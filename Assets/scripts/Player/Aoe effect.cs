@@ -2,6 +2,7 @@ using Photon.Pun;
 using UnityEngine;
 using System.Collections;
 using Photon.Realtime;
+using TMPro;
 
 public class AoEEffect : MonoBehaviourPunCallbacks
 {
@@ -30,7 +31,7 @@ public class AoEEffect : MonoBehaviourPunCallbacks
             foreach (Collider hit in hitColliders)
             {
                 Multiplayer player = hit.GetComponent<Multiplayer>();
-                if (player != null)
+                if (player != null && player.playerNameText.text != caster.NickName) //temp fix
                 {
                     Debug.Log($"[AoEEffect] {player.playerNameText.text} hit! Applying {damage} damage.");
                     player.ApplyAoEDamage(damage, caster);

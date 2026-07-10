@@ -10,7 +10,7 @@ public class BulletController : MonoBehaviour
     public float bulletSpeed = 15f;
     public GameObject bulletImpactEffect;
     public AudioClip BulletHitAudio;
-    public int damage = 10;
+    public int damage = 30;
 
     // Start is called before the first frame update
     void Awake()

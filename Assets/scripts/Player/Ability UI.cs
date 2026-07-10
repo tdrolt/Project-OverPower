@@ -42,44 +42,51 @@ public class AbilityUIManager : MonoBehaviour
         dashWithBuffButton.onClick.AddListener(EnableDashWithBuff);
         dashWithProjectileButton.onClick.AddListener(EnableDashWithProjectile);
         aoeButton.onClick.AddListener(EnableAOE);
-        shootingButton.onClick.AddListener(EnableShooting);
+        //shootingButton.onClick.AddListener(EnableShooting);
+        shootingAbility.enabled = true;
     }
 
     void EnableDash()
     {
-        DisableAllAbilities();
+        playerDashWithBuff.enabled = false;
+        playerDashWithProjectile.enabled = false;
+        aoeAbility.enabled = false;
+
         playerDash.enabled = true;
     }
 
     void EnableDashWithBuff()
     {
-        DisableAllAbilities();
+        playerDash.enabled = false;
+        playerDashWithProjectile.enabled = false;
+        aoeAbility.enabled = false;
+
         playerDashWithBuff.enabled = true;
     }
 
     void EnableDashWithProjectile()
     {
-        DisableAllAbilities();
+        playerDash.enabled = false;
+        playerDashWithBuff.enabled = false;
+        aoeAbility.enabled = false;
+
         playerDashWithProjectile.enabled = true;
     }
 
     void EnableAOE()
     {
-        DisableAllAbilities();
-        aoeAbility.enabled = true;
-    }
-
-    void EnableShooting()
-    {
-        DisableAllAbilities();
-        shootingAbility.enabled = true;
-    }
-
-    void DisableAllAbilities()
-    {
         playerDash.enabled = false;
         playerDashWithBuff.enabled = false;
         playerDashWithProjectile.enabled = false;
-        aoeAbility.enabled = false;
+
+        aoeAbility.enabled = true;
     }
+
+    /*void EnableShooting()
+    {
+        
+        shootingAbility.enabled = true;
+    }
+    */
+   
 }

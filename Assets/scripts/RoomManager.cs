@@ -18,13 +18,28 @@ public class RoomManager : MonoBehaviourPunCallbacks
     public override void OnConnectedToMaster()
     {
         Debug.Log("Connected to Photon Master");
+        // Do not join lobby here anymore
+    }
+
+    // ✅ Called from UI when "Join Game" is pressed
+    public void JoinGame()
+    {
         PhotonNetwork.JoinLobby();
     }
 
     public override void OnJoinedLobby()
     {
         Debug.Log("Joined Lobby");
-        PhotonNetwork.JoinOrCreateRoom("MainRoom", new RoomOptions(), TypedLobby.Default);
+        PhotonNetwork.JoinRandomRoom();
+    }
+
+    public override void OnJoinRandomFailed(short returnCode, string message)
+    {
+        Debug.Log("No room found, creating one.");
+        string roomName = "Room_" + Random.Range(1000, 9999);
+        RoomOptions options = new RoomOptions();
+        options.MaxPlayers = 9;
+        PhotonNetwork.CreateRoom(roomName, options, TypedLobby.Default);
     }
 
     public override void OnJoinedRoom()
@@ -35,14 +50,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     void AssignTeamAndSpawnPlayer()
     {
-        // Get team ID based on join order (0,1,2,0,1,2...)
         int teamID = (PhotonNetwork.LocalPlayer.ActorNumber - 1) % 3;
         Debug.Log($"Assigned Team: {teamID}");
 
-        // Validate prefabs and spawn points
         if (!ValidateTeamResources(teamID)) return;
 
-        // Spawn player with team-specific prefab
         GameObject player = PhotonNetwork.Instantiate(
             teamPlayerPrefabs[teamID].name,
             teamSpawnPoints[teamID].position,
@@ -82,7 +94,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
             Debug.LogWarning("Player prefab missing PlayerTeam component!");
         }
     }
-
 
     void UpdateNetworkProperties(int teamID)
     {

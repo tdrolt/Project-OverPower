@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp *)",
+      "Bash(node -e \"try{const c=require\\('os'\\).homedir\\(\\)+'/.claude.json';const j=require\\(c\\);console.log\\('mcpServers:',JSON.stringify\\(j.mcpServers||{},null,2\\)\\);if\\(j.projects\\){for\\(const p of Object.keys\\(j.projects\\)\\){if\\(j.projects[p].mcpServers&&Object.keys\\(j.projects[p].mcpServers\\).length\\){console.log\\('project',p,JSON.stringify\\(j.projects[p].mcpServers\\)\\)}}}}catch\\(e\\){console.log\\('err',e.message\\)}\")",
+      "mcp__UnityMCP__read_console"
+    ]
+  }
+}

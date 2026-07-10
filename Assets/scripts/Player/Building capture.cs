@@ -364,6 +364,12 @@ public class BuildingCapture : MonoBehaviourPun
                     adjacentCaptured = true;
                     break;
                 }
+
+                if (BuildingManager.Instance.CathedralBuildingIDs.ContainsKey(buildingID) && BuildingManager.Instance.CathedralBuildingIDs[buildingID] == player.teamID)
+                {
+                    adjacentCaptured = true;
+                    break;
+                }
             }
 
             if (adjacentCaptured == false)

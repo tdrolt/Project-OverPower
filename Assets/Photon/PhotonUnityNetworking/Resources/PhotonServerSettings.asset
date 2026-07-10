@@ -15,7 +15,7 @@ MonoBehaviour:
   AppSettings:
     AppIdRealtime: c631f6e2-20f6-4481-9984-6025e8f3596b
     AppIdFusion: 
-    AppIdChat: 
+    AppIdChat: 3902c4a1-066d-4946-8577-185f2d9a0a90
     AppIdVoice: 
     AppVersion: 
     UseNameServer: 1
@@ -64,6 +64,15 @@ MonoBehaviour:
   - RPC_UpdateTowerDictionary
   - RecaptureBuilding
   - RPC_PlayRecaptureSound
+  - RPC_HandleDeath
+  - RPC_HidePlayer
+  - RPC_HideWaitingPanelAll
+  - RPC_ShowPlayer
+  - RPC_ShowYouLostPanel
+  - RPC_ShowWaitingPanel
+  - RPC_HandleDeathMaster
+  - RPC_HandleRespawnMaster
+  - RPC_ShowYouWonPanel
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

@@ -6,9 +6,9 @@ public class AoEAbility : MonoBehaviourPunCallbacks
 {
     [Header("AoE Settings")]
     public GameObject aoePrefab;      // Networked prefab with AoEEffect attached
-    public float aoeDamage = 20f;     // Damage per tick
-    public float aoeDuration = 5f;    // Duration the AoE effect lasts (in seconds)
-    public float aoeRadius = 5f;      // Radius of the AoE effect
+    public float aoeDamage = 15f;     // Damage per tick
+    public float aoeDuration = 3f;    // Duration the AoE effect lasts (in seconds)
+    public float aoeRadius = 6f;      // Radius of the AoE effect
     public AudioClip SpellCastingAudio;
 
     [Header("Cooldown Settings")]
