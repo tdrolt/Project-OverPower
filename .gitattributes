@@ -7,7 +7,20 @@
 # and distributed under MIT License.
 
 # Define macros (only works in top-level gitattributes files)
-[attr]lfs               filter=lfs diff=lfs merge=lfs -text
+#
+# NOTE: LFS routing is intentionally disabled for this project.
+# This repository was created before .gitattributes was added, so every binary
+# asset already lives in normal Git history and "git lfs migrate" was never run.
+# With "filter=lfs" active, Git compares the real committed image against the
+# small pointer file LFS would generate, and reports every binary as a huge
+# phantom change (709 files, at last count). Keeping "-text" still marks these
+# files as binary, which is the part that actually matters here: no line-ending
+# mangling and no bogus text diffs.
+#
+# To enable LFS later: restore "filter=lfs diff=lfs merge=lfs -text" below,
+# then run "git lfs migrate import --include=..." to move the existing binaries
+# into LFS. Note this rewrites history and needs a force push.
+[attr]lfs               -text
 [attr]unity-json        eol=lf linguist-language=json
 [attr]unity-yaml        merge=unityyamlmerge eol=lf linguist-language=yaml
 
