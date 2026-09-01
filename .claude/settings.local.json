@@ -3,7 +3,25 @@
     "allow": [
       "Bash(claude mcp *)",
       "Bash(node -e \"try{const c=require\\('os'\\).homedir\\(\\)+'/.claude.json';const j=require\\(c\\);console.log\\('mcpServers:',JSON.stringify\\(j.mcpServers||{},null,2\\)\\);if\\(j.projects\\){for\\(const p of Object.keys\\(j.projects\\)\\){if\\(j.projects[p].mcpServers&&Object.keys\\(j.projects[p].mcpServers\\).length\\){console.log\\('project',p,JSON.stringify\\(j.projects[p].mcpServers\\)\\)}}}}catch\\(e\\){console.log\\('err',e.message\\)}\")",
-      "mcp__UnityMCP__read_console"
+      "mcp__UnityMCP__read_console",
+      "Bash(echo \"=== target dir ===\"; ls -la \"/c/Uni stuff/Y3/Minor Skilled/Resources\" 2>&1 | head -20 *)",
+      "Bash(markitdown \"Global Planning Sheet_V08-2021.xlsx\")",
+      "Bash(cd /tmp)",
+      "Bash(python -c ' *)",
+      "PowerShell(python -m pip install openpyxl --quiet 2>&1)",
+      "PowerShell(python -c \"import openpyxl; print\\('openpyxl', openpyxl.__version__\\)\")",
+      "Bash(python3 -c ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 python3 -c ' *)",
+      "Bash(mkdir -p \"/c/Uni stuff/Y3/Minor Skilled/Resources\" 2>&1 *)",
+      "Bash(python3 \"C:\\\\Users\\\\bascu\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\xlsx\\\\fill_sheet.py\")",
+      "Bash(python3 \"C:\\\\Users\\\\bascu\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\xlsx\\\\fix_semicolons.py\")",
+      "Bash(python3 -c \"import docx; print\\('python-docx available:', docx.__file__\\)\")",
+      "Bash(python3 -m pip install python-docx --quiet)",
+      "Bash(python3 -c \"import docx; print\\('OK', docx.__file__\\)\")",
+      "Bash(python3 \"C:\\\\Users\\\\bascu\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\xlsx\\\\build_overview_docx.py\")",
+      "Bash(python3 \"/c/Users/bascu/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/2b95ba27-2f75-45b7-84af-a64ba9e3fc0e/1a695a31-45bd-480a-b683-b91fb58cad70/skills/xlsx/scripts/recalc.py\" \"C:\\\\Uni stuff\\\\Y3\\\\Minor Skilled\\\\Resources\\\\Global Planning Sheet - Tudor Oltean.xlsx\" 60)",
+      "PowerShell(python \"C:\\\\Users\\\\bascu\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\2b95ba27-2f75-45b7-84af-a64ba9e3fc0e\\\\1a695a31-45bd-480a-b683-b91fb58cad70\\\\skills\\\\xlsx\\\\scripts\\\\recalc.py\" \"C:\\\\Uni stuff\\\\Y3\\\\Minor Skilled\\\\Resources\\\\Global Planning Sheet - Tudor Oltean.xlsx\" 60)",
+      "PowerShell(python \"C:\\\\Users\\\\bascu\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\xlsx\\\\skill_scripts\\\\recalc.py\" \"C:\\\\Uni stuff\\\\Y3\\\\Minor Skilled\\\\Resources\\\\Global Planning Sheet - Tudor Oltean.xlsx\" 60)"
     ]
   }
 }
