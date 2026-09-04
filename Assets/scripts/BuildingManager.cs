@@ -23,7 +23,15 @@ public class BuildingManager : MonoBehaviourPun
 
     public void UpdateTowerDictionary(bool value, int controllingTeam, int buildingID)
     {
-        photonView.RPC("RPC_UpdateTowerDictionary", RpcTarget.All, value, controllingTeam, buildingID);
+        // AllBuffered, not All: a player joining mid-match must receive every ownership change
+        // that already happened, otherwise their TowerDictionary only has the scene defaults and
+        // the adjacency gate in BuildingCapture.OnTriggerEnter refuses to let them capture
+        // anything next to a tower their team took before they joined.
+        //
+        // Buffered RPCs accumulate for the room's lifetime. With 9 towers in a prototype match
+        // that is fine; if capture churn ever gets high, replicate ownership through Room Custom
+        // Properties instead of a buffered call per change.
+        photonView.RPC("RPC_UpdateTowerDictionary", RpcTarget.AllBuffered, value, controllingTeam, buildingID);
     }
 
     [PunRPC]

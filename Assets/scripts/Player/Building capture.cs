@@ -12,7 +12,14 @@ public class BuildingCapture : MonoBehaviourPun
     public float captureThreshold = 100f;
     public float baseCaptureRate = 20f;
     public float captureRadius = 10f;
-    public float decayRate = 10f;
+    // Seconds to drain a fully captured tower back to neutral once an undefended enemy holds it.
+    // Replaces the old 'decayRate' field, which nothing read: the decay was hardcoded as
+    // captureThreshold / 5f, so changing decayRate in the Inspector did nothing at all.
+    // 5 here reproduces the previous behaviour exactly.
+    public float decaySeconds = 5f;
+
+    // Seconds a neutralised tower cannot be recaptured. Was hardcoded in CooldownRoutine.
+    public float recaptureCooldownSeconds = 5f;
 
     [Header("Visual Settings")]
     public Renderer flagRenderer;
@@ -61,7 +68,6 @@ public class BuildingCapture : MonoBehaviourPun
         if (collider)
         {
             collider.radius = captureRadius;
-            Debug.Log($"[BuildingCapture] Collider radius set to {captureRadius}.");
         }
         else
         {
@@ -74,8 +80,6 @@ public class BuildingCapture : MonoBehaviourPun
         audioSource = GetComponent<AudioSource>();
         if (!audioSource)
             Debug.LogWarning("[BuildingCapture] Missing AudioSource component!");
-        else
-            Debug.Log("[BuildingCapture] AudioSource initialized.");
     }
 
     void ResetFlag()
@@ -83,7 +87,6 @@ public class BuildingCapture : MonoBehaviourPun
         if (flagRenderer && neutralMaterial)
         {
             flagRenderer.material = neutralMaterial;
-            Debug.Log("[BuildingCapture] Flag reset to neutral.");
         }
         else
         {
@@ -95,22 +98,21 @@ public class BuildingCapture : MonoBehaviourPun
     {
         if (!PhotonNetwork.IsMasterClient) return;
 
-        foreach (var p in playersInZone)
-        {
-            Debug.Log($"[BuildingCapture] Player in zone: TeamID {p.teamID}");
-        }
+        // A player who died or disconnected while standing in the ring leaves a destroyed
+        // reference behind: OnTriggerExit cannot fire for an object that no longer exists.
+        // Every consumer below reads p.teamID, so one stale entry throws a
+        // MissingReferenceException every frame and the capture system stops working for the
+        // rest of the match. Unity's == treats a destroyed object as null, so this catches both
+        // the destroyed and the disconnected case.
+        playersInZone.RemoveAll(p => p == null);
 
         if (isCaptured)
         {
-            Debug.Log($"[BuildingCapture] Is Captured");
-            HandleCapturedState(); // NEW: now handles recapture decay if enemy present
+            HandleCapturedState(); // handles recapture decay if an enemy is present
             return;
         }
 
-        Debug.Log($"[BuildingCapture] Checking Cooldown");
         if (isOnCooldown) return;
-
-        Debug.Log($"[BuildingCapture] Entering Calculate Capture Progress");
 
         CalculateCaptureProgress();
     }
@@ -161,14 +163,13 @@ public class BuildingCapture : MonoBehaviourPun
     {
         isDecaying = true;
         captureProgress = captureThreshold;
-        // Decay started – progress resets to threshold.
+        // Decay started ï¿½ progress resets to threshold.
     }
 
     void UpdateDecay()
     {
-        float decayStep = (captureThreshold / 5f) * Time.deltaTime;
-        captureProgress -= decayStep;
-        Debug.Log($"[BuildingCapture] Recapture decay... New progress: {captureProgress} (-{decayStep} per frame).");
+        float seconds = Mathf.Max(0.01f, decaySeconds);
+        captureProgress -= (captureThreshold / seconds) * Time.deltaTime;
     }
 
     void NeutralizeBuilding()
@@ -199,7 +200,7 @@ public class BuildingCapture : MonoBehaviourPun
     IEnumerator CooldownRoutine()
     {
         isOnCooldown = true;
-        yield return new WaitForSeconds(5f);
+        yield return new WaitForSeconds(recaptureCooldownSeconds);
         isOnCooldown = false;
     }
 
@@ -221,8 +222,6 @@ public class BuildingCapture : MonoBehaviourPun
             captureProgress += contribution;
             captureProgress = Mathf.Clamp(captureProgress, 0, captureThreshold);
 
-            Debug.Log($"[BuildingCapture] {count} eligible player(s) capturing. Progress increased by {contribution}, now at {captureProgress}.");
-
             // Start the capturing sound only if progress is increasing
             if (!audioSource.isPlaying && captureProgress > 0 && captureProgress < captureThreshold)
             {
@@ -238,7 +237,7 @@ public class BuildingCapture : MonoBehaviourPun
         }
         else
         {
-            //ApplyDecay();
+
 
             // Stop the capturing sound if no eligible players are capturing
             if (audioSource.isPlaying)
@@ -337,61 +336,62 @@ public class BuildingCapture : MonoBehaviourPun
         }
     }
 
-    void ApplyDecay()
-    {
-        float decayStep = decayRate * Time.deltaTime;
-        captureProgress -= decayStep;
-        captureProgress = Mathf.Max(captureProgress, 0);
-    }
-
     void OnTriggerEnter(Collider other)
     {
         var player = other.GetComponent<PlayerTeam>();
-        if (player)
+        if (!player) return;
+
+        BuildingManager manager = BuildingManager.Instance;
+        if (manager == null) return;
+
+        // Your own capital is always enterable. This test used to sit INSIDE the loop below, so
+        // it could only be reached by a tower that has at least one adjacent, and it was
+        // re-evaluated once per adjacent. A tower with an empty Adjacents list was therefore
+        // uncapturable by anyone -- worth knowing before the Tier-4 centre zone is added.
+        bool allowed = manager.CathedralBuildingIDs.TryGetValue(buildingID, out int capitalOwner)
+                       && capitalOwner == player.teamID;
+
+        if (!allowed)
         {
-
-            var adjacents = BuildingManager.Instance.TowerDictionary[buildingID].Adjacents;
-
-            bool adjacentCaptured = false;
-
-            foreach (var adjacent in adjacents)
+            // Guarded: the dictionary indexer logs an error and hands back a default TowerData
+            // for a missing key, which silently reads as "neutral, owned by nobody".
+            if (!manager.TowerDictionary.ContainsKey(buildingID))
             {
-                TowerData adjacentTowerData = BuildingManager.Instance.TowerDictionary[adjacent];
-
-                if (adjacentTowerData.isCaptured && adjacentTowerData.controllingTeam == player.teamID)
-                {
-                    //Debug.Log($"[OnTriggerEnter] Captured Adjacent Detected: {}.");
-                    adjacentCaptured = true;
-                    break;
-                }
-
-                if (BuildingManager.Instance.CathedralBuildingIDs.ContainsKey(buildingID) && BuildingManager.Instance.CathedralBuildingIDs[buildingID] == player.teamID)
-                {
-                    adjacentCaptured = true;
-                    break;
-                }
-            }
-
-            if (adjacentCaptured == false)
+                Debug.LogWarning($"[BuildingCapture] Tower {buildingID} is missing from the TowerDictionary.");
                 return;
-
-            if (capturingID == -1)
-                capturingID = player.teamID;
-
-            // NEW: No immediate reset if enemy enters; the recapture decay is now handled in HandleCapturedState.
-            // We still update the capturingID if needed.            
-            photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, player.teamID);
-
-            if (player.photonView.IsMine)
-            {
-                Debug.Log($"[OnTriggerEnter] Player from team {player.teamID} entered zone and matches capturingID {capturingID}.");
-                Debug.Log($"[OnTriggerEnter] Player's PhotonView ViewID: {player.photonView.ViewID}");
-                photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, player.photonView.ViewID);
             }
-            else if (player.photonView.IsMine)
+
+            var adjacents = manager.TowerDictionary[buildingID].Adjacents;
+            if (adjacents != null)
             {
-                Debug.Log($"[OnTriggerEnter] Player from team {player.teamID} entered zone but does NOT match capturingID {capturingID}.");
+                foreach (var adjacent in adjacents)
+                {
+                    if (!manager.TowerDictionary.ContainsKey(adjacent))
+                        continue;
+
+                    TowerData adjacentTowerData = manager.TowerDictionary[adjacent];
+                    if (adjacentTowerData.isCaptured && adjacentTowerData.controllingTeam == player.teamID)
+                    {
+                        allowed = true;
+                        break;
+                    }
+                }
             }
+        }
+
+        if (!allowed)
+            return;
+
+        if (capturingID == -1)
+            capturingID = player.teamID;
+
+        // No immediate reset if an enemy enters; recapture decay is handled in HandleCapturedState.
+        photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, player.teamID);
+
+        if (player.photonView.IsMine)
+        {
+            Debug.Log($"[BuildingCapture] Team {player.teamID} entered tower {buildingID} (capturingID {capturingID}).");
+            photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, player.photonView.ViewID);
         }
     }
 
