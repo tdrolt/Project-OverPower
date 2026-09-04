@@ -12,6 +12,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     void Start()
     {
+        // Default is 10 Hz, which makes the remote position a staircase updating once per
+        // 100 ms. 20 Hz halves that interval and is the single cheapest smoothness win.
+        // Must stay <= SendRate (default 30).
+        PhotonNetwork.SerializationRate = 20;
+
         PhotonNetwork.ConnectUsingSettings();
     }
 
