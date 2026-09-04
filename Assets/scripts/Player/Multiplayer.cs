@@ -9,6 +9,9 @@ using System.Linq;
 public class Multiplayer : MonoBehaviour, IPunObservable
 {
     public float movementSpeed = 5f;
+    // Captured at Start so death (which sets speed to 0) and respawn can restore whatever the
+    // prefab actually says, instead of a second hardcoded number that disagrees with it.
+    private float startingMovementSpeed;
     private Rigidbody rigidbody;
 
     public float fireRate = 0.75f;
@@ -61,6 +64,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable
     void Start()
     {
         rigidbody = GetComponent<Rigidbody>();
+        startingMovementSpeed = movementSpeed;
         photonView = GetComponent<PhotonView>();
         playerShooting = GetComponent<PlayerShooting>();
         playerDash = GetComponent<PlayerDash>();
@@ -445,7 +449,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable
         if (rigidbody != null)
         {
             rigidbody.linearVelocity = Vector3.zero;
-            movementSpeed = 10f;
+            movementSpeed = startingMovementSpeed;
         }
 
 /*        int prevTeamDeadCount = teamDeadCount[teamID];
