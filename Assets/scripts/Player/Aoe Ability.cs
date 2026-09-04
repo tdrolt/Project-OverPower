@@ -39,7 +39,12 @@ public class AoEAbility : MonoBehaviourPunCallbacks
             Vector3 targetPos = ray.GetPoint(rayDistance);
 
             // Spawn the AoE effect prefab via Photon
-            GameObject aoeObj = PhotonNetwork.Instantiate(aoePrefab.name, targetPos, Quaternion.identity);
+            // The caster travels as instantiation data so EVERY client knows who cast this.
+            // Previously it was only assigned on the casting client, so remote copies had a null
+            // caster and dereferenced it on the first tick.
+            GameObject aoeObj = PhotonNetwork.Instantiate(
+                aoePrefab.name, targetPos, Quaternion.identity, 0,
+                new object[] { photonView.OwnerActorNr });
             
             // Configure the AoE effect with the desired parameters
             AoEEffect effect = aoeObj.GetComponent<AoEEffect>();

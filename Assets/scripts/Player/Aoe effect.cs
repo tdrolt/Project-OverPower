@@ -4,7 +4,7 @@ using System.Collections;
 using Photon.Realtime;
 using TMPro;
 
-public class AoEEffect : MonoBehaviourPunCallbacks
+public class AoEEffect : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallback
 {
     public float damage = 20f;       // Damage per tick
     public float duration = 5f;      // Total duration of the effect
@@ -15,6 +15,17 @@ public class AoEEffect : MonoBehaviourPunCallbacks
     public Player caster; 
 
     private float elapsedTime = 0f;
+
+    // Runs on every client the moment PhotonNetwork.Instantiate creates this object, before Start.
+    public void OnPhotonInstantiate(PhotonMessageInfo info)
+    {
+        object[] data = info.photonView.InstantiationData;
+        if (data != null && data.Length > 0 && data[0] is int actorNumber)
+            caster = PhotonNetwork.CurrentRoom?.GetPlayer(actorNumber);
+
+        if (caster == null)
+            caster = info.Sender;
+    }
 
     void Start()
     {
@@ -30,12 +41,12 @@ public class AoEEffect : MonoBehaviourPunCallbacks
             Collider[] hitColliders = Physics.OverlapSphere(transform.position, radius);
             foreach (Collider hit in hitColliders)
             {
+                // Friend-or-foe used to be a nickname string comparison against a caster that was
+                // null on every non-casting client. Multiplayer.ApplyAoEDamage now owns that
+                // decision (ownership, self-hit and team), so there is one place that decides.
                 Multiplayer player = hit.GetComponent<Multiplayer>();
-                if (player != null && player.playerNameText.text != caster.NickName) //temp fix
-                {
-                    Debug.Log($"[AoEEffect] {player.playerNameText.text} hit! Applying {damage} damage.");
+                if (player != null)
                     player.ApplyAoEDamage(damage, caster);
-                }
             }
             yield return new WaitForSeconds(tickInterval);
             elapsedTime += tickInterval;

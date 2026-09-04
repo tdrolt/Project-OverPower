@@ -17,6 +17,10 @@ public class PlayerDashWithProjectile : MonoBehaviourPun
     public int projectileDamage = 20;
     public Transform bulletSpawnPosition;
 
+    [Header("Obstacle Detection")]
+    // Adjust this to roughly match your player's collider radius.
+    public float dashColliderRadius = 0.5f;
+
     private bool isDashing = false;
     private float lastDashTime = -Mathf.Infinity;
     private Rigidbody rb;
@@ -24,6 +28,7 @@ public class PlayerDashWithProjectile : MonoBehaviourPun
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     }
 
     public bool CanDash()
@@ -54,16 +59,35 @@ public class PlayerDashWithProjectile : MonoBehaviourPun
         Vector3 startPosition = rb.position;
         Vector3 targetPosition = startPosition + inputDirection.normalized * dashDistance;
         float elapsedTime = 0f;
+        bool hitObstacle = false;
 
         while (elapsedTime < dashDuration)
         {
             float t = elapsedTime / dashDuration;
             Vector3 newPosition = Vector3.Lerp(startPosition, targetPosition, Mathf.SmoothStep(0f, 1f, t));
+
+            // Obstacle check, restored to match Dash.cs and Dash with buff.cs. This was lost in
+            // the copy-paste that created this file, which is why this dash went through walls.
+            Vector3 moveDirection = (newPosition - rb.position).normalized;
+            float moveDistance = (newPosition - rb.position).magnitude;
+            RaycastHit hit;
+            if (Physics.SphereCast(rb.position, dashColliderRadius, moveDirection, out hit, moveDistance))
+            {
+                rb.MovePosition(hit.point);
+                hitObstacle = true;
+                break;
+            }
+
             rb.MovePosition(newPosition);
             elapsedTime += Time.deltaTime;
             yield return null;
         }
-        rb.MovePosition(targetPosition);
+
+        if (!hitObstacle)
+        {
+            rb.MovePosition(targetPosition);
+        }
+
         isDashing = false;
 
         // Wait before spawning the projectile

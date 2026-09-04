@@ -317,7 +317,35 @@ public class Multiplayer : MonoBehaviour, IPunObservable
         if (bullet.owner != null && bullet.owner == photonView.Owner)
             return;
 
+        // No friendly fire.
+        if (IsSameTeam(bullet.owner, photonView.Owner))
+            return;
+
         TakeDamage(bullet);
+    }
+
+    /// True only when both players are known and share a teamID. Deliberately fails OPEN:
+    /// if either team is unknown, damage still applies, because an unknown state silently
+    /// making someone invulnerable is far worse to debug than one stray friendly-fire hit.
+    static bool IsSameTeam(Photon.Realtime.Player a, Photon.Realtime.Player b)
+    {
+        if (a == null || b == null)
+            return false;
+        if (a == b)
+            return true;
+
+        return TryGetTeam(a, out int teamA) && TryGetTeam(b, out int teamB) && teamA == teamB;
+    }
+
+    static bool TryGetTeam(Photon.Realtime.Player player, out int teamID)
+    {
+        teamID = -1;
+        if (player != null && player.CustomProperties.TryGetValue("teamID", out object raw) && raw is int value)
+        {
+            teamID = value;
+            return true;
+        }
+        return false;
     }
 
     void TakeDamage(MultiplayerBulletController bullet)
@@ -345,6 +373,17 @@ public class Multiplayer : MonoBehaviour, IPunObservable
 
     public void ApplyAoEDamage(float damage, Photon.Realtime.Player caster)
     {
+        // Same single-authority rule as bullets: only the player being hit decides.
+        if (!photonView.IsMine)
+            return;
+
+        if (caster == null)
+            return;
+
+        // Your own AoE does not hurt you, and neither does a teammate's.
+        if (caster == photonView.Owner || IsSameTeam(caster, photonView.Owner))
+            return;
+
         health -= (int)damage;
         healthBar.value = health;
         Debug.Log($"[Multiplayer] {playerNameText.text} took {damage} AoE damage. Remaining health: {health}");
