@@ -393,7 +393,12 @@ public class Multiplayer : MonoBehaviour, IPunObservable
 
         if (!cathedralTower.isCaptured || cathedralTower.controllingTeam != teamID)
         {
-            Debug.LogWarning($"[Multiplayer] Team {teamID} lost their base. Sending death RPC...");
+            // NOTE: this branch hides the player permanently -- no respawn, no RPC_ShowPlayer.
+            // It reads TowerDictionary, which is replicated with RpcTarget.All (not AllBuffered),
+            // so a client with a stale tower state can take this branch when it should not. That
+            // is a live suspect for "sometimes I cannot see enemies anymore".
+            Debug.LogWarning($"[VIS] PERMANENT DEATH  team={teamID} base={baseBuildingID} " +
+                             $"isCaptured={cathedralTower.isCaptured} controllingTeam={cathedralTower.controllingTeam}");
 
             photonView.RPC("RPC_HandleDeath", RpcTarget.All, teamID);
             photonView.RPC("RPC_HandleDeathMaster", RpcTarget.MasterClient, teamID, actorNumber);       
@@ -420,7 +425,9 @@ public class Multiplayer : MonoBehaviour, IPunObservable
         Debug.Log($"{playerNameText.text} has been revived after recapture!");
 
 
-        waitingPanel.SetActive(false);
+        // Null-guarded: an NRE here would kill the coroutine after the 5s wait but BEFORE
+        // RPC_ShowPlayer below, leaving the player hidden on every client forever.
+        waitingPanel?.SetActive(false);
 
         RoomManager roomManager = FindObjectOfType<RoomManager>();
         if (roomManager != null && roomManager.teamSpawnPoints.Length > teamID)
@@ -582,6 +589,8 @@ public class Multiplayer : MonoBehaviour, IPunObservable
             rigidbody.linearVelocity = Vector3.zero;
             movementSpeed = 0f;
         }
+
+        Debug.Log($"[VIS] HandleDeath  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");
     }
 
     [PunRPC]
@@ -702,5 +711,13 @@ public class Multiplayer : MonoBehaviour, IPunObservable
     {
         if (playerMesh != null)
             playerMesh.SetActive(true);
+
+        // RPC_HandleDeath moves the whole hierarchy to the DeadPlayer layer on EVERY client, but
+        // the reset lived only in RespawnPlayer, which runs on the owner. Remote copies stayed on
+        // DeadPlayer permanently, where the collision matrix ignores Building. Restore it here so
+        // hide and show are symmetric.
+        SetLayerRecursively(gameObject, LayerMask.NameToLayer("Default"));
+
+        Debug.Log($"[VIS] ShowPlayer  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");
     }
 }
