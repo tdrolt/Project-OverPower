@@ -17,7 +17,7 @@ GameObject:
   - component: {fileID: -3987078801300396147}
   - component: {fileID: 6785381916098770548}
   - component: {fileID: 7313011507356542698}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: MultiplayerBullet
   m_TagString: Bullet
   m_Icon: {fileID: 0}
@@ -100,7 +100,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2498108459180963871}
   serializedVersion: 4
-  m_Mass: 1
+  m_Mass: 0.001
   m_Drag: 0
   m_AngularDrag: 0.05
   m_CenterOfMass: {x: 0, y: 0, z: 0}
