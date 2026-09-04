@@ -47,6 +47,8 @@ public class BuildingCapture : MonoBehaviourPun
 
     void Start()
     {
+        BuildingManager.Instance.RegisterCapture(buildingID, this);
+
         ConfigureCollider();
         InitializeAudio();
         if (BuildingManager.Instance.CathedralBuildingIDs.ContainsKey(buildingID))
@@ -59,6 +61,15 @@ public class BuildingCapture : MonoBehaviourPun
         }
         else
             ResetFlag();
+
+        // A buffered ownership call can arrive before this component existed to be notified, so
+        // read the current replicated state once here rather than relying only on being told.
+        if (BuildingManager.Instance.TowerDictionary.ContainsKey(buildingID))
+        {
+            TowerData current = BuildingManager.Instance.TowerDictionary[buildingID];
+            ApplyOwnerVisual(current.isCaptured, current.controllingTeam);
+        }
+
         Debug.Log($"[BuildingCapture] Building ready with capturingID {capturingID}. Waiting for rightful team to show up.");
     }
 
@@ -180,21 +191,10 @@ public class BuildingCapture : MonoBehaviourPun
         controllingTeam = -1;
         isCaptured = false;
         isDecaying = false;
-        photonView.RPC("RPC_UpdateFlag", RpcTarget.All, -1);
-        PlayNeutralizationSound(); // Play neutralization sound when neutralizing the building
+        // No RPC_UpdateFlag here: UpdateBuildingManager(false) above already replicated the
+        // ownership change, and the flag follows that.
+        PlayNeutralizationSound();
         StartCoroutine(CooldownRoutine());
-    }
-
-    // Kept the old recapture method, though now it's not used directly.
-    [PunRPC]
-    void RecaptureBuilding()
-    {
-        controllingTeam = -1;
-        isCaptured = false;
-        isDecaying = false;
-        captureProgress = 0f;
-        photonView.RPC("RPC_UpdateFlag", RpcTarget.All, -1);
-        Debug.Log("[RecaptureBuilding] Building reset for recapture.");
     }
 
     IEnumerator CooldownRoutine()
@@ -315,25 +315,13 @@ public class BuildingCapture : MonoBehaviourPun
         BuildingManager.Instance.UpdateTowerDictionary(value, controllingTeam, buildingID);
     }
 
+    // Sound only. The flag is no longer set here: it follows replicated ownership via
+    // BuildingManager, so a late joiner gets the right colour without needing this call.
     [PunRPC]
     void RPC_CompleteCapture(int teamID)
     {
-        Material mat = GetTeamMaterial(teamID);
-
-        if (flagRenderer)
-        {
-            flagRenderer.material = mat;
-            Debug.Log($"[RPC_CompleteCapture] Flag updated to material {mat.name} for team {teamID}.");
-        }
-        else
-        {
-            Debug.LogWarning("[RPC_CompleteCapture] Missing flagRenderer!");
-        }
-        if (audioSource)
-        {
+        if (audioSource && capturedSound)
             audioSource.PlayOneShot(capturedSound);
-            Debug.Log("[RPC_CompleteCapture] Played captured sound.");
-        }
     }
 
     void OnTriggerEnter(Collider other)
@@ -527,18 +515,17 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
 
-    [PunRPC]
-    void RPC_UpdateFlag(int teamID)
+    /// Sets the flag to match replicated ownership. Called on every client from
+    /// BuildingManager.RPC_UpdateTowerDictionary, so the flag always follows the state rather
+    /// than arriving as its own message that a late joiner never receives.
+    /// Takes 'captured' separately because the dictionary keeps the previous owner's team id
+    /// after a neutralise -- it is set to false before controllingTeam is cleared.
+    public void ApplyOwnerVisual(bool captured, int teamID)
     {
-        if (flagRenderer)
-        {
-            flagRenderer.material = GetTeamMaterial(teamID);
-            Debug.Log($"[RPC_UpdateFlag] Flag updated to {(teamID == -1 ? "neutral" : $"team {teamID}")} material.");
-        }
-        else
-        {
-            Debug.LogWarning("[RPC_UpdateFlag] Missing flagRenderer!");
-        }
+        if (!flagRenderer)
+            return;
+
+        flagRenderer.material = GetTeamMaterial(captured ? teamID : -1);
     }
 
     Material GetTeamMaterial(int teamID)

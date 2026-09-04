@@ -9,6 +9,17 @@ public class BuildingManager : MonoBehaviourPun
    
     [SerializeField] public SerializableDictionary<int, TowerData> TowerDictionary;
     public Dictionary<int, int> CathedralBuildingIDs = new Dictionary<int, int>() { { 6, 0 }, { 7, 1 }, { 8, 2 } };
+
+    // Towers register themselves here so ownership changes can drive their flag colour.
+    // TowerData.Building exists for this but is null on all nine towers in the scene, and a new
+    // tower (the planned Tier-4 centre) would need remembering to wire up by hand. Registering
+    // is one line in BuildingCapture.Start and cannot be forgotten.
+    private readonly Dictionary<int, BuildingCapture> captures = new Dictionary<int, BuildingCapture>();
+
+    public void RegisterCapture(int buildingID, BuildingCapture capture)
+    {
+        captures[buildingID] = capture;
+    }
       
     void Awake()
     {
@@ -46,6 +57,12 @@ public class BuildingManager : MonoBehaviourPun
 
         TowerDictionary.Remove(buildingID);
         TowerDictionary.Add(buildingID, towerData);
+
+        // The flag is presentation derived from this state, not a separate message. Driving it
+        // from here means a late joiner replaying the buffered ownership call also gets the
+        // right flag colour, instead of ownership being correct while the map looks wrong.
+        if (captures.TryGetValue(buildingID, out BuildingCapture capture) && capture != null)
+            capture.ApplyOwnerVisual(value, controllingTeam);
     }
 }
 
