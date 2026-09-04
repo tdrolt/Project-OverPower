@@ -74,7 +74,7 @@ public class PlayerDashWithProjectile : MonoBehaviourPun
     }
 
     [PunRPC]
-    void RPC_SpawnProjectile()
+    void RPC_SpawnProjectile(PhotonMessageInfo info)
     {
         if (projectilePrefab == null || bulletSpawnPosition == null)
         {
@@ -102,7 +102,10 @@ public class PlayerDashWithProjectile : MonoBehaviourPun
         if (bulletController != null)
         {
             bulletController.damage = projectileDamage;
-            bulletController.owner = PhotonNetwork.LocalPlayer;
+            // Ownership must come from the sender, never PhotonNetwork.LocalPlayer: inside an RPC
+            // body that resolves to whoever RECEIVED it, so every machine credited the projectile
+            // to itself. That also made the new self-damage check treat it as your own bullet.
+            bulletController.owner = info.Sender;
         }
 
         Debug.Log("[PlayerDashWithProjectile] Projectile spawned via RPC!");

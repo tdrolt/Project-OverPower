@@ -296,11 +296,24 @@ public class Multiplayer : MonoBehaviour, IPunObservable
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (collision.gameObject.CompareTag("Bullet"))
-        {
-            MultiplayerBulletController bullet = collision.gameObject.GetComponent<MultiplayerBulletController>();
-            TakeDamage(bullet);
-        }
+        // Only the player being hit decides that they were hit. Without this, every client
+        // subtracted health from its own copy of the victim and the owner's next serialization
+        // put it back, so the health bar visibly fought itself.
+        if (!photonView.IsMine)
+            return;
+
+        if (!collision.gameObject.CompareTag("Bullet"))
+            return;
+
+        MultiplayerBulletController bullet = collision.gameObject.GetComponent<MultiplayerBulletController>();
+        if (bullet == null)
+            return;
+
+        // Your own bullet cannot hurt you (dash in front of your own shot).
+        if (bullet.owner != null && bullet.owner == photonView.Owner)
+            return;
+
+        TakeDamage(bullet);
     }
 
     void TakeDamage(MultiplayerBulletController bullet)
