@@ -62,7 +62,25 @@ public class DebugOverlay : MonoBehaviour
         if (!isProblem && Filters.Length > 0 && !MatchesFilter(message))
             return;
 
-        Add(isProblem ? $"{type}: {message}" : message);
+        if (!isProblem)
+        {
+            Add(message);
+            return;
+        }
+
+        // Errors and exceptions carry the first couple of stack frames, otherwise a
+        // NullReferenceException in a build tells you nothing about where it came from.
+        Add($"{type}: {message}");
+
+        if (string.IsNullOrEmpty(stackTrace))
+            return;
+
+        string[] frames = stackTrace.Split('\n');
+        for (int i = 0; i < frames.Length && i < 2; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(frames[i]))
+                Add("    at " + frames[i].Trim());
+        }
     }
 
     static bool MatchesFilter(string message)

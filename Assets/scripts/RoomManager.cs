@@ -55,8 +55,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     void AssignTeamAndSpawnPlayer()
     {
-        int teamID = (PhotonNetwork.LocalPlayer.ActorNumber - 1) % 3;
-        Debug.Log($"Assigned Team: {teamID}");
+        int teamID = PickSmallestTeam();
+        Debug.Log($"[TEAM] assigned team {teamID} on join");
 
         if (!ValidateTeamResources(teamID)) return;
 
@@ -83,6 +83,42 @@ public class RoomManager : MonoBehaviourPunCallbacks
             return false;
         }
         return true;
+    }
+
+    /// Teams used to be (ActorNumber - 1) % 3. Photon never reuses actor numbers, so one player
+    /// reconnecting got a fresh number and the split skewed permanently -- that is how a team
+    /// ended up with four players while others had spare slots.
+    ///
+    /// Counting who is actually here handles reconnects, because a player who left stops being
+    /// counted. Known limitation: two people joining in the same instant can both read the same
+    /// counts and pick the same team, leaving it one over. Photon's check-and-swap on Room
+    /// Properties would close that, but it is not worth the complexity for a nine-player
+    /// prototype where people join over Discord.
+    int PickSmallestTeam()
+    {
+        int[] counts = new int[3];
+
+        foreach (var p in PhotonNetwork.PlayerList)
+        {
+            if (p == PhotonNetwork.LocalPlayer)
+                continue;
+
+            if (p.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out object raw)
+                && raw is int team && team >= 0 && team < counts.Length)
+            {
+                counts[team]++;
+            }
+        }
+
+        int smallest = 0;
+        for (int i = 1; i < counts.Length; i++)
+        {
+            if (counts[i] < counts[smallest])
+                smallest = i;
+        }
+
+        Debug.Log($"[TEAM] current split {counts[0]}/{counts[1]}/{counts[2]} -> joining team {smallest}");
+        return smallest;
     }
 
     void SetupPlayerTeamComponent(GameObject player, int teamID)

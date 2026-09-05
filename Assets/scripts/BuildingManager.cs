@@ -16,6 +16,9 @@ public class BuildingManager : MonoBehaviourPun
     // is one line in BuildingCapture.Start and cannot be forgotten.
     private readonly Dictionary<int, BuildingCapture> captures = new Dictionary<int, BuildingCapture>();
 
+    // Latch, so the win is announced once rather than on every subsequent ownership change.
+    private bool territoryWinAnnounced = false;
+
     public void RegisterCapture(int buildingID, BuildingCapture capture)
     {
         captures[buildingID] = capture;
@@ -65,6 +68,48 @@ public class BuildingManager : MonoBehaviourPun
         // right flag colour, instead of ownership being correct while the map looks wrong.
         if (captures.TryGetValue(buildingID, out BuildingCapture capture) && capture != null)
             capture.ApplyOwnerVisual(value, controllingTeam);
+
+        CheckTerritoryWin();
+    }
+
+    /// The match previously ended only when every player of every other team was dead at the same
+    /// instant, which almost never happens once people are respawning. Holding all three capitals
+    /// now also wins. Both conditions are live: whichever happens first ends the match.
+    void CheckTerritoryWin()
+    {
+        if (!PhotonNetwork.IsMasterClient || territoryWinAnnounced)
+            return;
+
+        int owner = -1;
+
+        foreach (var capital in CathedralBuildingIDs)
+        {
+            if (!TowerDictionary.TryGetValue(capital.Key, out TowerData tower) || !tower.isCaptured)
+                return;
+
+            if (owner == -1)
+                owner = tower.controllingTeam;
+            else if (owner != tower.controllingTeam)
+                return;
+        }
+
+        if (owner < 0)
+            return;
+
+        territoryWinAnnounced = true;
+        photonView.RPC("RPC_TerritoryWin", RpcTarget.All, owner);
+    }
+
+    [PunRPC]
+    private void RPC_TerritoryWin(int winningTeam)
+    {
+        Debug.Log($"[TOWER] territory win: team {winningTeam} holds every capital");
+
+        PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
+        Multiplayer local = localView != null ? localView.GetComponent<Multiplayer>() : null;
+
+        if (local != null)
+            local.ShowMatchResult(winningTeam);
     }
 }
 

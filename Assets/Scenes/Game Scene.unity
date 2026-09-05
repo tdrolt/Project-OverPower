@@ -257,7 +257,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 1106086790}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -3962,7 +3963,7 @@ Camera:
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
-  m_FOVAxisMode: 0
+  m_FOVAxisMode: 1
   m_Iso: 200
   m_ShutterSpeed: 0.005
   m_Aperture: 16
@@ -4076,6 +4077,9 @@ MonoBehaviour:
   zoomSpeed: 5
   minZoomDistance: 5
   maxZoomDistance: 20
+  rotateLeftKey: 113
+  rotateRightKey: 101
+  rotationSpeed: 90
 --- !u!1 &334480042
 GameObject:
   m_ObjectHideFlags: 0
@@ -12244,7 +12248,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 621158885}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -19418,7 +19423,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 1987334065}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -20732,7 +20738,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 1645031342}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -22667,7 +22674,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 2053064970}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -23074,7 +23082,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 584437327}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -23244,7 +23253,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 1927331553}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -30263,7 +30273,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 897176781}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}
@@ -31156,7 +31167,8 @@ MonoBehaviour:
   captureThreshold: 5
   baseCaptureRate: 1
   captureRadius: 10
-  decayRate: 1
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
   flagRenderer: {fileID: 774682142}
   neutralMaterial: {fileID: 2100000, guid: e4e180e300b770d4cb0093a9758ce0e9, type: 2}
   team0Material: {fileID: 2100000, guid: 776f65cea68bfa645aeea0c7fb6fabb5, type: 2}

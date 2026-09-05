@@ -81,8 +81,14 @@ public class CameraTracking : MonoBehaviour
     public float minZoomDistance = 10f; // Closest zoom
     public float maxZoomDistance = 16f; // Farthest zoom
 
+    [Header("Rotation")]
+    public KeyCode rotateLeftKey = KeyCode.Q;
+    public KeyCode rotateRightKey = KeyCode.E;
+    public float rotationSpeed = 90f;   // degrees per second held
+
     private Vector3 currentOffset;
     private float currentZoom = 1f; // Default zoom level (1 = baseOffset)
+    private float yaw = 0f;         // degrees rotated around the player
 
     void Start()
     {
@@ -102,8 +108,16 @@ public class CameraTracking : MonoBehaviour
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, 0.5f, 2f); // Adjust multiplier as needed
 
-        // Apply zoom to offset
-        currentOffset = baseOffset * currentZoom;
+        // Orbit around the player. Rotating the offset around the world Y axis keeps the height,
+        // the distance and therefore the viewing angle exactly as they were: only the compass
+        // direction changes, so nobody gains a better view, they just pick one they prefer.
+        if (Input.GetKey(rotateLeftKey))
+            yaw -= rotationSpeed * Time.deltaTime;
+        if (Input.GetKey(rotateRightKey))
+            yaw += rotationSpeed * Time.deltaTime;
+
+        // Apply zoom, then rotation.
+        currentOffset = Quaternion.AngleAxis(yaw, Vector3.up) * (baseOffset * currentZoom);
 
         // Update camera position
         transform.position = target.position + currentOffset;

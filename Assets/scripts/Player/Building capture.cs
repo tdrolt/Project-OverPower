@@ -342,6 +342,15 @@ public class BuildingCapture : MonoBehaviourPun
         BuildingManager manager = BuildingManager.Instance;
         if (manager == null) return;
 
+        // Already held by your own team, so there is nothing to capture. Testers found they could
+        // re-capture their own towers once the map was fully taken. Reads the replicated
+        // dictionary rather than controllingTeam, which is only correct on the master.
+        if (manager.TowerDictionary.TryGetValue(buildingID, out TowerData self)
+            && self.isCaptured && self.controllingTeam == player.teamID)
+        {
+            return;
+        }
+
         // Your own capital is always enterable. This test used to sit INSIDE the loop below, so
         // it could only be reached by a tower that has at least one adjacent, and it was
         // re-evaluated once per adjacent. A tower with an empty Adjacents list was therefore

@@ -3617,6 +3617,9 @@ MonoBehaviour:
   youWonPanel: {fileID: 8089540278649774538}
   respawnPanel: {fileID: 8845810845504228429}
   youLostPanel: {fileID: 824179298454423665}
+  killHeight: -10
+  baseRespawnSeconds: 5
+  maxRespawnSeconds: 10
 --- !u!114 &9118536337621688220
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3647,11 +3650,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   aoePrefab: {fileID: 100000, guid: 0fddeeac4d9b4a74981d41ab7ae6f622, type: 3}
-  aoeDamage: 5
+  aoeDamage: 4
   aoeDuration: 7
   aoeRadius: 2
+  aoeRange: 10
   SpellCastingAudio: {fileID: 8300000, guid: e5be2c3c4b4ec3842b9f33053a93d02c, type: 3}
-  cooldown: 3
+  cooldown: 6
 --- !u!114 &655205570813804917
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3692,6 +3696,7 @@ MonoBehaviour:
   projectileSpeed: 15
   projectileDamage: 10
   bulletSpawnPosition: {fileID: 8170903716044679203}
+  dashColliderRadius: 0.5
 --- !u!114 &4496639006839607004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3750,7 +3755,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a5de808ac530b245baa2b2f6a92cfaf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  teamID: 0
 --- !u!1 &2567698297689850112
 GameObject:
   m_ObjectHideFlags: 0

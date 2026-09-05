@@ -70,6 +70,14 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     private bool loggedSelfHitBlocked = false;
     private bool loggedFriendlyFireBlocked = false;
 
+    // Below this world height a player has fallen out of the map and is put back at their spawn.
+    public float killHeight = -10f;
+
+    [Header("Respawn")]
+    public float baseRespawnSeconds = 5f;   // wait after the first death
+    public float maxRespawnSeconds = 10f;   // ceiling, reached after 6 deaths
+    private int deathCount = 0;
+
     // Mirrors the replicated alive state so input and physics can be gated on it locally.
     private bool isAlive = true;
     // The dash currently running, so death can cancel it.
@@ -180,17 +188,17 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         // Process abilities (keys updated as needed)
         if (Input.GetKeyDown(KeyCode.Space) && playerDash != null && playerDash.enabled && playerDash.CanDash())
         {
-            Vector3 inputDirection = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
+            Vector3 inputDirection = MovementInput();
             activeDash = StartCoroutine(playerDash.Dash(inputDirection));
         }
         if (Input.GetKeyDown(KeyCode.Space) && playerDashWithBuff != null && playerDashWithBuff.enabled && playerDashWithBuff.CanDash())
         {
-            Vector3 inputDirection = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
+            Vector3 inputDirection = MovementInput();
             activeDash = StartCoroutine(playerDashWithBuff.Dash(inputDirection));
         }
         if (Input.GetKeyDown(KeyCode.Space) && playerDashWithProjectile != null && playerDashWithProjectile.enabled && playerDashWithProjectile.CanDash())
         {
-            Vector3 inputDirection = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
+            Vector3 inputDirection = MovementInput();
             activeDash = StartCoroutine(playerDashWithProjectile.Dash(inputDirection));
         }
         if (Input.GetKeyDown(KeyCode.Space) && aoeAbility != null && aoeAbility.enabled)
@@ -205,6 +213,12 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     {
         if (photonView.IsMine)
         {
+            // Players fall off the map. Returning them costs nothing and needs no keybind, which
+            // beats a manual respawn button: someone falling should not have to know a shortcut,
+            // and a free respawn key is an escape hatch out of a losing fight.
+            if (isAlive && transform.position.y < killHeight)
+                ReturnToSpawn();
+
             if (playerDash == null || !playerDash.IsDashing())
             {
                 Move();
@@ -248,12 +262,31 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         }
     }
 
-    void Move()
+    /// WASD relative to where the camera is looking, not to world axes.
+    /// Required now that Q/E orbit the camera: with world-space input, rotating the view 90 would
+    /// make W move the player sideways across the screen.
+    Vector3 MovementInput()
     {
         float horizontalInput = Input.GetAxisRaw("Horizontal");
         float verticalInput = Input.GetAxisRaw("Vertical");
 
-        Vector3 movementDir = new Vector3(horizontalInput, 0, verticalInput);
+        Camera cam = Camera.main;
+        if (cam == null)
+            return new Vector3(horizontalInput, 0f, verticalInput);
+
+        Vector3 forward = cam.transform.forward;
+        Vector3 right = cam.transform.right;
+        forward.y = 0f;
+        right.y = 0f;
+        forward.Normalize();
+        right.Normalize();
+
+        return right * horizontalInput + forward * verticalInput;
+    }
+
+    void Move()
+    {
+        Vector3 movementDir = MovementInput();
         if (movementDir.magnitude > 1)
             movementDir.Normalize();
 
@@ -496,7 +529,14 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
             SetAlive(false);
             Debug.Log("[PlayerDied] Player Respawn Entered");
             respawnPanel?.SetActive(true);
-            StartCoroutine(RespawnPlayer(5f, teamID, actorNumber));
+
+            // Each death costs a second more than the last, capped, so repeated deaths carry a
+            // growing price without ever benching someone for an unreasonable stretch.
+            deathCount++;
+            float delay = Mathf.Min(baseRespawnSeconds + (deathCount - 1), maxRespawnSeconds);
+            Debug.Log($"[VIS] death {deathCount}, respawning in {delay}s");
+
+            StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         }
 
         Debug.Log($"{playerNameText.text} respawned at team {teamID} spawn point.");
@@ -540,6 +580,36 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         teamDeadCount[teamID] = prevTeamDeadCount - 1;*/
 
         respawnPanel?.SetActive(false);
+    }
+
+    /// Shows the end-of-match result to this client, win or lose. Used by the territory win
+    /// condition, which needs to tell losers as well -- the elimination path only ever announced
+    /// the winner, so everyone else was left with no screen at all.
+    public void ShowMatchResult(int winningTeam)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        int myTeam = PlayerTeam.NoTeam;
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out object raw)
+            && raw is int value)
+        {
+            myTeam = value;
+        }
+
+        waitingPanel?.SetActive(false);
+        respawnPanel?.SetActive(false);
+
+        if (myTeam == winningTeam)
+            youWonPanel?.SetActive(true);
+        else
+            youLostPanel?.SetActive(true);
+
+        if (rigidbody != null)
+        {
+            rigidbody.linearVelocity = Vector3.zero;
+            movementSpeed = 0f;
+        }
     }
 
     [PunRPC]
@@ -639,6 +709,30 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
     }
 
+    /// Puts a player who fell out of the world back on their spawn point. Deliberately NOT a
+    /// death: falling is a level problem, not a play outcome, so it should not feed the respawn
+    /// timer or the elimination count.
+    void ReturnToSpawn()
+    {
+        PlayerTeam pt = GetComponent<PlayerTeam>();
+        RoomManager roomManager = FindObjectOfType<RoomManager>();
+
+        if (pt == null || !pt.HasTeam || roomManager == null
+            || roomManager.teamSpawnPoints == null
+            || pt.teamID >= roomManager.teamSpawnPoints.Length)
+        {
+            return;
+        }
+
+        transform.position = roomManager.teamSpawnPoints[pt.teamID].position;
+        transform.rotation = roomManager.teamSpawnPoints[pt.teamID].rotation;
+
+        if (rigidbody != null)
+            rigidbody.linearVelocity = Vector3.zero;
+
+        Debug.Log($"[VIS] fell below y={killHeight}, returned to spawn");
+    }
+
     void SetLayerRecursively(GameObject o, int layer)
     {
         o.layer = layer;
@@ -720,6 +814,11 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         // OnEnable registers this callback before Start assigns photonView, so a property update
         // arriving in that window would dereference null.
         if (photonView == null || photonView.Owner == null || targetPlayer != photonView.Owner)
+            return;
+
+        // The owner already applied this in SetAlive before publishing, so reacting again would
+        // just repeat the work and log every visibility change twice for the local player.
+        if (photonView.IsMine)
             return;
 
         if (changedProps.TryGetValue(AliveKey, out object raw) && raw is bool alive)
