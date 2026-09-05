@@ -1,13 +1,21 @@
 using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 using UnityEngine.UI;
 using Photon.Pun.UtilityScripts;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
-public class Multiplayer : MonoBehaviour, IPunObservable
+public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 {
+    /// Whether this player is currently alive. Lives in Photon Player Custom Properties rather
+    /// than being announced by an RPC, because it is state, not an event: a player joining
+    /// mid-match needs to know who is currently dead, and an unbuffered RPC cannot tell them.
+    /// See CODING-STANDARDS.md section 5, rule 2.
+    public const string AliveKey = "alive";
+
     public float movementSpeed = 5f;
     // Captured at Start so death (which sets speed to 0) and respawn can restore whatever the
     // prefab actually says, instead of a second hardcoded number that disagrees with it.
@@ -113,7 +121,11 @@ public class Multiplayer : MonoBehaviour, IPunObservable
             playerNameText.color = Color.white;
         }
 
-        Debug.LogError("This message will make the console appear in Development Builds");
+        // Removed: a Debug.LogError fired here on every spawn purely to make the console appear
+        // in development builds. DebugOverlay (F1) does that job now, and this line polluted it,
+        // since the overlay captures every error.
+
+        ApplyAliveStateFromProperties();
 
         // Initialize network sync values
         networkPosition = transform.position;
@@ -439,7 +451,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable
             Debug.LogWarning($"[VIS] PERMANENT DEATH  team={teamID} base={baseBuildingID} " +
                              $"isCaptured={cathedralTower.isCaptured} controllingTeam={cathedralTower.controllingTeam}");
 
-            photonView.RPC("RPC_HandleDeath", RpcTarget.All, teamID);
+            SetAlive(false);
             photonView.RPC("RPC_HandleDeathMaster", RpcTarget.MasterClient, teamID, actorNumber);       
             return;
         }
@@ -448,7 +460,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable
         {
             respawnStarted = true;
 
-            photonView.RPC("RPC_HandleDeath", RpcTarget.All, teamID);
+            SetAlive(false);
             Debug.Log("[PlayerDied] Player Respawn Entered");
             respawnPanel?.SetActive(true);
             StartCoroutine(RespawnPlayer(5f, teamID, actorNumber));
@@ -479,7 +491,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable
         health = 100;
         healthBar.value = health;
 
-        photonView.RPC("RPC_ShowPlayer", RpcTarget.All);
+        SetAlive(true);
         photonView.RPC("RPC_HandleRespawnMaster", RpcTarget.MasterClient, teamID, actorNumber);
 
         Debug.Log($"{playerNameText.text} fully respawned at base after cathedral recapture.");
@@ -489,14 +501,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable
 
         //capsuleCollider.GetComponent<Collider>().enabled = true;
 
-        int defaultLayer = LayerMask.NameToLayer("Default");
-        SetLayerRecursively(gameObject, defaultLayer);
-
-        if (rigidbody != null)
-        {
-            rigidbody.linearVelocity = Vector3.zero;
-            movementSpeed = startingMovementSpeed;
-        }
+        // Layer, mesh and speed are all restored by SetAlive(true) above.
 
 /*        int prevTeamDeadCount = teamDeadCount[teamID];
         teamDeadCount[teamID] = prevTeamDeadCount - 1;*/
@@ -608,29 +613,69 @@ public class Multiplayer : MonoBehaviour, IPunObservable
             SetLayerRecursively(child.gameObject, layer);
     }
 
-    // 3) Updated death handler
-    [PunRPC]
-    void RPC_HandleDeath(int teamID)
-    {
-        // 1) Hide the player's mesh
-        //capsuleCollider.GetComponent<Collider>().enabled = false;
-        //capsuleCollider.GetComponent<Collider>().enabled = false;
+    // ---- alive / dead as replicated state -------------------------------------------------
 
-        int deadLayer = LayerMask.NameToLayer("DeadPlayer");
-        SetLayerRecursively(gameObject, deadLayer);
+    void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
+    void OnDisable() => PhotonNetwork.RemoveCallbackTarget(this);
+
+    /// Owner-only. Applies the change locally straight away so dying feels instant, then
+    /// publishes it so every other client -- including anyone who joins later -- agrees.
+    void SetAlive(bool alive)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        ApplyAliveState(alive);
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { AliveKey, alive } });
+    }
+
+    /// Everything that used to live in RPC_HandleDeath and RPC_ShowPlayer, in one place so hide
+    /// and show cannot drift apart. The old pair did not: RPC_HandleDeath moved the hierarchy to
+    /// the DeadPlayer layer on every client, but only the owner ever moved it back.
+    void ApplyAliveState(bool alive)
+    {
+        SetLayerRecursively(gameObject, LayerMask.NameToLayer(alive ? "Default" : "DeadPlayer"));
 
         if (playerMesh != null)
-            playerMesh.SetActive(false);
-
+            playerMesh.SetActive(alive);
 
         if (rigidbody != null)
         {
             rigidbody.linearVelocity = Vector3.zero;
-            movementSpeed = 0f;
+            if (photonView.IsMine)
+                movementSpeed = alive ? startingMovementSpeed : 0f;
         }
 
-        Debug.Log($"[VIS] HandleDeath  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");
+        Debug.Log($"[VIS] alive={alive}  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");
     }
+
+    /// Reads the current value, for a client that arrived after the change was published.
+    void ApplyAliveStateFromProperties()
+    {
+        if (photonView.Owner == null)
+            return;
+
+        if (photonView.Owner.CustomProperties.TryGetValue(AliveKey, out object raw) && raw is bool alive)
+            ApplyAliveState(alive);
+    }
+
+    public void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+    {
+        // OnEnable registers this callback before Start assigns photonView, so a property update
+        // arriving in that window would dereference null.
+        if (photonView == null || photonView.Owner == null || targetPlayer != photonView.Owner)
+            return;
+
+        if (changedProps.TryGetValue(AliveKey, out object raw) && raw is bool alive)
+            ApplyAliveState(alive);
+    }
+
+    // Unused IInRoomCallbacks members.
+    public void OnPlayerEnteredRoom(Player newPlayer) { }
+    public void OnPlayerLeftRoom(Player otherPlayer) { }
+    public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) { }
+    public void OnMasterClientSwitched(Player newMasterClient) { }
+
 
     [PunRPC]
     public void RPC_HandleRespawnMaster(int teamID, int actorNumber)
@@ -738,25 +783,5 @@ public class Multiplayer : MonoBehaviour, IPunObservable
         }
     }
 
-    [PunRPC]
-    void RPC_HidePlayer()
-    {
-        if (playerMesh != null)
-            playerMesh.SetActive(false);
-    }
 
-    [PunRPC]
-    void RPC_ShowPlayer()
-    {
-        if (playerMesh != null)
-            playerMesh.SetActive(true);
-
-        // RPC_HandleDeath moves the whole hierarchy to the DeadPlayer layer on EVERY client, but
-        // the reset lived only in RespawnPlayer, which runs on the owner. Remote copies stayed on
-        // DeadPlayer permanently, where the collision matrix ignores Building. Restore it here so
-        // hide and show are symmetric.
-        SetLayerRecursively(gameObject, LayerMask.NameToLayer("Default"));
-
-        Debug.Log($"[VIS] ShowPlayer  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");
-    }
 }
