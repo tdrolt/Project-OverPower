@@ -117,27 +117,8 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
             teamDeadCount[localTeam] = 0;
         }
 
-        // Set color based on team relation (friendly green, enemy red)
         PlayerTeam pt = GetComponent<PlayerTeam>();
-        if (pt != null && !photonView.IsMine)
-        {
-            if (pt.teamID == localTeam)
-            {
-                playerNameText.color = Color.green;
-            }
-            else
-            {
-                playerNameText.color = Color.red;
-            }
-        }
-        else if (photonView.IsMine)
-        {
-            playerNameText.color = Color.white; // local player sees self as white
-        }
-        else
-        {
-            playerNameText.color = Color.white;
-        }
+        UpdateNameTagColour();
 
         // Removed: a Debug.LogError fired here on every spawn purely to make the console appear
         // in development builds. DebugOverlay (F1) does that job now, and this line polluted it,
@@ -803,6 +784,45 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         Debug.Log($"[VIS] alive={alive}  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");
     }
 
+    /// Green for a teammate, red for an enemy, white for yourself, grey while the answer is not
+    /// known yet.
+    ///
+    /// The colour is a comparison between two Custom Properties -- this player's team and mine --
+    /// and either can arrive after the object spawns. It used to be decided once in Start, so
+    /// whichever value was missing at that instant produced a wrong colour that never corrected:
+    /// a teammate whose team had not arrived showed red forever, and if my own team was missing
+    /// too, both read as "unknown" and matched, so an enemy showed green forever.
+    ///
+    /// Grey rather than guessing: a briefly neutral tag is better than a confidently wrong one,
+    /// and it resolves within a moment.
+    void UpdateNameTagColour()
+    {
+        if (playerNameText == null || photonView == null)
+            return;
+
+        if (photonView.IsMine)
+        {
+            playerNameText.color = Color.white;
+            return;
+        }
+
+        PlayerTeam team = GetComponent<PlayerTeam>();
+        int localTeam = PlayerTeam.NoTeam;
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out object raw)
+            && raw is int value)
+        {
+            localTeam = value;
+        }
+
+        if (team == null || !team.HasTeam || localTeam == PlayerTeam.NoTeam)
+        {
+            playerNameText.color = Color.grey;
+            return;
+        }
+
+        playerNameText.color = team.teamID == localTeam ? Color.green : Color.red;
+    }
+
     /// Reads the current value, for a client that arrived after the change was published.
     void ApplyAliveStateFromProperties()
     {
@@ -817,7 +837,18 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     {
         // OnEnable registers this callback before Start assigns photonView, so a property update
         // arriving in that window would dereference null.
-        if (photonView == null || photonView.Owner == null || targetPlayer != photonView.Owner)
+        if (photonView == null || photonView.Owner == null)
+            return;
+
+        // Name tag colour compares THIS player's team against MY team, so it has to react to
+        // either one arriving, not just this player's.
+        if (changedProps.ContainsKey(PlayerTeam.TeamKey)
+            && (targetPlayer == photonView.Owner || targetPlayer == PhotonNetwork.LocalPlayer))
+        {
+            UpdateNameTagColour();
+        }
+
+        if (targetPlayer != photonView.Owner)
             return;
 
         // The owner already applied this in SetAlive before publishing, so reacting again would
