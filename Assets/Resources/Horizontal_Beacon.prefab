@@ -4792,10 +4792,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 425ba52896598b54db150470080d1b54, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  damage: 5
-  duration: 7
+  damage: 15
+  duration: 4
   radius: 2
-  tickInterval: 0.1
+  tickInterval: 1
 --- !u!114 &-4174413949116556144
 MonoBehaviour:
   m_ObjectHideFlags: 0

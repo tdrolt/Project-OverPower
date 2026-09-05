@@ -3650,8 +3650,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   aoePrefab: {fileID: 100000, guid: 0fddeeac4d9b4a74981d41ab7ae6f622, type: 3}
-  aoeDamage: 4
-  aoeDuration: 7
+  aoeDamage: 15
+  aoeDuration: 4
   aoeRadius: 2
   aoeRange: 10
   SpellCastingAudio: {fileID: 8300000, guid: e5be2c3c4b4ec3842b9f33053a93d02c, type: 3}

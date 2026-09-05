@@ -565,6 +565,10 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         healthBar.value = health;
 
         SetAlive(true);
+
+        // Logged because 2.10 (respawning where you died) is a fix I cannot verify from the
+        // editor. If a respawn ever lands somewhere other than the base, this line says so.
+        Debug.Log($"[VIS] respawned at {transform.position} (team {teamID} spawn)");
         photonView.RPC("RPC_HandleRespawnMaster", RpcTarget.MasterClient, teamID, actorNumber);
 
         Debug.Log($"{playerNameText.text} fully respawned at base after cathedral recapture.");

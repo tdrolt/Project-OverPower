@@ -10,6 +10,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
     public GameObject[] teamPlayerPrefabs; // Index 0:Team0, 1:Team1, 2:Team2
     public Transform[] teamSpawnPoints;    // Index 0:Team0, 1:Team1, 2:Team2
 
+    public const int TeamSize = 3;         // hard cap per team; 3 teams x 3 = the room's 9
+    private const int NoFreeTeam = -1;
+
     void Start()
     {
         // Default is 10 Hz, which makes the remote position a staircase updating once per
@@ -43,7 +46,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
         Debug.Log("No room found, creating one.");
         string roomName = "Room_" + Random.Range(1000, 9999);
         RoomOptions options = new RoomOptions();
-        options.MaxPlayers = 9;
+        options.MaxPlayers = (byte)(TeamSize * 3);   // 3 teams at the hard cap
         PhotonNetwork.CreateRoom(roomName, options, TypedLobby.Default);
     }
 
@@ -56,6 +59,17 @@ public class RoomManager : MonoBehaviourPunCallbacks
     void AssignTeamAndSpawnPlayer()
     {
         int teamID = PickSmallestTeam();
+
+        // Belt and braces alongside MaxPlayers. Photon's room cap stops a tenth client joining,
+        // but this also catches the case where the counts are momentarily wrong -- better to turn
+        // one player away with a clear reason than to let a team quietly reach four.
+        if (teamID == NoFreeTeam)
+        {
+            Debug.LogWarning("[TEAM] no free slot in any team, leaving the room");
+            PhotonNetwork.LeaveRoom();
+            return;
+        }
+
         Debug.Log($"[TEAM] assigned team {teamID} on join");
 
         if (!ValidateTeamResources(teamID)) return;
@@ -115,6 +129,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
         {
             if (counts[i] < counts[smallest])
                 smallest = i;
+        }
+
+        if (counts[smallest] >= TeamSize)
+        {
+            Debug.LogWarning($"[TEAM] every team is full ({counts[0]}/{counts[1]}/{counts[2]}, cap {TeamSize}) -- refusing to spawn");
+            return NoFreeTeam;
         }
 
         Debug.Log($"[TEAM] current split {counts[0]}/{counts[1]}/{counts[2]} -> joining team {smallest}");

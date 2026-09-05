@@ -81,14 +81,20 @@ public class CameraTracking : MonoBehaviour
     public float minZoomDistance = 10f; // Closest zoom
     public float maxZoomDistance = 16f; // Farthest zoom
 
-    [Header("Rotation")]
-    public KeyCode rotateLeftKey = KeyCode.Q;
-    public KeyCode rotateRightKey = KeyCode.E;
-    public float rotationSpeed = 90f;   // degrees per second held
+    [Header("Per-team orientation")]
+    // Every team should see the arena from the same relative angle, so that "toward the centre"
+    // is the same direction on screen for everyone. The rotation for each team is derived from
+    // where its spawn actually sits, so it stays correct if the map moves.
+    //
+    // This offset rotates all three together. It is the one value to nudge if the bases do not
+    // sit where you want them on screen; 0 leaves the team whose spawn is due north looking
+    // exactly as the camera did before.
+    public float teamYawOffset = 0f;
 
     private Vector3 currentOffset;
     private float currentZoom = 1f; // Default zoom level (1 = baseOffset)
     private float yaw = 0f;         // degrees rotated around the player
+    private bool teamYawResolved = false;
 
     void Start()
     {
@@ -108,13 +114,7 @@ public class CameraTracking : MonoBehaviour
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, 0.5f, 2f); // Adjust multiplier as needed
 
-        // Orbit around the player. Rotating the offset around the world Y axis keeps the height,
-        // the distance and therefore the viewing angle exactly as they were: only the compass
-        // direction changes, so nobody gains a better view, they just pick one they prefer.
-        if (Input.GetKey(rotateLeftKey))
-            yaw -= rotationSpeed * Time.deltaTime;
-        if (Input.GetKey(rotateRightKey))
-            yaw += rotationSpeed * Time.deltaTime;
+        ResolveTeamYaw();
 
         // Apply zoom, then rotation.
         currentOffset = Quaternion.AngleAxis(yaw, Vector3.up) * (baseOffset * currentZoom);
@@ -122,5 +122,45 @@ public class CameraTracking : MonoBehaviour
         // Update camera position
         transform.position = target.position + currentOffset;
         transform.LookAt(target);
+    }
+
+    /// Works out this player's camera rotation from where their team actually spawns, so all three
+    /// teams get the same view of the arena relative to their own base rather than three different
+    /// ones. Runs until it succeeds, because the team arrives as a network property and is not
+    /// known on the first frame.
+    void ResolveTeamYaw()
+    {
+        if (teamYawResolved || target == null)
+            return;
+
+        PlayerTeam team = target.GetComponent<PlayerTeam>();
+        if (team == null || !team.HasTeam)
+            return;
+
+        RoomManager room = FindObjectOfType<RoomManager>();
+        if (room == null || room.teamSpawnPoints == null || team.teamID >= room.teamSpawnPoints.Length)
+            return;
+
+        Vector3 centre = Vector3.zero;
+        int counted = 0;
+        foreach (Transform spawn in room.teamSpawnPoints)
+        {
+            if (spawn == null) continue;
+            centre += spawn.position;
+            counted++;
+        }
+
+        if (counted == 0)
+            return;
+
+        centre /= counted;
+
+        Vector3 toSpawn = room.teamSpawnPoints[team.teamID].position - centre;
+        toSpawn.y = 0f;
+
+        yaw = Mathf.Atan2(toSpawn.x, toSpawn.z) * Mathf.Rad2Deg + teamYawOffset;
+        teamYawResolved = true;
+
+        Debug.Log($"[TEAM] camera yaw {yaw:0} deg for team {team.teamID}");
     }
 }
