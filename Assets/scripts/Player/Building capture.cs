@@ -329,6 +329,12 @@ public class BuildingCapture : MonoBehaviourPun
         var player = other.GetComponent<PlayerTeam>();
         if (!player) return;
 
+        // Spawn points sit inside capitals, so a player can overlap a capture zone in the brief
+        // window before their team property has arrived. Registering them while their team reads
+        // as unknown would make them look like an enemy in their own capital and start a decay.
+        // They register normally on their next entry.
+        if (!player.HasTeam) return;
+
         BuildingManager manager = BuildingManager.Instance;
         if (manager == null) return;
 

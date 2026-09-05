@@ -90,9 +90,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
         PlayerTeam pt = player.GetComponent<PlayerTeam>();
         if (pt != null)
         {
-            pt.teamID = teamID;
+            // One write, one source of truth. PlayerTeam.teamID now reads this property, so the
+            // direct field assignment and the buffered RPC that used to sit here are gone.
             UpdateNetworkProperties(teamID);
-            pt.photonView.RPC("RPC_SetTeamID", RpcTarget.AllBuffered, teamID);
         }
         else
         {
