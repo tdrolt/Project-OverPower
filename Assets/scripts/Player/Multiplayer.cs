@@ -69,6 +69,11 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     // without a teamfight filling the log.
     private bool loggedSelfHitBlocked = false;
     private bool loggedFriendlyFireBlocked = false;
+
+    // Mirrors the replicated alive state so input and physics can be gated on it locally.
+    private bool isAlive = true;
+    // The dash currently running, so death can cancel it.
+    private Coroutine activeDash;
     // Static dictionary to keep track of dead players per team.
     private static Dictionary<int, int> teamDeadCount = new Dictionary<int, int>();
     private static HashSet<int> processedDeaths = new HashSet<int>();
@@ -79,7 +84,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         rigidbody = GetComponent<Rigidbody>();
         startingMovementSpeed = movementSpeed;
         photonView = GetComponent<PhotonView>();
-        playerShooting = GetComponent<PlayerShooting>();
+        playerShooting = GetComponentInChildren<PlayerShooting>(true);
         playerDash = GetComponent<PlayerDash>();
         playerDashWithBuff = GetComponent<PlayerDashWithBuff>();
         playerDashWithProjectile = GetComponent<PlayerDashWithProjectile>();
@@ -167,21 +172,26 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
         UpdateRotationFromMouse();
 
+        // No casting while dead. Without this a player could dash during the respawn wait and
+        // reappear where they died instead of at their base.
+        if (!isAlive)
+            return;
+
         // Process abilities (keys updated as needed)
         if (Input.GetKeyDown(KeyCode.Space) && playerDash != null && playerDash.enabled && playerDash.CanDash())
         {
             Vector3 inputDirection = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
-            StartCoroutine(playerDash.Dash(inputDirection));
+            activeDash = StartCoroutine(playerDash.Dash(inputDirection));
         }
         if (Input.GetKeyDown(KeyCode.Space) && playerDashWithBuff != null && playerDashWithBuff.enabled && playerDashWithBuff.CanDash())
         {
             Vector3 inputDirection = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
-            StartCoroutine(playerDashWithBuff.Dash(inputDirection));
+            activeDash = StartCoroutine(playerDashWithBuff.Dash(inputDirection));
         }
         if (Input.GetKeyDown(KeyCode.Space) && playerDashWithProjectile != null && playerDashWithProjectile.enabled && playerDashWithProjectile.CanDash())
         {
             Vector3 inputDirection = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
-            StartCoroutine(playerDashWithProjectile.Dash(inputDirection));
+            activeDash = StartCoroutine(playerDashWithProjectile.Dash(inputDirection));
         }
         if (Input.GetKeyDown(KeyCode.Space) && aoeAbility != null && aoeAbility.enabled)
         {
@@ -657,16 +667,39 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     /// the DeadPlayer layer on every client, but only the owner ever moved it back.
     void ApplyAliveState(bool alive)
     {
+        isAlive = alive;
+
         SetLayerRecursively(gameObject, LayerMask.NameToLayer(alive ? "Default" : "DeadPlayer"));
 
         if (playerMesh != null)
             playerMesh.SetActive(alive);
 
+        // A corpse used to keep its collider, so it still blocked shots and bodies until respawn.
+        // Kinematic while dead as well, otherwise removing the collider just drops it through the
+        // floor for five seconds.
+        if (capsuleCollider != null)
+            capsuleCollider.enabled = alive;
+
         if (rigidbody != null)
         {
             rigidbody.linearVelocity = Vector3.zero;
+            rigidbody.isKinematic = !alive;
             if (photonView.IsMine)
                 movementSpeed = alive ? startingMovementSpeed : 0f;
+        }
+
+        // Shooting runs its own Update on the child mesh object, so gating input in this class
+        // does not stop it. (Its reference was also broken until now: GetComponent on the root
+        // returned null because PlayerShooting is not on the root.)
+        if (playerShooting != null)
+            playerShooting.enabled = alive;
+
+        // A dash already in flight would keep moving the body after death, and could land it
+        // somewhere other than the spawn point.
+        if (!alive && activeDash != null)
+        {
+            StopCoroutine(activeDash);
+            activeDash = null;
         }
 
         Debug.Log($"[VIS] alive={alive}  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");

@@ -36,7 +36,11 @@ public class AoEEffect : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallback
     {
         while (elapsedTime < duration)
         {
-            Debug.Log($"[AoEEffect] Ticking at {transform.position} (Elapsed: {elapsedTime}s)");
+            // Removed a Debug.Log here that ran EVERY tick. With tickInterval 0.1 over a 7s
+            // duration that is ~70 lines per cast, on every client, each written synchronously to
+            // Player.log in a build. It is the leading suspect for the freezes in the 9-player
+            // playtest.
+
             // Check all colliders within the AoE radius
             Collider[] hitColliders = Physics.OverlapSphere(transform.position, radius);
             foreach (Collider hit in hitColliders)
@@ -52,8 +56,11 @@ public class AoEEffect : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallback
             elapsedTime += tickInterval;
         }
 
-        // Destroy this AoE effect over the network when done
-        PhotonNetwork.Destroy(gameObject);
+        // This coroutine runs on EVERY client, but only the owner may network-destroy the object.
+        // Without this guard the other eight clients each logged
+        // "Failed to 'network-remove' GameObject" for every single cast.
+        if (photonView.IsMine)
+            PhotonNetwork.Destroy(gameObject);
     }
 
     // Visualize the AoE radius in the editor for debugging

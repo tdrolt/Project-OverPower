@@ -9,6 +9,7 @@ public class AoEAbility : MonoBehaviourPunCallbacks
     public float aoeDamage = 15f;     // Damage per tick
     public float aoeDuration = 3f;    // Duration the AoE effect lasts (in seconds)
     public float aoeRadius = 6f;      // Radius of the AoE effect
+    public float aoeRange = 10f;      // Max distance from the caster the AoE can be placed
     public AudioClip SpellCastingAudio;
 
     [Header("Cooldown Settings")]
@@ -37,6 +38,15 @@ public class AoEAbility : MonoBehaviourPunCallbacks
         if (groundPlane.Raycast(ray, out rayDistance))
         {
             Vector3 targetPos = ray.GetPoint(rayDistance);
+
+            // Clamp to a maximum cast range. Without this the target was wherever the mouse
+            // pointed on the ground plane, so a player with a wider view could drop an AoE on the
+            // far side of the map. Casting beyond the limit lands at the edge of the range rather
+            // than failing, so the ability still does something.
+            Vector3 fromCaster = targetPos - transform.position;
+            fromCaster.y = 0f;
+            if (fromCaster.magnitude > aoeRange)
+                targetPos = transform.position + fromCaster.normalized * aoeRange;
 
             // Spawn the AoE effect prefab via Photon
             // The caster travels as instantiation data so EVERY client knows who cast this.
