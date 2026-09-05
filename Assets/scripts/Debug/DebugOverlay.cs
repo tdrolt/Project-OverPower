@@ -13,8 +13,15 @@ using UnityEngine;
 /// </summary>
 public class DebugOverlay : MonoBehaviour
 {
-    /// Substring a log line must contain to be captured. Set to "" to capture everything.
-    const string Filter = "[VIS]";
+    /// Tags this overlay captures, on top of every error and exception.
+    /// Deliberately short: each of these fires once per event, never per frame or per hit, so a
+    /// whole match produces a readable page rather than a wall of text.
+    ///   [VIS]   alive / dead visibility changes
+    ///   [TEAM]  which team a player resolved to
+    ///   [TOWER] tower ownership changes
+    ///   [DMG]   damage refused, reported once per reason per player
+    /// Set to an empty array to capture every log line.
+    static readonly string[] Filters = { "[VIS]", "[TEAM]", "[TOWER]", "[DMG]" };
 
     const int MaxLines = 60;
     const KeyCode ToggleKey = KeyCode.F1;
@@ -52,10 +59,19 @@ public class DebugOverlay : MonoBehaviour
     void OnLog(string message, string stackTrace, LogType type)
     {
         bool isProblem = type == LogType.Error || type == LogType.Exception || type == LogType.Assert;
-        if (!isProblem && Filter.Length > 0 && !message.Contains(Filter))
+        if (!isProblem && Filters.Length > 0 && !MatchesFilter(message))
             return;
 
         Add(isProblem ? $"{type}: {message}" : message);
+    }
+
+    static bool MatchesFilter(string message)
+    {
+        for (int i = 0; i < Filters.Length; i++)
+            if (message.Contains(Filters[i]))
+                return true;
+
+        return false;
     }
 
     void Add(string message)

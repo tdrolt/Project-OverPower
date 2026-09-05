@@ -50,7 +50,9 @@ public class BuildingManager : MonoBehaviourPun
     {
         TowerData towerData = TowerDictionary[buildingID];
 
-        Debug.Log($"[BuildingManager]: Building {buildingID} captured by {controllingTeam}. Value: {value}");
+        // Once per ownership change, and replayed once per tower for a late joiner. That replay
+        // is itself the signal that buffered ownership reached them.
+        Debug.Log($"[TOWER] {buildingID} -> {(value ? $"team {controllingTeam}" : "neutral")}");
 
         towerData.isCaptured = value;
         towerData.controllingTeam = controllingTeam;

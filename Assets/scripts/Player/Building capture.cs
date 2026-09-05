@@ -333,7 +333,11 @@ public class BuildingCapture : MonoBehaviourPun
         // window before their team property has arrived. Registering them while their team reads
         // as unknown would make them look like an enemy in their own capital and start a decay.
         // They register normally on their next entry.
-        if (!player.HasTeam) return;
+        if (!player.HasTeam)
+        {
+            Debug.Log($"[TEAM] tower {buildingID}: ignored a player whose team is not known yet.");
+            return;
+        }
 
         BuildingManager manager = BuildingManager.Instance;
         if (manager == null) return;

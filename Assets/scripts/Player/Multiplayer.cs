@@ -64,6 +64,11 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
     private bool death = false;
     private bool respawnStarted = false;
+
+    // Damage refusals are reported once each, not per hit: enough to confirm the rule is live
+    // without a teamfight filling the log.
+    private bool loggedSelfHitBlocked = false;
+    private bool loggedFriendlyFireBlocked = false;
     // Static dictionary to keep track of dead players per team.
     private static Dictionary<int, int> teamDeadCount = new Dictionary<int, int>();
     private static HashSet<int> processedDeaths = new HashSet<int>();
@@ -124,6 +129,10 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         // Removed: a Debug.LogError fired here on every spawn purely to make the console appear
         // in development builds. DebugOverlay (F1) does that job now, and this line polluted it,
         // since the overlay captures every error.
+
+        // Once per player per match. A team of -1 here means the Custom Property had not arrived
+        // yet, which is the thing to look for if teams or friendly fire ever behave oddly.
+        Debug.Log($"[TEAM] {photonView.Owner?.NickName} team={(pt != null ? pt.teamID : PlayerTeam.NoTeam)} isMine={photonView.IsMine}");
 
         ApplyAliveStateFromProperties();
 
@@ -327,11 +336,25 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
         // Your own bullet cannot hurt you (dash in front of your own shot).
         if (bullet.owner != null && bullet.owner == photonView.Owner)
+        {
+            if (!loggedSelfHitBlocked)
+            {
+                loggedSelfHitBlocked = true;
+                Debug.Log("[DMG] blocked own bullet (reported once per match)");
+            }
             return;
+        }
 
         // No friendly fire.
         if (IsSameTeam(bullet.owner, photonView.Owner))
+        {
+            if (!loggedFriendlyFireBlocked)
+            {
+                loggedFriendlyFireBlocked = true;
+                Debug.Log($"[DMG] blocked friendly fire from {bullet.owner?.NickName} (reported once per match)");
+            }
             return;
+        }
 
         TakeDamage(bullet);
     }
