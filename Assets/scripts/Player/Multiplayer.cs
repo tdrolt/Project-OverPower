@@ -119,6 +119,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
         PlayerTeam pt = GetComponent<PlayerTeam>();
         UpdateNameTagColour();
+        GetComponent<PlayerTeamAppearance>()?.Apply();   // no-op if the team has not arrived yet
 
         // Removed: a Debug.LogError fired here on every spawn purely to make the console appear
         // in development builds. DebugOverlay (F1) does that job now, and this line polluted it,
@@ -846,6 +847,11 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
             && (targetPlayer == photonView.Owner || targetPlayer == PhotonNetwork.LocalPlayer))
         {
             UpdateNameTagColour();
+
+            // The mesh colour is the same problem as the name tag colour: the team is a Custom
+            // Property, so it is routinely still NoTeam when the object spawns. One prefab is
+            // now shared by all three teams, so without this every player is team 0's colour.
+            GetComponent<PlayerTeamAppearance>()?.Apply();
         }
 
         if (targetPlayer != photonView.Owner)

@@ -7,7 +7,11 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 public class RoomManager : MonoBehaviourPunCallbacks
 {
     [Header("Team Settings")]
-    public GameObject[] teamPlayerPrefabs; // Index 0:Team0, 1:Team1, 2:Team2
+    // ONE prefab for every team. There used to be three -- teamPlayerPrefabs[teamID] -- which
+    // were identical apart from one material, and which silently drifted apart: their dash values
+    // disagreed per team, so every playtest before 2026-09-08 ran on an asymmetric game. The team
+    // colour is applied at runtime by PlayerTeamAppearance instead.
+    public GameObject playerPrefab;
     public Transform[] teamSpawnPoints;    // Index 0:Team0, 1:Team1, 2:Team2
 
     public const int TeamSize = 3;         // hard cap per team; 3 teams x 3 = the room's 9
@@ -75,7 +79,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
         if (!ValidateTeamResources(teamID)) return;
 
         GameObject player = PhotonNetwork.Instantiate(
-            teamPlayerPrefabs[teamID].name,
+            playerPrefab.name,
             teamSpawnPoints[teamID].position,
             Quaternion.identity
         );
@@ -85,15 +89,15 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     bool ValidateTeamResources(int teamID)
     {
-        if (teamPlayerPrefabs.Length < 3 || teamSpawnPoints.Length < 3)
+        if (playerPrefab == null)
         {
-            Debug.LogError("Missing team prefabs or spawn points!");
+            Debug.LogError("RoomManager.playerPrefab is not assigned!");
             return false;
         }
 
-        if (teamPlayerPrefabs[teamID] == null || teamSpawnPoints[teamID] == null)
+        if (teamSpawnPoints.Length < 3 || teamSpawnPoints[teamID] == null)
         {
-            Debug.LogError($"Missing resources for team {teamID}!");
+            Debug.LogError($"Missing spawn point for team {teamID}!");
             return false;
         }
         return true;

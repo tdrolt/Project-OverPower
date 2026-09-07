@@ -1560,10 +1560,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b0241a0aa4c1d8147b34371ecec61c4b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  teamPlayerPrefabs:
-  - {fileID: 2536872752076754183, guid: 85fd2a1743a90bc45880230cecf56101, type: 3}
-  - {fileID: 2536872752076754183, guid: 895b30196e469bf47811477ffdbd37eb, type: 3}
-  - {fileID: 2536872752076754183, guid: ed7ab8060f1f5c846bc0ba7ee5277e1b, type: 3}
+  playerPrefab: {fileID: 2536872752076754183, guid: 85fd2a1743a90bc45880230cecf56101, type: 3}
   teamSpawnPoints:
   - {fileID: 773190230}
   - {fileID: 1375737369}
@@ -4077,9 +4074,7 @@ MonoBehaviour:
   zoomSpeed: 5
   minZoomDistance: 5
   maxZoomDistance: 20
-  rotateLeftKey: 113
-  rotateRightKey: 101
-  rotationSpeed: 90
+  teamYawOffset: 0
 --- !u!1 &334480042
 GameObject:
   m_ObjectHideFlags: 0
