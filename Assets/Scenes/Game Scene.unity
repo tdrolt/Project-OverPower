@@ -4074,7 +4074,7 @@ MonoBehaviour:
   zoomSpeed: 5
   minZoomDistance: 5
   maxZoomDistance: 20
-  teamYawOffset: 0
+  teamYawOffset: 120
 --- !u!1 &334480042
 GameObject:
   m_ObjectHideFlags: 0
