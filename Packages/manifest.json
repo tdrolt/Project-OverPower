@@ -5,6 +5,9 @@
     "com.unity.ide.visualstudio": "2.0.27",
     "com.unity.inputsystem": "1.19.0",
     "com.unity.multiplayer.center": "1.0.0",
+    "com.unity.multiplayer.playmode": "1.6.3",
+    "com.unity.multiplayer.tools": "2.2.11",
+    "com.unity.pipeline": "0.6.0-exp.1",
     "com.unity.render-pipelines.universal": "17.0.4",
     "com.unity.test-framework": "1.6.0",
     "com.unity.timeline": "1.8.10",
@@ -41,7 +44,6 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0",
-    "com.unity.pipeline": "0.6.0-exp.1"
+    "com.unity.modules.xr": "1.0.0"
   }
 }
