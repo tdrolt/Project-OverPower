@@ -29,6 +29,10 @@ public class PlayerMotor : MonoBehaviour
 
     private Rigidbody rb;
     private PhotonView photonView;
+    private PlayerInputRouter router;
+
+    // Logged once, not every frame the reference stays missing - see MovementInput().
+    private bool loggedMissingRouter;
 
     // Resolved once from gameplayConfig in Awake, not read from it every FixedUpdate - killHeight
     // does not change mid-match, and re-reading it every frame would mean re-logging the missing-
@@ -80,6 +84,7 @@ public class PlayerMotor : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         photonView = GetComponent<PhotonView>();
+        router = GetComponent<PlayerInputRouter>();
 
         // A silent null here would mean a player who falls off the map falls forever instead of
         // ever being caught, so this falls back to the old hardcoded value rather than leaving
@@ -142,11 +147,27 @@ public class PlayerMotor : MonoBehaviour
     /// the player sideways across the screen. Public because a dash or blink needs a raw input
     /// direction to travel along - the four Space-bound dash scripts that used this were deleted in
     /// Task 0.11b, and the ability system replacing them will want it again.
+    ///
+    /// The raw WASD read itself moved to PlayerInputRouter in Task 0.12 (it also owns the alive
+    /// and chat-focus gates, so a dead or typing player's axis already reads zero by the time it
+    /// gets here) - this method keeps only the camera-relative conversion, which is motor-specific
+    /// rather than input-specific.
     /// </summary>
     public Vector3 MovementInput()
     {
-        float horizontalInput = Input.GetAxisRaw("Horizontal");
-        float verticalInput = Input.GetAxisRaw("Vertical");
+        if (router == null)
+        {
+            if (!loggedMissingRouter)
+            {
+                loggedMissingRouter = true;
+                Debug.LogError($"[PlayerMotor] {name}: PlayerInputRouter is missing - movement disabled.");
+            }
+            return Vector3.zero;
+        }
+
+        Vector2 rawInput = router.MoveAxis;
+        float horizontalInput = rawInput.x;
+        float verticalInput = rawInput.y;
 
         Camera cam = Camera.main;
         if (cam == null)
