@@ -4185,12 +4185,6 @@ GameObject:
   - component: {fileID: 4482859887274795101}
   - component: {fileID: 2490652321199623925}
   - component: {fileID: 7266508299085458083}
-  - component: {fileID: 1076015078126253386}
-  - component: {fileID: 9118536337621688220}
-  - component: {fileID: -8074560819650703973}
-  - component: {fileID: 655205570813804917}
-  - component: {fileID: 7429358551962766898}
-  - component: {fileID: 4496639006839607004}
   - component: {fileID: 7642428642100231979}
   - component: {fileID: 1611995115818407409}
   - component: {fileID: 7910462079668740804}
@@ -4200,6 +4194,9 @@ GameObject:
   - component: {fileID: 7995799834452346527}
   - component: {fileID: 8536702459645128775}
   - component: {fileID: 2000531152435971246}
+  - component: {fileID: 8718283993306383629}
+  - component: {fileID: 9000035540746409762}
+  - component: {fileID: 5221256228866866382}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -4326,134 +4323,10 @@ MonoBehaviour:
   OwnershipTransfer: 0
   observableSearch: 2
   ObservedComponents:
-  - {fileID: 1076015078126253386}
+  - {fileID: 0}
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
---- !u!114 &1076015078126253386
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2536872752076754183}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5e082bc81a43c4e468d5b2320d43d3d1, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  fireRate: 0.75
-  bulletPrefab: {fileID: 2498108459180963871, guid: 1f9f495d7cbc7ae4db3ea0ca37b33d9a, type: 3}
-  bulletPosition: {fileID: 8170903716044679203}
-  bulletFiringEffect: {fileID: 1000011513120438, guid: 8d9a47f111c9e1247a1f24953cd07236, type: 3}
-  playerNameText: {fileID: 3996453988446948075}
-  playerShootingAudio: {fileID: 8300000, guid: b1a32d3a3ec4c6e499fa65ce1e60b663, type: 3}
-  playerMesh: {fileID: 2327462636180084888}
-  waitingPanel: {fileID: 811910928182454971}
-  youWonPanel: {fileID: 8582863100347077675}
-  respawnPanel: {fileID: 9051395882172250540}
-  youLostPanel: {fileID: 878118593987345808}
-  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
---- !u!114 &9118536337621688220
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2536872752076754183}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 469a21a154c1155419ec869ddfccce94, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  dashDistance: 6
-  dashDuration: 0.2
-  dashCooldown: 2
-  animator: {fileID: 2327462636830915389}
-  dashColliderRadius: 0.7
---- !u!114 &-8074560819650703973
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2536872752076754183}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a87f282adb02b9f4a8d6eabc9dbf4b7b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  aoePrefab: {fileID: 100000, guid: 0fddeeac4d9b4a74981d41ab7ae6f622, type: 3}
-  aoeDamage: 15
-  aoeDuration: 4
-  aoeRadius: 2
-  aoeRange: 10
-  SpellCastingAudio: {fileID: 8300000, guid: e5be2c3c4b4ec3842b9f33053a93d02c, type: 3}
-  cooldown: 6
---- !u!114 &655205570813804917
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2536872752076754183}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 23336e9f93701a941923c715a3dc3adc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  dashDistance: 4
-  dashDuration: 0.2
-  dashCooldown: 3.5
-  animator: {fileID: 2327462636830915389}
-  damageReductionPercent: 80
-  buffDuration: 5
-  dashColliderRadius: 0.5
---- !u!114 &7429358551962766898
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2536872752076754183}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 506af90758d7aff4aa983831ce4b2493, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  dashDistance: 5
-  dashDuration: 0.2
-  dashCooldown: 3
-  projectileSpawnDelay: 0.2
-  animator: {fileID: 2327462636830915389}
-  projectilePrefab: {fileID: 2498108459180963871, guid: 1f9f495d7cbc7ae4db3ea0ca37b33d9a, type: 3}
-  projectileSpeed: 15
-  projectileDamage: 10
-  bulletSpawnPosition: {fileID: 8170903716044679203}
-  dashColliderRadius: 0.5
---- !u!114 &4496639006839607004
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2536872752076754183}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 48d1eab16efdbfb41aee8b3e48bd437b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  playerDash: {fileID: 9118536337621688220}
-  playerDashWithBuff: {fileID: 655205570813804917}
-  playerDashWithProjectile: {fileID: 7429358551962766898}
-  aoeAbility: {fileID: -8074560819650703973}
-  shootingAbility: {fileID: 9035221781050470253}
-  abilityPanel: {fileID: 2270444008928040264}
-  dashButton: {fileID: 4540920412376631507}
-  dashWithBuffButton: {fileID: 5827811826694076399}
-  dashWithProjectileButton: {fileID: 3544212990563641656}
-  aoeButton: {fileID: 3483124972730255165}
-  shootingButton: {fileID: 0}
 --- !u!136 &7642428642100231979
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -4589,6 +4462,49 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 60eceb9aba58e3d47b774f691e9dadfe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &8718283993306383629
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cafe56d0fb23eb44ea4afd8d9e932fe1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
+  playerMesh: {fileID: 2327462636180084888}
+--- !u!114 &9000035540746409762
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7abb0c1a289a3d748a99d72825c6fead, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  waitingPanel: {fileID: 811910928182454971}
+  youWonPanel: {fileID: 8582863100347077675}
+  respawnPanel: {fileID: 9051395882172250540}
+  youLostPanel: {fileID: 878118593987345808}
+--- !u!114 &5221256228866866382
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6765b647c354f9640b03fc26e383393c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerNameText: {fileID: 3996453988446948075}
 --- !u!1 &2624496485518630304
 GameObject:
   m_ObjectHideFlags: 0
