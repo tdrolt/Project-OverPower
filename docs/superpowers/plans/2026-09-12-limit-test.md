@@ -1163,7 +1163,7 @@ The first real content, and the reference every other weapon's numbers are relat
 | `minConeAngle` | 1.5 | **Claude** |
 | `maxConeAngle` | 7 | **Claude** |
 | `bloomPerShot` | 0.8 | **Claude** |
-| `recoveryPerSecond` | 6 | **Claude** |
+| `recoveryPerSecond` | 2.0 | **Claude** |
 | `standingStillMultiplier` | 1.5 | GDD |
 | `overheatPerShot` | 7 | **Claude** — 14 shots to silence, roughly 4.5s of sustained fire |
 
@@ -1277,7 +1277,7 @@ which fires everything at once.
 | `minConeAngle` | 1.8 | 1.8 | 1.8 | [C] |
 | `maxConeAngle` | 9 | 9 | 9 | [C] |
 | `bloomPerShot` | 0.7 | 0.7 | 0.7 | [C] |
-| `recoveryPerSecond` | 7 | 7 | 7 | [C] |
+| `recoveryPerSecond` | 3.0 | 3.0 | 3.0 | [C] |
 | `overheatPerShot` | 9 per trigger pull | 12 | 9 | [C] |
 | `maxChargeSeconds` | — | 0.35 | — | [C] |
 | `chargeMaxProjectiles` | — | 5 | — | [T] |
@@ -1328,7 +1328,7 @@ a few metres most of them miss. No special-case code.
 | `minConeAngle` | 2.5 | 4.0 | 3.0 | [C] |
 | `maxConeAngle` | 12 | 20 | 8 | [C] |
 | `bloomPerShot` | 1.1 | 1.6 | 2.5 | [C] |
-| `recoveryPerSecond` | 8 | 9 | 6 | [C] |
+| `recoveryPerSecond` | 3.0 | 9.0 | 1.5 | [C] |
 | `overheatPerShot` | 3.5 | 2.2 | 18 | [C] |
 
 TTK: SMG 125/6 = 20.8 shots x 0.16 = **3.3s** nominal, longer in practice because of the cone.
@@ -1362,7 +1362,7 @@ for the laser applies: **double overheat per shot, half refunded if the shot con
 | `minConeAngle` | 0.8 | 0.8 | 0.8 | [C] |
 | `maxConeAngle` | 6 | 6 | 6 | [C] |
 | `bloomPerShot` | 1.5 | 1.5 | 1.5 | [C] |
-| `recoveryPerSecond` | 5 | 5 | 5 | [C] |
+| `recoveryPerSecond` | 1.5 | 1.5 | 1.5 | [C] |
 | `overheatPerShot` | 14 | 14 | 14 | [C], doubling the baseline per [G] |
 | `overheatRefundOnHit` | 7 | 7 | 7 | [G] |
 | `maxChargeSeconds` | — | 0.45 | — | [C] |
@@ -1891,6 +1891,21 @@ One document, kept brief per Tudor's instruction, containing:
 5. **What is safe to playtest and what is not**, since a test with 2–3 people follows the window.
 
 ---
+
+## A balance invariant the tests exposed, 2026-09-12
+
+**`recoveryPerSecond` must be lower than `bloomPerShot / fireInterval`, or the aim cone does
+nothing.** If recovery outpaces the rate at which sustained fire adds bloom, the cone sits pinned at
+`minAngle` forever and accuracy becomes a decorative number.
+
+Writing Task 0.6's tests surfaced that **five of the seven weapons were configured this way** in the
+first draft of this plan: baseline (2.50 bloom/s vs 6.0 recovery), SMG (6.88 vs 8.0), burst (5.53 vs
+7.0), laser (3.00 vs 5.0) and shotgun (2.78 vs 6.0). Only the rocket and the double-rate SMG were
+correct. Nobody would have found this by playing — the cone would simply have felt like it "does not
+do much", and the complaint would have landed on the random-spread decision instead.
+
+Corrected values are in the tables above. **Re-check this invariant whenever a fire rate changes**,
+because a faster weapon needs slower recovery to keep the same feel.
 
 ## Self-review against the spec
 

@@ -21,11 +21,23 @@ namespace Overpower.Combat
         public float CurrentAngle { get; private set; }
 
         /// <summary>
+        /// Whether the owner was moving as of the last Tick. Stored rather than passed to
+        /// EffectiveAngle so that callers cannot read a spread that disagrees with CurrentAngle.
+        /// </summary>
+        private bool isMoving;
+
+        /// <summary>
         /// The spread actually used to fire, after the standing-still bonus. 1.5x tighter the
         /// instant the movement vector hits zero, so that strafing versus planting your feet is
         /// a real decision rather than something players discover by accident.
+        ///
+        /// Computed on read, never cached: caching it meant RegisterShot could grow CurrentAngle
+        /// while EffectiveAngle still reported the pre-shot spread until the next Tick, and Reset
+        /// left it at the moving value even for a standing player. Both are the kind of silent
+        /// wrongness that gets blamed on the random spread instead of on the bookkeeping.
         /// </summary>
-        public float EffectiveAngle { get; private set; }
+        public float EffectiveAngle =>
+            isMoving ? CurrentAngle : CurrentAngle / standingStillMultiplier;
 
         public AimConeState(float minAngle, float maxAngle, float bloomPerShot,
                             float recoveryPerSecond, float standingStillMultiplier)
@@ -37,7 +49,7 @@ namespace Overpower.Combat
             this.standingStillMultiplier = standingStillMultiplier;
 
             CurrentAngle = minAngle;
-            EffectiveAngle = minAngle;
+            isMoving = false;
         }
 
         public void RegisterShot()
@@ -54,7 +66,7 @@ namespace Overpower.Combat
         public void Tick(float deltaTime, bool isMoving)
         {
             CurrentAngle = Mathf.Max(minAngle, CurrentAngle - recoveryPerSecond * deltaTime);
-            EffectiveAngle = isMoving ? CurrentAngle : CurrentAngle / standingStillMultiplier;
+            this.isMoving = isMoving;
         }
 
         /// <summary>
@@ -71,7 +83,6 @@ namespace Overpower.Combat
         public void Reset()
         {
             CurrentAngle = minAngle;
-            EffectiveAngle = minAngle;
         }
     }
 }
