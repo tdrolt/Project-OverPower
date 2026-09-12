@@ -3272,6 +3272,54 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1686887134142385820, guid: 4a312fc04edc6584bbbcfcca6e2bf602, type: 3}
   m_PrefabInstance: {fileID: 288501798}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &288696749
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 288696750}
+  - component: {fileID: 288696751}
+  m_Layer: 0
+  m_Name: TestRangePanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &288696750
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288696749}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &288696751
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288696749}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d58825df59643a0499a21fda7ce068ae, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
+  armorConfig: {fileID: 11400000, guid: 7c3c352cca1b63c418cb15fb4105cfa5, type: 2}
+  weaponCatalogue: {fileID: 11400000, guid: 16afde6d43329db4bbd7fed72f897638, type: 2}
+  abilityCatalogue: {fileID: 11400000, guid: 70e5ea7660cd12b4bbb497e71ca8b00e, type: 2}
 --- !u!1001 &292850233
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -28194,6 +28242,60 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1911939709741095366, guid: e449ee857113d68468c8619a3c2396ec, type: 3}
   m_PrefabInstance: {fileID: 2134998303}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &2139623632
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2139623633}
+  - component: {fileID: 2139623634}
+  m_Layer: 0
+  m_Name: TestRangeSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2139623633
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139623632}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2139623634
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139623632}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 286e4b3ebab5b58419a6629347496236, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
+  roomManager: {fileID: 101938906}
+  dummyTargetPrefab: {fileID: 8202614152504659180, guid: d91407d1ea61734448b6672cd59f320a, type: 3}
+  stationaryDistances:
+  - 5
+  - 25
+  lateralSpacing: 4
+  strafingDummyCount: 1
+  strafeDistance: 6
+  strafeRowDistance: 15
 --- !u!33 &117287209119933339
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -32248,3 +32350,5 @@ SceneRoots:
   - {fileID: 2034992530}
   - {fileID: 941603634}
   - {fileID: 1781703214}
+  - {fileID: 288696750}
+  - {fileID: 2139623633}
