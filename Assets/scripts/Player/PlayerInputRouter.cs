@@ -31,6 +31,9 @@ public class PlayerInputRouter : MonoBehaviour
     // per AliveChanged event instead.
     private bool isAlive = true;
 
+    // Set by whichever tool currently wants gameplay input suppressed - see SetToolFocus below.
+    private bool toolHasFocus;
+
     /// <summary>Raw WASD, not camera-relative - PlayerMotor does that conversion, since it depends
     /// on the camera rig and not on input.</summary>
     public Vector2 MoveAxis => gameplayMap != null && !InputSuppressed ? moveAction.ReadValue<Vector2>() : Vector2.zero;
@@ -58,13 +61,22 @@ public class PlayerInputRouter : MonoBehaviour
     public event System.Action ScoreboardPressed;
     public event System.Action ScoreboardReleased;
 
-    /// <summary>True while dead or while the player is typing into a text field (e.g. chat). Every
-    /// property and event above is gated on this being false.
+    /// <summary>True while dead, while the player is typing into a text field (e.g. chat), or while
+    /// a tool has claimed focus (see SetToolFocus). Every property and event above is gated on this
+    /// being false.
     ///
     /// Deliberately NOT gated on PlayerOverheat.CanAct - full overheat silencing the weapon and
     /// abilities is an ability-level rule the ability system enforces itself, not an input-level
     /// one, and the design wants an overheated player to still be able to walk away.</summary>
-    public bool InputSuppressed => !isAlive || IsTypingInChat();
+    public bool InputSuppressed => !isAlive || IsTypingInChat() || toolHasFocus;
+
+    /// <summary>
+    /// General-purpose input lock for anything that is a tool rather than gameplay - right now
+    /// only the test range panel, which must stop a dropdown click from also firing the weapon
+    /// underneath it. Deliberately a flag the caller sets rather than this router special-casing
+    /// the test range by name, so a future tool (a map, a shop) can reuse it with no change here.
+    /// </summary>
+    public void SetToolFocus(bool hasFocus) => toolHasFocus = hasFocus;
 
     private void Awake()
     {

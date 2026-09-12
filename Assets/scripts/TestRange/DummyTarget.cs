@@ -52,6 +52,12 @@ namespace Overpower.TestRange
         private float firstHitTime;
         private int hits;
 
+        // A static bulletin board of the most recent kill from ANY dummy in the scene, so the test
+        // range panel's readout can show it without polling logs or holding a reference to whichever
+        // dummy happens to die. -1 means nothing has died yet this session.
+        public static float LastMeasuredTtkSeconds { get; private set; } = -1f;
+        public static int LastMeasuredHits { get; private set; }
+
         public bool IsAlive => !isDead;
         public int TeamId => teamId;
 
@@ -111,7 +117,9 @@ namespace Overpower.TestRange
                 isDead = true;
 
                 // The line the whole test range exists to print.
-                Debug.Log($"[TTK] killed in {Time.time - firstHitTime:F2}s after {hits} hits");
+                LastMeasuredTtkSeconds = Time.time - firstHitTime;
+                LastMeasuredHits = hits;
+                Debug.Log($"[TTK] killed in {LastMeasuredTtkSeconds:F2}s after {hits} hits");
 
                 StartCoroutine(ResetAfterDelay());
             }
