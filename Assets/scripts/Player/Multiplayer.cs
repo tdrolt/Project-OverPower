@@ -16,6 +16,12 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     /// See CODING-STANDARDS.md section 5, rule 2.
     public const string AliveKey = "alive";
 
+    // Task 0.10 moved actual movement to PlayerMotor, which reads its own speed from
+    // GameplayConfig plus a keyed multiplier stack - this field no longer drives motion. It stays
+    // here only because ApplyAliveState/ShowMatchResult/RPC_ShowYouLostPanel below (all Task 0.11
+    // territory: death and match-end) still assign it. That task should redirect those three call
+    // sites to PlayerMotor.AddSpeedMultiplier/RemoveSpeedMultiplier so "stop moving on death"
+    // actually does something again.
     public float movementSpeed = 5f;
     // Captured at Start so death (which sets speed to 0) and respawn can restore whatever the
     // prefab actually says, instead of a second hardcoded number that disagrees with it.
@@ -47,9 +53,10 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
     private PhotonView photonView;
 
-    // Variables for network synchronization
-    private Vector3 networkPosition;
-    private Quaternion networkRotation;
+    // Movement, remote-player interpolation and the kill-height safety net now live on
+    // PlayerMotor; this class only feeds it network targets and reacts to falling out of the
+    // map. See PlayerMotor.cs.
+    private PlayerMotor playerMotor;
 
     // References to ability scripts
     private PlayerShooting playerShooting;
@@ -64,9 +71,6 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
     private bool death = false;
     private bool respawnStarted = false;
-
-    // Below this world height a player has fallen out of the map and is put back at their spawn.
-    public float killHeight = -10f;
 
     [Header("Respawn")]
     public float baseRespawnSeconds = 5f;   // wait after the first death
@@ -95,6 +99,8 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         capsuleCollider = GetComponent<CapsuleCollider>();
         playerHealth = GetComponent<PlayerHealth>();
         playerHealth.Died += HandlePlayerHealthDied;
+        playerMotor = GetComponent<PlayerMotor>();
+        playerMotor.FellBelowKillHeight += HandleFellBelowKillHeight;
 
         // Set player name based on Photon owner
         playerNameText.text = photonView.Owner.NickName;
@@ -128,10 +134,6 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
         ApplyAliveStateFromProperties();
 
-        // Initialize network sync values
-        networkPosition = transform.position;
-        networkRotation = transform.rotation;
-
         if (photonView.IsMine)
         {
             // Let the camera follow your player
@@ -157,7 +159,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         if (!photonView.IsMine)
             return;
 
-        UpdateRotationFromMouse();
+        // Rotation-to-cursor now runs on PlayerAim's own Update - nothing to call here.
 
         // No casting while dead. Without this a player could dash during the respawn wait and
         // reappear where they died instead of at their base.
@@ -190,87 +192,19 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
     void FixedUpdate()
     {
+        // PlayerMotor now does the actual moving, remote-player interpolation and falling check;
+        // this just tells it whether a dash currently owns the Rigidbody for the frame, exactly
+        // as this check used to gate the old direct Move() call.
         if (photonView.IsMine)
-        {
-            // Players fall off the map. Returning them costs nothing and needs no keybind, which
-            // beats a manual respawn button: someone falling should not have to know a shortcut,
-            // and a free respawn key is an escape hatch out of a losing fight.
-            if (isAlive && transform.position.y < killHeight)
-                ReturnToSpawn();
-
-            if (playerDash == null || !playerDash.IsDashing())
-            {
-                Move();
-            }
-        }
-        else
-        {
-            rigidbody.MovePosition(Vector3.Lerp(transform.position, networkPosition, Time.deltaTime * 10));
-            rigidbody.MoveRotation(Quaternion.Lerp(transform.rotation, networkRotation, Time.deltaTime * 10));
-        }
+            playerMotor.ExternalMotionControl = playerDash != null && playerDash.IsDashing();
 
         // Continuously check for cathedral capture status
         CheckForCathedralCapture();
     }
 
-    void UpdateRotationFromMouse()
-    {
-        // Only allow local player to control rotation
-        if (!photonView.IsMine)
-            return;
-
-        // Cast a ray from the mouse position to the game world
-        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        Plane groundPlane = new Plane(Vector3.up, new Vector3(0, transform.position.y, 0));
-        float rayDistance;
-
-        if (groundPlane.Raycast(ray, out rayDistance))
-        {
-            // Get the point where the ray hits the ground plane
-            Vector3 pointToLook = ray.GetPoint(rayDistance);
-
-            // Calculate direction from player to mouse position
-            Vector3 direction = pointToLook - transform.position;
-            direction.y = 0f; // Keep rotation horizontal
-
-            if (direction != Vector3.zero)
-            {
-                // Rotate player to face the mouse cursor
-                transform.rotation = Quaternion.LookRotation(direction);
-            }
-        }
-    }
-
-    /// WASD relative to where the camera is looking, not to world axes.
-    /// Required now that Q/E orbit the camera: with world-space input, rotating the view 90 would
-    /// make W move the player sideways across the screen.
-    Vector3 MovementInput()
-    {
-        float horizontalInput = Input.GetAxisRaw("Horizontal");
-        float verticalInput = Input.GetAxisRaw("Vertical");
-
-        Camera cam = Camera.main;
-        if (cam == null)
-            return new Vector3(horizontalInput, 0f, verticalInput);
-
-        Vector3 forward = cam.transform.forward;
-        Vector3 right = cam.transform.right;
-        forward.y = 0f;
-        right.y = 0f;
-        forward.Normalize();
-        right.Normalize();
-
-        return right * horizontalInput + forward * verticalInput;
-    }
-
-    void Move()
-    {
-        Vector3 movementDir = MovementInput();
-        if (movementDir.magnitude > 1)
-            movementDir.Normalize();
-
-        rigidbody.MovePosition(rigidbody.position + movementDir * movementSpeed * Time.deltaTime);
-    }
+    /// Forwards to PlayerMotor, which now owns the actual camera-relative input calculation - kept
+    /// under this name so the dash calls below (still Task 0.11+ territory) do not need to change.
+    Vector3 MovementInput() => playerMotor.MovementInput();
 
     void CheckForCathedralCapture()
     {
@@ -335,8 +269,10 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         }
         else
         {
-            networkPosition = (Vector3)stream.ReceiveNext();
-            networkRotation = (Quaternion)stream.ReceiveNext();
+            // Position/rotation are handed straight to PlayerMotor, which now owns the
+            // remote-player interpolation - the wire protocol itself is unchanged, same 4
+            // values in the same order.
+            playerMotor.SetNetworkTarget((Vector3)stream.ReceiveNext(), (Quaternion)stream.ReceiveNext());
             float receivedHealth = (float)stream.ReceiveNext();
             float receivedArmor = (float)stream.ReceiveNext();
             playerHealth.SetHealthFromNetwork(receivedHealth, receivedArmor);
@@ -352,6 +288,15 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
             PlayerDied();
 
         death = true;
+    }
+
+    /// PlayerMotor only detects falling below the kill height and raises this - it does not know
+    /// about isAlive, so this preserves the guard the inline check used to have (a dead player's
+    /// Rigidbody is kinematic and should not normally be moving at all, but this costs nothing).
+    private void HandleFellBelowKillHeight()
+    {
+        if (isAlive)
+            ReturnToSpawn();
     }
 
     void PlayerDied()
@@ -605,7 +550,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         if (rigidbody != null)
             rigidbody.linearVelocity = Vector3.zero;
 
-        Debug.Log($"[VIS] fell below y={killHeight}, returned to spawn");
+        Debug.Log($"[VIS] fell below y={playerMotor.KillHeight}, returned to spawn");
     }
 
     void SetLayerRecursively(GameObject o, int layer)
@@ -624,6 +569,8 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     {
         if (playerHealth != null)
             playerHealth.Died -= HandlePlayerHealthDied;
+        if (playerMotor != null)
+            playerMotor.FellBelowKillHeight -= HandleFellBelowKillHeight;
     }
 
     /// Owner-only. Applies the change locally straight away so dying feels instant, then

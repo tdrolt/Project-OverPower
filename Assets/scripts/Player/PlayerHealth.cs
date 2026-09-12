@@ -27,7 +27,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     private float health;
     private ArmorState armor;
-    private StatusEffectState statusEffects;
+    private PlayerStatusEffects statusEffects; // A status is not health - see PlayerStatusEffects.cs.
     private int armorTier = 0; // Everyone starts on tier 0 armor, not on none.
     private float secondsSinceCombat;
     private bool isDead;
@@ -57,6 +57,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         photonView = GetComponent<PhotonView>();
         dashBuff = GetComponent<PlayerDashWithBuff>();
+        statusEffects = GetComponent<PlayerStatusEffects>();
 
         // A silent null here would make this player un-damageable - the worst failure mode.
         if (gameplayConfig == null)
@@ -65,8 +66,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             Debug.LogError($"[PlayerHealth] {name}: ArmorConfig is not assigned - cannot take damage.");
 
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
-        statusEffects = new StatusEffectState(gameplayConfig != null ? gameplayConfig.SlowCap : 0f,
-                                               gameplayConfig != null ? gameplayConfig.VulnerabilityCap : 0f);
         armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(armorTier) : 0f,
                                 armorConfig != null ? armorConfig.RechargeSecondsFor(armorTier) : 6f);
 
@@ -81,14 +80,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         secondsSinceCombat += Time.deltaTime;
 
-        // Burn is charged through ApplyDamage, never subtracted from health directly - that
-        // shortcut is the divergence this component removes. (Nothing applies Burn yet, so this
-        // is a no-op for now; self-attribution below will need a real caster once something does.)
-        float burn = statusEffects.ConsumeBurnDamage(Time.deltaTime);
-        if (burn > 0f)
-            ApplyDamage(new DamageInfo(burn, ActorNumber, TeamId, -1, DamageSource.Burn, false, transform.position));
-
-        statusEffects.Tick(Time.deltaTime);
+        // Burn is ticked by PlayerStatusEffects now, which routes it back through ApplyDamage below.
         armor.Tick(Time.deltaTime, secondsSinceCombat);
     }
 
@@ -98,6 +90,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // Bug 1.1: the victim is the sole authority on its own health, or every client would
         // subtract from its own copy and the owner's next serialization would fight it back.
         if (!photonView.IsMine || isDead)
+            return default;
+
+        // The Invulnerability ultimate depends on this: the funnel is the only place that can stop a hit for everyone.
+        if (statusEffects != null && statusEffects.IsInvulnerable)
             return default;
 
         Photon.Realtime.Player sourcePlayer = PhotonNetwork.CurrentRoom?.GetPlayer(info.SourceActorNumber);
@@ -125,7 +121,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return default;
         }
 
-        float vulnerability = statusEffects.Magnitude(StatusKind.Vulnerability);
+        float vulnerability = statusEffects != null ? statusEffects.Vulnerability : 0f;
         DamageResult result = DamageResolver.Resolve(info.Amount, info.IgnoresArmor, health,
                                                        armor.Current, vulnerability, CurrentDamageReduction());
         armor.Absorb(result.ArmorAbsorbed);
@@ -194,7 +190,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public void ResetForRespawn()
     {
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
-        statusEffects.ClearAll();
+        statusEffects?.ClearAll();
         secondsSinceCombat = 0f;
         isDead = false;
 
