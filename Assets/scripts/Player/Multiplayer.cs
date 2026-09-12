@@ -2,10 +2,10 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using UnityEngine.UI;
-using Photon.Pun.UtilityScripts;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Overpower.Combat;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
@@ -28,9 +28,6 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     public GameObject bulletFiringEffect;    
     private float nextFire;
 
-    [HideInInspector]
-    public int health = 100;
-    public Slider healthBar;
     public Text playerNameText; // UI Text for player name display
 
     public AudioClip playerShootingAudio;
@@ -61,14 +58,12 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     private PlayerDashWithBuff playerDashWithBuff;
     private PlayerDashWithProjectile playerDashWithProjectile;
     private CapsuleCollider capsuleCollider;
+    // Health, armor and the damage funnel now live on PlayerHealth; this class reacts to its
+    // Died event instead of computing health itself. See PlayerHealth.cs.
+    private PlayerHealth playerHealth;
 
     private bool death = false;
     private bool respawnStarted = false;
-
-    // Damage refusals are reported once each, not per hit: enough to confirm the rule is live
-    // without a teamfight filling the log.
-    private bool loggedSelfHitBlocked = false;
-    private bool loggedFriendlyFireBlocked = false;
 
     // Below this world height a player has fallen out of the map and is put back at their spawn.
     public float killHeight = -10f;
@@ -98,6 +93,8 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         playerDashWithProjectile = GetComponent<PlayerDashWithProjectile>();
         aoeAbility = GetComponent<AoEAbility>();
         capsuleCollider = GetComponent<CapsuleCollider>();
+        playerHealth = GetComponent<PlayerHealth>();
+        playerHealth.Died += HandlePlayerHealthDied;
 
         // Set player name based on Photon owner
         playerNameText.text = photonView.Owner.NickName;
@@ -333,135 +330,28 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         {
             stream.SendNext(transform.position);
             stream.SendNext(transform.rotation);
-            stream.SendNext(health);
+            stream.SendNext(playerHealth.Health);
+            stream.SendNext(playerHealth.Armor);
         }
         else
         {
             networkPosition = (Vector3)stream.ReceiveNext();
             networkRotation = (Quaternion)stream.ReceiveNext();
-            health = (int)stream.ReceiveNext();
-            healthBar.value = health;
+            float receivedHealth = (float)stream.ReceiveNext();
+            float receivedArmor = (float)stream.ReceiveNext();
+            playerHealth.SetHealthFromNetwork(receivedHealth, receivedArmor);
         }
     }
 
-    private void OnCollisionEnter(Collision collision)
+    /// Reacts to PlayerHealth reporting a lethal hit, rather than polling health every frame.
+    /// PlayerHealth already latches Died to fire only once; this keeps this class's own `death`
+    /// flag (read by the respawn coroutine and CheckForCathedralCapture) in step with it.
+    private void HandlePlayerHealthDied(DamageInfo info)
     {
-        // Only the player being hit decides that they were hit. Without this, every client
-        // subtracted health from its own copy of the victim and the owner's next serialization
-        // put it back, so the health bar visibly fought itself.
-        if (!photonView.IsMine)
-            return;
+        if (!death)
+            PlayerDied();
 
-        if (!collision.gameObject.CompareTag("Bullet"))
-            return;
-
-        MultiplayerBulletController bullet = collision.gameObject.GetComponent<MultiplayerBulletController>();
-        if (bullet == null)
-            return;
-
-        // Your own bullet cannot hurt you (dash in front of your own shot).
-        if (bullet.owner != null && bullet.owner == photonView.Owner)
-        {
-            if (!loggedSelfHitBlocked)
-            {
-                loggedSelfHitBlocked = true;
-                Debug.Log("[DMG] blocked own bullet (reported once per match)");
-            }
-            return;
-        }
-
-        // No friendly fire.
-        if (IsSameTeam(bullet.owner, photonView.Owner))
-        {
-            if (!loggedFriendlyFireBlocked)
-            {
-                loggedFriendlyFireBlocked = true;
-                Debug.Log($"[DMG] blocked friendly fire from {bullet.owner?.NickName} (reported once per match)");
-            }
-            return;
-        }
-
-        TakeDamage(bullet);
-    }
-
-    /// True only when both players are known and share a teamID. Deliberately fails OPEN:
-    /// if either team is unknown, damage still applies, because an unknown state silently
-    /// making someone invulnerable is far worse to debug than one stray friendly-fire hit.
-    static bool IsSameTeam(Photon.Realtime.Player a, Photon.Realtime.Player b)
-    {
-        if (a == null || b == null)
-            return false;
-        if (a == b)
-            return true;
-
-        return TryGetTeam(a, out int teamA) && TryGetTeam(b, out int teamB) && teamA == teamB;
-    }
-
-    static bool TryGetTeam(Photon.Realtime.Player player, out int teamID)
-    {
-        teamID = -1;
-        if (player != null && player.CustomProperties.TryGetValue("teamID", out object raw) && raw is int value)
-        {
-            teamID = value;
-            return true;
-        }
-        return false;
-    }
-
-    void TakeDamage(MultiplayerBulletController bullet)
-    {
-        float finalDamage = bullet.damage;
-
-        if (playerDashWithBuff != null && playerDashWithBuff.IsBuffActive())
-        {
-            finalDamage = playerDashWithBuff.ApplyDamageReduction(bullet.damage);
-        }
-
-        health -= (int)finalDamage;
-        healthBar.value = health;
-
-        if (health <= 0)
-        {
-            bullet.owner.AddScore(1);
-
-            if (!death)
-                PlayerDied();
-
-            death = true;
-        }
-    }
-
-    public void ApplyAoEDamage(float damage, Photon.Realtime.Player caster)
-    {
-        // Same single-authority rule as bullets: only the player being hit decides.
-        if (!photonView.IsMine)
-            return;
-
-        if (caster == null)
-            return;
-
-        // Your own AoE does not hurt you, and neither does a teammate's.
-        if (caster == photonView.Owner || IsSameTeam(caster, photonView.Owner))
-            return;
-
-        health -= (int)damage;
-        healthBar.value = health;
-        Debug.Log($"[Multiplayer] {playerNameText.text} took {damage} AoE damage. Remaining health: {health}");
-
-        if (health <= 0)
-        {
-         
-            if (caster != null && caster != photonView.Owner)
-            {
-                caster.AddScore(1);
-                Debug.Log($"[Multiplayer] {playerNameText.text} died. {caster.NickName} scores!");
-            }
-
-            if (!death)
-                PlayerDied();
-
-            death = true;
-        }
+        death = true;
     }
 
     void PlayerDied()
@@ -543,8 +433,7 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         }
 
     
-        health = 100;
-        healthBar.value = health;
+        playerHealth.ResetForRespawn();
 
         SetAlive(true);
 
@@ -730,6 +619,12 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
 
     void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
     void OnDisable() => PhotonNetwork.RemoveCallbackTarget(this);
+
+    void OnDestroy()
+    {
+        if (playerHealth != null)
+            playerHealth.Died -= HandlePlayerHealthDied;
+    }
 
     /// Owner-only. Applies the change locally straight away so dying feels instant, then
     /// publishes it so every other client -- including anyone who joins later -- agrees.

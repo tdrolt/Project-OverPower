@@ -4194,6 +4194,7 @@ GameObject:
   - component: {fileID: 7642428642100231979}
   - component: {fileID: 1611995115818407409}
   - component: {fileID: 7910462079668740804}
+  - component: {fileID: 1553252449368925797}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -4341,8 +4342,6 @@ MonoBehaviour:
   bulletPrefab: {fileID: 2498108459180963871, guid: 1f9f495d7cbc7ae4db3ea0ca37b33d9a, type: 3}
   bulletPosition: {fileID: 8170903716044679203}
   bulletFiringEffect: {fileID: 1000011513120438, guid: 8d9a47f111c9e1247a1f24953cd07236, type: 3}
-  health: 100
-  healthBar: {fileID: 7281419878178676536}
   playerNameText: {fileID: 3996453988446948075}
   playerShootingAudio: {fileID: 8300000, guid: b1a32d3a3ec4c6e499fa65ce1e60b663, type: 3}
   playerMesh: {fileID: 2327462636180084888}
@@ -4504,6 +4503,21 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 1666fb81395f51e4293b01cca8f58481, type: 2}
   - {fileID: 2100000, guid: 93954767c5da02742b700c59b05ae323, type: 2}
   - {fileID: 2100000, guid: 4196b6395cb60664ebf09292238527fe, type: 2}
+--- !u!114 &1553252449368925797
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a8c99653f867494ba5906539b8b4c7a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
+  armorConfig: {fileID: 11400000, guid: 7c3c352cca1b63c418cb15fb4105cfa5, type: 2}
+  healthBar: {fileID: 7281419878178676536}
 --- !u!1 &2624496485518630304
 GameObject:
   m_ObjectHideFlags: 0

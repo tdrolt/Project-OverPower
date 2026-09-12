@@ -46,11 +46,11 @@ public class AoEEffect : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallback
             foreach (Collider hit in hitColliders)
             {
                 // Friend-or-foe used to be a nickname string comparison against a caster that was
-                // null on every non-casting client. Multiplayer.ApplyAoEDamage now owns that
-                // decision (ownership, self-hit and team), so there is one place that decides.
-                Multiplayer player = hit.GetComponent<Multiplayer>();
-                if (player != null)
-                    player.ApplyAoEDamage(damage, caster);
+                // null on every non-casting client. PlayerHealth.ApplyAoEDamage now owns that
+                // decision (ownership, self-hit and team) as part of the one damage funnel.
+                PlayerHealth targetHealth = hit.GetComponent<PlayerHealth>();
+                if (targetHealth != null)
+                    targetHealth.ApplyAoEDamage(damage, caster);
             }
             yield return new WaitForSeconds(tickInterval);
             elapsedTime += tickInterval;
