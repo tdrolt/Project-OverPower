@@ -62,7 +62,20 @@ namespace Overpower.TestRange
         public float Health => health;
         public float Armor => armor.Current;
 
-        private void Awake() => ResetToFull();
+        private void Awake()
+        {
+            // Loud, matching PlayerHealth. A dummy quietly falling back to a hardcoded 100 health
+            // would still look like it was working, and would report a time-to-kill that no longer
+            // matched a real player - poisoning the one thing this object exists to measure.
+            if (gameplayConfig == null)
+                Debug.LogError($"[DummyTarget] {name}: GameplayConfig is not assigned - falling back to " +
+                                "hardcoded health, so any measured time-to-kill is meaningless.");
+            if (armorConfig == null)
+                Debug.LogError($"[DummyTarget] {name}: ArmorConfig is not assigned - this dummy has no " +
+                                "armor, so any measured time-to-kill is too short.");
+
+            ResetToFull();
+        }
 
         private void ResetToFull()
         {
