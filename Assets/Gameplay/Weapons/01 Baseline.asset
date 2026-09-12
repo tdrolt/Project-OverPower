@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c71eff52457a59a4ab28ff8ab8364cd5, type: 3}
+  m_Name: 01 Baseline
+  m_EditorClassIdentifier: 
+  id: 1
+  displayName: Baseline
+  parent: {fileID: 0}
+  icon: {fileID: 0}
+  goldCost: 0
+  damage: 11
+  fireInterval: 0.32
+  projectilesPerShot: 1
+  simultaneous: 0
+  sequentialDelay: 0.07
+  spreadDegrees: 0
+  projectilePrefab: {fileID: 1623706127264014633, guid: 63c51692d08317f4fa141f5524c8f695, type: 3}
+  projectileSpeed: 55
+  projectileRadius: 0.1
+  maxRange: 30
+  minConeAngle: 1.5
+  maxConeAngle: 7
+  bloomPerShot: 0.8
+  recoveryPerSecond: 2
+  standingStillMultiplier: 1.5
+  overheatPerShot: 7
+  overheatRefundOnHit: 0
+  canCharge: 0
+  maxChargeSeconds: 0
+  chargeSteps: 0
+  chargeDamageMultiplier: 1
+  chargeRangeMultiplier: 1
+  chargeMaxProjectiles: 0
+  muzzleVfx: {fileID: 1000011513120438, guid: 8d9a47f111c9e1247a1f24953cd07236, type: 3}
+  fireSfx: {fileID: 8300000, guid: b1a32d3a3ec4c6e499fa65ce1e60b663, type: 3}
+  impactVfx: {fileID: 1000010321467122, guid: c108d1bfc37c0494daea3e4e53c3c16e, type: 3}

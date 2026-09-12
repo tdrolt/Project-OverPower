@@ -1721,7 +1721,6 @@ GameObject:
   - component: {fileID: 2327462636180309176}
   - component: {fileID: 2327462636830915389}
   - component: {fileID: 7279713820920932377}
-  - component: {fileID: 9035221781050470253}
   - component: {fileID: 909816904038918450}
   - component: {fileID: 2980338632064543759}
   m_Layer: 0
@@ -1792,24 +1791,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3326cdb1e1da9964993d35e49d40d0c8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerShooting: {fileID: 9035221781050470253}
---- !u!114 &9035221781050470253
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2327462636180084888}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6eff5af9b927aaf4b8f2d681f6911f70, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  bulletPrefab: {fileID: 2498108459180963871, guid: 1f9f495d7cbc7ae4db3ea0ca37b33d9a, type: 3}
-  bulletPosition: {fileID: 8170903716044679203}
-  bulletFiringEffect: {fileID: 1000011513120438, guid: 8d9a47f111c9e1247a1f24953cd07236, type: 3}
-  fireRate: 0.75
-  playerShootingAudio: {fileID: 8300000, guid: b1a32d3a3ec4c6e499fa65ce1e60b663, type: 3}
+  weaponFiring: {fileID: 5273499792215120218}
 --- !u!114 &909816904038918450
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4198,6 +4180,7 @@ GameObject:
   - component: {fileID: 9000035540746409762}
   - component: {fileID: 5221256228866866382}
   - component: {fileID: 7191723350578664248}
+  - component: {fileID: 5273499792215120218}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -4519,6 +4502,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   controls: {fileID: -944628639613478452, guid: 133348405d87d8845a30ed7fd128440c, type: 3}
+--- !u!114 &5273499792215120218
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f1f38f2dc1109642b6d5ce313360c9d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  catalogue: {fileID: 11400000, guid: 16afde6d43329db4bbd7fed72f897638, type: 2}
+  startingWeapon: {fileID: 11400000, guid: 0023f41e1c59d7c4cb3f34c116cacfe1, type: 2}
+  muzzle: {fileID: 8170903716044679203}
 --- !u!1 &2624496485518630304
 GameObject:
   m_ObjectHideFlags: 0
