@@ -6,9 +6,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Overpower.Combat;
+using Overpower.Data;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
-public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
+public class Multiplayer : MonoBehaviour, IInRoomCallbacks
 {
     /// Whether this player is currently alive. Lives in Photon Player Custom Properties rather
     /// than being announced by an RPC, because it is state, not an event: a player joining
@@ -16,16 +17,6 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     /// See CODING-STANDARDS.md section 5, rule 2.
     public const string AliveKey = "alive";
 
-    // Task 0.10 moved actual movement to PlayerMotor, which reads its own speed from
-    // GameplayConfig plus a keyed multiplier stack - this field no longer drives motion. It stays
-    // here only because ApplyAliveState/ShowMatchResult/RPC_ShowYouLostPanel below (all Task 0.11
-    // territory: death and match-end) still assign it. That task should redirect those three call
-    // sites to PlayerMotor.AddSpeedMultiplier/RemoveSpeedMultiplier so "stop moving on death"
-    // actually does something again.
-    public float movementSpeed = 5f;
-    // Captured at Start so death (which sets speed to 0) and respawn can restore whatever the
-    // prefab actually says, instead of a second hardcoded number that disagrees with it.
-    private float startingMovementSpeed;
     private Rigidbody rigidbody;
 
     public float fireRate = 0.75f;
@@ -73,8 +64,10 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     private bool respawnStarted = false;
 
     [Header("Respawn")]
-    public float baseRespawnSeconds = 5f;   // wait after the first death
-    public float maxRespawnSeconds = 10f;   // ceiling, reached after 6 deaths
+    [Tooltip("Match tuning asset. The base respawn wait, the per-death increase and the cap all " +
+             "come from here now, so all three respawn numbers live in one place with everything " +
+             "else a designer tunes.")]
+    [SerializeField] private GameplayConfig gameplayConfig;
     private int deathCount = 0;
 
     // Mirrors the replicated alive state so input and physics can be gated on it locally.
@@ -89,7 +82,13 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
     void Start()
     {
         rigidbody = GetComponent<Rigidbody>();
-        startingMovementSpeed = movementSpeed;
+
+        // A silent null here would make every respawn use the hardcoded fallbacks below with no
+        // way to tell from the Inspector that the asset was never wired up.
+        if (gameplayConfig == null)
+            Debug.LogError($"[Multiplayer] {name}: GameplayConfig is not assigned - respawn " +
+                            "timing will use hardcoded fallbacks.");
+
         photonView = GetComponent<PhotonView>();
         playerShooting = GetComponentInChildren<PlayerShooting>(true);
         playerDash = GetComponent<PlayerDash>();
@@ -251,31 +250,16 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
             respawnPanel?.SetActive(true);
             waitingPanel?.SetActive(false);
             respawnStarted = true;
-            StartCoroutine(RespawnPlayer(5f, teamID, actorNumber));
+
+            // Used to hardcode 5f here and never touch deathCount, so a capital-recapture respawn
+            // never scaled with repeated deaths the way a normal death does (Task 0.11a defect 3).
+            // NextRespawnDelay is the one place both paths compute this now.
+            float delay = NextRespawnDelay();
+            Debug.Log($"[VIS] cathedral-recapture death {deathCount}, respawning in {delay}s");
+            StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         } else
         {
             Debug.Log("[PlayerDied] Player NOT Respawn Entered");
-        }
-    }
-
-    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
-    {
-        if (stream.IsWriting)
-        {
-            stream.SendNext(transform.position);
-            stream.SendNext(transform.rotation);
-            stream.SendNext(playerHealth.Health);
-            stream.SendNext(playerHealth.Armor);
-        }
-        else
-        {
-            // Position/rotation are handed straight to PlayerMotor, which now owns the
-            // remote-player interpolation - the wire protocol itself is unchanged, same 4
-            // values in the same order.
-            playerMotor.SetNetworkTarget((Vector3)stream.ReceiveNext(), (Quaternion)stream.ReceiveNext());
-            float receivedHealth = (float)stream.ReceiveNext();
-            float receivedArmor = (float)stream.ReceiveNext();
-            playerHealth.SetHealthFromNetwork(receivedHealth, receivedArmor);
         }
     }
 
@@ -347,16 +331,30 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
             Debug.Log("[PlayerDied] Player Respawn Entered");
             respawnPanel?.SetActive(true);
 
-            // Each death costs a second more than the last, capped, so repeated deaths carry a
-            // growing price without ever benching someone for an unreasonable stretch.
-            deathCount++;
-            float delay = Mathf.Min(baseRespawnSeconds + (deathCount - 1), maxRespawnSeconds);
+            float delay = NextRespawnDelay();
             Debug.Log($"[VIS] death {deathCount}, respawning in {delay}s");
 
             StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         }
 
         Debug.Log($"{playerNameText.text} respawned at team {teamID} spawn point.");
+    }
+
+    /// The one place the respawn wait is computed, called from both death paths (a normal death in
+    /// PlayerDied and the capital-recapture death in CheckForCathedralCapture) so they cannot
+    /// quietly diverge again the way they had before Task 0.11a: the recapture path used to
+    /// hardcode 5f and skip deathCount entirely. Each death costs a bit more than the last, up to
+    /// a cap, so repeated deaths carry a growing price without benching anyone for an unreasonable
+    /// stretch - all three numbers now live on GameplayConfig, not here.
+    private float NextRespawnDelay()
+    {
+        deathCount++;
+
+        float baseSeconds = gameplayConfig != null ? gameplayConfig.RespawnBaseSeconds : 5f;
+        float perDeathSeconds = gameplayConfig != null ? gameplayConfig.RespawnPerDeathSeconds : 1f;
+        float maxSeconds = gameplayConfig != null ? gameplayConfig.RespawnMaxSeconds : 10f;
+
+        return Mathf.Min(baseSeconds + perDeathSeconds * (deathCount - 1), maxSeconds);
     }
 
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)
@@ -428,7 +426,13 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         if (rigidbody != null)
         {
             rigidbody.linearVelocity = Vector3.zero;
-            movementSpeed = 0f;
+            // Freezes the player for the rest of the match. Used to assign a raw speed field on
+            // this class directly, which PlayerMotor stopped reading once it moved to its own
+            // keyed multiplier stack - that made the assignment a dead write, and a match-over
+            // player could still slide around (Task 0.11a defect 1). There is no matching
+            // RemoveSpeedMultiplier because the match is over for this player; nothing here ever
+            // un-freezes them.
+            playerMotor.AddSpeedMultiplier(this, 0f);
         }
     }
 
@@ -511,7 +515,9 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
         if (rigidbody != null)
         {
             rigidbody.linearVelocity = Vector3.zero;
-            movementSpeed = 0f;
+            // See the matching comment in ShowMatchResult - same freeze-on-match-over fix, same
+            // reason there is no corresponding RemoveSpeedMultiplier call.
+            playerMotor.AddSpeedMultiplier(this, 0f);
         }
     }
 
@@ -607,7 +613,17 @@ public class Multiplayer : MonoBehaviour, IPunObservable, IInRoomCallbacks
             rigidbody.linearVelocity = Vector3.zero;
             rigidbody.isKinematic = !alive;
             if (photonView.IsMine)
-                movementSpeed = alive ? startingMovementSpeed : 0f;
+            {
+                // Keyed so this can never step on some other system's own multiplier (a sprint
+                // ability, a slow debuff). Used to assign a raw speed field directly, which
+                // PlayerMotor stopped reading once it moved to this stack - that silently turned
+                // "freeze on death" into a no-op and a corpse could still slide around (Task
+                // 0.11a defect 1).
+                if (alive)
+                    playerMotor.RemoveSpeedMultiplier(this);
+                else
+                    playerMotor.AddSpeedMultiplier(this, 0f);
+            }
         }
 
         // Shooting runs its own Update on the child mesh object, so gating input in this class

@@ -13,8 +13,8 @@ using Overpower.Net;
 /// now the only place damage maths happens.
 ///
 /// Deliberately NOT IPunObservable: the PhotonView auto-finds observables on children too, so a
-/// second one here would silently add a second serialization block. Multiplayer.cs stays the
-/// sole observable and reads/writes through the members below.
+/// second one here would silently add a second serialization block. PlayerNetSync is the sole
+/// observable and reads/writes through the members below.
 /// </summary>
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
@@ -32,18 +32,16 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private float secondsSinceCombat;
     private bool isDead;
 
-    // ArmorState exposes no way to set Current to an arbitrary value (only Absorb, which only
-    // decreases it, SetTier and Clear), and a non-owner never ticks its own (see Update). So a
-    // remote client mirrors the owner's reported value here instead of writing through it.
-    private float mirroredArmor;
-
     // Each blocked-damage reason logs once per match, not per hit - a teamfight would otherwise
     // fill a log that writes synchronously to disk in a build.
     private bool loggedSelfHitBlocked;
     private bool loggedFriendlyFireBlocked;
 
     public float Health => health;
-    public float Armor => photonView.IsMine ? armor.Current : mirroredArmor;
+    // A single ArmorState per client now, owner and remote alike - a remote client's copy is
+    // written by SetHealthFromNetwork below through ArmorState.SetFromNetwork instead of a
+    // separately mirrored field, so Armor means the same thing regardless of whose client reads it.
+    public float Armor => armor.Current;
     public int ArmorTier => armorTier;
     public float SecondsSinceCombat => secondsSinceCombat;
     public bool IsOutOfCombat => gameplayConfig != null && secondsSinceCombat >= gameplayConfig.OutOfCombatSeconds;
@@ -202,13 +200,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// taking it does.
     public void NoteDealtDamage() => secondsSinceCombat = 0f;
 
-    /// Called by the non-owner's read of OnPhotonSerializeView - see the mirroredArmor field
-    /// comment above for why armor is stored separately rather than written into this player's
-    /// own ArmorState, which only the owner ever runs.
+    /// Called by PlayerNetSync's receive side on a non-owner. Health is written directly since
+    /// only the owner ever simulates it; armor goes through ArmorState.SetFromNetwork rather than
+    /// a plain assignment, since ArmorState has no public setter for Current by design (see its
+    /// class comment) and clamping here keeps a stale or out-of-order packet from handing a
+    /// remote client more armor than the pool can hold.
     public void SetHealthFromNetwork(float health, float armor)
     {
         this.health = health;
-        mirroredArmor = armor;
+        this.armor.SetFromNetwork(armor);
 
         if (healthBar != null)
             healthBar.value = health;

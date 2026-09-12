@@ -9,8 +9,8 @@ using Overpower.Data;
 /// small file instead of being buried in a 900-line class.
 ///
 /// Speed is a keyed multiplier stack rather than a settable field on purpose: a real playtest
-/// bug once had code assign the field directly (movementSpeed = 10f) while the prefab said 5,
-/// silently overwriting it. Sprint and slow debuffs need to compose (a slowed sprinter is still
+/// bug once had respawn code assign a raw speed field directly (10, hardcoded) while the prefab
+/// said 5, silently overwriting it. Sprint and slow debuffs need to compose (a slowed sprinter is still
 /// faster than an un-sprinting target), which a single field can never do but a product of
 /// multipliers does for free.
 /// </summary>
@@ -22,11 +22,6 @@ public class PlayerMotor : MonoBehaviour
              "number balance actually tunes.")]
     private GameplayConfig gameplayConfig;
 
-    [SerializeField, Tooltip("Fall below this world Y height and FellBelowKillHeight fires so the " +
-             "player is returned to their spawn. Set a few metres under the lowest floor a player " +
-             "can legitimately stand on.")]
-    private float killHeight = -10f;
-
     [SerializeField, Tooltip("How fast a remote player's transform catches up to the position and " +
              "rotation received over the network, per second. Higher snaps faster but looks less " +
              "smooth on a laggy connection.")]
@@ -35,13 +30,20 @@ public class PlayerMotor : MonoBehaviour
     private Rigidbody rb;
     private PhotonView photonView;
 
+    // Resolved once from gameplayConfig in Awake, not read from it every FixedUpdate - killHeight
+    // does not change mid-match, and re-reading it every frame would mean re-logging the missing-
+    // config error every frame too. Used to be its own [SerializeField] here, disagreeing with
+    // GameplayConfig.KillHeight and making a designer's edit to the "authoritative" asset do
+    // nothing (Task 0.11a defect 2).
+    private float killHeight;
+
     // Multiplied together against GameplayConfig.BaseMoveSpeed to get CurrentSpeed. Keyed so two
     // independent systems (e.g. a sprint ability and a slow debuff) can each own one entry
     // without needing to know about each other or fight over a single number.
     private readonly Dictionary<object, float> speedMultipliers = new Dictionary<object, float>();
 
-    // Where a remote (non-owner) copy of this player lerps toward. Pushed in by Multiplayer's
-    // OnPhotonSerializeView for now - Task 0.11's PlayerNetSync takes this over.
+    // Where a remote (non-owner) copy of this player lerps toward. Pushed in by PlayerNetSync's
+    // OnPhotonSerializeView.
     private Vector3 networkPosition;
     private Quaternion networkRotation;
 
@@ -78,6 +80,14 @@ public class PlayerMotor : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         photonView = GetComponent<PhotonView>();
+
+        // A silent null here would mean a player who falls off the map falls forever instead of
+        // ever being caught, so this falls back to the old hardcoded value rather than leaving
+        // killHeight at C#'s default of 0 (which would return anyone standing at ground level).
+        if (gameplayConfig == null)
+            Debug.LogError($"[PlayerMotor] {name}: GameplayConfig is not assigned - falling back " +
+                            "to a kill height of -10.");
+        killHeight = gameplayConfig != null ? gameplayConfig.KillHeight : -10f;
     }
 
     private void Start()
@@ -114,8 +124,8 @@ public class PlayerMotor : MonoBehaviour
         }
     }
 
-    /// <summary>Called by whoever owns network receive (Multiplayer today, PlayerNetSync in Task
-    /// 0.11) instead of PlayerMotor reaching into that class itself.</summary>
+    /// <summary>Called by PlayerNetSync's receive side, so PlayerMotor never has to reach into the
+    /// networking code itself.</summary>
     public void SetNetworkTarget(Vector3 position, Quaternion rotation)
     {
         networkPosition = position;

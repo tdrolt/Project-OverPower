@@ -4199,6 +4199,7 @@ GameObject:
   - component: {fileID: 1013426135256432800}
   - component: {fileID: 7995799834452346527}
   - component: {fileID: 8536702459645128775}
+  - component: {fileID: 2000531152435971246}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -4341,7 +4342,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e082bc81a43c4e468d5b2320d43d3d1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  movementSpeed: 5
   fireRate: 0.75
   bulletPrefab: {fileID: 2498108459180963871, guid: 1f9f495d7cbc7ae4db3ea0ca37b33d9a, type: 3}
   bulletPosition: {fileID: 8170903716044679203}
@@ -4353,8 +4353,7 @@ MonoBehaviour:
   youWonPanel: {fileID: 8582863100347077675}
   respawnPanel: {fileID: 9051395882172250540}
   youLostPanel: {fileID: 878118593987345808}
-  baseRespawnSeconds: 5
-  maxRespawnSeconds: 10
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
 --- !u!114 &9118536337621688220
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4534,7 +4533,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
-  killHeight: -10
   networkLerpSpeed: 10
 --- !u!114 &1013426135256432800
 MonoBehaviour:
@@ -4579,6 +4577,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
+--- !u!114 &2000531152435971246
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 60eceb9aba58e3d47b774f691e9dadfe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2624496485518630304
 GameObject:
   m_ObjectHideFlags: 0

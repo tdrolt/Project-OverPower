@@ -89,5 +89,21 @@ namespace Overpower.Combat
         {
             Current = 0f;
         }
+
+        /// <summary>
+        /// Adopts a value replicated from the owning client, clamped to this pool's current
+        /// capacity. This exists for one purpose - a remote client's copy of this player never
+        /// runs Absorb or Tick (Update on PlayerHealth skips both when the player is not mine), so
+        /// PlayerNetSync's receive side needs some way to make a non-owner's ArmorState agree with
+        /// what the owner actually has.
+        ///
+        /// Do not reach for this as a general setter: a capacity change (buying an armor tier)
+        /// must still go through SetTier, which fills to the new capacity rather than clamping an
+        /// old value into it.
+        /// </summary>
+        public void SetFromNetwork(float current)
+        {
+            Current = Mathf.Clamp(current, 0f, capacity);
+        }
     }
 }

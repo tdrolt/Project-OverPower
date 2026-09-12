@@ -107,5 +107,39 @@ namespace Overpower.Tests
             Assert.AreEqual(0f, taken, 0.001f);
             Assert.AreEqual(25f, a.Current, 0.001f);
         }
+
+        [Test]
+        public void SetFromNetworkAcceptsAnInRangeValue()
+        {
+            // The normal case: a remote client adopting exactly what the owner reported.
+            var a = NewState();
+
+            a.SetFromNetwork(12f);
+
+            Assert.AreEqual(12f, a.Current, 0.001f);
+        }
+
+        [Test]
+        public void SetFromNetworkClampsAboveCapacity()
+        {
+            // A stale or out-of-order packet must never hand a remote client more armor than the
+            // pool can legitimately hold.
+            var a = NewState();
+
+            a.SetFromNetwork(999f);
+
+            Assert.AreEqual(25f, a.Current, 0.001f);
+        }
+
+        [Test]
+        public void SetFromNetworkClampsBelowZero()
+        {
+            var a = NewState();
+
+            a.SetFromNetwork(-5f);
+
+            Assert.AreEqual(0f, a.Current, 0.001f);
+            Assert.IsTrue(a.IsBroken);
+        }
     }
 }
