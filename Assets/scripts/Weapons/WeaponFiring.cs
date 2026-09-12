@@ -153,11 +153,19 @@ namespace Overpower.Weapons
             float coneAngle = aim != null ? aim.EffectiveConeAngle : 0f;
             Vector3 origin = muzzle != null ? muzzle.position : transform.position;
             Vector3 direction = aim != null ? aim.AimDirection : transform.forward;
+
+            // Where the cursor is resting on the ground, for the weapons that detonate at a POINT
+            // rather than on whatever they run into. It has to be read here and sent as a
+            // parameter: PlayerAim resolves it from Camera.main and the mouse, both of which
+            // answer for the RECEIVER inside an RPC body. Weapons that do not aim at a point
+            // carry it and ignore it, which costs one Vector3 on the wire and saves a second RPC.
+            Vector3 targetPoint = aim != null ? aim.GroundPointUnderCursor
+                                              : origin + direction * weapon.MaxRange;
             aim?.RegisterShot();
 
             photonView.RPC(nameof(RPC_FireWeapon), RpcTarget.AllViaServer, weapon.Id, origin,
-                           direction, coneAngle, Random.Range(int.MinValue, int.MaxValue),
-                           ChargeFraction());
+                           direction, targetPoint, coneAngle,
+                           Random.Range(int.MinValue, int.MaxValue), ChargeFraction());
             return true;
         }
 
@@ -186,8 +194,8 @@ namespace Overpower.Weapons
         /// </summary>
         [PunRPC]
         private void RPC_FireWeapon(int weaponId, Vector3 origin, Vector3 aimDirection,
-                                    float coneAngleDegrees, int seed, float chargeFraction,
-                                    PhotonMessageInfo info)
+                                    Vector3 targetPoint, float coneAngleDegrees, int seed,
+                                    float chargeFraction, PhotonMessageInfo info)
         {
             // By id through the catalogue, never by list position: an id that resolved by order
             // would silently re-map everyone's weapon the moment the list was tidied up.
@@ -203,8 +211,8 @@ namespace Overpower.Weapons
             int shooterActor = info.Sender != null ? info.Sender.ActorNumber : -1;
             Teams.TryGetTeam(info.Sender, out int shooterTeam);
 
-            ProjectileContext[] shots = BuildShots(fired, aimDirection, coneAngleDegrees, seed,
-                                                    shooterActor, shooterTeam, chargeFraction);
+            ProjectileContext[] shots = BuildShots(fired, aimDirection, targetPoint, coneAngleDegrees,
+                                                    seed, shooterActor, shooterTeam, chargeFraction);
 
             if (fired.Simultaneous)
             {
@@ -233,8 +241,9 @@ namespace Overpower.Weapons
         /// shared seed is what makes it fair rather than chaotic.
         /// </summary>
         private static ProjectileContext[] BuildShots(WeaponDefinition weapon, Vector3 aimDirection,
-                                                       float coneAngleDegrees, int seed,
-                                                       int shooterActor, int shooterTeam, float chargeFraction)
+                                                       Vector3 targetPoint, float coneAngleDegrees,
+                                                       int seed, int shooterActor, int shooterTeam,
+                                                       float chargeFraction)
         {
             int count = Mathf.Max(1, weapon.ProjectilesPerShot);
             var rng = new System.Random(seed);
@@ -248,8 +257,11 @@ namespace Overpower.Weapons
             {
                 float degrees = FanOffset(weapon, i, count) + cone.SampleOffsetDegrees(rng);
                 Vector3 direction = Quaternion.AngleAxis(degrees, Vector3.up) * aimDirection;
+                // Every pellet of one trigger pull shares the same target point - the cursor was
+                // in one place when the trigger went down, whatever the spread did to each
+                // projectile's heading afterwards.
                 shots[i] = new ProjectileContext(weapon, shooterActor, shooterTeam, direction,
-                                                  chargeFraction, weapon.Damage);
+                                                  targetPoint, chargeFraction, weapon.Damage);
             }
 
             return shots;

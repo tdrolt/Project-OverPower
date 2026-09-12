@@ -48,20 +48,62 @@ namespace Overpower.Weapons
         /// weapons need no new RPC later; nothing scales off it yet.</summary>
         public float ChargeFraction { get; }
 
-        /// <summary>Damage this one projectile deals before armor, vulnerability or reduction -
-        /// resolved once at fire time rather than read off the weapon at impact, so a shot in
-        /// flight cannot be retuned mid-air by a weapon swap.</summary>
-        public float Damage { get; }
+        /// <summary>
+        /// Where the shooter's cursor was resting on the ground when the trigger went down.
+        ///
+        /// It travels with the shot because Camera.main and Input.mousePosition inside the fire
+        /// RPC would resolve on the RECEIVER - the same class of bug WeaponFiring was written to
+        /// fix. Only a weapon that aims at a point rather than a direction reads it (the cursor
+        /// rocket); for everything else it is carried and ignored.
+        /// </summary>
+        public Vector3 TargetPoint { get; }
+
+        /// <summary>
+        /// What this shot's damage is currently multiplied by, 1 for a shot nothing has modified.
+        ///
+        /// A behaviour that changes how hard the shot lands sets this ONE number rather than
+        /// rewriting a damage figure, so everything derived from the shot - the direct hit the
+        /// motor deals and the splash an explosion deals - scales together automatically. A
+        /// distance-scaling rocket whose direct damage grew while its splash did not would be a
+        /// nasty surprise to a designer reading "+50% damage at range".
+        /// </summary>
+        public float DamageMultiplier { get; private set; } = 1f;
+
+        /// <summary>
+        /// Damage this one projectile deals before armor, vulnerability or reduction - the figure
+        /// resolved at fire time, scaled by whatever DamageMultiplier currently is.
+        ///
+        /// The base figure is resolved once at fire time rather than read off the weapon at
+        /// impact, so a shot in flight cannot be retuned mid-air by a weapon swap. Only an
+        /// IProjectileBehaviour riding along on this same projectile may move the multiplier.
+        /// </summary>
+        public float Damage => baseDamage * DamageMultiplier;
+
+        private readonly float baseDamage;
+
+        /// <summary>
+        /// Rescale this shot while it is in the air - the seam ScaleDamageWithDistance uses.
+        ///
+        /// Set the multiplier rather than adding to it, so a behaviour ticking every frame
+        /// recomputes the same answer instead of compounding it into orbit. Negative multipliers
+        /// are clamped away: a projectile that heals what it hits is never what anyone meant.
+        /// </summary>
+        public void SetDamageMultiplier(float multiplier)
+        {
+            DamageMultiplier = Mathf.Max(0f, multiplier);
+        }
 
         public ProjectileContext(WeaponDefinition weapon, int shooterActorNumber, int shooterTeamId,
-                                 Vector3 direction, float chargeFraction, float damage)
+                                 Vector3 direction, Vector3 targetPoint, float chargeFraction,
+                                 float damage)
         {
             Weapon = weapon;
             ShooterActorNumber = shooterActorNumber;
             ShooterTeamId = shooterTeamId;
             Direction = direction;
+            TargetPoint = targetPoint;
             ChargeFraction = chargeFraction;
-            Damage = damage;
+            baseDamage = damage;
         }
     }
 
