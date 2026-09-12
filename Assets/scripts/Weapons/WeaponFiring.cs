@@ -89,19 +89,40 @@ namespace Overpower.Weapons
 
         /// Held is polled rather than evented because that is what automatic fire is: the press
         /// event gives the first shot with no delay, and this keeps them coming.
+        ///
+        /// A charging weapon is excluded here on purpose - see HandlePrimaryPressed/Released. Held
+        /// automatic fire would otherwise spam a zero-charge shot on every single frame the player
+        /// is trying to hold the trigger down to charge one.
         private void Update()
         {
-            if (photonView.IsMine && input != null && input.PrimaryHeld)
+            if (photonView.IsMine && input != null && input.PrimaryHeld &&
+                (weapon == null || !weapon.CanCharge))
                 TryFire();
         }
 
+        /// <summary>A charging weapon fires nothing on press - it only starts the clock
+        /// ChargeFraction() reads. See HandlePrimaryReleased for where the shot actually leaves.
+        /// Everything else fires immediately on press, exactly as before charging existed.</summary>
         private void HandlePrimaryPressed()
         {
             triggerHeldSince = Time.time;
+
+            if (weapon != null && weapon.CanCharge)
+                return;
+
             TryFire();
         }
 
-        private void HandlePrimaryReleased() => triggerHeldSince = 0f;
+        /// <summary>Where a charging weapon actually fires - with whatever charge the hold reached.
+        /// TryFire must run BEFORE triggerHeldSince is cleared, since ChargeFraction() below reads
+        /// it to work out how long the trigger was held.</summary>
+        private void HandlePrimaryReleased()
+        {
+            if (weapon != null && weapon.CanCharge)
+                TryFire();
+
+            triggerHeldSince = 0f;
+        }
 
         /// <summary>Swap the active weapon by id - what the shop and the test range call.</summary>
         public void SetWeapon(int weaponId)
@@ -239,13 +260,17 @@ namespace Overpower.Weapons
         /// is rolled from a System.Random seeded by a number that crossed the wire, so every client
         /// rolls the identical spread - random spread was the designer's explicit choice, and the
         /// shared seed is what makes it fair rather than chaotic.
+        ///
+        /// Charge scales two things here, both derived from the one chargeFraction parameter that
+        /// already crosses the wire - no second RPC value was needed for either.
         /// </summary>
         private static ProjectileContext[] BuildShots(WeaponDefinition weapon, Vector3 aimDirection,
                                                        Vector3 targetPoint, float coneAngleDegrees,
                                                        int seed, int shooterActor, int shooterTeam,
                                                        float chargeFraction)
         {
-            int count = Mathf.Max(1, weapon.ProjectilesPerShot);
+            int count = ChargedProjectileCount(weapon, chargeFraction);
+            float damage = ChargedDamage(weapon, chargeFraction);
             var rng = new System.Random(seed);
 
             // A cone pinned at exactly the width the shooter fired with, so the tested sampler in
@@ -261,10 +286,52 @@ namespace Overpower.Weapons
                 // in one place when the trigger went down, whatever the spread did to each
                 // projectile's heading afterwards.
                 shots[i] = new ProjectileContext(weapon, shooterActor, shooterTeam, direction,
-                                                  targetPoint, chargeFraction, weapon.Damage);
+                                                  targetPoint, chargeFraction, damage);
             }
 
             return shots;
+        }
+
+        /// <summary>
+        /// How many projectiles this trigger pull sends out. Weapons that cannot charge, or that
+        /// charge something other than their projectile count (Charge Max Projectiles left at 0),
+        /// are untouched - they always send Projectiles Per Shot.
+        ///
+        /// Charge Steps quantises the ramp into readable stages rather than a smooth count a
+        /// player cannot react to - see the tooltip on WeaponDefinition.ChargeSteps. Two steps
+        /// means three levels (0, 1, 2), which for the burst charge path reads as 3 -> 4 -> 5
+        /// projectiles: a HALF charge is a real, intentional middle step, not a rounding accident.
+        /// </summary>
+        private static int ChargedProjectileCount(WeaponDefinition weapon, float chargeFraction)
+        {
+            if (!weapon.CanCharge || weapon.ChargeMaxProjectiles <= weapon.ProjectilesPerShot)
+                return Mathf.Max(1, weapon.ProjectilesPerShot);
+
+            float quantised = QuantiseChargeFraction(chargeFraction, weapon.ChargeSteps);
+            return Mathf.Max(1, Mathf.RoundToInt(
+                Mathf.Lerp(weapon.ProjectilesPerShot, weapon.ChargeMaxProjectiles, quantised)));
+        }
+
+        /// <summary>Snaps a continuous 0..1 hold to the nearest of Charge Steps + 1 even levels
+        /// (0, 1/steps, 2/steps, ... 1), so a half-second hold on a 1-second charge lands on
+        /// exactly the same level every time rather than drifting with frame timing. Steps of 0
+        /// or less leaves the fraction smooth, for a weapon that charges something continuous
+        /// (damage only) rather than in stages.</summary>
+        private static float QuantiseChargeFraction(float chargeFraction, int steps)
+        {
+            float clamped = Mathf.Clamp01(chargeFraction);
+            return steps > 0 ? Mathf.RoundToInt(clamped * steps) / (float)steps : clamped;
+        }
+
+        /// <summary>Damage ramps smoothly (not stepped) towards Charge Damage Multiplier, since
+        /// nothing asked for readable damage stages the way the projectile count needs them - only
+        /// the count is a number a player can visibly count leaving the barrel.</summary>
+        private static float ChargedDamage(WeaponDefinition weapon, float chargeFraction)
+        {
+            if (!weapon.CanCharge)
+                return weapon.Damage;
+
+            return weapon.Damage * Mathf.Lerp(1f, weapon.ChargeDamageMultiplier, Mathf.Clamp01(chargeFraction));
         }
 
         /// <summary>Where this pellet sits in the shotgun fan: evenly spaced across Spread Degrees,
