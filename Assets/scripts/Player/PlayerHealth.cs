@@ -23,7 +23,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     [SerializeField] private Slider healthBar;
 
     private PhotonView photonView;
-    private PlayerDashWithBuff dashBuff;
 
     private float health;
     private ArmorState armor;
@@ -54,7 +53,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private void Awake()
     {
         photonView = GetComponent<PhotonView>();
-        dashBuff = GetComponent<PlayerDashWithBuff>();
         statusEffects = GetComponent<PlayerStatusEffects>();
 
         // A silent null here would make this player un-damageable - the worst failure mode.
@@ -142,12 +140,16 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         return result;
     }
 
-    /// Bridges to the old dash damage-reduction buff and converts its percent into the 0..1
-    /// fraction DamageResolver expects. This single location is the actual fix this task exists
-    /// for - the query used to live only on the bullet path and was silently absent from AoE. A
-    /// later task replaces this with a real status-effect lookup.
-    private float CurrentDamageReduction()
-        => dashBuff != null && dashBuff.IsBuffActive() ? dashBuff.damageReductionPercent / 100f : 0f;
+    /// The one place damage reduction is read, as a 0..1 fraction for DamageResolver. That single
+    /// location is the point of the damage funnel: the reduction used to be applied on the bullet
+    /// path only and was silently absent from AoE, so the same buff did two different things
+    /// depending on what hit you.
+    ///
+    /// Returns nothing for now. It used to query the dash-with-buff script, which Task 0.11b
+    /// deleted along with the other three Space-bound abilities; a later task wires this to a
+    /// PlayerStatusEffects lookup, which is where a reduction buff belongs anyway. Do not inline
+    /// this away - every future source of damage reduction reports through here.
+    private float CurrentDamageReduction() => 0f;
 
     /// Transitional: a later task replaces this Rigidbody bullet collision with swept
     /// spherecast projectiles that build a DamageInfo and call ApplyDamage directly.
@@ -163,19 +165,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         Teams.TryGetTeam(bullet.owner, out int sourceTeam);
         ApplyDamage(new DamageInfo(bullet.damage, bullet.owner.ActorNumber, sourceTeam, -1,
                                     DamageSource.Projectile, false, collision.GetContact(0).point));
-    }
-
-    /// Kept with exactly this signature - Assets/scripts/Player/Aoe effect.cs calls it. This is
-    /// where the divergence this task exists to fix goes away: AoE now runs through the same
-    /// funnel as bullets, so dash damage reduction applies to it for the first time.
-    public void ApplyAoEDamage(float damage, Photon.Realtime.Player caster)
-    {
-        if (!photonView.IsMine || caster == null)
-            return;
-
-        Teams.TryGetTeam(caster, out int sourceTeam);
-        ApplyDamage(new DamageInfo(damage, caster.ActorNumber, sourceTeam, -1,
-                                    DamageSource.Zone, false, transform.position));
     }
 
     public void SetArmorTier(int tier)

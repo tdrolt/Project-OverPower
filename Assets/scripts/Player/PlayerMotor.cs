@@ -56,7 +56,7 @@ public class PlayerMotor : MonoBehaviour
     /// stops.</summary>
     public bool IsMoving { get; private set; }
 
-    /// <summary>Exposed only so Multiplayer's fall-log can report the threshold it just crossed.</summary>
+    /// <summary>Exposed only so PlayerLifecycle's fall-log can report the threshold it just crossed.</summary>
     public float KillHeight => killHeight;
 
     /// <summary>Base speed times the product of every active multiplier.</summary>
@@ -72,7 +72,7 @@ public class PlayerMotor : MonoBehaviour
     }
 
     /// <summary>Fired when this (locally owned) player falls below killHeight. PlayerMotor only
-    /// detects the fall - Multiplayer owns respawning and decides what to do about it, so this
+    /// detects the fall - PlayerLifecycle owns respawning and decides what to do about it, so this
     /// stays an event rather than a direct call.</summary>
     public event System.Action FellBelowKillHeight;
 
@@ -139,8 +139,9 @@ public class PlayerMotor : MonoBehaviour
     /// <summary>
     /// WASD relative to where the camera is looking, not to world axes. Required now that Q/E
     /// orbit the camera: with world-space input, rotating the view 90 degrees would make W move
-    /// the player sideways across the screen. Public because the dash abilities in Multiplayer
-    /// still need a raw input direction to dash toward.
+    /// the player sideways across the screen. Public because a dash or blink needs a raw input
+    /// direction to travel along - the four Space-bound dash scripts that used this were deleted in
+    /// Task 0.11b, and the ability system replacing them will want it again.
     /// </summary>
     public Vector3 MovementInput()
     {

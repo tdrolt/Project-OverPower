@@ -106,7 +106,8 @@ public class BuildingManager : MonoBehaviourPun
         Debug.Log($"[TOWER] territory win: team {winningTeam} holds every capital");
 
         PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-        Multiplayer local = localView != null ? localView.GetComponent<Multiplayer>() : null;
+        // MatchUI owns the win/lose panels now that Multiplayer.cs has been split up (Task 0.11b).
+        MatchUI local = localView != null ? localView.GetComponent<MatchUI>() : null;
 
         if (local != null)
             local.ShowMatchResult(winningTeam);
