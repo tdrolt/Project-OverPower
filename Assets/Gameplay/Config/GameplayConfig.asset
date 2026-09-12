@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e82e59811b1c17149b3111647c0e9348, type: 3}
+  m_Name: GameplayConfig
+  m_EditorClassIdentifier: 
+  baseMoveSpeed: 5
+  maxHealth: 100
+  respawnBaseSeconds: 5
+  respawnPerDeathSeconds: 1
+  respawnMaxSeconds: 10
+  killHeight: -10
+  outOfCombatSeconds: 6
+  shopOutOfCombatSeconds: 5
+  overheatMax: 100
+  overheatDecayDelay: 1.5
+  overheatDecayPerSecond: 25
+  overheatWarningThreshold: 80
+  slowCap: 0.6
+  vulnerabilityCap: 0.6
+  testRangeEnabled: 1
