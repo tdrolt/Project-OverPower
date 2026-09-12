@@ -74,6 +74,7 @@ MonoBehaviour:
   - RPC_HandleRespawnMaster
   - RPC_ShowYouWonPanel
   - RPC_TerritoryWin
+  - RPC_FireWeapon
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

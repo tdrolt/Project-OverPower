@@ -151,21 +151,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// this away - every future source of damage reduction reports through here.
     private float CurrentDamageReduction() => 0f;
 
-    /// Transitional: a later task replaces this Rigidbody bullet collision with swept
-    /// spherecast projectiles that build a DamageInfo and call ApplyDamage directly.
-    private void OnCollisionEnter(Collision collision)
-    {
-        if (!photonView.IsMine || !collision.gameObject.CompareTag("Bullet"))
-            return;
-
-        MultiplayerBulletController bullet = collision.gameObject.GetComponent<MultiplayerBulletController>();
-        if (bullet == null || bullet.owner == null)
-            return;
-
-        Teams.TryGetTeam(bullet.owner, out int sourceTeam);
-        ApplyDamage(new DamageInfo(bullet.damage, bullet.owner.ActorNumber, sourceTeam, -1,
-                                    DamageSource.Projectile, false, collision.GetContact(0).point));
-    }
+    // The OnCollisionEnter that used to sit here read damage off a Rigidbody bullet that had
+    // collided with this player. Task 0.13 deleted it along with those bullets: projectiles are now
+    // swept spherecasts that build a DamageInfo and call ApplyDamage above directly, so there is no
+    // longer a physics collision to react to. Nothing replaced it, which is the point - there is
+    // one way in.
 
     public void SetArmorTier(int tier)
     {

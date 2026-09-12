@@ -6,6 +6,7 @@ using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Weapons;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
@@ -55,11 +56,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // this class only freezes it while dead and reacts to falling out of the map. See PlayerMotor.cs.
     private PlayerMotor playerMotor;
 
-    // Shooting runs its own Update on a child object, so gating input in this class does not stop
-    // it - ApplyAliveState has to switch the component itself off. (Its reference was also broken
-    // for a long time: GetComponent on the root returns null because PlayerShooting is not on the
-    // root.)
-    private PlayerShooting playerShooting;
+    // Shooting keeps its own Update, so ApplyAliveState switches the component itself off rather
+    // than relying on gated input alone. Searched for in children as well as on the root: the
+    // component this replaced (PlayerShooting) lived on a child, and a GetComponent on the root
+    // returning null is how its reference sat broken for a long time.
+    private WeaponFiring weaponFiring;
 
     // The death and respawn panels belong to MatchUI; this class tells it what happened rather
     // than holding panel references of its own. See MatchUI.cs.
@@ -101,7 +102,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         photonView = GetComponent<PhotonView>();
         rigidbody = GetComponent<Rigidbody>();
         capsuleCollider = GetComponent<CapsuleCollider>();
-        playerShooting = GetComponentInChildren<PlayerShooting>(true);
+        weaponFiring = GetComponentInChildren<WeaponFiring>(true);
         matchUI = GetComponent<MatchUI>();
 
         playerHealth = GetComponent<PlayerHealth>();
@@ -445,10 +446,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             }
         }
 
-        // Shooting runs its own Update on the child mesh object, so gating input in this class
-        // does not stop it.
-        if (playerShooting != null)
-            playerShooting.enabled = alive;
+        // Shooting runs its own Update, so gating input in this class does not stop it.
+        if (weaponFiring != null)
+            weaponFiring.enabled = alive;
 
         // A dash already in flight kept moving the body after death and could land it somewhere
         // other than the spawn point, so the running coroutine was cancelled here. The four
