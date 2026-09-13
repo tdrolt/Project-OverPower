@@ -47,6 +47,12 @@ namespace Overpower.TestRange
         private ArmorState armor;
         private bool isDead;
 
+        // The delayed reset scheduled on death. Held onto so an early reset (ResetToFull called by
+        // an external caller - the F1 panel, a test harness, or a future respawn button) can cancel
+        // it. Without this, a dummy reused inside the delay window would take the stale coroutine's
+        // ResetToFull a few seconds later, quietly wiping mid-test state back to full health/armor.
+        private Coroutine resetCoroutine;
+
         // Measurement state, running from the FIRST hit rather than from spawn - the clock should
         // time the kill, not however long the tester spent lining the shot up.
         private float firstHitTime;
@@ -83,14 +89,36 @@ namespace Overpower.TestRange
             ResetToFull();
         }
 
-        private void ResetToFull()
+        private void OnDisable()
         {
+            // A disabled component's coroutines are NOT stopped automatically unless the whole
+            // GameObject is deactivated - only relying on that would leave the coroutine running
+            // whenever something merely sets enabled = false. Cancel explicitly either way.
+            CancelPendingReset();
+        }
+
+        /// <summary>Restores the dummy to full health/armor immediately. Public so an early external
+        /// reset (F1 panel, test harness) goes through the same path the delayed post-death reset
+        /// uses, and cancels that delayed reset first - see resetCoroutine.</summary>
+        public void ResetToFull()
+        {
+            CancelPendingReset();
+
             health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
             armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(armorTier) : 0f,
                                     armorConfig != null ? armorConfig.RechargeSecondsFor(armorTier) : 6f);
             isDead = false;
             firstHitTime = 0f;
             hits = 0;
+        }
+
+        private void CancelPendingReset()
+        {
+            if (resetCoroutine == null)
+                return;
+
+            StopCoroutine(resetCoroutine);
+            resetCoroutine = null;
         }
 
         /// <summary>
@@ -121,7 +149,7 @@ namespace Overpower.TestRange
                 LastMeasuredHits = hits;
                 Debug.Log($"[TTK] killed in {LastMeasuredTtkSeconds:F2}s after {hits} hits");
 
-                StartCoroutine(ResetAfterDelay());
+                resetCoroutine = StartCoroutine(ResetAfterDelay());
             }
 
             return result;
@@ -130,6 +158,11 @@ namespace Overpower.TestRange
         private IEnumerator ResetAfterDelay()
         {
             yield return new WaitForSeconds(resetDelaySeconds);
+
+            // Clear the handle before resetting rather than let ResetToFull's own cancel do it, so
+            // this coroutine - which is, at this point, still "pending" as far as the field is
+            // concerned - never asks Unity to stop itself.
+            resetCoroutine = null;
             ResetToFull();
         }
     }
