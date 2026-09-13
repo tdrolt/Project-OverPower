@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using Photon.Pun;
 using UnityEngine;
@@ -31,7 +32,7 @@ namespace Overpower.TestRange
     /// Not networked, and deliberately so: it exists to be shot at in a single Editor session.
     /// </summary>
     [RequireComponent(typeof(Collider))]
-    public class DummyTarget : MonoBehaviour, IDamageable, IStatusReceiver
+    public class DummyTarget : MonoBehaviour, IDamageable, IStatusReceiver, IDisplaceable
     {
         [SerializeField, Tooltip("Match tuning asset. Max Health comes from here, so the dummy has " +
                  "exactly as much health as a real player.")]
@@ -96,6 +97,36 @@ namespace Overpower.TestRange
         public static float LastMeasuredTtkSeconds { get; private set; } = -1f;
         public static int LastMeasuredHits { get; private set; }
 
+        // ---- IDisplaceable (Task 1.10a): sonic pulse knockback ---------------------------------
+        //
+        // A dummy has no Rigidbody the way a player does (PlayerDisplacement sweeps a Rigidbody with
+        // Rigidbody.SweepTestAll) - it is plain scenery with a Collider - so this drives the same
+        // "travel N metres, stop at the first wall or body" contract with a bare Physics.CapsuleCast
+        // against this dummy's own CapsuleCollider instead, resolved a step at a time in Update.
+        // Same blockMask as PlayerDisplacement (Default | Building) for the same reason: Default
+        // carries every living player AND every other dummy, Building carries the walls and
+        // deployable cover.
+        private CapsuleCollider capsule;
+        private int displaceBlockMask;
+        private Coroutine displaceCoroutine;
+        private Action<DisplaceEnd> pendingDisplaceCallback;
+
+        // Where the CURRENT push started, kept as a field rather than a coroutine-local variable:
+        // cancelling a push (a second pulse landing mid-flight) stops the coroutine from OUTSIDE it,
+        // at which point a local variable is already gone - FinishDisplacement still needs this to
+        // report how far that interrupted push actually moved before Displaced fires.
+        private Vector3 activeDisplaceStart;
+
+        /// <summary>True while a knockback is actively moving this dummy. TestRangeSpawner's Strafer
+        /// reads this so it stops rewriting this dummy's position out from under the push, the same
+        /// tug-of-war PlayerDisplacement.ExternalMotionControl exists to prevent for a real player.</summary>
+        public bool IsDisplacing { get; private set; }
+
+        /// <summary>Fired once, when a knockback finishes, with the NET world-space movement it
+        /// caused. TestRangeSpawner's Strafer adds this to its own patrol centre so the patrol
+        /// continues from wherever the dummy ended up instead of snapping back to the old line.</summary>
+        public event Action<Vector3> Displaced;
+
         public bool IsAlive => !isDead;
         public int TeamId => teamId;
 
@@ -128,6 +159,11 @@ namespace Overpower.TestRange
                 gameplayConfig != null ? gameplayConfig.SlowCap : 0f,
                 gameplayConfig != null ? gameplayConfig.VulnerabilityCap : 0f);
 
+            capsule = GetComponent<CapsuleCollider>();
+            if (capsule == null)
+                Debug.LogError($"[DummyTarget] {name}: no CapsuleCollider - a sonic pulse cannot knock this dummy back.");
+            displaceBlockMask = LayerMask.GetMask("Default", "Building");
+
             ResetToFull();
         }
 
@@ -137,6 +173,7 @@ namespace Overpower.TestRange
             // GameObject is deactivated - only relying on that would leave the coroutine running
             // whenever something merely sets enabled = false. Cancel explicitly either way.
             CancelPendingReset();
+            CancelDisplacement();
         }
 
         /// <summary>
@@ -179,6 +216,135 @@ namespace Overpower.TestRange
         private void LogStatusApplied(in StatusEffectSpec spec)
         {
             Debug.Log($"[DUMMY] {spec.kind} {spec.magnitude:0.00} {spec.duration:0.0}s");
+        }
+
+        /// <summary>
+        /// IDisplaceable's entry point - Forced only, the same shape PlayerDisplacement.Displace
+        /// exposes. No IsMine-style guard here either, for the identical reason ApplyStatus above has
+        /// none: HasLocalAuthority is always true for a dummy, so there is no "someone else's copy"
+        /// this call could have come from. A push already running is cancelled outright rather than
+        /// queued - Forced always wins, matching DisplacementPriority's own rule for a real player.
+        /// </summary>
+        public void Displace(Vector3 direction, float distance, float speed, Action<DisplaceEnd> onEnd)
+        {
+            if (capsule == null)
+                return; // Awake already logged why.
+
+            if (displaceCoroutine != null)
+            {
+                StopCoroutine(displaceCoroutine);
+                FinishDisplacement(DisplaceOutcome.Cancelled, null); // Reports the interrupted push's own partial movement.
+            }
+
+            Vector3 travelDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : transform.forward;
+            activeDisplaceStart = transform.position;
+            pendingDisplaceCallback = onEnd;
+            displaceCoroutine = StartCoroutine(DisplaceRoutine(travelDirection, Mathf.Max(0f, distance), Mathf.Max(0.01f, speed)));
+        }
+
+        private IEnumerator DisplaceRoutine(Vector3 direction, float distance, float speed)
+        {
+            float remaining = distance;
+            IsDisplacing = true;
+
+            while (remaining > 0f)
+            {
+                float step = Mathf.Min(speed * Time.deltaTime, remaining);
+
+                GetCapsuleWorldPoints(out Vector3 point1, out Vector3 point2, out float radius);
+                RaycastHit[] hits = Physics.CapsuleCastAll(point1, point2, radius, direction, step,
+                                                            displaceBlockMask, QueryTriggerInteraction.Ignore);
+                Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+                RaycastHit? blocked = null;
+                foreach (RaycastHit hit in hits)
+                {
+                    if (IsDisplaceBlocker(hit))
+                    {
+                        blocked = hit;
+                        break;
+                    }
+                }
+
+                if (blocked.HasValue)
+                {
+                    transform.position += direction * blocked.Value.distance;
+                    FinishDisplacement(DisplaceOutcome.Blocked, blocked.Value.collider);
+                    yield break;
+                }
+
+                transform.position += direction * step;
+                remaining -= step;
+                yield return null;
+            }
+
+            FinishDisplacement(DisplaceOutcome.Completed, null);
+        }
+
+        /// <summary>Same two exclusions PlayerDisplacement.IsBlocker applies, for the same reasons:
+        /// a near-vertical normal is the floor underfoot, not a wall in the way, and a dummy can
+        /// never be blocked by its own collider.</summary>
+        private bool IsDisplaceBlocker(RaycastHit hit)
+        {
+            if (hit.collider == null)
+                return false;
+
+            if (hit.normal.y > 0.5f)
+                return false; // Ground underfoot, not a wall in the way.
+
+            if (hit.collider.transform.IsChildOf(transform))
+                return false; // Never blocked by our own body.
+
+            return true;
+        }
+
+        /// <summary>World-space endpoints and radius of this dummy's own CapsuleCollider, matching
+        /// its current position exactly (unlike TestRangeSpawner.Grounded, which only ever reads the
+        /// PREFAB's capsule to place a dummy before it has moved).</summary>
+        private void GetCapsuleWorldPoints(out Vector3 point1, out Vector3 point2, out float radius)
+        {
+            Vector3 center = transform.TransformPoint(capsule.center);
+            float halfSegment = Mathf.Max(0f, capsule.height * 0.5f - capsule.radius);
+            Vector3 up = transform.up;
+
+            point1 = center + up * halfSegment;
+            point2 = center - up * halfSegment;
+            radius = capsule.radius;
+        }
+
+        private void FinishDisplacement(DisplaceOutcome outcome, Collider blocker)
+        {
+            IsDisplacing = false;
+            displaceCoroutine = null;
+
+            Action<DisplaceEnd> callback = pendingDisplaceCallback;
+            pendingDisplaceCallback = null;
+
+            Vector3 netMovement = transform.position - activeDisplaceStart;
+            LogDisplaceOutcome(outcome, netMovement.magnitude, blocker);
+
+            // Cancelled (superseded by a second pulse before this one finished moving) still moved
+            // the dummy partway - the strafer must absorb that partial shift too, or it would snap
+            // back to a patrol centre that no longer matches where the dummy actually stands.
+            if (netMovement.sqrMagnitude > 0.0001f)
+                Displaced?.Invoke(netMovement);
+
+            callback?.Invoke(new DisplaceEnd(outcome, transform.position, blocker));
+        }
+
+        private void CancelDisplacement()
+        {
+            if (displaceCoroutine == null)
+                return;
+
+            StopCoroutine(displaceCoroutine);
+            FinishDisplacement(DisplaceOutcome.Cancelled, null);
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        private void LogDisplaceOutcome(DisplaceOutcome outcome, float metres, Collider blocker)
+        {
+            Debug.Log($"[DUMMY] pushed {metres:0.0}m outcome={outcome} blocker={(blocker != null ? blocker.name : "none")}");
         }
 
         /// <summary>Restores the dummy to full health/armor immediately. Public so an early external

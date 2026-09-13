@@ -141,7 +141,17 @@ namespace Overpower.TestRange
         /// multiply here. Multiplying the PingPong clock's own advance by (stunned ? 0 : 1 - Slow)
         /// has the identical visible effect: a stunned dummy freezes in place (the clock stops
         /// advancing, so it snaps back to full speed the instant the stun lifts, exactly like a
-        /// player's speed multiplier does) and a slowed one visibly crosses less ground per second.</summary>
+        /// player's speed multiplier does) and a slowed one visibly crosses less ground per second.
+        ///
+        /// KNOCKED BACK BY A SONIC PULSE (Task 1.10a): DummyTarget.Displace moves this same
+        /// transform directly while a push is in flight - if Update kept rewriting
+        /// transform.position from center + axis * offset every frame at the same time, the two
+        /// would fight every frame and the push would never visibly go anywhere. While
+        /// dummy.IsDisplacing is true this skips its own write AND stops advancing t, so the patrol
+        /// clock is exactly where it left off once the push ends; DummyTarget.Displaced then reports
+        /// the net movement the push caused, which is added straight onto center. Together those two
+        /// mean the very next frame computes center(shifted) + axis * offset(unchanged) - precisely
+        /// the position the push ended at - so the patrol resumes from there with no snap.</summary>
         private sealed class Strafer : MonoBehaviour
         {
             private Vector3 center;
@@ -163,10 +173,30 @@ namespace Overpower.TestRange
             {
                 // Same GameObject: TestRangeSpawner adds this component to the dummy it just spawned.
                 dummy = GetComponent<DummyTarget>();
+                if (dummy != null)
+                    dummy.Displaced += OnDummyDisplaced;
+            }
+
+            private void OnDestroy()
+            {
+                if (dummy != null)
+                    dummy.Displaced -= OnDummyDisplaced;
+            }
+
+            private void OnDummyDisplaced(Vector3 worldDelta)
+            {
+                // The full 3D delta, not just its component along axis: a pulse rarely pushes
+                // exactly along the patrol line, and dropping the sideways part would leave the
+                // dummy visibly off its own center the instant the patrol clock starts reading from
+                // it again.
+                center += worldDelta;
             }
 
             private void Update()
             {
+                if (dummy != null && dummy.IsDisplacing)
+                    return; // A knockback owns this dummy's position right now - see the class comment.
+
                 if (distance <= 0f)
                     return;
 
