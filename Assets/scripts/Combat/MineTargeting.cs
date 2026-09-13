@@ -16,6 +16,12 @@ namespace Overpower.Combat
     /// always passes - DummyTarget.HasLocalAuthority is always true, and its unmatched team id (99)
     /// already fails FriendlyFire's team check open, so a dummy is an enemy of every real team.
     ///
+    /// A THIRD RULE, added by the Task 1.8b review: never IStructure. Cover's own -1/-1 identity
+    /// fails FriendlyFire open exactly like an unrecognised team does, which is exactly what let a
+    /// mine detonate against a player's own cover before this fix - IStructure is the explicit
+    /// marker that tells a structure apart from a real combatant with no known team (see that
+    /// interface's own class comment for why identity alone cannot do this).
+    ///
     /// Plain C#, no UnityEngine dependency beyond IDamageable's own types, so this is testable with
     /// fake targets and no scene - the same shape as FriendlyFire and DeployablePruning.
     /// </summary>
@@ -29,6 +35,9 @@ namespace Overpower.Combat
             {
                 if (candidate == null || !candidate.HasLocalAuthority)
                     continue;
+
+                if (candidate is IStructure)
+                    continue; // Cover and its kind are not combatants - never trips a mine, never caught in its blast.
 
                 if (FriendlyFire.IsSelfOrTeammate(ownerActor, candidate.ActorNumber, ownerTeam, candidate.TeamId))
                     continue;

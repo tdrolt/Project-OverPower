@@ -46,7 +46,7 @@ namespace Overpower.Abilities
     /// be seen stopping at cover that is, a moment later, gone.
     /// </summary>
     [RequireComponent(typeof(BoxCollider))]
-    public sealed class CoverWall : NetworkedDeployable, IDamageable
+    public sealed class CoverWall : NetworkedDeployable, IDamageable, IStructure
     {
         /// <summary>How far, in metres, this wall's own collider bottom sits above the ground point
         /// it was placed at - shared with DeployableCoverAbility's own placement check (as
@@ -96,6 +96,12 @@ namespace Overpower.Abilities
         public int TeamId => -1;
 
         public bool IsAlive => damageState == null || !damageState.Destroyed;
+
+        // ---- IStructure (marker only, no members - see its own class comment) -----------------
+        // Task 1.8b review fix: without this, cover's fails-open -1/-1 identity (above) let a mine
+        // treat it as just another enemy to trip and blast (MineTargeting), and let a piercing laser
+        // treat it as just another target to punch through (BeamResolver) - both wrong, since cover
+        // is a structure, not a combatant.
 
         /// <summary>Same rule PlayerHealth exposes: only the owner's own machine is authoritative
         /// over this object's HP.</summary>
@@ -148,8 +154,13 @@ namespace Overpower.Abilities
             if (healthLost <= 0f)
                 return default; // Wrong source (Burn/Zone) or nothing left to absorb.
 
+            // Through the shared guard, not PhotonNetwork.Destroy directly: this HP-triggered
+            // destroy and the base class's own lifetime timer (Lifetime Seconds, 10s) are two
+            // independent paths that know nothing of each other and can both decide to end this
+            // object in the same window - the exact race RequestDestroy exists to guard (see its own
+            // class comment, and Mine's identical fix).
             if (damageState.Destroyed)
-                PhotonNetwork.Destroy(gameObject); // Only the owner may - see FireField.Burn's "eight errors" lesson.
+                RequestDestroy();
 
             return new DamageResult(0f, healthLost, false, damageState.Destroyed);
         }

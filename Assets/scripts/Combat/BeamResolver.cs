@@ -18,11 +18,20 @@ namespace Overpower.Combat
         /// effects are reported at.</summary>
         public readonly Vector3 Point;
 
-        public BeamContact(float distance, IDamageable target, Vector3 point)
+        /// <summary>True when Target is a structure (IStructure - CoverWall today) rather than a
+        /// combatant. A structure blocks a beam exactly like a plain wall (Target == null) once it
+        /// has taken the hit, regardless of Pierce's own Max Targets - see BeamResolver.Resolve.
+        /// Always false for a null Target; a wall already stops the beam by that path and needs no
+        /// second one. Set by the caller (Hitscan), which is the one place that actually knows
+        /// whether Target implements IStructure - this struct stays a plain data carrier.</summary>
+        public readonly bool IsStructure;
+
+        public BeamContact(float distance, IDamageable target, Vector3 point, bool isStructure = false)
         {
             Distance = distance;
             Target = target;
             Point = point;
+            IsStructure = isStructure;
         }
     }
 
@@ -63,7 +72,14 @@ namespace Overpower.Combat
     /// unit tests rather than code inside the Hitscan component.
     ///
     /// Walls are not special-cased for the through-walls laser. That leaf simply never asks
-    /// Physics about the Building layer, so no wall ever arrives here - see IgnoreWalls.
+    /// Physics about the Building layer, so no wall ever arrives here - see IgnoreWalls. A
+    /// STRUCTURE (BeamContact.IsStructure - CoverWall) IS special-cased, on purpose: it is an
+    /// IDamageable, so without the check below it would just be another pierceable target and a
+    /// laser with Pierce's Max Targets at -1 would carry straight through it to whoever stood
+    /// behind - contradicting Pierce's own "never lets a beam through a WALL" (Task 1.8b review
+    /// finding). The through-walls laser is unaffected either way, since IgnoreWalls removes the
+    /// Building layer from Hitscan's own raycast mask before Physics ever runs, so that beam never
+    /// produces a structure contact to begin with.
     /// </summary>
     public static class BeamResolver
     {
@@ -105,6 +121,15 @@ namespace Overpower.Combat
                     continue;
 
                 struck.Add(contact);
+
+                // A structure takes its hit, then stops the beam right there - it does not spend a
+                // pierce and does not care what Max Targets says, the same way hitting a wall
+                // (Target == null, above) is never subject to either. StoppedOnGeometry is false
+                // here (not true, like the wall case) only to avoid Hitscan.Fire drawing a second,
+                // redundant impact VFX on top of the one the Struck loop already plays for this hit.
+                if (contact.IsStructure)
+                    return new BeamResult(struck, contact.Distance, false);
+
                 if (struck.Count >= cap)
                     return new BeamResult(struck, contact.Distance, false);
             }

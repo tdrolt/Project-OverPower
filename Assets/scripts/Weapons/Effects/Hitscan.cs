@@ -75,9 +75,13 @@ namespace Overpower.Weapons
                 if (hit.collider == null)
                     continue;
 
-                ContactBuffer.Add(new BeamContact(hit.distance,
-                                                  hit.collider.GetComponentInParent<IDamageable>(),
-                                                  hit.point));
+                IDamageable target = hit.collider.GetComponentInParent<IDamageable>();
+
+                // IStructure (CoverWall) is the fact BeamResolver needs to stop a piercing beam at
+                // it like a wall rather than carrying on through it as just another target - see
+                // BeamResolver's own class comment (Task 1.8b review fix). Resolved here, once, since
+                // this is the one place that actually has the IDamageable to check.
+                ContactBuffer.Add(new BeamContact(hit.distance, target, hit.point, target is IStructure));
             }
 
             Pierce pierce = GetComponent<Pierce>();

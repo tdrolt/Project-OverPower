@@ -40,6 +40,9 @@ namespace Overpower.Tests
         private static BeamContact Wall(float distance) =>
             new BeamContact(distance, null, Vector3.forward * distance);
 
+        private static BeamContact Structure(IDamageable target, float distance) =>
+            new BeamContact(distance, target, Vector3.forward * distance, isStructure: true);
+
         private static BeamResult Resolve(int maxTargets, params BeamContact[] contacts) =>
             BeamResolver.Resolve(new List<BeamContact>(contacts), Range, maxTargets,
                                  ShooterActor, ShooterTeam);
@@ -86,6 +89,59 @@ namespace Overpower.Tests
             Assert.IsTrue(result.StoppedOnGeometry);
             Assert.AreEqual(10f, result.Length, 0.0001f,
                 "The beam's visible length must end at the wall, not run on to max range.");
+        }
+
+        [Test]
+        public void AStructureStopsAPiercingBeamAfterTakingTheHit()
+        {
+            // Task 1.8b review finding: CoverWall is an IDamageable, so without IsStructure a laser
+            // with Pierce's Max Targets at -1 (unlimited - the real weapon asset's own setting)
+            // would treat it as just another target and carry straight through to whoever stood
+            // behind it. It must stop here instead, exactly like hitting a plain wall, but only
+            // after taking the hit - the wall itself is still struck and still takes damage.
+            var cover = Enemy(2);
+            var behind = Enemy(3);
+
+            var result = Resolve(BeamResolver.Unlimited, Structure(cover, 6f), Hit(behind, 12f));
+
+            Assert.AreEqual(1, result.Struck.Count);
+            Assert.AreSame(cover, result.Struck[0].Target);
+            Assert.AreEqual(6f, result.Length, 0.0001f,
+                "The beam's visible length must end at the structure, not run on to whoever is behind it.");
+        }
+
+        [Test]
+        public void AFriendlyStructureIsPassedThroughLikeAnyOtherTeammate()
+        {
+            // Not exercised by CoverWall today (its own -1/-1 identity never reads as friendly to a
+            // real shooter - see its class comment), but the rule this locks in is general: a
+            // structure that DOES pass FriendlyFire's check is transparent, not a wall, the same as
+            // any other passed-through contact.
+            var friendlyStructure = new FakeTarget(ShooterActor, ShooterTeam);
+            var enemy = Enemy(3);
+
+            var result = Resolve(BeamResolver.Unlimited, Structure(friendlyStructure, 4f), Hit(enemy, 8f));
+
+            Assert.AreEqual(1, result.Struck.Count);
+            Assert.AreSame(enemy, result.Struck[0].Target);
+        }
+
+        [Test]
+        public void WithNoStructureContactAtAllTheBeamReachesWhateverIsBehindWhereOneWouldHaveBeen()
+        {
+            // What the through-walls laser (IgnoreWalls) actually does: it removes the Building
+            // layer from Hitscan's own raycast mask before Physics ever runs, so a structure never
+            // produces a contact for that beam in the first place - BeamResolver needs no special
+            // case of its own for it, an absent contact behaves exactly like there was never a wall
+            // there. This is that case: the same enemy-behind setup as the test above, but with no
+            // structure contact at all.
+            var behind = Enemy(3);
+
+            var result = Resolve(BeamResolver.Unlimited, Hit(behind, 12f));
+
+            Assert.AreEqual(1, result.Struck.Count);
+            Assert.AreSame(behind, result.Struck[0].Target);
+            Assert.IsFalse(result.StoppedOnGeometry);
         }
 
         [Test]
