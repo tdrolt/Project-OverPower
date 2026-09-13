@@ -31,6 +31,9 @@ namespace Overpower.TestRange
                  "absorb value a player of that tier would have.")]
         private ArmorConfig armorConfig;
 
+        // Deliberately ONE index into both AbsorbLevels and RechargeSeconds, unlike a player's two
+        // independent upgrade paths (see ArmorConfig's class comment) - a dummy never buys
+        // upgrades, so it only ever needs "the tier everyone starts on" from both arrays at once.
         [SerializeField, Tooltip("Which armor tier this dummy wears. 0 is the tier everyone starts " +
                  "a match on, which is what the baseline time-to-kill is measured against.")]
         private int armorTier = 0;

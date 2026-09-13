@@ -53,6 +53,11 @@ public class PlayerNetSync : MonoBehaviour, IPunObservable
             float receivedArmor = (float)stream.ReceiveNext();
 
             playerMotor.SetNetworkTarget(NetworkPosition, NetworkRotation);
+
+            // receivedArmor can legitimately clamp down for one frame here if an armor-level
+            // Custom Property (which changes ArmorState.Capacity) hasn't arrived on this client
+            // yet - this stream and Custom Properties are two separate channels. Harmless and
+            // self-healing: see ArmorState.SetFromNetwork.
             playerHealth.SetHealthFromNetwork(receivedHealth, receivedArmor);
         }
     }
