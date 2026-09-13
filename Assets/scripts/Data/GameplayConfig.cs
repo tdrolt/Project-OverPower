@@ -113,8 +113,8 @@ namespace Overpower.Data
                  "actually returns, so a button mashed a frame early still fires instead of being " +
                  "silently dropped. Kept short on purpose - long enough to swallow one frame of " +
                  "timing jitter, too short to let a player queue up a surprise cast for the exact " +
-                 "instant a silence ends. Not consumed yet; the ability runner (a later task) is " +
-                 "the first thing that reads it.")]
+                 "instant a silence ends. Applies to all three ability keys (right mouse, Space, " +
+                 "Left Shift), not to the weapon.")]
         [SerializeField] private float abilityPressBufferSeconds = 0.12f;
         public float AbilityPressBufferSeconds => abilityPressBufferSeconds;
 

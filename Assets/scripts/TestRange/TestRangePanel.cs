@@ -5,14 +5,15 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using Overpower.Data;
+using Overpower.Net;
 using Overpower.Weapons;
 
 namespace Overpower.TestRange
 {
-    /// <summary>A cooldown the "Reset Cooldowns" button can clear. Nothing implements this yet -
-    /// dash and mines (Phase 1) will be first - so the registry below is empty for now and only
-    /// PlayerOverheat.Clear() does anything. Implementers register in OnEnable, unregister in
-    /// OnDisable.</summary>
+    /// <summary>A cooldown the "Reset Cooldowns" button can clear - today the local player's
+    /// AbilityRunner, which refills every equipped ability's charges. Implementers register in
+    /// OnEnable, unregister in OnDisable, and only for the local player: the button means "my
+    /// cooldowns".</summary>
     public interface ITestRangeResettable
     {
         void ResetForTestRange();
@@ -71,9 +72,9 @@ namespace Overpower.TestRange
                  "the dropdown with no script change.")]
         private WeaponCatalogue weaponCatalogue;
 
-        [SerializeField, Tooltip("Every ability in the game, across all four slots. Empty today, " +
-                 "so all three ability dropdowns read '(none available)' until a later task adds " +
-                 "assets.")]
+        [SerializeField, Tooltip("Every ability in the game, across all four slots. Add an asset " +
+                 "here and it appears in its slot's dropdown with no script change; a slot with no " +
+                 "abilities reads '(none available)'.")]
         private AbilityCatalogue abilityCatalogue;
 
         // Fixed once here and reused to build the three ability dropdowns identically, instead of
@@ -90,6 +91,13 @@ namespace Overpower.TestRange
         private readonly TMP_Dropdown[] abilityDropdowns = new TMP_Dropdown[AbilitySlots.Length];
         private TextMeshProUGUI readoutText;
         private readonly List<WeaponDefinition> weaponOptions = new List<WeaponDefinition>();
+
+        // Per ability dropdown, the ability behind each option. Option 0 is always "(none)", so an
+        // option index is one more than its index in here.
+        private readonly List<AbilityDefinition>[] abilityOptions =
+        {
+            new List<AbilityDefinition>(), new List<AbilityDefinition>(), new List<AbilityDefinition>()
+        };
 
         private bool visible;
         private GameObject cachedLocalPlayer;
@@ -136,7 +144,10 @@ namespace Overpower.TestRange
             visible = show;
             uiRoot.SetActive(show);
             if (show)
+            {
                 RefreshWeaponSelection();
+                RefreshAbilitySelection();
+            }
         }
 
         /// <summary>Keeps exactly one router suppressed - the local player's, re-resolved every
@@ -208,6 +219,8 @@ namespace Overpower.TestRange
             {
                 AddLabel(panel.transform, AbilitySlots[i].label, 14f, FontStyles.Normal);
                 abilityDropdowns[i] = AddDropdown(panel.transform, res);
+                int slotIndex = i; // Captured per dropdown - the loop variable itself would be 3 by click time.
+                abilityDropdowns[i].onValueChanged.AddListener(option => OnAbilitySelected(slotIndex, option));
             }
 
             GameObject buttonRow = new GameObject("Buttons", typeof(RectTransform));
@@ -222,7 +235,7 @@ namespace Overpower.TestRange
 
             PopulateWeaponDropdown();
             for (int i = 0; i < AbilitySlots.Length; i++)
-                PopulateAbilityDropdown(abilityDropdowns[i], AbilitySlots[i].slot);
+                PopulateAbilityDropdown(i);
         }
 
         private static TextMeshProUGUI AddLabel(Transform parent, string text, float fontSize, FontStyles style)
@@ -283,14 +296,16 @@ namespace Overpower.TestRange
             if (index < 0 || index >= weaponOptions.Count)
                 return;
 
-            WeaponFiring firing = ResolveLocalPlayer()?.GetComponentInChildren<WeaponFiring>(true);
-            if (firing == null)
+            // Through PlayerLoadout, never WeaponFiring.SetWeapon directly: that would swap the gun on
+            // this screen only, and every other client would keep drawing the old one.
+            PlayerLoadout loadout = ResolveLocalPlayer()?.GetComponent<PlayerLoadout>();
+            if (loadout == null)
             {
-                Debug.LogWarning("[TestRangePanel] no local WeaponFiring found - cannot switch weapon.");
+                Debug.LogWarning("[TestRangePanel] no local PlayerLoadout found - cannot switch weapon.");
                 return;
             }
 
-            firing.SetWeapon(weaponOptions[index].Id);
+            loadout.SetWeapon(weaponOptions[index].Id);
         }
 
         /// <summary>Shows the player's real current weapon as selected on every open, so a designer
@@ -308,16 +323,16 @@ namespace Overpower.TestRange
 
         // ---- Ability dropdowns ----
 
-        /// <summary>No ability-equip API exists anywhere yet - abilities are Phase 1 territory. These
-        /// dropdowns exist so the panel already reads whatever AbilityCatalogue holds; empty, they
-        /// read "(none available)" and are disabled, so it reads as "nothing built yet" rather than
-        /// "broken". Wiring a selection to an equip call is for whichever task adds the first
-        /// ability.</summary>
-        private void PopulateAbilityDropdown(TMP_Dropdown dropdown, AbilitySlot slot)
+        /// <summary>Fills one slot's dropdown from AbilityCatalogue, led by "(none)" so a designer can
+        /// empty the slot again. A slot with nothing in the catalogue reads "(none available)" and is
+        /// disabled, so it reads as "nothing built yet" rather than "broken".</summary>
+        private void PopulateAbilityDropdown(int slotIndex)
         {
-            List<AbilityDefinition> options = abilityCatalogue != null
-                ? abilityCatalogue.ForSlot(slot)
-                : new List<AbilityDefinition>();
+            TMP_Dropdown dropdown = abilityDropdowns[slotIndex];
+            List<AbilityDefinition> options = abilityOptions[slotIndex];
+            options.Clear();
+            if (abilityCatalogue != null)
+                options.AddRange(abilityCatalogue.ForSlot(AbilitySlots[slotIndex].slot));
 
             dropdown.ClearOptions();
             if (options.Count == 0)
@@ -327,12 +342,48 @@ namespace Overpower.TestRange
                 return;
             }
 
-            var labels = new List<string>();
+            var labels = new List<string> { "(none)" };
             foreach (AbilityDefinition ability in options)
-                labels.Add(ability.DisplayName);
+                labels.Add($"{ability.Id} {ability.DisplayName}");
 
             dropdown.AddOptions(labels);
             dropdown.interactable = true;
+        }
+
+        private void OnAbilitySelected(int slotIndex, int option)
+        {
+            List<AbilityDefinition> options = abilityOptions[slotIndex];
+            if (option < 0 || option > options.Count)
+                return;
+
+            PlayerLoadout loadout = ResolveLocalPlayer()?.GetComponent<PlayerLoadout>();
+            if (loadout == null)
+            {
+                Debug.LogWarning("[TestRangePanel] no local PlayerLoadout found - cannot equip an ability.");
+                return;
+            }
+
+            int abilityId = option == 0 ? LoadoutProperties.Empty : options[option - 1].Id;
+            loadout.SetAbility(AbilitySlots[slotIndex].slot, abilityId);
+        }
+
+        /// <summary>Shows what the local player really has in each slot on every open - the same
+        /// reason RefreshWeaponSelection exists.</summary>
+        private void RefreshAbilitySelection()
+        {
+            AbilityRunner runner = ResolveLocalPlayer()?.GetComponent<AbilityRunner>();
+            if (runner == null)
+                return;
+
+            for (int i = 0; i < AbilitySlots.Length; i++)
+            {
+                if (abilityOptions[i].Count == 0)
+                    continue;
+
+                int equipped = runner.EquippedId(AbilitySlots[i].slot);
+                int index = abilityOptions[i].FindIndex(a => a.Id == equipped);
+                abilityDropdowns[i].SetValueWithoutNotify(index >= 0 ? index + 1 : 0);
+            }
         }
 
         // ---- Buttons ----

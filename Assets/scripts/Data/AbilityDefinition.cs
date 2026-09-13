@@ -1,4 +1,7 @@
+using System.Collections.Generic;
+using Photon.Pun;
 using UnityEngine;
+using Overpower.Abilities;
 
 namespace Overpower.Data
 {
@@ -69,5 +72,62 @@ namespace Overpower.Data
                  "nothing numeric about it lives on this asset.")]
         [SerializeField] private GameObject modulePrefab;
         public GameObject ModulePrefab => modulePrefab;
+
+        /// <summary>
+        /// Every reason this ability could not work in a match, one readable line each; empty means
+        /// sound. Returned rather than logged, like AbilityCatalogue.Validate, so a test can call it.
+        ///
+        /// Each check is a trap that fails silently in play rather than loudly here:
+        ///  - no AbilityModule: the runner has nothing to equip, and the key just does nothing;
+        ///  - a PhotonView: every client creates its own copy of the module locally, so a view on it
+        ///    would claim a network id nobody allocated;
+        ///  - an IPunObservable: the player's PhotonView searches its children for observables, and a
+        ///    second one would quietly add bytes to every network update (PlayerNetSync is the only one);
+        ///  - a Collider: modules sit under the player, whose whole hierarchy moves to the DeadPlayer
+        ///    layer on death - and a module's collider would block its own player's shots besides;
+        ///  - slot Primary: left mouse is the weapon, and the ability runner has no Primary slot.
+        /// </summary>
+        public List<string> Validate()
+        {
+            var problems = new List<string>();
+
+            if (slot == AbilitySlot.Primary)
+                problems.Add($"Ability '{name}': Slot is Primary (left mouse), which belongs to the weapon. " +
+                             "Choose Equipment, Ultimate or Mobility.");
+
+            if (modulePrefab == null)
+            {
+                problems.Add($"Ability '{name}': Module Prefab is empty, so this ability does nothing when " +
+                             "cast. Assign the prefab that holds its AbilityModule.");
+                return problems;
+            }
+
+            if (modulePrefab.GetComponent<AbilityModule>() == null)
+                problems.Add($"Ability '{name}': Module Prefab '{modulePrefab.name}' has no AbilityModule " +
+                             "component on its top object, so there is nothing to cast.");
+            if (modulePrefab.GetComponentInChildren<PhotonView>(true) != null)
+                problems.Add($"Ability '{name}': Module Prefab '{modulePrefab.name}' contains a PhotonView. " +
+                             "Ability modules are created locally on every client and must not have one - " +
+                             "send later moments of a cast with SendPhase instead.");
+            if (modulePrefab.GetComponentInChildren<IPunObservable>(true) != null)
+                problems.Add($"Ability '{name}': Module Prefab '{modulePrefab.name}' contains an " +
+                             "IPunObservable. PlayerNetSync must stay the player's only one - remove it.");
+            if (modulePrefab.GetComponentInChildren<Collider>(true) != null)
+                problems.Add($"Ability '{name}': Module Prefab '{modulePrefab.name}' contains a Collider. " +
+                             "Modules live inside the player and must have none - spawn a separate object " +
+                             "into the world for anything that needs to be hit or touched.");
+
+            return problems;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>Surfaces the problems above the moment the asset is edited or loaded, naming the
+        /// asset, instead of as a key that silently does nothing in a playtest.</summary>
+        private void OnValidate()
+        {
+            foreach (string problem in Validate())
+                Debug.LogError(problem, this);
+        }
+#endif
     }
 }

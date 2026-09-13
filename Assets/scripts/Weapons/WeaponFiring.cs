@@ -34,7 +34,7 @@ namespace Overpower.Weapons
         private WeaponCatalogue catalogue;
 
         [SerializeField, Tooltip("The weapon this player starts the match holding. The shop and " +
-                 "the test range replace it at runtime through SetWeapon.")]
+                 "the test range replace it at runtime through PlayerLoadout.")]
         private WeaponDefinition startingWeapon;
 
         [SerializeField, Tooltip("Where projectiles leave the gun. Falls back to the player's own " +
@@ -54,7 +54,7 @@ namespace Overpower.Weapons
         public WeaponDefinition Weapon => weapon;
 
         /// <summary>Where the muzzle currently sits in world space - the exact origin every shot
-        /// already fires from below. Read-only and exposed for Task 1.0b's AbilityRunner, which
+        /// already fires from below. Read-only and exposed for AbilityRunner, which
         /// needs the same point to build a CastContext without this class knowing anything about
         /// abilities. Does not change the muzzle's own height - see the Transform it reads from.</summary>
         public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position;
@@ -132,17 +132,23 @@ namespace Overpower.Weapons
             triggerHeldSince = 0f;
         }
 
-        /// <summary>Swap the active weapon by id - what the shop and the test range call.</summary>
-        public void SetWeapon(int weaponId)
+        /// <summary>
+        /// Swap the active weapon by id, on THIS machine only - apply-only. PlayerLoadout is the
+        /// only caller: it is what publishes the change so every other client (and a late joiner)
+        /// swaps too. Calling this directly from a shop or a tool would change your own screen and
+        /// nobody else's. False, with the current weapon kept, for an id the catalogue does not know.
+        /// </summary>
+        public bool SetWeapon(int weaponId)
         {
             WeaponDefinition next = catalogue != null ? catalogue.Resolve(weaponId) : null;
             if (next == null)
             {
                 Debug.LogWarning($"[WeaponFiring] {name}: no weapon with Id {weaponId} in the catalogue - keeping the current one.");
-                return;
+                return false;
             }
 
             EquipWeapon(next);
+            return true;
         }
 
         private void EquipWeapon(WeaponDefinition next)
@@ -167,7 +173,7 @@ namespace Overpower.Weapons
             if (!photonView.IsMine || weapon == null || Time.time < nextFireTime)
                 return false;
 
-            // The same rule Task 1.0b's abilities gate on: dead beats stunned beats silenced.
+            // The same rule AbilityRunner gates abilities on: dead beats stunned beats silenced.
             // Routing the trigger through CastGate instead of this class's own if-chain is what
             // keeps "can this player act right now" from drifting between the weapon and whatever
             // ability checks it next - a stun that should freeze a dash must freeze the gun too.
