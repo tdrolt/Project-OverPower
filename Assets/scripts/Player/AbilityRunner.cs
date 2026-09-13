@@ -96,7 +96,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         if (catalogue == null)
             Debug.LogError($"[AbilityRunner] {name}: Ability Catalogue is not assigned - abilities cannot be equipped or received.");
         if (gameplayConfig == null)
-            Debug.LogError($"[AbilityRunner] {name}: GameplayConfig is not assigned - the press buffer falls back to 0.12s.");
+            Debug.LogError($"[AbilityRunner] {name}: GameplayConfig is not assigned - the press buffer falls back to 0s (no buffering).");
         if (moduleParent == null)
             Debug.LogError($"[AbilityRunner] {name}: Module Parent is not assigned - modules will be created on the player root instead.");
 
@@ -152,7 +152,10 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
 
         float deltaTime = Time.deltaTime;
         float now = Time.time;
-        float window = gameplayConfig != null ? gameplayConfig.AbilityPressBufferSeconds : 0.12f;
+        // No literal duplicating GameplayConfig's own default here: the missing-config error is
+        // already logged in Awake, so a missing config degrades honestly to no buffering at all
+        // rather than silently guessing at the tuning value.
+        float window = gameplayConfig != null ? gameplayConfig.AbilityPressBufferSeconds : 0f;
 
         InterruptOnStunOrSilence();
 
