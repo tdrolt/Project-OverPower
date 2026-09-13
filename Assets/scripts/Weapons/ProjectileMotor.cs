@@ -88,9 +88,9 @@ namespace Overpower.Weapons
         {
             context = shot;
             direction = shot.Direction.normalized;
-            speed = shot.Weapon.ProjectileSpeed;
-            radius = shot.Weapon.ProjectileRadius;
-            range = new RangeBudget(shot.Weapon.MaxRange);
+            speed = shot.ProjectileSpeed;
+            radius = shot.ProjectileRadius;
+            range = new RangeBudget(shot.MaxRange);
             mask = BuildMask();
             transform.forward = direction;
             initialised = true;
@@ -221,15 +221,17 @@ namespace Overpower.Weapons
 
         /// <summary>Deals the damage, then asks the attached behaviours what to do next. Damage is
         /// applied on every client and only the victim's own component acts on it - see the class
-        /// comment on victim-side detection.</summary>
+        /// comment on victim-side detection. A pure-utility ability shot (the zip gun, damage 0)
+        /// skips ApplyDamage entirely rather than calling it for zero - see the class comment on
+        /// Task 1.7b's two ways a shot is built.</summary>
         private ProjectileHitResponse ResolveHit(RaycastHit hit)
         {
             IDamageable victim = hit.collider.GetComponentInParent<IDamageable>();
 
-            if (victim != null)
+            if (victim != null && context.Damage > 0f)
             {
                 victim.ApplyDamage(new DamageInfo(context.Damage, context.ShooterActorNumber,
-                                                   context.ShooterTeamId, context.Weapon.Id,
+                                                   context.ShooterTeamId, context.SourceId,
                                                    DamageSource.Projectile, false, hit.point));
             }
 
@@ -249,7 +251,11 @@ namespace Overpower.Weapons
         {
             if (onImpact)
             {
-                GameObject vfx = context.Weapon.ImpactVfx != null ? context.Weapon.ImpactVfx : fallbackImpactVfx;
+                // context.Weapon is null for an ability shot (Task 1.7b) - the fallback below is
+                // then the only impact VFX this projectile can show, exactly as if a weapon simply
+                // had none of its own set.
+                GameObject vfx = context.Weapon != null && context.Weapon.ImpactVfx != null
+                    ? context.Weapon.ImpactVfx : fallbackImpactVfx;
                 if (vfx != null && VFXManager.Instance != null)
                     VFXManager.Instance.PlayVFX(vfx, at);
 

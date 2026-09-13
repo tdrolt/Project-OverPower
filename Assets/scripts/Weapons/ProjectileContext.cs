@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
@@ -5,9 +6,10 @@ using Overpower.Data;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Everything one projectile needs to know about the shot that produced it: which weapon fired
-    /// it, who fired it, which way it is going and how hard it hits. Rebuilt from the fire RPC on
-    /// every client, so all nine machines simulate the identical projectile.
+    /// Everything one projectile needs to know about the shot that produced it: which weapon (or
+    /// ability) fired it, who fired it, which way it is going and how hard it hits. Rebuilt from the
+    /// fire RPC (a weapon) or the cast RPC (an ability) on every client, so every machine simulates
+    /// the identical projectile.
     ///
     /// A plain class rather than fields on ProjectileMotor, so that anything bolted onto a
     /// projectile later - an explosion, a trail, a debug gizmo - reads the same one description of
@@ -20,19 +22,61 @@ namespace Overpower.Weapons
     /// Do NOT copy this pattern to PhotonNetwork.Instantiate. That returns only the CALLER's copy;
     /// every other client builds its own from the prefab and never sees fields you assigned
     /// afterwards, so the object silently behaves differently on each machine. Networked spawns
-    /// pass their setup through instantiationData instead, which is what the deployables in a later
-    /// task do.
+    /// pass their setup through instantiationData instead, which is what the deployables use.
+    ///
+    /// TWO WAYS A SHOT IS BUILT (Task 1.7b). A weapon shot carries a WeaponDefinition and reads its
+    /// speed/radius/range/impact VFX from it, so retuning the weapon asset retunes shots already in
+    /// the air on the next trigger pull. An ABILITY shot (the zip gun, later the stun gun) has no
+    /// weapon at all - its own module's Inspector fields ARE the stat block - so it hands the motor
+    /// speed/radius/range/damage directly instead. ProjectileMotor reads ONLY the properties below
+    /// (ProjectileSpeed/ProjectileRadius/MaxRange/Damage/SourceId), never context.Weapon itself, so
+    /// it never needs to know which kind of shot it is simulating. Weapon-only extras - ImpactVfx,
+    /// beam range-charging, cursor detonation - are read straight off context.Weapon by the effect
+    /// components that use them, and those components only ever ride on a WEAPON'S projectile prefab,
+    /// so Weapon being null for an ability shot never reaches them.
     /// </summary>
     public sealed class ProjectileContext
     {
-        /// <summary>The stat block this shot came from. Everything a projectile needs that is not
-        /// per-shot - speed, radius, range, impact VFX - is read from here rather than duplicated,
-        /// so retuning the weapon asset retunes shots already in the air on the next trigger pull.</summary>
+        /// <summary>The stat block this shot came from, or null for an ability shot - see the class
+        /// comment. Everything a projectile needs that is not per-shot - speed, radius, range,
+        /// impact VFX - is read from here rather than duplicated, so retuning the weapon asset
+        /// retunes shots already in the air on the next trigger pull.</summary>
         public WeaponDefinition Weapon { get; }
 
-        /// <summary>ActorNumber of whoever pulled the trigger. Inside the fire RPC this comes from
-        /// PhotonMessageInfo.Sender, never PhotonNetwork.LocalPlayer - see DamageInfo's own note on
-        /// why getting this wrong hands kill credit to the victim.</summary>
+        /// <summary>The ability that fired this shot, or -1 for a weapon shot. Set once by the
+        /// ability constructor below; never used when Weapon is not null.</summary>
+        public int AbilityId { get; } = -1;
+
+        /// <summary>What DamageInfo.WeaponId should read for this shot: the weapon's own id for a
+        /// weapon shot, the ability's id otherwise. One place to ask "who gets credit" instead of
+        /// every caller null-checking Weapon itself.</summary>
+        public int SourceId => Weapon != null ? Weapon.Id : AbilityId;
+
+        /// <summary>Metres per second. From the weapon for a weapon shot; from the ability module's
+        /// own field otherwise - see the class comment.</summary>
+        public float ProjectileSpeed { get; }
+
+        /// <summary>Metres. From the weapon for a weapon shot; from the ability module's own field
+        /// otherwise.</summary>
+        public float ProjectileRadius { get; }
+
+        /// <summary>Metres this shot may travel before it expires. From the weapon for a weapon
+        /// shot; from the ability module's own field otherwise.</summary>
+        public float MaxRange { get; }
+
+        /// <summary>
+        /// Set only when this exact context was built for the CASTER's own local copy of an ability
+        /// projectile - see ZipGunAbility.ExecuteCast. Every client spawns the same local projectile
+        /// (so a remote player's shot is still visible on your screen), but only the shooter's own
+        /// machine should ACT on the hit (a zip pull moves the shooter's own body). Null for a
+        /// weapon shot and for every other client's copy of an ability shot; AbilityHitRelay is the
+        /// IProjectileBehaviour that calls it.
+        /// </summary>
+        public Action<ProjectileHitInfo> OnAbilityHit { get; }
+
+        /// <summary>ActorNumber of whoever pulled the trigger (or cast the ability). Inside the fire
+        /// RPC this comes from PhotonMessageInfo.Sender, never PhotonNetwork.LocalPlayer - see
+        /// DamageInfo's own note on why getting this wrong hands kill credit to the victim.</summary>
         public int ShooterActorNumber { get; }
 
         /// <summary>The shooter's team, so the sweep can fly straight through teammates instead of
@@ -93,17 +137,54 @@ namespace Overpower.Weapons
             DamageMultiplier = Mathf.Max(0f, multiplier);
         }
 
+        /// <summary>A weapon shot - Weapon is never null afterwards. ProjectileSpeed/Radius/MaxRange
+        /// are read from it once here rather than by the motor at every use, so a weapon shot and an
+        /// ability shot look identical to ProjectileMotor from this point on.</summary>
         public ProjectileContext(WeaponDefinition weapon, int shooterActorNumber, int shooterTeamId,
                                  Vector3 direction, Vector3 targetPoint, float chargeFraction,
                                  float damage)
         {
             Weapon = weapon;
+            ProjectileSpeed = weapon.ProjectileSpeed;
+            ProjectileRadius = weapon.ProjectileRadius;
+            MaxRange = weapon.MaxRange;
             ShooterActorNumber = shooterActorNumber;
             ShooterTeamId = shooterTeamId;
             Direction = direction;
             TargetPoint = targetPoint;
             ChargeFraction = chargeFraction;
             baseDamage = damage;
+        }
+
+        /// <summary>
+        /// An ability shot (Task 1.7b) - the zip gun today, the stun gun later. Weapon stays null;
+        /// speed/radius/range/damage come from the ability module's own Inspector fields instead of
+        /// a WeaponDefinition, and AbilityId stands in for Weapon.Id wherever a weapon shot would use
+        /// it (see SourceId). ChargeFraction is always 0 - no ability charges a projectile today.
+        ///
+        /// onHit is how the CASTER's own local copy of the projectile reacts to a hit (a zip pull) -
+        /// pass it only when building the context for the caster's own client; every other client's
+        /// copy of the same shot passes null, so AbilityHitRelay quietly does nothing there. This is
+        /// what makes "only the caster's copy acts on a hit" true without ProjectileMotor or
+        /// AbilityHitRelay ever asking "am I the caster" themselves.
+        /// </summary>
+        public ProjectileContext(int abilityId, float projectileSpeed, float projectileRadius,
+                                 float maxRange, float damage, int shooterActorNumber,
+                                 int shooterTeamId, Vector3 direction, Vector3 targetPoint,
+                                 Action<ProjectileHitInfo> onHit = null)
+        {
+            Weapon = null;
+            AbilityId = abilityId;
+            ProjectileSpeed = projectileSpeed;
+            ProjectileRadius = projectileRadius;
+            MaxRange = maxRange;
+            ShooterActorNumber = shooterActorNumber;
+            ShooterTeamId = shooterTeamId;
+            Direction = direction;
+            TargetPoint = targetPoint;
+            ChargeFraction = 0f;
+            baseDamage = damage;
+            OnAbilityHit = onHit;
         }
     }
 
@@ -116,6 +197,30 @@ namespace Overpower.Weapons
         /// <summary>Carry on flying. A pierce behaviour returns this after telling the motor to
         /// ignore what it just hit; a bounce behaviour returns it after redirecting the motor.</summary>
         KeepFlying
+    }
+
+    /// <summary>
+    /// What one ability projectile hit, handed to ProjectileContext.OnAbilityHit - see its own
+    /// comment for why that delegate is only ever set on the caster's own copy of the shot.
+    /// </summary>
+    public readonly struct ProjectileHitInfo
+    {
+        /// <summary>Where the sweep actually touched - a wall's surface or a player's hitbox.</summary>
+        public readonly Vector3 Point;
+
+        /// <summary>The surface normal at Point. Not read by the zip gun (it pulls toward Point, not
+        /// away from the normal), kept for a future ability that does.</summary>
+        public readonly Vector3 Normal;
+
+        /// <summary>The thing that took the hit, or null when it was level geometry (a wall).</summary>
+        public readonly IDamageable Victim;
+
+        public ProjectileHitInfo(Vector3 point, Vector3 normal, IDamageable victim)
+        {
+            Point = point;
+            Normal = normal;
+            Victim = victim;
+        }
     }
 
     /// <summary>
