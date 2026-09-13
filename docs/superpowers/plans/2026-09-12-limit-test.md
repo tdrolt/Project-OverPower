@@ -2,6 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **STATUS NOTE, 2026-09-13 — read before using this plan.** The authoritative task order, current status and
+> next steps live in `C:/UniStuff/Y3/MinorSkilled/Resources/loops/Limit Test/HANDOFF.md`. This plan's **number
+> tables remain the source** for every weapon and ability value, but its task list has drifted from reality:
+>
+> - **`AbilityRunner.cs` does not exist.** The file table and Task 0.12 name it as existing, but no task ever built it.
+>   It is now **Task 1.0 (ability framework)**, scheduled after Task 1.4.
+> - **There is no `Player` layer.** Living players are on `Default`; corpses on `DeadPlayer`.
+> - Five aim-cone `recoveryPerSecond` values were corrected in the tables below (see "A balance invariant").
+> - `10 SMG - Shotgun` `spreadDegrees` is **15**, not 11 — and it is blocked on a muzzle-height problem (HANDOFF §7).
+> - Charge accumulates only after the fire cooldown ends (commits `c268b40`, `60aae29`).
+> - Line-count targets of ~150 lines have proven unrealistic at this project's comment density; most files run ~2×.
+> - Tasks 0.1–0.15 and 1.1–1.3 are done. The checkboxes below were never ticked; do not read them as status.
+
 **Goal:** Bring Project OverPower as close to `POP GDD.pdf` as possible on the `limit-testing`
 branch, with every gameplay value editable from the Unity Inspector and the game still running
 networked with two clients.
