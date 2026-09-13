@@ -190,14 +190,20 @@ namespace Overpower.Weapons
             return true;
         }
 
-        /// <summary>0..1 for a charge weapon, 0 for everything else. The baseline cannot charge, so
-        /// this is plumbing only: the value crosses the wire and scales nothing yet.</summary>
+        /// <summary>0..1 for a charge weapon, 0 for everything else.
+        ///
+        /// Charge only starts accumulating once the weapon is off cooldown. Measuring from the moment
+        /// of the press instead let a player hold straight through the Fire Interval they had to wait
+        /// anyway, so the charge time cost nothing and a full charge was strictly better than a tap:
+        /// the burst charge path measured a 1.54s kill against a 2-3s design intent. The charge time is
+        /// meant to BE the price of the payoff, so it has to come after the cooldown, not inside it.</summary>
         private float ChargeFraction()
         {
             if (weapon == null || !weapon.CanCharge || weapon.MaxChargeSeconds <= 0f || triggerHeldSince <= 0f)
                 return 0f;
 
-            return Mathf.Clamp01((Time.time - triggerHeldSince) / weapon.MaxChargeSeconds);
+            float chargeStart = Mathf.Max(triggerHeldSince, nextFireTime);
+            return Mathf.Clamp01((Time.time - chargeStart) / weapon.MaxChargeSeconds);
         }
 
         /// <summary>
