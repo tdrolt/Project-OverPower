@@ -155,6 +155,13 @@ namespace Overpower.TestRange
         private sealed class Strafer : MonoBehaviour
         {
             private Vector3 center;
+
+            // The row TestRangeSpawner actually calibrated this strafer to patrol, captured once in
+            // Configure and never written to again - center itself drifts with every push
+            // (OnDummyDisplaced) and needs a stable value to be restored to when the dummy resets.
+            // Review finding, Task 1.10a: without this, a pushed strafer's row was lost forever.
+            private Vector3 originalCenter;
+
             private Vector3 axis;
             private float distance;
             private float speed;
@@ -164,6 +171,7 @@ namespace Overpower.TestRange
             public void Configure(Vector3 center, Vector3 axis, float distance, float speed)
             {
                 this.center = center;
+                this.originalCenter = center;
                 this.axis = axis.normalized;
                 this.distance = distance;
                 this.speed = speed;
@@ -174,13 +182,19 @@ namespace Overpower.TestRange
                 // Same GameObject: TestRangeSpawner adds this component to the dummy it just spawned.
                 dummy = GetComponent<DummyTarget>();
                 if (dummy != null)
+                {
                     dummy.Displaced += OnDummyDisplaced;
+                    dummy.ResetOccurred += OnDummyReset;
+                }
             }
 
             private void OnDestroy()
             {
                 if (dummy != null)
+                {
                     dummy.Displaced -= OnDummyDisplaced;
+                    dummy.ResetOccurred -= OnDummyReset;
+                }
             }
 
             private void OnDummyDisplaced(Vector3 worldDelta)
@@ -190,6 +204,14 @@ namespace Overpower.TestRange
                 // dummy visibly off its own center the instant the patrol clock starts reading from
                 // it again.
                 center += worldDelta;
+            }
+
+            /// <summary>The dummy just restored its own transform.position to its spawn point
+            /// (DummyTarget.ResetToFull) - the patrol centre must snap back to match, or the very
+            /// next frame's center + axis * offset would drag the dummy right back off of it.</summary>
+            private void OnDummyReset()
+            {
+                center = originalCenter;
             }
 
             private void Update()

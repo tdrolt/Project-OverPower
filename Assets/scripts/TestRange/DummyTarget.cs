@@ -127,6 +127,19 @@ namespace Overpower.TestRange
         /// continues from wherever the dummy ended up instead of snapping back to the old line.</summary>
         public event Action<Vector3> Displaced;
 
+        // Captured once, in Awake, before anything can move this dummy - the exact spot
+        // TestRangeSpawner placed it at. ResetToFull restores transform.position here (review
+        // finding on Task 1.10a: it already restored health/armor/status but left position
+        // untouched, so a dummy pushed by a sonic pulse and then reset stayed drifted forever).
+        private Vector3 spawnPosition;
+
+        /// <summary>Fired at the end of every ResetToFull, after position/health/armor/status are
+        /// all back to their spawn values - so a component that shifted its OWN idea of where this
+        /// dummy belongs (TestRangeSpawner.Strafer's patrol centre, nudged by Displaced whenever a
+        /// pulse pushes the dummy) can snap that back too. Not the same event as Displaced: that one
+        /// fires on every push, this one only on a reset.</summary>
+        public event Action ResetOccurred;
+
         public bool IsAlive => !isDead;
         public int TeamId => teamId;
 
@@ -143,6 +156,10 @@ namespace Overpower.TestRange
 
         private void Awake()
         {
+            // Before anything else runs - this is the position TestRangeSpawner just placed the
+            // dummy at (a plain Instantiate already sets transform.position before Awake fires).
+            spawnPosition = transform.position;
+
             // Loud, matching PlayerHealth. A dummy quietly falling back to a hardcoded 100 health
             // would still look like it was working, and would report a time-to-kill that no longer
             // matched a real player - poisoning the one thing this object exists to measure.
@@ -354,6 +371,10 @@ namespace Overpower.TestRange
         {
             CancelPendingReset();
 
+            // Review finding, Task 1.10a: this used to restore health/armor/status but never
+            // position, so a strafer pushed off its row by a sonic pulse stayed drifted forever.
+            transform.position = spawnPosition;
+
             health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
             armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(armorTier) : 0f,
                                     armorConfig != null ? armorConfig.RechargeSecondsFor(armorTier) : 6f,
@@ -363,6 +384,10 @@ namespace Overpower.TestRange
             hits = 0;
             statusState.ClearAll(); // Awake builds statusState before ever calling this, so it is never null here.
             burnSourceActorNumber = -1;
+
+            // After everything above is back to spawn values, not before - a listener (the
+            // Strafer's own centre) should see a fully-reset dummy, not one mid-restore.
+            ResetOccurred?.Invoke();
         }
 
         private void CancelPendingReset()
