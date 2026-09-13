@@ -38,6 +38,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
 
     private WeaponFiring weaponFiring;
     private AbilityRunner abilityRunner;
+    private PlayerHealth playerHealth;
 
     // The prefab's own starting weapon id, captured before anything can change it - a remote copy
     // falls back to this when a property is missing or unreadable.
@@ -47,11 +48,14 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
     {
         weaponFiring = GetComponent<WeaponFiring>();
         abilityRunner = GetComponent<AbilityRunner>();
+        playerHealth = GetComponent<PlayerHealth>();
 
         if (weaponFiring == null)
             Debug.LogError($"[PlayerLoadout] {name}: no WeaponFiring on the player root - the weapon cannot be replicated.");
         if (abilityRunner == null)
             Debug.LogError($"[PlayerLoadout] {name}: no AbilityRunner on the player root - abilities cannot be equipped.");
+        if (playerHealth == null)
+            Debug.LogError($"[PlayerLoadout] {name}: no PlayerHealth on the player root - armor upgrade levels cannot be replicated.");
     }
 
     private void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
@@ -76,6 +80,12 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
                 ApplyAbility(slot, abilityRunner != null ? abilityRunner.StartingId(slot) : LoadoutProperties.Empty);
                 props[LoadoutProperties.KeyFor(slot)] = EquippedAbilityId(slot);
             }
+
+            // PlayerHealth already starts at level 0/0 in its own Awake - published explicitly so
+            // the room's Custom Properties are self-describing rather than relying on a missing
+            // key silently meaning the same thing.
+            props[LoadoutProperties.ArmorAbsorbLevelKey] = playerHealth != null ? playerHealth.AbsorbLevel : 0;
+            props[LoadoutProperties.ArmorRechargeLevelKey] = playerHealth != null ? playerHealth.RechargeLevel : 0;
 
             PhotonNetwork.LocalPlayer.SetCustomProperties(props);
             LogLoadout();
@@ -118,6 +128,28 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             return;
 
         PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { key, abilityId } });
+        LogLoadout();
+    }
+
+    /// <summary>Owner only. Applies new armor upgrade levels on this machine, then tells everyone -
+    /// same apply-locally-then-publish pattern as SetWeapon/SetAbility. Called by the F1 panel's
+    /// upgrade buttons today (a future shop calls it once gold is spent), never with a decision of
+    /// its own: the caller already ran the levels through Combat.ArmorUpgradePath and is only
+    /// asking to make the result official. Required for correctness, not only for late joiners - a
+    /// remote copy clamps synced armor to its OWN capacity (ArmorState.SetFromNetwork), which stays
+    /// at level 0 until this replicates.</summary>
+    public void SetArmorLevels(int absorbLevel, int rechargeLevel)
+    {
+        if (!photonView.IsMine || playerHealth == null)
+            return;
+
+        playerHealth.SetArmorLevels(absorbLevel, rechargeLevel);
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        {
+            { LoadoutProperties.ArmorAbsorbLevelKey, absorbLevel },
+            { LoadoutProperties.ArmorRechargeLevelKey, rechargeLevel }
+        });
         LogLoadout();
     }
 
@@ -165,6 +197,20 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             touched = true;
         }
 
+        // Both armor keys are always published together (SetArmorLevels writes them in one
+        // Hashtable), so either one present means both are - but each still falls back to
+        // playerHealth's OWN current level rather than 0, so an update carrying only, say, a
+        // property refresh for another key can never silently reset the other path.
+        if (playerHealth != null && (!onlyKeysPresent ||
+            props.ContainsKey(LoadoutProperties.ArmorAbsorbLevelKey) ||
+            props.ContainsKey(LoadoutProperties.ArmorRechargeLevelKey)))
+        {
+            int absorbLevel = LoadoutProperties.ReadInt(props, LoadoutProperties.ArmorAbsorbLevelKey, playerHealth.AbsorbLevel);
+            int rechargeLevel = LoadoutProperties.ReadInt(props, LoadoutProperties.ArmorRechargeLevelKey, playerHealth.RechargeLevel);
+            playerHealth.SetArmorLevels(absorbLevel, rechargeLevel);
+            touched = true;
+        }
+
         if (touched)
             LogLoadout();
     }
@@ -185,7 +231,9 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         int weaponId = weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : LoadoutProperties.Empty;
         Debug.Log($"[LOADOUT] actor={photonView.OwnerActorNr} W={weaponId} " +
                   $"E={EquippedAbilityId(AbilitySlot.Equipment)} U={EquippedAbilityId(AbilitySlot.Ultimate)} " +
-                  $"M={EquippedAbilityId(AbilitySlot.Mobility)} isMine={photonView.IsMine}");
+                  $"M={EquippedAbilityId(AbilitySlot.Mobility)} " +
+                  $"A={(playerHealth != null ? playerHealth.AbsorbLevel : 0)}/{(playerHealth != null ? playerHealth.RechargeLevel : 0)} " +
+                  $"isMine={photonView.IsMine}");
     }
 
     // Unused IInRoomCallbacks members.

@@ -22,6 +22,12 @@ namespace Overpower.Net
         public const string UltimateKey = "ultimateId";
         public const string MobilityKey = "mobilityId";
 
+        /// <summary>Armor upgrade levels (Task 1.5) - two independent counters, not one tier, so
+        /// they live under two keys. A missing key means level 0, the level everyone starts on,
+        /// which is why PlayerLoadout reads these with a fallback rather than LoadoutProperties.Empty.</summary>
+        public const string ArmorAbsorbLevelKey = "armorAbsorbLvl";
+        public const string ArmorRechargeLevelKey = "armorRechargeLvl";
+
         /// <summary>Means "no ability equipped in this slot". Never 0 - id 0 on an AbilityDefinition
         /// means "not set" on the asset itself, a different kind of empty, so this needs its own
         /// value that can never collide with a real id.</summary>
