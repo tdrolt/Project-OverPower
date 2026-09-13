@@ -15,7 +15,11 @@ namespace Overpower.Combat
     /// </summary>
     public sealed class ChargePool
     {
-        private readonly float rechargeSeconds;
+        // Not readonly: an ability module's designer-facing cooldownSeconds can be retuned on the
+        // live component in Play mode, and SetRechargeSeconds below is how that retune reaches the
+        // pool it actually drives - a value fixed at construction would make that Inspector edit
+        // silently do nothing.
+        private float rechargeSeconds;
 
         // Seconds accumulated toward returning the next missing charge. Only meaningful while
         // Available is below MaxCharges - a full pool has nothing to time.
@@ -24,8 +28,10 @@ namespace Overpower.Combat
         public int Available { get; private set; }
         public int MaxCharges { get; private set; }
 
-        /// <summary>0..1 toward the next charge, for the HUD. 0 whenever the pool is full.</summary>
-        public float RechargeProgress => Available >= MaxCharges ? 0f : timer / rechargeSeconds;
+        /// <summary>0..1 toward the next charge, for the HUD. 0 whenever the pool is full, and also
+        /// 0 - never NaN - for a 0-second recharge: dividing timer by a zero rechargeSeconds has no
+        /// meaningful "partway there" to report, since the very next Tick fills it outright.</summary>
+        public float RechargeProgress => Available >= MaxCharges || rechargeSeconds <= 0f ? 0f : timer / rechargeSeconds;
 
         public ChargePool(int maxCharges, float rechargeSeconds)
         {
@@ -69,6 +75,18 @@ namespace Overpower.Combat
         {
             Available = MaxCharges;
             timer = 0f;
+        }
+
+        /// <summary>
+        /// Retunes how long one charge takes to return, keeping Available exactly as it was - a
+        /// designer changing cooldownSeconds mid-match should not reset or refund anything, only
+        /// change the pace of what happens next. Clamped to never go negative, since a negative
+        /// recharge time has no sensible meaning and would make the Tick loop below spin forever
+        /// subtracting a negative number from timer instead of ever finishing.
+        /// </summary>
+        public void SetRechargeSeconds(float seconds)
+        {
+            rechargeSeconds = Mathf.Max(0f, seconds);
         }
 
         /// <summary>

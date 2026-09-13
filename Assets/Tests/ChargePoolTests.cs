@@ -140,5 +140,65 @@ namespace Overpower.Tests
 
             Assert.AreEqual(0.5f, p.RechargeProgress, 0.01f);
         }
+
+        [Test]
+        public void SetRechargeSecondsKeepsAvailableUnchanged()
+        {
+            var p = NewPool();
+            p.TryConsume(); // Available == 1
+
+            p.SetRechargeSeconds(2f);
+
+            Assert.AreEqual(1, p.Available);
+        }
+
+        [Test]
+        public void SetRechargeSecondsChangesHowLongTheNextChargeTakes()
+        {
+            var p = NewPool();
+            p.TryConsume();
+
+            p.SetRechargeSeconds(2f);
+            p.Tick(2f);
+
+            Assert.AreEqual(2, p.Available);
+        }
+
+        [Test]
+        public void AZeroSecondRechargeReportsProgressOfZeroRatherThanNaN()
+        {
+            var p = NewPool();
+            p.TryConsume();
+
+            p.SetRechargeSeconds(0f);
+
+            Assert.AreEqual(0f, p.RechargeProgress, 0.001f);
+            Assert.IsFalse(float.IsNaN(p.RechargeProgress));
+        }
+
+        [Test]
+        public void AZeroSecondPoolRefillsInstantlyOnTheNextTick()
+        {
+            var p = NewPool();
+            p.TryConsume();
+            p.TryConsume(); // Available == 0
+
+            p.SetRechargeSeconds(0f);
+            p.Tick(0.016f); // one ordinary frame, not a specially large step
+
+            Assert.AreEqual(2, p.Available);
+        }
+
+        [Test]
+        public void SetRechargeSecondsClampsANegativeValueToZero()
+        {
+            var p = NewPool();
+            p.TryConsume();
+
+            p.SetRechargeSeconds(-5f);
+
+            Assert.AreEqual(0f, p.RechargeProgress, 0.001f);
+            Assert.IsFalse(float.IsNaN(p.RechargeProgress));
+        }
     }
 }
