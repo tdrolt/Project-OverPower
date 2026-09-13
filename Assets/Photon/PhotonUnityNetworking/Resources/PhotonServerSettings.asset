@@ -78,6 +78,7 @@ MonoBehaviour:
   - RPC_CastAbility
   - RPC_ApplyStatusFromPeer
   - RPC_DamageCredit
+  - RPC_Detonate
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

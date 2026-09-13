@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c660593cf9bb4d44b3954e56e33cfd8, type: 3}
+  m_Name: 19 Mines E
+  m_EditorClassIdentifier: 
+  id: 19
+  displayName: Mines
+  slot: 1
+  icon: {fileID: 0}
+  goldCost: 0
+  modulePrefab: {fileID: 8955745586176628307, guid: 029294588b429ef438c4b52d8735316f, type: 3}
