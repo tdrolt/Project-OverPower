@@ -88,17 +88,38 @@ namespace Overpower.TestRange
 
             for (int i = 0; i < stationaryDistances.Length; i++)
             {
-                Vector3 pos = spawn.position + forward * stationaryDistances[i] + right * (i * lateralSpacing);
+                Vector3 pos = Grounded(spawn.position + forward * stationaryDistances[i] + right * (i * lateralSpacing));
                 SpawnDummy(pos, spawn.rotation);
             }
 
             float moveSpeed = gameplayConfig.BaseMoveSpeed;
             for (int i = 0; i < strafingDummyCount; i++)
             {
-                Vector3 center = spawn.position + forward * strafeRowDistance + right * (i * lateralSpacing * 2f);
+                Vector3 center = Grounded(spawn.position + forward * strafeRowDistance + right * (i * lateralSpacing * 2f));
                 GameObject dummy = SpawnDummy(center, spawn.rotation);
                 dummy.AddComponent<Strafer>().Configure(center, right, strafeDistance, moveSpeed);
             }
+        }
+
+        /// <summary>
+        /// Lifts a point on the ground to where the dummy's ROOT must sit for its collider to stand on
+        /// that ground. The dummy's collider copies the player's capsule, whose bottom is below the root
+        /// (local Y -0.5), just as a player standing on the floor has its root 0.5m up. Placing the root
+        /// ON the ground instead buried every dummy by 0.5m (measured 2026-09-13), so a shot fired from a
+        /// real player's muzzle crossed the narrow top of the dummy's capsule: it read as a ~0.4m-wide
+        /// target instead of 0.7m, and the shotgun spread was tuned against that buried target.
+        ///
+        /// Derived from the collider rather than a hardcoded 0.5, so it stays right if the capsule changes.
+        /// Also applied to the strafer's centre, which re-applies its position every frame.
+        /// </summary>
+        private Vector3 Grounded(Vector3 groundPoint)
+        {
+            CapsuleCollider capsule = dummyTargetPrefab.GetComponent<CapsuleCollider>();
+            if (capsule == null)
+                return groundPoint;
+
+            float bottom = (capsule.center.y - capsule.height * 0.5f) * dummyTargetPrefab.transform.localScale.y;
+            return groundPoint + Vector3.up * -bottom;
         }
 
         private GameObject SpawnDummy(Vector3 position, Quaternion rotation)
