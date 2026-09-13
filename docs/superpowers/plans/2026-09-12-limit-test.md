@@ -1211,6 +1211,219 @@ not write".
 Ordered so that cuts land at the bottom. Every number below marked **[C]** is Claude's invention and
 goes in the provenance doc; **[T]** is Tudor's from the brief; **[G]** is from the GDD.
 
+## Task 1.0: Ability framework
+
+> Scheduled after Task 1.4. Numbered 1.0 because Tasks 1.6–1.11 cannot start without it. Designed 2026-09-13
+> by a read-only design pass against the code; the findings below were verified in source.
+
+**Code facts this design is built on (verified in source, 2026-09-13):**
+- PUN delivers an RPC only to components on the PhotonView's **own GameObject** (`PhotonView.cs:578`, `PhotonNetworkPart.cs:471`), and does not check `enabled` — it calls RPCs on disabled components too. An RPC on a child module is never found.
+- `PBRCharacter` (the mesh child) has its **own PhotonView** (`Multiplayer Player.prefab` ~line 1795). `PhotonView.Get` returns the nearest view up the tree (`PhotonView.cs:680`), and death does `playerMesh.SetActive(false)` (`PlayerLifecycle.cs:423`). Modules must not live under it.
+- **Stun blocks nothing today** — nothing reads `IsStunned`.
+- `PlayerStatusEffects.Apply` has **no `IsMine` guard**, yet only the owner ticks — an effect applied to a remote copy never expires (`PlayerStatusEffects.cs:57`, `PlayerOverheat.cs:61`).
+- Invulnerability already returns early in `PlayerHealth.cs:92`; `CurrentDamageReduction()` is for dash's `damageReduction` and future buffs.
+- The **weapon id is not replicated** today — `RPC_FireWeapon` carries it per shot, so remote copies keep `startingWeapon` forever.
+- `PlayerInputRouter` has no `EquipmentReleased`/`UltimateReleased`, and `Emit` drops events while input is suppressed (`PlayerInputRouter.cs:159`).
+- `ChargePool.rechargeSeconds` is `readonly` (`ChargePool.cs:18`) and `RechargeProgress` divides by it (`ChargePool.cs:28`).
+
+**Files:**
+- Create: `Assets/scripts/Abilities/Core/CastTypes.cs` — `CastContext`, `CastPayload`, `CastEvent`, `InterruptReason`, `IAbilityStatus`
+- Create: `Assets/scripts/Abilities/Core/AbilityModule.cs` — base class every ability derives from: inherited `cooldownSeconds`/`charges` + their `ChargePool`, and `AbilityOwner` (the player's components, cached)
+- Create: `Assets/scripts/Combat/CastGate.cs` — pure logic: `CastBlock`, `CastGate`, `PressBuffer`
+- Create: `Assets/scripts/Combat/DamageReductionStack.cs` — pure logic: keyed reductions, combined multiplicatively
+- Create: `Assets/scripts/Net/LoadoutProperties.cs` — the four Custom Property keys + a never-throwing reader (the loadout's `Teams.cs`)
+- Create: `Assets/scripts/Player/AbilityRunner.cs` — three slots, input, gating, the one cast RPC, death/respawn
+- Create: `Assets/scripts/Player/PlayerLoadout.cs` — the only writer of loadout properties; applies them on every client
+- Create: `Assets/scripts/Abilities/Debug/DebugPingAbility.cs`, `Assets/Gameplay/Abilities/Debug Ping.prefab`, variant `Debug Ping Channel.prefab`, and `901 Debug Ping E.asset`, `902 Debug Ping U.asset`, `903 Debug Ping M.asset`
+- Create: `Assets/Tests/CastGateTests.cs`, `DamageReductionStackTests.cs`, `LoadoutPropertiesTests.cs`
+- Modify: `Combat/ChargePool.cs` + `Tests/ChargePoolTests.cs` — add `SetRechargeSeconds`; `RechargeProgress` safe at 0s
+- Modify: `Player/PlayerStatusEffects.cs` — stun freezes the motor, `Apply` owner-only, hosts the reduction stack
+- Modify: `Player/PlayerHealth.cs` — `CurrentDamageReduction()` reads the stack
+- Modify: `Weapons/WeaponFiring.cs` — stun blocks firing; add read-only `MuzzlePosition`
+- Modify: `Data/GameplayConfig.cs` — add `abilityPressBufferSeconds`
+- Modify: `Data/AbilityDefinition.cs` — `OnValidate` checks on the module prefab
+- Modify: `TestRange/TestRangePanel.cs` — weapon and ability dropdowns equip through `PlayerLoadout`
+- Modify: `Assets/Resources/Multiplayer Player.prefab` — add `AbilityRunner` + `PlayerLoadout` to the root, plus an empty `Abilities` child of the root
+- Modify: `AbilityCatalogue.asset`; `PhotonServerSettings.asset` gets one appended RpcList line
+
+Every ability is a module prefab that every client instantiates locally (from the catalogue reference) as a child of that
+player's `Abilities` transform. No PhotonView, no colliders, not in `Resources/`. Only the owner's copy decides to cast;
+every copy, the owner's included, runs the cast. **Trust model: cooldowns, charges and casts are client-authoritative. No
+anti-cheat — this is a prototype on a relay; the file comments must say so.**
+
+### The seam
+
+```csharp
+namespace Overpower.Abilities
+{
+    // Everything the caster's machine knew at the press. Built by AbilityRunner on the OWNER only,
+    // so no module ever reads Camera.main or the mouse itself.
+    public readonly struct CastContext
+    {
+        public readonly Vector3 Origin;        // player root
+        public readonly Vector3 Muzzle;        // WeaponFiring.MuzzlePosition
+        public readonly Vector3 AimDirection;  // PlayerAim.AimDirection
+        public readonly Vector3 TargetPoint;   // PlayerAim.GroundPointUnderCursor
+        public readonly Vector3 MoveDirection; // PlayerMotor.MovementInput(); zero when standing still
+    }
+
+    // What crosses the wire, flattened into RPC parameters: PUN cannot send a custom struct without
+    // PhotonPeer.RegisterType, and a registered type per ability is exactly what this avoids.
+    public struct CastPayload
+    {
+        public Vector3 Origin, Direction, Point;
+        public int Seed;        // any randomness, rolled identically everywhere
+        public int IntArg;      // module-defined
+        public float FloatArg;  // module-defined
+    }
+
+    public readonly struct CastEvent       // what ExecuteCast receives on every client
+    {
+        public readonly CastPayload Payload;
+        public readonly byte Phase;          // 0 = the cast; a module defines 1+ (channel end, sprint stop)
+        public readonly int CasterActor;     // from info.Sender, never PhotonNetwork.LocalPlayer
+        public readonly int CasterTeam;      // Teams.TryGetTeam(info.Sender, ...)
+        public readonly bool IsCasterClient; // true only on the caster's own machine
+        public readonly float SecondsLate;   // PhotonNetwork.Time - info.SentServerTime, >= 0
+    }
+
+    public enum InterruptReason { Died, Stunned, Silenced, Unequipped }
+
+    public interface IAbilityStatus         // the HUD's (Task 1.12) whole view of a slot
+    {
+        AbilityDefinition Definition { get; }
+        int ChargesAvailable { get; }
+        int MaxCharges { get; }              // 0 = no cooldown gate (sprint)
+        float RechargeProgress { get; }      // 0..1 toward the next charge, 0 when full
+        bool IsActive { get; }               // a channel, dash or sprint is running
+    }
+
+    // Deliberately NOT MonoBehaviourPun - see Risks. Do not use Owner in Awake; it is bound after.
+    public abstract class AbilityModule : MonoBehaviour, IAbilityStatus
+    {
+        [Header("Cooldown")]
+        [SerializeField, Tooltip("...")] private float cooldownSeconds = 5f; // 0 = no cooldown
+        [SerializeField, Tooltip("...")] private int charges = 1;            // recharge one at a time
+
+        protected AbilityOwner Owner { get; private set; } // motor, aim, health, overheat, status, lifecycle
+        public AbilityDefinition Definition { get; private set; }
+
+        // ---- OWNER only, called by AbilityRunner ----
+        public virtual bool IsReady => true;                  // extra gate: ultimate charge, portal count
+        protected virtual bool SpendsChargeOnCast => true;    // teleport spends after travel instead
+        public abstract bool TryBuildCast(in CastContext ctx, out CastPayload payload); // false = refuse, nothing spent
+        public virtual void OwnerTick(float deltaTime, bool held) { } // held is false while dead/stunned/silenced
+        protected void SendPhase(byte phase, in CastPayload payload);  // goes out through the runner's RPC
+        protected bool SpendCharge();
+        protected void RefillCharges();                       // zip gun on takedown
+
+        // ---- EVERY client, the caster included ----
+        public abstract void ExecuteCast(in CastEvent cast);
+        public virtual void OnEquip() { }
+        public virtual void Interrupt(InterruptReason reason) { } // cancel channels, release ExternalMotionControl
+        public virtual void OnRespawned() { }
+
+        public int ChargesAvailable { get; }   public int MaxCharges { get; }
+        public float RechargeProgress { get; } public virtual bool IsActive => false;
+        internal void Bind(AbilityRunner runner, AbilityOwner owner, AbilityDefinition definition);
+        internal void TickCooldown(float deltaTime); // owner only
+        internal void ResetCooldowns();              // respawn and F1 "Reset Cooldowns"
+    }
+}
+
+// Assets/scripts/Player/AbilityRunner.cs - on the player ROOT, beside the root PhotonView.
+public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
+{
+    public IAbilityStatus StatusFor(AbilitySlot slot); // null when the slot is empty
+    public CastBlock BlockFor(AbilitySlot slot);       // live, so the HUD can grey the icon
+    public int EquippedId(AbilitySlot slot);           // LoadoutProperties.Empty (-1) when empty
+    public event System.Action<AbilitySlot> SlotChanged;
+    public void Equip(AbilitySlot slot, int abilityId); // apply-only; only PlayerLoadout calls this
+
+    [PunRPC] // Appended to RpcList. Never rename it, never change its parameters.
+    private void RPC_CastAbility(byte slot, int abilityId, byte phase, Vector3 origin, Vector3 direction,
+                                 Vector3 point, int seed, int intArg, float floatArg, PhotonMessageInfo info);
+}
+```
+
+**Why this shape.**
+- **One RPC on the runner is the only option that works** (child modules can't receive RPCs). The alternative — a PhotonView per module — means allocating view ids at runtime for every ability.
+- **Adding an ability never touches `RpcList`**, the most fragile file in the project.
+- **"Local means receiver" becomes structural.** `TryBuildCast` (owner only) is the only hook that may read input or the camera; `ExecuteCast` gets nothing but a struct.
+- **The id travels next to the slot**, so a cast that arrives before a loadout change can never run the wrong module.
+- **`RpcTarget.All`, not `AllViaServer` (unlike `WeaponFiring`).** Abilities move the caster's own body; a server round trip on a dash feels like input lag. Remote clients still receive one sender's RPCs in send order.
+
+**To add an ability (Tasks 1.6–1.11):** (1) write one `AbilityModule` subclass; (2) make one prefab holding only that
+component (no PhotonView, no colliders, not in `Resources/`); (3) create one `AbilityDefinition` asset (id, slot, prefab)
+and add it to `AbilityCatalogue`. `AbilityRunner`, `PlayerLoadout`, `TestRangePanel` and `RpcList` need no edits.
+Persistent world objects (mines, portals, cover, fence, zone) follow the `FireField.Spawn` pattern from `ExecuteCast` when
+`cast.IsCasterClient`. Effects that land on a player are applied victim-side: on each client, only to the player whose
+`photonView.IsMine`.
+
+### Gating, holds and death
+- **Gate order.** `CastGate.ForActor(alive, stunned, silenced)` → `Dead` > `Stunned` > `Silenced` > `None`. `CastGate.ForAbility(actorBlock, hasCharge, module.IsReady)` adds `Recharging`, then `NotReady`. Only the **owner** evaluates the gate. `RPC_CastAbility` never gates on the receiver — overheat, stun and cooldowns are not replicated.
+- **Overheat** silences all three slots through `ForActor`. `WeaponFiring.TryFire` calls the same `ForActor`, so weapon and abilities cannot drift apart.
+- **Stun** blocks casts and firing (`ForActor`) and movement: `PlayerStatusEffects` calls `motor.AddSpeedMultiplier(StunKey, 0f)` under its own key (not `this`, which slow already uses).
+- **Interrupts.** The runner watches stun/silence switching on and calls `Interrupt(Stunned|Silenced)`. Those states are owner-only, so a module that cancels something must also `SendPhase(end)` so remote clients stop the visual. A module that stuns its own caster (Invulnerability) receives its own `Interrupt(Stunned)` and must ignore it.
+- **Press vs. hold.** The runner subscribes to `EquipmentPressed`/`UltimatePressed`/`MobilityPressed` for the press edge and buffers it for `abilityPressBufferSeconds`. Every frame it calls `OwnerTick(dt, held && ForActor == None)` from the router's polled `*Held` values. **No release hook, on purpose**: sprint and channels end when `held` goes false, which covers death, F1 focus and silence for free. Toggle-vs-hold is a checkbox on the sprint module (1.6). Sprint needs no RPC for speed (position replicates); phases are only for visuals.
+- **Death.** The runner subscribes to `PlayerLifecycle.AliveChanged` (fires on every client). On `false`: `Interrupt(Died)` on all modules. On `true`: `ResetCooldowns()` (owner only) then `OnRespawned()`. Do not add the runner to the `enabled` toggle in `ApplyAliveState`. `UltimateCharge` (1.11) is separate and must not reset on respawn.
+- **Damage reduction.** `PlayerStatusEffects.AddDamageReduction(key, fraction)` / `RemoveDamageReduction(key)` feed a `DamageReductionStack`: total = 1 − Π(1 − r) (two 50% sources = 75%). `ClearAll()` empties it. `CurrentDamageReduction()` returns its total. Owner-only, like `ApplyDamage`.
+
+### Loadout replication
+- **Keys** (`LoadoutProperties`): `"weaponId"`, `"equipmentId"`, `"ultimateId"`, `"mobilityId"`. All int; `Empty = -1` (id 0 means "not set" on `AbilityDefinition`).
+- **Writer.** Only the owner's `PlayerLoadout.SetWeapon(id)` / `SetAbility(slot, id)`: apply locally first (`WeaponFiring.SetWeapon`, `AbilityRunner.Equip`), then `SetCustomProperties` — same pattern as `PlayerLifecycle.SetAlive` (`PlayerLifecycle.cs:404`). In `Start` the owner publishes what the prefab's `startingWeapon` and the runner's starting abilities produced.
+- **Remote clients.** `OnPlayerPropertiesUpdate` filtered to `photonView.Owner` and `!IsMine`, applies the same calls. A late joiner reads `Owner.CustomProperties` in `Start`. Missing or wrong-typed value → prefab default, never throws.
+- **Weapon unification.** `WeaponFiring` keeps `startingWeapon`, catalogue resolution and `SetWeapon`, now apply-only; `PlayerLoadout` is its only caller (test range included). Firing is unchanged (the RPC carries the id). Gain: remote `WeaponFiring.Weapon` becomes correct for HUD/scoreboard/kill feed.
+- **Cast before loadout.** `Equip` with the same id does nothing; a different id → `Interrupt(Unequipped)`, destroy old module, instantiate, bind, `OnEquip`. A cast RPC for an id the slot doesn't hold yet → resolve and equip on the spot; reject if `Definition.Slot` doesn't match the slot sent (or is `Primary`), logging once per session.
+
+### Numbers
+
+| Field | Home | Value | Whose |
+|---|---|---|---|
+| `abilityPressBufferSeconds` | `GameplayConfig`, new "Abilities" header | 0.12 | [C] — forgives a dash pressed one frame before its charge returns; too short to fire a surprise cast when silence ends |
+| Debug Ping `cooldownSeconds` / `charges` | `Debug Ping.prefab` | 2 / 2 | [C], test content |
+| `markerRadius` / `markerSeconds` | same | 0.5 / 1.5 | [C] |
+| `channelSeconds` | `Debug Ping` / `Debug Ping Channel` | 0 / 1.5 | [C] — 0 = instant; >0 = hold to channel, releasing cancels |
+| Catalogue ids | 901 Equipment, 902 Ultimate (both `Debug Ping`), 903 Mobility (`Debug Ping Channel`) | | [C] |
+
+Ability numbers belong to Tasks 1.6–1.11.
+
+- [ ] **Step 1: Write the failing tests.**
+  - `CastGateTests`: each block wins over every block below it (Dead > Stunned > Silenced > Recharging > NotReady); all clear → `None`; a module with no charges gate never returns `Recharging`; `PressBuffer`: pending inside the window, expired after, consumed exactly once, a second press restarts it, a 0 window is pending only on the press frame.
+  - `DamageReductionStackTests`: empty = 0; 0.3 alone = 0.3; 0.5 + 0.5 = 0.75; same key replaces; removing a key restores the total; inputs clamped 0..1.
+  - `LoadoutPropertiesTests` (plain `Dictionary<object,object>`): missing key → fallback; non-int → fallback without throwing; -1 reads as empty.
+  - `ChargePoolTests`: `SetRechargeSeconds` keeps `Available`; a 0s pool reports `RechargeProgress` 0, not NaN.
+- [ ] **Step 2: Run to verify they fail.**
+- [ ] **Step 3: Implement `CastGate`, `DamageReductionStack`, `LoadoutProperties` and the `ChargePool` changes; run to verify they pass.**
+- [ ] **Step 4: Wire status and damage.** `PlayerStatusEffects`: `IsMine` guard on `Apply`; stun multiplier under its own key; host the reduction stack. `PlayerHealth.CurrentDamageReduction()` reads the stack (keep the method). `WeaponFiring`: gate `TryFire` on `ForActor`; add `MuzzlePosition`.
+- [ ] **Step 5: Implement `CastTypes`, `AbilityModule`, `AbilityRunner`.** Runner fields `catalogue`, `moduleParent`, three starting abilities, each with a plain-language tooltip. Register `ITestRangeResettable` **only when `photonView.IsMine`**. Spend the charge *before* `photonView.RPC(..., RpcTarget.All, ...)` (the local call runs synchronously).
+- [ ] **Step 6: `PlayerLoadout` and the F1 panel.** Ability dropdowns get a leading "(none)"; selecting calls `PlayerLoadout.SetAbility`; the weapon dropdown calls `SetWeapon`. Add `RefreshAbilitySelection()` beside `RefreshWeaponSelection()`. Log one line per applied change: `[LOADOUT] actor=N W=.. E=.. U=.. M=..`.
+- [ ] **Step 7: `AbilityDefinition.OnValidate`** — log an error naming the asset when the module prefab lacks an `AbilityModule`, contains a PhotonView, an `IPunObservable` or a Collider, or when slot is `Primary`.
+- [ ] **Step 8: Edit the prefab** via `unity command eval` + `LoadPrefabContents`/`SaveAsPrefabAsset` (`add_component` on a prefab path does not persist). Read it back; tell Tudor to reload the prefab.
+- [ ] **Step 9: Build Debug Ping.** `TryBuildCast` fills `Point = ctx.TargetPoint`. `ExecuteCast` spawns a collider-less sphere at `Payload.Point` for `markerSeconds` and logs `[PING] actor slot point caster=<bool>`. The channel variant sends phase 0 on press, 1 on completion, 2 on cancel.
+- [ ] **Step 10: Refresh the RPC list.** `git diff PhotonServerSettings.asset` must show exactly one appended line `- RPC_CastAbility`, nothing reordered. Recompile, poll `recompile_status`, run EditMode tests.
+- [ ] **Step 11: Verify single-client** (F1 closed while testing holds — tool focus suppresses input):
+  1. **Equip.** Select 901 in F1 → `Abilities/Debug Ping(Clone)` under the root, not under `PBRCharacter`.
+  2. **Cast and charges.** RMB → sphere at cursor + one `[PING]` line. Two fast RMBs → two spheres; a third refused with `BlockFor` = `Recharging`. Charges return one at a time at 2s and 4s. A press 0.1s before a charge returns still fires.
+  3. **Overheat.** Fire 14 baseline shots → RMB/Space do nothing; holding Shift mid-channel cancels; all works once heat clears.
+  4. **Stun.** `eval` `PlayerStatusEffects.Apply(Stun, 2s)` → cannot move, fire or cast; a channel cancels; all works after 2s.
+  5. **Channel.** Hold Shift 1.5s → completes. Release at 0.5s → cancels, charge stays spent.
+  6. **Death.** `eval` `ApplyDamage` 999, source actor -1, ignoring armor. Die mid-channel → channel cancels; respawn with both charges full.
+  7. **Reduction.** `AddDamageReduction(key, 0.5)` → 20 armor-ignoring damage costs 10 health; `RemoveDamageReduction` restores.
+  8. **F1.** "Reset Cooldowns" refills; "(none)" destroys the module with no errors; changing `cooldownSeconds` on the live module in Play mode affects the next recharge.
+- [ ] **Step 12: Needs a two-client test** (both builds from the same commit): B sees A's sphere at A's cursor once per cast; A equips and casts in the same second and B still runs the new module; late joiner C logs A's non-default `[LOADOUT]` and remote `WeaponFiring.Weapon` matches; B kills A mid-channel and the sphere stops on B's screen; A's overheat/stun never makes B drop A's casts; a reduction on A halves B's shots.
+- [ ] **Step 13: Commit.**
+
+**Risks — what the implementer will get wrong.**
+- **Parenting modules under the mesh** (`PBRCharacter` has its own PhotonView; death hides the mesh). Parent under `Abilities` on the root; never derive a module from `MonoBehaviourPun`.
+- **A `[PunRPC]` on a module** — never found, and each new name means another `RpcList` refresh. Use `SendPhase`.
+- **Status effects or heat applied from `ExecuteCast` on every client** — remote copies never tick them, so a remote copy stays stunned forever. Apply only where the target's `IsMine`; spend heat only in owner hooks.
+- **Waiting for a release** — `Emit` drops events while suppressed; Equipment/Ultimate have no release event. A sprint waiting for `MobilityReleased` never ends after dying mid-hold.
+- **Re-applying the loadout echo on the owner** — `OnPlayerPropertiesUpdate` fires for your own writes too; skip when `IsMine`, as `PlayerLifecycle.cs:485` does.
+- **Gating inside `RPC_CastAbility`** — receivers don't know the caster's heat/stun/cooldowns, so a receiver-side gate silently drops legitimate casts.
+- **`ChargePool` cooldown fixed at construction** — an Inspector retune in Play mode does nothing and `RechargeProgress` goes NaN at 0s. Rebuild through `SetRechargeSeconds` in the module's `OnValidate`.
+- **Death swaps every layer under the root** (`PlayerLifecycle.cs:420`), so modules carry no colliders. A module that sets `ExternalMotionControl` must clear it in `Interrupt(Died)`, or the respawned player cannot walk (`PlayerMotor.cs:122`).
+
 ## Task 1.1: Rocket launcher path and its two leaves
 
 **Files:**
