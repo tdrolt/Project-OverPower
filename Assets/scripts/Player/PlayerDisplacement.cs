@@ -31,13 +31,6 @@ using Overpower.Combat;
 /// </summary>
 public class PlayerDisplacement : MonoBehaviour, IDisplaceable
 {
-    // Not a design tunable, the way a weapon's hit mask is: a dash that could be tuned to pass
-    // through walls would break the arena, so which layers can block a displacement is fixed here
-    // rather than exposed for a designer to mis-set. Default carries level geometry's absence and
-    // every living player (see PlayerLifecycle - a corpse's collider is switched off entirely, so
-    // it can never appear in this sweep at all); Building is the walls.
-    private static readonly int BlockMask = LayerMask.GetMask("Default", "Building");
-
     // Not a tuning value: the line between "a wall in the way" and "the floor underfoot" a sweep
     // can hit. A wall's surface normal points roughly sideways; a floor's points roughly up, so
     // anything closer to straight up than this is the ground, not something to stop for.
@@ -47,6 +40,18 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     private Rigidbody rb;
     private PlayerMotor motor;
     private PlayerLifecycle lifecycle;
+
+    // Not a design tunable, the way a weapon's hit mask is: a dash that could be tuned to pass
+    // through walls would break the arena, so which layers can block a displacement is fixed here
+    // rather than exposed for a designer to mis-set. Default carries level geometry's absence and
+    // every living player (see PlayerLifecycle - a corpse's collider is switched off entirely, so
+    // it can never appear in this sweep at all); Building is the walls.
+    //
+    // Computed in Awake, NOT as a static field initializer: Unity refuses to run LayerMask.NameToLayer
+    // from a MonoBehaviour type's static constructor (it throws TypeInitializationException the first
+    // time the type is touched, which - for a networked prefab - is during PhotonNetwork.Instantiate
+    // itself). Found by playing a dash immediately after landing this file.
+    private int blockMask;
 
     // The move in progress, or null when nothing is running. Kept as the three primitives a step
     // needs rather than a struct so FixedUpdate never allocates one every tick.
@@ -62,6 +67,7 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         rb = GetComponent<Rigidbody>();
         motor = GetComponent<PlayerMotor>();
         lifecycle = GetComponent<PlayerLifecycle>();
+        blockMask = LayerMask.GetMask("Default", "Building");
 
         if (rb == null)
             Debug.LogError($"[PlayerDisplacement] {name}: Rigidbody is missing - nothing can be displaced.");
@@ -217,7 +223,7 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         if (hit.collider == null)
             return false;
 
-        if ((BlockMask & (1 << hit.collider.gameObject.layer)) == 0)
+        if ((blockMask & (1 << hit.collider.gameObject.layer)) == 0)
             return false; // Not a layer a displacement stops for (e.g. Bullet).
 
         if (hit.normal.y > FloorNormalYThreshold)
