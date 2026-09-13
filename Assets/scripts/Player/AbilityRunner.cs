@@ -67,6 +67,9 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         new CastGate.PressBuffer(), new CastGate.PressBuffer(), new CastGate.PressBuffer()
     };
 
+    // Per slot, the time until which HoldSlot keeps that key held. 0 = no tool hold.
+    private readonly float[] toolHoldUntil = new float[SlotCount];
+
     private AbilityOwner owner;
     private PlayerInputRouter input;
 
@@ -195,6 +198,23 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             return;
 
         pressBuffers[index].Press(Time.time);
+    }
+
+    /// <summary>
+    /// Owner only. Holds one slot's key down, as far as abilities are concerned, for the given
+    /// number of seconds - PressSlot's partner for testing channels and sprints from editor tooling,
+    /// where the real keyboard does not reach the game. Deliberately time-limited rather than an
+    /// on/off switch, so a tool that forgets to let go can never leave a key stuck down; 0 lets go
+    /// at once. Still subject to the gate: a stun or death ends the hold exactly as it would a
+    /// real key.
+    /// </summary>
+    public void HoldSlot(AbilitySlot slot, float seconds)
+    {
+        int index = SlotIndex(slot);
+        if (!photonView.IsMine || index < 0)
+            return;
+
+        toolHoldUntil[index] = Time.time + Mathf.Max(0f, seconds);
     }
 
     private void TryCast(AbilityModule module)
@@ -484,6 +504,9 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
 
     private bool IsHeld(AbilitySlot slot)
     {
+        int index = SlotIndex(slot);
+        if (index >= 0 && Time.time < toolHoldUntil[index])
+            return true;
         if (input == null)
             return false;
 
