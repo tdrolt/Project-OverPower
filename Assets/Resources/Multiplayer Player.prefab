@@ -3135,6 +3135,7 @@ GameObject:
   - component: {fileID: 7214282870583745347}
   - component: {fileID: 1234403843316505251}
   - component: {fileID: 3962883773585707915}
+  - component: {fileID: 581303668377604427}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -3473,6 +3474,8 @@ MonoBehaviour:
   catalogue: {fileID: 11400000, guid: 16afde6d43329db4bbd7fed72f897638, type: 2}
   startingWeapon: {fileID: 11400000, guid: 0023f41e1c59d7c4cb3f34c116cacfe1, type: 2}
   muzzle: {fileID: 8170903716044679203}
+  muzzleClearanceRadius: 0.15
+  muzzleClearanceSkin: 0.05
 --- !u!114 &2969745939278581170
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3545,6 +3548,10 @@ MonoBehaviour:
   healthColor: {r: 0.336, g: 0.914, b: 0.263, a: 1}
   armorColor: {r: 0.45, g: 0.75, b: 0.95, a: 1}
   barBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}
+  overheatTrackColor: {r: 0.78, g: 0.78, b: 0.8, a: 1}
+  overheatBarHeight: 18
+  overheatTickColor: {r: 0.12, g: 0.12, b: 0.14, a: 0.9}
+  overheatTickWidth: 2
   overheatNormalColor: {r: 0.6, g: 0.6, b: 0.66, a: 1}
   overheatWarningColor: {r: 1, g: 0.65, b: 0.05, a: 1}
   overheatSilencedColor: {r: 0.85, g: 0.16, b: 0.16, a: 1}
@@ -3556,6 +3563,23 @@ MonoBehaviour:
   pipAvailableColor: {r: 1, g: 1, b: 1, a: 1}
   pipSpentColor: {r: 1, g: 1, b: 1, a: 0.15}
   cooldownCoverColor: {r: 0, g: 0, b: 0, a: 0.65}
+--- !u!114 &581303668377604427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ade533858a49ae4989aeccd5ae0bc0c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxCharge: 1000
+  chargePerDamageDealt: 1
+  chargePerDamageTaken: 0.5
+  chargePerKill: 150
+  chargePerAssist: 75
 --- !u!1 &2741422025056904628
 GameObject:
   m_ObjectHideFlags: 0

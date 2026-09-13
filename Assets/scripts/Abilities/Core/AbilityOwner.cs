@@ -31,9 +31,9 @@ namespace Overpower.Abilities
         /// check for null rather than assume it.</summary>
         public readonly IDisplaceable Displacement;
 
-        // Task 1.11: the ultimate-charge component goes here as one more cached reference. Not
-        // declared yet on purpose - the type does not exist, and a placeholder type invented now
-        // would only have to be deleted then.
+        /// <summary>The Space-bar meter every ultimate reads through IsReady and spends through
+        /// TryBuildCast (Task 1.11) - see UltimateCharge's own class comment for why it is owner-only.</summary>
+        public readonly UltimateCharge UltimateCharge;
 
         /// <summary>The owning player's actor number - fixed for the life of this player object.</summary>
         public int ActorNumber => PhotonView.OwnerActorNr;
@@ -59,6 +59,7 @@ namespace Overpower.Abilities
             Lifecycle = root.GetComponent<PlayerLifecycle>();
             Weapon = root.GetComponent<WeaponFiring>();
             Displacement = root.GetComponent<IDisplaceable>();
+            UltimateCharge = root.GetComponent<UltimateCharge>();
         }
     }
 }
