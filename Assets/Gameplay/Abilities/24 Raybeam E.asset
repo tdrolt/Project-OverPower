@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4c660593cf9bb4d44b3954e56e33cfd8, type: 3}
+  m_Name: 24 Raybeam E
+  m_EditorClassIdentifier: 
+  id: 24
+  displayName: Raybeam
+  slot: 1
+  icon: {fileID: 0}
+  goldCost: 0
+  modulePrefab: {fileID: 4917443891297609325, guid: c3a0ad903ce2a9f4d98a228c514f2e1d, type: 3}
