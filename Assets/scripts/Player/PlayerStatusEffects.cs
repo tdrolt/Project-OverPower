@@ -118,6 +118,41 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     /// PlayerStatusEffects underneath. Forwards straight to Apply.</summary>
     public void ApplyStatus(in StatusEffectSpec spec, int sourceActor) => Apply(spec, sourceActor);
 
+    /// <summary>
+    /// The one-caster-decides path: for an effect that only ONE client resolves and tells the
+    /// victim about, unlike every status above, which every client resolves for itself off a
+    /// shared seed. Sonic pulse's player-into-player collision stun (Task 1.10) is the first user -
+    /// only the pulse owner's physics sees that collision, so only that client can know it happened.
+    ///
+    /// Applies locally with no network trip when this IS the local player (self-inflicted or
+    /// already running on the right machine); otherwise RPCs the one owner who is allowed to apply
+    /// it to themselves. Never RpcTarget.All: every other client would then also try to apply a
+    /// status meant for one specific victim.
+    /// </summary>
+    public void RequestOnOwner(in StatusEffectSpec spec, int sourceActor)
+    {
+        if (photonView.IsMine)
+        {
+            Apply(spec, sourceActor);
+            return;
+        }
+
+        photonView.RPC(nameof(RPC_ApplyStatusFromPeer), photonView.Owner,
+                       (byte)spec.kind, spec.duration, spec.magnitude, sourceActor);
+    }
+
+    /// <summary>
+    /// RequestOnOwner's wire side. Rebuilds the spec on the receiving (owning) machine and applies
+    /// it through the normal owner-only Apply above - the stacking rule still comes from `kind`
+    /// alone (StatusEffectState.RuleFor), so nothing here needs to carry or guess a StackRule.
+    /// </summary>
+    [PunRPC]
+    private void RPC_ApplyStatusFromPeer(byte kind, float duration, float magnitude, int sourceActor)
+    {
+        var spec = new StatusEffectSpec { kind = (StatusKind)kind, duration = duration, magnitude = magnitude };
+        Apply(spec, sourceActor);
+    }
+
     /// <summary>Adds or replaces one source of damage reduction - a dash buff, an armor upgrade.
     /// Owner-only, like ApplyDamage: only your own client should decide how much less damage you
     /// take.</summary>
