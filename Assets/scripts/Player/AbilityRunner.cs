@@ -240,7 +240,10 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     private CastContext BuildContext()
     {
         Vector3 origin = transform.position;
-        Vector3 muzzle = owner.Weapon != null ? owner.Weapon.MuzzlePosition : origin;
+        // SafeMuzzlePosition, not MuzzlePosition - a cast fired flush against a wall (the stun gun,
+        // the zip gun) must start on the near side of it, exactly like a weapon shot now does. See
+        // WeaponFiring.SafeMuzzlePosition's own comment (Task 1.9 follow-up review finding).
+        Vector3 muzzle = owner.Weapon != null ? owner.Weapon.SafeMuzzlePosition : origin;
         Vector3 aim = owner.Aim != null ? owner.Aim.AimDirection : transform.forward;
         Vector3 point = owner.Aim != null ? owner.Aim.GroundPointUnderCursor : origin;
         Vector3 move = owner.Motor != null ? Vector3.ClampMagnitude(owner.Motor.MovementInput(), 1f) : Vector3.zero;

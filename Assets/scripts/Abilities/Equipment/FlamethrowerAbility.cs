@@ -206,9 +206,23 @@ namespace Overpower.Abilities
             // below is the one place that specifically says "muzzle" instead. Using the muzzle for
             // BOTH was tried first and measured wrong: the muzzle sits ~2m forward of the root, so an
             // 8m dummy (outside the 7m cone) still read as ~6m from the muzzle and kept burning.
+            //
+            // On a NON-OWNER client this reads the caster's own network-lerped Transform - PlayerAim
+            // rotates and PlayerNetSync replicates it, but a remote copy is always a little behind
+            // and a little smoothed relative to what the caster's own client sees. That is the same
+            // accepted victim-favouring latency tradeoff every projectile already lives with (see
+            // ProjectileMotor's own class comment): each client's cone is judged against its own
+            // best copy of the world, and the VICTIM's client is still the one that decides whether
+            // the burn actually lands (IStatusReceiver is owner-guarded) - a caster cannot use a
+            // laggy remote copy of themselves to burn someone their own client would have missed.
             Vector3 apex = Owner.Root.transform.position;
             Vector3 forward = Owner.Root.transform.forward;
-            Vector3 muzzle = Owner.Weapon != null ? Owner.Weapon.MuzzlePosition : apex;
+            // SafeMuzzlePosition, not MuzzlePosition - hugging a wall pushes the raw muzzle inside or
+            // through it, and a Physics.Raycast started inside a collider never reports it, so the
+            // occlusion check below would read the wall as clear (Task 1.9 follow-up review finding:
+            // measured leaking through both a real Wall_01 and a Deployable Cover). The clearance
+            // check pulls the point back to the near side of whatever wall the caster is touching.
+            Vector3 muzzle = Owner.Weapon != null ? Owner.Weapon.SafeMuzzlePosition : apex;
 
             PositionVfx(apex, forward);
 

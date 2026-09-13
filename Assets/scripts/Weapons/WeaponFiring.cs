@@ -41,6 +41,29 @@ namespace Overpower.Weapons
                  "position if it is empty, which looks wrong but still fires.")]
         private Transform muzzle;
 
+        [Header("Wall-hugging clearance (review finding, Task 1.9 follow-up)")]
+        [SerializeField, Tooltip("Radius, in metres, of the clearance check between the player's " +
+                 "body and the muzzle tip - approximately a projectile's own radius. The muzzle sits " +
+                 "roughly 1.36m in front of the root (about 0.66m past a 0.7m capsule); a player " +
+                 "standing flush against a wall or thin cover pushes that point INSIDE or THROUGH it, " +
+                 "and Physics.Raycast/SphereCast never report a collider their own origin already " +
+                 "starts inside - so a shot, beam or the flamethrower's occlusion check fired from " +
+                 "the raw muzzle sailed straight through the wall it was touching (measured: the " +
+                 "laser and the flamethrower leaked through a real Wall_01, and everything but the " +
+                 "stun gun leaked through the thinner Deployable Cover). See SafeMuzzlePosition.")]
+        private float muzzleClearanceRadius = 0.15f;
+
+        [SerializeField, Tooltip("How far, in metres, a blocked origin is pulled back from the wall " +
+                 "toward the player's own body, so the shot starts on the near side and hits the " +
+                 "wall immediately instead of spawning inside or beyond it.")]
+        private float muzzleClearanceSkin = 0.05f;
+
+        // Not a design tunable: whatever layer every wall and every piece of cover already stands
+        // on (CoverWall.cs's own class comment) is what a wall-hugging shot must be pulled back
+        // from - the same layer FlamethrowerAbility's own occlusion check and ExplodeOnImpact's
+        // splash check already use. Computed once since NameToLayer never changes at runtime.
+        private int buildingMask;
+
         private PlayerAim aim;
         private PlayerOverheat overheat;
         private PlayerLifecycle lifecycle;
@@ -53,11 +76,52 @@ namespace Overpower.Weapons
 
         public WeaponDefinition Weapon => weapon;
 
-        /// <summary>Where the muzzle currently sits in world space - the exact origin every shot
-        /// already fires from below. Read-only and exposed for AbilityRunner, which
-        /// needs the same point to build a CastContext without this class knowing anything about
-        /// abilities. Does not change the muzzle's own height - see the Transform it reads from.</summary>
+        /// <summary>Where the muzzle currently sits in world space, unclamped - the Transform's own
+        /// point, used for cosmetics (muzzle flash placement point before the clearance pull-back)
+        /// and by SafeMuzzlePosition below. Never the origin a shot or a cast should actually use by
+        /// itself - see SafeMuzzlePosition's own comment. Does not change the muzzle's own height or
+        /// its open-ground position - the shotgun spread was tuned from this exact point.</summary>
         public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position;
+
+        /// <summary>
+        /// THE origin every shot and every ability cast should use - AbilityRunner.CastContext.Muzzle
+        /// and TryFire's own origin below both read this, never MuzzlePosition directly (Task 1.9
+        /// follow-up review finding).
+        ///
+        /// Sweeps a small sphere from the player's own root, raised to muzzle HEIGHT, out to the raw
+        /// muzzle point, against Building only (triggers ignored). In the open this hits nothing and
+        /// returns the raw muzzle unchanged - the normal case, and the one the shotgun's spread and
+        /// every other weapon number was tuned against. Hugging a wall or a piece of cover puts that
+        /// short hop through it, so the origin is pulled back to the sweep's contact point, minus
+        /// Muzzle Clearance Skin toward the body - on the NEAR side of the wall, exactly where a
+        /// gun barrel actually stops when its owner is pressed up against something solid.
+        ///
+        /// Deliberately does not touch the muzzle's HEIGHT or its position over open ground - only
+        /// the wall-hugging case is affected, so the earlier measured TTK, shotgun spread and laser
+        /// range all stay valid.
+        /// </summary>
+        public Vector3 SafeMuzzlePosition
+        {
+            get
+            {
+                Vector3 raw = MuzzlePosition;
+                Vector3 bodyAtMuzzleHeight = new Vector3(transform.position.x, raw.y, transform.position.z);
+                Vector3 toMuzzle = raw - bodyAtMuzzleHeight;
+                float distance = toMuzzle.magnitude;
+                if (distance <= 0.0001f)
+                    return raw;
+
+                Vector3 direction = toMuzzle / distance;
+                if (Physics.SphereCast(bodyAtMuzzleHeight, muzzleClearanceRadius, direction,
+                                       out RaycastHit hit, distance, buildingMask, QueryTriggerInteraction.Ignore))
+                {
+                    float pulledBack = Mathf.Max(0f, hit.distance - muzzleClearanceSkin);
+                    return bodyAtMuzzleHeight + direction * pulledBack;
+                }
+
+                return raw;
+            }
+        }
 
         private void Awake()
         {
@@ -66,6 +130,7 @@ namespace Overpower.Weapons
             lifecycle = GetComponent<PlayerLifecycle>();
             input = GetComponent<PlayerInputRouter>();
             statusEffects = GetComponent<PlayerStatusEffects>();
+            buildingMask = LayerMask.GetMask("Building");
 
             // A silent null here would leave this player unable to fire at all, or - worse - able
             // to fire a weapon nobody can resolve on the other clients. Loud, matching PlayerHealth.
@@ -200,7 +265,10 @@ namespace Overpower.Weapons
             // The cone this shot actually fires through is the one from BEFORE it blooms: holding
             // the trigger costs you the NEXT shot's accuracy, not this one's.
             float coneAngle = aim != null ? aim.EffectiveConeAngle : 0f;
-            Vector3 origin = muzzle != null ? muzzle.position : transform.position;
+            // SafeMuzzlePosition, not the raw muzzle - a shot fired flush against a wall must start
+            // on the near side of it, or it spawns inside/through the wall and hits whatever is on
+            // the other side for free. See that property's own comment (Task 1.9 follow-up finding).
+            Vector3 origin = SafeMuzzlePosition;
             Vector3 direction = aim != null ? aim.AimDirection : transform.forward;
 
             // Where the cursor is resting on the ground, for the weapons that detonate at a POINT
