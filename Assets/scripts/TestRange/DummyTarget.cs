@@ -1,4 +1,5 @@
 using System.Collections;
+using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
@@ -144,6 +145,8 @@ namespace Overpower.TestRange
             armor.Absorb(result.ArmorAbsorbed);
             health -= result.HealthLost;
 
+            NotifyLocalCombatCredit(info, result);
+
             if (result.Lethal)
             {
                 isDead = true;
@@ -157,6 +160,31 @@ namespace Overpower.TestRange
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// A dummy has no owner and sends no RPC - it lives in exactly one client's scene, so it
+        /// needs none of PlayerCombatCredit's networked round trip to tell the shooter what they
+        /// dealt. A hit from the LOCAL player's own actor number feeds CombatEvents and
+        /// NoteDealtDamage directly instead, the same information a real target's
+        /// RPC_DamageCredit would eventually deliver - which is what lets armor recharge, the zip
+        /// gun's cooldown reset and ultimate charge all be exercised single-client against the test
+        /// range, with no second Editor session required.
+        /// </summary>
+        private void NotifyLocalCombatCredit(in DamageInfo info, DamageResult result)
+        {
+            if (result.Total <= 0f || PhotonNetwork.LocalPlayer == null ||
+                info.SourceActorNumber != PhotonNetwork.LocalPlayer.ActorNumber)
+                return;
+
+            CombatEvents.RaiseDamageDealt(result.Total);
+
+            PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
+            PlayerHealth localHealth = localView != null ? localView.GetComponent<PlayerHealth>() : null;
+            localHealth?.NoteDealtDamage();
+
+            if (result.Lethal)
+                CombatEvents.RaiseTakedown(true);
         }
 
         private IEnumerator ResetAfterDelay()
