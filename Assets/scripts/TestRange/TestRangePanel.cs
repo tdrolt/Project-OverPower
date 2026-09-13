@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
 using Overpower.Weapons;
@@ -231,6 +232,15 @@ namespace Overpower.TestRange
             AddButton(buttonRow.transform, "Reset Cooldowns", res, OnResetCooldownsClicked);
             AddButton(buttonRow.transform, "Heal", res, OnHealClicked);
 
+            GameObject armorButtonRow = new GameObject("Armor Buttons", typeof(RectTransform));
+            armorButtonRow.transform.SetParent(panel.transform, false);
+            HorizontalLayoutGroup armorRowLayout = armorButtonRow.AddComponent<HorizontalLayoutGroup>();
+            armorRowLayout.spacing = 8f;
+            armorRowLayout.childControlWidth = armorRowLayout.childForceExpandWidth = true;
+            AddButton(armorButtonRow.transform, "+Absorb", res, OnAbsorbUpgradeClicked);
+            AddButton(armorButtonRow.transform, "+Recharge", res, OnRechargeUpgradeClicked);
+            AddButton(armorButtonRow.transform, "Reset Armor", res, OnResetArmorClicked);
+
             readoutText = AddLabel(panel.transform, "", 14f, FontStyles.Normal);
 
             PopulateWeaponDropdown();
@@ -405,6 +415,41 @@ namespace Overpower.TestRange
             health.SetArmorLevels(health.AbsorbLevel, health.RechargeLevel);   // Refills armor at whatever levels are already owned.
         }
 
+        /// <summary>Spends one purchase on the absorb path, if the combined cap and the path's own
+        /// top level both still allow it - see ArmorUpgradePath. Exercises the exact rule a future
+        /// shop will use, without needing gold or a shop UI to test it.</summary>
+        private void OnAbsorbUpgradeClicked() => TryUpgradeArmor(upgradeAbsorb: true);
+
+        /// <summary>Spends one purchase on the recharge path - see OnAbsorbUpgradeClicked.</summary>
+        private void OnRechargeUpgradeClicked() => TryUpgradeArmor(upgradeAbsorb: false);
+
+        private void TryUpgradeArmor(bool upgradeAbsorb)
+        {
+            PlayerHealth health = ResolveLocalPlayer()?.GetComponentInChildren<PlayerHealth>(true);
+            PlayerLoadout loadout = ResolveLocalPlayer()?.GetComponent<PlayerLoadout>();
+            if (health == null || loadout == null || armorConfig == null)
+                return;
+
+            var path = new ArmorUpgradePath(armorConfig, health.AbsorbLevel, health.RechargeLevel);
+            bool upgraded = upgradeAbsorb ? path.TryUpgradeAbsorb() : path.TryUpgradeRecharge();
+            if (!upgraded)
+            {
+                Debug.Log($"[ARMOR] {(upgradeAbsorb ? "+Absorb" : "+Recharge")} refused - at the upgrade cap.");
+                return;
+            }
+
+            loadout.SetArmorLevels(path.AbsorbLevel, path.RechargeLevel);
+        }
+
+        /// <summary>Returns both armor paths to level 0, so a designer can re-run the upgrade sweep
+        /// without restarting play mode. Goes through PlayerLoadout, same as the upgrade buttons,
+        /// so every other client sees the reset too.</summary>
+        private void OnResetArmorClicked()
+        {
+            PlayerLoadout loadout = ResolveLocalPlayer()?.GetComponent<PlayerLoadout>();
+            loadout?.SetArmorLevels(0, 0);
+        }
+
         // ---- Readout ----
 
         /// <summary>The computed-versus-measured pair on the last two lines is the point of this
@@ -415,10 +460,12 @@ namespace Overpower.TestRange
         {
             GameObject player = ResolveLocalPlayer();
             WeaponFiring firing = player != null ? player.GetComponentInChildren<WeaponFiring>(true) : null;
+            PlayerHealth health = player != null ? player.GetComponentInChildren<PlayerHealth>(true) : null;
+            string armorLine = ArmorReadoutLine(health);
 
             if (firing == null || firing.Weapon == null)
             {
-                readoutText.text = "No local weapon found - join a match to populate this readout.";
+                readoutText.text = "No local weapon found - join a match to populate this readout.\n" + armorLine;
                 return;
             }
 
@@ -447,7 +494,21 @@ namespace Overpower.TestRange
                 $"Damage: {weapon.Damage:0.#}   Fire interval: {weapon.FireInterval:0.##}s\n" +
                 $"Overheat: {overheatLine}\n" +
                 $"Computed DPS: {dps:0.#}   Computed TTK ({effectiveHp:0} HP): {computedTtk:0.00}s\n" +
-                $"Measured TTK (last dummy kill): {measuredLine}";
+                $"Measured TTK (last dummy kill): {measuredLine}\n" +
+                armorLine;
+        }
+
+        /// <summary>Format matches the design review's example: "Armor A1/R0: 50 cap, 6s" - A/R are
+        /// the absorb/recharge levels, so a designer can read the upgrade state at a glance without
+        /// cross-referencing ArmorConfig.</summary>
+        private string ArmorReadoutLine(PlayerHealth health)
+        {
+            if (health == null)
+                return "Armor: n/a";
+
+            float delay = armorConfig != null ? armorConfig.RechargeSecondsFor(health.RechargeLevel) : 0f;
+            return $"Armor A{health.AbsorbLevel}/R{health.RechargeLevel}: {health.ArmorCapacity:0} cap, {delay:0}s delay " +
+                   $"({health.Armor:0}/{health.ArmorCapacity:0} current)";
         }
     }
 }
