@@ -149,11 +149,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// path only and was silently absent from AoE, so the same buff did two different things
     /// depending on what hit you.
     ///
-    /// Returns nothing for now. It used to query the dash-with-buff script, which Task 0.11b
-    /// deleted along with the other three Space-bound abilities; a later task wires this to a
-    /// PlayerStatusEffects lookup, which is where a reduction buff belongs anyway. Do not inline
-    /// this away - every future source of damage reduction reports through here.
-    private float CurrentDamageReduction() => 0f;
+    /// Reads PlayerStatusEffects.CurrentDamageReduction (Task 1.0a), which combines every source -
+    /// a dash buff, an armor upgrade - the same way Vulnerability above already does. Do not
+    /// inline this away - every future source of damage reduction reports through here.
+    private float CurrentDamageReduction() => statusEffects != null ? statusEffects.CurrentDamageReduction : 0f;
 
     // The OnCollisionEnter that used to sit here read damage off a Rigidbody bullet that had
     // collided with this player. Task 0.13 deleted it along with those bullets: projectiles are now

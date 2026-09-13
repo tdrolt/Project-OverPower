@@ -45,6 +45,7 @@ namespace Overpower.Weapons
         private PlayerOverheat overheat;
         private PlayerLifecycle lifecycle;
         private PlayerInputRouter input;
+        private PlayerStatusEffects statusEffects;
 
         private WeaponDefinition weapon;
         private float nextFireTime;
@@ -52,12 +53,19 @@ namespace Overpower.Weapons
 
         public WeaponDefinition Weapon => weapon;
 
+        /// <summary>Where the muzzle currently sits in world space - the exact origin every shot
+        /// already fires from below. Read-only and exposed for Task 1.0b's AbilityRunner, which
+        /// needs the same point to build a CastContext without this class knowing anything about
+        /// abilities. Does not change the muzzle's own height - see the Transform it reads from.</summary>
+        public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position;
+
         private void Awake()
         {
             aim = GetComponent<PlayerAim>();
             overheat = GetComponent<PlayerOverheat>();
             lifecycle = GetComponent<PlayerLifecycle>();
             input = GetComponent<PlayerInputRouter>();
+            statusEffects = GetComponent<PlayerStatusEffects>();
 
             // A silent null here would leave this player unable to fire at all, or - worse - able
             // to fire a weapon nobody can resolve on the other clients. Loud, matching PlayerHealth.
@@ -158,9 +166,15 @@ namespace Overpower.Weapons
         {
             if (!photonView.IsMine || weapon == null || Time.time < nextFireTime)
                 return false;
-            if (lifecycle != null && !lifecycle.IsAlive)
-                return false;
-            if (overheat != null && !overheat.CanAct)
+
+            // The same rule Task 1.0b's abilities gate on: dead beats stunned beats silenced.
+            // Routing the trigger through CastGate instead of this class's own if-chain is what
+            // keeps "can this player act right now" from drifting between the weapon and whatever
+            // ability checks it next - a stun that should freeze a dash must freeze the gun too.
+            bool alive = lifecycle == null || lifecycle.IsAlive;
+            bool stunned = statusEffects != null && statusEffects.IsStunned;
+            bool silenced = overheat != null && overheat.IsSilenced;
+            if (CastGate.ForActor(alive, stunned, silenced) != CastBlock.None)
                 return false;
 
             // Resolved BEFORE nextFireTime is overwritten below. ChargeFraction() reads nextFireTime

@@ -108,6 +108,16 @@ namespace Overpower.Data
         [SerializeField] private float vulnerabilityCap = 0.60f;
         public float VulnerabilityCap => vulnerabilityCap;
 
+        [Header("Abilities")]
+        [Tooltip("Forgives a cast pressed up to this many seconds before its charge or cooldown " +
+                 "actually returns, so a button mashed a frame early still fires instead of being " +
+                 "silently dropped. Kept short on purpose - long enough to swallow one frame of " +
+                 "timing jitter, too short to let a player queue up a surprise cast for the exact " +
+                 "instant a silence ends. Not consumed yet; the ability runner (a later task) is " +
+                 "the first thing that reads it.")]
+        [SerializeField] private float abilityPressBufferSeconds = 0.12f;
+        public float AbilityPressBufferSeconds => abilityPressBufferSeconds;
+
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
                  "click. Handy while tuning weapons; switch it off for a real match.")]

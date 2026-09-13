@@ -8,8 +8,13 @@ using Overpower.Net;
 /// Owns the StatusEffectState for one player - burns, slows, stuns, vulnerability and
 /// invulnerability. Moved out of PlayerHealth (Task 0.10): a status is not health, and
 /// PlayerHealth only ever needed to read Vulnerability back out and be told about burn damage.
+///
+/// Also hosts this player's DamageReductionStack (Task 1.0a) - a reduction buff is a status the
+/// same way a slow is, just one StatusEffectState has no notion of ("stacks multiplicatively,
+/// never expires on its own"), so it gets its own small stack alongside the timed effects rather
+/// than being forced into StatusKind.
 /// </summary>
-public class PlayerStatusEffects : MonoBehaviour
+public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
 {
     [SerializeField, Tooltip("Match tuning asset. Caps how far Slow and Vulnerability can stack, " +
              "however many effects are landing at once.")]
@@ -19,6 +24,17 @@ public class PlayerStatusEffects : MonoBehaviour
     private PlayerHealth playerHealth;
     private PlayerMotor motor;
     private StatusEffectState state;
+    private DamageReductionStack reductionStack;
+
+    // A key of its own, distinct from `this` - Slow already keys its multiplier on `this`, and a
+    // stunned, slowed player needs both multipliers to compose (0 speed either way) rather than
+    // one silently overwriting the other's dictionary entry.
+    private static readonly object StunKey = new object();
+
+    // Mirrors IsStunned so ApplyStunToMotor only touches the motor on the frame stun actually
+    // starts or ends, not every frame it happens to still be true - the same "only when it
+    // actually changes" rule ApplySlowToMotor follows for appliedSlow.
+    private bool stunAppliedToMotor;
 
     // StatusEffectSpec deliberately carries no source actor (it is a tested type shared by every
     // status kind, most of which have no notion of a "caster"), so the source for kill credit is
@@ -41,6 +57,10 @@ public class PlayerStatusEffects : MonoBehaviour
     /// <summary>0..1 fraction of speed lost.</summary>
     public float Slow => state.Magnitude(StatusKind.Slow);
 
+    /// <summary>0..1 - what PlayerHealth.CurrentDamageReduction() reports to DamageResolver, and
+    /// the one place every reduction source (dash, an armor upgrade, a future buff) is combined.</summary>
+    public float CurrentDamageReduction => reductionStack.Total;
+
     private void Awake()
     {
         photonView = GetComponent<PhotonView>();
@@ -50,6 +70,7 @@ public class PlayerStatusEffects : MonoBehaviour
         state = new StatusEffectState(
             gameplayConfig != null ? gameplayConfig.SlowCap : 0f,
             gameplayConfig != null ? gameplayConfig.VulnerabilityCap : 0f);
+        reductionStack = new DamageReductionStack();
     }
 
     private void Update()
@@ -66,26 +87,64 @@ public class PlayerStatusEffects : MonoBehaviour
             ApplyBurnDamage(burn);
 
         ApplySlowToMotor();
+        ApplyStunToMotor(); // Ticked every frame so a stun that just expired unfreezes the same frame.
     }
 
     /// <summary>
     /// Applies one timed status effect. sourceActorNumber only matters for Burn - see the field
     /// comment above for why tracking just the latest one is safe today - and defaults to -1
     /// (unknown) so existing call sites that do not yet have a caster keep compiling.
+    ///
+    /// Owner-only: every client's copy of a projectile or beam can reach the target it hit and
+    /// call this, but only the target's own client should ever act on it. Applying to a remote
+    /// copy used to leave that status running forever, because nothing but Update above (also
+    /// owner-only) ever ticks it down - this guard is what closes that gap.
     /// </summary>
     public void Apply(in StatusEffectSpec spec, int sourceActorNumber = -1)
     {
+        if (!photonView.IsMine)
+            return;
+
         if (spec.kind == StatusKind.Burn)
             burnSourceActorNumber = sourceActorNumber;
 
         state.Apply(spec);
+        ApplyStunToMotor(); // Freeze immediately rather than waiting for the next Update - a
+                            // stun landing and the movement it blocks should read as the same frame.
+    }
+
+    /// <summary>IStatusReceiver's generic entry point, for callers that found this component
+    /// through GetComponentInParent&lt;IStatusReceiver&gt; without knowing it is a
+    /// PlayerStatusEffects underneath. Forwards straight to Apply.</summary>
+    public void ApplyStatus(in StatusEffectSpec spec, int sourceActor) => Apply(spec, sourceActor);
+
+    /// <summary>Adds or replaces one source of damage reduction - a dash buff, an armor upgrade.
+    /// Owner-only, like ApplyDamage: only your own client should decide how much less damage you
+    /// take.</summary>
+    public void AddDamageReduction(object key, float fraction)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        reductionStack.Set(key, fraction);
+    }
+
+    /// <summary>Removes one source of damage reduction - the buff ending.</summary>
+    public void RemoveDamageReduction(object key)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        reductionStack.Remove(key);
     }
 
     public void ClearAll()
     {
         state.ClearAll();
         burnSourceActorNumber = -1;
+        reductionStack.Clear();
         ApplySlowToMotor(); // Slow is now 0 - make sure the motor's multiplier is dropped with it.
+        ApplyStunToMotor(); // Same for stun - a death or respawn must not leave the freeze behind.
     }
 
     public float Remaining(StatusKind kind) => state.Remaining(kind);
@@ -115,5 +174,26 @@ public class PlayerStatusEffects : MonoBehaviour
             motor.AddSpeedMultiplier(this, 1f - slow);
         else
             motor.RemoveSpeedMultiplier(this);
+    }
+
+    /// <summary>
+    /// Stun freezes movement the same way Slow throttles it - through a keyed multiplier, never a
+    /// direct write to speed - but under StunKey rather than `this`, so the two compose instead of
+    /// fighting over one dictionary entry: a stunned AND slowed player still reads as stunned
+    /// (0 speed) the instant the stun lands, and correctly resumes at their slowed speed, not full
+    /// speed, once it lifts.
+    /// </summary>
+    private void ApplyStunToMotor()
+    {
+        bool stunned = IsStunned;
+        if (stunned == stunAppliedToMotor || motor == null)
+            return;
+
+        stunAppliedToMotor = stunned;
+
+        if (stunned)
+            motor.AddSpeedMultiplier(StunKey, 0f);
+        else
+            motor.RemoveSpeedMultiplier(StunKey);
     }
 }
