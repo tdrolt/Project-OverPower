@@ -111,7 +111,8 @@ namespace Overpower.TestRange
 
             health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
             armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(armorTier) : 0f,
-                                    armorConfig != null ? armorConfig.RechargeSecondsFor(armorTier) : 6f);
+                                    armorConfig != null ? armorConfig.RechargeSecondsFor(armorTier) : 6f,
+                                    armorConfig != null ? armorConfig.RefillSeconds : 2.5f);
             isDead = false;
             firstHitTime = 0f;
             hits = 0;

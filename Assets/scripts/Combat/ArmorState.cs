@@ -8,31 +8,42 @@ namespace Overpower.Combat
     /// rest of Combat - it is unit tested without touching the Unity engine, and a MonoBehaviour
     /// wrapper feeds it Time.deltaTime and the out-of-combat timer in a later task.
     ///
-    /// The refill is instant, not gradual. The design document says "armor regenerates after 6
-    /// seconds out of combat", and a gradual refill would be a materially different design: it
-    /// would reward re-engaging early with partial armor, where an instant refill makes the
-    /// decision binary - you either waited long enough or you did not. That binary read is what
-    /// makes the out-of-combat timer something a player can feel.
+    /// The refill is GRADUAL, not instant - Tudor's 2026-09-13 revision of the original design.
+    /// Once secondsSinceCombat clears the recharge delay, the pool climbs toward Capacity at a
+    /// constant rate of Capacity / refillSeconds per second, rather than snapping to full the
+    /// instant the delay is up. That means a pool that was only partly drained finishes refilling
+    /// sooner than one that broke completely, and re-engaging mid-refill keeps whatever has ticked
+    /// back in rather than losing it. refillSeconds is one value shared by every armor tier - only
+    /// the WAIT before a refill starts (the recharge delay) differs per tier, not the speed of the
+    /// climb once it does.
     ///
-    /// Capacity and the recharge delay are passed in rather than read from ArmorConfig, so this
-    /// class never depends on the asset layer and tiers can be swapped at runtime via SetTier.
+    /// Capacity, the recharge delay and the refill duration are passed in rather than read from
+    /// ArmorConfig, so this class never depends on the asset layer and tiers can be swapped at
+    /// runtime via SetTier.
     /// </summary>
     public sealed class ArmorState
     {
         private float capacity;
         private float rechargeDelaySeconds;
+        private readonly float refillSeconds;
 
         public float Current { get; private set; }
 
         public float Capacity => capacity;
 
-        /// <summary>Broken means there is nothing left to absorb with; damage now reaches health.</summary>
+        /// <summary>
+        /// Broken means the pool cannot absorb anything right now - Current is exactly 0, so the
+        /// next hit reaches health unfiltered. A refill in progress clears this the moment Current
+        /// ticks above 0, even though the pool may still be far from full: Broken describes whether
+        /// there is currently anything to absorb with, not whether the refill has finished.
+        /// </summary>
         public bool IsBroken => Current <= 0f;
 
-        public ArmorState(float capacity, float rechargeDelaySeconds)
+        public ArmorState(float capacity, float rechargeDelaySeconds, float refillSeconds)
         {
             this.capacity = capacity;
             this.rechargeDelaySeconds = rechargeDelaySeconds;
+            this.refillSeconds = refillSeconds;
 
             // A fresh pool starts full: a player who has just bought armor should have it.
             Current = capacity;
@@ -41,8 +52,9 @@ namespace Overpower.Combat
         /// <summary>
         /// Switches to a different tier and fills the pool to the new capacity. Filling is the
         /// point: buying an upgrade mid-match must not leave the player sitting on the old, lower
-        /// armor amount until the next time they happen to go out of combat. Downgrading fills to
-        /// the new, smaller capacity, which also guarantees Current can never exceed Capacity.
+        /// armor amount, waiting through a gradual refill for armor they already paid for. This is
+        /// a purchase, not a recharge, so it is still instant. Downgrading fills to the new,
+        /// smaller capacity, which also guarantees Current can never exceed Capacity.
         /// </summary>
         public void SetTier(float capacity, float rechargeDelaySeconds)
         {
@@ -69,21 +81,36 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Refills the pool the moment the out-of-combat timer reaches the tier's delay.
-        /// deltaTime is accepted so this ticks like every other state object in Combat, but it is
-        /// deliberately unused: an instant refill has nothing to integrate over time, and the
-        /// caller already owns the secondsSinceCombat timer that does the accumulating.
+        /// Waits out rechargeDelaySeconds, then climbs Current toward Capacity at a constant rate
+        /// of Capacity / refillSeconds per second. secondsSinceCombat is owned by the caller
+        /// (PlayerHealth) and is reset to 0 the instant this player deals OR takes damage, so a hit
+        /// landing mid-refill needs no special handling here: the caller's next Tick call simply
+        /// arrives with secondsSinceCombat back below the delay, which halts progress until the
+        /// delay elapses again. deltaTime is only consulted once the delay has passed - before
+        /// that there is nothing to integrate.
         /// </summary>
         public void Tick(float deltaTime, float secondsSinceCombat)
         {
-            if (secondsSinceCombat >= rechargeDelaySeconds)
+            if (secondsSinceCombat < rechargeDelaySeconds || Current >= capacity)
+                return;
+
+            if (refillSeconds <= 0f)
+            {
+                // A designer-facing safety net, not a supported tuning value: 0 would otherwise
+                // divide by zero below. Treat it as "as fast as possible" rather than throwing.
                 Current = capacity;
+                return;
+            }
+
+            float ratePerSecond = capacity / refillSeconds;
+            Current = Mathf.Min(capacity, Current + ratePerSecond * deltaTime);
         }
 
         /// <summary>
         /// Empties the pool. Called on death, so a respawning player does not keep the armor they
         /// had when they went down - they earn it back through the out-of-combat timer like
-        /// anyone else.
+        /// anyone else. Upgrade levels are a separate, longer-lived thing PlayerHealth keeps
+        /// through death; only the current fill of the pool clears here.
         /// </summary>
         public void Clear()
         {

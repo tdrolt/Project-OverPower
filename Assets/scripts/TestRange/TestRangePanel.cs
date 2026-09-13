@@ -401,8 +401,8 @@ namespace Overpower.TestRange
             if (health == null)
                 return;
 
-            health.ResetForRespawn();               // Full health, clears burn/slow/etc.
-            health.SetArmorTier(health.ArmorTier);   // Refills armor at whatever tier is already owned.
+            health.ResetForRespawn();                                          // Full health, clears burn/slow/etc.
+            health.SetArmorLevels(health.AbsorbLevel, health.RechargeLevel);   // Refills armor at whatever levels are already owned.
         }
 
         // ---- Readout ----

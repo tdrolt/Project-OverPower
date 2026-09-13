@@ -27,7 +27,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private float health;
     private ArmorState armor;
     private PlayerStatusEffects statusEffects; // A status is not health - see PlayerStatusEffects.cs.
-    private int armorTier = 0; // Everyone starts on tier 0 armor, not on none.
+
+    // The two independent armor upgrade paths (Combat/ArmorUpgradePath), each an index into
+    // ArmorConfig's own array. Everyone starts at level 0 on both, not on no armor. These survive
+    // death - only the current fill of the pool (armor.Clear(), below) resets - because an upgrade
+    // is bought, not lent.
+    private int absorbLevel = 0;
+    private int rechargeLevel = 0;
     private float secondsSinceCombat;
     private bool isDead;
 
@@ -41,7 +47,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     // written by SetHealthFromNetwork below through ArmorState.SetFromNetwork instead of a
     // separately mirrored field, so Armor means the same thing regardless of whose client reads it.
     public float Armor => armor.Current;
-    public int ArmorTier => armorTier;
+    public float ArmorCapacity => armor.Capacity;
+    public int AbsorbLevel => absorbLevel;
+    public int RechargeLevel => rechargeLevel;
     public float SecondsSinceCombat => secondsSinceCombat;
     public bool IsOutOfCombat => gameplayConfig != null && secondsSinceCombat >= gameplayConfig.OutOfCombatSeconds;
     public bool IsAlive => !isDead;
@@ -66,8 +74,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             Debug.LogError($"[PlayerHealth] {name}: ArmorConfig is not assigned - cannot take damage.");
 
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
-        armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(armorTier) : 0f,
-                                armorConfig != null ? armorConfig.RechargeSecondsFor(armorTier) : 6f);
+        armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(absorbLevel) : 0f,
+                                armorConfig != null ? armorConfig.RechargeSecondsFor(rechargeLevel) : 6f,
+                                armorConfig != null ? armorConfig.RefillSeconds : 2.5f);
 
         if (healthBar != null)
             healthBar.value = health;
@@ -160,11 +169,18 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     // longer a physics collision to react to. Nothing replaced it, which is the point - there is
     // one way in.
 
-    public void SetArmorTier(int tier)
+    /// <summary>
+    /// Applies a new pair of armor upgrade levels - the sink every client calls when
+    /// PlayerLoadout replicates a purchase (or a late joiner reads one for the first time). Refills
+    /// the pool to the new capacity immediately: this is a purchase, not a recharge, the same
+    /// distinction ArmorState.SetTier documents.
+    /// </summary>
+    public void SetArmorLevels(int newAbsorbLevel, int newRechargeLevel)
     {
-        armorTier = tier;
+        absorbLevel = newAbsorbLevel;
+        rechargeLevel = newRechargeLevel;
         if (armorConfig != null)
-            armor.SetTier(armorConfig.AbsorbFor(tier), armorConfig.RechargeSecondsFor(tier));
+            armor.SetTier(armorConfig.AbsorbFor(absorbLevel), armorConfig.RechargeSecondsFor(rechargeLevel));
     }
 
     public void ResetForRespawn()
