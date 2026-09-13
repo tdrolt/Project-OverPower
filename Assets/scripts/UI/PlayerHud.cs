@@ -54,6 +54,25 @@ namespace Overpower.UI
         private Color barBackgroundColor = new Color(0f, 0f, 0f, 0.55f);
 
         [Header("Overheat bar [C]")]
+        [SerializeField, Tooltip("Opaque track colour behind the overheat bar's fill - deliberately " +
+                 "its OWN colour rather than the shared translucent Bar Background Colour, and " +
+                 "deliberately lighter than every fill state (normal/warning/silenced), so the " +
+                 "empty part of the bar reads as a bright, solid trough instead of blending into " +
+                 "whatever is behind the HUD.")]
+        private Color overheatTrackColor = new Color(0.78f, 0.78f, 0.80f, 1f);
+
+        [SerializeField, Tooltip("Height of the overheat bar, in canvas units - taller than health/" +
+                 "armor on purpose: it is the one bar a player must read at a glance mid-fight."), Range(8f, 32f)]
+        private float overheatBarHeight = 18f;
+
+        [SerializeField, Tooltip("Colour of the thin vertical tick marking exactly where the warning " +
+                 "threshold sits on the track. Dark so it stays visible against the light track " +
+                 "colour above and every fill colour it might be drawn over.")]
+        private Color overheatTickColor = new Color(0.12f, 0.12f, 0.14f, 0.9f);
+
+        [SerializeField, Tooltip("Width of the warning-threshold tick mark, in canvas units."), Range(1f, 6f)]
+        private float overheatTickWidth = 2f;
+
         [SerializeField, Tooltip("Bar colour below the warning threshold.")]
         private Color overheatNormalColor = new Color(0.60f, 0.60f, 0.66f);
 
@@ -109,6 +128,7 @@ namespace Overpower.UI
 
         private Image healthFill;
         private Image overheatFill;
+        private RectTransform overheatTickRect; // Repositioned live - see UpdateOverheat.
         private Image armorFill;
         private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
         private GameObject silencedBanner;
@@ -146,6 +166,7 @@ namespace Overpower.UI
         private float lastArmorFraction = -1f;
         private float lastArmorExtentWidth = -1f;
         private float lastOverheatFraction = -1f;
+        private float lastWarningThreshold01 = -1f;
         private bool lastSilenced;
         private bool lastWeaponBlocked;
         private WeaponDefinition lastWeaponDef;
@@ -267,6 +288,15 @@ namespace Overpower.UI
                 ? gameplayConfig.OverheatWarningThreshold / gameplayConfig.OverheatMax
                 : 0.8f;
             bool warning = !silenced && fraction >= warningThreshold01;
+
+            // The tick mark moves with the same live threshold read above - a designer retuning it
+            // in Play Mode sees both the colour boundary AND the mark on the track move together.
+            if (!Mathf.Approximately(warningThreshold01, lastWarningThreshold01))
+            {
+                overheatTickRect.anchorMin = new Vector2(warningThreshold01, 0f);
+                overheatTickRect.anchorMax = new Vector2(warningThreshold01, 1f);
+                lastWarningThreshold01 = warningThreshold01;
+            }
 
             if (!Mathf.Approximately(fraction, lastOverheatFraction))
             {
@@ -511,10 +541,9 @@ namespace Overpower.UI
             panelLayout.childForceExpandHeight = false;
 
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
-            healthFill = BuildBar(panel.transform, "Health Bar", BarWidth, 20f, healthColor);
-            overheatFill = BuildBar(panel.transform, "Overheat Bar", BarWidth, 12f, overheatNormalColor);
-
-            silencedBanner = BuildSilencedBanner(panel.transform);
+            healthFill = BuildBar(panel.transform, "Health Bar", BarWidth, 20f, barBackgroundColor, healthColor, out _);
+            overheatFill = BuildBar(panel.transform, "Overheat Bar", BarWidth, overheatBarHeight, overheatTrackColor, overheatNormalColor, out Image overheatTrack);
+            overheatTickRect = BuildOverheatTick(overheatTrack.transform);
 
             GameObject slotsRow = new GameObject("Slots Row", typeof(RectTransform));
             slotsRow.transform.SetParent(panel.transform, false);
@@ -533,9 +562,19 @@ namespace Overpower.UI
             weaponSlotUi = BuildSlot(slotsRow.transform, "LMB", withCooldown: false);
             for (int i = 0; i < AbilitySlotOrder.Length; i++)
                 abilitySlotUi[i] = BuildSlot(slotsRow.transform, AbilitySlotOrder[i].keyLabel, withCooldown: true);
+
+            // Built LAST and parented to the row itself (not the panel): a plain child with
+            // ignoreLayout stretched over slotsRow's own rect draws literally "over the slot row"
+            // (the addendum's own words) without ever being counted by any layout group - toggling
+            // it on/off with SetActive can no longer shift the row's position the way it did when
+            // this lived as a separate, height-reserving sibling under Hud Panel (code review fix).
+            silencedBanner = BuildSilencedBanner(slotsRow.transform);
         }
 
-        private Image BuildBar(Transform parent, string name, float width, float height, Color fillColor)
+        /// <summary>trackImage is handed back so a caller can add something on top of the track
+        /// itself (the overheat bar's warning tick) or give it its own colour instead of the shared
+        /// Bar Background Colour (again, overheat - see its Track Colour tooltip).</summary>
+        private Image BuildBar(Transform parent, string name, float width, float height, Color trackColor, Color fillColor, out Image trackImage)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -548,8 +587,9 @@ namespace Overpower.UI
             // onto the RectTransform. Set it explicitly here or the box stays at the default 100x100.
             go.GetComponent<RectTransform>().sizeDelta = new Vector2(width, height);
             Image background = go.AddComponent<Image>();
-            background.color = barBackgroundColor;
+            background.color = trackColor;
             background.raycastTarget = false;
+            trackImage = background;
 
             GameObject fillGo = new GameObject("Fill", typeof(RectTransform));
             fillGo.transform.SetParent(go.transform, false);
@@ -566,6 +606,28 @@ namespace Overpower.UI
             fillImg.fillAmount = 1f;
             fillImg.raycastTarget = false;
             return fillImg;
+        }
+
+        /// <summary>A thin vertical mark on the overheat track showing exactly where the warning
+        /// threshold sits. Parented to the track (a sibling of Fill, added after it so it always
+        /// draws on top of the fill) and built at a placeholder position - UpdateOverheat repositions
+        /// it every frame the live threshold fraction changes, the same pattern the colour swap uses.</summary>
+        private RectTransform BuildOverheatTick(Transform trackParent)
+        {
+            GameObject tick = new GameObject("Warning Tick", typeof(RectTransform));
+            tick.transform.SetParent(trackParent, false);
+            RectTransform tickRt = tick.GetComponent<RectTransform>();
+            // X is a point-anchor (min == max) so it can be slid along the track by changing just
+            // that one number; Y stretches the full track height so the mark spans the whole bar.
+            tickRt.anchorMin = new Vector2(0.8f, 0f);
+            tickRt.anchorMax = new Vector2(0.8f, 1f);
+            tickRt.pivot = new Vector2(0.5f, 0.5f);
+            tickRt.sizeDelta = new Vector2(overheatTickWidth, 0f);
+            tickRt.anchoredPosition = Vector2.zero;
+            Image tickImg = tick.AddComponent<Image>();
+            tickImg.color = overheatTickColor;
+            tickImg.raycastTarget = false;
+            return tickRt;
         }
 
         /// <summary>The armor bar is a fixed-width track (like the other two) holding a "capacity
@@ -615,22 +677,45 @@ namespace Overpower.UI
         /// <summary>Hidden until IsSilenced; a crossed-out weapon mark built from plain rectangles
         /// (the project has no weapon-silhouette sprite yet) so full overheat silence reads as a
         /// state with an end, not a wall - PlayerOverheat's class comment records that this was
-        /// Tudor's explicit condition for accepting the harsher "silences everything" rule.</summary>
+        /// Tudor's explicit condition for accepting the harsher "silences everything" rule.
+        ///
+        /// Parented to slotsRow and stretched over its full rect with ignoreLayout on (see the
+        /// BuildUi call site) - a translucent wash plus the icon and label draw directly over the
+        /// four slot boxes, matching the addendum's own wording ("over the slot row") instead of
+        /// the height-reserving sibling row this used to be, which shifted the slots by its own
+        /// height every time SetActive toggled it (code review fix).</summary>
         private GameObject BuildSilencedBanner(Transform parent)
         {
             GameObject row = new GameObject("Silenced Banner", typeof(RectTransform));
             row.transform.SetParent(parent, false);
+            RectTransform rowRt = row.GetComponent<RectTransform>();
+            rowRt.anchorMin = Vector2.zero;
+            rowRt.anchorMax = Vector2.one;
+            rowRt.offsetMin = Vector2.zero;
+            rowRt.offsetMax = Vector2.zero;
             LayoutElement rowLe = row.AddComponent<LayoutElement>();
-            rowLe.preferredWidth = BarWidth;
-            rowLe.preferredHeight = 22f;
-            row.GetComponent<RectTransform>().sizeDelta = new Vector2(BarWidth, 22f); // See BuildBar's comment.
-            HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
+            rowLe.ignoreLayout = true; // slotsRow's own HorizontalLayoutGroup must never see this as a 5th column.
+
+            // A translucent wash across the whole row, behind the icon/label below, so "you cannot
+            // use any of this right now" reads even before the eye finds the label.
+            Image wash = row.AddComponent<Image>();
+            wash.color = new Color(overheatSilencedColor.r, overheatSilencedColor.g, overheatSilencedColor.b, 0.35f);
+            wash.raycastTarget = false;
+
+            GameObject content = new GameObject("Content", typeof(RectTransform));
+            content.transform.SetParent(row.transform, false);
+            RectTransform contentRt = content.GetComponent<RectTransform>();
+            contentRt.anchorMin = Vector2.zero;
+            contentRt.anchorMax = Vector2.one;
+            contentRt.offsetMin = Vector2.zero;
+            contentRt.offsetMax = Vector2.zero;
+            HorizontalLayoutGroup layout = content.AddComponent<HorizontalLayoutGroup>();
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.spacing = 8f;
             layout.childControlWidth = layout.childControlHeight = false;
 
             GameObject iconGo = new GameObject("Weapon Icon", typeof(RectTransform));
-            iconGo.transform.SetParent(row.transform, false);
+            iconGo.transform.SetParent(content.transform, false);
             LayoutElement iconLe = iconGo.AddComponent<LayoutElement>();
             iconLe.preferredWidth = 20f;
             iconLe.preferredHeight = 20f;
@@ -649,7 +734,7 @@ namespace Overpower.UI
             strikeImg.color = overheatSilencedColor;
             strikeImg.raycastTarget = false;
 
-            TextMeshProUGUI text = AddLabel(row.transform, "WEAPON SILENCED", 14f, FontStyles.Bold);
+            TextMeshProUGUI text = AddLabel(content.transform, "WEAPON SILENCED", 14f, FontStyles.Bold);
             LayoutElement textLe = text.gameObject.AddComponent<LayoutElement>();
             textLe.preferredWidth = 220f;
             textLe.preferredHeight = 20f;
