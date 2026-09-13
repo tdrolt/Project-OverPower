@@ -3,6 +3,7 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Net;
 
 namespace Overpower.TestRange
 {
@@ -18,10 +19,19 @@ namespace Overpower.TestRange
     /// with health and armor read from the same two config assets - so a change to either config
     /// moves the dummy and the player together, and the measurement stays honest.
     ///
+    /// IT ALSO CARRIES A REAL StatusEffectState (Task 1.8), the same class PlayerStatusEffects wraps
+    /// for a real player - built with the same GameplayConfig caps, so a slow or a vulnerability
+    /// stacks and expires identically whichever kind of target it landed on. There is no owner guard
+    /// here the way PlayerStatusEffects.Apply has one: HasLocalAuthority is always true for a dummy
+    /// (see below), so every caller of ApplyStatus is already "the owner" by definition. Burn ticks
+    /// itself in Update, through this class's own ApplyDamage, exactly like PlayerStatusEffects
+    /// routes a real player's burn back through PlayerHealth.ApplyDamage - one funnel, whichever
+    /// target is burning.
+    ///
     /// Not networked, and deliberately so: it exists to be shot at in a single Editor session.
     /// </summary>
     [RequireComponent(typeof(Collider))]
-    public class DummyTarget : MonoBehaviour, IDamageable
+    public class DummyTarget : MonoBehaviour, IDamageable, IStatusReceiver
     {
         [SerializeField, Tooltip("Match tuning asset. Max Health comes from here, so the dummy has " +
                  "exactly as much health as a real player.")]
@@ -50,6 +60,24 @@ namespace Overpower.TestRange
         private float health;
         private ArmorState armor;
         private bool isDead;
+
+        // The dummy's own status timers - Slow, Stun, Vulnerability, Burn - built with the same
+        // caps a real player's PlayerStatusEffects uses, so a designer testing a slow or a
+        // vulnerability debuff against a dummy sees exactly the number a player would take.
+        private StatusEffectState statusState;
+
+        // StatusEffectSpec carries no source actor (see PlayerStatusEffects.burnSourceActorNumber's
+        // identical comment) - kill/damage credit for a burn tick needs it separately, and "most
+        // recent burn owns credit for all of its damage" is exactly correct because Burn stacks
+        // with StackRule.Refresh, so at most one is ever live.
+        private int burnSourceActorNumber = -1;
+
+        public bool IsStunned => statusState.IsActive(StatusKind.Stun);
+
+        /// <summary>0..1 fraction of speed lost - read by TestRangeSpawner's Strafer, which rewrites
+        /// its own position every frame and so cannot go through a speed multiplier the way a real
+        /// player's PlayerMotor does.</summary>
+        public float Slow => statusState.Magnitude(StatusKind.Slow);
 
         // The delayed reset scheduled on death. Held onto so an early reset (ResetToFull called by
         // an external caller - the F1 panel, a test harness, or a future respawn button) can cancel
@@ -94,6 +122,12 @@ namespace Overpower.TestRange
                 Debug.LogError($"[DummyTarget] {name}: ArmorConfig is not assigned - this dummy has no " +
                                 "armor, so any measured time-to-kill is too short.");
 
+            // Built once, before the first ResetToFull (which clears it) - same two caps
+            // PlayerStatusEffects.Awake reads off the same asset.
+            statusState = new StatusEffectState(
+                gameplayConfig != null ? gameplayConfig.SlowCap : 0f,
+                gameplayConfig != null ? gameplayConfig.VulnerabilityCap : 0f);
+
             ResetToFull();
         }
 
@@ -103,6 +137,48 @@ namespace Overpower.TestRange
             // GameObject is deactivated - only relying on that would leave the coroutine running
             // whenever something merely sets enabled = false. Cancel explicitly either way.
             CancelPendingReset();
+        }
+
+        /// <summary>
+        /// Ticks every status effect currently on this dummy and pays out its burn damage, exactly
+        /// the way PlayerStatusEffects.Update does for a real player - see that class's own comment
+        /// for why ConsumeBurnDamage must run BEFORE Tick ages the same burn down. Not gated on
+        /// isDead: a dummy killed by the tail end of a burn still needs this to run once more so the
+        /// kill is reported, and ApplyDamage below already refuses a dead dummy on its own.
+        /// </summary>
+        private void Update()
+        {
+            float burn = statusState.ConsumeBurnDamage(Time.deltaTime);
+            statusState.Tick(Time.deltaTime);
+
+            if (burn > 0f)
+                ApplyBurnDamage(burn);
+        }
+
+        private void ApplyBurnDamage(float burn)
+        {
+            Teams.TryGetTeam(burnSourceActorNumber, out int sourceTeamId);
+            var info = new DamageInfo(burn, burnSourceActorNumber, sourceTeamId, -1,
+                                       DamageSource.Burn, false, transform.position);
+            ApplyDamage(info);
+        }
+
+        /// <summary>IStatusReceiver's entry point. No IsMine-style guard, unlike
+        /// PlayerStatusEffects.Apply: HasLocalAuthority is always true for a dummy (see below), so
+        /// there is no "someone else's copy" for this call to have come from.</summary>
+        public void ApplyStatus(in StatusEffectSpec spec, int sourceActor)
+        {
+            if (spec.kind == StatusKind.Burn)
+                burnSourceActorNumber = sourceActor;
+
+            statusState.Apply(spec);
+            LogStatusApplied(spec);
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        private void LogStatusApplied(in StatusEffectSpec spec)
+        {
+            Debug.Log($"[DUMMY] {spec.kind} {spec.magnitude:0.00} {spec.duration:0.0}s");
         }
 
         /// <summary>Restores the dummy to full health/armor immediately. Public so an early external
@@ -119,6 +195,8 @@ namespace Overpower.TestRange
             isDead = false;
             firstHitTime = 0f;
             hits = 0;
+            statusState.ClearAll(); // Awake builds statusState before ever calling this, so it is never null here.
+            burnSourceActorNumber = -1;
         }
 
         private void CancelPendingReset()
@@ -132,8 +210,10 @@ namespace Overpower.TestRange
 
         /// <summary>
         /// The same order of operations a player takes damage in, because it is literally the same
-        /// resolver: vulnerability, then reduction, then armor, then health. The dummy carries
-        /// neither buff, so both multipliers are passed as zero.
+        /// resolver: vulnerability, then reduction, then armor, then health. Vulnerability now comes
+        /// from this dummy's own StatusEffectState (Task 1.8) instead of a hardcoded 0, so a raybeam
+        /// or a mine's own debuff measures the same extra damage on a dummy as it would on a real
+        /// player. Reduction stays 0 - a dummy has no dash buff or armor upgrade to grant one.
         /// </summary>
         public DamageResult ApplyDamage(in DamageInfo info)
         {
@@ -145,7 +225,7 @@ namespace Overpower.TestRange
             hits++;
 
             DamageResult result = DamageResolver.Resolve(info.Amount, info.IgnoresArmor, health,
-                                                          armor.Current, 0f, 0f);
+                                                          armor.Current, statusState.Magnitude(StatusKind.Vulnerability), 0f);
             armor.Absorb(result.ArmorAbsorbed);
             health -= result.HealthLost;
 

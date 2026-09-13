@@ -133,7 +133,15 @@ namespace Overpower.TestRange
 
         /// <summary>Moves a dummy left and right of a fixed centre at a fixed speed, for practicing
         /// leading a moving target. Nested here rather than a third file, since nothing outside this
-        /// spawner ever needs to create one.</summary>
+        /// spawner ever needs to create one.
+        ///
+        /// SCALES WITH THE DUMMY'S OWN STATUS (Task 1.8): this rewrites transform.position directly
+        /// every frame rather than driving a real PlayerMotor, so it cannot go through a speed
+        /// multiplier the way a stunned or slowed player does - AddSpeedMultiplier has nothing to
+        /// multiply here. Multiplying the PingPong clock's own advance by (stunned ? 0 : 1 - Slow)
+        /// has the identical visible effect: a stunned dummy freezes in place (the clock stops
+        /// advancing, so it snaps back to full speed the instant the stun lifts, exactly like a
+        /// player's speed multiplier does) and a slowed one visibly crosses less ground per second.</summary>
         private sealed class Strafer : MonoBehaviour
         {
             private Vector3 center;
@@ -141,6 +149,7 @@ namespace Overpower.TestRange
             private float distance;
             private float speed;
             private float t;
+            private DummyTarget dummy;
 
             public void Configure(Vector3 center, Vector3 axis, float distance, float speed)
             {
@@ -150,15 +159,23 @@ namespace Overpower.TestRange
                 this.speed = speed;
             }
 
+            private void Awake()
+            {
+                // Same GameObject: TestRangeSpawner adds this component to the dummy it just spawned.
+                dummy = GetComponent<DummyTarget>();
+            }
+
             private void Update()
             {
                 if (distance <= 0f)
                     return;
 
+                float multiplier = dummy != null ? (dummy.IsStunned ? 0f : 1f - dummy.Slow) : 1f;
+
                 // A round trip covers 4x distance (there and back); PingPong over 2x distance and
                 // re-centring on zero turns that into a smooth back-and-forth with no snap at
                 // either end, instead of a sawtooth that teleports at the turnaround.
-                t += Time.deltaTime * speed;
+                t += Time.deltaTime * speed * multiplier;
                 float offset = Mathf.PingPong(t, distance * 2f) - distance;
                 transform.position = center + axis * offset;
             }
