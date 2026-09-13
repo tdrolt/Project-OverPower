@@ -4395,6 +4395,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
   networkLerpSpeed: 10
+  remoteSnapDistance: 3
 --- !u!114 &1013426135256432800
 MonoBehaviour:
   m_ObjectHideFlags: 0
