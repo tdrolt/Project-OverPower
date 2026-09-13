@@ -27,6 +27,15 @@ public class PlayerMotor : MonoBehaviour
              "smooth on a laggy connection.")]
     private float networkLerpSpeed = 10f;
 
+    [SerializeField, Tooltip("If a remote player's new network position is farther than this from " +
+             "where their body currently sits, snap straight there instead of lerping. A blink or " +
+             "teleport moves the caster many metres in a single network tick; left to the lerp " +
+             "above, every other client would draw that as a slide through anything in between - " +
+             "including walls. At SerializationRate 20 (RoomManager.cs) a dash only covers about " +
+             "0.9m per tick, so ordinary movement never reaches this and only a blink/teleport ever " +
+             "snaps.")]
+    private float remoteSnapDistance = 3f;
+
     private Rigidbody rb;
     private PhotonView photonView;
     private PlayerInputRouter router;
@@ -133,6 +142,15 @@ public class PlayerMotor : MonoBehaviour
     /// networking code itself.</summary>
     public void SetNetworkTarget(Vector3 position, Quaternion rotation)
     {
+        // A jump this big cannot be an ordinary step - see remoteSnapDistance's tooltip. Snapping
+        // the Rigidbody straight away (rather than just letting the lerp target move) means this
+        // remote copy is never seen sliding through the gap on its way there.
+        if (Vector3.Distance(transform.position, position) > remoteSnapDistance)
+        {
+            rb.position = position;
+            rb.rotation = rotation;
+        }
+
         networkPosition = position;
         networkRotation = rotation;
     }
