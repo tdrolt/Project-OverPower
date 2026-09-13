@@ -231,6 +231,7 @@ namespace Overpower.TestRange
             rowLayout.childControlWidth = rowLayout.childForceExpandWidth = true;
             AddButton(buttonRow.transform, "Reset Cooldowns", res, OnResetCooldownsClicked);
             AddButton(buttonRow.transform, "Heal", res, OnHealClicked);
+            AddButton(buttonRow.transform, "Fill Ultimate", res, OnFillUltimateClicked);
 
             GameObject armorButtonRow = new GameObject("Armor Buttons", typeof(RectTransform));
             armorButtonRow.transform.SetParent(panel.transform, false);
@@ -413,6 +414,20 @@ namespace Overpower.TestRange
 
             health.ResetForRespawn();                                          // Full health, clears burn/slow/etc.
             health.SetArmorLevels(health.AbsorbLevel, health.RechargeLevel);   // Refills armor at whatever levels are already owned.
+        }
+
+        /// <summary>Task 1.11's own "F1 gets a Fill Ultimate button" [C] - instantly fills
+        /// UltimateCharge so Space can be tested without farming a dummy for real.</summary>
+        private void OnFillUltimateClicked()
+        {
+            UltimateCharge charge = ResolveLocalPlayer()?.GetComponentInChildren<UltimateCharge>(true);
+            if (charge == null)
+            {
+                Debug.LogWarning("[TestRangePanel] no local UltimateCharge found - cannot fill the ultimate meter.");
+                return;
+            }
+
+            charge.Fill();
         }
 
         /// <summary>Spends one purchase on the absorb path, if the combined cap and the path's own

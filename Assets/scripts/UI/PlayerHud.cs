@@ -113,6 +113,17 @@ namespace Overpower.UI
                  "recharges - fully covered the instant a charge is spent, gone the instant it returns.")]
         private Color cooldownCoverColor = new Color(0f, 0f, 0f, 0.65f);
 
+        [Header("Ultimate charge meter [C] (Task 1.11 hook, now filled in)")]
+        [SerializeField, Tooltip("Fill colour of the Ultimate slot's own charge meter - a translucent " +
+                 "wash drawn over the icon, from empty to full, independent of the slot's ordinary " +
+                 "recharge cover (which reflects the trivial always-instant base-class pool, not the " +
+                 "real gate). Bound to UltimateCharge.Normalised.")]
+        private Color ultimateChargeColor = new Color(1f, 0.85f, 0.25f, 0.45f);
+
+        [SerializeField, Tooltip("Colour of the READY text shown over the Ultimate slot once " +
+                 "UltimateCharge.IsFull is true - the moment Space actually casts something.")]
+        private Color ultimateReadyTextColor = new Color(1f, 0.95f, 0.6f);
+
         // The one width every bar shares, so the health, overheat and armor track all line up.
         private const float BarWidth = 560f;
 
@@ -123,6 +134,7 @@ namespace Overpower.UI
         private PlayerStatusEffects statusEffects;
         private WeaponFiring weaponFiring;
         private AbilityRunner abilityRunner;
+        private UltimateCharge ultimateCharge;
 
         // ---- built UI: bars ------------------------------------------------------------------------
 
@@ -146,6 +158,14 @@ namespace Overpower.UI
             public Transform pipRow;      // Null for the weapon slot.
             public readonly List<Image> pips = new List<Image>();
             public TextMeshProUGUI blockReasonText; // Null for the weapon slot.
+
+            // Ultimate slot only (Task 1.11) - null for every other slot. A separate overlay from
+            // cooldownCover above: the base class's own charge pool for an ultimate module is a
+            // trivial 1-charge/0-cooldown pool that recovers the instant it is spent (see the
+            // addendum's "fit with 1.0"), so its RechargeProgress never reflects the real gate -
+            // UltimateCharge.Normalised is read directly instead.
+            public Image ultimateChargeFill;
+            public TextMeshProUGUI readyLabel;
         }
 
         private SlotUi weaponSlotUi;
@@ -175,6 +195,8 @@ namespace Overpower.UI
         private readonly float[] lastRecharge = { -1f, -1f, -1f };
         private readonly bool[] lastActive = { false, false, false };
         private readonly CastBlock[] lastBlock = { (CastBlock)(-1), (CastBlock)(-1), (CastBlock)(-1) };
+        private float lastUltimateCharge = -1f;
+        private bool lastUltimateReady;
 
         private void Awake()
         {
@@ -190,11 +212,14 @@ namespace Overpower.UI
             statusEffects = GetComponent<PlayerStatusEffects>();
             weaponFiring = GetComponent<WeaponFiring>();
             abilityRunner = GetComponent<AbilityRunner>();
+            ultimateCharge = GetComponent<UltimateCharge>();
 
             if (gameplayConfig == null)
                 Debug.LogError($"[PlayerHud] {name}: GameplayConfig is not assigned - the overheat warning threshold and max health fall back to hardcoded numbers.");
             if (playerHealth == null || playerOverheat == null || statusEffects == null || weaponFiring == null || abilityRunner == null)
                 Debug.LogError($"[PlayerHud] {name}: missing PlayerHealth/PlayerOverheat/PlayerStatusEffects/WeaponFiring/AbilityRunner on this player - the HUD cannot bind to it.");
+            if (ultimateCharge == null)
+                Debug.LogError($"[PlayerHud] {name}: no UltimateCharge on this player - the Ultimate slot's charge meter will read as always empty.");
 
             BuildUi();
 
@@ -428,6 +453,35 @@ namespace Overpower.UI
                     lastActive[i] = active;
                     lastBlock[i] = block;
                 }
+
+                if (slot == AbilitySlot.Ultimate)
+                    UpdateUltimateMeter(ui);
+            }
+        }
+
+        /// <summary>The Task 1.11 hook, filled in: a translucent fill over the Ultimate slot's icon
+        /// tracking UltimateCharge.Normalised, and a READY label shown only once IsFull is true - the
+        /// same moment Space actually casts something. Independent of the slot's ordinary cooldown
+        /// cover above, which for an ultimate module reflects only the trivial always-instant
+        /// base-class pool, never the real gate.</summary>
+        private void UpdateUltimateMeter(SlotUi ui)
+        {
+            if (ui.ultimateChargeFill == null)
+                return; // Built only for the Ultimate slot - see BuildSlot's isUltimate parameter.
+
+            float normalised = ultimateCharge != null ? ultimateCharge.Normalised : 0f;
+            bool ready = ultimateCharge != null && ultimateCharge.IsFull;
+
+            if (!Mathf.Approximately(normalised, lastUltimateCharge))
+            {
+                ui.ultimateChargeFill.fillAmount = normalised;
+                lastUltimateCharge = normalised;
+            }
+
+            if (ready != lastUltimateReady)
+            {
+                ui.readyLabel.gameObject.SetActive(ready);
+                lastUltimateReady = ready;
             }
         }
 
@@ -559,9 +613,12 @@ namespace Overpower.UI
             slotsLayout.childAlignment = TextAnchor.UpperCenter;
             slotsLayout.childControlWidth = slotsLayout.childControlHeight = false;
 
-            weaponSlotUi = BuildSlot(slotsRow.transform, "LMB", withCooldown: false);
+            weaponSlotUi = BuildSlot(slotsRow.transform, "LMB", withCooldown: false, isUltimate: false);
             for (int i = 0; i < AbilitySlotOrder.Length; i++)
-                abilitySlotUi[i] = BuildSlot(slotsRow.transform, AbilitySlotOrder[i].keyLabel, withCooldown: true);
+            {
+                bool isUltimate = AbilitySlotOrder[i].slot == AbilitySlot.Ultimate;
+                abilitySlotUi[i] = BuildSlot(slotsRow.transform, AbilitySlotOrder[i].keyLabel, withCooldown: true, isUltimate: isUltimate);
+            }
 
             // Built LAST and parented to the row itself (not the panel): a plain child with
             // ignoreLayout stretched over slotsRow's own rect draws literally "over the slot row"
@@ -748,8 +805,10 @@ namespace Overpower.UI
 
         /// <summary>One weapon or ability box: a tinted background (ready/blocked/active), an icon
         /// that falls back to the ability's display name when it has none, and - for the three
-        /// ability slots only - a charge pip row and a recharge cover sweep.</summary>
-        private SlotUi BuildSlot(Transform parent, string keyLabel, bool withCooldown)
+        /// ability slots only - a charge pip row and a recharge cover sweep. isUltimate additionally
+        /// builds the Task 1.11 charge meter (a fill plus a READY label), true for exactly one of
+        /// the three ability slots.</summary>
+        private SlotUi BuildSlot(Transform parent, string keyLabel, bool withCooldown, bool isUltimate)
         {
             var ui = new SlotUi();
 
@@ -840,12 +899,37 @@ namespace Overpower.UI
                 ui.blockReasonText.alignment = TextAlignmentOptions.Center;
                 ui.blockReasonText.color = overheatWarningColor;
 
-                // TASK 1.11 HOOK: UltimateCharge does not exist yet - out of scope for this dispatch.
-                // When it lands, the Ultimate slot (AbilitySlot.Ultimate, built here with key label
-                // "SPACE") is where its Normalised value belongs, most likely as a ring drawn around
-                // this same box the way the cooldown cover already wraps it. Do not invent a
-                // placeholder number in the meantime - an empty/full guess would be indistinguishable
-                // from a real reading.
+                // TASK 1.11: the Ultimate slot's own charge meter - a translucent fill drawn OVER the
+                // cooldown cover above (built after it, so it draws on top) plus a READY label shown
+                // only at full charge. Bound in UpdateUltimateMeter from UltimateCharge.Normalised/
+                // IsFull, never the base class's own RechargeProgress - see the SlotUi field comment
+                // for why that number means nothing for an ultimate.
+                if (isUltimate)
+                {
+                    GameObject fillGo = new GameObject("Ultimate Charge Fill", typeof(RectTransform));
+                    fillGo.transform.SetParent(iconBox.transform, false);
+                    RectTransform fillRt = fillGo.GetComponent<RectTransform>();
+                    fillRt.anchorMin = Vector2.zero;
+                    fillRt.anchorMax = Vector2.one;
+                    fillRt.offsetMin = Vector2.zero;
+                    fillRt.offsetMax = Vector2.zero;
+                    ui.ultimateChargeFill = fillGo.AddComponent<Image>();
+                    ui.ultimateChargeFill.color = ultimateChargeColor;
+                    ui.ultimateChargeFill.type = Image.Type.Filled;
+                    ui.ultimateChargeFill.fillMethod = Image.FillMethod.Vertical;
+                    ui.ultimateChargeFill.fillOrigin = (int)Image.OriginVertical.Bottom;
+                    ui.ultimateChargeFill.fillAmount = 0f;
+                    ui.ultimateChargeFill.raycastTarget = false;
+
+                    ui.readyLabel = AddLabel(iconBox.transform, "READY", 13f, FontStyles.Bold);
+                    RectTransform readyRt = ui.readyLabel.rectTransform;
+                    readyRt.anchorMin = Vector2.zero;
+                    readyRt.anchorMax = Vector2.one;
+                    readyRt.offsetMin = Vector2.zero;
+                    readyRt.offsetMax = Vector2.zero;
+                    ui.readyLabel.color = ultimateReadyTextColor;
+                    ui.readyLabel.gameObject.SetActive(false); // UpdateUltimateMeter turns this on once IsFull.
+                }
             }
 
             TextMeshProUGUI keyText = AddLabel(go.transform, keyLabel, 9f, FontStyles.Bold);
