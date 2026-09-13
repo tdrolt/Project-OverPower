@@ -20,3 +20,9 @@ MonoBehaviour:
   - 6
   - 4
   - 2
+  refillSeconds: 2.5
+  maxArmorUpgrades: 2
+  upgradeCosts:
+  - 1400
+  - 1800
+  - 2200
