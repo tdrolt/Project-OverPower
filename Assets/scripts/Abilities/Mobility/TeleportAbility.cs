@@ -23,8 +23,10 @@ namespace Overpower.Abilities
     /// draws locally - a player joining mid-match has to see a gate that has been standing there for
     /// two minutes. Placing therefore happens in ExecuteCast's IsCasterClient branch, exactly where
     /// FireField's own spawn happens, not in TryBuildCast: TryBuildCast only decides WHERE (clamped
-    /// to Placement Range, refused if the spot is inside a Building) and hands the built-once
-    /// placement counter along as the payload's IntArg.
+    /// to Placement Range, then GROUNDED and validated exactly like Blink's own destination check -
+    /// see GroundProbe.TryFindGround - refused if there is no ground within reach, it sits below the
+    /// kill plane, or the grounded spot is blocked) and hands the built-once placement counter along
+    /// as the payload's IntArg.
     ///
     /// THE CHANNEL ITSELF is pure logic in PortalChannelState (Assets/scripts/Combat) - this class
     /// only supplies, every OwnerTick, "which of my own portals (if any) am I standing in" and
@@ -57,6 +59,18 @@ namespace Overpower.Abilities
                  "that value to send along with the placement, and reads the prefab's name to spawn it.")]
         private GameObject portalPrefab;
 
+        [Header("Placement - ground probe (same rule as Blink)")]
+        [SerializeField, Tooltip("How far, in metres, BELOW the player's OWN current height the " +
+                 "ground is allowed to be for a placement spot to count as solid ground. Too small " +
+                 "refuses a valid spot on a gentle slope or a step down; too large can accept a spot " +
+                 "far below the arena - past a thin floor - as if it were ground.")]
+        private float groundProbeDistance = 2f;
+
+        [SerializeField, Tooltip("How far, in metres, ABOVE the player's OWN current height the " +
+                 "ground is allowed to be - a small step or curb, not a roof. A portal stays at " +
+                 "roughly the caster's own level, the same reason Blink's own step-up is small.")]
+        private float maxStepUp = 0.6f;
+
         [Header("Channel")]
         [SerializeField, Tooltip("Seconds you must stand inside your own portal, without leaving, " +
                  "before it teleports you to its pair. Interrupted by leaving the circle or by dying, " +
@@ -76,9 +90,10 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("Seconds the arrival marker stays up before it disappears on its own.")]
         private float arrivalVfxSeconds = 0.3f;
 
-        // Not a design tunable: which layers refuse a placement outright. Only Building - a portal is
-        // a flat gate on the ground, not a player-sized shape that needs to dodge another player's
-        // capsule, and only a solid structure makes a spot actually invalid to stand a gate in.
+        // Not a design tunable, like BlinkAbility's own blockMask: Default|Building is both what
+        // counts as ground (the arena floor sits on Default, same as every living player; roofs and
+        // walls are Building) and what a placement may not overlap once grounded - see IsBlocked.
+        // Fixed here rather than exposed, the same reasoning PlayerDisplacement gives for its mask.
         private int blockMask;
 
         // Owner only: the portal template's own numbers (diameter), read once so TryBuildCast's
@@ -87,7 +102,10 @@ namespace Overpower.Abilities
         private Portal portalTemplate;
 
         // Owner only: increments once per successful placement, travels as CastPayload.IntArg so
-        // every client's Portal.Seq (and this owner's own pruning) agree on placement order.
+        // every client's Portal.Seq (and this owner's own pruning) agree on placement order. Safe to
+        // restart at 0 on every fresh equip (a new module instance) ONLY because Interrupt(Unequipped)
+        // destroys every portal this owner had before the old instance goes away - there is never a
+        // live portal left whose Seq could collide with a restarted counter.
         private int nextSeq;
 
         // Owner only: the pure channel timer this module drives every OwnerTick.
@@ -107,7 +125,7 @@ namespace Overpower.Abilities
 
         private void Awake()
         {
-            blockMask = LayerMask.GetMask("Building");
+            blockMask = LayerMask.GetMask("Default", "Building");
             channelState = new PortalChannelState(channelSeconds);
         }
 
@@ -128,6 +146,8 @@ namespace Overpower.Abilities
             maxPortals = Mathf.Max(1, maxPortals);
             channelSeconds = Mathf.Max(0.01f, channelSeconds);
             channelState?.SetChannelSeconds(channelSeconds);
+            groundProbeDistance = Mathf.Max(0f, groundProbeDistance);
+            maxStepUp = Mathf.Max(0f, maxStepUp);
         }
 
         // ---- owner only ---------------------------------------------------------------------------
@@ -136,14 +156,24 @@ namespace Overpower.Abilities
         {
             payload = default;
 
-            if (portalTemplate == null)
-                return false; // OnEquip already logged why.
+            if (portalTemplate == null || Owner.Motor == null)
+                return false; // OnEquip already logged the missing prefab; a missing Motor means no KillHeight to check the ground against.
 
-            Vector3 point = ClampToRange(ctx.Origin, ctx.TargetPoint, placementRange);
-            if (IsBlocked(point))
+            Vector3 flatXZ = ClampToRange(ctx.Origin, ctx.TargetPoint, placementRange);
+
+            // GroundPointUnderCursor (ctx.TargetPoint) is only a flat math plane at the player's own
+            // Y - PlayerAim never asks Physics what is actually there - so without this the clamped
+            // point could sit over a void, off the map edge, or buried/floating on a slope, and
+            // TeleportTo would happily put the player there later. Same rule as Blink's own
+            // destination check (GroundProbe's class comment), refused with nothing spent if it fails.
+            if (!GroundProbe.TryFindGround(ctx.Origin.y, flatXZ, maxStepUp, groundProbeDistance,
+                    Owner.Motor.KillHeight, blockMask, Owner.Root.transform, out Vector3 ground))
+                return false;
+
+            if (IsBlocked(ground))
                 return false; // refuse, nothing spent - see the class comment on why placing never spends the gate charge anyway.
 
-            payload = new CastPayload { Origin = ctx.Origin, Point = point, IntArg = nextSeq };
+            payload = new CastPayload { Origin = ctx.Origin, Point = ground, IntArg = nextSeq };
             nextSeq++;
             return true;
         }
@@ -202,6 +232,10 @@ namespace Overpower.Abilities
         private void CompleteTravel(Portal from, Portal to)
         {
             channelingPortal = null;
+            // Spent here, before SendPhase/ExecuteCast actually calls TeleportTo - so a Forced
+            // displacement (a knockback) that sneaks in during the one frame before ExecuteCast runs
+            // can still win the race and the charge is already gone, unrefundable - the same accepted
+            // race BlinkAbility.ExecuteCast's own comment documents for its jump.
             SpendCharge();
             channelState.LatchArrival(to);
             SendPhase(PhaseTravelled, new CastPayload { Origin = from.transform.position, Point = to.transform.position });
@@ -354,14 +388,42 @@ namespace Overpower.Abilities
             return new Vector3(clampedXZ.x, requested.y, clampedXZ.z);
         }
 
-        /// <summary>A short, wide capsule rather than a flat point check, so a wall's base still
-        /// refuses a spot a single ground-level ray could slip under.</summary>
-        private bool IsBlocked(Vector3 point)
+        // The check volume's vertical band above the grounded point - not a design tunable, the
+        // same reasoning as blockMask: an arbitrary human-height band, not something a designer
+        // should be able to mis-set into checking the wrong height entirely.
+        private const float BlockCheckBottom = 0.1f;
+        private const float BlockCheckTop = 1.8f;
+
+        /// <summary>
+        /// True if a portal-sized volume at this already-grounded point would overlap a wall or
+        /// another player's body - the same Default|Building mask and self-exclusion rule
+        /// BlinkAbility.IsCapsuleBlocked uses, so a portal is refused by the same "something solid
+        /// occupies this spot" idea as any other destination check.
+        ///
+        /// A BOX, not a capsule like Blink's own check: Physics.OverlapCapsule's two hemispherical
+        /// end caps extend a FURTHER radius beyond the two points passed to it. That is invisible for
+        /// Blink's player capsule, whose radius is well under half its height, but not for a 1.25m
+        /// portal radius against a band only 1.7m tall - built the same way, the bottom cap would dip
+        /// (radius - halfBandHeight) below the intended floor, back down into the ground itself. Once
+        /// Default (the floor's own layer) is in the mask, as it now is, every placement on ordinary
+        /// flat ground would read as "blocked" by the floor no candidate could ever clear. A box's
+        /// flat faces have no such overshoot - found by a live placement test refusing a portal on
+        /// perfectly open ground once this mask changed to match Blink's.
+        /// </summary>
+        private bool IsBlocked(Vector3 groundPoint)
         {
             float radius = portalTemplate.Radius;
-            Vector3 bottom = point + Vector3.up * 0.1f;
-            Vector3 top = point + Vector3.up * 1.8f;
-            return Physics.CheckCapsule(bottom, top, radius, blockMask, QueryTriggerInteraction.Ignore);
+            Vector3 center = groundPoint + Vector3.up * ((BlockCheckBottom + BlockCheckTop) * 0.5f);
+            Vector3 halfExtents = new Vector3(radius, (BlockCheckTop - BlockCheckBottom) * 0.5f, radius);
+
+            Collider[] overlaps = Physics.OverlapBox(center, halfExtents, Quaternion.identity, blockMask, QueryTriggerInteraction.Ignore);
+            foreach (Collider overlap in overlaps)
+            {
+                if (overlap.transform.IsChildOf(Owner.Root.transform))
+                    continue; // never blocked by the caster's own body.
+                return true;
+            }
+            return false;
         }
 
         private void ClearChannelVfx()
