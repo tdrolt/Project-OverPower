@@ -61,6 +61,34 @@ namespace Overpower.Abilities
         /// must still guard on this the same way this base does for the lifetime timer.</summary>
         protected bool IsOwnerClient => photonView.IsMine;
 
+        // Guards PhotonNetwork.Destroy itself, not just who may call it: a mine can be ended by
+        // THREE independent paths that know nothing of each other - this base's own lifetime timer,
+        // a detonation, and a caller pruning the oldest of a capped set (MineAbility.PruneOldest) -
+        // and nothing stops two of them from deciding to destroy the same object in the same window.
+        // Object.Destroy does not null a reference until the end of the frame, so a same-frame second
+        // call would not be caught by a plain "is this null yet" check; a same-frame issue is exactly
+        // the "eight errors per cast" FireField's class comment warns about. Every destroy path must
+        // go through RequestDestroy below instead of calling PhotonNetwork.Destroy directly.
+        private bool destroyRequested;
+
+        /// <summary>
+        /// The one place this object's life actually ends. Safe to call from more than one path, or
+        /// more than once from the same path - only the first call still holding IsOwnerClient true
+        /// does anything. Public so a caller outside this hierarchy (MineAbility pruning its own
+        /// oldest mine) shares the same guard as this base's own lifetime timer and a subclass's own
+        /// detonation, rather than keeping a second, unguarded PhotonNetwork.Destroy of its own.
+        /// </summary>
+        public void RequestDestroy()
+        {
+            if (destroyRequested || this == null || gameObject == null)
+                return;
+
+            destroyRequested = true;
+
+            if (IsOwnerClient)
+                PhotonNetwork.Destroy(gameObject);
+        }
+
         public void OnPhotonInstantiate(PhotonMessageInfo info)
         {
             OwnerActor = info.Sender != null ? info.Sender.ActorNumber : -1;
@@ -126,10 +154,9 @@ namespace Overpower.Abilities
             if (seconds > 0f)
                 yield return new WaitForSeconds(seconds);
 
-            // Re-checked after the wait: something else (a pruning rule, an Interrupt) may already
-            // have destroyed this object during that time.
-            if (this != null && gameObject != null)
-                PhotonNetwork.Destroy(gameObject);
+            // RequestDestroy re-checks whether this is still here and not already ended by something
+            // else (a pruning rule, a detonation, an Interrupt) during the wait - see its own comment.
+            RequestDestroy();
         }
     }
 }

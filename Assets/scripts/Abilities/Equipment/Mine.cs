@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
@@ -32,6 +33,17 @@ namespace Overpower.Abilities
     /// walked close enough - agrees on the same blast at the same point in the same relative order.
     /// MineDetonationState.TryDetonate is what makes sure a client that sees both its own trigger
     /// fire AND the resulting RPC only ever runs the explosion once.
+    ///
+    /// THE OWNER DOES NOT DESTROY THIS THE INSTANT IT DETONATES (code review finding). PUN silently
+    /// drops any RPC addressed to a PhotonView that no longer exists (see PhotonNetworkPart.ExecuteRpc's
+    /// own "Maybe GO was destroyed but RPC not cleaned up" case), and relay delivery order is not a
+    /// guarantee - a bystander's own RPC_Detonate could still be in flight when the owner's
+    /// PhotonNetwork.Destroy call reaches the room, and that bystander would silently take no damage
+    /// at all. RPC_Detonate therefore only hides the visual and relies on the 'detonated' flag
+    /// (already set by TryDetonate) to stop the trigger - on EVERY client, immediately - and the
+    /// OWNER alone schedules the real PhotonNetwork.Destroy (through the shared NetworkedDeployable.
+    /// RequestDestroy guard) Destroy Delay Seconds later, giving every other client's own copy of
+    /// this same RPC time to arrive first.
     /// </summary>
     public sealed class Mine : NetworkedDeployable
     {
@@ -67,6 +79,23 @@ namespace Overpower.Abilities
                  "is everything with health - a player or a practice dummy; nothing on any other " +
                  "layer has an IDamageable to find, so widening this only costs performance.")]
         private LayerMask detectionMask = ~0;
+
+        [Header("Destruction")]
+        [SerializeField, Tooltip("Seconds between this mine detonating and its object actually " +
+                 "leaving the game - not zero. RPC_Detonate is what applies the damage and slow, on " +
+                 "EVERY client, and PUN silently drops any RPC whose target PhotonView no longer " +
+                 "exists (see the class comment) - so the owner's PhotonNetwork.Destroy must wait " +
+                 "long enough for every other client's own copy of this same RPC to have already " +
+                 "arrived, or a bystander standing inside Explosion Radius could silently take no " +
+                 "damage at all. The mine already looks and behaves gone well before this: its " +
+                 "visual hides and its trigger already stopped (Mine Detonation State's own " +
+                 "'detonated' flag) the instant RPC_Detonate runs on each client. Controller's call: 0.5.")]
+        private float destroyDelaySeconds = 0.5f;
+
+        [SerializeField, Tooltip("The mine's visible model. Hidden on every client the instant this " +
+                 "mine detonates - see Destroy Delay Seconds for why the underlying object survives " +
+                 "a little longer than that. Left empty just skips hiding anything.")]
+        private Transform visual;
 
         // Not a design tunable: how many colliders one overlap considers. A mine's blast is small
         // enough that this comfortably covers every player plus every practice dummy at once - see
@@ -137,18 +166,38 @@ namespace Overpower.Abilities
         {
             // Guards the one real explosion: the first RPC_Detonate any client receives, whether
             // that is this client's own trigger echoing back or another client's copy of this same
-            // mine having triggered first - see MineDetonationState's own class comment.
+            // mine having triggered first - see MineDetonationState's own class comment. The same
+            // flag is also what stops FixedUpdate's own trigger check from now on - nothing extra to
+            // add there.
             if (detonation == null || !detonation.TryDetonate())
                 return;
 
             int hitCount = ApplyBlast(at);
             LogDetonation(at, hitCount);
 
-            // Only the owner may PhotonNetwork.Destroy a networked object - every other client
-            // calling this too is the "eight errors per cast" mistake FireField's class comment
-            // documents.
+            // Every client hides the visual right away - a detonated mine must not keep looking
+            // armed just because its object is still alive for a little longer. See the class
+            // comment for why the object itself outlives this by Destroy Delay Seconds.
+            HideVisual();
+
+            // Only the owner ends this object's life, and only after the delay - see RequestDestroy
+            // and the class comment for why an immediate destroy here is the actual bug being fixed.
             if (IsOwnerClient)
-                PhotonNetwork.Destroy(gameObject);
+                StartCoroutine(DestroyAfterDetonation());
+        }
+
+        private IEnumerator DestroyAfterDetonation()
+        {
+            if (destroyDelaySeconds > 0f)
+                yield return new WaitForSeconds(destroyDelaySeconds);
+
+            RequestDestroy();
+        }
+
+        private void HideVisual()
+        {
+            if (visual != null)
+                visual.gameObject.SetActive(false);
         }
 
         private bool AnyEnemyWithin(float radius)

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
 
@@ -113,7 +112,11 @@ namespace Overpower.Abilities
                 {
                     if (m.Seq == seq)
                     {
-                        PhotonNetwork.Destroy(m.gameObject);
+                        // Through the shared guard, not PhotonNetwork.Destroy directly - the oldest
+                        // mine being pruned here could be the SAME one a detonation on some other
+                        // client already scheduled for destruction (Mine's own Destroy Delay Seconds
+                        // wait); RequestDestroy is what stops that from becoming a second real call.
+                        m.RequestDestroy();
                         break;
                     }
                 }
