@@ -179,6 +179,15 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     }
 
     /// <summary>
+    /// Read-only query for a blink to check BEFORE it spends its charge: TeleportTo would refuse
+    /// while a Forced move (a knockback) is running, but by the time TeleportTo actually runs the
+    /// caster's charge is already spent and cannot be handed back. Small addition to this class
+    /// rather than a workaround in the ability - it is one more read of the same priority rule
+    /// TeleportTo itself already checks, not a new rule.
+    /// </summary>
+    public bool CanTeleport => DisplacementPriority.Accepts(activeKind, DisplaceKind.Teleport);
+
+    /// <summary>
     /// Instant reposition for a blink/teleport - no travel time, so nothing here is ever "the move
     /// running" afterwards. Refused (returns false) while a Forced move is running; otherwise ends
     /// a Voluntary move in flight as Cancelled before the jump, so a dash mid-travel cannot keep
