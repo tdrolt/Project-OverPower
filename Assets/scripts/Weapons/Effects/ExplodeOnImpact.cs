@@ -156,16 +156,14 @@ namespace Overpower.Weapons
             return splashDamage * context.DamageMultiplier * Mathf.Max(0f, falloff.Evaluate(normalised));
         }
 
-        /// <summary>The same no-friendly-fire rule the projectile sweep uses, so a rocket cannot
-        /// do by exploding what it is forbidden to do by hitting. Unknown teams fail OPEN and stay
-        /// valid targets, matching ProjectileMotor.FliesThrough and Teams.AreSameTeam. It also
-        /// means a rocket detonating at your own feet does not kill you.</summary>
+        /// <summary>The same no-friendly-fire rule the projectile sweep and the beam use -
+        /// FriendlyFire.IsSelfOrTeammate - so a rocket cannot do by exploding what it is forbidden
+        /// to do by hitting. It also means a rocket detonating at your own feet does not kill
+        /// you.</summary>
         private bool IsFriendly(IDamageable target)
         {
-            if (target.ActorNumber == context.ShooterActorNumber)
-                return true;
-
-            return context.ShooterTeamId >= 0 && target.TeamId == context.ShooterTeamId;
+            return FriendlyFire.IsSelfOrTeammate(context.ShooterActorNumber, target.ActorNumber,
+                                                  context.ShooterTeamId, target.TeamId);
         }
     }
 }

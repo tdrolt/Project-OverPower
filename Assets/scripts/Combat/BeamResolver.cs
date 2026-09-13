@@ -116,21 +116,22 @@ namespace Overpower.Combat
         /// The shooter, a teammate, or a corpse: the beam carries on as if they were not there.
         /// Neither damaged nor a shield, and they do not use up a pierce.
         ///
-        /// The self and teammate rules are the same ones ProjectileMotor.FliesThrough applies to
-        /// bullets, so a laser cannot do what a bullet is forbidden to. Unknown teams fail OPEN,
-        /// matching Teams.AreSameTeam. Corpses are passed because a dead body blocking shots was a
-        /// fixed playtest bug - a dead player is already off the hit layers, but a dead practice
-        /// dummy keeps its collider while it waits to reset.
+        /// The self and teammate check is FriendlyFire.IsSelfOrTeammate, shared with
+        /// ProjectileMotor.FliesThrough and ExplodeOnImpact.IsFriendly, so a laser cannot do what a
+        /// bullet is forbidden to. The corpse check is BeamResolver's own addition on top of that
+        /// shared rule: a dead body blocking shots was a fixed playtest bug, and a dead player is
+        /// already off the hit layers, but a dead practice dummy keeps its collider while it waits
+        /// to reset - a case the projectile sweep does not need to handle the same way, since a
+        /// projectile that stops harmlessly on a freshly-dead dummy for a couple of seconds costs
+        /// nothing, where a beam that cannot pierce past one would.
         /// </summary>
         private static bool PassesThrough(IDamageable target, int shooterActorNumber, int shooterTeamId)
         {
             if (!target.IsAlive)
                 return true;
 
-            if (target.ActorNumber == shooterActorNumber)
-                return true;
-
-            return shooterTeamId >= 0 && target.TeamId == shooterTeamId;
+            return FriendlyFire.IsSelfOrTeammate(shooterActorNumber, target.ActorNumber,
+                                                  shooterTeamId, target.TeamId);
         }
     }
 }

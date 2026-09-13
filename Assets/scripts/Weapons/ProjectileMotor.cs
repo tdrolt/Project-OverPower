@@ -207,17 +207,16 @@ namespace Overpower.Weapons
 
         /// <summary>You cannot shoot yourself and you cannot shoot a teammate; in both cases the
         /// shot carries on rather than stopping, so a teammate crossing your line of fire is not a
-        /// shield. Unknown teams fail OPEN and stay valid targets, matching Teams.AreSameTeam.</summary>
+        /// shield. Delegates to FriendlyFire.IsSelfOrTeammate, shared with ExplodeOnImpact and
+        /// BeamResolver - see that method for the fail-open rule.</summary>
         private bool FliesThrough(Collider collider)
         {
             IDamageable target = collider.GetComponentInParent<IDamageable>();
             if (target == null)
                 return false; // Level geometry. Stops the shot.
 
-            if (target.ActorNumber == context.ShooterActorNumber)
-                return true;
-
-            return context.ShooterTeamId >= 0 && target.TeamId == context.ShooterTeamId;
+            return FriendlyFire.IsSelfOrTeammate(context.ShooterActorNumber, target.ActorNumber,
+                                                  context.ShooterTeamId, target.TeamId);
         }
 
         /// <summary>Deals the damage, then asks the attached behaviours what to do next. Damage is
@@ -264,19 +263,11 @@ namespace Overpower.Weapons
             Destroy(gameObject);
         }
 
-        /// <summary>The designer's layer choices, minus two that are never negotiable. Bullet is
-        /// stripped because bullets colliding with each other was a fixed playtest bug, DeadPlayer
-        /// because a corpse blocking shots was another. Both are correctness invariants rather than
-        /// tuning, so they are enforced here instead of trusting the Inspector dropdown.</summary>
+        /// <summary>The designer's layer choices, minus the two invariants HitMasks enforces for
+        /// every shot - see HitMasks.StripNonNegotiableLayers.</summary>
         private int BuildMask()
         {
-            return hitMask.value & ~LayerBit("Bullet") & ~LayerBit("DeadPlayer");
-        }
-
-        private static int LayerBit(string layerName)
-        {
-            int layer = LayerMask.NameToLayer(layerName);
-            return layer >= 0 ? 1 << layer : 0;
+            return HitMasks.StripNonNegotiableLayers(hitMask);
         }
     }
 }

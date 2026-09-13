@@ -126,21 +126,15 @@ namespace Overpower.Weapons
             return weapon.MaxRange * Mathf.Lerp(1f, weapon.ChargeRangeMultiplier, Mathf.Clamp01(chargeFraction));
         }
 
-        /// <summary>The designer's layers, minus the two ProjectileMotor also strips for
-        /// correctness (bullets and corpses never block a shot), minus walls if this is the
-        /// through-walls leaf.</summary>
+        /// <summary>The designer's layers, minus the two invariants HitMasks enforces for every
+        /// shot - see HitMasks.StripNonNegotiableLayers, shared with ProjectileMotor - minus walls
+        /// if this is the through-walls leaf.</summary>
         private int BuildMask()
         {
-            int mask = hitMask.value & ~LayerBit("Bullet") & ~LayerBit("DeadPlayer");
+            int mask = HitMasks.StripNonNegotiableLayers(hitMask);
 
             IgnoreWalls ignoreWalls = GetComponent<IgnoreWalls>();
             return ignoreWalls != null ? ignoreWalls.RemoveWallsFrom(mask) : mask;
-        }
-
-        private static int LayerBit(string layerName)
-        {
-            int layer = LayerMask.NameToLayer(layerName);
-            return layer >= 0 ? 1 << layer : 0;
         }
 
         /// <summary>A local, throwaway effect on each client - never a networked object, since
