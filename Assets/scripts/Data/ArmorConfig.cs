@@ -62,6 +62,13 @@ namespace Overpower.Data
         [SerializeField] private int[] upgradeCosts = { 1400, 1800, 2200 };
         public int[] UpgradeCosts => upgradeCosts;
 
+        [Header("Respawn")]
+        [Tooltip("On: a respawned player starts with full armor for their levels. Off: they start " +
+                 "empty and earn it back through the out-of-combat timer, the same as anyone who " +
+                 "broke their armor mid-fight.")]
+        [SerializeField] private bool respawnWithFullArmor = true;
+        public bool RespawnWithFullArmor => respawnWithFullArmor;
+
         /// <summary>
         /// How much the given absorb level holds. The index is clamped into range instead of
         /// throwing, because a level number can arrive from the network, and a malformed packet

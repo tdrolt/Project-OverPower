@@ -84,8 +84,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     private void Update()
     {
-        if (!photonView.IsMine)
-            return; // No other client should simulate your health or tick your armor recharge.
+        // No other client should simulate your health or tick your armor recharge. isDead is
+        // checked too: without it, armor kept climbing on a corpse (Update never used to look at
+        // isDead), so how much armor you respawned with silently depended on how long the respawn
+        // timer happened to take. ResetForRespawn resets this clock and decides the respawn armor
+        // outright (ArmorConfig.RespawnWithFullArmor), so there is nothing useful to tick while dead.
+        if (!photonView.IsMine || isDead)
+            return;
 
         secondsSinceCombat += Time.deltaTime;
 
@@ -145,7 +150,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (result.Lethal)
         {
             isDead = true;   // Latched before raising Died so a re-entrant hit cannot double-kill.
-            armor.Clear();   // Per ArmorState's own doc: earned back post-respawn, not kept.
+            armor.Clear();   // A corpse has no armor; ResetForRespawn decides what comes back.
             sourcePlayer?.AddScore(1);
             Died?.Invoke(info);
         }
@@ -177,6 +182,16 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// </summary>
     public void SetArmorLevels(int newAbsorbLevel, int newRechargeLevel)
     {
+        // Clamped against the config's own array lengths, not just >= 0: a stale or malformed
+        // replicated level (this arrives over the network via PlayerLoadout) must never let
+        // absorbLevel/rechargeLevel sit out of range, which would otherwise misreport
+        // ArmorUpgradePath.TotalUpgrades and could block every future upgrade for this player.
+        if (armorConfig != null)
+        {
+            newAbsorbLevel = Mathf.Clamp(newAbsorbLevel, 0, Mathf.Max(0, armorConfig.AbsorbLevelCount - 1));
+            newRechargeLevel = Mathf.Clamp(newRechargeLevel, 0, Mathf.Max(0, armorConfig.RechargeLevelCount - 1));
+        }
+
         absorbLevel = newAbsorbLevel;
         rechargeLevel = newRechargeLevel;
         if (armorConfig != null)
@@ -189,6 +204,16 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         statusEffects?.ClearAll();
         secondsSinceCombat = 0f;
         isDead = false;
+
+        // Controller decision [C]: respawn with full armor by default. RespawnWithFullArmor off
+        // means a respawning player earns their armor back through the out-of-combat timer like
+        // anyone else, the original design before this setting existed. A missing config fails
+        // toward Clear() rather than assuming the field's true default, same as every other
+        // missing-config fallback in this class.
+        if (armorConfig != null && armorConfig.RespawnWithFullArmor)
+            armor.RefillToFull();
+        else
+            armor.Clear();
 
         if (healthBar != null)
             healthBar.value = health;

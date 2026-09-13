@@ -174,6 +174,21 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void SetTierMidRefillFillsToTheNewCapacityRatherThanContinuingTheOldClimb()
+        {
+            // A purchase landing while a gradual refill is already in progress must still be
+            // instant and complete - it does not keep whatever fraction had ticked in so far.
+            var a = NewState();
+            a.Absorb(25f); // fully broken
+            a.Tick(0.1f, secondsSinceCombat: 6f); // mid-refill: Current == 1, well short of 25
+
+            a.SetTier(capacity: 100f, rechargeDelaySeconds: 2f);
+
+            Assert.AreEqual(100f, a.Current, 0.001f);
+            Assert.AreEqual(100f, a.Capacity, 0.001f);
+        }
+
+        [Test]
         public void ClearEmptiesThePoolAndBreaksIt()
         {
             var a = NewState();
@@ -182,6 +197,32 @@ namespace Overpower.Tests
 
             Assert.AreEqual(0f, a.Current, 0.001f);
             Assert.IsTrue(a.IsBroken);
+        }
+
+        [Test]
+        public void RefillToFullFillsToCapacityWithoutChangingTier()
+        {
+            // Backs PlayerHealth.ResetForRespawn's RespawnWithFullArmor path - a respawn decides
+            // how much of the CURRENT tier's armor a player starts with, never a tier change.
+            var a = NewState();
+            a.Absorb(10f); // 15 of 25 left
+
+            a.RefillToFull();
+
+            Assert.AreEqual(25f, a.Current, 0.001f);
+            Assert.AreEqual(25f, a.Capacity, 0.001f);
+        }
+
+        [Test]
+        public void RefillToFullOnAnAlreadyBrokenPoolAlsoFills()
+        {
+            var a = NewState();
+            a.Absorb(25f); // fully broken
+
+            a.RefillToFull();
+
+            Assert.AreEqual(25f, a.Current, 0.001f);
+            Assert.IsFalse(a.IsBroken);
         }
 
         [Test]

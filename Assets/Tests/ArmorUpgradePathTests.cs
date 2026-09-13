@@ -166,6 +166,19 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ConstructorClampsAnOutOfRangeStartingLevelIntoTheConfigsOwnArrayLength()
+        {
+            // A malformed or stale replicated level (this can arrive over the network) must never
+            // leave TotalUpgrades reading higher than the config can support - that would silently
+            // refuse every future upgrade for this player, since TotalUpgrades would already look
+            // like it exceeded MaxArmorUpgrades.
+            var path = new ArmorUpgradePath(config, absorbLevel: 99, rechargeLevel: 99);
+
+            Assert.AreEqual(2, path.AbsorbLevel);   // absorbLevels has 3 entries: indices 0, 1, 2
+            Assert.AreEqual(2, path.RechargeLevel); // rechargeSeconds likewise
+        }
+
+        [Test]
         public void ANullConfigRefusesEveryUpgradeAndReadsAsZero()
         {
             var path = new ArmorUpgradePath(null);

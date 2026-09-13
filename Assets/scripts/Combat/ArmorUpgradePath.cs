@@ -47,13 +47,18 @@ namespace Overpower.Combat
         /// <param name="config">Armor tiers asset. A null config makes every upgrade refused and
         /// every reading 0 - the same fail-safe every other Combat class uses for a missing asset.</param>
         /// <param name="absorbLevel">Starting absorb level - the caller's current one, e.g. read
-        /// from a replicated Custom Property for a late joiner.</param>
+        /// from a replicated Custom Property for a late joiner. Clamped into the config's own
+        /// array length, not just >= 0: a stale or malformed replicated value must never leave
+        /// TotalUpgrades reading higher than the config can support, which would otherwise refuse
+        /// every future upgrade.</param>
         /// <param name="rechargeLevel">Starting recharge level - see absorbLevel.</param>
         public ArmorUpgradePath(ArmorConfig config, int absorbLevel = 0, int rechargeLevel = 0)
         {
             this.config = config;
-            AbsorbLevel = Mathf.Max(0, absorbLevel);
-            RechargeLevel = Mathf.Max(0, rechargeLevel);
+            int maxAbsorbLevel = config != null ? Mathf.Max(0, config.AbsorbLevelCount - 1) : 0;
+            int maxRechargeLevel = config != null ? Mathf.Max(0, config.RechargeLevelCount - 1) : 0;
+            AbsorbLevel = Mathf.Clamp(absorbLevel, 0, maxAbsorbLevel);
+            RechargeLevel = Mathf.Clamp(rechargeLevel, 0, maxRechargeLevel);
         }
 
         /// <summary>Spends one purchase on the absorb path. Refused (returns false, nothing changes)

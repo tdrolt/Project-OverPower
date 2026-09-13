@@ -23,3 +23,4 @@ MonoBehaviour:
   refillSeconds: 2.5
   maxArmorUpgrades: 2
   upgradeCosts: 780500000807000098080000
+  respawnWithFullArmor: 1

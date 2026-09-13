@@ -107,14 +107,29 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Empties the pool. Called on death, so a respawning player does not keep the armor they
-        /// had when they went down - they earn it back through the out-of-combat timer like
-        /// anyone else. Upgrade levels are a separate, longer-lived thing PlayerHealth keeps
-        /// through death; only the current fill of the pool clears here.
+        /// Empties the pool. Called unconditionally the instant a player dies
+        /// (PlayerHealth.ApplyDamage) - a corpse has no armor. What happens NEXT, at respawn, is
+        /// ArmorConfig.RespawnWithFullArmor's call: PlayerHealth.ResetForRespawn calls this again
+        /// (off) so the armor is earned back through the out-of-combat timer like anyone else, or
+        /// calls RefillToFull instead (on, the default) so the player respawns geared. Upgrade
+        /// levels are a separate, longer-lived thing PlayerHealth keeps through death; only the
+        /// current fill of the pool clears here.
         /// </summary>
         public void Clear()
         {
             Current = 0f;
+        }
+
+        /// <summary>
+        /// Fills the pool to its current Capacity without touching tier - the "respawn with full
+        /// armor" path (ArmorConfig.RespawnWithFullArmor), called from PlayerHealth.ResetForRespawn.
+        /// Deliberately separate from SetTier: a respawn does not change which tier a player owns,
+        /// it just decides how much of that tier's capacity they start with, so this never touches
+        /// capacity or rechargeDelaySeconds.
+        /// </summary>
+        public void RefillToFull()
+        {
+            Current = capacity;
         }
 
         /// <summary>
@@ -127,6 +142,14 @@ namespace Overpower.Combat
         /// Do not reach for this as a general setter: a capacity change (buying an armor tier)
         /// must still go through SetTier, which fills to the new capacity rather than clamping an
         /// old value into it.
+        ///
+        /// A transient clamp here is expected, not a bug: continuous position/health/armor sync
+        /// (PlayerNetSync) runs every network tick, while the armor LEVELS that change Capacity
+        /// travel separately, as Custom Properties. If a sync packet lands on a remote client the
+        /// same frame a level bump is still in flight, this clamps the new Current down to the
+        /// remote's still-stale (lower) Capacity for one frame. It self-heals on the very next sync
+        /// tick, because the stream is continuous - nothing needs to remember or replay the
+        /// clamped-off amount.
         /// </summary>
         public void SetFromNetwork(float current)
         {
