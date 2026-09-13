@@ -37,11 +37,19 @@ namespace Overpower.Abilities
                  "larger is cheaper to compute but can skip past a narrow valid gap.")]
         private float searchStep = 0.25f;
 
-        [SerializeField, Tooltip("How far, in metres, above or below the player's OWN current " +
-                 "height the ground is allowed to be for a candidate spot to count as solid ground. " +
-                 "Too small refuses valid spots on a gentle slope or staircase; too large can accept " +
-                 "a spot far below the arena - past a thin floor - as if it were ground.")]
+        [SerializeField, Tooltip("How far, in metres, BELOW the player's OWN current height the " +
+                 "ground is allowed to be for a candidate spot to count as solid ground. Too small " +
+                 "refuses valid spots on a gentle slope or staircase down; too large can accept a " +
+                 "spot far below the arena - past a thin floor - as if it were ground.")]
         private float groundProbeDistance = 2f;
+
+        [SerializeField, Tooltip("How far, in metres, ABOVE the player's OWN current height the " +
+                 "ground is allowed to be - a small step or curb, not a roof. Blink stays at roughly " +
+                 "the caster's own level; it is not a way onto a rooftop. Keep this well under a " +
+                 "typical building's floor-to-ceiling height, or a candidate under a roof will read " +
+                 "the roof's top as ground and land the caster on top of the building instead of the " +
+                 "floor beneath it.")]
+        private float maxStepUp = 0.6f;
 
         [Header("Remote VFX (cosmetic only)")]
         [SerializeField, Tooltip("Radius in metres of the marker briefly shown at the start and end " +
@@ -99,9 +107,22 @@ namespace Overpower.Abilities
             {
                 landingPoint = default;
 
-                // Ground is looked for within groundProbeDistance of the CASTER'S OWN current
-                // height, not the candidate's unknown height - the candidate has no height of its
-                // own yet, that is exactly what this probe is trying to find.
+                // Ground is looked for within [maxStepUp above .. groundProbeDistance below] the
+                // CASTER'S OWN current height, not the candidate's unknown height - the candidate
+                // has no height of its own yet, that is exactly what this probe is trying to find.
+                //
+                // Starting the ray groundProbeDistance (2m) ABOVE the caster, as the first version
+                // of this did, started the ray roughly at ceiling height - a house's roof is Building
+                // layer now like everything else, so a candidate under a roof or overhang had its ray
+                // start ABOVE the roof and hit the ROOF'S TOP first, blinking the caster onto the
+                // building instead of the floor beneath it. Starting only maxStepUp (a curb, not a
+                // ceiling) above the caster's own height means an ordinary roof is simply never in
+                // the ray's reach at all - a downward ray cannot find something the search never
+                // looks above. Blink is meant to stay at roughly the caster's own level; it is not a
+                // way onto a rooftop. IsCapsuleBlocked below is a second, general backstop against
+                // any solid geometry at the resolved spot (roof-related or not), not the primary fix
+                // for this - this rule is about which HEIGHT counts as "ground" in the first place,
+                // which is a physics concept the pure search below deliberately knows nothing about.
                 //
                 // RaycastAll, not Raycast: a candidate close to the caster (the search walks back
                 // toward them) can put this ray's start-to-end span through the caster's OWN
@@ -110,9 +131,9 @@ namespace Overpower.Abilities
                 // head instead of refusing - found by testing a blink with no real ground anywhere
                 // in reach, which should refuse but instead landed a few steps back from the
                 // cursor. Same self-exclusion PlayerDisplacement's own sweep already needs.
-                Vector3 rayOrigin = new Vector3(candidateXZ.x, originHeight + groundProbeDistance, candidateXZ.z);
+                Vector3 rayOrigin = new Vector3(candidateXZ.x, originHeight + maxStepUp, candidateXZ.z);
                 RaycastHit[] groundHits = Physics.RaycastAll(rayOrigin, Vector3.down,
-                    groundProbeDistance * 2f, blockMask, QueryTriggerInteraction.Ignore);
+                    maxStepUp + groundProbeDistance, blockMask, QueryTriggerInteraction.Ignore);
                 System.Array.Sort(groundHits, (a, b) => a.distance.CompareTo(b.distance));
 
                 RaycastHit hit = default;

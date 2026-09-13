@@ -49,5 +49,6 @@ MonoBehaviour:
   range: 9
   searchStep: 0.25
   groundProbeDistance: 2
+  maxStepUp: 0.6
   remoteVfxRadius: 0.4
   remoteVfxSeconds: 0.3
