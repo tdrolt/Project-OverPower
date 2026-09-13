@@ -86,13 +86,25 @@ namespace Overpower.Abilities
         protected virtual void OnPlaced(object[] data, PhotonMessageInfo info) { }
 
         /// <summary>
-        /// Networked spawn for any deployable. prefabName resolves through PUN's default pool
-        /// (Resources.Load), so the prefab must live under a Resources folder - see FireField.Spawn's
-        /// own doc for why that folder is otherwise kept minimal. Returns null (and logs why) rather
-        /// than throwing, the same contract FireField.Spawn already has: a missing room or a bad name
-        /// should refuse the cast quietly, not crash a client mid-match.
+        /// Networked spawn for any deployable placed with no particular facing - a portal, a mine.
+        /// Identical to the rotated overload below except for that; see its own doc for everything
+        /// else (resolution, the null/not-in-room refusals, the late-joiner replay guarantee).
         /// </summary>
         public static GameObject Spawn(string prefabName, Vector3 position, object[] instantiationData)
+            => Spawn(prefabName, position, Quaternion.identity, instantiationData);
+
+        /// <summary>
+        /// Networked spawn for a deployable that needs a facing at the moment it is placed - Cover
+        /// Wall (Task 1.8b), rotated to face the caster's aim. prefabName resolves through PUN's
+        /// default pool (Resources.Load), so the prefab must live under a Resources folder - see
+        /// FireField.Spawn's own doc for why that folder is otherwise kept minimal. Returns null
+        /// (and logs why) rather than throwing, the same contract FireField.Spawn already has: a
+        /// missing room or a bad name should refuse the cast quietly, not crash a client mid-match.
+        /// The rotation travels as part of PUN's own instantiate call, exactly like position does -
+        /// no extra instantiationData needed for it, and a late joiner replaying this from the room
+        /// cache gets the identical facing along with everything else NetworkedDeployable restores.
+        /// </summary>
+        public static GameObject Spawn(string prefabName, Vector3 position, Quaternion rotation, object[] instantiationData)
         {
             if (string.IsNullOrEmpty(prefabName))
             {
@@ -106,7 +118,7 @@ namespace Overpower.Abilities
                 return null;
             }
 
-            return PhotonNetwork.Instantiate(prefabName, position, Quaternion.identity, 0, instantiationData);
+            return PhotonNetwork.Instantiate(prefabName, position, rotation, 0, instantiationData);
         }
 
         private IEnumerator DestroyAfter(float seconds)
