@@ -22,7 +22,7 @@ MonoBehaviour:
   projectilesPerShot: 8
   simultaneous: 1
   sequentialDelay: 0.07
-  spreadDegrees: 11
+  spreadDegrees: 15
   projectilePrefab: {fileID: 1623706127264014633, guid: 9a053dd5e9b0eeb448b577cf0d6c424c, type: 3}
   projectileSpeed: 45
   projectileRadius: 0.07
