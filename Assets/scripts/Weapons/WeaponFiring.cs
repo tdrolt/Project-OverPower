@@ -163,6 +163,14 @@ namespace Overpower.Weapons
             if (overheat != null && !overheat.CanAct)
                 return false;
 
+            // Resolved BEFORE nextFireTime is overwritten below. ChargeFraction() reads nextFireTime
+            // as the deadline the hold had to wait out - the whole point of the c268b40 fix. Once
+            // this shot's own cooldown is written to that same field it points at the NEXT shot's
+            // deadline instead, which is always later than Time.time, which clamped the fraction to
+            // 0 on every single release. That made c268b40 inert: the formula was right, but by the
+            // time it read nextFireTime, this line had already moved the goalposts.
+            float chargeFraction = ChargeFraction();
+
             nextFireTime = Time.time + weapon.FireInterval;
 
             // Heat is charged once per TRIGGER PULL, not once per projectile - see the tooltip on
@@ -186,7 +194,7 @@ namespace Overpower.Weapons
 
             photonView.RPC(nameof(RPC_FireWeapon), RpcTarget.AllViaServer, weapon.Id, origin,
                            direction, targetPoint, coneAngle,
-                           Random.Range(int.MinValue, int.MaxValue), ChargeFraction());
+                           Random.Range(int.MinValue, int.MaxValue), chargeFraction);
             return true;
         }
 
