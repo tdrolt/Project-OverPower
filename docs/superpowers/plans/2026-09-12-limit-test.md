@@ -10,7 +10,7 @@
 >   It is now **Task 1.0 (ability framework)**, scheduled after Task 1.4.
 > - **There is no `Player` layer.** Living players are on `Default`; corpses on `DeadPlayer`.
 > - Five aim-cone `recoveryPerSecond` values were corrected in the tables below (see "A balance invariant").
-> - `10 SMG - Shotgun` `spreadDegrees` is **15**, not 11 — and it is blocked on a muzzle-height problem (HANDOFF §7).
+> - `10 SMG - Shotgun` `spreadDegrees` is **15**, not 11 — but 15 was tuned against a dummy buried 0.5m underground and must be re-swept (HANDOFF §7). The muzzle height is fine.
 > - Charge accumulates only after the fire cooldown ends (commits `c268b40`, `60aae29`).
 > - Line-count targets of ~150 lines have proven unrealistic at this project's comment density; most files run ~2×.
 > - Tasks 0.1–0.15 and 1.1–1.3 are done. The checkboxes below were never ticked; do not read them as status.
