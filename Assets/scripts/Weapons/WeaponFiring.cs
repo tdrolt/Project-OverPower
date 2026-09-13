@@ -192,10 +192,54 @@ namespace Overpower.Weapons
                                               : origin + direction * weapon.MaxRange;
             aim?.RegisterShot();
 
+            int seed = Random.Range(int.MinValue, int.MaxValue);
+            RefundHeatIfBeamConnects(origin, direction, targetPoint, coneAngle, seed, chargeFraction);
+
             photonView.RPC(nameof(RPC_FireWeapon), RpcTarget.AllViaServer, weapon.Id, origin,
-                           direction, targetPoint, coneAngle,
-                           Random.Range(int.MinValue, int.MaxValue), chargeFraction);
+                           direction, targetPoint, coneAngle, seed, chargeFraction);
             return true;
+        }
+
+        /// <summary>
+        /// The laser's overheat rule from the GDD: every shot costs double heat (already added
+        /// above), and half of it comes back if the beam connects with a target.
+        ///
+        /// The SHOOTER decides, from its own ray, the instant it fires. Heat is local state that
+        /// only its owner ever reads, so nothing about the refund crosses the network. The ray is
+        /// the same one every client will cast: BuildShots is fed the same seed and cone that are
+        /// about to go into the RPC, so the aim-cone roll lands on the identical direction.
+        ///
+        /// ACCEPTED TRADEOFF: damage is decided on the victim's client, the refund on the shooter's.
+        /// Under latency the two can disagree - the shooter sees the beam cross a target that, on
+        /// the target's own screen, had already stepped aside - and the shooter gets the refund
+        /// for a hit that dealt no damage. The alternative, waiting for the victim to confirm,
+        /// needs a reply message per hit for a few points of heat. Revisit after a real-latency test.
+        ///
+        /// Projectile weapons are untouched: they land later, on every client, and no projectile
+        /// weapon has a refund today.
+        /// </summary>
+        private void RefundHeatIfBeamConnects(Vector3 origin, Vector3 direction, Vector3 targetPoint,
+                                              float coneAngle, int seed, float chargeFraction)
+        {
+            if (overheat == null || weapon.OverheatRefundOnHit <= 0f || weapon.ProjectilePrefab == null)
+                return;
+
+            Hitscan beam = weapon.ProjectilePrefab.GetComponent<Hitscan>();
+            if (beam == null)
+                return;
+
+            // Outside an RPC body, so LocalPlayer really is the shooter here - these are the same
+            // values RPC_FireWeapon will read from info.Sender on every other machine.
+            int shooterActor = PhotonNetwork.LocalPlayer != null ? PhotonNetwork.LocalPlayer.ActorNumber : -1;
+            Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int shooterTeam);
+
+            ProjectileContext[] shots = BuildShots(weapon, direction, targetPoint, coneAngle, seed,
+                                                    shooterActor, shooterTeam, chargeFraction);
+            for (int i = 0; i < shots.Length; i++)
+            {
+                if (beam.Resolve(origin, shots[i]).Connected)
+                    overheat.Refund(weapon.OverheatRefundOnHit);
+            }
         }
 
         /// <summary>0..1 for a charge weapon, 0 for everything else.
@@ -376,6 +420,16 @@ namespace Overpower.Weapons
             if (weapon.ProjectilePrefab == null)
             {
                 Debug.LogError($"[WeaponFiring] weapon '{weapon.name}' has no Projectile Prefab - nothing was fired.");
+                return;
+            }
+
+            // A beam, not a projectile: resolved instantly on this client and nothing is spawned.
+            // Checked here rather than in the RPC so a beam weapon still honours Simultaneous and
+            // Sequential Delay like any other weapon. See Hitscan.
+            Hitscan beam = weapon.ProjectilePrefab.GetComponent<Hitscan>();
+            if (beam != null)
+            {
+                beam.Fire(origin, shot);
                 return;
             }
 

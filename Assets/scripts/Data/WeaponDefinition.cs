@@ -89,7 +89,9 @@ namespace Overpower.Data
         [Header("Projectile")]
         [Tooltip("The projectile prefab this weapon spawns. The prefab carries the look of the " +
                  "shot and its hit detection; how fast, how fat and how far it flies come from " +
-                 "the three fields below.")]
+                 "the three fields below. A prefab with a Hitscan component makes this a beam " +
+                 "weapon instead: nothing is spawned, the shot lands instantly, and of the three " +
+                 "fields below only Max Range still applies.")]
         [SerializeField] private GameObject projectilePrefab;
         public GameObject ProjectilePrefab => projectilePrefab;
 
@@ -145,8 +147,11 @@ namespace Overpower.Data
         [SerializeField] private float overheatPerShot = 7f;
         public float OverheatPerShot => overheatPerShot;
 
-        [Tooltip("Heat given back for every projectile that actually hits something, so accurate " +
-                 "players get to hold the trigger longer. 0 means no refund at all.")]
+        [Tooltip("Heat given back when a shot connects with a player, so accurate players get to " +
+                 "hold the trigger longer. Only BEAM weapons (a Hitscan component on the Projectile " +
+                 "Prefab) use this today: once per beam that strikes at least one target, however " +
+                 "many it pierces - hitting a wall does not count. Projectile weapons ignore it. " +
+                 "0 means no refund at all.")]
         [SerializeField] private float overheatRefundOnHit = 0f;
         public float OverheatRefundOnHit => overheatRefundOnHit;
 
@@ -172,7 +177,8 @@ namespace Overpower.Data
         public float ChargeDamageMultiplier => chargeDamageMultiplier;
 
         [Tooltip("Range at a full charge, as a multiple of the Max Range field above. 1 means " +
-                 "charging does not change how far the shot travels.")]
+                 "charging does not change how far the shot travels. Only beam weapons (Hitscan) " +
+                 "read this today; projectiles always fly exactly Max Range.")]
         [SerializeField] private float chargeRangeMultiplier = 1f;
         public float ChargeRangeMultiplier => chargeRangeMultiplier;
 
