@@ -81,6 +81,22 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
             lifecycle.AliveChanged += HandleAliveChanged;
     }
 
+    /// <summary>
+    /// Runs whenever this component (or its GameObject) is switched off, disabled being the only
+    /// path a move-in-progress can vanish through without Finish ever being asked to run: the
+    /// loadout swapping the player prefab out, the object pool recycling it, a domain reload mid-
+    /// play. Without this, a move cut off here left activeKind set and, worse,
+    /// PlayerMotor.ExternalMotionControl stuck true forever - the player would never be able to
+    /// walk again even after coming back. Unity calls OnDisable before OnDestroy for an active
+    /// object being destroyed, so this alone already covers that path too; OnDestroy below only
+    /// unsubscribes and has nothing left to finish by the time it runs.
+    /// </summary>
+    private void OnDisable()
+    {
+        if (activeKind != null)
+            Finish(DisplaceOutcome.Cancelled, null, rb != null ? rb.position : transform.position);
+    }
+
     private void OnDestroy()
     {
         if (lifecycle != null)
@@ -95,17 +111,33 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         float step = Mathf.Min(speed * Time.fixedDeltaTime, remainingDistance);
         Vector3 fromPosition = rb.position;
 
-        // Triggers ignored (QueryTriggerInteraction.Ignore) and everything else PlayerDisplacement
-        // does not treat as a wall (wrong layer, a floor, our own body) filtered out in IsBlocker -
-        // SweepTest itself only knows how to ask "does the capsule touch anything at all".
-        if (rb.SweepTest(direction, out RaycastHit hit, step, QueryTriggerInteraction.Ignore) && IsBlocker(hit))
+        // SweepTest (singular) only ever reports the NEAREST thing it touches, with no layer mask
+        // of its own - so a closer collider this displacement does not stop for (Bullet layer, a
+        // trigger-less prop on an excluded layer, a corpse on DeadPlayer) would mask a real wall
+        // sitting just behind it in the same step, and the dash would sail through the wall on the
+        // step after next. SweepTestAll returns every collider the capsule would touch along the
+        // step; sorted nearest-first, the first one IsBlocker accepts is the correct stop point,
+        // whatever order PhysX happened to report them in. Triggers are still excluded by
+        // QueryTriggerInteraction.Ignore; the floor-normal and own-collider rules stay in IsBlocker.
+        RaycastHit[] hits = rb.SweepTestAll(direction, step, QueryTriggerInteraction.Ignore);
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (RaycastHit hit in hits)
         {
+            if (!IsBlocker(hit))
+                continue;
+
             Vector3 blockedPosition = fromPosition + direction * hit.distance;
             rb.MovePosition(blockedPosition);
             Finish(DisplaceOutcome.Blocked, hit.collider, blockedPosition);
             return;
         }
 
+        // MovePosition on this Rigidbody (dynamic, gravity on, not kinematic) is solved by PhysX
+        // alongside whatever contacts it is already resting in - not applied as a bare teleport -
+        // so a run can overshoot its requested distance by a few centimetres (measured: 3.115m for
+        // a requested 3m). Accepted rather than snapped to the exact figure: snapping would fight
+        // the same contact solving that keeps the capsule from sinking into the floor it stands on.
         Vector3 nextPosition = fromPosition + direction * step;
         rb.MovePosition(nextPosition);
         remainingDistance -= step;
