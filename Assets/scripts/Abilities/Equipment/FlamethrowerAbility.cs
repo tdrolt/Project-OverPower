@@ -14,14 +14,20 @@ namespace Overpower.Abilities
     ///
     /// RUNS ON EVERY CLIENT, INCLUDING THE CASTER'S OWN. ExecuteCast starts a Spray Seconds coroutine
     /// on every machine that receives the cast; each FixedUpdate it re-reads the CASTER's CURRENT
-    /// position and facing from Owner (Root.transform / Weapon.MuzzlePosition), never the payload's
-    /// Origin/Direction, which are only a snapshot of the instant the trigger was pulled - a spray is
-    /// meant to track wherever the caster is aiming as it plays out, not freeze at the press. This is
-    /// safe to read from Owner rather than looking the caster up by actor number: this exact module
-    /// instance was Equipped onto the caster's own "Abilities" child transform (AbilityRunner.Equip),
-    /// on every client, so Owner already IS the caster here, on whichever machine this is running.
-    /// Facing comes from the caster's own Transform, which PlayerAim keeps rotated toward its aim and
-    /// PlayerNetSync replicates - see PlayerAim.cs's own class comment.
+    /// position and facing from Owner.Root.transform, never the payload's Origin/Direction, which are
+    /// only a snapshot of the instant the trigger was pulled - a spray is meant to track wherever the
+    /// caster is aiming as it plays out, not freeze at the press. This is safe to read from Owner
+    /// rather than looking the caster up by actor number: this exact module instance was Equipped onto
+    /// the caster's own "Abilities" child transform (AbilityRunner.Equip), on every client, so Owner
+    /// already IS the caster here, on whichever machine this is running. Facing comes from the
+    /// caster's own Transform, which PlayerAim keeps rotated toward its aim and PlayerNetSync
+    /// replicates - see PlayerAim.cs's own class comment.
+    ///
+    /// RANGE/ANGLE USE THE ROOT; OCCLUSION USES THE MUZZLE - the addendum's own wording draws this
+    /// distinction ("around the caster's current position" for the cone, "between the MUZZLE and the
+    /// target" for the wall check), and it is not cosmetic: the muzzle sits ~2m forward of the root, so
+    /// measuring range from it instead let an 8m target (outside a 7m cone) still read as roughly 6m
+    /// away and keep burning - caught by measurement, not by reasoning about the code on paper.
     ///
     /// ONCE PER TARGET PER CAST, VIA A HASHSET (the addendum's own warning). Without it, a FixedUpdate
     /// re-application roughly every 0.02s would re-Refresh the same 5s burn on the same standing
@@ -195,12 +201,18 @@ namespace Overpower.Abilities
 
         private void TickCone(int casterActor, int casterTeam, in StatusEffectSpec burn, HashSet<IDamageable> alreadyHit)
         {
-            Vector3 muzzle = Owner.Weapon != null ? Owner.Weapon.MuzzlePosition : Owner.Root.transform.position;
+            // Range and angle are measured from the caster's own ROOT position, per the addendum's
+            // exact wording ("around the caster's current position and facing") - the occlusion check
+            // below is the one place that specifically says "muzzle" instead. Using the muzzle for
+            // BOTH was tried first and measured wrong: the muzzle sits ~2m forward of the root, so an
+            // 8m dummy (outside the 7m cone) still read as ~6m from the muzzle and kept burning.
+            Vector3 apex = Owner.Root.transform.position;
             Vector3 forward = Owner.Root.transform.forward;
+            Vector3 muzzle = Owner.Weapon != null ? Owner.Weapon.MuzzlePosition : apex;
 
-            PositionVfx(muzzle, forward);
+            PositionVfx(apex, forward);
 
-            int count = Physics.OverlapSphereNonAlloc(muzzle, coneRange, overlapBuffer, detectionMask,
+            int count = Physics.OverlapSphereNonAlloc(apex, coneRange, overlapBuffer, detectionMask,
                                                        QueryTriggerInteraction.Ignore);
 
             seenThisTick.Clear();
@@ -220,7 +232,7 @@ namespace Overpower.Abilities
                 candidateBuffer.Add(new ConeCandidate(candidate, collider.transform.position));
             }
 
-            List<ConeCandidate> eligible = ConeFilter.SelectCandidates(candidateBuffer, muzzle, forward, coneRange,
+            List<ConeCandidate> eligible = ConeFilter.SelectCandidates(candidateBuffer, apex, forward, coneRange,
                                                                         coneAngle, casterActor, casterTeam, alreadyHit);
 
             foreach (ConeCandidate candidate in eligible)
@@ -272,14 +284,14 @@ namespace Overpower.Abilities
             vfx.gameObject.SetActive(true);
         }
 
-        private void PositionVfx(Vector3 muzzle, Vector3 forward)
+        private void PositionVfx(Vector3 apex, Vector3 forward)
         {
             if (vfx == null)
                 return;
 
             // A cylinder's own length runs along its local Y - LookRotation points Z at forward, so
             // the extra 90 degree tilt lays that length axis flat along the spray direction instead.
-            vfx.position = muzzle + forward * (coneRange * 0.5f);
+            vfx.position = apex + forward * (coneRange * 0.5f);
             vfx.rotation = Quaternion.LookRotation(forward) * Quaternion.Euler(90f, 0f, 0f);
 
             float width = Mathf.Tan(coneAngle * 0.5f * Mathf.Deg2Rad) * coneRange * 2f;
