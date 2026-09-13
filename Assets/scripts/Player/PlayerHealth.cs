@@ -22,6 +22,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     [SerializeField] private ArmorConfig armorConfig;
     [SerializeField] private Slider healthBar;
 
+    [SerializeField, Tooltip("The thin strip on the overhead HealthBarCanvas that shows this " +
+             "player's armor - everyone sees it, the same way everyone already sees the health " +
+             "bar below it. Its own WIDTH-via-maxValue tracks armor capacity (25/50/100 by " +
+             "upgrade level) so a bought upgrade reads as a visibly bigger strip, not just a " +
+             "fuller small one - see UpdateArmorBar.")]
+    private Slider armorBar;
+
     private PhotonView photonView;
 
     private float health;
@@ -80,6 +87,21 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         if (healthBar != null)
             healthBar.value = health;
+        UpdateArmorBar();
+    }
+
+    /// <summary>Keeps the overhead armor strip in step with both numbers armor has: how full the
+    /// pool is (value) and how big the pool is (maxValue) - the second one is what makes an armor
+    /// upgrade visibly widen the strip instead of just letting it fill fuller. Called from every
+    /// place armor.Current or the pool's capacity can change, the same pattern healthBar.value
+    /// already follows for health.</summary>
+    private void UpdateArmorBar()
+    {
+        if (armorBar == null)
+            return;
+
+        armorBar.maxValue = armor.Capacity;
+        armorBar.value = armor.Current;
     }
 
     private void Update()
@@ -96,6 +118,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         // Burn is ticked by PlayerStatusEffects now, which routes it back through ApplyDamage below.
         armor.Tick(Time.deltaTime, secondsSinceCombat);
+        UpdateArmorBar(); // So the overhead strip visibly refills as the pool recharges, not just on the next hit.
     }
 
     /// The one funnel every damage source goes through - see the class comment.
@@ -144,6 +167,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         if (healthBar != null)
             healthBar.value = health;
+        UpdateArmorBar();
 
         Damaged?.Invoke(result, info);
 
@@ -196,6 +220,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         rechargeLevel = newRechargeLevel;
         if (armorConfig != null)
             armor.SetTier(armorConfig.AbsorbFor(absorbLevel), armorConfig.RechargeSecondsFor(rechargeLevel));
+        UpdateArmorBar(); // Capacity just changed - the strip must widen (or shrink) immediately, not wait for the next hit.
     }
 
     public void ResetForRespawn()
@@ -217,6 +242,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         if (healthBar != null)
             healthBar.value = health;
+        UpdateArmorBar();
     }
 
     /// Call when this player deals damage, so dealing it keeps you "in combat" the same way
@@ -235,5 +261,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         if (healthBar != null)
             healthBar.value = health;
+        UpdateArmorBar();
     }
 }

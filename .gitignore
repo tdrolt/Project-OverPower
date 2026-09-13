@@ -115,3 +115,8 @@ InitTestScene*.unity*
 *.zip.meta
 *.7z
 *.rar
+
+# Verification screenshots written by unity command capture_game_view during agent playtests -
+# throwaway evidence for a chat report, not a game asset. Never committed.
+/[Aa]ssets/[Ss]creenshots/
+/[Aa]ssets/[Ss]creenshots.meta
