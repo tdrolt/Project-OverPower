@@ -47,6 +47,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public bool IsAlive => !isDead;
     public int TeamId => Teams.TryGetTeam(photonView.Owner, out int teamId) ? teamId : -1;
     public int ActorNumber => photonView.OwnerActorNr;
+
+    /// <summary>True only on the machine this player belongs to - the same guard ApplyDamage
+    /// already enforces, exposed so a mine (Task 1.8) can ask before it decides to trigger.</summary>
+    public bool HasLocalAuthority => photonView.IsMine;
     public event System.Action<DamageResult, DamageInfo> Damaged;
     public event System.Action<DamageInfo> Died;
 

@@ -71,6 +71,10 @@ namespace Overpower.TestRange
         /// Photon actor number, which start at 1.</summary>
         public int ActorNumber => -1;
 
+        /// <summary>A dummy has no owning client to defer to - it exists to be shot at from
+        /// whichever single Editor session is running it - so it is always its own authority.</summary>
+        public bool HasLocalAuthority => true;
+
         public float Health => health;
         public float Armor => armor.Current;
 

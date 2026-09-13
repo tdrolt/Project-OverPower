@@ -68,5 +68,14 @@ namespace Overpower.Combat
         bool IsAlive { get; }
         int TeamId { get; }
         int ActorNumber { get; }
+
+        /// <summary>
+        /// True only on the machine that owns this target - the same machine ApplyDamage already
+        /// requires IsMine on for a real player. A mine (Task 1.8) reads this so only the victim's
+        /// own client decides to trigger it, the same "only the owner acts, every client calls"
+        /// rule the rest of this interface already follows; a test dummy has no owner to defer to,
+        /// so it is always locally authoritative over itself.
+        /// </summary>
+        bool HasLocalAuthority { get; }
     }
 }

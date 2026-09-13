@@ -29,6 +29,7 @@ namespace Overpower.Tests
             public bool IsAlive { get; }
             public int TeamId { get; }
             public int ActorNumber { get; }
+            public bool HasLocalAuthority => true;
         }
 
         private static FakeTarget Enemy(int actor) => new FakeTarget(actor, EnemyTeam);
