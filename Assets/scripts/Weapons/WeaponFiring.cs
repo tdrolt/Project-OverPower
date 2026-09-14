@@ -347,6 +347,13 @@ namespace Overpower.Weapons
             return Mathf.Clamp01((Time.time - chargeStart) / weapon.MaxChargeSeconds);
         }
 
+        /// <summary>Read-only mirror of ChargeFraction() for anything that only needs to DRAW the
+        /// current charge - today AimConeView, for the range arc on a charging beam weapon - without
+        /// duplicating or changing that method's own logic (its trap is documented on its own
+        /// comment above: charge must be read before nextFireTime is overwritten, which this getter
+        /// does not touch either way).</summary>
+        public float CurrentChargeFraction => ChargeFraction();
+
         /// <summary>
         /// Builds this shot on EVERY client, including the shooter's own. Every value it needs
         /// arrives as a parameter or from info.Sender; nothing in this body reads local state that
