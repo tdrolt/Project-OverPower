@@ -125,7 +125,7 @@ namespace Overpower.TestRange
 
         private void OnDisable()
         {
-            suppressedRouter?.SetToolFocus(false);
+            suppressedRouter?.SetToolFocus(this, false);
             suppressedRouter = null;
         }
 
@@ -152,7 +152,10 @@ namespace Overpower.TestRange
         }
 
         /// <summary>Keeps exactly one router suppressed - the local player's, re-resolved every
-        /// frame the panel is open so a mid-session player change is never left stuck either way.</summary>
+        /// frame the panel is open so a mid-session player change is never left stuck either way.
+        /// Focus is keyed by "this" (PlayerInputRouter.SetToolFocus's owner parameter) so closing
+        /// this panel can never release a claim the loadout screen is still holding, and vice
+        /// versa - see that method's own comment.</summary>
         private void UpdateInputSuppression(bool wantSuppressed)
         {
             PlayerInputRouter router = wantSuppressed
@@ -161,11 +164,11 @@ namespace Overpower.TestRange
 
             if (router != suppressedRouter)
             {
-                suppressedRouter?.SetToolFocus(false);
+                suppressedRouter?.SetToolFocus(this, false);
                 suppressedRouter = router;
             }
 
-            suppressedRouter?.SetToolFocus(true);
+            suppressedRouter?.SetToolFocus(this, true);
         }
 
         private GameObject ResolveLocalPlayer()

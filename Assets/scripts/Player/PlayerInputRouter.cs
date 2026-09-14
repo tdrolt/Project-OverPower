@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -31,8 +32,13 @@ public class PlayerInputRouter : MonoBehaviour
     // per AliveChanged event instead.
     private bool isAlive = true;
 
-    // Set by whichever tool currently wants gameplay input suppressed - see SetToolFocus below.
-    private bool toolHasFocus;
+    // Every tool that currently wants gameplay input suppressed, keyed by the caller itself - see
+    // SetToolFocus below. A HashSet rather than a single bool because Task 9 added a second tool
+    // (the loadout screen) alongside the first (the F1 test range panel): with one shared bool,
+    // opening the loadout screen while F1 was already open and then closing the loadout again
+    // would call SetToolFocus(false) and unlock input right out from under the still-open F1
+    // panel. Keying by owner means each tool can only ever release its OWN claim.
+    private readonly HashSet<object> toolFocusOwners = new HashSet<object>();
 
     /// <summary>Raw WASD, not camera-relative - PlayerMotor does that conversion, since it depends
     /// on the camera rig and not on input.</summary>
@@ -53,30 +59,51 @@ public class PlayerInputRouter : MonoBehaviour
     public event System.Action MobilityPressed;
     public event System.Action MobilityReleased;
 
-    // Nothing subscribes to these three yet, and that is correct - the map, shop and scoreboard
-    // UIs do not exist. They are wired here so those later tasks have a gated input source to
-    // subscribe to on day one instead of adding their own Input.GetKeyDown.
+    // Map and Scoreboard still have nothing subscribed - those UIs do not exist yet, and are wired
+    // here so they have a gated input source to subscribe to on day one instead of adding their
+    // own Input.GetKeyDown. Shop now has a subscriber (Task 9's LoadoutScreen), and is raised
+    // through EmitShop below rather than the general Emit every other event uses - see its comment.
     public event System.Action MapToggled;
     public event System.Action ShopToggled;
     public event System.Action ScoreboardPressed;
     public event System.Action ScoreboardReleased;
 
     /// <summary>True while dead, while the player is typing into a text field (e.g. chat), or while
-    /// a tool has claimed focus (see SetToolFocus). Every property and event above is gated on this
-    /// being false.
+    /// any tool has claimed focus (see SetToolFocus). Every property and event above except
+    /// ShopToggled is gated on this being false - ShopToggled has its own, narrower gate
+    /// (ShopSuppressed) so the P key can still close the loadout screen while that screen's own
+    /// focus claim would otherwise block it.
     ///
     /// Deliberately NOT gated on PlayerOverheat.CanAct - full overheat silencing the weapon and
     /// abilities is an ability-level rule the ability system enforces itself, not an input-level
     /// one, and the design wants an overheated player to still be able to walk away.</summary>
-    public bool InputSuppressed => !isAlive || IsTypingInChat() || toolHasFocus;
+    public bool InputSuppressed => !isAlive || IsTypingInChat() || toolFocusOwners.Count > 0;
+
+    /// <summary>Dead or typing in chat block Shop too, but a tool holding general focus must not -
+    /// P is how the loadout screen (itself a tool focus owner) closes again, and F1 being open must
+    /// not swallow a P press either (Verification 1: F1 open AND loadout open, closing the loadout
+    /// must leave InputSuppressed true, which only works if opening/closing the loadout while F1
+    /// holds focus works at all).</summary>
+    private bool ShopSuppressed => !isAlive || IsTypingInChat();
 
     /// <summary>
-    /// General-purpose input lock for anything that is a tool rather than gameplay - right now
-    /// only the test range panel, which must stop a dropdown click from also firing the weapon
-    /// underneath it. Deliberately a flag the caller sets rather than this router special-casing
-    /// the test range by name, so a future tool (a map, a shop) can reuse it with no change here.
+    /// General-purpose input lock for anything that is a tool rather than gameplay - the F1 test
+    /// range panel and the loadout screen today, either of which must stop a click on itself from
+    /// also firing the weapon underneath it. owner is whichever MonoBehaviour is claiming or
+    /// releasing focus (typically "this" from the caller) - see toolFocusOwners' comment for why a
+    /// single shared bool was not enough once a second tool existed. Safe to call with hasFocus:
+    /// false for an owner that never claimed focus; safe to call twice with the same value.
     /// </summary>
-    public void SetToolFocus(bool hasFocus) => toolHasFocus = hasFocus;
+    public void SetToolFocus(object owner, bool hasFocus)
+    {
+        if (owner == null)
+            return;
+
+        if (hasFocus)
+            toolFocusOwners.Add(owner);
+        else
+            toolFocusOwners.Remove(owner);
+    }
 
     private void Awake()
     {
@@ -121,7 +148,7 @@ public class PlayerInputRouter : MonoBehaviour
         primaryAction.started += _ => Emit(PrimaryPressed); primaryAction.canceled += _ => Emit(PrimaryReleased);
         equipmentAction.started += _ => Emit(EquipmentPressed); ultimateAction.started += _ => Emit(UltimatePressed);
         mobilityAction.started += _ => Emit(MobilityPressed); mobilityAction.canceled += _ => Emit(MobilityReleased);
-        mapAction.started += _ => Emit(MapToggled); shopAction.started += _ => Emit(ShopToggled);
+        mapAction.started += _ => Emit(MapToggled); shopAction.started += _ => EmitShop();
         scoreboardAction.started += _ => Emit(ScoreboardPressed); scoreboardAction.canceled += _ => Emit(ScoreboardReleased);
     }
 
@@ -160,6 +187,14 @@ public class PlayerInputRouter : MonoBehaviour
     {
         if (!InputSuppressed)
             evt?.Invoke();
+    }
+
+    /// <summary>ShopToggled's own emit path - see ShopSuppressed's comment for why this cannot
+    /// reuse Emit/InputSuppressed above.</summary>
+    private void EmitShop()
+    {
+        if (!ShopSuppressed)
+            ShopToggled?.Invoke();
     }
 
     /// <summary>Suppresses input the instant a text field takes focus - e.g. the chat box under
