@@ -30,7 +30,8 @@ namespace Overpower.UI
         [Header("Panels")]
         [Tooltip("Background behind HUD groups and the loadout screen.")] public Color panelColor = new Color(0.06f, 0.06f, 0.08f, 0.85f);
         [Tooltip("Border / highlight for the equipped or selected item.")] public Color highlightColor = new Color(1f, 0.78f, 0.25f, 1f);
-        [Tooltip("Colour of items you cannot pick yet.")] public Color lockedColor = new Color(1f, 1f, 1f, 0.25f);
+        [Tooltip("Colour of items you cannot pick yet - a dark, mostly-opaque fill with muted text on top (Muted Text Colour), not a near-transparent wash: at low alpha over a translucent panel this read as barely-there rather than clearly locked (Task 9a review, 616x576 capture).")]
+        public Color lockedColor = new Color(0.09f, 0.09f, 0.10f, 0.92f);
         [Tooltip("Space between a panel's background edge and the bars/slots inside it, in canvas units, on every side.")]
         public float hudPanelPadding = 16f;
         [Tooltip("Distance from the bottom of the screen to the bottom of the HUD panel, in canvas units. Kept " +
@@ -111,24 +112,30 @@ namespace Overpower.UI
         [Header("Loadout screen")]
         [Tooltip("Colour of the full-screen wash behind the loadout panel - dims the game world so the panel reads as a modal screen.")]
         public Color loadoutDimColor = new Color(0f, 0f, 0f, 0.75f);
+        [Tooltip("Background behind the loadout panel itself - its OWN colour, separate from Panel Colour (the HUD's), because a HUD panel sits over solid HUD chrome while this one sits over the game world: at Panel Colour's own opacity the world, and a player's overhead health/shield bar, showed straight through the middle of it (Task 9a review, 616x576 capture). Kept nearly opaque (~0.96) so nothing behind the modal panel is visible through it.")]
+        public Color loadoutPanelColor = new Color(0.05f, 0.05f, 0.07f, 0.96f);
         [Tooltip("Space between the loadout panel's background edge and its title/columns, in canvas units, on every side.")]
         public float loadoutPanelPadding = 20f;
+        [Tooltip("Extra vertical gap inserted above the 'Armor' heading, on top of the normal item spacing between it and the Reset Weapon button above it - at the normal spacing alone the heading read as crowding the button above it (Task 9a review, 616x576 capture).")]
+        public float loadoutSectionGap = 16f;
         [Tooltip("Gap from the top of the screen to the top of the loadout panel, in canvas units. The panel is anchored to the TOP of the screen rather than dead-centre so a tall tree/armor column never grows down into the HUD, which sits at the bottom.")]
         public float loadoutPanelTopMargin = 40f;
         [Tooltip("Width of the weapon-tree/armor column on the left, in canvas units - fixed so the ability column on the right (Task 9b) lines up beside it instead of both fighting over leftover space.")]
         public float loadoutLeftColumnWidth = 640f;
         [Tooltip("Width of the ability-picks column on the right, in canvas units - empty until Task 9b fills it in; reserved now so the panel does not visibly resize when that task adds content.")]
         public float loadoutRightColumnWidth = 640f;
-        [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units.")]
+        [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units - also the width of one ability card in the right-hand column's grids, so both columns read as the same kind of pickable button.")]
         public float loadoutNodeWidth = 130f;
-        [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units.")]
+        [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units - also the height of one ability card in the right-hand column's grids.")]
         public float loadoutNodeHeight = 64f;
-        [Tooltip("Gap between sibling weapon nodes - side to side in the branches row, and top to bottom in a branch's own stack of children - in canvas units.")]
+        [Tooltip("Gap between sibling weapon nodes - side to side in the branches row, and top to bottom in a branch's own stack of children - in canvas units. Also the gap between ability cards in the right-hand column's grids, both directions.")]
         public float loadoutNodeSpacing = 14f;
-        [Tooltip("Thickness of the highlight border drawn around the equipped weapon node, in canvas units.")]
+        [Tooltip("Thickness of the highlight border drawn around the equipped weapon node or ability card, in canvas units.")]
         public float loadoutEquippedBorderWidth = 4f;
-        [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units.")]
-        public float loadoutStepperButtonSize = 44f;
+        [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units. Raised from an original 44 (Task 9a review, 616x576 capture): a bigger button gives the bigger glyph below more room to stay legible.")]
+        public float loadoutStepperButtonSize = 56f;
+        [Tooltip("Font size for the glyph inside a stepper button (the close X, the armor + buttons), in canvas units - bigger than Body Text Size on purpose: at Body Text Size a '+' drawn this small read as a flat dash rather than a clear plus (Task 9a review, 616x576 capture).")]
+        public float loadoutStepperFontSize = 32f;
         [Tooltip("Width of a labelled loadout button - Reset Weapon, Reset Armor - in canvas units.")]
         public float loadoutSmallButtonWidth = 170f;
         [Tooltip("Height of a labelled loadout button - Reset Weapon, Reset Armor - in canvas units.")]

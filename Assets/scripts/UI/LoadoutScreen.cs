@@ -586,6 +586,16 @@ namespace Overpower.UI
 
         private void BuildArmorSection(Transform leftColumn)
         {
+            // Extra breathing room above "Armor" (Task 9a review, 616x576 capture): the ordinary
+            // item spacing between this and the Reset Weapon button above it read as the heading
+            // crowding the button. An invisible spacer rather than padding on the header itself, so
+            // only the gap ABOVE the heading grows, not the gap below it too.
+            GameObject armorGap = new GameObject("Armor Section Gap", typeof(RectTransform));
+            armorGap.transform.SetParent(leftColumn, false);
+            LayoutElement armorGapLe = armorGap.AddComponent<LayoutElement>();
+            armorGapLe.preferredHeight = theme.loadoutSectionGap;
+            armorGapLe.minHeight = theme.loadoutSectionGap;
+
             AddSectionHeader(leftColumn, "Armor");
 
             absorbText = BuildArmorRow(leftColumn, out absorbButton, OnAbsorbClicked);
@@ -609,7 +619,7 @@ namespace Overpower.UI
             LayoutElement labelLe = label.gameObject.AddComponent<LayoutElement>();
             labelLe.flexibleWidth = 1f; // Takes whatever width the fixed-size + button below does not.
 
-            plusButton = AddButton(row.transform, "+", onClick, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize);
+            plusButton = AddButton(row.transform, "+", onClick, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
 
             return label;
         }
@@ -914,7 +924,8 @@ namespace Overpower.UI
             panelRt.pivot = new Vector2(0.5f, 1f);
             panelRt.anchoredPosition = new Vector2(0f, -theme.loadoutPanelTopMargin);
             Image panelBackground = panel.AddComponent<Image>();
-            panelBackground.color = theme.panelColor;
+            // Its OWN colour, not the HUD's theme.panelColor - see Loadout Panel Colour's tooltip.
+            panelBackground.color = theme.loadoutPanelColor;
             panelBackground.raycastTarget = true;
 
             VerticalLayoutGroup panelLayout = panel.AddComponent<VerticalLayoutGroup>();
@@ -1012,7 +1023,7 @@ namespace Overpower.UI
             LayoutElement titleLe = title.gameObject.AddComponent<LayoutElement>();
             titleLe.flexibleWidth = 1f; // Pushes the close button to the row's right edge.
 
-            AddButton(row.transform, "X", Toggle, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize);
+            AddButton(row.transform, "X", Toggle, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
         }
 
         /// <summary>The always-visible "Loadout (P)" button, bottom-right - clear of the HUD panel
@@ -1062,8 +1073,10 @@ namespace Overpower.UI
 
         /// <summary>width/height of 0 (the default) leaves that axis to the layout group instead of
         /// pinning it - used for the title and section headers, which should stretch to their row's
-        /// own width rather than carry a fixed one.</summary>
-        private Button AddButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick, float width = 0f, float height = 0f)
+        /// own width rather than carry a fixed one. fontSize of 0 (the default) uses Body Text Size;
+        /// the close X and the armor steppers pass Loadout Stepper Font Size instead, a bigger glyph
+        /// sized to Loadout Stepper Button Size - see that field's own tooltip for why.</summary>
+        private Button AddButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick, float width = 0f, float height = 0f, float fontSize = 0f)
         {
             GameObject go = TMP_DefaultControls.CreateButton(new TMP_DefaultControls.Resources());
             go.transform.SetParent(parent, false);
@@ -1073,7 +1086,7 @@ namespace Overpower.UI
             text.text = label;
             if (theme.font != null)
                 text.font = theme.font;
-            text.fontSize = theme.bodyTextSize;
+            text.fontSize = fontSize > 0f ? fontSize : theme.bodyTextSize;
             text.color = theme.textColor;
             ApplyOutline(text);
 
