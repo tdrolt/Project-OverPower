@@ -40,89 +40,8 @@ namespace Overpower.UI
                  "its own reference only because it draws on its own schedule (LateUpdate).")]
         private GameplayConfig gameplayConfig;
 
-        [Header("Health and armor bars [C]")]
-        [SerializeField, Tooltip("Fill colour of the health bar.")]
-        private Color healthColor = new Color(0.336f, 0.914f, 0.263f);
-
-        [SerializeField, Tooltip("Fill colour of the armor bar's current charge. The armor bar's own " +
-                 "WIDTH (not just its fill) grows with armor capacity, up to the full bar width at " +
-                 "100 capacity - the same scale as max health - so an armor upgrade reads as a " +
-                 "visibly bigger segment, not just a fuller small one.")]
-        private Color armorColor = new Color(0.45f, 0.75f, 0.95f);
-
-        [SerializeField, Tooltip("Shared dark backing colour behind every bar's fill.")]
-        private Color barBackgroundColor = new Color(0f, 0f, 0f, 0.55f);
-
-        [Header("Overheat bar [C]")]
-        [SerializeField, Tooltip("Opaque track colour behind the overheat bar's fill - deliberately " +
-                 "its OWN colour rather than the shared translucent Bar Background Colour, and " +
-                 "deliberately lighter than every fill state (normal/warning/silenced), so the " +
-                 "empty part of the bar reads as a bright, solid trough instead of blending into " +
-                 "whatever is behind the HUD.")]
-        private Color overheatTrackColor = new Color(0.78f, 0.78f, 0.80f, 1f);
-
-        [SerializeField, Tooltip("Height of the overheat bar, in canvas units - taller than health/" +
-                 "armor on purpose: it is the one bar a player must read at a glance mid-fight."), Range(8f, 32f)]
-        private float overheatBarHeight = 18f;
-
-        [SerializeField, Tooltip("Colour of the thin vertical tick marking exactly where the warning " +
-                 "threshold sits on the track. Dark so it stays visible against the light track " +
-                 "colour above and every fill colour it might be drawn over.")]
-        private Color overheatTickColor = new Color(0.12f, 0.12f, 0.14f, 0.9f);
-
-        [SerializeField, Tooltip("Width of the warning-threshold tick mark, in canvas units."), Range(1f, 6f)]
-        private float overheatTickWidth = 2f;
-
-        [SerializeField, Tooltip("Bar colour below the warning threshold.")]
-        private Color overheatNormalColor = new Color(0.60f, 0.60f, 0.66f);
-
-        [SerializeField, Tooltip("Bar colour from the warning threshold up to the silence, pulsing - " +
-                 "Tudor's condition for accepting full-silence overheat was that this warning exists, " +
-                 "so it has to read as \"your mistake\", not a wall.")]
-        private Color overheatWarningColor = new Color(1f, 0.65f, 0.05f);
-
-        [SerializeField, Tooltip("Bar colour while the weapon and every ability are silenced.")]
-        private Color overheatSilencedColor = new Color(0.85f, 0.16f, 0.16f);
-
-        [SerializeField, Tooltip("How many times per second the warning colour pulses."), Range(0.5f, 8f)]
-        private float warningPulseSpeed = 2.5f;
-
-        [SerializeField, Tooltip("How far the pulse dims the warning colour at its darkest point - " +
-                 "0.35 means it dips to 65% brightness and back."), Range(0f, 0.9f)]
-        private float warningPulseDepth = 0.35f;
-
-        [Header("Ability and weapon slots [C]")]
-        [SerializeField, Tooltip("Slot background when the slot can be used right now.")]
-        private Color slotReadyColor = new Color(0f, 0f, 0f, 0.6f);
-
-        [SerializeField, Tooltip("Slot background when BlockFor reports anything other than None - " +
-                 "dead, stunned, silenced, recharging, or an empty/not-ready slot.")]
-        private Color slotBlockedColor = new Color(0.30f, 0.30f, 0.30f, 0.85f);
-
-        [SerializeField, Tooltip("Slot background while the ability's IsActive is true - a channel, " +
-                 "a dash mid-flight, sprint held.")]
-        private Color slotActiveGlowColor = new Color(1f, 0.85f, 0.25f, 1f);
-
-        [SerializeField, Tooltip("Charge pip colour when that charge is available.")]
-        private Color pipAvailableColor = Color.white;
-
-        [SerializeField, Tooltip("Charge pip colour when that charge is spent.")]
-        private Color pipSpentColor = new Color(1f, 1f, 1f, 0.15f);
-
-        [SerializeField, Tooltip("Colour of the dark cover that wipes off an ability icon as it " +
-                 "recharges - fully covered the instant a charge is spent, gone the instant it returns.")]
-        private Color cooldownCoverColor = new Color(0f, 0f, 0f, 0.65f);
-
-        [Header("Ultimate charge meter [C] (Task 1.11 hook, now filled in)")]
-        [SerializeField, Tooltip("Fill colour of the Ultimate slot's own charge meter - a translucent " +
-                 "wash drawn over the icon, from empty to full, independent of the slot's ordinary " +
-                 "recharge cover (which reflects the trivial always-instant base-class pool, not the " +
-                 "real gate). Bound to UltimateCharge.Normalised.")]
-        private Color ultimateChargeColor = new Color(1f, 0.85f, 0.25f, 0.45f);
-
-        [SerializeField, Tooltip("Colour of the READY text shown over the Ultimate slot once " +
-                 "UltimateCharge.IsFull is true - the moment Space actually casts something.")]
-        private Color ultimateReadyTextColor = new Color(1f, 0.95f, 0.6f);
+        [SerializeField, Tooltip("Colours, text sizes and the bar sprite for this HUD.")]
+        private UiTheme theme;
 
         // The one width every bar shares, so the health, overheat and armor track all line up.
         private const float BarWidth = 560f;
@@ -203,6 +122,23 @@ namespace Overpower.UI
             // Every remote copy of this component stays permanently dormant - see the class comment.
             if (!photonView.IsMine)
             {
+                enabled = false;
+                return;
+            }
+
+            // A missing theme (or a theme with no bar sprite) must not NRE its way through BuildUi -
+            // bail out the same clean way the remote-copy check above does. A theme with no sprite is
+            // exactly the Task 3 bug (every Filled Image draws full width regardless of fillAmount),
+            // so refusing to build with one is the point, not just a safety net.
+            if (theme == null)
+            {
+                Debug.LogError($"[PlayerHud] {name}: UiTheme is not assigned - the HUD cannot be built.");
+                enabled = false;
+                return;
+            }
+            if (theme.barSprite == null)
+            {
+                Debug.LogError($"[PlayerHud] {name}: UiTheme has no Bar Sprite - every filled bar would draw full width regardless of fillAmount, so the HUD is not built.");
                 enabled = false;
                 return;
             }
@@ -329,12 +265,12 @@ namespace Overpower.UI
                 lastOverheatFraction = fraction;
             }
 
-            Color target = silenced ? overheatSilencedColor : warning ? overheatWarningColor : overheatNormalColor;
-            if (warning)
+            Color target = silenced ? theme.overheatSilencedColor : warning ? theme.overheatWarningColor : theme.overheatColor;
+            if (warning && theme.pulseAtWarning)
             {
                 // A genuine pulse (dimming the same colour), not a colour swap - reads as "this is
                 // still your weapon warning you", not a second state.
-                float pulse = 1f - warningPulseDepth * (0.5f + 0.5f * Mathf.Sin(Time.time * warningPulseSpeed * Mathf.PI * 2f));
+                float pulse = 1f - theme.pulseDepth * (0.5f + 0.5f * Mathf.Sin(Time.time * theme.pulseSpeed * Mathf.PI * 2f));
                 float alpha = target.a;
                 target *= pulse;
                 target.a = alpha;
@@ -373,7 +309,7 @@ namespace Overpower.UI
             bool blocked = CastGate.ForActor(alive, stunned, silenced) != CastBlock.None;
             if (blocked != lastWeaponBlocked)
             {
-                weaponSlotUi.background.color = blocked ? slotBlockedColor : slotReadyColor;
+                weaponSlotUi.background.color = blocked ? theme.slotBlockedColor : theme.slotReadyColor;
                 lastWeaponBlocked = blocked;
             }
         }
@@ -446,9 +382,9 @@ namespace Overpower.UI
 
                 if (active != lastActive[i] || block != lastBlock[i])
                 {
-                    ui.background.color = block != CastBlock.None ? slotBlockedColor
-                                         : active ? slotActiveGlowColor
-                                         : slotReadyColor;
+                    ui.background.color = block != CastBlock.None ? theme.slotBlockedColor
+                                         : active ? theme.slotActiveGlowColor
+                                         : theme.slotReadyColor;
                     ui.blockReasonText.text = block == CastBlock.None ? "" : BlockReasonLabel(block);
                     lastActive[i] = active;
                     lastBlock[i] = block;
@@ -541,7 +477,7 @@ namespace Overpower.UI
             }
 
             for (int i = 0; i < ui.pips.Count; i++)
-                ui.pips[i].color = i < charges ? pipAvailableColor : pipSpentColor;
+                ui.pips[i].color = i < charges ? theme.pipAvailableColor : theme.pipSpentColor;
         }
 
         // ============================================================================================
@@ -562,13 +498,15 @@ namespace Overpower.UI
             canvas.sortingOrder = -10;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            // Match by HEIGHT, not TestRangePanel's default (width): this HUD is anchored to the
-            // bottom edge by a fixed reference-unit offset, and matching by height keeps that offset
-            // a predictable fraction of screen height on any window shape instead of shrinking
-            // toward the bottom on a narrower-than-16:9 window - which is exactly the window this
-            // was measured against (a small, near-square Game view during single-client testing).
-            scaler.matchWidthOrHeight = 1f;
+            scaler.referenceResolution = theme.referenceResolution;
+            // Match value now lives on UiTheme (shared with the loadout screen, Task 9) rather than
+            // being hardcoded per-canvas. This used to be pinned to 1 (match by HEIGHT) because this
+            // HUD is anchored to the bottom edge by a fixed reference-unit offset, and matching by
+            // height keeps that offset a predictable fraction of screen height on a narrower-than-
+            // 16:9 window. UiTheme's default is 0.5 instead - a mix of width and height - per spec,
+            // so the HUD stays readable on ultrawide AND 16:10 too, not just narrower windows; Task 3
+            // confirmed the panel is still fully on screen at 1920x1080 with this value.
+            scaler.matchWidthOrHeight = theme.matchWidthOrHeight;
             // No GraphicRaycaster and no EventSystem: nothing on this HUD is clickable (see the class
             // comment) - adding one would just be a second, unnecessary EventSystem warning waiting
             // to happen.
@@ -595,8 +533,8 @@ namespace Overpower.UI
             panelLayout.childForceExpandHeight = false;
 
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
-            healthFill = BuildBar(panel.transform, "Health Bar", BarWidth, 20f, barBackgroundColor, healthColor, out _);
-            overheatFill = BuildBar(panel.transform, "Overheat Bar", BarWidth, overheatBarHeight, overheatTrackColor, overheatNormalColor, out Image overheatTrack);
+            healthFill = BuildBar(panel.transform, "Health Bar", BarWidth, 20f, theme.barTrackColor, theme.healthColor, out _);
+            overheatFill = BuildBar(panel.transform, "Overheat Bar", BarWidth, theme.overheatBarHeight, theme.barTrackColor, theme.overheatColor, out Image overheatTrack);
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
 
             GameObject slotsRow = new GameObject("Slots Row", typeof(RectTransform));
@@ -657,6 +595,10 @@ namespace Overpower.UI
             fillRt.offsetMax = new Vector2(-2f, -2f);
             Image fillImg = fillGo.AddComponent<Image>();
             fillImg.color = fillColor;
+            // Sprite MUST be set before Type - a Filled Image with no sprite ignores fillAmount and
+            // always draws full width. That was the Task 3 bug: every bar changed colour correctly
+            // but never visibly emptied or filled.
+            fillImg.sprite = theme.barSprite;
             fillImg.type = Image.Type.Filled;
             fillImg.fillMethod = Image.FillMethod.Horizontal;
             fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
@@ -679,10 +621,10 @@ namespace Overpower.UI
             tickRt.anchorMin = new Vector2(0.8f, 0f);
             tickRt.anchorMax = new Vector2(0.8f, 1f);
             tickRt.pivot = new Vector2(0.5f, 0.5f);
-            tickRt.sizeDelta = new Vector2(overheatTickWidth, 0f);
+            tickRt.sizeDelta = new Vector2(theme.overheatTickWidth, 0f);
             tickRt.anchoredPosition = Vector2.zero;
             Image tickImg = tick.AddComponent<Image>();
-            tickImg.color = overheatTickColor;
+            tickImg.color = theme.overheatTickColor;
             tickImg.raycastTarget = false;
             return tickRt;
         }
@@ -702,7 +644,7 @@ namespace Overpower.UI
             // See BuildBar's comment: childControlWidth/Height off means this has to be set directly too.
             track.GetComponent<RectTransform>().sizeDelta = new Vector2(BarWidth, 12f);
             Image background = track.AddComponent<Image>();
-            background.color = barBackgroundColor;
+            background.color = theme.barTrackColor;
             background.raycastTarget = false;
 
             GameObject extentGo = new GameObject("Capacity Extent", typeof(RectTransform));
@@ -722,7 +664,9 @@ namespace Overpower.UI
             fillRt.offsetMin = Vector2.zero;
             fillRt.offsetMax = Vector2.zero;
             Image fillImg = fillGo.AddComponent<Image>();
-            fillImg.color = armorColor;
+            fillImg.color = theme.shieldColor;
+            // See BuildBar's comment: sprite before type, or fillAmount is ignored.
+            fillImg.sprite = theme.barSprite;
             fillImg.type = Image.Type.Filled;
             fillImg.fillMethod = Image.FillMethod.Horizontal;
             fillImg.fillOrigin = (int)Image.OriginHorizontal.Left;
@@ -756,7 +700,7 @@ namespace Overpower.UI
             // A translucent wash across the whole row, behind the icon/label below, so "you cannot
             // use any of this right now" reads even before the eye finds the label.
             Image wash = row.AddComponent<Image>();
-            wash.color = new Color(overheatSilencedColor.r, overheatSilencedColor.g, overheatSilencedColor.b, 0.35f);
+            wash.color = new Color(theme.overheatSilencedColor.r, theme.overheatSilencedColor.g, theme.overheatSilencedColor.b, 0.35f);
             wash.raycastTarget = false;
 
             GameObject content = new GameObject("Content", typeof(RectTransform));
@@ -788,7 +732,7 @@ namespace Overpower.UI
             strikeRt.sizeDelta = new Vector2(30f, 3f);
             strikeRt.localRotation = Quaternion.Euler(0f, 0f, -45f);
             Image strikeImg = strike.AddComponent<Image>();
-            strikeImg.color = overheatSilencedColor;
+            strikeImg.color = theme.overheatSilencedColor;
             strikeImg.raycastTarget = false;
 
             TextMeshProUGUI text = AddLabel(content.transform, "WEAPON SILENCED", 14f, FontStyles.Bold);
@@ -796,7 +740,7 @@ namespace Overpower.UI
             textLe.preferredWidth = 220f;
             textLe.preferredHeight = 20f;
             text.rectTransform.sizeDelta = new Vector2(220f, 20f); // See BuildBar's comment.
-            text.color = overheatSilencedColor;
+            text.color = theme.overheatSilencedColor;
             text.alignment = TextAlignmentOptions.MidlineLeft;
 
             row.SetActive(false);
@@ -823,7 +767,7 @@ namespace Overpower.UI
             go.GetComponent<RectTransform>().sizeDelta = new Vector2(64f, withCooldown ? 92f : 64f);
 
             ui.background = go.AddComponent<Image>();
-            ui.background.color = slotReadyColor;
+            ui.background.color = theme.slotReadyColor;
 
             // The icon box occupies the top 64 units - the only part that exists at all on the
             // weapon slot, which has no pip row or recharge sweep below it.
@@ -868,7 +812,9 @@ namespace Overpower.UI
                 coverRt.offsetMin = Vector2.zero;
                 coverRt.offsetMax = Vector2.zero;
                 ui.cooldownCover = coverGo.AddComponent<Image>();
-                ui.cooldownCover.color = cooldownCoverColor;
+                ui.cooldownCover.color = theme.cooldownCoverColor;
+                // See BuildBar's comment: sprite before type, or fillAmount is ignored.
+                ui.cooldownCover.sprite = theme.barSprite;
                 ui.cooldownCover.type = Image.Type.Filled;
                 ui.cooldownCover.fillMethod = Image.FillMethod.Vertical;
                 ui.cooldownCover.fillOrigin = (int)Image.OriginVertical.Bottom;
@@ -897,7 +843,7 @@ namespace Overpower.UI
                 reasonRt.anchoredPosition = new Vector2(0f, -78f);
                 reasonRt.sizeDelta = new Vector2(0f, 14f);
                 ui.blockReasonText.alignment = TextAlignmentOptions.Center;
-                ui.blockReasonText.color = overheatWarningColor;
+                ui.blockReasonText.color = theme.overheatWarningColor;
 
                 // TASK 1.11: the Ultimate slot's own charge meter - a translucent fill drawn OVER the
                 // cooldown cover above (built after it, so it draws on top) plus a READY label shown
@@ -914,7 +860,9 @@ namespace Overpower.UI
                     fillRt.offsetMin = Vector2.zero;
                     fillRt.offsetMax = Vector2.zero;
                     ui.ultimateChargeFill = fillGo.AddComponent<Image>();
-                    ui.ultimateChargeFill.color = ultimateChargeColor;
+                    ui.ultimateChargeFill.color = theme.ultimateChargeColor;
+                    // See BuildBar's comment: sprite before type, or fillAmount is ignored.
+                    ui.ultimateChargeFill.sprite = theme.barSprite;
                     ui.ultimateChargeFill.type = Image.Type.Filled;
                     ui.ultimateChargeFill.fillMethod = Image.FillMethod.Vertical;
                     ui.ultimateChargeFill.fillOrigin = (int)Image.OriginVertical.Bottom;
@@ -927,7 +875,7 @@ namespace Overpower.UI
                     readyRt.anchorMax = Vector2.one;
                     readyRt.offsetMin = Vector2.zero;
                     readyRt.offsetMax = Vector2.zero;
-                    ui.readyLabel.color = ultimateReadyTextColor;
+                    ui.readyLabel.color = theme.ultimateReadyTextColor;
                     ui.readyLabel.gameObject.SetActive(false); // UpdateUltimateMeter turns this on once IsFull.
                 }
             }

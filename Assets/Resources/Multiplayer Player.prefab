@@ -3545,26 +3545,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
-  healthColor: {r: 0.336, g: 0.914, b: 0.263, a: 1}
-  armorColor: {r: 0.45, g: 0.75, b: 0.95, a: 1}
-  barBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}
-  overheatTrackColor: {r: 0.78, g: 0.78, b: 0.8, a: 1}
-  overheatBarHeight: 18
-  overheatTickColor: {r: 0.12, g: 0.12, b: 0.14, a: 0.9}
-  overheatTickWidth: 2
-  overheatNormalColor: {r: 0.6, g: 0.6, b: 0.66, a: 1}
-  overheatWarningColor: {r: 1, g: 0.65, b: 0.05, a: 1}
-  overheatSilencedColor: {r: 0.85, g: 0.16, b: 0.16, a: 1}
-  warningPulseSpeed: 2.5
-  warningPulseDepth: 0.35
-  slotReadyColor: {r: 0, g: 0, b: 0, a: 0.6}
-  slotBlockedColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.85}
-  slotActiveGlowColor: {r: 1, g: 0.85, b: 0.25, a: 1}
-  pipAvailableColor: {r: 1, g: 1, b: 1, a: 1}
-  pipSpentColor: {r: 1, g: 1, b: 1, a: 0.15}
-  cooldownCoverColor: {r: 0, g: 0, b: 0, a: 0.65}
-  ultimateChargeColor: {r: 1, g: 0.85, b: 0.25, a: 0.45}
-  ultimateReadyTextColor: {r: 1, g: 0.95, b: 0.6, a: 1}
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!114 &581303668377604427
 MonoBehaviour:
   m_ObjectHideFlags: 0
