@@ -210,11 +210,8 @@ namespace Overpower.UI
                 lastHealthFraction = healthFraction;
             }
 
-            // The armor TRACK's visible width scales with capacity relative to max health - both are
-            // just "hit points" on the same 0-100-ish scale, so an armor pool as big as max health
-            // fills the whole track, and level 0's starting 25 capacity is a quarter-width sliver.
-            // This is what makes "+Absorb twice" read as a visibly bigger segment, not merely a
-            // fuller small one (see the Armor Colour tooltip).
+            // The armor TRACK's visible width scales with capacity - see BuildArmorBar's class
+            // comment for why.
             float capacity = playerHealth.ArmorCapacity;
             float trackWidth = BarWidth - 4f; // matches the 2px margin baked into BuildArmorBar on each side.
             float extentWidth = maxHealth > 0f ? Mathf.Clamp01(capacity / maxHealth) * trackWidth : 0f;
@@ -365,18 +362,27 @@ namespace Overpower.UI
                 float recharge = status != null ? status.RechargeProgress : 0f;
                 bool active = status != null && status.IsActive;
 
-                if (charges != lastCharges[i] || maxCharges != lastMaxCharges[i])
+                // Captured before either cache is overwritten below: the cover's own gate (next
+                // block) needs to know whether CHARGES moved this frame, not just recharge - see its
+                // comment for why the two can move independently.
+                bool chargesChanged = charges != lastCharges[i] || maxCharges != lastMaxCharges[i];
+                if (chargesChanged)
                 {
                     SetPips(ui, charges, maxCharges);
                     lastCharges[i] = charges;
                     lastMaxCharges[i] = maxCharges;
                 }
 
-                if (!Mathf.Approximately(recharge, lastRecharge[i]))
+                if (chargesChanged || !Mathf.Approximately(recharge, lastRecharge[i]))
                 {
-                    // A module with no charge pool at all (Sprint spends heat, not charges) draws no
-                    // sweep - see IAbilityStatus.MaxCharges' own doc comment.
-                    ui.cooldownCover.fillAmount = maxCharges > 0 ? Mathf.Clamp01(1f - recharge) : 0f;
+                    // charges >= maxCharges (full, or no pool at all - IAbilityStatus.MaxCharges' own
+                    // doc comment on the Sprint case) is its OWN condition, not just "recharge == 0":
+                    // ChargePool.RechargeProgress reports 0 both when a pool is full AND the instant a
+                    // charge is spent (pinned by RechargeProgressIsZeroOnAFullPool), so recharge alone
+                    // cannot tell "ready" from "just spent". Without this gate the Ultimate slot's
+                    // trivial 1-charge/0s-cooldown pool - whose RechargeProgress is 0 FOREVER, never
+                    // just briefly - would show its cover permanently, fully covering the READY meter.
+                    ui.cooldownCover.fillAmount = charges >= maxCharges ? 0f : Mathf.Clamp01(1f - recharge);
                     lastRecharge[i] = recharge;
                 }
 
@@ -567,8 +573,9 @@ namespace Overpower.UI
         }
 
         /// <summary>trackImage is handed back so a caller can add something on top of the track
-        /// itself (the overheat bar's warning tick) or give it its own colour instead of the shared
-        /// Bar Background Colour (again, overheat - see its Track Colour tooltip).</summary>
+        /// itself - today just the overheat bar's warning tick, built by the caller right after this
+        /// returns. Every bar passes the same theme.barTrackColor for trackColor; the parameter still
+        /// exists because BuildArmorBar's track is built separately and needs the same colour.</summary>
         private Image BuildBar(Transform parent, string name, float width, float height, Color trackColor, Color fillColor, out Image trackImage)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
@@ -633,7 +640,13 @@ namespace Overpower.UI
         /// extent" rectangle whose WIDTH is set live from script (see UpdateHealthAndArmor) rather
         /// than by any layout group - that sidesteps layout-rebuild timing entirely, since a plain
         /// child RectTransform's sizeDelta takes effect immediately. Inside that extent, an ordinary
-        /// horizontal fill shows current armor against its own capacity, same as the other bars.</summary>
+        /// horizontal fill shows current armor against its own capacity, same as the other bars.
+        ///
+        /// The extent's WIDTH scales with capacity relative to max health - both are just "hit
+        /// points" on the same 0-100-ish scale, so an armor pool as big as max health fills the
+        /// whole track, and level 0's starting 25 capacity is a quarter-width sliver. This is what
+        /// makes "+Absorb twice" read as a visibly bigger segment, not merely a fuller small
+        /// one.</summary>
         private Image BuildArmorBar(Transform parent, out RectTransform extentRect)
         {
             GameObject track = new GameObject("Armor Bar", typeof(RectTransform));
@@ -722,7 +735,7 @@ namespace Overpower.UI
             iconLe.preferredHeight = 20f;
             iconGo.GetComponent<RectTransform>().sizeDelta = new Vector2(20f, 20f); // See BuildBar's comment.
             Image iconImg = iconGo.AddComponent<Image>();
-            iconImg.color = new Color(0.85f, 0.85f, 0.85f, 0.9f);
+            iconImg.color = theme.silencedIconColor;
             iconImg.raycastTarget = false;
 
             GameObject strike = new GameObject("Strike", typeof(RectTransform));

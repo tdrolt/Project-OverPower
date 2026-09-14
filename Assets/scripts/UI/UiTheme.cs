@@ -45,9 +45,10 @@ namespace Overpower.UI
                  "one bar a player must read at a glance mid-fight.")]
         [Range(8f, 32f)] public float overheatBarHeight = 18f;
         [Tooltip("Colour of the thin vertical tick marking exactly where the warning threshold sits on the " +
-                 "overheat track. Dark so it stays visible against the track colour and every fill colour it " +
-                 "might be drawn over.")]
-        public Color overheatTickColor = new Color(0.12f, 0.12f, 0.14f, 0.9f);
+                 "overheat track. Light so it stays visible on the dark track and on the amber/orange fill - " +
+                 "a dark tick (the original colour) read fine on the old light track but disappeared once " +
+                 "Bar Track Colour went dark for the fill/track contrast.")]
+        public Color overheatTickColor = new Color(1f, 1f, 1f, 0.85f);
         [Tooltip("Width of the overheat warning-threshold tick mark, in canvas units.")]
         [Range(1f, 6f)] public float overheatTickWidth = 2f;
         [Tooltip("Pulse the overheat bar while it is at the warning level.")] public bool pulseAtWarning = true;
@@ -76,6 +77,9 @@ namespace Overpower.UI
         public Color ultimateChargeColor = new Color(1f, 0.85f, 0.25f, 0.45f);
         [Tooltip("Colour of the READY text shown over the Ultimate slot once its charge is full.")]
         public Color ultimateReadyTextColor = new Color(1f, 0.95f, 0.6f);
+        [Tooltip("Colour of the weapon-icon placeholder in the silenced banner - a plain rectangle, since the " +
+                 "project has no weapon-silhouette sprite yet.")]
+        public Color silencedIconColor = new Color(0.85f, 0.85f, 0.85f, 0.9f);
 
         [Header("Aim cone")]
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
