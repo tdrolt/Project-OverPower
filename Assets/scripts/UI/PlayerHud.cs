@@ -27,8 +27,11 @@ namespace Overpower.UI
     /// Polls every value in LateUpdate (Tudor's instruction, so the HUD always reads this frame's
     /// final state) rather than subscribing to a "health changed"-style event per bar - there is no
     /// such event today, and one dozen tiny events would outweigh reading a dozen numbers in a fixed
-    /// function. Every write to a Text or Image is guarded by a change check so an unmoving bar never
-    /// re-allocates a string or re-touches a Graphic 60 times a second.
+    /// function. Most writes to a Text or Image are guarded by an explicit change check so an
+    /// unmoving bar never re-allocates a string or re-touches a Graphic 60 times a second. The one
+    /// exception is overheatFill.color, written unconditionally every frame while warning (it has to
+    /// be, to pulse) - harmless because Graphic.color itself no-ops (no dirty flag, no redraw) when
+    /// set to the value it already holds, the same guarantee the explicit checks below give by hand.
     /// </summary>
     public class PlayerHud : MonoBehaviourPun
     {
@@ -173,6 +176,11 @@ namespace Overpower.UI
         {
             if (abilityRunner != null)
                 abilityRunner.SlotChanged -= HandleSlotChanged;
+
+            // The one Material ApplyOutline clones for every HUD text - nothing else references it,
+            // so nothing else will clean it up.
+            if (hudTextMaterial != null)
+                Destroy(hudTextMaterial);
         }
 
         private void HandleSlotChanged(AbilitySlot slot)
@@ -487,7 +495,8 @@ namespace Overpower.UI
                     LayoutElement le = pip.AddComponent<LayoutElement>();
                     le.preferredWidth = 8f;
                     le.preferredHeight = 8f;
-                    pip.GetComponent<RectTransform>().sizeDelta = new Vector2(8f, 8f); // See BuildBar's comment.
+                    // See panelLayout's comment in BuildUi: pipRow's child control is ON, so this
+                    // LayoutElement alone becomes the pip's actual rendered size.
                     Image img = pip.AddComponent<Image>();
                     img.raycastTarget = false;
                     ui.pips.Add(img);
@@ -553,8 +562,15 @@ namespace Overpower.UI
                 Mathf.RoundToInt(theme.hudPanelPadding), Mathf.RoundToInt(theme.hudPanelPadding),
                 Mathf.RoundToInt(theme.hudPanelPadding), Mathf.RoundToInt(theme.hudPanelPadding));
             panelLayout.childAlignment = TextAnchor.UpperCenter;
-            panelLayout.childControlWidth = false;
-            panelLayout.childControlHeight = false;
+            // ON, not off: with child control off, each child's RectTransform.sizeDelta is what
+            // actually renders while this group reads LayoutElement.preferred* only to POSITION
+            // children and size the panel for ContentSizeFitter below - two numbers that have to be
+            // hand-kept equal, and silently drift the moment someone edits one without the other.
+            // With child control ON, LayoutElement.preferred* is the only number: this group WRITES
+            // it onto each child's sizeDelta itself, so every "go.GetComponent<RectTransform>().sizeDelta
+            // = ..." line that used to shadow a LayoutElement is gone (code review fix).
+            panelLayout.childControlWidth = true;
+            panelLayout.childControlHeight = true;
             panelLayout.childForceExpandWidth = false;
             panelLayout.childForceExpandHeight = false;
 
@@ -578,14 +594,14 @@ namespace Overpower.UI
             LayoutElement slotsRowLe = slotsRow.AddComponent<LayoutElement>();
             slotsRowLe.preferredWidth = theme.barWidth;
             slotsRowLe.preferredHeight = slotsRowHeight;
-            // See BuildBar's comment: the outer VerticalLayoutGroup has childControl off on both
-            // axes, so this row's own rect needs an explicit size - the same width as the bars
-            // above it, so the slot boxes end up centred under them.
-            slotsRow.GetComponent<RectTransform>().sizeDelta = new Vector2(theme.barWidth, slotsRowHeight);
+            // See panelLayout's comment above: panelLayout's own child control (ON) is what turns
+            // this LayoutElement into this row's actual rendered size - no sizeDelta line needed here.
             HorizontalLayoutGroup slotsLayout = slotsRow.AddComponent<HorizontalLayoutGroup>();
             slotsLayout.spacing = 10f;
             slotsLayout.childAlignment = TextAnchor.UpperCenter;
-            slotsLayout.childControlWidth = slotsLayout.childControlHeight = false;
+            // ON for the same reason as panelLayout above - this group's four slot children each
+            // carry a LayoutElement (see BuildSlot) that is now the one place their size lives.
+            slotsLayout.childControlWidth = slotsLayout.childControlHeight = true;
 
             weaponSlotUi = BuildSlot(slotsRow.transform, "LMB", withCooldown: false, isUltimate: false);
             for (int i = 0; i < AbilitySlotOrder.Length; i++)
@@ -620,11 +636,8 @@ namespace Overpower.UI
             LayoutElement le = go.AddComponent<LayoutElement>();
             le.preferredWidth = width;
             le.preferredHeight = height;
-            // The parent VerticalLayoutGroup has childControlWidth/Height off (each bar keeps its
-            // own exact height), and with control off a LayoutGroup only reads LayoutElement's
-            // preferred size to POSITION this box along the stack - it never writes that size back
-            // onto the RectTransform. Set it explicitly here or the box stays at the default 100x100.
-            go.GetComponent<RectTransform>().sizeDelta = new Vector2(width, height);
+            // See panelLayout's comment in BuildUi: its child control is ON, so this LayoutElement
+            // alone becomes the bar's actual rendered size - no sizeDelta line needed here.
             Image background = go.AddComponent<Image>();
             background.color = theme.barTrackColor;
             background.raycastTarget = false;
@@ -691,8 +704,8 @@ namespace Overpower.UI
             LayoutElement le = track.AddComponent<LayoutElement>();
             le.preferredWidth = theme.barWidth;
             le.preferredHeight = theme.armorBarHeight;
-            // See BuildBar's comment: childControlWidth/Height off means this has to be set directly too.
-            track.GetComponent<RectTransform>().sizeDelta = new Vector2(theme.barWidth, theme.armorBarHeight);
+            // See panelLayout's comment in BuildUi: its child control is ON, so this LayoutElement
+            // alone becomes the track's actual rendered size - no sizeDelta line needed here.
             Image background = track.AddComponent<Image>();
             background.color = theme.barTrackColor;
             background.raycastTarget = false;
@@ -750,7 +763,7 @@ namespace Overpower.UI
             // A translucent wash across the whole row, behind the icon/label below, so "you cannot
             // use any of this right now" reads even before the eye finds the label.
             Image wash = row.AddComponent<Image>();
-            wash.color = new Color(theme.overheatSilencedColor.r, theme.overheatSilencedColor.g, theme.overheatSilencedColor.b, 0.35f);
+            wash.color = new Color(theme.overheatSilencedColor.r, theme.overheatSilencedColor.g, theme.overheatSilencedColor.b, theme.silencedWashAlpha);
             wash.raycastTarget = false;
 
             GameObject content = new GameObject("Content", typeof(RectTransform));
@@ -763,23 +776,26 @@ namespace Overpower.UI
             HorizontalLayoutGroup layout = content.AddComponent<HorizontalLayoutGroup>();
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.spacing = 8f;
-            layout.childControlWidth = layout.childControlHeight = false;
+            // ON for the same reason as panelLayout in BuildUi - the icon and label below each carry
+            // a LayoutElement that is now the one place their size lives, not a duplicated sizeDelta.
+            layout.childControlWidth = layout.childControlHeight = true;
 
             GameObject iconGo = new GameObject("Weapon Icon", typeof(RectTransform));
             iconGo.transform.SetParent(content.transform, false);
             LayoutElement iconLe = iconGo.AddComponent<LayoutElement>();
-            iconLe.preferredWidth = 28f;
-            iconLe.preferredHeight = 28f;
-            iconGo.GetComponent<RectTransform>().sizeDelta = new Vector2(28f, 28f); // See BuildBar's comment.
+            iconLe.preferredWidth = theme.silencedIconSize;
+            iconLe.preferredHeight = theme.silencedIconSize;
             Image iconImg = iconGo.AddComponent<Image>();
             iconImg.color = theme.silencedIconColor;
             iconImg.raycastTarget = false;
 
+            // Not a layout-group child (parented to the icon, not to Content) - a fixed-size rect
+            // rotated in place, so it keeps its own explicit sizeDelta regardless of child control.
             GameObject strike = new GameObject("Strike", typeof(RectTransform));
             strike.transform.SetParent(iconGo.transform, false);
             RectTransform strikeRt = strike.GetComponent<RectTransform>();
             strikeRt.anchorMin = strikeRt.anchorMax = strikeRt.pivot = new Vector2(0.5f, 0.5f);
-            strikeRt.sizeDelta = new Vector2(38f, 4f);
+            strikeRt.sizeDelta = new Vector2(theme.silencedStrikeWidth, theme.silencedStrikeHeight);
             strikeRt.localRotation = Quaternion.Euler(0f, 0f, -45f);
             Image strikeImg = strike.AddComponent<Image>();
             strikeImg.color = theme.overheatSilencedColor;
@@ -791,7 +807,6 @@ namespace Overpower.UI
             LayoutElement textLe = text.gameObject.AddComponent<LayoutElement>();
             textLe.preferredWidth = 260f;
             textLe.preferredHeight = 30f;
-            text.rectTransform.sizeDelta = new Vector2(260f, 30f); // See BuildBar's comment.
             text.color = theme.overheatSilencedColor;
             text.alignment = TextAlignmentOptions.MidlineLeft;
 
@@ -815,10 +830,9 @@ namespace Overpower.UI
             LayoutElement le = go.AddComponent<LayoutElement>();
             le.preferredWidth = theme.slotWidth;
             le.preferredHeight = slotHeight;
-            // See BuildBar's comment: the row's HorizontalLayoutGroup has childControl off on both
-            // axes, so the slot box needs its own explicit size - everything inside it (Icon Box,
-            // pips, text) stretches or anchors relative to THIS rect.
-            go.GetComponent<RectTransform>().sizeDelta = new Vector2(theme.slotWidth, slotHeight);
+            // See panelLayout's comment in BuildUi: slotsLayout's child control is ON, so this
+            // LayoutElement alone becomes the slot's actual rendered size - everything inside it
+            // (Icon Box, pips, text) then stretches or anchors relative to that rect as normal.
 
             ui.background = go.AddComponent<Image>();
             ui.background.color = theme.slotReadyColor;
@@ -895,7 +909,9 @@ namespace Overpower.UI
                 HorizontalLayoutGroup pipLayout = pipRow.AddComponent<HorizontalLayoutGroup>();
                 pipLayout.spacing = 2f;
                 pipLayout.childAlignment = TextAnchor.MiddleCenter;
-                pipLayout.childControlWidth = pipLayout.childControlHeight = false;
+                // ON for the same reason as panelLayout in BuildUi - SetPips's own LayoutElement per
+                // pip is now the one place their size lives, not a duplicated sizeDelta.
+                pipLayout.childControlWidth = pipLayout.childControlHeight = true;
                 ui.pipRow = pipRow.transform;
 
                 ui.blockReasonText = AddLabel(go.transform, "", theme.smallTextSize, FontStyles.Italic);

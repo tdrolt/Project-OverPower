@@ -54,6 +54,10 @@ MonoBehaviour:
   ultimateChargeColor: {r: 1, g: 0.85, b: 0.25, a: 0.45}
   ultimateReadyTextColor: {r: 1, g: 0.95, b: 0.6, a: 1}
   silencedIconColor: {r: 0.85, g: 0.85, b: 0.85, a: 0.9}
+  silencedWashAlpha: 0.35
+  silencedIconSize: 28
+  silencedStrikeWidth: 38
+  silencedStrikeHeight: 4
   coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
   coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
   coneLineWidth: 0.04

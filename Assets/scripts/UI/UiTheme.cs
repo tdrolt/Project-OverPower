@@ -50,12 +50,12 @@ namespace Overpower.UI
         [Tooltip("Overheat fill while silenced.")] public Color overheatSilencedColor = new Color(0.9f, 0.1f, 0.1f, 1f);
         [Tooltip("Empty part of every bar.")] public Color barTrackColor = new Color(0.18f, 0.18f, 0.2f, 1f);
         [Tooltip("Height of the health bar, in canvas units.")]
-        [Range(8f, 32f)] public float healthBarHeight = 28f;
+        [Range(8f, 64f)] public float healthBarHeight = 28f;
         [Tooltip("Height of the shield/armor bar, in canvas units.")]
-        [Range(8f, 32f)] public float armorBarHeight = 22f;
+        [Range(8f, 64f)] public float armorBarHeight = 22f;
         [Tooltip("Height of the overheat bar, in canvas units - taller than health/armor on purpose: it is the " +
                  "one bar a player must read at a glance mid-fight.")]
-        [Range(8f, 32f)] public float overheatBarHeight = 32f;
+        [Range(8f, 64f)] public float overheatBarHeight = 32f;
         [Tooltip("Colour of the thin vertical tick marking exactly where the warning threshold sits on the " +
                  "overheat track. Light so it stays visible on the dark track and on the amber/orange fill - " +
                  "a dark tick (the original colour) read fine on the old light track but disappeared once " +
@@ -98,6 +98,15 @@ namespace Overpower.UI
         [Tooltip("Colour of the weapon-icon placeholder in the silenced banner - a plain rectangle, since the " +
                  "project has no weapon-silhouette sprite yet.")]
         public Color silencedIconColor = new Color(0.85f, 0.85f, 0.85f, 0.9f);
+        [Tooltip("Opacity of the translucent wash drawn behind the WEAPON SILENCED banner, on top of the slot " +
+                 "row - 0 is invisible, 1 is a solid block.")]
+        [Range(0f, 1f)] public float silencedWashAlpha = 0.35f;
+        [Tooltip("Width and height of the square weapon-icon placeholder in the silenced banner, in canvas units.")]
+        public float silencedIconSize = 28f;
+        [Tooltip("Width of the diagonal strike line drawn across the silenced banner's weapon icon, in canvas units.")]
+        public float silencedStrikeWidth = 38f;
+        [Tooltip("Height (thickness) of the diagonal strike line, in canvas units.")]
+        public float silencedStrikeHeight = 4f;
 
         [Header("Aim cone")]
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
