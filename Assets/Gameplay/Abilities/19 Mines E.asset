@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 19
   displayName: Mines
+  description: Drop mines that damage and slow enemies.
   slot: 1
   icon: {fileID: 0}
   goldCost: 0

@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 06 Burst - Charge
   m_EditorClassIdentifier: 
   id: 6
-  displayName: Burst - Charge
+  displayName: Charge
+  description: Hold to charge up to five shots.
   parent: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
   icon: {fileID: 0}
   goldCost: 0

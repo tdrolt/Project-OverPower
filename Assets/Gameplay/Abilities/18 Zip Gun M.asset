@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 18 Zip Gun M
   m_EditorClassIdentifier: 
   id: 18
-  displayName: Zip Gun
+  displayName: Zip
+  description: Fire a hook that pulls you to what it hits.
   slot: 3
   icon: {fileID: 0}
   goldCost: 0

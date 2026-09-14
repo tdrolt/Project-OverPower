@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 14
   displayName: Dash
+  description: Two quick hops toward your cursor.
   slot: 3
   icon: {fileID: 0}
   goldCost: 0

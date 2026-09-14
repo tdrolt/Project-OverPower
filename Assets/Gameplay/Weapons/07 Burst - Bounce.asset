@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 07 Burst - Bounce
   m_EditorClassIdentifier: 
   id: 7
-  displayName: Burst - Bounce
+  displayName: Bounce
+  description: Shots ricochet off walls and hit harder each bounce.
   parent: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
   icon: {fileID: 0}
   goldCost: 0

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 16
   displayName: Sprint
+  description: Run faster, but it builds overheat.
   slot: 3
   icon: {fileID: 0}
   goldCost: 0

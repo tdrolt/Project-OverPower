@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 21 Flamethrower E
   m_EditorClassIdentifier: 
   id: 21
-  displayName: Flamethrower
+  displayName: Flame
+  description: Set enemies in front of you on fire.
   slot: 1
   icon: {fileID: 0}
   goldCost: 0

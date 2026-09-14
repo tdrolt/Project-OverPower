@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 23 Sonic Pulse E
   m_EditorClassIdentifier: 
   id: 23
-  displayName: Sonic Pulse
+  displayName: Pulse
+  description: Knock enemies back; walls and allies stun them.
   slot: 1
   icon: {fileID: 0}
   goldCost: 0

@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 27 AoE Zone U
   m_EditorClassIdentifier: 
   id: 27
-  displayName: AoE Zone
+  displayName: Zone
+  description: A damaging aura that follows you.
   slot: 2
   icon: {fileID: 0}
   goldCost: 0

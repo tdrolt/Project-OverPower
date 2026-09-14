@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 22 Stun Gun E
   m_EditorClassIdentifier: 
   id: 22
-  displayName: Stun Gun
+  displayName: Stun
+  description: A slow orb that stuns the first enemy hit.
   slot: 1
   icon: {fileID: 0}
   goldCost: 0

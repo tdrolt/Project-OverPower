@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 09 SMG - Double Rate
   m_EditorClassIdentifier: 
   id: 9
-  displayName: SMG - Double Rate
+  displayName: Rapid
+  description: Double fire rate, wide spread. Close range.
   parent: {fileID: 11400000, guid: 27983484f42c6eb409acf1c5d0d8e823, type: 2}
   icon: {fileID: 0}
   goldCost: 0

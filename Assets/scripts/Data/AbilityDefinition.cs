@@ -52,6 +52,11 @@ namespace Overpower.Data
         [SerializeField] private string displayName = "";
         public string DisplayName => displayName;
 
+        [Tooltip("One line shown when a player hovers this in the loadout screen. Say what it " +
+                 "does, not its numbers - numbers are shown next to it automatically.")]
+        [SerializeField, TextArea(1, 3)] private string description = "";
+        public string Description => description;
+
         [Tooltip("Which of the four slots this ability occupies, and therefore which key fires it: " +
                  "Primary is left mouse, Equipment is right mouse, Ultimate is Space, Mobility is " +
                  "Left Shift. A player can carry one ability per slot.")]

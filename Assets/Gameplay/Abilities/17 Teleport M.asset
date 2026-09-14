@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 17 Teleport M
   m_EditorClassIdentifier: 
   id: 17
-  displayName: Teleport
+  displayName: Portal
+  description: Place two portals; stand in one to travel to the other.
   slot: 3
   icon: {fileID: 0}
   goldCost: 0

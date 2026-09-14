@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 11
   displayName: Laser
+  description: Instant beam that pierces every enemy in line.
   parent: {fileID: 11400000, guid: 0023f41e1c59d7c4cb3f34c116cacfe1, type: 2}
   icon: {fileID: 0}
   goldCost: 0

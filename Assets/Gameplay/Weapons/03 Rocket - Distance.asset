@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 03 Rocket - Distance
   m_EditorClassIdentifier: 
   id: 3
-  displayName: Rocket - Distance
+  displayName: Scaling
+  description: Rockets hit harder the further they travel.
   parent: {fileID: 11400000, guid: 73e5ab1af24e5fa44b3323918b8d42ee, type: 2}
   icon: {fileID: 0}
   goldCost: 0

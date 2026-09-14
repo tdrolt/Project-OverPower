@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 15
   displayName: Blink
+  description: Teleport to your cursor.
   slot: 3
   icon: {fileID: 0}
   goldCost: 0

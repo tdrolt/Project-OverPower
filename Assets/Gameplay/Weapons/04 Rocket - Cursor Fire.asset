@@ -13,7 +13,8 @@ MonoBehaviour:
   m_Name: 04 Rocket - Cursor Fire
   m_EditorClassIdentifier: 
   id: 4
-  displayName: Rocket - Cursor Fire
+  displayName: Cursor
+  description: Rockets burst at your cursor and leave fire on the ground.
   parent: {fileID: 11400000, guid: 73e5ab1af24e5fa44b3323918b8d42ee, type: 2}
   icon: {fileID: 0}
   goldCost: 0

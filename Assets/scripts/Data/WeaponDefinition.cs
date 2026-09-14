@@ -34,6 +34,11 @@ namespace Overpower.Data
         [SerializeField] private string displayName = "";
         public string DisplayName => displayName;
 
+        [Tooltip("One line shown when a player hovers this in the loadout screen. Say what it " +
+                 "does, not its numbers - numbers are shown next to it automatically.")]
+        [SerializeField, TextArea(1, 3)] private string description = "";
+        public string Description => description;
+
         [Tooltip("The weapon this one upgrades from. Leave it empty if this is a starting weapon. " +
                  "These links are the entire upgrade tree - there is no separate tree asset that " +
                  "could drift out of sync with them.")]
