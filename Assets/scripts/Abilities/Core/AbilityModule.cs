@@ -129,6 +129,18 @@ namespace Overpower.Abilities
         public float RechargeProgress => pool != null ? pool.RechargeProgress : 0f;
         public virtual bool IsActive => false;
 
+        /// <summary>The serialized cooldown this module was authored with - the DESIGN number, not
+        /// a live remaining cooldown. Added for the loadout screen's hover text (Task 9b), which
+        /// reads a MODULE PREFAB ASSET: ChargesAvailable/RechargeProgress above answer "how charged
+        /// up is THIS player's live pool right now" and are 0 on a prefab, which has no pool at all
+        /// (Bind never ran on it) - this and Charges below are the two numbers that exist either
+        /// way.</summary>
+        public float CooldownSeconds => cooldownSeconds;
+
+        /// <summary>The serialized charge count this module was authored with - same "a prefab
+        /// asset has no live pool to read instead" reasoning as CooldownSeconds above.</summary>
+        public int Charges => charges;
+
         internal bool HasChargeGate => pool != null;
         internal bool HasCharge => pool == null || pool.Available > 0;
         internal bool SpendsChargeWhenCast => SpendsChargeOnCast;
