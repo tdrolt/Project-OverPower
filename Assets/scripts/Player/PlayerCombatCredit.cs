@@ -96,7 +96,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
             return;
 
         // Total, not HealthLost alone: armor absorbed is still damage the attacker actually dealt,
-        // the same figure PlayerHealth's own healthBar update and DamageResolver's callers use.
+        // the same figure PlayerHealth's own UpdateOverheadBar and DamageResolver's callers use.
         ledger.Record(info.SourceActorNumber, result.Total, Time.time);
     }
 

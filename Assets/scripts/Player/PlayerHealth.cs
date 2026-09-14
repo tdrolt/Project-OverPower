@@ -104,6 +104,12 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // theme asset exists to prevent.
         if (theme == null)
             Debug.LogError($"[PlayerHealth] {name}: UiTheme is not assigned - overhead bar will not be themed.");
+        // Mirrors PlayerHud's own guard: a theme with no bar sprite is the exact Task 3 bug (a
+        // Filled Image with no sprite ignores fillAmount and draws full), and unlike a missing
+        // theme entirely this would say nothing in the console while every overhead bar quietly
+        // lies about health and armor.
+        else if (theme.barSprite == null)
+            Debug.LogError($"[PlayerHealth] {name}: UiTheme has no Bar Sprite - overhead bar will draw full width regardless of health/armor.");
 
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
         armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(absorbLevel) : 0f,
