@@ -140,5 +140,62 @@ namespace Overpower.Tests
 
             Assert.AreEqual(1.5f, c.CurrentAngle, 0.001f);
         }
+
+        // Movement terms. Values chosen so every expected number is exact:
+        // min 2, max 10, bloom 1, recovery 1, standing-still 1.5, moving spread 4, moving bloom 3.
+        private static AimConeState MovingCone() =>
+            new AimConeState(2f, 10f, 1f, 1f, 1.5f, 4f, 3f);
+
+        [Test]
+        public void MovingAddsTheFlatSpreadTheInstantMovementStarts()
+        {
+            var cone = MovingCone();
+            cone.Tick(0f, true);
+            Assert.AreEqual(6f, cone.EffectiveAngle, 1e-4f); // 2 current + 4 moving spread
+        }
+
+        [Test]
+        public void StoppingRemovesTheFlatSpreadTheInstantMovementEnds()
+        {
+            var cone = MovingCone();
+            cone.Tick(0f, true);
+            cone.Tick(0f, false);
+            Assert.AreEqual(2f / 1.5f, cone.EffectiveAngle, 1e-4f);
+        }
+
+        [Test]
+        public void MovingBloomsAtItsRateMinusRecovery()
+        {
+            var cone = MovingCone();
+            cone.Tick(1f, true);
+            Assert.AreEqual(4f, cone.CurrentAngle, 1e-4f); // 2 + (3 - 1) * 1
+        }
+
+        [Test]
+        public void MovingBloomNeverPassesMaxAngle()
+        {
+            var cone = MovingCone();
+            cone.Tick(10f, true);
+            Assert.AreEqual(10f, cone.CurrentAngle, 1e-4f);
+            Assert.AreEqual(14f, cone.EffectiveAngle, 1e-4f); // max + moving spread
+        }
+
+        [Test]
+        public void StandingStillRecoversBloomGainedWhileMoving()
+        {
+            var cone = MovingCone();
+            cone.Tick(1f, true);   // 4
+            cone.Tick(1f, false);  // 4 - 1 = 3
+            Assert.AreEqual(3f, cone.CurrentAngle, 1e-4f);
+        }
+
+        [Test]
+        public void FiveArgumentConeHasNoMovementPenalty()
+        {
+            var cone = new AimConeState(2f, 10f, 1f, 1f, 1.5f);
+            cone.Tick(1f, true);
+            Assert.AreEqual(2f, cone.CurrentAngle, 1e-4f);
+            Assert.AreEqual(2f, cone.EffectiveAngle, 1e-4f);
+        }
     }
 }
