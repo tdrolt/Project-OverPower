@@ -153,6 +153,55 @@ namespace Overpower.UI
         [Tooltip("Distance from the bottom-right screen corner to the 'Loadout (P)' button, in canvas units, on both axes.")]
         public float loadoutToggleButtonMargin = 24f;
 
+        [Header("Shots")]
+        [Tooltip("Trail colour for each team, index = team id (0/1/2) - Teams.TryGetTeam's own numbering, " +
+                 "read through ShotColorFor below rather than indexed directly so an out-of-range id falls " +
+                 "back safely. NOT the same three colours as the player meshes (white/black/cyan): team 1's " +
+                 "mesh is black, and a black trail would be invisible against the arena's dark walls, so its " +
+                 "shot colour is chosen separately here instead of copied from the mesh.")]
+        public Color[] teamShotColors = new Color[3]
+        {
+            new Color(0.93f, 0.97f, 1f, 1f),  // team 0 - cool near-white (mesh is white; a warm pale yellow
+                                               // was tried first and measured unreadable against the arena's
+                                               // orange/sand ground - Task 11a review, 616x576 capture)
+            new Color(0.68f, 0.32f, 1f, 1f),  // team 1 - violet (mesh is black - would be invisible as a trail)
+            new Color(0.15f, 0.95f, 1f, 1f),  // team 2 - cyan (matches its mesh)
+        };
+        [Tooltip("Trail/tint colour used when the shooter's team could not be resolved - Teams.TryGetTeam " +
+                 "returned -1. Should never actually appear in a real match; only a debug/test-range shot " +
+                 "fired with no team assigned reads this.")]
+        public Color unknownTeamShotColor = new Color(0.5f, 0.5f, 0.53f, 1f);
+        [Tooltip("How many seconds a shot's trail keeps fading behind it after the bullet itself is gone.")]
+        public float trailTime = 0.25f;
+        [Tooltip("Trail width where it meets the bullet, in metres.")]
+        public float trailStartWidth = 0.09f;
+        [Tooltip("Trail width at its fading tail end, in metres - thinner than Trail Start Width so the " +
+                 "trail reads as tapering off rather than a solid ribbon.")]
+        public float trailEndWidth = 0.01f;
+        [Tooltip("Shared unlit material every shot trail renders with - Assets/Gameplay/UI/ShotTrail.mat, " +
+                 "built the same way Task 7's Aim Cone Line Material was (URP Particles/Unlit, alpha " +
+                 "transparent, no shadows). Its own colour stays white: every trail tints itself through " +
+                 "TrailRenderer.colorGradient, which is what lets one material serve every team.")]
+        public Material trailMaterial;
+        [Tooltip("0 = the bullet's core keeps its own material colour, 1 = fully replaced by the team " +
+                 "colour. How far ShotTeamVisuals lerps the core's tint toward Shot Color For.")]
+        [Range(0f, 1f)] public float bulletTintStrength = 0.65f;
+        [Tooltip("Emission brightness multiplier on the bullet core's team colour, so the core itself - not " +
+                 "just its trail - reads as a bright, glowing shot rather than a flat-lit sphere at a " +
+                 "glance. 1 = no boost over the plain team colour.")]
+        public float bulletEmission = 2.4f;
+
+        /// <summary>The trail/tint colour for a shot fired by teamId, or Unknown Team Shot Colour for an
+        /// id Teams.TryGetTeam could not resolve (-1) or that falls outside Team Shot Colors - the same
+        /// fail-open reading ShooterTeamId already carries everywhere else in the weapons code.</summary>
+        public Color ShotColorFor(int teamId)
+        {
+            if (teamShotColors != null && teamId >= 0 && teamId < teamShotColors.Length)
+                return teamShotColors[teamId];
+
+            return unknownTeamShotColor;
+        }
+
         [Header("Aim cone")]
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
         [Tooltip("Colour of the shotgun's inner fan lines.")] public Color coneFanLineColor = new Color(1f, 1f, 1f, 0.25f);
