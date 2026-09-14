@@ -3365,6 +3365,8 @@ MonoBehaviour:
   bloomPerShot: 0.8
   recoveryPerSecond: 2
   standingStillMultiplier: 1.5
+  movingSpreadDegrees: 0
+  movingBloomPerSecond: 0
 --- !u!114 &7995799834452346527
 MonoBehaviour:
   m_ObjectHideFlags: 0

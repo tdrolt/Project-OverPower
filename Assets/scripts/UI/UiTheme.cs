@@ -31,19 +31,31 @@ namespace Overpower.UI
         [Tooltip("Background behind HUD groups and the loadout screen.")] public Color panelColor = new Color(0.06f, 0.06f, 0.08f, 0.85f);
         [Tooltip("Border / highlight for the equipped or selected item.")] public Color highlightColor = new Color(1f, 0.78f, 0.25f, 1f);
         [Tooltip("Colour of items you cannot pick yet.")] public Color lockedColor = new Color(1f, 1f, 1f, 0.25f);
+        [Tooltip("Space between a panel's background edge and the bars/slots inside it, in canvas units, on every side.")]
+        public float hudPanelPadding = 16f;
+        [Tooltip("Distance from the bottom of the screen to the bottom of the HUD panel, in canvas units. Kept " +
+                 "small - Task 5 shrank the chat prompt so the HUD no longer needs to clear a tall band.")]
+        public float hudBottomOffset = 28f;
 
         [Header("Bars")]
         [Tooltip("Plain white sprite every filled bar uses. Without a sprite Unity ignores the fill amount and draws the bar full.")]
         public Sprite barSprite;
+        [Tooltip("Width of every HUD bar (health, armor, overheat) and the slots row beneath them, in canvas units - " +
+                 "the one width they all share so the bars and slots line up.")]
+        public float barWidth = 590f;
         [Tooltip("Health fill.")] public Color healthColor = new Color(0.39f, 0.8f, 0.25f, 1f);
         [Tooltip("Shield fill.")] public Color shieldColor = new Color(0.25f, 0.6f, 1f, 1f);
         [Tooltip("Overheat fill below the warning threshold.")] public Color overheatColor = new Color(0.95f, 0.62f, 0.15f, 1f);
         [Tooltip("Overheat fill at or above the warning threshold.")] public Color overheatWarningColor = new Color(1f, 0.35f, 0.1f, 1f);
         [Tooltip("Overheat fill while silenced.")] public Color overheatSilencedColor = new Color(0.9f, 0.1f, 0.1f, 1f);
         [Tooltip("Empty part of every bar.")] public Color barTrackColor = new Color(0.18f, 0.18f, 0.2f, 1f);
+        [Tooltip("Height of the health bar, in canvas units.")]
+        [Range(8f, 32f)] public float healthBarHeight = 28f;
+        [Tooltip("Height of the shield/armor bar, in canvas units.")]
+        [Range(8f, 32f)] public float armorBarHeight = 22f;
         [Tooltip("Height of the overheat bar, in canvas units - taller than health/armor on purpose: it is the " +
                  "one bar a player must read at a glance mid-fight.")]
-        [Range(8f, 32f)] public float overheatBarHeight = 18f;
+        [Range(8f, 32f)] public float overheatBarHeight = 32f;
         [Tooltip("Colour of the thin vertical tick marking exactly where the warning threshold sits on the " +
                  "overheat track. Light so it stays visible on the dark track and on the amber/orange fill - " +
                  "a dark tick (the original colour) read fine on the old light track but disappeared once " +
@@ -53,11 +65,17 @@ namespace Overpower.UI
         [Range(1f, 6f)] public float overheatTickWidth = 2f;
         [Tooltip("Pulse the overheat bar while it is at the warning level.")] public bool pulseAtWarning = true;
         [Tooltip("Pulses per second when Pulse At Warning is on. Keep it slow - fast reads as flicker.")] public float pulseSpeed = 1.2f;
-        [Tooltip("How far the warning pulse dims the overheat colour at its darkest point - 0.35 means it dips " +
-                 "to 65% brightness and back.")]
-        [Range(0f, 0.9f)] public float pulseDepth = 0.35f;
 
         [Header("HUD slots")]
+        [Tooltip("Width of one weapon/ability slot box, in canvas units - sized so the longest short names " +
+                 "(Raybeam, Shotgun, Baseline) and the longest key label (SPACE) both fit at Body Text Size.")]
+        public float slotWidth = 140f;
+        [Tooltip("Height of a slot's icon/name area, in canvas units - the only part the weapon slot has; the " +
+                 "three ability slots add Slot Cooldown Area Height below it.")]
+        public float slotIconBoxHeight = 104f;
+        [Tooltip("Extra height below the icon box, in canvas units, reserved for the charge pips and the " +
+                 "block-reason text on the three ability slots. The weapon slot has neither and never adds this.")]
+        public float slotCooldownAreaHeight = 58f;
         [Tooltip("Slot background when the slot can be used right now.")]
         public Color slotReadyColor = new Color(0f, 0f, 0f, 0.6f);
         [Tooltip("Slot background when the slot is blocked - dead, stunned, silenced, recharging, or an " +

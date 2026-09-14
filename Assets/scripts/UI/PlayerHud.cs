@@ -43,8 +43,10 @@ namespace Overpower.UI
         [SerializeField, Tooltip("Colours, text sizes and the bar sprite for this HUD.")]
         private UiTheme theme;
 
-        // The one width every bar shares, so the health, overheat and armor track all line up.
-        private const float BarWidth = 560f;
+        // One Material instance shared by every TextMeshProUGUI this HUD builds - see AddLabel's
+        // comment for why sharing beats letting each text auto-instantiate its own the moment its
+        // outline is touched.
+        private Material hudTextMaterial;
 
         // ---- component refs, read off this same player root --------------------------------------
 
@@ -213,7 +215,7 @@ namespace Overpower.UI
             // The armor TRACK's visible width scales with capacity - see BuildArmorBar's class
             // comment for why.
             float capacity = playerHealth.ArmorCapacity;
-            float trackWidth = BarWidth - 4f; // matches the 2px margin baked into BuildArmorBar on each side.
+            float trackWidth = theme.barWidth - 4f; // matches the 2px margin baked into BuildArmorBar on each side.
             float extentWidth = maxHealth > 0f ? Mathf.Clamp01(capacity / maxHealth) * trackWidth : 0f;
             if (!Mathf.Approximately(extentWidth, lastArmorExtentWidth))
             {
@@ -262,15 +264,25 @@ namespace Overpower.UI
                 lastOverheatFraction = fraction;
             }
 
-            Color target = silenced ? theme.overheatSilencedColor : warning ? theme.overheatWarningColor : theme.overheatColor;
-            if (warning && theme.pulseAtWarning)
+            Color target;
+            if (silenced)
             {
-                // A genuine pulse (dimming the same colour), not a colour swap - reads as "this is
-                // still your weapon warning you", not a second state.
-                float pulse = 1f - theme.pulseDepth * (0.5f + 0.5f * Mathf.Sin(Time.time * theme.pulseSpeed * Mathf.PI * 2f));
-                float alpha = target.a;
-                target *= pulse;
-                target.a = alpha;
+                target = theme.overheatSilencedColor;
+            }
+            else if (warning)
+            {
+                // A genuine pulse BETWEEN the two overheat colours (not a dim/brighten of one, and
+                // not a flicker) - reads as "this is still your weapon warning you, and it is getting
+                // more urgent", not a second on/off state. theme.pulseDepth used to control a
+                // brightness dip here; it has no meaning against a two-colour lerp, so Task 5 removed
+                // it from UiTheme rather than leave a field nothing reads.
+                target = theme.pulseAtWarning
+                    ? Color.Lerp(theme.overheatColor, theme.overheatWarningColor, 0.5f + 0.5f * Mathf.Sin(Time.time * theme.pulseSpeed * Mathf.PI * 2f))
+                    : theme.overheatWarningColor;
+            }
+            else
+            {
+                target = theme.overheatColor;
             }
             overheatFill.color = target;
 
@@ -521,37 +533,55 @@ namespace Overpower.UI
             panel.transform.SetParent(canvasGo.transform, false);
             RectTransform panelRt = panel.GetComponent<RectTransform>();
             // Bottom-centre: the F1 test panel owns the top-left (TestRangePanel.BuildUi), and this
-            // keeps the two tools from ever overlapping. Lifted well clear of the bottom edge -
-            // measured against a running client - because the chat prompt ("press Enter to chat")
-            // occupies a tall band at the very bottom of the screen and would otherwise sit on top
-            // of this canvas (chat's Canvas has the default sortingOrder 0, above this one's -10).
+            // keeps the two tools from ever overlapping. Task 5 shrank the chat prompt ("press Enter
+            // to chat") from a tall band down to a small corner label, so this no longer needs to
+            // clear much - Hud Bottom Offset is a small, theme-tunable gap instead.
             panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 0f);
             panelRt.pivot = new Vector2(0.5f, 0f);
-            panelRt.anchoredPosition = new Vector2(0f, 260f);
-            panelRt.sizeDelta = new Vector2(BarWidth, 190f);
+            panelRt.anchoredPosition = new Vector2(0f, theme.hudBottomOffset);
+            // Sized by the ContentSizeFitter below, not by hand - see its comment.
+
+            // A visible background so the bars and slots read as one HUD group instead of floating
+            // text over the game world (Step 2 - "add a panel background if none exists").
+            Image panelBackground = panel.AddComponent<Image>();
+            panelBackground.color = theme.panelColor;
+            panelBackground.raycastTarget = false;
 
             VerticalLayoutGroup panelLayout = panel.AddComponent<VerticalLayoutGroup>();
             panelLayout.spacing = 6f;
-            panelLayout.childAlignment = TextAnchor.LowerCenter;
+            panelLayout.padding = new RectOffset(
+                Mathf.RoundToInt(theme.hudPanelPadding), Mathf.RoundToInt(theme.hudPanelPadding),
+                Mathf.RoundToInt(theme.hudPanelPadding), Mathf.RoundToInt(theme.hudPanelPadding));
+            panelLayout.childAlignment = TextAnchor.UpperCenter;
             panelLayout.childControlWidth = false;
             panelLayout.childControlHeight = false;
             panelLayout.childForceExpandWidth = false;
             panelLayout.childForceExpandHeight = false;
 
-            armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
-            healthFill = BuildBar(panel.transform, "Health Bar", BarWidth, 20f, theme.barTrackColor, theme.healthColor, out _);
-            overheatFill = BuildBar(panel.transform, "Overheat Bar", BarWidth, theme.overheatBarHeight, theme.barTrackColor, theme.overheatColor, out Image overheatTrack);
-            overheatTickRect = BuildOverheatTick(overheatTrack.transform);
+            // The panel's own rect is driven by its content (padding + every bar/row below) instead
+            // of a hand-picked sizeDelta - one less number to keep in sync by hand whenever a bar
+            // height or slot size changes on UiTheme. childAlignment above therefore never has slack
+            // to resolve either way; it is set for clarity, not because it matters here.
+            ContentSizeFitter panelFitter = panel.AddComponent<ContentSizeFitter>();
+            panelFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+            // Step 1 order - slots row, then overheat, then shield/armor, then health, top to
+            // bottom - matches [T], the mocked-up layout Tudor approved after Phase 1. A
+            // VerticalLayoutGroup lays children top-to-bottom in the order they are ADDED
+            // regardless of childAlignment (alignment only decides where leftover space goes, which
+            // the ContentSizeFitter above leaves at zero anyway) - so build order here IS visual
+            // order, and this comment is the one place that fact needs recording.
             GameObject slotsRow = new GameObject("Slots Row", typeof(RectTransform));
             slotsRow.transform.SetParent(panel.transform, false);
+            float slotsRowHeight = theme.slotIconBoxHeight + theme.slotCooldownAreaHeight;
             LayoutElement slotsRowLe = slotsRow.AddComponent<LayoutElement>();
-            slotsRowLe.preferredWidth = BarWidth;
-            slotsRowLe.preferredHeight = 92f;
+            slotsRowLe.preferredWidth = theme.barWidth;
+            slotsRowLe.preferredHeight = slotsRowHeight;
             // See BuildBar's comment: the outer VerticalLayoutGroup has childControl off on both
             // axes, so this row's own rect needs an explicit size - the same width as the bars
             // above it, so the slot boxes end up centred under them.
-            slotsRow.GetComponent<RectTransform>().sizeDelta = new Vector2(BarWidth, 92f);
+            slotsRow.GetComponent<RectTransform>().sizeDelta = new Vector2(theme.barWidth, slotsRowHeight);
             HorizontalLayoutGroup slotsLayout = slotsRow.AddComponent<HorizontalLayoutGroup>();
             slotsLayout.spacing = 10f;
             slotsLayout.childAlignment = TextAnchor.UpperCenter;
@@ -570,13 +600,20 @@ namespace Overpower.UI
             // it on/off with SetActive can no longer shift the row's position the way it did when
             // this lived as a separate, height-reserving sibling under Hud Panel (code review fix).
             silencedBanner = BuildSilencedBanner(slotsRow.transform);
+
+            overheatFill = BuildBar(panel.transform, "Overheat Bar", theme.barWidth, theme.overheatBarHeight, theme.overheatColor, out Image overheatTrack);
+            overheatTickRect = BuildOverheatTick(overheatTrack.transform);
+            armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
+            healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
         }
 
         /// <summary>trackImage is handed back so a caller can add something on top of the track
         /// itself - today just the overheat bar's warning tick, built by the caller right after this
-        /// returns. Every bar passes the same theme.barTrackColor for trackColor; the parameter still
-        /// exists because BuildArmorBar's track is built separately and needs the same colour.</summary>
-        private Image BuildBar(Transform parent, string name, float width, float height, Color trackColor, Color fillColor, out Image trackImage)
+        /// returns. Reads theme.barTrackColor directly rather than taking it as a parameter: both
+        /// callers (health and overheat) pass that same colour, and BuildArmorBar builds its own
+        /// track separately rather than calling this method at all, so a parameter here would only
+        /// ever hold one value.</summary>
+        private Image BuildBar(Transform parent, string name, float width, float height, Color fillColor, out Image trackImage)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -589,7 +626,7 @@ namespace Overpower.UI
             // onto the RectTransform. Set it explicitly here or the box stays at the default 100x100.
             go.GetComponent<RectTransform>().sizeDelta = new Vector2(width, height);
             Image background = go.AddComponent<Image>();
-            background.color = trackColor;
+            background.color = theme.barTrackColor;
             background.raycastTarget = false;
             trackImage = background;
 
@@ -652,10 +689,10 @@ namespace Overpower.UI
             GameObject track = new GameObject("Armor Bar", typeof(RectTransform));
             track.transform.SetParent(parent, false);
             LayoutElement le = track.AddComponent<LayoutElement>();
-            le.preferredWidth = BarWidth;
-            le.preferredHeight = 12f;
+            le.preferredWidth = theme.barWidth;
+            le.preferredHeight = theme.armorBarHeight;
             // See BuildBar's comment: childControlWidth/Height off means this has to be set directly too.
-            track.GetComponent<RectTransform>().sizeDelta = new Vector2(BarWidth, 12f);
+            track.GetComponent<RectTransform>().sizeDelta = new Vector2(theme.barWidth, theme.armorBarHeight);
             Image background = track.AddComponent<Image>();
             background.color = theme.barTrackColor;
             background.raycastTarget = false;
@@ -731,9 +768,9 @@ namespace Overpower.UI
             GameObject iconGo = new GameObject("Weapon Icon", typeof(RectTransform));
             iconGo.transform.SetParent(content.transform, false);
             LayoutElement iconLe = iconGo.AddComponent<LayoutElement>();
-            iconLe.preferredWidth = 20f;
-            iconLe.preferredHeight = 20f;
-            iconGo.GetComponent<RectTransform>().sizeDelta = new Vector2(20f, 20f); // See BuildBar's comment.
+            iconLe.preferredWidth = 28f;
+            iconLe.preferredHeight = 28f;
+            iconGo.GetComponent<RectTransform>().sizeDelta = new Vector2(28f, 28f); // See BuildBar's comment.
             Image iconImg = iconGo.AddComponent<Image>();
             iconImg.color = theme.silencedIconColor;
             iconImg.raycastTarget = false;
@@ -742,17 +779,19 @@ namespace Overpower.UI
             strike.transform.SetParent(iconGo.transform, false);
             RectTransform strikeRt = strike.GetComponent<RectTransform>();
             strikeRt.anchorMin = strikeRt.anchorMax = strikeRt.pivot = new Vector2(0.5f, 0.5f);
-            strikeRt.sizeDelta = new Vector2(30f, 3f);
+            strikeRt.sizeDelta = new Vector2(38f, 4f);
             strikeRt.localRotation = Quaternion.Euler(0f, 0f, -45f);
             Image strikeImg = strike.AddComponent<Image>();
             strikeImg.color = theme.overheatSilencedColor;
             strikeImg.raycastTarget = false;
 
-            TextMeshProUGUI text = AddLabel(content.transform, "WEAPON SILENCED", 14f, FontStyles.Bold);
+            // Body Text Size, not Small - this is the one HUD state that must read at a glance, the
+            // same reasoning Overheat Bar Height gets its own taller-than-the-rest treatment.
+            TextMeshProUGUI text = AddLabel(content.transform, "WEAPON SILENCED", theme.bodyTextSize, FontStyles.Bold);
             LayoutElement textLe = text.gameObject.AddComponent<LayoutElement>();
-            textLe.preferredWidth = 220f;
-            textLe.preferredHeight = 20f;
-            text.rectTransform.sizeDelta = new Vector2(220f, 20f); // See BuildBar's comment.
+            textLe.preferredWidth = 260f;
+            textLe.preferredHeight = 30f;
+            text.rectTransform.sizeDelta = new Vector2(260f, 30f); // See BuildBar's comment.
             text.color = theme.overheatSilencedColor;
             text.alignment = TextAlignmentOptions.MidlineLeft;
 
@@ -769,21 +808,23 @@ namespace Overpower.UI
         {
             var ui = new SlotUi();
 
+            float slotHeight = withCooldown ? theme.slotIconBoxHeight + theme.slotCooldownAreaHeight : theme.slotIconBoxHeight;
+
             GameObject go = new GameObject("Slot " + keyLabel, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             LayoutElement le = go.AddComponent<LayoutElement>();
-            le.preferredWidth = 64f;
-            le.preferredHeight = withCooldown ? 92f : 64f;
+            le.preferredWidth = theme.slotWidth;
+            le.preferredHeight = slotHeight;
             // See BuildBar's comment: the row's HorizontalLayoutGroup has childControl off on both
             // axes, so the slot box needs its own explicit size - everything inside it (Icon Box,
             // pips, text) stretches or anchors relative to THIS rect.
-            go.GetComponent<RectTransform>().sizeDelta = new Vector2(64f, withCooldown ? 92f : 64f);
+            go.GetComponent<RectTransform>().sizeDelta = new Vector2(theme.slotWidth, slotHeight);
 
             ui.background = go.AddComponent<Image>();
             ui.background.color = theme.slotReadyColor;
 
-            // The icon box occupies the top 64 units - the only part that exists at all on the
-            // weapon slot, which has no pip row or recharge sweep below it.
+            // The icon box occupies the top Slot Icon Box Height units - the only part that exists
+            // at all on the weapon slot, which has no pip row or recharge sweep below it.
             GameObject iconBox = new GameObject("Icon Box", typeof(RectTransform));
             iconBox.transform.SetParent(go.transform, false);
             RectTransform iconBoxRt = iconBox.GetComponent<RectTransform>();
@@ -791,7 +832,7 @@ namespace Overpower.UI
             iconBoxRt.anchorMax = new Vector2(1f, 1f);
             iconBoxRt.pivot = new Vector2(0.5f, 1f);
             iconBoxRt.anchoredPosition = Vector2.zero;
-            iconBoxRt.sizeDelta = new Vector2(0f, 64f);
+            iconBoxRt.sizeDelta = new Vector2(0f, theme.slotIconBoxHeight);
 
             GameObject iconGo = new GameObject("Icon", typeof(RectTransform));
             iconGo.transform.SetParent(iconBox.transform, false);
@@ -805,7 +846,9 @@ namespace Overpower.UI
             ui.icon.raycastTarget = false;
             ui.icon.enabled = false;
 
-            ui.fallbackNameText = AddLabel(iconBox.transform, "", 11f, FontStyles.Normal);
+            // Body Text Size - Step 2's explicit call: the icon box is sized (Slot Width/Slot Icon
+            // Box Height) so the longest short names (Raybeam, Shotgun, Baseline) fit at this size.
+            ui.fallbackNameText = AddLabel(iconBox.transform, "", theme.bodyTextSize, FontStyles.Normal);
             RectTransform nameRt = ui.fallbackNameText.rectTransform;
             nameRt.anchorMin = Vector2.zero;
             nameRt.anchorMax = Vector2.one;
@@ -813,7 +856,6 @@ namespace Overpower.UI
             nameRt.offsetMax = new Vector2(-3f, -3f);
             ui.fallbackNameText.enableWordWrapping = true;
             ui.fallbackNameText.alignment = TextAlignmentOptions.Center;
-            ui.fallbackNameText.fontSize = 11f;
 
             if (withCooldown)
             {
@@ -834,27 +876,35 @@ namespace Overpower.UI
                 ui.cooldownCover.fillAmount = 0f;
                 ui.cooldownCover.raycastTarget = false;
 
+                // Pip row and block-reason text sit BELOW the icon box, in the Slot Cooldown Area
+                // Height band reserved for them - positions derive from Slot Icon Box Height so they
+                // never drift out of sync with it.
+                const float PipRowHeight = 14f;
+                const float ReasonTextHeight = 26f;
+                float pipRowY = -(theme.slotIconBoxHeight + 2f);
+                float reasonY = pipRowY - PipRowHeight - 2f;
+
                 GameObject pipRow = new GameObject("Pips", typeof(RectTransform));
                 pipRow.transform.SetParent(go.transform, false);
                 RectTransform pipRt = pipRow.GetComponent<RectTransform>();
                 pipRt.anchorMin = new Vector2(0f, 1f);
                 pipRt.anchorMax = new Vector2(1f, 1f);
                 pipRt.pivot = new Vector2(0.5f, 1f);
-                pipRt.anchoredPosition = new Vector2(0f, -66f);
-                pipRt.sizeDelta = new Vector2(0f, 10f);
+                pipRt.anchoredPosition = new Vector2(0f, pipRowY);
+                pipRt.sizeDelta = new Vector2(0f, PipRowHeight);
                 HorizontalLayoutGroup pipLayout = pipRow.AddComponent<HorizontalLayoutGroup>();
                 pipLayout.spacing = 2f;
                 pipLayout.childAlignment = TextAnchor.MiddleCenter;
                 pipLayout.childControlWidth = pipLayout.childControlHeight = false;
                 ui.pipRow = pipRow.transform;
 
-                ui.blockReasonText = AddLabel(go.transform, "", 9f, FontStyles.Italic);
+                ui.blockReasonText = AddLabel(go.transform, "", theme.smallTextSize, FontStyles.Italic);
                 RectTransform reasonRt = ui.blockReasonText.rectTransform;
                 reasonRt.anchorMin = new Vector2(0f, 1f);
                 reasonRt.anchorMax = new Vector2(1f, 1f);
                 reasonRt.pivot = new Vector2(0.5f, 1f);
-                reasonRt.anchoredPosition = new Vector2(0f, -78f);
-                reasonRt.sizeDelta = new Vector2(0f, 14f);
+                reasonRt.anchoredPosition = new Vector2(0f, reasonY);
+                reasonRt.sizeDelta = new Vector2(0f, ReasonTextHeight);
                 ui.blockReasonText.alignment = TextAlignmentOptions.Center;
                 ui.blockReasonText.color = theme.overheatWarningColor;
 
@@ -882,7 +932,7 @@ namespace Overpower.UI
                     ui.ultimateChargeFill.fillAmount = 0f;
                     ui.ultimateChargeFill.raycastTarget = false;
 
-                    ui.readyLabel = AddLabel(iconBox.transform, "READY", 13f, FontStyles.Bold);
+                    ui.readyLabel = AddLabel(iconBox.transform, "READY", theme.smallTextSize, FontStyles.Bold);
                     RectTransform readyRt = ui.readyLabel.rectTransform;
                     readyRt.anchorMin = Vector2.zero;
                     readyRt.anchorMax = Vector2.one;
@@ -893,35 +943,64 @@ namespace Overpower.UI
                 }
             }
 
-            TextMeshProUGUI keyText = AddLabel(go.transform, keyLabel, 9f, FontStyles.Bold);
+            // Body Text Size - Step 2's explicit call, alongside the fallback name above: the
+            // longest key label (SPACE) has to fit here too.
+            TextMeshProUGUI keyText = AddLabel(go.transform, keyLabel, theme.bodyTextSize, FontStyles.Bold);
             RectTransform keyRt = keyText.rectTransform;
             keyRt.anchorMin = new Vector2(0f, 1f);
             keyRt.anchorMax = new Vector2(0f, 1f);
             keyRt.pivot = new Vector2(0f, 1f);
             keyRt.anchoredPosition = new Vector2(2f, -2f);
-            keyRt.sizeDelta = new Vector2(36f, 12f);
+            keyRt.sizeDelta = new Vector2(90f, 32f);
             keyText.alignment = TextAlignmentOptions.TopLeft;
-            keyText.fontSize = 9f;
 
             return ui;
         }
 
         /// <summary>Same recipe as TestRangePanel.AddLabel (see its class comment) - kept private to
         /// this file rather than shared, since the two panels have no other coupling and a shared
-        /// utility class would be the only reason to introduce one.</summary>
-        private static TextMeshProUGUI AddLabel(Transform parent, string text, float fontSize, FontStyles style)
+        /// utility class would be the only reason to introduce one. An instance method (not static,
+        /// unlike before Task 5) because it now needs theme for the font/colour/outline every HUD
+        /// text is built with.</summary>
+        private TextMeshProUGUI AddLabel(Transform parent, string text, float fontSize, FontStyles style)
         {
             GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
             go.transform.SetParent(parent, false);
             TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
             tmp.text = text;
+            // Font must be assigned BEFORE fontSharedMaterial is touched below - assigning .font
+            // switches fontSharedMaterial to that font asset's own default material, which is
+            // exactly the template ApplyOutline clones from the first time it runs.
+            if (theme.font != null)
+                tmp.font = theme.font;
             tmp.fontSize = fontSize;
             tmp.fontStyle = style;
-            tmp.color = Color.white;
+            tmp.color = theme.textColor;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = true;
             tmp.raycastTarget = false;
+            ApplyOutline(tmp);
             return tmp;
+        }
+
+        /// <summary>Gives a text an outline via ONE Material instance shared by every text this HUD
+        /// builds, instead of the dozen-plus near-identical instances TMP_Text would create on its
+        /// own - TMP_Text.outlineWidth/outlineColor each auto-clone fontSharedMaterial into a fresh
+        /// per-object instance (fontMaterial) the first time either is touched, so setting them
+        /// directly on every label would mean one material per label, all with the same two numbers.
+        /// Setting the shared material's shader properties once up front and handing every label the
+        /// SAME instance avoids that, and lets every HUD text batch into fewer draw calls besides.
+        /// Built lazily from the first label's font (all HUD labels share theme.font, so the shader
+        /// this material's cloned from is the same for every text this method is ever called for).</summary>
+        private void ApplyOutline(TextMeshProUGUI tmp)
+        {
+            if (hudTextMaterial == null)
+            {
+                hudTextMaterial = new Material(tmp.fontSharedMaterial);
+                hudTextMaterial.SetFloat(ShaderUtilities.ID_OutlineWidth, theme.textOutlineWidth);
+                hudTextMaterial.SetColor(ShaderUtilities.ID_OutlineColor, theme.textOutlineColor);
+            }
+            tmp.fontSharedMaterial = hudTextMaterial;
         }
     }
 }
