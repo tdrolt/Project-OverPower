@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 5667895376292780098}
   - component: {fileID: 5730266993843930018}
   - component: {fileID: 6410789498585402660}
+  - component: {fileID: 694183307610266887}
   m_Layer: 7
   m_Name: Burst Bullet - Bounce
   m_TagString: Bullet
@@ -66,7 +67,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: f0b4b93929628ec4f856bb2035cf8d69, type: 2}
+  - {fileID: 2100000, guid: cb9354d80aa14fb4381c2af32cea0e4f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -120,3 +121,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxBounces: 3
   damagePerBounce: 0.2
+--- !u!114 &694183307610266887
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623706127264014633}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 00827b3b37fae444a883384a298d7b81, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
