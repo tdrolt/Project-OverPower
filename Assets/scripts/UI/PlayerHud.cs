@@ -601,7 +601,14 @@ namespace Overpower.UI
             slotsLayout.childAlignment = TextAnchor.UpperCenter;
             // ON for the same reason as panelLayout above - this group's four slot children each
             // carry a LayoutElement (see BuildSlot) that is now the one place their size lives.
+            // Force-expand OFF, same as panelLayout - a runtime AddComponent<HorizontalLayoutGroup>
+            // does NOT run the Editor's Reset() (that only fires from the Add Component button), so
+            // childForceExpandWidth/Height default to true, not false. Left unset here, child
+            // control ON meant every slot got cross-axis stretched to the row's full height instead
+            // of staying at its own LayoutElement size - the weapon slot visibly taller than the
+            // ability slots below it (code review fix).
             slotsLayout.childControlWidth = slotsLayout.childControlHeight = true;
+            slotsLayout.childForceExpandWidth = slotsLayout.childForceExpandHeight = false;
 
             weaponSlotUi = BuildSlot(slotsRow.transform, "LMB", withCooldown: false, isUltimate: false);
             for (int i = 0; i < AbilitySlotOrder.Length; i++)
@@ -778,7 +785,11 @@ namespace Overpower.UI
             layout.spacing = 8f;
             // ON for the same reason as panelLayout in BuildUi - the icon and label below each carry
             // a LayoutElement that is now the one place their size lives, not a duplicated sizeDelta.
+            // Force-expand OFF - see slotsLayout's comment in BuildUi for why a runtime
+            // AddComponent needs this said explicitly (code review fix): without it the icon and
+            // text both stretched to the row's full height.
             layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
             GameObject iconGo = new GameObject("Weapon Icon", typeof(RectTransform));
             iconGo.transform.SetParent(content.transform, false);
@@ -911,7 +922,11 @@ namespace Overpower.UI
                 pipLayout.childAlignment = TextAnchor.MiddleCenter;
                 // ON for the same reason as panelLayout in BuildUi - SetPips's own LayoutElement per
                 // pip is now the one place their size lives, not a duplicated sizeDelta.
+                // Force-expand OFF - see slotsLayout's comment in BuildUi for why a runtime
+                // AddComponent needs this said explicitly (code review fix): without it every pip
+                // stretched to fill the row, so two 8x8 pips rendered as one wide bar.
                 pipLayout.childControlWidth = pipLayout.childControlHeight = true;
+                pipLayout.childForceExpandWidth = pipLayout.childForceExpandHeight = false;
                 ui.pipRow = pipRow.transform;
 
                 ui.blockReasonText = AddLabel(go.transform, "", theme.smallTextSize, FontStyles.Italic);
