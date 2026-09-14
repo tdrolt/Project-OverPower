@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3474bf16eda717b49839d4c51e29158b, type: 3}
+  m_Name: UiTheme
+  m_EditorClassIdentifier: 
+  referenceResolution: {x: 1920, y: 1080}
+  matchWidthOrHeight: 0.5
+  font: {fileID: 0}
+  smallTextSize: 20
+  bodyTextSize: 24
+  titleTextSize: 34
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  mutedTextColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
+  textOutlineColor: {r: 0, g: 0, b: 0, a: 0.9}
+  textOutlineWidth: 0.2
+  panelColor: {r: 0.06, g: 0.06, b: 0.08, a: 0.85}
+  highlightColor: {r: 1, g: 0.78, b: 0.25, a: 1}
+  lockedColor: {r: 1, g: 1, b: 1, a: 0.25}
+  barSprite: {fileID: 21300000, guid: 1615351f74fe97140aa068aafd0324e6, type: 3}
+  healthColor: {r: 0.39, g: 0.8, b: 0.25, a: 1}
+  shieldColor: {r: 0.25, g: 0.6, b: 1, a: 1}
+  overheatColor: {r: 0.95, g: 0.62, b: 0.15, a: 1}
+  overheatWarningColor: {r: 1, g: 0.35, b: 0.1, a: 1}
+  overheatSilencedColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
+  barTrackColor: {r: 0.18, g: 0.18, b: 0.2, a: 1}
+  overheatBarHeight: 18
+  overheatTickColor: {r: 0.12, g: 0.12, b: 0.14, a: 0.9}
+  overheatTickWidth: 2
+  pulseAtWarning: 1
+  pulseSpeed: 1.2
+  pulseDepth: 0.35
+  slotReadyColor: {r: 0, g: 0, b: 0, a: 0.6}
+  slotBlockedColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.85}
+  slotActiveGlowColor: {r: 1, g: 0.85, b: 0.25, a: 1}
+  pipAvailableColor: {r: 1, g: 1, b: 1, a: 1}
+  pipSpentColor: {r: 1, g: 1, b: 1, a: 0.15}
+  cooldownCoverColor: {r: 0, g: 0, b: 0, a: 0.65}
+  ultimateChargeColor: {r: 1, g: 0.85, b: 0.25, a: 0.45}
+  ultimateReadyTextColor: {r: 1, g: 0.95, b: 0.6, a: 1}
+  coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
+  coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
+  coneLineWidth: 0.04
