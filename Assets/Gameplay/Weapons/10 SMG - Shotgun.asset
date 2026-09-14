@@ -32,6 +32,8 @@ MonoBehaviour:
   bloomPerShot: 2.5
   recoveryPerSecond: 1.5
   standingStillMultiplier: 1.5
+  movingSpreadDegrees: 2
+  movingBloomPerSecond: 2
   overheatPerShot: 18
   overheatRefundOnHit: 0
   canCharge: 0

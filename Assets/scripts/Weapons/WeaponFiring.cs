@@ -225,7 +225,8 @@ namespace Overpower.Weapons
             // Points the aim cone at this weapon's own accuracy numbers, which is what PlayerAim's
             // serialized fallback values were always placeholders for.
             aim.ConfigureCone(weapon.MinConeAngle, weapon.MaxConeAngle, weapon.BloomPerShot,
-                              weapon.RecoveryPerSecond, weapon.StandingStillMultiplier);
+                              weapon.RecoveryPerSecond, weapon.StandingStillMultiplier,
+                              weapon.MovingSpreadDegrees, weapon.MovingBloomPerSecond);
         }
 
         /// <summary>

@@ -6,9 +6,10 @@ using Overpower.Combat;
 /// Faces the player at the mouse cursor and owns the active weapon's aim cone (bloom on fire,
 /// tighter while standing still, recovers over time). Split out of Multiplayer.cs (Task 0.10).
 ///
-/// No weapon system exists yet, so the cone below is seeded from the assault rifle's own numbers
-/// as a fallback. A later weapon task calls ConfigureCone when the active weapon changes instead
-/// of editing this file.
+/// The cone below is seeded from the assault rifle's own numbers as a fallback, for the moment
+/// before the active weapon's first ConfigureCone call. WeaponFiring calls ConfigureCone whenever
+/// the active weapon changes, repointing the cone at that weapon's own numbers instead of editing
+/// this file.
 /// </summary>
 public class PlayerAim : MonoBehaviour
 {
@@ -29,6 +30,16 @@ public class PlayerAim : MonoBehaviour
     [SerializeField, Tooltip("How much tighter the cone gets the instant the player stops moving. " +
              "1.5 means the standing spread is the moving spread divided by 1.5.")]
     private float standingStillMultiplier = 1.5f;
+
+    [SerializeField, Tooltip("Degrees added to this weapon's spread the moment the player starts moving, " +
+             "removed the moment they stop. Makes shooting on the move visibly less accurate. Defaults to 0 " +
+             "so this fallback cone (before any weapon has configured it) is unchanged.")]
+    private float movingSpreadDegrees = 0f;
+
+    [SerializeField, Tooltip("While the player keeps moving, the spread widens by this many degrees per second " +
+             "toward maxAngle. recoveryPerSecond still pulls it back, so this only does anything when it is " +
+             "larger than recoveryPerSecond. Defaults to 0 so this fallback cone is unchanged.")]
+    private float movingBloomPerSecond = 0f;
 
     private PhotonView photonView;
     private PlayerMotor motor;
@@ -59,18 +70,22 @@ public class PlayerAim : MonoBehaviour
 
     private void BuildCone()
     {
-        coneState = new AimConeState(minAngle, maxAngle, bloomPerShot, recoveryPerSecond, standingStillMultiplier);
+        coneState = new AimConeState(minAngle, maxAngle, bloomPerShot, recoveryPerSecond, standingStillMultiplier,
+                                     movingSpreadDegrees, movingBloomPerSecond);
     }
 
     /// <summary>Lets a later weapon task repoint the cone to the active weapon's own numbers
     /// without editing this file.</summary>
-    public void ConfigureCone(float min, float max, float bloom, float recovery, float standingStill)
+    public void ConfigureCone(float min, float max, float bloom, float recovery, float standingStill,
+                              float movingSpread, float movingBloom)
     {
         minAngle = min;
         maxAngle = max;
         bloomPerShot = bloom;
         recoveryPerSecond = recovery;
         standingStillMultiplier = standingStill;
+        movingSpreadDegrees = movingSpread;
+        movingBloomPerSecond = movingBloom;
         BuildCone();
     }
 

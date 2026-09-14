@@ -140,6 +140,17 @@ namespace Overpower.Data
         [SerializeField] private float standingStillMultiplier = 1.5f;
         public float StandingStillMultiplier => standingStillMultiplier;
 
+        [SerializeField, Tooltip("Degrees added to this weapon's spread the moment the player starts moving, " +
+                                 "removed the moment they stop. Makes shooting on the move visibly less accurate.")]
+        private float movingSpreadDegrees = 4f;
+        public float MovingSpreadDegrees => movingSpreadDegrees;
+
+        [SerializeField, Tooltip("While the player keeps moving, the spread widens by this many degrees per second " +
+                                 "toward Max Cone Angle. Recovery Per Second still pulls it back, so this only " +
+                                 "does anything when it is larger than Recovery Per Second.")]
+        private float movingBloomPerSecond = 3f;
+        public float MovingBloomPerSecond => movingBloomPerSecond;
+
         [Header("Overheat")]
         [Tooltip("Heat added per trigger pull - NOT per projectile. A shot that fires five " +
                  "projectiles still adds this amount once. Divide Overheat Max on the Gameplay " +
@@ -214,21 +225,32 @@ namespace Overpower.Data
         /// </summary>
         private void OnValidate()
         {
-            if (fireInterval <= 0f || bloomPerShot <= 0f)
-                return;
+            if (fireInterval > 0f && bloomPerShot > 0f)
+            {
+                float bloomPerSecond = bloomPerShot / fireInterval;
+                if (recoveryPerSecond >= bloomPerSecond)
+                {
+                    Debug.LogWarning(
+                        $"Weapon '{name}': accuracy currently does nothing. Holding the trigger adds " +
+                        $"{bloomPerSecond:0.##} degrees of spread per second ({bloomPerShot} Bloom Per " +
+                        $"Shot every {fireInterval}s), but Recovery Per Second removes {recoveryPerSecond} " +
+                        $"- so the cone never leaves Min Cone Angle and sustained fire is as accurate as " +
+                        $"a single shot. Fix it by lowering Recovery Per Second below {bloomPerSecond:0.##}, " +
+                        $"or by raising Bloom Per Shot above {recoveryPerSecond * fireInterval:0.##}.",
+                        this);
+                }
+            }
 
-            float bloomPerSecond = bloomPerShot / fireInterval;
-            if (recoveryPerSecond < bloomPerSecond)
-                return;
-
-            Debug.LogWarning(
-                $"Weapon '{name}': accuracy currently does nothing. Holding the trigger adds " +
-                $"{bloomPerSecond:0.##} degrees of spread per second ({bloomPerShot} Bloom Per " +
-                $"Shot every {fireInterval}s), but Recovery Per Second removes {recoveryPerSecond} " +
-                $"- so the cone never leaves Min Cone Angle and sustained fire is as accurate as " +
-                $"a single shot. Fix it by lowering Recovery Per Second below {bloomPerSecond:0.##}, " +
-                $"or by raising Bloom Per Shot above {recoveryPerSecond * fireInterval:0.##}.",
-                this);
+            // Same shape of trap as above, but for the moving bloom added in the playtest polish
+            // pass: if it doesn't outpace recovery, moving never widens the cone past the flat
+            // moving spread, and Moving Bloom Per Second is a decorative number.
+            if (movingBloomPerSecond > 0f && movingBloomPerSecond <= recoveryPerSecond)
+            {
+                Debug.LogWarning(
+                    $"{name}: Moving Bloom Per Second ({movingBloomPerSecond}) is not larger than Recovery Per Second " +
+                    $"({recoveryPerSecond}), so moving never widens the cone - the bloom is decorative. Raise Moving " +
+                    $"Bloom Per Second above {recoveryPerSecond}, or set it to 0 on purpose.", this);
+            }
         }
 #endif
     }
