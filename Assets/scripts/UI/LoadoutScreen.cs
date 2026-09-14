@@ -1,10 +1,12 @@
 using System.Collections.Generic;
+using System.Text;
 using Photon.Pun;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Weapons;
@@ -42,11 +44,12 @@ namespace Overpower.UI
     /// general tool focus the same way the F1 panel does (PlayerInputRouter.SetToolFocus), now keyed
     /// by owner so the two tools can be open at once without one closing stealing the other's claim.
     ///
-    /// ABILITIES (Task 9b): rightColumnContent now holds a heading and a wrapping card grid per
-    /// ability slot (see BuildAbilitiesUi), in place of the placeholder label Task 9a left there.
-    /// descriptionPanelContent is still the same empty, zero-height strip under both columns from
-    /// Task 9a - a later commit in this same task gives it the hover-description content the brief
-    /// asks for.
+    /// ABILITIES AND HOVER (Task 9b): rightColumnContent now holds a heading and a wrapping card
+    /// grid per ability slot (see BuildAbilitiesUi), in place of the placeholder label Task 9a left
+    /// there. descriptionPanelContent is a fixed-height strip under both columns (see BuildScreenCanvas
+    /// and the "Hover description" region) that every weapon node and ability card feeds through a
+    /// HoverRelay pointer-enter/exit component - name, description and live numbers read straight
+    /// off the asset/module at hover time.
     /// </summary>
     public class LoadoutScreen : MonoBehaviourPun
     {
@@ -122,6 +125,26 @@ namespace Overpower.UI
         {
             AbilitySlot.Mobility, AbilitySlot.Equipment, AbilitySlot.Ultimate
         };
+
+        // ---- hover description ------------------------------------------------------------------
+
+        /// <summary>Turns UI pointer enter/exit into a plain callback - added to every weapon node
+        /// and ability card so hovering either one can drive the description panel below, without
+        /// every node/card wiring its own EventTrigger by hand. A MonoBehaviour because
+        /// IPointerEnterHandler/IPointerExitHandler only work on one.</summary>
+        private sealed class HoverRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+        {
+            public System.Action OnEnter;
+            public System.Action OnExit;
+            public void OnPointerEnter(PointerEventData eventData) => OnEnter?.Invoke();
+            public void OnPointerExit(PointerEventData eventData) => OnExit?.Invoke();
+        }
+
+        private const string HoverHintText = "Hover an item to see what it does.";
+
+        private TextMeshProUGUI hoverNameLabel;
+        private TextMeshProUGUI hoverDescriptionLabel;
+        private TextMeshProUGUI hoverNumbersLabel;
 
         // ---- armor --------------------------------------------------------------------------------
 
@@ -314,6 +337,7 @@ namespace Overpower.UI
             inputRouter?.SetToolFocus(this, true);
             // No Cursor.lockState/Cursor.visible call exists anywhere in this project (checked
             // before writing this) - the cursor is always free, so there is nothing to unlock here.
+            ClearHover(); // Reopening must not show whatever was last hovered before it closed.
             Refresh();
         }
 
@@ -483,6 +507,10 @@ namespace Overpower.UI
 
             int weaponId = def.Id; // Captured per node - the field itself would be the last weapon iterated by click time.
             button.onClick.AddListener(() => OnWeaponNodeClicked(weaponId));
+
+            HoverRelay hover = go.AddComponent<HoverRelay>();
+            hover.OnEnter = () => ShowWeaponHover(def);
+            hover.OnExit = ClearHover;
 
             return new WeaponNodeUi { button = button, outer = outer, inner = inner, label = label };
         }
@@ -716,6 +744,10 @@ namespace Overpower.UI
             int abilityId = def.Id;
             button.onClick.AddListener(() => OnAbilityCardClicked(slot, abilityId));
 
+            HoverRelay hover = go.AddComponent<HoverRelay>();
+            hover.OnEnter = () => ShowAbilityHover(def);
+            hover.OnExit = ClearHover;
+
             return new AbilityCardUi { button = button, outer = outer, inner = inner, label = label };
         }
 
@@ -747,6 +779,90 @@ namespace Overpower.UI
                 ui.label.color = theme.textColor;
             }
         }
+
+        // ============================================================================================
+        // Hover description - one panel at the bottom of the screen, fed by whichever weapon node
+        // or ability card the pointer is currently over (HoverRelay above). Numbers are always read
+        // live off the asset/module at hover time, never typed text, so a designer retuning a
+        // weapon or ability never has to remember to also update a description here.
+        // ============================================================================================
+
+        private void ClearHover()
+        {
+            hoverNameLabel.text = "";
+            hoverDescriptionLabel.text = HoverHintText;
+            hoverNumbersLabel.text = "";
+        }
+
+        private void ShowWeaponHover(WeaponDefinition def)
+        {
+            if (def == null)
+            {
+                ClearHover();
+                return;
+            }
+
+            hoverNameLabel.text = def.DisplayName;
+            hoverDescriptionLabel.text = def.Description ?? "";
+            hoverNumbersLabel.text = WeaponNumbersText(def);
+        }
+
+        private static string WeaponNumbersText(WeaponDefinition def)
+        {
+            var sb = new StringBuilder();
+            sb.Append(def.ProjectilesPerShot > 1
+                ? $"Damage {Compact(def.Damage)} x{def.ProjectilesPerShot} ({Compact(def.Damage * def.ProjectilesPerShot)} total)"
+                : $"Damage {Compact(def.Damage)}");
+
+            float shotsPerSecond = def.FireInterval > 0f ? 1f / def.FireInterval : 0f;
+            sb.Append($"\nFire interval {Compact(def.FireInterval)}s ({Compact(shotsPerSecond)}/s) · Range {Compact(def.MaxRange)}m");
+            sb.Append($"\nOverheat {Compact(def.OverheatPerShot)}/shot");
+            if (def.CanCharge)
+                sb.Append(" · hold to charge");
+
+            return sb.ToString();
+        }
+
+        private void ShowAbilityHover(AbilityDefinition def)
+        {
+            if (def == null)
+            {
+                ClearHover();
+                return;
+            }
+
+            hoverNameLabel.text = def.DisplayName;
+            hoverDescriptionLabel.text = def.Description ?? "";
+            hoverNumbersLabel.text = AbilityNumbersText(def);
+        }
+
+        /// <summary>The module prefab carries an ability's only numbers (AbilityDefinition itself is
+        /// deliberately thin - see its own class comment), read through AbilityModule.CooldownSeconds/
+        /// Charges rather than ChargesAvailable/RechargeProgress: those read a live runtime
+        /// ChargePool, which is null on a prefab asset that was never Bind-ed to a player.</summary>
+        private static string AbilityNumbersText(AbilityDefinition def)
+        {
+            AbilityModule prefabModule = def.ModulePrefab != null ? def.ModulePrefab.GetComponent<AbilityModule>() : null;
+            if (prefabModule == null)
+                return "";
+
+            // Ultimates have 0s cooldown / 1 charge by design (AbilityModule's own defaults) -
+            // readiness instead comes from the shared UltimateCharge meter (kills, assists, damage
+            // dealt/taken), so "cooldown 0s" here would flatly misdescribe how they work.
+            if (def.Slot == AbilitySlot.Ultimate)
+                return "Charges from kills, assists, and damage dealt or taken.";
+
+            if (prefabModule.Charges <= 0)
+                return "No cooldown.";
+            if (prefabModule.Charges == 1)
+                return $"{Compact(prefabModule.CooldownSeconds)}s cooldown";
+
+            return $"{prefabModule.Charges} charges, {Compact(prefabModule.CooldownSeconds)}s each";
+        }
+
+        /// <summary>Trims a float to at most two decimals and drops a trailing ".00" - so this panel
+        /// shows "5" or "3.13", never "5.000000".</summary>
+        private static string Compact(float value) => value.ToString("0.##");
 
         // ============================================================================================
         // UI construction
@@ -837,10 +953,34 @@ namespace Overpower.UI
 
             BuildArmorSection(leftColumn.transform);
 
-            // Task 9b's hover-description hook - present, empty, and zero-height (no LayoutElement
-            // means the layout group gives it no size) until that task gives it content.
+            // Hover-description strip. Fixed height (Loadout Description Panel Height) via
+            // LayoutElement's min AND preferred, both pinned, so switching between a short weapon
+            // hover and a long ability description never resizes the panel around it - see the
+            // "Hover description" region for what fills it in.
             GameObject descriptionPanel = new GameObject("Description Panel", typeof(RectTransform));
             descriptionPanel.transform.SetParent(panel.transform, false);
+            LayoutElement descriptionLe = descriptionPanel.AddComponent<LayoutElement>();
+            descriptionLe.preferredHeight = theme.loadoutDescriptionPanelHeight;
+            descriptionLe.minHeight = theme.loadoutDescriptionPanelHeight;
+            Image descriptionBackground = descriptionPanel.AddComponent<Image>();
+            descriptionBackground.color = theme.barTrackColor;
+            descriptionBackground.raycastTarget = false;
+
+            VerticalLayoutGroup descriptionLayout = descriptionPanel.AddComponent<VerticalLayoutGroup>();
+            int descPad = Mathf.RoundToInt(theme.loadoutPanelPadding * 0.5f);
+            descriptionLayout.padding = new RectOffset(descPad, descPad, descPad, descPad);
+            descriptionLayout.spacing = 2f;
+            descriptionLayout.childAlignment = TextAnchor.UpperLeft;
+            descriptionLayout.childControlWidth = descriptionLayout.childControlHeight = true;
+            descriptionLayout.childForceExpandWidth = descriptionLayout.childForceExpandHeight = false;
+
+            hoverNameLabel = AddStretchedLabel(descriptionPanel.transform, "", theme.bodyTextSize, FontStyles.Bold);
+            hoverDescriptionLabel = AddStretchedLabel(descriptionPanel.transform, "", theme.smallTextSize, FontStyles.Normal);
+            hoverDescriptionLabel.color = theme.mutedTextColor;
+            hoverNumbersLabel = AddStretchedLabel(descriptionPanel.transform, "", theme.smallTextSize, FontStyles.Normal);
+            hoverNumbersLabel.color = theme.mutedTextColor;
+            ClearHover();
+
             descriptionPanelContent = descriptionPanel.transform;
         }
 
@@ -948,6 +1088,19 @@ namespace Overpower.UI
             }
 
             return button;
+        }
+
+        /// <summary>A label that stretches to fill whatever width it sits in - the same flexibleWidth
+        /// trick BuildTitleRow's own title text and BuildArmorRow's own label already use, here
+        /// pulled into a helper for the hover-description panel's three stacked lines, each of which
+        /// needs the same "wrap to the panel's own width, not to my own text's width" behaviour.</summary>
+        private TextMeshProUGUI AddStretchedLabel(Transform parent, string text, float fontSize, FontStyles style)
+        {
+            TextMeshProUGUI label = AddLabel(parent, text, fontSize, style);
+            label.alignment = TextAlignmentOptions.TopLeft;
+            LayoutElement le = label.gameObject.AddComponent<LayoutElement>();
+            le.flexibleWidth = 1f;
+            return label;
         }
 
         /// <summary>Same recipe as PlayerHud.AddLabel - kept private to this file rather than shared

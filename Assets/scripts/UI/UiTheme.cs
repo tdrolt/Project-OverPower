@@ -137,6 +137,8 @@ namespace Overpower.UI
         public Color loadoutSelectableColor = new Color(0.16f, 0.16f, 0.19f, 0.95f);
         [Tooltip("Node fill for a weapon you already passed through on the way to your current one.")]
         public Color loadoutOwnedColor = new Color(0.30f, 0.30f, 0.33f, 0.85f);
+        [Tooltip("Fixed height of the hover-description strip under the weapon/ability columns, in canvas units - fixed so switching between a short weapon hover and a long ability description never resizes the panel around it. Generous enough for a three-line name/description/numbers block; a longer hover string overflows past it rather than growing it.")]
+        public float loadoutDescriptionPanelHeight = 150f;
         [Tooltip("Width of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
         public float loadoutToggleButtonWidth = 190f;
         [Tooltip("Height of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
