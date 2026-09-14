@@ -154,12 +154,14 @@ public class AimConeView : MonoBehaviourPun
 
     private void LateUpdate()
     {
-        // Dead: nothing to aim. Suppressed: chatting, or a tool (F1, and later Task 9's loadout
-        // screen - LoadoutScreen.IsOpen does not exist yet, so InputSuppressed's toolHasFocus flag
-        // is the only signal available; Task 9 should read LoadoutScreen.IsOpen here directly once
-        // it exists, the same way it will make AimConeView hide for it. No weapon: nothing to draw.
+        // Dead: nothing to aim. Suppressed: chatting, or a tool (F1) has claimed focus. Loadout
+        // screen open: checked explicitly via LoadoutScreen.IsOpen rather than relying only on
+        // InputSuppressed - the loadout screen's own tool-focus claim already makes InputSuppressed
+        // true while it is open, but reading IsOpen directly means this line does not silently stop
+        // working if the loadout screen's focus semantics ever change. No weapon: nothing to draw.
         bool hide = (lifecycle != null && !lifecycle.IsAlive) ||
                     (input != null && input.InputSuppressed) ||
+                    LoadoutScreen.IsOpen ||
                     weaponFiring.Weapon == null;
 
         if (hide)

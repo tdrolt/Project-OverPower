@@ -108,6 +108,40 @@ namespace Overpower.UI
         [Tooltip("Height (thickness) of the diagonal strike line, in canvas units.")]
         public float silencedStrikeHeight = 4f;
 
+        [Header("Loadout screen")]
+        [Tooltip("Colour of the full-screen wash behind the loadout panel - dims the game world so the panel reads as a modal screen.")]
+        public Color loadoutDimColor = new Color(0f, 0f, 0f, 0.75f);
+        [Tooltip("Space between the loadout panel's background edge and its title/columns, in canvas units, on every side.")]
+        public float loadoutPanelPadding = 20f;
+        [Tooltip("Width of the weapon-tree/armor column on the left, in canvas units - fixed so the ability column on the right (Task 9b) lines up beside it instead of both fighting over leftover space.")]
+        public float loadoutLeftColumnWidth = 640f;
+        [Tooltip("Width of the ability-picks column on the right, in canvas units - empty until Task 9b fills it in; reserved now so the panel does not visibly resize when that task adds content.")]
+        public float loadoutRightColumnWidth = 640f;
+        [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units.")]
+        public float loadoutNodeWidth = 130f;
+        [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units.")]
+        public float loadoutNodeHeight = 64f;
+        [Tooltip("Gap between sibling weapon nodes - side to side in the branches row, and top to bottom in a branch's own stack of children - in canvas units.")]
+        public float loadoutNodeSpacing = 14f;
+        [Tooltip("Thickness of the highlight border drawn around the equipped weapon node, in canvas units.")]
+        public float loadoutEquippedBorderWidth = 4f;
+        [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units.")]
+        public float loadoutStepperButtonSize = 44f;
+        [Tooltip("Width of a labelled loadout button - Reset Weapon, Reset Armor - in canvas units.")]
+        public float loadoutSmallButtonWidth = 170f;
+        [Tooltip("Height of a labelled loadout button - Reset Weapon, Reset Armor - in canvas units.")]
+        public float loadoutSmallButtonHeight = 42f;
+        [Tooltip("Node fill for a weapon you can upgrade into right now.")]
+        public Color loadoutSelectableColor = new Color(0.16f, 0.16f, 0.19f, 0.95f);
+        [Tooltip("Node fill for a weapon you already passed through on the way to your current one.")]
+        public Color loadoutOwnedColor = new Color(0.30f, 0.30f, 0.33f, 0.85f);
+        [Tooltip("Width of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
+        public float loadoutToggleButtonWidth = 190f;
+        [Tooltip("Height of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
+        public float loadoutToggleButtonHeight = 48f;
+        [Tooltip("Distance from the bottom-right screen corner to the 'Loadout (P)' button, in canvas units, on both axes.")]
+        public float loadoutToggleButtonMargin = 24f;
+
         [Header("Aim cone")]
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
         [Tooltip("Colour of the shotgun's inner fan lines.")] public Color coneFanLineColor = new Color(1f, 1f, 1f, 0.25f);
