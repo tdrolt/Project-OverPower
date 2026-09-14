@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
+using Overpower.UI;
 
 /// <summary>
 /// One player's health, armor and damage funnel. Replaces two copies that used to live in
@@ -20,14 +21,33 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 {
     [SerializeField] private GameplayConfig gameplayConfig;
     [SerializeField] private ArmorConfig armorConfig;
-    [SerializeField] private Slider healthBar;
 
-    [SerializeField, Tooltip("The thin strip on the overhead HealthBarCanvas that shows this " +
-             "player's armor - everyone sees it, the same way everyone already sees the health " +
-             "bar below it. Its own WIDTH-via-maxValue tracks armor capacity (25/50/100 by " +
-             "upgrade level) so a bought upgrade reads as a visibly bigger strip, not just a " +
-             "fuller small one - see UpdateArmorBar.")]
-    private Slider armorBar;
+    [SerializeField, Tooltip("The health fill on the overhead HealthBarCanvas - drawn first, so " +
+             "the shield fill can sit on top of it. A plain filled Image, not a Slider: Task 6 " +
+             "dropped the Slider (it cannot cleanly draw a second fill over its own) in favour of " +
+             "two Images PlayerHealth drives directly. Fraction is health / max health.")]
+    private Image healthFillImage;
+
+    [SerializeField, Tooltip("The shield (armor) fill on the overhead HealthBarCanvas, same rect " +
+             "as the health fill but drawn AFTER it in the hierarchy so it renders on top - " +
+             "Tudor's call [T]: one bar, shield drawn over health, each against its own max. A " +
+             "full shield hides max HP on purpose. Fraction is armor / armor capacity.")]
+    private Image shieldFillImage;
+
+    [SerializeField, Tooltip("The static backing behind both fills on the overhead HealthBarCanvas. " +
+             "Themed from code too (colour + sprite) so a retune never needs reopening the prefab.")]
+    private Image overheadTrackImage;
+
+    [SerializeField, Tooltip("Shared colours and bar sprite.")]
+    private UiTheme theme;
+
+    // The overhead bar's own fraction of the last value it was WRITTEN with, not the health/armor
+    // value itself - so ApplyDamage, SetArmorLevels, SetHealthFromNetwork and the per-frame armor
+    // recharge tick can all funnel through UpdateOverheadBar without that tick rewriting
+    // Image.fillAmount 60 times a second while armor sits at full or empty. -1 so the very first
+    // call (Awake) always writes, even though a fresh spawn's fraction is often 1.
+    private float lastHealthFraction = -1f;
+    private float lastShieldFraction = -1f;
 
     private PhotonView photonView;
 
@@ -79,29 +99,76 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             Debug.LogError($"[PlayerHealth] {name}: GameplayConfig is not assigned - cannot take damage.");
         if (armorConfig == null)
             Debug.LogError($"[PlayerHealth] {name}: ArmorConfig is not assigned - cannot take damage.");
+        // A silent null here would leave the overhead bar wearing whatever colours/sprite the
+        // prefab happened to ship with, which is exactly the "two homes for one value" bug the
+        // theme asset exists to prevent.
+        if (theme == null)
+            Debug.LogError($"[PlayerHealth] {name}: UiTheme is not assigned - overhead bar will not be themed.");
 
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
         armor = new ArmorState(armorConfig != null ? armorConfig.AbsorbFor(absorbLevel) : 0f,
                                 armorConfig != null ? armorConfig.RechargeSecondsFor(rechargeLevel) : 6f,
                                 armorConfig != null ? armorConfig.RefillSeconds : 2.5f);
 
-        if (healthBar != null)
-            healthBar.value = health;
-        UpdateArmorBar();
+        ApplyTheme();
+        UpdateOverheadBar();
     }
 
-    /// <summary>Keeps the overhead armor strip in step with both numbers armor has: how full the
-    /// pool is (value) and how big the pool is (maxValue) - the second one is what makes an armor
-    /// upgrade visibly widen the strip instead of just letting it fill fuller. Called from every
-    /// place armor.Current or the pool's capacity can change, the same pattern healthBar.value
-    /// already follows for health.</summary>
-    private void UpdateArmorBar()
+    /// <summary>Applies the theme's bar sprite and colours to the three overhead-bar Images once,
+    /// at spawn - the prefab holds only structure (hierarchy, rect sizes, Filled/Horizontal/Left
+    /// set up on the two fill Images), so the theme asset stays the ONE place a retune happens.
+    /// Without theme.barSprite a Filled Image ignores fillAmount and draws full - see UiTheme's
+    /// own comment on barSprite, the exact bug Task 3 fixed on the screen-space HUD.</summary>
+    private void ApplyTheme()
     {
-        if (armorBar == null)
+        if (theme == null)
             return;
 
-        armorBar.maxValue = armor.Capacity;
-        armorBar.value = armor.Current;
+        if (healthFillImage != null)
+        {
+            healthFillImage.sprite = theme.barSprite;
+            healthFillImage.color = theme.healthColor;
+        }
+        if (shieldFillImage != null)
+        {
+            shieldFillImage.sprite = theme.barSprite;
+            shieldFillImage.color = theme.shieldColor;
+        }
+        if (overheadTrackImage != null)
+        {
+            overheadTrackImage.sprite = theme.barSprite;
+            overheadTrackImage.color = theme.barTrackColor;
+        }
+    }
+
+    /// <summary>The one place both overhead fills are written - option C, Task 6 [T]: shield drawn
+    /// OVER health, each fill against its OWN max (health/maxHealth, armor/ArmorCapacity), so a
+    /// full shield hides max HP by design. Called from every place that used to set healthBar.value
+    /// or call UpdateArmorBar: Awake, ApplyDamage, SetArmorLevels, ResetForRespawn, the armor
+    /// recharge tick in Update, and SetHealthFromNetwork (the remote-client path). Guards against
+    /// rewriting an unchanged fillAmount - the recharge tick calls this every frame armor is not
+    /// already full, and a filled Image write is not free.</summary>
+    private void UpdateOverheadBar()
+    {
+        float maxHealth = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
+        float healthFraction = maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
+
+        float capacity = armor.Capacity;
+        // Guarded against a capacity of 0 (no armor upgrade bought yet) - dividing by it would be
+        // a NaN fillAmount, which Unity's UI renders as an empty-looking bar anyway but for the
+        // wrong reason.
+        float shieldFraction = capacity > 0f ? Mathf.Clamp01(armor.Current / capacity) : 0f;
+
+        if (healthFillImage != null && !Mathf.Approximately(healthFraction, lastHealthFraction))
+        {
+            healthFillImage.fillAmount = healthFraction;
+            lastHealthFraction = healthFraction;
+        }
+        if (shieldFillImage != null && !Mathf.Approximately(shieldFraction, lastShieldFraction))
+        {
+            shieldFillImage.fillAmount = shieldFraction;
+            lastShieldFraction = shieldFraction;
+        }
     }
 
     private void Update()
@@ -118,7 +185,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         // Burn is ticked by PlayerStatusEffects now, which routes it back through ApplyDamage below.
         armor.Tick(Time.deltaTime, secondsSinceCombat);
-        UpdateArmorBar(); // So the overhead strip visibly refills as the pool recharges, not just on the next hit.
+        UpdateOverheadBar(); // So the shield fill visibly refills as the pool recharges, not just on the next hit.
     }
 
     /// The one funnel every damage source goes through - see the class comment.
@@ -165,9 +232,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         health -= result.HealthLost;
         secondsSinceCombat = 0f;
 
-        if (healthBar != null)
-            healthBar.value = health;
-        UpdateArmorBar();
+        UpdateOverheadBar();
 
         Damaged?.Invoke(result, info);
 
@@ -220,7 +285,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         rechargeLevel = newRechargeLevel;
         if (armorConfig != null)
             armor.SetTier(armorConfig.AbsorbFor(absorbLevel), armorConfig.RechargeSecondsFor(rechargeLevel));
-        UpdateArmorBar(); // Capacity just changed - the strip must widen (or shrink) immediately, not wait for the next hit.
+        UpdateOverheadBar(); // Capacity just changed - the shield fraction must recompute against it immediately, not wait for the next hit.
     }
 
     public void ResetForRespawn()
@@ -240,9 +305,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         else
             armor.Clear();
 
-        if (healthBar != null)
-            healthBar.value = health;
-        UpdateArmorBar();
+        UpdateOverheadBar();
     }
 
     /// Call when this player deals damage, so dealing it keeps you "in combat" the same way
@@ -259,8 +322,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         this.health = health;
         this.armor.SetFromNetwork(armor);
 
-        if (healthBar != null)
-            healthBar.value = health;
-        UpdateArmorBar();
+        UpdateOverheadBar();
     }
 }
