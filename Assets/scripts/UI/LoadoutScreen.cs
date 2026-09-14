@@ -74,6 +74,7 @@ namespace Overpower.UI
         private WeaponFiring weaponFiring;
         private PlayerInputRouter inputRouter;
         private PlayerLifecycle lifecycle;
+        private MatchUI matchUI;
 
         // ---- weapon tree ------------------------------------------------------------------------
 
@@ -117,6 +118,15 @@ namespace Overpower.UI
         /// and once from OnDisable during teardown) never double-releases.</summary>
         private bool isOpenLocal;
 
+        // Snapshot of what Refresh() last drew, so Update() (while open) can tell when the weapon
+        // or armor changed from OUTSIDE this screen's own clicks - the F1 panel's dropdown/buttons,
+        // or a property echo from a remote change - and catch up (Task 9a review finding 2).
+        // Abilities need no equivalent: AbilityRunner.SlotChanged already fires for every equip from
+        // every source, and Refresh is already subscribed to it.
+        private int lastKnownWeaponId = int.MinValue;
+        private int lastKnownAbsorbLevel = -1;
+        private int lastKnownRechargeLevel = -1;
+
         // One Material instance shared by every text this screen builds - see PlayerHud.ApplyOutline
         // for why sharing beats letting TMP auto-instantiate one per label.
         private Material loadoutTextMaterial;
@@ -142,6 +152,9 @@ namespace Overpower.UI
             weaponFiring = GetComponent<WeaponFiring>();
             inputRouter = GetComponent<PlayerInputRouter>();
             lifecycle = GetComponent<PlayerLifecycle>();
+            // Optional: not every rig this component might run on has one, and there is nothing
+            // this screen cannot do without it besides the match-over gate below.
+            matchUI = GetComponent<MatchUI>();
 
             if (playerHealth == null || playerLoadout == null || weaponFiring == null || inputRouter == null)
                 Debug.LogError($"[LoadoutScreen] {name}: missing PlayerHealth/PlayerLoadout/WeaponFiring/PlayerInputRouter on this player - the loadout screen cannot apply choices.");
@@ -176,11 +189,21 @@ namespace Overpower.UI
             if (inputRouter != null)
                 inputRouter.ShopToggled -= Toggle;
 
-            // Belt-and-braces alongside OnDisable's own Close() - OnDisable does not run for every
-            // teardown path, so this is what actually guarantees the focus claim and IsOpen never
-            // outlive this component.
-            inputRouter?.SetToolFocus(this, false);
-            IsOpen = false;
+            // MINE ONLY (Task 9a review, critical): every remote copy of this player also runs
+            // OnDestroy - e.g. whenever any OTHER player leaves the room - and every remote copy
+            // bailed out of Awake before ever touching IsOpen or claiming focus. Without this guard,
+            // a remote player's teardown would still reach the two lines below and clear the STATIC
+            // IsOpen (and release a focus claim it never made) out from under whichever OTHER
+            // player's screen is the LOCAL one actually open right now.
+            //
+            // Belt-and-braces alongside OnDisable's own Close() for the owner's own copy - only
+            // OnDisable does not run for every teardown path, so this is what actually guarantees
+            // the focus claim and IsOpen never outlive the local player's own component.
+            if (photonView != null && photonView.IsMine)
+            {
+                inputRouter?.SetToolFocus(this, false);
+                IsOpen = false;
+            }
 
             if (loadoutTextMaterial != null)
                 Destroy(loadoutTextMaterial);
@@ -188,10 +211,38 @@ namespace Overpower.UI
 
         private void Update()
         {
+            if (!isOpenLocal)
+                return;
+
             // A raw keyboard poll, not an InputAction, matching TestRangePanel's own reasoning for
             // F1: Esc-closes-a-tool is a tool convention, not a rebindable gameplay control.
-            if (isOpenLocal && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
                 Close();
+                return;
+            }
+
+            // The match ending must close this screen even though ShopSuppressed deliberately does
+            // not gate ShopToggled on it (Task 9a review, finding 3) - MatchUI freezes movement, but
+            // nothing told this screen to stop letting a still-living player re-pick a loadout after
+            // the result is already decided.
+            if (matchUI != null && matchUI.MatchOver)
+            {
+                Close();
+                return;
+            }
+
+            // Refresh() otherwise only runs on Open and on this screen's OWN clicks (Task 9a review,
+            // finding 2) - an equip made elsewhere while the screen is open (the F1 panel's dropdown
+            // or armor buttons, or a property echo from a remote change) would sit stale here until
+            // something on THIS screen was clicked. Abilities do not need this: AbilityRunner's
+            // SlotChanged already fires for every equip from every source, and Refresh is already
+            // subscribed to it.
+            int weaponId = CurrentWeaponId();
+            int absorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
+            int rechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
+            if (weaponId != lastKnownWeaponId || absorbLevel != lastKnownAbsorbLevel || rechargeLevel != lastKnownRechargeLevel)
+                Refresh();
         }
 
         private void HandleAliveChanged(bool alive)
@@ -210,6 +261,8 @@ namespace Overpower.UI
                 return;
             if (lifecycle != null && !lifecycle.IsAlive)
                 return; // Never open on a corpse - Verification 5 also requires staying closed through death.
+            if (matchUI != null && matchUI.MatchOver)
+                return; // The match is already decided - see Update()'s own MatchOver check (Task 9a review).
 
             isOpenLocal = true;
             IsOpen = true;
@@ -248,6 +301,13 @@ namespace Overpower.UI
         {
             RefreshWeaponTree();
             RefreshArmor();
+
+            // Snapshot what was just drawn, so Update()'s poll (Task 9a review) only calls back in
+            // here once something ACTUALLY changes since this Refresh, from any path - Open, a
+            // click on this screen, or Update() catching an external change.
+            lastKnownWeaponId = CurrentWeaponId();
+            lastKnownAbsorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
+            lastKnownRechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
         }
 
         // ============================================================================================
@@ -524,6 +584,9 @@ namespace Overpower.UI
 
         private void BuildUi()
         {
+            // Once for both canvases below (Task 9a review, finding 4) - each used to call this
+            // itself, which was harmless (EnsureEventSystem no-ops once one exists) but redundant.
+            EnsureEventSystem();
             BuildScreenCanvas();
             BuildToggleButtonCanvas();
         }
@@ -541,7 +604,6 @@ namespace Overpower.UI
             scaler.referenceResolution = theme.referenceResolution;
             scaler.matchWidthOrHeight = theme.matchWidthOrHeight;
             canvasGo.AddComponent<GraphicRaycaster>();
-            EnsureEventSystem();
             screenRoot = canvasGo;
 
             GameObject dim = new GameObject("Dim", typeof(RectTransform));
@@ -663,7 +725,6 @@ namespace Overpower.UI
             scaler.referenceResolution = theme.referenceResolution;
             scaler.matchWidthOrHeight = theme.matchWidthOrHeight;
             canvasGo.AddComponent<GraphicRaycaster>();
-            EnsureEventSystem();
 
             GameObject buttonGo = TMP_DefaultControls.CreateButton(new TMP_DefaultControls.Resources());
             buttonGo.name = "Loadout Toggle Button";

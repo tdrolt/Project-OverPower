@@ -43,6 +43,14 @@ public class MatchUI : MonoBehaviour
     /// single source of truth for that, rather than a second bool that could disagree with it.</summary>
     public bool IsWaitingForRespawn => waitingPanel != null && waitingPanel.activeSelf;
 
+    /// <summary>True once this player has been shown a match result panel (win or lose). Added for
+    /// LoadoutScreen (Task 9a review): FreezeForRestOfMatch only stops movement, and
+    /// PlayerInputRouter's ShopSuppressed deliberately does not gate on the match being over (it
+    /// only checks alive/typing), so without this a still-living player could open the loadout
+    /// screen and keep re-picking a loadout after the result is already decided. Same
+    /// panel-is-the-source-of-truth reasoning as IsWaitingForRespawn above.</summary>
+    public bool MatchOver => (youWonPanel != null && youWonPanel.activeSelf) || (youLostPanel != null && youLostPanel.activeSelf);
+
     private void Awake()
     {
         photonView = GetComponent<PhotonView>();
