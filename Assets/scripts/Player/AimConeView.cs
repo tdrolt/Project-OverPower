@@ -31,7 +31,11 @@ public class AimConeView : MonoBehaviourPun
 
     // Same layer every wall and every piece of deployable cover stands on (see WeaponFiring's own
     // comment on SafeMuzzlePosition and CoverWall's class comment) - computed once since
-    // LayerMask.NameToLayer never changes at runtime.
+    // LayerMask.NameToLayer never changes at runtime. Assumes every weapon's own hit mask
+    // includes Building, the same assumption WeaponFiring.cs's own buildingMask field (~line 133,
+    // used by SafeMuzzlePosition) makes for the same reason - if some future weapon's Hitscan hit
+    // mask ever excludes Building on purpose, its lines here would still clip on a wall its shots
+    // actually pass through.
     private int buildingMask;
 
     private LineRenderer leftEdgeLine;
@@ -43,6 +47,18 @@ public class AimConeView : MonoBehaviourPun
     // Reused every frame instead of re-allocated, since LateUpdate runs it once per player per
     // frame for as long as the match lasts.
     private Vector3[] arcPoints;
+
+    // ---- per-weapon lookups, cached and refreshed only when the equipped weapon changes --------
+    //
+    // GetComponent on a prefab asset is cheap but not free, and LateUpdate runs it every player
+    // every frame for as long as the match lasts. cachedWeapon is the guard: RefreshWeaponCache
+    // below is a no-op whenever the equipped weapon has not changed since the last frame, and
+    // every field below it is only ever written from inside that method, so there is exactly one
+    // place that can go stale.
+    private WeaponDefinition cachedWeapon;
+    private Hitscan cachedBeam;
+    private bool cachedIgnoresWalls;
+    private DetonateAtCursor cachedCursorDetonator;
 
     private void Awake()
     {
@@ -109,7 +125,11 @@ public class AimConeView : MonoBehaviourPun
         go.transform.SetParent(transform, worldPositionStays: false);
 
         var line = go.AddComponent<LineRenderer>();
-        line.material = theme.coneLineMaterial;
+        // sharedMaterial, not material - the latter silently clones the asset the first time it
+        // is READ, not just written, so five LineRenderers under one .material assignment meant
+        // five clones per player for a material nothing here ever varies per instance (colour
+        // comes from each LineRenderer's own start/end colour instead, see SetLine).
+        line.sharedMaterial = theme.coneLineMaterial;
         line.useWorldSpace = true;
         line.textureMode = LineTextureMode.Stretch;
         line.numCapVertices = 0;
@@ -164,9 +184,7 @@ public class AimConeView : MonoBehaviourPun
         // The same value WeaponFiring hands the shot sampler THIS frame - never recomputed here.
         float half = aim.EffectiveConeAngle / 2f;
 
-        GameObject prefab = weapon.ProjectilePrefab;
-        Hitscan beam = prefab != null ? prefab.GetComponent<Hitscan>() : null;
-        bool ignoresWalls = prefab != null && prefab.GetComponent<IgnoreWalls>() != null;
+        RefreshWeaponCache(weapon);
 
         // Only a BEAM weapon's shots actually reach further when charged - ProjectileContext
         // always copies weapon.MaxRange verbatim for a spawned projectile (see its Initialize),
@@ -174,9 +192,21 @@ public class AimConeView : MonoBehaviourPun
         // was held. Hitscan.ChargedRange already returns MaxRange unchanged for a non-charging
         // weapon, so it is always safe to call once a beam is confirmed - reused, not re-derived,
         // per the task brief.
-        float range = beam != null
+        float range = cachedBeam != null
             ? Hitscan.ChargedRange(weapon, weaponFiring.CurrentChargeFraction)
             : weapon.MaxRange;
+
+        // Weapon 4 (Rocket -> Cursor) detonates at the player's cursor rather than flying out to
+        // MaxRange - DetonateAtCursor clamps its own travel distance to whichever is closer, the
+        // cursor or the weapon's range (see its ClampedDistanceToTarget). Drawing the bare
+        // MaxRange here would overstate this weapon's reach whenever the cursor sits closer than
+        // that, so the lines and arc track the cursor instead, from the SAME origin and target
+        // point (SafeMuzzlePosition / GroundPointUnderCursor) the real shot resolves at fire time
+        // - the one helper both call, so this can never drift from what the rocket actually does.
+        if (cachedCursorDetonator != null)
+            range = DetonateAtCursor.ClampedDistanceToTarget(origin, aim.GroundPointUnderCursor, weapon.MaxRange);
+
+        bool ignoresWalls = cachedIgnoresWalls;
 
         // A shotgun's fixed pellet fan (SpreadDegrees) is centred on the aim, and every pellet
         // then gets its own random jitter from the SAME aim cone every other weapon uses (see
@@ -221,6 +251,34 @@ public class AimConeView : MonoBehaviourPun
             fanLeftLine.enabled = false;
             fanRightLine.enabled = false;
         }
+    }
+
+    /// <summary>
+    /// Re-reads the equipped weapon's projectile prefab for the handful of components that decide
+    /// how this file draws it - a Hitscan (is it a beam, and if so does charge grow its range), an
+    /// IgnoreWalls (does it clip on Building), a DetonateAtCursor (does it track the cursor
+    /// instead of MaxRange) - and skips the work entirely once the weapon has not changed since
+    /// the last frame. GetComponent on a prefab asset is cheap, but LateUpdate calls this once per
+    /// player every frame for as long as the match lasts, and every one of these answers only
+    /// changes on a weapon switch, which is rare by comparison.
+    /// </summary>
+    private void RefreshWeaponCache(WeaponDefinition weapon)
+    {
+        if (weapon == cachedWeapon)
+            return;
+
+        cachedWeapon = weapon;
+
+        GameObject prefab = weapon != null ? weapon.ProjectilePrefab : null;
+        cachedBeam = prefab != null ? prefab.GetComponent<Hitscan>() : null;
+
+        // Only Hitscan's own ray query (BuildMask) actually honours IgnoreWalls - ProjectileMotor's
+        // sweep never checks for it, so a projectile weapon can never truly pass through a wall no
+        // matter what sits on its prefab. Gating on cachedBeam here keeps this cache from drawing a
+        // wall-piercing line for a weapon whose real shots would not behave that way.
+        cachedIgnoresWalls = cachedBeam != null && prefab.GetComponent<IgnoreWalls>() != null;
+
+        cachedCursorDetonator = prefab != null ? prefab.GetComponent<DetonateAtCursor>() : null;
     }
 
     /// <summary>Where one edge of the cone (or the arc) actually ends: the wall it hits within

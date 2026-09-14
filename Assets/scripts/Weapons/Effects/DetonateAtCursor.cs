@@ -53,25 +53,31 @@ namespace Overpower.Weapons
             targetDistance = DistanceToCursorPoint();
         }
 
+        /// <summary>How far this rocket has to fly to reach the cursor - see the static helper
+        /// below for the actual maths and why. AimConeView (Task 7) draws exactly this same
+        /// distance for this weapon's aim lines/arc, through that helper, so the two can never
+        /// disagree about how far a cursor rocket actually reaches.</summary>
+        private float DistanceToCursorPoint() =>
+            ClampedDistanceToTarget(transform.position, context.TargetPoint, context.Weapon.MaxRange);
+
         /// <summary>
-        /// How far the rocket has to fly to reach the cursor, measured flat.
+        /// How far a shot from origin toward targetPoint travels before it would reach that point,
+        /// clamped to maxRange - the one place this maths lives, called by DistanceToCursorPoint
+        /// above and by AimConeView's aim-line drawing for this weapon.
         ///
         /// Flat because the cursor point is resolved against the player's own ground plane while
         /// the rocket leaves a muzzle somewhere above it, so the straight-line distance between
         /// the two would be slightly long and the rocket would drift past the mark.
         ///
-        /// Clamped to the weapon's range for the obvious reason: a rocket cannot arrive somewhere
-        /// it is not allowed to fly to, and one that expired short of an uncapped target would
-        /// still detonate - just wherever the range ran out. Clamping makes "aimed too far" behave
-        /// as "aimed at the edge of my range", which is the reading a player expects.
+        /// Clamped to maxRange for the obvious reason: a rocket cannot arrive somewhere it is not
+        /// allowed to fly to, and one that expired short of an uncapped target would still
+        /// detonate - just wherever the range ran out. Clamping makes "aimed too far" behave as
+        /// "aimed at the edge of my range", which is the reading a player expects.
         /// </summary>
-        private float DistanceToCursorPoint()
+        public static float ClampedDistanceToTarget(Vector3 origin, Vector3 targetPoint, float maxRange)
         {
-            Vector3 here = transform.position;
-            Vector3 target = context.TargetPoint;
-            target.y = here.y;
-
-            return Mathf.Min(Vector3.Distance(here, target), context.Weapon.MaxRange);
+            targetPoint.y = origin.y;
+            return Mathf.Min(Vector3.Distance(origin, targetPoint), maxRange);
         }
 
         private void Update()
