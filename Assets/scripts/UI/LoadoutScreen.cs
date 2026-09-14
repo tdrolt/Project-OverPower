@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 using Photon.Pun;
 using TMPro;
@@ -44,12 +45,12 @@ namespace Overpower.UI
     /// general tool focus the same way the F1 panel does (PlayerInputRouter.SetToolFocus), now keyed
     /// by owner so the two tools can be open at once without one closing stealing the other's claim.
     ///
-    /// ABILITIES AND HOVER (Task 9b): rightColumnContent now holds a heading and a wrapping card
-    /// grid per ability slot (see BuildAbilitiesUi), in place of the placeholder label Task 9a left
-    /// there. descriptionPanelContent is a fixed-height strip under both columns (see BuildScreenCanvas
-    /// and the "Hover description" region) that every weapon node and ability card feeds through a
-    /// HoverRelay pointer-enter/exit component - name, description and live numbers read straight
-    /// off the asset/module at hover time.
+    /// ABILITIES AND HOVER (Task 9b): the right column now holds a heading and a wrapping card grid
+    /// per ability slot (see BuildAbilitiesUi), in place of the placeholder label Task 9a left there.
+    /// Under both columns sits a fixed-height hover-description strip (see BuildScreenCanvas and the
+    /// "Hover description" region) that every weapon node and ability card feeds through a HoverRelay
+    /// pointer-enter/exit component - name, description and live numbers read straight off the
+    /// asset/module at hover time.
     /// </summary>
     public class LoadoutScreen : MonoBehaviourPun
     {
@@ -160,11 +161,10 @@ namespace Overpower.UI
         /// life anyway; this one just toggles.</summary>
         private GameObject screenRoot;
 
-        /// <summary>Task 9b's right-hand column container - see the class comment.</summary>
-        private Transform rightColumnContent;
-
-        /// <summary>Task 9b's hover-description strip - see the class comment.</summary>
-        private Transform descriptionPanelContent;
+        /// <summary>The always-visible "Loadout (P)" button - kept so Update() can disable it once
+        /// the match is over (Task 9b quality review), matching Open()'s own refusal instead of
+        /// leaving a clickable button that silently no-ops.</summary>
+        private Button loadoutToggleButton;
 
         /// <summary>This instance's own open/closed flag. Deliberately separate from the static
         /// IsOpen: IsOpen is what the rest of the game reads, this is what THIS component uses to
@@ -272,6 +272,15 @@ namespace Overpower.UI
 
         private void Update()
         {
+            bool matchOver = matchUI != null && matchUI.MatchOver;
+
+            // The always-visible toggle button must stop offering a loadout once the match is over
+            // too (Task 9b quality review) - runs regardless of isOpenLocal below, since the button
+            // is visible and clickable whether this screen is open or closed. Previously it stayed
+            // interactable and Toggle()/Open() just silently refused.
+            if (loadoutToggleButton != null)
+                loadoutToggleButton.interactable = !matchOver;
+
             if (!isOpenLocal)
                 return;
 
@@ -287,7 +296,7 @@ namespace Overpower.UI
             // not gate ShopToggled on it (Task 9a review, finding 3) - MatchUI freezes movement, but
             // nothing told this screen to stop letting a still-living player re-pick a loadout after
             // the result is already decided.
-            if (matchUI != null && matchUI.MatchOver)
+            if (matchOver)
             {
                 Close();
                 return;
@@ -847,9 +856,10 @@ namespace Overpower.UI
         }
 
         /// <summary>The module prefab carries an ability's only numbers (AbilityDefinition itself is
-        /// deliberately thin - see its own class comment), read through AbilityModule.CooldownSeconds/
-        /// Charges rather than ChargesAvailable/RechargeProgress: those read a live runtime
-        /// ChargePool, which is null on a prefab asset that was never Bind-ed to a player.</summary>
+        /// deliberately thin - see its own class comment), read through
+        /// AbilityModule.ConfiguredCooldownSeconds/ConfiguredCharges rather than
+        /// ChargesAvailable/RechargeProgress: those read a live runtime ChargePool, which is null on
+        /// a prefab asset that was never Bind-ed to a player.</summary>
         private static string AbilityNumbersText(AbilityDefinition def)
         {
             AbilityModule prefabModule = def.ModulePrefab != null ? def.ModulePrefab.GetComponent<AbilityModule>() : null;
@@ -862,17 +872,20 @@ namespace Overpower.UI
             if (def.Slot == AbilitySlot.Ultimate)
                 return "Charges from kills, assists, and damage dealt or taken.";
 
-            if (prefabModule.Charges <= 0)
+            if (prefabModule.ConfiguredCharges <= 0)
                 return "No cooldown.";
-            if (prefabModule.Charges == 1)
-                return $"{Compact(prefabModule.CooldownSeconds)}s cooldown";
+            if (prefabModule.ConfiguredCharges == 1)
+                return $"{Compact(prefabModule.ConfiguredCooldownSeconds)}s cooldown";
 
-            return $"{prefabModule.Charges} charges, {Compact(prefabModule.CooldownSeconds)}s each";
+            return $"{prefabModule.ConfiguredCharges} charges, {Compact(prefabModule.ConfiguredCooldownSeconds)}s each";
         }
 
         /// <summary>Trims a float to at most two decimals and drops a trailing ".00" - so this panel
-        /// shows "5" or "3.13", never "5.000000".</summary>
-        private static string Compact(float value) => value.ToString("0.##");
+        /// shows "5" or "3.13", never "5.000000". CultureInfo.InvariantCulture on purpose (Task 9b
+        /// quality review): the default "current culture" format uses a comma decimal separator on
+        /// nl/ro Windows and others, which would render "3,13" here and, worse, inside a string
+        /// already built with " · " and ", " separators of its own.</summary>
+        private static string Compact(float value) => value.ToString("0.##", CultureInfo.InvariantCulture);
 
         // ============================================================================================
         // UI construction
@@ -955,7 +968,6 @@ namespace Overpower.UI
 
             GameObject leftColumn = BuildColumn(contentRow.transform, theme.loadoutLeftColumnWidth);
             GameObject rightColumn = BuildColumn(contentRow.transform, theme.loadoutRightColumnWidth);
-            rightColumnContent = rightColumn.transform;
             BuildAbilitiesUi(rightColumn.transform);
 
             AddSectionHeader(leftColumn.transform, "Weapons");
@@ -991,8 +1003,6 @@ namespace Overpower.UI
             hoverNumbersLabel = AddStretchedLabel(descriptionPanel.transform, "", theme.smallTextSize, FontStyles.Normal);
             hoverNumbersLabel.color = theme.mutedTextColor;
             ClearHover();
-
-            descriptionPanelContent = descriptionPanel.transform;
         }
 
         private GameObject BuildColumn(Transform parent, float width)
@@ -1061,7 +1071,8 @@ namespace Overpower.UI
             label.color = theme.textColor;
             ApplyOutline(label);
 
-            buttonGo.GetComponent<Button>().onClick.AddListener(Toggle);
+            loadoutToggleButton = buttonGo.GetComponent<Button>();
+            loadoutToggleButton.onClick.AddListener(Toggle);
         }
 
         private void AddSectionHeader(Transform parent, string text)

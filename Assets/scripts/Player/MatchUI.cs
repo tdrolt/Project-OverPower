@@ -48,7 +48,14 @@ public class MatchUI : MonoBehaviour
     /// PlayerInputRouter's ShopSuppressed deliberately does not gate on the match being over (it
     /// only checks alive/typing), so without this a still-living player could open the loadout
     /// screen and keep re-picking a loadout after the result is already decided. Same
-    /// panel-is-the-source-of-truth reasoning as IsWaitingForRespawn above.</summary>
+    /// panel-is-the-source-of-truth reasoning as IsWaitingForRespawn above.
+    ///
+    /// ONE-WAY LATCH (Task 9b quality review): nothing ever sets youWonPanel/youLostPanel back to
+    /// inactive, so once true this stays true for the rest of the match - fine today because there
+    /// is no rematch/new-match-in-place flow, a match ending is the last thing that happens on this
+    /// player object before the scene changes or the room closes. Phase 2's match loop (if it adds a
+    /// rematch or a return-to-lobby-without-reloading path) will need to reset these panels, and this
+    /// property, explicitly when that happens - it will not do so on its own.</summary>
     public bool MatchOver => (youWonPanel != null && youWonPanel.activeSelf) || (youLostPanel != null && youLostPanel.activeSelf);
 
     private void Awake()

@@ -130,16 +130,19 @@ namespace Overpower.Abilities
         public virtual bool IsActive => false;
 
         /// <summary>The serialized cooldown this module was authored with - the DESIGN number, not
-        /// a live remaining cooldown. Added for the loadout screen's hover text (Task 9b), which
-        /// reads a MODULE PREFAB ASSET: ChargesAvailable/RechargeProgress above answer "how charged
-        /// up is THIS player's live pool right now" and are 0 on a prefab, which has no pool at all
-        /// (Bind never ran on it) - this and Charges below are the two numbers that exist either
-        /// way.</summary>
-        public float CooldownSeconds => cooldownSeconds;
+        /// a live remaining cooldown. Named Configured, not just CooldownSeconds (Task 9b quality
+        /// review), so it reads unmistakably differently from MaxCharges/ChargesAvailable above -
+        /// those are live runtime numbers, this is not. Added for the loadout screen's hover text,
+        /// which reads a MODULE PREFAB ASSET: ChargesAvailable/RechargeProgress above answer "how
+        /// charged up is THIS player's live pool right now" and are 0 on a prefab, which has no pool
+        /// at all (Bind never ran on it) - this and ConfiguredCharges below are the two numbers that
+        /// exist either way.</summary>
+        public float ConfiguredCooldownSeconds => cooldownSeconds;
 
         /// <summary>The serialized charge count this module was authored with - same "a prefab
-        /// asset has no live pool to read instead" reasoning as CooldownSeconds above.</summary>
-        public int Charges => charges;
+        /// asset has no live pool to read instead" reasoning as ConfiguredCooldownSeconds above, and
+        /// the same Configured naming to keep it distinct from the live MaxCharges/ChargesAvailable.</summary>
+        public int ConfiguredCharges => charges;
 
         internal bool HasChargeGate => pool != null;
         internal bool HasCharge => pool == null || pool.Available > 0;
