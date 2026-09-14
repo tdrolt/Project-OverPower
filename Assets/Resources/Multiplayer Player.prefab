@@ -3563,6 +3563,8 @@ MonoBehaviour:
   pipAvailableColor: {r: 1, g: 1, b: 1, a: 1}
   pipSpentColor: {r: 1, g: 1, b: 1, a: 0.15}
   cooldownCoverColor: {r: 0, g: 0, b: 0, a: 0.65}
+  ultimateChargeColor: {r: 1, g: 0.85, b: 0.25, a: 0.45}
+  ultimateReadyTextColor: {r: 1, g: 0.95, b: 0.6, a: 1}
 --- !u!114 &581303668377604427
 MonoBehaviour:
   m_ObjectHideFlags: 0
