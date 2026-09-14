@@ -11930,6 +11930,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3478814641139743335, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
       insertIndex: -1
       addedObject: {fileID: 941603639}
+    - targetCorrespondingSourceObject: {fileID: 5165643279370163622, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1828822120}
   m_SourcePrefab: {fileID: 100100000, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
 --- !u!1 &941603635 stripped
 GameObject:
@@ -24116,6 +24119,24 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1827144675}
   m_Mesh: {fileID: -7514991316261419789, guid: c977749822b3f384f88c994714e19035, type: 3}
+--- !u!1 &1828822119 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5165643279370163622, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
+  m_PrefabInstance: {fileID: 941603634}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1828822120
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1828822119}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c26d44bab971c8d419f0bccfb27736a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!1 &1829263422
 GameObject:
   m_ObjectHideFlags: 0
@@ -27644,6 +27665,7 @@ GameObject:
   - component: {fileID: 2104338210}
   - component: {fileID: 2104338209}
   - component: {fileID: 2104338208}
+  - component: {fileID: 2104338211}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -27734,6 +27756,19 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!114 &2104338211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2104338206}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c26d44bab971c8d419f0bccfb27736a6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!1001 &2120964556
 PrefabInstance:
   m_ObjectHideFlags: 0
