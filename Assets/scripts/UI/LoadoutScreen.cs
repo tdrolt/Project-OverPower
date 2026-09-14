@@ -558,8 +558,13 @@ namespace Overpower.UI
             GameObject panel = new GameObject("Panel", typeof(RectTransform));
             panel.transform.SetParent(canvasGo.transform, false);
             RectTransform panelRt = panel.GetComponent<RectTransform>();
-            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
-            panelRt.anchoredPosition = Vector2.zero;
+            // Anchored to the TOP, not dead-centre: the panel's height grows with the weapon tree
+            // and (Task 9b) the ability column, and a centred panel grew down far enough at
+            // 1920x1080 to overlap the HUD sitting at the bottom of the screen. Top-anchoring keeps
+            // that clearance regardless of how tall the content gets.
+            panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 1f);
+            panelRt.pivot = new Vector2(0.5f, 1f);
+            panelRt.anchoredPosition = new Vector2(0f, -theme.loadoutPanelTopMargin);
             Image panelBackground = panel.AddComponent<Image>();
             panelBackground.color = theme.panelColor;
             panelBackground.raycastTarget = true;

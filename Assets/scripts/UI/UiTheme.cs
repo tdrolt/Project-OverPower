@@ -113,6 +113,8 @@ namespace Overpower.UI
         public Color loadoutDimColor = new Color(0f, 0f, 0f, 0.75f);
         [Tooltip("Space between the loadout panel's background edge and its title/columns, in canvas units, on every side.")]
         public float loadoutPanelPadding = 20f;
+        [Tooltip("Gap from the top of the screen to the top of the loadout panel, in canvas units. The panel is anchored to the TOP of the screen rather than dead-centre so a tall tree/armor column never grows down into the HUD, which sits at the bottom.")]
+        public float loadoutPanelTopMargin = 40f;
         [Tooltip("Width of the weapon-tree/armor column on the left, in canvas units - fixed so the ability column on the right (Task 9b) lines up beside it instead of both fighting over leftover space.")]
         public float loadoutLeftColumnWidth = 640f;
         [Tooltip("Width of the ability-picks column on the right, in canvas units - empty until Task 9b fills it in; reserved now so the panel does not visibly resize when that task adds content.")]
