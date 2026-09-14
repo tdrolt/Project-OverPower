@@ -103,6 +103,35 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ResetThenNextSampleRecordsSideWithoutHitting()
+        {
+            // Simulates the respawn bug (review fix): a target the fence was tracking dies while
+            // inside the ring, then reappears on the OUTSIDE (a spawn point, unrelated to the ring) -
+            // without Reset(), this next sample would read as a side-flip crossing and land a free hit
+            // + slow on a player who just respawned. Reset() makes it read like a fresh sighting instead.
+            var state = new FenceCrossingState(radius: 6f, ringThickness: 1f, perTargetCooldownSeconds: 1f);
+            state.ShouldHit(distance: 2f, now: 0f); // inside, recorded
+
+            state.Reset();
+
+            Assert.IsFalse(state.ShouldHit(distance: 20f, now: 0.1f)); // now outside - no crossing, just a fresh sample
+        }
+
+        [Test]
+        public void AfterAResetANewRealCrossingIsStillDetected()
+        {
+            // Reset() only forgets the stale side - it must not disable the crossing rule going
+            // forward. Once the post-reset sample has recorded a side, a genuine crossing from there
+            // is caught exactly as it would be for any other tracked target.
+            var state = new FenceCrossingState(radius: 6f, ringThickness: 1f, perTargetCooldownSeconds: 1f);
+            state.ShouldHit(distance: 2f, now: 0f);
+            state.Reset();
+            state.ShouldHit(distance: 20f, now: 0.1f); // post-reset sample: records "outside", not a hit
+
+            Assert.IsTrue(state.ShouldHit(distance: 2f, now: 0.2f)); // crosses back inside - a real crossing
+        }
+
+        [Test]
         public void StrafingBackAndForthAcrossTheBandHitsAtMostOncePerCooldown()
         {
             // Roughly the ~6s strafing scenario from the Task 1.11b verify steps, compressed: repeated

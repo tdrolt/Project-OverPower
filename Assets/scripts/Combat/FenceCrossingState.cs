@@ -68,5 +68,21 @@ namespace Overpower.Combat
             cooldownUntil = now + perTargetCooldownSeconds;
             return true;
         }
+
+        /// <summary>
+        /// Forgets whatever side was last recorded - review fix (respawn false-crossing): a target
+        /// that died while tracked and comes back somewhere else entirely (a respawn point, not
+        /// wherever it happened to fall relative to the ring) must not read as having "crossed" the
+        /// distance between its last living position and its new one. Only hasSample/wasOutside are
+        /// cleared, matching the "no sample yet" state before ShouldHit was ever called - the very
+        /// next call can only hit through the in-band rule, never the crossing one, exactly like the
+        /// class comment's own first-sample case. The per-target cooldown is left untouched: this is
+        /// about forgetting a stale POSITION, not granting a free hit by also clearing the cooldown.
+        /// </summary>
+        public void Reset()
+        {
+            hasSample = false;
+            wasOutside = false;
+        }
     }
 }

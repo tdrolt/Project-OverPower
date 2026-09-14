@@ -12,10 +12,12 @@ namespace Overpower.Combat
     /// (NetworkedDeployable.Age plus real time elapsed on this client - the exact secondsSincePlaced
     /// pattern Mine.cs already uses for its own arm delay); it never reads a clock itself.
     ///
-    /// A LATE CALL PAYS OUT EVERY TICK IT OWES, NOT JUST THE NEXT ONE - ConsumeDueTicks loops rather
-    /// than checking a single boundary, so a client that only starts ticking after tick 3's moment has
-    /// already passed (a late joiner, or one slow frame) is handed 1, 2 and 3 together the first time
-    /// it asks, and never asked for again - "no repeats" falls out of nextTick only ever advancing.
+    /// A CALL CAN STILL PAY OUT SEVERAL TICKS TOGETHER - ConsumeDueTicks loops rather than checking a
+    /// single boundary - but review fix (Task 1.11b): which ticks it is allowed to owe now depends on
+    /// how old the zone already was the first time THIS client ever evaluated it (see initialAgeSeconds
+    /// below). Only a HITCH - a frame spike that happens mid-life, on a client that has been evaluating
+    /// the schedule right along - can still bundle up to N ticks into one call; that is still correct,
+    /// because the victim really did stand in the zone for the whole span the hitch skipped over.
     /// </summary>
     public sealed class ZoneTickSchedule
     {
@@ -24,22 +26,41 @@ namespace Overpower.Combat
 
         // The next tick number still owed, 1-based to match the addendum's own "tick k, k = 1..6"
         // wording - tick k lands at k * tickSeconds after placement.
-        private int nextTick = 1;
+        private int nextTick;
 
-        public ZoneTickSchedule(float tickSeconds, int totalTicks)
+        /// <param name="tickSeconds">Seconds between ticks.</param>
+        /// <param name="totalTicks">How many ticks the zone's whole life is worth.</param>
+        /// <param name="initialAgeSeconds">
+        /// How old the zone already was (NetworkedDeployable.Age, read once at OnPlaced) the moment
+        /// THIS client's schedule was built. Review fix (Task 1.11b): a late joiner's zone copy can
+        /// already be several ticks old before this client ever evaluates it - this client's players
+        /// were never simulated for those already-passed moments, so they must never fire, unlike a
+        /// HITCH (see the class comment), which happens mid-life on a client that has been evaluating
+        /// right along and so still owes every tick the frame spike spans. Defaults to 0, which is
+        /// exactly the old always-nextTick-starts-at-1 behaviour for an on-time client.
+        /// </param>
+        public ZoneTickSchedule(float tickSeconds, int totalTicks, float initialAgeSeconds = 0f)
         {
             this.tickSeconds = tickSeconds;
             this.totalTicks = totalTicks;
+
+            // Skip past every tick whose moment was already behind this client before it ever looked.
+            // At initialAgeSeconds 0 (the normal, on-time case) this is floor(0) + 1 = 1, identical to
+            // the old hardcoded starting value.
+            nextTick = (int)(initialAgeSeconds / tickSeconds) + 1;
         }
 
         /// <summary>True once every tick has been consumed - the owner's cue to destroy the zone
-        /// (Task 1.11 addendum: "tick on every client, destroy on the owner only").</summary>
+        /// (Task 1.11 addendum: "tick on every client, destroy on the owner only"). Also true from
+        /// construction if initialAgeSeconds already put nextTick past totalTicks - a client whose
+        /// first evaluation happens after the zone's entire life has already elapsed owes nothing.</summary>
         public bool IsComplete => nextTick > totalTicks;
 
         /// <summary>
         /// Call every frame with seconds elapsed since the zone was actually placed. Returns how many
-        /// ticks are newly due this call (0 most frames; more than 1 only for a late-starting client
-        /// catching up) and advances past every one of them, so the same tick is never reported twice.
+        /// ticks are newly due this call (0 most frames; more than 1 only for a hitch mid-life catching
+        /// up - see the class comment) and advances past every one of them, so the same tick is never
+        /// reported twice.
         /// </summary>
         public int ConsumeDueTicks(float secondsSincePlaced)
         {

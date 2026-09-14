@@ -31,6 +31,15 @@ namespace Overpower.Abilities
     /// class calls RequestDestroy itself once it does. A second, always-0, "Lifetime Seconds" field
     /// sitting in the Inspector unused would be the exact "one number, two homes" mistake this
     /// project's own coding standards call out.
+    ///
+    /// FOLLOWING THE CASTER'S NETWORK-LERPED TRANSFORM (comments-only note, review): on a client that
+    /// is not the caster, CasterFollower.Tick reads the caster's PhotonView transform, which
+    /// PlayerNetSync is smoothing toward the caster's last RECEIVED position, not their true
+    /// instantaneous one. A victim can therefore already be standing inside this zone on their own
+    /// client's copy of it while the caster's own screen still shows them clear of it, and ApplyTick
+    /// below (victim-side damage) will hit them anyway. Not a bug: the same accepted
+    /// victim-favours-the-defender latency tradeoff every projectile in this project already makes -
+    /// see CasterFollower.Tick's own comment.
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
     public sealed class AoeZone : NetworkedDeployable
@@ -97,7 +106,14 @@ namespace Overpower.Abilities
         protected override void OnPlaced(object[] data, PhotonMessageInfo info)
         {
             int totalTicks = Mathf.Max(1, Mathf.RoundToInt(durationSeconds / tickSeconds));
-            schedule = new ZoneTickSchedule(tickSeconds, totalTicks);
+
+            // Review fix (Task 1.11b): Age here already reflects how old this zone really is on THIS
+            // client (NetworkedDeployable's own class comment - a late joiner's replay keeps the
+            // original SentServerTime, so Age is never "since I joined"). Seeding the schedule with it
+            // means a late joiner's ticks whose moment already passed before this client existed are
+            // skipped outright instead of all firing together the first time this client evaluates -
+            // see ZoneTickSchedule's own class comment for the hitch-vs-late-start distinction.
+            schedule = new ZoneTickSchedule(tickSeconds, totalTicks, (float)Age);
             follower = new CasterFollower(followsCaster, OwnerActor);
             localPlacedRealTime = Time.time;
 

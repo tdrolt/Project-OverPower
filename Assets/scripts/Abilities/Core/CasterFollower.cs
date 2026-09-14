@@ -52,7 +52,15 @@ namespace Overpower.Abilities
 
         /// <summary>Call every frame this object is alive. Snaps target to the caster's current
         /// position while the caster still exists and is alive; the first frame that stops being true
-        /// switches this off for good, leaving target exactly where it last was.</summary>
+        /// switches this off for good, leaving target exactly where it last was.
+        ///
+        /// ON A NON-CASTER CLIENT, casterView.transform.position IS THE NETWORK-LERPED COPY
+        /// (comments-only note, review) - PlayerNetSync smooths a remote player toward their last
+        /// RECEIVED position, never their true instantaneous one. So a follower object (AoeZone) can
+        /// already be a little ahead of or behind where the caster's OWN screen currently shows them,
+        /// and a victim's client ticks damage against this copy regardless. Same accepted
+        /// victim-favours-the-defender latency tradeoff every projectile in this project already makes
+        /// - not something this class needs to correct for.</summary>
         public void Tick(Transform target)
         {
             if (!active)

@@ -90,6 +90,11 @@ namespace Overpower.Abilities
         private readonly Dictionary<IDamageable, FenceCrossingState> tracked =
             new Dictionary<IDamageable, FenceCrossingState>();
 
+        // Scratch list for one evaluation pass: entries whose target turned out to be destroyed get
+        // removed from `tracked` after the foreach below finishes, never during it (mutating a
+        // Dictionary mid-enumeration throws) - reused every frame instead of allocated fresh.
+        private readonly List<IDamageable> pruneBuffer = new List<IDamageable>();
+
         private CasterFollower follower;
 
         private void OnValidate()
@@ -112,6 +117,11 @@ namespace Overpower.Abilities
 
         private void FixedUpdate()
         {
+            // If Follows Caster is on, the ring itself moves here before targets are evaluated below
+            // - a perfectly STATIONARY enemy the moving ring sweeps past still reads as a crossing
+            // (their distance from the ring's new centre passes through Radius) exactly as if they
+            // had walked through a fixed ring. Intended, not a bug: the ring passed through them
+            // either way, and FenceCrossingState only ever sees relative distance, never who moved.
             follower?.Tick(transform);
 
             DiscoverNewTargets();
@@ -154,6 +164,7 @@ namespace Overpower.Abilities
                 return;
 
             float now = Time.time;
+            pruneBuffer.Clear();
 
             foreach (KeyValuePair<IDamageable, FenceCrossingState> pair in tracked)
             {
@@ -162,8 +173,29 @@ namespace Overpower.Abilities
 
                 // Unity's fake-null: true for a destroyed dummy/player object even though the C#
                 // reference itself is not null - the same check MineTargeting already relies on.
-                if (targetComponent == null || target == null || !target.IsAlive)
+                // Review fix (minor): a destroyed target is never coming back, so its entry is
+                // forgotten entirely instead of being skipped forever on every future frame.
+                if (targetComponent == null || target == null)
+                {
+                    pruneBuffer.Add(target);
                     continue;
+                }
+
+                if (!target.IsAlive)
+                {
+                    // Review fix (respawn false-crossing): forget which side this target was last
+                    // seen on while it is dead. PlayerLifecycle.RespawnPlayer teleports a revived
+                    // player straight to a spawn point with no regard for where the fence is - without
+                    // this, the very next alive sample would read that teleport as a "crossing" and
+                    // land a free hit + slow on someone who just respawned, possibly nowhere near this
+                    // fence. Resetting every frame the target reads as dead (rather than only once, on
+                    // the dead-to-alive edge) needs no extra "was it already dead last frame" bit to
+                    // keep in sync - re-resetting an already-reset state is a no-op. Side-flip damage
+                    // for a target that blinks/teleports across the ring WHILE ALIVE is untouched: this
+                    // branch only ever runs for a target that is currently dead.
+                    pair.Value.Reset();
+                    continue;
+                }
 
                 Vector3 delta = targetComponent.transform.position - transform.position;
                 delta.y = 0f;
@@ -178,6 +210,9 @@ namespace Overpower.Abilities
                 var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude };
                 (target as IStatusReceiver)?.ApplyStatus(slow, OwnerActor);
             }
+
+            foreach (IDamageable destroyed in pruneBuffer)
+                tracked.Remove(destroyed);
         }
 
         /// <summary>Not a teammate, not the caster, not a structure, and locally authoritative -
