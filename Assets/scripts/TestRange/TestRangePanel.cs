@@ -4,7 +4,6 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
-using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
 using Overpower.Weapons;
@@ -441,32 +440,24 @@ namespace Overpower.TestRange
         /// <summary>Spends one purchase on the recharge path - see OnAbsorbUpgradeClicked.</summary>
         private void OnRechargeUpgradeClicked() => TryUpgradeArmor(upgradeAbsorb: false);
 
+        /// <summary>Spends one purchase through the shared ArmorLoadoutActions rule (Task 9a pulled
+        /// this out of here so the loadout screen calls the exact same rule) and logs a refusal -
+        /// the loadout screen instead disables its +Absorb/+Recharge buttons at the cap, so only
+        /// this designer-facing tool needs a log line for "why didn't that do anything".</summary>
         private void TryUpgradeArmor(bool upgradeAbsorb)
         {
             PlayerHealth health = ResolveLocalPlayer()?.GetComponentInChildren<PlayerHealth>(true);
             PlayerLoadout loadout = ResolveLocalPlayer()?.GetComponent<PlayerLoadout>();
-            if (health == null || loadout == null || armorConfig == null)
-                return;
 
-            var path = new ArmorUpgradePath(armorConfig, health.AbsorbLevel, health.RechargeLevel);
-            bool upgraded = upgradeAbsorb ? path.TryUpgradeAbsorb() : path.TryUpgradeRecharge();
-            if (!upgraded)
-            {
+            if (!ArmorLoadoutActions.TryUpgrade(health, loadout, armorConfig, upgradeAbsorb))
                 Debug.Log($"[ARMOR] {(upgradeAbsorb ? "+Absorb" : "+Recharge")} refused - at the upgrade cap.");
-                return;
-            }
-
-            loadout.SetArmorLevels(path.AbsorbLevel, path.RechargeLevel);
         }
 
         /// <summary>Returns both armor paths to level 0, so a designer can re-run the upgrade sweep
-        /// without restarting play mode. Goes through PlayerLoadout, same as the upgrade buttons,
-        /// so every other client sees the reset too.</summary>
-        private void OnResetArmorClicked()
-        {
-            PlayerLoadout loadout = ResolveLocalPlayer()?.GetComponent<PlayerLoadout>();
-            loadout?.SetArmorLevels(0, 0);
-        }
+        /// without restarting play mode. Goes through the same shared helper as the upgrade
+        /// buttons, so every other client sees the reset too.</summary>
+        private void OnResetArmorClicked() =>
+            ArmorLoadoutActions.Reset(ResolveLocalPlayer()?.GetComponent<PlayerLoadout>());
 
         // ---- Readout ----
 
