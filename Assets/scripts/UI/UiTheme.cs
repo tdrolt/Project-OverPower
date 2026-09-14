@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -169,27 +170,47 @@ namespace Overpower.UI
         };
         [Tooltip("Trail/tint colour used when the shooter's team could not be resolved - Teams.TryGetTeam " +
                  "returned -1. Should never actually appear in a real match; only a debug/test-range shot " +
-                 "fired with no team assigned reads this.")]
-        public Color unknownTeamShotColor = new Color(0.5f, 0.5f, 0.53f, 1f);
-        [Tooltip("How many seconds a shot's trail keeps fading behind it after the bullet itself is gone.")]
-        public float trailTime = 0.25f;
-        [Tooltip("Trail width where it meets the bullet, in metres.")]
-        public float trailStartWidth = 0.09f;
+                 "fired with no team assigned reads this. Deliberately dimmer AND lower alpha than every " +
+                 "real team colour - both the trail's fade (reads straight off this colour's alpha) and " +
+                 "the core's glow (ShotTeamVisuals.TintCore scales emission by this same alpha) key off " +
+                 "it, so an unresolved shot reads as a faint, washed-out ghost rather than a fourth team " +
+                 "colour. Two earlier versions both still read as a near-duplicate of Team 0's near-white " +
+                 "once Team 0's own washed-out blue tint was fixed: a flat mid-grey at full alpha, then a " +
+                 "light grey whose CORE glow (before emission also scaled by alpha) was still just as " +
+                 "bright as a real team's (Task 11a follow-up review, 616x576 captures).")]
+        public Color unknownTeamShotColor = new Color(0.55f, 0.55f, 0.58f, 0.5f);
+        [Tooltip("How many seconds a shot's trail keeps fading behind it after the bullet itself is gone. " +
+                 "Raised from an original 0.25 - at the game's normal camera zoom a shot crosses almost the " +
+                 "whole visible frame in under half a second, and 0.25 left too little of the tail actually " +
+                 "drawn to compare colours by (Task 11a follow-up review, 616x576 capture).")]
+        public float trailTime = 0.35f;
+        [Tooltip("Trail width where it meets the bullet, in metres. Raised from an original 0.09 - too thin " +
+                 "a ribbon to read its colour at a glance at the game's normal camera zoom (Task 11a " +
+                 "follow-up review, 616x576 capture).")]
+        public float trailStartWidth = 0.15f;
         [Tooltip("Trail width at its fading tail end, in metres - thinner than Trail Start Width so the " +
                  "trail reads as tapering off rather than a solid ribbon.")]
-        public float trailEndWidth = 0.01f;
+        public float trailEndWidth = 0.02f;
         [Tooltip("Shared unlit material every shot trail renders with - Assets/Gameplay/UI/ShotTrail.mat, " +
                  "built the same way Task 7's Aim Cone Line Material was (URP Particles/Unlit, alpha " +
                  "transparent, no shadows). Its own colour stays white: every trail tints itself through " +
                  "TrailRenderer.colorGradient, which is what lets one material serve every team.")]
         public Material trailMaterial;
         [Tooltip("0 = the bullet's core keeps its own material colour, 1 = fully replaced by the team " +
-                 "colour. How far ShotTeamVisuals lerps the core's tint toward Shot Color For.")]
-        [Range(0f, 1f)] public float bulletTintStrength = 0.65f;
+                 "colour. How far ShotTeamVisuals lerps the core's tint toward Shot Color For. Raised from " +
+                 "an original 0.65, which against Boolet Weapon.mat's ORIGINAL blue base colour left the " +
+                 "core reading as a washed-out version of that old blue for every team rather than the " +
+                 "team's own colour - fixed together with turning that base colour neutral white below, so " +
+                 "the tint now has a true white to blend from instead of fighting a saturated blue " +
+                 "(Task 11a follow-up review, 616x576 capture).")]
+        [Range(0f, 1f)] public float bulletTintStrength = 0.9f;
         [Tooltip("Emission brightness multiplier on the bullet core's team colour, so the core itself - not " +
                  "just its trail - reads as a bright, glowing shot rather than a flat-lit sphere at a " +
-                 "glance. 1 = no boost over the plain team colour.")]
-        public float bulletEmission = 2.4f;
+                 "glance. 1 = no boost over the plain team colour. Raised from an original 2.4 - the scene's " +
+                 "Bloom (Assets/Settings/SampleSceneProfile.asset, threshold 1.0) only blooms a pixel whose " +
+                 "linear value clears that threshold, and 2.4 left the dimmer channels of some team colours " +
+                 "under it (Task 11a follow-up review).")]
+        public float bulletEmission = 5f;
 
         /// <summary>The trail/tint colour for a shot fired by teamId, or Unknown Team Shot Colour for an
         /// id Teams.TryGetTeam could not resolve (-1) or that falls outside Team Shot Colors - the same
@@ -200,6 +221,35 @@ namespace Overpower.UI
                 return teamShotColors[teamId];
 
             return unknownTeamShotColor;
+        }
+
+        // Not serialized - rebuilt lazily the first time each bucket is asked for, then reused for the
+        // rest of the play session. Every client simulates every projectile (a nine-player SMG burst is a
+        // lot of bullets), so ShotTeamVisuals must not allocate a new Gradient per shot - see GradientFor.
+        [System.NonSerialized] private Dictionary<int, Gradient> cachedShotGradients;
+
+        /// <summary>The same colour ShotColorFor(teamId) returns, pre-built into the two-key fade-to-
+        /// transparent Gradient a shot's TrailRenderer wants, and cached by resolved bucket (0/1/2, or -1
+        /// for every unresolved id) so two calls for the same team return the exact same Gradient object
+        /// instead of allocating a fresh one - see the class comment on why that matters here.</summary>
+        public Gradient GradientFor(int teamId)
+        {
+            int bucket = (teamShotColors != null && teamId >= 0 && teamId < teamShotColors.Length) ? teamId : -1;
+
+            if (cachedShotGradients == null)
+                cachedShotGradients = new Dictionary<int, Gradient>();
+
+            if (cachedShotGradients.TryGetValue(bucket, out Gradient cached))
+                return cached;
+
+            Color color = ShotColorFor(teamId);
+            var gradient = new Gradient
+            {
+                colorKeys = new[] { new GradientColorKey(color, 0f), new GradientColorKey(color, 1f) },
+                alphaKeys = new[] { new GradientAlphaKey(color.a, 0f), new GradientAlphaKey(0f, 1f) },
+            };
+            cachedShotGradients[bucket] = gradient;
+            return gradient;
         }
 
         [Header("Aim cone")]

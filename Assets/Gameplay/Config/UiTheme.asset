@@ -83,13 +83,13 @@ MonoBehaviour:
   - {r: 0.93, g: 0.97, b: 1, a: 1}
   - {r: 0.68, g: 0.32, b: 1, a: 1}
   - {r: 0.15, g: 0.95, b: 1, a: 1}
-  unknownTeamShotColor: {r: 0.5, g: 0.5, b: 0.53, a: 1}
-  trailTime: 0.25
-  trailStartWidth: 0.09
-  trailEndWidth: 0.01
+  unknownTeamShotColor: {r: 0.55, g: 0.55, b: 0.58, a: 0.5}
+  trailTime: 0.35
+  trailStartWidth: 0.15
+  trailEndWidth: 0.02
   trailMaterial: {fileID: 2100000, guid: 26c3ed38fb3f03746848d4f3ce14fb2c, type: 2}
-  bulletTintStrength: 0.65
-  bulletEmission: 2.4
+  bulletTintStrength: 0.9
+  bulletEmission: 5
   coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
   coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
   coneLineWidth: 0.04
