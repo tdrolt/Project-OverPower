@@ -172,6 +172,17 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void FiringWhileMovingStacksShotBloomWithMovingBloomAndSpread()
+        {
+            var cone = MovingCone();
+            cone.Tick(0f, true);
+            cone.RegisterShot();
+            cone.Tick(1f, true);
+            Assert.AreEqual(5f, cone.CurrentAngle, 1e-4f); // 2 + 1 (shot) + (3 - 1) * 1 (moving bloom)
+            Assert.AreEqual(9f, cone.EffectiveAngle, 1e-4f); // 5 current + 4 moving spread
+        }
+
+        [Test]
         public void MovingBloomNeverPassesMaxAngle()
         {
             var cone = MovingCone();

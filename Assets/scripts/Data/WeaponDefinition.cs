@@ -140,15 +140,15 @@ namespace Overpower.Data
         [SerializeField] private float standingStillMultiplier = 1.5f;
         public float StandingStillMultiplier => standingStillMultiplier;
 
-        [SerializeField, Tooltip("Degrees added to this weapon's spread the moment the player starts moving, " +
-                                 "removed the moment they stop. Makes shooting on the move visibly less accurate.")]
-        private float movingSpreadDegrees = 4f;
+        [Tooltip("Degrees added to this weapon's spread the moment the player starts moving, " +
+                 "removed the moment they stop. Makes shooting on the move visibly less accurate.")]
+        [SerializeField] private float movingSpreadDegrees = 4f;
         public float MovingSpreadDegrees => movingSpreadDegrees;
 
-        [SerializeField, Tooltip("While the player keeps moving, the spread widens by this many degrees per second " +
-                                 "toward Max Cone Angle. Recovery Per Second still pulls it back, so this only " +
-                                 "does anything when it is larger than Recovery Per Second.")]
-        private float movingBloomPerSecond = 3f;
+        [Tooltip("While the player keeps moving, the spread widens by this many degrees per second " +
+                 "toward Max Cone Angle. Recovery Per Second still pulls it back, so this only " +
+                 "does anything when it is larger than Recovery Per Second.")]
+        [SerializeField] private float movingBloomPerSecond = 3f;
         public float MovingBloomPerSecond => movingBloomPerSecond;
 
         [Header("Overheat")]
