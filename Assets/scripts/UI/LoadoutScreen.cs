@@ -42,10 +42,11 @@ namespace Overpower.UI
     /// general tool focus the same way the F1 panel does (PlayerInputRouter.SetToolFocus), now keyed
     /// by owner so the two tools can be open at once without one closing stealing the other's claim.
     ///
-    /// TASK 9B HOOKS: rightColumnContent (an empty column the same width as the weapon tree's own,
-    /// sitting where ability picks belong) and descriptionPanelContent (an empty, zero-height strip
-    /// under both columns, where a hovered item's live-numbers description will go) exist now and
-    /// are deliberately left empty - see Awake and BuildScreenCanvas.
+    /// ABILITIES (Task 9b): rightColumnContent now holds a heading and a wrapping card grid per
+    /// ability slot (see BuildAbilitiesUi), in place of the placeholder label Task 9a left there.
+    /// descriptionPanelContent is still the same empty, zero-height strip under both columns from
+    /// Task 9a - a later commit in this same task gives it the hover-description content the brief
+    /// asks for.
     /// </summary>
     public class LoadoutScreen : MonoBehaviourPun
     {
@@ -55,7 +56,7 @@ namespace Overpower.UI
         [SerializeField, Tooltip("Every weapon in the game and its upgrade-tree parent link. Add a weapon asset with a Parent and it appears in the tree with no code change.")]
         private WeaponCatalogue weapons;
 
-        [SerializeField, Tooltip("Every ability in the game. Not drawn yet (Task 9b fills in the right-hand column) but wired here now so that task is a content change, not a wiring change.")]
+        [SerializeField, Tooltip("Every ability in the game, drawn as cards in the right-hand column. A new ability asset with Id < 900 appears with no code change; ids 901-903 are debug abilities and stay reachable only through the F1 test range panel.")]
         private AbilityCatalogue abilities;
 
         [SerializeField, Tooltip("Armor tiers asset - the same one the F1 panel reads, so both call the exact same upgrade rule (ArmorLoadoutActions).")]
@@ -75,6 +76,7 @@ namespace Overpower.UI
         private PlayerInputRouter inputRouter;
         private PlayerLifecycle lifecycle;
         private MatchUI matchUI;
+        private AbilityRunner abilityRunner;
 
         // ---- weapon tree ------------------------------------------------------------------------
 
@@ -91,6 +93,35 @@ namespace Overpower.UI
         }
 
         private readonly Dictionary<int, WeaponNodeUi> weaponNodes = new Dictionary<int, WeaponNodeUi>();
+
+        // ---- abilities --------------------------------------------------------------------------
+
+        /// <summary>One ability card's three visual pieces - same recipe as WeaponNodeUi (an outer
+        /// border Image, an inset inner fill Image, a label), but abilities have only two states
+        /// (Equipped or not) where weapons have four, so there is no separate styling method - see
+        /// RefreshAbilities.</summary>
+        private sealed class AbilityCardUi
+        {
+            public Button button;
+            public Image outer;
+            public Image inner;
+            public TextMeshProUGUI label;
+        }
+
+        // Keyed by (slot, id) rather than id alone - unlike weapon ids, ability ids are not unique
+        // WITHIN one card set only by construction (AbilityCatalogue enforces global uniqueness
+        // already), but the pair is what RefreshAbilities needs to ask "is THIS slot's card THIS
+        // slot's equipped id" without a second lookup.
+        private readonly Dictionary<(AbilitySlot slot, int id), AbilityCardUi> abilityCards =
+            new Dictionary<(AbilitySlot slot, int id), AbilityCardUi>();
+
+        // Mobility (Shift), Equipment (RMB), Ultimate (Space) - the brief's own order, left to right
+        // across the movement/utility/panic-button spectrum rather than AbilitySlot's declaration
+        // order (which puts Primary - the weapon, not drawn here at all - first).
+        private static readonly AbilitySlot[] LoadoutAbilitySlotOrder =
+        {
+            AbilitySlot.Mobility, AbilitySlot.Equipment, AbilitySlot.Ultimate
+        };
 
         // ---- armor --------------------------------------------------------------------------------
 
@@ -152,14 +183,17 @@ namespace Overpower.UI
             weaponFiring = GetComponent<WeaponFiring>();
             inputRouter = GetComponent<PlayerInputRouter>();
             lifecycle = GetComponent<PlayerLifecycle>();
+            abilityRunner = GetComponent<AbilityRunner>();
             // Optional: not every rig this component might run on has one, and there is nothing
             // this screen cannot do without it besides the match-over gate below.
             matchUI = GetComponent<MatchUI>();
 
-            if (playerHealth == null || playerLoadout == null || weaponFiring == null || inputRouter == null)
-                Debug.LogError($"[LoadoutScreen] {name}: missing PlayerHealth/PlayerLoadout/WeaponFiring/PlayerInputRouter on this player - the loadout screen cannot apply choices.");
+            if (playerHealth == null || playerLoadout == null || weaponFiring == null || inputRouter == null || abilityRunner == null)
+                Debug.LogError($"[LoadoutScreen] {name}: missing PlayerHealth/PlayerLoadout/WeaponFiring/PlayerInputRouter/AbilityRunner on this player - the loadout screen cannot apply choices.");
             if (weapons == null)
                 Debug.LogError($"[LoadoutScreen] {name}: WeaponCatalogue is not assigned - the weapon tree will be empty.");
+            if (abilities == null)
+                Debug.LogError($"[LoadoutScreen] {name}: Ability Catalogue is not assigned - the ability columns will be empty.");
             if (armorConfig == null)
                 Debug.LogError($"[LoadoutScreen] {name}: ArmorConfig is not assigned - armor upgrades will always be refused.");
 
@@ -171,6 +205,8 @@ namespace Overpower.UI
                 lifecycle.AliveChanged += HandleAliveChanged;
             if (inputRouter != null)
                 inputRouter.ShopToggled += Toggle;
+            if (abilityRunner != null)
+                abilityRunner.SlotChanged += HandleAbilitySlotChanged;
         }
 
         private void OnDisable()
@@ -188,6 +224,8 @@ namespace Overpower.UI
                 lifecycle.AliveChanged -= HandleAliveChanged;
             if (inputRouter != null)
                 inputRouter.ShopToggled -= Toggle;
+            if (abilityRunner != null)
+                abilityRunner.SlotChanged -= HandleAbilitySlotChanged;
 
             // MINE ONLY (Task 9a review, critical): every remote copy of this player also runs
             // OnDestroy - e.g. whenever any OTHER player leaves the room - and every remote copy
@@ -251,6 +289,12 @@ namespace Overpower.UI
                 Close();
         }
 
+        /// <summary>AbilityRunner.SlotChanged fires for every equip, from any source - this
+        /// screen's own click, the F1 panel, or a remote property echo - so subscribing it straight
+        /// to Refresh (rather than polling like Update() does for the weapon and armor, Task 9a
+        /// review finding 2) keeps the ability column live with no extra bookkeeping.</summary>
+        private void HandleAbilitySlotChanged(AbilitySlot slot) => Refresh();
+
         // ============================================================================================
         // Open / close
         // ============================================================================================
@@ -301,6 +345,7 @@ namespace Overpower.UI
         {
             RefreshWeaponTree();
             RefreshArmor();
+            RefreshAbilities();
 
             // Snapshot what was just drawn, so Update()'s poll (Task 9a review) only calls back in
             // here once something ACTUALLY changes since this Refresh, from any path - Open, a
@@ -579,6 +624,131 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
+        // Abilities (right column) - Mobility, Equipment, Ultimate, each a heading and a wrapping
+        // grid of cards straight from the catalogue. No upgrade tree here: any non-debug ability in
+        // the right slot is pickable any time, so unlike weapons there is no Owned/Locked state.
+        // ============================================================================================
+
+        private void BuildAbilitiesUi(Transform rightColumn)
+        {
+            abilityCards.Clear();
+            if (abilities == null)
+                return; // Awake already logged why.
+
+            foreach (AbilitySlot slot in LoadoutAbilitySlotOrder)
+            {
+                AddSectionHeader(rightColumn, SlotHeading(slot));
+
+                List<AbilityDefinition> slotAbilities = abilities.ForSlot(slot);
+                slotAbilities.RemoveAll(a => a == null || a.Id >= 900); // Debug abilities stay in F1 only.
+                slotAbilities.Sort((a, b) => a.Id.CompareTo(b.Id));
+
+                GameObject grid = new GameObject($"{slot} Ability Grid", typeof(RectTransform));
+                grid.transform.SetParent(rightColumn, false);
+                // Same "pin only the width, let the group compute its own height" trick BuildColumn
+                // uses - a GridLayoutGroup needs its own rect width already resolved before it can
+                // work out how many cards fit per row, so this cannot be left for the outer
+                // VerticalLayoutGroup to guess from the (not yet laid out) cards inside it.
+                LayoutElement gridLe = grid.AddComponent<LayoutElement>();
+                gridLe.preferredWidth = theme.loadoutRightColumnWidth;
+                GridLayoutGroup gridLayout = grid.AddComponent<GridLayoutGroup>();
+                gridLayout.cellSize = new Vector2(theme.loadoutNodeWidth, theme.loadoutNodeHeight);
+                gridLayout.spacing = new Vector2(theme.loadoutNodeSpacing, theme.loadoutNodeSpacing);
+                gridLayout.childAlignment = TextAnchor.UpperLeft;
+                gridLayout.constraint = GridLayoutGroup.Constraint.Flexible; // Wraps to a new row once Loadout Right Column Width runs out.
+
+                foreach (AbilityDefinition def in slotAbilities)
+                    abilityCards[(slot, def.Id)] = BuildAbilityCard(grid.transform, def);
+            }
+        }
+
+        /// <summary>"Mobility — Shift" etc - the brief's own wording, RMB/Space/Shift rather than
+        /// AbilitySlot's own doc-comment phrasing ("Right mouse button") so the heading stays one
+        /// short line at Small Text Size.</summary>
+        private static string SlotHeading(AbilitySlot slot)
+        {
+            switch (slot)
+            {
+                case AbilitySlot.Mobility: return "Mobility — Shift";
+                case AbilitySlot.Equipment: return "Equipment — RMB";
+                case AbilitySlot.Ultimate: return "Ultimate — Space";
+                default: return slot.ToString(); // Primary never reaches here - ForSlot(Primary) is never called.
+            }
+        }
+
+        /// <summary>One ability card - same three-Image recipe as BuildNodeButton (outer border,
+        /// inset inner fill, label on top), sized to GridLayoutGroup's own cell rather than a
+        /// LayoutElement: the grid sets every child's size directly and ignores a child's own
+        /// layout element entirely, unlike the Horizontal/VerticalLayoutGroups the weapon tree
+        /// uses.</summary>
+        private AbilityCardUi BuildAbilityCard(Transform parent, AbilityDefinition def)
+        {
+            GameObject go = new GameObject($"Ability Card {def.Id}", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+
+            Image outer = go.AddComponent<Image>();
+            outer.color = Color.clear;
+            outer.raycastTarget = true;
+
+            Button button = go.AddComponent<Button>();
+            button.transition = Selectable.Transition.None; // Refresh drives every colour by hand - see StyleNode's own comment.
+            button.targetGraphic = outer;
+
+            GameObject innerGo = new GameObject("Fill", typeof(RectTransform));
+            innerGo.transform.SetParent(go.transform, false);
+            RectTransform innerRt = innerGo.GetComponent<RectTransform>();
+            innerRt.anchorMin = Vector2.zero;
+            innerRt.anchorMax = Vector2.one;
+            float b = theme.loadoutEquippedBorderWidth;
+            innerRt.offsetMin = new Vector2(b, b);
+            innerRt.offsetMax = new Vector2(-b, -b);
+            Image inner = innerGo.AddComponent<Image>();
+            inner.raycastTarget = false;
+
+            TextMeshProUGUI label = AddLabel(innerGo.transform, def.DisplayName, theme.smallTextSize, FontStyles.Normal);
+            RectTransform labelRt = label.rectTransform;
+            labelRt.anchorMin = Vector2.zero;
+            labelRt.anchorMax = Vector2.one;
+            labelRt.offsetMin = Vector2.zero;
+            labelRt.offsetMax = Vector2.zero;
+
+            AbilitySlot slot = def.Slot;
+            int abilityId = def.Id;
+            button.onClick.AddListener(() => OnAbilityCardClicked(slot, abilityId));
+
+            return new AbilityCardUi { button = button, outer = outer, inner = inner, label = label };
+        }
+
+        private void OnAbilityCardClicked(AbilitySlot slot, int abilityId)
+        {
+            if (playerLoadout == null || abilityRunner == null)
+                return;
+            if (abilityRunner.EquippedId(slot) == abilityId)
+                return; // Already equipped - same no-op-on-self-click guard as OnWeaponNodeClicked.
+
+            playerLoadout.SetAbility(slot, abilityId);
+            Refresh();
+        }
+
+        /// <summary>Equipped gets the weapon tree's own Equipped look (highlight border); every
+        /// other card gets its Selectable look (no border, normal fill/text) - abilities have
+        /// nothing equivalent to Owned or Locked.</summary>
+        private void RefreshAbilities()
+        {
+            if (abilityRunner == null)
+                return;
+
+            foreach (var pair in abilityCards)
+            {
+                bool equipped = abilityRunner.EquippedId(pair.Key.slot) == pair.Key.id;
+                AbilityCardUi ui = pair.Value;
+                ui.outer.color = equipped ? theme.highlightColor : Color.clear;
+                ui.inner.color = theme.loadoutSelectableColor;
+                ui.label.color = theme.textColor;
+            }
+        }
+
+        // ============================================================================================
         // UI construction
         // ============================================================================================
 
@@ -659,10 +829,7 @@ namespace Overpower.UI
             GameObject leftColumn = BuildColumn(contentRow.transform, theme.loadoutLeftColumnWidth);
             GameObject rightColumn = BuildColumn(contentRow.transform, theme.loadoutRightColumnWidth);
             rightColumnContent = rightColumn.transform;
-            // Task 9b's own hook - a placeholder so an empty column does not look broken in the
-            // meantime; 9b replaces this label with real ability cards.
-            TextMeshProUGUI abilitiesPlaceholder = AddLabel(rightColumn.transform, "Abilities (Task 9b)", theme.smallTextSize, FontStyles.Italic);
-            abilitiesPlaceholder.color = theme.mutedTextColor;
+            BuildAbilitiesUi(rightColumn.transform);
 
             AddSectionHeader(leftColumn.transform, "Weapons");
             BuildWeaponTreeUi(leftColumn.transform);
