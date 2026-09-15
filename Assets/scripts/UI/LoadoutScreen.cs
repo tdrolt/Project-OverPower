@@ -10,6 +10,8 @@ using UnityEngine.UI;
 using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Match;
+using Overpower.Net;
 using Overpower.Weapons;
 
 namespace Overpower.UI
@@ -65,6 +67,21 @@ namespace Overpower.UI
 
         [SerializeField, Tooltip("Armor tiers asset - the same one the F1 panel reads, so both call the exact same upgrade rule (ArmorLoadoutActions).")]
         private ArmorConfig armorConfig;
+
+        [SerializeField, Tooltip("Match tuning asset - Free Loadout, the sell refund rate, and the shop's own (shorter) out-of-combat timer. The same asset PlayerLoadout and GoldWallet read. Task 2.5b: missing this fails OPEN to Free Loadout (see ShopPricing.Build) rather than silently locking every purchase.")]
+        private GameplayConfig gameplayConfig;
+
+        /// <summary>This player's gold, owner-authoritative (GoldWallet's own class comment). Read,
+        /// never written directly - every spend/refund goes through TrySpend/Add so the wallet is
+        /// the only thing that ever publishes the "gold" Custom Property.</summary>
+        private GoldWallet goldWallet;
+
+        /// <summary>What this player has paid per category this match, so a weapon/armor reset can
+        /// refund part of it (Task 2.5b Step 7). Lives here rather than a separate component - see
+        /// the report's "ledger home" note - because this is the only thing that ever spends
+        /// through it, and it resets exactly when a fresh LoadoutScreen does: a new player object,
+        /// same as GoldWallet's own balance starts fresh only for a genuinely new player.</summary>
+        private readonly PurchaseLedger ledger = new PurchaseLedger();
 
         /// <summary>True only while the LOCAL player's own screen is open - only one instance of this
         /// component ever builds anything (every remote copy bails in Awake), so there is only ever
@@ -147,6 +164,30 @@ namespace Overpower.UI
         private TextMeshProUGUI hoverDescriptionLabel;
         private TextMeshProUGUI hoverNumbersLabel;
 
+        // ---- shop header (Task 2.5b) --------------------------------------------------------------
+
+        private TextMeshProUGUI goldLabel;
+        private TextMeshProUGUI statusLabel;
+
+        // Cached against the LAST TEXT ACTUALLY DRAWN, not against the raw numbers, so Update()'s
+        // per-frame poll (see its own comment) can call RefreshHeader every frame for cheap - most
+        // frames this comparison is the only work done - while the label itself is only ever
+        // touched when what it would say actually changes, exactly the "tenths of a second" cadence
+        // the brief asks for (the seconds-until-ok string only changes when its own tenths digit
+        // does; see ShopContext.StatusText).
+        private string lastGoldText;
+        private string lastStatusText;
+
+        /// <summary>Shown under the Ultimate heading only while that slot is empty ("Buy an
+        /// ultimate") - the one ability slot with no card that can ever read Equipped at spawn, so
+        /// without this the column would otherwise say nothing about why nothing is highlighted.</summary>
+        private TextMeshProUGUI ultimateEmptyLabel;
+
+        // Reset-button labels, kept so Refresh can rewrite their refund preview in place - see
+        // RefreshResetLabels. AddButton returns the Button; GetComponentInChildren grabs its label.
+        private TextMeshProUGUI resetWeaponLabel;
+        private TextMeshProUGUI resetArmorLabel;
+
         // ---- armor --------------------------------------------------------------------------------
 
         private TextMeshProUGUI absorbText;
@@ -181,6 +222,15 @@ namespace Overpower.UI
         private int lastKnownAbsorbLevel = -1;
         private int lastKnownRechargeLevel = -1;
 
+        // Task 2.5b: the shop gate can flip (the out-of-combat timer running out, walking into your
+        // own territory) or the balance can rise (passive territory income) with NOTHING on this
+        // screen having been clicked - the same "something changed from OUTSIDE this screen" gap
+        // Task 9a's review already found for the weapon/armor poll above, now extended to gold and
+        // the gate. A full Refresh() only fires when one of these actually changes; otherwise
+        // Update() still calls the cheap RefreshHeader() every frame so the countdown keeps ticking.
+        private int lastKnownGold = int.MinValue;
+        private bool lastKnownBlocked;
+
         // One Material instance shared by every text this screen builds - see PlayerHud.ApplyOutline
         // for why sharing beats letting TMP auto-instantiate one per label.
         private Material loadoutTextMaterial;
@@ -207,6 +257,7 @@ namespace Overpower.UI
             inputRouter = GetComponent<PlayerInputRouter>();
             lifecycle = GetComponent<PlayerLifecycle>();
             abilityRunner = GetComponent<AbilityRunner>();
+            goldWallet = GetComponent<GoldWallet>();
             // Optional: not every rig this component might run on has one, and there is nothing
             // this screen cannot do without it besides the match-over gate below.
             matchUI = GetComponent<MatchUI>();
@@ -219,6 +270,10 @@ namespace Overpower.UI
                 Debug.LogError($"[LoadoutScreen] {name}: Ability Catalogue is not assigned - the ability columns will be empty.");
             if (armorConfig == null)
                 Debug.LogError($"[LoadoutScreen] {name}: ArmorConfig is not assigned - armor upgrades will always be refused.");
+            if (goldWallet == null)
+                Debug.LogError($"[LoadoutScreen] {name}: no GoldWallet on this player - purchases can never spend or refund gold.");
+            if (gameplayConfig == null)
+                Debug.LogWarning($"[LoadoutScreen] {name}: GameplayConfig is not assigned - the shop gate fails open to Free Loadout (ShopPricing.Build).");
 
             BuildWeaponTree();
             BuildUi();
@@ -311,8 +366,20 @@ namespace Overpower.UI
             int weaponId = CurrentWeaponId();
             int absorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
             int rechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
-            if (weaponId != lastKnownWeaponId || absorbLevel != lastKnownAbsorbLevel || rechargeLevel != lastKnownRechargeLevel)
+
+            // Task 2.5b: gold can rise from passive territory income, and the gate can flip from
+            // walking into your own zone or the combat timer running out - either changes what
+            // every node/card should look like, with nothing on THIS screen clicked (same reasoning
+            // as the weapon/armor poll above).
+            int gold = goldWallet != null ? goldWallet.Balance : 0;
+            ShopContext ctx = CurrentShopContext();
+            bool blocked = ctx.Check(0) != PurchaseBlock.None;
+
+            if (weaponId != lastKnownWeaponId || absorbLevel != lastKnownAbsorbLevel || rechargeLevel != lastKnownRechargeLevel
+                || gold != lastKnownGold || blocked != lastKnownBlocked)
                 Refresh();
+            else
+                RefreshHeader(); // Still cheap even when nothing else changed - see RefreshHeader's own comment.
         }
 
         private void HandleAliveChanged(bool alive)
@@ -380,9 +447,11 @@ namespace Overpower.UI
         /// and Refresh is already subscribed to it directly.</summary>
         private void Refresh()
         {
+            RefreshHeader();
             RefreshWeaponTree();
             RefreshArmor();
             RefreshAbilities();
+            RefreshResetLabels();
 
             // Snapshot what was just drawn, so Update()'s poll (Task 9a review) only calls back in
             // here once something ACTUALLY changes since this Refresh, from any path - Open, a
@@ -390,6 +459,62 @@ namespace Overpower.UI
             lastKnownWeaponId = CurrentWeaponId();
             lastKnownAbsorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
             lastKnownRechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
+            lastKnownGold = goldWallet != null ? goldWallet.Balance : 0;
+            lastKnownBlocked = CurrentShopContext().Check(0) != PurchaseBlock.None;
+        }
+
+        /// <summary>This player's shop gate and balance right now - built fresh each call (cheap:
+        /// a couple of dictionary/property reads, no allocation) rather than cached, so every caller
+        /// this frame agrees even if territory or the wallet changed mid-frame. One home for the
+        /// BuildingManager/Teams/GoldWallet reads every purchase check needs - see ShopPricing's own
+        /// class comment for why this was pulled out of LoadoutScreen itself.</summary>
+        private ShopContext CurrentShopContext() =>
+            ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position);
+
+        /// <summary>Header row: "Gold 1234" and the status line (a block reason, the Free Loadout
+        /// note, or ""). Called every frame while open (see Update()'s own comment) but only ever
+        /// writes a label's .text when the STRING it would show actually changed - lastGoldText/
+        /// lastStatusText, not the raw numbers, so a countdown only redraws on the tenth of a second
+        /// its own displayed digit moves, per the brief.</summary>
+        private void RefreshHeader()
+        {
+            int gold = goldWallet != null ? goldWallet.Balance : 0;
+            string goldText = $"Gold {gold}";
+            if (goldText != lastGoldText)
+            {
+                goldLabel.text = goldText;
+                lastGoldText = goldText;
+            }
+
+            ShopContext ctx = CurrentShopContext();
+            string statusText = ctx.StatusText();
+            if (statusText != lastStatusText)
+            {
+                statusLabel.text = statusText;
+                // Free Loadout's note and "all clear" (empty string) both read as a plain aside;
+                // an actual block reason borrows the overheat-warning amber so it reads as the same
+                // kind of "something is stopping you" signal the HUD already uses elsewhere.
+                statusLabel.color = statusText.Length == 0 || ctx.FreeLoadout ? theme.mutedTextColor : theme.overheatWarningColor;
+                lastStatusText = statusText;
+            }
+        }
+
+        /// <summary>Rewrites the Reset Weapon/Reset Armor buttons' own labels with a refund preview
+        /// ("Reset Weapon (+600)") - read straight off the ledger, never spent, so hovering (or just
+        /// looking at) the button tells a player what undoing costs them before they click it.</summary>
+        private void RefreshResetLabels()
+        {
+            double rate = gameplayConfig != null ? gameplayConfig.SellRefundRate : 0.5;
+            if (resetWeaponLabel != null)
+            {
+                int refund = GoldMath.Refund(ledger.WeaponSpent, rate);
+                resetWeaponLabel.text = refund > 0 ? $"Reset Weapon (+{refund})" : "Reset Weapon";
+            }
+            if (resetArmorLabel != null)
+            {
+                int refund = GoldMath.Refund(ledger.ArmorSpent, rate);
+                resetArmorLabel.text = refund > 0 ? $"Reset Armor (+{refund})" : "Reset Armor";
+            }
         }
 
         // ============================================================================================
@@ -542,6 +667,22 @@ namespace Overpower.UI
             if (!tree.CanUpgrade(equipped, weaponId))
                 return;
 
+            // Task 2.5b: a Selectable node stays clickable even while shop-blocked (see StyleNode) -
+            // the click itself, refused here, IS how a player learns why; the node's colour and the
+            // header status line already said so before they clicked.
+            WeaponDefinition target = weapons.Resolve(weaponId);
+            int price = target != null ? target.GoldCost : 0;
+            ShopContext ctx = CurrentShopContext();
+
+            if (!ctx.FreeLoadout)
+            {
+                if (ctx.Check(price) != PurchaseBlock.None)
+                    return;
+                if (goldWallet == null || !goldWallet.TrySpend(price))
+                    return;
+                ledger.RecordWeapon(price);
+            }
+
             playerLoadout?.SetWeapon(weaponId);
             Refresh();
         }
@@ -550,6 +691,18 @@ namespace Overpower.UI
         {
             if (tree.RootId < 0)
                 return;
+
+            // A reset has no price of its own - only the territory/combat gate applies (price 0
+            // never trips CannotAfford) - so the same Check(0) the header status line reads decides
+            // whether the refund is allowed here too.
+            ShopContext ctx = CurrentShopContext();
+            if (!ctx.FreeLoadout)
+            {
+                if (ctx.Check(0) != PurchaseBlock.None)
+                    return;
+                if (goldWallet != null && gameplayConfig != null)
+                    goldWallet.Add(ledger.SellWeapon(gameplayConfig.SellRefundRate));
+            }
 
             playerLoadout?.SetWeapon(tree.RootId);
             Refresh();
@@ -560,16 +713,34 @@ namespace Overpower.UI
 
         private void RefreshWeaponTree()
         {
-            if (tree == null)
+            if (tree == null || weapons == null)
                 return;
 
             int equipped = CurrentWeaponId();
+            ShopContext ctx = CurrentShopContext();
             foreach (var pair in weaponNodes)
-                StyleNode(pair.Value, tree.StateOf(pair.Key, equipped));
+                StyleNode(pair.Value, tree.StateOf(pair.Key, equipped), weapons.Resolve(pair.Key), ctx);
         }
 
-        private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state)
+        /// <summary>Task 2.5b: the label's second line now reads "Equipped"/"Owned" for a weapon
+        /// already reached, or its price otherwise (ShopPricing.PriceLabel) - shown even under Free
+        /// Loadout, which only changes whether the price is actually charged, not whether it is
+        /// shown (assignment brief). A Selectable node that is out of territory/combat/gold reads
+        /// exactly like Locked (dark fill, muted text) but STAYS interactable: the click is what
+        /// tells the player why (OnWeaponNodeClicked re-checks the same rule), and a disabled
+        /// button would also stop it being hoverable for the price/description below.</summary>
+        private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state, WeaponDefinition def, ShopContext ctx)
         {
+            string suffix = state == UpgradeNodeState.Equipped ? "Equipped"
+                          : state == UpgradeNodeState.Owned ? "Owned"
+                          : def != null ? ShopPricing.PriceLabel(def.GoldCost) : "";
+            // <size=70%> on the price/status line only - the node is small (Loadout Node Width x
+            // Height) and two full-size lines would not both fit; see Task 2.5b's own verification
+            // capture for whether this needs a further pass.
+            ui.label.text = def != null ? $"{def.DisplayName}\n<size=70%>{suffix}</size>" : suffix;
+
+            bool shopBlocked = state == UpgradeNodeState.Selectable && def != null && ctx.Check(def.GoldCost) != PurchaseBlock.None;
+
             switch (state)
             {
                 case UpgradeNodeState.Equipped:
@@ -580,8 +751,8 @@ namespace Overpower.UI
                     break;
                 case UpgradeNodeState.Selectable:
                     ui.outer.color = Color.clear;
-                    ui.inner.color = theme.loadoutSelectableColor;
-                    ui.label.color = theme.textColor;
+                    ui.inner.color = shopBlocked ? theme.lockedColor : theme.loadoutSelectableColor;
+                    ui.label.color = shopBlocked ? theme.mutedTextColor : theme.textColor;
                     ui.button.interactable = true;
                     break;
                 case UpgradeNodeState.Owned:
@@ -620,7 +791,8 @@ namespace Overpower.UI
             absorbText = BuildArmorRow(leftColumn, out absorbButton, OnAbsorbClicked);
             rechargeText = BuildArmorRow(leftColumn, out rechargeButton, OnRechargeClicked);
 
-            AddButton(leftColumn, "Reset Armor", OnResetArmorClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
+            Button resetArmorButton = AddButton(leftColumn, "Reset Armor", OnResetArmorClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
+            resetArmorLabel = resetArmorButton.GetComponentInChildren<TextMeshProUGUI>();
         }
 
         private TextMeshProUGUI BuildArmorRow(Transform parent, out Button plusButton, UnityEngine.Events.UnityAction onClick)
@@ -643,20 +815,51 @@ namespace Overpower.UI
             return label;
         }
 
-        private void OnAbsorbClicked()
-        {
-            ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb: true);
-            Refresh();
-        }
+        private void OnAbsorbClicked() => TryBuyArmorUpgrade(upgradeAbsorb: true);
+        private void OnRechargeClicked() => TryBuyArmorUpgrade(upgradeAbsorb: false);
 
-        private void OnRechargeClicked()
+        /// <summary>Task 2.5b: spends BEFORE upgrading, from the price of the purchase about to be
+        /// made (armorConfig.UpgradeCosts[absorbLevel + rechargeLevel] - one shared "how many armor
+        /// purchases so far" index, absorb or recharge). The CanUpgrade check mirrors what
+        /// RefreshArmor already used to disable the button, kept here too as a second guard - same
+        /// belt-and-braces pattern as OnWeaponNodeClicked re-checking CanUpgrade.</summary>
+        private void TryBuyArmorUpgrade(bool upgradeAbsorb)
         {
-            ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb: false);
+            if (playerHealth == null || armorConfig == null)
+                return;
+
+            var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel);
+            if (!(upgradeAbsorb ? path.CanUpgradeAbsorb : path.CanUpgradeRecharge))
+                return;
+
+            int price = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
+            ShopContext ctx = CurrentShopContext();
+
+            if (!ctx.FreeLoadout)
+            {
+                if (ctx.Check(price) != PurchaseBlock.None)
+                    return;
+                if (goldWallet == null || !goldWallet.TrySpend(price))
+                    return;
+                ledger.RecordArmor(price);
+            }
+
+            ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb);
             Refresh();
         }
 
         private void OnResetArmorClicked()
         {
+            // Same "no price of its own, only the gate applies" reasoning as OnResetWeaponClicked.
+            ShopContext ctx = CurrentShopContext();
+            if (!ctx.FreeLoadout)
+            {
+                if (ctx.Check(0) != PurchaseBlock.None)
+                    return;
+                if (goldWallet != null && gameplayConfig != null)
+                    goldWallet.Add(ledger.SellArmor(gameplayConfig.SellRefundRate));
+            }
+
             ArmorLoadoutActions.Reset(playerLoadout);
             Refresh();
         }
@@ -664,7 +867,10 @@ namespace Overpower.UI
         /// <summary>Refused-upgrade choice: DISABLE the + button rather than a muted note, computed
         /// up front from the same ArmorUpgradePath rule TryUpgrade itself would apply, so a click
         /// that would be refused is never even offered - unlike the F1 panel, whose console log is a
-        /// designer convenience this player-facing screen does not need.</summary>
+        /// designer convenience this player-facing screen does not need. Task 2.5b adds the next
+        /// purchase's price next to whichever path can still be bought, and mutes both rows' text
+        /// (not the + buttons themselves, which the CanUpgrade check above already governs) while
+        /// shop-blocked, matching the weapon tree's own "still visible, reads as unavailable" look.</summary>
         private void RefreshArmor()
         {
             if (playerHealth == null || armorConfig == null)
@@ -672,10 +878,21 @@ namespace Overpower.UI
 
             int absorbMax = Mathf.Max(0, armorConfig.AbsorbLevelCount - 1);
             int rechargeMax = Mathf.Max(0, armorConfig.RechargeLevelCount - 1);
-            absorbText.text = $"Absorb {playerHealth.AbsorbLevel}/{absorbMax}";
-            rechargeText.text = $"Recharge {playerHealth.RechargeLevel}/{rechargeMax}";
 
             var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel);
+            int nextPrice = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
+            ShopContext ctx = CurrentShopContext();
+            bool gateBlocked = ctx.Check(nextPrice) != PurchaseBlock.None;
+
+            absorbText.text = path.CanUpgradeAbsorb
+                ? $"Absorb {playerHealth.AbsorbLevel}/{absorbMax} ({ShopPricing.PriceLabel(nextPrice)})"
+                : $"Absorb {playerHealth.AbsorbLevel}/{absorbMax}";
+            rechargeText.text = path.CanUpgradeRecharge
+                ? $"Recharge {playerHealth.RechargeLevel}/{rechargeMax} ({ShopPricing.PriceLabel(nextPrice)})"
+                : $"Recharge {playerHealth.RechargeLevel}/{rechargeMax}";
+            absorbText.color = path.CanUpgradeAbsorb && gateBlocked ? theme.mutedTextColor : theme.textColor;
+            rechargeText.color = path.CanUpgradeRecharge && gateBlocked ? theme.mutedTextColor : theme.textColor;
+
             absorbButton.interactable = path.CanUpgradeAbsorb;
             rechargeButton.interactable = path.CanUpgradeRecharge;
         }
@@ -695,6 +912,16 @@ namespace Overpower.UI
             foreach (AbilitySlot slot in LoadoutAbilitySlotOrder)
             {
                 AddSectionHeader(rightColumn, SlotHeading(slot));
+
+                // Task 2.5b: the Ultimate slot is the one slot that can read Equipped on NO card at
+                // all (starts empty when the economy is on - Task 2.5a) - without this, an empty
+                // ultimate column would say nothing at all about why nothing is highlighted.
+                if (slot == AbilitySlot.Ultimate)
+                {
+                    ultimateEmptyLabel = AddLabel(rightColumn, "", theme.smallTextSize, FontStyles.Normal);
+                    ultimateEmptyLabel.alignment = TextAlignmentOptions.MidlineLeft;
+                    ultimateEmptyLabel.color = theme.overheatWarningColor;
+                }
 
                 List<AbilityDefinition> slotAbilities = abilities.ForSlot(slot);
                 slotAbilities.RemoveAll(a => a == null || a.Id >= 900); // Debug abilities stay in F1 only.
@@ -785,29 +1012,65 @@ namespace Overpower.UI
         {
             if (playerLoadout == null || abilityRunner == null)
                 return;
-            if (abilityRunner.EquippedId(slot) == abilityId)
+            int equippedId = abilityRunner.EquippedId(slot);
+            if (equippedId == abilityId)
                 return; // Already equipped - same no-op-on-self-click guard as OnWeaponNodeClicked.
+
+            // Task 2.5b: ShopRules.AbilityPrice reads 0 for a first pick into an empty Mobility/
+            // Equipment slot (the free starting kit - Task 2.5a leaves those slots empty on the
+            // prefab) and the card's real GoldCost otherwise; the Ultimate slot is never free.
+            AbilityDefinition def = abilities != null ? abilities.Resolve(abilityId) : null;
+            int goldCost = def != null ? def.GoldCost : 0;
+            bool slotIsEmpty = equippedId == LoadoutProperties.Empty;
+            int price = ShopRules.AbilityPrice(slotIsEmpty, slot, goldCost);
+            ShopContext ctx = CurrentShopContext();
+
+            if (!ctx.FreeLoadout)
+            {
+                if (ctx.Check(price) != PurchaseBlock.None)
+                    return;
+                // No ledger entry: abilities have no sell-back path (GDD silent on it), and a free
+                // first pick has nothing paid to refund anyway.
+                if (price > 0 && (goldWallet == null || !goldWallet.TrySpend(price)))
+                    return;
+            }
 
             playerLoadout.SetAbility(slot, abilityId);
             Refresh();
         }
 
-        /// <summary>Equipped gets the weapon tree's own Equipped look (highlight border); every
-        /// other card gets its Selectable look (no border, normal fill/text) - abilities have
-        /// nothing equivalent to Owned or Locked.</summary>
+        /// <summary>Equipped gets the weapon tree's own Equipped look (highlight border) and its
+        /// label reads "Equipped"; every other card shows its price (ShopPricing.PriceLabel of
+        /// ShopRules.AbilityPrice - "Free" for a first pick into an empty Mobility/Equipment slot)
+        /// and, while shop-blocked, the same dark-fill/muted-text look Selectable weapon nodes use -
+        /// see StyleNode's own comment for why that stays interactable rather than disabled.</summary>
         private void RefreshAbilities()
         {
-            if (abilityRunner == null)
+            if (abilityRunner == null || abilities == null)
                 return;
 
+            ShopContext ctx = CurrentShopContext();
             foreach (var pair in abilityCards)
             {
-                bool equipped = abilityRunner.EquippedId(pair.Key.slot) == pair.Key.id;
+                AbilitySlot slot = pair.Key.slot;
+                int cardId = pair.Key.id;
+                int equippedId = abilityRunner.EquippedId(slot);
+                bool equipped = equippedId == cardId;
+
+                AbilityDefinition def = abilities.Resolve(cardId);
+                int goldCost = def != null ? def.GoldCost : 0;
+                int price = equipped ? 0 : ShopRules.AbilityPrice(equippedId == LoadoutProperties.Empty, slot, goldCost);
+                bool shopBlocked = !equipped && ctx.Check(price) != PurchaseBlock.None;
+
                 AbilityCardUi ui = pair.Value;
+                ui.label.text = def != null ? $"{def.DisplayName}\n<size=70%>{(equipped ? "Equipped" : ShopPricing.PriceLabel(price))}</size>" : "";
                 ui.outer.color = equipped ? theme.highlightColor : Color.clear;
-                ui.inner.color = theme.loadoutSelectableColor;
-                ui.label.color = theme.textColor;
+                ui.inner.color = shopBlocked ? theme.lockedColor : theme.loadoutSelectableColor;
+                ui.label.color = shopBlocked ? theme.mutedTextColor : theme.textColor;
             }
+
+            if (ultimateEmptyLabel != null)
+                ultimateEmptyLabel.text = abilityRunner.EquippedId(AbilitySlot.Ultimate) == LoadoutProperties.Empty ? "Buy an ultimate" : "";
         }
 
         // ============================================================================================
@@ -972,6 +1235,7 @@ namespace Overpower.UI
             panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             BuildTitleRow(panel.transform);
+            BuildHeaderRow(panel.transform);
 
             GameObject contentRow = new GameObject("Content", typeof(RectTransform));
             contentRow.transform.SetParent(panel.transform, false);
@@ -987,7 +1251,8 @@ namespace Overpower.UI
 
             AddSectionHeader(leftColumn.transform, "Weapons");
             BuildWeaponTreeUi(leftColumn.transform);
-            AddButton(leftColumn.transform, "Reset Weapon", OnResetWeaponClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
+            Button resetWeaponButton = AddButton(leftColumn.transform, "Reset Weapon", OnResetWeaponClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
+            resetWeaponLabel = resetWeaponButton.GetComponentInChildren<TextMeshProUGUI>();
 
             BuildArmorSection(leftColumn.transform);
 
@@ -1049,6 +1314,30 @@ namespace Overpower.UI
             titleLe.flexibleWidth = 1f; // Pushes the close button to the row's right edge.
 
             AddButton(row.transform, "X", Toggle, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
+        }
+
+        /// <summary>"Gold 1234" on the left, the shop's status line on the right (a block reason,
+        /// the Free Loadout note, or nothing) - a row of its own under the title rather than folded
+        /// into it, so the title row's own X-button-pushing flexibleWidth trick does not have to be
+        /// redone around two more labels. Text is filled in by RefreshHeader, called from Refresh
+        /// and every frame from Update() while open - see their own comments.</summary>
+        private void BuildHeaderRow(Transform parent)
+        {
+            GameObject row = new GameObject("Header Row", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+
+            goldLabel = AddLabel(row.transform, "", theme.bodyTextSize, FontStyles.Bold);
+            goldLabel.alignment = TextAlignmentOptions.MidlineLeft;
+            goldLabel.color = theme.goldTextColor;
+
+            statusLabel = AddLabel(row.transform, "", theme.smallTextSize, FontStyles.Normal);
+            statusLabel.alignment = TextAlignmentOptions.MidlineRight;
+            LayoutElement statusLe = statusLabel.gameObject.AddComponent<LayoutElement>();
+            statusLe.flexibleWidth = 1f; // Takes the rest of the row, pushing the gold label to the left edge.
         }
 
         /// <summary>The always-visible "Loadout (P)" button, bottom-right - clear of the HUD panel

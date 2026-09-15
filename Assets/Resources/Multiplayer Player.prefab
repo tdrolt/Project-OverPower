@@ -3365,6 +3365,7 @@ MonoBehaviour:
   weapons: {fileID: 11400000, guid: 16afde6d43329db4bbd7fed72f897638, type: 2}
   abilities: {fileID: 11400000, guid: 70e5ea7660cd12b4bbb497e71ca8b00e, type: 2}
   armorConfig: {fileID: 11400000, guid: 7c3c352cca1b63c418cb15fb4105cfa5, type: 2}
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
 --- !u!114 &1053378542657063450
 MonoBehaviour:
   m_ObjectHideFlags: 0
