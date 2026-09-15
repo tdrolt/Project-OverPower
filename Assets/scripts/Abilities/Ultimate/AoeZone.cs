@@ -108,11 +108,14 @@ namespace Overpower.Abilities
             int totalTicks = Mathf.Max(1, Mathf.RoundToInt(durationSeconds / tickSeconds));
 
             // Review fix (Task 1.11b): Age here already reflects how old this zone really is on THIS
-            // client (NetworkedDeployable's own class comment - a late joiner's replay keeps the
-            // original SentServerTime, so Age is never "since I joined"). Seeding the schedule with it
-            // means a late joiner's ticks whose moment already passed before this client existed are
-            // skipped outright instead of all firing together the first time this client evaluates -
-            // see ZoneTickSchedule's own class comment for the hitch-vs-late-start distinction.
+            // client (NetworkedDeployable's own class comment - the placer's PhotonNetwork.ServerTimestamp
+            // travels explicitly in instantiationData and DeployableAge.SecondsSince turns it and this
+            // client's own current ServerTimestamp into Age, so a late joiner's replay is never "since I
+            // joined" - see NetworkedDeployable's FAIL #15 fix for why that is no longer read from
+            // info.SentServerTime). Seeding the schedule with it means a late joiner's ticks whose moment
+            // already passed before this client existed are skipped outright instead of all firing
+            // together the first time this client evaluates - see ZoneTickSchedule's own class comment
+            // for the hitch-vs-late-start distinction.
             schedule = new ZoneTickSchedule(tickSeconds, totalTicks, (float)Age);
             follower = new CasterFollower(followsCaster, OwnerActor);
             localPlacedRealTime = Time.time;

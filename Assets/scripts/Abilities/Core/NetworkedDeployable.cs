@@ -36,12 +36,20 @@ namespace Overpower.Abilities
     /// FireField.Burn documents, where every non-owner calling PhotonNetwork.Destroy on the same
     /// object logs one error each.
     ///
-    /// A COPY THAT ARRIVES ALREADY PAST ITS LIFETIME (IsExpired below) hides its renderers, disables
-    /// its colliders, and otherwise does nothing - the owner's own real destroy (already in flight,
-    /// or a stale cache entry the server never finished clearing before this client's join raced it)
-    /// is what actually removes it. This is a defensive backstop for that race, not the primary fix:
-    /// the primary fix is simply computing Age correctly, so a copy that is genuinely still alive
-    /// reports its true remaining life instead of a fresh Lifetime Seconds.
+    /// A COPY THAT ARRIVES ALREADY PAST ITS LIFETIME (IsExpired below) hides its renderers and disables
+    /// its colliders rather than looking freshly armed - a defensive backstop for the cache-removal/
+    /// destroy race described above, not the primary fix (the primary fix is simply computing Age
+    /// correctly, so a copy that is genuinely still alive reports its true remaining life instead of a
+    /// fresh Lifetime Seconds). Hiding is NOT this object's only fate, though: the lifetime-destroy
+    /// schedule below runs unconditionally whenever this is the owner's own copy and Lifetime Seconds is
+    /// set, regardless of whether IsExpired is also true - code review finding, Task 2.1a-era pass. It
+    /// used to be an else-if against the IsExpired hide, which meant an OWNER whose own copy computed
+    /// IsExpired true (a Lifetime Seconds under one frame, or this very initialization stalling past it)
+    /// never scheduled its own destroy at all - Mine and ElectricFence have no other path off IsExpired
+    /// (their own FixedUpdate also early-returns on it), so that hidden, collider-less object leaked
+    /// forever. Scheduling on "am I the owner with a lifetime" rather than "is this read of Age not
+    /// already expired" means an already-expired owner's copy just gets a zero-second wait and destroys
+    /// itself on the next frame instead of never.
     ///
     /// A SECOND BUG FOUND WHILE VERIFYING THE FIRST ONE: PhotonNetwork.ServerTimestamp itself is not
     /// trustworthy the INSTANT a late joiner's cached replay first fires - it is fetched from the
@@ -49,7 +57,8 @@ namespace Overpower.Abilities
     /// can beat that fetch home, reading ServerTimestamp as its un-set default of 0. Subtracting a real
     /// placement timestamp from a wrongly-zero "now" does not read as Age 0 the way the first bug did -
     /// it swings however the sign happens to fall, including a multi-million-second Age. See
-    /// InitializeAfterServerTimeIsReady below for the fix (wait for a non-zero reading, bounded).
+    /// InitializeAfterServerTimeIsReady below for the fix (wait for a non-zero reading, bounded, with a
+    /// one-time warning if the wait ever actually runs out - see that coroutine's own comment).
     ///
     /// WHAT THIS BASE DOES NOT OWN: anything about what the object looks like, does, or how its own
     /// numbers arrive. A subclass overrides OnPlaced to unpack its own instantiationData and do
@@ -176,6 +185,19 @@ namespace Overpower.Abilities
                 waited++;
             }
 
+            // Failed open (see this coroutine's own comment) rather than waiting forever - but failing
+            // open here silently would recreate the exact "Age reads 0" symptom FAIL #15 was about, one
+            // level down: DeployableAge.SecondsSince(placedMs, 0) with a positive placedMs also clamps
+            // to 0. Loud rather than silent, so a genuinely stuck calibration (never observed, but the
+            // whole point of a bounded wait instead of an infinite one) shows up in the console instead
+            // of quietly masquerading as "placed 0 seconds ago" again.
+            if (PhotonNetwork.ServerTimestamp == 0)
+            {
+                Debug.LogWarning($"[NetworkedDeployable] {name}: PhotonNetwork.ServerTimestamp was still " +
+                                  $"0 after waiting {MaxServerTimeCalibrationFrames} frames for it to " +
+                                  "calibrate - Age is falling back to 0 for this object.");
+            }
+
             Age = DeployableAge.SecondsSince(placedServerTimestampMs, PhotonNetwork.ServerTimestamp);
 
             OnPlaced(subclassData, info);
@@ -183,12 +205,31 @@ namespace Overpower.Abilities
             if (IsExpired)
             {
                 // Defensive backstop for the cache-removal/destroy race the class comment describes -
-                // never the normal path. Hide and go inert; the owner's own real destroy (already in
-                // flight, or about to be) is what actually removes this, not us - we may not even be
-                // the owner, and RequestDestroy() below already no-ops on every non-owner client.
+                // never the normal path. Hide and go inert; RequestDestroy() below (when this is also
+                // the owner) or the real owner's own destroy (already in flight, or about to be) is
+                // what actually removes this - RequestDestroy() already no-ops on every non-owner
+                // client, so this is safe to run alongside the scheduling below rather than instead of
+                // it (see that branch's own comment for why it must not be "instead of").
                 HideExpiredVisualAndColliders();
             }
-            else if (lifetimeSeconds > 0f && IsOwnerClient)
+
+            // Deliberately NOT an "else if" against the IsExpired branch above (code review finding,
+            // Task 2.1a-era pass): the OWNER's own copy can itself compute IsExpired true - a Lifetime
+            // Seconds under one frame's worth of real time, or this very coroutine stalling past it
+            // while it waited on InitializeAfterServerTimeIsReady's calibration loop above. Skipping
+            // the destroy schedule whenever IsExpired was true used to leave a hidden, collider-less,
+            // never-destroyed networked object behind forever on exactly the owner's own machine -
+            // Mine and ElectricFence have no OTHER path off IsExpired (their own FixedUpdate also
+            // early-returns on it, so neither ever ticks its way to a detonation or a discovery hit
+            // either); CoverWall only escaped it by accident, and only if someone actually shot it
+            // first. Scheduling this unconditionally on "am I the owner and do I have a lifetime at
+            // all" - never on whether THIS particular read of Age happened to already clear it -
+            // means an already-expired owner's copy gets Mathf.Max(0f, ...) = 0 here and destroys
+            // itself on the very next frame instead of never. DeployableLifetime.ShouldScheduleOwnerDestroy
+            // (Combat/DeployableLifetime.cs) is that decision pulled out pure and tested: its own
+            // signature has no isExpired parameter at all, so there is nothing here that could
+            // reintroduce the coupling by accident.
+            if (DeployableLifetime.ShouldScheduleOwnerDestroy(lifetimeSeconds, IsOwnerClient))
             {
                 float remaining = Mathf.Max(0f, lifetimeSeconds - (float)Age);
                 StartCoroutine(DestroyAfter(remaining));
