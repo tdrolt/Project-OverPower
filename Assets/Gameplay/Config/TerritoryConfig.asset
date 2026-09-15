@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7bc79a254ed9974db1522f567185b72, type: 3}
+  m_Name: TerritoryConfig
+  m_EditorClassIdentifier: 
+  tiers:
+  - captureSeconds: 20
+    teamGoldPerSecond: 0
+    captureBounty: 0
+    healthRegenPerSecond: 10
+  - captureSeconds: 15
+    teamGoldPerSecond: 5
+    captureBounty: 0
+    healthRegenPerSecond: 4
+  - captureSeconds: 10
+    teamGoldPerSecond: 10
+    captureBounty: 900
+    healthRegenPerSecond: 0
+  - captureSeconds: 15
+    teamGoldPerSecond: 8
+    captureBounty: 1200
+    healthRegenPerSecond: 0
+  playersPerTeam: 3
+  bountyHoldSeconds: 300
+  startingGold: 0
+  decaySeconds: 5
+  recaptureCooldownSeconds: 5
