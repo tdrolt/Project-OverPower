@@ -297,5 +297,26 @@ namespace Overpower.Tests
 
             Assert.AreEqual(9f, contacts[0].Distance, 0.0001f);
         }
+
+        [Test]
+        public void AContactAtZeroDistanceIsStruckFirstAndEndsTheBeamThere()
+        {
+            // Point-blank fix (Issue 1, 2026-09-15): Hitscan now adds a target overlapping the
+            // origin - a case Physics.Raycast structurally cannot report, since a ray never hits a
+            // collider it starts inside - as a BeamContact at Distance 0, alongside whatever the
+            // raycast itself found. This locks in that BeamResolver, unmodified, already does the
+            // right thing with that shape of input: a zero-distance contact sorts before every
+            // farther one and, for a non-piercing beam, is the one that stops it, at Length 0 (the
+            // beam is visually a stub right at the muzzle - correct, since the muzzle is already
+            // inside the target).
+            var pointBlank = Enemy(2);
+            var farther = Enemy(3);
+
+            var result = Resolve(1, Hit(farther, 8f), Hit(pointBlank, 0f));
+
+            Assert.AreEqual(1, result.Struck.Count);
+            Assert.AreSame(pointBlank, result.Struck[0].Target);
+            Assert.AreEqual(0f, result.Length, 0.0001f);
+        }
     }
 }

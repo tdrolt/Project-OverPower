@@ -61,7 +61,14 @@ namespace Overpower.Weapons
         // Physics would drop hits arbitrarily - possibly the wall - so it is generous on purpose.
         private const int MaxContacts = 32;
         private static readonly RaycastHit[] HitBuffer = new RaycastHit[MaxContacts];
+        private static readonly Collider[] OverlapBuffer = new Collider[MaxContacts];
         private static readonly List<BeamContact> ContactBuffer = new List<BeamContact>(MaxContacts);
+
+        // Not a tuning value either: a physics epsilon for AddPointBlankContacts below, not a
+        // gameplay range. Physics.OverlapSphere needs a non-zero radius to reliably report a
+        // collider containing its centre; this is deliberately tiny so it can never itself reach a
+        // target the origin is merely NEAR rather than actually inside/touching.
+        private const float PointBlankRadius = 0.02f;
 
         // Reused across every beam this (never-spawned) asset draws rather than `new`-ed per shot -
         // see ShotTeamVisuals' own propertyBlock field for why a MaterialPropertyBlock is written
@@ -90,8 +97,9 @@ namespace Overpower.Weapons
         {
             float range = ChargedRange(shot.Weapon, shot.ChargeFraction);
             Vector3 direction = shot.Direction.normalized;
+            int mask = BuildMask();
 
-            int count = Physics.RaycastNonAlloc(origin, direction, HitBuffer, range, BuildMask(),
+            int count = Physics.RaycastNonAlloc(origin, direction, HitBuffer, range, mask,
                                                 QueryTriggerInteraction.Ignore);
 
             ContactBuffer.Clear();
@@ -110,11 +118,60 @@ namespace Overpower.Weapons
                 ContactBuffer.Add(new BeamContact(hit.distance, target, hit.point, target is IStructure));
             }
 
+            AddPointBlankContacts(origin, mask);
+
             Pierce pierce = GetComponent<Pierce>();
             int maxTargets = pierce != null ? pierce.MaxTargets : 1;
 
             return BeamResolver.Resolve(ContactBuffer, range, maxTargets,
                                         shot.ShooterActorNumber, shot.ShooterTeamId);
+        }
+
+        /// <summary>
+        /// Issue 1 fix (2026-09-15): catches a target whose collider already CONTAINS the origin -
+        /// the point-blank case the raycast above structurally cannot see. Unity never reports a
+        /// collider a ray starts inside of, and the muzzle (SafeMuzzlePosition, ~1.36m in front of
+        /// the shooter's root) sits inside a target's capsule (radius ~0.7) at any centre distance
+        /// under about 2.06m - measured and confirmed live: at 1.5m the muzzle sat exactly on the
+        /// dummy capsule's ClosestPoint (i.e. inside it), and the raycast above reported only the
+        /// far wall, skipping the dummy entirely.
+        ///
+        /// Deliberately an OverlapSphere AT THE ORIGIN, not a second ray cast from farther back:
+        /// a volume-overlap test at a single point can only ever find something that point is
+        /// ALREADY touching, so it can never see past a wall the raycast above did not already see -
+        /// SafeMuzzlePosition still guarantees that point sits on the shooter's own side of anything
+        /// it was hugging, which is exactly what keeps the old wall exploit closed. Uses the same
+        /// mask as the raycast (so the through-walls leaf still ignores Building here too), but only
+        /// ever turns an overlap into a contact when it is IDamageable - plain geometry overlapping
+        /// the origin would mean SafeMuzzlePosition itself failed to clear it, which is that
+        /// property's job to prevent, not this method's to second-guess.
+        ///
+        /// Distance is recorded as 0 - nothing can be closer to the muzzle than something the muzzle
+        /// is already inside of, and BeamResolver only uses Distance to ORDER and CAP contacts (see
+        /// BeamResolverTests.AContactAtZeroDistanceIsStruckFirstAndEndsTheBeamThere), so 0 sorting
+        /// first is exactly correct. A target also found by the raycast above (relevant past ~2.06m,
+        /// where the origin has cleared it but the beam still reaches it) is naturally deduplicated
+        /// by BeamResolver's own alreadyStruck set, which keeps whichever contact it meets first in
+        /// distance order - here, always this 0-distance one. Point is the origin itself
+        /// (Collider.ClosestPoint returns the query point unchanged when it is already inside),
+        /// used only for damage/impact-VFX placement.
+        /// </summary>
+        private void AddPointBlankContacts(Vector3 origin, int mask)
+        {
+            int count = Physics.OverlapSphereNonAlloc(origin, PointBlankRadius, OverlapBuffer, mask,
+                                                       QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                Collider collider = OverlapBuffer[i];
+                if (collider == null)
+                    continue;
+
+                IDamageable target = collider.GetComponentInParent<IDamageable>();
+                if (target == null)
+                    continue;
+
+                ContactBuffer.Add(new BeamContact(0f, target, origin, target is IStructure));
+            }
         }
 
         /// <summary>The whole shot, on one client: resolve the ray, damage what it struck, and draw
