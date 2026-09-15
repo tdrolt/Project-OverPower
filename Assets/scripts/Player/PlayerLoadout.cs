@@ -36,6 +36,11 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         AbilitySlot.Equipment, AbilitySlot.Ultimate, AbilitySlot.Mobility
     };
 
+    [SerializeField, Tooltip("Match tuning asset. Free Loadout decides whether the ultimate slot " +
+             "starts with the prefab's starting ultimate (free-test mode) or empty, to be bought " +
+             "through the shop (the real economy). Every other starting slot is unaffected.")]
+    private GameplayConfig gameplayConfig;
+
     private WeaponFiring weaponFiring;
     private AbilityRunner abilityRunner;
     private PlayerHealth playerHealth;
@@ -56,6 +61,11 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             Debug.LogError($"[PlayerLoadout] {name}: no AbilityRunner on the player root - abilities cannot be equipped.");
         if (playerHealth == null)
             Debug.LogError($"[PlayerLoadout] {name}: no PlayerHealth on the player root - armor upgrade levels cannot be replicated.");
+        // Not a hard error like the three above: a missing config fails OPEN to the old always-
+        // free starting kit (see Start()) rather than silently locking every player out of their
+        // ultimate for the whole match, so a warning is enough.
+        if (gameplayConfig == null)
+            Debug.LogWarning($"[PlayerLoadout] {name}: GameplayConfig is not assigned - the ultimate slot will always start with the prefab's default, even with Free Loadout off.");
     }
 
     private void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
@@ -75,9 +85,19 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             if (startingWeaponId != LoadoutProperties.Empty)
                 props[LoadoutProperties.WeaponKey] = startingWeaponId;
 
+            // Task 2.5a: with the real economy on (Free Loadout off), the ultimate slot starts
+            // EMPTY and must be bought through the shop (GDD p.18) - every other slot still
+            // starts at the prefab's free default. A late joiner reads whichever id this publish
+            // ends up writing below, and a respawn never re-runs Start() (this component lives on
+            // the same player object for the whole match), so a bought ultimate is never lost.
+            bool ultimateStartsEmpty = gameplayConfig != null && !gameplayConfig.FreeLoadout;
+
             foreach (AbilitySlot slot in AbilitySlots)
             {
-                ApplyAbility(slot, abilityRunner != null ? abilityRunner.StartingId(slot) : LoadoutProperties.Empty);
+                int startingId = ultimateStartsEmpty && slot == AbilitySlot.Ultimate
+                    ? LoadoutProperties.Empty
+                    : (abilityRunner != null ? abilityRunner.StartingId(slot) : LoadoutProperties.Empty);
+                ApplyAbility(slot, startingId);
                 props[LoadoutProperties.KeyFor(slot)] = EquippedAbilityId(slot);
             }
 
