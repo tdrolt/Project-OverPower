@@ -6,7 +6,10 @@ namespace Overpower.UI
 {
     /// <summary>
     /// Every visual value the HUD, the loadout screen, the aim cone and the overhead bars share, in one asset so
-    /// readability is tuned in one place. Presentation only - no gameplay number belongs here.
+    /// readability is tuned in one place - plus, since Task 11a/11b, every shot's trail/core tint (ShotTeamVisuals)
+    /// and a laser's wind-up warning line and fired beam (Hitscan). Also the one home for the reference
+    /// resolution/match value a scene-built canvas that is not PlayerHud's own (chat's canvases) scales by, through
+    /// ThemedCanvasScaler - see that component's class comment. Presentation only - no gameplay number belongs here.
     /// </summary>
     [CreateAssetMenu(menuName = "Overpower/UI Theme", fileName = "UiTheme")]
     public sealed class UiTheme : ScriptableObject
@@ -29,7 +32,9 @@ namespace Overpower.UI
         [Tooltip("Outline thickness, 0 to 1. Around 0.2 reads well without looking bold.")] [Range(0f, 1f)] public float textOutlineWidth = 0.2f;
 
         [Header("Panels")]
-        [Tooltip("Background behind HUD groups and the loadout screen.")] public Color panelColor = new Color(0.06f, 0.06f, 0.08f, 0.85f);
+        [Tooltip("Background behind HUD groups (the slots row, the bars panel). NOT the loadout screen - that " +
+                 "reads its own Loadout Panel Colour below instead; see that field's tooltip for why the two are " +
+                 "kept separate.")] public Color panelColor = new Color(0.06f, 0.06f, 0.08f, 0.85f);
         [Tooltip("Border / highlight for the equipped or selected item.")] public Color highlightColor = new Color(1f, 0.78f, 0.25f, 1f);
         [Tooltip("Colour of items you cannot pick yet - a dark, mostly-opaque fill with muted text on top (Muted Text Colour), not a near-transparent wash: at low alpha over a translucent panel this read as barely-there rather than clearly locked (Task 9a review, 616x576 capture).")]
         public Color lockedColor = new Color(0.09f, 0.09f, 0.10f, 0.92f);
@@ -42,8 +47,11 @@ namespace Overpower.UI
         [Header("Bars")]
         [Tooltip("Plain white sprite every filled bar uses. Without a sprite Unity ignores the fill amount and draws the bar full.")]
         public Sprite barSprite;
-        [Tooltip("Width of every HUD bar (health, armor, overheat) and the slots row beneath them, in canvas units - " +
-                 "the one width they all share so the bars and slots line up.")]
+        [Tooltip("Width of every HUD bar (health, armor, overheat), in canvas units. The slots row beneath them " +
+                 "does not read this directly (fix 7, Playtest polish review) - its own preferred width is " +
+                 "computed from Slot Width and Hud Slot Spacing below (4 slots: the weapon plus the three " +
+                 "ability slots - see PlayerHud.BuildUi). Keep 4 x Slot Width + 3 x Hud Slot Spacing equal to " +
+                 "this number, or the slot row will no longer line up under the bars above it.")]
         public float barWidth = 590f;
         [Tooltip("Health fill.")] public Color healthColor = new Color(0.39f, 0.8f, 0.25f, 1f);
         [Tooltip("Shield fill.")] public Color shieldColor = new Color(0.25f, 0.6f, 1f, 1f);
@@ -70,8 +78,16 @@ namespace Overpower.UI
 
         [Header("HUD slots")]
         [Tooltip("Width of one weapon/ability slot box, in canvas units - sized so the longest short names " +
-                 "(Raybeam, Shotgun, Baseline) and the longest key label (SPACE) both fit at Body Text Size.")]
+                 "(Raybeam, Shotgun, Baseline) and the longest key label (SPACE) both fit at Body Text Size. " +
+                 "The slots row's own width is 4 of these plus 3 gaps of Hud Slot Spacing below - see Bar " +
+                 "Width's tooltip for why that total is kept equal to it.")]
         public float slotWidth = 140f;
+        [Tooltip("Horizontal gap between adjacent HUD slots (the weapon slot and the three ability slots), in " +
+                 "canvas units - fix 7, Playtest polish review: this used to be a number hardcoded in " +
+                 "PlayerHud.BuildUi that the slots row's own width (wrongly pinned to Bar Width instead of its " +
+                 "own content) never accounted for. Now the one home for that gap, read by both the layout " +
+                 "group's spacing and the row's own preferred-width calculation, so the two can never disagree.")]
+        public float hudSlotSpacing = 10f;
         [Tooltip("Height of a slot's icon/name area, in canvas units - the only part the weapon slot has; the " +
                  "three ability slots add Slot Cooldown Area Height below it.")]
         public float slotIconBoxHeight = 104f;
@@ -123,7 +139,7 @@ namespace Overpower.UI
         public float loadoutPanelTopMargin = 40f;
         [Tooltip("Width of the weapon-tree/armor column on the left, in canvas units - fixed so the ability column on the right (Task 9b) lines up beside it instead of both fighting over leftover space.")]
         public float loadoutLeftColumnWidth = 640f;
-        [Tooltip("Width of the ability-picks column on the right, in canvas units - empty until Task 9b fills it in; reserved now so the panel does not visibly resize when that task adds content.")]
+        [Tooltip("Width of the ability-picks column on the right, in canvas units - holds the Mobility/Equipment/Ultimate card grids (see LoadoutScreen.BuildAbilitiesUi). Kept equal to Loadout Left Column Width so neither column reads as the odd one out.")]
         public float loadoutRightColumnWidth = 640f;
         [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units - also the width of one ability card in the right-hand column's grids, so both columns read as the same kind of pickable button.")]
         public float loadoutNodeWidth = 130f;
@@ -227,6 +243,14 @@ namespace Overpower.UI
         // rest of the play session. Every client simulates every projectile (a nine-player SMG burst is a
         // lot of bullets), so ShotTeamVisuals must not allocate a new Gradient per shot - see GradientFor.
         [System.NonSerialized] private Dictionary<int, Gradient> cachedShotGradients;
+
+        /// <summary>Playtest polish review fix 3: without this, editing Team Shot Colors (or the
+        /// unknown-team fallback) in the Inspector while the Editor is open kept handing out the
+        /// OLD Gradient objects until the next domain reload - a live colour tweak looked like it
+        /// did nothing. Clearing the cache here just means the next GradientFor call rebuilds it
+        /// from the field's new value; it costs nothing at runtime, since a build never calls
+        /// OnValidate at all.</summary>
+        private void OnValidate() => cachedShotGradients = null;
 
         /// <summary>The same colour ShotColorFor(teamId) returns, pre-built into the two-key fade-to-
         /// transparent Gradient a shot's TrailRenderer wants, and cached by resolved bucket (0/1/2, or -1

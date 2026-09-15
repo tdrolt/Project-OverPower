@@ -32,8 +32,8 @@ public class AimConeView : MonoBehaviourPun
     // Same layer every wall and every piece of deployable cover stands on (see WeaponFiring's own
     // comment on SafeMuzzlePosition and CoverWall's class comment) - computed once since
     // LayerMask.NameToLayer never changes at runtime. Assumes every weapon's own hit mask
-    // includes Building, the same assumption WeaponFiring.cs's own buildingMask field (~line 133,
-    // used by SafeMuzzlePosition) makes for the same reason - if some future weapon's Hitscan hit
+    // includes Building, the same assumption WeaponFiring's own buildingMask field (used by its
+    // SafeMuzzlePosition property) makes for the same reason - if some future weapon's Hitscan hit
     // mask ever excludes Building on purpose, its lines here would still clip on a wall its shots
     // actually pass through.
     private int buildingMask;

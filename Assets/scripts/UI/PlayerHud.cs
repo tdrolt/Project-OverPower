@@ -591,13 +591,22 @@ namespace Overpower.UI
             GameObject slotsRow = new GameObject("Slots Row", typeof(RectTransform));
             slotsRow.transform.SetParent(panel.transform, false);
             float slotsRowHeight = theme.slotIconBoxHeight + theme.slotCooldownAreaHeight;
+            // Fix 7 (Playtest polish review): this used to just read theme.barWidth, which happened
+            // to equal 4 slots' worth of content only because nothing kept the two numbers in sync -
+            // Slot Width or the slot count could change and this row's own preferred width would
+            // silently stop matching what it actually contains. Computed from the real content
+            // instead: the weapon slot plus one entry per AbilitySlotOrder, spaced by Hud Slot
+            // Spacing - see that field's tooltip (and Bar Width's) for the invariant that keeps this
+            // landing on the same number as the bars above it.
+            int slotCount = AbilitySlotOrder.Length + 1;
+            float slotsRowWidth = slotCount * theme.slotWidth + (slotCount - 1) * theme.hudSlotSpacing;
             LayoutElement slotsRowLe = slotsRow.AddComponent<LayoutElement>();
-            slotsRowLe.preferredWidth = theme.barWidth;
+            slotsRowLe.preferredWidth = slotsRowWidth;
             slotsRowLe.preferredHeight = slotsRowHeight;
             // See panelLayout's comment above: panelLayout's own child control (ON) is what turns
             // this LayoutElement into this row's actual rendered size - no sizeDelta line needed here.
             HorizontalLayoutGroup slotsLayout = slotsRow.AddComponent<HorizontalLayoutGroup>();
-            slotsLayout.spacing = 10f;
+            slotsLayout.spacing = theme.hudSlotSpacing;
             slotsLayout.childAlignment = TextAnchor.UpperCenter;
             // ON for the same reason as panelLayout above - this group's four slot children each
             // carry a LayoutElement (see BuildSlot) that is now the one place their size lives.
