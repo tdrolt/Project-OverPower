@@ -13,6 +13,13 @@ using UnityEngine;
 /// tick with nobody having touched the Inspector. PlayerHealth, PlayerMotor and every other player
 /// component are deliberately NOT observable for this reason - see their own class comments.
 ///
+/// AutoFindAll does NOT run at runtime for this prefab. PhotonNetwork.Instantiate sets the ViewID
+/// before PhotonView.Awake, which then skips its search - only the Observed Components list SAVED
+/// in the prefab is used, and only the PhotonView Inspector rewrites it. From 32e2b1a until
+/// 2026-09-15 that saved list still pointed at the deleted Multiplayer component, so this class
+/// never sent anything and every remote player sat frozen at spawn at full health.
+/// NetworkPrefabObservablesTests now fails if the saved list drifts from what the search finds.
+///
 /// Wire order is position, rotation, health, armor - do not reorder or change a type here without
 /// updating the read side to match. PUN has no version tag on this payload, so a mismatch does not
 /// error, it just silently assigns each value to the wrong field on every receiving client.
