@@ -3,23 +3,47 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using System.Linq;
+using Overpower.Data;
 
 public class BuildingCapture : MonoBehaviourPun
 {
     public int buildingID;
 
     [Header("Capture Settings")]
-    public float captureThreshold = 100f;
-    public float baseCaptureRate = 20f;
     public float captureRadius = 10f;
-    // Seconds to drain a fully captured tower back to neutral once an undefended enemy holds it.
-    // Replaces the old 'decayRate' field, which nothing read: the decay was hardcoded as
-    // captureThreshold / 5f, so changing decayRate in the Inspector did nothing at all.
-    // 5 here reproduces the previous behaviour exactly.
-    public float decaySeconds = 5f;
 
-    // Seconds a neutralised tower cannot be recaptured. Was hardcoded in CooldownRoutine.
-    public float recaptureCooldownSeconds = 5f;
+    [Header("Territory")]
+    [Tooltip("1 = Capital, 2 = Transition, 3 = Flanking, 4 = Centre. Decides capture time, income, bounty and " +
+             "regen from the Territory Config.")]
+    [Range(1, 4)] public int tier = 2;
+
+    [Tooltip("Shared per-tier numbers. Every tower should point at the same asset.")]
+    public TerritoryConfig territoryConfig;
+
+    // Used only if territoryConfig is missing (logged as an error in Start), so a misconfigured
+    // tower keeps working instead of throwing every frame. Reproduces the numbers every tower had
+    // before Territory Config existed.
+    private const float FallbackCaptureSeconds = 5f;
+    private const float FallbackDecaySeconds = 5f;
+    private const float FallbackRecaptureCooldownSeconds = 5f;
+
+    // Seconds for ONE player to capture this tower's tier, from the Territory Config. Capture
+    // progress below is tracked in those same seconds, not an arbitrary point total, so a
+    // designer reading captureProgress mid-match can tell directly how many seconds of solo
+    // capturing it represents.
+    private float CaptureSeconds =>
+        territoryConfig != null ? territoryConfig.ForTier(tier).captureSeconds : FallbackCaptureSeconds;
+
+    // Progress per player per second of capture time. N players capture N times faster - the GDD
+    // doesn't specify multi-player capture speed, so this keeps the game's existing behaviour
+    // (the old baseCaptureRate was tuned so that N players finished a capture N times sooner).
+    private const float ProgressPerPlayerPerSecond = 1f;
+
+    private float DecaySeconds =>
+        territoryConfig != null ? territoryConfig.DecaySeconds : FallbackDecaySeconds;
+
+    private float RecaptureCooldownSeconds =>
+        territoryConfig != null ? territoryConfig.RecaptureCooldownSeconds : FallbackRecaptureCooldownSeconds;
 
     [Header("Visual Settings")]
     public Renderer flagRenderer;
@@ -47,6 +71,12 @@ public class BuildingCapture : MonoBehaviourPun
 
     void Start()
     {
+        if (territoryConfig == null)
+        {
+            Debug.LogError($"[BuildingCapture] Tower {buildingID} has no Territory Config assigned - " +
+                            "falling back to the old fixed capture numbers (5s/1 per player/5s/5s).", this);
+        }
+
         BuildingManager.Instance.RegisterCapture(buildingID, this);
 
         ConfigureCollider();
@@ -57,7 +87,7 @@ public class BuildingCapture : MonoBehaviourPun
             capturingID = owner;
             controllingTeam = owner;
             isCaptured = true;
-            captureProgress = captureThreshold;
+            captureProgress = CaptureSeconds;
         }
         else
             ResetFlag();
@@ -140,7 +170,7 @@ public class BuildingCapture : MonoBehaviourPun
             if (!isDecaying)
             {
                 isDecaying = true;
-                captureProgress = captureThreshold;
+                captureProgress = CaptureSeconds;
                 capturingID = playersInZone.First(p => p.teamID != controllingTeam).teamID;
                 photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, capturingID);
                 Debug.Log("[HandleCapturedState] Enemy detected. Starting recapture decay.");
@@ -173,14 +203,14 @@ public class BuildingCapture : MonoBehaviourPun
     void StartDecay()
     {
         isDecaying = true;
-        captureProgress = captureThreshold;
+        captureProgress = CaptureSeconds;
         // Decay started � progress resets to threshold.
     }
 
     void UpdateDecay()
     {
-        float seconds = Mathf.Max(0.01f, decaySeconds);
-        captureProgress -= (captureThreshold / seconds) * Time.deltaTime;
+        float seconds = Mathf.Max(0.01f, DecaySeconds);
+        captureProgress -= (CaptureSeconds / seconds) * Time.deltaTime;
     }
 
     void NeutralizeBuilding()
@@ -200,7 +230,7 @@ public class BuildingCapture : MonoBehaviourPun
     IEnumerator CooldownRoutine()
     {
         isOnCooldown = true;
-        yield return new WaitForSeconds(recaptureCooldownSeconds);
+        yield return new WaitForSeconds(RecaptureCooldownSeconds);
         isOnCooldown = false;
     }
 
@@ -218,18 +248,19 @@ public class BuildingCapture : MonoBehaviourPun
         if (eligiblePlayers.Any() && !enemyPlayers)
         {
             int count = eligiblePlayers.Count;
-            float contribution = count * baseCaptureRate * Time.deltaTime;
+            // N players contribute N progress-per-second - see ProgressPerPlayerPerSecond above.
+            float contribution = count * ProgressPerPlayerPerSecond * Time.deltaTime;
             captureProgress += contribution;
-            captureProgress = Mathf.Clamp(captureProgress, 0, captureThreshold);
+            captureProgress = Mathf.Clamp(captureProgress, 0, CaptureSeconds);
 
             // Start the capturing sound only if progress is increasing
-            if (!audioSource.isPlaying && captureProgress > 0 && captureProgress < captureThreshold)
+            if (!audioSource.isPlaying && captureProgress > 0 && captureProgress < CaptureSeconds)
             {
                 PlayCapturingSound();
             }
 
             // Stop capturing sound and complete capture if progress reaches the threshold
-            if (captureProgress >= captureThreshold)
+            if (captureProgress >= CaptureSeconds)
             {
                 StopCapturingSound();
                 CompleteCapture(capturingID);
@@ -250,7 +281,7 @@ public class BuildingCapture : MonoBehaviourPun
     void PlayCapturingSound()
     {
         // Play sound if it's not already playing, and only if the capture is in progress
-        if (audioSource && capturingSound && !audioSource.isPlaying && captureProgress > 0 && captureProgress < captureThreshold)
+        if (audioSource && capturingSound && !audioSource.isPlaying && captureProgress > 0 && captureProgress < CaptureSeconds)
         {
             photonView.RPC("RPC_PlayCaptureSound", RpcTarget.All);
         }
