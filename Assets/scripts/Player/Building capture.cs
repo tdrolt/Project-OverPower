@@ -66,8 +66,14 @@ public class BuildingCapture : MonoBehaviourPun
     private bool isCaptured = false;
     private bool isDecaying = false;
     private bool isOnCooldown = false;
+    private Coroutine cooldownRoutine;
 
     private List<PlayerTeam> playersInZone = new List<PlayerTeam>();
+
+    // The ViewID of THIS client's own player while it stands in the zone and was let in by the
+    // territory rule (0 = not here). Only the master counts who is in a zone; this lets the player
+    // be reported again to a new master (OnMasterClientChanged).
+    private int localPlayerViewIdInZone;
 
     void Start()
     {
@@ -76,8 +82,6 @@ public class BuildingCapture : MonoBehaviourPun
             Debug.LogError($"[BuildingCapture] Tower {buildingID} has no Territory Config assigned - " +
                             "falling back to the old fixed capture numbers (5s/1 per player/5s/5s).", this);
         }
-
-        BuildingManager.Instance.RegisterCapture(buildingID, this);
 
         ConfigureCollider();
         InitializeAudio();
@@ -92,7 +96,12 @@ public class BuildingCapture : MonoBehaviourPun
         else
             ResetFlag();
 
-        // A buffered ownership call can arrive before this component existed to be notified, so
+        // Registered after the starting values above, because registering also applies the
+        // room's territory snapshot if this client has already read it - and that must win over
+        // the scene's starting values, not be overwritten by them.
+        BuildingManager.Instance.RegisterCapture(buildingID, this);
+
+        // The room's snapshot can be applied before this component existed to be notified, so
         // read the current replicated state once here rather than relying only on being told.
         if (BuildingManager.Instance.TowerDictionary.ContainsKey(buildingID))
         {
@@ -215,22 +224,33 @@ public class BuildingCapture : MonoBehaviourPun
 
     void NeutralizeBuilding()
     {
-        // REMOVING THE CAPTURED BUILDING FROM TEAM DATA
-        UpdateBuildingManager(false);
+        // Ownership replicates through the room's territory snapshot, which the master writes.
+        // This runs on the master only (Update is master-gated). The flag follows the snapshot on
+        // every client, so there is no flag call here.
+        BuildingManager.Instance.SetNeutral(buildingID);
 
         controllingTeam = -1;
         isCaptured = false;
         isDecaying = false;
-        // No RPC_UpdateFlag here: UpdateBuildingManager(false) above already replicated the
-        // ownership change, and the flag follows that.
         PlayNeutralizationSound();
-        StartCoroutine(CooldownRoutine());
+        cooldownRoutine = StartCoroutine(CooldownRoutine());
     }
 
     IEnumerator CooldownRoutine()
     {
         isOnCooldown = true;
         yield return new WaitForSeconds(RecaptureCooldownSeconds);
+        isOnCooldown = false;
+        cooldownRoutine = null;
+    }
+
+    void StopCooldown()
+    {
+        if (cooldownRoutine != null)
+        {
+            StopCoroutine(cooldownRoutine);
+            cooldownRoutine = null;
+        }
         isOnCooldown = false;
     }
 
@@ -319,14 +339,13 @@ public class BuildingCapture : MonoBehaviourPun
 
     void CompleteCapture(int capturingTeam)
     {
-
-        UpdateBuildingManager(false);
-
         controllingTeam = capturingTeam;
         isCaptured = true;
 
-        // CALLING THE UPDATE FUNCTION TO UPLOAD THE LATEST DATA
-        UpdateBuildingManager(true);
+        // The master's own fields above keep its capture logic going at once; everyone else
+        // (and this client's TowerDictionary and flag) follows when the room sends the snapshot
+        // back. Bounty is 0 until Task 2.4 works out what a capture pays.
+        BuildingManager.Instance.SetCaptured(buildingID, capturingTeam, bountyPaid: 0);
 
         Debug.Log($"[BuildingCapture] Building captured by team {capturingTeam}!");
         photonView.RPC("RPC_CompleteCapture", RpcTarget.All, controllingTeam);
@@ -336,14 +355,56 @@ public class BuildingCapture : MonoBehaviourPun
         PlayCapturedSound();
     }
 
-
-    // THE FUNCTION TO UPDATE THE BUILDING DATA FOR ALL PLAYERS
-    void UpdateBuildingManager(bool value)
+    /// Brings this tower's master-side fields in line with the replicated owner. Every client
+    /// keeps them current, so whichever client becomes master next starts from the real state
+    /// rather than from the scene's starting values.
+    ///
+    /// Does nothing when the fields already agree - which is always the case on the master that
+    /// made the change - so its recapture cooldown and any decay keep running.
+    public void SyncFromReplicated(int owner)
     {
-        if (controllingTeam == -1)
+        bool captured = owner >= 0;
+        if (captured == isCaptured && (!captured || controllingTeam == owner))
             return;
 
-        BuildingManager.Instance.UpdateTowerDictionary(value, controllingTeam, buildingID);
+        ResetToOwner(owner);
+    }
+
+    /// Called on every client when the master client changes. Who is standing in the zone, the
+    /// capture progress, decay and cooldown were only ever tracked on the old master, so start
+    /// again from the replicated owner and report this client's own player again if it is still
+    /// standing here - otherwise the new master would not count it until it stepped out and back.
+    /// A capture that was part-way through restarts from zero (accepted: plan Task 2.1b).
+    public void OnMasterClientChanged(int owner)
+    {
+        playersInZone.Clear();
+        ResetToOwner(owner);
+
+        if (localPlayerViewIdInZone == 0)
+            return;
+
+        PhotonView view = PhotonView.Find(localPlayerViewIdInZone);
+        PlayerTeam player = view != null ? view.GetComponent<PlayerTeam>() : null;
+        if (player == null || !view.IsMine)
+        {
+            localPlayerViewIdInZone = 0;
+            return;
+        }
+
+        // Same two calls, same order, as a normal entry in OnTriggerEnter.
+        photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, player.teamID);
+        photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, localPlayerViewIdInZone);
+    }
+
+    private void ResetToOwner(int owner)
+    {
+        bool captured = owner >= 0;
+        controllingTeam = captured ? owner : -1;
+        isCaptured = captured;
+        capturingID = captured ? owner : -1;
+        captureProgress = captured ? CaptureSeconds : 0f;
+        isDecaying = false;
+        StopCooldown();
     }
 
     // Sound only. The flag is no longer set here: it follows replicated ownership via
@@ -371,53 +432,17 @@ public class BuildingCapture : MonoBehaviourPun
         }
 
         BuildingManager manager = BuildingManager.Instance;
-        if (manager == null) return;
+        if (manager == null || manager.Map == null) return;
 
-        // Already held by your own team, so there is nothing to capture. Testers found they could
-        // re-capture their own towers once the map was fully taken. Reads the replicated
-        // dictionary rather than controllingTeam, which is only correct on the master.
-        if (manager.TowerDictionary.TryGetValue(buildingID, out TowerData self)
-            && self.isCaptured && self.controllingTeam == player.teamID)
-        {
-            return;
-        }
+        // Until this client has read the room's territory snapshot nobody here knows who owns
+        // what, so refuse rather than guess. It only happens in the moment after joining; the
+        // player registers normally on their next entry.
+        if (manager.Current == null) return;
 
-        // Your own capital is always enterable. This test used to sit INSIDE the loop below, so
-        // it could only be reached by a tower that has at least one adjacent, and it was
-        // re-evaluated once per adjacent. A tower with an empty Adjacents list was therefore
-        // uncapturable by anyone -- worth knowing before the Tier-4 centre zone is added.
-        bool allowed = manager.CathedralBuildingIDs.TryGetValue(buildingID, out int capitalOwner)
-                       && capitalOwner == player.teamID;
-
-        if (!allowed)
-        {
-            // Guarded: the dictionary indexer logs an error and hands back a default TowerData
-            // for a missing key, which silently reads as "neutral, owned by nobody".
-            if (!manager.TowerDictionary.ContainsKey(buildingID))
-            {
-                Debug.LogWarning($"[BuildingCapture] Tower {buildingID} is missing from the TowerDictionary.");
-                return;
-            }
-
-            var adjacents = manager.TowerDictionary[buildingID].Adjacents;
-            if (adjacents != null)
-            {
-                foreach (var adjacent in adjacents)
-                {
-                    if (!manager.TowerDictionary.ContainsKey(adjacent))
-                        continue;
-
-                    TowerData adjacentTowerData = manager.TowerDictionary[adjacent];
-                    if (adjacentTowerData.isCaptured && adjacentTowerData.controllingTeam == player.teamID)
-                    {
-                        allowed = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!allowed)
+        // The one territory rule (TerritoryMap, tested in edit mode): not a zone you already own,
+        // and next to one you do - except your own capital, which is always capturable. Reads the
+        // replicated owners rather than controllingTeam, which is only correct on the master.
+        if (!manager.Map.MayCapture(player.teamID, buildingID, manager.Current.OwnersByZone()))
             return;
 
         if (capturingID == -1)
@@ -429,6 +454,7 @@ public class BuildingCapture : MonoBehaviourPun
         if (player.photonView.IsMine)
         {
             Debug.Log($"[BuildingCapture] Team {player.teamID} entered tower {buildingID} (capturingID {capturingID}).");
+            localPlayerViewIdInZone = player.photonView.ViewID;
             photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, player.photonView.ViewID);
         }
     }
@@ -438,6 +464,8 @@ public class BuildingCapture : MonoBehaviourPun
         var player = other.GetComponent<PlayerTeam>();
         if (player && player.photonView.IsMine)
         {
+            if (localPlayerViewIdInZone == player.photonView.ViewID)
+                localPlayerViewIdInZone = 0;
             photonView.RPC("RPC_RemoveFromZone", RpcTarget.MasterClient, player.photonView.ViewID);
             /*if (player.teamID == capturingID)
             {
@@ -503,10 +531,10 @@ public class BuildingCapture : MonoBehaviourPun
 
             Debug.Log($"[RPC_RemoveFromZone] Removed player (Team {pt.teamID}) from zone.");
         }
-        else
-        {
-            Debug.LogWarning("[RPC_RemoveFromZone] Player not found in zone!");
-        }
+
+        // Nothing to report otherwise: every exit is sent here, including players the territory
+        // rule never let register (walking through a zone you may not capture yet), so "not in
+        // the zone" is the normal case for them, not a fault.
     }
 
     [PunRPC]
@@ -565,11 +593,11 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
 
-    /// Sets the flag to match replicated ownership. Called on every client from
-    /// BuildingManager.RPC_UpdateTowerDictionary, so the flag always follows the state rather
-    /// than arriving as its own message that a late joiner never receives.
+    /// Sets the flag to match replicated ownership. Called on every client when BuildingManager
+    /// applies the room's territory snapshot, so the flag always follows the state rather than
+    /// arriving as its own message that a late joiner never receives.
     /// Takes 'captured' separately because the dictionary keeps the previous owner's team id
-    /// after a neutralise -- it is set to false before controllingTeam is cleared.
+    /// after a neutralise.
     public void ApplyOwnerVisual(bool captured, int teamID)
     {
         if (!flagRenderer)

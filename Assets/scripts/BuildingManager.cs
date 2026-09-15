@@ -1,12 +1,27 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using Project.Tools.DictionaryHelp;
 using Photon.Pun;
-using System.Collections.Generic;
+using Photon.Realtime;
+using Overpower.Match;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
-public class BuildingManager : MonoBehaviourPun
+/// Territory state for the whole match: who owns each zone, since when, who held it before.
+///
+/// Authority (CODING-STANDARDS §5): the master client is the ONLY writer. It writes the whole state
+/// as one TerritorySnapshot into the room's Custom Properties, and every client - the master
+/// included - applies what the room sends back. Why Room Properties and not the old buffered RPC:
+/// a player joining mid-match reads one value instead of replaying every capture of the match, and
+/// the state stays in the room when the master leaves, so the next master carries on from it.
+///
+/// TowerDictionary stays as the in-memory mirror existing code reads (PlayerLifecycle's capital
+/// check, CheckTerritoryWin). It is only ever changed by Apply, from the replicated snapshot.
+public class BuildingManager : MonoBehaviourPunCallbacks
 {
     public static BuildingManager Instance { get; private set; }
-   
+
     [SerializeField] public SerializableDictionary<int, TowerData> TowerDictionary;
     public Dictionary<int, int> CathedralBuildingIDs = new Dictionary<int, int>() { { 6, 0 }, { 7, 1 }, { 8, 2 } };
 
@@ -19,11 +34,62 @@ public class BuildingManager : MonoBehaviourPun
     // Latch, so the win is announced once rather than on every subsequent ownership change.
     private bool territoryWinAnnounced = false;
 
+    private TerritoryMap map;
+    private TerritorySnapshot current;
+
+    // Master only. Room Properties come back from the server a network round trip after they are
+    // set, and Current only changes when they do. If the master changed two zones inside that
+    // window (two captures in one frame, or the phase rules neutralising every Tier-3 zone at
+    // once), building the second change from Current would silently undo the first. So while the
+    // master still has writes on their way, the next write builds on the last one it sent.
+    private TerritorySnapshot lastWritten;
+    private int writesAwaitingEcho;
+
+    private Coroutine initialWrite;
+
+    // How long the master waits for the server clock before writing the first snapshot anyway.
+    // Not a gameplay number: the clock normally arrives within a frame or two of connecting.
+    private const float ServerClockWaitSeconds = 5f;
+
+    /// Who may capture what. Built once from the scene's TowerDictionary adjacency and the capitals.
+    public TerritoryMap Map => map;
+
+    /// The territory state every client agrees on. Null until this client has read the room's
+    /// snapshot (just after joining), so readers must treat null as "not known yet".
+    public TerritorySnapshot Current => current;
+
+    /// Highest tower id + 1: the length of every array in the snapshot.
+    public int ZoneCount { get; private set; }
+
+    /// Raised on every client when an applied snapshot changes a zone's owner:
+    /// (zone, oldOwner, newOwner, snapshot). NOT raised for the snapshot a client reads when it
+    /// joins - that is the match as it already was, and treating it as fresh captures would, for
+    /// example, pay a late joiner bounties that were settled before they arrived.
+    public event Action<int, int, int, TerritorySnapshot> OwnershipChanged;
+
+    /// How many OwnershipChanged events this client has raised. Diagnostic only: lets a test read
+    /// from outside that a late joiner's first read raised none.
+    public int OwnershipChangedRaisedCount { get; private set; }
+
     public void RegisterCapture(int buildingID, BuildingCapture capture)
     {
         captures[buildingID] = capture;
+
+        // A tower missing from TowerDictionary has no adjacency, so the territory rules can never
+        // let anyone capture it. Say so once here instead of silently refusing every entry.
+        if (!TowerDictionary.ContainsKey(buildingID))
+            Debug.LogError($"[TOWER] tower {buildingID} is not in BuildingManager's TowerDictionary - " +
+                           "nobody will be able to capture it. Add an entry with its adjacent towers.", capture);
+
+        // The room's snapshot may already have been applied before this tower's Start ran.
+        if (current != null)
+        {
+            int owner = current.OwnerOf(buildingID);
+            capture.ApplyOwnerVisual(owner >= 0, owner);
+            capture.SyncFromReplicated(owner);
+        }
     }
-      
+
     void Awake()
     {
         if (Instance == null)
@@ -32,45 +98,302 @@ public class BuildingManager : MonoBehaviourPun
         } else
         {
             Destroy(gameObject);
+            return;
+        }
+
+        BuildMap();
+    }
+
+    void Start()
+    {
+        // Normally the room is joined after this scene has started, and OnJoinedRoom does this.
+        if (PhotonNetwork.InRoom)
+            ReadOrCreateRoomSnapshot();
+    }
+
+    private void BuildMap()
+    {
+        var zones = new List<(int zoneId, IEnumerable<int> adjacent)>();
+        int highestId = -1;
+
+        foreach (KeyValuePair<int, TowerData> tower in TowerDictionary)
+        {
+            zones.Add((tower.Key, tower.Value.Adjacents));
+            highestId = Mathf.Max(highestId, tower.Key);
+        }
+
+        var capitals = new List<(int zoneId, int teamId)>();
+        foreach (KeyValuePair<int, int> capital in CathedralBuildingIDs)
+        {
+            capitals.Add((capital.Key, capital.Value));
+            highestId = Mathf.Max(highestId, capital.Key);
+        }
+
+        map = new TerritoryMap(zones, capitals);
+        ZoneCount = highestId + 1;
+    }
+
+    // ---------------------------------------------------------------- reading the room
+
+    public override void OnJoinedRoom()
+    {
+        ReadOrCreateRoomSnapshot();
+    }
+
+    public override void OnLeftRoom()
+    {
+        // The next room is a different match; nothing from this one may leak into it.
+        current = null;
+        lastWritten = null;
+        writesAwaitingEcho = 0;
+        if (initialWrite != null)
+        {
+            StopCoroutine(initialWrite);
+            initialWrite = null;
         }
     }
 
-    public void UpdateTowerDictionary(bool value, int controllingTeam, int buildingID)
+    private void ReadOrCreateRoomSnapshot()
     {
-        // AllBuffered, not All: a player joining mid-match must receive every ownership change
-        // that already happened, otherwise their TowerDictionary only has the scene defaults and
-        // the adjacency gate in BuildingCapture.OnTriggerEnter refuses to let them capture
-        // anything next to a tower their team took before they joined.
-        //
-        // Buffered RPCs accumulate for the room's lifetime. With 9 towers in a prototype match
-        // that is fine; if capture churn ever gets high, replicate ownership through Room Custom
-        // Properties instead of a buffered call per change.
-        photonView.RPC("RPC_UpdateTowerDictionary", RpcTarget.AllBuffered, value, controllingTeam, buildingID);
+        if (TerritorySnapshot.TryRead(PhotonNetwork.CurrentRoom.CustomProperties, ZoneCount, out TerritorySnapshot snapshot))
+        {
+            // The match as it already is: no events (see OwnershipChanged).
+            Apply(snapshot, raiseEvents: false);
+            return;
+        }
+
+        if (PhotonNetwork.IsMasterClient && initialWrite == null)
+            initialWrite = StartCoroutine(WriteInitialSnapshotWhenClockIsReady());
     }
 
-    [PunRPC]
-    private void RPC_UpdateTowerDictionary(bool value, int controllingTeam, int buildingID)
+    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
-        TowerData towerData = TowerDictionary[buildingID];
+        // Other systems will share the room's properties (capture progress, match phase); only a
+        // territory write carries the owners array, and every territory write carries all of it.
+        if (propertiesThatChanged == null || !propertiesThatChanged.ContainsKey(TerritorySnapshot.OwnersKey))
+            return;
 
-        // Once per ownership change, and replayed once per tower for a late joiner. That replay
-        // is itself the signal that buffered ownership reached them.
-        Debug.Log($"[TOWER] {buildingID} -> {(value ? $"team {controllingTeam}" : "neutral")}");
+        if (writesAwaitingEcho > 0)
+            writesAwaitingEcho--;
 
-        towerData.isCaptured = value;
-        towerData.controllingTeam = controllingTeam;
+        if (TerritorySnapshot.TryRead(propertiesThatChanged, ZoneCount, out TerritorySnapshot snapshot))
+            Apply(snapshot, raiseEvents: true);
+    }
 
-        TowerDictionary.Remove(buildingID);
-        TowerDictionary.Add(buildingID, towerData);
+    public override void OnMasterClientSwitched(Player newMasterClient)
+    {
+        // Pending-write bookkeeping belonged to the old master's writes, not ours.
+        lastWritten = null;
+        writesAwaitingEcho = 0;
 
-        // The flag is presentation derived from this state, not a separate message. Driving it
-        // from here means a late joiner replaying the buffered ownership call also gets the
-        // right flag colour, instead of ownership being correct while the map looks wrong.
-        if (captures.TryGetValue(buildingID, out BuildingCapture capture) && capture != null)
-            capture.ApplyOwnerVisual(value, controllingTeam);
+        // Who is standing in which zone, capture progress, decay and cooldown lived only on the
+        // old master's machine. Every client resets its towers from the replicated owners, and
+        // re-reports its own player if it is standing in one, so the new master can carry on.
+        // A capture that was part-way through starts again from zero (accepted in the plan).
+        if (current != null)
+        {
+            foreach (KeyValuePair<int, BuildingCapture> pair in captures)
+                if (pair.Value != null)
+                    pair.Value.OnMasterClientChanged(current.OwnerOf(pair.Key));
+        }
+
+        // The old master may have left before its first snapshot reached the room.
+        if (PhotonNetwork.IsMasterClient && current == null)
+            ReadOrCreateRoomSnapshot();
+    }
+
+    /// Makes this client's picture of the territory match a snapshot from the room.
+    private void Apply(TerritorySnapshot snapshot, bool raiseEvents)
+    {
+        TerritorySnapshot previous = current;
+        current = snapshot;
+        bool firstRead = previous == null;
+
+        // On the first read every zone counts as changed, so towers and TowerDictionary drop the
+        // scene's starting values for the room's real state.
+        List<int> changed = snapshot.ZonesWhoseOwnerChangedSince(previous);
+
+        foreach (int zone in changed)
+        {
+            int newOwner = snapshot.OwnerOf(zone);
+
+            if (TowerDictionary.TryGetValue(zone, out TowerData tower))
+            {
+                // Keeps the existing "captured flag + last team" meaning: a neutral tower still
+                // remembers which team last held it. ApplyOwnerVisual and PlayerLifecycle's
+                // capital check were written against that.
+                tower.isCaptured = newOwner >= 0;
+                if (newOwner >= 0)
+                    tower.controllingTeam = newOwner;
+
+                // Remove + Add: SerializableDictionary hides the indexer with a read-only one.
+                TowerDictionary.Remove(zone);
+                TowerDictionary.Add(zone, tower);
+            }
+
+            // Only zones whose owner changed: resyncing every tower would wipe the master's
+            // progress on a capture that is still going on somewhere else.
+            if (captures.TryGetValue(zone, out BuildingCapture capture) && capture != null)
+            {
+                capture.ApplyOwnerVisual(newOwner >= 0, newOwner);
+                capture.SyncFromReplicated(newOwner);
+            }
+
+            if (!firstRead)
+                Debug.Log($"[TOWER] {zone} -> {(newOwner >= 0 ? $"team {newOwner}" : "neutral")}");
+        }
+
+        if (firstRead)
+            Debug.Log($"[TOWER] territory read from the room: owners [{string.Join(",", OwnersOf(snapshot))}]");
+
+        // Raised after every zone above is updated, so a listener sees the whole new state.
+        if (raiseEvents && !firstRead)
+        {
+            foreach (int zone in changed)
+                RaiseOwnershipChanged(zone, previous.OwnerOf(zone), snapshot.OwnerOf(zone), snapshot);
+        }
 
         CheckTerritoryWin();
     }
+
+    private void RaiseOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot)
+    {
+        OwnershipChangedRaisedCount++;
+        if (OwnershipChanged == null)
+            return;
+
+        // One faulty listener (a HUD, the wallet) must not stop the others hearing about a capture.
+        foreach (Delegate listener in OwnershipChanged.GetInvocationList())
+        {
+            try
+            {
+                ((Action<int, int, int, TerritorySnapshot>)listener)(zone, oldOwner, newOwner, snapshot);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, this);
+            }
+        }
+    }
+
+    private static IEnumerable<int> OwnersOf(TerritorySnapshot snapshot)
+    {
+        for (int zone = 0; zone < snapshot.ZoneCount; zone++)
+            yield return snapshot.OwnerOf(zone);
+    }
+
+    // ---------------------------------------------------------------- writing (master only)
+
+    /// Master only: the zone now belongs to this team. bountyPaid is the gold each player of that
+    /// team was paid for it (Task 2.4). Takes effect on every client, this one included, when the
+    /// room sends it back - not immediately.
+    public void SetCaptured(int zone, int team, int bountyPaid)
+    {
+        TerritorySnapshot basis = WriteBasis(nameof(SetCaptured), zone);
+        if (basis == null || basis.OwnerOf(zone) == team)
+            return;
+
+        Write(basis.WithCapture(zone, team, ServerNowMs(), bountyPaid));
+    }
+
+    /// Master only: the zone goes neutral, remembering who held it and for how long (bounty).
+    public void SetNeutral(int zone)
+    {
+        TerritorySnapshot basis = WriteBasis(nameof(SetNeutral), zone);
+        if (basis == null || basis.OwnerOf(zone) == TerritoryMap.Neutral)
+            return;
+
+        Write(basis.WithNeutral(zone, ServerNowMs()));
+    }
+
+    private TerritorySnapshot WriteBasis(string caller, int zone)
+    {
+        if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
+        {
+            Debug.LogWarning($"[TOWER] {caller}({zone}) ignored: only the master client writes territory.");
+            return null;
+        }
+
+        if (zone < 0 || zone >= ZoneCount)
+        {
+            Debug.LogError($"[TOWER] {caller}({zone}) ignored: no such zone (0..{ZoneCount - 1}).", this);
+            return null;
+        }
+
+        TerritorySnapshot basis = writesAwaitingEcho > 0 && lastWritten != null ? lastWritten : current;
+        if (basis == null)
+            Debug.LogWarning($"[TOWER] {caller}({zone}) ignored: the room's territory snapshot does not exist yet.");
+        return basis;
+    }
+
+    private void Write(TerritorySnapshot next)
+    {
+        var props = new Hashtable();
+        next.WriteTo(props);   // Photon's Hashtable is a Dictionary<object, object>
+
+        if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props))
+        {
+            Debug.LogWarning("[TOWER] the territory snapshot could not be sent to the room.");
+            return;
+        }
+
+        lastWritten = next;
+        writesAwaitingEcho++;
+    }
+
+    private static int ServerNowMs()
+    {
+        int now = PhotonNetwork.ServerTimestamp;
+        if (now == 0)
+            Debug.LogWarning("[TOWER] server clock reads 0 (not synced yet) - this zone's hold timer will be wrong.");
+        return now;
+    }
+
+    /// The first master of a room writes the starting state: every capital owned by its team.
+    /// Waits for the server clock first. ServerTimestamp is fetched once, asynchronously, after
+    /// connecting and reads 0 until then (that caught the deployables out once, FAIL #15); a
+    /// capital stamped with 0 would later read as held for weeks, and would pay a bounty early.
+    private IEnumerator WriteInitialSnapshotWhenClockIsReady()
+    {
+        float waited = 0f;
+        while (PhotonNetwork.ServerTimestamp == 0 && waited < ServerClockWaitSeconds)
+        {
+            waited += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        initialWrite = null;
+
+        if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
+            yield break;
+
+        // Another master may have written it while this one waited.
+        if (TerritorySnapshot.TryRead(PhotonNetwork.CurrentRoom.CustomProperties, ZoneCount, out TerritorySnapshot existing))
+        {
+            if (current == null)
+                Apply(existing, raiseEvents: false);
+            yield break;
+        }
+
+        int now = ServerNowMs();
+        TerritorySnapshot start = new TerritorySnapshot(ZoneCount);
+        foreach (KeyValuePair<int, int> capital in CathedralBuildingIDs)
+            start = start.WithCapture(capital.Key, capital.Value, now, bountyPaid: 0);
+
+        Debug.Log($"[TOWER] master wrote the starting territory snapshot ({ZoneCount} zones, capitals owned).");
+        Write(start);
+    }
+
+    // ---------------------------------------------------------------- retired
+
+    // Kept only because RpcList dispatches by index - nothing calls it since territory moved to
+    // Room Properties (Task 2.1b). Renaming or deleting it would shift every RPC listed after it.
+    [PunRPC]
+    private void RPC_UpdateTowerDictionary(bool value, int controllingTeam, int buildingID)
+    {
+    }
+
+    // ---------------------------------------------------------------- territory win
 
     /// The match previously ended only when every player of every other team was dead at the same
     /// instant, which almost never happens once people are respawning. Holding all three capitals
