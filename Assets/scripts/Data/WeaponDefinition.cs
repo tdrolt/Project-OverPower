@@ -91,9 +91,12 @@ namespace Overpower.Data
         [SerializeField] private float spreadDegrees = 0f;
         public float SpreadDegrees => spreadDegrees;
 
-        [Tooltip("Seconds between pulling the trigger and the beam firing. During the wind-up " +
-                 "every player sees a warning line along the beam's path, so the target can step " +
-                 "out of it. 0 = fires instantly.")]
+        [Tooltip("Seconds between pulling the trigger and the shot actually firing. For a BEAM " +
+                 "weapon (a Hitscan component on the Projectile Prefab) every player also sees a " +
+                 "warning line along the beam's exact path during the wait, so the target can step " +
+                 "out of it before it lands. A projectile weapon given a wind-up just fires later - " +
+                 "there is no fixed path to draw a warning line along until the shot actually " +
+                 "leaves the barrel, so it gets no line. 0 = fires instantly.")]
         [SerializeField] private float windupSeconds = 0f;
         public float WindupSeconds => windupSeconds;
 
@@ -128,8 +131,11 @@ namespace Overpower.Data
         [SerializeField] private float minConeAngle = 1.5f;
         public float MinConeAngle => minConeAngle;
 
-        [Tooltip("The widest the aim cone can ever open, in degrees, no matter how long the " +
-                 "trigger is held. This is the ceiling on how inaccurate sustained fire gets.")]
+        [Tooltip("The widest the aim cone's BLOOM can ever open, in degrees, no matter how long the " +
+                 "trigger is held - the ceiling on how inaccurate sustained fire alone gets. Moving " +
+                 "Spread Degrees below adds ON TOP of this while the player is moving (see " +
+                 "AimConeState.EffectiveAngle), so the actual spread while moving can exceed this " +
+                 "number - this is a ceiling on bloom, not on the weapon's effective spread.")]
         [SerializeField] private float maxConeAngle = 7f;
         public float MaxConeAngle => maxConeAngle;
 
