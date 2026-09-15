@@ -73,6 +73,19 @@ namespace Overpower.UI
         private GameObject silencedBanner;
         private TextMeshProUGUI goldText; // "Gold 1234  +7.7/s" - see BuildUi's placement comment.
 
+        // Task 2.4: the transient "Bounty +900" toast. A single pre-built label toggled on/off
+        // (see BuildBountyToast/UpdateBountyToast) rather than instantiated per payout, so a bounty
+        // never allocates UI - the same reasoning the silenced banner above already follows.
+        // bountyToastGo is the toast's OWN root (what SetActive actually toggles) - NOT
+        // bountyToastText.gameObject, which is a child of it: toggling the child while the parent
+        // stays inactive is a no-op (code review fix, Task 2.4 - caught by the 616x576 capture step,
+        // which showed no toast at all despite HandleBountyReceived having run).
+        private GameObject bountyToastGo;
+        private TextMeshProUGUI bountyToastText;
+        // Time.unscaledTime the toast should hide by; < 0 means "not currently showing".
+        // Unscaled so a debug Time.timeScale change cannot freeze a stale toast on screen forever.
+        private float bountyToastHideAtTime = -1f;
+
         // ---- built UI: slots -----------------------------------------------------------------------
 
         /// <summary>One slot's widgets. A class, not a struct, purely so BuildSlot/SetPips can mutate
@@ -175,6 +188,8 @@ namespace Overpower.UI
 
             if (abilityRunner != null)
                 abilityRunner.SlotChanged += HandleSlotChanged;
+            if (goldWallet != null)
+                goldWallet.BountyReceived += HandleBountyReceived;
 
             RefreshWeaponSlotContent();
             for (int i = 0; i < AbilitySlotOrder.Length; i++)
@@ -185,6 +200,8 @@ namespace Overpower.UI
         {
             if (abilityRunner != null)
                 abilityRunner.SlotChanged -= HandleSlotChanged;
+            if (goldWallet != null)
+                goldWallet.BountyReceived -= HandleBountyReceived;
 
             // The one Material ApplyOutline clones for every HUD text - nothing else references it,
             // so nothing else will clean it up.
@@ -204,10 +221,35 @@ namespace Overpower.UI
         private void LateUpdate()
         {
             UpdateGold();
+            UpdateBountyToast();
             UpdateHealthAndArmor();
             UpdateOverheat();
             UpdateWeaponSlot();
             UpdateAbilitySlots();
+        }
+
+        // ============================================================================================
+        // Bounty toast (Task 2.4)
+        // ============================================================================================
+
+        /// <summary>GoldWallet.BountyReceived handler: shows "Bounty +900" and starts its countdown.
+        /// The text is set here, once, on the trigger frame only - UpdateBountyToast below never
+        /// touches .text, just the GameObject's active flag, so a bounty allocates exactly one string
+        /// no matter how long the toast stays up.</summary>
+        private void HandleBountyReceived(int amount)
+        {
+            bountyToastText.text = $"Bounty +{amount.ToString(CultureInfo.InvariantCulture)}";
+            bountyToastGo.SetActive(true);
+            bountyToastHideAtTime = Time.unscaledTime + theme.bountyToastDurationSeconds;
+        }
+
+        private void UpdateBountyToast()
+        {
+            if (bountyToastHideAtTime < 0f || Time.unscaledTime < bountyToastHideAtTime)
+                return;
+
+            bountyToastGo.SetActive(false);
+            bountyToastHideAtTime = -1f;
         }
 
         // ============================================================================================
@@ -682,6 +724,40 @@ namespace Overpower.UI
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
+
+            BuildBountyToast(canvasGo.transform);
+        }
+
+        /// <summary>Task 2.4's "Bounty +900" toast: a fixed-size label parented directly to the
+        /// canvas (NOT to Hud Panel's VerticalLayoutGroup - a bounty is rare enough that it must not
+        /// nudge the bars/slots around every time it shows or hides) and anchored top-centre, clear
+        /// of both the bottom-anchored Hud Panel and TestRangePanel's own top-left corner. Built once,
+        /// hidden until the first bounty - see HandleBountyReceived/UpdateBountyToast. Fills the
+        /// bountyToastGo/bountyToastText fields directly rather than returning anything: callers must
+        /// toggle the ROOT (bountyToastGo), not the label's own gameObject, which stays a child of an
+        /// inactive parent otherwise (see bountyToastGo's own field comment).</summary>
+        private void BuildBountyToast(Transform canvasParent)
+        {
+            GameObject go = new GameObject("Bounty Toast", typeof(RectTransform));
+            go.transform.SetParent(canvasParent, false);
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -theme.hudBottomOffset);
+            rt.sizeDelta = new Vector2(theme.barWidth, theme.titleTextSize + 12f);
+
+            TextMeshProUGUI text = AddLabel(go.transform, "", theme.titleTextSize, FontStyles.Bold);
+            RectTransform textRt = text.rectTransform;
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+            text.color = theme.bountyToastColor;
+            text.alignment = TextAlignmentOptions.Center;
+
+            go.SetActive(false); // HandleBountyReceived turns this on; UpdateBountyToast turns it off again.
+            bountyToastGo = go;
+            bountyToastText = text;
         }
 
         /// <summary>trackImage is handed back so a caller can add something on top of the track

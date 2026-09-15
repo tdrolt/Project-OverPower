@@ -314,6 +314,15 @@ namespace Overpower.UI
                  "same way the ultimate-ready glow does, not just another stat.")]
         public Color goldTextColor = new Color(1f, 0.82f, 0.2f, 1f);
 
+        [Header("Bounty toast")]
+        [Tooltip("Text colour of the transient \"Bounty +900\" toast shown when a capture pays your " +
+                 "team a bounty (Task 2.4, GDD p.20) - the same warm amber family as Gold Text " +
+                 "Colour, so a bounty reads as an emphatic version of the same gold reward rather " +
+                 "than an unrelated alert colour.")]
+        public Color bountyToastColor = new Color(1f, 0.82f, 0.2f, 1f);
+        [Tooltip("Seconds the bounty toast stays on screen before it hides itself again.")]
+        public float bountyToastDurationSeconds = 3f;
+
         [Header("Capture bar")]
         [Tooltip("Width of the small world-space bar shown above a tower while it is being captured or drained, in world units (metres) - NOT canvas units, since this bar is not on the screen-space HUD.")]
         public float captureBarWidth = 2.2f;

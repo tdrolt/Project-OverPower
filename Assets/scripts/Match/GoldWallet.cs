@@ -73,6 +73,12 @@ namespace Overpower.Match
         /// every time the owner's "gold" property arrives with a new value.
         public event System.Action<int> BalanceChanged;
 
+        /// Owner only (Task 2.4): raised exactly when THIS wallet is credited a capture bounty - a
+        /// narrower signal than BalanceChanged/Add, which also fire for passive income and the F1
+        /// "+1000 Gold" test button. Only the HUD toast ("Bounty +900") listens to this; the balance
+        /// itself is credited through the ordinary Add(amount) call below, same as any other credit.
+        public event System.Action<int> BountyReceived;
+
         private void Awake()
         {
             if (territoryConfig == null)
@@ -113,6 +119,45 @@ namespace Overpower.Match
                 // property - the same reasoning PlayerLoadout's starting-weapon publish uses.
                 PublishBalance();
             }
+
+            // Task 2.4: only the owner's own wallet ever pays itself a bounty - a remote copy has no
+            // accrual to credit anyway (see Balance's own comment). BuildingManager raises this event
+            // on EVERY client whose applied snapshot changed a zone's owner, including a zone this
+            // player's team did not just take, so HandleOwnershipChanged below is what filters that
+            // down to "did MY team just take this zone, and was there a bounty on it".
+            if (BuildingManager.Instance != null)
+                BuildingManager.Instance.OwnershipChanged += HandleOwnershipChanged;
+            else
+                Debug.LogError($"[GoldWallet] {name}: no BuildingManager in the scene - capture bounties will never be paid.");
+        }
+
+        private void OnDestroy()
+        {
+            if (BuildingManager.Instance != null)
+                BuildingManager.Instance.OwnershipChanged -= HandleOwnershipChanged;
+        }
+
+        /// <summary>Task 2.4: pays this wallet's owner a capture bounty the moment their team takes a
+        /// zone that had one. Not raised for a late joiner's first read of the room's snapshot (see
+        /// BuildingManager.OwnershipChanged's own doc), so nobody is ever paid twice for a capture
+        /// that already happened before they connected. bountyPaid is read off the snapshot ITSELF
+        /// rather than recomputed here - BountyRule.PayoutOnCapture already ran once, on the master,
+        /// inside BuildingManager.SetCaptured, against the write basis at the moment of capture; this
+        /// is a plain client-side reaction to what the master decided, not a second, possibly
+        /// differently-timed judgement of the same rule.</summary>
+        private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot)
+        {
+            if (!photonView.IsMine || accrual == null)
+                return;
+            if (!Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam) || newOwner != myTeam)
+                return;
+
+            int bounty = snapshot.BountyPaidOnLastCapture(zone);
+            if (bounty <= 0)
+                return;
+
+            Add(bounty);
+            BountyReceived?.Invoke(bounty);
         }
 
         private void Update()
