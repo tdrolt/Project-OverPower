@@ -40,6 +40,14 @@ public class PlayerInputRouter : MonoBehaviour
     // panel. Keying by owner means each tool can only ever release its OWN claim.
     private readonly HashSet<object> toolFocusOwners = new HashSet<object>();
 
+    // Whether the cursor sits over a raycast-target Graphic on a canvas that has a
+    // GraphicRaycaster - cached once a frame in Update rather than read inside the Input System
+    // callbacks below, because EventSystem.IsPointerOverGameObject() logs an Input System warning
+    // when called from outside a MonoBehaviour message (Playtest polish review, fix 1). The HUD's
+    // own canvas has no GraphicRaycaster, so hovering its bars never sets this true - only a real
+    // clickable panel (the F1 test range, the loadout screen) does.
+    private bool pointerOverUi;
+
     /// <summary>Raw WASD, not camera-relative - PlayerMotor does that conversion, since it depends
     /// on the camera rig and not on input.</summary>
     public Vector2 MoveAxis => gameplayMap != null && !InputSuppressed ? moveAction.ReadValue<Vector2>() : Vector2.zero;
@@ -47,8 +55,12 @@ public class PlayerInputRouter : MonoBehaviour
     // A polled Held property AND an edge event exist for each of the four ability slots on
     // purpose: a charge weapon reads Held every frame it is still holding the trigger, while a
     // dash only cares about the instant the button went down. One cannot substitute for the other.
-    public bool PrimaryHeld => gameplayMap != null && !InputSuppressed && primaryAction.IsPressed();
-    public bool EquipmentHeld => gameplayMap != null && !InputSuppressed && equipmentAction.IsPressed();
+    //
+    // Primary and Equipment additionally gate on !pointerOverUi (fix 1) - both are mouse buttons
+    // (see OverpowerControls.inputactions), and the other two Held properties are keyboard keys
+    // that can never land on a UI click in the first place, so they do not need the same gate.
+    public bool PrimaryHeld => gameplayMap != null && !InputSuppressed && !pointerOverUi && primaryAction.IsPressed();
+    public bool EquipmentHeld => gameplayMap != null && !InputSuppressed && !pointerOverUi && equipmentAction.IsPressed();
     public bool UltimateHeld => gameplayMap != null && !InputSuppressed && ultimateAction.IsPressed();
     public bool MobilityHeld => gameplayMap != null && !InputSuppressed && mobilityAction.IsPressed();
 
@@ -145,8 +157,13 @@ public class PlayerInputRouter : MonoBehaviour
         // Button actions with no interaction assigned go Waiting -> Started -> Performed on press
         // (same frame) and Performed -> Canceled on release, so started/canceled are the clean
         // press/release edges below.
-        primaryAction.started += _ => Emit(PrimaryPressed); primaryAction.canceled += _ => Emit(PrimaryReleased);
-        equipmentAction.started += _ => Emit(EquipmentPressed); ultimateAction.started += _ => Emit(UltimatePressed);
+        // Primary/Equipment PRESSED go through EmitPointerGated, not Emit - see fix 1's comment on
+        // that method. Release is deliberately left on plain Emit: a click that opened a tool
+        // fires no press (blocked above), so there is nothing still "held" for a release to
+        // wrongly end, and gating release too would risk a stuck-held weapon if the pointer were
+        // over UI at the exact frame the button came up.
+        primaryAction.started += _ => EmitPointerGated(PrimaryPressed); primaryAction.canceled += _ => Emit(PrimaryReleased);
+        equipmentAction.started += _ => EmitPointerGated(EquipmentPressed); ultimateAction.started += _ => Emit(UltimatePressed);
         mobilityAction.started += _ => Emit(MobilityPressed); mobilityAction.canceled += _ => Emit(MobilityReleased);
         mapAction.started += _ => Emit(MapToggled); shopAction.started += _ => EmitShop();
         scoreboardAction.started += _ => Emit(ScoreboardPressed); scoreboardAction.canceled += _ => Emit(ScoreboardReleased);
@@ -181,11 +198,44 @@ public class PlayerInputRouter : MonoBehaviour
             playerLifecycle.AliveChanged -= HandleAliveChanged;
     }
 
+    /// <summary>Fix 1 (Playtest polish review): a UI click and a mouse-button gameplay action are
+    /// the SAME physical click, so a "Loadout (P)" HUD button press reached PlayerInputRouter as a
+    /// Primary press too, fired the equipped weapon (or Equipment, for a right-click control),
+    /// then only afterwards did the button's own onClick claim tool focus and shut input off - by
+    /// then the shot had already gone. Read here, once a frame, rather than inside the Input
+    /// System callback that raises PrimaryPressed/EquipmentPressed: EventSystem.
+    /// IsPointerOverGameObject() logs an Input System warning if it is called from outside a
+    /// MonoBehaviour message. Only ever meaningful for the local player - gameplayMap is null (or
+    /// disabled) for every other copy, so nothing reads this field for them.</summary>
+    private void Update()
+    {
+        // Only the local player's clicks can ever be a UI click on THIS machine - see OnEnable's
+        // own "only the local player should ever read input" reasoning. A remote copy's gameplayMap
+        // is disabled anyway (nothing reads pointerOverUi for it), so this skips 8 redundant
+        // EventSystem queries a frame in a full room rather than just one.
+        if (photonView != null && !photonView.IsMine)
+            return;
+
+        pointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+    }
+
     private void HandleAliveChanged(bool alive) => isAlive = alive;
 
     private void Emit(System.Action evt)
     {
         if (!InputSuppressed)
+            evt?.Invoke();
+    }
+
+    /// <summary>Primary/Equipment's own emit path (fix 1) - both are mouse buttons (see
+    /// OverpowerControls.inputactions), so both can land on a UI click before that click's own
+    /// onClick has claimed tool focus (see Update's comment above for the concrete "Loadout (P)"
+    /// case). IsPointerOverGameObject() only ever returns true for a raycast-target Graphic on a
+    /// canvas that carries a GraphicRaycaster - the HUD's own canvas has none, so hovering its bars
+    /// never blocks firing, only an actual clickable panel (F1, the loadout screen) does.</summary>
+    private void EmitPointerGated(System.Action evt)
+    {
+        if (!InputSuppressed && !pointerOverUi)
             evt?.Invoke();
     }
 

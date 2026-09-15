@@ -176,6 +176,19 @@ namespace Overpower.Weapons
         /// is trying to hold the trigger down to charge one.
         private void Update()
         {
+            // Fix 10 (Playtest polish review, cosmetic): opening a tool (P for the loadout screen,
+            // F1 for the test range) while holding a charge weapon's trigger sets InputSuppressed
+            // true, which swallows PrimaryReleased the same way it swallows every other router
+            // event - HandlePrimaryReleased, the only other place triggerHeldSince is cleared,
+            // never runs. Left alone, triggerHeldSince stayed set for as long as the tool was open,
+            // so ChargeFraction() (and CurrentChargeFraction, which AimConeView reads for the range
+            // arc) kept reporting a growing charge the player was no longer actually holding, and
+            // still read close to full for an instant after the tool closed. Cleared here instead,
+            // every frame input stays suppressed, WITHOUT calling TryFire - a real release fires a
+            // charge weapon (HandlePrimaryReleased), a suppressed one must not.
+            if (photonView.IsMine && input != null && input.InputSuppressed && triggerHeldSince != 0f)
+                triggerHeldSince = 0f;
+
             if (photonView.IsMine && input != null && input.PrimaryHeld &&
                 (weapon == null || !weapon.CanCharge))
                 TryFire();
@@ -311,6 +324,17 @@ namespace Overpower.Weapons
         /// the target's own screen, had already stepped aside - and the shooter gets the refund
         /// for a hit that dealt no damage. The alternative, waiting for the victim to confirm,
         /// needs a reply message per hit for a few points of heat. Revisit after a real-latency test.
+        ///
+        /// TASK 11B WIND-UP NOTE: this method runs from TryFire, at the moment the trigger is
+        /// pressed - BEFORE the RPC is even sent, let alone before FireAfterWindup's wait. So for a
+        /// weapon with Windup Seconds set, the same "decided early, might not match what actually
+        /// lands" tradeoff above now also happens with ZERO latency: the refund is locked in
+        /// against the target's position at the PRESS, while the real beam only resolves once the
+        /// wind-up ends - after the target has had the whole warning line to read and step out of
+        /// it. A shooter can be refunded heat for a beam that, once it actually fires, connects
+        /// with nobody. Tudor was told and chose to leave this method exactly as it is rather than
+        /// re-deriving the refund after the wind-up (2026-09-14) - the wind-up telegraph is the
+        /// player-facing fairness fix; the shooter's own heat bookkeeping was not asked to change.
         ///
         /// Projectile weapons are untouched: they land later, on every client, and no projectile
         /// weapon has a refund today.
