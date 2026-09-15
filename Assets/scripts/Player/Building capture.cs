@@ -4,6 +4,8 @@ using UnityEngine;
 using Photon.Pun;
 using System.Linq;
 using Overpower.Data;
+using Overpower.Match;
+using Overpower.UI;
 
 public class BuildingCapture : MonoBehaviourPun
 {
@@ -19,6 +21,11 @@ public class BuildingCapture : MonoBehaviourPun
 
     [Tooltip("Shared per-tier numbers. Every tower should point at the same asset.")]
     public TerritoryConfig territoryConfig;
+
+    [Header("UI")]
+    [Tooltip("Colours and world-space bar sprite for the capture progress bar shown above this " +
+             "tower (Task 2.1d) - every tower should point at the same asset, same as Territory Config.")]
+    public UiTheme theme;
 
     // Used only if territoryConfig is missing (logged as an error in Start), so a misconfigured
     // tower keeps working instead of throwing every frame. Reproduces the numbers every tower had
@@ -70,6 +77,17 @@ public class BuildingCapture : MonoBehaviourPun
 
     private List<PlayerTeam> playersInZone = new List<PlayerTeam>();
 
+    // The world-space bar over this tower (Task 2.1d), built in code in Start so every tower gets
+    // one - see CaptureProgressView's own class comment. Null if theme is unassigned.
+    private CaptureProgressView progressView;
+
+    // The last CaptureProgress THIS client told BuildingManager to publish for this zone - only
+    // meaningful while this client is master (only the master ever calls PublishProgressIfNeeded).
+    // Starts Idle, matching a fresh, never-captured zone, so a genuinely idle tower never publishes
+    // at match start. See BuildingManager.OnMasterClientSwitched for why a master promotion cannot
+    // rely on comparing against this alone.
+    private CaptureProgress lastPublishedProgress = CaptureProgress.Idle;
+
     // The ViewID of THIS client's own player while it stands in the zone and was let in by the
     // territory rule (0 = not here). Only the master counts who is in a zone; this lets the player
     // be reported again to a new master (OnMasterClientChanged).
@@ -82,6 +100,11 @@ public class BuildingCapture : MonoBehaviourPun
             Debug.LogError($"[BuildingCapture] Tower {buildingID} has no Territory Config assigned - " +
                             "falling back to the old fixed capture numbers (5s/1 per player/5s/5s).", this);
         }
+
+        if (theme == null)
+            Debug.LogError($"[BuildingCapture] Tower {buildingID} has no UI Theme assigned - no capture progress bar will be shown.", this);
+        else
+            progressView = CaptureProgressView.Create(transform, theme);
 
         ConfigureCollider();
         InitializeAudio();
@@ -146,6 +169,12 @@ public class BuildingCapture : MonoBehaviourPun
 
     void Update()
     {
+        // Runs on EVERY client, master or not - the bar is something everyone watches, not
+        // something only the master simulates. Reads whatever BuildingManager last decoded from
+        // the room (possibly still this client's own write, echoing back a moment later - see
+        // BuildingManager's class comment on the echo window), same as the flag/ownership visuals.
+        RefreshProgressView();
+
         if (!PhotonNetwork.IsMasterClient) return;
 
         // A player who died or disconnected while standing in the ring leaves a destroyed
@@ -157,14 +186,86 @@ public class BuildingCapture : MonoBehaviourPun
         playersInZone.RemoveAll(p => p == null);
 
         if (isCaptured)
-        {
             HandleCapturedState(); // handles recapture decay if an enemy is present
+        else if (!isOnCooldown)
+            CalculateCaptureProgress();
+
+        // Runs after the state above settles for this frame, so it always publishes THIS frame's
+        // real state - including the "just neutralised, now on cooldown" and "just completed, now
+        // idle" transitions, which the old early-returns above would otherwise skip on the very
+        // frame that matters.
+        PublishProgressIfNeeded();
+    }
+
+    private void RefreshProgressView()
+    {
+        if (progressView == null || BuildingManager.Instance == null)
             return;
+
+        progressView.Refresh(BuildingManager.Instance.CaptureProgressOf(buildingID));
+    }
+
+    /// <summary>Master only. Works out this zone's CaptureProgress from the same fields
+    /// CalculateCaptureProgress/HandleCapturedState just updated this frame, and tells
+    /// BuildingManager only when it differs from what this client last told it - see
+    /// CaptureProgress.NeedsRepublishComparedTo. A capture in progress: team = the capturing team,
+    /// progress01/rate scaled by CaptureSeconds (one-player-seconds, same units captureProgress is
+    /// already tracked in). A decay in progress: team = the ENEMY doing the draining, rate =
+    /// -1/DecaySeconds (matches UpdateDecay's own maths - see its comment). Anything else (idle,
+    /// on cooldown, captured with nobody contesting it): Idle, which hides the bar.</summary>
+    private void PublishProgressIfNeeded()
+    {
+        CaptureProgress current = ComputeCurrentProgress();
+        if (!current.NeedsRepublishComparedTo(lastPublishedProgress))
+            return;
+
+        lastPublishedProgress = current;
+        BuildingManager.Instance.PublishCaptureProgress(buildingID, current);
+    }
+
+    private CaptureProgress ComputeCurrentProgress()
+    {
+        int nowMs = PhotonNetwork.ServerTimestamp;
+        float captureSeconds = CaptureSeconds;
+
+        if (isCaptured)
+        {
+            if (!isDecaying || captureSeconds <= 0f)
+                return CaptureProgress.Idle;
+
+            float decayProgress01 = captureProgress / captureSeconds;
+            float decayRate = DecaySeconds > 0f ? -1f / DecaySeconds : 0f;
+            return new CaptureProgress(capturingID, decayProgress01, decayRate, nowMs);
         }
 
-        if (isOnCooldown) return;
+        if (isOnCooldown || capturingID == -1 || captureSeconds <= 0f)
+            return CaptureProgress.Idle;
 
-        CalculateCaptureProgress();
+        // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
+        // else" actually moves the bar - anyone else present means CalculateCaptureProgress itself
+        // is not advancing captureProgress this frame either, so the bar must not claim it is.
+        var eligiblePlayers = playersInZone.Where(p => p.teamID == capturingID).ToList();
+        bool enemyPresent = playersInZone.Any(p => p.teamID != capturingID);
+        if (!eligiblePlayers.Any() || enemyPresent)
+            return CaptureProgress.Idle;
+
+        float progress01 = captureProgress / captureSeconds;
+        float rate = eligiblePlayers.Count / captureSeconds;
+        return new CaptureProgress(capturingID, progress01, rate, nowMs);
+    }
+
+    /// <summary>Forces this tower to tell the room its current capture progress right now,
+    /// bypassing the NeedsRepublishComparedTo gate. Called once per tower by
+    /// BuildingManager.OnMasterClientSwitched when THIS client becomes the new master - see that
+    /// method's own comment for why the ordinary gate cannot be trusted on a master's first
+    /// frame.</summary>
+    public void RepublishProgressNow()
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        lastPublishedProgress = ComputeCurrentProgress();
+        BuildingManager.Instance.PublishCaptureProgress(buildingID, lastPublishedProgress);
     }
 
 
@@ -620,5 +721,12 @@ public class BuildingCapture : MonoBehaviourPun
     {
         return isCaptured && controllingTeam == teamID;
     }
+
+    /// This tower's own ground-truth fraction (captureProgress / CaptureSeconds) - only meaningful
+    /// on whichever client is currently master, the only one that simulates it. Diagnostic only,
+    /// for Task 2.1d's own verification: lets a two-client check compare a remote client's
+    /// extrapolated CaptureProgressView fill directly against the number it is supposed to track,
+    /// instead of reading the private captureProgress field through reflection.
+    public float CaptureProgressFraction => CaptureSeconds > 0f ? Mathf.Clamp01(captureProgress / CaptureSeconds) : 0f;
 
 }

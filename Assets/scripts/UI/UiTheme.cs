@@ -308,6 +308,16 @@ namespace Overpower.UI
                  "so all three laser leaves read consistently instead of being tuned per-prefab.")]
         public float laserBeamLingerSeconds = 0.18f;
 
+        [Header("Capture bar")]
+        [Tooltip("Width of the small world-space bar shown above a tower while it is being captured or drained, in world units (metres) - NOT canvas units, since this bar is not on the screen-space HUD.")]
+        public float captureBarWidth = 2.2f;
+        [Tooltip("Height of the capture bar, in world units (metres).")]
+        public float captureBarHeight = 0.22f;
+        [Tooltip("Height above the tower's own transform (its scene origin, NOT the flag mesh's own height) the capture bar sits at, in world units (metres). Measured against the scene's own towers (Task 2.1d): every tower's roof peaks at ~5.7m and its flag sits at ~5.6-5.7m, so this must clear that or the bar renders behind/inside the roof and never shows.")]
+        public float captureBarHeightOffset = 6.5f;
+        [Tooltip("Empty part of the capture bar, drawn behind the coloured fill - the fill itself uses Shot Color For the capturing (or draining) team, same colours as that team's shots.")]
+        public Color captureBarTrackColor = new Color(0.1f, 0.1f, 0.12f, 0.85f);
+
         [Header("Aim cone")]
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
         [Tooltip("Colour of the shotgun's inner fan lines.")] public Color coneFanLineColor = new Color(1f, 1f, 1f, 0.25f);

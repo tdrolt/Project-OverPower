@@ -45,6 +45,22 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     private TerritorySnapshot lastWritten;
     private int writesAwaitingEcho;
 
+    // Every client's picture of each zone's capture progress (Task 2.1d), decoded from the room's
+    // four int[] arrays. Null until this client has read them at least once; CaptureProgressOf
+    // reads that as Idle, same convention as Current above for territory. Indices beyond what the
+    // room currently holds - a zone nobody has ever tried to capture, or a room from before this
+    // feature shipped - also read as Idle (see ApplyCaptureProgress/CaptureProgressOf).
+    private CaptureProgress[] currentProgress;
+
+    // Master only, exactly the same purpose as lastWritten/writesAwaitingEcho above, kept as a
+    // SEPARATE echo-window because a territory write and a capture-progress write are separate
+    // SetCustomProperties calls with disjoint keys (see PublishCaptureProgress) and so echo back
+    // independently. A fresh master's own copy of this starts null (see OnMasterClientSwitched) -
+    // PublishCaptureProgress falls back to currentProgress (this client's last-read echo, which is
+    // still correct) rather than assuming an empty room.
+    private CaptureProgress[] progressLastWritten;
+    private int progressWritesAwaitingEcho;
+
     private Coroutine initialWrite;
 
     // How long the master waits for the server clock before writing the first snapshot anyway.
@@ -61,6 +77,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// Highest tower id + 1: the length of every array in the snapshot.
     public int ZoneCount { get; private set; }
 
+    /// This client's last-known capture progress for a zone - CaptureProgress.Idle if nothing has
+    /// been read yet or the zone is out of range. Extrapolate the live fill with
+    /// progress.Evaluate(PhotonNetwork.ServerTimestamp) - see CaptureProgress's own class comment.
+    public CaptureProgress CaptureProgressOf(int zone) =>
+        currentProgress != null && zone >= 0 && zone < currentProgress.Length ? currentProgress[zone] : CaptureProgress.Idle;
+
     /// Raised on every client when an applied snapshot changes a zone's owner:
     /// (zone, oldOwner, newOwner, snapshot). NOT raised for the snapshot a client reads when it
     /// joins - that is the match as it already was, and treating it as fresh captures would, for
@@ -70,6 +92,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// How many OwnershipChanged events this client has raised. Diagnostic only: lets a test read
     /// from outside that a late joiner's first read raised none.
     public int OwnershipChangedRaisedCount { get; private set; }
+
+    /// How many times THIS client has published capture progress (master only - stays 0 on every
+    /// other client). Diagnostic only, same idea as OwnershipChangedRaisedCount: lets Task 2.1d's
+    /// own verification step count publishes during a clean solo capture from outside, instead of
+    /// grepping the console log.
+    public int CaptureProgressPublishCount { get; private set; }
 
     public void RegisterCapture(int buildingID, BuildingCapture capture)
     {
@@ -146,6 +174,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         current = null;
         lastWritten = null;
         writesAwaitingEcho = 0;
+        currentProgress = null;
+        progressLastWritten = null;
+        progressWritesAwaitingEcho = 0;
         if (initialWrite != null)
         {
             StopCoroutine(initialWrite);
@@ -155,6 +186,11 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     private void ReadOrCreateRoomSnapshot()
     {
+        // Capture progress has no "create": a fresh room simply has nobody capturing anything, so
+        // CaptureProgressOf reads Idle everywhere until the first real publish. Read whatever a
+        // room already in progress (a late joiner's case) has.
+        ApplyCaptureProgressIfPresent(PhotonNetwork.CurrentRoom.CustomProperties);
+
         if (TerritorySnapshot.TryRead(PhotonNetwork.CurrentRoom.CustomProperties, ZoneCount, out TerritorySnapshot snapshot))
         {
             // The match as it already is: no events (see OwnershipChanged).
@@ -168,16 +204,28 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
     {
-        // Other systems will share the room's properties (capture progress, match phase); only a
-        // territory write carries the owners array, and every territory write carries all of it.
-        if (propertiesThatChanged == null || !propertiesThatChanged.ContainsKey(TerritorySnapshot.OwnersKey))
+        if (propertiesThatChanged == null)
             return;
 
-        if (writesAwaitingEcho > 0)
-            writesAwaitingEcho--;
+        // Territory and capture progress are two separate publishers writing disjoint key sets in
+        // separate SetCustomProperties calls (see the class comment on PublishCaptureProgress) -
+        // both can legitimately be present, on their own or together, in one update.
+        if (propertiesThatChanged.ContainsKey(TerritorySnapshot.OwnersKey))
+        {
+            if (writesAwaitingEcho > 0)
+                writesAwaitingEcho--;
 
-        if (TerritorySnapshot.TryRead(propertiesThatChanged, ZoneCount, out TerritorySnapshot snapshot))
-            Apply(snapshot, raiseEvents: true);
+            if (TerritorySnapshot.TryRead(propertiesThatChanged, ZoneCount, out TerritorySnapshot snapshot))
+                Apply(snapshot, raiseEvents: true);
+        }
+
+        if (propertiesThatChanged.ContainsKey(CaptureProgress.TeamKey))
+        {
+            if (progressWritesAwaitingEcho > 0)
+                progressWritesAwaitingEcho--;
+
+            ApplyCaptureProgressIfPresent(propertiesThatChanged);
+        }
     }
 
     public override void OnMasterClientSwitched(Player newMasterClient)
@@ -185,6 +233,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // Pending-write bookkeeping belonged to the old master's writes, not ours.
         lastWritten = null;
         writesAwaitingEcho = 0;
+        progressLastWritten = null;
+        progressWritesAwaitingEcho = 0;
 
         // Who is standing in which zone, capture progress, decay and cooldown lived only on the
         // old master's machine. Every client resets its towers from the replicated owners, and
@@ -200,6 +250,20 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // The old master may have left before its first snapshot reached the room.
         if (PhotonNetwork.IsMasterClient && current == null)
             ReadOrCreateRoomSnapshot();
+
+        // The room may still be showing a capture rate the OLD master last published - a capture
+        // in progress when it left, say. This new master's own "have I told the room this already"
+        // memory (progressLastWritten, just cleared above) is empty, and every tower's own
+        // per-frame republish gate (BuildingCapture.lastPublishedProgress) only ever compares
+        // against ITS OWN prior publishes - on a client that has never been master before, that is
+        // still CaptureProgress.Idle, so a tower whose real state is ALSO idle after the reset
+        // above would never think it needs to say so. Force one publish per zone here instead of
+        // trusting that gate on the new master's first frame (explicitly called out in the plan).
+        if (PhotonNetwork.IsMasterClient)
+        {
+            foreach (KeyValuePair<int, BuildingCapture> pair in captures)
+                pair.Value?.RepublishProgressNow();
+        }
     }
 
     /// Makes this client's picture of the territory match a snapshot from the room.
@@ -382,6 +446,99 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
         Debug.Log($"[TOWER] master wrote the starting territory snapshot ({ZoneCount} zones, capitals owned).");
         Write(start);
+    }
+
+    // ---------------------------------------------------------------- capture progress (Task 2.1d)
+
+    /// Master only: publishes zone's new CaptureProgress to the room, in its OWN SetCustomProperties
+    /// call carrying only the four cTeam/cProg/cRate/cStamp keys - a separate call from Write above
+    /// (territory), never merged into it. Photon only replaces the keys a call actually sends, so
+    /// this and a territory write can happen in the same frame without either clobbering the
+    /// other's keys, as long as they stay two calls (CODING-STANDARDS one-home rule read literally:
+    /// one publisher, one call, per state).
+    public void PublishCaptureProgress(int zone, CaptureProgress progress)
+    {
+        if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
+            return;
+        if (zone < 0 || zone >= ZoneCount)
+        {
+            Debug.LogError($"[TOWER] PublishCaptureProgress({zone}) ignored: no such zone (0..{ZoneCount - 1}).", this);
+            return;
+        }
+
+        // Same echo-window reasoning as WriteBasis/Write above: build on the last array this
+        // client told the room, not on the last one the room told US, in case a second zone
+        // changes speed before the first write's echo has come back.
+        CaptureProgress[] basis = progressWritesAwaitingEcho > 0 && progressLastWritten != null
+            ? progressLastWritten
+            : (currentProgress ?? NewIdleProgressArray());
+
+        var next = (CaptureProgress[])basis.Clone();
+        next[zone] = progress;
+
+        var team = new int[ZoneCount];
+        var prog = new int[ZoneCount];
+        var rate = new int[ZoneCount];
+        var stamp = new int[ZoneCount];
+        for (int i = 0; i < ZoneCount; i++)
+        {
+            team[i] = next[i].EncodeTeam();
+            prog[i] = next[i].EncodeProgress();
+            rate[i] = next[i].EncodeRate();
+            stamp[i] = next[i].StampMs;
+        }
+
+        var props = new Hashtable
+        {
+            [CaptureProgress.TeamKey] = team,
+            [CaptureProgress.ProgressKey] = prog,
+            [CaptureProgress.RateKey] = rate,
+            [CaptureProgress.StampKey] = stamp,
+        };
+
+        if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props))
+        {
+            Debug.LogWarning($"[TOWER] capture progress for zone {zone} could not be sent to the room.");
+            return;
+        }
+
+        progressLastWritten = next;
+        progressWritesAwaitingEcho++;
+        CaptureProgressPublishCount++;
+    }
+
+    /// Every client (the master included, once its own write echoes back): decodes the room's four
+    /// arrays into currentProgress. Silently does nothing if the room carries no capture-progress
+    /// keys yet (a fresh room, or a Territory-only update) - checked by the caller via TeamKey.
+    private void ApplyCaptureProgressIfPresent(IDictionary<object, object> props)
+    {
+        if (props == null || !props.TryGetValue(CaptureProgress.TeamKey, out object teamRaw) || !(teamRaw is int[] team))
+            return;
+
+        int[] prog = ReadIntArray(props, CaptureProgress.ProgressKey);
+        int[] rate = ReadIntArray(props, CaptureProgress.RateKey);
+        int[] stamp = ReadIntArray(props, CaptureProgress.StampKey);
+
+        var next = new CaptureProgress[ZoneCount];
+        for (int i = 0; i < ZoneCount; i++)
+        {
+            int t = i < team.Length ? team[i] : CaptureProgress.Idle.Team;
+            int p = prog != null && i < prog.Length ? prog[i] : 0;
+            int r = rate != null && i < rate.Length ? rate[i] : 0;
+            int s = stamp != null && i < stamp.Length ? stamp[i] : 0;
+            next[i] = CaptureProgress.Decode(t, p, r, s);
+        }
+        currentProgress = next;
+    }
+
+    private static int[] ReadIntArray(IDictionary<object, object> props, string key) =>
+        props.TryGetValue(key, out object raw) ? raw as int[] : null;
+
+    private CaptureProgress[] NewIdleProgressArray()
+    {
+        var array = new CaptureProgress[ZoneCount];
+        for (int i = 0; i < ZoneCount; i++) array[i] = CaptureProgress.Idle;
+        return array;
     }
 
     // ---------------------------------------------------------------- retired
