@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Overpower.Data;
 using Overpower.Match;
 
 namespace Overpower.Tests
@@ -60,6 +61,27 @@ namespace Overpower.Tests
             ledger.RecordArmor(1400);
             Assert.AreEqual(700, ledger.SellArmor(0.5));
             Assert.AreEqual(1200, ledger.WeaponSpent);
+        }
+
+        [Test]
+        public void FirstPickIntoAnEmptyMobilityOrEquipmentSlotIsFree()
+        {
+            Assert.AreEqual(0, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Mobility, goldCost: 800));
+            Assert.AreEqual(0, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Equipment, goldCost: 800));
+        }
+
+        [Test]
+        public void ChangingAnAlreadyFilledMobilityOrEquipmentSlotCostsItsPrice()
+        {
+            Assert.AreEqual(800, ShopRules.AbilityPrice(slotIsEmpty: false, AbilitySlot.Mobility, goldCost: 800));
+            Assert.AreEqual(800, ShopRules.AbilityPrice(slotIsEmpty: false, AbilitySlot.Equipment, goldCost: 800));
+        }
+
+        [Test]
+        public void TheUltimateSlotIsNeverFreeEvenWhenEmpty()
+        {
+            Assert.AreEqual(1550, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Ultimate, goldCost: 1550));
+            Assert.AreEqual(1550, ShopRules.AbilityPrice(slotIsEmpty: false, AbilitySlot.Ultimate, goldCost: 1550));
         }
     }
 }
