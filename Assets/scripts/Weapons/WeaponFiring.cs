@@ -4,6 +4,7 @@ using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
+using Overpower.UI;
 
 namespace Overpower.Weapons
 {
@@ -40,6 +41,13 @@ namespace Overpower.Weapons
         [SerializeField, Tooltip("Where projectiles leave the gun. Falls back to the player's own " +
                  "position if it is empty, which looks wrong but still fires.")]
         private Transform muzzle;
+
+        [SerializeField, Tooltip("Where a laser's wind-up warning line gets its team colour and its " +
+                 "width/alpha/material numbers from - Assets/Gameplay/Config/UiTheme.asset, shared " +
+                 "with the HUD, the aim cone and every shot's trail (Task 11b). Presentation only; " +
+                 "every weapon still fires with this left empty, the warning line just falls back " +
+                 "to plain numbers and no material instead of the theme's.")]
+        private UiTheme theme;
 
         [Header("Wall-hugging clearance (review finding, Task 1.9 follow-up)")]
         [SerializeField, Tooltip("Radius, in metres, of the clearance check between the player's " +
@@ -389,20 +397,115 @@ namespace Overpower.Weapons
             ProjectileContext[] shots = BuildShots(fired, aimDirection, targetPoint, coneAngleDegrees,
                                                     seed, shooterActor, shooterTeam, chargeFraction);
 
-            if (fired.Simultaneous)
-            {
-                for (int i = 0; i < shots.Length; i++)
-                    Spawn(fired, origin, shots[i]);
-            }
+            // Task 11b (design [T] - Tudor reversed the earlier "no warning" call, see the comment on
+            // IgnoreWalls.cs): a weapon with a wind-up shows its warning line(s) now and only fires
+            // for real once that wait is over. Everything else fires exactly as it always has.
+            if (fired.WindupSeconds > 0f)
+                StartCoroutine(FireAfterWindup(fired, origin, shots, shooterTeam));
             else
-            {
-                StartCoroutine(SpawnSequentially(fired, origin, shots));
-            }
+                DispatchShots(fired, origin, shots);
 
             if (fired.MuzzleVfx != null && VFXManager.Instance != null)
                 VFXManager.Instance.PlayVFX(fired.MuzzleVfx, origin);
             if (fired.FireSfx != null && AudioManager.Instance != null)
                 AudioManager.Instance.Play3D(fired.FireSfx, origin);
+        }
+
+        /// <summary>What RPC_FireWeapon always did before Task 11b added the wind-up - fire every
+        /// shot now, simultaneously or spaced by Sequential Delay. Pulled out on its own so a
+        /// wind-up weapon and an instant one both end up calling exactly this, rather than the two
+        /// paths drifting apart.</summary>
+        private void DispatchShots(WeaponDefinition weapon, Vector3 origin, ProjectileContext[] shots)
+        {
+            if (weapon.Simultaneous)
+            {
+                for (int i = 0; i < shots.Length; i++)
+                    Spawn(weapon, origin, shots[i]);
+            }
+            else
+            {
+                StartCoroutine(SpawnSequentially(weapon, origin, shots));
+            }
+        }
+
+        /// <summary>
+        /// Task 11b: shows a warning line along each shot's already-locked path, waits Windup
+        /// Seconds, then fires exactly as DispatchShots always has. Runs on EVERY client, including
+        /// the shooter's own - each machine counts its own wind-up from the moment IT received this
+        /// RPC, so a target who steps out of the line during the wait takes no damage on ITS OWN
+        /// client the instant the beam actually resolves (damage is victim-side - see Hitscan's
+        /// class comment) even though the shooter's own screen already shows the beam connecting.
+        ///
+        /// Origin and every shot's direction are already locked - they arrived as RPC parameters,
+        /// same as any other shot this class fires - so nothing here can change what the beam does;
+        /// only whether the player caught in it had a chance to move first.
+        ///
+        /// ACCEPTED [C]: if this WeaponFiring is destroyed mid-wind-up (its player despawns), this
+        /// coroutine dies with it and the beam never fires on THIS client - the same way any other
+        /// coroutine on a destroyed MonoBehaviour stops. A shooter who merely dies or is stunned
+        /// (without despawning) still gets their beam off once the wait ends, the same way a bullet
+        /// already in flight keeps flying - this class has no hook that would stop it, and design
+        /// [C] says it should not gain one.
+        /// </summary>
+        private IEnumerator FireAfterWindup(WeaponDefinition weapon, Vector3 origin,
+                                            ProjectileContext[] shots, int shooterTeam)
+        {
+            LaserWarningLine[] warnings = ShowWarnings(weapon, origin, shots, shooterTeam);
+
+            yield return new WaitForSeconds(weapon.WindupSeconds);
+
+            for (int i = 0; i < warnings.Length; i++)
+            {
+                if (warnings[i] != null)
+                    Destroy(warnings[i].gameObject);
+            }
+
+            DispatchShots(weapon, origin, shots);
+        }
+
+        /// <summary>One warning line per shot, along the exact path that shot will travel - drawn
+        /// only for a beam weapon (Hitscan on its Projectile Prefab); a projectile weapon given a
+        /// wind-up for some future design would otherwise have nothing sensible to draw a line
+        /// toward, since a bullet's path is not a straight ray to a fixed stop point the way a beam's
+        /// is. Nothing gives a projectile weapon a wind-up today, so this never actually happens.</summary>
+        private LaserWarningLine[] ShowWarnings(WeaponDefinition weapon, Vector3 origin,
+                                                ProjectileContext[] shots, int shooterTeam)
+        {
+            var warnings = new LaserWarningLine[shots.Length];
+
+            Hitscan beam = weapon.ProjectilePrefab != null
+                ? weapon.ProjectilePrefab.GetComponent<Hitscan>()
+                : null;
+            if (beam == null)
+                return warnings;
+
+            Color color = ResolveWarningColor(shooterTeam);
+            for (int i = 0; i < shots.Length; i++)
+            {
+                float length = beam.PredictBeamLength(origin, shots[i]);
+                warnings[i] = LaserWarningLine.Create(origin, shots[i].Direction, length, color,
+                                                      weapon.WindupSeconds, theme);
+            }
+
+            return warnings;
+        }
+
+        // Logged once per play session, not once per shot - see ShotTeamVisuals/Hitscan's own copies
+        // of this same guard for the same reason.
+        private static bool warnedMissingTheme;
+
+        private Color ResolveWarningColor(int shooterTeam)
+        {
+            if (theme != null)
+                return theme.ShotColorFor(shooterTeam);
+
+            if (!warnedMissingTheme)
+            {
+                warnedMissingTheme = true;
+                Debug.LogWarning($"[WeaponFiring] {name}: no UI Theme assigned - laser warning lines " +
+                                  "draw in plain white instead of the shooter's team colour.");
+            }
+            return Color.white;
         }
 
         /// <summary>

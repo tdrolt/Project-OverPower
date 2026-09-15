@@ -252,6 +252,38 @@ namespace Overpower.UI
             return gradient;
         }
 
+        [Header("Lasers")]
+        [Tooltip("Width of the wind-up warning line the instant the trigger is pulled, in metres. Grows to " +
+                 "Laser Warning End Width over the wind-up, so the line visibly thickens as the beam gets " +
+                 "closer to firing - part of the Task 11b telegraph (design reversed the earlier no-warning " +
+                 "call, see IgnoreWalls.cs).")]
+        public float laserWarningStartWidth = 0.03f;
+        [Tooltip("Width of the wind-up warning line right before it fires, in metres.")]
+        public float laserWarningEndWidth = 0.14f;
+        [Tooltip("Opacity of the wind-up warning line the instant the trigger is pulled, 0-1. Kept low so " +
+                 "the very start of a wind-up reads as a faint hint rather than an alarm.")]
+        [Range(0f, 1f)] public float laserWarningStartAlpha = 0.15f;
+        [Tooltip("Opacity of the wind-up warning line right before it fires, 0-1. Higher than the start so " +
+                 "the line is unmistakable by the moment the beam actually lands.")]
+        [Range(0f, 1f)] public float laserWarningEndAlpha = 0.9f;
+        [Tooltip("Shared unlit material the wind-up warning line renders with - reuses Shot Trail's or Aim " +
+                 "Cone Line's own material (URP Particles/Unlit, vertex colour) rather than adding a third " +
+                 "near-identical one. Every warning line tints itself through its own LineRenderer start/end " +
+                 "colour, which is what lets one material serve every team.")]
+        public Material laserWarningMaterial;
+        [Tooltip("Width of a fired laser beam's visible line, in metres - the line every client draws the " +
+                 "instant a laser's wind-up ends (or immediately, for a laser with no wind-up).")]
+        public float laserBeamWidth = 0.14f;
+        [Tooltip("Multiplies the beam line's team colour before it is drawn, so the beam itself reads as a " +
+                 "bright, glowing line rather than a flat-lit one at a glance - the same idea as Bullet " +
+                 "Emission above, applied to the laser's own LineRenderer colour instead of a property " +
+                 "block. 1 = no boost over the plain team colour.")]
+        public float laserBeamEmission = 1.6f;
+        [Tooltip("Seconds a fired beam stays on screen, fading to transparent over this time, before it " +
+                 "disappears - replaces Hitscan's own former Beam Duration field. One home for this number " +
+                 "so all three laser leaves read consistently instead of being tuned per-prefab.")]
+        public float laserBeamLingerSeconds = 0.18f;
+
         [Header("Aim cone")]
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
         [Tooltip("Colour of the shotgun's inner fan lines.")] public Color coneFanLineColor = new Color(1f, 1f, 1f, 0.25f);
