@@ -268,7 +268,15 @@ namespace Overpower.TestRange
         {
             GameObject go = TMP_DefaultControls.CreateDropdown(res);
             go.transform.SetParent(parent, false);
-            return go.GetComponent<TMP_Dropdown>();
+            TMP_Dropdown dropdown = go.GetComponent<TMP_Dropdown>();
+            // Fix 2 (Playtest polish review): a code-built Selectable keeps Unity's default
+            // Automatic navigation, so a click selects it and the scene's Input System UI module
+            // maps Enter to Submit on whatever is selected - Enter also opens chat
+            // (chatmanager.cs), so without this, opening chat right after picking a dropdown
+            // option quietly re-submitted that dropdown instead. Same fix as LoadoutScreen's
+            // buttons, applied here too since this panel builds its own controls.
+            dropdown.navigation = new Navigation { mode = Navigation.Mode.None };
+            return dropdown;
         }
 
         private static void AddButton(Transform parent, string label, TMP_DefaultControls.Resources res,
@@ -277,7 +285,9 @@ namespace Overpower.TestRange
             GameObject go = TMP_DefaultControls.CreateButton(res);
             go.transform.SetParent(parent, false);
             go.GetComponentInChildren<TextMeshProUGUI>().text = label;
-            go.GetComponent<Button>().onClick.AddListener(onClick);
+            Button button = go.GetComponent<Button>();
+            button.onClick.AddListener(onClick);
+            button.navigation = new Navigation { mode = Navigation.Mode.None }; // See AddDropdown's comment.
         }
 
         // ---- Weapon dropdown ----
@@ -295,7 +305,10 @@ namespace Overpower.TestRange
                         continue;
 
                     weaponOptions.Add(weapon);
-                    labels.Add(weapon.DisplayName);
+                    // Id prefix, matching the ability dropdown below (fix 5) - weapons 6 (Burst -
+                    // Charge) and 12 (Laser - Charge) both have DisplayName "Charge", which read
+                    // as the same weapon listed twice before the id was added to tell them apart.
+                    labels.Add($"{weapon.Id} {weapon.DisplayName}");
                 }
             }
 

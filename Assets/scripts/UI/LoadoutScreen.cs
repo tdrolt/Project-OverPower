@@ -370,10 +370,14 @@ namespace Overpower.UI
         }
 
         /// <summary>Re-reads everything this screen shows from the live player state. Called on
-        /// Open and after every click that changes something - there is no "loadout changed" event
-        /// to subscribe to instead (WeaponFiring has none, and while the screen is open only this
-        /// owner's own clicks can change anything anyway, so polling every frame would answer a
-        /// question that never changes between clicks).</summary>
+        /// Open and after every click that changes something on THIS screen. Also called from
+        /// Update()'s own poll (see its comment, Task 9a review finding 2) while the screen stays
+        /// open, since there is no "loadout changed" event this class could subscribe to instead
+        /// (WeaponFiring has none) - a weapon or armor change from OUTSIDE this screen (the F1
+        /// panel's dropdown/buttons, or a property echo from a remote change) would otherwise sit
+        /// stale here until something on THIS screen happened to be clicked. Abilities need no
+        /// such poll: AbilityRunner.SlotChanged already fires for every equip from every source,
+        /// and Refresh is already subscribed to it directly.</summary>
         private void Refresh()
         {
             RefreshWeaponTree();
@@ -495,6 +499,12 @@ namespace Overpower.UI
             // built-in transition tint would fight that on every hover/click.
             button.transition = Selectable.Transition.None;
             button.targetGraphic = outer;
+            // Fix 2 (Playtest polish review): a code-built button keeps Unity's default Automatic
+            // navigation, so clicking it SELECTS it, and the scene's Input System UI module maps
+            // Enter to Submit on whatever is selected. Chat also opens on Enter (chatmanager.cs) -
+            // without this, pressing Enter to open chat right after clicking a node quietly
+            // re-clicked that node instead. None on every button this screen builds.
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
 
             GameObject innerGo = new GameObject("Fill", typeof(RectTransform));
             innerGo.transform.SetParent(go.transform, false);
@@ -740,6 +750,7 @@ namespace Overpower.UI
             Button button = go.AddComponent<Button>();
             button.transition = Selectable.Transition.None; // Refresh drives every colour by hand - see StyleNode's own comment.
             button.targetGraphic = outer;
+            button.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton's comment (fix 2).
 
             GameObject innerGo = new GameObject("Fill", typeof(RectTransform));
             innerGo.transform.SetParent(go.transform, false);
@@ -1077,6 +1088,7 @@ namespace Overpower.UI
 
             loadoutToggleButton = buttonGo.GetComponent<Button>();
             loadoutToggleButton.onClick.AddListener(Toggle);
+            loadoutToggleButton.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton's comment (fix 2) - this is the button fix 1/2 were both found from.
         }
 
         private void AddSectionHeader(Transform parent, string text)
@@ -1107,6 +1119,7 @@ namespace Overpower.UI
 
             Button button = go.GetComponent<Button>();
             button.onClick.AddListener(onClick);
+            button.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton's comment (fix 2).
 
             if (width > 0f || height > 0f)
             {
