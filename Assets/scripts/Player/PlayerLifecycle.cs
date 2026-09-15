@@ -56,6 +56,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // this class only freezes it while dead and reacts to falling out of the map. See PlayerMotor.cs.
     private PlayerMotor playerMotor;
 
+    // THE mover both respawn paths use to place the player - see TeleportToSpawnPoint below for
+    // why a bare transform.position write is not safe here.
+    private PlayerDisplacement playerDisplacement;
+
     // Shooting keeps its own Update, so ApplyAliveState switches the component itself off rather
     // than relying on gated input alone. Searched for in children as well as on the root: the
     // component this replaced (PlayerShooting) lived on a child, and a GetComponent on the root
@@ -109,6 +113,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         playerHealth.Died += HandlePlayerHealthDied;
         playerMotor = GetComponent<PlayerMotor>();
         playerMotor.FellBelowKillHeight += HandleFellBelowKillHeight;
+        playerDisplacement = GetComponent<PlayerDisplacement>();
 
         // How the master client finds a specific victim's PhotonView in RPC_HandleDeathMaster
         // below, and how BuildingManager finds the local player to show a match result.
@@ -342,8 +347,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         RoomManager roomManager = FindObjectOfType<RoomManager>();
         if (roomManager != null && roomManager.teamSpawnPoints.Length > teamID)
         {
-            transform.position = roomManager.teamSpawnPoints[teamID].position;
-            transform.rotation = roomManager.teamSpawnPoints[teamID].rotation;
+            TeleportToSpawnPoint(roomManager.teamSpawnPoints[teamID].position,
+                                  roomManager.teamSpawnPoints[teamID].rotation);
         }
 
         playerHealth.ResetForRespawn();
@@ -354,8 +359,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         SetAlive(true);
 
         // Logged because "respawning where you died" is a fix that cannot be verified from the
-        // editor. If a respawn ever lands somewhere other than the base, this line says so.
-        Debug.Log($"[VIS] respawned at {transform.position} (team {teamID} spawn)");
+        // editor. Reads rigidbody.position, not transform.position: this class used to log
+        // transform.position immediately after writing it, which always "looked" right even on the
+        // ~1-in-10 runs where PlayerMotor.Move()'s rb.MovePosition silently reverted the write a
+        // tick later (see TeleportToSpawnPoint below) - the log could never have caught its own bug.
+        Debug.Log($"[VIS] respawned at {rigidbody.position} (team {teamID} spawn)");
         photonView.RPC("RPC_HandleRespawnMaster", RpcTarget.MasterClient, teamID, actorNumber);
 
         Debug.Log($"{photonView.Owner?.NickName} fully respawned at base after cathedral recapture.");
@@ -381,13 +389,52 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return;
         }
 
-        transform.position = roomManager.teamSpawnPoints[pt.teamID].position;
-        transform.rotation = roomManager.teamSpawnPoints[pt.teamID].rotation;
+        TeleportToSpawnPoint(roomManager.teamSpawnPoints[pt.teamID].position,
+                              roomManager.teamSpawnPoints[pt.teamID].rotation);
 
+        Debug.Log($"[VIS] fell below y={playerMotor.KillHeight}, returned to spawn at {rigidbody.position}");
+    }
+
+    /// <summary>
+    /// The only way either respawn path (a normal respawn or falling below the kill height) is
+    /// allowed to move this player. A bare transform.position write here is not safe: PlayerMotor
+    /// .Move() calls rb.MovePosition(rb.position + ...) every FixedUpdate the player owns
+    /// themselves, and rb.position is the physics engine's own cached position, not a mirror of
+    /// transform.position - Unity only syncs the two on its own schedule. Writing transform.position
+    /// directly leaves rb.position stale until that sync catches up, and if Move() reads rb.position
+    /// before it does, it re-asserts the STALE (pre-teleport) position as the Rigidbody's new target
+    /// for that physics step, permanently overwriting the intended move. Measured: 1 of 10 single-
+    /// client respawns reproduced this exact way (deathCount 1, HEAD 88cc260) - the player stayed at
+    /// the death spot at +0.5s and +2.0s despite the "[VIS] respawned at spawn" log line. See
+    /// two-client-harness.md item 15, which found the identical mechanism on an already-alive player.
+    ///
+    /// PlayerDisplacement.TeleportTo writes rb.position directly (no transform-sync race possible)
+    /// and zeroes residual velocity - it is documented as the one mover that actually sticks. Works
+    /// regardless of whether the Rigidbody is currently kinematic (mid-death) or dynamic (mid-fall):
+    /// the position setter does not care about the kinematic flag.
+    /// </summary>
+    void TeleportToSpawnPoint(Vector3 position, Quaternion rotation)
+    {
+        if (playerDisplacement == null || !playerDisplacement.TeleportTo(position))
+        {
+            // Defensive fallback only - should not happen for the owner. TeleportTo can refuse
+            // only while a Forced (knockback) move is running, and death already cancels any move
+            // in flight via AliveChanged before either caller of this method runs.
+            if (rigidbody != null)
+            {
+                rigidbody.position = position;
+                rigidbody.linearVelocity = Vector3.zero;
+                rigidbody.angularVelocity = Vector3.zero;
+            }
+            else
+            {
+                transform.position = position;
+            }
+        }
+
+        transform.rotation = rotation;
         if (rigidbody != null)
-            rigidbody.linearVelocity = Vector3.zero;
-
-        Debug.Log($"[VIS] fell below y={playerMotor.KillHeight}, returned to spawn");
+            rigidbody.rotation = rotation;
     }
 
     void SetLayerRecursively(GameObject o, int layer)
