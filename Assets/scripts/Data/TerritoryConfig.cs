@@ -14,7 +14,7 @@ namespace Overpower.Data
     /// process, so writing to one at runtime quietly edits the asset in the Editor and does nothing
     /// in a build.
     /// </summary>
-    [CreateAssetMenu(menuName = "Overpower/Territory Config", fileName = "TerritoryConfig")]
+    [CreateAssetMenu(menuName = "OverPower/Territory Config", fileName = "TerritoryConfig")]
     public sealed class TerritoryConfig : ScriptableObject
     {
         [Serializable]
