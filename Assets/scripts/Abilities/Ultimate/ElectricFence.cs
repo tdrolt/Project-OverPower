@@ -117,6 +117,15 @@ namespace Overpower.Abilities
 
         private void FixedUpdate()
         {
+            // Defensive backstop (NetworkedDeployable's own class comment, FAIL #15): a copy that
+            // arrived already past Lifetime Seconds - the narrow cache-removal/destroy race, not the
+            // normal path - must never discover or hit anyone. IsExpired already hid this fence's own
+            // visual (it has no collider of its own to disable - see the class comment), but that does
+            // not stop the OverlapSphere query below, which looks at OTHER colliders - hence the
+            // explicit check here.
+            if (IsExpired)
+                return;
+
             // If Follows Caster is on, the ring itself moves here before targets are evaluated below
             // - a perfectly STATIONARY enemy the moving ring sweeps past still reads as a crossing
             // (their distance from the ring's new centre passes through Radius) exactly as if they

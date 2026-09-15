@@ -1,6 +1,7 @@
 using System.Collections;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Combat;
 using Overpower.Net;
 
 namespace Overpower.Abilities
@@ -17,14 +18,38 @@ namespace Overpower.Abilities
     /// WHAT THIS BASE OWNS: who placed it, and when. OnPhotonInstantiate resolves OwnerActor and
     /// OwnerTeam from info.Sender - never from PhotonNetwork.LocalPlayer, which inside this callback
     /// is whichever machine is RECEIVING the spawn, not who sent it (the same "local means the
-    /// receiver" trap WeaponFiring's and AbilityRunner's own class comments call out). Age is
-    /// PhotonNetwork.Time minus info.SentServerTime - the moment the OWNER's client actually sent
-    /// the instantiate call. For a late joiner, PUN replays the room's cached instantiations with
-    /// their ORIGINAL SentServerTime intact, so Age already reads as "how long ago this was really
-    /// placed" for them too, not "since I joined". A subclass that wants a maximum lifetime sets
-    /// Lifetime Seconds; this base schedules PhotonNetwork.Destroy at lifetime - Age, owner only -
-    /// the same single-destroyer rule FireField.Burn documents, where every non-owner calling
-    /// PhotonNetwork.Destroy on the same object logs one error each.
+    /// receiver" trap WeaponFiring's and AbilityRunner's own class comments call out).
+    ///
+    /// AGE COMES FROM instantiationData, NOT FROM info.SentServerTime (fixed 2026-09-15, FAIL #15).
+    /// The old code trusted PUN to hand a late joiner replaying a cached PhotonNetwork.Instantiate
+    /// event the ORIGINAL SentServerTime, the same way it hands back the original position. Measured
+    /// on a genuinely fresh late joiner (two-client-harness.md ss7): it does not - info.SentServerTime
+    /// read back as though the object had just been placed, even ~23 real seconds after it actually
+    /// was, so a still-alive Mine (Lifetime Seconds 45) reported Age 0.00 and a full 45s still ahead
+    /// of it - visually a freshly-placed trap. Spawn below now appends the placer's own
+    /// PhotonNetwork.ServerTimestamp as the LAST element of instantiationData; OnPhotonInstantiate
+    /// strips it back off (every existing parameter index a subclass reads from OnPlaced's own data
+    /// is unchanged) and hands both raw ints to DeployableAge.SecondsSince (Combat/DeployableAge.cs),
+    /// which does the unchecked 32-bit subtraction that survives ServerTimestamp's own ~49.7-day
+    /// wrap. A subclass that wants a maximum lifetime sets Lifetime Seconds; this base schedules
+    /// PhotonNetwork.Destroy at lifetime - Age, owner only - the same single-destroyer rule
+    /// FireField.Burn documents, where every non-owner calling PhotonNetwork.Destroy on the same
+    /// object logs one error each.
+    ///
+    /// A COPY THAT ARRIVES ALREADY PAST ITS LIFETIME (IsExpired below) hides its renderers, disables
+    /// its colliders, and otherwise does nothing - the owner's own real destroy (already in flight,
+    /// or a stale cache entry the server never finished clearing before this client's join raced it)
+    /// is what actually removes it. This is a defensive backstop for that race, not the primary fix:
+    /// the primary fix is simply computing Age correctly, so a copy that is genuinely still alive
+    /// reports its true remaining life instead of a fresh Lifetime Seconds.
+    ///
+    /// A SECOND BUG FOUND WHILE VERIFYING THE FIRST ONE: PhotonNetwork.ServerTimestamp itself is not
+    /// trustworthy the INSTANT a late joiner's cached replay first fires - it is fetched from the
+    /// server once, asynchronously, right after connecting, and a fresh join's first OnPhotonInstantiate
+    /// can beat that fetch home, reading ServerTimestamp as its un-set default of 0. Subtracting a real
+    /// placement timestamp from a wrongly-zero "now" does not read as Age 0 the way the first bug did -
+    /// it swings however the sign happens to fall, including a multi-million-second Age. See
+    /// InitializeAfterServerTimeIsReady below for the fix (wait for a non-zero reading, bounded).
     ///
     /// WHAT THIS BASE DOES NOT OWN: anything about what the object looks like, does, or how its own
     /// numbers arrive. A subclass overrides OnPlaced to unpack its own instantiationData and do
@@ -51,10 +76,21 @@ namespace Overpower.Abilities
         /// team change mid-match, only "whose is this".</summary>
         public int OwnerTeam { get; private set; } = -1;
 
-        /// <summary>Seconds since this was ACTUALLY placed - PhotonNetwork.Time minus the
-        /// instantiate's own SentServerTime - so a late joiner's cached replay reports the true age,
-        /// never zero.</summary>
+        /// <summary>Seconds since this was ACTUALLY placed - DeployableAge.SecondsSince applied to
+        /// the placement timestamp carried in instantiationData and PhotonNetwork.ServerTimestamp at
+        /// the moment THIS client learned about it - so a late joiner's cached replay reports the
+        /// true age, never zero. See the class comment for why this is no longer read from
+        /// info.SentServerTime.</summary>
         public double Age { get; private set; }
+
+        /// <summary>True once Age has already reached or passed Lifetime Seconds the moment this
+        /// client first placed/received this object - the defensive backstop the class comment
+        /// describes. Always false when Lifetime Seconds is 0 (Portal, AoeZone - something else
+        /// entirely decides when those end). A subclass with per-frame simulation (a mine's trigger,
+        /// a fence's discovery) must check this at the top of that loop; OnPhotonInstantiate already
+        /// hides renderers and disables colliders for it, but only a subclass knows what its own
+        /// per-frame logic must skip.</summary>
+        protected bool IsExpired => lifetimeSeconds > 0f && Age >= lifetimeSeconds;
 
         /// <summary>True on the one machine that placed this object - the only machine allowed to
         /// PhotonNetwork.Destroy it. A subclass destroying itself early (Portal's "oldest of three")
@@ -89,16 +125,70 @@ namespace Overpower.Abilities
                 PhotonNetwork.Destroy(gameObject);
         }
 
+        // How many frames InitializeAfterServerTimeIsReady will wait for PhotonNetwork.ServerTimestamp
+        // to leave its uninitialized-int default of 0 before giving up and using whatever it reads -
+        // see that coroutine's own comment. 10 frames is generous slack (well over 100ms even at 60fps)
+        // for a one-time fetch-after-connect that normally lands within the very next frame or two;
+        // never a hang, just a bound on how long a wrong Age can theoretically be trusted.
+        private const int MaxServerTimeCalibrationFrames = 10;
+
         public void OnPhotonInstantiate(PhotonMessageInfo info)
         {
             OwnerActor = info.Sender != null ? info.Sender.ActorNumber : -1;
             Teams.TryGetTeam(info.Sender, out int team);
             OwnerTeam = team;
-            Age = System.Math.Max(0.0, PhotonNetwork.Time - info.SentServerTime);
 
-            OnPlaced(info.photonView.InstantiationData, info);
+            object[] subclassData = StripPlacedTimestamp(info.photonView.InstantiationData, out int placedServerTimestampMs);
+            StartCoroutine(InitializeAfterServerTimeIsReady(placedServerTimestampMs, subclassData, info));
+        }
 
-            if (lifetimeSeconds > 0f && IsOwnerClient)
+        /// <summary>
+        /// Waits, if it has to, for PhotonNetwork.ServerTimestamp to look calibrated before computing
+        /// Age and running everything downstream of it (OnPlaced, the IsExpired hide, the lifetime
+        /// destroy timer) - fixed 2026-09-15, found while verifying the FAIL #15 fix above.
+        ///
+        /// PhotonPeer.ServerTimeInMilliSeconds - what PhotonNetwork.ServerTimestamp reads - is "fetched
+        /// after connecting (once)" per its own XML doc, asynchronously, over the SAME connection a
+        /// late joiner's cached PhotonNetwork.Instantiate events arrive on. Measured: a genuinely fresh
+        /// join's very first OnPhotonInstantiate for a cached replay can fire before that fetch lands,
+        /// reading ServerTimestamp as its un-set default, 0 - which, subtracted from a real (possibly
+        /// negative, see DeployableAge's own class comment) placement timestamp, does not read as "age
+        /// 0" the way the OLD info.SentServerTime bug did. It swings the OTHER way just as easily: a
+        /// mine placed ~30s earlier read Age as roughly 1.6 MILLION seconds - the placement timestamp's
+        /// own magnitude divided by 1000, because 0 minus a large negative IS a large positive. Either
+        /// direction is wrong for the same reason: "now" was not really 0, calibration just had not
+        /// landed yet on THIS client's THIS connection.
+        ///
+        /// A flat one-frame yield is not quite enough of a guarantee (the fetch is a real round trip,
+        /// not just a local computation), so this polls ServerTimestamp != 0 for up to
+        /// MaxServerTimeCalibrationFrames frames and then proceeds regardless - failing open, the same
+        /// call FriendlyFire's own unknown-team check makes, rather than ever leaving a deployable stuck
+        /// mid-initialization. OwnerActor/OwnerTeam are resolved synchronously in OnPhotonInstantiate,
+        /// above, because they do not depend on ServerTimestamp at all and every other client's own
+        /// early logic (a mine's registry, say) may want them the instant this object exists.
+        /// </summary>
+        private IEnumerator InitializeAfterServerTimeIsReady(int placedServerTimestampMs, object[] subclassData, PhotonMessageInfo info)
+        {
+            int waited = 0;
+            while (PhotonNetwork.ServerTimestamp == 0 && waited < MaxServerTimeCalibrationFrames)
+            {
+                yield return null;
+                waited++;
+            }
+
+            Age = DeployableAge.SecondsSince(placedServerTimestampMs, PhotonNetwork.ServerTimestamp);
+
+            OnPlaced(subclassData, info);
+
+            if (IsExpired)
+            {
+                // Defensive backstop for the cache-removal/destroy race the class comment describes -
+                // never the normal path. Hide and go inert; the owner's own real destroy (already in
+                // flight, or about to be) is what actually removes this, not us - we may not even be
+                // the owner, and RequestDestroy() below already no-ops on every non-owner client.
+                HideExpiredVisualAndColliders();
+            }
+            else if (lifetimeSeconds > 0f && IsOwnerClient)
             {
                 float remaining = Mathf.Max(0f, lifetimeSeconds - (float)Age);
                 StartCoroutine(DestroyAfter(remaining));
@@ -106,10 +196,52 @@ namespace Overpower.Abilities
         }
 
         /// <summary>
+        /// Splits the placer's own PhotonNetwork.ServerTimestamp (appended by Spawn below) off the
+        /// end of instantiationData and returns the rest, unchanged, at the same indices a subclass's
+        /// own OnPlaced has always read them at. Missing or malformed data (a caller that bypassed
+        /// Spawn, or a stale build with fewer elements - the same defensive read FireField.
+        /// OnPhotonInstantiate uses) falls back to "placed right now" rather than throwing, loudly,
+        /// exactly like the null-data fallbacks OnPlaced's own subclasses already use.
+        /// </summary>
+        private static object[] StripPlacedTimestamp(object[] rawData, out int placedServerTimestampMs)
+        {
+            if (rawData == null || rawData.Length == 0 || !(rawData[rawData.Length - 1] is int placedMs))
+            {
+                Debug.LogError("[NetworkedDeployable] instantiationData is missing its placement " +
+                                "timestamp - falling back to Age 0 (this object was spawned by a " +
+                                "caller that bypassed NetworkedDeployable.Spawn).");
+                placedServerTimestampMs = PhotonNetwork.ServerTimestamp;
+                return rawData;
+            }
+
+            placedServerTimestampMs = placedMs;
+
+            var subclassData = new object[rawData.Length - 1];
+            System.Array.Copy(rawData, subclassData, subclassData.Length);
+            return subclassData;
+        }
+
+        /// <summary>The IsExpired backstop's only visible effect: every Renderer and Collider under
+        /// this object turns off, on every client that computes IsExpired true, regardless of which
+        /// subclass this is - a mine's model, a cover wall's box, a fence's ring. A subclass whose own
+        /// per-frame logic does not go through a Collider (Mine's and ElectricFence's own
+        /// Physics.OverlapSphere queries look at OTHER colliders, never their own) still needs its own
+        /// IsExpired check at the top of that loop - this alone is not enough for those two.</summary>
+        private void HideExpiredVisualAndColliders()
+        {
+            foreach (Renderer r in GetComponentsInChildren<Renderer>(true))
+                r.enabled = false;
+            foreach (Collider c in GetComponentsInChildren<Collider>(true))
+                c.enabled = false;
+        }
+
+        /// <summary>
         /// Runs on every client - including a late joiner replaying this from the room cache - right
-        /// after OwnerActor/OwnerTeam/Age are set. data is the raw instantiationData; null-check it
-        /// before indexing (a stale build with fewer elements, or a caller that spawned this with
-        /// none), the same defensive read FireField.OnPhotonInstantiate uses.
+        /// after OwnerActor/OwnerTeam/Age are set. data is instantiationData with the placement
+        /// timestamp already stripped back off (see StripPlacedTimestamp) - every index a subclass
+        /// reads here is exactly what it passed into Spawn, unchanged. Still null-check before
+        /// indexing (a stale build with fewer elements, or a caller that spawned this with none), the
+        /// same defensive read FireField.OnPhotonInstantiate uses.
         /// </summary>
         protected virtual void OnPlaced(object[] data, PhotonMessageInfo info) { }
 
@@ -131,6 +263,13 @@ namespace Overpower.Abilities
         /// The rotation travels as part of PUN's own instantiate call, exactly like position does -
         /// no extra instantiationData needed for it, and a late joiner replaying this from the room
         /// cache gets the identical facing along with everything else NetworkedDeployable restores.
+        ///
+        /// APPENDS PhotonNetwork.ServerTimestamp AS THE LAST ELEMENT of instantiationData (FAIL #15
+        /// fix) - the placer's own "right now", boxed as an int, after whatever a subclass already
+        /// put there (Mine's Seq, Portal's diameter+Seq, or nothing at all). OnPhotonInstantiate on
+        /// every receiving client strips that same last element back off before handing the rest to
+        /// OnPlaced, so a subclass never sees it and every existing parameter index it already reads
+        /// stays exactly where it was.
         /// </summary>
         public static GameObject Spawn(string prefabName, Vector3 position, Quaternion rotation, object[] instantiationData)
         {
@@ -146,7 +285,13 @@ namespace Overpower.Abilities
                 return null;
             }
 
-            return PhotonNetwork.Instantiate(prefabName, position, rotation, 0, instantiationData);
+            int existingCount = instantiationData != null ? instantiationData.Length : 0;
+            var dataWithPlacedMs = new object[existingCount + 1];
+            if (existingCount > 0)
+                System.Array.Copy(instantiationData, dataWithPlacedMs, existingCount);
+            dataWithPlacedMs[existingCount] = PhotonNetwork.ServerTimestamp;
+
+            return PhotonNetwork.Instantiate(prefabName, position, rotation, 0, dataWithPlacedMs);
         }
 
         private IEnumerator DestroyAfter(float seconds)

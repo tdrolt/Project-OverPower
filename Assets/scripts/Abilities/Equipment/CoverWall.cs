@@ -142,6 +142,15 @@ namespace Overpower.Abilities
         /// </summary>
         public DamageResult ApplyDamage(in DamageInfo info)
         {
+            // Defensive backstop (NetworkedDeployable's own class comment, FAIL #15): a copy that
+            // arrived already past Lifetime Seconds - the narrow cache-removal/destroy race, not the
+            // normal path - must never absorb damage. IsExpired already disabled this wall's own
+            // BoxCollider, which should already keep any real shot from reaching this call at all;
+            // this is the same belt-and-suspenders check Mine.FixedUpdate and ElectricFence.FixedUpdate
+            // use for their own per-frame logic.
+            if (IsExpired)
+                return default;
+
             if (!photonView.IsMine || damageState == null || damageState.Destroyed)
                 return default;
 

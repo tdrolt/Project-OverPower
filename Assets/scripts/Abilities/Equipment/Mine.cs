@@ -147,6 +147,14 @@ namespace Overpower.Abilities
 
         private void FixedUpdate()
         {
+            // Defensive backstop (NetworkedDeployable's own class comment, FAIL #15): a copy that
+            // arrived already past Lifetime Seconds - the narrow cache-removal/destroy race, not the
+            // normal path - must never trigger. IsExpired already hid this mine's own visual and
+            // disabled its own collider, but neither of those stops FixedUpdate's OverlapSphere query
+            // below, which looks at OTHER colliders, not this mine's - hence the explicit check here.
+            if (IsExpired)
+                return;
+
             if (detonation == null || detonation.Detonated || triggerSent)
                 return;
 
