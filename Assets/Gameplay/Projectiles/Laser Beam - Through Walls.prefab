@@ -50,7 +50,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 9
   beamVfx: {fileID: 2342750703545289233, guid: d09fb09f6ecf10b4d82c3634d237e1a1, type: 3}
-  beamDuration: 0.12
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!114 &5579103638257824093
 MonoBehaviour:
   m_ObjectHideFlags: 0
