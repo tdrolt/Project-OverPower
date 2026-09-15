@@ -124,7 +124,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// at spawn - the prefab holds only structure (hierarchy, rect sizes, Filled/Horizontal/Left
     /// set up on the two fill Images), so the theme asset stays the ONE place a retune happens.
     /// Without theme.barSprite a Filled Image ignores fillAmount and draws full - see UiTheme's
-    /// own comment on barSprite, the exact bug Task 3 fixed on the screen-space HUD.</summary>
+    /// own comment on barSprite, the exact bug Task 3 fixed on the screen-space HUD.
+    ///
+    /// Re-review fix: also forces raycastTarget false on all three. This is a second guard, not
+    /// the real fix - HealthBarCanvas (world-space, every player) should carry no
+    /// GraphicRaycaster at all, since nothing on an overhead bar is clickable and a world-space
+    /// raycaster falls back to Camera.main, making PlayerInputRouter.pointerOverUi true (and so
+    /// swallowing a shot) the instant the cursor crossed ANY player's head, including an enemy's,
+    /// which is exactly what a crosshair does mid-fight. Belt-and-braces in case a prefab variant
+    /// or a future edit re-adds a raycaster here without noticing what it would break.</summary>
     private void ApplyTheme()
     {
         if (theme == null)
@@ -134,16 +142,19 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         {
             healthFillImage.sprite = theme.barSprite;
             healthFillImage.color = theme.healthColor;
+            healthFillImage.raycastTarget = false;
         }
         if (shieldFillImage != null)
         {
             shieldFillImage.sprite = theme.barSprite;
             shieldFillImage.color = theme.shieldColor;
+            shieldFillImage.raycastTarget = false;
         }
         if (overheadTrackImage != null)
         {
             overheadTrackImage.sprite = theme.barSprite;
             overheadTrackImage.color = theme.barTrackColor;
+            overheadTrackImage.raycastTarget = false;
         }
     }
 

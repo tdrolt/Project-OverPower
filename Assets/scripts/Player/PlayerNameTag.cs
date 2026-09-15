@@ -55,6 +55,11 @@ public class PlayerNameTag : MonoBehaviourPunCallbacks
         }
 
         playerNameText.text = photonView.Owner != null ? photonView.Owner.NickName : string.Empty;
+        // Re-review fix: second guard alongside removing the world-space overhead canvas's
+        // GraphicRaycaster (see PlayerHealth.ApplyTheme's own comment) - a raycast-target name
+        // tag under a raycaster falling back to Camera.main would make hovering ANY player's name
+        // register as "over UI" to PlayerInputRouter and swallow a shot.
+        playerNameText.raycastTarget = false;
 
         UpdateNameTagColour();
         teamAppearance?.Apply();   // no-op if the team has not arrived yet

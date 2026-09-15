@@ -161,6 +161,15 @@ namespace Overpower.Weapons
 
         private void OnDisable()
         {
+            // Re-review fix: PlayerLifecycle disables this component on death
+            // (weaponFiring.enabled = alive). Without this, a charge weapon held right up to a
+            // death kept triggerHeldSince set, and respawn re-enables this same component with
+            // that stale value still in it - AimConeView's range arc (CurrentChargeFraction) would
+            // read a leftover, possibly full, charge the player never actually held on the new
+            // life. Cleared unconditionally, before the null-check below, since it must happen
+            // regardless of whether input ever resolved.
+            triggerHeldSince = 0f;
+
             if (input == null)
                 return;
 
@@ -209,10 +218,21 @@ namespace Overpower.Weapons
 
         /// <summary>Where a charging weapon actually fires - with whatever charge the hold reached.
         /// TryFire must run BEFORE triggerHeldSince is cleared, since ChargeFraction() below reads
-        /// it to work out how long the trigger was held.</summary>
+        /// it to work out how long the trigger was held.
+        ///
+        /// Re-review fix: PlayerInputRouter deliberately does NOT pointer-gate the release event
+        /// the way it gates the press (see EmitPointerGated's own comment - gating release risked
+        /// a stuck-held weapon) - so releasing the mouse over the "Loadout (P)" button still reaches
+        /// here even though the matching PRESS was blocked and never ran HandlePrimaryPressed.
+        /// Without the triggerHeldSince > 0f guard below, that blocked-press-but-unblocked-release
+        /// pair fired an uncharged shot through the button on every click (weapons 6 and 12 - the
+        /// only two that CanCharge). triggerHeldSince is 0 whenever the matching press never ran
+        /// (HandlePrimaryPressed is the only place that sets it, other than this method's own
+        /// unconditional clear below and Update's InputSuppressed clear, both of which always leave
+        /// it at 0), so this is exactly "did a real press start this hold".</summary>
         private void HandlePrimaryReleased()
         {
-            if (weapon != null && weapon.CanCharge)
+            if (weapon != null && weapon.CanCharge && triggerHeldSince > 0f)
                 TryFire();
 
             triggerHeldSince = 0f;
