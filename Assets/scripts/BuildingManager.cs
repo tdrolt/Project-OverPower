@@ -107,21 +107,35 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public int TierOf(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.tier : 0;
 
+    // Backing store for TierByZone below. Rebuilt in RegisterCapture (the only thing that can make
+    // a zone's tier change: a tower going from "not registered yet" (tier 0) to its real tier) -
+    // GoldWallet used to pay for a fresh allocation here on every player's every Update.
+    private int[] tierByZoneCache;
+
     /// Tier 1..4 per zone id, index = zone id, length ZoneCount - the array shape GoldMath.
-    /// TeamIncomePerSecond's tierByZone parameter wants. Built fresh each call (ZoneCount is at
-    /// most a handful of towers) rather than cached, since the only thing that could go stale is a
-    /// tower registering after the cache was built.
+    /// TeamIncomePerSecond's tierByZone parameter wants. Read-only by convention: this is the same
+    /// array every caller gets back, not a copy, so nobody may write into it.
     public int[] TierByZone()
     {
-        var tiers = new int[ZoneCount];
+        if (tierByZoneCache == null || tierByZoneCache.Length != ZoneCount)
+            RebuildTierByZoneCache();
+        return tierByZoneCache;
+    }
+
+    private void RebuildTierByZoneCache()
+    {
+        tierByZoneCache = new int[ZoneCount];
         for (int zone = 0; zone < ZoneCount; zone++)
-            tiers[zone] = TierOf(zone);
-        return tiers;
+            tierByZoneCache[zone] = TierOf(zone);
     }
 
     public void RegisterCapture(int buildingID, BuildingCapture capture)
     {
         captures[buildingID] = capture;
+
+        // This tower's tier just went from 0 ("not registered yet") to its real value - the one
+        // thing that can make TierByZone's cached array stale.
+        RebuildTierByZoneCache();
 
         // A tower missing from TowerDictionary has no adjacency, so the territory rules can never
         // let anyone capture it. Say so once here instead of silently refusing every entry.

@@ -51,6 +51,12 @@ namespace Overpower.Match
         // are at most four tiers, so rebuilding is cheaper than tracking whether the asset moved.
         private int[] teamGoldByTierScratch;
 
+        // Same idea as teamGoldByTierScratch above, for the owners array GoldMath.TeamIncomePerSecond
+        // also wants: Update used to allocate a fresh int[ZoneCount] every single frame for every
+        // player's wallet. ZoneCount does not change mid-match, so one buffer, resized only if it
+        // ever does, replaces that per-frame allocation.
+        private int[] ownersScratch;
+
         /// Owner: the accrual's live balance. Remote copy: the owner's last-published "gold"
         /// Player Property (0 if it has never been written, e.g. read for one frame before Start
         /// has run on either side).
@@ -81,12 +87,32 @@ namespace Overpower.Match
             if (!photonView.IsMine)
                 return;
 
-            accrual = new GoldAccrual(territoryConfig != null ? territoryConfig.StartingGold : 0);
+            // A fresh GoldWallet component is not always a fresh player: a scene reload or a rejoin
+            // that re-instantiates the player object runs this Start again while the room still
+            // remembers this actor's real "gold" Player Property from before. Always starting from
+            // StartingGold and republishing would silently wipe that balance back to 0 the moment
+            // the new component's Start ran - read it back first if the room already has it.
+            bool hasExistingBalance = PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey(GoldKey);
+            int startingBalance = hasExistingBalance
+                ? LoadoutProperties.ReadInt(PhotonNetwork.LocalPlayer.CustomProperties, GoldKey, 0)
+                : (territoryConfig != null ? territoryConfig.StartingGold : 0);
 
-            // Published once immediately, the same reasoning as PlayerLoadout's starting-weapon
-            // publish in its own Start: every other client, and anyone who joins later, should read
-            // the real starting balance instead of guessing it is 0 from a missing property.
-            PublishBalance();
+            accrual = new GoldAccrual(startingBalance);
+
+            if (hasExistingBalance)
+            {
+                // Already published by whichever earlier Start wrote it - nothing changed, so
+                // nothing to re-send. Recorded so PublishIfDue's own "did the balance change"
+                // check does not see a spurious diff against the default 0 on the very next frame.
+                lastPublishedBalance = startingBalance;
+            }
+            else
+            {
+                // A genuinely new player: every other client, and anyone who joins later, should
+                // read the real starting balance instead of guessing it is 0 from a missing
+                // property - the same reasoning PlayerLoadout's starting-weapon publish uses.
+                PublishBalance();
+            }
         }
 
         private void Update()
@@ -98,14 +124,15 @@ namespace Overpower.Match
                 BuildingManager.Instance.Current != null && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int team))
             {
                 TerritorySnapshot current = BuildingManager.Instance.Current;
-                var owners = new int[current.ZoneCount];
-                for (int zone = 0; zone < owners.Length; zone++)
-                    owners[zone] = current.OwnerOf(zone);
+                if (ownersScratch == null || ownersScratch.Length != current.ZoneCount)
+                    ownersScratch = new int[current.ZoneCount];
+                for (int zone = 0; zone < ownersScratch.Length; zone++)
+                    ownersScratch[zone] = current.OwnerOf(zone);
 
                 int[] tiers = BuildingManager.Instance.TierByZone();
                 int[] teamGoldByTier = TeamGoldByTierFromConfig();
 
-                int teamIncome = GoldMath.TeamIncomePerSecond(team, owners, tiers, teamGoldByTier);
+                int teamIncome = GoldMath.TeamIncomePerSecond(team, ownersScratch, tiers, teamGoldByTier);
                 double playerIncome = GoldMath.PlayerIncomePerSecond(teamIncome, territoryConfig.PlayersPerTeam);
                 IncomePerSecond = playerIncome;
 
