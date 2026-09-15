@@ -215,7 +215,18 @@ public class BuildingCapture : MonoBehaviourPun
     /// on cooldown, captured with nobody contesting it): Idle, which hides the bar.</summary>
     private void PublishProgressIfNeeded()
     {
-        CaptureProgress current = ComputeCurrentProgress();
+        int nowMs = PhotonNetwork.ServerTimestamp;
+        if (nowMs == 0)
+            return; // Server clock not synced yet (fetched once, asynchronously, right after
+                     // connecting - PhotonNetwork.ServerTimestamp's own doc). Publishing a progress
+                     // stamped at 0 here would make every client's later CaptureProgress.Evaluate()
+                     // extrapolate from the wrong "since" instant for as long as that stamp stands -
+                     // the same failure mode FAIL #15 found for a deployable's Age (see
+                     // two-client-harness.md §12), just for a capture bar instead of a mine timer.
+                     // Skip this one frame; the very next frame (the clock lands within about a
+                     // frame of connecting) publishes normally.
+
+        CaptureProgress current = ComputeCurrentProgress(nowMs);
         if (!current.NeedsRepublishComparedTo(lastPublishedProgress))
             return;
 
@@ -223,9 +234,8 @@ public class BuildingCapture : MonoBehaviourPun
         BuildingManager.Instance.PublishCaptureProgress(buildingID, current);
     }
 
-    private CaptureProgress ComputeCurrentProgress()
+    private CaptureProgress ComputeCurrentProgress(int nowMs)
     {
-        int nowMs = PhotonNetwork.ServerTimestamp;
         float captureSeconds = CaptureSeconds;
 
         if (isCaptured)
@@ -264,7 +274,12 @@ public class BuildingCapture : MonoBehaviourPun
         if (!PhotonNetwork.IsMasterClient)
             return;
 
-        lastPublishedProgress = ComputeCurrentProgress();
+        int nowMs = PhotonNetwork.ServerTimestamp;
+        if (nowMs == 0)
+            return; // Same clock guard as PublishProgressIfNeeded - a master promotion can in
+                     // principle land before this client's own clock has ever synced.
+
+        lastPublishedProgress = ComputeCurrentProgress(nowMs);
         BuildingManager.Instance.PublishCaptureProgress(buildingID, lastPublishedProgress);
     }
 

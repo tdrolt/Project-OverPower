@@ -114,7 +114,20 @@ namespace Overpower.Match
         /// Called every frame, by every client, from BuildingCapture.Update.</summary>
         public void Refresh(CaptureProgress progress)
         {
-            float fraction = progress.Evaluate(PhotonNetwork.ServerTimestamp);
+            int nowMs = PhotonNetwork.ServerTimestamp;
+
+            // This client's own clock hasn't synced yet (reads 0 right after connecting - the same
+            // window FAIL #15 found for a deployable's Age, two-client-harness.md §12), or the room
+            // is carrying a progress stamped at 0 while claiming a real team (should not happen once
+            // BuildingCapture's own publish guard is in place, but a stale room from before that fix
+            // could still hold one). Evaluate(0) against a real StampMs would extrapolate from a
+            // huge, wrong elapsed time and flash the bar full or empty for a frame - a late-joiner-
+            // shaped bug (Task 2.1d review). Skip this frame and keep whatever the bar already shows;
+            // the very next frame reads correctly.
+            if (nowMs == 0 || (progress.Team >= 0 && progress.StampMs == 0))
+                return;
+
+            float fraction = progress.Evaluate(nowMs);
 
             if (progress.Team < 0 || fraction <= 0f)
             {

@@ -258,7 +258,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // against ITS OWN prior publishes - on a client that has never been master before, that is
         // still CaptureProgress.Idle, so a tower whose real state is ALSO idle after the reset
         // above would never think it needs to say so. Force one publish per zone here instead of
-        // trusting that gate on the new master's first frame (explicitly called out in the plan).
+        // trusting that gate on the new master's first frame - a new master's own per-tower publish
+        // cache (lastPublishedProgress) starts empty/Idle, so it cannot tell "genuinely idle" from
+        // "never told the room yet" the way an established master's cache can.
         if (PhotonNetwork.IsMasterClient)
         {
             foreach (KeyValuePair<int, BuildingCapture> pair in captures)
