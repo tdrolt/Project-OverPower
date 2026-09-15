@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using Photon.Pun;
 using TMPro;
 using UnityEngine;
@@ -6,6 +7,7 @@ using UnityEngine.UI;
 using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Match;
 using Overpower.Weapons;
 
 namespace Overpower.UI
@@ -59,6 +61,7 @@ namespace Overpower.UI
         private WeaponFiring weaponFiring;
         private AbilityRunner abilityRunner;
         private UltimateCharge ultimateCharge;
+        private GoldWallet goldWallet;
 
         // ---- built UI: bars ------------------------------------------------------------------------
 
@@ -68,6 +71,7 @@ namespace Overpower.UI
         private Image armorFill;
         private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
         private GameObject silencedBanner;
+        private TextMeshProUGUI goldText; // "Gold 1234  +7.7/s" - see BuildUi's placement comment.
 
         // ---- built UI: slots -----------------------------------------------------------------------
 
@@ -121,6 +125,8 @@ namespace Overpower.UI
         private readonly CastBlock[] lastBlock = { (CastBlock)(-1), (CastBlock)(-1), (CastBlock)(-1) };
         private float lastUltimateCharge = -1f;
         private bool lastUltimateReady;
+        private int lastGoldBalance = int.MinValue;
+        private double lastGoldIncome = double.MinValue;
 
         private void Awake()
         {
@@ -154,6 +160,7 @@ namespace Overpower.UI
             weaponFiring = GetComponent<WeaponFiring>();
             abilityRunner = GetComponent<AbilityRunner>();
             ultimateCharge = GetComponent<UltimateCharge>();
+            goldWallet = GetComponent<GoldWallet>();
 
             if (gameplayConfig == null)
                 Debug.LogError($"[PlayerHud] {name}: GameplayConfig is not assigned - the overheat warning threshold and max health fall back to hardcoded numbers.");
@@ -161,6 +168,8 @@ namespace Overpower.UI
                 Debug.LogError($"[PlayerHud] {name}: missing PlayerHealth/PlayerOverheat/PlayerStatusEffects/WeaponFiring/AbilityRunner on this player - the HUD cannot bind to it.");
             if (ultimateCharge == null)
                 Debug.LogError($"[PlayerHud] {name}: no UltimateCharge on this player - the Ultimate slot's charge meter will read as always empty.");
+            if (goldWallet == null)
+                Debug.LogError($"[PlayerHud] {name}: no GoldWallet on this player - the gold readout will read as always 0.");
 
             BuildUi();
 
@@ -194,10 +203,33 @@ namespace Overpower.UI
 
         private void LateUpdate()
         {
+            UpdateGold();
             UpdateHealthAndArmor();
             UpdateOverheat();
             UpdateWeaponSlot();
             UpdateAbilitySlots();
+        }
+
+        // ============================================================================================
+        // Gold (Task 2.2)
+        // ============================================================================================
+
+        /// <summary>"Gold 1234  +7.7/s" - InvariantCulture so the decimal point in the income figure
+        /// never turns into a comma on a machine set to a culture that uses one (a stray comma there
+        /// would read as a thousands separator, not a decimal point).</summary>
+        private void UpdateGold()
+        {
+            if (goldWallet == null)
+                return;
+
+            int balance = goldWallet.Balance;
+            double income = goldWallet.IncomePerSecond;
+            if (balance == lastGoldBalance && income == lastGoldIncome)
+                return;
+
+            goldText.text = $"Gold {balance.ToString(CultureInfo.InvariantCulture)}  +{income.ToString("0.0", CultureInfo.InvariantCulture)}/s";
+            lastGoldBalance = balance;
+            lastGoldIncome = income;
         }
 
         // ============================================================================================
@@ -582,8 +614,21 @@ namespace Overpower.UI
             panelFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+            // Gold row (Task 2.2), added FIRST so it sits above everything else - a judgement call
+            // [C, assumptions-for-tudor.md]: Tudor's own approved mockup (below) predates the
+            // economy, so there was no slot reserved for it. Placed above the slots row rather than
+            // wedged between the bars, since it is closer to a status readout (like a score) than to
+            // a combat stat.
+            goldText = AddLabel(panel.transform, "Gold 0  +0.0/s", theme.bodyTextSize, FontStyles.Bold);
+            LayoutElement goldLe = goldText.gameObject.AddComponent<LayoutElement>();
+            goldLe.preferredWidth = theme.barWidth;
+            goldLe.preferredHeight = theme.bodyTextSize + 8f;
+            goldText.color = theme.goldTextColor;
+            goldText.alignment = TextAlignmentOptions.Center;
+
             // Step 1 order - slots row, then overheat, then shield/armor, then health, top to
-            // bottom - matches [T], the mocked-up layout Tudor approved after Phase 1. A
+            // bottom - matches [T], the mocked-up layout Tudor approved after Phase 1 (the gold row
+            // above is a later addition, Task 2.2, not part of that original mockup). A
             // VerticalLayoutGroup lays children top-to-bottom in the order they are ADDED
             // regardless of childAlignment (alignment only decides where leftover space goes, which
             // the ContentSizeFitter above leaves at zero anyway) - so build order here IS visual

@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 using Overpower.Data;
+using Overpower.Match;
 using Overpower.Net;
 using Overpower.Weapons;
 
@@ -234,6 +235,7 @@ namespace Overpower.TestRange
             AddButton(buttonRow.transform, "Reset Cooldowns", res, OnResetCooldownsClicked);
             AddButton(buttonRow.transform, "Heal", res, OnHealClicked);
             AddButton(buttonRow.transform, "Fill Ultimate", res, OnFillUltimateClicked);
+            AddButton(buttonRow.transform, "+1000 Gold", res, OnAddGoldClicked);
 
             GameObject armorButtonRow = new GameObject("Armor Buttons", typeof(RectTransform));
             armorButtonRow.transform.SetParent(panel.transform, false);
@@ -443,6 +445,20 @@ namespace Overpower.TestRange
             }
 
             charge.Fill();
+        }
+
+        /// <summary>Task 2.2's own "F1 gets a +1000 Gold button" [C] - so shop testing (Task 2.5)
+        /// never has to wait for territory income to trickle in first.</summary>
+        private void OnAddGoldClicked()
+        {
+            GoldWallet wallet = ResolveLocalPlayer()?.GetComponent<GoldWallet>();
+            if (wallet == null)
+            {
+                Debug.LogWarning("[TestRangePanel] no local GoldWallet found - cannot add gold.");
+                return;
+            }
+
+            wallet.Add(1000);
         }
 
         /// <summary>Spends one purchase on the absorb path, if the combined cap and the path's own

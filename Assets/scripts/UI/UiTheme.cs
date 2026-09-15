@@ -308,6 +308,12 @@ namespace Overpower.UI
                  "so all three laser leaves read consistently instead of being tuned per-prefab.")]
         public float laserBeamLingerSeconds = 0.18f;
 
+        [Header("Gold")]
+        [Tooltip("Colour of the HUD gold readout (\"Gold 1234  +7.7/s\") - a warm amber, the same " +
+                 "family as Highlight Colour/Ultimate Charge Colour, so gold reads as a reward the " +
+                 "same way the ultimate-ready glow does, not just another stat.")]
+        public Color goldTextColor = new Color(1f, 0.82f, 0.2f, 1f);
+
         [Header("Capture bar")]
         [Tooltip("Width of the small world-space bar shown above a tower while it is being captured or drained, in world units (metres) - NOT canvas units, since this bar is not on the screen-space HUD.")]
         public float captureBarWidth = 2.2f;
