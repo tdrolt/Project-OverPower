@@ -91,6 +91,12 @@ namespace Overpower.Data
         [SerializeField] private float spreadDegrees = 0f;
         public float SpreadDegrees => spreadDegrees;
 
+        [Tooltip("Seconds between pulling the trigger and the beam firing. During the wind-up " +
+                 "every player sees a warning line along the beam's path, so the target can step " +
+                 "out of it. 0 = fires instantly.")]
+        [SerializeField] private float windupSeconds = 0f;
+        public float WindupSeconds => windupSeconds;
+
         [Header("Projectile")]
         [Tooltip("The projectile prefab this weapon spawns. The prefab carries the look of the " +
                  "shot and its hit detection; how fast, how fat and how far it flies come from " +
@@ -255,6 +261,19 @@ namespace Overpower.Data
                     $"{name}: Moving Bloom Per Second ({movingBloomPerSecond}) is not larger than Recovery Per Second " +
                     $"({recoveryPerSecond}), so moving never widens the cone - the bloom is decorative. Raise Moving " +
                     $"Bloom Per Second above {recoveryPerSecond}, or set it to 0 on purpose.", this);
+            }
+
+            // Task 11b (playtest polish, designer request [T]): a wind-up that lasts as long as - or
+            // longer than - the weapon's own cooldown lets a second trigger pull land its RPC, and
+            // therefore start showing ITS OWN warning line, before the first beam has fired. Two
+            // overlapping warning lines from the same shooter read as a glitch, not a weapon.
+            if (windupSeconds > 0f && windupSeconds >= fireInterval)
+            {
+                Debug.LogWarning(
+                    $"{name}: Windup Seconds ({windupSeconds}) is not less than Fire Interval " +
+                    $"({fireInterval}), so a second trigger pull can start a new warning line before " +
+                    "this one's beam has fired - the warnings would overlap. Lower Windup Seconds " +
+                    $"below {fireInterval}, or raise Fire Interval above {windupSeconds}.", this);
             }
         }
 #endif
