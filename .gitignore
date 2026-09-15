@@ -120,3 +120,8 @@ InitTestScene*.unity*
 # throwaway evidence for a chat report, not a game asset. Never committed.
 /[Aa]ssets/[Ss]creenshots/
 /[Aa]ssets/[Ss]creenshots.meta
+
+# com.unity.pipeline writes two transient assets here during every Player build and deletes them
+# afterwards, but leaves the empty folders and their .meta files behind. Build scaffolding, never committed.
+/[Aa]ssets/[Ss]ettings/[Pp]ipeline/
+/[Aa]ssets/[Ss]ettings/[Pp]ipeline.meta
