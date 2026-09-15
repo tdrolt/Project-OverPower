@@ -2901,6 +2901,7 @@ GameObject:
   - component: {fileID: 581303668377604427}
   - component: {fileID: 4150014734893116678}
   - component: {fileID: 4361268667979922634}
+  - component: {fileID: 1053378542657063450}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -3362,6 +3363,19 @@ MonoBehaviour:
   weapons: {fileID: 11400000, guid: 16afde6d43329db4bbd7fed72f897638, type: 2}
   abilities: {fileID: 11400000, guid: 70e5ea7660cd12b4bbb497e71ca8b00e, type: 2}
   armorConfig: {fileID: 11400000, guid: 7c3c352cca1b63c418cb15fb4105cfa5, type: 2}
+--- !u!114 &1053378542657063450
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4fbe065eead251544867e999701ce45c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
 --- !u!1 &2741422025056904628
 GameObject:
   m_ObjectHideFlags: 0

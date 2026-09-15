@@ -99,6 +99,26 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// grepping the console log.
     public int CaptureProgressPublishCount { get; private set; }
 
+    /// The registered capture's tier (1..4), or 0 if no tower with that id has registered itself
+    /// yet (RegisterCapture runs in BuildingCapture.Start, so this can briefly read 0 during scene
+    /// startup) or the id is not a zone at all. GoldMath.TeamIncomePerSecond reads 0 as "not a
+    /// tiered zone" and pays it nothing, so a not-yet-registered tower simply earns no income for
+    /// the one frame that can happen in, rather than throwing.
+    public int TierOf(int zone) =>
+        captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.tier : 0;
+
+    /// Tier 1..4 per zone id, index = zone id, length ZoneCount - the array shape GoldMath.
+    /// TeamIncomePerSecond's tierByZone parameter wants. Built fresh each call (ZoneCount is at
+    /// most a handful of towers) rather than cached, since the only thing that could go stale is a
+    /// tower registering after the cache was built.
+    public int[] TierByZone()
+    {
+        var tiers = new int[ZoneCount];
+        for (int zone = 0; zone < ZoneCount; zone++)
+            tiers[zone] = TierOf(zone);
+        return tiers;
+    }
+
     public void RegisterCapture(int buildingID, BuildingCapture capture)
     {
         captures[buildingID] = capture;
