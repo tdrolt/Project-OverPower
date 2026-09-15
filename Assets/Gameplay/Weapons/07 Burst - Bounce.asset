@@ -17,13 +17,14 @@ MonoBehaviour:
   description: Shots ricochet off walls and hit harder each bounce.
   parent: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
   icon: {fileID: 0}
-  goldCost: 0
+  goldCost: 1600
   damage: 4.4
   fireInterval: 0.38
   projectilesPerShot: 3
   simultaneous: 0
   sequentialDelay: 0.07
   spreadDegrees: 0
+  windupSeconds: 0
   projectilePrefab: {fileID: 1623706127264014633, guid: 1ebb1ff824072814f8b555d6460d336f, type: 3}
   projectileSpeed: 58
   projectileRadius: 0.09

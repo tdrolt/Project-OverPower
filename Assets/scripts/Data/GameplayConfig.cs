@@ -118,6 +118,18 @@ namespace Overpower.Data
         [SerializeField] private float abilityPressBufferSeconds = 0.12f;
         public float AbilityPressBufferSeconds => abilityPressBufferSeconds;
 
+        [Header("Shop")]
+        [Tooltip("On = the P screen changes anything for free, anywhere - for testing weapons. " +
+                 "Off = the full match economy: prices, territory and out-of-combat rules, " +
+                 "ultimate bought.")]
+        [SerializeField] private bool freeLoadout = true;
+        public bool FreeLoadout => freeLoadout;
+
+        [Tooltip("Fraction of what you paid that a weapon or armor reset refunds. 0.5 = half " +
+                 "back, so re-speccing is possible without making it free to chop and change.")]
+        [SerializeField, Range(0f, 1f)] private float sellRefundRate = 0.5f;
+        public float SellRefundRate => sellRefundRate;
+
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
                  "click. Handy while tuning weapons; switch it off for a real match.")]

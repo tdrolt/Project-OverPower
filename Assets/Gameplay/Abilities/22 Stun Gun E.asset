@@ -17,5 +17,5 @@ MonoBehaviour:
   description: A slow orb that stuns the first enemy hit.
   slot: 1
   icon: {fileID: 0}
-  goldCost: 0
+  goldCost: 800
   modulePrefab: {fileID: 5621843770665407029, guid: 43403e6cd4749984d8bf5902d6388744, type: 3}

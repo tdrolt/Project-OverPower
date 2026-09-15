@@ -26,4 +26,7 @@ MonoBehaviour:
   overheatWarningThreshold: 80
   slowCap: 0.6
   vulnerabilityCap: 0.6
+  abilityPressBufferSeconds: 0.12
+  freeLoadout: 1
+  sellRefundRate: 0.5
   testRangeEnabled: 1

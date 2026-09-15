@@ -17,13 +17,14 @@ MonoBehaviour:
   description: A wide blast of pellets. Deadly up close.
   parent: {fileID: 11400000, guid: 27983484f42c6eb409acf1c5d0d8e823, type: 2}
   icon: {fileID: 0}
-  goldCost: 0
+  goldCost: 1600
   damage: 7
   fireInterval: 0.9
   projectilesPerShot: 8
   simultaneous: 1
   sequentialDelay: 0.07
   spreadDegrees: 28
+  windupSeconds: 0
   projectilePrefab: {fileID: 1623706127264014633, guid: 9a053dd5e9b0eeb448b577cf0d6c424c, type: 3}
   projectileSpeed: 45
   projectileRadius: 0.07

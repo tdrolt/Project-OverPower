@@ -17,13 +17,14 @@ MonoBehaviour:
   description: Slow, heavy rockets that explode on impact.
   parent: {fileID: 11400000, guid: 0023f41e1c59d7c4cb3f34c116cacfe1, type: 2}
   icon: {fileID: 0}
-  goldCost: 0
+  goldCost: 1200
   damage: 38
   fireInterval: 1.1
   projectilesPerShot: 1
   simultaneous: 0
   sequentialDelay: 0.07
   spreadDegrees: 0
+  windupSeconds: 0
   projectilePrefab: {fileID: 537786092872534407, guid: fa51684d100c6044aa2fdc8bdc3f695b, type: 3}
   projectileSpeed: 28
   projectileRadius: 0.22

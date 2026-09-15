@@ -17,7 +17,7 @@ MonoBehaviour:
   description: A beam that pierces every enemy in line, after a short warning.
   parent: {fileID: 11400000, guid: 0023f41e1c59d7c4cb3f34c116cacfe1, type: 2}
   icon: {fileID: 0}
-  goldCost: 0
+  goldCost: 1200
   damage: 16
   fireInterval: 0.5
   projectilesPerShot: 1

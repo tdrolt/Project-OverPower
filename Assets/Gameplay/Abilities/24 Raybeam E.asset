@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Three beams that make enemies take more damage.
   slot: 1
   icon: {fileID: 0}
-  goldCost: 0
+  goldCost: 800
   modulePrefab: {fileID: 4917443891297609325, guid: c3a0ad903ce2a9f4d98a228c514f2e1d, type: 3}
