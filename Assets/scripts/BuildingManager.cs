@@ -129,6 +129,62 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             tierByZoneCache[zone] = TierOf(zone);
     }
 
+    /// <summary>Finds which registered zone position stands inside (flat XZ distance to the tower ≤
+    /// its own captureRadius) - the "which zone am I in" question health regen (Task 2.3), the shop
+    /// gate and OverPower's "near a zone" check (Tasks 2.5/2.6) all ask the same way. Capture rings
+    /// are not meant to overlap, but if two ever do the nearest centre wins rather than an arbitrary
+    /// dictionary order. No allocation: a plain foreach over the existing captures dictionary.</summary>
+    public bool TryGetZoneAt(Vector3 position, out int zoneId)
+    {
+        zoneId = -1;
+        float bestDistance = float.PositiveInfinity;
+        foreach (KeyValuePair<int, BuildingCapture> pair in captures)
+        {
+            BuildingCapture capture = pair.Value;
+            if (capture == null) continue;
+
+            float distance = FlatDistance(position, capture.transform.position);
+            if (distance > capture.captureRadius) continue;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                zoneId = pair.Key;
+            }
+        }
+        return zoneId >= 0;
+    }
+
+    /// <summary>How far position is from the edge of the nearest zone teamId owns - 0 while standing
+    /// inside one, PositiveInfinity if the team owns nothing (or the room's territory state has not
+    /// been read yet). Same building block as TryGetZoneAt, reused by the shop's "in your own
+    /// territory" gate and OverPower's "near a zone your team owns" range check.</summary>
+    public float DistanceToOwnedZoneEdge(Vector3 position, int teamId)
+    {
+        float best = float.PositiveInfinity;
+        if (current == null)
+            return best;
+
+        foreach (KeyValuePair<int, BuildingCapture> pair in captures)
+        {
+            BuildingCapture capture = pair.Value;
+            if (capture == null || current.OwnerOf(pair.Key) != teamId) continue;
+
+            float distanceToEdge = FlatDistance(position, capture.transform.position) - capture.captureRadius;
+            if (distanceToEdge < 0f) distanceToEdge = 0f;
+            if (distanceToEdge < best) best = distanceToEdge;
+        }
+        return best;
+    }
+
+    // XZ-plane distance only: territory is measured on the ground, not by how far above/below a
+    // tower's pivot a player happens to be standing (a balcony, a slope).
+    private static float FlatDistance(Vector3 a, Vector3 b)
+    {
+        float dx = a.x - b.x;
+        float dz = a.z - b.z;
+        return Mathf.Sqrt(dx * dx + dz * dz);
+    }
+
     public void RegisterCapture(int buildingID, BuildingCapture capture)
     {
         captures[buildingID] = capture;

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Match;
 using Overpower.Net;
 using Overpower.UI;
 
@@ -21,6 +22,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 {
     [SerializeField] private GameplayConfig gameplayConfig;
     [SerializeField] private ArmorConfig armorConfig;
+
+    [SerializeField, Tooltip("Shared per-tier numbers, used here for health regen (Task 2.3): the " +
+             "rate you heal while standing in a zone your own team owns. The same asset every tower " +
+             "and GoldWallet point at - one home for territory numbers.")]
+    private TerritoryConfig territoryConfig;
 
     [SerializeField, Tooltip("The health fill on the overhead HealthBarCanvas - drawn first, so " +
              "the shield fill can sit on top of it. A plain filled Image, not a Slider: Task 6 " +
@@ -99,6 +105,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             Debug.LogError($"[PlayerHealth] {name}: GameplayConfig is not assigned - cannot take damage.");
         if (armorConfig == null)
             Debug.LogError($"[PlayerHealth] {name}: ArmorConfig is not assigned - cannot take damage.");
+        // Not fatal like the two above - health regen simply never ticks without it (TickHealthRegen
+        // guards on the same null), so a warning rather than an error.
+        if (territoryConfig == null)
+            Debug.LogWarning($"[PlayerHealth] {name}: Territory Config is not assigned - health will never regenerate from standing in owned territory.");
         // A silent null here would leave the overhead bar wearing whatever colours/sprite the
         // prefab happened to ship with, which is exactly the "two homes for one value" bug the
         // theme asset exists to prevent.
@@ -202,7 +212,47 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         // Burn is ticked by PlayerStatusEffects now, which routes it back through ApplyDamage below.
         armor.Tick(Time.deltaTime, secondsSinceCombat);
+        TickHealthRegen(Time.deltaTime);
         UpdateOverheadBar(); // So the shield fill visibly refills as the pool recharges, not just on the next hit.
+    }
+
+    /// <summary>Task 2.3: health regen by tier. Owner only (guarded by Update's own IsMine check),
+    /// after the armor tick above - armor and health recharge on the same out-of-combat clock, armor
+    /// first, same order the class always had for the two pools. Finds which zone (if any) this
+    /// player is standing in via BuildingManager.TryGetZoneAt, checks it against the replicated
+    /// owner, and asks HealthRegenRule for the rate - see that class's own comment for the gate.
+    /// The resulting health change reaches other clients through the existing PlayerNetSync
+    /// serialize tick (it reads playerHealth.Health live); no new RPC or property.</summary>
+    private void TickHealthRegen(float deltaTime)
+    {
+        if (gameplayConfig == null || territoryConfig == null)
+            return;
+
+        float maxHealth = gameplayConfig.MaxHealth;
+        if (health >= maxHealth)
+            return;
+
+        bool standingInOwnZone = false;
+        float tierRegenPerSecond = 0f;
+
+        BuildingManager manager = BuildingManager.Instance;
+        if (manager != null && manager.Current != null && manager.TryGetZoneAt(transform.position, out int zone))
+        {
+            int team = TeamId;
+            int tier = manager.TierOf(zone); // 0 = tower hasn't registered itself yet; never a real tier.
+            if (team >= 0 && tier > 0 && manager.Current.OwnerOf(zone) == team)
+            {
+                standingInOwnZone = true;
+                tierRegenPerSecond = territoryConfig.ForTier(tier).healthRegenPerSecond;
+            }
+        }
+
+        float rate = HealthRegenRule.RegenPerSecond(standingInOwnZone, tierRegenPerSecond,
+                                                      secondsSinceCombat, gameplayConfig.OutOfCombatSeconds);
+        if (rate <= 0f)
+            return;
+
+        health = Mathf.Min(maxHealth, health + rate * deltaTime);
     }
 
     /// The one funnel every damage source goes through - see the class comment.

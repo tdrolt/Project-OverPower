@@ -3097,6 +3097,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
   armorConfig: {fileID: 11400000, guid: 7c3c352cca1b63c418cb15fb4105cfa5, type: 2}
+  territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   healthFillImage: {fileID: 1930445476211775569}
   shieldFillImage: {fileID: 9188229139438532087}
   overheadTrackImage: {fileID: 3380359861528615027}
