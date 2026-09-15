@@ -838,6 +838,10 @@ namespace Overpower.UI
             sb.Append($"\nOverheat {Compact(def.OverheatPerShot)}/shot");
             if (def.CanCharge)
                 sb.Append(" · hold to charge");
+            // Task 11b: the three lasers now wind up before they fire - worth a player reading this
+            // before they equip one, the same way "hold to charge" already is above.
+            if (def.WindupSeconds > 0f)
+                sb.Append($" · {Compact(def.WindupSeconds)}s wind-up");
 
             return sb.ToString();
         }

@@ -90,6 +90,14 @@ MonoBehaviour:
   trailMaterial: {fileID: 2100000, guid: 26c3ed38fb3f03746848d4f3ce14fb2c, type: 2}
   bulletTintStrength: 0.9
   bulletEmission: 5
+  laserWarningStartWidth: 0.03
+  laserWarningEndWidth: 0.14
+  laserWarningStartAlpha: 0.15
+  laserWarningEndAlpha: 0.9
+  laserWarningMaterial: {fileID: 2100000, guid: 26c3ed38fb3f03746848d4f3ce14fb2c, type: 2}
+  laserBeamWidth: 0.14
+  laserBeamEmission: 1.6
+  laserBeamLingerSeconds: 0.18
   coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
   coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
   coneLineWidth: 0.04
