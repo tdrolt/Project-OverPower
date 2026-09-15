@@ -7,8 +7,9 @@ using Overpower.UI;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Turns a weapon into an instant beam: no travel time, the shot lands the moment the trigger
-    /// is pulled, anywhere along its range. The laser path's defining trait.
+    /// Turns a weapon into an instant beam: no travel time - once it actually fires (immediately,
+    /// or after its weapon's Windup Seconds delay; see WeaponFiring.FireAfterWindup) the shot
+    /// lands that same instant, anywhere along its range. The laser path's defining trait.
     ///
     /// Put it on the prefab in a weapon's Projectile Prefab slot. WeaponFiring checks that prefab
     /// for this component and, if it is there, casts a ray instead of spawning a projectile. That is
@@ -41,7 +42,9 @@ namespace Overpower.Weapons
 
         [SerializeField, Tooltip("The visible beam. A prefab with a Line Renderer on it - its two " +
                  "points are set to run from the muzzle to wherever the beam ended. Leave empty " +
-                 "for an invisible beam.")]
+                 "for an invisible beam. Its own Line Renderer width/colour (e.g. 0.08 on Laser " +
+                 "Beam VFX.prefab) are cosmetic placeholders only - DrawBeam overwrites both every " +
+                 "beam from UiTheme's Laser Beam Width/team colour, so set the real numbers there.")]
         private GameObject beamVfx;
 
         [SerializeField, Tooltip("Where the beam's team colour, width, glow and linger time come " +
@@ -59,6 +62,24 @@ namespace Overpower.Weapons
         private const int MaxContacts = 32;
         private static readonly RaycastHit[] HitBuffer = new RaycastHit[MaxContacts];
         private static readonly List<BeamContact> ContactBuffer = new List<BeamContact>(MaxContacts);
+
+        // Reused across every beam this (never-spawned) asset draws rather than `new`-ed per shot -
+        // see ShotTeamVisuals' own propertyBlock field for why a MaterialPropertyBlock is written
+        // and applied immediately rather than held onto: SetPropertyBlock copies its contents into
+        // the renderer, so the same instance can be safely reused for the next beam - see
+        // ApplyBeamGlow (fix 4, Playtest polish review).
+        //
+        // NOT a `= new MaterialPropertyBlock()` field initializer (review fix, caught by
+        // HitscanChargedRangeTests/WeaponUpgradeTreeTests failing after the first pass): a static
+        // field initializer runs the first time ANYTHING touches this type, which in the editor
+        // can be while Unity is still constructing/deserializing a Hitscan instance off a prefab
+        // (e.g. loading the weapon catalogue for a test) - "CreateImpl is not allowed to be called
+        // from a MonoBehaviour constructor (or instance field initializer)" is Unity's own guard
+        // against exactly that. Constructed lazily in ApplyBeamGlow instead, the same rule
+        // ShotTeamVisuals follows by building its own MaterialPropertyBlock in Awake rather than a
+        // field initializer - either way, never at type-construction time.
+        private static MaterialPropertyBlock beamPropertyBlock;
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         /// <summary>
         /// Works out what this beam strikes WITHOUT dealing damage or drawing anything. The
@@ -193,23 +214,28 @@ namespace Overpower.Weapons
             line.SetPosition(0, from);
             line.SetPosition(1, to);
 
+            // Overwrites whatever start/end width the beam VFX prefab's own Line Renderer was
+            // baked with (see the Beam Vfx field's own tooltip) - Laser Beam Width on UiTheme is
+            // the one real home for this number now.
             float width = theme != null ? theme.laserBeamWidth : FallbackBeamWidth;
             line.startWidth = width;
             line.endWidth = width;
 
+            // The TRUE team colour, never boosted - see ApplyBeamGlow below for why the brightness
+            // multiply moved off this value (fix 4, Playtest polish review).
             Color color = ResolveBeamColor(shooterTeamId);
             line.startColor = color;
             line.endColor = color;
+            ApplyBeamGlow(line, theme != null ? theme.laserBeamEmission : 1f);
 
             float linger = theme != null ? theme.laserBeamLingerSeconds : FallbackLingerSeconds;
             beam.AddComponent<BeamFade>().Begin(line, color, linger);
         }
 
-        /// <summary>The shooter's team colour, boosted by Laser Beam Emission for a brighter, more
-        /// glowing line than a flat team tint - see UiTheme.laserBeamEmission. Falls back to the old
-        /// hardcoded cyan (FallbackBeamColor) and logs once, the same ShotTeamVisuals/AimConeView
-        /// pattern for a component whose Theme slot was never assigned - the beam still fires and
-        /// still draws either way, just untinted.</summary>
+        /// <summary>The shooter's team colour, unmodified - see ApplyBeamGlow for where the
+        /// brightness boost happens instead. Falls back to the old hardcoded cyan (FallbackBeamColor)
+        /// and logs once, the same ShotTeamVisuals/AimConeView pattern for a component whose Theme
+        /// slot was never assigned - the beam still fires and still draws either way, just untinted.</summary>
         private Color ResolveBeamColor(int shooterTeamId)
         {
             if (theme == null)
@@ -223,9 +249,42 @@ namespace Overpower.Weapons
                 return FallbackBeamColor;
             }
 
-            Color baseColor = theme.ShotColorFor(shooterTeamId);
-            float glow = theme.laserBeamEmission;
-            return new Color(baseColor.r * glow, baseColor.g * glow, baseColor.b * glow, baseColor.a);
+            return theme.ShotColorFor(shooterTeamId);
+        }
+
+        /// <summary>
+        /// Fix 4 (Playtest polish review, quality finding): Laser Beam Emission used to multiply
+        /// straight into the vertex colour returned by ResolveBeamColor (baseColor.rgb * glow), but
+        /// a LineRenderer's start/end colour is written into the mesh's 8-bit-per-channel vertex
+        /// colour buffer, so any channel that crossed 1.0 silently clamped there instead of getting
+        /// brighter - team 1's violet (0.68, 0.32, 1) x the old 1.6 rendered as (1, 0.51, 1), a
+        /// visibly pinker colour, not a brighter violet one (confirmed with a before/after capture,
+        /// see the task's verification notes).
+        ///
+        /// Fixed the same way ShotTeamVisuals brightens a bullet's core: the vertex colour
+        /// (line.startColor/endColor, set by the caller just above) stays the plain team colour,
+        /// and the brightness multiply happens in the shader instead, via a MaterialPropertyBlock
+        /// on _BaseColor - a full-precision float4 shader uniform that is never quantised the way a
+        /// vertex colour is, so (glow, glow, glow, 1) scales every channel by the identical factor
+        /// with no clamp and therefore no hue shift.
+        ///
+        /// This only works because Laser Beam.mat's shader (checked with get_material_properties/
+        /// get_shader_properties rather than assumed: Universal Render Pipeline/Particles/Unlit,
+        /// _ColorMode 0 = Multiply) already multiplies its vertex colour by _BaseColor - the same
+        /// property every particle using this shader reads for its own base tint, HDR or not. Its
+        /// _EmissionColor IS HDR-tagged, which looked like the obvious property to use, but the
+        /// material never enables the shader's _EMISSION keyword, so writing that channel from a
+        /// property block would have done nothing without also flipping a keyword on the shared
+        /// asset - _BaseColor needs no such toggle.
+        /// </summary>
+        private static void ApplyBeamGlow(LineRenderer line, float glow)
+        {
+            if (beamPropertyBlock == null)
+                beamPropertyBlock = new MaterialPropertyBlock();
+
+            beamPropertyBlock.Clear();
+            beamPropertyBlock.SetColor(BaseColorId, new Color(glow, glow, glow, 1f));
+            line.SetPropertyBlock(beamPropertyBlock);
         }
 
         private static void PlayImpact(WeaponDefinition weapon, Vector3 at)

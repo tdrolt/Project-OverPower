@@ -40,7 +40,9 @@ namespace Overpower.Weapons
 
         [SerializeField, Tooltip("Where the team colours, trail settings and tint/emission strength come " +
                  "from - Assets/Gameplay/Config/UiTheme.asset, shared with the HUD and the aim cone. " +
-                 "Presentation only; nothing here is a gameplay value.")]
+                 "Presentation only; nothing here is a gameplay value. Overwrites the baked 'Shot Trail' " +
+                 "child's own time/width/material every spawn (see ConfigureTrail) - set those on UiTheme, " +
+                 "not on the prefab child.")]
         private UiTheme theme;
 
         // Found once in Awake rather than looked up on every shot - GetComponent is not free, and a
@@ -101,6 +103,11 @@ namespace Overpower.Weapons
             if (trail == null)
                 return;
 
+            // Overwrites whatever time/width the "Shot Trail" child was baked with on this
+            // projectile prefab (fix 6, Playtest polish review) - Trail Time/Trail Start Width/
+            // Trail End Width on UiTheme are the one real home for these numbers across all seven
+            // weapon projectile prefabs; the prefab's own baked values are only a design-time
+            // preview in the Scene view, never what actually renders in play.
             trail.time = theme.trailTime;
             trail.startWidth = theme.trailStartWidth;
             trail.endWidth = theme.trailEndWidth;
