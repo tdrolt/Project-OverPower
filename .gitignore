@@ -125,3 +125,9 @@ InitTestScene*.unity*
 # afterwards, but leaves the empty folders and their .meta files behind. Build scaffolding, never committed.
 /[Aa]ssets/[Ss]ettings/[Pp]ipeline/
 /[Aa]ssets/[Ss]ettings/[Pp]ipeline.meta
+
+# The Pipeline Runtime server's own discovery descriptor (two-client-harness.md): PID, port and a
+# per-session eval token, written next to whatever process hosts the server - the Editor itself
+# included, at the project root, whenever Play Mode runs with the Runtime server enabled. Local
+# machine state, never committed (same reasoning as Builds/, which carries a Player's own copy).
+.unity-pipeline-runtime-port
