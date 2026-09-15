@@ -485,6 +485,16 @@ namespace Overpower.Weapons
                 float length = beam.PredictBeamLength(origin, shots[i]);
                 warnings[i] = LaserWarningLine.Create(origin, shots[i].Direction, length, color,
                                                       weapon.WindupSeconds, theme);
+
+                // Quality review finding: parented to the SHOOTER, not left as a loose root object.
+                // FireAfterWindup only destroys this line after its own WaitForSeconds finishes, and
+                // that coroutine dies silently (never reaching the Destroy call) if this WeaponFiring
+                // is destroyed first - a player despawning (leaving the room; PUN cleans it up) mid
+                // wind-up. Parenting means the warning line dies WITH the shooter's object instead of
+                // being orphaned on screen at full width forever. worldPositionStays: true because
+                // the line is drawn in world space (LaserWarningLine.Initialize) - reparenting must
+                // not move it.
+                warnings[i].transform.SetParent(transform, true);
             }
 
             return warnings;
