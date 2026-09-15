@@ -107,24 +107,31 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public int TierOf(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.tier : 0;
 
-    // Backing store for TierByZone below. Rebuilt in RegisterCapture (the only thing that can make
-    // a zone's tier change: a tower going from "not registered yet" (tier 0) to its real tier) -
-    // GoldWallet used to pay for a fresh allocation here on every player's every Update.
+    // Backing store for TierByZone below. Allocated ONCE (ZoneCount is fixed for the whole match)
+    // and filled IN PLACE by RebuildTierByZoneCache on every RegisterCapture (the only thing that
+    // can make a zone's tier change: a tower going from "not registered yet" (tier 0) to its real
+    // tier) - never reassigned to a new array. GoldWallet used to pay for a fresh allocation here on
+    // every player's every Update; a future caller that keeps the reference TierByZone() hands back
+    // (the shop gate, OverPower - Tasks 2.5/2.6) needs the SAME array to pick up a late tower's real
+    // tier too, which reassigning here would break (code review fix, Task 2.4).
     private int[] tierByZoneCache;
 
     /// Tier 1..4 per zone id, index = zone id, length ZoneCount - the array shape GoldMath.
     /// TeamIncomePerSecond's tierByZone parameter wants. Read-only by convention: this is the same
-    /// array every caller gets back, not a copy, so nobody may write into it.
+    /// array every caller gets back, not a copy, so nobody may write into it - and it stays the
+    /// SAME array instance for the whole match (see tierByZoneCache's own comment), so a caller that
+    /// holds onto the reference sees a late tower's tier the moment it registers.
     public int[] TierByZone()
     {
-        if (tierByZoneCache == null || tierByZoneCache.Length != ZoneCount)
+        if (tierByZoneCache == null)
             RebuildTierByZoneCache();
         return tierByZoneCache;
     }
 
     private void RebuildTierByZoneCache()
     {
-        tierByZoneCache = new int[ZoneCount];
+        if (tierByZoneCache == null || tierByZoneCache.Length != ZoneCount)
+            tierByZoneCache = new int[ZoneCount];
         for (int zone = 0; zone < ZoneCount; zone++)
             tierByZoneCache[zone] = TierOf(zone);
     }
@@ -440,15 +447,23 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     // ---------------------------------------------------------------- writing (master only)
 
-    /// Master only: the zone now belongs to this team. bountyPaid is the gold each player of that
-    /// team was paid for it (Task 2.4). Takes effect on every client, this one included, when the
-    /// room sends it back - not immediately.
-    public void SetCaptured(int zone, int team, int bountyPaid)
+    /// Master only: the zone now belongs to this team. tierBounty/holdMs are this zone's tier
+    /// numbers (TerritoryConfig.ForTier(tier).captureBounty, BountyHoldSeconds*1000) - the actual
+    /// payout (Task 2.4, BountyRule.PayoutOnCapture) is worked out IN HERE, from the same basis
+    /// snapshot this write builds on, rather than handed in pre-computed from the caller's own copy
+    /// of Current. Current can lag one echo behind: a zone neutralised and then recaptured before
+    /// that neutralise's echo has come back must pay from the hold IT just settled, and only the
+    /// basis (see WriteBasis - lastWritten while an echo is outstanding, Current otherwise) carries
+    /// that yet-to-be-confirmed history. Computing from Current here would silently read the OLDER
+    /// hold (or none at all) for exactly the capture that most needs the fresh one. Takes effect on
+    /// every client, this one included, when the room sends it back - not immediately.
+    public void SetCaptured(int zone, int team, int tierBounty, int holdMs)
     {
         TerritorySnapshot basis = WriteBasis(nameof(SetCaptured), zone);
         if (basis == null || basis.OwnerOf(zone) == team)
             return;
 
+        int bountyPaid = BountyRule.PayoutOnCapture(team, basis.LastOwnerOf(zone), basis.LastHeldMs(zone), tierBounty, holdMs);
         Write(basis.WithCapture(zone, team, ServerNowMs(), bountyPaid));
     }
 

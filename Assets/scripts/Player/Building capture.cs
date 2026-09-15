@@ -460,8 +460,12 @@ public class BuildingCapture : MonoBehaviourPun
 
         // The master's own fields above keep its capture logic going at once; everyone else
         // (and this client's TowerDictionary and flag) follows when the room sends the snapshot
-        // back. Bounty is 0 until Task 2.4 works out what a capture pays.
-        BuildingManager.Instance.SetCaptured(buildingID, capturingTeam, bountyPaid: 0);
+        // back. The bounty PAYOUT (Task 2.4, BountyRule.PayoutOnCapture) is computed inside
+        // SetCaptured itself, from the same write basis that write builds on - see its own comment
+        // for why. Only this zone's tier numbers need passing in here.
+        int tierBounty = territoryConfig != null ? territoryConfig.ForTier(tier).captureBounty : 0;
+        int holdMs = territoryConfig != null ? (int)(territoryConfig.BountyHoldSeconds * 1000f) : 0;
+        BuildingManager.Instance.SetCaptured(buildingID, capturingTeam, tierBounty, holdMs);
 
         Debug.Log($"[BuildingCapture] Building captured by team {capturingTeam}!");
         photonView.RPC("RPC_CompleteCapture", RpcTarget.All, controllingTeam);
