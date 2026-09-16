@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
+using Overpower.Telemetry;
 using Overpower.Weapons;
 
 namespace Overpower.TestRange
@@ -91,6 +92,7 @@ namespace Overpower.TestRange
         private TMP_Dropdown weaponDropdown;
         private readonly TMP_Dropdown[] abilityDropdowns = new TMP_Dropdown[AbilitySlots.Length];
         private TextMeshProUGUI readoutText;
+        private TextMeshProUGUI telemetryStatusText;
         private readonly List<WeaponDefinition> weaponOptions = new List<WeaponDefinition>();
 
         // Per ability dropdown, the ability behind each option. Option 0 is always "(none)", so an
@@ -137,7 +139,10 @@ namespace Overpower.TestRange
             UpdateInputSuppression(visible);
 
             if (visible)
+            {
                 RefreshReadout();
+                RefreshTelemetryStatus();
+            }
         }
 
         private void SetVisible(bool show)
@@ -247,6 +252,16 @@ namespace Overpower.TestRange
             AddButton(armorButtonRow.transform, "Reset Armor", res, OnResetArmorClicked);
 
             readoutText = AddLabel(panel.transform, "", 14f, FontStyles.Normal);
+
+            GameObject telemetryButtonRow = new GameObject("Telemetry Buttons", typeof(RectTransform));
+            telemetryButtonRow.transform.SetParent(panel.transform, false);
+            HorizontalLayoutGroup telemetryRowLayout = telemetryButtonRow.AddComponent<HorizontalLayoutGroup>();
+            telemetryRowLayout.spacing = 8f;
+            telemetryRowLayout.childControlWidth = telemetryRowLayout.childForceExpandWidth = true;
+            AddButton(telemetryButtonRow.transform, "Open telemetry folder", res, OnOpenTelemetryFolderClicked);
+            AddButton(telemetryButtonRow.transform, "Drop marker", res, OnDropMarkerClicked);
+
+            telemetryStatusText = AddLabel(panel.transform, "Telemetry: off", 14f, FontStyles.Normal);
 
             PopulateWeaponDropdown();
             for (int i = 0; i < AbilitySlots.Length; i++)
@@ -488,6 +503,31 @@ namespace Overpower.TestRange
         private void OnResetArmorClicked() =>
             ArmorLoadoutActions.Reset(ResolveLocalPlayer()?.GetComponent<PlayerLoadout>());
 
+        /// <summary>Reveals this client's current match folder in the OS file browser. In the Editor,
+        /// EditorUtility.RevealInFinder opens Explorer/Finder directly; a build has no Editor to do
+        /// that, so it falls back to Application.OpenURL on a file:// URL instead, which Unity's docs
+        /// confirm opens the OS's own file browser for a directory path.</summary>
+        private void OnOpenTelemetryFolderClicked()
+        {
+            string folder = MatchTelemetry.Instance != null ? MatchTelemetry.Instance.CurrentFolder : null;
+            if (string.IsNullOrEmpty(folder))
+            {
+                Debug.LogWarning("[TestRangePanel] no telemetry folder yet - join a match first (or check TelemetryConfig.Enabled).");
+                return;
+            }
+
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.RevealInFinder(folder);
+#else
+            Application.OpenURL("file:///" + folder.Replace('\\', '/'));
+#endif
+        }
+
+        /// <summary>Task T2's own "F1 gets a Drop marker button" - logs a `marker` line with an empty
+        /// note so a designer can flag "something interesting just happened" while playing, without
+        /// typing anything. The report's Markers section (Task T6) shows the 30s of events around it.</summary>
+        private void OnDropMarkerClicked() => MatchTelemetry.Instance?.DropMarker("");
+
         // ---- Readout ----
 
         /// <summary>The computed-versus-measured pair on the last two lines is the point of this
@@ -547,6 +587,17 @@ namespace Overpower.TestRange
             float delay = armorConfig != null ? armorConfig.RechargeSecondsFor(health.RechargeLevel) : 0f;
             return $"Armor A{health.AbsorbLevel}/R{health.RechargeLevel}: {health.ArmorCapacity:0} cap, {delay:0}s delay " +
                    $"({health.Armor:0}/{health.ArmorCapacity:0} current)";
+        }
+
+        /// <summary>"Telemetry: <lines> lines -> <folder>" while recording, or "off" before a match's
+        /// file has opened (telemetry disabled, or not in a room yet) - the plan's own wording for
+        /// this label.</summary>
+        private void RefreshTelemetryStatus()
+        {
+            MatchTelemetry telemetry = MatchTelemetry.Instance;
+            telemetryStatusText.text = telemetry != null && telemetry.IsRecording
+                ? $"Telemetry: {telemetry.LineCount} lines -> {telemetry.CurrentFolder}"
+                : "Telemetry: off";
         }
     }
 }

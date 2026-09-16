@@ -131,3 +131,10 @@ InitTestScene*.unity*
 # included, at the project root, whenever Play Mode runs with the Runtime server enabled. Local
 # machine state, never committed (same reasoning as Builds/, which carries a Player's own copy).
 .unity-pipeline-runtime-port
+
+# Baked by BuildInfoWriter (Assets/scripts/Editor/Telemetry) before every build: the commit hash a
+# Player build stamps its telemetry session header with, since a Player ships with no .git folder to
+# read from. A build artifact, not source - it goes stale the moment someone pulls without
+# rebuilding, so it is regenerated on every build and never committed.
+/Assets/Resources/BuildInfo.txt
+/Assets/Resources/BuildInfo.txt.meta
