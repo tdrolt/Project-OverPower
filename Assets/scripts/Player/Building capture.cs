@@ -248,15 +248,16 @@ public class BuildingCapture : MonoBehaviourPun
             return new CaptureProgress(capturingID, decayProgress01, decayRate, nowMs);
         }
 
-        if (isOnCooldown || capturingID == -1 || captureSeconds <= 0f)
+        if (isOnCooldown || capturingID == -1 || captureSeconds <= 0f || playersInZone.Count == 0)
             return CaptureProgress.Idle;
 
         // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
-        // else" actually moves the bar - anyone else present means CalculateCaptureProgress itself
-        // is not advancing captureProgress this frame either, so the bar must not claim it is.
+        // else, and still allowed to capture" actually moves the bar - otherwise
+        // CalculateCaptureProgress itself is not advancing captureProgress this frame either, so the
+        // bar must not claim it is. TeamMayCaptureNow gives both the same answer within a frame.
         var eligiblePlayers = playersInZone.Where(p => p.teamID == capturingID).ToList();
         bool enemyPresent = playersInZone.Any(p => p.teamID != capturingID);
-        if (!eligiblePlayers.Any() || enemyPresent)
+        if (!eligiblePlayers.Any() || enemyPresent || !TeamMayCaptureNow(capturingID))
             return CaptureProgress.Idle;
 
         float progress01 = captureProgress / captureSeconds;
@@ -283,12 +284,78 @@ public class BuildingCapture : MonoBehaviourPun
         BuildingManager.Instance.PublishCaptureProgress(buildingID, lastPublishedProgress);
     }
 
+    // Cached so the per-frame capture check below doesn't allocate a new delegate for every tower every frame.
+    private static readonly System.Func<int, bool> ZoneUnderAttack =
+        zone => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(zone);
+
+    // OwnersByZone() builds a new dictionary on every call. Every tower reads the same snapshot, which only changes
+    // when a zone changes hands, so the dictionary is built once per snapshot instead of per tower per frame.
+    private static TerritorySnapshot ownersBuiltFrom;
+    private static IReadOnlyDictionary<int, int> ownersOfSnapshot;
+
+    // One answer per team per frame. "Under attack" ends on the server clock, which keeps ticking during a frame, so
+    // asking twice (CalculateCaptureProgress, then ComputeCurrentProgress for the bar) could straddle the end of the
+    // linger and let the bar claim a capture the tick didn't make.
+    private int mayCaptureFrame = -1;
+    private int mayCaptureTeam = -1;
+    private bool mayCaptureAnswer;
+
+    /// <summary>Master, every frame a team is actually capturing or draining this zone: may that team still capture
+    /// it right now? OnTriggerEnter checks the plain adjacency rule once, on entry - deliberately not the threat-aware
+    /// one, or a player who walked in while the link was under attack would never be counted and would have to step
+    /// out and back in. This re-asks the threat-aware rule (Tudor, 2026-09-16: no capturing through an owned zone
+    /// that is under attack), so a capture already in progress holds the moment its link comes under attack and
+    /// carries on by itself once the link is safe again.</summary>
+    private bool TeamMayCaptureNow(int team)
+    {
+        if (mayCaptureFrame == Time.frameCount && mayCaptureTeam == team)
+            return mayCaptureAnswer;
+
+        BuildingManager manager = BuildingManager.Instance;
+        bool answer = true; // Nothing to judge by yet; the entry check already applied the plain rule.
+        if (manager != null && manager.Map != null && manager.Current != null)
+        {
+            if (!ReferenceEquals(ownersBuiltFrom, manager.Current))
+            {
+                ownersOfSnapshot = manager.Current.OwnersByZone();
+                ownersBuiltFrom = manager.Current;
+            }
+            answer = manager.Map.MayCapture(team, buildingID, ownersOfSnapshot, ZoneUnderAttack);
+        }
+
+        mayCaptureFrame = Time.frameCount;
+        mayCaptureTeam = team;
+        mayCaptureAnswer = answer;
+        return answer;
+    }
+
 
     // NEW: Modified to handle recapture decay if enemy enters
     void HandleCapturedState()
     {
-        bool enemyPresent = playersInZone.Any(p => p.teamID != controllingTeam);
-        bool teamMemberPresent = playersInZone.Any(p => p.teamID == controllingTeam);
+        // The enemy team that drains this zone: the first one standing here that may still capture
+        // it right now (Tudor, 2026-09-16: not through a zone of its own that is under attack). -1 if
+        // none. Nobody standing here means no drain, so a quiet tower skips every check below.
+        int drainingTeam = -1;
+        foreach (PlayerTeam p in playersInZone)
+        {
+            if (p.teamID != controllingTeam && TeamMayCaptureNow(p.teamID))
+            {
+                drainingTeam = p.teamID;
+                break;
+            }
+        }
+        bool enemyPresent = drainingTeam != -1;
+
+        // playersInZone only holds players the territory rule let in on entry, and it refuses a zone
+        // your team already owns. A defender who walks in after the capture was therefore never
+        // listed, and an enemy drained the zone right past them (measured 2026-09-16: drain rate
+        // unchanged with a defender inside, zone neutral 3.9 s later). Presence is tracked for every
+        // living player, so ask it too. The list still counts players who captured this zone and
+        // never left.
+        bool teamMemberPresent = enemyPresent
+            && (playersInZone.Any(p => p.teamID == controllingTeam)
+                || (ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsTeamPresent(buildingID, controllingTeam)));
 
         if (enemyPresent && !teamMemberPresent)
         {
@@ -296,7 +363,7 @@ public class BuildingCapture : MonoBehaviourPun
             {
                 isDecaying = true;
                 captureProgress = CaptureSeconds;
-                capturingID = playersInZone.First(p => p.teamID != controllingTeam).teamID;
+                capturingID = drainingTeam;
                 photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, capturingID);
                 Debug.Log("[HandleCapturedState] Enemy detected. Starting recapture decay.");
 
@@ -372,7 +439,16 @@ public class BuildingCapture : MonoBehaviourPun
 
     void CalculateCaptureProgress()
     {
-        if (capturingID == -1 && playersInZone.Count != 0)
+        // Nobody standing here: nothing advances, so skip the per-frame checks below (the else
+        // branch's sound stop is all that would have happened).
+        if (playersInZone.Count == 0)
+        {
+            if (audioSource.isPlaying)
+                StopCapturingSound();
+            return;
+        }
+
+        if (capturingID == -1)
         {
             capturingID = playersInZone[0].teamID;
             captureProgress = 0;
@@ -381,7 +457,9 @@ public class BuildingCapture : MonoBehaviourPun
         var eligiblePlayers = playersInZone.Where(p => p.teamID == capturingID).ToList();
         var enemyPlayers = playersInZone.Any(p => p.teamID != capturingID);
 
-        if (eligiblePlayers.Any() && !enemyPlayers)
+        // TeamMayCaptureNow last: while the capturers' only way in is under attack, progress holds
+        // where it is (the else branch only stops the sound) and carries on once the link is safe.
+        if (eligiblePlayers.Any() && !enemyPlayers && TeamMayCaptureNow(capturingID))
         {
             int count = eligiblePlayers.Count;
             // N players contribute N progress-per-second - see ProgressPerPlayerPerSecond above.
