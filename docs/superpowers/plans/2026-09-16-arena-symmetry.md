@@ -1342,6 +1342,183 @@ counts, every check's measured value, and the final test total.
 
 ---
 
+### Task A4: Shrink each capital pocket to wrap the capture circle (Tudor, 2026-09-16)
+
+Tudor's feedback on the A3 renders: **"the pocket size should be the size of the whole T1 capture area"** — the pocket
+walls wrap the capital's 10 m capture circle; the radius stays 10 m [T].
+
+**Files:**
+- Modify: `Assets/Scenes/Game Scene.unity` (Source third's pocket walls; Rebuild)
+- Scratch (not committed): `<scratchpad>/ArenaPocketResize.cs`
+
+**Geometry (source third, capital axis +Z, centre C = (65.05, 53.34)) [C]:**
+- Converging walls gain one more whole piece each (`Wall R 28m`, `Wall L 28m`) and end 31.5 m from each wall's
+  midpoint, at z = 96.14, x = 65.05 ± 11.13. That is the first piece boundary where the lane is narrower than 23 m.
+- **Pocket side walls** at x = C.x ± 11.13 (pivot = outer face). The inner face is 10.40 m from the axis, so the 10 m
+  circle has 0.40 m to spare on each side.
+- **Back wall** pivot at z = 53.34 (C.z) + 57.66 (capital) + 10 (radius) + 0.40 (spare) + 0.73 (thickness) =
+  **122.13**, so its inner face is 10.40 m behind the capital.
+- Side walls run 25.99 m (4 pieces, scale X 0.9283). The back wall is 22.26 m (3 pieces, scale X 1.0602).
+- The terrain tiles at x −64 / 128 stay (the bottom-right back corner still reaches x ≈ 130). The mountains moved in
+  A3 stay.
+
+- [ ] **Step 1: Write the resize script**
+
+```csharp
+using System.Linq;
+using System.Text;
+using Overpower.Arena;
+using Overpower.EditorTools;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+/// One-time: replaces the Source third's capital pocket with one that wraps the 10 m capture circle.
+public static class ArenaPocketResize
+{
+    private static readonly Vector3 C = new Vector3(65.05f, 0f, 53.34f);
+    private const float InRadius = 31.04f;
+    private const float WallLength = 7f;
+    private const float WallY = 0.06f;
+    private const float WallThickness = 0.73f;     // mesh occupies local z 0.01..0.73 from the pivot (outer face)
+    private const float CapitalDistance = 57.66f;  // tower 8 from the centre along +Z
+    private const float CaptureRadius = 10f;
+
+    public static string Run()
+    {
+        var log = new StringBuilder();
+        Scene scene = SceneManager.GetActiveScene();
+        if (EditorApplication.isPlaying) return "ABORT: play mode";
+        if (scene.isDirty) return "ABORT: scene is dirty - reload it from disk first";
+
+        ArenaSymmetry arena = UnityEngine.Object.FindFirstObjectByType<ArenaSymmetry>();
+        Transform walls = arena.source.Find("Boundry");
+        GameObject wall1 = walls.Find("Wall R 0m").gameObject;
+        GameObject wall2 = walls.Find("Wall R 14m").gameObject;
+
+        // 1. Remove the old pocket.
+        int removed = 0;
+        foreach (Transform piece in walls.Cast<Transform>().Where(t => t.name.StartsWith("Pocket ")).ToList())
+        {
+            UnityEngine.Object.DestroyImmediate(piece.gameObject);
+            removed++;
+        }
+
+        // 2. One more whole converging piece on each side (the lane narrows to the pocket's width there).
+        Vector3 vertex = At(90f, 2f * InRadius);
+        Vector3 midRight = At(30f, InRadius), midLeft = At(150f, InRadius);
+        Vector3 alongRight = (vertex - midRight).normalized, alongLeft = (vertex - midLeft).normalized;
+        Place(wall1, walls, "Wall R 28m", midRight + alongRight * 28f, 240f, 1f);
+        Place(wall1, walls, "Wall L 28m", midLeft + alongLeft * 28f, 120f, 1f);
+
+        Vector3 corner = midRight + alongRight * 31.5f;           // where the pocket's right wall starts
+        float halfWidth = corner.x - C.x;                          // pivot (outer face) distance from the axis
+        float spare = (halfWidth - WallThickness) - CaptureRadius; // room between circle and inner face
+        float mouthZ = corner.z;
+        float backZ = C.z + CapitalDistance + CaptureRadius + spare + WallThickness;
+
+        // 3. Pocket side walls: 4 pieces stretched to fit exactly.
+        float sideLength = backZ - mouthZ;
+        float sideScale = sideLength / (4f * WallLength);
+        for (int j = 0; j < 4; j++)
+        {
+            float z = mouthZ + sideLength * (j + 0.5f) / 4f;
+            Place(j == 2 ? wall2 : wall1, walls, $"Pocket R {j}", new Vector3(C.x + halfWidth, 0f, z), 270f, sideScale);
+            Place(j == 2 ? wall2 : wall1, walls, $"Pocket L {j}", new Vector3(C.x - halfWidth, 0f, z), 90f, sideScale);
+        }
+
+        // 4. Back wall: 3 pieces stretched to fit exactly.
+        float backWidth = 2f * halfWidth;
+        float backScale = backWidth / (3f * WallLength);
+        for (int j = 0; j < 3; j++)
+            Place(j == 1 ? wall2 : wall1, walls, $"Pocket Back {j}",
+                  new Vector3(C.x - halfWidth + backWidth * (j + 0.5f) / 3f, 0f, backZ), 180f, backScale);
+
+        log.AppendLine($"removed {removed} old pocket pieces; halfWidth {halfWidth:0.000}, spare {spare:0.000}, mouthZ {mouthZ:0.000}, backZ {backZ:0.000}, side scale {sideScale:0.0000}, back scale {backScale:0.0000}");
+
+        var problems = ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false);
+        log.AppendLine(problems.Count == 0 ? "rebuild: symmetric" : "REBUILD PROBLEMS:\n" + string.Join("\n", problems));
+
+        // 5. Nothing but terrain inside any capital's capture circle (walls must be outside it).
+        Physics.SyncTransforms();
+        foreach (float axis in new[] { 90f, 210f, 330f })
+        {
+            Vector3 capital = At(axis, CapitalDistance);
+            int blocked = 0;
+            for (int i = 0; i < 72; i++)
+            {
+                float a = i * 5f * Mathf.Deg2Rad;
+                Vector3 edge = capital + new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (CaptureRadius - 0.05f);
+                // A horizontal ray at waist height from 6 m out (outside the capital house) to the circle's edge.
+                Vector3 from = capital + (edge - capital).normalized * 6f + Vector3.up * 1f;
+                Vector3 to = edge + Vector3.up * 1f;
+                if (Physics.Linecast(from, to, out RaycastHit hit, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore)
+                    && hit.collider.name.Contains("Wall"))
+                    blocked++;
+            }
+            log.AppendLine($"capital {axis}°: circle edge rays blocked by a wall: {blocked} of 72");
+        }
+
+        if (problems.Count == 0)
+        {
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            log.AppendLine("scene saved");
+        }
+        else log.AppendLine("NOT SAVED - reload the scene from disk");
+        return log.ToString();
+    }
+
+    private static Vector3 At(float degrees, float radius) =>
+        C + new Vector3(Mathf.Cos(degrees * Mathf.Deg2Rad), 0f, Mathf.Sin(degrees * Mathf.Deg2Rad)) * radius;
+
+    private static void Place(GameObject template, Transform parent, string name, Vector3 position, float yaw, float scaleX)
+    {
+        GameObject piece = UnityEngine.Object.Instantiate(template, parent);
+        piece.name = name;
+        piece.transform.SetPositionAndRotation(new Vector3(position.x, WallY, position.z), Quaternion.Euler(0f, yaw, 0f));
+        piece.transform.localScale = new Vector3(scaleX, 1f, 1f);
+    }
+}
+```
+
+- [ ] **Step 2: Run it**
+
+Check the scene isn't dirty and play mode is stopped. Run:
+`unity command --timeout 240 run_script -- --file "<scratchpad>/ArenaPocketResize.cs" --entry ArenaPocketResize.Run --timeout_ms 200000`
+
+Expected:
+- `halfWidth 11.132`, `spare 0.402`, `backZ 122.13` (±0.01)
+- `rebuild: symmetric`
+- all three `blocked: 0 of 72`
+- `scene saved`
+
+- [ ] **Step 3: Render and look.** Run `ArenaRender` to `<scratchpad>/arena-after-a4.png`. Read it. For each of the three
+pockets, check and report:
+- it is closed (the corners meet);
+- it is visibly about as wide as the capture circle;
+- the T2 sits outside, before the mouth;
+- there are no leftover old pocket pieces.
+
+Then zoom-render one pocket.
+
+- [ ] **Step 4: Tests.** Recompile isn't needed (no code). Run the tests async: all pass, including both
+`ArenaSymmetrySceneTests`. The scene isn't dirty afterwards.
+
+- [ ] **Step 5: Play mode.**
+- Join; teleport to 1 m inside each back corner of your own capital pocket, i.e. (C.x ± 9.4, 0, 121.3) turned for your
+  team's axis. After 1 s of game time, read `Rigidbody.position`: the player is still inside.
+- Stand on the capture circle's edge (9.8 m from the capital, toward a side wall). `BuildingManager.TryGetZoneAt`
+  returns the capital's zone and the player isn't blocked there.
+- Stop play mode.
+
+- [ ] **Step 6: Commit** the scene only:
+`feat(arena): capital pockets wrap the capture circle (Tudor feedback)`. Push. Report the log, the render paths, the
+play-mode numbers, and the test total.
+
+---
+
 ## Self-review against the spec
 
 | Spec requirement | Task |
