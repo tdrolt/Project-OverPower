@@ -25,6 +25,16 @@ Markers: [T] Tudor decided · [G] GDD · [C] Claude's starting value (Inspector-
 | Capture block | **Per link** [T]: a team may capture a zone only through an adjacent zone it owns **that is not under attack**. Another safe owned neighbour still allows it. A team's own capital stays capturable by that team (unchanged rule) |
 | Pocket | Walls wrap the capture circle; radius stays 10 m [T] |
 
+### Decisions added during implementation and review (2026-09-16, [C], all in `assumptions-for-tudor.md`)
+
+| Topic | Decision |
+|---|---|
+| Linger vs death | The 3 s linger is for a **living player walking out** only. **A death or a disconnect ends "under attack" at once**: the linger stops flicker at the edge, a death can't flicker, and killing the last attacker should make your capital safe right away. It is tracked per player, so a walk-out still lingers even if a teammate stays inside and dies later |
+| Link-blocked drain | A drain paused because the attacker's way in is under attack **pauses and resumes from where it was**, like a blocked neutral capture. A drain stopped by a defender, or by all attackers leaving, still restarts from full |
+| Dead players in a zone | **A player who dies inside a zone stops counting there at once** (measured bug: a dead attacker kept draining, then captured the zone after respawning at their own base). A capturer dying in a neutral zone resets its progress, the same as walking out. A player who respawns inside a zone counts again |
+| Defenders | Measured broken (a defender standing inside didn't stop a drain), so fixed: a defender present stops a drain within ~0.1 s |
+| Capture radius | **Capture Radius is world metres to the player's centre**, for capturing, presence, regen and the shop alike. It was 8 m for capturing (the tower scale); fixed, including the player body's own radius, so all four agree |
+
 ## What exists (verified in code 2026-09-16)
 
 - **Adjacency** is explicit per tower. Capitals 6/7/8 are adjacent only to T2 0/1/2. Each T2 is adjacent to its capital
@@ -84,8 +94,11 @@ presence separate from capture eligibility, and out of `BuildingManager`.
 - **Continuous (master):**
   - `CalculateCaptureProgress` counts capturers only while `MayCapture(capturingID, …, IsUnderAttack)` holds. When it
     stops holding, progress **holds**, exactly as if the capturers had stepped out.
-  - `HandleCapturedState` counts a draining enemy team only while that team `MayCapture` holds. If not, no drain.
+  - `HandleCapturedState` counts a draining enemy team only while that team `MayCapture` holds. If not, the drain
+    **pauses** (see the added decisions above).
   - When the link is safe again, capture/drain resumes without anyone re-entering.
+  - As built, the drain decision (who drains; continue / pause / stop; defender present) is a pure `DrainRule` with
+    edit-mode tests.
 - **Defenders (measured first):** if the measurement confirms that a defender standing in their own zone doesn't stop
   a drain, `HandleCapturedState`'s "team member present" reads `ZonePresenceTracker.IsTeamPresent(zone, owner)` instead
   of `playersInZone`. This is a fix to the evident intent of the existing code [C]. If the measurement shows it already
