@@ -136,6 +136,16 @@ namespace Overpower.Telemetry
         public const string TimeDead = "deadSec";
         public const string UnderAttackSpawn = "uaSpawn";
         public const string HealTiers = "tiers";
+        /// <summary>Task T3: `death`'s embedded loadout snapshot needs its own keys, distinct from
+        /// Weapon/Equipment/Mobility/Ultimate above - those mean "the killing weapon/ability" on a
+        /// `death` line (matching `hit`'s own convention), so the VICTIM's own equipped loadout at
+        /// the moment of death needs separate keys on that same line rather than colliding with them.
+        /// `sample` has no such collision (there is no "killing weapon" concept there), so it keeps
+        /// using Weapon/Equipment/Mobility/Ultimate directly for this player's own loadout.</summary>
+        public const string LoadoutWeapon = "lw";
+        public const string LoadoutEquipment = "leq";
+        public const string LoadoutMobility = "lmob";
+        public const string LoadoutUltimate = "lult";
         /// <summary>A short string state/label, reused by every event that needs one instead of a
         /// dedicated bool or a bespoke key: overheat's "silenced"/"recovered", capture's
         /// "started"/"paused"/"resumed"/"completed"/"drainStarted"/"neutralised"/"drainPaused",

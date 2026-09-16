@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
@@ -39,6 +40,14 @@ public class PlayerCombatCredit : MonoBehaviourPun
     private PlayerHealth playerHealth;
     private readonly DamageCreditLedger ledger = new DamageCreditLedger();
     private float nextFlushTime;
+
+    /// <summary>Task T3 (telemetry): every assist actor from the death HandleDied just resolved,
+    /// captured here before ledger.Clear() wipes the ledger's own last-hit times. PlayerHealth.Died
+    /// always reaches this component's own handler before PlayerTelemetry's (Unity runs every
+    /// OnEnable, where this subscribes, before any Start, where PlayerTelemetry subscribes - see
+    /// its own class comment), so PlayerTelemetry's `death` line reads this rather than calling
+    /// AssistersSince itself against an already-cleared ledger.</summary>
+    public IReadOnlyList<int> LastDeathAssisters { get; private set; } = System.Array.Empty<int>();
 
     private void Awake()
     {
@@ -114,13 +123,16 @@ public class PlayerCombatCredit : MonoBehaviourPun
         var drained = ledger.Drain();
         var notified = new System.Collections.Generic.HashSet<int>();
 
+        // Task T3: captured before ledger.Clear() below - see LastDeathAssisters's own comment.
+        LastDeathAssisters = new List<int>(ledger.AssistersSince(Time.time, assistWindowSeconds, killerActor));
+
         if (killerActor > 0)
         {
             SendCredit(killerActor, AmountFor(drained, killerActor), takedown: 1);
             notified.Add(killerActor);
         }
 
-        foreach (int assistActor in ledger.AssistersSince(Time.time, assistWindowSeconds, killerActor))
+        foreach (int assistActor in LastDeathAssisters)
         {
             if (!notified.Add(assistActor))
                 continue;

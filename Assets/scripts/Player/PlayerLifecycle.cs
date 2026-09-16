@@ -108,6 +108,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// false - see the note in ApplyAliveState.</summary>
     public event System.Action<bool> AliveChanged;
 
+    /// <summary>Task T3 (telemetry): whether the respawn that most recently ran (RespawnPlayer)
+    /// landed this player at the capital-under-attack spawn instead of the normal one - the same
+    /// bool ChooseSpawnPoint already decides, just remembered past that method's own return so
+    /// PlayerTelemetry's `respawn` line (raised from AliveChanged(true), after this field is set)
+    /// can read it. Meaningless before the first respawn; false until then.</summary>
+    public bool LastRespawnWasUnderAttackSpawn { get; private set; }
+
     void Start()
     {
         // A silent null here would make every respawn use the hardcoded fallbacks in
@@ -384,6 +391,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         Transform spawn = roomManager != null ? ChooseSpawnPoint(roomManager, teamID, out atUnderAttackSpawn) : null;
         if (spawn != null)
             TeleportToSpawnPoint(spawn.position, spawn.rotation);
+
+        // Set before SetAlive(true) below raises AliveChanged - PlayerTelemetry's `respawn` line
+        // reads this from that same event.
+        LastRespawnWasUnderAttackSpawn = atUnderAttackSpawn;
 
         playerHealth.ResetForRespawn();
 
