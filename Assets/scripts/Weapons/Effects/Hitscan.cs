@@ -95,7 +95,7 @@ namespace Overpower.Weapons
         /// </summary>
         public BeamResult Resolve(Vector3 origin, ProjectileContext shot)
         {
-            float range = ChargedRange(shot.Weapon, shot.ChargeFraction);
+            float range = ChargedRange(shot.Weapon, shot.ChargeFraction, shot.RangeMultiplier);
             Vector3 direction = shot.Direction.normalized;
             int mask = BuildMask();
 
@@ -204,13 +204,19 @@ namespace Overpower.Weapons
         ///
         /// The charge fraction is the one that crossed the wire, so every client draws the same
         /// length and damages the same targets.
+        ///
+        /// rangeMultiplier defaults to 1 (unchanged) - Task 2.6's OverPower buff is the one caller
+        /// that ever passes anything else, via the shot's own ProjectileContext.RangeMultiplier (see
+        /// that property's comment for why a beam takes this as a parameter instead of reading a
+        /// second, independently-tuned range field off MaxRange).
         /// </summary>
-        public static float ChargedRange(WeaponDefinition weapon, float chargeFraction)
+        public static float ChargedRange(WeaponDefinition weapon, float chargeFraction, float rangeMultiplier = 1f)
         {
-            if (!weapon.CanCharge)
-                return weapon.MaxRange;
+            float range = weapon.CanCharge
+                ? weapon.MaxRange * Mathf.Lerp(1f, weapon.ChargeRangeMultiplier, Mathf.Clamp01(chargeFraction))
+                : weapon.MaxRange;
 
-            return weapon.MaxRange * Mathf.Lerp(1f, weapon.ChargeRangeMultiplier, Mathf.Clamp01(chargeFraction));
+            return range * rangeMultiplier;
         }
 
         /// <summary>

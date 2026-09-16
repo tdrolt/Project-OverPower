@@ -61,8 +61,19 @@ namespace Overpower.Weapons
         public float ProjectileRadius { get; }
 
         /// <summary>Metres this shot may travel before it expires. From the weapon for a weapon
-        /// shot; from the ability module's own field otherwise.</summary>
+        /// shot (already scaled by RangeMultiplier below), or from the ability module's own field
+        /// otherwise (never scaled - no ability reads OverPower's buff).</summary>
         public float MaxRange { get; }
+
+        /// <summary>
+        /// What MaxRange above was multiplied by at fire time - 1 for a shot nothing has boosted.
+        /// Task 2.6 (GDD p.20): OverPower's +10% range needs to reach every place range is measured
+        /// for THIS shot, not just the travel-distance cap MaxRange already covers - a beam weapon's
+        /// Hitscan.ChargedRange recomputes its reach from the weapon asset directly rather than
+        /// reading MaxRange, so it takes this multiplier as its own parameter instead of a second,
+        /// independently-tuned formula. Always 1 for an ability shot.
+        /// </summary>
+        public float RangeMultiplier { get; }
 
         /// <summary>
         /// Set only when this exact context was built for the CASTER's own local copy of an ability
@@ -142,12 +153,13 @@ namespace Overpower.Weapons
         /// ability shot look identical to ProjectileMotor from this point on.</summary>
         public ProjectileContext(WeaponDefinition weapon, int shooterActorNumber, int shooterTeamId,
                                  Vector3 direction, Vector3 targetPoint, float chargeFraction,
-                                 float damage)
+                                 float damage, float rangeMultiplier = 1f)
         {
             Weapon = weapon;
             ProjectileSpeed = weapon.ProjectileSpeed;
             ProjectileRadius = weapon.ProjectileRadius;
-            MaxRange = weapon.MaxRange;
+            RangeMultiplier = rangeMultiplier;
+            MaxRange = weapon.MaxRange * rangeMultiplier;
             ShooterActorNumber = shooterActorNumber;
             ShooterTeamId = shooterTeamId;
             Direction = direction;
@@ -177,6 +189,7 @@ namespace Overpower.Weapons
             AbilityId = abilityId;
             ProjectileSpeed = projectileSpeed;
             ProjectileRadius = projectileRadius;
+            RangeMultiplier = 1f; // No ability reads OverPower's buff - see the property's own comment.
             MaxRange = maxRange;
             ShooterActorNumber = shooterActorNumber;
             ShooterTeamId = shooterTeamId;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
@@ -25,6 +26,16 @@ public class PlayerOverheat : MonoBehaviour
 
     private PhotonView photonView;
     private OverheatState overheat;
+
+    // Task 2.6 (GDD p.20): OverPower "nullif[ies] the overheat mechanic" while active. Keyed the
+    // same way PlayerMotor's speedMultipliers stack is (see its class comment) rather than a
+    // single bool, so a second future system wanting the same lockout can add its own key without
+    // needing to know whether OverPower (or anything else) already holds one - whichever key
+    // clears last is the one that actually lifts the suppression.
+    private readonly HashSet<object> suppressionKeys = new HashSet<object>();
+
+    /// <summary>True while any key suppresses - Add becomes a no-op, existing heat is untouched.</summary>
+    public bool IsSuppressed => suppressionKeys.Count > 0;
 
     public float Heat => overheat.Heat;
 
@@ -64,11 +75,33 @@ public class PlayerOverheat : MonoBehaviour
         overheat.Tick(Time.deltaTime);
     }
 
-    public void Add(float amount) => overheat.Add(amount);
+    /// <summary>Does nothing while IsSuppressed (Task 2.6) - a shot fired during OverPower must
+    /// cost no heat at all, not merely decay faster.</summary>
+    public void Add(float amount)
+    {
+        if (IsSuppressed)
+            return;
+
+        overheat.Add(amount);
+    }
 
     /// <summary>The laser's half-cost refund when a shot connects.</summary>
     public void Refund(float amount) => overheat.Refund(amount);
 
     /// <summary>On death: zero the bar and lift any silence with it.</summary>
     public void Clear() => overheat.Clear();
+
+    /// <summary>
+    /// OverPowerBuff's hook (Task 2.6, GDD p.20): keyed exactly like PlayerMotor.AddSpeedMultiplier/
+    /// RemoveSpeedMultiplier (see the suppressionKeys field comment) - true adds key, false removes
+    /// it. Existing heat and any silence already in progress are left alone; only future Add calls
+    /// are gated. Idempotent either way (HashSet.Add/Remove no-op on a value already in/out).
+    /// </summary>
+    public void SetSuppressed(object key, bool suppressed)
+    {
+        if (suppressed)
+            suppressionKeys.Add(key);
+        else
+            suppressionKeys.Remove(key);
+    }
 }

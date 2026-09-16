@@ -188,6 +188,10 @@ public class AimConeView : MonoBehaviourPun
 
         RefreshWeaponCache(weapon);
 
+        // Task 2.6 (GDD p.20): OverPower's +10% range must show up here too, or the aim lines
+        // would promise a shorter reach than the buffed shot actually has.
+        float rangeMultiplier = weaponFiring.CurrentRangeMultiplier;
+
         // Only a BEAM weapon's shots actually reach further when charged - ProjectileContext
         // always copies weapon.MaxRange verbatim for a spawned projectile (see its Initialize),
         // so a charging burst/rocket path flies exactly MaxRange no matter how long the trigger
@@ -195,8 +199,8 @@ public class AimConeView : MonoBehaviourPun
         // weapon, so it is always safe to call once a beam is confirmed - reused, not re-derived,
         // per the task brief.
         float range = cachedBeam != null
-            ? Hitscan.ChargedRange(weapon, weaponFiring.CurrentChargeFraction)
-            : weapon.MaxRange;
+            ? Hitscan.ChargedRange(weapon, weaponFiring.CurrentChargeFraction, rangeMultiplier)
+            : weapon.MaxRange * rangeMultiplier;
 
         // Weapon 4 (Rocket -> Cursor) detonates at the player's cursor rather than flying out to
         // MaxRange - DetonateAtCursor clamps its own travel distance to whichever is closer, the
@@ -205,8 +209,11 @@ public class AimConeView : MonoBehaviourPun
         // that, so the lines and arc track the cursor instead, from the SAME origin and target
         // point (SafeMuzzlePosition / GroundPointUnderCursor) the real shot resolves at fire time
         // - the one helper both call, so this can never drift from what the rocket actually does.
+        // weapon.MaxRange * rangeMultiplier here, not the bare asset value, for the same Task 2.6
+        // reason DetonateAtCursor.DistanceToCursorPoint reads context.MaxRange rather than
+        // context.Weapon.MaxRange - the real shot's own cap is the buffed one.
         if (cachedCursorDetonator != null)
-            range = DetonateAtCursor.ClampedDistanceToTarget(origin, aim.GroundPointUnderCursor, weapon.MaxRange);
+            range = DetonateAtCursor.ClampedDistanceToTarget(origin, aim.GroundPointUnderCursor, weapon.MaxRange * rangeMultiplier);
 
         bool ignoresWalls = cachedIgnoresWalls;
 

@@ -56,9 +56,15 @@ namespace Overpower.Weapons
         /// <summary>How far this rocket has to fly to reach the cursor - see the static helper
         /// below for the actual maths and why. AimConeView (Task 7) draws exactly this same
         /// distance for this weapon's aim lines/arc, through that helper, so the two can never
-        /// disagree about how far a cursor rocket actually reaches.</summary>
+        /// disagree about how far a cursor rocket actually reaches.
+        ///
+        /// context.MaxRange, not context.Weapon.MaxRange (Task 2.6): the former already carries
+        /// OverPower's range multiplier (see ProjectileContext.MaxRange), the latter is the bare
+        /// weapon asset value - reading the wrong one would let the buff extend how far this rocket
+        /// FLIES without extending how far it is allowed to detonate at the cursor, which is exactly
+        /// the kind of second, disagreeing range this class's own comment warns against.</summary>
         private float DistanceToCursorPoint() =>
-            ClampedDistanceToTarget(transform.position, context.TargetPoint, context.Weapon.MaxRange);
+            ClampedDistanceToTarget(transform.position, context.TargetPoint, context.MaxRange);
 
         /// <summary>
         /// How far a shot from origin toward targetPoint travels before it would reach that point,

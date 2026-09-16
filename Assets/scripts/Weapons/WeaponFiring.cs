@@ -82,7 +82,40 @@ namespace Overpower.Weapons
         private float nextFireTime;
         private float triggerHeldSince;
 
+        // Task 2.6 (GDD p.20): OverPower's comeback buff scales this player's own damage, fire
+        // rate and range while active. Owner state only, set through SetStatMultipliers below - a
+        // shot's damage and range must still be IDENTICAL on every client, so they cross the wire
+        // as RPC_FireWeapon parameters rather than being read locally by a receiver (see that RPC's
+        // own comment). Default 1 = unchanged, exactly OverPowerBuff's "off" state.
+        private float damageMultiplier = 1f;
+        private float fireRateMultiplier = 1f;
+        private float rangeMultiplier = 1f;
+
         public WeaponDefinition Weapon => weapon;
+
+        /// <summary>The shooter's own current range multiplier (1 = unchanged) - AimConeView reads
+        /// this to draw the SAME multiplied range a real shot would travel, the same way it already
+        /// reads CurrentChargeFraction for a charging beam's arc.</summary>
+        public float CurrentRangeMultiplier => rangeMultiplier;
+
+        /// <summary>
+        /// OverPowerBuff's hook (Task 2.6, GDD p.20): while the comeback buff is active, this
+        /// player's primary fires 10% harder, 10% faster and 10% further; when it ends every
+        /// multiplier goes back to 1. 1 = unchanged for all three - the plan's own shorthand.
+        ///
+        /// Owner-only state, exactly like triggerHeldSince above - nothing here is read on a
+        /// remote copy, which never runs TryFire (photonView.IsMine guards it) and has no
+        /// OverPowerBuff of its own driving this player's stats.
+        /// </summary>
+        public void SetStatMultipliers(float damage, float fireRate, float range)
+        {
+            damageMultiplier = damage;
+            // A zero or negative fire-rate multiplier would divide nextFireTime's interval by zero
+            // or flip the cooldown negative - guarded the same defensive way ArmorState guards a
+            // zero refillSeconds, even though nothing today ever calls this with such a value.
+            fireRateMultiplier = Mathf.Max(0.0001f, fireRate);
+            rangeMultiplier = range;
+        }
 
         /// <summary>Where the muzzle currently sits in world space, unclamped - the Transform's own
         /// point, used for cosmetics (muzzle flash placement point before the clearance pull-back)
@@ -298,7 +331,10 @@ namespace Overpower.Weapons
             // time it read nextFireTime, this line had already moved the goalposts.
             float chargeFraction = ChargeFraction();
 
-            nextFireTime = Time.time + weapon.FireInterval;
+            // Task 2.6: a fire-rate multiplier over 1 shrinks the effective interval (dividing,
+            // not multiplying) - see SetStatMultipliers's own comment for why this can never be
+            // zero or negative.
+            nextFireTime = Time.time + weapon.FireInterval / fireRateMultiplier;
 
             // Heat is charged once per TRIGGER PULL, not once per projectile - see the tooltip on
             // Overheat Per Shot. A five-pellet shotgun costs the same heat as a single bullet.
@@ -323,10 +359,17 @@ namespace Overpower.Weapons
             aim?.RegisterShot();
 
             int seed = Random.Range(int.MinValue, int.MaxValue);
-            RefundHeatIfBeamConnects(origin, direction, targetPoint, coneAngle, seed, chargeFraction);
+            RefundHeatIfBeamConnects(origin, direction, targetPoint, coneAngle, seed, chargeFraction,
+                                      damageMultiplier, rangeMultiplier);
 
+            // Task 2.6: damageMultiplier/rangeMultiplier are appended AFTER chargeFraction and
+            // BEFORE PhotonMessageInfo - appending RPC parameters does not touch the RpcList (it
+            // indexes method NAMES, not signatures - see PhotonServerSettings.RpcList), but every
+            // client must be running this same build for the extra parameters to line up, so
+            // rebuild every Player before a two-client check that exercises this RPC.
             photonView.RPC(nameof(RPC_FireWeapon), RpcTarget.AllViaServer, weapon.Id, origin,
-                           direction, targetPoint, coneAngle, seed, chargeFraction);
+                           direction, targetPoint, coneAngle, seed, chargeFraction,
+                           damageMultiplier, rangeMultiplier);
             return true;
         }
 
@@ -360,7 +403,8 @@ namespace Overpower.Weapons
         /// weapon has a refund today.
         /// </summary>
         private void RefundHeatIfBeamConnects(Vector3 origin, Vector3 direction, Vector3 targetPoint,
-                                              float coneAngle, int seed, float chargeFraction)
+                                              float coneAngle, int seed, float chargeFraction,
+                                              float damageMultiplier, float rangeMultiplier)
         {
             if (overheat == null || weapon.OverheatRefundOnHit <= 0f || weapon.ProjectilePrefab == null)
                 return;
@@ -375,7 +419,8 @@ namespace Overpower.Weapons
             Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int shooterTeam);
 
             ProjectileContext[] shots = BuildShots(weapon, direction, targetPoint, coneAngle, seed,
-                                                    shooterActor, shooterTeam, chargeFraction);
+                                                    shooterActor, shooterTeam, chargeFraction,
+                                                    damageMultiplier, rangeMultiplier);
             for (int i = 0; i < shots.Length; i++)
             {
                 if (beam.Resolve(origin, shots[i]).Connected)
@@ -422,7 +467,8 @@ namespace Overpower.Weapons
         [PunRPC]
         private void RPC_FireWeapon(int weaponId, Vector3 origin, Vector3 aimDirection,
                                     Vector3 targetPoint, float coneAngleDegrees, int seed,
-                                    float chargeFraction, PhotonMessageInfo info)
+                                    float chargeFraction, float damageMultiplier, float rangeMultiplier,
+                                    PhotonMessageInfo info)
         {
             // By id through the catalogue, never by list position: an id that resolved by order
             // would silently re-map everyone's weapon the moment the list was tidied up.
@@ -438,8 +484,13 @@ namespace Overpower.Weapons
             int shooterActor = info.Sender != null ? info.Sender.ActorNumber : -1;
             Teams.TryGetTeam(info.Sender, out int shooterTeam);
 
+            // damageMultiplier/rangeMultiplier are the SHOOTER's OverPower state (Task 2.6, GDD
+            // p.20) at the moment it fired, carried as RPC parameters so every client - including
+            // the shooter's own - builds an identical shot. Never re-read locally: a receiver has
+            // no way to know another player's OverPower state, and is not supposed to need one.
             ProjectileContext[] shots = BuildShots(fired, aimDirection, targetPoint, coneAngleDegrees,
-                                                    seed, shooterActor, shooterTeam, chargeFraction);
+                                                    seed, shooterActor, shooterTeam, chargeFraction,
+                                                    damageMultiplier, rangeMultiplier);
 
             // Task 11b (design [T] - Tudor reversed the earlier "no warning" call, see the comment on
             // IgnoreWalls.cs): a weapon with a wind-up shows its warning line(s) now and only fires
@@ -574,14 +625,20 @@ namespace Overpower.Weapons
         ///
         /// Charge scales two things here, both derived from the one chargeFraction parameter that
         /// already crosses the wire - no second RPC value was needed for either.
+        ///
+        /// damageMultiplier/rangeMultiplier (Task 2.6) are the shooter's OverPower state, 1 when
+        /// nothing has boosted it - damage is scaled once here, on top of any charge scaling;
+        /// range is handed to ProjectileContext's own constructor (see its RangeMultiplier
+        /// property) rather than applied a second time in this method.
         /// </summary>
         private static ProjectileContext[] BuildShots(WeaponDefinition weapon, Vector3 aimDirection,
                                                        Vector3 targetPoint, float coneAngleDegrees,
                                                        int seed, int shooterActor, int shooterTeam,
-                                                       float chargeFraction)
+                                                       float chargeFraction, float damageMultiplier,
+                                                       float rangeMultiplier)
         {
             int count = ChargedProjectileCount(weapon, chargeFraction);
-            float damage = ChargedDamage(weapon, chargeFraction);
+            float damage = ChargedDamage(weapon, chargeFraction) * damageMultiplier;
             var rng = new System.Random(seed);
 
             // A cone pinned at exactly the width the shooter fired with, so the tested sampler in
@@ -597,7 +654,7 @@ namespace Overpower.Weapons
                 // in one place when the trigger went down, whatever the spread did to each
                 // projectile's heading afterwards.
                 shots[i] = new ProjectileContext(weapon, shooterActor, shooterTeam, direction,
-                                                  targetPoint, chargeFraction, damage);
+                                                  targetPoint, chargeFraction, damage, rangeMultiplier);
             }
 
             return shots;
