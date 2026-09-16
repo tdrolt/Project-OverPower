@@ -161,6 +161,12 @@ namespace Overpower.UI
         public Color loadoutSelectableColor = new Color(0.16f, 0.16f, 0.19f, 0.95f);
         [Tooltip("Node fill for a weapon you already passed through on the way to your current one.")]
         public Color loadoutOwnedColor = new Color(0.30f, 0.30f, 0.33f, 0.85f);
+        [Tooltip("Node/card fill for a Selectable item the shop gate refuses right now (out of territory, in combat, or short of gold) - Task 2.5b review fix 1. Deliberately its OWN colour, distinct from Locked Colour: a shop-blocked item is still reachable (leave the zone, wait out combat, earn the gold) where a tree-Locked item genuinely cannot be picked yet, and the two used to be painted identically. Also distinct from the HUD's Slot Blocked Colour, which marks a HUD ability slot that cannot fire right now (dead/stunned/recharging) - a different question with its own look.")]
+        public Color loadoutShopBlockedColor = new Color(0.22f, 0.14f, 0.05f, 0.92f);
+        [Tooltip("Font size percentage (of Body/Small Text Size) for the price/status line under a weapon node or ability card's name - e.g. \"<size=70%>\" (Task 2.5b review fix 6: this used to be a magic string typed out at every call site).")]
+        [Range(10f, 100f)] public float loadoutPriceLineSizePercent = 70f;
+        [Tooltip("Seconds a refused click's reason (\"Need 700 more gold\", \"Out of combat in 2.4s\"...) stays shown in the header status line before it reverts to the ordinary gate status - Task 2.5b review fix 2. A click on a shop-blocked item used to do nothing visible at all.")]
+        public float loadoutBlockedReasonDurationSeconds = 2f;
         [Tooltip("Fixed height of the hover-description strip under the weapon/ability columns, in canvas units - fixed so switching between a short weapon hover and a long ability description never resizes the panel around it. Generous enough for a three-line name/description/numbers block; a longer hover string overflows past it rather than growing it.")]
         public float loadoutDescriptionPanelHeight = 150f;
         [Tooltip("Width of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]

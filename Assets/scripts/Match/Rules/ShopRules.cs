@@ -33,10 +33,12 @@ namespace Overpower.Match
         /// Equipment slots EMPTY (Task 2.5a) rather than pre-loaded with a free starting pick, so
         /// the GDD's "starting kit is free" [G p.17-18] has to be read here instead: the FIRST pick
         /// into an empty Mobility or Equipment slot is free, and only a later CHANGE away from it
-        /// costs the ability's own price [C, assumptions-for-tudor.md]. The Ultimate slot is never
-        /// free even when empty - GDD p.18 has it bought, not started with.</summary>
+        /// costs the ability's own price [C, assumptions-for-tudor.md]. Named explicitly rather
+        /// than "free unless Ultimate" (Task 2.5b review fix 5) - AbilitySlot has a fourth value,
+        /// Primary, which the old check also silently freed; Primary is never actually offered
+        /// through this screen, but the rule itself should not depend on that being true forever.</summary>
         public static int AbilityPrice(bool slotIsEmpty, AbilitySlot slot, int goldCost) =>
-            slotIsEmpty && slot != AbilitySlot.Ultimate ? 0 : goldCost;
+            slotIsEmpty && (slot == AbilitySlot.Mobility || slot == AbilitySlot.Equipment) ? 0 : goldCost;
     }
 
     /// <summary>What a player has paid per category, so "undo" can refund part of it. Local to the

@@ -46,22 +46,29 @@ namespace Overpower.UI
 
         public float SecondsUntilOutOfCombat => ShopRules.SecondsUntilOutOfCombat(SecondsSinceCombat, RequiredOutOfCombatSeconds);
 
+        /// <summary>Why a SPECIFIC purchase attempt is blocked, in one place (Task 2.5b review
+        /// fix 2) so StatusText's generic (price-less) header question and a refused click's own
+        /// item-specific reason (LoadoutScreen.ShowBlockedReason) always agree on the wording.
+        /// Price is the item actually being bought - 0 for the header's own question, since
+        /// CannotAfford is deliberately per-item there (shown on the node/card, not the header) -
+        /// but the real price when a click's own gate check found CannotAfford, so the shortfall
+        /// ("Need 700 more gold") is the real one, not always zero.</summary>
+        public string ReasonText(PurchaseBlock block, int price)
+        {
+            switch (block)
+            {
+                case PurchaseBlock.NotInOwnTerritory: return "Go to a zone your team owns";
+                case PurchaseBlock.InCombat: return $"Out of combat in {SecondsUntilOutOfCombat.ToString("0.0", CultureInfo.InvariantCulture)}s";
+                case PurchaseBlock.CannotAfford: return $"Need {price - Balance} more gold";
+                default: return "";
+            }
+        }
+
         /// <summary>The header's status line: why nothing can be bought here right now (checked with
         /// no price of its own, so CannotAfford never fires for this generic question - that is
         /// per-item, shown on the node/card itself instead), or "" once the gate holds. Free Loadout
         /// gets its own single note here instead of a block reason, matching the header's brief.</summary>
-        public string StatusText()
-        {
-            if (FreeLoadout)
-                return "Free (test mode)";
-
-            switch (Check(0))
-            {
-                case PurchaseBlock.NotInOwnTerritory: return "Go to a zone your team owns";
-                case PurchaseBlock.InCombat: return $"Out of combat in {SecondsUntilOutOfCombat.ToString("0.0", CultureInfo.InvariantCulture)}s";
-                default: return "";
-            }
-        }
+        public string StatusText() => FreeLoadout ? "Free (test mode)" : ReasonText(Check(0), 0);
     }
 
     /// <summary>Builds a ShopContext from live player state - the one place LoadoutScreen asks
@@ -98,5 +105,19 @@ namespace Overpower.UI
         /// Loadout: prices stay shown as real info even while testing for free (assignment brief),
         /// so a designer previews the real economy without it costing them anything yet.</summary>
         public static string PriceLabel(int price) => price > 0 ? price.ToString(CultureInfo.InvariantCulture) : "Free";
+
+        /// <summary>A node/card's own price line while the shop gate specifically CANNOT afford it
+        /// right now - "1200 · need 700" (Task 2.5b review fix 1), shortfall = price - balance,
+        /// the same subtraction ShopContext.ReasonText's "Need N more gold" uses for the header.
+        /// Every OTHER block (territory/combat, already explained by the header status line, or no
+        /// block at all) just reads the plain PriceLabel - piling a second reason onto the node
+        /// would repeat what the header already says.</summary>
+        public static string PriceLine(int price, PurchaseBlock block, int balance) =>
+            block == PurchaseBlock.CannotAfford ? $"{PriceLabel(price)} · need {price - balance}" : PriceLabel(price);
+
+        /// <summary>"Gold 1234" - CultureInfo.InvariantCulture (Task 2.5b review fix 4), matching
+        /// PlayerHud.UpdateGold's own gold formatting so the HUD and this header never disagree on
+        /// a decimal/thousands separator on a non-English Windows locale.</summary>
+        public static string GoldLabel(int balance) => $"Gold {balance.ToString(CultureInfo.InvariantCulture)}";
     }
 }

@@ -169,14 +169,27 @@ namespace Overpower.UI
         private TextMeshProUGUI goldLabel;
         private TextMeshProUGUI statusLabel;
 
-        // Cached against the LAST TEXT ACTUALLY DRAWN, not against the raw numbers, so Update()'s
-        // per-frame poll (see its own comment) can call RefreshHeader every frame for cheap - most
-        // frames this comparison is the only work done - while the label itself is only ever
-        // touched when what it would say actually changes, exactly the "tenths of a second" cadence
-        // the brief asks for (the seconds-until-ok string only changes when its own tenths digit
-        // does; see ShopContext.StatusText).
-        private string lastGoldText;
+        // Task 2.5b review fix 3: cached against the raw gold int / block enum / out-of-combat
+        // TENTH-of-a-second, not against a formatted string, so Update()'s per-frame poll (see its
+        // own comment) can call RefreshHeader every frame for cheap without building "Gold {gold}"
+        // or the status text just to throw the result away when nothing changed - most frames these
+        // comparisons are the only work done. lastStatusText still records the last string actually
+        // drawn (from either path below) purely so the two paths never redundantly rewrite the same
+        // text as one another.
+        private bool headerInitialized;
+        private int lastDisplayedGold;
+        private bool lastDisplayedFreeLoadout;
+        private PurchaseBlock lastDisplayedBlock;
+        private int lastDisplayedTenths;
         private string lastStatusText;
+
+        // Task 2.5b review fix 2: a refused click's own reason, shown in the header status line in
+        // place of the ordinary gate status until Loadout Blocked Reason Duration Seconds (UiTheme)
+        // runs out - see ShowBlockedReason. Expiry <= 0 means "no override active"; Time.time is
+        // never <= 0 once the game has been running for any length of time, so this doubles as the
+        // "not yet used" sentinel with no separate bool needed.
+        private string blockedReasonText = "";
+        private float blockedReasonExpiryTime = -1f;
 
         /// <summary>Shown under the Ultimate heading only while that slot is empty ("Buy an
         /// ultimate") - the one ability slot with no card that can ever read Equipped at spawn, so
@@ -370,16 +383,18 @@ namespace Overpower.UI
             // Task 2.5b: gold can rise from passive territory income, and the gate can flip from
             // walking into your own zone or the combat timer running out - either changes what
             // every node/card should look like, with nothing on THIS screen clicked (same reasoning
-            // as the weapon/armor poll above).
+            // as the weapon/armor poll above). Built ONCE here (Task 2.5b review fix 3 - this used
+            // to be built again inside RefreshHeader every frame) and passed down to whichever of
+            // Refresh/RefreshHeader below actually runs.
             int gold = goldWallet != null ? goldWallet.Balance : 0;
             ShopContext ctx = CurrentShopContext();
             bool blocked = ctx.Check(0) != PurchaseBlock.None;
 
             if (weaponId != lastKnownWeaponId || absorbLevel != lastKnownAbsorbLevel || rechargeLevel != lastKnownRechargeLevel
                 || gold != lastKnownGold || blocked != lastKnownBlocked)
-                Refresh();
+                Refresh(ctx);
             else
-                RefreshHeader(); // Still cheap even when nothing else changed - see RefreshHeader's own comment.
+                RefreshHeader(ctx); // Still cheap even when nothing else changed - see RefreshHeader's own comment.
         }
 
         private void HandleAliveChanged(bool alive)
@@ -445,12 +460,19 @@ namespace Overpower.UI
         /// stale here until something on THIS screen happened to be clicked. Abilities need no
         /// such poll: AbilityRunner.SlotChanged already fires for every equip from every source,
         /// and Refresh is already subscribed to it directly.</summary>
-        private void Refresh()
+        private void Refresh() => Refresh(CurrentShopContext());
+
+        /// <summary>Overload taking an already-built ShopContext (Task 2.5b review fix 3) for
+        /// callers that already have one this frame (Update()'s own poll) - every other caller
+        /// (Open, a click on this screen, AbilityRunner.SlotChanged) goes through the parameterless
+        /// Refresh() above, which builds the one ctx this whole pass needs exactly once instead of
+        /// each Refresh* method below building its own.</summary>
+        private void Refresh(ShopContext ctx)
         {
-            RefreshHeader();
-            RefreshWeaponTree();
-            RefreshArmor();
-            RefreshAbilities();
+            RefreshHeader(ctx);
+            RefreshWeaponTree(ctx);
+            RefreshArmor(ctx);
+            RefreshAbilities(ctx);
             RefreshResetLabels();
 
             // Snapshot what was just drawn, so Update()'s poll (Task 9a review) only calls back in
@@ -460,7 +482,7 @@ namespace Overpower.UI
             lastKnownAbsorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
             lastKnownRechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
             lastKnownGold = goldWallet != null ? goldWallet.Balance : 0;
-            lastKnownBlocked = CurrentShopContext().Check(0) != PurchaseBlock.None;
+            lastKnownBlocked = ctx.Check(0) != PurchaseBlock.None;
         }
 
         /// <summary>This player's shop gate and balance right now - built fresh each call (cheap:
@@ -471,32 +493,75 @@ namespace Overpower.UI
         private ShopContext CurrentShopContext() =>
             ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position);
 
-        /// <summary>Header row: "Gold 1234" and the status line (a block reason, the Free Loadout
-        /// note, or ""). Called every frame while open (see Update()'s own comment) but only ever
-        /// writes a label's .text when the STRING it would show actually changed - lastGoldText/
-        /// lastStatusText, not the raw numbers, so a countdown only redraws on the tenth of a second
-        /// its own displayed digit moves, per the brief.</summary>
-        private void RefreshHeader()
+        /// <summary>Header row: "Gold 1234" and the status line - a refused click's own reason
+        /// (Task 2.5b review fix 2, see ShowBlockedReason) while its timer runs, else the shop
+        /// gate's ordinary status (ShopContext.StatusText). Called every frame while open (see
+        /// Update()'s own comment) with the SAME ShopContext Update() already built for this frame
+        /// (fix 3 - this used to build a second one every frame, and always format "Gold {gold}"
+        /// before ever comparing it to what was last drawn). Every comparison below happens on the
+        /// raw gold int, the block enum, or the countdown's own tenth-of-a-second BEFORE any string
+        /// is built, so a frame where nothing actually changed does no string formatting at all.</summary>
+        private void RefreshHeader(ShopContext ctx)
         {
             int gold = goldWallet != null ? goldWallet.Balance : 0;
-            string goldText = $"Gold {gold}";
-            if (goldText != lastGoldText)
+            if (!headerInitialized || gold != lastDisplayedGold)
             {
-                goldLabel.text = goldText;
-                lastGoldText = goldText;
+                goldLabel.text = ShopPricing.GoldLabel(gold);
+                lastDisplayedGold = gold;
             }
 
-            ShopContext ctx = CurrentShopContext();
-            string statusText = ctx.StatusText();
-            if (statusText != lastStatusText)
+            bool reasonActive = blockedReasonExpiryTime > 0f && Time.time < blockedReasonExpiryTime;
+            if (reasonActive)
             {
+                if (blockedReasonText != lastStatusText)
+                {
+                    statusLabel.text = blockedReasonText;
+                    statusLabel.color = theme.overheatWarningColor; // Always a block reason - never muted.
+                    lastStatusText = blockedReasonText;
+                }
+                headerInitialized = true;
+                return; // The reason's own timer owns the status line until it expires - see below.
+            }
+            // The reason just expired (or there never was one) - either way the label may currently
+            // show blockedReasonText, which the raw comparisons below know nothing about (they only
+            // track the NORMAL status's own last value, and the normal status may genuinely not have
+            // changed underneath the reason). "justExpired" forces one write to replace it even when
+            // the normal status equals what it was before the reason interrupted it - without this a
+            // reason whose gate condition never changed (e.g. still out of territory) would get
+            // stuck on screen forever once its timer ran out.
+            bool justExpired = blockedReasonExpiryTime > 0f;
+            blockedReasonExpiryTime = -1f;
+
+            PurchaseBlock block = ctx.FreeLoadout ? PurchaseBlock.None : ctx.Check(0);
+            int tenths = block == PurchaseBlock.InCombat ? Mathf.RoundToInt(ctx.SecondsUntilOutOfCombat * 10f) : 0;
+
+            if (justExpired || !headerInitialized || ctx.FreeLoadout != lastDisplayedFreeLoadout || block != lastDisplayedBlock || tenths != lastDisplayedTenths)
+            {
+                string statusText = ctx.StatusText();
                 statusLabel.text = statusText;
                 // Free Loadout's note and "all clear" (empty string) both read as a plain aside;
                 // an actual block reason borrows the overheat-warning amber so it reads as the same
                 // kind of "something is stopping you" signal the HUD already uses elsewhere.
                 statusLabel.color = statusText.Length == 0 || ctx.FreeLoadout ? theme.mutedTextColor : theme.overheatWarningColor;
                 lastStatusText = statusText;
+                lastDisplayedFreeLoadout = ctx.FreeLoadout;
+                lastDisplayedBlock = block;
+                lastDisplayedTenths = tenths;
             }
+            headerInitialized = true;
+        }
+
+        /// <summary>Task 2.5b review fix 2: a click refused by the shop gate used to return silently
+        /// with nothing shown anywhere - this is what actually tells the player why, by taking over
+        /// the header status line for Loadout Blocked Reason Duration Seconds (UiTheme) before it
+        /// reverts to the ordinary gate status on its own. Takes the SAME ctx and price the calling
+        /// click handler already built its own gate check from, so a CannotAfford reason quotes the
+        /// real shortfall for the item that was actually clicked.</summary>
+        private void ShowBlockedReason(ShopContext ctx, PurchaseBlock block, int price)
+        {
+            blockedReasonText = ctx.ReasonText(block, price);
+            blockedReasonExpiryTime = Time.time + theme.loadoutBlockedReasonDurationSeconds;
+            RefreshHeader(ctx); // Shows it from the same frame as the click, not one frame late.
         }
 
         /// <summary>Rewrites the Reset Weapon/Reset Armor buttons' own labels with a refund preview
@@ -667,17 +732,21 @@ namespace Overpower.UI
             if (!tree.CanUpgrade(equipped, weaponId))
                 return;
 
-            // Task 2.5b: a Selectable node stays clickable even while shop-blocked (see StyleNode) -
-            // the click itself, refused here, IS how a player learns why; the node's colour and the
-            // header status line already said so before they clicked.
+            // Task 2.5b review fix 2: a Selectable node stays clickable even while shop-blocked (see
+            // StyleNode) - a refused click used to return here with nothing shown anywhere.
+            // ShowBlockedReason is what actually tells the player why, in the header status line.
             WeaponDefinition target = weapons.Resolve(weaponId);
             int price = target != null ? target.GoldCost : 0;
             ShopContext ctx = CurrentShopContext();
 
             if (!ctx.FreeLoadout)
             {
-                if (ctx.Check(price) != PurchaseBlock.None)
+                PurchaseBlock block = ctx.Check(price);
+                if (block != PurchaseBlock.None)
+                {
+                    ShowBlockedReason(ctx, block, price);
                     return;
+                }
                 if (goldWallet == null || !goldWallet.TrySpend(price))
                     return;
                 ledger.RecordWeapon(price);
@@ -698,8 +767,12 @@ namespace Overpower.UI
             ShopContext ctx = CurrentShopContext();
             if (!ctx.FreeLoadout)
             {
-                if (ctx.Check(0) != PurchaseBlock.None)
+                PurchaseBlock block = ctx.Check(0);
+                if (block != PurchaseBlock.None)
+                {
+                    ShowBlockedReason(ctx, block, 0);
                     return;
+                }
                 if (goldWallet != null && gameplayConfig != null)
                     goldWallet.Add(ledger.SellWeapon(gameplayConfig.SellRefundRate));
             }
@@ -711,35 +784,37 @@ namespace Overpower.UI
         private int CurrentWeaponId() =>
             weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : tree.RootId;
 
-        private void RefreshWeaponTree()
+        private void RefreshWeaponTree(ShopContext ctx)
         {
             if (tree == null || weapons == null)
                 return;
 
             int equipped = CurrentWeaponId();
-            ShopContext ctx = CurrentShopContext();
             foreach (var pair in weaponNodes)
                 StyleNode(pair.Value, tree.StateOf(pair.Key, equipped), weapons.Resolve(pair.Key), ctx);
         }
 
         /// <summary>Task 2.5b: the label's second line now reads "Equipped"/"Owned" for a weapon
-        /// already reached, or its price otherwise (ShopPricing.PriceLabel) - shown even under Free
+        /// already reached, or its price otherwise (ShopPricing.PriceLine) - shown even under Free
         /// Loadout, which only changes whether the price is actually charged, not whether it is
-        /// shown (assignment brief). A Selectable node that is out of territory/combat/gold reads
-        /// exactly like Locked (dark fill, muted text) but STAYS interactable: the click is what
-        /// tells the player why (OnWeaponNodeClicked re-checks the same rule), and a disabled
-        /// button would also stop it being hoverable for the price/description below.</summary>
+        /// shown (assignment brief). A Selectable node the shop gate refuses right now (out of
+        /// territory/combat/gold) gets its OWN look (Loadout Shop Blocked Colour, Task 2.5b review
+        /// fix 1 - this used to be painted with Locked Colour, indistinguishable from a genuinely
+        /// Locked node) but STAYS interactable: OnWeaponNodeClicked re-checks the same rule and,
+        /// on a refusal, shows the specific reason in the header (ShowBlockedReason, fix 2) - a
+        /// disabled button would also stop this node being hoverable for the price/description
+        /// panel below.</summary>
         private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state, WeaponDefinition def, ShopContext ctx)
         {
+            PurchaseBlock block = state == UpgradeNodeState.Selectable && def != null ? ctx.Check(def.GoldCost) : PurchaseBlock.None;
+            bool shopBlocked = block != PurchaseBlock.None;
+
             string suffix = state == UpgradeNodeState.Equipped ? "Equipped"
                           : state == UpgradeNodeState.Owned ? "Owned"
-                          : def != null ? ShopPricing.PriceLabel(def.GoldCost) : "";
-            // <size=70%> on the price/status line only - the node is small (Loadout Node Width x
-            // Height) and two full-size lines would not both fit; see Task 2.5b's own verification
-            // capture for whether this needs a further pass.
-            ui.label.text = def != null ? $"{def.DisplayName}\n<size=70%>{suffix}</size>" : suffix;
-
-            bool shopBlocked = state == UpgradeNodeState.Selectable && def != null && ctx.Check(def.GoldCost) != PurchaseBlock.None;
+                          : def != null ? ShopPricing.PriceLine(def.GoldCost, block, ctx.Balance) : "";
+            // Loadout Price Line Size Percent (UiTheme) on the price/status line only - the node is
+            // small (Loadout Node Width x Height) and two full-size lines would not both fit.
+            ui.label.text = def != null ? $"{def.DisplayName}\n<size={theme.loadoutPriceLineSizePercent}%>{suffix}</size>" : suffix;
 
             switch (state)
             {
@@ -751,7 +826,7 @@ namespace Overpower.UI
                     break;
                 case UpgradeNodeState.Selectable:
                     ui.outer.color = Color.clear;
-                    ui.inner.color = shopBlocked ? theme.lockedColor : theme.loadoutSelectableColor;
+                    ui.inner.color = shopBlocked ? theme.loadoutShopBlockedColor : theme.loadoutSelectableColor;
                     ui.label.color = shopBlocked ? theme.mutedTextColor : theme.textColor;
                     ui.button.interactable = true;
                     break;
@@ -837,8 +912,12 @@ namespace Overpower.UI
 
             if (!ctx.FreeLoadout)
             {
-                if (ctx.Check(price) != PurchaseBlock.None)
+                PurchaseBlock block = ctx.Check(price);
+                if (block != PurchaseBlock.None)
+                {
+                    ShowBlockedReason(ctx, block, price);
                     return;
+                }
                 if (goldWallet == null || !goldWallet.TrySpend(price))
                     return;
                 ledger.RecordArmor(price);
@@ -854,8 +933,12 @@ namespace Overpower.UI
             ShopContext ctx = CurrentShopContext();
             if (!ctx.FreeLoadout)
             {
-                if (ctx.Check(0) != PurchaseBlock.None)
+                PurchaseBlock block = ctx.Check(0);
+                if (block != PurchaseBlock.None)
+                {
+                    ShowBlockedReason(ctx, block, 0);
                     return;
+                }
                 if (goldWallet != null && gameplayConfig != null)
                     goldWallet.Add(ledger.SellArmor(gameplayConfig.SellRefundRate));
             }
@@ -868,10 +951,11 @@ namespace Overpower.UI
         /// up front from the same ArmorUpgradePath rule TryUpgrade itself would apply, so a click
         /// that would be refused is never even offered - unlike the F1 panel, whose console log is a
         /// designer convenience this player-facing screen does not need. Task 2.5b adds the next
-        /// purchase's price next to whichever path can still be bought, and mutes both rows' text
-        /// (not the + buttons themselves, which the CanUpgrade check above already governs) while
+        /// purchase's price (ShopPricing.PriceLine - a CannotAfford shortfall included, Task 2.5b
+        /// review fix 1) next to whichever path can still be bought, and mutes both rows' text (not
+        /// the + buttons themselves, which the CanUpgrade check above already governs) while
         /// shop-blocked, matching the weapon tree's own "still visible, reads as unavailable" look.</summary>
-        private void RefreshArmor()
+        private void RefreshArmor(ShopContext ctx)
         {
             if (playerHealth == null || armorConfig == null)
                 return;
@@ -881,14 +965,15 @@ namespace Overpower.UI
 
             var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel);
             int nextPrice = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
-            ShopContext ctx = CurrentShopContext();
-            bool gateBlocked = ctx.Check(nextPrice) != PurchaseBlock.None;
+            PurchaseBlock block = ctx.Check(nextPrice);
+            bool gateBlocked = block != PurchaseBlock.None;
+            string priceLine = ShopPricing.PriceLine(nextPrice, block, ctx.Balance);
 
             absorbText.text = path.CanUpgradeAbsorb
-                ? $"Absorb {playerHealth.AbsorbLevel}/{absorbMax} ({ShopPricing.PriceLabel(nextPrice)})"
+                ? $"Absorb {playerHealth.AbsorbLevel}/{absorbMax} ({priceLine})"
                 : $"Absorb {playerHealth.AbsorbLevel}/{absorbMax}";
             rechargeText.text = path.CanUpgradeRecharge
-                ? $"Recharge {playerHealth.RechargeLevel}/{rechargeMax} ({ShopPricing.PriceLabel(nextPrice)})"
+                ? $"Recharge {playerHealth.RechargeLevel}/{rechargeMax} ({priceLine})"
                 : $"Recharge {playerHealth.RechargeLevel}/{rechargeMax}";
             absorbText.color = path.CanUpgradeAbsorb && gateBlocked ? theme.mutedTextColor : theme.textColor;
             rechargeText.color = path.CanUpgradeRecharge && gateBlocked ? theme.mutedTextColor : theme.textColor;
@@ -1027,8 +1112,12 @@ namespace Overpower.UI
 
             if (!ctx.FreeLoadout)
             {
-                if (ctx.Check(price) != PurchaseBlock.None)
+                PurchaseBlock block = ctx.Check(price);
+                if (block != PurchaseBlock.None)
+                {
+                    ShowBlockedReason(ctx, block, price);
                     return;
+                }
                 // No ledger entry: abilities have no sell-back path (GDD silent on it), and a free
                 // first pick has nothing paid to refund anyway.
                 if (price > 0 && (goldWallet == null || !goldWallet.TrySpend(price)))
@@ -1040,16 +1129,16 @@ namespace Overpower.UI
         }
 
         /// <summary>Equipped gets the weapon tree's own Equipped look (highlight border) and its
-        /// label reads "Equipped"; every other card shows its price (ShopPricing.PriceLabel of
-        /// ShopRules.AbilityPrice - "Free" for a first pick into an empty Mobility/Equipment slot)
-        /// and, while shop-blocked, the same dark-fill/muted-text look Selectable weapon nodes use -
-        /// see StyleNode's own comment for why that stays interactable rather than disabled.</summary>
-        private void RefreshAbilities()
+        /// label reads "Equipped"; every other card shows its price (ShopPricing.PriceLine of
+        /// ShopRules.AbilityPrice - "Free" for a first pick into an empty Mobility/Equipment slot,
+        /// or a CannotAfford shortfall) and, while shop-blocked, its OWN look (Loadout Shop Blocked
+        /// Colour, Task 2.5b review fix 1) rather than Locked Colour - see StyleNode's own comment
+        /// for why this stays interactable rather than disabled.</summary>
+        private void RefreshAbilities(ShopContext ctx)
         {
             if (abilityRunner == null || abilities == null)
                 return;
 
-            ShopContext ctx = CurrentShopContext();
             foreach (var pair in abilityCards)
             {
                 AbilitySlot slot = pair.Key.slot;
@@ -1060,12 +1149,14 @@ namespace Overpower.UI
                 AbilityDefinition def = abilities.Resolve(cardId);
                 int goldCost = def != null ? def.GoldCost : 0;
                 int price = equipped ? 0 : ShopRules.AbilityPrice(equippedId == LoadoutProperties.Empty, slot, goldCost);
-                bool shopBlocked = !equipped && ctx.Check(price) != PurchaseBlock.None;
+                PurchaseBlock block = equipped ? PurchaseBlock.None : ctx.Check(price);
+                bool shopBlocked = block != PurchaseBlock.None;
 
                 AbilityCardUi ui = pair.Value;
-                ui.label.text = def != null ? $"{def.DisplayName}\n<size=70%>{(equipped ? "Equipped" : ShopPricing.PriceLabel(price))}</size>" : "";
+                string suffix = equipped ? "Equipped" : ShopPricing.PriceLine(price, block, ctx.Balance);
+                ui.label.text = def != null ? $"{def.DisplayName}\n<size={theme.loadoutPriceLineSizePercent}%>{suffix}</size>" : "";
                 ui.outer.color = equipped ? theme.highlightColor : Color.clear;
-                ui.inner.color = shopBlocked ? theme.lockedColor : theme.loadoutSelectableColor;
+                ui.inner.color = shopBlocked ? theme.loadoutShopBlockedColor : theme.loadoutSelectableColor;
                 ui.label.color = shopBlocked ? theme.mutedTextColor : theme.textColor;
             }
 

@@ -83,5 +83,17 @@ namespace Overpower.Tests
             Assert.AreEqual(1550, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Ultimate, goldCost: 1550));
             Assert.AreEqual(1550, ShopRules.AbilityPrice(slotIsEmpty: false, AbilitySlot.Ultimate, goldCost: 1550));
         }
+
+        [Test]
+        public void EmptyPrimarySlotIsNotFree()
+        {
+            // Task 2.5b review fix 5: AbilitySlot has FOUR values (Primary, Equipment, Ultimate,
+            // Mobility) - the old rule read "free unless Ultimate", which silently also freed an
+            // empty Primary slot. Nothing equips Primary through this screen today
+            // (LoadoutScreen.SlotHeading's own comment: "Primary never reaches here"), but the RULE
+            // itself must say "free only for Mobility/Equipment" explicitly rather than relying on
+            // that coincidence.
+            Assert.AreEqual(800, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Primary, goldCost: 800));
+        }
     }
 }
