@@ -131,6 +131,11 @@ namespace Overpower.Data
         public float SellRefundRate => sellRefundRate;
 
         [Header("OverPower (Task 2.6, GDD p.20)")]
+        [Tooltip("Turn off to disable the OverPower comeback buff entirely for a playtest. Nothing " +
+                 "arms, triggers or shows on the HUD.")]
+        [SerializeField] private bool enableOverPower = true;
+        public bool EnableOverPower => enableOverPower;
+
         [Tooltip("Seconds between two different enemy teams' hits for them to count as the same " +
                  "'attacked by both enemy teams' moment that arms the comeback buff. Too short and " +
                  "a real 3v1 gang-up would not register as simultaneous; too long and any two " +

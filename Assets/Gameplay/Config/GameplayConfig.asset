@@ -29,6 +29,7 @@ MonoBehaviour:
   abilityPressBufferSeconds: 0.12
   freeLoadout: 1
   sellRefundRate: 0.5
+  enableOverPower: 1
   overPowerWindowSeconds: 3
   overPowerRadius: 15
   overPowerHealthThreshold: 35

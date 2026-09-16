@@ -157,6 +157,13 @@ namespace Overpower.Match
         /// </summary>
         private void RegisterHitFrom(int attackerTeam)
         {
+            // Task: GameplayConfig.EnableOverPower is the whole kill switch for a playtest - gating
+            // here (the one place every real hit AND every reflection-driven test both funnel
+            // through) means Armed can never become true while it's off, so CheckTrigger below never
+            // fires, Activate never runs, and the HUD label (shown = active || armed) stays hidden -
+            // all without touching Update, HandleDamaged or the HUD itself.
+            if (!gameplayConfig.EnableOverPower) return;
+
             state.RecordEnemyHit(attackerTeam, Time.time, DistanceToOwnTerritory());
         }
 
