@@ -64,7 +64,16 @@ namespace Overpower.Match
         }
 
         /// <param name="ownerByZone">Current owner per zone; a missing zone or Neutral means nobody.</param>
-        public bool MayCapture(int teamId, int zoneId, IReadOnlyDictionary<int, int> ownerByZone)
+        public bool MayCapture(int teamId, int zoneId, IReadOnlyDictionary<int, int> ownerByZone) =>
+            MayCapture(teamId, zoneId, ownerByZone, null);
+
+        /// <summary>
+        /// The same rule, where an owned neighbour only counts as a way in while it is NOT under attack (Tudor,
+        /// 2026-09-16). A team whose capital is being attacked can't use the capital to take the T2 next to it, but a
+        /// second safe owned neighbour still works. Your own capital stays capturable no matter what, as before.
+        /// </summary>
+        /// <param name="isUnderAttack">Asked for each owned neighbour; null = nothing is under attack.</param>
+        public bool MayCapture(int teamId, int zoneId, IReadOnlyDictionary<int, int> ownerByZone, System.Func<int, bool> isUnderAttack)
         {
             if (teamId < 0 || !adjacency.ContainsKey(zoneId))
                 return false;
@@ -73,7 +82,8 @@ namespace Overpower.Match
             if (IsCapitalOf(zoneId, teamId))
                 return true;
             foreach (int neighbour in AdjacentTo(zoneId))
-                if (ownerByZone.TryGetValue(neighbour, out int neighbourOwner) && neighbourOwner == teamId)
+                if (ownerByZone.TryGetValue(neighbour, out int neighbourOwner) && neighbourOwner == teamId
+                    && (isUnderAttack == null || !isUnderAttack(neighbour)))
                     return true;
             return false;
         }

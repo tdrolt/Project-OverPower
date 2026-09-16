@@ -62,11 +62,17 @@ namespace Overpower.Data
         [Tooltip("Seconds a zone that just went neutral cannot be captured by anyone.")]
         [SerializeField, Min(0f)] private float recaptureCooldownSeconds = 5f;
 
+        [Tooltip("Seconds a zone still counts as under attack after the last enemy steps out of it. While your capital " +
+                 "is under attack you respawn at its Tier 2 zone, and no zone counts as a way in for capturing while " +
+                 "it's under attack. Stops both from flickering when someone steps on and off the edge.")]
+        [SerializeField, Min(0f)] private float underAttackLingerSeconds = 3f;
+
         public int PlayersPerTeam => playersPerTeam;
         public float BountyHoldSeconds => bountyHoldSeconds;
         public int StartingGold => startingGold;
         public float DecaySeconds => decaySeconds;
         public float RecaptureCooldownSeconds => recaptureCooldownSeconds;
+        public float UnderAttackLingerSeconds => underAttackLingerSeconds;
         public int TierCount => tiers != null ? tiers.Length : 0;
 
         // Set once an out-of-range tier has already logged, so a mistyped tower spams the console

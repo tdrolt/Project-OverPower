@@ -86,5 +86,33 @@ namespace Overpower.Tests
             Assert.AreEqual(7, RealMap().CapitalOf(1));
             Assert.AreEqual(TerritoryMap.Neutral, RealMap().CapitalOf(5));
         }
+
+        [Test]
+        public void AnOwnedNeighbourUnderAttackIsNotALink()
+        {
+            // Team 0 owns only its capital 6; 6 is under attack, so T2 zone 0 can't be captured through it.
+            Assert.IsFalse(RealMap().MayCapture(0, 0, StartOwners(), zone => zone == 6));
+        }
+
+        [Test]
+        public void ASecondSafeOwnedNeighbourStillAllowsTheCapture()
+        {
+            var owners = new Dictionary<int, int> { { 6, 0 }, { 3, 0 }, { 7, 1 }, { 8, 2 } };
+            Assert.IsTrue(RealMap().MayCapture(0, 0, owners, zone => zone == 6));
+        }
+
+        [Test]
+        public void YourOwnCapitalStaysCapturableWhateverIsUnderAttack()
+        {
+            var owners = new Dictionary<int, int> { { 6, 1 }, { 7, 1 }, { 8, 2 } };
+            Assert.IsTrue(RealMap().MayCapture(0, 6, owners, zone => true));
+        }
+
+        [Test]
+        public void NoUnderAttackCheckBehavesLikeTheOriginalRule()
+        {
+            Assert.IsTrue(RealMap().MayCapture(0, 0, StartOwners(), null));
+            Assert.IsFalse(RealMap().MayCapture(0, 3, StartOwners(), null));
+        }
     }
 }

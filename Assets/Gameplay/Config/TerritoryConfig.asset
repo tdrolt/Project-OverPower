@@ -34,3 +34,4 @@ MonoBehaviour:
   startingGold: 0
   decaySeconds: 5
   recaptureCooldownSeconds: 5
+  underAttackLingerSeconds: 3
