@@ -566,8 +566,10 @@ unsubscriptions in `OnDestroy`). Every event logs through `MatchTelemetry.Instan
   - `purchase`, `refund`, `shopBlocked` lines, with the zone id standing in.
   - **`goldEarned` every sample interval:**
     - `Territory` credits summed;
-    - per-zone attribution via `IncomeAttribution.Accumulate` over the same interval, using
-      `BuildingManager.Current` owners, `TierByZone()`, `TerritoryConfig` tier rates and `PlayersPerTeam`;
+    - per-zone attribution via `IncomeAttribution.Accumulate`, **called every `Update` with that frame's delta time
+      against the live owners** (`BuildingManager.Current` owners, `TierByZone()`, `TerritoryConfig` tier rates and
+      `PlayersPerTeam`), exactly as `GoldWallet` accrues. Calling it once per interval from an end-of-interval
+      snapshot would misattribute a zone that changed hands mid-interval (T1 review);
     - write `zones` as an int array of whole gold per zone (rounded; the aggregator uses the sum, and the
       `Territory` total stays authoritative);
     - bounty, refund, debug and other totals.
