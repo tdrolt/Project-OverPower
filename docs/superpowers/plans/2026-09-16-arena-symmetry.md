@@ -1519,6 +1519,61 @@ play-mode numbers, and the test total.
 
 ---
 
+### Task A5: T3 flank pockets, cover crates, under-attack spawn move (Tudor, 2026-09-17)
+
+**Approved on sketches** `arena-proposal-t3-pocket-t1-boxes.png` and `arena-proposal-crates-zoom.png` (session
+scratchpad). All edits go in the Source third, then Rebuild thirds, so all three thirds match.
+
+**Geometry (source third; C = (65.05, 53.34); wall pivot line = outer face, 31.04 m from C; wall pieces 7 m, thickness
+0.73 m inward):**
+- **T3 flank pocket, 3 m deep [T],** around the right wall's midpoint M = C + 31.04·n, where n = (cos 30°, sin 30°) and
+  t = (−sin 30°, cos 30°) points along the wall toward the top vertex.
+  - **Remove** `Source/Boundry/Wall R 0m`, `Wall R 7m`, and `Wall L 7m`. Turned 240°, the last one is this wall's
+    s = −7 piece. The wall between s = −10.5 and +10.5 opens.
+  - **Add:**
+    - back wall: 3 pieces with outer face at M + t·s + n·3 for s = −7, 0, +7, yaw 240 (same as the old pieces);
+    - side A: centre M + t·(−10.5) + n·1.5, yaw 330, scale X 3/7;
+    - side B: centre M + t·(+10.5) + n·1.5, yaw 150, scale X 3/7.
+  - Use `Wall R 14m` as the template (same layer, collider, material).
+  - The existing covers that touch the wall stay; about 2.3 m of walkway opens behind them.
+- **Cover crates, 6 per third:**
+  - Defenders (a triangle pointing at the pocket mouth): (58.85, 111.0), (71.25, 111.0), (65.05, 101.0).
+  - Attackers (the same triangle mirrored, pointing at the capital): (65.05, 95.0), (58.85, 91.0), (71.25, 91.0).
+  - Footprint 2.1 × 2.1 m, **height ≥ 2.6 m** so shots fired from about 2 m can't pass over.
+  - Use the project's crate model: find `Box_02` with `AssetDatabase.FindAssets`. If it's missing, use a primitive cube
+    with a crate-coloured material.
+  - Put them under `Source/Props` with names `Cover Crate Defender Front/Left/Right` and
+    `Cover Crate Attacker Front/Left/Right`.
+  - Same layer as the wall template; a `BoxCollider` matching the visual; no Rigidbody.
+- **Under-attack spawn:** `Spawn Points/team (2) under attack` moves from (65.05, 92.36) to **(65.05, 82.36)**, 5 m past
+  the T2 house on the arena side, because the front attacker crate would crowd it. Rebuild snaps the other two.
+
+**Steps:**
+1. Scene not dirty. Render the arena before (the `ArenaRender` scratch script).
+2. Run one scratch script that applies all the above, calls `ArenaSymmetryBuilder.Rebuild(arena, false)` (0
+   problems), and saves the scene.
+3. Checks, from the script or evals:
+   - `Validate` returns 0; tests pass, including `ArenaSymmetrySceneTests`.
+   - Each under-attack spawn is still inside its T2 zone (`TryGetZoneAt`) and ≥ 2 m clear of any collider. Use
+     `Physics.OverlapCapsule` with the player capsule size.
+   - The capital spawn is ≥ 2 m clear of every crate.
+   - All crate-to-crate edge gaps are ≥ 3 m. Crate-to-wall and crate-to-house gaps are reported.
+4. Render after and zoom on one third. **The controller looks.**
+5. Play mode, single client:
+   - **Flank path:** teleport into the pocket walkway behind a cover (`P(s = −9, d = 1.2)` in world coordinates),
+     wait a frame, then `PlayerDisplacement.Displace` along +t for 18 m. It must reach s ≈ +9 without being blocked
+     early. Report the end s.
+   - **Cover height:** stand 6 m from a defender crate, aim at the crate's far side with `SetAimOverride`, fire 3
+     shots with weapon 1, and record projectile end positions (`shot_recorder_tpl.cs`). They must stop at the crate,
+     not pass over.
+   - Respawn under attack still works: teleport a fake attacker isn't possible with one client, so check with an eval
+     that `ChooseSpawnPoint` returns the moved transform when `IsUnderAttack` is forced (reflection).
+   - Stop play mode.
+6. Commit the scene only: `feat(arena): T3 flank pockets, cover crates, under-attack spawn behind the T2 house`. Push.
+   Log [C] lines: crate height, attacker crate positions, spawn move.
+
+---
+
 ## Self-review against the spec
 
 | Spec requirement | Task |
