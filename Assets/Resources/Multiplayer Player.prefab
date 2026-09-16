@@ -2902,6 +2902,7 @@ GameObject:
   - component: {fileID: 4150014734893116678}
   - component: {fileID: 4361268667979922634}
   - component: {fileID: 1053378542657063450}
+  - component: {fileID: 4850270857029199922}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -3381,6 +3382,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
+--- !u!114 &4850270857029199922
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ed72cfdd372da04caa7ad9125bfd8b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
 --- !u!1 &2741422025056904628
 GameObject:
   m_ObjectHideFlags: 0

@@ -130,6 +130,34 @@ namespace Overpower.Data
         [SerializeField, Range(0f, 1f)] private float sellRefundRate = 0.5f;
         public float SellRefundRate => sellRefundRate;
 
+        [Header("OverPower (Task 2.6, GDD p.20)")]
+        [Tooltip("Seconds between two different enemy teams' hits for them to count as the same " +
+                 "'attacked by both enemy teams' moment that arms the comeback buff. Too short and " +
+                 "a real 3v1 gang-up would not register as simultaneous; too long and any two " +
+                 "unrelated pokes minutes apart would arm it.")]
+        [SerializeField] private float overPowerWindowSeconds = 3f;
+        public float OverPowerWindowSeconds => overPowerWindowSeconds;
+
+        [Tooltip("How close, in metres, to the edge of a zone your team owns counts as 'near a " +
+                 "territory you control' - both for a hit to arm the buff and for how far you may " +
+                 "wander before an active or armed buff ends. 0 is inside the zone itself " +
+                 "(BuildingManager.DistanceToOwnedZoneEdge already reports 0 there).")]
+        [SerializeField] private float overPowerRadius = 15f;
+        public float OverPowerRadius => overPowerRadius;
+
+        [Tooltip("The buff triggers the instant your health drops below this, while armed. The GDD's " +
+                 "own number (p.20) - not a rate or a rescale, so it is not shared with any other " +
+                 "health threshold in this asset.")]
+        [SerializeField] private float overPowerHealthThreshold = 35f;
+        public float OverPowerHealthThreshold => overPowerHealthThreshold;
+
+        [Tooltip("Fraction added to damage, fire rate and range while the buff is active - 0.10 = " +
+                 "+10% on each, the GDD's own '3 of the highest parameters' number (p.20; damage, " +
+                 "fire rate and range are Claude's own reading of 'highest parameters' for a " +
+                 "prototype with no per-weapon stat ranking - see assumptions-for-tudor.md).")]
+        [SerializeField] private float overPowerStatBonus = 0.10f;
+        public float OverPowerStatBonus => overPowerStatBonus;
+
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
                  "click. Handy while tuning weapons; switch it off for a real match.")]

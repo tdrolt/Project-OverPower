@@ -360,6 +360,19 @@ namespace Overpower.UI
         [Tooltip("Empty part of the capture bar, drawn behind the coloured fill - the fill itself uses Shot Color For the capturing (or draining) team, same colours as that team's shots.")]
         public Color captureBarTrackColor = new Color(0.1f, 0.1f, 0.12f, 0.85f);
 
+        [Header("OverPower (Task 2.6, GDD p.20)")]
+        [Tooltip("Text colour of the HUD label while the comeback buff is fully ACTIVE (shield just " +
+                 "refilled, damage/fire rate/range boosted, overheat nullified). A hot, urgent colour " +
+                 "of its own - distinct from the overheat/bounty families - so the one moment the " +
+                 "buff is actually live reads as a clearly different state from everything else the " +
+                 "HUD already shows in red/amber.")]
+        public Color overPowerActiveColor = new Color(1f, 0.25f, 0.55f, 1f);
+        [Tooltip("Text colour of the fainter hint shown while the buff is only ARMED - two enemy " +
+                 "teams have hit you within the window, near your own territory, but you have not " +
+                 "yet dropped under the health threshold. Same hue as Active, low alpha, so it reads " +
+                 "as a preview of the same state rather than an unrelated colour.")]
+        public Color overPowerArmedColor = new Color(1f, 0.25f, 0.55f, 0.45f);
+
         [Header("Aim cone")]
         [Tooltip("Colour of the two lines showing where your shots can go.")] public Color coneLineColor = new Color(1f, 1f, 1f, 0.55f);
         [Tooltip("Colour of the shotgun's inner fan lines.")] public Color coneFanLineColor = new Color(1f, 1f, 1f, 0.25f);

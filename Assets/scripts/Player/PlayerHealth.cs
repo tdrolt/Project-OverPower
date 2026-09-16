@@ -355,6 +355,18 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         UpdateOverheadBar(); // Capacity just changed - the shield fraction must recompute against it immediately, not wait for the next hit.
     }
 
+    /// <summary>
+    /// OverPowerBuff's hook (Task 2.6, GDD p.20): "regenerate their shield instantly" the moment
+    /// the comeback buff triggers. Goes through ArmorState.RefillToFull, the same instant-fill path
+    /// ResetForRespawn already uses when RespawnWithFullArmor is on - a comeback moment deserves the
+    /// same immediacy as a bought upgrade or a fresh spawn, not the ordinary gradual recharge.
+    /// </summary>
+    public void RefillArmor()
+    {
+        armor.RefillToFull();
+        UpdateOverheadBar();
+    }
+
     public void ResetForRespawn()
     {
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;

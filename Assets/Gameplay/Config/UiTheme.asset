@@ -43,6 +43,7 @@ MonoBehaviour:
   pulseAtWarning: 1
   pulseSpeed: 1.2
   slotWidth: 140
+  hudSlotSpacing: 10
   slotIconBoxHeight: 104
   slotCooldownAreaHeight: 58
   slotReadyColor: {r: 0, g: 0, b: 0, a: 0.6}
@@ -75,6 +76,9 @@ MonoBehaviour:
   loadoutSmallButtonHeight: 42
   loadoutSelectableColor: {r: 0.16, g: 0.16, b: 0.19, a: 0.95}
   loadoutOwnedColor: {r: 0.3, g: 0.3, b: 0.33, a: 0.85}
+  loadoutShopBlockedColor: {r: 0.22, g: 0.14, b: 0.05, a: 0.92}
+  loadoutPriceLineSizePercent: 70
+  loadoutBlockedReasonDurationSeconds: 2
   loadoutDescriptionPanelHeight: 150
   loadoutToggleButtonWidth: 190
   loadoutToggleButtonHeight: 48
@@ -98,12 +102,21 @@ MonoBehaviour:
   laserBeamWidth: 0.14
   laserBeamEmission: 1.6
   laserBeamLingerSeconds: 0.18
+  goldTextColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+  bountyToastColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+  bountyToastDurationSeconds: 3
   capitalUnderAttackRespawnNote: Your capital is under attack - you will respawn
     at your Tier 2 zone
   capitalUnderAttackRespawnToast: 'Respawned at Tier 2: capital under attack'
   capitalUnderAttackNoteFontSize: 30
   capitalUnderAttackNoteColor: {r: 1, g: 1, b: 1, a: 1}
   capitalUnderAttackNoteBackingColor: {r: 0, g: 0, b: 0, a: 0.6}
+  captureBarWidth: 2.2
+  captureBarHeight: 0.22
+  captureBarHeightOffset: 6.5
+  captureBarTrackColor: {r: 0.1, g: 0.1, b: 0.12, a: 0.85}
+  overPowerActiveColor: {r: 1, g: 0.25, b: 0.55, a: 1}
+  overPowerArmedColor: {r: 1, g: 0.25, b: 0.55, a: 0.45}
   coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
   coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
   coneLineWidth: 0.04

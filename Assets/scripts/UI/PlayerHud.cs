@@ -62,6 +62,7 @@ namespace Overpower.UI
         private AbilityRunner abilityRunner;
         private UltimateCharge ultimateCharge;
         private GoldWallet goldWallet;
+        private OverPowerBuff overPowerBuff;
 
         // ---- built UI: bars ------------------------------------------------------------------------
 
@@ -87,6 +88,11 @@ namespace Overpower.UI
         // Time.unscaledTime the toast should hide by; < 0 means "not currently showing".
         // Unscaled so a debug Time.timeScale change cannot freeze a stale toast on screen forever.
         private float toastHideAtTime = -1f;
+
+        // Task 2.6: a PERSISTENT label (unlike the toast above, which always hides itself on a
+        // timer) - shown for as long as the buff is armed or active, however long that turns out
+        // to be, not for a fixed duration.
+        private TextMeshProUGUI overPowerLabel;
 
         // ---- built UI: slots -----------------------------------------------------------------------
 
@@ -142,6 +148,8 @@ namespace Overpower.UI
         private bool lastUltimateReady;
         private int lastGoldBalance = int.MinValue;
         private double lastGoldIncome = double.MinValue;
+        private bool lastOverPowerShown;
+        private bool lastOverPowerActive;
 
         private void Awake()
         {
@@ -176,6 +184,7 @@ namespace Overpower.UI
             abilityRunner = GetComponent<AbilityRunner>();
             ultimateCharge = GetComponent<UltimateCharge>();
             goldWallet = GetComponent<GoldWallet>();
+            overPowerBuff = GetComponent<OverPowerBuff>();
 
             if (gameplayConfig == null)
                 Debug.LogError($"[PlayerHud] {name}: GameplayConfig is not assigned - the overheat warning threshold and max health fall back to hardcoded numbers.");
@@ -185,6 +194,8 @@ namespace Overpower.UI
                 Debug.LogError($"[PlayerHud] {name}: no UltimateCharge on this player - the Ultimate slot's charge meter will read as always empty.");
             if (goldWallet == null)
                 Debug.LogError($"[PlayerHud] {name}: no GoldWallet on this player - the gold readout will read as always 0.");
+            if (overPowerBuff == null)
+                Debug.LogWarning($"[PlayerHud] {name}: no OverPowerBuff on this player - the OVERPOWER HUD label will never show (Task 2.6 is cuttable, so this is a warning, not an error).");
 
             BuildUi();
 
@@ -224,10 +235,44 @@ namespace Overpower.UI
         {
             UpdateGold();
             UpdateToast();
+            UpdateOverPower();
             UpdateHealthAndArmor();
             UpdateOverheat();
             UpdateWeaponSlot();
             UpdateAbilitySlots();
+        }
+
+        // ============================================================================================
+        // OverPower (Task 2.6, GDD p.20)
+        // ============================================================================================
+
+        /// <summary>Shows "OVERPOWER" while the buff is fully active, a fainter "OverPower ready"
+        /// hint while only armed, and hides the label the rest of the time - both colours and both
+        /// strings distinguishing the two states so a glance tells you which one you are in, the
+        /// same distinction the silenced banner's own on/off state does not need but this one does.</summary>
+        private void UpdateOverPower()
+        {
+            if (overPowerBuff == null)
+                return;
+
+            bool active = overPowerBuff.IsActive;
+            bool armed = overPowerBuff.IsArmed;
+            bool shown = active || armed;
+
+            if (shown != lastOverPowerShown)
+            {
+                overPowerLabel.gameObject.SetActive(shown);
+                lastOverPowerShown = shown;
+            }
+            if (!shown)
+                return;
+
+            if (active != lastOverPowerActive)
+            {
+                overPowerLabel.text = active ? "OVERPOWER" : "OverPower ready";
+                overPowerLabel.color = active ? theme.overPowerActiveColor : theme.overPowerArmedColor;
+                lastOverPowerActive = active;
+            }
         }
 
         // ============================================================================================
@@ -680,6 +725,16 @@ namespace Overpower.UI
             goldLe.preferredHeight = theme.bodyTextSize + 8f;
             goldText.color = theme.goldTextColor;
             goldText.alignment = TextAlignmentOptions.Center;
+
+            // Task 2.6: the OverPower label - persistent (see the field's own comment), hidden
+            // until UpdateOverPower's first armed/active frame, placed directly under the gold row
+            // since both are status readouts rather than combat stats like the bars/slots below.
+            overPowerLabel = AddLabel(panel.transform, "", theme.bodyTextSize, FontStyles.Bold);
+            LayoutElement overPowerLe = overPowerLabel.gameObject.AddComponent<LayoutElement>();
+            overPowerLe.preferredWidth = theme.barWidth;
+            overPowerLe.preferredHeight = theme.bodyTextSize + 8f;
+            overPowerLabel.alignment = TextAlignmentOptions.Center;
+            overPowerLabel.gameObject.SetActive(false);
 
             // Step 1 order - slots row, then overheat, then shield/armor, then health, top to
             // bottom - matches [T], the mocked-up layout Tudor approved after Phase 1 (the gold row
