@@ -117,10 +117,19 @@ namespace Overpower.Telemetry
         public const string Debug = "debug";
         public const string Other = "other";
         public const string Category = "cat";
+        /// <summary>`purchase`/`shopBlocked`'s own item id: a weapon or ability's real id for those
+        /// categories. Armor has no id of its own (only a path and a level), so LoadoutScreen
+        /// encodes it: 100 + the absorb level reached/attempted, 200 + the recharge level
+        /// reached/attempted (LoadoutScreen.ArmorAbsorbItemBase/ArmorRechargeItemBase) - so "absorb
+        /// reaches 1" (101) and "recharge reaches 1" (201) never collide on the same number.</summary>
         public const string ItemId = "item";
         public const string Price = "price";
         public const string BalanceAfter = "balAfter";
         public const string Free = "free";
+        /// <summary>`refund`'s own gold amount, or `bounty`'s own payout. For `bounty`, this is the
+        /// PER-PLAYER amount - TerritoryConfig's own `captureBounty` tooltip already defines it as
+        /// "gold paid to EACH player of a team that captures this zone", and BountyRule.PayoutOnCapture
+        /// passes that same per-tier number straight through unmultiplied by team size.</summary>
         public const string Amount = "amount";
         public const string Reason = "reason";
         public const string Shortfall = "shortfall";

@@ -89,9 +89,17 @@ namespace Overpower.UI
         // reset), and ShowBlockedReason, which every refusal already funnelled through. Nothing here
         // changes what a click actually does; PlayerTelemetry (Task T4) is the only listener.
 
+        // Armor has no item id of its own (unlike a weapon or ability) - only a path (absorb or
+        // recharge) and a level reached on that path. TelemetryKeys.ItemId documents this same
+        // encoding for whoever reads the log: 100 + level for absorb, 200 + level for recharge, so
+        // "absorb reaches 1" and "recharge reaches 1" are never the same number (opus review fix -
+        // the level alone could not tell the two paths apart).
+        private const int ArmorAbsorbItemBase = 100;
+        private const int ArmorRechargeItemBase = 200;
+
         /// <summary>owner, on a successful purchase: category, the item bought (a weapon or ability
-        /// id; for armor, the resulting absorb/recharge level reached - armor upgrades have no id of
-        /// their own), the price actually charged (0 under Free Loadout), the balance right after,
+        /// id; for armor, ArmorAbsorbItemBase/ArmorRechargeItemBase + the level reached, see their
+        /// own comment), the price actually charged (0 under Free Loadout), the balance right after,
         /// and whether Free Loadout paid for it.</summary>
         public event System.Action<PurchaseCategory, int, int, int, bool> Purchased;
 
@@ -804,12 +812,19 @@ namespace Overpower.UI
             bool free = ctx.FreeLoadout;
             int chargedPrice = 0;
 
+            // Task T4: armor has no item id of its own (unlike a weapon or ability), only a path
+            // (absorb/recharge) and a level on that path - encoded per TelemetryKeys.ItemId's own
+            // doc comment (opus review fix: the level alone, with no path, could not tell an absorb
+            // upgrade apart from a recharge one that happened to reach the same level).
+            int prospectiveLevel = (upgradeAbsorb ? playerHealth.AbsorbLevel : playerHealth.RechargeLevel) + 1;
+            int prospectiveItem = (upgradeAbsorb ? ArmorAbsorbItemBase : ArmorRechargeItemBase) + prospectiveLevel;
+
             if (!free)
             {
                 PurchaseBlock block = ctx.Check(price);
                 if (block != PurchaseBlock.None)
                 {
-                    ShowBlockedReason(ctx, block, price);
+                    ShowBlockedReason(ctx, block, price, prospectiveItem);
                     return;
                 }
                 if (goldWallet == null || !goldWallet.TrySpend(price))
@@ -820,11 +835,11 @@ namespace Overpower.UI
 
             ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb);
 
-            // Task T4: armor has no item id of its own (unlike a weapon or ability) - the level
-            // this purchase just reached on the path being upgraded is the closest equivalent, and
-            // is read AFTER TryUpgrade so it reflects what was actually bought.
+            // Read AFTER TryUpgrade so it reflects what was actually bought, rather than trusting
+            // the prospective level computed above went through exactly as predicted.
             int newLevel = upgradeAbsorb ? playerHealth.AbsorbLevel : playerHealth.RechargeLevel;
-            Purchased?.Invoke(PurchaseCategory.Armor, newLevel, chargedPrice, goldWallet != null ? goldWallet.Balance : 0, free);
+            int purchasedItem = (upgradeAbsorb ? ArmorAbsorbItemBase : ArmorRechargeItemBase) + newLevel;
+            Purchased?.Invoke(PurchaseCategory.Armor, purchasedItem, chargedPrice, goldWallet != null ? goldWallet.Balance : 0, free);
             Refresh();
         }
 

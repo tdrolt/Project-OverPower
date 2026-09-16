@@ -7,6 +7,12 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 namespace Overpower.Match
 {
+    /// <summary>Task T4: where a credit to this wallet came from, so telemetry (PlayerTelemetry's
+    /// `goldEarned`) can split a player's income by source instead of only seeing one growing
+    /// balance. Territory is the passive per-frame trickle GoldMath pays every owned zone;
+    /// everything else is a discrete credit from one call to Add.</summary>
+    public enum GoldSource { Territory, Bounty, Refund, Debug, Other }
+
     /// <summary>
     /// One player's gold (Task 2.2). OWNER-AUTHORITATIVE: the owner's own client is the only one
     /// that accrues and spends gold, publishing the result as a Player Custom Property ("gold") so
@@ -22,12 +28,6 @@ namespace Overpower.Match
     /// feels instant), then publishes it; every OTHER client only ever reads the published
     /// property; a LATE JOINER reads whatever value is already there.
     /// </summary>
-    /// <summary>Task T4: where a credit to this wallet came from, so telemetry (PlayerTelemetry's
-    /// `goldEarned`) can split a player's income by source instead of only seeing one growing
-    /// balance. Territory is the passive per-frame trickle GoldMath pays every owned zone;
-    /// everything else is a discrete credit from one call to Add.</summary>
-    public enum GoldSource { Territory, Bounty, Refund, Debug, Other }
-
     public class GoldWallet : MonoBehaviourPun, IInRoomCallbacks
     {
         public const string GoldKey = "gold";

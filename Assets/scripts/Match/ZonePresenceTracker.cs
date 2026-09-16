@@ -191,6 +191,20 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         }
     }
 
+    /// <summary>Opus review fix: sets wasUnderAttack to what IsUnderAttack says RIGHT NOW for every
+    /// zone, without raising UnderAttackChanged for any of it - see OnMasterClientSwitched's own
+    /// comment for why a freshly promoted master needs this instead of starting from all-false.</summary>
+    private void SeedUnderAttackBaseline()
+    {
+        BuildingManager manager = BuildingManager.Instance;
+        if (manager == null || manager.ZoneCount <= 0)
+            return;
+
+        EnsureArrays(manager.ZoneCount);
+        for (int zone = 0; zone < manager.ZoneCount; zone++)
+            wasUnderAttack[zone] = IsUnderAttack(zone);
+    }
+
     /// <summary>Master: alive, and not in the moment just after coming back to life (see RespawnSettleSeconds). A
     /// missing "alive" property means they haven't died yet.</summary>
     private bool IsCountable(Player player)
@@ -272,6 +286,13 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
             // Who stood where is only known from this master's own measures, which start now.
             lastMeasured.Clear();
             ReadFrom(PhotonNetwork.CurrentRoom.CustomProperties);
+            // Opus review fix: without this, wasUnderAttack starts all-false (EnsureArrays' own
+            // default) on a freshly promoted master, so its first measure would read every zone
+            // already under attack as a brand new "start" - a duplicate the OLD master (or this
+            // client, the last time it was master) already told the report about. Seeded from
+            // IsUnderAttack itself, using the presence state ReadFrom just applied above, WITHOUT
+            // raising UnderAttackChanged - a baseline, not an event.
+            SeedUnderAttackBaseline();
         }
     }
 
