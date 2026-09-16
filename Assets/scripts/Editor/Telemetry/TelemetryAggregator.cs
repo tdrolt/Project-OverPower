@@ -132,6 +132,18 @@ namespace Overpower.EditorTools.Telemetry
             double? tPhase2 = timeline.TransitionSeconds;
             TimeWindow effectiveWindow = window ?? timeline.WholeMatch;
 
+            // Review fix: when this build's own window lies entirely within ONE phase (a Phase
+            // 1- or Phase 2-scoped build), every surviving row belongs to that phase - null when
+            // the window spans both (the whole-match build), which is the only case where a
+            // straddling minute bucket's own absolute start time is still the right way to tag it
+            // (see BuildGoldTimelineAndEconomy's own comment).
+            int? forcedPhase = null;
+            if (tPhase2.HasValue)
+            {
+                if (effectiveWindow.End <= tPhase2.Value) forcedPhase = 1;
+                else if (effectiveWindow.Start >= tPhase2.Value) forcedPhase = 2;
+            }
+
             // Opus review item 2: team from the actor's own first sample with tm >= 0, falling back
             // to the session - see the method's own comment.
             Dictionary<int, int> effectiveTeam = BuildEffectiveTeam(log, fileActor, sessionByActor);
@@ -155,7 +167,7 @@ namespace Overpower.EditorTools.Telemetry
             BuildCaptures(log, rawChangesByZone, zoneTier, matchLength, tables.Header, tables.Captures, effectiveWindow, tPhase2);
             BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables, effectiveWindow, tPhase2);
             BuildHits(log, effectiveTeam, tables.Hits, effectiveWindow, tPhase2);
-            BuildGoldTimelineAndEconomy(log, fileActor, sessionByActor, effectiveTeam, zoneTier, rawChangesByZone, matchLength, tables, effectiveWindow, tPhase2);
+            BuildGoldTimelineAndEconomy(log, fileActor, sessionByActor, effectiveTeam, zoneTier, rawChangesByZone, matchLength, tables, effectiveWindow, tPhase2, forcedPhase);
             BuildZoneIncome(log, fileActor, effectiveTeam, zoneTier, tables.Ownership, tables.ZoneIncome, effectiveWindow);
 
             var sampleStats = BuildSampleDerivedStats(log, fileActor, effectiveTeam, rawChangesByZone, coverageByActor, sampleInterval, effectiveWindow);
@@ -789,7 +801,7 @@ namespace Overpower.EditorTools.Telemetry
         private static void BuildGoldTimelineAndEconomy(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam, Dictionary<int, int> zoneTier,
             Dictionary<int, List<(double T, int New)>> rawChangesByZone, double matchLength, ReportTables tables,
-            TimeWindow window, double? tPhase2)
+            TimeWindow window, double? tPhase2, int? forcedPhase)
         {
             var earnedRunning = new Dictionary<int, int>();
             var spentRunning = new Dictionary<int, int>();
@@ -939,14 +951,19 @@ namespace Overpower.EditorTools.Telemetry
             }
 
             // Task T7: keep only the minute buckets that actually overlap this window (see this
-            // method's own class comment on why the minute INDEX itself stays absolute), and tag
-            // each surviving row with the phase its own bucket START falls in.
+            // method's own class comment on why the minute INDEX itself stays absolute). Review
+            // fix: a Phase 1- or Phase 2-SCOPED build (forcedPhase set) tags every surviving row
+            // with that one phase - a bucket straddling the transition can otherwise overlap a
+            // single-phase window while its own START time still reads as the OTHER phase (minute
+            // 1, 60->120, overlaps the Phase 2 window [90,180] but starts at 60). Only the
+            // whole-match build (forcedPhase null) still tags a straddling bucket by its own
+            // absolute start - documented above as this table's one simplification.
             tables.EconomyByMinute = economyRows.Values
                 .Where(r => BucketOverlapsWindow(r.Minute, matchLength, window))
                 .OrderBy(r => r.Minute).ThenBy(r => r.Team)
                 .ToList();
             foreach (EconomyByMinuteRow row in tables.EconomyByMinute)
-                row.Phase = PhaseOf(row.Minute * 60.0, tPhase2);
+                row.Phase = forcedPhase ?? PhaseOf(row.Minute * 60.0, tPhase2);
         }
 
         private static bool BucketOverlapsWindow(int minute, double matchLength, TimeWindow window)
@@ -1473,13 +1490,15 @@ namespace Overpower.EditorTools.Telemetry
                 var gold = goldByActor.GetValueOrDefault(actor);
                 (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
 
-                // Opus review item 3 (Task T7 update): sum of every completed life's own `timeAlive`
-                // field WHOSE OWN DEATH FALLS IN THIS WINDOW, plus - if still alive after the last
-                // (true, unwindowed) death, or never died at all - the CLIPPED tail from wherever it
-                // begins (the next respawn, or this player's own first covered instant) through to
-                // their own last covered instant. Splitting a life's timeAlive by its death's phase,
-                // and clipping the still-alive tail like every other integral, is what makes Phase 1's
-                // + Phase 2's alive time add up to exactly the whole match's.
+                // Opus review item 3 (Task T7), CORRECTED by the T7 review: a completed life is a
+                // continuous span [deathT - timeAlive, deathT), not an instant - CLIPPED to the
+                // window like every other integral here, rather than crediting the WHOLE life to
+                // whichever phase the death instant itself falls in. Crediting the whole life to the
+                // death's phase could report more alive time in a phase than the phase itself lasted
+                // (a life of 125s dying at t=125, entirely credited to a 90s-long Phase 2). Clipping
+                // the life's own span the same way the still-alive tail already is keeps Phase 1 +
+                // Phase 2 summing to exactly the whole match, this time without ever exceeding either
+                // phase's own length.
                 double timeAlive = 0;
                 double? lastDeathT = null;
                 foreach (TelemetryEvent e in log.Events)
@@ -1487,7 +1506,10 @@ namespace Overpower.EditorTools.Telemetry
                     if (e.Name != TelemetryKeys.Death) continue;
                     if (ActorOf(e, fileActor) != actor) continue;
                     if (!lastDeathT.HasValue || e.T > lastDeathT.Value) lastDeathT = e.T; // unwindowed - the TRUE last death
-                    if (window.Contains(e.T)) timeAlive += ReadFloat(e.Data, TelemetryKeys.TimeAlive);
+
+                    float lifeTimeAlive = ReadFloat(e.Data, TelemetryKeys.TimeAlive);
+                    if (window.Clip(e.T - lifeTimeAlive, e.T, out double lifeFrom, out double lifeTo))
+                        timeAlive += lifeTo - lifeFrom;
                 }
 
                 double tailStart;

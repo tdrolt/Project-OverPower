@@ -102,6 +102,11 @@ namespace Overpower.EditorTools.Telemetry
             TelemetryKeys.UltimateUsed, TelemetryKeys.Ownership, TelemetryKeys.Capture, TelemetryKeys.Bounty,
             TelemetryKeys.UnderAttack, TelemetryKeys.Overpower, TelemetryKeys.Join, TelemetryKeys.Leave,
             TelemetryKeys.MasterChanged, TelemetryKeys.Marker,
+            // Review fix (T7): these two were added to TelemetryKeys in this same task but never
+            // added here, so every report - including one with no elimination at all, since
+            // MatchTelemetry's own phase-1 anchor is unconditional - showed a false "unknown
+            // event(s) were skipped" warning.
+            TelemetryKeys.Phase, TelemetryKeys.Elimination,
         };
 
         public static TelemetryLog Load(string folder)

@@ -63,7 +63,92 @@ namespace Overpower.Tests
             double wholeAlive = set.WholeMatch.Players.Sum(p => p.TimeAlive);
             double p1Alive = set.Phase1.Players.Sum(p => p.TimeAlive);
             double p2Alive = set.Phase2.Players.Sum(p => p.TimeAlive);
-            Assert.AreEqual(wholeAlive, p1Alive + p2Alive, Tolerance, "alive time");
+            Assert.AreEqual(wholeAlive, p1Alive + p2Alive, Tolerance, "alive time (total)");
+
+            // Review fix: alive time PER PLAYER, not just the aggregate sum - a per-life
+            // credit-to-one-phase bug could still cancel out in the total while being wrong for
+            // any one player.
+            foreach (var actor in new[] { 1, 2 })
+            {
+                double whole = set.WholeMatch.Players.Single(p => p.Actor == actor).TimeAlive;
+                double p1 = set.Phase1.Players.Single(p => p.Actor == actor).TimeAlive;
+                double p2 = set.Phase2.Players.Single(p => p.Actor == actor).TimeAlive;
+                Assert.AreEqual(whole, p1 + p2, Tolerance, $"alive time (actor {actor})");
+            }
+
+            // Review fix: deaths, hits, ownership seconds and the zone-time columns too.
+            Assert.AreEqual(set.WholeMatch.Deaths.Count, set.Phase1.Deaths.Count + set.Phase2.Deaths.Count, "death count");
+            Assert.AreEqual(set.WholeMatch.Hits.Count, set.Phase1.Hits.Count + set.Phase2.Hits.Count, "hit count");
+            Assert.AreEqual(set.WholeMatch.Hits.Sum(h => h.Raw), set.Phase1.Hits.Sum(h => h.Raw) + set.Phase2.Hits.Sum(h => h.Raw), Tolerance, "hit raw damage");
+
+            double wholeOwnershipSeconds = set.WholeMatch.Ownership.Sum(o => o.Duration);
+            double p1OwnershipSeconds = set.Phase1.Ownership.Sum(o => o.Duration);
+            double p2OwnershipSeconds = set.Phase2.Ownership.Sum(o => o.Duration);
+            Assert.AreEqual(wholeOwnershipSeconds, p1OwnershipSeconds + p2OwnershipSeconds, Tolerance, "ownership seconds");
+
+            foreach (var actor in new[] { 1, 2 })
+            {
+                var wholeRow = set.WholeMatch.Players.Single(p => p.Actor == actor);
+                var p1Row = set.Phase1.Players.Single(p => p.Actor == actor);
+                var p2Row = set.Phase2.Players.Single(p => p.Actor == actor);
+                Assert.AreEqual(wholeRow.TimeOwnZone, p1Row.TimeOwnZone + p2Row.TimeOwnZone, Tolerance, $"time own zone (actor {actor})");
+                Assert.AreEqual(wholeRow.TimeEnemyZone, p1Row.TimeEnemyZone + p2Row.TimeEnemyZone, Tolerance, $"time enemy zone (actor {actor})");
+                Assert.AreEqual(wholeRow.TimeNeutralZone, p1Row.TimeNeutralZone + p2Row.TimeNeutralZone, Tolerance, $"time neutral zone (actor {actor})");
+            }
+        }
+
+        // ---------------------------------------------------------------- review fix: alive time is a proper per-life split
+
+        [Test]
+        public void AliveTimeIsProperlySplitByLifeSpanNotCreditedWhollyToTheDeathsPhase()
+        {
+            ReportSet set = BuildFixtureSet();
+
+            // Actor 1: life [0, 45) (dies t=45, timeAlive=45) then a tail [50 (respawn), 180]
+            // (their own coverage end). Phase 1 [0,90): life fully inside (45) + tail clipped to
+            // [50,90) (40) = 85. Phase 2 [90,180]: life clipped away (0) + tail clipped to
+            // [90,180] (90) = 90.
+            Assert.AreEqual(85.0, set.Phase1.Players.Single(p => p.Actor == 1).TimeAlive, 1e-6);
+            Assert.AreEqual(90.0, set.Phase2.Players.Single(p => p.Actor == 1).TimeAlive, 1e-6);
+
+            // Actor 2: life [0, 125) (dies t=125, timeAlive=125) then a tail [130, 180]. Phase 1
+            // [0,90): life clipped to [0,90) (90) + tail clipped away (0) = 90. Phase 2 [90,180]:
+            // life clipped to [90,125) (35) + tail clipped to [130,180] (50) = 85.
+            //
+            // Before this fix, the whole 125s life was credited to Phase 2 (the death's own
+            // phase) instead of being split - reporting more alive time in Phase 2 (125 + the
+            // 50s tail = 175s) than Phase 2 itself lasted (90s). Neither actor's own per-phase
+            // alive time may now exceed that phase's own length.
+            Assert.AreEqual(90.0, set.Phase1.Players.Single(p => p.Actor == 2).TimeAlive, 1e-6);
+            Assert.AreEqual(85.0, set.Phase2.Players.Single(p => p.Actor == 2).TimeAlive, 1e-6);
+
+            double phase1Length = set.Phase1.Header.MatchLengthSeconds;
+            double phase2Length = set.Phase2.Header.MatchLengthSeconds;
+            foreach (var p in set.Phase1.Players) Assert.LessOrEqual(p.TimeAlive, phase1Length + 1e-6, $"actor {p.Actor} Phase 1");
+            foreach (var p in set.Phase2.Players) Assert.LessOrEqual(p.TimeAlive, phase2Length + 1e-6, $"actor {p.Actor} Phase 2");
+        }
+
+        // ---------------------------------------------------------------- review fix: minute buckets tag their OWN scope's phase
+
+        [Test]
+        public void MinuteBucketsInAPhaseScopedBuildAreTaggedWithThatPhaseNotTheirOwnBucketStart()
+        {
+            ReportSet set = BuildFixtureSet();
+
+            // A Phase-2-scoped build only ever contains buckets belonging to Phase 2 - even one
+            // (minute 1, 60->120) whose own START falls before the t=90 transition, because it
+            // still overlaps the Phase 2 window. Before this fix, that bucket kept reading Phase 1
+            // (derived from its own absolute start time) even inside the Phase 2 build.
+            Assert.IsTrue(set.Phase2.EconomyByMinute.Count > 0);
+            Assert.IsTrue(set.Phase2.EconomyByMinute.All(r => r.Phase == 2), "every row in a Phase-2-scoped build must read Phase 2");
+            Assert.IsTrue(set.Phase1.EconomyByMinute.All(r => r.Phase == 1), "every row in a Phase-1-scoped build must read Phase 1");
+
+            // The whole-match build still tags a straddling bucket by its own absolute start (a
+            // documented simplification of economy_by_minute's own windowing, not a bug) - minute
+            // 1 (60->120) starts before the transition, so it reads Phase 1 there.
+            var wholeMinute1 = set.WholeMatch.EconomyByMinute.Where(r => r.Minute == 1).ToList();
+            if (wholeMinute1.Count > 0)
+                Assert.AreEqual(1, wholeMinute1[0].Phase);
         }
 
         // ---------------------------------------------------------------- ownership stint split at the boundary
@@ -126,6 +211,20 @@ namespace Overpower.Tests
             Assert.AreEqual(100.0, WeaponOneSeconds(set.WholeMatch), 1e-6);
             Assert.AreEqual(10.0, WeaponOneSeconds(set.Phase1), 1e-6);
             Assert.AreEqual(90.0, WeaponOneSeconds(set.Phase2), 1e-6);
+        }
+
+        // ---------------------------------------------------------------- review fix: phase/elimination are known events
+
+        [Test]
+        public void PhaseAndEliminationEventsAreNotCountedAsUnknown()
+        {
+            // The fixture's own phase (x2) and elimination (x1) lines must not inflate
+            // UnknownEventCount - before the review fix, KnownEventNames lacked both names, so
+            // every report (even one with no elimination at all, since MatchTelemetry's own
+            // phase-1 anchor is unconditional) showed a false "unknown event(s) were skipped"
+            // warning.
+            var log = TelemetryLog.Load(FixturePath);
+            Assert.AreEqual(0, log.UnknownEventCount);
         }
 
         // ---------------------------------------------------------------- log coverage: a missing actor seen only via `hit`
