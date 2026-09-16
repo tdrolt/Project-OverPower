@@ -76,6 +76,12 @@ namespace Overpower.EditorTools.Telemetry
         /// <summary>Index 0..3 = tier 1..4.</summary>
         public int[] ZonesHeldByTier = new int[4];
         public int GoldGapToRichest;
+        /// <summary>T5 re-review fix (item 9): a `goldEarned` line can have `terr` > 0 (real
+        /// territory gold, already counted in players.csv via its running total) with `zones`
+        /// empty or summing to 0 - ScaledZones has no ratio to rescale by in that case, so the whole
+        /// amount used to vanish from every zone-keyed table instead of landing in some zone's tier.
+        /// Kept here instead, so team/tier income totals still add up to what players.csv reports.</summary>
+        public double UnattributedIncome;
     }
 
     public sealed class ZoneIncomeRow
@@ -105,6 +111,10 @@ namespace Overpower.EditorTools.Telemetry
     public sealed class CaptureRow
     {
         public int Zone;
+        /// <summary>T6 review fix: the zone's tier at the time of this capture attempt (from the
+        /// same ownership-derived zoneTier map BuildOwnership already builds) - 0 if this zone's
+        /// tier was never established by an ownership line.</summary>
+        public int Tier;
         public int Team;
         public double Start;
         public double End;

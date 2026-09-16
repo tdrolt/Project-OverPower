@@ -80,6 +80,9 @@ namespace Overpower.Tests
 
             var capture = tables.Captures[0];
             Assert.AreEqual(0, capture.Zone);
+            // T6 review fix: captures now carry the zone's tier (from the same ownership-derived
+            // zoneTier map) - zone 0 is tier 2 (see zone0.Tier above).
+            Assert.AreEqual(2, capture.Tier);
             Assert.AreEqual(0, capture.Team);
             Assert.AreEqual(15.0, capture.Start, 1e-9);
             // Closed by zone 0's ownership event at t=20 (new owner 0 matches the open attempt's team) -

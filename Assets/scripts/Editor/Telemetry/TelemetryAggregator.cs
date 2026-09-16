@@ -64,6 +64,10 @@ namespace Overpower.EditorTools.Telemetry
     public static class TelemetryAggregator
     {
         private const int Neutral = -1; // TerritoryMap.Neutral's own value - a zone with no owner.
+        // T5 re-review item 9: same sentinel value as Neutral (both mean "no real zone id"), under
+        // its own name so a reader of zone_income.csv/economy_by_minute.csv isn't confused about
+        // which concept a -1 zone/tier means in that context.
+        private const int UnattributedZone = -1;
         private const double DefaultSampleIntervalSeconds = 5.0;
 
         private static readonly HashSet<string> CaptureOpenStates =
@@ -120,9 +124,9 @@ namespace Overpower.EditorTools.Telemetry
             BuildOwnership(log, tables.Ownership, zoneTier, rawChangesByZone, matchLength);
 
             BuildHeader(tables.Header, log, sessionByActor, matchLength);
-            BuildCaptures(log, rawChangesByZone, tables.Header, tables.Captures);
+            BuildCaptures(log, rawChangesByZone, zoneTier, tables.Header, tables.Captures);
             BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables);
-            BuildHits(log, tables.Hits);
+            BuildHits(log, effectiveTeam, tables.Hits);
             BuildGoldTimelineAndEconomy(log, fileActor, sessionByActor, effectiveTeam, zoneTier, rawChangesByZone, matchLength, tables);
             BuildZoneIncome(log, fileActor, effectiveTeam, zoneTier, tables.Ownership, tables.ZoneIncome);
 
@@ -346,7 +350,7 @@ namespace Overpower.EditorTools.Telemetry
         /// so a completion recorded in the same instant as a stray same-tick capture line always closes
         /// the right attempt first.</summary>
         private static void BuildCaptures(TelemetryLog log, Dictionary<int, List<(double T, int New)>> rawChangesByZone,
-                                           ReportHeader header, List<CaptureRow> outCaptures)
+                                           Dictionary<int, int> zoneTier, ReportHeader header, List<CaptureRow> outCaptures)
         {
             var items = new List<(double T, bool IsOwnership, int Zone, string State, int Team, int Players, int NewOwner)>();
 
@@ -384,6 +388,7 @@ namespace Overpower.EditorTools.Telemetry
                     outCaptures.Add(new CaptureRow
                     {
                         Zone = item.Zone,
+                        Tier = zoneTier.GetValueOrDefault(item.Zone, 0),
                         Team = attempt.Team,
                         Start = attempt.Start,
                         End = item.T,
@@ -415,6 +420,7 @@ namespace Overpower.EditorTools.Telemetry
                             outCaptures.Add(new CaptureRow
                             {
                                 Zone = item.Zone,
+                                Tier = zoneTier.GetValueOrDefault(item.Zone, 0),
                                 Team = existing.Team,
                                 Start = existing.Start,
                                 End = item.T,
@@ -451,6 +457,7 @@ namespace Overpower.EditorTools.Telemetry
                 outCaptures.Add(new CaptureRow
                 {
                     Zone = kv.Key,
+                    Tier = zoneTier.GetValueOrDefault(kv.Key, 0),
                     Team = attempt.Team,
                     Start = attempt.Start,
                     End = matchLength,
@@ -516,7 +523,19 @@ namespace Overpower.EditorTools.Telemetry
             }
         }
 
-        private static void BuildHits(TelemetryLog log, List<HitRow> outHits)
+        /// <summary>Opus review item 7 (T5 re-review): hits.csv/deaths.csv used to read the raw
+        /// `at`/`vt`/`at` (killer) team field straight off the event line, bypassing the same
+        /// late-joiner fallback every other team-keyed table already gets via effectiveTeam (a late
+        /// joiner's own early lines can carry tm:-1 before the room's player-properties echo
+        /// arrives). A raw value of -1 now falls back to the actor's resolved effective team; a
+        /// genuinely unresolvable actor (id -1, e.g. a dummy) still reads -1.</summary>
+        private static int ResolveTeam(int rawTeam, int actor, Dictionary<int, int> effectiveTeam)
+        {
+            if (rawTeam >= 0) return rawTeam;
+            return effectiveTeam.GetValueOrDefault(actor, -1);
+        }
+
+        private static void BuildHits(TelemetryLog log, Dictionary<int, int> effectiveTeam, List<HitRow> outHits)
         {
             foreach (TelemetryEvent e in log.Events)
             {
@@ -525,13 +544,16 @@ namespace Overpower.EditorTools.Telemetry
                 JToken dToken = e.Data[TelemetryKeys.Distance];
                 float? distance = (dToken != null && dToken.Type != JTokenType.Null) ? dToken.ToObject<float?>() : null;
 
+                int attacker = ReadInt(e.Data, TelemetryKeys.Attacker, -1);
+                int victim = ReadInt(e.Data, TelemetryKeys.Victim, -1);
+
                 outHits.Add(new HitRow
                 {
                     T = e.T,
-                    Attacker = ReadInt(e.Data, TelemetryKeys.Attacker, -1),
-                    AttackerTeam = ReadInt(e.Data, TelemetryKeys.AttackerTeam, -1),
-                    Victim = ReadInt(e.Data, TelemetryKeys.Victim, -1),
-                    VictimTeam = ReadInt(e.Data, TelemetryKeys.VictimTeam, -1),
+                    Attacker = attacker,
+                    AttackerTeam = ResolveTeam(ReadInt(e.Data, TelemetryKeys.AttackerTeam, -1), attacker, effectiveTeam),
+                    Victim = victim,
+                    VictimTeam = ResolveTeam(ReadInt(e.Data, TelemetryKeys.VictimTeam, -1), victim, effectiveTeam),
                     Weapon = ReadInt(e.Data, TelemetryKeys.Weapon, -1),
                     Ability = ReadInt(e.Data, TelemetryKeys.AbilityId, -1),
                     Source = e.Data[TelemetryKeys.Source]?.ToString() ?? "",
@@ -598,6 +620,9 @@ namespace Overpower.EditorTools.Telemetry
                             if (tier < 1 || tier > row.IncomeByTier.Length) { tables.Header.InvalidTierCount++; continue; } // item 5
                             row.IncomeByTier[tier - 1] += scaledZones[z];
                         }
+                        // T5 re-review item 9: terr > 0 with no zones[] to rescale by (empty or all
+                        // zero) - kept here rather than silently dropped, see UnattributedIncome.
+                        row.UnattributedIncome += UnattributedTerritoryGold(e.Data, scaledZones);
                         // Point 2 (first-pass review): goldEarned.bounty is the OWNER's own credited
                         // total, not the master's per-payout `bounty` line - safe to sum without double counting.
                         row.Bounty += ReadInt(e.Data, TelemetryKeys.Bounty, 0);
@@ -629,14 +654,25 @@ namespace Overpower.EditorTools.Telemetry
                 }
             }
 
+            // T5 re-review item 10: a zone's own tier (from zoneTier, set once per zone by
+            // BuildOwnership) never changes across this sweep - only its OWNER does per minute - so
+            // checking validity inside the "for each minute" loop counted the SAME bad zone once per
+            // minute (a 20-minute match inflated one bad zone to 20). Computed once, outside the
+            // minute loop, so Header.InvalidTierCount counts distinct bad zones, not zone-minutes.
+            var invalidTierZones = new HashSet<int>();
+            foreach (var kv in zoneTier)
+                if (kv.Value < 1 || kv.Value > 4)
+                    invalidTierZones.Add(kv.Key);
+            tables.Header.InvalidTierCount += invalidTierZones.Count;
+
             // Zones held per tier, sampled at each minute's midpoint.
             for (int m = 0; m < numMinutes; m++)
             {
                 double midpoint = Math.Min(m * 60.0 + 30.0, matchLength);
                 foreach (int zone in zoneTier.Keys)
                 {
+                    if (invalidTierZones.Contains(zone)) continue;
                     int tier = zoneTier[zone];
-                    if (tier < 1 || tier > 4) { tables.Header.InvalidTierCount++; continue; } // item 5
                     int owner = OwnerAtTime(rawChangesByZone, zone, midpoint);
                     if (owner < 0) continue;
                     if (economyRows.TryGetValue((m, owner), out EconomyByMinuteRow row))
@@ -711,6 +747,14 @@ namespace Overpower.EditorTools.Telemetry
                     if (scaledZones[z] == 0) continue;
                     goldGenerated[(z, team)] = goldGenerated.GetValueOrDefault((z, team)) + scaledZones[z];
                 }
+
+                // T5 re-review item 9: terr > 0 with no zones[] to rescale by - a synthetic
+                // "Unattributed" zone (id UnattributedZone) keeps this gold visible per team instead
+                // of vanishing from zone_income.csv while players.csv's own running total still
+                // includes it.
+                double unattributed = UnattributedTerritoryGold(e.Data, scaledZones);
+                if (unattributed > 0)
+                    goldGenerated[(UnattributedZone, team)] = goldGenerated.GetValueOrDefault((UnattributedZone, team)) + unattributed;
             }
 
             var keys = secondsHeld.Keys.Union(goldGenerated.Keys).OrderBy(k => k.Zone).ThenBy(k => k.Team);
@@ -755,6 +799,23 @@ namespace Overpower.EditorTools.Telemetry
                     raw[i] *= factor;
             }
             return raw;
+        }
+
+        /// <summary>T5 re-review item 9: ScaledZones has no ratio to rescale a line's `zones[]` by
+        /// when they sum to ~0 (empty array, or every entry 0) - if that same line's own `terr` is
+        /// still > 0, that gold has nowhere to go in a zone-keyed table and used to just vanish from
+        /// zone_income.csv/economy_by_minute.csv while players.csv's running total (summed straight
+        /// from `terr`, never from `zones`) stayed correct. Returns the leftover amount to bucket
+        /// into an "Unattributed" row instead, or 0 when the zones already accounted for it (or
+        /// there was no territory income on this line at all).</summary>
+        private static double UnattributedTerritoryGold(JObject data, double[] scaledZones)
+        {
+            int terr = ReadInt(data, TelemetryKeys.Territory, 0);
+            if (terr <= 0) return 0;
+
+            double sum = 0;
+            for (int i = 0; i < scaledZones.Length; i++) sum += scaledZones[i];
+            return sum <= 0.0001 ? terr : 0;
         }
 
         // ==================================================================== sample-derived stats (shared sweep)
@@ -1061,7 +1122,7 @@ namespace Overpower.EditorTools.Telemetry
                     VictimNick = victimSession?.Nick ?? "",
                     VictimTeam = effectiveTeam.GetValueOrDefault(victim, -1),
                     Killer = ReadInt(e.Data, TelemetryKeys.Killer, -1),
-                    KillerTeam = ReadInt(e.Data, TelemetryKeys.KillerTeam, -1),
+                    KillerTeam = ResolveTeam(ReadInt(e.Data, TelemetryKeys.KillerTeam, -1), ReadInt(e.Data, TelemetryKeys.Killer, -1), effectiveTeam),
                     Assists = assists,
                     Weapon = ReadInt(e.Data, TelemetryKeys.Weapon, -1),
                     Ability = ReadInt(e.Data, TelemetryKeys.AbilityId, -1),

@@ -49,12 +49,12 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WriteEconomyByMinute(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "economy_by_minute.csv"),
-            new[] { "minute", "team", "incomeTier1", "incomeTier2", "incomeTier3", "incomeTier4",
+            new[] { "minute", "team", "incomeTier1", "incomeTier2", "incomeTier3", "incomeTier4", "incomeUnattributed",
                     "bounty", "refunds", "spent", "zonesTier1", "zonesTier2", "zonesTier3", "zonesTier4", "goldGapToRichest" },
             t.EconomyByMinute.Select(r => new[]
             {
                 N(r.Minute), N(r.Team),
-                N(r.IncomeByTier[0]), N(r.IncomeByTier[1]), N(r.IncomeByTier[2]), N(r.IncomeByTier[3]),
+                N(r.IncomeByTier[0]), N(r.IncomeByTier[1]), N(r.IncomeByTier[2]), N(r.IncomeByTier[3]), N(r.UnattributedIncome),
                 N(r.Bounty), N(r.Refund), N(r.Spent),
                 N(r.ZonesHeldByTier[0]), N(r.ZonesHeldByTier[1]), N(r.ZonesHeldByTier[2]), N(r.ZonesHeldByTier[3]),
                 N(r.GoldGapToRichest),
@@ -72,8 +72,8 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WriteCaptures(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "captures.csv"),
-            new[] { "zone", "team", "start", "end", "outcome", "duration", "players" },
-            t.Captures.Select(r => new[] { N(r.Zone), N(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players) }));
+            new[] { "zone", "tier", "team", "start", "end", "outcome", "duration", "players" },
+            t.Captures.Select(r => new[] { N(r.Zone), N(r.Tier), N(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players) }));
 
         private static void WritePurchases(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "purchases.csv"),
