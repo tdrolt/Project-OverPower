@@ -249,9 +249,10 @@ namespace Overpower.EditorTools.Telemetry
         }
 
         /// <summary>The sample interval used to bound the trailing interval and cap gaps (opus review
-        /// item 11). Not yet part of the tuning snapshot (TelemetryConfig isn't serialized into it -
-        /// see TuningSnapshot.Json), so this reads a `telemetry.sampleIntervalSeconds` field if a
-        /// future schema ever adds one, and otherwise falls back to the shipped default (5s).</summary>
+        /// item 11). Step 0b added TelemetryConfig to the tuning snapshot (TuningSnapshot.Json), so a
+        /// session line from a real match now carries `telemetry.sampleIntervalSeconds`; older logs
+        /// captured before that change don't, so this still falls back to the shipped default (5s)
+        /// when the field is absent.</summary>
         private static double ResolveSampleIntervalSeconds(TelemetryLog log)
         {
             foreach (TelemetrySession s in log.Sessions)

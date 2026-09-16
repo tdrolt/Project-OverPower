@@ -17,11 +17,13 @@ namespace Overpower.Telemetry
     public static class TuningSnapshot
     {
         /// <summary>One flat JSON object: {"territory":{...},"gameplay":{...},"armor":{...},
-        /// "weapons":[{"id":..,"name":..,"goldCost":..,"json":{...}}, ...],"abilities":[...]}.
-        /// A null config/catalogue writes `null` (or `[]` for a catalogue) rather than throwing - a
-        /// half-wired MatchTelemetry should still produce a parseable, if incomplete, session line.</summary>
+        /// "telemetry":{...},"weapons":[{"id":..,"name":..,"goldCost":..,"json":{...}}, ...],
+        /// "abilities":[...]}. A null config/catalogue writes `null` (or `[]` for a catalogue) rather
+        /// than throwing - a half-wired MatchTelemetry should still produce a parseable, if
+        /// incomplete, session line.</summary>
         public static string Json(TerritoryConfig territoryConfig, GameplayConfig gameplayConfig,
-                                   ArmorConfig armorConfig, WeaponCatalogue weapons, AbilityCatalogue abilities)
+                                   ArmorConfig armorConfig, TelemetryConfig telemetryConfig,
+                                   WeaponCatalogue weapons, AbilityCatalogue abilities)
         {
             var sb = new StringBuilder(4096);
             sb.Append('{');
@@ -34,6 +36,11 @@ namespace Overpower.Telemetry
             AppendRawField(sb, "gameplay", gameplayConfig != null ? JsonUtility.ToJson(gameplayConfig) : "null");
             sb.Append(',');
             AppendRawField(sb, "armor", armorConfig != null ? JsonUtility.ToJson(armorConfig) : "null");
+            sb.Append(',');
+            // Step 0b: the T5 aggregator's ResolveSampleIntervalSeconds already looks for
+            // tuning.telemetry.sampleIntervalSeconds and falls back to 5s when it's absent - this is
+            // what makes that field present instead of always falling back.
+            AppendRawField(sb, "telemetry", telemetryConfig != null ? JsonUtility.ToJson(telemetryConfig) : "null");
             sb.Append(',');
             AppendWeapons(sb, weapons);
             sb.Append(',');

@@ -517,7 +517,7 @@ namespace Overpower.Telemetry
             line.String(TelemetryKeys.Commit, ReadCommitHash());
             line.String(TelemetryKeys.UnityVersion, Application.unityVersion);
             line.String(TelemetryKeys.Platform, Application.platform.ToString());
-            line.Raw(TelemetryKeys.Tuning, TuningSnapshot.Json(territoryConfig, gameplayConfig, armorConfig, weapons, abilities));
+            line.Raw(TelemetryKeys.Tuning, TuningSnapshot.Json(territoryConfig, gameplayConfig, armorConfig, config, weapons, abilities));
             writer.Write(line.End());
         }
 
