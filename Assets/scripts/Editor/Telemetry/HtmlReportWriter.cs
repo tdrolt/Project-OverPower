@@ -21,7 +21,14 @@ namespace Overpower.EditorTools.Telemetry
     /// &lt;script&gt; tag - every '&lt;', '&gt;', '&amp;' and quote becomes a \uXXXX escape, so the
     /// literal text "&lt;/script&gt;" can never appear in the emitted HTML at all. The page's own JS
     /// then writes every player-provided string via .textContent (never innerHTML) as a second,
-    /// independent layer of the same protection.</summary>
+    /// independent layer of the same protection.
+    ///
+    /// Polish pass (post-review): weapon/ability/zone ids are shown with their names/tiers, the team
+    /// income chart is split one-per-team so its legend stays short, reference lines get compact
+    /// in-chart labels instead of legend entries, every chart sits in a fixed-height wrapper with
+    /// responsive:true/maintainAspectRatio:false so narrow viewports never force page-wide horizontal
+    /// scroll, the damage matrix is labelled with the exact measure it uses, and death dots get a
+    /// legend and an outline so they read clearly over the arena image.</summary>
     public static class HtmlReportWriter
     {
         public static string Write(ReportTables tables, TelemetryLog log, BalanceTargetsData targets, ArenaReportRender.Result arena, string folder)
@@ -116,6 +123,7 @@ namespace Overpower.EditorTools.Telemetry
 <html lang='en'>
 <head>
 <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>OverPower Telemetry Report</title>
 <style>
 :root {
@@ -147,32 +155,40 @@ namespace Overpower.EditorTools.Telemetry
   }
 }
 * { box-sizing: border-box; }
+html, body { max-width: 100%; overflow-x: hidden; }
 body { background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px 24px 60px; }
 h1 { margin-top: 0; }
 h2 { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
 section { margin-bottom: 44px; }
-.card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; overflow-x: auto; }
+.card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; overflow-x: auto; min-width: 0; }
+.card-desc { font-size: 12px; color: var(--muted); margin: -6px 0 12px; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
 th, td { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; white-space: nowrap; }
 th { cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; }
 th.sorted-asc::after { content: ' \25b2'; font-size: 10px; }
 th.sorted-desc::after { content: ' \25bc'; font-size: 10px; }
 .warn { background: var(--warn-bg); color: var(--warn-fg); padding: 8px 14px; border-radius: 6px; margin: 6px 0; font-size: 13px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 16px; min-width: 0; }
+.chart-wrap { position: relative; height: 260px; min-width: 0; }
+.chart-wrap.tall { height: 320px; }
 canvas { max-width: 100%; }
 .gantt-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
-.gantt-label { width: 70px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
-.gantt-track { position: relative; flex: 1; height: 16px; background: var(--border); border-radius: 3px; }
+.gantt-label { width: 96px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.gantt-track { position: relative; flex: 1; height: 16px; background: var(--border); border-radius: 3px; min-width: 0; }
 .gantt-bar { position: absolute; top: 0; height: 100%; border-radius: 3px; min-width: 2px; }
 .note { color: var(--muted); font-size: 12px; }
 #arena-wrap { position: relative; display: inline-block; max-width: 100%; }
 #arena-canvas { border: 1px solid var(--border); border-radius: 6px; max-width: 100%; height: auto; background: #000; }
+#heatmap-legend { font-size: 12px; color: var(--muted); margin: 8px 0; }
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 5px 0 12px; vertical-align: middle; border: 1.5px solid rgba(0,0,0,0.6); }
+.legend-dot:first-of-type { margin-left: 6px; }
 details.card summary { cursor: pointer; font-weight: 600; }
 pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
 .tab-button { background: none; border: none; border-bottom: 3px solid transparent; color: var(--muted); font: inherit; font-size: 14px; padding: 8px 14px; cursor: pointer; }
 .tab-button.active { color: var(--fg); border-bottom-color: var(--team0); font-weight: 600; }
-.tab-panel { display: block; }
+.tab-panel { display: block; min-width: 0; }
 </style>
 </head>
 <body>
@@ -207,11 +223,31 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 <section id='section-economy'>
 <h2>Economy</h2>
 <div class='grid'>
-<div class='card'><h3>Gold per player over time</h3><canvas id='chart-gold-per-player'></canvas></div>
-<div class='card'><h3>Team income per second by tier</h3><canvas id='chart-team-income'></canvas></div>
-<div class='card'><h3>Gold generated per zone by team</h3><canvas id='chart-zone-income'></canvas></div>
-<div class='card'><h3>Gold gap to richest team</h3><canvas id='chart-gold-gap'></canvas></div>
-<div class='card'><h3>Purchase timeline vs targets</h3><canvas id='chart-purchase-timeline'></canvas></div>
+<div class='card'>
+<h3>Gold per player over time</h3>
+<p class='card-desc'>Each player's gold balance over time. Flat lines mean saving; drops mean a purchase; steady climbs mean territory income.</p>
+<div class='chart-wrap'><canvas id='chart-gold-per-player'></canvas></div>
+</div>
+<div class='card'>
+<h3>Team income per second by tier</h3>
+<p class='card-desc'>One small chart per team: gold/s from each tier, stacked, against the GDD's own reference bands (dashed, labelled Lo/St/Av/Do at the right edge = Losing/Struggling/Average/Dominant).</p>
+<div id='team-income-charts' class='grid'></div>
+</div>
+<div class='card'>
+<h3>Gold generated per zone by team</h3>
+<p class='card-desc'>Total gold each team earned from each zone it held over the match.</p>
+<div class='chart-wrap'><canvas id='chart-zone-income'></canvas></div>
+</div>
+<div class='card'>
+<h3>Gold gap to richest team</h3>
+<p class='card-desc'>How far behind the richest team each team was, over time. 0 means that team WAS the richest at that minute.</p>
+<div class='chart-wrap'><canvas id='chart-gold-gap'></canvas></div>
+</div>
+<div class='card'>
+<h3>Purchase timeline vs targets</h3>
+<p class='card-desc'>Every purchase (colour = category) against the GDD's target minutes (dashed vertical lines, labelled P1/A1/Ult/P2/A2 = Primary Upgrade 1, Armor 1, Ultimate, Primary Upgrade 2, Armor 2).</p>
+<div class='chart-wrap'><canvas id='chart-purchase-timeline'></canvas></div>
+</div>
 </div>
 <div class='grid'>
 <div class='card'><h3>Unspent gold (at death / at end)</h3><div id='table-unspent-gold'></div></div>
@@ -221,9 +257,17 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 
 <section id='section-territory'>
 <h2>Territory</h2>
-<div class='card'><h3>Ownership timeline</h3><div id='ownership-gantt'></div></div>
+<div class='card'>
+<h3>Ownership timeline</h3>
+<p class='card-desc'>Each row is one zone; a coloured bar is one team's uninterrupted holding of it. Hover a bar for its exact start/end time and how it ended.</p>
+<div id='ownership-gantt'></div>
+</div>
 <div class='grid'>
-<div class='card'><h3>Zones held per team over time</h3><canvas id='chart-zones-held'></canvas></div>
+<div class='card'>
+<h3>Zones held per team over time</h3>
+<p class='card-desc'>How many zones (of any tier) each team held at each minute. Rising means expanding; falling means losing ground.</p>
+<div class='chart-wrap'><canvas id='chart-zones-held'></canvas></div>
+</div>
 <div class='card'><h3>Bounty total by team</h3><div id='table-bounty'></div></div>
 </div>
 <div class='card'><h3>Captures</h3><div id='table-captures'></div></div>
@@ -231,16 +275,27 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 
 <section id='section-combat'>
 <h2>Combat</h2>
-<div class='card'><h3>Weapons</h3><canvas id='chart-weapons'></canvas><div id='table-weapons'></div></div>
+<div class='card'>
+<h3>Weapons</h3>
+<p class='card-desc'>Damage per minute a weapon was actually equipped, so weapons used for very different lengths of time are still comparable.</p>
+<div class='chart-wrap'><canvas id='chart-weapons'></canvas></div>
+<div id='table-weapons'></div>
+</div>
 <div class='card'><h3>Abilities</h3><div id='table-abilities'></div></div>
-<div class='card'><h3>Team versus team damage</h3><div id='table-damage-matrix'></div></div>
+<div class='card'>
+<h3>Team versus team damage</h3>
+<p class='card-desc' id='damage-matrix-desc'></p>
+<div id='table-damage-matrix'></div>
+</div>
 <div class='card' id='heatmaps'>
 <h3>Death and position heatmaps</h3>
+<p class='card-desc'>Dots plotted on a top-down render of the arena. Deaths are solid, outlined, coloured by the victim's team; positions are small translucent samples showing where players spent time.</p>
 <div>
 <label><input type='checkbox' id='toggle-deaths' checked> Deaths</label>
 &nbsp;&nbsp;
 <label><input type='checkbox' id='toggle-positions'> Positions</label>
 </div>
+<div id='heatmap-legend'></div>
 <div id='arena-wrap'><canvas id='arena-canvas' width='1024' height='1024'></canvas></div>
 <div id='arena-note' class='note'></div>
 </div>
@@ -286,25 +341,61 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
   // Telemetry step 7 (not implemented yet - see assumptions-for-tudor.md) will add a per-row
   // `phase` value ('3 teams' / '2 teams') once a team is eliminated. currentPhase and rowsFor are
   // the one seam that work plugs into: every render function already reads its table through
-  // rowsFor(name) instead of DATA[name] directly, so filtering by currentPhase later is a
-  // one-line change here, not a rewrite of every render function.
+  // rowsFor(name, scope) instead of DATA[name] directly, so filtering by scope later is a one-line
+  // change here, not a rewrite of every render function.
   var currentPhase = 'all';
   function rowsFor(tableName, scope) { return DATA[tableName] || []; }
 
-  // Every time-based chart (x = seconds or minutes) builds its options through this one function,
-  // so a phase-boundary marker line (telemetry step 7) can be injected in ONE place later instead
-  // of hunting through five separate chart configs.
-  function timeChartOptions(xLabel, yLabel, config) {
+  // Every chart builds its options through this one function - x/y titles, responsive sizing (so a
+  // fixed-height .chart-wrap controls the actual pixel size instead of Chart.js guessing one), and
+  // an optional legend filter for datasets carrying a `refLabel` (drawn in-chart instead - see
+  // refLineLabelPlugin below). A phase-boundary marker line (telemetry step 7) has one place to be
+  // added later instead of hunting through every chart config.
+  function chartOptions(xLabel, yLabel, config) {
     config = config || {};
     var xScale = { title: { display: true, text: xLabel } };
     if (config.xType) xScale.type = config.xType;
     if (config.stacked) xScale.stacked = true;
     var yScale = { title: { display: true, text: yLabel } };
     if (config.stacked) yScale.stacked = true;
-    var options = { scales: { x: xScale, y: yScale } };
+    var options = { responsive: true, maintainAspectRatio: false, scales: { x: xScale, y: yScale } };
     if (config.parsing === false) options.parsing = false;
+    if (config.hideRefLinesFromLegend) {
+      options.plugins = { legend: { labels: { filter: function (item, data) { return !data.datasets[item.datasetIndex].refLabel; } } } };
+    }
     return options;
   }
+
+  // A dashed reference-line dataset (a GDD scenario income, a GDD purchase-timing target) carries
+  // its own short `refLabel` instead of a legend entry - a legend with one entry per team/tier PLUS
+  // one per reference line was the exact 'legend swamps the plot' bug found in review. This plugin
+  // draws that short label right next to the line's own last point instead: at the right end for a
+  // horizontal line (same y twice), at the top end for a vertical one (same x twice).
+  var refLineLabelPlugin = {
+    id: 'refLineLabels',
+    afterDatasetsDraw: function (chart) {
+      var ctx = chart.ctx;
+      chart.data.datasets.forEach(function (ds, i) {
+        if (!ds.refLabel) return;
+        var meta = chart.getDatasetMeta(i);
+        if (!meta || meta.hidden || !meta.data || meta.data.length < 2) return;
+        var p0 = meta.data[0], p1 = meta.data[meta.data.length - 1];
+        if (p0.x === undefined || p1.x === undefined) return;
+        ctx.save();
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.fillStyle = '#888';
+        var vertical = Math.abs(p0.x - p1.x) < 1;
+        if (vertical) {
+          ctx.textAlign = 'center';
+          ctx.fillText(ds.refLabel, p1.x, Math.min(p0.y, p1.y) - 4);
+        } else {
+          ctx.textAlign = 'left';
+          ctx.fillText(ds.refLabel, p1.x + 4, p1.y + 3);
+        }
+        ctx.restore();
+      });
+    },
+  };
 
   // Telemetry step 7 (not implemented yet - see assumptions-for-tudor.md) splits this report into
   // a 3-team phase and a 2-team phase. Today's log has no phase data at all, so only the 'Whole
@@ -365,8 +456,37 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     for (var i = 0; i < list.length; i++) { if (list[i].id === id) return list[i].name; }
     return null;
   }
-  function weaponName(id) { return (tuning && nameFromList(tuning.weapons, id)) || ('Weapon ' + id); }
-  function abilityName(id) { return (tuning && nameFromList(tuning.abilities, id)) || ('Ability ' + id); }
+  // 'Rocket (2)' when the tuning snapshot has a name for this id, else a plain 'Weapon 2' fallback
+  // (an older log with no matching entry, or an id outside the catalogue).
+  function weaponName(id) {
+    var n = tuning && nameFromList(tuning.weapons, id);
+    return n ? (n + ' (' + id + ')') : ('Weapon ' + id);
+  }
+  function abilityName(id) {
+    var n = tuning && nameFromList(tuning.abilities, id);
+    return n ? (n + ' (' + id + ')') : ('Ability ' + id);
+  }
+
+  // Zone id -> tier, built once from whichever table has it first (ownership, else zoneIncome) -
+  // there is no separate 'zone definitions' table, so this is read from the match's own data
+  // rather than TerritoryConfig (which only has per-TIER settings, not a zone-to-tier map).
+  var zoneTierCache = null;
+  function zoneTier(zoneId) {
+    if (zoneTierCache === null) {
+      zoneTierCache = {};
+      (rowsFor('ownership', 'whole-match') || []).forEach(function (o) { if (!(o.zone in zoneTierCache)) zoneTierCache[o.zone] = o.tier; });
+      (rowsFor('zoneIncome', 'whole-match') || []).forEach(function (z) { if (!(z.zone in zoneTierCache)) zoneTierCache[z.zone] = z.tier; });
+    }
+    return zoneTierCache[zoneId];
+  }
+  // 'Zone 6 · T1 capital' (tier 1 is always a team's capital - TerritoryConfig's own tier-0 row
+  // comment) or 'Zone 0 · T2' for any other tier, falling back to a plain 'Zone N' if no ownership
+  // or income row ever named this zone's tier (never captured, or a malformed/partial log).
+  function zoneLabel(zoneId) {
+    var tier = zoneTier(zoneId);
+    if (tier === undefined || tier === null) return 'Zone ' + zoneId;
+    return 'Zone ' + zoneId + ' · T' + tier + (tier === 1 ? ' capital' : '');
+  }
 
   var chartsOk = (typeof Chart !== 'undefined');
   if (!chartsOk) {
@@ -452,6 +572,8 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       { label: 'First t', value: function (r) { return r.firstT; } },
       { label: 'Last t', value: function (r) { return r.lastT; } },
     ], h.coverage || []);
+    // Telemetry step 7 (not implemented yet): this stays empty until it can list which players'
+    // log files are present vs missing for the match.
   });
 
   safeRun('economy', function () {
@@ -472,7 +594,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       new Chart(document.getElementById('chart-gold-per-player'), {
         type: 'line',
         data: { datasets: goldDatasets },
-        options: timeChartOptions('seconds', 'gold', { xType: 'linear', parsing: false })
+        options: chartOptions('seconds', 'gold', { xType: 'linear', parsing: false })
       });
     }
 
@@ -480,15 +602,29 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var teams = uniqueSorted(eb.map(function (r) { return r.team; }));
     var minutesList = uniqueSorted(eb.map(function (r) { return r.minute; }));
 
-    if (chartsOk) {
-      var tierColors = ['#c9d6ff', '#8fa8ff', '#5a7cf7', '#2b52d6'];
-      var incomeDatasets = [];
-      for (var ti = 0; ti < teams.length; ti++) {
-        var incomeTeam = teams[ti];
+    var teamIncomeContainer = document.getElementById('team-income-charts');
+    var tierColors = ['#c9d6ff', '#8fa8ff', '#5a7cf7', '#2b52d6'];
+    var scenarioDefs = [];
+    if (DATA.targets) {
+      var scen = DATA.targets.scenarioIncomePerTeam;
+      scenarioDefs = [['Lo', scen.losing], ['St', scen.struggling], ['Av', scen.average], ['Do', scen.dominant]];
+    }
+    for (var ti2 = 0; ti2 < teams.length; ti2++) {
+      var incomeTeam = teams[ti2];
+      var teamCard = el('div', { class: 'card' });
+      teamCard.appendChild(el('h4', null, 'Team ' + incomeTeam));
+      var wrap = el('div', { class: 'chart-wrap' });
+      var canvas = el('canvas');
+      wrap.appendChild(canvas);
+      teamCard.appendChild(wrap);
+      teamIncomeContainer.appendChild(teamCard);
+
+      if (chartsOk) {
+        var teamDatasets = [];
         for (var tier = 0; tier < 4; tier++) {
-          incomeDatasets.push({
-            label: 'Team ' + incomeTeam + ' tier ' + (tier + 1),
-            stack: 'team' + incomeTeam,
+          teamDatasets.push({
+            label: 'Tier ' + (tier + 1),
+            stack: 'tiers',
             backgroundColor: tierColors[tier],
             data: minutesList.map(function (m) {
               var matchRow = null;
@@ -497,24 +633,20 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
             }),
           });
         }
-      }
-      if (DATA.targets) {
-        var scen = DATA.targets.scenarioIncomePerTeam;
-        var scenarios = [['Losing', scen.losing], ['Struggling', scen.struggling], ['Average', scen.average], ['Dominant', scen.dominant]];
-        for (var s = 0; s < scenarios.length; s++) {
-          var scenarioValue = scenarios[s][1];
-          incomeDatasets.push({
-            type: 'line', label: scenarios[s][0] + ' (GDD)',
-            data: minutesList.map(function () { return scenarioValue; }),
+        scenarioDefs.forEach(function (sc) {
+          teamDatasets.push({
+            type: 'line', label: sc[0], refLabel: sc[0],
+            data: minutesList.map(function () { return sc[1]; }),
             borderColor: '#888', borderDash: [5, 4], pointRadius: 0, fill: false,
           });
-        }
+        });
+        new Chart(canvas, {
+          type: 'bar',
+          data: { labels: minutesList, datasets: teamDatasets },
+          options: chartOptions('minute', 'gold/s', { stacked: true, hideRefLinesFromLegend: true }),
+          plugins: [refLineLabelPlugin],
+        });
       }
-      new Chart(document.getElementById('chart-team-income'), {
-        type: 'bar',
-        data: { labels: minutesList, datasets: incomeDatasets },
-        options: timeChartOptions('minute', 'gold per second', { stacked: true })
-      });
     }
 
     var zi = rowsFor('zoneIncome', 'whole-match') || [];
@@ -534,8 +666,8 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       }
       new Chart(document.getElementById('chart-zone-income'), {
         type: 'bar',
-        data: { labels: zones.map(function (z) { return 'Zone ' + z; }), datasets: zoneDatasets },
-        options: { scales: { y: { title: { display: true, text: 'gold' } } } }
+        data: { labels: zones.map(zoneLabel), datasets: zoneDatasets },
+        options: chartOptions('zone', 'gold')
       });
     }
 
@@ -554,7 +686,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       new Chart(document.getElementById('chart-gold-gap'), {
         type: 'line',
         data: { labels: minutesList, datasets: gapDatasets },
-        options: timeChartOptions('minute', 'gold behind richest team')
+        options: chartOptions('minute', 'gold behind richest team')
       });
     }
 
@@ -580,20 +712,25 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       var targetsP = DATA.targets ? DATA.targets.purchaseTargetMinutes : null;
       if (targetsP) {
         var lines = [
-          ['Primary Upgrade 1', targetsP.primaryUpgrade1Minutes],
-          ['Armor 1', targetsP.armor1Minutes],
-          ['Ultimate', targetsP.ultimateMinutes],
-          ['Primary Upgrade 2', targetsP.primaryUpgrade2Minutes],
-          ['Armor 2', targetsP.armor2Minutes],
+          ['P1', targetsP.primaryUpgrade1Minutes],
+          ['A1', targetsP.armor1Minutes],
+          ['Ult', targetsP.ultimateMinutes],
+          ['P2', targetsP.primaryUpgrade2Minutes],
+          ['A2', targetsP.armor2Minutes],
         ];
         for (var li = 0; li < lines.length; li++) {
-          purchaseDatasets.push({ type: 'line', label: lines[li][0] + ' target', data: [{ x: lines[li][1], y: 0 }, { x: lines[li][1], y: maxAmount }], borderColor: '#888', borderDash: [5, 4], pointRadius: 0, fill: false });
+          purchaseDatasets.push({
+            type: 'line', label: lines[li][0], refLabel: lines[li][0],
+            data: [{ x: lines[li][1], y: 0 }, { x: lines[li][1], y: maxAmount }],
+            borderColor: '#888', borderDash: [5, 4], pointRadius: 0, fill: false,
+          });
         }
       }
       new Chart(document.getElementById('chart-purchase-timeline'), {
         type: 'scatter',
         data: { datasets: purchaseDatasets },
-        options: timeChartOptions('minute', 'price')
+        options: chartOptions('minute', 'price', { hideRefLinesFromLegend: true }),
+        plugins: [refLineLabelPlugin],
       });
     }
 
@@ -646,7 +783,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     for (var zi = 0; zi < zones.length; zi++) {
       var zone = zones[zi];
       var rowDiv = el('div', { class: 'gantt-row' });
-      rowDiv.appendChild(el('div', { class: 'gantt-label' }, 'Zone ' + zone));
+      rowDiv.appendChild(el('div', { class: 'gantt-label' }, zoneLabel(zone)));
       var track = el('div', { class: 'gantt-track' });
       var stints = ownership.filter(function (r) { return r.zone === zone; });
       for (var si = 0; si < stints.length; si++) {
@@ -656,7 +793,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         var bar = el('div', {
           class: 'gantt-bar',
           style: 'left:' + leftPct + '%;width:' + widthPct + '%;background:' + teamColor(st.team) + ';',
-          title: 'Zone ' + st.zone + ' tier ' + st.tier + ' team ' + st.team + ' ' + fmt(st.from) + 's to ' + fmt(st.to) + 's (' + st.howEnded + ')',
+          title: zoneLabel(st.zone) + ' team ' + st.team + ' ' + fmt(st.from) + 's to ' + fmt(st.to) + 's (' + st.howEnded + ')',
         });
         track.appendChild(bar);
       }
@@ -685,7 +822,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       new Chart(document.getElementById('chart-zones-held'), {
         type: 'line',
         data: { labels: minutesList, datasets: zoneHeldDatasets },
-        options: timeChartOptions('minute', 'zones held')
+        options: chartOptions('minute', 'zones held')
       });
     }
 
@@ -700,7 +837,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     ], Object.keys(bountyByTeam).map(function (bk) { return { team: bk, total: bountyByTeam[bk] }; }));
 
     buildTable(document.getElementById('table-captures'), [
-      { label: 'Zone', value: function (r) { return r.zone; } },
+      { label: 'Zone', value: function (r) { return zoneLabel(r.zone); } },
       { label: 'Team', value: function (r) { return r.team; } },
       { label: 'Start', value: function (r) { return r.start; } },
       { label: 'End', value: function (r) { return r.end; } },
@@ -719,7 +856,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
           labels: weapons.map(function (w) { return weaponName(w.weaponId); }),
           datasets: [{ label: 'Damage per equipped minute', backgroundColor: '#3a6df0', data: weapons.map(function (w) { return w.damagePerEquippedMinute; }) }],
         },
-        options: { scales: { y: { title: { display: true, text: 'damage per equipped minute' } } } }
+        options: chartOptions('weapon', 'damage per equipped minute')
       });
     }
     buildTable(document.getElementById('table-weapons'), [
@@ -748,6 +885,17 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       { label: 'Status seconds', value: function (r) { return r.statusSeconds; } },
     ], rowsFor('abilities', 'whole-match') || []);
 
+    // Same measure as the players table's own 'Dmg dealt' column (raw, pre-armor, Burn-source HIT
+    // rows excluded because they're already counted via their `dot` bucket) - see
+    // TelemetryAggregator.CountsTowardDamageSums / damageDealtByActor. The one remaining gap: the
+    // players table also adds each `dot` event's own raw total (continuous burn/DoT damage, which
+    // is never attributed to an attacker-victim TEAM pair anywhere in this report), so a team's row
+    // here can read lower than that team's players' combined 'Dmg dealt' whenever there was
+    // sustained burning - flagged in the caption rather than silently differing.
+    document.getElementById('damage-matrix-desc').textContent =
+      'Damage dealt (raw, pre-armor; attacker team → victim team) - same measure as the players table’s ‘Dmg dealt’, ' +
+      'except burn/DoT tick damage isn’t attributed to a team pair here, so a team’s row can read lower than its players’ combined total.';
+
     var hits = (rowsFor('hits', 'whole-match') || []).filter(function (h) { return h.source !== 'Burn'; });
     var teamsSeen = uniqueSorted(hits.map(function (h) { return h.attackerTeam; }).concat(hits.map(function (h) { return h.victimTeam; })));
     var matrix = {};
@@ -755,7 +903,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     for (var hi = 0; hi < hits.length; hi++) {
       var h = hits[hi];
       var key = h.attackerTeam + ':' + h.victimTeam;
-      matrix[key] = (matrix[key] || 0) + (h.healthLost || 0);
+      matrix[key] = (matrix[key] || 0) + (h.raw || 0);
       if (matrix[key] > maxVal) maxVal = matrix[key];
     }
     var matrixDiv = document.getElementById('table-damage-matrix');
@@ -789,10 +937,21 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var arena = DATA.arena;
     var canvas = document.getElementById('arena-canvas');
     var note = document.getElementById('arena-note');
+    var legendHost = document.getElementById('heatmap-legend');
     if (!arena || !arena.available) {
       note.textContent = (arena && arena.note) ? arena.note : 'Arena render is unavailable.';
       canvas.style.display = 'none';
       return;
+    }
+
+    var deaths = rowsFor('deaths', 'whole-match') || [];
+    var deathTeams = uniqueSorted(deaths.map(function (d) { return d.victimTeam; }));
+    if (deathTeams.length) {
+      legendHost.appendChild(el('span', null, 'Deaths (victim team):'));
+      deathTeams.forEach(function (t) {
+        legendHost.appendChild(el('span', { class: 'legend-dot', style: 'background:' + teamColor(t) + ';' }));
+        legendHost.appendChild(el('span', null, 'Team ' + t));
+      });
     }
 
     var ctx = canvas.getContext('2d');
@@ -817,13 +976,15 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         }
       }
       if (document.getElementById('toggle-deaths').checked) {
-        ctx.fillStyle = 'rgba(224,71,63,0.9)';
-        var deaths = rowsFor('deaths', 'whole-match') || [];
         for (var d = 0; d < deaths.length; d++) {
           var pd = toPixel(deaths[d].x, deaths[d].z);
           ctx.beginPath();
-          ctx.arc(pd[0], pd[1], 4, 0, 2 * Math.PI);
+          ctx.arc(pd[0], pd[1], 5, 0, 2 * Math.PI);
+          ctx.fillStyle = teamColor(deaths[d].victimTeam);
           ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+          ctx.stroke();
         }
       }
     }
@@ -875,10 +1036,10 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     (rowsFor('purchases', 'whole-match') || []).forEach(function (pr) { events.push({ t: pr.t, kind: pr.kind, text: pr.nick + ' ' + pr.kind + ' (' + pr.category + ')' }); });
     (rowsFor('shopBlocked', 'whole-match') || []).forEach(function (sr) { events.push({ t: sr.t, kind: 'shopBlocked', text: sr.nick + ' blocked: ' + sr.reason }); });
     (rowsFor('captures', 'whole-match') || []).forEach(function (cr) {
-      events.push({ t: cr.start, kind: 'captureStart', text: 'Zone ' + cr.zone + ' capture by team ' + cr.team + ' started' });
-      events.push({ t: cr.end, kind: 'captureEnd', text: 'Zone ' + cr.zone + ' capture ' + cr.outcome });
+      events.push({ t: cr.start, kind: 'captureStart', text: zoneLabel(cr.zone) + ' capture by team ' + cr.team + ' started' });
+      events.push({ t: cr.end, kind: 'captureEnd', text: zoneLabel(cr.zone) + ' capture ' + cr.outcome });
     });
-    (rowsFor('ownership', 'whole-match') || []).forEach(function (or_) { events.push({ t: or_.from, kind: 'ownership', text: 'Zone ' + or_.zone + ' to team ' + or_.team }); });
+    (rowsFor('ownership', 'whole-match') || []).forEach(function (or_) { events.push({ t: or_.from, kind: 'ownership', text: zoneLabel(or_.zone) + ' to team ' + or_.team }); });
 
     for (var m = 0; m < markers.length; m++) {
       var marker = markers[m];
