@@ -874,4 +874,11 @@ public class BuildingCapture : MonoBehaviourPun
     /// instead of reading the private captureProgress field through reflection.
     public float CaptureProgressFraction => CaptureSeconds > 0f ? Mathf.Clamp01(captureProgress / CaptureSeconds) : 0f;
 
+    /// <summary>Task T4: how many players are currently listed inside this zone (any team) - the
+    /// `capture` telemetry event's own "players" field, read through BuildingManager.PlayersInZone.
+    /// Meaningful on the master only (playersInZone is only ever populated there); reads as
+    /// whatever count a remote copy's own never-updated list happens to hold otherwise (always 0,
+    /// since only RPC_AddToZone/RemoveFromZone touch it and those run master-side).</summary>
+    public int PlayersInZoneCount => playersInZone.Count;
+
 }

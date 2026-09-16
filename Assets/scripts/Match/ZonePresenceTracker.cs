@@ -43,6 +43,16 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     /// <summary>Diagnostic only: how many presence writes this client has sent (master only).</summary>
     public int PresenceWriteCount { get; private set; }
 
+    /// <summary>Task T4: raised on the master only, once per measure (see Update), the instant a
+    /// zone's IsUnderAttack answer flips - not on every measure, only a change. MatchTelemetry is
+    /// the only listener; it logs with the zone's current owner.</summary>
+    public event System.Action<int, bool> UnderAttackChanged;
+
+    // Master only: this measure's IsUnderAttack answer per zone, so EvaluateUnderAttack can tell a
+    // change from a repeat. Index = zone, same shape as presentMasks. Never touched on a non-master
+    // client - Update's own early-out already gates the whole measure to the master.
+    private bool[] wasUnderAttack;
+
     private int[] presentMasks;   // index = zone
     private int[] lastSeenMs;     // index = zone × ZoneThreat.MaxTeams + team
     private float nextMeasureTime;
@@ -153,10 +163,32 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         // mask, but their stamp must be there if that teammate then dies inside.
         bool stamped = ZoneThreat.StampDepartures(moves, lastSeenMs, nowMs);
 
+        // Task T4: evaluated here, after presentMasks/lastSeenMs are this measure's real values and
+        // before Publish - IsUnderAttack reads exactly those two arrays plus the server clock, all
+        // already current for this frame.
+        EvaluateUnderAttack(manager.ZoneCount);
+
         // A write the room refused is retried on the next measure; the local arrays have already moved on, so waiting
         // for the next change would leave everyone else on the old state until someone happened to move.
         if (changed || stamped || publishPending)
             publishPending = !Publish();
+    }
+
+    /// <summary>Task T4: this measure's IsUnderAttack answer per zone, compared against the last
+    /// measure's - a change (not a level) is what raises UnderAttackChanged. wasUnderAttack starts
+    /// all-false (EnsureArrays), so the very first measure after a join or a scene load correctly
+    /// raises a "start" for any zone that is already under attack the moment measuring begins,
+    /// rather than staying silent about an attack already in progress.</summary>
+    private void EvaluateUnderAttack(int zoneCount)
+    {
+        for (int zone = 0; zone < zoneCount; zone++)
+        {
+            bool now = IsUnderAttack(zone);
+            if (now == wasUnderAttack[zone])
+                continue;
+            wasUnderAttack[zone] = now;
+            UnderAttackChanged?.Invoke(zone, now);
+        }
     }
 
     /// <summary>Master: alive, and not in the moment just after coming back to life (see RespawnSettleSeconds). A
@@ -257,6 +289,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     {
         presentMasks = null;
         lastSeenMs = null;
+        wasUnderAttack = null;
         publishPending = false;
         measuredDead.Clear();
         countAgainFrom.Clear();
@@ -269,5 +302,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
             presentMasks = new int[zoneCount];
         if (lastSeenMs == null || lastSeenMs.Length != zoneCount * ZoneThreat.MaxTeams)
             lastSeenMs = new int[zoneCount * ZoneThreat.MaxTeams];
+        if (wasUnderAttack == null || wasUnderAttack.Length != zoneCount)
+            wasUnderAttack = new bool[zoneCount];
     }
 }

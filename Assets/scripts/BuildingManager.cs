@@ -131,6 +131,20 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// example, pay a late joiner bounties that were settled before they arrived.
     public event Action<int, int, int, TerritorySnapshot> OwnershipChanged;
 
+    /// <summary>Task T4: raised on EVERY client (master included) whenever a decoded capture-progress
+    /// publish changes a zone's team or rate - see ApplyCaptureProgressIfPresent, which raises this
+    /// using CaptureProgress.NeedsRepublishComparedTo, the exact same "did this actually change"
+    /// predicate a tower already uses to decide whether to publish in the first place. MatchTelemetry
+    /// is the only listener today, and only logs while PhotonNetwork.IsMasterClient at the moment the
+    /// event fires - see its own comment for why a master-only LOG guard, not a master-only RAISE,
+    /// is what survives a master switch cleanly.</summary>
+    public event Action<int, CaptureProgress, CaptureProgress> CaptureProgressChanged;
+
+    /// <summary>Task T4: raised on the master only, from inside SetCaptured, the moment a capture
+    /// actually pays out a bounty (bountyPaid > 0) - see SetCaptured's own comment for why the
+    /// payout is computed there rather than passed in. Not raised for a zero-bounty capture.</summary>
+    public event Action<int, int, int, int> BountyPaid;
+
     /// How many OwnershipChanged events this client has raised. Diagnostic only: lets a test read
     /// from outside that a late joiner's first read raised none.
     public int OwnershipChangedRaisedCount { get; private set; }
@@ -183,6 +197,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// gate and OverPower's "near a zone" check (Tasks 2.5/2.6) all ask the same way. Capture rings
     /// are not meant to overlap, but if two ever do the nearest centre wins rather than an arbitrary
     /// dictionary order. No allocation: a plain foreach over the existing captures dictionary.</summary>
+    /// <summary>Task T4: how many players BuildingCapture currently counts inside this zone (its own
+    /// PlayersInZoneCount) - the `capture` telemetry event's own "players" field. 0 for a zone id
+    /// with no registered tower (not yet started, or a bad id), same convention as TierOf.</summary>
+    public int PlayersInZone(int zone) =>
+        captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.PlayersInZoneCount : 0;
+
     public bool TryGetZoneAt(Vector3 position, out int zoneId)
     {
         zoneId = -1;
@@ -514,6 +534,30 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
         int bountyPaid = BountyRule.PayoutOnCapture(team, basis.LastOwnerOf(zone), basis.LastHeldMs(zone), tierBounty, holdMs);
         Write(basis.WithCapture(zone, team, ServerNowMs(), bountyPaid));
+
+        // Task T4: raised here, not off the replicated snapshot's own BountyPaidOnLastCapture (which
+        // GoldWallet.HandleOwnershipChanged reads on every client to actually pay each player) -
+        // this is the single MASTER-side "a bounty was paid" fact for telemetry, independent of
+        // when (or whether) any one client's echo of the write above lands.
+        if (bountyPaid > 0)
+            RaiseBountyPaid(zone, team, bountyPaid, basis.LastHeldMs(zone));
+    }
+
+    private void RaiseBountyPaid(int zone, int team, int amount, int heldMs)
+    {
+        if (BountyPaid == null)
+            return;
+        foreach (Delegate listener in BountyPaid.GetInvocationList())
+        {
+            try
+            {
+                ((Action<int, int, int, int>)listener)(zone, team, amount, heldMs);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, this);
+            }
+        }
     }
 
     /// Master only: the zone goes neutral, remembering who held it and for how long (bounty).
@@ -675,6 +719,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         int[] rate = ReadIntArray(props, CaptureProgress.RateKey);
         int[] stamp = ReadIntArray(props, CaptureProgress.StampKey);
 
+        // Task T4: kept so the loop below can compare each zone's fresh value against what this
+        // client believed a moment ago - currentProgress itself is overwritten with `next` right
+        // after, so the comparison has to happen against this snapshot of the OLD array, not the
+        // field (which by then would just be comparing `next` against itself).
+        CaptureProgress[] previous = currentProgress;
+
         var next = new CaptureProgress[ZoneCount];
         for (int i = 0; i < ZoneCount; i++)
         {
@@ -685,6 +735,36 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             next[i] = CaptureProgress.Decode(t, p, r, s);
         }
         currentProgress = next;
+
+        if (CaptureProgressChanged != null)
+        {
+            for (int i = 0; i < ZoneCount; i++)
+            {
+                CaptureProgress before = previous != null && i < previous.Length ? previous[i] : CaptureProgress.Idle;
+                CaptureProgress after = next[i];
+                // Same predicate a tower already uses to decide whether ITS OWN new value is worth
+                // publishing at all (CaptureProgress.NeedsRepublishComparedTo) - reused here rather
+                // than re-deriving "did this change" a second way, so this event and the room's own
+                // wire traffic can never disagree about what counts as a change.
+                if (after.NeedsRepublishComparedTo(before))
+                    RaiseCaptureProgressChanged(i, before, after);
+            }
+        }
+    }
+
+    private void RaiseCaptureProgressChanged(int zone, CaptureProgress before, CaptureProgress after)
+    {
+        foreach (Delegate listener in CaptureProgressChanged.GetInvocationList())
+        {
+            try
+            {
+                ((Action<int, CaptureProgress, CaptureProgress>)listener)(zone, before, after);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, this);
+            }
+        }
     }
 
     private static int[] ReadIntArray(IDictionary<object, object> props, string key) =>
