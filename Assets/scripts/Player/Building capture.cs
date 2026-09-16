@@ -193,7 +193,10 @@ public class BuildingCapture : MonoBehaviourPun
         // below reads p.teamID, so one stale entry throws a MissingReferenceException every frame
         // and the capture system stops working for the rest of the match. Unity's == treats a
         // destroyed object as null, so this catches both the destroyed and the disconnected case.
-        playersInZone.RemoveAll(p => p == null);
+        // It is a leave like any other: if the capturing team is now gone, the capture ends, or
+        // another team standing here could never start one without stepping out and back in.
+        if (playersInZone.RemoveAll(p => p == null) > 0)
+            EndCaptureIfCapturersLeft();
 
         // A player who dies in the ring never leaves it either: death switches their collider off,
         // which fires no OnTriggerExit. Measured 2026-09-16, two clients: a killed attacker stayed
@@ -765,7 +768,12 @@ public class BuildingCapture : MonoBehaviourPun
     private void RemoveFromZone(PlayerTeam pt)
     {
         playersInZone.Remove(pt);
+        EndCaptureIfCapturersLeft();
+    }
 
+    /// Master, after anyone leaves the zone (walked out, died or disconnected).
+    private void EndCaptureIfCapturersLeft()
+    {
         // Only a neutral capture ends here. An owned zone's drain is left to HandleCapturedState: resetting it
         // on a leave wiped a running drain in one frame (see DrainRule.LeavingEndsCapture).
         if (DrainRule.LeavingEndsCapture(isCaptured, playersInZone.Any(p => p.teamID == capturingID)))

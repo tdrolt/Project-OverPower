@@ -96,6 +96,16 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void APausedDrainEndsWhenItsTeamLeavesEvenIfABlockedTeamIsStillInside()
+        {
+            // Three teams: team 1 drained, both teams' ways in are under attack, team 1 leaves. Team 2 must not later
+            // carry on from team 1's progress.
+            Assert.AreEqual(DrainRule.Step.Pause, Decide(new[] { 1, 2 }, false, true, 1, NoTeamMay).Step);
+            Assert.AreEqual(DrainRule.Step.Stop, Decide(new[] { 2 }, false, true, 1, NoTeamMay).Step);
+            Assert.AreEqual(DrainRule.Step.Start, Decide(new[] { 2 }, false, false, 1, AnyTeamMay).Step);
+        }
+
+        [Test]
         public void WhenTheDrainingTeamLeavesTheTeamStillDrainingIsNamed()
         {
             DrainRule.Decision d = Decide(new[] { 2 }, false, true, 1, AnyTeamMay);
