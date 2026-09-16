@@ -187,6 +187,35 @@ default came from):
 
 They're reference lines only, and nothing in the game reads them.
 
+## Part 3: 3-team vs 2-team phase split (added 2026-09-16, Tudor)
+
+Tudor wants the data for the 3-team phase kept separate from the data after the first team is out.
+
+- **The phase changes ONLY on an elimination** (Tudor, corrected the same day). Data is **Phase 1: 3 teams** from the
+  match start, until a team is actually eliminated. It is **Phase 2: 2 teams** from that moment. Player counts never
+  change the phase.
+- **Runtime:** the master logs an `elimination` event (team, time, teams remaining) and a `phase` event (number,
+  teams remaining) when a team is eliminated. Task 2.7's `MatchDirector` raises them. Until 2.7 exists there are no
+  eliminations, so every log is Phase 1. A 2-player test stays Phase 1 until one of its two teams is eliminated, which
+  ends the match.
+- **Aggregator:**
+  - Builds a phase timeline from `phase` events: Phase 1 from t=0 until the first `phase` event.
+  - Every time-based row gets a `phase` column, and ownership stints are split at the boundary.
+  - `weapons`, `abilities`, `players` and `zone_income` get one row per phase plus a whole-match row.
+- **Clearly separated output:**
+  - **HTML:** three tabs, **Phase 1: 3 teams**, **Phase 2: 2 teams** and **Whole match**, each with its own charts,
+    tables and target lines. A tab with no data says so. The whole-match time charts draw a line at the transition.
+  - **CSV:** one folder per scope: `csv/phase1_3teams/`, `csv/phase2_2teams/`, `csv/whole_match/`.
+- **`BalanceTargets`:**
+  - Phase 1 scenario incomes, per team: Losing 5 / Struggling 15 / Average 23 / Dominant 33 gold/s (GDD p.37).
+  - Phase 2 scenario incomes, per team: Losing 5 / Even 15 / Winning 25 gold/s (p.38).
+  - Phase durations: 900 s / 450 s (p.36).
+  - Each tab is drawn against its own phase's lines.
+- **Which logs are included:** the report header lists every player seen in the match (join events, sessions) and
+  whether their log file is present. It flags anyone missing, e.g. "No log from <name> (actor 3): their damage taken,
+  gold and purchases aren't counted." One PC shares one folder automatically. For several PCs, copy every PC's match
+  folder into one before building.
+
 ## Error handling
 
 - Disk or IO failure: one error log, telemetry disabled for the session, gameplay unaffected.
