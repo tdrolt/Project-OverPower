@@ -23,26 +23,32 @@ namespace Overpower.Tests
         public void WritesNonEmptyReportWithEmbeddedDataAndEverySectionId()
         {
             var log = TelemetryLog.Load(FixturePath);
-            var tables = TelemetryAggregator.Build(log);
+            var reportSet = TelemetryAggregator.BuildSet(log);
             string folder = Path.Combine(Path.GetTempPath(), "OverPowerHtmlReportWriterTest_" + Guid.NewGuid().ToString("N"));
 
             try
             {
-                string path = HtmlReportWriter.Write(tables, log, new BalanceTargetsData(), null, folder);
+                string path = HtmlReportWriter.Write(reportSet, log, new BalanceTargetsData(), null, folder);
                 Assert.IsTrue(File.Exists(path));
 
                 string html = File.ReadAllText(path);
                 Assert.IsNotEmpty(html);
                 StringAssert.Contains("const DATA = ", html);
 
-                foreach (string id in new[]
+                // Task T7: every scope gets its own suffixed copy of every section id (three tabs).
+                foreach (string scope in new[] { "whole-match", "phase-1", "phase-2" })
+                foreach (string sectionId in new[]
                          {
                              "section-header", "section-economy", "section-territory",
                              "section-combat", "section-players", "section-markers",
                          })
                 {
-                    StringAssert.Contains("id='" + id + "'", html);
+                    StringAssert.Contains("id='" + sectionId + "-" + scope + "'", html);
                 }
+
+                // match_a has no phase event at all, so the Phase 2 tab must show the "no
+                // elimination" note and hide its own content.
+                StringAssert.Contains("No team was eliminated in this match", html);
             }
             finally
             {
@@ -54,12 +60,12 @@ namespace Overpower.Tests
         public void PlayerProvidedNicknameIsEscapedInEmbeddedJson()
         {
             var log = TelemetryLog.Load(EscapingFixturePath);
-            var tables = TelemetryAggregator.Build(log);
+            var reportSet = TelemetryAggregator.BuildSet(log);
             string folder = Path.Combine(Path.GetTempPath(), "OverPowerHtmlReportWriterEscTest_" + Guid.NewGuid().ToString("N"));
 
             try
             {
-                string path = HtmlReportWriter.Write(tables, log, new BalanceTargetsData(), null, folder);
+                string path = HtmlReportWriter.Write(reportSet, log, new BalanceTargetsData(), null, folder);
                 string html = File.ReadAllText(path);
 
                 // The raw payload must never appear literally in the page (it would close the
@@ -83,12 +89,12 @@ namespace Overpower.Tests
         public void LineAndParagraphSeparatorsAreEscapedInEmbeddedJson()
         {
             var log = TelemetryLog.Load(LineSeparatorFixturePath);
-            var tables = TelemetryAggregator.Build(log);
+            var reportSet = TelemetryAggregator.BuildSet(log);
             string folder = Path.Combine(Path.GetTempPath(), "OverPowerHtmlReportWriterLsTest_" + Guid.NewGuid().ToString("N"));
 
             try
             {
-                string path = HtmlReportWriter.Write(tables, log, new BalanceTargetsData(), null, folder);
+                string path = HtmlReportWriter.Write(reportSet, log, new BalanceTargetsData(), null, folder);
                 string html = File.ReadAllText(path);
 
                 Assert.IsFalse(html.Contains("\u2028"), "a raw U+2028 must never reach the embedded JSON");
@@ -117,8 +123,9 @@ namespace Overpower.Tests
 
                 var tables = new ReportTables();
                 tables.GoldTimeline.Add(new GoldTimelineRow { T = 1.5, Actor = 1, Nick = "Test", Team = 0, Balance = 100, EarnedSoFar = 50, SpentSoFar = 25 });
+                var reportSet = new ReportSet { WholeMatch = tables, Phase1 = tables };
 
-                string path = HtmlReportWriter.Write(tables, null, new BalanceTargetsData(), null, folder);
+                string path = HtmlReportWriter.Write(reportSet, null, new BalanceTargetsData(), null, folder);
                 string html = File.ReadAllText(path);
 
                 StringAssert.Contains("\"t\":1.5", html);

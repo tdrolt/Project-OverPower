@@ -65,14 +65,17 @@ namespace Overpower.EditorTools.Telemetry
             }
 
             TelemetryLog log = TelemetryLog.Load(sourceFolder);
-            ReportTables tables = TelemetryAggregator.Build(log);
+            // Task T7: one log, three scopes (whole match, Phase 1, Phase 2 when the match had one) -
+            // see ReportSet's own comment. CsvReportWriter and HtmlReportWriter both take the whole
+            // set now, so the CSV folders and the HTML tabs are always built from the exact same data.
+            ReportSet reportSet = TelemetryAggregator.BuildSet(log);
 
             Directory.CreateDirectory(outputFolder);
-            CsvReportWriter.Write(tables, outputFolder);
+            CsvReportWriter.Write(reportSet, outputFolder);
 
             BalanceTargetsData targets = LoadBalanceTargetsData();
             ArenaReportRender.Result arena = ArenaReportRender.Render();
-            string htmlPath = HtmlReportWriter.Write(tables, log, targets, arena, outputFolder);
+            string htmlPath = HtmlReportWriter.Write(reportSet, log, targets, arena, outputFolder);
 
             Debug.Log($"[TelemetryMenu] Built report from '{sourceFolder}' into '{outputFolder}': {htmlPath}");
             // Review fix (T6 item 4): a hand-built "file://" + path string leaves spaces (and any
