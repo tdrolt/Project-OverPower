@@ -93,6 +93,22 @@ namespace Overpower.Weapons
 
         public WeaponDefinition Weapon => weapon;
 
+        /// <summary>Task T3 (telemetry): raised on the shooter's own client the moment a shot is
+        /// actually committed - once for a simultaneous (shotgun-style) pull with its full pellet
+        /// count, or once per round for a burst/sequential weapon, so an interrupted burst only
+        /// counts the rounds that actually left the gun. See DispatchShots/SpawnSequentially.
+        /// PlayerTelemetry is the only subscriber today.</summary>
+        public event System.Action<int, int> Fired;
+
+        /// <summary>Guarded on IsMine so this never fires with no possible correct listener - every
+        /// client runs RPC_FireWeapon (and so DispatchShots) for every shot it hears about, the
+        /// shooter's own included, but only the shooter's own copy of this event means anything.</summary>
+        private void RaiseFired(int weaponId, int projectileCount)
+        {
+            if (photonView.IsMine)
+                Fired?.Invoke(weaponId, projectileCount);
+        }
+
         /// <summary>The shooter's own current range multiplier (1 = unchanged) - AimConeView reads
         /// this to draw the SAME multiplied range a real shot would travel, the same way it already
         /// reads CurrentChargeFraction for a charging beam's arc.</summary>
@@ -543,6 +559,11 @@ namespace Overpower.Weapons
             {
                 for (int i = 0; i < shots.Length; i++)
                     Spawn(weapon, origin, shots[i]);
+
+                // Shotgun case (Task T3): "one pull, N projectiles" - a Simultaneous weapon spawns
+                // every pellet in this same synchronous loop, so there is no partial-completion case
+                // to account for the way a burst's coroutine has.
+                RaiseFired(weapon.Id, shots.Length);
             }
             else
             {
@@ -752,6 +773,11 @@ namespace Overpower.Weapons
             for (int i = 0; i < shots.Length; i++)
             {
                 Spawn(weapon, origin, shots[i]);
+                // Burst case (Task T3): raised per round ACTUALLY spawned, not once for the whole
+                // burst up front - a stun, death or despawn mid-sequence (this coroutine simply
+                // stops running) means fewer Fired calls than the nominal shots.Length, which is
+                // the point: telemetry should only count rounds that really left the gun.
+                RaiseFired(weapon.Id, 1);
                 if (i + 1 < shots.Length)
                     yield return new WaitForSeconds(weapon.SequentialDelay);
             }

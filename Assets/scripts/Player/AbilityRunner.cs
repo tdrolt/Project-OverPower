@@ -86,6 +86,13 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     /// the HUD to redraw that slot's icon.</summary>
     public event System.Action<AbilitySlot> SlotChanged;
 
+    /// <summary>Task T3 (telemetry): raised on the caster's own client right after a successful
+    /// cast's RPC is sent - TryCast only, never SendPhase's later phases (a channel completing or
+    /// being cancelled is not a fresh cast). PlayerTelemetry reads its own transform.position for
+    /// the `cast` line's x/z, so this carries only what a "cast" event actually needs to identify
+    /// which one happened.</summary>
+    public event System.Action<AbilitySlot, int> Cast;
+
     private void Awake()
     {
         owner = new AbilityOwner(gameObject);
@@ -233,6 +240,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             return;
 
         SendCast(module, 0, payload);
+        Cast?.Invoke(module.Definition.Slot, module.Definition.Id);
     }
 
     /// <summary>What the caster's machine knows at the press, gathered in one place so no module

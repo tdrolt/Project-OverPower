@@ -47,6 +47,14 @@ namespace Overpower.Match
         /// <summary>The buff is live right now: shield refilled, stats boosted, overheat nullified.</summary>
         public bool IsActive => state != null && state.Active;
 
+        /// <summary>Task T3 (telemetry): raised the instant Activate() runs - see that method.</summary>
+        public event System.Action Triggered;
+
+        /// <summary>Task T3 (telemetry): raised the instant Deactivate() runs, with "distance" (left
+        /// the territory radius - Update's own check) or "death" (HandleDied) - the same two paths
+        /// the class comment already documents.</summary>
+        public event System.Action<string> Ended;
+
         private void Awake()
         {
             // Nobody but the owner should simulate their own OverPower state - see the class
@@ -112,7 +120,7 @@ namespace Overpower.Match
                 Activate();
 
             if (wasActive && !state.Active)
-                Deactivate();
+                Deactivate("distance"); // The only way Update itself ends it - see UpdateDistance.
         }
 
         /// <summary>PlayerHealth.Damaged handler: works out the attacker's TEAM from the actor
@@ -157,7 +165,7 @@ namespace Overpower.Match
             bool wasActive = state.Active;
             state.EndOnDeath();
             if (wasActive)
-                Deactivate();
+                Deactivate("death");
         }
 
         private float DistanceToOwnTerritory()
@@ -188,16 +196,20 @@ namespace Overpower.Match
             weaponFiring?.SetStatMultipliers(1f + bonus, 1f + bonus, 1f + bonus);
             overheat?.Clear();
             overheat?.SetSuppressed(this, true);
+
+            Triggered?.Invoke();
         }
 
         /// <summary>Reached either from distancing yourself past the territory radius or from dying
         /// (HandleDied) - both put every multiplier straight back to 1 and lift the overheat
         /// suppression. The shield refill Activate granted is NOT undone: it already happened, the
         /// same way a health regen tick is not un-ticked when regen conditions change.</summary>
-        private void Deactivate()
+        private void Deactivate(string reason)
         {
             weaponFiring?.SetStatMultipliers(1f, 1f, 1f);
             overheat?.SetSuppressed(this, false);
+
+            Ended?.Invoke(reason);
         }
     }
 }
