@@ -46,8 +46,19 @@ public class PlayerCombatCredit : MonoBehaviourPun
     /// always reaches this component's own handler before PlayerTelemetry's (Unity runs every
     /// OnEnable, where this subscribes, before any Start, where PlayerTelemetry subscribes - see
     /// its own class comment), so PlayerTelemetry's `death` line reads this rather than calling
-    /// AssistersSince itself against an already-cleared ledger.</summary>
+    /// AssistersSince itself against an already-cleared ledger.
+    ///
+    /// T3 review: that ordering guarantee is real, but a reader should not have to trust it blindly -
+    /// see LastDeathTime below for the freshness guard a caller can check instead of assuming.</summary>
     public IReadOnlyList<int> LastDeathAssisters { get; private set; } = System.Array.Empty<int>();
+
+    /// <summary>Task T3 review: Time.time of the death LastDeathAssisters belongs to, -1 before any
+    /// death this life. PlayerTelemetry compares this against its own captured death time before
+    /// trusting LastDeathAssisters, rather than relying purely on subscriber ordering between two
+    /// separate components - a guard against a future refactor (either component's subscription
+    /// moving from OnEnable/Start to some other lifecycle method) silently reintroducing the ordering
+    /// bug LastDeathAssisters was built to avoid in the first place.</summary>
+    public float LastDeathTime { get; private set; } = -1f;
 
     private void Awake()
     {
@@ -125,6 +136,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
 
         // Task T3: captured before ledger.Clear() below - see LastDeathAssisters's own comment.
         LastDeathAssisters = new List<int>(ledger.AssistersSince(Time.time, assistWindowSeconds, killerActor));
+        LastDeathTime = Time.time;
 
         if (killerActor > 0)
         {

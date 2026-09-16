@@ -98,6 +98,15 @@ namespace Overpower.Telemetry
         /// <summary>True once this client's file has been opened and the session header written.</summary>
         public bool IsRecording => writer.IsOpen;
 
+        /// <summary>T3 review (item 10): raised right before the writer closes in every path that can
+        /// end it - quitting, leaving the room, or this object being destroyed - so a recorder with
+        /// its own buffered totals (PlayerTelemetry's `shots`/`dot` accumulators) gets one last chance
+        /// to flush through Log before it would otherwise be silently dropped. Fixes a real loss:
+        /// OnApplicationQuit used to close the writer with no such hook, and PlayerTelemetry's own
+        /// OnDestroy (which flushes its own accumulators) is not guaranteed to run first - Unity does
+        /// not order OnDestroy between two different GameObjects during teardown.</summary>
+        public event System.Action BeforeClose;
+
         private void Awake()
         {
             if (Instance == null)
@@ -134,10 +143,15 @@ namespace Overpower.Telemetry
             writer.Flush();
         }
 
-        private void OnApplicationQuit() => writer.Close();
+        private void OnApplicationQuit()
+        {
+            BeforeClose?.Invoke();
+            writer.Close();
+        }
 
         private void OnDestroy()
         {
+            BeforeClose?.Invoke();
             writer.Close();
             if (Instance == this) Instance = null;
         }
@@ -154,6 +168,7 @@ namespace Overpower.Telemetry
 
         public override void OnLeftRoom()
         {
+            BeforeClose?.Invoke();
             writer.Close();
             writer = new TelemetryWriter(); // Fresh writer for whatever match comes next - see the field's own comment.
             CurrentFolder = null;

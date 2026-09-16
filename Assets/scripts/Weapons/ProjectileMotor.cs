@@ -230,13 +230,17 @@ namespace Overpower.Weapons
 
             if (victim != null && context.Damage > 0f)
             {
-                // Task T3: context.SourceId already carries the ability id here for an ability shot
-                // (Weapon null - see ProjectileContext.SourceId's own comment), read back out
-                // separately so WeaponId keeps its existing value and AbilityId is only set when
-                // this really was cast, not fired.
+                // T3 review fix (item 12): context.SourceId is "weapon id, or the ability id when
+                // there is no weapon" (its own comment) - using it for WeaponId here used to also
+                // set AbilityId to the SAME value for an ability shot, so a hit from one carried
+                // w == ab, redundant and confusing to read. WeaponId is now only ever a real
+                // weapon's id (-1 for an ability shot); AbilityId is only ever a real ability's id
+                // (-1 for a weapon shot) - the two are mutually exclusive, matching every other
+                // DamageInfo site in the game.
+                int weaponId = context.Weapon != null ? context.Weapon.Id : -1;
                 int abilityId = context.Weapon == null ? context.AbilityId : -1;
                 victim.ApplyDamage(new DamageInfo(context.Damage, context.ShooterActorNumber,
-                                                   context.ShooterTeamId, context.SourceId,
+                                                   context.ShooterTeamId, weaponId,
                                                    DamageSource.Projectile, false, hit.point, abilityId));
             }
 

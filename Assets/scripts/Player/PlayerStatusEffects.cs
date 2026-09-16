@@ -55,10 +55,10 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
 
     /// <summary>Task T3 (telemetry): raised on the victim's own client every time a status is
     /// applied through Apply below - PlayerTelemetry logs a `status` line from it. Carries the
-    /// spec's own abilityId (-1 when it did not come from an ability) and, per kind, whichever of
-    /// duration/magnitude is the informative number: magnitude for Burn/Slow/Vulnerability (the
-    /// dps or the fraction), duration for Stun/Invulnerability (whose magnitude is unused).</summary>
-    public event System.Action<StatusKind, int, int, float> StatusApplied;
+    /// spec's own abilityId (-1 when it did not come from an ability) and BOTH duration and
+    /// magnitude (T3 review item 5 - an earlier version picked only one per kind, which dropped
+    /// duration for Burn/Slow/Vulnerability; T5 wants to sum seconds across every kind uniformly).</summary>
+    public event System.Action<StatusKind, int, int, float, float> StatusApplied;
 
     public bool IsStunned => state.IsActive(StatusKind.Stun);
     public bool IsInvulnerable => state.IsActive(StatusKind.Invulnerability);
@@ -127,12 +127,11 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
         ApplyStunToMotor(); // Freeze immediately rather than waiting for the next Update - a
                             // stun landing and the movement it blocks should read as the same frame.
 
-        // Task T3 (telemetry): magnitude is the informative number for Burn/Slow/Vulnerability
-        // (dps or a 0..1 fraction); duration is for Stun/Invulnerability, whose magnitude field is
-        // unused (StatusEffectSpec's own field comment).
-        float durationOrMagnitude = spec.kind == StatusKind.Stun || spec.kind == StatusKind.Invulnerability
-            ? spec.duration : spec.magnitude;
-        StatusApplied?.Invoke(spec.kind, sourceActorNumber, spec.abilityId, durationOrMagnitude);
+        // Task T3 review (item 5): both raw numbers, not one picked per kind - an earlier version of
+        // this reported only whichever of duration/magnitude was "informative" for a given kind,
+        // which silently dropped duration for Burn/Slow/Vulnerability (T5 wants to sum seconds
+        // uniformly across every kind).
+        StatusApplied?.Invoke(spec.kind, sourceActorNumber, spec.abilityId, spec.duration, spec.magnitude);
     }
 
     /// <summary>IStatusReceiver's generic entry point, for callers that found this component
@@ -159,8 +158,13 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
             return;
         }
 
+        // abilityId appended LAST (T3 review, item 13): appending an RPC parameter does not touch
+        // the RpcList (it indexes method NAMES, not signatures - see WeaponFiring.RPC_FireWeapon's
+        // own comment on the identical pattern), so this carries the sonic pulse's ability id across
+        // the wire without adding a new RPC. Every client must be running the same build for the
+        // extra parameter to line up.
         photonView.RPC(nameof(RPC_ApplyStatusFromPeer), photonView.Owner,
-                       (byte)spec.kind, spec.duration, spec.magnitude, sourceActor);
+                       (byte)spec.kind, spec.duration, spec.magnitude, sourceActor, spec.abilityId);
     }
 
     /// <summary>
@@ -169,13 +173,9 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     /// alone (StatusEffectState.RuleFor), so nothing here needs to carry or guess a StackRule.
     /// </summary>
     [PunRPC]
-    private void RPC_ApplyStatusFromPeer(byte kind, float duration, float magnitude, int sourceActor)
+    private void RPC_ApplyStatusFromPeer(byte kind, float duration, float magnitude, int sourceActor, int abilityId)
     {
-        // abilityId -1: this RPC's own parameter list does not carry it (Task T3 deviation - see
-        // the assumptions file). The only caller today is the sonic pulse's cross-client collision
-        // stun, which never feeds DamageInfo either way; only the `status` telemetry line for that
-        // one path reports an unknown ability id.
-        var spec = new StatusEffectSpec { kind = (StatusKind)kind, duration = duration, magnitude = magnitude, abilityId = -1 };
+        var spec = new StatusEffectSpec { kind = (StatusKind)kind, duration = duration, magnitude = magnitude, abilityId = abilityId };
         Apply(spec, sourceActor);
     }
 

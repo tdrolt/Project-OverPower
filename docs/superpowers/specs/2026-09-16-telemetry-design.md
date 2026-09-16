@@ -80,7 +80,8 @@ In the Editor the commit is read from `.git`. Builds get it written into a Resou
 | `shopBlocked` | owner, on a refused click | item id, price, reason (territory / combat / gold), shortfall |
 | `shots` | shooter, every sample interval (summed per weapon) | weapon id, trigger pulls, projectiles spawned (pellets and burst rounds counted singly) |
 | `cast` | caster, on a successful cast | slot, ability id, x, z |
-| `hit` | victim, per applied hit (friendly-fire blocks excluded) | attacker actor and team, weapon id, **ability id**, damage source, raw amount, armor absorbed, health lost, lethal, distance to the attacker's replicated position, vulnerability active, invulnerable, OverPower active on victim |
+| `dot` | victim, **every sample interval, summed** (added in T3 review: burn ticks every frame, one `hit` line each would be ~120 lines/s per burning victim) | per (attacker actor/team, weapon, ability, source): tick count, raw/armor/health sums, first/last t. Continuous source: `Burn` (status burn, fire field). A lethal burn tick flushes its bucket and is also logged as a normal `hit` |
+| `hit` | victim, per applied hit (friendly-fire blocks excluded; **continuous `Burn` damage goes to `dot` instead**) | attacker actor and team, weapon id, **ability id**, damage source, raw amount, armor absorbed, health lost, lethal, distance to the attacker's replicated position, vulnerability active, invulnerable, OverPower active on victim |
 | `status` | victim, when applied | effect (stun/slow/vulnerability/knockback/burn), source actor, ability id, duration or magnitude |
 | `death` | victim | killer, assists (from the existing `DamageCreditLedger`, same assist window), killing weapon/ability, x, z, time alive, unspent gold, full loadout |
 | `respawn` | owner | x, z, time dead |

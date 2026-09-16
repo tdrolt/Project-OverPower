@@ -24,9 +24,11 @@ namespace Overpower.Telemetry
     ///
     /// ALLOCATION: one TelemetryLine is built once and reused for every event this component ever
     /// raises (Begin/.../End is safe to call again immediately - see TelemetryLine's own class
-    /// comment); the only heap traffic per frame is the two cheap bool reads in Update's polling
-    /// (IsSilenced, IsFull), not a single line built or logged unless something actually happened or
-    /// the sample interval elapsed.
+    /// comment); the shots/dots accumulators are reset in place rather than reallocated on every
+    /// flush (T3 review item 11); event-name strings come from static arrays instead of
+    /// Enum.ToString(). The only heap traffic per frame is the two cheap bool reads in Update's
+    /// polling (IsSilenced, IsFull), not a single line built or logged unless something actually
+    /// happened or the sample interval elapsed.
     /// </summary>
     [DisallowMultipleComponent]
     public class PlayerTelemetry : MonoBehaviourPun
@@ -47,6 +49,17 @@ namespace Overpower.Telemetry
         private PlayerCombatCredit combatCredit;
         private GoldWallet goldWallet;
 
+        /// <summary>T3 review fix (item 2): PlayerDisplacement.TeleportTo writes rb.position
+        /// directly; Unity does not sync transform.position from it until the next physics step, so
+        /// a position read in the SAME frame as a teleport (respawn's own AliveChanged(true), fired
+        /// synchronously right after TeleportToSpawnPoint) read the OLD position through transform
+        /// while rb.position was already correct - measured live: a respawn logged the corpse's own
+        /// x/z instead of the spawn point. MyPosition below is used for every "this player's own
+        /// position" field, not just respawn's, since reading through the Rigidbody is never wrong
+        /// and is sometimes measurably right where transform.position is not.</summary>
+        private Rigidbody body;
+        private Vector3 MyPosition => body != null ? body.position : transform.position;
+
         private readonly TelemetryLine line = new TelemetryLine();
 
         private float sampleTimer;
@@ -64,18 +77,48 @@ namespace Overpower.Telemetry
         // every respawn after. death's own "time alive".
         private float aliveSinceTime;
 
-        // Time.time the most recent death happened - respawn's own "time dead".
+        // Time.time the most recent death happened - respawn's own "time dead", and the freshness
+        // stamp AssistArray checks against PlayerCombatCredit.LastDeathTime (T3 review item 9).
         private float deathTime;
+
+        // Index-matched to their enums (Combat/DamageInfo.cs, Combat/StatusEffectState.cs) - T3
+        // review item 11: avoids a ToString()/ToLowerInvariant() allocation on every hit/dot/status
+        // line. NameFor falls back to ToString() only if an enum ever grows past these arrays.
+        private static readonly string[] DamageSourceNames = { "Projectile", "Splash", "Burn", "Zone", "Contact" };
+        private static readonly string[] StatusKindNames = { "burn", "slow", "stun", "vulnerability", "invulnerability" };
+
+        private static string NameFor(DamageSource source)
+        {
+            int i = (int)source;
+            return i >= 0 && i < DamageSourceNames.Length ? DamageSourceNames[i] : source.ToString();
+        }
+
+        private static string NameFor(StatusKind kind)
+        {
+            int i = (int)kind;
+            return i >= 0 && i < StatusKindNames.Length ? StatusKindNames[i] : kind.ToString();
+        }
 
         private sealed class ShotAccumulator
         {
             public int Pulls;
             public int Projectiles;
+            public void Reset() { Pulls = 0; Projectiles = 0; }
         }
 
-        // Cleared on every flush (sample interval, death, OnDestroy) rather than reset in place -
-        // see FlushShots. Never allocated per frame: only Fired (a real shot) or a flush touches it.
+        // Entries persist for the whole match and are Reset() in place on every flush (sample
+        // interval, death/leave, BeforeClose) rather than removed - T3 review item 11: the dictionary
+        // itself only ever grows to "how many distinct weapons this player fired", and reusing the
+        // same ShotAccumulator instances avoids reallocating one every flush.
         private readonly Dictionary<int, ShotAccumulator> shotsByWeapon = new Dictionary<int, ShotAccumulator>();
+
+        /// <summary>T3 review item 1 (VOLUME): continuous damage (DamageSource.Burn - status burn
+        /// and FireField's DoT both use it) is bucketed here instead of logging one `hit` line per
+        /// tick - measured at ~129 lines/second for a single burning victim at Editor framerate.
+        /// Keyed exactly as the review specified: victim, attacker actor/team, weapon, ability,
+        /// source. Same reset-in-place reasoning as shotsByWeapon above.</summary>
+        private readonly Dictionary<(int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, DamageSource Source), DotAccumulator> dotsByKey =
+            new Dictionary<(int, int, int, int, int, DamageSource), DotAccumulator>();
 
         private void Awake()
         {
@@ -100,6 +143,7 @@ namespace Overpower.Telemetry
             ultimateCharge = GetComponent<UltimateCharge>();
             combatCredit = GetComponent<PlayerCombatCredit>();
             goldWallet = GetComponent<GoldWallet>();
+            body = GetComponent<Rigidbody>();
             // Not on the root - see WeaponFiring's own siblings (OverPowerBuff, PlayerLifecycle)
             // for the identical GetComponentInChildren lookup.
             weaponFiring = GetComponentInChildren<WeaponFiring>(true);
@@ -130,6 +174,11 @@ namespace Overpower.Telemetry
                 overPowerBuff.Triggered += HandleOverpowerTriggered;
                 overPowerBuff.Ended += HandleOverpowerEnded;
             }
+            // T3 review item 10: flush shots/dots before the writer actually closes, regardless of
+            // whether this object's own OnDestroy happens to run before or after MatchTelemetry's -
+            // see BeforeClose's own comment.
+            if (MatchTelemetry.Instance != null)
+                MatchTelemetry.Instance.BeforeClose += HandleBeforeClose;
 
             // Static event (Task T3): a dummy is not networked and lives in exactly one client's
             // scene, so the only listener that could ever be right is that same client's own local
@@ -157,12 +206,22 @@ namespace Overpower.Telemetry
                 overPowerBuff.Triggered -= HandleOverpowerTriggered;
                 overPowerBuff.Ended -= HandleOverpowerEnded;
             }
+            if (MatchTelemetry.Instance != null)
+                MatchTelemetry.Instance.BeforeClose -= HandleBeforeClose;
             DummyTarget.AnyDamaged -= HandleDummyDamaged;
 
             // "On death/leave" - see the plan's own `shots` bullet. This player object is about to
             // stop existing (this client leaving the room, or the player itself being destroyed),
-            // so anything accumulated since the last sample must not be lost.
+            // so anything accumulated since the last sample must not be lost. BeforeClose (above)
+            // additionally covers the case where MatchTelemetry closes the writer before this
+            // OnDestroy would otherwise run.
+            HandleBeforeClose();
+        }
+
+        private void HandleBeforeClose()
+        {
             FlushShots();
+            FlushDots();
         }
 
         private void Update()
@@ -181,6 +240,7 @@ namespace Overpower.Telemetry
             sampleTimer = 0f;
             WriteSample();
             FlushShots();
+            FlushDots();
         }
 
         // ---------------------------------------------------------------- overheat / ultimate polling
@@ -223,7 +283,11 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- shots
 
-        private void HandleFired(int weaponId, int projectileCount)
+        /// <summary>T3 review item 3: newPull is true once per trigger pull (always true for a
+        /// Simultaneous/shotgun weapon's single call, true only for round 0 of a burst/Sequential
+        /// weapon's several calls) - only that edge increments Pulls, so a 3-round burst weapon
+        /// reports pulls=1 per press instead of 3.</summary>
+        private void HandleFired(int weaponId, int projectileCount, bool newPull)
         {
             if (!shotsByWeapon.TryGetValue(weaponId, out ShotAccumulator acc))
             {
@@ -231,25 +295,28 @@ namespace Overpower.Telemetry
                 shotsByWeapon[weaponId] = acc;
             }
 
-            acc.Pulls++;
+            if (newPull)
+                acc.Pulls++;
             acc.Projectiles += projectileCount;
         }
 
         private void FlushShots()
         {
-            if (shotsByWeapon.Count == 0 || MatchTelemetry.Instance == null)
+            if (MatchTelemetry.Instance == null)
                 return;
 
             foreach (KeyValuePair<int, ShotAccumulator> pair in shotsByWeapon)
             {
+                if (pair.Value.Pulls == 0 && pair.Value.Projectiles == 0)
+                    continue;
+
                 line.Begin(TelemetryKeys.Shots, MatchTelemetry.Instance.Now);
                 line.Int(TelemetryKeys.Weapon, pair.Key);
                 line.Int(TelemetryKeys.Pulls, pair.Value.Pulls);
                 line.Int(TelemetryKeys.Projectiles, pair.Value.Projectiles);
                 MatchTelemetry.Instance.Log(line);
+                pair.Value.Reset();
             }
-
-            shotsByWeapon.Clear();
         }
 
         // ---------------------------------------------------------------- cast / ultimate used
@@ -262,8 +329,8 @@ namespace Overpower.Telemetry
             line.Begin(TelemetryKeys.Cast, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.Slot, (int)slot);
             line.Int(TelemetryKeys.AbilityId, abilityId);
-            line.Float(TelemetryKeys.X, transform.position.x);
-            line.Float(TelemetryKeys.Z, transform.position.z);
+            line.Float(TelemetryKeys.X, MyPosition.x);
+            line.Float(TelemetryKeys.Z, MyPosition.z);
             MatchTelemetry.Instance.Log(line);
 
             if (slot != AbilitySlot.Ultimate)
@@ -280,16 +347,17 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- status
 
-        private void HandleStatusApplied(StatusKind kind, int sourceActor, int abilityId, float durationOrMagnitude)
+        private void HandleStatusApplied(StatusKind kind, int sourceActor, int abilityId, float duration, float magnitude)
         {
             if (MatchTelemetry.Instance == null)
                 return;
 
             line.Begin(TelemetryKeys.Status, MatchTelemetry.Instance.Now);
-            line.String(TelemetryKeys.Effect, kind.ToString().ToLowerInvariant());
+            line.String(TelemetryKeys.Effect, NameFor(kind));
             line.Int(TelemetryKeys.SourceActor, sourceActor);
             line.Int(TelemetryKeys.AbilityId, abilityId);
-            line.Float(TelemetryKeys.DurationOrMagnitude, durationOrMagnitude);
+            line.Float(TelemetryKeys.Duration, duration);
+            line.Float(TelemetryKeys.DurationOrMagnitude, magnitude);
             MatchTelemetry.Instance.Log(line);
         }
 
@@ -325,34 +393,20 @@ namespace Overpower.Telemetry
             if (BuildingManager.Instance == null || playerHealth == null)
                 return float.PositiveInfinity;
 
-            return BuildingManager.Instance.DistanceToOwnedZoneEdge(transform.position, playerHealth.TeamId);
+            return BuildingManager.Instance.DistanceToOwnedZoneEdge(MyPosition, playerHealth.TeamId);
         }
 
-        // ---------------------------------------------------------------- hit (real player + dummy)
+        // ---------------------------------------------------------------- hit / dot (real player + dummy)
 
         /// <summary>PlayerHealth.Damaged, on this player's own (victim's) client.</summary>
         private void HandleDamaged(DamageResult result, DamageInfo info)
         {
-            if (MatchTelemetry.Instance == null)
-                return;
+            int victimTeam = playerHealth != null ? playerHealth.TeamId : -1;
+            float distance = DistanceToAttacker(info.SourceActorNumber);
+            float vulnerability = statusEffects != null ? statusEffects.Vulnerability : 0f;
+            bool overpowerActive = overPowerBuff != null && overPowerBuff.IsActive;
 
-            line.Begin(TelemetryKeys.Hit, MatchTelemetry.Instance.Now);
-            line.Int(TelemetryKeys.Attacker, info.SourceActorNumber);
-            line.Int(TelemetryKeys.AttackerTeam, info.SourceTeamId);
-            line.Int(TelemetryKeys.Victim, photonView.OwnerActorNr);
-            line.Int(TelemetryKeys.VictimTeam, playerHealth.TeamId);
-            line.Int(TelemetryKeys.Weapon, info.WeaponId);
-            line.Int(TelemetryKeys.AbilityId, info.AbilityId);
-            line.String(TelemetryKeys.Source, info.Source.ToString());
-            line.Float(TelemetryKeys.Raw, info.Amount);
-            line.Float(TelemetryKeys.ArmorAbsorbed, result.ArmorAbsorbed);
-            line.Float(TelemetryKeys.HealthLost, result.HealthLost);
-            line.Bool(TelemetryKeys.Lethal, result.Lethal);
-            line.Float(TelemetryKeys.Distance, DistanceToAttacker(info.SourceActorNumber));
-            line.Float(TelemetryKeys.Vulnerable, statusEffects != null ? statusEffects.Vulnerability : 0f);
-            line.Bool(TelemetryKeys.Invulnerable, statusEffects != null && statusEffects.IsInvulnerable);
-            line.Bool(TelemetryKeys.OverpowerActive, overPowerBuff != null && overPowerBuff.IsActive);
-            MatchTelemetry.Instance.Log(line);
+            RouteHit(photonView.OwnerActorNr, victimTeam, info, result, distance, vulnerability, overpowerActive);
         }
 
         /// <summary>DummyTarget.AnyDamaged: a dummy has no owner of its own (it is not networked -
@@ -362,7 +416,7 @@ namespace Overpower.Telemetry
         /// Photon identity to report (DummyTarget.ActorNumber is already -1 by the same convention).</summary>
         private void HandleDummyDamaged(DummyTarget dummy, DamageResult result, DamageInfo info)
         {
-            if (MatchTelemetry.Instance == null || PhotonNetwork.LocalPlayer == null)
+            if (PhotonNetwork.LocalPlayer == null)
                 return;
 
             // Only this player's own shots landing on a dummy are this client's to log - see the
@@ -371,23 +425,110 @@ namespace Overpower.Telemetry
             if (info.SourceActorNumber != PhotonNetwork.LocalPlayer.ActorNumber)
                 return;
 
+            float distance = Vector3.Distance(MyPosition, dummy.transform.position);
+            RouteHit(-1, -1, info, result, distance, dummy.Vulnerability, overpowerActive: false);
+        }
+
+        /// <summary>T3 review item 1 (VOLUME): routes one landed hit to an immediate `hit` line for
+        /// Projectile/Splash/Zone/Contact, or into a per-key DotAccumulator bucket for
+        /// DamageSource.Burn (status burn and FireField's DoT both tick every frame - logging one
+        /// `hit` per tick measured ~129 lines/second for a single burning victim). A lethal Burn tick
+        /// flushes its own bucket as a `dot` line first, so the sums leading up to a kill are not
+        /// lost, then still logs the normal `hit` line so every kill keeps a row.</summary>
+        private void RouteHit(int victim, int victimTeam, DamageInfo info, DamageResult result,
+                              float distance, float vulnerability, bool overpowerActive)
+        {
+            if (info.Source != DamageSource.Burn)
+            {
+                WriteHitLine(victim, victimTeam, info, result, distance, vulnerability, overpowerActive);
+                return;
+            }
+
+            var key = (victim, info.SourceActorNumber, info.SourceTeamId, info.WeaponId, info.AbilityId, info.Source);
+            if (!dotsByKey.TryGetValue(key, out DotAccumulator dot))
+            {
+                dot = new DotAccumulator();
+                dotsByKey[key] = dot;
+            }
+
+            double now = MatchTelemetry.Instance != null ? MatchTelemetry.Instance.Now : -1.0;
+            dot.Merge(now, info.Amount, result.ArmorAbsorbed, result.HealthLost);
+
+            if (!result.Lethal)
+                return;
+
+            WriteDotLine(key, dot);
+            dot.Reset();
+            WriteHitLine(victim, victimTeam, info, result, distance, vulnerability, overpowerActive);
+        }
+
+        private void WriteHitLine(int victim, int victimTeam, DamageInfo info, DamageResult result,
+                                  float distance, float vulnerability, bool overpowerActive)
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
             line.Begin(TelemetryKeys.Hit, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.Attacker, info.SourceActorNumber);
             line.Int(TelemetryKeys.AttackerTeam, info.SourceTeamId);
-            line.Int(TelemetryKeys.Victim, -1);
-            line.Int(TelemetryKeys.VictimTeam, -1);
+            line.Int(TelemetryKeys.Victim, victim);
+            line.Int(TelemetryKeys.VictimTeam, victimTeam);
             line.Int(TelemetryKeys.Weapon, info.WeaponId);
             line.Int(TelemetryKeys.AbilityId, info.AbilityId);
-            line.String(TelemetryKeys.Source, info.Source.ToString());
+            line.String(TelemetryKeys.Source, NameFor(info.Source));
             line.Float(TelemetryKeys.Raw, info.Amount);
             line.Float(TelemetryKeys.ArmorAbsorbed, result.ArmorAbsorbed);
             line.Float(TelemetryKeys.HealthLost, result.HealthLost);
             line.Bool(TelemetryKeys.Lethal, result.Lethal);
-            line.Float(TelemetryKeys.Distance, Vector3.Distance(transform.position, dummy.transform.position));
-            line.Float(TelemetryKeys.Vulnerable, dummy.Vulnerability);
-            line.Bool(TelemetryKeys.Invulnerable, dummy.IsInvulnerable);
-            line.Bool(TelemetryKeys.OverpowerActive, false); // A dummy is never OverPower's victim.
+            line.Float(TelemetryKeys.Distance, distance);
+            line.Float(TelemetryKeys.Vulnerable, vulnerability);
+            // Invulnerable dropped (T3 review item 6): PlayerHealth.ApplyDamage returns BEFORE
+            // Damaged fires when the victim is already invulnerable, so a real player's `hit` line
+            // could never read true; a dummy never checks invulnerability at all, so its own reading
+            // would not mean "this hit was blocked" either. See TelemetryKeys.Invulnerable's comment.
+            line.Bool(TelemetryKeys.OverpowerActive, overpowerActive);
             MatchTelemetry.Instance.Log(line);
+        }
+
+        private void WriteDotLine((int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, DamageSource Source) key,
+                                  DotAccumulator dot)
+        {
+            if (MatchTelemetry.Instance == null || !dot.HasData)
+                return;
+
+            // A dummy (Victim -1) has no team; a real victim here is always this player's own.
+            int victimTeam = key.Victim == -1 ? -1 : (playerHealth != null ? playerHealth.TeamId : -1);
+
+            line.Begin(TelemetryKeys.Dot, MatchTelemetry.Instance.Now);
+            line.Int(TelemetryKeys.Attacker, key.AttackerActor);
+            line.Int(TelemetryKeys.AttackerTeam, key.AttackerTeam);
+            line.Int(TelemetryKeys.Victim, key.Victim);
+            line.Int(TelemetryKeys.VictimTeam, victimTeam);
+            line.Int(TelemetryKeys.Weapon, key.WeaponId);
+            line.Int(TelemetryKeys.AbilityId, key.AbilityId);
+            line.String(TelemetryKeys.Source, NameFor(key.Source));
+            line.Int(TelemetryKeys.Ticks, dot.Ticks);
+            line.Float(TelemetryKeys.Raw, dot.RawSum);
+            line.Float(TelemetryKeys.ArmorAbsorbed, dot.ArmorSum);
+            line.Float(TelemetryKeys.HealthLost, dot.HealthSum);
+            line.Float(TelemetryKeys.FirstT, (float)dot.FirstT);
+            line.Float(TelemetryKeys.LastT, (float)dot.LastT);
+            MatchTelemetry.Instance.Log(line);
+        }
+
+        private void FlushDots()
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
+            foreach (var pair in dotsByKey)
+            {
+                if (!pair.Value.HasData)
+                    continue;
+
+                WriteDotLine(pair.Key, pair.Value);
+                pair.Value.Reset();
+            }
         }
 
         /// <summary>Distance from the attacker's own replicated position to this player (the
@@ -406,7 +547,7 @@ namespace Overpower.Telemetry
                 ? netSync.NetworkPosition
                 : attackerView.transform.position;
 
-            return Vector3.Distance(attackerPosition, transform.position);
+            return Vector3.Distance(attackerPosition, MyPosition);
         }
 
         // ---------------------------------------------------------------- death / respawn
@@ -416,19 +557,26 @@ namespace Overpower.Telemetry
         {
             deathTime = Time.time;
 
+            // Continuous damage leading up to this kill (if any) belongs in the report as its own
+            // `dot` row, flushed BEFORE `death` - see FlushDots and the plan's own `shots` bullet for
+            // the identical "flush before death" rule. A lethal Burn tick already flushed its own
+            // bucket in RouteHit; this catches every OTHER bucket that was still accumulating.
+            FlushDots();
+
             if (MatchTelemetry.Instance == null)
                 return;
 
-            Teams.TryGetTeam(info.SourceActorNumber, out int killerTeam);
-
             line.Begin(TelemetryKeys.Death, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.Killer, info.SourceActorNumber);
-            line.Int(TelemetryKeys.KillerTeam, killerTeam);
+            // T3 review item 8: info.SourceTeamId, not Teams.TryGetTeam(info.SourceActorNumber, ...) -
+            // the latter reads -1 if the killer has since left the room, disagreeing with `hit`'s own
+            // AttackerTeam (which always uses SourceTeamId, the value recorded AT the hit).
+            line.Int(TelemetryKeys.KillerTeam, info.SourceTeamId);
             line.Int(TelemetryKeys.Weapon, info.WeaponId);
             line.Int(TelemetryKeys.AbilityId, info.AbilityId);
             line.Ints(TelemetryKeys.Assists, AssistArray());
-            line.Float(TelemetryKeys.X, transform.position.x);
-            line.Float(TelemetryKeys.Z, transform.position.z);
+            line.Float(TelemetryKeys.X, MyPosition.x);
+            line.Float(TelemetryKeys.Z, MyPosition.z);
             line.Float(TelemetryKeys.TimeAlive, Time.time - aliveSinceTime);
             line.Int(TelemetryKeys.UnspentGold, goldWallet != null ? goldWallet.Balance : 0);
             WriteLoadout(useDeathKeys: true);
@@ -440,7 +588,11 @@ namespace Overpower.Telemetry
 
         private int[] AssistArray()
         {
-            if (combatCredit == null)
+            // T3 review item 9: a freshness guard, not blind trust in subscriber ordering.
+            // PlayerCombatCredit.LastDeathAssisters is only meaningful for THIS death if its own
+            // LastDeathTime stamp (set in the same synchronous PlayerHealth.Died chain, the same
+            // Time.time) matches - otherwise it is empty or a previous life's list.
+            if (combatCredit == null || combatCredit.LastDeathTime != deathTime)
                 return System.Array.Empty<int>();
 
             IReadOnlyList<int> assisters = combatCredit.LastDeathAssisters;
@@ -462,8 +614,8 @@ namespace Overpower.Telemetry
                 return;
 
             line.Begin(TelemetryKeys.Respawn, MatchTelemetry.Instance.Now);
-            line.Float(TelemetryKeys.X, transform.position.x);
-            line.Float(TelemetryKeys.Z, transform.position.z);
+            line.Float(TelemetryKeys.X, MyPosition.x);
+            line.Float(TelemetryKeys.Z, MyPosition.z);
             line.Float(TelemetryKeys.TimeDead, timeDead);
             line.Bool(TelemetryKeys.UnderAttackSpawn, lifecycle != null && lifecycle.LastRespawnWasUnderAttackSpawn);
             MatchTelemetry.Instance.Log(line);
@@ -478,14 +630,14 @@ namespace Overpower.Telemetry
 
             bool recordPositions = config == null || config.RecordPositions;
             int zone = -1;
-            BuildingManager.Instance?.TryGetZoneAt(transform.position, out zone);
+            BuildingManager.Instance?.TryGetZoneAt(MyPosition, out zone);
 
             line.Begin(TelemetryKeys.Sample, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.Balance, goldWallet != null ? goldWallet.Balance : 0);
             if (recordPositions)
             {
-                line.Float(TelemetryKeys.X, transform.position.x);
-                line.Float(TelemetryKeys.Z, transform.position.z);
+                line.Float(TelemetryKeys.X, MyPosition.x);
+                line.Float(TelemetryKeys.Z, MyPosition.z);
             }
             line.Bool(TelemetryKeys.Alive, lifecycle == null || lifecycle.IsAlive);
             line.Int(TelemetryKeys.Zone, zone);

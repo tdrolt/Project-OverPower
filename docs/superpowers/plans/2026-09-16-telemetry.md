@@ -650,6 +650,11 @@ unsubscriptions in `OnDestroy`). Every event logs through `MatchTelemetry.Instan
   - **`ownership`:** stints. **`captures`:** attempts from `capture` started → completed / neutralised / abandoned
     (abandoned = paused and never resumed by match end).
   - **`purchases`** / **`shop_blocked`:** straight rows. **`hits`:** raw rows.
+  - **Damage totals include `dot` lines** (added after the T3 review): damage = Σ `hit` raw + Σ `dot` raw, and the
+    same for armor and health. Hit counts and accuracy use only discrete `hit` rows with source `Projectile`/`Splash`
+    (a `dot` is many ticks, not a hit). Kills come from `death`. **Key changes from T3's review:** `hit`/`dot` health
+    lost is `hpLost` (`hp` is current health on `sample`); `status` has both `dur` and `mag`; `Fired`-based `shots`
+    pulls count trigger pulls, not burst rounds; `hit` has no `inv` field.
   - **`weapons`** (all 13):
     - time equipped (from samples: the interval × samples with that weapon);
     - pulls and projectiles (from `shots`), hits;

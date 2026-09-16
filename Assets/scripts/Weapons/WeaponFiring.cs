@@ -97,16 +97,22 @@ namespace Overpower.Weapons
         /// actually committed - once for a simultaneous (shotgun-style) pull with its full pellet
         /// count, or once per round for a burst/sequential weapon, so an interrupted burst only
         /// counts the rounds that actually left the gun. See DispatchShots/SpawnSequentially.
-        /// PlayerTelemetry is the only subscriber today.</summary>
-        public event System.Action<int, int> Fired;
+        ///
+        /// newPull (T3 review fix) is true exactly once per TRIGGER PULL - always true for a
+        /// Simultaneous weapon (one Fired call already covers the whole pull), true only for round 0
+        /// of a burst/Sequential weapon's several Fired calls. Without this, PlayerTelemetry's own
+        /// "pulls" counter treated every burst round as its own pull, inflating a 3-round burst
+        /// weapon's pull count 3x against what was actually pressed. PlayerTelemetry is the only
+        /// subscriber today.</summary>
+        public event System.Action<int, int, bool> Fired;
 
         /// <summary>Guarded on IsMine so this never fires with no possible correct listener - every
         /// client runs RPC_FireWeapon (and so DispatchShots) for every shot it hears about, the
         /// shooter's own included, but only the shooter's own copy of this event means anything.</summary>
-        private void RaiseFired(int weaponId, int projectileCount)
+        private void RaiseFired(int weaponId, int projectileCount, bool newPull)
         {
             if (photonView.IsMine)
-                Fired?.Invoke(weaponId, projectileCount);
+                Fired?.Invoke(weaponId, projectileCount, newPull);
         }
 
         /// <summary>The shooter's own current range multiplier (1 = unchanged) - AimConeView reads
@@ -562,8 +568,9 @@ namespace Overpower.Weapons
 
                 // Shotgun case (Task T3): "one pull, N projectiles" - a Simultaneous weapon spawns
                 // every pellet in this same synchronous loop, so there is no partial-completion case
-                // to account for the way a burst's coroutine has.
-                RaiseFired(weapon.Id, shots.Length);
+                // to account for the way a burst's coroutine has. newPull true: this one call is the
+                // whole pull.
+                RaiseFired(weapon.Id, shots.Length, newPull: true);
             }
             else
             {
@@ -774,10 +781,16 @@ namespace Overpower.Weapons
             {
                 Spawn(weapon, origin, shots[i]);
                 // Burst case (Task T3): raised per round ACTUALLY spawned, not once for the whole
-                // burst up front - a stun, death or despawn mid-sequence (this coroutine simply
-                // stops running) means fewer Fired calls than the nominal shots.Length, which is
-                // the point: telemetry should only count rounds that really left the gun.
-                RaiseFired(weapon.Id, 1);
+                // burst up front. newPull is true only for round 0 - see Fired's own comment for why
+                // (a burst's later rounds must not each count as their own trigger pull).
+                //
+                // T3 review correction: a stun or death does NOT stop this coroutine - only this
+                // WeaponFiring being destroyed (its player despawning) does, matching
+                // FireAfterWindup's own documented behaviour ("a shooter who merely dies or is
+                // stunned... still gets their beam off"). So every round here really does fire and
+                // get counted, including any fired after this player has since died or been stunned -
+                // that is correct, not a gap: the shot was already committed before either happened.
+                RaiseFired(weapon.Id, 1, newPull: i == 0);
                 if (i + 1 < shots.Length)
                     yield return new WaitForSeconds(weapon.SequentialDelay);
             }
