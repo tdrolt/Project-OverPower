@@ -26,10 +26,19 @@ namespace Overpower.EditorTools
         /// and returns what is wrong. It never saves the scene: the designer looks first, then saves.</summary>
         public static List<string> Rebuild(ArenaSymmetry arena, bool recordUndo)
         {
+            // A rebuild moves live snapped towers and spawns. In Play Mode that would move them on this one client
+            // only - every other client's arena stays where it was, desyncing the match - so refuse outright.
+            if (EditorApplication.isPlaying)
+                return new List<string> { "Can't rebuild the arena thirds in Play Mode: it would move live towers and spawns on this client only and desync the match. Stop Play Mode first." };
+
             List<string> problems = CheckSetup(arena);
             if (problems.Count > 0)
                 return problems;
 
+            // A fresh group per rebuild, so a script that calls Rebuild in a loop still collapses each call into its
+            // own single undo step instead of merging every call into whichever group was open before the first one.
+            if (recordUndo)
+                Undo.IncrementCurrentGroup();
             int undoGroup = Undo.GetCurrentGroup();
             if (recordUndo)
                 Undo.SetCurrentGroupName(UndoName);
@@ -55,6 +64,11 @@ namespace Overpower.EditorTools
                         RadialSymmetry.RotatePoint(original.position, arena.centre, thirds),
                         RadialSymmetry.RotateRotation(original.rotation, thirds));
                     copy.transform.localScale = original.localScale;
+                    // A copy must be a plain object: one still linked to a prefab asset would offer "Apply to
+                    // Prefab" in its context menu, and using that on a generated, throwaway copy would silently
+                    // overwrite the shared asset with this copy's (turned) transform.
+                    if (PrefabUtility.IsPartOfPrefabInstance(copy))
+                        PrefabUtility.UnpackPrefabInstance(copy, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
                     foreach (Transform part in copy.GetComponentsInChildren<Transform>(true))
                         part.gameObject.hideFlags |= HideFlags.NotEditable;
                     if (recordUndo)
@@ -102,7 +116,12 @@ namespace Overpower.EditorTools
                     Transform original = arena.source.GetChild(i);
                     Transform copy = target.GetChild(i);
                     if (copy.name != original.name)
-                        problems.Add($"{target.name}: object {i} is '{copy.name}' but Source's is '{original.name}': press Rebuild thirds.");
+                    {
+                        // Once Source's order no longer lines up with a generated third, comparing further indices
+                        // just restates the same cause once per object; one line for the whole third says it plainly.
+                        problems.Add($"{target.name}: Source order or contents changed since the last rebuild: press Rebuild thirds.");
+                        break;
+                    }
                     Compare(original, copy, arena.centre, t + 1, problems);
                     if ((copy.localScale - original.localScale).sqrMagnitude > 1e-6f)
                         problems.Add($"{copy.name} ({(t + 1) * 120}°) has a different scale from its Source.");
@@ -149,8 +168,31 @@ namespace Overpower.EditorTools
 
             foreach (PhotonView view in arena.source.GetComponentsInChildren<PhotonView>(true))
                 problems.Add($"'{view.name}' under Source has a PhotonView. Networked objects can't be copied (their view ids must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+
+            // Towers get their own message below; anything else that is networked - a MonoBehaviourPun script, or
+            // any component that streams state over the network via IPunObservable - gets a generic one. A
+            // component already covered by the tower message isn't repeated with the generic wording too.
+            var alreadyReportedNetworked = new HashSet<Component>();
             foreach (BuildingCapture tower in arena.source.GetComponentsInChildren<BuildingCapture>(true))
+            {
                 problems.Add($"'{tower.name}' under Source is a capture tower. Towers can't be copied (their ids must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+                alreadyReportedNetworked.Add(tower);
+            }
+            foreach (MonoBehaviourPun pun in arena.source.GetComponentsInChildren<MonoBehaviourPun>(true))
+            {
+                if (pun == null || alreadyReportedNetworked.Contains(pun))
+                    continue; // null means a missing script, which has nothing to move to Snapped Triplets anyway
+                problems.Add($"'{pun.name}' under Source has a {pun.GetType().Name}, a networked script. Networked objects can't be copied (their view state must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+                alreadyReportedNetworked.Add(pun);
+            }
+            foreach (IPunObservable observable in arena.source.GetComponentsInChildren<IPunObservable>(true))
+            {
+                var component = observable as Component;
+                if (component == null || alreadyReportedNetworked.Contains(component))
+                    continue;
+                problems.Add($"'{component.name}' under Source has a {component.GetType().Name}, which streams state over the network (IPunObservable). Networked objects can't be copied (their view state must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+                alreadyReportedNetworked.Add(component);
+            }
 
             for (int i = 0; i < arena.snappedTriplets.Count; i++)
             {

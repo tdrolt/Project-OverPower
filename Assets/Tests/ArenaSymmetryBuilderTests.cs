@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Overpower.Arena;
 using Overpower.EditorTools;
+using Photon.Pun;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -16,6 +17,13 @@ namespace Overpower.Tests
     /// </summary>
     public class ArenaSymmetryBuilderTests
     {
+        /// <summary>A stand-in for a real networked script (e.g. PlayerNetSync): plain MonoBehaviour, no
+        /// MonoBehaviourPun, only IPunObservable. Proves CheckSetup catches this shape too, not just towers.</summary>
+        private class FakeNetworkedComponent : MonoBehaviour, IPunObservable
+        {
+            public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info) { }
+        }
+
         private static readonly Vector3 Centre = new Vector3(10f, 0f, 20f);
         private Scene scene;
         private ArenaSymmetry arena;
@@ -146,6 +154,79 @@ namespace Overpower.Tests
             MakeChild("Barrel", arena.source);
 
             Assert.IsNotEmpty(ArenaSymmetryBuilder.Validate(arena));
+        }
+
+        [Test]
+        public void ACopyOfAPrefabInstanceIsNotPrefabLinked()
+        {
+            string[] guids = AssetDatabase.FindAssets("Furniture_02 t:Prefab");
+            if (guids.Length == 0)
+            {
+                Assert.Ignore("Furniture_02 prefab not found in the project; skipping the prefab-link check.");
+                return;
+            }
+            GameObject prefabAsset = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guids[0]));
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefabAsset, scene);
+            instance.transform.SetParent(arena.source, false);
+
+            Assert.IsEmpty(ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false));
+
+            Transform copy = arena.generated120.GetChild(0);
+            Assert.IsFalse(PrefabUtility.IsPartOfPrefabInstance(copy.gameObject),
+                "a rebuilt copy must be a plain object: a prefab-linked one could 'Apply to Prefab' and rewrite the shared asset");
+        }
+
+        [Test]
+        public void RebuildRefusesANetworkedComponentUnderSourceAndBuildsNothing()
+        {
+            Transform networked = MakeChild("Networked Thing", arena.source);
+            networked.gameObject.AddComponent<FakeNetworkedComponent>();
+
+            List<string> problems = ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false);
+
+            Assert.IsNotEmpty(problems);
+            StringAssert.Contains("Networked Thing", string.Join("\n", problems));
+            Assert.AreEqual(0, arena.generated120.childCount);
+        }
+
+        [Test]
+        public void RebuildRefusesANonIdentitySourceParent()
+        {
+            arena.source.position += new Vector3(1f, 0f, 0f);
+            MakeChild("Crate", arena.source);
+
+            List<string> problems = ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false);
+
+            Assert.IsNotEmpty(problems);
+            Assert.AreEqual(0, arena.generated120.childCount);
+        }
+
+        [Test]
+        public void ValidateReportsAReorderedSourceOnce()
+        {
+            MakeChild("A", arena.source);
+            MakeChild("B", arena.source);
+            ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false);
+            arena.source.GetChild(0).SetSiblingIndex(1); // swap A and B's order under Source
+
+            List<string> problems = ArenaSymmetryBuilder.Validate(arena);
+
+            Assert.AreEqual(2, problems.Count); // one line per generated third, not one per shifted object
+        }
+
+        [Test]
+        public void RebuildRecordsAnUndoableStep()
+        {
+            // Measured (2026-09-16): Undo does track HideAndDontSave preview-scene objects - a rebuild's created
+            // copies and moved snapped partners are undone by RevertAllDownToGroup like any normal-scene edit.
+            MakeChild("Crate", arena.source).position = Centre + new Vector3(0f, 0f, 10f);
+            int groupBeforeRebuild = Undo.GetCurrentGroup();
+
+            ArenaSymmetryBuilder.Rebuild(arena, recordUndo: true);
+            Assert.AreEqual(1, arena.generated120.childCount);
+
+            Undo.RevertAllDownToGroup(groupBeforeRebuild);
+            Assert.AreEqual(0, arena.generated120.childCount);
         }
     }
 }

@@ -44,10 +44,28 @@ namespace Overpower.EditorTools
 
         private static ArenaSymmetry FindArena()
         {
-            ArenaSymmetry arena = UnityEngine.Object.FindFirstObjectByType<ArenaSymmetry>(FindObjectsInactive.Include);
-            if (arena == null)
+            // FindFirstObjectByType would silently pick one of several open scenes' ArenaSymmetry components with
+            // no way for the designer to tell which; with more than one, act on none and name them instead so the
+            // designer can use that component's own Inspector button.
+            ArenaSymmetry[] arenas = UnityEngine.Object.FindObjectsByType<ArenaSymmetry>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (arenas.Length == 0)
+            {
                 Debug.LogWarning("[Arena] There is no ArenaSymmetry in the open scene.");
-            return arena;
+                return null;
+            }
+            if (arenas.Length > 1)
+            {
+                var names = new System.Text.StringBuilder();
+                foreach (ArenaSymmetry a in arenas)
+                {
+                    if (names.Length > 0) names.Append(", ");
+                    names.Append($"'{a.name}' (scene '{a.gameObject.scene.name}')");
+                }
+                Debug.LogWarning($"[Arena] Found {arenas.Length} ArenaSymmetry components: {names}. Use that " +
+                                  "component's own Inspector button instead of this menu.");
+                return null;
+            }
+            return arenas[0];
         }
 
         private static void Report(string action, List<string> problems)
