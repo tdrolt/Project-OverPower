@@ -249,6 +249,16 @@ namespace Overpower.Telemetry
 
         private void OnDestroy()
         {
+            // Opus review fix: Unity calls OnDestroy on every component being torn down, even one
+            // Awake left permanently disabled - a remote copy's own fields below are all still null
+            // (Start never ran to populate them), so every unsubscribe here was already a harmless
+            // no-op, but the unconditional HandleBeforeClose() call at the end was not: it reached
+            // MatchTelemetry.Instance (the scene singleton, shared by every player including remote
+            // ones) and wrote an all-zero `goldEarned` line into THIS client's own file every time
+            // any OTHER player's object was destroyed (left the room, or disconnected).
+            if (!photonView.IsMine)
+                return;
+
             if (playerHealth != null)
             {
                 playerHealth.Damaged -= HandleDamaged;
@@ -497,10 +507,30 @@ namespace Overpower.Telemetry
         /// plus the per-zone split accumulated frame-by-frame above. `zones` is rounded to whole
         /// gold per zone; the `terr` total (from GoldWallet.Credited(Territory), the same whole-gold
         /// crossings the wallet itself publishes) stays the authoritative total - see the T4 step 3
-        /// check this is verified against.</summary>
+        /// check this is verified against. Writes nothing when every total is zero (opus review fix)
+        /// - an all-zero line was previously written every interval regardless, including one extra
+        /// redundant time whenever BeforeClose ran right after an interval had already flushed
+        /// everything back to zero.</summary>
         private void FlushGoldEarned()
         {
             if (MatchTelemetry.Instance == null)
+                return;
+
+            bool anyZoneGold = false;
+            if (perZoneGoldScratch != null)
+            {
+                for (int i = 0; i < perZoneGoldScratch.Length; i++)
+                {
+                    if (perZoneGoldScratch[i] > 0.0001)
+                    {
+                        anyZoneGold = true;
+                        break;
+                    }
+                }
+            }
+
+            if (territoryCreditedThisInterval == 0 && bountyCreditedThisInterval == 0 && refundCreditedThisInterval == 0
+                && debugCreditedThisInterval == 0 && otherCreditedThisInterval == 0 && !anyZoneGold)
                 return;
 
             line.Begin(TelemetryKeys.GoldEarned, MatchTelemetry.Instance.Now);
@@ -535,10 +565,13 @@ namespace Overpower.Telemetry
         // ---------------------------------------------------------------- heal (Task T4)
 
         /// <summary>Polled every Update: a health increase while alive, not hit this frame (see
-        /// HandleDamaged's own tookDamageThisFrame flag) and not the instantaneous jump a respawn's
+        /// HandleDamaged's own tookDamageThisFrame flag), not the instantaneous jump a respawn's
         /// full heal produces (guarded by wasAliveLastFrameForHealPoll - respawn's own `respawn` event
         /// already records the fact of coming back to life; counting that jump again here as "healing"
-        /// would hugely overstate the zone regen this event exists to measure).</summary>
+        /// would hugely overstate the zone regen this event exists to measure), and not a jump bigger
+        /// than any real zone regen could produce in one frame (opus review fix - see
+        /// MaxPlausibleHealThisFrame: the F1 "Heal" button's own instant full heal was otherwise
+        /// counted as regen from whichever zone tier the player happened to be standing in).</summary>
         private void PollHeal()
         {
             if (playerHealth == null || lifecycle == null)
@@ -565,12 +598,38 @@ namespace Overpower.Telemetry
             else if (!justRespawned && !tookDamageThisFrame)
             {
                 float delta = currentHealth - lastHealthForHealPoll;
-                if (delta > 0.0001f)
+                if (delta > 0.0001f && delta <= MaxPlausibleHealThisFrame())
                     AccumulateHeal(delta);
             }
 
             lastHealthForHealPoll = currentHealth;
             tookDamageThisFrame = false;
+        }
+
+        // -1 = not yet computed. TerritoryConfig's tier rates are fixed for the whole match (a
+        // designer retuning them in Play Mode is the one exception nobody has ever asked this poll
+        // to react to live), so this is worked out once rather than re-scanning up to 4 tiers every
+        // single frame.
+        private float cachedMaxTierRegenPerSecond = -1f;
+
+        /// <summary>Opus review fix: the most health any REAL zone regen could plausibly add in one
+        /// frame - the fastest tier's healthRegenPerSecond times this frame's delta time, doubled for
+        /// slack against a slow frame or two coalescing. A jump bigger than this (the F1 "Heal"
+        /// button's instant full heal, or ResetForRespawn's own full-health snap outside the
+        /// justRespawned guard's own window) is not regen and must not be counted as any zone's.</summary>
+        private float MaxPlausibleHealThisFrame()
+        {
+            if (cachedMaxTierRegenPerSecond < 0f)
+            {
+                float max = 0f;
+                if (territoryConfig != null)
+                {
+                    for (int tier = 1; tier <= territoryConfig.TierCount; tier++)
+                        max = Mathf.Max(max, territoryConfig.ForTier(tier).healthRegenPerSecond);
+                }
+                cachedMaxTierRegenPerSecond = max;
+            }
+            return cachedMaxTierRegenPerSecond * Time.unscaledDeltaTime * 2f;
         }
 
         private void AccumulateHeal(float amount)
