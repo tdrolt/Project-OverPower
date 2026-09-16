@@ -94,7 +94,18 @@ namespace Overpower.Weapons
         /// <param name="prefab">The fire field prefab. It must live under a Resources folder -
         /// PhotonNetwork.Instantiate resolves prefabs by name through PUN's default pool, which
         /// loads them with Resources.Load.</param>
-        public static void Spawn(GameObject prefab, Vector3 position, int weaponId)
+        /// <param name="damageMultiplier">
+        /// Task 2.6 review: the shot that left this field's own combined damage multiplier
+        /// (ProjectileContext.DamageMultiplier * FireTimeDamageMultiplier - the same product
+        /// Damage and ExplodeOnImpact.SplashDamageAt already apply) - 1 for a shot nothing has
+        /// boosted. Without this, OverPower's +10% (or a distance-scaling rocket's own bonus)
+        /// landed on the direct hit and the splash but not on the burning ground the rocket left
+        /// behind. Multiplies damagePerSecond BEFORE it is packed into instantiationData, so every
+        /// client - including remote copies, which only ever read that packed value, never this
+        /// static method's own locals - burns for the same, already-scaled number. Clamped to >= 0
+        /// for the same reason WeaponFiring.SetStatMultipliers clamps its own multipliers.
+        /// </param>
+        public static void Spawn(GameObject prefab, Vector3 position, int weaponId, float damageMultiplier = 1f)
         {
             if (prefab == null)
                 return;
@@ -119,7 +130,7 @@ namespace Overpower.Weapons
             object[] data =
             {
                 template.radius,
-                template.damagePerSecond,
+                template.damagePerSecond * Mathf.Max(0f, damageMultiplier),
                 template.duration,
                 weaponId,
             };

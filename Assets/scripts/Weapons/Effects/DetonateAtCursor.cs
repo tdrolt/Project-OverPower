@@ -135,7 +135,12 @@ namespace Overpower.Weapons
                 PhotonNetwork.LocalPlayer.ActorNumber != context.ShooterActorNumber)
                 return;
 
-            FireField.Spawn(fireFieldPrefab, transform.position, context.Weapon.Id);
+            // Task 2.6 review: the combined multiplier (behaviour-scaling * OverPower's fire-time
+            // bonus) - the same product Damage and SplashDamageAt already apply, so the burning
+            // ground this rocket leaves scales with the shot exactly like its direct hit and its
+            // splash do, instead of always burning at the prefab's bare damagePerSecond.
+            FireField.Spawn(fireFieldPrefab, transform.position, context.Weapon.Id,
+                             context.DamageMultiplier * context.FireTimeDamageMultiplier);
         }
     }
 }
