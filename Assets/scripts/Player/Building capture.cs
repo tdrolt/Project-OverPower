@@ -72,6 +72,9 @@ public class BuildingCapture : MonoBehaviourPun
     private float captureProgress = 0f;
     private bool isCaptured = false;
     private bool isDecaying = false;
+    // Master: the drain is holding because its drainers' way in is under attack (see DrainRule). isDecaying stays
+    // true meanwhile, so the drain carries on from where it was.
+    private bool isDrainPaused = false;
     private bool isOnCooldown = false;
     private Coroutine cooldownRoutine;
 
@@ -243,7 +246,8 @@ public class BuildingCapture : MonoBehaviourPun
 
         if (isCaptured)
         {
-            if (!isDecaying || captureSeconds <= 0f)
+            // A paused drain shows no bar, the same as a blocked neutral capture.
+            if (!isDecaying || isDrainPaused || captureSeconds <= 0f)
                 return CaptureProgress.Idle;
 
             float decayProgress01 = captureProgress / captureSeconds;
@@ -303,6 +307,10 @@ public class BuildingCapture : MonoBehaviourPun
     private int mayCaptureTeam = -1;
     private bool mayCaptureAnswer;
 
+    // Reused every frame by HandleCapturedState, so the drain check allocates nothing.
+    private readonly List<int> teamsInZone = new List<int>();
+    private System.Func<int, bool> mayCaptureNow;
+
     /// <summary>Master, every frame a team is actually capturing or draining this zone: may that team still capture
     /// it right now? OnTriggerEnter checks the plain adjacency rule once, on entry - deliberately not the threat-aware
     /// one, or a player who walked in while the link was under attack would never be counted and would have to step
@@ -336,54 +344,49 @@ public class BuildingCapture : MonoBehaviourPun
     // NEW: Modified to handle recapture decay if enemy enters
     void HandleCapturedState()
     {
-        // The enemy team that drains this zone: the first one standing here that may still capture
-        // it right now (Tudor, 2026-09-16: not through a zone of its own that is under attack). -1 if
-        // none. Nobody standing here means no drain, so a quiet tower skips every check below.
-        int drainingTeam = -1;
+        // Nobody standing here and no drain to stop: a quiet tower skips every check below.
+        if (playersInZone.Count == 0 && !isDecaying)
+            return;
+
+        teamsInZone.Clear();
         foreach (PlayerTeam p in playersInZone)
-        {
-            if (p.teamID != controllingTeam && TeamMayCaptureNow(p.teamID))
-            {
-                drainingTeam = p.teamID;
-                break;
-            }
-        }
-        bool enemyPresent = drainingTeam != -1;
+            teamsInZone.Add(p.teamID);
+        mayCaptureNow ??= TeamMayCaptureNow;
 
-        // playersInZone only holds players the territory rule let in on entry, and it refuses a zone
-        // your team already owns. A defender who walks in after the capture was therefore never
-        // listed, and an enemy drained the zone right past them (measured 2026-09-16: drain rate
-        // unchanged with a defender inside, zone neutral 3.9 s later). Presence is tracked for every
-        // living player, so ask it too. The list still counts players who captured this zone and
-        // never left.
-        bool teamMemberPresent = enemyPresent
-            && (playersInZone.Any(p => p.teamID == controllingTeam)
-                || (ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsTeamPresent(buildingID, controllingTeam)));
+        // Who drains, and whether the drain starts, goes on, pauses or stops: see DrainRule.
+        DrainRule.Decision drain = DrainRule.Decide(controllingTeam, teamsInZone, DefenderPresent(), isDecaying,
+                                                    capturingID, mayCaptureNow);
+        isDrainPaused = drain.Step == DrainRule.Step.Pause;
 
-        if (enemyPresent && !teamMemberPresent)
+        switch (drain.Step)
         {
-            if (!isDecaying)
-            {
+            case DrainRule.Step.Start:
                 isDecaying = true;
                 captureProgress = CaptureSeconds;
-                capturingID = drainingTeam;
+                capturingID = drain.Team;
                 photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, capturingID);
                 Debug.Log("[HandleCapturedState] Enemy detected. Starting recapture decay.");
 
                 // Play recapture sound when an enemy starts recapturing
                 PlayRecaptureSound();  // This was missing from your decay logic
-            }
+                break;
 
+            case DrainRule.Step.Continue:
+                // Usually the same team. When another attacker takes the drain over, the bar names the team really
+                // draining now.
+                capturingID = drain.Team;
+                break;
+
+            case DrainRule.Step.Stop:
+            case DrainRule.Step.None:
+                isDecaying = false;
+                break;
+        }
+
+        if (drain.Step == DrainRule.Step.Start || drain.Step == DrainRule.Step.Continue)
+        {
             // Stop the capturing sound if decaying
             StopCapturingSound();
-        }
-        else
-        {
-            isDecaying = false;
-        }
-
-        if (isDecaying)
-        {
             UpdateDecay();
 
             if (captureProgress <= 0)
@@ -392,6 +395,20 @@ public class BuildingCapture : MonoBehaviourPun
                 NeutralizeBuilding();
             }
         }
+    }
+
+    /// <summary>Master: is a player of the owner's team standing in this zone? playersInZone only lists players the
+    /// territory rule let in on entry, and it refuses a zone your team already owns, so a defender who walked in after
+    /// the capture was never listed and an enemy drained the zone right past them (measured 2026-09-16: drain rate
+    /// unchanged with a defender inside, zone neutral 3.9 s later). Presence is tracked for every living player, so
+    /// ask it too. The list still counts players who captured this zone and never left.</summary>
+    private bool DefenderPresent()
+    {
+        foreach (PlayerTeam p in playersInZone)
+            if (p.teamID == controllingTeam)
+                return true;
+        return ZonePresenceTracker.Instance != null
+            && ZonePresenceTracker.Instance.IsTeamPresent(buildingID, controllingTeam);
     }
 
 
@@ -418,6 +435,7 @@ public class BuildingCapture : MonoBehaviourPun
         controllingTeam = -1;
         isCaptured = false;
         isDecaying = false;
+        isDrainPaused = false;
         PlayNeutralizationSound();
         cooldownRoutine = StartCoroutine(CooldownRoutine());
     }
@@ -605,6 +623,7 @@ public class BuildingCapture : MonoBehaviourPun
         capturingID = captured ? owner : -1;
         captureProgress = captured ? CaptureSeconds : 0f;
         isDecaying = false;
+        isDrainPaused = false;
         StopCooldown();
     }
 
@@ -724,7 +743,9 @@ public class BuildingCapture : MonoBehaviourPun
         {
             playersInZone.Remove(pt);
 
-            if (!playersInZone.Any(p => p.teamID == capturingID))
+            // Only a neutral capture ends here. An owned zone's drain is left to HandleCapturedState: resetting it
+            // on a leave wiped a running drain in one frame (see DrainRule.LeavingEndsCapture).
+            if (DrainRule.LeavingEndsCapture(isCaptured, playersInZone.Any(p => p.teamID == capturingID)))
             {
                 capturingID = -1;
                 captureProgress = 0;
