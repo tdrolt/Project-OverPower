@@ -481,10 +481,11 @@ namespace Overpower.Telemetry
         ///
         /// Small same-instant race, accepted rather than fixed: two local clients opening their file for
         /// the first time in the very same frame can both fail to see the other's not-yet-created
-        /// directory and each create their own `_{mId8}` folder. Harmless - T5's report builder already
-        /// has to merge every client's `.jsonl` by `mId`, not by which folder happened to hold it, so two
-        /// folders for one match still merge into one report; it would only ever show up as a slightly
-        /// odd folder listing, never a wrong number.</summary>
+        /// directory and each create their own `_{mId8}` folder. Not silently harmless - T5's
+        /// TelemetryLog.Load reads ONE folder (it merges every `.jsonl` FILE it finds there by `mId`,
+        /// it does not itself go looking across sibling folders), so two folders from this race need
+        /// their files copied into one before Build Report is pointed at them - the same manual step
+        /// a multi-PC playtest already requires (design doc, "Files").</summary>
         private string ResolveMatchFolder()
         {
             string root = Path.Combine(Application.persistentDataPath, string.IsNullOrEmpty(config.FolderName) ? "Telemetry" : config.FolderName);
