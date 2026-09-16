@@ -78,7 +78,9 @@ presence separate from capture eligibility, and out of `BuildingManager`.
 - **`TerritoryMap.MayCapture(team, zone, owners, Func<int, bool> isUnderAttack)`:** an owned neighbour counts only if
   `!isUnderAttack(neighbour)`. The existing 3-argument overload keeps its behaviour (nothing is under attack). Own
   capital unchanged.
-- **Entry:** `OnTriggerEnter` uses the new overload.
+- **Entry stays on the plain adjacency rule** (corrected 2026-09-16 after B2). Checking the threat on entry would
+  refuse a player who walks in during an attack, and they would never be counted once the link turned safe without
+  stepping out and back in. The continuous check below does the blocking.
 - **Continuous (master):**
   - `CalculateCaptureProgress` counts capturers only while `MayCapture(capturingID, …, IsUnderAttack)` holds. When it
     stops holding, progress **holds**, exactly as if the capturers had stepped out.
