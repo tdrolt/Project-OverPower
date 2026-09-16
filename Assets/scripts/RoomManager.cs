@@ -14,6 +14,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
     public GameObject playerPrefab;
     public Transform[] teamSpawnPoints;    // Index 0:Team0, 1:Team1, 2:Team2
 
+    [Tooltip("Where each team respawns while its capital is under attack (index = team, same order as Team Spawn " +
+             "Points). Each sits in that capital's Tier 2 zone, whoever owns it. Placed by the arena tool: move the Team " +
+             "2 one and press Rebuild thirds on Enviorment/Arena.")]
+    public Transform[] capitalUnderAttackSpawnPoints;
+
     public const int TeamSize = 3;         // hard cap per team; 3 teams x 3 = the room's 9
     private const int NoFreeTeam = -1;
 
