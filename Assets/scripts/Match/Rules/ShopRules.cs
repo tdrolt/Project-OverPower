@@ -13,6 +13,13 @@ namespace Overpower.Match
         CannotAfford,
     }
 
+    /// <summary>Task T4: which shop section a purchase/refund/refusal belongs to - LoadoutScreen's
+    /// own Purchased/Refunded/PurchaseRefused events carry this so PlayerTelemetry's
+    /// `purchase`/`refund`/`shopBlocked` lines can write it as the spec's plain "weapon" / "armor" /
+    /// "equipment" / "mobility" / "ultimate" category string without LoadoutScreen and
+    /// PlayerTelemetry each inventing their own naming.</summary>
+    public enum PurchaseCategory { Weapon, Armor, Equipment, Mobility, Ultimate }
+
     /// <summary>The shop's purchase rules, apart from any UI, so the screen and any future shop ask the
     /// same questions in the same order (the first failing reason is the one a player needs to fix).</summary>
     public static class ShopRules

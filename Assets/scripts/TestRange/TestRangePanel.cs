@@ -473,7 +473,7 @@ namespace Overpower.TestRange
                 return;
             }
 
-            wallet.Add(1000);
+            wallet.Add(1000, GoldSource.Debug);
         }
 
         /// <summary>Spends one purchase on the absorb path, if the combined cap and the path's own

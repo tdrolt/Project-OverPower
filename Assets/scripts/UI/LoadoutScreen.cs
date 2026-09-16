@@ -83,6 +83,28 @@ namespace Overpower.UI
         /// same as GoldWallet's own balance starts fresh only for a genuinely new player.</summary>
         private readonly PurchaseLedger ledger = new PurchaseLedger();
 
+        // ---- shop telemetry events (Task T4) -----------------------------------------------------
+        // Raised at the same five sites this screen already had before telemetry existed - the
+        // three TrySpend sites (weapon, armor, ability), the two refund sites (weapon reset, armor
+        // reset), and ShowBlockedReason, which every refusal already funnelled through. Nothing here
+        // changes what a click actually does; PlayerTelemetry (Task T4) is the only listener.
+
+        /// <summary>owner, on a successful purchase: category, the item bought (a weapon or ability
+        /// id; for armor, the resulting absorb/recharge level reached - armor upgrades have no id of
+        /// their own), the price actually charged (0 under Free Loadout), the balance right after,
+        /// and whether Free Loadout paid for it.</summary>
+        public event System.Action<PurchaseCategory, int, int, int, bool> Purchased;
+
+        /// <summary>owner, on a successful weapon/armor reset: category, gold refunded, balance
+        /// after. Never raised under Free Loadout (nothing was ever spent to refund) or when the
+        /// refund rounds down to 0.</summary>
+        public event System.Action<PurchaseCategory, int, int> Refunded;
+
+        /// <summary>owner, on any refused click (weapon, armor, ability, or either reset) - the item
+        /// id (-1 for a reset, which buys nothing in particular), the price that was checked, why it
+        /// was refused, and the gold shortfall (0 unless the reason is CannotAfford).</summary>
+        public event System.Action<int, int, PurchaseBlock, int> PurchaseRefused;
+
         /// <summary>True only while the LOCAL player's own screen is open - only one instance of this
         /// component ever builds anything (every remote copy bails in Awake), so there is only ever
         /// one writer. Reset in OnDestroy so a player object being torn down can never leave this
@@ -571,13 +593,18 @@ namespace Overpower.UI
         /// reverts to the ordinary gate status on its own. Takes the SAME ctx and price the calling
         /// click handler already built its own gate check from, so a CannotAfford reason quotes the
         /// real shortfall for the item that was actually clicked.</summary>
-        private void ShowBlockedReason(ShopContext ctx, PurchaseBlock block, int price)
+        private void ShowBlockedReason(ShopContext ctx, PurchaseBlock block, int price, int itemId = -1)
         {
             blockedReasonText = ctx.ReasonText(block, price);
             // Unscaled (re-review fix, project convention - see PlayerHud.bountyToastHideAtTime's own
             // comment): a debug Time.timeScale change must not freeze this reason on screen forever.
             blockedReasonExpiryTime = Time.unscaledTime + theme.loadoutBlockedReasonDurationSeconds;
             RefreshHeader(ctx); // Shows it from the same frame as the click, not one frame late.
+
+            // Task T4: `shopBlocked` telemetry. Shortfall only means anything for CannotAfford -
+            // every other reason already explains itself via the reason string alone.
+            int shortfall = block == PurchaseBlock.CannotAfford ? Mathf.Max(0, price - ctx.Balance) : 0;
+            PurchaseRefused?.Invoke(itemId, price, block, shortfall);
         }
 
         /// <summary>Rewrites the Reset Weapon/Reset Armor buttons' own labels with a refund preview
@@ -635,21 +662,25 @@ namespace Overpower.UI
             WeaponDefinition target = weapons.Resolve(weaponId);
             int price = target != null ? target.GoldCost : 0;
             ShopContext ctx = CurrentShopContext();
+            bool free = ctx.FreeLoadout;
+            int chargedPrice = 0;
 
-            if (!ctx.FreeLoadout)
+            if (!free)
             {
                 PurchaseBlock block = ctx.Check(price);
                 if (block != PurchaseBlock.None)
                 {
-                    ShowBlockedReason(ctx, block, price);
+                    ShowBlockedReason(ctx, block, price, weaponId);
                     return;
                 }
                 if (goldWallet == null || !goldWallet.TrySpend(price))
                     return;
                 ledger.RecordWeapon(price);
+                chargedPrice = price;
             }
 
             playerLoadout?.SetWeapon(weaponId);
+            Purchased?.Invoke(PurchaseCategory.Weapon, weaponId, chargedPrice, goldWallet != null ? goldWallet.Balance : 0, free);
             Refresh();
         }
 
@@ -671,7 +702,12 @@ namespace Overpower.UI
                     return;
                 }
                 if (goldWallet != null && gameplayConfig != null)
-                    goldWallet.Add(ledger.SellWeapon(gameplayConfig.SellRefundRate));
+                {
+                    int refund = ledger.SellWeapon(gameplayConfig.SellRefundRate);
+                    goldWallet.Add(refund, GoldSource.Refund);
+                    if (refund > 0)
+                        Refunded?.Invoke(PurchaseCategory.Weapon, refund, goldWallet.Balance);
+                }
             }
 
             playerLoadout?.SetWeapon(tree.RootId);
@@ -765,8 +801,10 @@ namespace Overpower.UI
 
             int price = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
             ShopContext ctx = CurrentShopContext();
+            bool free = ctx.FreeLoadout;
+            int chargedPrice = 0;
 
-            if (!ctx.FreeLoadout)
+            if (!free)
             {
                 PurchaseBlock block = ctx.Check(price);
                 if (block != PurchaseBlock.None)
@@ -777,9 +815,16 @@ namespace Overpower.UI
                 if (goldWallet == null || !goldWallet.TrySpend(price))
                     return;
                 ledger.RecordArmor(price);
+                chargedPrice = price;
             }
 
             ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb);
+
+            // Task T4: armor has no item id of its own (unlike a weapon or ability) - the level
+            // this purchase just reached on the path being upgraded is the closest equivalent, and
+            // is read AFTER TryUpgrade so it reflects what was actually bought.
+            int newLevel = upgradeAbsorb ? playerHealth.AbsorbLevel : playerHealth.RechargeLevel;
+            Purchased?.Invoke(PurchaseCategory.Armor, newLevel, chargedPrice, goldWallet != null ? goldWallet.Balance : 0, free);
             Refresh();
         }
 
@@ -796,7 +841,12 @@ namespace Overpower.UI
                     return;
                 }
                 if (goldWallet != null && gameplayConfig != null)
-                    goldWallet.Add(ledger.SellArmor(gameplayConfig.SellRefundRate));
+                {
+                    int refund = ledger.SellArmor(gameplayConfig.SellRefundRate);
+                    goldWallet.Add(refund, GoldSource.Refund);
+                    if (refund > 0)
+                        Refunded?.Invoke(PurchaseCategory.Armor, refund, goldWallet.Balance);
+                }
             }
 
             ArmorLoadoutActions.Reset(playerLoadout);
@@ -860,23 +910,41 @@ namespace Overpower.UI
             bool slotIsEmpty = equippedId == LoadoutProperties.Empty;
             int price = ShopRules.AbilityPrice(slotIsEmpty, slot, goldCost);
             ShopContext ctx = CurrentShopContext();
+            bool free = ctx.FreeLoadout;
+            int chargedPrice = 0;
 
-            if (!ctx.FreeLoadout)
+            if (!free)
             {
                 PurchaseBlock block = ctx.Check(price);
                 if (block != PurchaseBlock.None)
                 {
-                    ShowBlockedReason(ctx, block, price);
+                    ShowBlockedReason(ctx, block, price, abilityId);
                     return;
                 }
                 // No ledger entry: abilities have no sell-back path (GDD silent on it), and a free
                 // first pick has nothing paid to refund anyway.
                 if (price > 0 && (goldWallet == null || !goldWallet.TrySpend(price)))
                     return;
+                chargedPrice = price;
             }
 
             playerLoadout.SetAbility(slot, abilityId);
+            Purchased?.Invoke(CategoryFor(slot), abilityId, chargedPrice, goldWallet != null ? goldWallet.Balance : 0, free);
             Refresh();
+        }
+
+        /// <summary>Task T4: this screen's own three ability slots, as the shared PurchaseCategory
+        /// telemetry uses. Primary never reaches here (this screen never builds a card for it - see
+        /// LoadoutAbilitySlotOrder), so it has no real mapping; Equipment is an arbitrary but
+        /// harmless fallback rather than throwing.</summary>
+        private static PurchaseCategory CategoryFor(AbilitySlot slot)
+        {
+            switch (slot)
+            {
+                case AbilitySlot.Mobility: return PurchaseCategory.Mobility;
+                case AbilitySlot.Ultimate: return PurchaseCategory.Ultimate;
+                default: return PurchaseCategory.Equipment;
+            }
         }
 
         /// <summary>Equipped gets the weapon tree's own Equipped look (highlight border) and its

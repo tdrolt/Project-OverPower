@@ -22,6 +22,12 @@ namespace Overpower.Match
     /// feels instant), then publishes it; every OTHER client only ever reads the published
     /// property; a LATE JOINER reads whatever value is already there.
     /// </summary>
+    /// <summary>Task T4: where a credit to this wallet came from, so telemetry (PlayerTelemetry's
+    /// `goldEarned`) can split a player's income by source instead of only seeing one growing
+    /// balance. Territory is the passive per-frame trickle GoldMath pays every owned zone;
+    /// everything else is a discrete credit from one call to Add.</summary>
+    public enum GoldSource { Territory, Bounty, Refund, Debug, Other }
+
     public class GoldWallet : MonoBehaviourPun, IInRoomCallbacks
     {
         public const string GoldKey = "gold";
@@ -78,6 +84,20 @@ namespace Overpower.Match
         /// "+1000 Gold" test button. Only the HUD toast ("Bounty +900") listens to this; the balance
         /// itself is credited through the ordinary Add(amount) call below, same as any other credit.
         public event System.Action<int> BountyReceived;
+
+        /// <summary>Task T4: owner only - raised every time this wallet's own balance goes UP,
+        /// whatever the reason (passive territory income crossing a whole gold, a bounty, a shop
+        /// refund, the F1 debug credit, or any other Add call). PlayerTelemetry sums these by
+        /// GoldSource into `goldEarned`'s per-source totals every sample interval. A remote copy
+        /// never raises this - see Add/TrySpend's own "owner only" guards, which this piggybacks
+        /// on rather than duplicating.</summary>
+        public event System.Action<int, GoldSource> Credited;
+
+        /// <summary>Task T4: owner only - raised every time TrySpend actually spends gold (a shop
+        /// purchase). PlayerTelemetry's `purchase`/`refund` events already carry the amount
+        /// themselves; this exists for anything else that wants "gold left this wallet" without
+        /// caring why.</summary>
+        public event System.Action<int> Spent;
 
         private void Awake()
         {
@@ -156,7 +176,7 @@ namespace Overpower.Match
             if (bounty <= 0)
                 return;
 
-            Add(bounty);
+            Add(bounty, GoldSource.Bounty);
             BountyReceived?.Invoke(bounty);
         }
 
@@ -186,7 +206,15 @@ namespace Overpower.Match
                 // assumptions-for-tudor.md]. Time.unscaledDeltaTime, not deltaTime, so a debug
                 // Time.timeScale change (EditorApplication.isPaused, a slow-mo test) can never
                 // speed up or freeze the economy.
+                int balanceBeforeAccrual = accrual.Balance;
                 accrual.Accrue(playerIncome, Time.unscaledDeltaTime);
+                // Task T4: GoldAccrual only ever shows WHOLE gold (its own class comment) - the
+                // fractional carry between frames means most frames credit nothing at all, and
+                // this fires only the frame a whole gold point is actually crossed, exactly
+                // matching what PublishIfDue below would (eventually) tell the room.
+                int wholeGoldCrossed = accrual.Balance - balanceBeforeAccrual;
+                if (wholeGoldCrossed > 0)
+                    Credited?.Invoke(wholeGoldCrossed, GoldSource.Territory);
             }
             else
             {
@@ -220,12 +248,17 @@ namespace Overpower.Match
                 return false;
 
             PublishBalance();
+            Spent?.Invoke(amount);
             return true;
         }
 
-        /// Owner only - see TrySpend's comment. Used by the bounty payout (Task 2.4) and the F1
-        /// "+1000 Gold" test button below (Task 2.2 Step 7), so shop testing never waits on income.
-        public void Add(int amount)
+        /// Owner only - see TrySpend's comment. Used by the bounty payout (Task 2.4), shop
+        /// refunds and purchases (Task 2.5b/T4) and the F1 "+1000 Gold" test button below
+        /// (Task 2.2 Step 7), so shop testing never waits on income. Task T4: source defaults to
+        /// Other rather than being required, so every pre-existing call site (the bounty payout
+        /// above already passes its own, the F1 button and LoadoutScreen's refunds are updated
+        /// too) keeps compiling unchanged.
+        public void Add(int amount, GoldSource source = GoldSource.Other)
         {
             if (!photonView.IsMine)
             {
@@ -237,6 +270,7 @@ namespace Overpower.Match
 
             accrual.Add(amount);
             PublishBalance();
+            Credited?.Invoke(amount, source);
         }
 
         private void PublishIfDue()
