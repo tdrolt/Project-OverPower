@@ -140,7 +140,10 @@ public class BuildingCapture : MonoBehaviourPun
         var collider = GetComponent<SphereCollider>();
         if (collider)
         {
-            collider.radius = captureRadius;
+            // Capture Radius is in world metres, the same number zone presence, health regen and the shop measure
+            // with (BuildingManager.TryGetZoneAt). A SphereCollider's radius is in the tower's own units and scales
+            // with it, so on the towers' 0.8 scale a radius of 10 only reached 8 m (measured 2026-09-16).
+            collider.radius = captureRadius / Mathf.Max(0.0001f, transform.lossyScale.x);
         }
         else
         {
