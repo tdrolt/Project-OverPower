@@ -210,7 +210,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public float DistanceToOwnedZoneEdge(Vector3 position, int teamId)
     {
         float best = float.PositiveInfinity;
-        if (current == null)
+        // Task 2.6 review fix: a team below 0 means "unknown" (e.g. the spawn frame, before this
+        // player's own team Custom Property has arrived) - never "owns nothing", which
+        // current.OwnerOf(zone) also reports as -1 for every NEUTRAL zone. Without this guard,
+        // teamId=-1 read as owning every neutral zone on the map, and a real distance to one would
+        // come back instead of the infinity an unknown team should always report.
+        if (current == null || teamId < 0)
             return best;
 
         foreach (KeyValuePair<int, BuildingCapture> pair in captures)

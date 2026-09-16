@@ -125,14 +125,30 @@ namespace Overpower.Weapons
         public float DamageMultiplier { get; private set; } = 1f;
 
         /// <summary>
+        /// Task 2.6 review fix: a SEPARATE damage multiplier, decided once at fire time and never
+        /// touched again - unlike DamageMultiplier above, which BounceOffWalls/ScaleDamageWithDistance
+        /// overwrite mid-flight for their own purpose. OverPower's own +10% used to be folded
+        /// straight into baseDamage (WeaponFiring.BuildShots), which worked for a direct hit but left
+        /// ExplodeOnImpact.SplashDamageAt with nothing to read - splash has its own separate damage
+        /// figure that never passes through baseDamage/Damage at all, so it read only
+        /// DamageMultiplier and silently missed the buff. Reusing DamageMultiplier for OverPower
+        /// instead would have the opposite problem: a bounce or a distance-scaling rocket calling
+        /// SetDamageMultiplier mid-flight would overwrite (not compose with) OverPower's bonus.
+        /// This field is read by both Damage below and SplashDamageAt, each applying it exactly
+        /// once. 1 = unchanged; always 1 for an ability shot (see that constructor).
+        /// </summary>
+        public float FireTimeDamageMultiplier { get; }
+
+        /// <summary>
         /// Damage this one projectile deals before armor, vulnerability or reduction - the figure
-        /// resolved at fire time, scaled by whatever DamageMultiplier currently is.
+        /// resolved at fire time, scaled by whatever DamageMultiplier currently is and by
+        /// FireTimeDamageMultiplier (fixed for this shot's whole life).
         ///
         /// The base figure is resolved once at fire time rather than read off the weapon at
         /// impact, so a shot in flight cannot be retuned mid-air by a weapon swap. Only an
-        /// IProjectileBehaviour riding along on this same projectile may move the multiplier.
+        /// IProjectileBehaviour riding along on this same projectile may move DamageMultiplier.
         /// </summary>
-        public float Damage => baseDamage * DamageMultiplier;
+        public float Damage => baseDamage * DamageMultiplier * FireTimeDamageMultiplier;
 
         private readonly float baseDamage;
 
@@ -153,7 +169,8 @@ namespace Overpower.Weapons
         /// ability shot look identical to ProjectileMotor from this point on.</summary>
         public ProjectileContext(WeaponDefinition weapon, int shooterActorNumber, int shooterTeamId,
                                  Vector3 direction, Vector3 targetPoint, float chargeFraction,
-                                 float damage, float rangeMultiplier = 1f)
+                                 float damage, float rangeMultiplier = 1f,
+                                 float fireTimeDamageMultiplier = 1f)
         {
             Weapon = weapon;
             ProjectileSpeed = weapon.ProjectileSpeed;
@@ -166,6 +183,7 @@ namespace Overpower.Weapons
             TargetPoint = targetPoint;
             ChargeFraction = chargeFraction;
             baseDamage = damage;
+            FireTimeDamageMultiplier = fireTimeDamageMultiplier;
         }
 
         /// <summary>
@@ -190,6 +208,7 @@ namespace Overpower.Weapons
             ProjectileSpeed = projectileSpeed;
             ProjectileRadius = projectileRadius;
             RangeMultiplier = 1f; // No ability reads OverPower's buff - see the property's own comment.
+            FireTimeDamageMultiplier = 1f; // Same reason.
             MaxRange = maxRange;
             ShooterActorNumber = shooterActorNumber;
             ShooterTeamId = shooterTeamId;

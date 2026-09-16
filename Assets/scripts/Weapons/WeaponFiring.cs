@@ -109,12 +109,14 @@ namespace Overpower.Weapons
         /// </summary>
         public void SetStatMultipliers(float damage, float fireRate, float range)
         {
-            damageMultiplier = damage;
-            // A zero or negative fire-rate multiplier would divide nextFireTime's interval by zero
-            // or flip the cooldown negative - guarded the same defensive way ArmorState guards a
-            // zero refillSeconds, even though nothing today ever calls this with such a value.
+            // Clamped the same defensive way ArmorState guards a zero refillSeconds, even though
+            // nothing today ever calls this with a negative value: a negative damage or range
+            // multiplier would read as healing or a shot that travels backwards, and a zero or
+            // negative fire-rate multiplier would divide nextFireTime's interval by zero or flip
+            // the cooldown negative.
+            damageMultiplier = Mathf.Max(0f, damage);
             fireRateMultiplier = Mathf.Max(0.0001f, fireRate);
-            rangeMultiplier = range;
+            rangeMultiplier = Mathf.Max(0f, range);
         }
 
         /// <summary>Where the muzzle currently sits in world space, unclamped - the Transform's own
@@ -331,10 +333,23 @@ namespace Overpower.Weapons
             // time it read nextFireTime, this line had already moved the goalposts.
             float chargeFraction = ChargeFraction();
 
-            // Task 2.6: a fire-rate multiplier over 1 shrinks the effective interval (dividing,
-            // not multiplying) - see SetStatMultipliers's own comment for why this can never be
-            // zero or negative.
-            nextFireTime = Time.time + weapon.FireInterval / fireRateMultiplier;
+            // Task 2.6 review fix: carries the previous shot's schedule forward instead of always
+            // re-basing off Time.time. Re-basing quietly capped how fast a buffed fast weapon could
+            // ever fire: TryFire only ever runs once per rendered frame (Update's PrimaryHeld poll),
+            // so a weapon whose buffed interval is shorter than a frame (weapon 09, 0.08s baseline,
+            // 0.0727s at x1.1, against a 60fps ~0.0167s frame) still only fired once a frame either
+            // way - but resetting the deadline to "now" on every one of those once-a-frame shots
+            // meant the SAME once-a-frame cadence applied whether or not the multiplier was active,
+            // since "now" already carries however late THIS frame's shot landed. Carrying the
+            // deadline forward by exactly one interval (while the trigger has been held
+            // continuously - the previous deadline is still within one interval of now) means the
+            // schedule itself runs at the true buffed rate even though any one frame can only ever
+            // catch up to wherever that schedule currently sits; averaged over many shots the
+            // measured rate matches the multiplier (see fire_driver_tpl.cs, weapon 09). A genuine
+            // gap - trigger released and re-pressed later - still re-bases off Time.time, so a stale
+            // schedule from long ago cannot let a player "bank" shots.
+            float interval = weapon.FireInterval / fireRateMultiplier;
+            nextFireTime = nextFireTime >= Time.time - interval ? nextFireTime + interval : Time.time + interval;
 
             // Heat is charged once per TRIGGER PULL, not once per projectile - see the tooltip on
             // Overheat Per Shot. A five-pellet shotgun costs the same heat as a single bullet.
@@ -638,7 +653,13 @@ namespace Overpower.Weapons
                                                        float rangeMultiplier)
         {
             int count = ChargedProjectileCount(weapon, chargeFraction);
-            float damage = ChargedDamage(weapon, chargeFraction) * damageMultiplier;
+            // Task 2.6 review fix: NOT pre-multiplied by damageMultiplier here any more - that used
+            // to fold OverPower's bonus straight into baseDamage, which a direct hit read fine but
+            // a rocket's splash (its own separate damage figure, never derived from baseDamage)
+            // never saw at all. damageMultiplier now travels into ProjectileContext's own
+            // FireTimeDamageMultiplier instead, which both Damage and ExplodeOnImpact.SplashDamageAt
+            // read - see that property's own comment.
+            float damage = ChargedDamage(weapon, chargeFraction);
             var rng = new System.Random(seed);
 
             // A cone pinned at exactly the width the shooter fired with, so the tested sampler in
@@ -654,7 +675,8 @@ namespace Overpower.Weapons
                 // in one place when the trigger went down, whatever the spread did to each
                 // projectile's heading afterwards.
                 shots[i] = new ProjectileContext(weapon, shooterActor, shooterTeam, direction,
-                                                  targetPoint, chargeFraction, damage, rangeMultiplier);
+                                                  targetPoint, chargeFraction, damage, rangeMultiplier,
+                                                  damageMultiplier);
             }
 
             return shots;

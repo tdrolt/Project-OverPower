@@ -72,5 +72,48 @@ namespace Overpower.Tests
         {
             Assert.IsFalse(New().CheckTrigger(1f));
         }
+
+        // ---- Task 2.6 review fix: death ends the buff outright, armed or active ----
+
+        [Test]
+        public void EndOnDeathClearsActive()
+        {
+            var s = New();
+            s.RecordEnemyHit(1, 10f, 2f);
+            s.RecordEnemyHit(2, 11f, 2f);
+            Assert.IsTrue(s.CheckTrigger(20f));
+            Assert.IsTrue(s.Active);
+
+            s.EndOnDeath();
+
+            Assert.IsFalse(s.Armed);
+            Assert.IsFalse(s.Active);
+        }
+
+        [Test]
+        public void EndOnDeathClearsArmedEvenBeforeItTriggers()
+        {
+            var s = New();
+            s.RecordEnemyHit(1, 10f, 2f);
+            s.RecordEnemyHit(2, 11f, 2f);
+            Assert.IsTrue(s.Armed);
+
+            s.EndOnDeath();
+
+            Assert.IsFalse(s.Armed);
+        }
+
+        [Test]
+        public void EndOnDeathForgetsPriorHitsSoATeamCannotRearmAloneAfterwards()
+        {
+            var s = New();
+            s.RecordEnemyHit(1, 10f, 2f);
+            s.EndOnDeath();
+
+            // Only team 1's own earlier hit survived somewhere, this would arm on its own -
+            // EndOnDeath must forget it exactly like UpdateDistance's own clear does.
+            s.RecordEnemyHit(1, 10.1f, 2f);
+            Assert.IsFalse(s.Armed);
+        }
     }
 }

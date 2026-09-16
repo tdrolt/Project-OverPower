@@ -58,27 +58,36 @@ namespace Overpower.Match
                 return;
             }
 
+            // Task 2.6 review fix: GameplayConfig is this buff's ONE home for every number it
+            // uses (window/radius/threshold/bonus) - a hardcoded fallback here would be a second,
+            // silently-diverging copy of numbers a designer already tunes on the asset. Missing
+            // config is loud and this component simply does not run, the same shape PlayerHealth/
+            // PlayerOverheat/AimConeView already use for their own required assets.
+            if (gameplayConfig == null)
+            {
+                Debug.LogError($"[OverPowerBuff] {name}: GameplayConfig is not assigned - the comeback buff cannot run.");
+                enabled = false;
+                return;
+            }
+
             playerHealth = GetComponent<PlayerHealth>();
             overheat = GetComponent<PlayerOverheat>();
             // Searched in children as well as on the root, matching PlayerLifecycle's own lookup -
             // the primary weapon's component does not live on the player root.
             weaponFiring = GetComponentInChildren<WeaponFiring>(true);
 
-            if (gameplayConfig == null)
-                Debug.LogError($"[OverPowerBuff] {name}: GameplayConfig is not assigned - the comeback buff will use hardcoded fallback numbers.");
             if (playerHealth == null || overheat == null || weaponFiring == null)
-                Debug.LogError($"[OverPowerBuff] {name}: missing PlayerHealth/PlayerOverheat/WeaponFiring on this player - the comeback buff cannot run.");
-
-            state = new OverPowerState(
-                gameplayConfig != null ? gameplayConfig.OverPowerWindowSeconds : 3f,
-                gameplayConfig != null ? gameplayConfig.OverPowerRadius : 15f,
-                gameplayConfig != null ? gameplayConfig.OverPowerHealthThreshold : 35f);
-
-            if (playerHealth != null)
             {
-                playerHealth.Damaged += HandleDamaged;
-                playerHealth.Died += HandleDied;
+                Debug.LogError($"[OverPowerBuff] {name}: missing PlayerHealth/PlayerOverheat/WeaponFiring on this player - the comeback buff cannot run.");
+                enabled = false;
+                return;
             }
+
+            state = new OverPowerState(gameplayConfig.OverPowerWindowSeconds, gameplayConfig.OverPowerRadius,
+                                       gameplayConfig.OverPowerHealthThreshold);
+
+            playerHealth.Damaged += HandleDamaged;
+            playerHealth.Died += HandleDied;
         }
 
         private void OnDestroy()
@@ -161,13 +170,23 @@ namespace Overpower.Match
 
         /// <summary>The moment the buff triggers: "regenerate their shield instantly and gain a 10%
         /// increase in 3 of the highest parameters on their primary ability while nullifying the
-        /// overheat mechanic" (GDD p.20).</summary>
+        /// overheat mechanic" (GDD p.20).
+        ///
+        /// Task 2.6 review fix: Clear(), not just SetSuppressed - a defender who triggers this
+        /// while ALREADY silenced (heat maxed from the fight that just dropped them under the
+        /// threshold) used to stay silenced through their own comeback moment, because
+        /// SetSuppressed only blocks future Add calls and does nothing about heat/silence already
+        /// in effect. "Nullifying the overheat mechanic" has to mean the weapon is usable the
+        /// instant the buff triggers, not merely that heat stops climbing further. Sprint spends
+        /// the same shared pool (PlayerOverheat's own class comment), so this clears its lockout
+        /// too - a deliberate side effect, not a special case for the weapon.</summary>
         private void Activate()
         {
             playerHealth?.RefillArmor();
 
-            float bonus = gameplayConfig != null ? gameplayConfig.OverPowerStatBonus : 0.10f;
+            float bonus = gameplayConfig.OverPowerStatBonus;
             weaponFiring?.SetStatMultipliers(1f + bonus, 1f + bonus, 1f + bonus);
+            overheat?.Clear();
             overheat?.SetSuppressed(this, true);
         }
 

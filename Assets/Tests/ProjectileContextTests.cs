@@ -130,6 +130,76 @@ namespace Overpower.Tests
             Assert.AreEqual(30f, shot.Damage);
         }
 
+        // ---- Task 2.6 review: RangeMultiplier and FireTimeDamageMultiplier ----
+
+        [Test]
+        public void RangeMultiplierScalesMaxRangeAndIsReadableOnItsOwn()
+        {
+            NewWeapon(id: 4, projectileSpeed: 55f, projectileRadius: 0.1f, maxRange: 30f);
+            var shot = new ProjectileContext(weapon, 1, 0, Vector3.forward, Vector3.zero, 0f, 10f,
+                                              rangeMultiplier: 1.1f);
+
+            Assert.AreEqual(1.1f, shot.RangeMultiplier, 1e-4f);
+            Assert.AreEqual(33f, shot.MaxRange, 1e-3f);
+        }
+
+        [Test]
+        public void DefaultRangeMultiplierLeavesMaxRangeUnchanged()
+        {
+            NewWeapon(id: 5, projectileSpeed: 55f, projectileRadius: 0.1f, maxRange: 30f);
+            var shot = new ProjectileContext(weapon, 1, 0, Vector3.forward, Vector3.zero, 0f, 10f);
+
+            Assert.AreEqual(1f, shot.RangeMultiplier);
+            Assert.AreEqual(30f, shot.MaxRange);
+        }
+
+        [Test]
+        public void FireTimeDamageMultiplierScalesDamageOnceAndIsFixedForTheShotsLife()
+        {
+            NewWeapon(id: 6, projectileSpeed: 55f, projectileRadius: 0.1f, maxRange: 30f);
+            var shot = new ProjectileContext(weapon, 1, 0, Vector3.forward, Vector3.zero, 0f, damage: 10f,
+                                              rangeMultiplier: 1f, fireTimeDamageMultiplier: 1.1f);
+
+            Assert.AreEqual(1.1f, shot.FireTimeDamageMultiplier, 1e-4f);
+            Assert.AreEqual(11f, shot.Damage, 1e-3f);
+        }
+
+        [Test]
+        public void FireTimeDamageMultiplierComposesWithDamageMultiplierRatherThanBeingOverwritten()
+        {
+            // The whole point of keeping this separate from DamageMultiplier (Task 2.6 review): a
+            // Bounce/Distance behaviour calling SetDamageMultiplier must not erase a fire-time
+            // bonus that was already baked in at construction.
+            NewWeapon(id: 7, projectileSpeed: 55f, projectileRadius: 0.1f, maxRange: 30f);
+            var shot = new ProjectileContext(weapon, 1, 0, Vector3.forward, Vector3.zero, 0f, damage: 10f,
+                                              rangeMultiplier: 1f, fireTimeDamageMultiplier: 1.1f);
+
+            shot.SetDamageMultiplier(2f);
+
+            Assert.AreEqual(22f, shot.Damage, 1e-3f);
+        }
+
+        [Test]
+        public void DefaultFireTimeDamageMultiplierLeavesDamageUnchanged()
+        {
+            NewWeapon(id: 8, projectileSpeed: 55f, projectileRadius: 0.1f, maxRange: 30f);
+            var shot = new ProjectileContext(weapon, 1, 0, Vector3.forward, Vector3.zero, 0f, 10f);
+
+            Assert.AreEqual(1f, shot.FireTimeDamageMultiplier);
+            Assert.AreEqual(10f, shot.Damage);
+        }
+
+        [Test]
+        public void AnAbilityShotsFireTimeDamageMultiplierIsAlwaysOne()
+        {
+            var shot = new ProjectileContext(abilityId: 18, projectileSpeed: 40f, projectileRadius: 0.15f,
+                                              maxRange: 15f, damage: 20f, shooterActorNumber: 1,
+                                              shooterTeamId: 0, direction: Vector3.forward, targetPoint: Vector3.zero);
+
+            Assert.AreEqual(1f, shot.FireTimeDamageMultiplier);
+            Assert.AreEqual(20f, shot.Damage);
+        }
+
         // ---- OnAbilityHit: only set on the caster's own copy - see ZipGunAbility.FireProjectile ----
 
         [Test]

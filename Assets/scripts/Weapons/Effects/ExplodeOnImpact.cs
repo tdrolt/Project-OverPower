@@ -239,7 +239,12 @@ namespace Overpower.Weapons
 
         /// <summary>Splash at a point, after Falloff and after whatever the shot's damage
         /// multiplier currently is - so a rocket that gains damage over distance gains it on the
-        /// blast too, not just on the thing it hit. See ProjectileContext.DamageMultiplier.</summary>
+        /// blast too, not just on the thing it hit. See ProjectileContext.DamageMultiplier.
+        ///
+        /// Task 2.6 review fix: also multiplied by FireTimeDamageMultiplier - OverPower's comeback
+        /// buff, decided once at fire time and never overwritten by DamageMultiplier's own
+        /// mid-flight rescaling (Bounce/Distance) - which splash used to miss entirely, since this
+        /// method never reads baseDamage (where the bonus used to be folded in) at all.</summary>
         private float SplashDamageAt(Vector3 blastCentre, Vector3 targetPosition)
         {
             // A zero radius would divide by zero, and reads as "no blast at all" rather than "an
@@ -248,7 +253,8 @@ namespace Overpower.Weapons
                 return 0f;
 
             float normalised = Mathf.Clamp01(Vector3.Distance(blastCentre, targetPosition) / splashRadius);
-            return splashDamage * context.DamageMultiplier * Mathf.Max(0f, falloff.Evaluate(normalised));
+            return splashDamage * context.DamageMultiplier * context.FireTimeDamageMultiplier *
+                   Mathf.Max(0f, falloff.Evaluate(normalised));
         }
 
         /// <summary>The same no-friendly-fire rule the projectile sweep and the beam use -
