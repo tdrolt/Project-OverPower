@@ -34,12 +34,18 @@ namespace Overpower.EditorTools.Telemetry
             EditorUtility.RevealInFinder(root);
         }
 
+        // Review fix (T6 item 3): one fixed folder, deleted and recreated on every call, instead of
+        // a fresh DateTime.Now.Ticks folder each time - a repeated "Build Report From Fixture" no
+        // longer leaves an ever-growing pile of temp folders behind, and a stale csv/report.html
+        // from a previous schema can never linger alongside a fresh build's output.
+        private static readonly string FixtureOutputFolder = Path.Combine(Path.GetTempPath(), "OverPowerTelemetryFixtureReport");
+
         [MenuItem("OverPower/Telemetry/Build Report From Fixture")]
         public static void BuildReportFromFixture()
         {
             string fixtureFolder = Path.Combine(Application.dataPath, FixtureFolder);
-            string outFolder = Path.Combine(Path.GetTempPath(), "OverPowerTelemetryFixtureReport_" + DateTime.Now.Ticks);
-            BuildReportInto(fixtureFolder, outFolder, true);
+            if (Directory.Exists(FixtureOutputFolder)) Directory.Delete(FixtureOutputFolder, true);
+            BuildReportInto(fixtureFolder, FixtureOutputFolder, true);
         }
 
         /// <summary>Task T6 step 4/5: Load -> Build -> CSV + HTML written INTO <paramref name="folder"/>,
@@ -69,7 +75,12 @@ namespace Overpower.EditorTools.Telemetry
             string htmlPath = HtmlReportWriter.Write(tables, log, targets, arena, outputFolder);
 
             Debug.Log($"[TelemetryMenu] Built report from '{sourceFolder}' into '{outputFolder}': {htmlPath}");
-            if (openInBrowser) Application.OpenURL("file://" + htmlPath.Replace('\\', '/'));
+            // Review fix (T6 item 4): a hand-built "file://" + path string leaves spaces (and any
+            // other reserved character) unescaped - persistentDataPath itself contains one on this
+            // PC ("...\Project OP\Telemetry\..."). System.Uri percent-encodes the path and
+            // normalises the backslashes properly, the same fix already applied to F1's own
+            // "Open telemetry folder" build path (see assumptions-for-tudor.md, Task T2).
+            if (openInBrowser) Application.OpenURL(new Uri(htmlPath).AbsoluteUri);
             return htmlPath;
         }
 

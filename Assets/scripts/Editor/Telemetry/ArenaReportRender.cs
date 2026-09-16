@@ -34,6 +34,18 @@ namespace Overpower.EditorTools.Telemetry
             public int PixelSize;
         }
 
+        /// <summary>Review fix (T6 item 6): the same world-to-pixel mapping the HTML's own toPixel()
+        /// JS function implements (HtmlReportWriter), exposed here as a pure function so the mapping
+        /// itself - including the Y-FLIP ("image up is +Z", per the arena-symmetry design doc's own
+        /// ArenaRender comment) - can be unit tested without Game Scene open or a real render.</summary>
+        public static (float Px, float Py) WorldToPixel(float x, float z)
+        {
+            float metresPerPixel = SpanMetres / PixelSize;
+            float px = (x - MinX) / metresPerPixel;
+            float py = PixelSize - (z - MinZ) / metresPerPixel;
+            return (px, py);
+        }
+
         /// <summary>Renders the arena if (and only if) a scene named "Game Scene" is currently open -
         /// checked across every LOADED scene, not just the active one, so the report still gets its
         /// heatmaps if Game Scene is merely not the active scene in a multi-scene setup.</summary>

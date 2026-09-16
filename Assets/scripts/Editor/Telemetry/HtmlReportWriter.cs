@@ -31,12 +31,18 @@ namespace Overpower.EditorTools.Telemetry
     /// legend and an outline so they read clearly over the arena image.</summary>
     public static class HtmlReportWriter
     {
+        /// <summary>Review fix (T6 item 5): a 9-player, 25-minute match at the shipped 5s sample
+        /// interval would embed ~2700 samples PER PLAYER (24300 total) as raw JSON otherwise - capped
+        /// so the report stays a reasonable size regardless of match length or player count.</summary>
+        private const int MaxPositionSamples = 3000;
+
         public static string Write(ReportTables tables, TelemetryLog log, BalanceTargetsData targets, ArenaReportRender.Result arena, string folder)
         {
             tables ??= new ReportTables();
             Directory.CreateDirectory(folder);
             string path = Path.Combine(folder, "report.html");
-            string html = Build(tables, ExtractPositions(log), targets, arena);
+            List<PositionSample> positions = ExtractPositions(log, out int keepEveryN);
+            string html = Build(tables, positions, keepEveryN, targets, arena);
             File.WriteAllText(path, html, new UTF8Encoding(false));
             return path;
         }
@@ -52,12 +58,25 @@ namespace Overpower.EditorTools.Telemetry
 
         /// <summary>Positions are only ever in the raw `sample` lines (design choice: not one of the
         /// 12 CSVs - see the spec's own CSV table list), so this reads the log directly rather than
-        /// going through TelemetryAggregator, which stays untouched by this whole task.</summary>
-        private static List<PositionSample> ExtractPositions(TelemetryLog log)
+        /// going through TelemetryAggregator, which stays untouched by this whole task.
+        ///
+        /// Review fix (T6 item 5): down-sampled to at most <see cref="MaxPositionSamples"/> kept
+        /// points - grouped per actor (own file) first, so a long match doesn't quietly lose an
+        /// entire short-lived joiner's coverage to a global "keep every Nth line read" cut; keeping
+        /// every Nth sample WITHIN each player's own sequence keeps their spatial coverage roughly
+        /// even instead of just truncating to their earliest N samples.</summary>
+        private static List<PositionSample> ExtractPositions(TelemetryLog log, out int keepEveryN)
         {
+            keepEveryN = 1;
             var result = new List<PositionSample>();
             if (log == null) return result;
 
+            var fileActor = new Dictionary<string, int>();
+            foreach (TelemetrySession s in log.Sessions)
+                if (!fileActor.ContainsKey(s.File)) fileActor[s.File] = s.Actor;
+
+            var byActor = new Dictionary<int, List<PositionSample>>();
+            int total = 0;
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Sample) continue;
@@ -66,7 +85,11 @@ namespace Overpower.EditorTools.Telemetry
                 var zToken = e.Data[TelemetryKeys.Z];
                 if (xToken == null || zToken == null) continue; // recordPositions was off for this line
 
-                result.Add(new PositionSample
+                int actor = fileActor.GetValueOrDefault(e.File, -1);
+                if (!byActor.TryGetValue(actor, out List<PositionSample> list))
+                    byActor[actor] = list = new List<PositionSample>();
+
+                list.Add(new PositionSample
                 {
                     T = e.T,
                     Team = e.Data[TelemetryKeys.Team]?.ToObject<int?>() ?? -1,
@@ -74,11 +97,19 @@ namespace Overpower.EditorTools.Telemetry
                     Z = zToken.ToObject<float>(),
                     Alive = e.Data[TelemetryKeys.Alive]?.ToObject<bool?>() ?? true,
                 });
+                total++;
             }
+
+            if (total > MaxPositionSamples)
+                keepEveryN = (int)System.Math.Ceiling(total / (double)MaxPositionSamples);
+
+            foreach (List<PositionSample> list in byActor.Values)
+                for (int i = 0; i < list.Count; i += keepEveryN)
+                    result.Add(list[i]);
             return result;
         }
 
-        private static string Build(ReportTables tables, List<PositionSample> positions, BalanceTargetsData targets, ArenaReportRender.Result arena)
+        private static string Build(ReportTables tables, List<PositionSample> positions, int positionsKeptEveryN, BalanceTargetsData targets, ArenaReportRender.Result arena)
         {
             var payload = new
             {
@@ -96,6 +127,7 @@ namespace Overpower.EditorTools.Telemetry
                 players = tables.Players,
                 deaths = tables.Deaths,
                 positions = positions,
+                positionsKeptEveryN = positionsKeptEveryN,
                 targets = targets,
                 arena = arena,
             };
@@ -106,6 +138,7 @@ namespace Overpower.EditorTools.Telemetry
                 StringEscapeHandling = StringEscapeHandling.EscapeHtml,
             };
             string json = JsonConvert.SerializeObject(payload, settings);
+            json = EscapeLineTerminators(json);
 
             var sb = new StringBuilder(json.Length + 65536);
             sb.Append(HtmlHead);
@@ -114,6 +147,20 @@ namespace Overpower.EditorTools.Telemetry
             sb.Append(";\n</script>\n");
             sb.Append(HtmlBody);
             return sb.ToString();
+        }
+
+        /// <summary>Review fix (T6 item 6): U+2028/U+2029 (LINE/PARAGRAPH SEPARATOR) are valid inside
+        /// a JSON string but were - for a long time, and still in plenty of non-browser JS engines -
+        /// NOT valid inside a JS string literal at all (only fixed for literals by ES2019). A
+        /// nickname or marker note containing one, embedded raw, could corrupt the surrounding
+        /// `const DATA = {...};` statement. Newtonsoft's StringEscapeHandling.EscapeHtml only
+        /// escapes '&lt;'/'&gt;'/'&amp;'/quotes, not these, so this is a final pass over the whole
+        /// serialized JSON text - safe as a blind replace because these two characters can only ever
+        /// appear INSIDE a JSON string value's content, never as JSON's own (all-ASCII) structural
+        /// syntax.</summary>
+        private static string EscapeLineTerminators(string json)
+        {
+            return json.Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
         }
 
         // Single-quoted HTML attributes and JS strings throughout, on purpose: a C# verbatim string
@@ -289,7 +336,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 </div>
 <div class='card' id='heatmaps'>
 <h3>Death and position heatmaps</h3>
-<p class='card-desc'>Dots plotted on a top-down render of the arena. Deaths are solid, outlined, coloured by the victim's team; positions are small translucent samples showing where players spent time.</p>
+<p class='card-desc'>Dots plotted on a top-down render of the arena. Deaths are solid, outlined, coloured by the victim's team; positions are small translucent samples showing where players spent time. <span id='position-sample-note'></span></p>
 <div>
 <label><input type='checkbox' id='toggle-deaths' checked> Deaths</label>
 &nbsp;&nbsp;
@@ -483,6 +530,9 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
   // comment) or 'Zone 0 · T2' for any other tier, falling back to a plain 'Zone N' if no ownership
   // or income row ever named this zone's tier (never captured, or a malformed/partial log).
   function zoneLabel(zoneId) {
+    // T5 re-review item 9: zone -1 is the synthetic 'Unattributed' bucket a goldEarned line's terr
+    // lands in when its own zones[] had nothing to rescale by - not a real zone at all.
+    if (zoneId === -1) return 'Unattributed';
     var tier = zoneTier(zoneId);
     if (tier === undefined || tier === null) return 'Zone ' + zoneId;
     return 'Zone ' + zoneId + ' · T' + tier + (tier === 1 ? ' capital' : '');
@@ -552,7 +602,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     if (h.malformedLineCount) warn(h.malformedLineCount + ' malformed log line(s) were skipped.');
     if (h.unknownEventCount) warn(h.unknownEventCount + ' unknown event(s) were skipped.');
     if (h.unknownCaptureStateCount) warn(h.unknownCaptureStateCount + ' capture line(s) had an unrecognised state.');
-    if (h.invalidTierCount) warn(h.invalidTierCount + ' ownership line(s) had an invalid tier and were skipped.');
+    if (h.invalidTierCount) warn(h.invalidTierCount + ' zone(s) had an invalid tier (0 or higher than 4) and were left out of tier-based income and zones-held totals.');
     if (h.unreadableFileCount) warn(h.unreadableFileCount + ' log file(s) could not be read.');
     if (h.newerSchemaCount) warn(h.newerSchemaCount + ' session(s) used a newer schema than this report understands.');
     if (h.otherMatchId) warn('This folder also holds ' + h.otherMatchFileCount + ' file(s) from a different match (' + h.otherMatchId + ') - not merged into this report.');
@@ -938,6 +988,12 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var canvas = document.getElementById('arena-canvas');
     var note = document.getElementById('arena-note');
     var legendHost = document.getElementById('heatmap-legend');
+
+    if (DATA.positionsKeptEveryN && DATA.positionsKeptEveryN > 1) {
+      document.getElementById('position-sample-note').textContent =
+        '(Positions down-sampled: kept every ' + DATA.positionsKeptEveryN + 'th sample per player, to limit report size.)';
+    }
+
     if (!arena || !arena.available) {
       note.textContent = (arena && arena.note) ? arena.note : 'Arena render is unavailable.';
       canvas.style.display = 'none';
