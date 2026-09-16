@@ -35,6 +35,11 @@ public class PlayerNetSync : MonoBehaviour, IPunObservable
     /// <summary>Last rotation received from the owner over the network.</summary>
     public Quaternion NetworkRotation { get; private set; }
 
+    /// <summary>True once this copy has received anything from its owner. Until then NetworkPosition and
+    /// NetworkRotation are still their defaults (the world origin), not where the player is. Nothing extra is sent for
+    /// this: it only records that the first update arrived.</summary>
+    public bool HasReceivedFromOwner { get; private set; }
+
     private void Awake()
     {
         playerMotor = GetComponent<PlayerMotor>();
@@ -56,6 +61,7 @@ public class PlayerNetSync : MonoBehaviour, IPunObservable
             // queue.
             NetworkPosition = (Vector3)stream.ReceiveNext();
             NetworkRotation = (Quaternion)stream.ReceiveNext();
+            HasReceivedFromOwner = true;
             float receivedHealth = (float)stream.ReceiveNext();
             float receivedArmor = (float)stream.ReceiveNext();
 

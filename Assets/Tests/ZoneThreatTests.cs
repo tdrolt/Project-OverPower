@@ -98,17 +98,79 @@ namespace Overpower.Tests
             Assert.AreEqual(0, masks[0]);
         }
 
-        [Test]
-        public void DeparturesStampOnlyTheTeamsThatLeft()
-        {
-            int[] before = new int[10]; before[2] = 0b011;
-            int[] after = new int[10]; after[2] = 0b001;
-            int[] seen = new int[30]; seen[2 * 3 + 0] = 111;
+        private static int[] NoStamps(int zones) => new int[zones * ZoneThreat.MaxTeams];
 
-            Assert.IsTrue(ZoneThreat.StampDepartures(before, after, seen, 50000));
+        [Test]
+        public void APlayerWhoWalksOutAliveIsStamped()
+        {
+            int[] seen = NoStamps(10);
+            var moves = new List<ZoneThreat.PlayerMove> { new ZoneThreat.PlayerMove(1, 2, -1, true) };
+
+            Assert.IsTrue(ZoneThreat.StampDepartures(moves, seen, 50000));
             Assert.AreEqual(50000, seen[2 * 3 + 1]);
-            Assert.AreEqual(111, seen[2 * 3 + 0], "team 0 is still there, so its stamp is untouched");
-            Assert.IsFalse(ZoneThreat.StampDepartures(after, after, seen, 60000));
+            Assert.IsTrue(ZoneThreat.IsUnderAttack(0, 0, seen, 2 * 3, 52000, Linger), "the linger runs after walking out");
+        }
+
+        [Test]
+        public void WalkingStraightIntoAnotherZoneStampsTheOneLeft()
+        {
+            int[] seen = NoStamps(10);
+            var moves = new List<ZoneThreat.PlayerMove> { new ZoneThreat.PlayerMove(1, 2, 5, true) };
+
+            Assert.IsTrue(ZoneThreat.StampDepartures(moves, seen, 50000));
+            Assert.AreEqual(50000, seen[2 * 3 + 1]);
+            Assert.AreEqual(0, seen[5 * 3 + 1]);
+        }
+
+        [Test]
+        public void APlayerWhoDiesInsideIsNotStamped()
+        {
+            int[] seen = NoStamps(10);
+            var moves = new List<ZoneThreat.PlayerMove> { new ZoneThreat.PlayerMove(1, 2, -1, false) };
+
+            Assert.IsFalse(ZoneThreat.StampDepartures(moves, seen, 50000));
+            Assert.AreEqual(0, seen[2 * 3 + 1]);
+            int[] masks = ZoneThreat.PresenceMasks(10, new List<(int team, int zone)>());
+            Assert.IsFalse(ZoneThreat.IsUnderAttack(0, masks[2], seen, 2 * 3, 50001, Linger), "the attack ends at once");
+        }
+
+        [Test]
+        public void APlayerWhoLeavesTheRoomIsNotStamped()
+        {
+            // The tracker reports a player gone from the room the same way: not countable, measured nowhere now.
+            int[] seen = NoStamps(10);
+            var moves = new List<ZoneThreat.PlayerMove> { new ZoneThreat.PlayerMove(2, 4, -1, false) };
+
+            Assert.IsFalse(ZoneThreat.StampDepartures(moves, seen, 50000));
+            Assert.AreEqual(0, seen[4 * 3 + 2]);
+        }
+
+        [Test]
+        public void APlayerStillStandingInTheSameZoneIsNotStamped()
+        {
+            int[] seen = NoStamps(10);
+            var moves = new List<ZoneThreat.PlayerMove> { new ZoneThreat.PlayerMove(1, 2, 2, true), new ZoneThreat.PlayerMove(1, -1, 3, true) };
+
+            Assert.IsFalse(ZoneThreat.StampDepartures(moves, seen, 50000));
+        }
+
+        [Test]
+        public void WhenATeammateIsStillInsideTheTeamsBitStays()
+        {
+            // Two team-1 players were in zone 2; one walks out alive, the other stays.
+            int[] seen = NoStamps(10);
+            var moves = new List<ZoneThreat.PlayerMove>
+            {
+                new ZoneThreat.PlayerMove(1, 2, -1, true),
+                new ZoneThreat.PlayerMove(1, 2, 2, true),
+            };
+            int[] masks = ZoneThreat.PresenceMasks(10, new List<(int team, int zone)> { (1, -1), (1, 2) });
+            ZoneThreat.StampDepartures(moves, seen, 50000);
+
+            Assert.AreEqual(0b010, masks[2]);
+            Assert.IsTrue(ZoneThreat.IsUnderAttack(0, masks[2], seen, 2 * 3, 60000, Linger), "still under attack");
+            // The walk-out was stamped, so if the teammate now dies inside, the linger still runs from it.
+            Assert.IsTrue(ZoneThreat.IsUnderAttack(0, 0, seen, 2 * 3, 52000, Linger));
         }
     }
 }

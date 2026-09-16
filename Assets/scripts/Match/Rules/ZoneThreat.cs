@@ -58,25 +58,50 @@ namespace Overpower.Match
             return masks;
         }
 
-        /// <summary>Stamps lastSeenMs[zone × MaxTeams + team] with nowMs for every team present in
-        /// <paramref name="before"/> and gone in <paramref name="after"/>. Returns true if it stamped anything.</summary>
-        public static bool StampDepartures(int[] before, int[] after, int[] lastSeenMs, int nowMs)
+        /// <summary>One player between two measures, for <see cref="StampDepartures"/>.</summary>
+        public readonly struct PlayerMove
+        {
+            public readonly int Team;
+
+            /// <summary>The zone they were measured in last time; -1 for no zone, or not measured then.</summary>
+            public readonly int PreviousZone;
+
+            /// <summary>The zone they are measured in now; -1 for no zone.</summary>
+            public readonly int CurrentZone;
+
+            /// <summary>Still in the room and alive now. False for someone who died or left.</summary>
+            public readonly bool StillCountable;
+
+            public PlayerMove(int team, int previousZone, int currentZone, bool stillCountable)
+            {
+                Team = team;
+                PreviousZone = previousZone;
+                CurrentZone = currentZone;
+                StillCountable = stillCountable;
+            }
+        }
+
+        /// <summary>Stamps lastSeenMs[zone × MaxTeams + team] with nowMs for every player who walked out of a zone:
+        /// still in the room and alive, measured in that zone last time and outside it now. A player who died or left
+        /// the room stamps nothing, so their team's bit just clears and the attack ends at once (controller decision,
+        /// 2026-09-16): the linger is there to stop the state flickering while someone steps on and off the edge, and a
+        /// death can't flicker. A walk-out is stamped even while a teammate is still inside, so the linger still runs if
+        /// that teammate then dies there. Returns true if it stamped anything.</summary>
+        public static bool StampDepartures(IReadOnlyList<PlayerMove> moves, int[] lastSeenMs, int nowMs)
         {
             bool stamped = false;
-            int zones = System.Math.Min(before.Length, after.Length);
-            for (int zone = 0; zone < zones; zone++)
+            for (int i = 0; i < moves.Count; i++)
             {
-                int left = before[zone] & ~after[zone];
-                if (left == 0) continue;
-                for (int team = 0; team < MaxTeams; team++)
+                PlayerMove move = moves[i];
+                if (!move.StillCountable || move.PreviousZone < 0 || move.CurrentZone == move.PreviousZone)
+                    continue;
+                if (TeamBit(move.Team) == 0)
+                    continue;
+                int index = move.PreviousZone * MaxTeams + move.Team;
+                if (index < lastSeenMs.Length)
                 {
-                    if ((left & TeamBit(team)) == 0) continue;
-                    int index = zone * MaxTeams + team;
-                    if (index < lastSeenMs.Length)
-                    {
-                        lastSeenMs[index] = nowMs;
-                        stamped = true;
-                    }
+                    lastSeenMs[index] = nowMs;
+                    stamped = true;
                 }
             }
             return stamped;
