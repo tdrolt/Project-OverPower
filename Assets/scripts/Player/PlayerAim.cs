@@ -48,6 +48,9 @@ public class PlayerAim : MonoBehaviour
     private Vector3 aimDirection = Vector3.forward;
     private Vector3 groundPointUnderCursor;
 
+    // Task 2.6 review, Tudor's own report: a test/harness hook, not gameplay - see SetAimOverride.
+    private Vector3? aimOverride;
+
     /// <summary>Flat, normalised, toward the cursor.</summary>
     public Vector3 AimDirection => aimDirection;
 
@@ -96,7 +99,24 @@ public class PlayerAim : MonoBehaviour
         if (!photonView.IsMine)
             return;
 
-        UpdateRotationFromMouse();
+        if (aimOverride.HasValue)
+        {
+            AimAt(aimOverride.Value);
+        }
+        else if (Application.isFocused)
+        {
+            UpdateRotationFromMouse();
+        }
+        // Tudor, Task 2.6 review: Input.mousePosition keeps reading the real OS cursor even while
+        // this window is UNFOCUSED (alt-tabbed, or a background Editor an automated script is
+        // driving) - an idle player kept turning to follow wherever the mouse happened to be on
+        // the rest of the desktop, a real gameplay bug and not merely a testing inconvenience.
+        // Skipping the read entirely while unfocused (and no override is set) leaves the last aim
+        // in place instead of chasing a cursor this window is not receiving on purpose. The cone
+        // still recovers either way - only the rotation/aim read is gated, not the whole method.
+        // See SetAimOverride for the deterministic alternative a test/harness script should reach
+        // for instead of fighting this gate.
+
         coneState.Tick(Time.deltaTime, motor != null && motor.IsMoving);
     }
 
@@ -107,19 +127,37 @@ public class PlayerAim : MonoBehaviour
         Plane groundPlane = new Plane(Vector3.up, new Vector3(0, transform.position.y, 0));
 
         if (groundPlane.Raycast(ray, out float rayDistance))
+            AimAt(ray.GetPoint(rayDistance));
+    }
+
+    /// <summary>Faces worldPoint on the flat ground plane - the one place both the real mouse path
+    /// (UpdateRotationFromMouse) and the SetAimOverride test path actually turn the body, so the
+    /// two can never disagree about what "aiming at a point" does.</summary>
+    private void AimAt(Vector3 worldPoint)
+    {
+        groundPointUnderCursor = worldPoint;
+
+        Vector3 direction = worldPoint - transform.position;
+        direction.y = 0f; // Keep rotation horizontal.
+
+        if (direction != Vector3.zero)
         {
-            groundPointUnderCursor = ray.GetPoint(rayDistance);
-
-            Vector3 direction = groundPointUnderCursor - transform.position;
-            direction.y = 0f; // Keep rotation horizontal.
-
-            if (direction != Vector3.zero)
-            {
-                aimDirection = direction.normalized;
-                transform.rotation = Quaternion.LookRotation(direction);
-            }
+            aimDirection = direction.normalized;
+            transform.rotation = Quaternion.LookRotation(direction);
         }
     }
+
+    /// <summary>
+    /// TEST/HARNESS HOOK - not a gameplay feature (Task 2.6 review, following Tudor's own OS-cursor
+    /// report). While set, this player aims at worldPoint every frame regardless of
+    /// Application.isFocused or the real mouse cursor, so an automated script can aim
+    /// deterministically without fighting whatever the OS cursor happens to be doing, or without
+    /// needing this window focused at all. Pass null to release the override and resume the normal
+    /// mouse/focus-gated aim. Prefer this over reflecting into aimDirection/groundPointUnderCursor
+    /// directly (two-client-harness.md §11) - it also turns the body, which those two fields alone
+    /// do not.
+    /// </summary>
+    public void SetAimOverride(Vector3? worldPoint) => aimOverride = worldPoint;
 
     public void RegisterShot() => coneState.RegisterShot();
 
