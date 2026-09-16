@@ -103,6 +103,7 @@ namespace Overpower.Tests
             Assert.AreEqual(3, w1.Pulls);
             Assert.AreEqual(3, w1.Projectiles);
             Assert.AreEqual(3, w1.Hits);                // 3 Projectile hits with w == 1
+            Assert.AreEqual(0, w1.SplashHits);          // no Splash-source hits in this fixture
             Assert.AreEqual(1.0, w1.Accuracy, 1e-9);     // 3 hits / 3 projectiles
             Assert.AreEqual(60f, w1.DamageRaw, 1e-6);    // 3 x raw 20
             Assert.AreEqual(15f, w1.ArmorDamage, 1e-6);  // 3 x arm 5
@@ -110,15 +111,27 @@ namespace Overpower.Tests
             Assert.AreEqual(1, w1.Kills);                 // the one death has w == 1
             Assert.AreEqual(12.0, w1.MeanDistance.Value, 1e-6);   // (10+12+14)/3
             Assert.AreEqual(12.0, w1.MedianDistance.Value, 1e-6);
+            // Equipped time (opus review items 3/11): player2 holds weapon 1 the WHOLE match (170s
+            // across consecutive-sample intervals) + player1's own first interval (60s, before
+            // switching to weapon 2 at t=65) = 230s. The fixture declares its own tuning
+            // sampleIntervalSeconds=60 (matching its actual ~60s sample spacing), so neither the
+            // trailing-interval addition nor the 2x-interval gap cap change this from the pre-review
+            // number - see the fixture's own tuning line.
+            Assert.AreEqual(230.0, w1.TimeEquippedSeconds, 1e-6);
+            Assert.AreEqual(60f * 60.0 / 230.0, w1.DamagePerEquippedMinute, 1e-2); // 60 raw / (230s/60) ~= 15.65/min
 
             var w2 = tables.Weapons.Single(w => w.WeaponId == 2);
             Assert.AreEqual(3, w2.Hits);
+            Assert.AreEqual(0, w2.SplashHits);
             Assert.AreEqual(90f, w2.DamageRaw, 1e-6);    // 3 x raw 30
             Assert.AreEqual(0, w2.Kills);
             Assert.AreEqual(22.0, w2.MeanDistance.Value, 1e-6); // (20+22+24)/3
+            Assert.AreEqual(115.0, w2.TimeEquippedSeconds, 1e-6); // player1 only: 60+55
+            Assert.AreEqual(90f * 60.0 / 115.0, w2.DamagePerEquippedMinute, 1e-2); // 90 raw / (115s/60) ~= 46.96/min
 
             var w3 = tables.Weapons.Single(w => w.WeaponId == 3); // never fired at all
             Assert.AreEqual(0, w3.Hits);
+            Assert.AreEqual(0, w3.SplashHits);
             Assert.AreEqual(0f, w3.DamageRaw);
             Assert.IsNull(w3.MeanDistance);
             Assert.AreEqual(0.0, w3.Accuracy);
@@ -152,6 +165,12 @@ namespace Overpower.Tests
             var p1 = tables.Players.Single(p => p.Actor == 1);
             var p2 = tables.Players.Single(p => p.Actor == 2);
 
+            // Opus review item 2: p2's OWN session line carries tm:-1 (a late joiner, before the
+            // room's player-properties echo arrived) - the effective team instead comes from p2's own
+            // first `sample` (tm:1), so team-keyed totals below (goldEarned, zone income, gold gap)
+            // aren't silently dropped for this player. Confirmed here directly on the player row.
+            Assert.AreEqual(1, p2.Team);
+
             // p1 dealt: the 3 weapon-1 hits he lands on p2 (raw 20 x3 = 60) plus the dot he applies (raw 15) = 75.
             Assert.AreEqual(75f, p1.DamageDealt, 1e-6);
             // p2 dealt: the 3 weapon-2 hits he lands on p1 (raw 30 x3 = 90).
@@ -179,7 +198,10 @@ namespace Overpower.Tests
             Assert.AreEqual(8, p2.GoldTerritory);  // 0 + 8 (the all-zero junk line at t=178 is in p1's file, adds nothing anyway)
             Assert.AreEqual(20f, p2.Healing, 1e-6); // the one heal line's tiers sum (0+0+20+0+0)
 
-            Assert.AreEqual(180.0, p1.TimeAlive, 1e-6); // never dies - alive the whole match
+            // Never dies - alive for p1's own covered range: session's own t (0.02, the first real
+            // event in file 1) to the last sample (180) - opus review item 3, bounded by the PLAYER'S
+            // OWN coverage rather than the whole match length.
+            Assert.AreEqual(179.98, p1.TimeAlive, 1e-6);
             // p2: first life 0 -> 60.05 (the death's own timeAlive) + the tail after respawn, 65.05 -> 180.
             Assert.AreEqual(60.05 + (180.0 - 65.05), p2.TimeAlive, 1e-6);
 
@@ -276,6 +298,39 @@ namespace Overpower.Tests
             Assert.AreEqual(250, death.UnspentGold);
             Assert.AreEqual(1, death.LoadoutWeapon);
             Assert.AreEqual(15, death.LoadoutMobility);
+        }
+
+        // ---------------------------------------------------------------- gold timeline (opus review item 12)
+
+        [Test]
+        public void GoldTimelineRows()
+        {
+            var tables = BuildFixtureTables();
+            // 4 samples for p1 (t=5,65,125,180) + 4 samples for p2 (t=10,70,130,180) = 8 rows.
+            Assert.AreEqual(8, tables.GoldTimeline.Count);
+
+            // p1 @ t=65: only the t=25 goldEarned (terr 25) and t=25 purchase (price 1200) have
+            // happened by then - the t=100 goldEarned/refund haven't yet.
+            var p1At65 = tables.GoldTimeline.Single(r => r.Actor == 1 && Math.Abs(r.T - 65.0) < 1e-9);
+            Assert.AreEqual(0, p1At65.Team);
+            Assert.AreEqual(325, p1At65.Balance);
+            Assert.AreEqual(25, p1At65.EarnedSoFar);
+            Assert.AreEqual(1200, p1At65.SpentSoFar);
+
+            // p1 @ t=180 (last sample): both goldEarned lines have landed (t=25: terr 25 + refund 0;
+            // t=100: terr 25 + refund 400 - EarnedSoFar sums EVERY source, not just territory) plus
+            // the one purchase; the t=178 junk zero line adds nothing.
+            var p1At180 = tables.GoldTimeline.Single(r => r.Actor == 1 && Math.Abs(r.T - 180.0) < 1e-9);
+            Assert.AreEqual(1350, p1At180.Balance);
+            Assert.AreEqual(25 + 25 + 400, p1At180.EarnedSoFar);
+            Assert.AreEqual(1200, p1At180.SpentSoFar);
+
+            // p2 @ t=10 (first sample): nothing has happened yet.
+            var p2At10 = tables.GoldTimeline.Single(r => r.Actor == 2 && Math.Abs(r.T - 10.0) < 1e-9);
+            Assert.AreEqual(800, p2At10.Balance);
+            Assert.AreEqual(0, p2At10.EarnedSoFar);
+            Assert.AreEqual(0, p2At10.SpentSoFar);
+            Assert.AreEqual(1, p2At10.Team); // effective team (fallback from tm:-1 session), not raw sample tm
         }
 
         // ---------------------------------------------------------------- multi-match-id merge key

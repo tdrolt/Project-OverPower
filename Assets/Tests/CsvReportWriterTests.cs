@@ -24,6 +24,7 @@ namespace Overpower.Tests
             var tables = new ReportTables();
             tables.Players.Add(new PlayerRow { Actor = 1, Nick = "Smith, \"Ace\" John", Team = 0 });
             tables.Purchases.Add(new PurchaseRow { T = 1.5, Actor = 1, Nick = "Editor", Team = 0, Kind = "purchase", Category = "weapon", ItemId = 2, Amount = 1200, BalanceAfter = 300, Zone = 0, Free = false });
+            tables.Weapons.Add(new WeaponRow { WeaponId = 5, Hits = 1, SplashHits = 2 });
             return tables;
         }
 
@@ -62,6 +63,53 @@ namespace Overpower.Tests
                 string text = File.ReadAllText(Path.Combine(folder, "csv", "players.csv"));
                 // RFC-4180: a field containing a comma or a quote is wrapped in quotes, with inner quotes doubled.
                 Assert.IsTrue(text.Contains("\"Smith, \"\"Ace\"\" John\""), text);
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
+        public void WeaponsHeaderRowNamesSplashHitsSeparatelyFromHits()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "CsvReportWriterTests_" + System.Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                CsvReportWriter.Write(MinimalTables(), folder);
+
+                string[] lines = File.ReadAllLines(Path.Combine(folder, "csv", "weapons.csv"));
+                StringAssert.Contains("splashHits", lines[0]);
+                int hitsIndex = System.Array.IndexOf(lines[0].Split(','), "hits");
+                int splashIndex = System.Array.IndexOf(lines[0].Split(','), "splashHits");
+                Assert.AreNotEqual(-1, hitsIndex);
+                Assert.AreNotEqual(-1, splashIndex);
+                string[] row = lines[1].Split(',');
+                Assert.AreEqual("1", row[hitsIndex]);
+                Assert.AreEqual("2", row[splashIndex]);
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
+        public void WritesUtf8WithBomSoExcelDetectsTheEncoding()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "CsvReportWriterTests_" + System.Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                CsvReportWriter.Write(MinimalTables(), folder);
+
+                byte[] bytes = File.ReadAllBytes(Path.Combine(folder, "csv", "players.csv"));
+                // UTF-8 BOM: EF BB BF.
+                Assert.GreaterOrEqual(bytes.Length, 3);
+                Assert.AreEqual(0xEF, bytes[0]);
+                Assert.AreEqual(0xBB, bytes[1]);
+                Assert.AreEqual(0xBF, bytes[2]);
             }
             finally
             {
