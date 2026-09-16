@@ -58,9 +58,15 @@ namespace Overpower.Telemetry
         public const string Leave = "leave";
         public const string MasterChanged = "masterChanged";
         public const string Marker = "marker";
-        // `phase` / `elimination` are Task 2.7's own events, raised into MatchTelemetry after this
-        // feature ships - deliberately not added yet (see the plan's "Changes from the spec, decided
-        // while planning"). Do not add them here from T2; that is 2.7's job.
+        /// <summary>Task T7: the runtime API (MatchTelemetry.LogPhase) and the aggregator
+        /// (PhaseTimeline) both exist as of this task, but 2.7's own MatchDirector is the only thing
+        /// that will ever call LogPhase with a number > 1 - until then every log is entirely Phase 1
+        /// (see PhaseTimeline.From). MatchTelemetry logs `phase` 1 once, itself, as a harmless anchor
+        /// the moment the master claims the match identity.</summary>
+        public const string Phase = "phase";
+        /// <summary>Task T7: the runtime API (MatchTelemetry.LogElimination) exists; nothing calls it
+        /// yet with a real elimination - that is 2.7's job (its MatchDirector).</summary>
+        public const string Elimination = "elimination";
 
         // ---------------------------------------------------------------- session (line 1)
         public const string Schema = "schema";
@@ -200,6 +206,15 @@ namespace Overpower.Telemetry
         public const string Progress = "progress";
         public const string Players = "players";
         public const string ZoneDistance = "zoneDist";
+
+        // ---------------------------------------------------------------- phase / elimination (Task T7)
+        /// <summary>`phase`'s own field: 1 (the anchor MatchTelemetry itself writes) or 2+ (2.7's
+        /// MatchDirector, once it exists). PhaseTimeline.From reads this to find the first phase >= 2.</summary>
+        public const string PhaseNumber = "num";
+        /// <summary>Shared by `phase` and `elimination`: which team ids are still in the match after
+        /// this change. `elimination` also uses the plain Team key (above) for the team that was just
+        /// eliminated.</summary>
+        public const string TeamsRemaining = "remain";
 
         // ---------------------------------------------------------------- marker
         public const string Note = "note";
