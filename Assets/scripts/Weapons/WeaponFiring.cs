@@ -315,6 +315,11 @@ namespace Overpower.Weapons
             if (!photonView.IsMine || weapon == null || Time.time < nextFireTime)
                 return false;
 
+            // Re-read every tick (cheap) so a fire-rate buff that changes mid-hold is reflected
+            // immediately in both the blocked-tick clamp below and the real fire decision further
+            // down, rather than only from the next full cycle.
+            float interval = weapon.FireInterval / fireRateMultiplier;
+
             // The same rule AbilityRunner gates abilities on: dead beats stunned beats silenced.
             // Routing the trigger through CastGate instead of this class's own if-chain is what
             // keeps "can this player act right now" from drifting between the weapon and whatever
@@ -323,7 +328,15 @@ namespace Overpower.Weapons
             bool stunned = statusEffects != null && statusEffects.IsStunned;
             bool silenced = overheat != null && overheat.IsSilenced;
             if (CastGate.ForActor(alive, stunned, silenced) != CastBlock.None)
+            {
+                // Task 2.6 review follow-up: without this, a blocked player's stale nextFireTime
+                // sat wherever it was left when the block started, and the first tick after the
+                // block lifted could misread as "still mid-cadence" and carry over into a shot
+                // fired only a sliver of an interval later - see FireScheduleRule's own comment.
+                nextFireTime = FireScheduleRule.NextFireTime(nextFireTime, Time.time, interval,
+                                                              triggerHeldContinuously: false, blockedThisTick: true);
                 return false;
+            }
 
             // Resolved BEFORE nextFireTime is overwritten below. ChargeFraction() reads nextFireTime
             // as the deadline the hold had to wait out - the whole point of the c268b40 fix. Once
@@ -334,22 +347,21 @@ namespace Overpower.Weapons
             float chargeFraction = ChargeFraction();
 
             // Task 2.6 review fix: carries the previous shot's schedule forward instead of always
-            // re-basing off Time.time. Re-basing quietly capped how fast a buffed fast weapon could
-            // ever fire: TryFire only ever runs once per rendered frame (Update's PrimaryHeld poll),
-            // so a weapon whose buffed interval is shorter than a frame (weapon 09, 0.08s baseline,
-            // 0.0727s at x1.1, against a 60fps ~0.0167s frame) still only fired once a frame either
-            // way - but resetting the deadline to "now" on every one of those once-a-frame shots
-            // meant the SAME once-a-frame cadence applied whether or not the multiplier was active,
-            // since "now" already carries however late THIS frame's shot landed. Carrying the
-            // deadline forward by exactly one interval (while the trigger has been held
-            // continuously - the previous deadline is still within one interval of now) means the
-            // schedule itself runs at the true buffed rate even though any one frame can only ever
-            // catch up to wherever that schedule currently sits; averaged over many shots the
-            // measured rate matches the multiplier (see fire_driver_tpl.cs, weapon 09). A genuine
-            // gap - trigger released and re-pressed later - still re-bases off Time.time, so a stale
-            // schedule from long ago cannot let a player "bank" shots.
-            float interval = weapon.FireInterval / fireRateMultiplier;
-            nextFireTime = nextFireTime >= Time.time - interval ? nextFireTime + interval : Time.time + interval;
+            // re-basing off Time.time, while the trigger is genuinely held continuously (not a
+            // charge weapon's one-off release - see FireScheduleRule's own parameter comment).
+            // Re-basing quietly capped how fast a buffed fast weapon could ever fire: TryFire only
+            // ever runs once per rendered frame (Update's PrimaryHeld poll), so a weapon whose
+            // buffed interval is shorter than a frame (weapon 09, 0.08s baseline, 0.0727s at x1.1,
+            // against a 60fps ~0.0167s frame) still only fired once a frame either way - but
+            // resetting the deadline to "now" on every one of those once-a-frame shots meant the
+            // SAME once-a-frame cadence applied whether or not the multiplier was active, since
+            // "now" already carries however late THIS frame's shot landed. Carrying the deadline
+            // forward by exactly one interval means the schedule itself runs at the true buffed
+            // rate even though any one frame can only ever catch up to wherever that schedule
+            // currently sits; averaged over many shots the measured rate matches the multiplier
+            // (see fire_driver_tpl.cs, weapon 09).
+            nextFireTime = FireScheduleRule.NextFireTime(nextFireTime, Time.time, interval,
+                                                          triggerHeldContinuously: !weapon.CanCharge, blockedThisTick: false);
 
             // Heat is charged once per TRIGGER PULL, not once per projectile - see the tooltip on
             // Overheat Per Shot. A five-pellet shotgun costs the same heat as a single bullet.
