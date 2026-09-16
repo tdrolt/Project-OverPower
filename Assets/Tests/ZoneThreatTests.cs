@@ -73,6 +73,21 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AStampAheadOfThisClientsClockIsNotAnAttack()
+        {
+            // A stale stamp (another room, a badly skewed clock) must not hold the zone under attack until now catches up.
+            int[] seen = { 0, 50000 + 60000, 0 };
+            Assert.IsFalse(ZoneThreat.IsUnderAttack(0, 0, seen, 0, 50000, Linger));
+        }
+
+        [Test]
+        public void AnAttackerWhoNowOwnsTheZoneIsNotAttackingIt()
+        {
+            int[] seen = { 0, 49000, 0 };
+            Assert.IsFalse(ZoneThreat.IsUnderAttack(1, 0b010, seen, 0, 50000, Linger));
+        }
+
+        [Test]
         public void PresenceMasksCombineTeamsPerZoneAndIgnorePlayersOutsideZones()
         {
             var players = new List<(int team, int zone)> { (0, 2), (1, 2), (1, 5), (2, -1), (7, 3) };

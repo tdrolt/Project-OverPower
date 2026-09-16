@@ -37,7 +37,11 @@ namespace Overpower.Match
                     continue;
                 int seen = lastSeenMs[offset + team];
                 // unchecked: the server clock is an int that wraps, and a wrapped subtraction is still the true gap.
-                if (seen != 0 && unchecked(nowMs - seen) < lingerMs)
+                // Compared as unsigned so a stamp AHEAD of this clock (a negative gap) never counts: otherwise a stale
+                // stamp would keep a zone under attack until the clock caught up with it, possibly for minutes. A small
+                // negative gap from clients' slightly different clock estimates just means "not under attack" for a few
+                // ms, which is harmless.
+                if (seen != 0 && unchecked((uint)(nowMs - seen) < (uint)lingerMs))
                     return true;
             }
             return false;
@@ -63,7 +67,8 @@ namespace Overpower.Match
             for (int zone = 0; zone < zones; zone++)
             {
                 int left = before[zone] & ~after[zone];
-                for (int team = 0; team < MaxTeams && left != 0; team++)
+                if (left == 0) continue;
+                for (int team = 0; team < MaxTeams; team++)
                 {
                     if ((left & TeamBit(team)) == 0) continue;
                     int index = zone * MaxTeams + team;
