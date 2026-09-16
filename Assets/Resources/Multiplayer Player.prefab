@@ -3188,6 +3188,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
   playerMesh: {fileID: 2327462636180084888}
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!114 &9000035540746409762
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3204,6 +3205,7 @@ MonoBehaviour:
   youWonPanel: {fileID: 8582863100347077675}
   respawnPanel: {fileID: 9051395882172250540}
   youLostPanel: {fileID: 878118593987345808}
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!114 &5221256228866866382
 MonoBehaviour:
   m_ObjectHideFlags: 0

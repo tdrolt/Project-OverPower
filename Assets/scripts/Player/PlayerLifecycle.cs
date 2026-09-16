@@ -6,6 +6,7 @@ using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.UI;
 using Overpower.Weapons;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
@@ -44,6 +45,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
              "disabling the root would switch this whole component off with it.")]
     private GameObject playerMesh;
 
+    [SerializeField, Tooltip("Colours and text for the capital-under-attack respawn note/toast (Tudor, " +
+             "2026-09-16). The same theme asset PlayerHud reads for the HUD.")]
+    private UiTheme theme;
+
     private PhotonView photonView;
     private Rigidbody rigidbody;
     private CapsuleCollider capsuleCollider;
@@ -70,9 +75,17 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // than holding panel references of its own. See MatchUI.cs.
     private MatchUI matchUI;
 
+    // The HUD toast shown after respawning at T2 because the capital was under attack. Fetched the
+    // same way matchUI is - a sibling component on this same player root.
+    private PlayerHud playerHud;
+
     private bool death = false;
     private bool respawnStarted = false;
     private int deathCount = 0;
+
+    // Caches the last value shown on the respawn note so UpdateRespawnNote only touches MatchUI's
+    // text when the under-attack state actually flips, not every frame it is polled.
+    private bool respawnNoteShowing = false;
 
     // Mirrors the replicated alive state so input and physics can be gated on it locally.
     private bool isAlive = true;
@@ -102,12 +115,16 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (gameplayConfig == null)
             Debug.LogError($"[PlayerLifecycle] {name}: GameplayConfig is not assigned - respawn " +
                             "timing will use hardcoded fallbacks.");
+        if (theme == null)
+            Debug.LogWarning($"[PlayerLifecycle] {name}: UiTheme is not assigned - the capital-under-" +
+                              "attack respawn note and toast will be skipped.");
 
         photonView = GetComponent<PhotonView>();
         rigidbody = GetComponent<Rigidbody>();
         capsuleCollider = GetComponent<CapsuleCollider>();
         weaponFiring = GetComponentInChildren<WeaponFiring>(true);
         matchUI = GetComponent<MatchUI>();
+        playerHud = GetComponent<PlayerHud>();
 
         playerHealth = GetComponent<PlayerHealth>();
         playerHealth.Died += HandlePlayerHealthDied;
@@ -267,6 +284,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return;
         }
 
+        // Tudor, 2026-09-16: preview the capital-under-attack respawn note while stuck here waiting
+        // for a teammate to recapture the capital - see UpdateRespawnNote's own comment for why this
+        // is also polled from the ordinary respawn-countdown wait in RespawnPlayer below, not just here.
+        UpdateRespawnNote(teamID);
+
         if (!TryGetOwnCathedral(teamID, out _, out TowerData cathedralTower))
             return;
 
@@ -336,20 +358,35 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)
     {
-        yield return new WaitForSeconds(delay);
+        // A per-frame wait rather than a single WaitForSeconds(delay), so the capital-under-attack
+        // note (Tudor, 2026-09-16) can update live on the respawn panel during the ordinary
+        // countdown too - not just the CheckForCathedralCapture wait, which only ever runs while
+        // waitingPanel (not respawnPanel) is the one showing. See UpdateRespawnNote.
+        float elapsed = 0f;
+        while (elapsed < delay)
+        {
+            UpdateRespawnNote(teamID);
+            yield return null;
+            elapsed += Time.deltaTime;
+        }
 
         Debug.Log($"{photonView.Owner?.NickName} has been revived after recapture!");
+
+        // The decision is made now, when the timer ends, not when the player died - the attack may
+        // be over by then (Tudor, 2026-09-16). Cleared here regardless of the outcome: whichever
+        // spawn is chosen, the preview note no longer applies once the respawn actually happens.
+        matchUI?.SetRespawnNote("");
+        respawnNoteShowing = false;
 
         // Null-guarded inside MatchUI: an NRE here would kill the coroutine after the wait but
         // BEFORE SetAlive(true) below, leaving the player hidden on every client forever.
         matchUI?.HideWaitingPanel();
 
         RoomManager roomManager = FindObjectOfType<RoomManager>();
-        if (roomManager != null && roomManager.teamSpawnPoints.Length > teamID)
-        {
-            TeleportToSpawnPoint(roomManager.teamSpawnPoints[teamID].position,
-                                  roomManager.teamSpawnPoints[teamID].rotation);
-        }
+        bool atUnderAttackSpawn = false;
+        Transform spawn = roomManager != null ? ChooseSpawnPoint(roomManager, teamID, out atUnderAttackSpawn) : null;
+        if (spawn != null)
+            TeleportToSpawnPoint(spawn.position, spawn.rotation);
 
         playerHealth.ResetForRespawn();
 
@@ -358,12 +395,16 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // that wrote a speed value here is exactly how "you move faster after respawning" happened.
         SetAlive(true);
 
+        if (atUnderAttackSpawn)
+            playerHud?.ShowToast(theme != null ? theme.capitalUnderAttackRespawnToast : "Respawned at Tier 2: capital under attack");
+
         // Logged because "respawning where you died" is a fix that cannot be verified from the
         // editor. Reads rigidbody.position, not transform.position: this class used to log
         // transform.position immediately after writing it, which always "looked" right even on the
         // ~1-in-10 runs where PlayerMotor.Move()'s rb.MovePosition silently reverted the write a
         // tick later (see TeleportToSpawnPoint below) - the log could never have caught its own bug.
-        Debug.Log($"[VIS] respawned at {rigidbody.position} (team {teamID} spawn)");
+        Debug.Log($"[VIS] respawned at {rigidbody.position} (team {teamID} " +
+                  $"{(atUnderAttackSpawn ? "T2 (capital under attack)" : "capital")})");
         photonView.RPC("RPC_HandleRespawnMaster", RpcTarget.MasterClient, teamID, actorNumber);
 
         Debug.Log($"{photonView.Owner?.NickName} fully respawned at base after cathedral recapture.");
@@ -393,6 +434,60 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
                               roomManager.teamSpawnPoints[pt.teamID].rotation);
 
         Debug.Log($"[VIS] fell below y={playerMotor.KillHeight}, returned to spawn at {rigidbody.position}");
+    }
+
+    /// Tudor, 2026-09-16: while your capital is under attack (an enemy standing in it, or who just left - see
+    /// ZonePresenceTracker) you come back at your capital's Tier 2 zone instead, whoever owns it, rather than
+    /// straight into the fight. Decided when the timer ends, not when you died, because the attack may be over by
+    /// then.
+    private Transform ChooseSpawnPoint(RoomManager roomManager, int teamID, out bool atUnderAttackSpawn)
+    {
+        atUnderAttackSpawn = false;
+        Transform normal = roomManager.teamSpawnPoints != null && roomManager.teamSpawnPoints.Length > teamID
+            ? roomManager.teamSpawnPoints[teamID] : null;
+
+        BuildingManager manager = BuildingManager.Instance;
+        ZonePresenceTracker presence = ZonePresenceTracker.Instance;
+        if (manager == null || manager.Map == null || presence == null)
+            return normal;
+
+        int capital = manager.Map.CapitalOf(teamID);
+        if (capital < 0 || !presence.IsUnderAttack(capital))
+            return normal;
+
+        Transform[] underAttack = roomManager.capitalUnderAttackSpawnPoints;
+        if (underAttack == null || underAttack.Length <= teamID || underAttack[teamID] == null)
+        {
+            Debug.LogWarning($"[PlayerLifecycle] team {teamID}'s capital is under attack but RoomManager has no Capital Under Attack Spawn Point for it - respawning at the capital.");
+            return normal;
+        }
+
+        atUnderAttackSpawn = true;
+        return underAttack[teamID];
+    }
+
+    /// <summary>Refreshes the "your capital is under attack" line on the respawn panel (Tudor, 2026-09-16) -
+    /// called from both waits a player can be stuck on: CheckForCathedralCapture's poll while waitingPanel is up
+    /// (a lost capital, waiting for a teammate to recapture it) and RespawnPlayer's own per-frame delay loop
+    /// while respawnPanel is up (an ordinary death, capital still owned but under attack). The plan's own text
+    /// named only the first call site; calling it there alone would leave the note silent for exactly the
+    /// scenario B3 verifies (a defended, merely-attacked capital), since that path never touches waitingPanel at
+    /// all - see assumptions-for-tudor.md, 2026-09-16. Only writes MatchUI's text when the bool actually flips.</summary>
+    private void UpdateRespawnNote(int teamID)
+    {
+        if (matchUI == null || theme == null)
+            return;
+
+        BuildingManager manager = BuildingManager.Instance;
+        ZonePresenceTracker presence = ZonePresenceTracker.Instance;
+        bool underAttack = manager != null && manager.Map != null && presence != null
+            && presence.IsUnderAttack(manager.Map.CapitalOf(teamID));
+
+        if (underAttack == respawnNoteShowing)
+            return;
+
+        respawnNoteShowing = underAttack;
+        matchUI.SetRespawnNote(underAttack ? theme.capitalUnderAttackRespawnNote : "");
     }
 
     /// <summary>

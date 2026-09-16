@@ -1,6 +1,8 @@
 using System.Collections;
 using Photon.Pun;
+using TMPro;
 using UnityEngine;
+using Overpower.UI;
 
 /// <summary>
 /// The four full-screen panels that tell one player where they stand in the match: waiting to be
@@ -34,9 +36,17 @@ public class MatchUI : MonoBehaviour
     [SerializeField, Tooltip("Shown for the rest of the match when this player's team is eliminated.")]
     private GameObject youLostPanel;
 
+    [Header("Capital under attack (Tudor, 2026-09-16)")]
+    [SerializeField, Tooltip("Colours/font/text the respawn panel's under-attack note is styled from - the " +
+             "same theme asset PlayerHud reads for the HUD.")]
+    private UiTheme theme;
+
     private PhotonView photonView;
     private Rigidbody rigidbody;
     private PlayerMotor playerMotor;
+
+    // Built lazily on the first SetRespawnNote call - see BuildRespawnNoteLabel.
+    private TextMeshProUGUI respawnNoteText;
 
     /// <summary>True while this player is stuck on the waiting panel. PlayerLifecycle polls this as
     /// its "am I waiting for my capital back" flag: the panel the player can actually see is the
@@ -84,6 +94,65 @@ public class MatchUI : MonoBehaviour
     {
         if (waitingPanel != null)
             waitingPanel.SetActive(false);
+    }
+
+    /// <summary>Tudor, 2026-09-16: the "your capital is under attack - you will respawn at your Tier 2 zone"
+    /// line PlayerLifecycle polls onto the respawn panel while a player waits to come back into the match. Built
+    /// lazily under respawnPanel, below its existing "Respawning! Please Wait!" label, the first time this is
+    /// called - hides itself (SetActive on its own GameObject, not just an empty string) whenever text is empty,
+    /// same "the root, not a child" rule PlayerHud.ShowToast follows for its own toast.</summary>
+    public void SetRespawnNote(string text)
+    {
+        if (respawnPanel == null)
+            return; // Awake already logged the missing-panel error; nothing to attach the note to.
+
+        if (respawnNoteText == null)
+            BuildRespawnNoteLabel();
+
+        respawnNoteText.text = text ?? "";
+        respawnNoteText.gameObject.SetActive(!string.IsNullOrEmpty(text));
+    }
+
+    /// <summary>Same small recipe PlayerHud.AddLabel/ApplyOutline uses (font/size/colour from UiTheme, one
+    /// outline material) - kept private and duplicated here rather than shared, the same call PlayerHud's own
+    /// class comment makes for itself: the two components have no other coupling, so a shared utility class
+    /// would exist only for this one method.</summary>
+    private void BuildRespawnNoteLabel()
+    {
+        GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
+        go.name = "Under Attack Note";
+        go.transform.SetParent(respawnPanel.transform, false);
+
+        RectTransform rt = go.GetComponent<RectTransform>();
+        // respawnPanel's own existing content ("Respawning! Please Wait!") sits at anchoredPosition
+        // (0, 150) - this sits below it rather than overlapping, still well inside the panel's own
+        // -80/-80 stretch margin at the game's tested 616x576 Game view.
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0f, 60f);
+        rt.sizeDelta = new Vector2(480f, 80f);
+
+        respawnNoteText = go.GetComponent<TextMeshProUGUI>();
+        if (theme != null && theme.font != null)
+            respawnNoteText.font = theme.font;
+        respawnNoteText.fontSize = theme != null ? theme.bodyTextSize : 24f;
+        respawnNoteText.color = theme != null ? theme.textColor : Color.white;
+        respawnNoteText.alignment = TextAlignmentOptions.Center;
+        respawnNoteText.enableWordWrapping = true;
+        respawnNoteText.raycastTarget = false;
+
+        if (theme != null)
+        {
+            // Font must be assigned before fontSharedMaterial is touched - see PlayerHud.AddLabel's
+            // own comment for why the order matters (assigning .font switches fontSharedMaterial to
+            // that font asset's own default, which is exactly the template this clones from).
+            Material outlineMaterial = new Material(respawnNoteText.fontSharedMaterial);
+            outlineMaterial.SetFloat(TMPro.ShaderUtilities.ID_OutlineWidth, theme.textOutlineWidth);
+            outlineMaterial.SetColor(TMPro.ShaderUtilities.ID_OutlineColor, theme.textOutlineColor);
+            respawnNoteText.fontSharedMaterial = outlineMaterial;
+        }
+
+        respawnNoteText.gameObject.SetActive(false); // SetRespawnNote shows/hides it from here on.
     }
 
     /// Shows the end-of-match result to this client, win or lose. Used by the territory win

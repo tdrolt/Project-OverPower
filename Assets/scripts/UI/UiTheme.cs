@@ -329,6 +329,15 @@ namespace Overpower.UI
         [Tooltip("Seconds the bounty toast stays on screen before it hides itself again.")]
         public float bountyToastDurationSeconds = 3f;
 
+        [Header("Capital under attack (Tudor, 2026-09-16)")]
+        [Tooltip("Shown on the respawn panel while a player waits to respawn and their capital is currently " +
+                 "under attack, so their coming respawn will land at their Tier 2 zone instead of the capital.")]
+        public string capitalUnderAttackRespawnNote = "Your capital is under attack - you will respawn at your Tier 2 zone";
+        [Tooltip("HUD toast shown right after a player respawns at their capital's Tier 2 zone because the " +
+                 "capital was under attack. Uses the same toast label and duration as the bounty payout " +
+                 "(Bounty Toast Duration Seconds above).")]
+        public string capitalUnderAttackRespawnToast = "Respawned at Tier 2: capital under attack";
+
         [Header("Capture bar")]
         [Tooltip("Width of the small world-space bar shown above a tower while it is being captured or drained, in world units (metres) - NOT canvas units, since this bar is not on the screen-space HUD.")]
         public float captureBarWidth = 2.2f;

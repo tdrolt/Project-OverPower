@@ -98,6 +98,9 @@ MonoBehaviour:
   laserBeamWidth: 0.14
   laserBeamEmission: 1.6
   laserBeamLingerSeconds: 0.18
+  capitalUnderAttackRespawnNote: Your capital is under attack - you will respawn
+    at your Tier 2 zone
+  capitalUnderAttackRespawnToast: 'Respawned at Tier 2: capital under attack'
   coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
   coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
   coneLineWidth: 0.04

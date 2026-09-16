@@ -73,18 +73,20 @@ namespace Overpower.UI
         private GameObject silencedBanner;
         private TextMeshProUGUI goldText; // "Gold 1234  +7.7/s" - see BuildUi's placement comment.
 
-        // Task 2.4: the transient "Bounty +900" toast. A single pre-built label toggled on/off
-        // (see BuildBountyToast/UpdateBountyToast) rather than instantiated per payout, so a bounty
-        // never allocates UI - the same reasoning the silenced banner above already follows.
-        // bountyToastGo is the toast's OWN root (what SetActive actually toggles) - NOT
-        // bountyToastText.gameObject, which is a child of it: toggling the child while the parent
-        // stays inactive is a no-op (code review fix, Task 2.4 - caught by the 616x576 capture step,
-        // which showed no toast at all despite HandleBountyReceived having run).
-        private GameObject bountyToastGo;
-        private TextMeshProUGUI bountyToastText;
+        // Task 2.4: the transient toast - originally just "Bounty +900", generalised (Task B3,
+        // 2026-09-16) into ShowToast(string) so "Respawned at Tier 2: capital under attack" can reuse
+        // the exact same label instead of a second one. A single pre-built label toggled on/off (see
+        // BuildToast/UpdateToast) rather than instantiated per message, so a toast never allocates UI -
+        // the same reasoning the silenced banner above already follows.
+        // toastGo is the toast's OWN root (what SetActive actually toggles) - NOT toastText.gameObject,
+        // which is a child of it: toggling the child while the parent stays inactive is a no-op (code
+        // review fix, Task 2.4 - caught by the 616x576 capture step, which showed no toast at all
+        // despite HandleBountyReceived having run).
+        private GameObject toastGo;
+        private TextMeshProUGUI toastText;
         // Time.unscaledTime the toast should hide by; < 0 means "not currently showing".
         // Unscaled so a debug Time.timeScale change cannot freeze a stale toast on screen forever.
-        private float bountyToastHideAtTime = -1f;
+        private float toastHideAtTime = -1f;
 
         // ---- built UI: slots -----------------------------------------------------------------------
 
@@ -221,7 +223,7 @@ namespace Overpower.UI
         private void LateUpdate()
         {
             UpdateGold();
-            UpdateBountyToast();
+            UpdateToast();
             UpdateHealthAndArmor();
             UpdateOverheat();
             UpdateWeaponSlot();
@@ -229,27 +231,36 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Bounty toast (Task 2.4)
+        // Toast (Task 2.4; generalised beyond bounty payouts in Task B3, 2026-09-16)
         // ============================================================================================
 
-        /// <summary>GoldWallet.BountyReceived handler: shows "Bounty +900" and starts its countdown.
-        /// The text is set here, once, on the trigger frame only - UpdateBountyToast below never
-        /// touches .text, just the GameObject's active flag, so a bounty allocates exactly one string
-        /// no matter how long the toast stays up.</summary>
-        private void HandleBountyReceived(int amount)
+        /// <summary>GoldWallet.BountyReceived handler: shows "Bounty +900" through the same transient
+        /// label every other HUD toast now uses. The text is set here, once, on the trigger frame only
+        /// - UpdateToast below never touches .text, just the GameObject's active flag, so a bounty
+        /// allocates exactly one string no matter how long the toast stays up.</summary>
+        private void HandleBountyReceived(int amount) =>
+            ShowToast($"Bounty +{amount.ToString(CultureInfo.InvariantCulture)}");
+
+        /// <summary>Shows <paramref name="text"/> in the HUD's one transient toast label for
+        /// bountyToastDurationSeconds (UiTheme - the name predates this generalisation, kept rather
+        /// than churned for a synonym since it was already the one home for this number), unscaled so
+        /// a debug Time.timeScale change cannot freeze a stale toast on screen forever. Same behaviour
+        /// the bounty payout always had; PlayerLifecycle's capital-under-attack respawn (Task B3,
+        /// 2026-09-16) is the second caller.</summary>
+        public void ShowToast(string text)
         {
-            bountyToastText.text = $"Bounty +{amount.ToString(CultureInfo.InvariantCulture)}";
-            bountyToastGo.SetActive(true);
-            bountyToastHideAtTime = Time.unscaledTime + theme.bountyToastDurationSeconds;
+            toastText.text = text;
+            toastGo.SetActive(true);
+            toastHideAtTime = Time.unscaledTime + theme.bountyToastDurationSeconds;
         }
 
-        private void UpdateBountyToast()
+        private void UpdateToast()
         {
-            if (bountyToastHideAtTime < 0f || Time.unscaledTime < bountyToastHideAtTime)
+            if (toastHideAtTime < 0f || Time.unscaledTime < toastHideAtTime)
                 return;
 
-            bountyToastGo.SetActive(false);
-            bountyToastHideAtTime = -1f;
+            toastGo.SetActive(false);
+            toastHideAtTime = -1f;
         }
 
         // ============================================================================================
@@ -725,20 +736,20 @@ namespace Overpower.UI
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
 
-            BuildBountyToast(canvasGo.transform);
+            BuildToast(canvasGo.transform);
         }
 
-        /// <summary>Task 2.4's "Bounty +900" toast: a fixed-size label parented directly to the
-        /// canvas (NOT to Hud Panel's VerticalLayoutGroup - a bounty is rare enough that it must not
-        /// nudge the bars/slots around every time it shows or hides) and anchored top-centre, clear
-        /// of both the bottom-anchored Hud Panel and TestRangePanel's own top-left corner. Built once,
-        /// hidden until the first bounty - see HandleBountyReceived/UpdateBountyToast. Fills the
-        /// bountyToastGo/bountyToastText fields directly rather than returning anything: callers must
-        /// toggle the ROOT (bountyToastGo), not the label's own gameObject, which stays a child of an
-        /// inactive parent otherwise (see bountyToastGo's own field comment).</summary>
-        private void BuildBountyToast(Transform canvasParent)
+        /// <summary>Task 2.4's transient toast (originally just "Bounty +900", generalised in Task B3,
+        /// 2026-09-16 - see ShowToast): a fixed-size label parented directly to the canvas (NOT to Hud
+        /// Panel's VerticalLayoutGroup - a toast is rare enough that it must not nudge the bars/slots
+        /// around every time it shows or hides) and anchored top-centre, clear of both the
+        /// bottom-anchored Hud Panel and TestRangePanel's own top-left corner. Built once, hidden until
+        /// the first ShowToast call. Fills the toastGo/toastText fields directly rather than returning
+        /// anything: callers must toggle the ROOT (toastGo), not the label's own gameObject, which
+        /// stays a child of an inactive parent otherwise (see toastGo's own field comment).</summary>
+        private void BuildToast(Transform canvasParent)
         {
-            GameObject go = new GameObject("Bounty Toast", typeof(RectTransform));
+            GameObject go = new GameObject("Toast", typeof(RectTransform));
             go.transform.SetParent(canvasParent, false);
             RectTransform rt = go.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
@@ -755,9 +766,9 @@ namespace Overpower.UI
             text.color = theme.bountyToastColor;
             text.alignment = TextAlignmentOptions.Center;
 
-            go.SetActive(false); // HandleBountyReceived turns this on; UpdateBountyToast turns it off again.
-            bountyToastGo = go;
-            bountyToastText = text;
+            go.SetActive(false); // ShowToast turns this on; UpdateToast turns it off again.
+            toastGo = go;
+            toastText = text;
         }
 
         /// <summary>trackImage is handed back so a caller can add something on top of the track
