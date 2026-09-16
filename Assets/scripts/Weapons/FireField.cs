@@ -230,8 +230,10 @@ namespace Overpower.Weapons
                 if (target == null || IsFriendly(target) || !burning.Add(target))
                     continue;
 
+                // abilityId -1: FireField's DoT is always a weapon's cursor leaf (the rocket) -
+                // the weapon id stays, per Task T3's own note.
                 target.ApplyDamage(new DamageInfo(amount, sourceActorNumber, sourceTeamId, weaponId,
-                                                   DamageSource.Burn, false, transform.position));
+                                                   DamageSource.Burn, false, transform.position, -1));
             }
         }
 

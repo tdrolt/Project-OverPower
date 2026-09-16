@@ -91,7 +91,9 @@ namespace Overpower.Abilities
 
         private void PlaceMine(CastPayload payload)
         {
-            object[] data = { payload.IntArg };
+            // Seq, then this ability's own id (Task T3, telemetry) - Mine.OnPlaced reads both at
+            // their fixed indices; appending keeps Seq's own index unchanged for anyone else reading it.
+            object[] data = { payload.IntArg, Definition.Id };
             GameObject spawned = NetworkedDeployable.Spawn(minePrefab.name, payload.Point, data);
             if (spawned == null)
                 return; // Spawn already logged why.

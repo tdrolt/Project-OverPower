@@ -183,9 +183,11 @@ namespace Overpower.Weapons
             for (int i = 0; i < beam.Struck.Count; i++)
             {
                 BeamContact contact = beam.Struck[i];
+                // abilityId -1: a beam is always a weapon's own (shot.Weapon read directly) - see
+                // DamageInfo.AbilityId's own comment.
                 contact.Target.ApplyDamage(new DamageInfo(shot.Damage, shot.ShooterActorNumber,
                                                           shot.ShooterTeamId, shot.Weapon.Id,
-                                                          DamageSource.Projectile, false, contact.Point));
+                                                          DamageSource.Projectile, false, contact.Point, -1));
                 PlayImpact(shot.Weapon, contact.Point);
             }
 

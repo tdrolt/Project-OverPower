@@ -26,8 +26,17 @@ namespace Overpower.Combat
         public readonly bool IgnoresArmor;
         public readonly Vector3 HitPoint;
 
+        /// <summary>
+        /// Id of the ability that dealt this damage, or -1 when it did not come from an ability
+        /// (a weapon shot, or a source with no ability to credit). Task T3 (telemetry): appended
+        /// LAST with a default so every existing call site keeps compiling unchanged. Mutually
+        /// exclusive with WeaponId in practice - a hit is either a weapon's or an ability's, never
+        /// both - but nothing here enforces that; each call site simply passes whichever it has.
+        /// </summary>
+        public readonly int AbilityId;
+
         public DamageInfo(float amount, int sourceActorNumber, int sourceTeamId, int weaponId,
-                          DamageSource source, bool ignoresArmor, Vector3 hitPoint)
+                          DamageSource source, bool ignoresArmor, Vector3 hitPoint, int abilityId = -1)
         {
             Amount = amount;
             SourceActorNumber = sourceActorNumber;
@@ -36,6 +45,7 @@ namespace Overpower.Combat
             Source = source;
             IgnoresArmor = ignoresArmor;
             HitPoint = hitPoint;
+            AbilityId = abilityId;
         }
     }
 

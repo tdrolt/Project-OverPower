@@ -90,6 +90,12 @@ namespace Overpower.Abilities
         private ZoneTickSchedule schedule;
         private CasterFollower follower;
 
+        /// <summary>Task T3 (telemetry): the id of the AoeZoneAbility that placed this, threaded
+        /// through instantiationData (that ability's own ExecuteCast now passes Definition.Id
+        /// instead of null) since this deployable is a separate prefab with no AbilityDefinition of
+        /// its own. -1 if the data is missing.</summary>
+        public int AbilityId { get; private set; } = -1;
+
         // The real Time.time this zone's OnPlaced ran on THIS client, turning Age (a one-time
         // snapshot) into a number that keeps growing - the identical secondsSincePlaced pattern
         // Mine.cs documents on its own localPlacedRealTime field.
@@ -105,6 +111,9 @@ namespace Overpower.Abilities
 
         protected override void OnPlaced(object[] data, PhotonMessageInfo info)
         {
+            if (data != null && data.Length >= 1 && data[0] is int abilityId)
+                AbilityId = abilityId;
+
             int totalTicks = Mathf.Max(1, Mathf.RoundToInt(durationSeconds / tickSeconds));
 
             // Review fix (Task 1.11b): Age here already reflects how old this zone really is on THIS
@@ -171,7 +180,7 @@ namespace Overpower.Abilities
             foreach (IDamageable target in targets)
             {
                 target.ApplyDamage(new DamageInfo(damagePerTick, OwnerActor, OwnerTeam, -1,
-                                                   DamageSource.Zone, false, transform.position));
+                                                   DamageSource.Zone, false, transform.position, AbilityId));
             }
         }
     }

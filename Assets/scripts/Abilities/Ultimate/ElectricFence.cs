@@ -97,6 +97,11 @@ namespace Overpower.Abilities
 
         private CasterFollower follower;
 
+        /// <summary>Task T3 (telemetry): the id of the ElectricFenceAbility that placed this,
+        /// threaded through instantiationData the same way AoeZone.AbilityId is - see that
+        /// property's own comment. -1 if the data is missing.</summary>
+        public int AbilityId { get; private set; } = -1;
+
         private void OnValidate()
         {
             radius = Mathf.Max(0.1f, radius);
@@ -109,6 +114,9 @@ namespace Overpower.Abilities
 
         protected override void OnPlaced(object[] data, PhotonMessageInfo info)
         {
+            if (data != null && data.Length >= 1 && data[0] is int abilityId)
+                AbilityId = abilityId;
+
             follower = new CasterFollower(followsCaster, OwnerActor);
 
             if (visual != null)
@@ -214,9 +222,9 @@ namespace Overpower.Abilities
                     continue;
 
                 target.ApplyDamage(new DamageInfo(damagePerPass, OwnerActor, OwnerTeam, -1,
-                                                   DamageSource.Zone, false, targetComponent.transform.position));
+                                                   DamageSource.Zone, false, targetComponent.transform.position, AbilityId));
 
-                var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude };
+                var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude, abilityId = AbilityId };
                 (target as IStatusReceiver)?.ApplyStatus(slow, OwnerActor);
             }
 

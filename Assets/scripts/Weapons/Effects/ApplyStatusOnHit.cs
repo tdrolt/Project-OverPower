@@ -49,7 +49,9 @@ namespace Overpower.Weapons
             if (victim != null)
             {
                 IStatusReceiver receiver = hit.collider.GetComponentInParent<IStatusReceiver>();
-                receiver?.ApplyStatus(new StatusEffectSpec { kind = kind, duration = duration, magnitude = magnitude },
+                // abilityId -1: this is a weapon projectile's own behaviour (the stun gun), not an
+                // ability cast - see StatusEffectSpec.abilityId's own comment.
+                receiver?.ApplyStatus(new StatusEffectSpec { kind = kind, duration = duration, magnitude = magnitude, abilityId = -1 },
                                        context.ShooterActorNumber);
             }
 

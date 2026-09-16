@@ -14,6 +14,15 @@ namespace Overpower.Combat
         public float duration;
         public float magnitude;   // Slow: 0..1 speed loss. Vulnerability: 0..1 extra damage.
                                   // Burn: damage per second. Stun/Invulnerability: ignored.
+
+        /// <summary>
+        /// Task T3 (telemetry): the ability that applied this status, or -1 for a weapon-based
+        /// status (the stun gun's ApplyStatusOnHit) or a path that cannot carry one across the wire
+        /// (PlayerStatusEffects.RPC_ApplyStatusFromPeer - see its own comment). A struct field, not
+        /// defaulted by the language: every call site sets it explicitly rather than relying on the
+        /// default(int) of 0, which could collide with a real ability id.
+        /// </summary>
+        public int abilityId;
     }
 
     /// <summary>

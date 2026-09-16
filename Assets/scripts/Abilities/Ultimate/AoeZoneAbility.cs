@@ -45,7 +45,9 @@ namespace Overpower.Abilities
             if (cast.Phase != 0 || !cast.IsCasterClient || zonePrefab == null)
                 return; // Only the caster's own machine ever places the real networked object.
 
-            NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, null);
+            // Task T3 (telemetry): this ability's own id, so AoeZone can attribute its own damage
+            // ticks to it (DamageInfo.AbilityId) - see AoeZone.OnPlaced.
+            NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
         }
     }
 }

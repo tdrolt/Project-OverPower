@@ -125,6 +125,12 @@ namespace Overpower.Abilities
 
         public int Seq { get; private set; }
 
+        /// <summary>Task T3 (telemetry): the id of the MineAbility that placed this, threaded through
+        /// instantiationData (MineAbility.PlaceMine appends Definition.Id right after Seq) since this
+        /// deployable is a separate prefab with no AbilityDefinition of its own to read. -1 if the
+        /// data is missing (see the same defensive fallback as Seq, just below).</summary>
+        public int AbilityId { get; private set; } = -1;
+
         protected override void OnPlaced(object[] data, PhotonMessageInfo info)
         {
             if (data != null && data.Length >= 1)
@@ -136,6 +142,9 @@ namespace Overpower.Abilities
                 Debug.LogError($"[Mine] {name} was placed without its instantiation data - the " +
                                 "oldest-mine prune may misorder it against this owner's other mines.");
             }
+
+            if (data != null && data.Length >= 2 && data[1] is int abilityId)
+                AbilityId = abilityId;
 
             detonation = new MineDetonationState(armDelaySeconds);
             localPlacedRealTime = Time.time;
@@ -219,11 +228,11 @@ namespace Overpower.Abilities
             List<IDamageable> candidates = OverlapDamageables(at, explosionRadius);
             List<IDamageable> targets = MineTargeting.SelectTargets(candidates, OwnerActor, OwnerTeam);
 
-            var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude };
+            var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude, abilityId = AbilityId };
 
             foreach (IDamageable target in targets)
             {
-                target.ApplyDamage(new DamageInfo(damage, OwnerActor, OwnerTeam, -1, DamageSource.Splash, false, at));
+                target.ApplyDamage(new DamageInfo(damage, OwnerActor, OwnerTeam, -1, DamageSource.Splash, false, at, AbilityId));
                 (target as IStatusReceiver)?.ApplyStatus(slow, OwnerActor);
             }
 

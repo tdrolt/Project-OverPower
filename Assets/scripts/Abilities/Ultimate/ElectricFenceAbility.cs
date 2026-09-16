@@ -54,7 +54,9 @@ namespace Overpower.Abilities
             if (cast.Phase != 0 || !cast.IsCasterClient || fencePrefab == null)
                 return; // Only the caster's own machine ever places the real networked object.
 
-            NetworkedDeployable.Spawn(fencePrefab.name, cast.Payload.Point, null);
+            // Task T3 (telemetry): this ability's own id, so ElectricFence can attribute its own
+            // damage passes to it (DamageInfo.AbilityId) - see ElectricFence.OnPlaced.
+            NetworkedDeployable.Spawn(fencePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
         }
     }
 }

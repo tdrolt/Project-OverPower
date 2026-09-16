@@ -44,9 +44,21 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     // became a stacking effect.
     private int burnSourceActorNumber = -1;
 
+    // Task T3 (telemetry): the ability id the CURRENT burn was applied with, tracked the same way
+    // burnSourceActorNumber is (see its own comment - "most recent burn owns credit" applies here
+    // identically, since Burn stacks with StackRule.Refresh).
+    private int burnAbilityId = -1;
+
     // Pushed into the motor only when the total actually changes, per AddSpeedMultiplier's own
     // contract - not every frame.
     private float appliedSlow;
+
+    /// <summary>Task T3 (telemetry): raised on the victim's own client every time a status is
+    /// applied through Apply below - PlayerTelemetry logs a `status` line from it. Carries the
+    /// spec's own abilityId (-1 when it did not come from an ability) and, per kind, whichever of
+    /// duration/magnitude is the informative number: magnitude for Burn/Slow/Vulnerability (the
+    /// dps or the fraction), duration for Stun/Invulnerability (whose magnitude is unused).</summary>
+    public event System.Action<StatusKind, int, int, float> StatusApplied;
 
     public bool IsStunned => state.IsActive(StatusKind.Stun);
     public bool IsInvulnerable => state.IsActive(StatusKind.Invulnerability);
@@ -106,11 +118,21 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
             return;
 
         if (spec.kind == StatusKind.Burn)
+        {
             burnSourceActorNumber = sourceActorNumber;
+            burnAbilityId = spec.abilityId;
+        }
 
         state.Apply(spec);
         ApplyStunToMotor(); // Freeze immediately rather than waiting for the next Update - a
                             // stun landing and the movement it blocks should read as the same frame.
+
+        // Task T3 (telemetry): magnitude is the informative number for Burn/Slow/Vulnerability
+        // (dps or a 0..1 fraction); duration is for Stun/Invulnerability, whose magnitude field is
+        // unused (StatusEffectSpec's own field comment).
+        float durationOrMagnitude = spec.kind == StatusKind.Stun || spec.kind == StatusKind.Invulnerability
+            ? spec.duration : spec.magnitude;
+        StatusApplied?.Invoke(spec.kind, sourceActorNumber, spec.abilityId, durationOrMagnitude);
     }
 
     /// <summary>IStatusReceiver's generic entry point, for callers that found this component
@@ -149,7 +171,11 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     [PunRPC]
     private void RPC_ApplyStatusFromPeer(byte kind, float duration, float magnitude, int sourceActor)
     {
-        var spec = new StatusEffectSpec { kind = (StatusKind)kind, duration = duration, magnitude = magnitude };
+        // abilityId -1: this RPC's own parameter list does not carry it (Task T3 deviation - see
+        // the assumptions file). The only caller today is the sonic pulse's cross-client collision
+        // stun, which never feeds DamageInfo either way; only the `status` telemetry line for that
+        // one path reports an unknown ability id.
+        var spec = new StatusEffectSpec { kind = (StatusKind)kind, duration = duration, magnitude = magnitude, abilityId = -1 };
         Apply(spec, sourceActor);
     }
 
@@ -177,6 +203,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     {
         state.ClearAll();
         burnSourceActorNumber = -1;
+        burnAbilityId = -1;
         reductionStack.Clear();
         ApplySlowToMotor(); // Slow is now 0 - make sure the motor's multiplier is dropped with it.
         ApplyStunToMotor(); // Same for stun - a death or respawn must not leave the freeze behind.
@@ -193,7 +220,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
 
         Teams.TryGetTeam(burnSourceActorNumber, out int sourceTeamId);
         var info = new DamageInfo(burn, burnSourceActorNumber, sourceTeamId, -1,
-                                   DamageSource.Burn, false, transform.position);
+                                   DamageSource.Burn, false, transform.position, burnAbilityId);
         playerHealth.ApplyDamage(info);
     }
 

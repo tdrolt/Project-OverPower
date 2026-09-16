@@ -183,7 +183,7 @@ namespace Overpower.Abilities
         {
             // Fresh per cast, on purpose - see the class comment on "once per target per cast".
             var alreadyHit = new HashSet<IDamageable>();
-            var burn = new StatusEffectSpec { kind = StatusKind.Burn, duration = burnSeconds, magnitude = burnDamagePerSecond };
+            var burn = new StatusEffectSpec { kind = StatusKind.Burn, duration = burnSeconds, magnitude = burnDamagePerSecond, abilityId = Definition.Id };
 
             ShowVfx();
 

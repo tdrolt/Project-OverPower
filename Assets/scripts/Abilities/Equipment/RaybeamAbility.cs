@@ -108,13 +108,22 @@ namespace Overpower.Abilities
 
         private void Awake() => RebuildSpec();
 
+        /// <summary>Rebuilt once more here (Task T3): Awake/OnValidate both run before Bind ever
+        /// assigns Definition (AbilityModule's own class comment - "do not read it in Awake"), so
+        /// the spec built at Awake always has abilityId -1. OnEquip is the first point Definition is
+        /// safe to read, and this module has nothing else to do on equip.</summary>
+        public override void OnEquip() => RebuildSpec();
+
         private void RebuildSpec()
         {
             vulnerabilitySpec = new StatusEffectSpec
             {
                 kind = StatusKind.Vulnerability,
                 duration = vulnerabilitySeconds,
-                magnitude = vulnerabilityPerBeam
+                magnitude = vulnerabilityPerBeam,
+                // Definition is null here when OnValidate runs on the raw prefab asset (before Bind
+                // ever assigns it) - see AbilityModule's own OnValidate comment.
+                abilityId = Definition != null ? Definition.Id : -1
             };
         }
 

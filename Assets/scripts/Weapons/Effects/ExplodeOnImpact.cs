@@ -195,9 +195,11 @@ namespace Overpower.Weapons
                 if (amount <= 0f)
                     continue;
 
+                // abilityId -1: this splash always comes from a weapon's own rocket (context.Weapon
+                // is read directly, never AbilityId) - see DamageInfo.AbilityId's own comment.
                 target.ApplyDamage(new DamageInfo(amount, context.ShooterActorNumber,
                                                    context.ShooterTeamId, context.Weapon.Id,
-                                                   DamageSource.Splash, false, at));
+                                                   DamageSource.Splash, false, at, -1));
             }
         }
 

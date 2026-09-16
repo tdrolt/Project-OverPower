@@ -73,12 +73,34 @@ namespace Overpower.TestRange
         // with StackRule.Refresh, so at most one is ever live.
         private int burnSourceActorNumber = -1;
 
+        // Task T3 (telemetry): tracked alongside burnSourceActorNumber, same "most recent burn owns
+        // credit" reasoning (Burn stacks with StackRule.Refresh, so at most one is ever live).
+        private int burnAbilityId = -1;
+
         public bool IsStunned => statusState.IsActive(StatusKind.Stun);
 
         /// <summary>0..1 fraction of speed lost - read by TestRangeSpawner's Strafer, which rewrites
         /// its own position every frame and so cannot go through a speed multiplier the way a real
         /// player's PlayerMotor does.</summary>
         public float Slow => statusState.Magnitude(StatusKind.Slow);
+
+        /// <summary>0..1 extra damage taken - Task T3 (telemetry), the same figure PlayerHealth's own
+        /// Vulnerability property reports for a real player, exposed here so PlayerTelemetry's `hit`
+        /// line can read it for a dummy too. Read-only: ApplyDamage below already uses
+        /// statusState.Magnitude(StatusKind.Vulnerability) directly, so this adds no new behaviour.</summary>
+        public float Vulnerability => statusState.Magnitude(StatusKind.Vulnerability);
+
+        /// <summary>Task T3 (telemetry): a dummy can be made Invulnerable the same way a player can
+        /// (ApplyStatus takes any StatusKind), even though ApplyDamage below does not check it - see
+        /// that method's own comment. Exposed read-only for the `hit` line's `inv` field.</summary>
+        public bool IsInvulnerable => statusState.IsActive(StatusKind.Invulnerability);
+
+        /// <summary>Task T3 (telemetry): every hit any dummy in the scene takes, so PlayerTelemetry
+        /// (which has no reference to any particular DummyTarget) can log a `hit` line for the test
+        /// range without a per-dummy subscription. A dummy is not networked and lives in exactly one
+        /// client's scene (the class comment), so the only listener that could ever see this is that
+        /// same client's own local player - see PlayerTelemetry.HandleDummyDamaged.</summary>
+        public static event Action<DummyTarget, DamageResult, DamageInfo> AnyDamaged;
 
         // The delayed reset scheduled on death. Held onto so an early reset (ResetToFull called by
         // an external caller - the F1 panel, a test harness, or a future respawn button) can cancel
@@ -213,7 +235,7 @@ namespace Overpower.TestRange
         {
             Teams.TryGetTeam(burnSourceActorNumber, out int sourceTeamId);
             var info = new DamageInfo(burn, burnSourceActorNumber, sourceTeamId, -1,
-                                       DamageSource.Burn, false, transform.position);
+                                       DamageSource.Burn, false, transform.position, burnAbilityId);
             ApplyDamage(info);
         }
 
@@ -223,7 +245,10 @@ namespace Overpower.TestRange
         public void ApplyStatus(in StatusEffectSpec spec, int sourceActor)
         {
             if (spec.kind == StatusKind.Burn)
+            {
                 burnSourceActorNumber = sourceActor;
+                burnAbilityId = spec.abilityId;
+            }
 
             statusState.Apply(spec);
             LogStatusApplied(spec);
@@ -384,6 +409,7 @@ namespace Overpower.TestRange
             hits = 0;
             statusState.ClearAll(); // Awake builds statusState before ever calling this, so it is never null here.
             burnSourceActorNumber = -1;
+            burnAbilityId = -1;
 
             // After everything above is back to spawn values, not before - a listener (the
             // Strafer's own centre) should see a fully-reset dummy, not one mid-restore.
@@ -421,6 +447,7 @@ namespace Overpower.TestRange
             health -= result.HealthLost;
 
             NotifyLocalCombatCredit(info, result);
+            AnyDamaged?.Invoke(this, result, info);
 
             if (result.Lethal)
             {

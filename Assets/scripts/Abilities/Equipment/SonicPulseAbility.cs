@@ -194,7 +194,7 @@ namespace Overpower.Abilities
             if (end.Blocker == null)
                 return;
 
-            var stun = new StatusEffectSpec { kind = StatusKind.Stun, duration = collisionStunSeconds };
+            var stun = new StatusEffectSpec { kind = StatusKind.Stun, duration = collisionStunSeconds, abilityId = Definition.Id };
 
             // The victim is stunned by ANY blocker - a wall, cover, or a player, teammate or not.
             // Only the SECOND stun (on whatever the victim hit) depends on who that is.
