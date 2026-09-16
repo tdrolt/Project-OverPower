@@ -11,6 +11,19 @@ namespace Overpower.EditorTools.Telemetry
     /// tested against a hand-written fixture with hand-computed totals (TelemetryAggregatorTests) plus
     /// a set of focused fixtures for the opus review fixes below (TelemetryAggregatorReviewFixesTests).
     ///
+    /// Task T7 (3-team / 2-team phase split): <see cref="Build(TelemetryLog, TimeWindow)"/> is the same
+    /// single pipeline as always - it is called up to three times (see <see cref="BuildSet"/>), once
+    /// per scope (whole match, Phase 1, Phase 2), each time with a different <see cref="TimeWindow"/>.
+    /// No table builder below is duplicated for phases: a DISCRETE event (a hit, a purchase, a death...)
+    /// is simply skipped when its own t falls outside the requested window; a CONTINUOUS integral (a
+    /// sample interval, an ownership stint, a capture attempt, the alive-time tail) is CLIPPED to the
+    /// window's own bounds instead, via TimeWindow.Clip. Several row types (ownership, captures, gold
+    /// timeline, economy-by-minute, hits, deaths, purchases, shop-blocked) also carry a `Phase` field,
+    /// tagged against the match's own phase-2 transition instant (from PhaseTimeline) REGARDLESS of
+    /// which window this particular build is scoped to - so even the whole-match tables show which
+    /// phase each row happened in, and a stint/attempt that straddles the transition is split into two
+    /// rows in every scope that can see both halves (see ClipAndTagPhase).
+    ///
     /// T4-review corrections (first pass, kept):
     /// 2. `bounty` (master, per-player-per-payout) is NOT added into any team/player income total -
     ///    the owner's own `goldEarned.bounty` field already reflects the credit that event describes.
@@ -88,7 +101,15 @@ namespace Overpower.EditorTools.Telemetry
             public int LastPlayers;
         }
 
-        public static ReportTables Build(TelemetryLog log)
+        /// <summary>The original, pre-T7 entry point - the whole match, exactly as before. Equivalent
+        /// to <c>Build(log, PhaseTimeline.From(log).WholeMatch)</c>.</summary>
+        public static ReportTables Build(TelemetryLog log) => Build(log, null);
+
+        /// <summary>Task T7: builds one scope. <paramref name="window"/> null means the whole match
+        /// (every event, every integral in full) - the same result <c>Build(log)</c> always produced.
+        /// A real window (Phase 1 or Phase 2, from PhaseTimeline) filters every discrete event to it
+        /// and clips every continuous integral to it - see the class comment.</summary>
+        public static ReportTables Build(TelemetryLog log, TimeWindow window)
         {
             var tables = new ReportTables();
             if (log == null) return tables;
@@ -102,9 +123,14 @@ namespace Overpower.EditorTools.Telemetry
                     sessionByActor[s.Actor] = s;
             }
 
-            double matchLength = 0;
-            foreach (TelemetryEvent e in log.Events)
-                if (e.T > matchLength) matchLength = e.T;
+            // Task T7: the phase timeline gives both this build's own default (whole-match) window
+            // AND the phase-2 transition instant - every phase-taggable row below is split/tagged
+            // against the transition regardless of which window THIS call is scoped to (see
+            // ClipAndTagPhase's own comment on why the whole-match build also splits at it).
+            PhaseTimeline timeline = PhaseTimeline.From(log);
+            double matchLength = timeline.MatchLength;
+            double? tPhase2 = timeline.TransitionSeconds;
+            TimeWindow effectiveWindow = window ?? timeline.WholeMatch;
 
             // Opus review item 2: team from the actor's own first sample with tm >= 0, falling back
             // to the session - see the method's own comment.
@@ -118,31 +144,89 @@ namespace Overpower.EditorTools.Telemetry
 
             var zoneTier = new Dictionary<int, int>();
             // Every raw ownership change per zone, IN TIME ORDER, including transitions to neutral -
-            // the ownership.csv stint list (below) deliberately omits neutral rows, but capture-closing
-            // and owner-at-time queries both need the full history.
+            // built from the WHOLE log regardless of window (Task T7): a sample inside a phase-scoped
+            // window still needs the true owner-at-time, even when the change that established it
+            // happened before this window started. The ownership.csv STINT ROWS (below) are what
+            // actually gets clipped/filtered to the window - this raw history never is.
             var rawChangesByZone = new Dictionary<int, List<(double T, int New)>>();
-            BuildOwnership(log, tables.Ownership, zoneTier, rawChangesByZone, matchLength);
+            BuildOwnership(log, tables.Ownership, zoneTier, rawChangesByZone, matchLength, effectiveWindow, tPhase2);
 
-            BuildHeader(tables.Header, log, sessionByActor, matchLength);
-            BuildCaptures(log, rawChangesByZone, zoneTier, tables.Header, tables.Captures);
-            BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables);
-            BuildHits(log, effectiveTeam, tables.Hits);
-            BuildGoldTimelineAndEconomy(log, fileActor, sessionByActor, effectiveTeam, zoneTier, rawChangesByZone, matchLength, tables);
-            BuildZoneIncome(log, fileActor, effectiveTeam, zoneTier, tables.Ownership, tables.ZoneIncome);
+            BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow);
+            BuildCaptures(log, rawChangesByZone, zoneTier, matchLength, tables.Header, tables.Captures, effectiveWindow, tPhase2);
+            BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables, effectiveWindow, tPhase2);
+            BuildHits(log, effectiveTeam, tables.Hits, effectiveWindow, tPhase2);
+            BuildGoldTimelineAndEconomy(log, fileActor, sessionByActor, effectiveTeam, zoneTier, rawChangesByZone, matchLength, tables, effectiveWindow, tPhase2);
+            BuildZoneIncome(log, fileActor, effectiveTeam, zoneTier, tables.Ownership, tables.ZoneIncome, effectiveWindow);
 
-            var sampleStats = BuildSampleDerivedStats(log, fileActor, effectiveTeam, rawChangesByZone, coverageByActor, sampleInterval);
-            BuildWeaponsAndAbilities(log, tables.Hits, sampleStats.EquippedSecondsByWeapon, tables);
-            BuildPlayersAndDeaths(log, fileActor, sessionByActor, effectiveTeam, coverageByActor, sampleStats, tables);
+            var sampleStats = BuildSampleDerivedStats(log, fileActor, effectiveTeam, rawChangesByZone, coverageByActor, sampleInterval, effectiveWindow);
+            BuildWeaponsAndAbilities(log, tables.Hits, sampleStats.EquippedSecondsByWeapon, tables, effectiveWindow);
+            BuildPlayersAndDeaths(log, fileActor, sessionByActor, effectiveTeam, coverageByActor, sampleStats, tables, effectiveWindow, tPhase2);
 
             return tables;
         }
 
+        /// <summary>Task T7: builds all three scopes from one log - see ReportSet's own comment. This
+        /// IS the "no second copy of the table logic" design in one call: the same Build(log, window)
+        /// runs up to three times, parameterized only by which window to clip/filter against.</summary>
+        public static ReportSet BuildSet(TelemetryLog log)
+        {
+            PhaseTimeline timeline = PhaseTimeline.From(log);
+            return new ReportSet
+            {
+                WholeMatch = Build(log, timeline.WholeMatch),
+                Phase1 = Build(log, timeline.Phase1),
+                Phase2 = timeline.HasPhase2 ? Build(log, timeline.Phase2) : null,
+            };
+        }
+
+        // ==================================================================== phase helpers (Task T7)
+
+        /// <summary>1 or 2, from a discrete event's own t vs the match's phase-2 transition (null when
+        /// the match never had one - everything is Phase 1).</summary>
+        private static int PhaseOf(double t, double? tPhase2) => (tPhase2.HasValue && t >= tPhase2.Value) ? 2 : 1;
+
+        /// <summary>Clips a real [realFrom, realTo) span to the requested window, AND splits it at the
+        /// phase-2 transition when the (already window-clipped) span straddles it. Used by both
+        /// ownership stints and capture attempts - the two tables whose rows can genuinely span more
+        /// than one phase.
+        ///
+        /// Yields nothing when the span has no overlap with the window at all; yields ONE piece when
+        /// it doesn't straddle tPhase2; yields TWO when it does (Phase 1's [from, tPhase2) and Phase
+        /// 2's [tPhase2, to)). This single mechanism is what makes "the whole-match build's rows are
+        /// ALSO phase-split" and "a Phase-1/Phase-2-scoped build only ever sees its own half" the same
+        /// code path: a phase-scoped window's own End IS tPhase2 (Phase 1) or Start IS tPhase2 (Phase
+        /// 2), so the window-clip alone already produces exactly one correctly-bounded piece for
+        /// those; only the whole-match window (whose End is well past tPhase2) ever needs the second
+        /// yield.</summary>
+        private static IEnumerable<(double From, double To, bool ReachedRealEnd, int Phase)> ClipAndTagPhase(
+            double realFrom, double realTo, TimeWindow window, double? tPhase2)
+        {
+            if (!window.Clip(realFrom, realTo, out double from, out double to))
+                yield break;
+
+            if (tPhase2.HasValue && from < tPhase2.Value && tPhase2.Value < to)
+            {
+                yield return (from, tPhase2.Value, false, 1);
+                yield return (tPhase2.Value, to, to >= realTo, 2);
+            }
+            else
+            {
+                int phase = (tPhase2.HasValue && from >= tPhase2.Value) ? 2 : 1;
+                yield return (from, to, to >= realTo, phase);
+            }
+        }
+
         // ==================================================================== header
 
-        private static void BuildHeader(ReportHeader header, TelemetryLog log, Dictionary<int, TelemetrySession> sessionByActor, double matchLength)
+        private static void BuildHeader(ReportHeader header, TelemetryLog log, Dictionary<int, TelemetrySession> sessionByActor,
+            Dictionary<int, (double First, double Last)> coverageByActor, TimeWindow window)
         {
             header.MatchId = log.MatchId;
-            header.MatchLengthSeconds = matchLength;
+            // Task T7: THIS window's own duration - the whole match's length when window is the
+            // whole-match window (unchanged from before T7), or a phase's own duration on a
+            // phase-scoped build, which is what lets the HTML compare it against BalanceTargets'
+            // Phase1DurationSeconds/Phase2DurationSeconds.
+            header.MatchLengthSeconds = window.End - window.Start;
             header.MalformedLineCount = log.MalformedLineCount;
             header.UnknownEventCount = log.UnknownEventCount;
             header.UnreadableFileCount = log.UnreadableFileCount;
@@ -168,6 +252,10 @@ namespace Overpower.EditorTools.Telemetry
 
             foreach (TelemetryEvent e in log.Events)
             {
+                // Task T7: markers and the free-loadout/debug-gold warnings are scoped to THIS
+                // window - a marker dropped in Phase 2 has no business on the Phase 1 tab.
+                if (!window.Contains(e.T)) continue;
+
                 if (e.Name == TelemetryKeys.Marker)
                 {
                     header.Markers.Add(new MarkerRow
@@ -191,6 +279,9 @@ namespace Overpower.EditorTools.Telemetry
                 }
             }
 
+            // Player coverage: each FILE's own first/last real event - a fact about the file, not
+            // about any one phase window, so this stays unwindowed even on a Phase 1/Phase
+            // 2-scoped build (Task T7).
             var firstT = new Dictionary<string, double>();
             var lastT = new Dictionary<string, double>();
             foreach (TelemetryEvent e in log.Events)
@@ -207,6 +298,65 @@ namespace Overpower.EditorTools.Telemetry
                     Nick = s.Nick,
                     FirstT = firstT.TryGetValue(s.File, out double f) ? f : 0,
                     LastT = lastT.TryGetValue(s.File, out double l) ? l : 0,
+                });
+            }
+
+            // Task T7: log coverage - every actor seen ANYWHERE (not just those with their own
+            // file), always whole-match regardless of this build's own window - see
+            // LogCoverageRow's own comment.
+            BuildLogCoverage(log, sessionByActor, coverageByActor, header.LogCoverage);
+        }
+
+        /// <summary>Task T7: every actor seen anywhere in the match - joins, sessions, `hit`
+        /// attackers/victims, `death` killers/assists - against which files are actually present, so
+        /// the report can say "no log from actor N" instead of silently under-counting their damage,
+        /// gold and purchases.</summary>
+        private static void BuildLogCoverage(TelemetryLog log, Dictionary<int, TelemetrySession> sessionByActor,
+            Dictionary<int, (double First, double Last)> coverageByActor, List<LogCoverageRow> outRows)
+        {
+            var seen = new HashSet<int>(sessionByActor.Keys);
+
+            foreach (TelemetryEvent e in log.Events)
+            {
+                if (e.Name == TelemetryKeys.Join)
+                {
+                    int a = ReadInt(e.Data, TelemetryKeys.Actor, -1);
+                    if (a >= 0) seen.Add(a);
+                }
+                else if (e.Name == TelemetryKeys.Hit)
+                {
+                    int attacker = ReadInt(e.Data, TelemetryKeys.Attacker, -1);
+                    int victim = ReadInt(e.Data, TelemetryKeys.Victim, -1);
+                    if (attacker >= 0) seen.Add(attacker);
+                    if (victim >= 0) seen.Add(victim);
+                }
+                else if (e.Name == TelemetryKeys.Death)
+                {
+                    int killer = ReadInt(e.Data, TelemetryKeys.Killer, -1);
+                    if (killer >= 0) seen.Add(killer);
+
+                    var assists = e.Data[TelemetryKeys.Assists] as JArray;
+                    if (assists != null)
+                        foreach (JToken t in assists)
+                        {
+                            if (t.Type == JTokenType.Null) continue;
+                            int assister = t.ToObject<int>();
+                            if (assister >= 0) seen.Add(assister);
+                        }
+                }
+            }
+
+            foreach (int actor in seen.OrderBy(a => a))
+            {
+                bool filePresent = sessionByActor.TryGetValue(actor, out TelemetrySession session);
+                (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
+                outRows.Add(new LogCoverageRow
+                {
+                    Actor = actor,
+                    Nick = filePresent ? session.Nick : "",
+                    FilePresent = filePresent,
+                    FirstT = coverage.First,
+                    LastT = coverage.Last,
                 });
             }
         }
@@ -270,7 +420,8 @@ namespace Overpower.EditorTools.Telemetry
         // ==================================================================== ownership
 
         private static void BuildOwnership(TelemetryLog log, List<OwnershipRow> outStints, Dictionary<int, int> zoneTier,
-                                            Dictionary<int, List<(double T, int New)>> rawChangesByZone, double matchLength)
+                                            Dictionary<int, List<(double T, int New)>> rawChangesByZone, double matchLength,
+                                            TimeWindow window, double? tPhase2)
         {
             var dedupe = new HashSet<(int Zone, int New, int Since)>();
             var changesByZone = new Dictionary<int, List<(double T, int Tier, int Old, int New)>>();
@@ -313,16 +464,23 @@ namespace Overpower.EditorTools.Telemetry
                         ? (changes[i + 1].New == Neutral ? "decayed" : "captured")
                         : "matchEnd";
 
-                    outStints.Add(new OwnershipRow
+                    // Task T7: clip this stint to the requested window, splitting it at the phase
+                    // boundary too when it straddles one (even on a whole-match build - see
+                    // ClipAndTagPhase's own comment).
+                    foreach (var piece in ClipAndTagPhase(t, to, window, tPhase2))
                     {
-                        Zone = zone,
-                        Tier = tier,
-                        Team = newOwner,
-                        From = t,
-                        To = to,
-                        Duration = to - t,
-                        HowEnded = howEnded,
-                    });
+                        outStints.Add(new OwnershipRow
+                        {
+                            Zone = zone,
+                            Tier = tier,
+                            Team = newOwner,
+                            From = piece.From,
+                            To = piece.To,
+                            Duration = piece.To - piece.From,
+                            HowEnded = piece.ReachedRealEnd ? howEnded : "phaseBoundary",
+                            Phase = piece.Phase,
+                        });
+                    }
                 }
             }
         }
@@ -348,9 +506,14 @@ namespace Overpower.EditorTools.Telemetry
         /// re-captured, drained, and captured again within one match produced at most one row instead
         /// of several. Ownership items sort BEFORE a same-instant capture item (see the merge below),
         /// so a completion recorded in the same instant as a stray same-tick capture line always closes
-        /// the right attempt first.</summary>
+        /// the right attempt first.
+        ///
+        /// Task T7: the state machine below builds the RAW (unwindowed) attempts exactly as before,
+        /// into a local list; only the final clip-and-tag pass (mirroring BuildOwnership's own) scopes
+        /// them to the requested window and phase-splits a straddling attempt.</summary>
         private static void BuildCaptures(TelemetryLog log, Dictionary<int, List<(double T, int New)>> rawChangesByZone,
-                                           Dictionary<int, int> zoneTier, ReportHeader header, List<CaptureRow> outCaptures)
+                                           Dictionary<int, int> zoneTier, double matchLength, ReportHeader header,
+                                           List<CaptureRow> outCaptures, TimeWindow window, double? tPhase2)
         {
             var items = new List<(double T, bool IsOwnership, int Zone, string State, int Team, int Players, int NewOwner)>();
 
@@ -374,6 +537,7 @@ namespace Overpower.EditorTools.Telemetry
             items = items.OrderBy(i => i.T).ToList();
 
             var open = new Dictionary<int, CaptureAttempt>();
+            var rawCaptures = new List<CaptureRow>();
 
             foreach (var item in items)
             {
@@ -385,7 +549,7 @@ namespace Overpower.EditorTools.Telemetry
                     bool closesAsNeutralised = attempt.IsDrain && item.NewOwner == Neutral;
                     if (!closesAsCompleted && !closesAsNeutralised) continue;
 
-                    outCaptures.Add(new CaptureRow
+                    rawCaptures.Add(new CaptureRow
                     {
                         Zone = item.Zone,
                         Tier = zoneTier.GetValueOrDefault(item.Zone, 0),
@@ -417,7 +581,7 @@ namespace Overpower.EditorTools.Telemetry
                         {
                             // A brand new start/drain-start while something is still open for this
                             // zone: that previous attempt's story ends here, unresolved.
-                            outCaptures.Add(new CaptureRow
+                            rawCaptures.Add(new CaptureRow
                             {
                                 Zone = item.Zone,
                                 Tier = zoneTier.GetValueOrDefault(item.Zone, 0),
@@ -450,11 +614,10 @@ namespace Overpower.EditorTools.Telemetry
                 // machine; the matching ownership item (in this same merged pass) is what actually closes it.
             }
 
-            double matchLength = header.MatchLengthSeconds;
             foreach (var kv in open.OrderBy(kv => kv.Key))
             {
                 CaptureAttempt attempt = kv.Value;
-                outCaptures.Add(new CaptureRow
+                rawCaptures.Add(new CaptureRow
                 {
                     Zone = kv.Key,
                     Tier = zoneTier.GetValueOrDefault(kv.Key, 0),
@@ -466,19 +629,44 @@ namespace Overpower.EditorTools.Telemetry
                     Players = attempt.LastPlayers,
                 });
             }
+
+            // Task T7: clip + phase-tag every raw attempt against the requested window - same
+            // mechanism as BuildOwnership's own stints (see ClipAndTagPhase).
+            foreach (CaptureRow raw in rawCaptures)
+            {
+                foreach (var piece in ClipAndTagPhase(raw.Start, raw.End, window, tPhase2))
+                {
+                    outCaptures.Add(new CaptureRow
+                    {
+                        Zone = raw.Zone,
+                        Tier = raw.Tier,
+                        Team = raw.Team,
+                        Start = piece.From,
+                        End = piece.To,
+                        Duration = piece.To - piece.From,
+                        Outcome = piece.ReachedRealEnd ? raw.Outcome : "phaseBoundary",
+                        Players = raw.Players,
+                        Phase = piece.Phase,
+                    });
+                }
+            }
         }
 
         // ==================================================================== purchases / shop blocked / hits
 
         private static void BuildPurchasesAndBlocked(TelemetryLog log, Dictionary<string, int> fileActor,
-            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam, ReportTables tables)
+            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam, ReportTables tables,
+            TimeWindow window, double? tPhase2)
         {
             foreach (TelemetryEvent e in log.Events)
             {
+                if (!window.Contains(e.T)) continue;
+
                 int actor = ActorOf(e, fileActor);
                 TelemetrySession session = sessionByActor.GetValueOrDefault(actor);
                 int team = effectiveTeam.GetValueOrDefault(actor, -1);
                 string nick = session?.Nick ?? "";
+                int phase = PhaseOf(e.T, tPhase2);
 
                 if (e.Name == TelemetryKeys.Purchase)
                 {
@@ -494,6 +682,7 @@ namespace Overpower.EditorTools.Telemetry
                         BalanceAfter = ReadInt(e.Data, TelemetryKeys.BalanceAfter, 0),
                         Zone = ReadInt(e.Data, TelemetryKeys.Zone, -1),
                         Free = e.Data[TelemetryKeys.Free]?.ToObject<bool?>() ?? false,
+                        Phase = phase,
                     });
                 }
                 else if (e.Name == TelemetryKeys.Refund)
@@ -506,6 +695,7 @@ namespace Overpower.EditorTools.Telemetry
                         Amount = ReadInt(e.Data, TelemetryKeys.Amount, 0),
                         BalanceAfter = ReadInt(e.Data, TelemetryKeys.BalanceAfter, 0),
                         Zone = ReadInt(e.Data, TelemetryKeys.Zone, -1),
+                        Phase = phase,
                     });
                 }
                 else if (e.Name == TelemetryKeys.ShopBlocked)
@@ -518,6 +708,7 @@ namespace Overpower.EditorTools.Telemetry
                         Reason = e.Data[TelemetryKeys.Reason]?.ToString() ?? "",
                         Shortfall = ReadInt(e.Data, TelemetryKeys.Shortfall, 0),
                         Zone = ReadInt(e.Data, TelemetryKeys.Zone, -1),
+                        Phase = phase,
                     });
                 }
             }
@@ -535,11 +726,13 @@ namespace Overpower.EditorTools.Telemetry
             return effectiveTeam.GetValueOrDefault(actor, -1);
         }
 
-        private static void BuildHits(TelemetryLog log, Dictionary<int, int> effectiveTeam, List<HitRow> outHits)
+        private static void BuildHits(TelemetryLog log, Dictionary<int, int> effectiveTeam, List<HitRow> outHits,
+            TimeWindow window, double? tPhase2)
         {
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Hit) continue;
+                if (!window.Contains(e.T)) continue;
 
                 JToken dToken = e.Data[TelemetryKeys.Distance];
                 float? distance = (dToken != null && dToken.Type != JTokenType.Null) ? dToken.ToObject<float?>() : null;
@@ -565,6 +758,7 @@ namespace Overpower.EditorTools.Telemetry
                     Distance = distance,
                     Vulnerable = ReadFloat(e.Data, TelemetryKeys.Vulnerable),
                     Overpower = e.Data[TelemetryKeys.OverpowerActive]?.ToObject<bool?>() ?? false,
+                    Phase = PhaseOf(e.T, tPhase2),
                 });
             }
         }
@@ -578,9 +772,24 @@ namespace Overpower.EditorTools.Telemetry
 
         // ==================================================================== gold timeline / economy by minute
 
+        /// <summary>Task T7: the one table this feature does NOT window as cleanly as the other
+        /// eleven. `gold_timeline.csv`'s own EarnedSoFar/SpentSoFar stay whole-match running totals on
+        /// PURPOSE even on a phase-scoped build (they keep their literal meaning, "earned/spent so far
+        /// in the match" - a Phase 2 row showing a Phase-1-inclusive running total is more useful than
+        /// a confusing reset-to-zero); only which SAMPLE ROWS are emitted is scoped to the window.
+        /// `economy_by_minute.csv` goes further: each event's own contribution to a minute bucket IS
+        /// scoped to the window (so a Phase 1/Phase 2 build's numbers are correct), and only buckets
+        /// that overlap the window survive into the output - but the minute INDEX itself stays the
+        /// absolute match minute rather than being renumbered relative to the phase's own start,
+        /// because the "zones held per tier" and "gold gap to richest" passes below both already
+        /// depend on absolute minute math (matchLength, OwnerAtTime at an absolute midpoint, a stale-
+        /// sample cutoff measured from an absolute bucket end) that would need its own separate
+        /// re-derivation to renumber cleanly. Reported to Tudor as a known simplification rather than
+        /// silently pretending it's exactly as clean as the rest.</summary>
         private static void BuildGoldTimelineAndEconomy(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam, Dictionary<int, int> zoneTier,
-            Dictionary<int, List<(double T, int New)>> rawChangesByZone, double matchLength, ReportTables tables)
+            Dictionary<int, List<(double T, int New)>> rawChangesByZone, double matchLength, ReportTables tables,
+            TimeWindow window, double? tPhase2)
         {
             var earnedRunning = new Dictionary<int, int>();
             var spentRunning = new Dictionary<int, int>();
@@ -605,42 +814,51 @@ namespace Overpower.EditorTools.Telemetry
                     if (IsJunkGoldEarned(e.Data)) continue;
 
                     int total = SumGoldEarnedTotal(e.Data);
+                    // Task T7: unwindowed on purpose - see this method's own class comment.
                     earnedRunning[actor] = earnedRunning.GetValueOrDefault(actor) + total;
 
-                    int minute = Math.Min((int)Math.Floor(e.T / 60.0), numMinutes - 1);
-                    if (minute < 0) minute = 0;
-                    if (team >= 0 && economyRows.TryGetValue((minute, team), out EconomyByMinuteRow row))
+                    if (window.Contains(e.T))
                     {
-                        // Opus review item 4: rescale this line's own zones[] to sum to its own terr
-                        // (authoritative) before accumulating - see ScaledZones.
-                        double[] scaledZones = ScaledZones(e.Data);
-                        for (int z = 0; z < scaledZones.Length; z++)
+                        int minute = Math.Min((int)Math.Floor(e.T / 60.0), numMinutes - 1);
+                        if (minute < 0) minute = 0;
+                        if (team >= 0 && economyRows.TryGetValue((minute, team), out EconomyByMinuteRow row))
                         {
-                            if (!zoneTier.TryGetValue(z, out int tier)) continue;
-                            if (tier < 1 || tier > row.IncomeByTier.Length) { tables.Header.InvalidTierCount++; continue; } // item 5
-                            row.IncomeByTier[tier - 1] += scaledZones[z];
+                            // Opus review item 4: rescale this line's own zones[] to sum to its own terr
+                            // (authoritative) before accumulating - see ScaledZones.
+                            double[] scaledZones = ScaledZones(e.Data);
+                            for (int z = 0; z < scaledZones.Length; z++)
+                            {
+                                if (!zoneTier.TryGetValue(z, out int tier)) continue;
+                                if (tier < 1 || tier > row.IncomeByTier.Length) { tables.Header.InvalidTierCount++; continue; } // item 5
+                                row.IncomeByTier[tier - 1] += scaledZones[z];
+                            }
+                            // T5 re-review item 9: terr > 0 with no zones[] to rescale by (empty or all
+                            // zero) - kept here rather than silently dropped, see UnattributedIncome.
+                            row.UnattributedIncome += UnattributedTerritoryGold(e.Data, scaledZones);
+                            // Point 2 (first-pass review): goldEarned.bounty is the OWNER's own credited
+                            // total, not the master's per-payout `bounty` line - safe to sum without double counting.
+                            row.Bounty += ReadInt(e.Data, TelemetryKeys.Bounty, 0);
+                            row.Refund += ReadInt(e.Data, TelemetryKeys.Refund, 0);
                         }
-                        // T5 re-review item 9: terr > 0 with no zones[] to rescale by (empty or all
-                        // zero) - kept here rather than silently dropped, see UnattributedIncome.
-                        row.UnattributedIncome += UnattributedTerritoryGold(e.Data, scaledZones);
-                        // Point 2 (first-pass review): goldEarned.bounty is the OWNER's own credited
-                        // total, not the master's per-payout `bounty` line - safe to sum without double counting.
-                        row.Bounty += ReadInt(e.Data, TelemetryKeys.Bounty, 0);
-                        row.Refund += ReadInt(e.Data, TelemetryKeys.Refund, 0);
                     }
                 }
                 else if (e.Name == TelemetryKeys.Purchase)
                 {
                     int price = ReadInt(e.Data, TelemetryKeys.Price, 0);
+                    // Task T7: unwindowed on purpose - see this method's own class comment.
                     spentRunning[actor] = spentRunning.GetValueOrDefault(actor) + price;
 
-                    int minute = Math.Min((int)Math.Floor(e.T / 60.0), numMinutes - 1);
-                    if (minute < 0) minute = 0;
-                    if (team >= 0 && economyRows.TryGetValue((minute, team), out EconomyByMinuteRow row))
-                        row.Spent += price;
+                    if (window.Contains(e.T))
+                    {
+                        int minute = Math.Min((int)Math.Floor(e.T / 60.0), numMinutes - 1);
+                        if (minute < 0) minute = 0;
+                        if (team >= 0 && economyRows.TryGetValue((minute, team), out EconomyByMinuteRow row))
+                            row.Spent += price;
+                    }
                 }
                 else if (e.Name == TelemetryKeys.Sample)
                 {
+                    if (!window.Contains(e.T)) continue; // Task T7: only this window's own samples.
                     tables.GoldTimeline.Add(new GoldTimelineRow
                     {
                         T = e.T,
@@ -650,6 +868,7 @@ namespace Overpower.EditorTools.Telemetry
                         Balance = ReadInt(e.Data, TelemetryKeys.Balance, 0),
                         EarnedSoFar = earnedRunning.GetValueOrDefault(actor),
                         SpentSoFar = spentRunning.GetValueOrDefault(actor),
+                        Phase = PhaseOf(e.T, tPhase2),
                     });
                 }
             }
@@ -719,15 +938,33 @@ namespace Overpower.EditorTools.Telemetry
                         row.GoldGapToRichest = richest - teamBalance.GetValueOrDefault(team);
             }
 
-            tables.EconomyByMinute = economyRows.Values.OrderBy(r => r.Minute).ThenBy(r => r.Team).ToList();
+            // Task T7: keep only the minute buckets that actually overlap this window (see this
+            // method's own class comment on why the minute INDEX itself stays absolute), and tag
+            // each surviving row with the phase its own bucket START falls in.
+            tables.EconomyByMinute = economyRows.Values
+                .Where(r => BucketOverlapsWindow(r.Minute, matchLength, window))
+                .OrderBy(r => r.Minute).ThenBy(r => r.Team)
+                .ToList();
+            foreach (EconomyByMinuteRow row in tables.EconomyByMinute)
+                row.Phase = PhaseOf(row.Minute * 60.0, tPhase2);
+        }
+
+        private static bool BucketOverlapsWindow(int minute, double matchLength, TimeWindow window)
+        {
+            double bucketStart = minute * 60.0;
+            double bucketEnd = Math.Min((minute + 1) * 60.0, matchLength);
+            if (bucketEnd <= window.Start) return false;
+            return window.EndInclusive ? bucketStart <= window.End : bucketStart < window.End;
         }
 
         // ==================================================================== zone income
 
         private static void BuildZoneIncome(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, int> effectiveTeam, Dictionary<int, int> zoneTier,
-            List<OwnershipRow> stints, List<ZoneIncomeRow> outRows)
+            List<OwnershipRow> stints, List<ZoneIncomeRow> outRows, TimeWindow window)
         {
+            // Task T7: `stints` is ALREADY window-clipped (BuildOwnership ran first) - summing its
+            // Duration here needs no extra work at all to be correctly scoped.
             var secondsHeld = new Dictionary<(int Zone, int Team), double>();
             foreach (OwnershipRow stint in stints)
                 secondsHeld[(stint.Zone, stint.Team)] = secondsHeld.GetValueOrDefault((stint.Zone, stint.Team)) + stint.Duration;
@@ -736,6 +973,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.GoldEarned || IsJunkGoldEarned(e.Data)) continue;
+                if (!window.Contains(e.T)) continue; // Task T7
 
                 int actor = ActorOf(e, fileActor);
                 int team = effectiveTeam.GetValueOrDefault(actor, -1);
@@ -842,10 +1080,14 @@ namespace Overpower.EditorTools.Telemetry
         ///   client's silent gap doesn't keep accruing whatever it was doing when it dropped;
         /// - the LAST sample of each actor's own stream gets one trailing interval too (capped at the
         ///   sample interval, and never past that actor's own last covered instant), so the tail of the
-        ///   match isn't simply uncounted.</summary>
+        ///   match isn't simply uncounted.
+        ///
+        /// Task T7: every interval (the main sweep's and the trailing one) is CLIPPED to the requested
+        /// window via TimeWindow.Clip before being accumulated - so a sample interval crossing a phase
+        /// boundary contributes its correct partial share to each phase's own build.</summary>
         private static SampleDerivedStats BuildSampleDerivedStats(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, int> effectiveTeam, Dictionary<int, List<(double T, int New)>> rawChangesByZone,
-            Dictionary<int, (double First, double Last)> coverageByActor, double sampleInterval)
+            Dictionary<int, (double First, double Last)> coverageByActor, double sampleInterval, TimeWindow window)
         {
             var stats = new SampleDerivedStats();
             var lastT = new Dictionary<int, double>();
@@ -887,8 +1129,10 @@ namespace Overpower.EditorTools.Telemetry
                     bool prevAlive = lastAlive.GetValueOrDefault(actor, true);
                     if (prevAlive) // item 3: a dead sample starts no counted interval
                     {
-                        double dur = Math.Min(t - prevT, gapCap); // item 11: cap a disconnect gap
-                        Accumulate(actor, dur, lastWeapon[actor], lastZone[actor], lastTeam[actor]);
+                        double intervalEnd = prevT + Math.Min(t - prevT, gapCap); // item 11: cap a disconnect gap
+                        // Task T7: clip [prevT, intervalEnd) to the requested window.
+                        if (window.Clip(prevT, intervalEnd, out double clipFrom, out double clipTo))
+                            Accumulate(actor, clipTo - clipFrom, lastWeapon[actor], lastZone[actor], lastTeam[actor]);
                     }
                 }
 
@@ -900,14 +1144,16 @@ namespace Overpower.EditorTools.Telemetry
             }
 
             // Trailing interval for each actor's own LAST sample (item 11), bounded by that actor's own
-            // covered range (item 3) - never invented time past what we actually have for them.
+            // covered range (item 3) - never invented time past what we actually have for them. Task
+            // T7: clipped to the window the same way as every other interval above.
             foreach (int actor in lastT.Keys)
             {
                 if (!lastAlive.GetValueOrDefault(actor, true)) continue;
                 double last = lastT[actor];
                 double coverageEnd = coverageByActor.TryGetValue(actor, out var range) ? range.Last : last;
-                double dur = Math.Min(sampleInterval, Math.Max(0, coverageEnd - last));
-                Accumulate(actor, dur, lastWeapon[actor], lastZone[actor], lastTeam[actor]);
+                double tailEnd = last + Math.Min(sampleInterval, Math.Max(0, coverageEnd - last));
+                if (window.Clip(last, tailEnd, out double clipFrom, out double clipTo))
+                    Accumulate(actor, clipTo - clipFrom, lastWeapon[actor], lastZone[actor], lastTeam[actor]);
             }
 
             return stats;
@@ -916,7 +1162,7 @@ namespace Overpower.EditorTools.Telemetry
         // ==================================================================== weapons / abilities
 
         private static void BuildWeaponsAndAbilities(TelemetryLog log, List<HitRow> hits,
-            Dictionary<int, double> equippedSecondsByWeapon, ReportTables tables)
+            Dictionary<int, double> equippedSecondsByWeapon, ReportTables tables, TimeWindow window)
         {
             List<int> weaponIds = WeaponIdUniverse(log);
 
@@ -925,6 +1171,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Shots) continue;
+                if (!window.Contains(e.T)) continue;
                 int w = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
                 pullsByWeapon[w] = pullsByWeapon.GetValueOrDefault(w) + ReadInt(e.Data, TelemetryKeys.Pulls, 0);
                 projectilesByWeapon[w] = projectilesByWeapon.GetValueOrDefault(w) + ReadInt(e.Data, TelemetryKeys.Projectiles, 0);
@@ -935,6 +1182,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Death) continue;
+                if (!window.Contains(e.T)) continue;
                 int w = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
                 int ab = ReadInt(e.Data, TelemetryKeys.AbilityId, -1);
                 if (w >= 0) killsByWeapon[w] = killsByWeapon.GetValueOrDefault(w) + 1;
@@ -942,10 +1190,11 @@ namespace Overpower.EditorTools.Telemetry
             }
 
             // Opus review item 6: accuracy is Projectile-hits / projectiles ONLY - Splash hits (one
-            // rocket's own splash falloff landing on several targets) are counted separately so they
-            // can no longer push accuracy over 100%. Distance stays Projectile-only too, for the same
-            // "matches what Hits counts" reason. Damage sums exclude any Burn-source hit row (item 8 -
-            // already counted via its `dot`), from BOTH weapon and ability totals.
+            // rocket's own splash falloff landing on several targets from one projectile) are counted
+            // separately so they can no longer push accuracy over 100%. Distance stays Projectile-only
+            // too, for the same "matches what Hits counts" reason. Damage sums exclude any Burn-source
+            // hit row (item 8 - already counted via its `dot`), from BOTH weapon and ability totals.
+            // `hits` (tables.Hits) is already window-filtered by BuildHits - nothing extra to do here.
             var hitCountByWeapon = new Dictionary<int, int>();
             var splashCountByWeapon = new Dictionary<int, int>();
             var distancesByWeapon = new Dictionary<int, List<double>>();
@@ -989,6 +1238,7 @@ namespace Overpower.EditorTools.Telemetry
             var statusSecondsByAbility = new Dictionary<int, double>();
             foreach (TelemetryEvent e in log.Events)
             {
+                if (!window.Contains(e.T)) continue;
                 if (e.Name == TelemetryKeys.Cast)
                 {
                     int ab = ReadInt(e.Data, TelemetryKeys.AbilityId, -1);
@@ -1012,6 +1262,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Dot) continue;
+                if (!window.Contains(e.T)) continue;
                 int w = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
                 if (w < 0) continue;
                 damageRawByWeapon[w] = damageRawByWeapon.GetValueOrDefault(w) + ReadFloat(e.Data, TelemetryKeys.Raw);
@@ -1099,12 +1350,15 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void BuildPlayersAndDeaths(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam,
-            Dictionary<int, (double First, double Last)> coverageByActor, SampleDerivedStats sampleStats, ReportTables tables)
+            Dictionary<int, (double First, double Last)> coverageByActor, SampleDerivedStats sampleStats, ReportTables tables,
+            TimeWindow window, double? tPhase2)
         {
             // Deaths first - "victim" has no field of its own on a `death` line; it is the file owner.
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Death) continue;
+                if (!window.Contains(e.T)) continue; // Task T7: this death didn't happen in this window.
+
                 int victim = ActorOf(e, fileActor);
                 TelemetrySession victimSession = sessionByActor.GetValueOrDefault(victim);
 
@@ -1135,18 +1389,22 @@ namespace Overpower.EditorTools.Telemetry
                     LoadoutUltimate = ReadInt(e.Data, TelemetryKeys.LoadoutUltimate, -1),
                     AbsorbLevel = ReadInt(e.Data, TelemetryKeys.AbsorbLevel, 0),
                     RechargeLevel = ReadInt(e.Data, TelemetryKeys.RechargeLevel, 0),
+                    Phase = PhaseOf(e.T, tPhase2),
                 });
             }
 
             var killsByActor = new Dictionary<int, int>();
             var assistsByActor = new Dictionary<int, int>();
             var respawnsByActor = new Dictionary<int, List<double>>();
-            foreach (DeathRow d in tables.Deaths)
+            foreach (DeathRow d in tables.Deaths) // already window-filtered
             {
                 if (d.Killer >= 0) killsByActor[d.Killer] = killsByActor.GetValueOrDefault(d.Killer) + 1;
                 foreach (int assister in d.Assists)
                     assistsByActor[assister] = assistsByActor.GetValueOrDefault(assister) + 1;
             }
+            // Task T7: respawns stay UNWINDOWED - the time-alive tail below needs the TRUE respawn
+            // history to find "the first respawn after the true last death", even when that respawn
+            // (or the death before it) falls outside this window.
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Respawn) continue;
@@ -1159,7 +1417,7 @@ namespace Overpower.EditorTools.Telemetry
             // Opus review item 8: Burn-source hit rows are excluded (already counted via their `dot`).
             var damageDealtByActor = new Dictionary<int, float>();
             var damageTakenByActor = new Dictionary<int, float>();
-            foreach (HitRow h in tables.Hits)
+            foreach (HitRow h in tables.Hits) // already window-filtered
             {
                 if (!CountsTowardDamageSums(h)) continue;
                 if (h.Attacker >= 0) damageDealtByActor[h.Attacker] = damageDealtByActor.GetValueOrDefault(h.Attacker) + h.Raw;
@@ -1168,6 +1426,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Dot) continue;
+                if (!window.Contains(e.T)) continue;
                 int a = ReadInt(e.Data, TelemetryKeys.Attacker, -1);
                 int v = ReadInt(e.Data, TelemetryKeys.Victim, -1);
                 float raw = ReadFloat(e.Data, TelemetryKeys.Raw);
@@ -1183,6 +1442,7 @@ namespace Overpower.EditorTools.Telemetry
                 int actor = ActorOf(e, fileActor);
                 if (e.Name == TelemetryKeys.GoldEarned && !IsJunkGoldEarned(e.Data))
                 {
+                    if (!window.Contains(e.T)) continue;
                     var prev = goldByActor.GetValueOrDefault(actor);
                     goldByActor[actor] = (
                         prev.Terr + ReadInt(e.Data, TelemetryKeys.Territory, 0),
@@ -1193,10 +1453,12 @@ namespace Overpower.EditorTools.Telemetry
                 }
                 else if (e.Name == TelemetryKeys.Purchase)
                 {
+                    if (!window.Contains(e.T)) continue;
                     spentByActor[actor] = spentByActor.GetValueOrDefault(actor) + ReadInt(e.Data, TelemetryKeys.Price, 0);
                 }
                 else if (e.Name == TelemetryKeys.Heal)
                 {
+                    if (!window.Contains(e.T)) continue;
                     var tiers = e.Data[TelemetryKeys.HealTiers] as JArray;
                     float sum = 0;
                     if (tiers != null) foreach (JToken v in tiers) sum += v.Type == JTokenType.Null ? 0f : v.ToObject<float>();
@@ -1211,34 +1473,38 @@ namespace Overpower.EditorTools.Telemetry
                 var gold = goldByActor.GetValueOrDefault(actor);
                 (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
 
-                // Opus review item 3: sum of every completed life's own `timeAlive` field (how long
-                // that life lasted, not when it ended), plus - if still alive after the last death -
-                // the tail from the next respawn to THIS PLAYER'S OWN last covered instant, never the
-                // whole match length (a joiner at t=600 in a 1200s match must not show 1200s alive).
+                // Opus review item 3 (Task T7 update): sum of every completed life's own `timeAlive`
+                // field WHOSE OWN DEATH FALLS IN THIS WINDOW, plus - if still alive after the last
+                // (true, unwindowed) death, or never died at all - the CLIPPED tail from wherever it
+                // begins (the next respawn, or this player's own first covered instant) through to
+                // their own last covered instant. Splitting a life's timeAlive by its death's phase,
+                // and clipping the still-alive tail like every other integral, is what makes Phase 1's
+                // + Phase 2's alive time add up to exactly the whole match's.
                 double timeAlive = 0;
                 double? lastDeathT = null;
                 foreach (TelemetryEvent e in log.Events)
                 {
                     if (e.Name != TelemetryKeys.Death) continue;
                     if (ActorOf(e, fileActor) != actor) continue;
-                    timeAlive += ReadFloat(e.Data, TelemetryKeys.TimeAlive);
-                    lastDeathT = e.T;
+                    if (!lastDeathT.HasValue || e.T > lastDeathT.Value) lastDeathT = e.T; // unwindowed - the TRUE last death
+                    if (window.Contains(e.T)) timeAlive += ReadFloat(e.Data, TelemetryKeys.TimeAlive);
                 }
 
+                double tailStart;
                 if (lastDeathT.HasValue)
                 {
-                    if (respawnsByActor.TryGetValue(actor, out var respawns))
-                    {
-                        double? firstAfter = respawns.Where(t => t > lastDeathT.Value).OrderBy(t => t).Cast<double?>().FirstOrDefault();
-                        if (firstAfter.HasValue)
-                            timeAlive += Math.Max(0, coverage.Last - firstAfter.Value);
-                    }
+                    double? firstAfter = respawnsByActor.TryGetValue(actor, out var respawns)
+                        ? respawns.Where(t => t > lastDeathT.Value).OrderBy(t => t).Cast<double?>().FirstOrDefault()
+                        : (double?)null;
+                    tailStart = firstAfter ?? double.PositiveInfinity; // never respawned again - no tail at all
                 }
                 else
                 {
-                    // Never died - alive for this player's own covered span, not the whole match.
-                    timeAlive = Math.Max(0, coverage.Last - coverage.First);
+                    tailStart = coverage.First; // never died - "alive" for this player's own covered span
                 }
+
+                if (window.Clip(tailStart, coverage.Last, out double clipFrom, out double clipTo))
+                    timeAlive += clipTo - clipFrom;
 
                 tables.Players.Add(new PlayerRow
                 {

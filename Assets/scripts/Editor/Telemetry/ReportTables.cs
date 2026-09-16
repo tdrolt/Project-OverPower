@@ -17,6 +17,23 @@ namespace Overpower.EditorTools.Telemetry
         public double LastT;
     }
 
+    /// <summary>Task T7: one row per actor seen ANYWHERE in the match - joins, sessions, `hit`
+    /// attackers/victims, `death` killers/assists - regardless of whether that actor's own log file is
+    /// actually present in this folder. Whole-match only (not scoped to a phase - "which logs are in
+    /// this report" is a fact about the folder, not about a time window); the header's `log-coverage`
+    /// container and csv/whole_match/log_coverage.csv both read this same list.</summary>
+    public sealed class LogCoverageRow
+    {
+        public int Actor;
+        /// <summary>Empty when this actor's own nick is unknown - which happens exactly when
+        /// <see cref="FilePresent"/> is false: nobody else's log line carries another actor's nickname.</summary>
+        public string Nick = "";
+        /// <summary>Whether a `session` line (so, a whole log file) for this actor was found.</summary>
+        public bool FilePresent;
+        public double FirstT;
+        public double LastT;
+    }
+
     /// <summary>Everything that isn't one of the 12 tables: match-wide facts and the quality counters
     /// the spec's Error handling section asks for (malformed/unknown lines are never a failure, just a
     /// number in the header).</summary>
@@ -30,6 +47,11 @@ namespace Overpower.EditorTools.Telemetry
         public bool DebugGoldUsed;
         public List<MarkerRow> Markers = new List<MarkerRow>();
         public List<PlayerCoverageRow> Coverage = new List<PlayerCoverageRow>();
+        /// <summary>Task T7: see LogCoverageRow's own comment - always the whole match's list, even on
+        /// a Phase 1/Phase 2-scoped ReportTables (CsvReportWriter only ever writes the CSV of this into
+        /// csv/whole_match/, and the HTML header only ever reads it once, from whichever scope it
+        /// happens to render first - the values are identical across every scope).</summary>
+        public List<LogCoverageRow> LogCoverage = new List<LogCoverageRow>();
         public int MalformedLineCount;
         public int UnknownEventCount;
         public int UnknownCaptureStateCount;
@@ -57,6 +79,9 @@ namespace Overpower.EditorTools.Telemetry
         public int Balance;
         public int EarnedSoFar;
         public int SpentSoFar;
+        /// <summary>Task T7: 1 or 2 - which phase this sample's own t falls in (see
+        /// TelemetryAggregator's phase-tagging). Always 1 when the match never had a phase 2.</summary>
+        public int Phase = 1;
     }
 
     public sealed class EconomyByMinuteRow
@@ -76,6 +101,12 @@ namespace Overpower.EditorTools.Telemetry
         /// <summary>Index 0..3 = tier 1..4.</summary>
         public int[] ZonesHeldByTier = new int[4];
         public int GoldGapToRichest;
+        /// <summary>Task T7: which phase this minute bucket belongs to, from the bucket's own START
+        /// time vs the transition - see TelemetryAggregator's phase-tagging. The minute INDEX itself
+        /// stays the absolute match minute (not renumbered relative to the phase start) even on a
+        /// Phase 2-scoped ReportTables - see TelemetryAggregator.BuildGoldTimelineAndEconomy's own
+        /// comment on why this table is the one that isn't windowed as cleanly as the rest.</summary>
+        public int Phase = 1;
         /// <summary>T5 re-review fix (item 9): a `goldEarned` line can have `terr` > 0 (real
         /// territory gold, already counted in players.csv via its running total) with `zones`
         /// empty or summing to 0 - ScaledZones has no ratio to rescale by in that case, so the whole
@@ -103,9 +134,15 @@ namespace Overpower.EditorTools.Telemetry
         public double From;
         public double To;
         public double Duration;
-        /// <summary>"captured" (another team took it), "decayed" (it went neutral), or "matchEnd"
-        /// (still held when the log ends).</summary>
+        /// <summary>"captured" (another team took it), "decayed" (it went neutral), "matchEnd"
+        /// (still held when the log ends), or "phaseBoundary" (Task T7: this row is a phase-clipped
+        /// PIECE of a stint that actually continues past this window's own end - the real reason lives
+        /// on the OTHER piece, whichever window that lands in).</summary>
         public string HowEnded;
+        /// <summary>Task T7: 1 or 2 - which phase this (possibly clipped) piece of the stint belongs
+        /// to. A stint that crosses the phase boundary is split into two rows, one per phase, even on
+        /// the whole-match ReportTables - see TelemetryAggregator.BuildOwnership.</summary>
+        public int Phase = 1;
     }
 
     public sealed class CaptureRow
@@ -123,10 +160,13 @@ namespace Overpower.EditorTools.Telemetry
         /// which is stateless as of the T4 fix: "paused"/"drainPaused" is reported for BOTH a genuine
         /// pause and a completion/neutralisation, at whatever progress it actually stopped at) or
         /// "abandoned" - either still open when the log ends, or superseded mid-match by a fresh
-        /// `started`/`drainStarted` for a different team or direction before this one ever closed.</summary>
+        /// `started`/`drainStarted` for a different team or direction before this one ever closed - or
+        /// "phaseBoundary" (Task T7, same meaning as OwnershipRow.HowEnded's own "phaseBoundary").</summary>
         public string Outcome;
         public double Duration;
         public int Players;
+        /// <summary>Task T7: see OwnershipRow.Phase's own comment - same mechanism, same reason.</summary>
+        public int Phase = 1;
     }
 
     public sealed class PurchaseRow
@@ -144,6 +184,8 @@ namespace Overpower.EditorTools.Telemetry
         public int BalanceAfter;
         public int Zone;
         public bool Free;
+        /// <summary>Task T7: 1 or 2, from this purchase/refund's own t.</summary>
+        public int Phase = 1;
     }
 
     public sealed class ShopBlockedRow
@@ -156,6 +198,8 @@ namespace Overpower.EditorTools.Telemetry
         public string Reason;
         public int Shortfall;
         public int Zone;
+        /// <summary>Task T7: 1 or 2, from this blocked click's own t.</summary>
+        public int Phase = 1;
     }
 
     public sealed class HitRow
@@ -175,6 +219,8 @@ namespace Overpower.EditorTools.Telemetry
         public float? Distance;
         public float Vulnerable;
         public bool Overpower;
+        /// <summary>Task T7: 1 or 2, from this hit's own t.</summary>
+        public int Phase = 1;
     }
 
     public sealed class WeaponRow
@@ -255,6 +301,8 @@ namespace Overpower.EditorTools.Telemetry
         public int LoadoutUltimate;
         public int AbsorbLevel;
         public int RechargeLevel;
+        /// <summary>Task T7: 1 or 2, from this death's own t.</summary>
+        public int Phase = 1;
     }
 
     /// <summary>Task T5: the whole report as plain data - one property per CSV, plus the header.
@@ -275,5 +323,16 @@ namespace Overpower.EditorTools.Telemetry
         public List<AbilityRow> Abilities = new List<AbilityRow>();
         public List<PlayerRow> Players = new List<PlayerRow>();
         public List<DeathRow> Deaths = new List<DeathRow>();
+    }
+
+    /// <summary>Task T7: the three scopes a match report is built for - see
+    /// TelemetryAggregator.BuildSet and PhaseTimeline. Phase2 is null for every log that never
+    /// eliminates a team (every log before Task 2.7 ships, and any match that ends 3-team) - CsvReportWriter
+    /// and HtmlReportWriter both treat that as "no Phase 2 tab/folder content", not an error.</summary>
+    public sealed class ReportSet
+    {
+        public ReportTables WholeMatch = new ReportTables();
+        public ReportTables Phase1 = new ReportTables();
+        public ReportTables Phase2;
     }
 }
