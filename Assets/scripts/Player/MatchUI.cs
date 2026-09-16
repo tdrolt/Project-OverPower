@@ -2,6 +2,7 @@ using System.Collections;
 using Photon.Pun;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using Overpower.UI;
 
 /// <summary>
@@ -45,7 +46,11 @@ public class MatchUI : MonoBehaviour
     private Rigidbody rigidbody;
     private PlayerMotor playerMotor;
 
-    // Built lazily on the first SetRespawnNote call - see BuildRespawnNoteLabel.
+    // Built lazily on the first SetRespawnNote call - see BuildRespawnNoteLabel. respawnNoteGo is the
+    // note's OWN root (backing strip + text child) - what SetActive actually toggles, the same "the
+    // root, not a child" rule PlayerHud.ShowToast follows for its own toast (toggling the text alone
+    // would leave a blank backing strip floating on the panel whenever the note has nothing to say).
+    private GameObject respawnNoteGo;
     private TextMeshProUGUI respawnNoteText;
 
     /// <summary>True while this player is stuck on the waiting panel. PlayerLifecycle polls this as
@@ -74,12 +79,15 @@ public class MatchUI : MonoBehaviour
         rigidbody = GetComponent<Rigidbody>();
         playerMotor = GetComponent<PlayerMotor>();
 
-        // A missing panel is silent at runtime - every call below is null-guarded so one broken
-        // Inspector reference cannot throw mid-match - so say so once at spawn instead. Three UI
+        // A missing panel (or theme - B3 review, 2026-09-16: joins the same check rather than its own
+        // separate log line, since a missing theme is just as silent - BuildRespawnNoteLabel falls back
+        // to plain white/no backing) is silent at runtime - every call below is null-guarded so one
+        // broken Inspector reference cannot throw mid-match - so say so once at spawn instead. Three UI
         // buttons sat broken for the life of this project because nothing ever complained.
-        if (waitingPanel == null || youWonPanel == null || respawnPanel == null || youLostPanel == null)
-            Debug.LogError($"[MatchUI] {name}: one or more match panels are not assigned - " +
-                            "this player will not be told when they win, lose or respawn.");
+        if (waitingPanel == null || youWonPanel == null || respawnPanel == null || youLostPanel == null || theme == null)
+            Debug.LogError($"[MatchUI] {name}: one or more match panels, or the UiTheme, are not " +
+                            "assigned - this player will not be told when they win, lose or respawn, " +
+                            "and the capital-under-attack respawn note will render unstyled.");
     }
 
     /// <summary>Called by PlayerLifecycle during the respawn countdown.</summary>
@@ -99,44 +107,62 @@ public class MatchUI : MonoBehaviour
     /// <summary>Tudor, 2026-09-16: the "your capital is under attack - you will respawn at your Tier 2 zone"
     /// line PlayerLifecycle polls onto the respawn panel while a player waits to come back into the match. Built
     /// lazily under respawnPanel, below its existing "Respawning! Please Wait!" label, the first time this is
-    /// called - hides itself (SetActive on its own GameObject, not just an empty string) whenever text is empty,
-    /// same "the root, not a child" rule PlayerHud.ShowToast follows for its own toast.</summary>
+    /// called - hides itself (SetActive on respawnNoteGo, the note's own root, not just an empty string or the
+    /// text's own GameObject) whenever text is empty, same "the root, not a child" rule PlayerHud.ShowToast
+    /// follows for its own toast.</summary>
     public void SetRespawnNote(string text)
     {
         if (respawnPanel == null)
             return; // Awake already logged the missing-panel error; nothing to attach the note to.
 
-        if (respawnNoteText == null)
+        if (respawnNoteGo == null)
             BuildRespawnNoteLabel();
 
         respawnNoteText.text = text ?? "";
-        respawnNoteText.gameObject.SetActive(!string.IsNullOrEmpty(text));
+        respawnNoteGo.SetActive(!string.IsNullOrEmpty(text));
     }
 
-    /// <summary>Same small recipe PlayerHud.AddLabel/ApplyOutline uses (font/size/colour from UiTheme, one
-    /// outline material) - kept private and duplicated here rather than shared, the same call PlayerHud's own
-    /// class comment makes for itself: the two components have no other coupling, so a shared utility class
-    /// would exist only for this one method.</summary>
+    /// <summary>Same small recipe PlayerHud.AddLabel/ApplyOutline uses (font/colour from UiTheme, one outline
+    /// material) plus a dark backing strip behind the text - the readability trick PlayerHud's own Panel Colour
+    /// gives every HUD group, applied here because plain white text with just a thin outline read too faint
+    /// against the respawn panel's own pale salmon wash (B3 review, 2026-09-16, 616x576 capture). Kept private
+    /// and duplicated here rather than shared, the same call PlayerHud's own class comment makes for itself: the
+    /// two components have no other coupling, so a shared utility class would exist only for this one method.</summary>
     private void BuildRespawnNoteLabel()
     {
-        GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
-        go.name = "Under Attack Note";
-        go.transform.SetParent(respawnPanel.transform, false);
+        respawnNoteGo = new GameObject("Under Attack Note", typeof(RectTransform));
+        respawnNoteGo.transform.SetParent(respawnPanel.transform, false);
 
-        RectTransform rt = go.GetComponent<RectTransform>();
+        RectTransform rootRt = respawnNoteGo.GetComponent<RectTransform>();
         // respawnPanel's own existing content ("Respawning! Please Wait!") sits at anchoredPosition
         // (0, 150) - this sits below it rather than overlapping, still well inside the panel's own
         // -80/-80 stretch margin at the game's tested 616x576 Game view.
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = new Vector2(0f, 60f);
-        rt.sizeDelta = new Vector2(480f, 80f);
+        rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
+        rootRt.pivot = new Vector2(0.5f, 0.5f);
+        rootRt.anchoredPosition = new Vector2(0f, 60f);
+        rootRt.sizeDelta = new Vector2(500f, 90f);
 
-        respawnNoteText = go.GetComponent<TextMeshProUGUI>();
+        Image backing = respawnNoteGo.AddComponent<Image>();
+        backing.color = theme != null ? theme.capitalUnderAttackNoteBackingColor : new Color(0f, 0f, 0f, 0.6f);
+        backing.raycastTarget = false;
+
+        GameObject textGo = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
+        textGo.name = "Text";
+        textGo.transform.SetParent(respawnNoteGo.transform, false);
+        RectTransform textRt = textGo.GetComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
+        textRt.offsetMin = new Vector2(10f, 6f);
+        textRt.offsetMax = new Vector2(-10f, -6f);
+
+        respawnNoteText = textGo.GetComponent<TextMeshProUGUI>();
         if (theme != null && theme.font != null)
             respawnNoteText.font = theme.font;
-        respawnNoteText.fontSize = theme != null ? theme.bodyTextSize : 24f;
-        respawnNoteText.color = theme != null ? theme.textColor : Color.white;
+        // Its own dedicated size/colour (B3 review), not Body Text Size/Text Colour: those are tuned for
+        // the HUD's own dark Panel Colour backing, and this note needed to be noticeably bigger to read
+        // clearly at a glance on the respawn panel.
+        respawnNoteText.fontSize = theme != null ? theme.capitalUnderAttackNoteFontSize : 30f;
+        respawnNoteText.color = theme != null ? theme.capitalUnderAttackNoteColor : Color.white;
         respawnNoteText.alignment = TextAlignmentOptions.Center;
         respawnNoteText.enableWordWrapping = true;
         respawnNoteText.raycastTarget = false;
@@ -152,7 +178,7 @@ public class MatchUI : MonoBehaviour
             respawnNoteText.fontSharedMaterial = outlineMaterial;
         }
 
-        respawnNoteText.gameObject.SetActive(false); // SetRespawnNote shows/hides it from here on.
+        respawnNoteGo.SetActive(false); // SetRespawnNote shows/hides it from here on.
     }
 
     /// Shows the end-of-match result to this client, win or lose. Used by the territory win

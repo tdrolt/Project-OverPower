@@ -246,7 +246,9 @@ namespace Overpower.UI
         /// than churned for a synonym since it was already the one home for this number), unscaled so
         /// a debug Time.timeScale change cannot freeze a stale toast on screen forever. Same behaviour
         /// the bounty payout always had; PlayerLifecycle's capital-under-attack respawn (Task B3,
-        /// 2026-09-16) is the second caller.</summary>
+        /// 2026-09-16) is the second caller. There is only ONE label: calling this while a toast is
+        /// already showing replaces its text and restarts the duration, it does not queue a second one
+        /// (B3 review, 2026-09-16).</summary>
         public void ShowToast(string text)
         {
             toastText.text = text;

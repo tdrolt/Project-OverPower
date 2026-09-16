@@ -116,8 +116,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             Debug.LogError($"[PlayerLifecycle] {name}: GameplayConfig is not assigned - respawn " +
                             "timing will use hardcoded fallbacks.");
         if (theme == null)
-            Debug.LogWarning($"[PlayerLifecycle] {name}: UiTheme is not assigned - the capital-under-" +
-                              "attack respawn note and toast will be skipped.");
+            Debug.LogError($"[PlayerLifecycle] {name}: UiTheme is not assigned - the capital-under-" +
+                            "attack respawn note and toast will be skipped.");
 
         photonView = GetComponent<PhotonView>();
         rigidbody = GetComponent<Rigidbody>();
@@ -125,6 +125,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         weaponFiring = GetComponentInChildren<WeaponFiring>(true);
         matchUI = GetComponent<MatchUI>();
         playerHud = GetComponent<PlayerHud>();
+        if (playerHud == null)
+            Debug.LogError($"[PlayerLifecycle] {name}: no PlayerHud on this player - the capital-under-" +
+                            "attack respawn toast will be skipped.");
 
         playerHealth = GetComponent<PlayerHealth>();
         playerHealth.Died += HandlePlayerHealthDied;
@@ -284,11 +287,6 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return;
         }
 
-        // Tudor, 2026-09-16: preview the capital-under-attack respawn note while stuck here waiting
-        // for a teammate to recapture the capital - see UpdateRespawnNote's own comment for why this
-        // is also polled from the ordinary respawn-countdown wait in RespawnPlayer below, not just here.
-        UpdateRespawnNote(teamID);
-
         if (!TryGetOwnCathedral(teamID, out _, out TowerData cathedralTower))
             return;
 
@@ -359,9 +357,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)
     {
         // A per-frame wait rather than a single WaitForSeconds(delay), so the capital-under-attack
-        // note (Tudor, 2026-09-16) can update live on the respawn panel during the ordinary
-        // countdown too - not just the CheckForCathedralCapture wait, which only ever runs while
-        // waitingPanel (not respawnPanel) is the one showing. See UpdateRespawnNote.
+        // note (Tudor, 2026-09-16) can update live on the respawn panel while this wait runs. See
+        // UpdateRespawnNote.
         float elapsed = 0f;
         while (elapsed < delay)
         {
@@ -395,8 +392,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // that wrote a speed value here is exactly how "you move faster after respawning" happened.
         SetAlive(true);
 
-        if (atUnderAttackSpawn)
-            playerHud?.ShowToast(theme != null ? theme.capitalUnderAttackRespawnToast : "Respawned at Tier 2: capital under attack");
+        // No fallback string: theme's own null already logged an error in Start, and playerHud's a
+        // second one - showing wrong or missing-theme text here would just be a second symptom.
+        if (atUnderAttackSpawn && theme != null)
+            playerHud?.ShowToast(theme.capitalUnderAttackRespawnToast);
 
         // Logged because "respawning where you died" is a fix that cannot be verified from the
         // editor. Reads rigidbody.position, not transform.position: this class used to log
@@ -452,7 +451,12 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return normal;
 
         int capital = manager.Map.CapitalOf(teamID);
-        if (capital < 0 || !presence.IsUnderAttack(capital))
+        // CapitalOf is the STATIC capital zone id; IsUnderAttack judges the CURRENT owner of that zone id,
+        // which is not necessarily this team any more (B3 review, 2026-09-16: the capital can flip - a real
+        // capture, not merely an attack - while this player is on the respawn wait). Trust the presence check
+        // only while this team still owns it, or a team that just lost its capital outright could still be
+        // routed to a T2 spawn on the strength of an attack against a zone that is no longer theirs.
+        if (capital < 0 || manager.Current == null || manager.Current.OwnerOf(capital) != teamID || !presence.IsUnderAttack(capital))
             return normal;
 
         Transform[] underAttack = roomManager.capitalUnderAttackSpawnPoints;
@@ -466,13 +470,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         return underAttack[teamID];
     }
 
-    /// <summary>Refreshes the "your capital is under attack" line on the respawn panel (Tudor, 2026-09-16) -
-    /// called from both waits a player can be stuck on: CheckForCathedralCapture's poll while waitingPanel is up
-    /// (a lost capital, waiting for a teammate to recapture it) and RespawnPlayer's own per-frame delay loop
-    /// while respawnPanel is up (an ordinary death, capital still owned but under attack). The plan's own text
-    /// named only the first call site; calling it there alone would leave the note silent for exactly the
-    /// scenario B3 verifies (a defended, merely-attacked capital), since that path never touches waitingPanel at
-    /// all - see assumptions-for-tudor.md, 2026-09-16. Only writes MatchUI's text when the bool actually flips.</summary>
+    /// <summary>Refreshes the "your capital is under attack" line on the respawn panel (Tudor, 2026-09-16),
+    /// polled every frame of RespawnPlayer's own wait (respawnPanel is up: an ordinary death, capital still
+    /// owned but possibly under attack). NOT also called from CheckForCathedralCapture's waitingPanel poll
+    /// (B3 review, 2026-09-16, fix 1): MatchUI parents the note under respawnPanel, which is inactive during
+    /// that lost-capital wait, so writing it there was invisible and only cost a stale comment. Only writes
+    /// MatchUI's text when the bool actually flips, and only trusts IsUnderAttack while this team still owns
+    /// the capital (see ChooseSpawnPoint's own comment on the same race).</summary>
     private void UpdateRespawnNote(int teamID)
     {
         if (matchUI == null || theme == null)
@@ -480,8 +484,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         BuildingManager manager = BuildingManager.Instance;
         ZonePresenceTracker presence = ZonePresenceTracker.Instance;
-        bool underAttack = manager != null && manager.Map != null && presence != null
-            && presence.IsUnderAttack(manager.Map.CapitalOf(teamID));
+        int capital = manager != null && manager.Map != null ? manager.Map.CapitalOf(teamID) : -1;
+        bool underAttack = capital >= 0 && manager.Current != null && manager.Current.OwnerOf(capital) == teamID
+            && presence != null && presence.IsUnderAttack(capital);
 
         if (underAttack == respawnNoteShowing)
             return;

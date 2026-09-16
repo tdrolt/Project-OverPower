@@ -101,6 +101,9 @@ MonoBehaviour:
   capitalUnderAttackRespawnNote: Your capital is under attack - you will respawn
     at your Tier 2 zone
   capitalUnderAttackRespawnToast: 'Respawned at Tier 2: capital under attack'
+  capitalUnderAttackNoteFontSize: 30
+  capitalUnderAttackNoteColor: {r: 1, g: 1, b: 1, a: 1}
+  capitalUnderAttackNoteBackingColor: {r: 0, g: 0, b: 0, a: 0.6}
   coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
   coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
   coneLineWidth: 0.04

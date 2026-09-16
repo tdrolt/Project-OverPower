@@ -337,6 +337,18 @@ namespace Overpower.UI
                  "capital was under attack. Uses the same toast label and duration as the bounty payout " +
                  "(Bounty Toast Duration Seconds above).")]
         public string capitalUnderAttackRespawnToast = "Respawned at Tier 2: capital under attack";
+        [Tooltip("Font size of the capital-under-attack respawn note, in canvas units (B3 review, 2026-09-16) - " +
+                 "its own dedicated size rather than Body Text Size: plain white text at that size read too " +
+                 "faint against the respawn panel's pale salmon wash (616x576 capture) to notice at a glance.")]
+        public float capitalUnderAttackNoteFontSize = 30f;
+        [Tooltip("Text colour of the capital-under-attack respawn note (B3 review, 2026-09-16).")]
+        public Color capitalUnderAttackNoteColor = Color.white;
+        [Tooltip("Background strip drawn behind the capital-under-attack respawn note (B3 review, 2026-09-16) - " +
+                 "the same readability trick the HUD's own Panel Colour gives every bar/slot group, applied here " +
+                 "because the note otherwise fights the respawn panel's own pale wash instead of standing out " +
+                 "against it. Semi-opaque dark so the note still reads as sitting ON the respawn panel, not as a " +
+                 "second, unrelated overlay.")]
+        public Color capitalUnderAttackNoteBackingColor = new Color(0f, 0f, 0f, 0.6f);
 
         [Header("Capture bar")]
         [Tooltip("Width of the small world-space bar shown above a tower while it is being captured or drained, in world units (metres) - NOT canvas units, since this bar is not on the screen-space HUD.")]
