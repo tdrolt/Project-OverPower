@@ -506,7 +506,10 @@ namespace Overpower.TestRange
         /// <summary>Reveals this client's current match folder in the OS file browser. In the Editor,
         /// EditorUtility.RevealInFinder opens Explorer/Finder directly; a build has no Editor to do
         /// that, so it falls back to Application.OpenURL on a file:// URL instead, which Unity's docs
-        /// confirm opens the OS's own file browser for a directory path.</summary>
+        /// confirm opens the OS's own file browser for a directory path. `persistentDataPath` on this
+        /// project's own PC contains a space ("...\Project OP\Telemetry\..."), which a hand-built
+        /// "file:///" + path string leaves unescaped - System.Uri.AbsoluteUri percent-encodes it (and
+        /// every backslash to a forward slash) into a well-formed URI instead.</summary>
         private void OnOpenTelemetryFolderClicked()
         {
             string folder = MatchTelemetry.Instance != null ? MatchTelemetry.Instance.CurrentFolder : null;
@@ -519,7 +522,7 @@ namespace Overpower.TestRange
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.RevealInFinder(folder);
 #else
-            Application.OpenURL("file:///" + folder.Replace('\\', '/'));
+            Application.OpenURL(new System.Uri(folder).AbsoluteUri);
 #endif
         }
 

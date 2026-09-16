@@ -24,7 +24,8 @@ namespace Overpower.Telemetry
     /// snapshot: wait for the server clock, re-check nobody else already wrote it, then write. The one
     /// difference is the write itself uses Photon's check-and-set (`expectedProperties`) on the ABSENT
     /// key, so two masters racing during a migration can't both win even inside that re-check's own
-    /// race window - see TryClaimMatchIdentity's comment.
+    /// race window - see TryClaimMatchIdentity's comment. A plain, unchecked write is the fallback if
+    /// mId never echoes back within a few seconds of that write (see ClaimMatchIdentityWhenClockIsReady).
     ///
     /// Deleting Assets/scripts/Telemetry (design doc, Principle 1) removes this whole component and
     /// the game still runs: nothing outside this folder depends on it existing.
@@ -61,13 +62,21 @@ namespace Overpower.Telemetry
         // same value and same reasoning as BuildingManager.ServerClockWaitSeconds.
         private const float ServerClockWaitSeconds = 5f;
 
+        // How long the master waits, after sending the check-and-set match identity write, for mId to
+        // actually show up in the room's Custom Properties before falling back to a plain write - see
+        // ClaimMatchIdentityWhenClockIsReady's own comment on why this fallback exists at all.
+        private const float MatchIdentityEchoWaitSeconds = 5f;
+
         // Cap on how many log lines are held before the file has opened (match id + this client's own
         // actor number both known). Only ever a handful of lines in practice - join/leave/masterChanged
         // observed in the first frame or two after connecting - but a cap keeps a client that somehow
         // never resolves its identity from growing this list forever.
         private const int MaxPendingLines = 200;
 
-        private readonly TelemetryWriter writer = new TelemetryWriter();
+        // Not readonly: OnLeftRoom replaces this with a fresh instance for the next match, so one
+        // match's IO error (which permanently sets TelemetryWriter.Disabled) doesn't silently disable
+        // telemetry for every match this client plays afterwards in the same session.
+        private TelemetryWriter writer = new TelemetryWriter();
         private readonly List<string> pendingLines = new List<string>();
 
         private string matchId;
@@ -146,6 +155,7 @@ namespace Overpower.Telemetry
         public override void OnLeftRoom()
         {
             writer.Close();
+            writer = new TelemetryWriter(); // Fresh writer for whatever match comes next - see the field's own comment.
             CurrentFolder = null;
             matchId = null;
             matchStartMs = 0;
@@ -200,15 +210,21 @@ namespace Overpower.Telemetry
         }
 
         /// <summary>Master only: writes mId/mStart if they are still absent from the room. Guarded
-        /// twice against two masters racing during a migration:
+        /// against two masters racing during a migration:
         /// (1) a local check that the key is absent before even trying, same shape as
         ///     BuildingManager.WriteInitialSnapshotWhenClockIsReady re-checking after its own wait;
         /// (2) the write itself passes `expectedProperties = { mId: null }` (Photon's check-and-set),
         ///     so the SERVER only applies it if mId is still unset at the moment it processes the
         ///     op - closing the window between (1)'s local check and the op actually landing, which a
-        ///     local check alone cannot close. If this client loses that race, SetCustomProperties
-        ///     simply returns false and this client does nothing further; the winner's value arrives
-        ///     through OnRoomPropertiesUpdate like any other client's.</summary>
+        ///     local check alone cannot close.
+        ///
+        /// `Room.SetCustomProperties`'s bool return is whether the operation could be SENT (are we
+        /// connected, is there a room...), NOT whether the server's compare-and-swap accepted it -
+        /// `LoadBalancingClient.OpSetPropertiesOfRoom` returns that same "could it be sent" bool and
+        /// never surfaces the CAS outcome to the caller. So this does not branch on that return value at
+        /// all; instead ClaimMatchIdentityWhenClockIsReady waits for the real answer - mId actually
+        /// showing up in the room's Custom Properties, via the ordinary OnRoomPropertiesUpdate path,
+        /// whether it was this client's write that won or another master's.</summary>
         private void TryClaimMatchIdentity()
         {
             if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient) return;
@@ -227,14 +243,17 @@ namespace Overpower.Telemetry
                 yield return null;
             }
 
-            claimIdentityRoutine = null;
+            if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
+            {
+                claimIdentityRoutine = null;
+                yield break;
+            }
 
-            if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient) yield break;
-
-            // Someone else may have written it while this client waited.
+            // Someone else may have written it while this client waited for the clock.
             if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(TelemetryKeys.RoomMatchId))
             {
                 ReadMatchIdentity(PhotonNetwork.CurrentRoom.CustomProperties);
+                claimIdentityRoutine = null;
                 yield break;
             }
 
@@ -242,15 +261,49 @@ namespace Overpower.Telemetry
             if (now == 0)
                 Debug.LogWarning("[Telemetry] server clock still reads 0 after waiting - writing the match start stamp anyway (events before it will read t = -1 - see the design doc's Error handling).");
 
+            string claimedMatchId = Guid.NewGuid().ToString("N");
             var props = new Hashtable
             {
-                { TelemetryKeys.RoomMatchId, Guid.NewGuid().ToString("N") },
+                { TelemetryKeys.RoomMatchId, claimedMatchId },
                 { TelemetryKeys.RoomMatchStart, now },
             };
             var expectedAbsent = new Hashtable { { TelemetryKeys.RoomMatchId, null } };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent);
 
-            if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent))
-                Debug.Log("[Telemetry] match identity write was refused (another master already wrote it) - waiting for its value.");
+            // Wait for mId to actually show up - see TryClaimMatchIdentity's own comment on why the call
+            // above's return value is not the signal to wait for.
+            float waitedForEcho = 0f;
+            while (!PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(TelemetryKeys.RoomMatchId) && waitedForEcho < MatchIdentityEchoWaitSeconds)
+            {
+                waitedForEcho += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            claimIdentityRoutine = null;
+
+            if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient) yield break;
+
+            if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(TelemetryKeys.RoomMatchId))
+            {
+                ReadMatchIdentity(PhotonNetwork.CurrentRoom.CustomProperties);
+                yield break;
+            }
+
+            // Safety net, not the primary path: a live single-master run confirmed the CAS write above
+            // shows up almost immediately, but Photon's client source gives no documented guarantee that
+            // an expected value of null matches a key that is ABSENT server-side (only that it matches an
+            // existing null-valued one - see TryClaimMatchIdentity's own comment on the return value not
+            // being proof either way). If mId still has not appeared after waiting, something silently
+            // dropped or rejected the write for a reason other than "another master's write won" - fall
+            // back to one plain, unchecked write rather than leaving the match with no identity at all
+            // (no session file would ever open on any client without mId).
+            Debug.LogWarning("[Telemetry] match identity never echoed back after the check-and-set write - falling back to a plain write.");
+            var fallbackProps = new Hashtable
+            {
+                { TelemetryKeys.RoomMatchId, claimedMatchId },
+                { TelemetryKeys.RoomMatchStart, PhotonNetwork.ServerTimestamp },
+            };
+            PhotonNetwork.CurrentRoom.SetCustomProperties(fallbackProps);
         }
 
         // ---------------------------------------------------------------- file + session header
@@ -281,7 +334,14 @@ namespace Overpower.Telemetry
 
         /// <summary>One folder per match on one PC: reuses an existing folder ending in `_{mId8}` if
         /// one already exists (a late-starting second client on the same machine), otherwise creates a
-        /// freshly dated one.</summary>
+        /// freshly dated one.
+        ///
+        /// Small same-instant race, accepted rather than fixed: two local clients opening their file for
+        /// the first time in the very same frame can both fail to see the other's not-yet-created
+        /// directory and each create their own `_{mId8}` folder. Harmless - T5's report builder already
+        /// has to merge every client's `.jsonl` by `mId`, not by which folder happened to hold it, so two
+        /// folders for one match still merge into one report; it would only ever show up as a slightly
+        /// odd folder listing, never a wrong number.</summary>
         private string ResolveMatchFolder()
         {
             string root = Path.Combine(Application.persistentDataPath, string.IsNullOrEmpty(config.FolderName) ? "Telemetry" : config.FolderName);
