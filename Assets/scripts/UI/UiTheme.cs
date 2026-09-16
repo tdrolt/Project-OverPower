@@ -361,6 +361,11 @@ namespace Overpower.UI
         public Color captureBarTrackColor = new Color(0.1f, 0.1f, 0.12f, 0.85f);
 
         [Header("OverPower (Task 2.6, GDD p.20)")]
+        [Tooltip("Text shown in the HUD's OverPower label while the buff is fully ACTIVE.")]
+        public string overPowerActiveText = "OVERPOWER";
+        [Tooltip("Text shown in the HUD's OverPower label while the buff is only ARMED - hit by both " +
+                 "enemy teams within the window, near your own territory, but not yet triggered.")]
+        public string overPowerArmedText = "OverPower ready";
         [Tooltip("Text colour of the HUD label while the comeback buff is fully ACTIVE (shield just " +
                  "refilled, damage/fire rate/range boosted, overheat nullified). A hot, urgent colour " +
                  "of its own - distinct from the overheat/bounty families - so the one moment the " +

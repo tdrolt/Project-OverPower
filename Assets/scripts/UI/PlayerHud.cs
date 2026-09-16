@@ -246,10 +246,17 @@ namespace Overpower.UI
         // OverPower (Task 2.6, GDD p.20)
         // ============================================================================================
 
-        /// <summary>Shows "OVERPOWER" while the buff is fully active, a fainter "OverPower ready"
-        /// hint while only armed, and hides the label the rest of the time - both colours and both
-        /// strings distinguishing the two states so a glance tells you which one you are in, the
-        /// same distinction the silenced banner's own on/off state does not need but this one does.</summary>
+        /// <summary>Shows theme.overPowerActiveText while the buff is fully active, the fainter
+        /// theme.overPowerArmedText while only armed, and hides the label the rest of the time -
+        /// both colours and both strings distinguishing the two states so a glance tells you which
+        /// one you are in, the same distinction the silenced banner's own on/off state does not
+        /// need but this one does.
+        ///
+        /// Task 2.6 review fix: the text/colour write used to be gated ONLY on "did active change
+        /// since last frame", so the very first frame the label went hidden -> armed (active never
+        /// having changed from its default false) skipped that write entirely and the label showed
+        /// visible but blank. justShown below forces the same write on the first shown frame
+        /// regardless of whether active also happens to have changed.</summary>
         private void UpdateOverPower()
         {
             if (overPowerBuff == null)
@@ -259,6 +266,7 @@ namespace Overpower.UI
             bool armed = overPowerBuff.IsArmed;
             bool shown = active || armed;
 
+            bool justShown = shown && !lastOverPowerShown;
             if (shown != lastOverPowerShown)
             {
                 overPowerLabel.gameObject.SetActive(shown);
@@ -267,9 +275,9 @@ namespace Overpower.UI
             if (!shown)
                 return;
 
-            if (active != lastOverPowerActive)
+            if (active != lastOverPowerActive || justShown)
             {
-                overPowerLabel.text = active ? "OVERPOWER" : "OverPower ready";
+                overPowerLabel.text = active ? theme.overPowerActiveText : theme.overPowerArmedText;
                 overPowerLabel.color = active ? theme.overPowerActiveColor : theme.overPowerArmedColor;
                 lastOverPowerActive = active;
             }
