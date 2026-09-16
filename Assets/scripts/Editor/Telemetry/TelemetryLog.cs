@@ -38,9 +38,10 @@ namespace Overpower.EditorTools.Telemetry
         public readonly bool IsMaster;
         public readonly string MatchId;
         public readonly string Commit;
+        public readonly int Schema;
         public readonly JObject Tuning;
 
-        public TelemetrySession(string file, int actor, string nick, int team, bool isMaster, string matchId, string commit, JObject tuning)
+        public TelemetrySession(string file, int actor, string nick, int team, bool isMaster, string matchId, string commit, int schema, JObject tuning)
         {
             File = file;
             Actor = actor;
@@ -49,6 +50,7 @@ namespace Overpower.EditorTools.Telemetry
             IsMaster = isMaster;
             MatchId = matchId;
             Commit = commit;
+            Schema = schema;
             Tuning = tuning;
         }
     }
@@ -59,7 +61,10 @@ namespace Overpower.EditorTools.Telemetry
     /// Merge key (the plan's own term): files are grouped by their own session's match id. A folder
     /// holding two different match ids (a stray file, or two runs accidentally sharing one folder)
     /// builds from whichever id has the most files and reports the other rather than silently
-    /// merging two matches' facts into one report - see <see cref="OtherMatchId"/>.</summary>
+    /// merging two matches' facts into one report - see <see cref="OtherMatchId"/>. Load reads a
+    /// SINGLE folder; it does not itself look across sibling folders for the rest of one match's
+    /// files (see MatchTelemetry.ResolveMatchFolder's own comment on the one race that can produce
+    /// two folders for one match).</summary>
     public sealed class TelemetryLog
     {
         private const string EventNameKey = "e";
@@ -70,8 +75,18 @@ namespace Overpower.EditorTools.Telemetry
         public IReadOnlyList<string> IncludedFiles { get; private set; }
         public IReadOnlyList<TelemetryEvent> Events { get; private set; }
         public IReadOnlyList<TelemetrySession> Sessions { get; private set; }
+        /// <summary>Malformed lines and unknown event names, counted only across the files that were
+        /// actually included in this build (opus review fix) - a stray "other match" file's own junk
+        /// no longer inflates the count for the match actually being reported.</summary>
         public int MalformedLineCount { get; private set; }
         public int UnknownEventCount { get; private set; }
+        /// <summary>A file that could not be opened/read at all (opus review fix - previously
+        /// silently skipped). Counted globally: an unreadable file has no session of its own, so it
+        /// can never be attributed to one match id or another.</summary>
+        public int UnreadableFileCount { get; private set; }
+        /// <summary>A session whose own `schema` is newer than this build understands
+        /// (TelemetryKeys.SchemaVersion) - counted, never a failure (design doc, Error handling).</summary>
+        public int NewerSchemaCount { get; private set; }
         public string OtherMatchId { get; private set; }
         public int OtherMatchFileCount { get; private set; }
 
@@ -99,17 +114,26 @@ namespace Overpower.EditorTools.Telemetry
 
             var eventsByFile = new Dictionary<string, List<TelemetryEvent>>();
             var sessionByFile = new Dictionary<string, TelemetrySession>();
-            int malformed = 0, unknown = 0;
+            var malformedByFile = new Dictionary<string, int>();
+            var unknownByFile = new Dictionary<string, int>();
+            int unreadable = 0;
+            int newerSchema = 0;
 
             foreach (string path in files)
             {
                 string name = Path.GetFileName(path);
                 var events = new List<TelemetryEvent>();
                 eventsByFile[name] = events;
+                malformedByFile[name] = 0;
+                unknownByFile[name] = 0;
 
                 string[] lines;
                 try { lines = File.ReadAllLines(path); }
-                catch { continue; } // Unreadable file - contributes nothing, doesn't fail the report.
+                catch
+                {
+                    unreadable++; // Opus review fix: counted, not silently dropped.
+                    continue;
+                }
 
                 foreach (string rawLine in lines)
                 {
@@ -117,31 +141,46 @@ namespace Overpower.EditorTools.Telemetry
                     if (trimmed.Length == 0) continue;
 
                     JObject data;
-                    try { data = JObject.Parse(trimmed); }
-                    catch { malformed++; continue; }
-
-                    string eventName = data[EventNameKey]?.ToString();
-                    if (string.IsNullOrEmpty(eventName))
+                    string eventName;
+                    double t;
+                    try
                     {
-                        malformed++; // Valid JSON, but not one of our lines at all.
+                        // Opus review fix: the "t" parse used to sit OUTSIDE this try, so a
+                        // non-numeric "t" (a corrupt or hand-edited line) threw uncaught instead of
+                        // counting as malformed like every other bad line.
+                        data = JObject.Parse(trimmed);
+                        eventName = data[EventNameKey]?.ToString();
+                        if (string.IsNullOrEmpty(eventName))
+                        {
+                            malformedByFile[name]++; // Valid JSON, but not one of our lines at all.
+                            continue;
+                        }
+                        JToken timeToken = data[TimeKey];
+                        t = (timeToken != null && timeToken.Type != JTokenType.Null) ? timeToken.ToObject<double>() : -1.0;
+                    }
+                    catch
+                    {
+                        malformedByFile[name]++;
                         continue;
                     }
 
-                    JToken timeToken = data[TimeKey];
-                    double t = (timeToken != null && timeToken.Type != JTokenType.Null) ? timeToken.ToObject<double>() : -1.0;
-
                     if (!KnownEventNames.Contains(eventName))
-                        unknown++;
+                        unknownByFile[name]++;
 
                     events.Add(new TelemetryEvent(name, eventName, t, data));
 
                     if (eventName == TelemetryKeys.Session && !sessionByFile.ContainsKey(name))
-                        sessionByFile[name] = ParseSession(name, data);
+                    {
+                        TelemetrySession session = ParseSession(name, data);
+                        sessionByFile[name] = session;
+                        if (session.Schema > TelemetryKeys.SchemaVersion)
+                            newerSchema++;
+                    }
                 }
             }
 
-            log.MalformedLineCount = malformed;
-            log.UnknownEventCount = unknown;
+            log.UnreadableFileCount = unreadable;
+            log.NewerSchemaCount = newerSchema;
 
             // ---------------------------------------------------------------- merge key: group by match id
             var filesByMatchId = new Dictionary<string, List<string>>();
@@ -188,6 +227,11 @@ namespace Overpower.EditorTools.Telemetry
             log.IncludedFiles = included;
             log.Sessions = included.Where(sessionByFile.ContainsKey).Select(f => sessionByFile[f]).ToList();
 
+            // Opus review fix: only the chosen match's own files contribute to these counts now -
+            // previously summed across every file read, including an "other match" one never merged in.
+            log.MalformedLineCount = included.Sum(f => malformedByFile.GetValueOrDefault(f));
+            log.UnknownEventCount = included.Sum(f => unknownByFile.GetValueOrDefault(f));
+
             var mergedEvents = new List<TelemetryEvent>();
             foreach (string name in included)
                 if (eventsByFile.TryGetValue(name, out List<TelemetryEvent> list))
@@ -208,8 +252,9 @@ namespace Overpower.EditorTools.Telemetry
             bool master = data[TelemetryKeys.IsMaster]?.ToObject<bool?>() ?? false;
             string matchId = data[TelemetryKeys.MatchId]?.ToString() ?? "";
             string commit = data[TelemetryKeys.Commit]?.ToString() ?? "";
+            int schema = data[TelemetryKeys.Schema]?.ToObject<int?>() ?? 0;
             JObject tuning = data[TelemetryKeys.Tuning] as JObject;
-            return new TelemetrySession(file, actor, nick, team, master, matchId, commit, tuning);
+            return new TelemetrySession(file, actor, nick, team, master, matchId, commit, schema, tuning);
         }
     }
 }

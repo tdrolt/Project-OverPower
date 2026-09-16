@@ -35,6 +35,13 @@ namespace Overpower.EditorTools.Telemetry
         public int UnknownCaptureStateCount;
         public string OtherMatchId;
         public int OtherMatchFileCount;
+        /// <summary>Opus review fixes (item 10): quality counters that used to either crash or pass
+        /// silently.</summary>
+        public int UnreadableFileCount;
+        public int NewerSchemaCount;
+        /// <summary>An `ownership` line whose own tier was outside 1..4 (a bad id, or a zone not yet
+        /// registered) - skipped rather than indexing out of range, and counted here.</summary>
+        public int InvalidTierCount;
 
         /// <summary>The primary session's own tuning snapshot, re-serialized flat - T6's HTML report
         /// embeds this verbatim; T5 just carries it through.</summary>
@@ -56,8 +63,13 @@ namespace Overpower.EditorTools.Telemetry
     {
         public int Minute;
         public int Team;
-        /// <summary>Index 0..3 = tier 1..4.</summary>
-        public int[] IncomeByTier = new int[4];
+        /// <summary>Index 0..3 = tier 1..4. Double, not int (opus review fix item 4): a `goldEarned`
+        /// line's own `zones` array is rounded to whole gold per zone at the SOURCE, so summing many
+        /// already-rounded lines drifted noticeably from the authoritative `terr` total (a real log
+        /// measured Sigma-terr 254 vs Sigma-zones 244, -4%) - each line is rescaled to sum to its own
+        /// `terr` before accumulating (see TelemetryAggregator.ScaledZones), so keeping this a double
+        /// preserves that correction instead of re-rounding it away immediately.</summary>
+        public double[] IncomeByTier = new double[4];
         public int Bounty;
         public int Refund;
         public int Spent;
@@ -72,7 +84,9 @@ namespace Overpower.EditorTools.Telemetry
         public int Team;
         public int Tier;
         public double SecondsHeld;
-        public int GoldGenerated;
+        /// <summary>Double, not int - see EconomyByMinuteRow.IncomeByTier's own comment on why the
+        /// per-line rescale needs to keep its fraction instead of re-rounding every interval.</summary>
+        public double GoldGenerated;
     }
 
     public sealed class OwnershipRow
@@ -95,9 +109,11 @@ namespace Overpower.EditorTools.Telemetry
         public double Start;
         public double End;
         /// <summary>"completed" / "neutralised" (from the matching `ownership` change - never trusted
-        /// from the `capture` line's own state string, which the T4 review found unreliable),
-        /// "abandoned" (paused and never resumed by match end) or "interrupted" (still active when
-        /// the log ends).</summary>
+        /// from the `capture` line's own state string, which the T4 review found unreliable and
+        /// which is stateless as of the T4 fix: "paused"/"drainPaused" is reported for BOTH a genuine
+        /// pause and a completion/neutralisation, at whatever progress it actually stopped at) or
+        /// "abandoned" - either still open when the log ends, or superseded mid-match by a fresh
+        /// `started`/`drainStarted` for a different team or direction before this one ever closed.</summary>
         public string Outcome;
         public double Duration;
         public int Players;
@@ -157,7 +173,15 @@ namespace Overpower.EditorTools.Telemetry
         public double TimeEquippedSeconds;
         public int Pulls;
         public int Projectiles;
+        /// <summary>Discrete `Projectile`-source hits only. Accuracy is Hits/Projectiles - a
+        /// splash-damage weapon's own splash rows are counted separately (<see cref="SplashHits"/>)
+        /// so one rocket landing (1 direct hit + N splash hits on nearby targets) can no longer push
+        /// accuracy over 100% (opus review fix item 6).</summary>
         public int Hits;
+        /// <summary>`Splash`-source hits - counted, but never divided into Projectiles for accuracy
+        /// (a splash row isn't "a projectile that connected", it's damage a DIFFERENT connecting
+        /// projectile happened to also deal).</summary>
+        public int SplashHits;
         public double Accuracy;
         public float DamageRaw;
         public float ArmorDamage;

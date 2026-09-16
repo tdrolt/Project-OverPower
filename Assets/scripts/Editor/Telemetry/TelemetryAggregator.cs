@@ -8,33 +8,71 @@ namespace Overpower.EditorTools.Telemetry
 {
     /// <summary>Task T5 step 3: pure log -> tables. No IO of its own - TelemetryLog already did the
     /// reading, CsvReportWriter (and later HtmlReportWriter) only format what this produces. Edit-mode
-    /// tested against a hand-written fixture with hand-computed totals (TelemetryAggregatorTests).
+    /// tested against a hand-written fixture with hand-computed totals (TelemetryAggregatorTests) plus
+    /// a set of focused fixtures for the opus review fixes below (TelemetryAggregatorReviewFixesTests).
     ///
-    /// T4-review corrections this was built against (see the coordinator's own note, applied here
-    /// rather than re-litigated):
-    /// 1. Capture outcomes come ONLY from `ownership` lines, never from a `capture` line's own state
-    ///    string - see BuildCaptures. `capture` lines are read defensively: an unrecognised state is
-    ///    counted (Header.UnknownCaptureStateCount) and otherwise ignored, never a crash.
+    /// T4-review corrections (first pass, kept):
     /// 2. `bounty` (master, per-player-per-payout) is NOT added into any team/player income total -
     ///    the owner's own `goldEarned.bounty` field already reflects the credit that event describes.
-    ///    `bounty` lines are parsed by TelemetryLog (a known event name) but this aggregator does not
-    ///    consume them into any T5 table.
     /// 3. A `goldEarned` line that is entirely zero (every source 0 and `zones` empty or all-zero) is
-    ///    junk from a remote copy's teardown or the owner's own closing flush - skipped everywhere.
+    ///    junk from a remote copy's teardown or the owner's own closing flush - skipped everywhere
+    ///    (kept for old logs; new clients no longer write these at all per the T4 fix).
     /// 4. `underAttack` isn't consumed by any T5 table (none of the 12 CSVs need it) - left for a
     ///    later task.
-    /// 5. An armor `purchase`'s `item` id is treated as a plain opaque int, never decoded.</summary>
+    /// 5. An armor `purchase`'s `item` id (100+level absorb, 200+level recharge as of the T4 fix) is
+    ///    treated as a plain opaque int, never decoded.
+    ///
+    /// Opus T5 review (second pass), by item number:
+    /// 1. Captures are rebuilt as ONE time-ordered pass over `capture` lines and deduped `ownership`
+    ///    changes together - see BuildCaptures. An `ownership` change is what closes an attempt
+    ///    (completed/neutralised); a fresh `started`/`drainStarted` while one is still open abandons
+    ///    it; anything still open at match end is abandoned. A `capture` line's own state is read
+    ///    defensively (unrecognised states counted, never fatal) but never trusted for the outcome -
+    ///    the T4 fix made `capture` stateless (a "paused" at progress 1 looks identical whether it
+    ///    completed or was merely interrupted; only `ownership` tells them apart).
+    /// 2. A player's team comes from their own first `sample` with tm >= 0, falling back to the
+    ///    session line - see EffectiveTeamByActor. A late joiner's session can carry tm:-1 before the
+    ///    room's player-properties echo arrives, which used to drop their whole income/spend/zone
+    ///    slice from every team-keyed table.
+    /// 3. Time alive and every sample-derived integral (equipped time, zone time) are bounded by the
+    ///    PLAYER'S OWN covered range (their file's first/last real event), not the whole match length -
+    ///    a joiner at t=600 no longer shows 1200s alive in a 1200s match. Dead samples (alive:false)
+    ///    no longer accrue equipped/zone time for the interval they start.
+    /// 4. A `goldEarned` line's `zones` array is rounded to whole gold per zone at the source, so
+    ///    summing many already-rounded lines drifts from the authoritative `terr` total. Each line is
+    ///    rescaled to sum to its own `terr` before accumulating (ScaledZones), keeping the fraction.
+    /// 5. An out-of-range tier (an `ownership` line can carry tier 0 for an unregistered zone) no
+    ///    longer indexes IncomeByTier/ZonesHeldByTier out of range - skipped and counted
+    ///    (Header.InvalidTierCount).
+    /// 6. Accuracy is Projectile-hits / projectiles only; Splash hits (a rocket's own splash falloff
+    ///    landing on several targets from one projectile) are counted separately (WeaponRow.SplashHits)
+    ///    instead of inflating both the numerator and looking like more than 100% accuracy.
+    /// 7. The gold gap ignores a balance sample older than (bucket end - 60s) - a leaver's stale last
+    ///    balance no longer keeps counting for their team forever.
+    /// 8. A lethal Burn tick is logged as BOTH a `dot` (flushed just before) and a `hit` (so every kill
+    ///    keeps a row) - `hit` rows with src:"Burn" are excluded from every damage sum (already counted
+    ///    via the `dot`), but kept in hits.csv and for kill attribution (kills come from `death`, never
+    ///    from a hit row, so this was never at risk).
+    /// 9. Header.FreeLoadoutUsed is the tuning snapshot's flag OR'd with any `purchase.free:true` -
+    ///    a mid-match toggle (or a per-purchase free flag with no matching tuning flag) is no longer missed.
+    /// 10. Robustness: a non-numeric `t`, a null inside `assists`, and an unreadable file no longer
+    ///     throw or vanish silently (see TelemetryLog); a newer `schema` is counted, not ignored.
+    /// 11. Integral edges: the last sample's own trailing interval (capped at the sample interval) is
+    ///     now included; t == -1 samples are ignored; any gap between two samples is capped at 2x the
+    ///     sample interval (a disconnected client doesn't keep accruing).
+    /// 13. CsvReportWriter now writes UTF-8 WITH a BOM (see its own comment).</summary>
     public static class TelemetryAggregator
     {
         private const int Neutral = -1; // TerritoryMap.Neutral's own value - a zone with no owner.
-
-        private static readonly HashSet<string> DiscreteHitSources = new HashSet<string> { "Projectile", "Splash" };
+        private const double DefaultSampleIntervalSeconds = 5.0;
 
         private static readonly HashSet<string> CaptureOpenStates =
             new HashSet<string> { "started", "resumed", "drainStarted", "drainResumed" };
+        private static readonly HashSet<string> CaptureFreshStartStates = new HashSet<string> { "started", "drainStarted" };
         private static readonly HashSet<string> CapturePauseStates = new HashSet<string> { "paused", "drainPaused" };
-        // "completed"/"neutralised" are known (older logs may still carry them) but never drive the
-        // state machine - see the class comment's point 1. Anything outside this whole set is unknown.
+        // "completed"/"neutralised" are known (older, pre-T4-fix logs may still carry them) but never
+        // drive the state machine - see the class comment's item 1. Anything outside this whole set
+        // is unknown (counted, not fatal).
         private static readonly HashSet<string> CaptureKnownStates = new HashSet<string>
             { "started", "resumed", "drainStarted", "drainResumed", "paused", "drainPaused", "completed", "neutralised" };
 
@@ -42,7 +80,6 @@ namespace Overpower.EditorTools.Telemetry
         {
             public int Team;
             public double Start;
-            public bool Paused;
             public bool IsDrain;
             public int LastPlayers;
         }
@@ -65,6 +102,16 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
                 if (e.T > matchLength) matchLength = e.T;
 
+            // Opus review item 2: team from the actor's own first sample with tm >= 0, falling back
+            // to the session - see the method's own comment.
+            Dictionary<int, int> effectiveTeam = BuildEffectiveTeam(log, fileActor, sessionByActor);
+
+            // Opus review item 3: every player's own covered range (their file's first/last real
+            // event) - time-alive and every sample integral are bounded by THIS, not matchLength.
+            Dictionary<int, (double First, double Last)> coverageByActor = BuildCoverageByActor(log, fileActor);
+
+            double sampleInterval = ResolveSampleIntervalSeconds(log);
+
             var zoneTier = new Dictionary<int, int>();
             // Every raw ownership change per zone, IN TIME ORDER, including transitions to neutral -
             // the ownership.csv stint list (below) deliberately omits neutral rows, but capture-closing
@@ -74,14 +121,14 @@ namespace Overpower.EditorTools.Telemetry
 
             BuildHeader(tables.Header, log, sessionByActor, matchLength);
             BuildCaptures(log, rawChangesByZone, tables.Header, tables.Captures);
-            BuildPurchasesAndBlocked(log, fileActor, sessionByActor, tables);
+            BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables);
             BuildHits(log, tables.Hits);
-            BuildGoldTimelineAndEconomy(log, fileActor, sessionByActor, zoneTier, rawChangesByZone, matchLength, tables);
-            BuildZoneIncome(log, fileActor, sessionByActor, zoneTier, tables.Ownership, tables.ZoneIncome);
+            BuildGoldTimelineAndEconomy(log, fileActor, sessionByActor, effectiveTeam, zoneTier, rawChangesByZone, matchLength, tables);
+            BuildZoneIncome(log, fileActor, effectiveTeam, zoneTier, tables.Ownership, tables.ZoneIncome);
 
-            var sampleStats = BuildSampleDerivedStats(log, fileActor, sessionByActor, rawChangesByZone);
+            var sampleStats = BuildSampleDerivedStats(log, fileActor, effectiveTeam, rawChangesByZone, coverageByActor, sampleInterval);
             BuildWeaponsAndAbilities(log, tables.Hits, sampleStats.EquippedSecondsByWeapon, tables);
-            BuildPlayersAndDeaths(log, fileActor, sessionByActor, sampleStats, matchLength, tables);
+            BuildPlayersAndDeaths(log, fileActor, sessionByActor, effectiveTeam, coverageByActor, sampleStats, tables);
 
             return tables;
         }
@@ -94,6 +141,8 @@ namespace Overpower.EditorTools.Telemetry
             header.MatchLengthSeconds = matchLength;
             header.MalformedLineCount = log.MalformedLineCount;
             header.UnknownEventCount = log.UnknownEventCount;
+            header.UnreadableFileCount = log.UnreadableFileCount;
+            header.NewerSchemaCount = log.NewerSchemaCount;
             header.OtherMatchId = log.OtherMatchId;
             header.OtherMatchFileCount = log.OtherMatchFileCount;
 
@@ -120,14 +169,21 @@ namespace Overpower.EditorTools.Telemetry
                     header.Markers.Add(new MarkerRow
                     {
                         T = e.T,
-                        Actor = e.Data[TelemetryKeys.Actor]?.ToObject<int?>() ?? -1,
+                        Actor = ReadInt(e.Data, TelemetryKeys.Actor, -1),
                         Note = e.Data[TelemetryKeys.Note]?.ToString() ?? "",
                     });
                 }
                 else if (e.Name == TelemetryKeys.GoldEarned && !IsJunkGoldEarned(e.Data))
                 {
-                    if ((e.Data[TelemetryKeys.Debug]?.ToObject<int?>() ?? 0) > 0)
+                    if (ReadInt(e.Data, TelemetryKeys.Debug, 0) > 0)
                         header.DebugGoldUsed = true;
+                }
+                // Opus review item 9: OR the tuning flag with any purchase actually marked free -
+                // a mid-match Free Loadout toggle (or a free purchase with no matching tuning read)
+                // must still surface the warning.
+                else if (e.Name == TelemetryKeys.Purchase && (e.Data[TelemetryKeys.Free]?.ToObject<bool?>() ?? false))
+                {
+                    header.FreeLoadoutUsed = true;
                 }
             }
 
@@ -151,6 +207,61 @@ namespace Overpower.EditorTools.Telemetry
             }
         }
 
+        /// <summary>Opus review item 2: a late joiner's `session` line can be written before the room's
+        /// player-properties echo carries their team (tm:-1), which used to drop their whole slice from
+        /// every team-keyed table (economy, zone income, gold gap, players.csv). Each actor's team is
+        /// instead read from their own first `sample` that reports tm >= 0 - `sample` is written by the
+        /// owner every interval for the rest of the match, so it catches up moments later - falling back
+        /// to the session's own team only if no sample ever does.</summary>
+        private static Dictionary<int, int> BuildEffectiveTeam(TelemetryLog log, Dictionary<string, int> fileActor,
+            Dictionary<int, TelemetrySession> sessionByActor)
+        {
+            var result = new Dictionary<int, int>();
+            foreach (TelemetryEvent e in log.Events)
+            {
+                if (e.Name != TelemetryKeys.Sample) continue;
+                int actor = ActorOf(e, fileActor);
+                if (result.ContainsKey(actor)) continue;
+                int tm = ReadInt(e.Data, TelemetryKeys.Team, -1);
+                if (tm >= 0) result[actor] = tm;
+            }
+            foreach (var kv in sessionByActor)
+                if (!result.ContainsKey(kv.Key))
+                    result[kv.Key] = kv.Value.Team;
+            return result;
+        }
+
+        private static Dictionary<int, (double First, double Last)> BuildCoverageByActor(TelemetryLog log, Dictionary<string, int> fileActor)
+        {
+            var firstT = new Dictionary<int, double>();
+            var lastT = new Dictionary<int, double>();
+            foreach (TelemetryEvent e in log.Events)
+            {
+                if (e.T < 0) continue; // Opus review item 11: t == -1 never counts as covered time.
+                int actor = ActorOf(e, fileActor);
+                if (!firstT.TryGetValue(actor, out double f) || e.T < f) firstT[actor] = e.T;
+                if (!lastT.TryGetValue(actor, out double l) || e.T > l) lastT[actor] = e.T;
+            }
+            var result = new Dictionary<int, (double, double)>();
+            foreach (int actor in firstT.Keys)
+                result[actor] = (firstT[actor], lastT[actor]);
+            return result;
+        }
+
+        /// <summary>The sample interval used to bound the trailing interval and cap gaps (opus review
+        /// item 11). Not yet part of the tuning snapshot (TelemetryConfig isn't serialized into it -
+        /// see TuningSnapshot.Json), so this reads a `telemetry.sampleIntervalSeconds` field if a
+        /// future schema ever adds one, and otherwise falls back to the shipped default (5s).</summary>
+        private static double ResolveSampleIntervalSeconds(TelemetryLog log)
+        {
+            foreach (TelemetrySession s in log.Sessions)
+            {
+                double? v = s.Tuning?["telemetry"]?["sampleIntervalSeconds"]?.ToObject<double?>();
+                if (v.HasValue && v.Value > 0) return v.Value;
+            }
+            return DefaultSampleIntervalSeconds;
+        }
+
         // ==================================================================== ownership
 
         private static void BuildOwnership(TelemetryLog log, List<OwnershipRow> outStints, Dictionary<int, int> zoneTier,
@@ -163,11 +274,11 @@ namespace Overpower.EditorTools.Telemetry
             {
                 if (e.Name != TelemetryKeys.Ownership) continue;
 
-                int zone = e.Data[TelemetryKeys.Zone]?.ToObject<int?>() ?? -1;
-                int tier = e.Data[TelemetryKeys.Tier]?.ToObject<int?>() ?? 0;
-                int oldOwner = e.Data[TelemetryKeys.OldOwner]?.ToObject<int?>() ?? Neutral;
-                int newOwner = e.Data[TelemetryKeys.NewOwner]?.ToObject<int?>() ?? Neutral;
-                int since = e.Data[TelemetryKeys.HeldSince]?.ToObject<int?>() ?? 0;
+                int zone = ReadInt(e.Data, TelemetryKeys.Zone, -1);
+                int tier = ReadInt(e.Data, TelemetryKeys.Tier, 0);
+                int oldOwner = ReadInt(e.Data, TelemetryKeys.OldOwner, Neutral);
+                int newOwner = ReadInt(e.Data, TelemetryKeys.NewOwner, Neutral);
+                int since = ReadInt(e.Data, TelemetryKeys.HeldSince, 0);
 
                 if (!dedupe.Add((zone, newOwner, since)))
                     continue; // The exact same change, logged by a second master around a handover.
@@ -225,86 +336,111 @@ namespace Overpower.EditorTools.Telemetry
 
         // ==================================================================== captures
 
+        /// <summary>Opus review item 1 (HIGH): rebuilt as ONE time-ordered pass over `capture` lines and
+        /// deduped `ownership` changes together - the old two-pass version consumed every capture line
+        /// first (collapsing every start/pause/resume cycle for a zone into a single mutable attempt
+        /// object) and only then walked ownership changes to close whatever was still open, so a zone
+        /// re-captured, drained, and captured again within one match produced at most one row instead
+        /// of several. Ownership items sort BEFORE a same-instant capture item (see the merge below),
+        /// so a completion recorded in the same instant as a stray same-tick capture line always closes
+        /// the right attempt first.</summary>
         private static void BuildCaptures(TelemetryLog log, Dictionary<int, List<(double T, int New)>> rawChangesByZone,
                                            ReportHeader header, List<CaptureRow> outCaptures)
         {
-            var open = new Dictionary<int, CaptureAttempt>();
+            var items = new List<(double T, bool IsOwnership, int Zone, string State, int Team, int Players, int NewOwner)>();
+
+            // Ownership items first: OrderBy below is stable, so for two items sharing the exact same
+            // t, whichever was appended here first keeps that relative order.
+            foreach (var kv in rawChangesByZone)
+                foreach (var (t, newOwner) in kv.Value)
+                    items.Add((t, true, kv.Key, "", -1, 0, newOwner));
 
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Capture) continue;
+                items.Add((e.T, false,
+                    ReadInt(e.Data, TelemetryKeys.Zone, -1),
+                    e.Data[TelemetryKeys.State]?.ToString() ?? "",
+                    ReadInt(e.Data, TelemetryKeys.Team, -1),
+                    ReadInt(e.Data, TelemetryKeys.Players, 0),
+                    0));
+            }
 
-                int zone = e.Data[TelemetryKeys.Zone]?.ToObject<int?>() ?? -1;
-                string state = e.Data[TelemetryKeys.State]?.ToString() ?? "";
-                int team = e.Data[TelemetryKeys.Team]?.ToObject<int?>() ?? -1;
-                int players = e.Data[TelemetryKeys.Players]?.ToObject<int?>() ?? 0;
+            items = items.OrderBy(i => i.T).ToList();
 
-                if (!CaptureKnownStates.Contains(state))
+            var open = new Dictionary<int, CaptureAttempt>();
+
+            foreach (var item in items)
+            {
+                if (item.IsOwnership)
+                {
+                    if (!open.TryGetValue(item.Zone, out CaptureAttempt attempt)) continue;
+
+                    bool closesAsCompleted = !attempt.IsDrain && item.NewOwner == attempt.Team;
+                    bool closesAsNeutralised = attempt.IsDrain && item.NewOwner == Neutral;
+                    if (!closesAsCompleted && !closesAsNeutralised) continue;
+
+                    outCaptures.Add(new CaptureRow
+                    {
+                        Zone = item.Zone,
+                        Team = attempt.Team,
+                        Start = attempt.Start,
+                        End = item.T,
+                        Duration = item.T - attempt.Start,
+                        Outcome = closesAsCompleted ? "completed" : "neutralised",
+                        Players = attempt.LastPlayers,
+                    });
+                    open.Remove(item.Zone);
+                    continue;
+                }
+
+                if (!CaptureKnownStates.Contains(item.State))
                 {
                     header.UnknownCaptureStateCount++;
                     continue;
                 }
 
-                if (CaptureOpenStates.Contains(state))
+                if (CaptureOpenStates.Contains(item.State))
                 {
-                    if (!open.TryGetValue(zone, out CaptureAttempt attempt))
+                    bool isDrain = item.State == "drainStarted" || item.State == "drainResumed";
+                    bool isFreshStart = CaptureFreshStartStates.Contains(item.State);
+
+                    if (open.TryGetValue(item.Zone, out CaptureAttempt existing))
                     {
-                        open[zone] = new CaptureAttempt
+                        if (isFreshStart)
                         {
-                            Team = team,
-                            Start = e.T,
-                            IsDrain = state == "drainStarted" || state == "drainResumed",
-                            LastPlayers = players,
-                        };
+                            // A brand new start/drain-start while something is still open for this
+                            // zone: that previous attempt's story ends here, unresolved.
+                            outCaptures.Add(new CaptureRow
+                            {
+                                Zone = item.Zone,
+                                Team = existing.Team,
+                                Start = existing.Start,
+                                End = item.T,
+                                Duration = item.T - existing.Start,
+                                Outcome = "abandoned",
+                                Players = existing.LastPlayers,
+                            });
+                            open[item.Zone] = new CaptureAttempt { Team = item.Team, Start = item.T, IsDrain = isDrain, LastPlayers = item.Players };
+                        }
+                        else
+                        {
+                            // resumed/drainResumed: continues the SAME open attempt.
+                            existing.LastPlayers = item.Players;
+                        }
                     }
                     else
                     {
-                        attempt.Paused = false;
-                        attempt.LastPlayers = players;
+                        open[item.Zone] = new CaptureAttempt { Team = item.Team, Start = item.T, IsDrain = isDrain, LastPlayers = item.Players };
                     }
                 }
-                else if (CapturePauseStates.Contains(state))
+                else if (CapturePauseStates.Contains(item.State))
                 {
-                    if (open.TryGetValue(zone, out CaptureAttempt attempt))
-                    {
-                        attempt.Paused = true;
-                        attempt.LastPlayers = players;
-                    }
+                    if (open.TryGetValue(item.Zone, out CaptureAttempt attempt))
+                        attempt.LastPlayers = item.Players;
                 }
-                else
-                {
-                    // "completed"/"neutralised" - informational only (point 1); keep players fresh in
-                    // case an ownership change closes this same instant.
-                    if (open.TryGetValue(zone, out CaptureAttempt attempt))
-                        attempt.LastPlayers = players;
-                }
-            }
-
-            // Close attempts using ownership changes, not the capture line's own state - see point 1.
-            var allChanges = rawChangesByZone
-                .SelectMany(kv => kv.Value.Select(c => (Zone: kv.Key, c.T, c.New)))
-                .OrderBy(c => c.T)
-                .ToList();
-
-            foreach (var change in allChanges)
-            {
-                if (!open.TryGetValue(change.Zone, out CaptureAttempt attempt)) continue;
-
-                bool closesAsCompleted = !attempt.IsDrain && change.New == attempt.Team;
-                bool closesAsNeutralised = attempt.IsDrain && change.New == Neutral;
-                if (!closesAsCompleted && !closesAsNeutralised) continue;
-
-                outCaptures.Add(new CaptureRow
-                {
-                    Zone = change.Zone,
-                    Team = attempt.Team,
-                    Start = attempt.Start,
-                    End = change.T,
-                    Duration = change.T - attempt.Start,
-                    Outcome = closesAsCompleted ? "completed" : "neutralised",
-                    Players = attempt.LastPlayers,
-                });
-                open.Remove(change.Zone);
+                // "completed"/"neutralised" (pre-T4-fix logs only) - known, but never drives the state
+                // machine; the matching ownership item (in this same merged pass) is what actually closes it.
             }
 
             double matchLength = header.MatchLengthSeconds;
@@ -318,7 +454,7 @@ namespace Overpower.EditorTools.Telemetry
                     Start = attempt.Start,
                     End = matchLength,
                     Duration = matchLength - attempt.Start,
-                    Outcome = attempt.Paused ? "abandoned" : "interrupted",
+                    Outcome = "abandoned",
                     Players = attempt.LastPlayers,
                 });
             }
@@ -327,13 +463,13 @@ namespace Overpower.EditorTools.Telemetry
         // ==================================================================== purchases / shop blocked / hits
 
         private static void BuildPurchasesAndBlocked(TelemetryLog log, Dictionary<string, int> fileActor,
-                                                      Dictionary<int, TelemetrySession> sessionByActor, ReportTables tables)
+            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam, ReportTables tables)
         {
             foreach (TelemetryEvent e in log.Events)
             {
                 int actor = ActorOf(e, fileActor);
                 TelemetrySession session = sessionByActor.GetValueOrDefault(actor);
-                int team = session?.Team ?? -1;
+                int team = effectiveTeam.GetValueOrDefault(actor, -1);
                 string nick = session?.Nick ?? "";
 
                 if (e.Name == TelemetryKeys.Purchase)
@@ -342,10 +478,13 @@ namespace Overpower.EditorTools.Telemetry
                     {
                         T = e.T, Actor = actor, Nick = nick, Team = team, Kind = "purchase",
                         Category = e.Data[TelemetryKeys.Category]?.ToString() ?? "",
-                        ItemId = e.Data[TelemetryKeys.ItemId]?.ToObject<int?>() ?? -1,
-                        Amount = e.Data[TelemetryKeys.Price]?.ToObject<int?>() ?? 0,
-                        BalanceAfter = e.Data[TelemetryKeys.BalanceAfter]?.ToObject<int?>() ?? 0,
-                        Zone = e.Data[TelemetryKeys.Zone]?.ToObject<int?>() ?? -1,
+                        // Opus review item 5 (armor encoding): item stays a plain opaque int here -
+                        // 100+level (absorb) / 200+level (recharge) as of the T4 fix, a real weapon/
+                        // ability id otherwise. Never decoded - see TelemetryKeys.ItemId's own comment.
+                        ItemId = ReadInt(e.Data, TelemetryKeys.ItemId, -1),
+                        Amount = ReadInt(e.Data, TelemetryKeys.Price, 0),
+                        BalanceAfter = ReadInt(e.Data, TelemetryKeys.BalanceAfter, 0),
+                        Zone = ReadInt(e.Data, TelemetryKeys.Zone, -1),
                         Free = e.Data[TelemetryKeys.Free]?.ToObject<bool?>() ?? false,
                     });
                 }
@@ -356,9 +495,9 @@ namespace Overpower.EditorTools.Telemetry
                         T = e.T, Actor = actor, Nick = nick, Team = team, Kind = "refund",
                         Category = e.Data[TelemetryKeys.Category]?.ToString() ?? "",
                         ItemId = -1,
-                        Amount = e.Data[TelemetryKeys.Amount]?.ToObject<int?>() ?? 0,
-                        BalanceAfter = e.Data[TelemetryKeys.BalanceAfter]?.ToObject<int?>() ?? 0,
-                        Zone = e.Data[TelemetryKeys.Zone]?.ToObject<int?>() ?? -1,
+                        Amount = ReadInt(e.Data, TelemetryKeys.Amount, 0),
+                        BalanceAfter = ReadInt(e.Data, TelemetryKeys.BalanceAfter, 0),
+                        Zone = ReadInt(e.Data, TelemetryKeys.Zone, -1),
                     });
                 }
                 else if (e.Name == TelemetryKeys.ShopBlocked)
@@ -366,11 +505,11 @@ namespace Overpower.EditorTools.Telemetry
                     tables.ShopBlocked.Add(new ShopBlockedRow
                     {
                         T = e.T, Actor = actor, Nick = nick,
-                        ItemId = e.Data[TelemetryKeys.ItemId]?.ToObject<int?>() ?? -1,
-                        Price = e.Data[TelemetryKeys.Price]?.ToObject<int?>() ?? 0,
+                        ItemId = ReadInt(e.Data, TelemetryKeys.ItemId, -1),
+                        Price = ReadInt(e.Data, TelemetryKeys.Price, 0),
                         Reason = e.Data[TelemetryKeys.Reason]?.ToString() ?? "",
-                        Shortfall = e.Data[TelemetryKeys.Shortfall]?.ToObject<int?>() ?? 0,
-                        Zone = e.Data[TelemetryKeys.Zone]?.ToObject<int?>() ?? -1,
+                        Shortfall = ReadInt(e.Data, TelemetryKeys.Shortfall, 0),
+                        Zone = ReadInt(e.Data, TelemetryKeys.Zone, -1),
                     });
                 }
             }
@@ -388,12 +527,12 @@ namespace Overpower.EditorTools.Telemetry
                 outHits.Add(new HitRow
                 {
                     T = e.T,
-                    Attacker = e.Data[TelemetryKeys.Attacker]?.ToObject<int?>() ?? -1,
-                    AttackerTeam = e.Data[TelemetryKeys.AttackerTeam]?.ToObject<int?>() ?? -1,
-                    Victim = e.Data[TelemetryKeys.Victim]?.ToObject<int?>() ?? -1,
-                    VictimTeam = e.Data[TelemetryKeys.VictimTeam]?.ToObject<int?>() ?? -1,
-                    Weapon = e.Data[TelemetryKeys.Weapon]?.ToObject<int?>() ?? -1,
-                    Ability = e.Data[TelemetryKeys.AbilityId]?.ToObject<int?>() ?? -1,
+                    Attacker = ReadInt(e.Data, TelemetryKeys.Attacker, -1),
+                    AttackerTeam = ReadInt(e.Data, TelemetryKeys.AttackerTeam, -1),
+                    Victim = ReadInt(e.Data, TelemetryKeys.Victim, -1),
+                    VictimTeam = ReadInt(e.Data, TelemetryKeys.VictimTeam, -1),
+                    Weapon = ReadInt(e.Data, TelemetryKeys.Weapon, -1),
+                    Ability = ReadInt(e.Data, TelemetryKeys.AbilityId, -1),
                     Source = e.Data[TelemetryKeys.Source]?.ToString() ?? "",
                     Raw = ReadFloat(e.Data, TelemetryKeys.Raw),
                     Armor = ReadFloat(e.Data, TelemetryKeys.ArmorAbsorbed),
@@ -407,10 +546,17 @@ namespace Overpower.EditorTools.Telemetry
             }
         }
 
+        /// <summary>Opus review item 8: a lethal Burn tick is logged as both a flushed `dot` (its
+        /// accumulated bucket) AND a `hit` (so every kill keeps a row - see PlayerTelemetry.RouteHit).
+        /// That `hit` row's own damage is already counted via the `dot`; summing it again here would
+        /// double it. Kept in hits.csv itself, and kills never read a hit row at all (they come from
+        /// `death`), so only damage sums need this guard.</summary>
+        private static bool CountsTowardDamageSums(HitRow h) => h.Source != "Burn";
+
         // ==================================================================== gold timeline / economy by minute
 
         private static void BuildGoldTimelineAndEconomy(TelemetryLog log, Dictionary<string, int> fileActor,
-            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> zoneTier,
+            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam, Dictionary<int, int> zoneTier,
             Dictionary<int, List<(double T, int New)>> rawChangesByZone, double matchLength, ReportTables tables)
         {
             var earnedRunning = new Dictionary<int, int>();
@@ -420,7 +566,7 @@ namespace Overpower.EditorTools.Telemetry
             // 180s match's final samples) must land in the LAST occupied minute, not spill into an
             // empty one after it - see the minute-index clamp below.
             int numMinutes = Math.Max(1, (int)Math.Ceiling(matchLength / 60.0));
-            List<int> teams = sessionByActor.Values.Select(s => s.Team).Distinct().OrderBy(t => t).ToList();
+            List<int> teams = effectiveTeam.Values.Distinct().Where(t => t >= 0).OrderBy(t => t).ToList();
             var economyRows = new Dictionary<(int Minute, int Team), EconomyByMinuteRow>();
             for (int m = 0; m < numMinutes; m++)
                 foreach (int team in teams)
@@ -429,8 +575,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 int actor = ActorOf(e, fileActor);
-                TelemetrySession session = sessionByActor.GetValueOrDefault(actor);
-                int team = session?.Team ?? -1;
+                int team = effectiveTeam.GetValueOrDefault(actor, -1);
 
                 if (e.Name == TelemetryKeys.GoldEarned)
                 {
@@ -443,25 +588,24 @@ namespace Overpower.EditorTools.Telemetry
                     if (minute < 0) minute = 0;
                     if (team >= 0 && economyRows.TryGetValue((minute, team), out EconomyByMinuteRow row))
                     {
-                        var zones = e.Data[TelemetryKeys.Zones] as JArray;
-                        if (zones != null)
+                        // Opus review item 4: rescale this line's own zones[] to sum to its own terr
+                        // (authoritative) before accumulating - see ScaledZones.
+                        double[] scaledZones = ScaledZones(e.Data);
+                        for (int z = 0; z < scaledZones.Length; z++)
                         {
-                            for (int z = 0; z < zones.Count; z++)
-                            {
-                                if (!zoneTier.TryGetValue(z, out int tier)) continue;
-                                int amount = zones[z].ToObject<int?>() ?? 0;
-                                row.IncomeByTier[tier - 1] += amount;
-                            }
+                            if (!zoneTier.TryGetValue(z, out int tier)) continue;
+                            if (tier < 1 || tier > row.IncomeByTier.Length) { tables.Header.InvalidTierCount++; continue; } // item 5
+                            row.IncomeByTier[tier - 1] += scaledZones[z];
                         }
-                        // Point 2: goldEarned.bounty is the OWNER's own credited total, not the
-                        // master's per-payout `bounty` line - safe to sum here without double counting.
-                        row.Bounty += e.Data[TelemetryKeys.Bounty]?.ToObject<int?>() ?? 0;
-                        row.Refund += e.Data[TelemetryKeys.Refund]?.ToObject<int?>() ?? 0;
+                        // Point 2 (first-pass review): goldEarned.bounty is the OWNER's own credited
+                        // total, not the master's per-payout `bounty` line - safe to sum without double counting.
+                        row.Bounty += ReadInt(e.Data, TelemetryKeys.Bounty, 0);
+                        row.Refund += ReadInt(e.Data, TelemetryKeys.Refund, 0);
                     }
                 }
                 else if (e.Name == TelemetryKeys.Purchase)
                 {
-                    int price = e.Data[TelemetryKeys.Price]?.ToObject<int?>() ?? 0;
+                    int price = ReadInt(e.Data, TelemetryKeys.Price, 0);
                     spentRunning[actor] = spentRunning.GetValueOrDefault(actor) + price;
 
                     int minute = Math.Min((int)Math.Floor(e.T / 60.0), numMinutes - 1);
@@ -475,9 +619,9 @@ namespace Overpower.EditorTools.Telemetry
                     {
                         T = e.T,
                         Actor = actor,
-                        Nick = session?.Nick ?? "",
-                        Team = e.Data[TelemetryKeys.Team]?.ToObject<int?>() ?? team,
-                        Balance = e.Data[TelemetryKeys.Balance]?.ToObject<int?>() ?? 0,
+                        Nick = sessionByActor.GetValueOrDefault(actor)?.Nick ?? "",
+                        Team = team,
+                        Balance = ReadInt(e.Data, TelemetryKeys.Balance, 0),
                         EarnedSoFar = earnedRunning.GetValueOrDefault(actor),
                         SpentSoFar = spentRunning.GetValueOrDefault(actor),
                     });
@@ -490,14 +634,18 @@ namespace Overpower.EditorTools.Telemetry
                 double midpoint = Math.Min(m * 60.0 + 30.0, matchLength);
                 foreach (int zone in zoneTier.Keys)
                 {
+                    int tier = zoneTier[zone];
+                    if (tier < 1 || tier > 4) { tables.Header.InvalidTierCount++; continue; } // item 5
                     int owner = OwnerAtTime(rawChangesByZone, zone, midpoint);
                     if (owner < 0) continue;
                     if (economyRows.TryGetValue((m, owner), out EconomyByMinuteRow row))
-                        row.ZonesHeldByTier[zoneTier[zone] - 1]++;
+                        row.ZonesHeldByTier[tier - 1]++;
                 }
             }
 
-            // Gold gap to the richest team, from each actor's last sample at or before the minute's end.
+            // Gold gap to the richest team, from each actor's last sample at or before the minute's
+            // end - opus review item 7: a sample older than (bucket end - 60s) is stale (the player
+            // likely left) and is ignored rather than keeping their last known balance forever.
             var samplesByActor = new Dictionary<int, List<(double T, int Balance)>>();
             foreach (TelemetryEvent e in log.Events)
             {
@@ -505,17 +653,18 @@ namespace Overpower.EditorTools.Telemetry
                 int actor = ActorOf(e, fileActor);
                 if (!samplesByActor.TryGetValue(actor, out var list))
                     samplesByActor[actor] = list = new List<(double, int)>();
-                list.Add((e.T, e.Data[TelemetryKeys.Balance]?.ToObject<int?>() ?? 0));
+                list.Add((e.T, ReadInt(e.Data, TelemetryKeys.Balance, 0)));
             }
 
+            const double StaleSampleWindowSeconds = 60.0;
             for (int m = 0; m < numMinutes; m++)
             {
                 double cutoff = Math.Min((m + 1) * 60.0, matchLength);
+                double staleBefore = cutoff - StaleSampleWindowSeconds;
                 var teamBalance = new Dictionary<int, int>();
-                foreach (var kv in sessionByActor)
+                foreach (int actor in effectiveTeam.Keys)
                 {
-                    int actor = kv.Key;
-                    int team = kv.Value.Team;
+                    int team = effectiveTeam[actor];
                     if (team < 0 || !samplesByActor.TryGetValue(actor, out var list)) continue;
 
                     int? balance = null;
@@ -523,7 +672,7 @@ namespace Overpower.EditorTools.Telemetry
                     foreach (var (t, bal) in list)
                         if (t <= cutoff && t >= bestT) { bestT = t; balance = bal; }
 
-                    if (balance.HasValue)
+                    if (balance.HasValue && bestT >= staleBefore)
                         teamBalance[team] = teamBalance.GetValueOrDefault(team) + balance.Value;
                 }
 
@@ -539,29 +688,27 @@ namespace Overpower.EditorTools.Telemetry
         // ==================================================================== zone income
 
         private static void BuildZoneIncome(TelemetryLog log, Dictionary<string, int> fileActor,
-            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> zoneTier,
+            Dictionary<int, int> effectiveTeam, Dictionary<int, int> zoneTier,
             List<OwnershipRow> stints, List<ZoneIncomeRow> outRows)
         {
             var secondsHeld = new Dictionary<(int Zone, int Team), double>();
             foreach (OwnershipRow stint in stints)
                 secondsHeld[(stint.Zone, stint.Team)] = secondsHeld.GetValueOrDefault((stint.Zone, stint.Team)) + stint.Duration;
 
-            var goldGenerated = new Dictionary<(int Zone, int Team), int>();
+            var goldGenerated = new Dictionary<(int Zone, int Team), double>();
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.GoldEarned || IsJunkGoldEarned(e.Data)) continue;
 
                 int actor = ActorOf(e, fileActor);
-                int team = sessionByActor.GetValueOrDefault(actor)?.Team ?? -1;
+                int team = effectiveTeam.GetValueOrDefault(actor, -1);
                 if (team < 0) continue;
 
-                var zones = e.Data[TelemetryKeys.Zones] as JArray;
-                if (zones == null) continue;
-                for (int z = 0; z < zones.Count; z++)
+                double[] scaledZones = ScaledZones(e.Data); // opus review item 4
+                for (int z = 0; z < scaledZones.Length; z++)
                 {
-                    int amount = zones[z].ToObject<int?>() ?? 0;
-                    if (amount == 0) continue;
-                    goldGenerated[(z, team)] = goldGenerated.GetValueOrDefault((z, team)) + amount;
+                    if (scaledZones[z] == 0) continue;
+                    goldGenerated[(z, team)] = goldGenerated.GetValueOrDefault((z, team)) + scaledZones[z];
                 }
             }
 
@@ -579,6 +726,36 @@ namespace Overpower.EditorTools.Telemetry
             }
         }
 
+        /// <summary>Opus review item 4: `goldEarned.zones[]` is rounded to whole gold PER ZONE at the
+        /// source (PlayerTelemetry.RoundedZoneArray), so summing many already-rounded lines drifts
+        /// noticeably from the line's own authoritative `terr` total (a real log measured Sigma-terr 254
+        /// vs Sigma-zones 244, a 4% loss). Rescaling each line's own zones to sum to its own terr before
+        /// accumulating removes that drift; the fraction is kept (callers accumulate into a double),
+        /// only rounded for display far downstream if at all. A line with terr == 0 or zones summing to
+        /// 0 is left as-is (no ratio to scale by).</summary>
+        private static double[] ScaledZones(JObject data)
+        {
+            var zones = data[TelemetryKeys.Zones] as JArray;
+            if (zones == null) return Array.Empty<double>();
+
+            var raw = new double[zones.Count];
+            double sum = 0;
+            for (int i = 0; i < zones.Count; i++)
+            {
+                raw[i] = zones[i].Type == JTokenType.Null ? 0 : zones[i].ToObject<double>();
+                sum += raw[i];
+            }
+
+            int terr = ReadInt(data, TelemetryKeys.Territory, 0);
+            if (sum > 0.0001 && terr > 0 && Math.Abs(sum - terr) > 0.0001)
+            {
+                double factor = terr / sum;
+                for (int i = 0; i < raw.Length; i++)
+                    raw[i] *= factor;
+            }
+            return raw;
+        }
+
         // ==================================================================== sample-derived stats (shared sweep)
 
         private sealed class SampleDerivedStats
@@ -593,48 +770,82 @@ namespace Overpower.EditorTools.Telemetry
         /// once from the same consecutive-sample intervals: how long each weapon was equipped
         /// (globally, for weapons.csv) and how long each player stood in their own/an enemy's/a
         /// neutral zone (for players.csv). Each interval is attributed using the state read at the
-        /// START of that interval - the same convention used throughout (e.g. ownership's own "from").</summary>
+        /// START of that interval - the same convention used throughout (e.g. ownership's own "from").
+        ///
+        /// Opus review items 3 and 11:
+        /// - a sample with t == -1 is ignored entirely (never a real state to start or end an interval);
+        /// - an interval starting on a DEAD sample (alive:false) contributes no equipped/zone time -
+        ///   a corpse doesn't hold a weapon or stand in anyone's territory;
+        /// - a gap between two consecutive samples is capped at 2x the sample interval - a disconnected
+        ///   client's silent gap doesn't keep accruing whatever it was doing when it dropped;
+        /// - the LAST sample of each actor's own stream gets one trailing interval too (capped at the
+        ///   sample interval, and never past that actor's own last covered instant), so the tail of the
+        ///   match isn't simply uncounted.</summary>
         private static SampleDerivedStats BuildSampleDerivedStats(TelemetryLog log, Dictionary<string, int> fileActor,
-            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, List<(double T, int New)>> rawChangesByZone)
+            Dictionary<int, int> effectiveTeam, Dictionary<int, List<(double T, int New)>> rawChangesByZone,
+            Dictionary<int, (double First, double Last)> coverageByActor, double sampleInterval)
         {
             var stats = new SampleDerivedStats();
             var lastT = new Dictionary<int, double>();
             var lastWeapon = new Dictionary<int, int>();
             var lastZone = new Dictionary<int, int>();
             var lastTeam = new Dictionary<int, int>();
+            var lastAlive = new Dictionary<int, bool>();
+            double gapCap = sampleInterval * 2.0;
+
+            void Accumulate(int actor, double dur, int weapon, int zone, int team)
+            {
+                if (dur <= 0) return;
+                if (weapon >= 0)
+                    stats.EquippedSecondsByWeapon[weapon] = stats.EquippedSecondsByWeapon.GetValueOrDefault(weapon) + dur;
+
+                int owner = zone < 0 ? Neutral : OwnerAtTime(rawChangesByZone, zone, lastT.GetValueOrDefault(actor));
+                if (zone < 0 || owner == Neutral)
+                    stats.NeutralZoneSecondsByActor[actor] = stats.NeutralZoneSecondsByActor.GetValueOrDefault(actor) + dur;
+                else if (owner == team)
+                    stats.OwnZoneSecondsByActor[actor] = stats.OwnZoneSecondsByActor.GetValueOrDefault(actor) + dur;
+                else
+                    stats.EnemyZoneSecondsByActor[actor] = stats.EnemyZoneSecondsByActor.GetValueOrDefault(actor) + dur;
+            }
 
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Sample) continue;
+                if (e.T < 0) continue; // item 11
+
                 int actor = ActorOf(e, fileActor);
                 double t = e.T;
-                int weapon = e.Data[TelemetryKeys.Weapon]?.ToObject<int?>() ?? -1;
-                int zone = e.Data[TelemetryKeys.Zone]?.ToObject<int?>() ?? -1;
-                int team = e.Data[TelemetryKeys.Team]?.ToObject<int?>() ?? sessionByActor.GetValueOrDefault(actor)?.Team ?? -1;
+                int weapon = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
+                int zone = ReadInt(e.Data, TelemetryKeys.Zone, -1);
+                int team = effectiveTeam.GetValueOrDefault(actor, -1);
+                bool alive = e.Data[TelemetryKeys.Alive]?.ToObject<bool?>() ?? true;
 
                 if (lastT.TryGetValue(actor, out double prevT) && t > prevT)
                 {
-                    double dur = t - prevT;
-                    int prevWeapon = lastWeapon[actor];
-                    if (prevWeapon >= 0)
-                        stats.EquippedSecondsByWeapon[prevWeapon] = stats.EquippedSecondsByWeapon.GetValueOrDefault(prevWeapon) + dur;
-
-                    int prevZone = lastZone[actor];
-                    int prevTeam = lastTeam[actor];
-                    int owner = prevZone < 0 ? Neutral : OwnerAtTime(rawChangesByZone, prevZone, prevT);
-
-                    if (prevZone < 0 || owner == Neutral)
-                        stats.NeutralZoneSecondsByActor[actor] = stats.NeutralZoneSecondsByActor.GetValueOrDefault(actor) + dur;
-                    else if (owner == prevTeam)
-                        stats.OwnZoneSecondsByActor[actor] = stats.OwnZoneSecondsByActor.GetValueOrDefault(actor) + dur;
-                    else
-                        stats.EnemyZoneSecondsByActor[actor] = stats.EnemyZoneSecondsByActor.GetValueOrDefault(actor) + dur;
+                    bool prevAlive = lastAlive.GetValueOrDefault(actor, true);
+                    if (prevAlive) // item 3: a dead sample starts no counted interval
+                    {
+                        double dur = Math.Min(t - prevT, gapCap); // item 11: cap a disconnect gap
+                        Accumulate(actor, dur, lastWeapon[actor], lastZone[actor], lastTeam[actor]);
+                    }
                 }
 
                 lastT[actor] = t;
                 lastWeapon[actor] = weapon;
                 lastZone[actor] = zone;
                 lastTeam[actor] = team;
+                lastAlive[actor] = alive;
+            }
+
+            // Trailing interval for each actor's own LAST sample (item 11), bounded by that actor's own
+            // covered range (item 3) - never invented time past what we actually have for them.
+            foreach (int actor in lastT.Keys)
+            {
+                if (!lastAlive.GetValueOrDefault(actor, true)) continue;
+                double last = lastT[actor];
+                double coverageEnd = coverageByActor.TryGetValue(actor, out var range) ? range.Last : last;
+                double dur = Math.Min(sampleInterval, Math.Max(0, coverageEnd - last));
+                Accumulate(actor, dur, lastWeapon[actor], lastZone[actor], lastTeam[actor]);
             }
 
             return stats;
@@ -652,9 +863,9 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Shots) continue;
-                int w = e.Data[TelemetryKeys.Weapon]?.ToObject<int?>() ?? -1;
-                pullsByWeapon[w] = pullsByWeapon.GetValueOrDefault(w) + (e.Data[TelemetryKeys.Pulls]?.ToObject<int?>() ?? 0);
-                projectilesByWeapon[w] = projectilesByWeapon.GetValueOrDefault(w) + (e.Data[TelemetryKeys.Projectiles]?.ToObject<int?>() ?? 0);
+                int w = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
+                pullsByWeapon[w] = pullsByWeapon.GetValueOrDefault(w) + ReadInt(e.Data, TelemetryKeys.Pulls, 0);
+                projectilesByWeapon[w] = projectilesByWeapon.GetValueOrDefault(w) + ReadInt(e.Data, TelemetryKeys.Projectiles, 0);
             }
 
             var killsByWeapon = new Dictionary<int, int>();
@@ -662,15 +873,19 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Death) continue;
-                int w = e.Data[TelemetryKeys.Weapon]?.ToObject<int?>() ?? -1;
-                int ab = e.Data[TelemetryKeys.AbilityId]?.ToObject<int?>() ?? -1;
+                int w = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
+                int ab = ReadInt(e.Data, TelemetryKeys.AbilityId, -1);
                 if (w >= 0) killsByWeapon[w] = killsByWeapon.GetValueOrDefault(w) + 1;
                 if (ab >= 0) killsByAbility[ab] = killsByAbility.GetValueOrDefault(ab) + 1;
             }
 
-            // Discrete hits (Projectile/Splash only) drive hit-count/accuracy/distance; hit + dot raw
-            // together drive damage (the T3-review global rule).
+            // Opus review item 6: accuracy is Projectile-hits / projectiles ONLY - Splash hits (one
+            // rocket's own splash falloff landing on several targets) are counted separately so they
+            // can no longer push accuracy over 100%. Distance stays Projectile-only too, for the same
+            // "matches what Hits counts" reason. Damage sums exclude any Burn-source hit row (item 8 -
+            // already counted via its `dot`), from BOTH weapon and ability totals.
             var hitCountByWeapon = new Dictionary<int, int>();
+            var splashCountByWeapon = new Dictionary<int, int>();
             var distancesByWeapon = new Dictionary<int, List<double>>();
             var damageRawByWeapon = new Dictionary<int, float>();
             var armorByWeapon = new Dictionary<int, float>();
@@ -679,10 +894,9 @@ namespace Overpower.EditorTools.Telemetry
 
             foreach (HitRow h in hits)
             {
-                bool discrete = DiscreteHitSources.Contains(h.Source);
                 if (h.Weapon >= 0)
                 {
-                    if (discrete)
+                    if (h.Source == "Projectile")
                     {
                         hitCountByWeapon[h.Weapon] = hitCountByWeapon.GetValueOrDefault(h.Weapon) + 1;
                         if (h.Distance.HasValue)
@@ -692,11 +906,19 @@ namespace Overpower.EditorTools.Telemetry
                             list.Add(h.Distance.Value);
                         }
                     }
-                    damageRawByWeapon[h.Weapon] = damageRawByWeapon.GetValueOrDefault(h.Weapon) + h.Raw;
-                    armorByWeapon[h.Weapon] = armorByWeapon.GetValueOrDefault(h.Weapon) + h.Armor;
-                    healthByWeapon[h.Weapon] = healthByWeapon.GetValueOrDefault(h.Weapon) + h.HealthLost;
+                    else if (h.Source == "Splash")
+                    {
+                        splashCountByWeapon[h.Weapon] = splashCountByWeapon.GetValueOrDefault(h.Weapon) + 1;
+                    }
+
+                    if (CountsTowardDamageSums(h))
+                    {
+                        damageRawByWeapon[h.Weapon] = damageRawByWeapon.GetValueOrDefault(h.Weapon) + h.Raw;
+                        armorByWeapon[h.Weapon] = armorByWeapon.GetValueOrDefault(h.Weapon) + h.Armor;
+                        healthByWeapon[h.Weapon] = healthByWeapon.GetValueOrDefault(h.Weapon) + h.HealthLost;
+                    }
                 }
-                if (h.Ability >= 0)
+                if (h.Ability >= 0 && CountsTowardDamageSums(h))
                     damageRawByAbility[h.Ability] = damageRawByAbility.GetValueOrDefault(h.Ability) + h.Raw;
             }
 
@@ -707,19 +929,19 @@ namespace Overpower.EditorTools.Telemetry
             {
                 if (e.Name == TelemetryKeys.Cast)
                 {
-                    int ab = e.Data[TelemetryKeys.AbilityId]?.ToObject<int?>() ?? -1;
+                    int ab = ReadInt(e.Data, TelemetryKeys.AbilityId, -1);
                     if (ab >= 0) castsByAbility[ab] = castsByAbility.GetValueOrDefault(ab) + 1;
                 }
                 else if (e.Name == TelemetryKeys.Status)
                 {
-                    int ab = e.Data[TelemetryKeys.AbilityId]?.ToObject<int?>() ?? -1;
+                    int ab = ReadInt(e.Data, TelemetryKeys.AbilityId, -1);
                     if (ab < 0) continue;
                     statusCountByAbility[ab] = statusCountByAbility.GetValueOrDefault(ab) + 1;
                     statusSecondsByAbility[ab] = statusSecondsByAbility.GetValueOrDefault(ab) + ReadFloat(e.Data, TelemetryKeys.Duration);
                 }
                 else if (e.Name == TelemetryKeys.Dot)
                 {
-                    int ab = e.Data[TelemetryKeys.AbilityId]?.ToObject<int?>() ?? -1;
+                    int ab = ReadInt(e.Data, TelemetryKeys.AbilityId, -1);
                     if (ab >= 0)
                         damageRawByAbility[ab] = damageRawByAbility.GetValueOrDefault(ab) + ReadFloat(e.Data, TelemetryKeys.Raw);
                 }
@@ -728,7 +950,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Dot) continue;
-                int w = e.Data[TelemetryKeys.Weapon]?.ToObject<int?>() ?? -1;
+                int w = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
                 if (w < 0) continue;
                 damageRawByWeapon[w] = damageRawByWeapon.GetValueOrDefault(w) + ReadFloat(e.Data, TelemetryKeys.Raw);
                 armorByWeapon[w] = armorByWeapon.GetValueOrDefault(w) + ReadFloat(e.Data, TelemetryKeys.ArmorAbsorbed);
@@ -750,6 +972,7 @@ namespace Overpower.EditorTools.Telemetry
                     Pulls = pullsByWeapon.GetValueOrDefault(weaponId),
                     Projectiles = projectiles,
                     Hits = hitsCount,
+                    SplashHits = splashCountByWeapon.GetValueOrDefault(weaponId),
                     Accuracy = projectiles > 0 ? (double)hitsCount / projectiles : 0,
                     DamageRaw = damage,
                     ArmorDamage = armorByWeapon.GetValueOrDefault(weaponId),
@@ -795,7 +1018,7 @@ namespace Overpower.EditorTools.Telemetry
             {
                 if (e.Name == TelemetryKeys.Shots || e.Name == TelemetryKeys.Hit || e.Name == TelemetryKeys.Death)
                 {
-                    int w = e.Data[TelemetryKeys.Weapon]?.ToObject<int?>() ?? -1;
+                    int w = ReadInt(e.Data, TelemetryKeys.Weapon, -1);
                     if (w >= 0) seen.Add(w);
                 }
             }
@@ -813,7 +1036,8 @@ namespace Overpower.EditorTools.Telemetry
         // ==================================================================== players / deaths
 
         private static void BuildPlayersAndDeaths(TelemetryLog log, Dictionary<string, int> fileActor,
-            Dictionary<int, TelemetrySession> sessionByActor, SampleDerivedStats sampleStats, double matchLength, ReportTables tables)
+            Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam,
+            Dictionary<int, (double First, double Last)> coverageByActor, SampleDerivedStats sampleStats, ReportTables tables)
         {
             // Deaths first - "victim" has no field of its own on a `death` line; it is the file owner.
             foreach (TelemetryEvent e in log.Events)
@@ -822,28 +1046,33 @@ namespace Overpower.EditorTools.Telemetry
                 int victim = ActorOf(e, fileActor);
                 TelemetrySession victimSession = sessionByActor.GetValueOrDefault(victim);
 
-                var assists = (e.Data[TelemetryKeys.Assists] as JArray)?.Select(t => t.ToObject<int>()).ToArray() ?? Array.Empty<int>();
+                // Opus review item 10: a null inside `assists` (a malformed line, or a future schema
+                // that can write one) used to throw on ToObject<int>() - skipped instead.
+                var assists = (e.Data[TelemetryKeys.Assists] as JArray)
+                    ?.Where(t => t.Type != JTokenType.Null)
+                    .Select(t => t.ToObject<int>())
+                    .ToArray() ?? Array.Empty<int>();
 
                 tables.Deaths.Add(new DeathRow
                 {
                     T = e.T,
                     Victim = victim,
                     VictimNick = victimSession?.Nick ?? "",
-                    VictimTeam = victimSession?.Team ?? -1,
-                    Killer = e.Data[TelemetryKeys.Killer]?.ToObject<int?>() ?? -1,
-                    KillerTeam = e.Data[TelemetryKeys.KillerTeam]?.ToObject<int?>() ?? -1,
+                    VictimTeam = effectiveTeam.GetValueOrDefault(victim, -1),
+                    Killer = ReadInt(e.Data, TelemetryKeys.Killer, -1),
+                    KillerTeam = ReadInt(e.Data, TelemetryKeys.KillerTeam, -1),
                     Assists = assists,
-                    Weapon = e.Data[TelemetryKeys.Weapon]?.ToObject<int?>() ?? -1,
-                    Ability = e.Data[TelemetryKeys.AbilityId]?.ToObject<int?>() ?? -1,
+                    Weapon = ReadInt(e.Data, TelemetryKeys.Weapon, -1),
+                    Ability = ReadInt(e.Data, TelemetryKeys.AbilityId, -1),
                     X = ReadFloat(e.Data, TelemetryKeys.X),
                     Z = ReadFloat(e.Data, TelemetryKeys.Z),
-                    UnspentGold = e.Data[TelemetryKeys.UnspentGold]?.ToObject<int?>() ?? 0,
-                    LoadoutWeapon = e.Data[TelemetryKeys.LoadoutWeapon]?.ToObject<int?>() ?? -1,
-                    LoadoutEquipment = e.Data[TelemetryKeys.LoadoutEquipment]?.ToObject<int?>() ?? -1,
-                    LoadoutMobility = e.Data[TelemetryKeys.LoadoutMobility]?.ToObject<int?>() ?? -1,
-                    LoadoutUltimate = e.Data[TelemetryKeys.LoadoutUltimate]?.ToObject<int?>() ?? -1,
-                    AbsorbLevel = e.Data[TelemetryKeys.AbsorbLevel]?.ToObject<int?>() ?? 0,
-                    RechargeLevel = e.Data[TelemetryKeys.RechargeLevel]?.ToObject<int?>() ?? 0,
+                    UnspentGold = ReadInt(e.Data, TelemetryKeys.UnspentGold, 0),
+                    LoadoutWeapon = ReadInt(e.Data, TelemetryKeys.LoadoutWeapon, -1),
+                    LoadoutEquipment = ReadInt(e.Data, TelemetryKeys.LoadoutEquipment, -1),
+                    LoadoutMobility = ReadInt(e.Data, TelemetryKeys.LoadoutMobility, -1),
+                    LoadoutUltimate = ReadInt(e.Data, TelemetryKeys.LoadoutUltimate, -1),
+                    AbsorbLevel = ReadInt(e.Data, TelemetryKeys.AbsorbLevel, 0),
+                    RechargeLevel = ReadInt(e.Data, TelemetryKeys.RechargeLevel, 0),
                 });
             }
 
@@ -865,18 +1094,20 @@ namespace Overpower.EditorTools.Telemetry
                 list.Add(e.T);
             }
 
+            // Opus review item 8: Burn-source hit rows are excluded (already counted via their `dot`).
             var damageDealtByActor = new Dictionary<int, float>();
             var damageTakenByActor = new Dictionary<int, float>();
             foreach (HitRow h in tables.Hits)
             {
+                if (!CountsTowardDamageSums(h)) continue;
                 if (h.Attacker >= 0) damageDealtByActor[h.Attacker] = damageDealtByActor.GetValueOrDefault(h.Attacker) + h.Raw;
                 if (h.Victim >= 0) damageTakenByActor[h.Victim] = damageTakenByActor.GetValueOrDefault(h.Victim) + h.Raw;
             }
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Dot) continue;
-                int a = e.Data[TelemetryKeys.Attacker]?.ToObject<int?>() ?? -1;
-                int v = e.Data[TelemetryKeys.Victim]?.ToObject<int?>() ?? -1;
+                int a = ReadInt(e.Data, TelemetryKeys.Attacker, -1);
+                int v = ReadInt(e.Data, TelemetryKeys.Victim, -1);
                 float raw = ReadFloat(e.Data, TelemetryKeys.Raw);
                 if (a >= 0) damageDealtByActor[a] = damageDealtByActor.GetValueOrDefault(a) + raw;
                 if (v >= 0) damageTakenByActor[v] = damageTakenByActor.GetValueOrDefault(v) + raw;
@@ -892,21 +1123,21 @@ namespace Overpower.EditorTools.Telemetry
                 {
                     var prev = goldByActor.GetValueOrDefault(actor);
                     goldByActor[actor] = (
-                        prev.Terr + (e.Data[TelemetryKeys.Territory]?.ToObject<int?>() ?? 0),
-                        prev.Bounty + (e.Data[TelemetryKeys.Bounty]?.ToObject<int?>() ?? 0),
-                        prev.Refund + (e.Data[TelemetryKeys.Refund]?.ToObject<int?>() ?? 0),
-                        prev.Debug + (e.Data[TelemetryKeys.Debug]?.ToObject<int?>() ?? 0),
-                        prev.Other + (e.Data[TelemetryKeys.Other]?.ToObject<int?>() ?? 0));
+                        prev.Terr + ReadInt(e.Data, TelemetryKeys.Territory, 0),
+                        prev.Bounty + ReadInt(e.Data, TelemetryKeys.Bounty, 0),
+                        prev.Refund + ReadInt(e.Data, TelemetryKeys.Refund, 0),
+                        prev.Debug + ReadInt(e.Data, TelemetryKeys.Debug, 0),
+                        prev.Other + ReadInt(e.Data, TelemetryKeys.Other, 0));
                 }
                 else if (e.Name == TelemetryKeys.Purchase)
                 {
-                    spentByActor[actor] = spentByActor.GetValueOrDefault(actor) + (e.Data[TelemetryKeys.Price]?.ToObject<int?>() ?? 0);
+                    spentByActor[actor] = spentByActor.GetValueOrDefault(actor) + ReadInt(e.Data, TelemetryKeys.Price, 0);
                 }
                 else if (e.Name == TelemetryKeys.Heal)
                 {
                     var tiers = e.Data[TelemetryKeys.HealTiers] as JArray;
                     float sum = 0;
-                    if (tiers != null) foreach (JToken v in tiers) sum += v.ToObject<float?>() ?? 0f;
+                    if (tiers != null) foreach (JToken v in tiers) sum += v.Type == JTokenType.Null ? 0f : v.ToObject<float>();
                     healByActor[actor] = healByActor.GetValueOrDefault(actor) + sum;
                 }
             }
@@ -916,10 +1147,12 @@ namespace Overpower.EditorTools.Telemetry
                 int actor = kv.Key;
                 TelemetrySession session = kv.Value;
                 var gold = goldByActor.GetValueOrDefault(actor);
+                (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
 
-                // Sum of every completed life's own `timeAlive` field (how long that life lasted, not
-                // when it ended), plus - if the player is still alive after their last death - the
-                // tail from their next respawn to the match's end (see below).
+                // Opus review item 3: sum of every completed life's own `timeAlive` field (how long
+                // that life lasted, not when it ended), plus - if still alive after the last death -
+                // the tail from the next respawn to THIS PLAYER'S OWN last covered instant, never the
+                // whole match length (a joiner at t=600 in a 1200s match must not show 1200s alive).
                 double timeAlive = 0;
                 double? lastDeathT = null;
                 foreach (TelemetryEvent e in log.Events)
@@ -932,25 +1165,24 @@ namespace Overpower.EditorTools.Telemetry
 
                 if (lastDeathT.HasValue)
                 {
-                    // Still-ongoing life after the last death: from the first respawn after it to the
-                    // match's end. No respawn after the last death (log ends while still dead) adds nothing.
                     if (respawnsByActor.TryGetValue(actor, out var respawns))
                     {
                         double? firstAfter = respawns.Where(t => t > lastDeathT.Value).OrderBy(t => t).Cast<double?>().FirstOrDefault();
                         if (firstAfter.HasValue)
-                            timeAlive += matchLength - firstAfter.Value;
+                            timeAlive += Math.Max(0, coverage.Last - firstAfter.Value);
                     }
                 }
                 else
                 {
-                    timeAlive = matchLength; // Never died - alive for the whole match.
+                    // Never died - alive for this player's own covered span, not the whole match.
+                    timeAlive = Math.Max(0, coverage.Last - coverage.First);
                 }
 
                 tables.Players.Add(new PlayerRow
                 {
                     Actor = actor,
                     Nick = session.Nick,
-                    Team = session.Team,
+                    Team = effectiveTeam.GetValueOrDefault(actor, session.Team),
                     Kills = killsByActor.GetValueOrDefault(actor),
                     Deaths = tables.Deaths.Count(d => d.Victim == actor),
                     Assists = assistsByActor.GetValueOrDefault(actor),
@@ -976,23 +1208,31 @@ namespace Overpower.EditorTools.Telemetry
         private static int ActorOf(TelemetryEvent e, Dictionary<string, int> fileActor) =>
             fileActor.TryGetValue(e.File, out int a) ? a : -1;
 
-        private static int SumGoldEarnedTotal(JObject data) =>
-            (data[TelemetryKeys.Territory]?.ToObject<int?>() ?? 0)
-            + (data[TelemetryKeys.Bounty]?.ToObject<int?>() ?? 0)
-            + (data[TelemetryKeys.Refund]?.ToObject<int?>() ?? 0)
-            + (data[TelemetryKeys.Debug]?.ToObject<int?>() ?? 0)
-            + (data[TelemetryKeys.Other]?.ToObject<int?>() ?? 0);
+        /// <summary>The repeated `data[key]?.ToObject&lt;int?&gt;() ?? fallback` read, in one place.</summary>
+        private static int ReadInt(JObject data, string key, int fallback)
+        {
+            JToken token = data[key];
+            return (token != null && token.Type != JTokenType.Null) ? token.ToObject<int>() : fallback;
+        }
 
-        /// <summary>Point 3: a `goldEarned` line where every source is 0 and `zones` is empty or all
-        /// zero is junk from a remote copy's teardown (or the owner's own closing flush) - skipped
-        /// everywhere this aggregator reads goldEarned.</summary>
+        private static int SumGoldEarnedTotal(JObject data) =>
+            ReadInt(data, TelemetryKeys.Territory, 0)
+            + ReadInt(data, TelemetryKeys.Bounty, 0)
+            + ReadInt(data, TelemetryKeys.Refund, 0)
+            + ReadInt(data, TelemetryKeys.Debug, 0)
+            + ReadInt(data, TelemetryKeys.Other, 0);
+
+        /// <summary>Point 3 (first-pass review): a `goldEarned` line where every source is 0 and
+        /// `zones` is empty or all-zero is junk from a remote copy's teardown (or the owner's own
+        /// closing flush) - skipped everywhere this aggregator reads goldEarned. Kept for old logs;
+        /// the T4 fix stopped writing these at the source, but a log recorded before it still can.</summary>
         private static bool IsJunkGoldEarned(JObject data)
         {
             if (SumGoldEarnedTotal(data) != 0) return false;
             var zones = data[TelemetryKeys.Zones] as JArray;
             if (zones == null || zones.Count == 0) return true;
             foreach (JToken z in zones)
-                if ((z.ToObject<int?>() ?? 0) != 0) return false;
+                if ((z.Type == JTokenType.Null ? 0 : z.ToObject<int>()) != 0) return false;
             return true;
         }
 

@@ -11,7 +11,13 @@ namespace Overpower.EditorTools.Telemetry
     /// never disagree about what a value is, only about how it's presented.
     ///
     /// RFC-4180: invariant culture, CRLF line endings, a field quoted only when it contains a comma,
-    /// a quote or a newline, with inner quotes doubled.</summary>
+    /// a quote or a newline, with inner quotes doubled.
+    ///
+    /// Opus review item 13: written UTF-8 WITH a BOM so Excel auto-detects the encoding and the
+    /// comma as a field separator on double-click; a Dutch-locale Windows install still defaults
+    /// Excel's own list separator to semicolon, so a Dutch reader may still need Data > From Text/CSV
+    /// and choose "Comma" explicitly rather than double-clicking the file directly - the BOM only
+    /// fixes character encoding, not that regional setting.</summary>
     public static class CsvReportWriter
     {
         public static void Write(ReportTables tables, string folder)
@@ -95,11 +101,13 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WriteWeapons(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "weapons.csv"),
-            new[] { "weapon", "timeEquippedSeconds", "pulls", "projectiles", "hits", "accuracy",
+            // splashHits (opus review item 6): counted separately from hits/accuracy, which are
+            // Projectile-source only - a rocket's own splash falloff no longer inflates accuracy past 100%.
+            new[] { "weapon", "timeEquippedSeconds", "pulls", "projectiles", "hits", "splashHits", "accuracy",
                     "damageRaw", "armorDamage", "healthDamage", "damagePerEquippedMinute", "kills", "meanDistance", "medianDistance" },
             t.Weapons.Select(r => new[]
             {
-                N(r.WeaponId), N(r.TimeEquippedSeconds), N(r.Pulls), N(r.Projectiles), N(r.Hits), N(r.Accuracy),
+                N(r.WeaponId), N(r.TimeEquippedSeconds), N(r.Pulls), N(r.Projectiles), N(r.Hits), N(r.SplashHits), N(r.Accuracy),
                 N(r.DamageRaw), N(r.ArmorDamage), N(r.HealthDamage), N(r.DamagePerEquippedMinute), N(r.Kills),
                 r.MeanDistance.HasValue ? N(r.MeanDistance.Value) : "",
                 r.MedianDistance.HasValue ? N(r.MedianDistance.Value) : "",
@@ -143,7 +151,7 @@ namespace Overpower.EditorTools.Telemetry
             AppendRow(sb, header);
             foreach (string[] row in rows)
                 AppendRow(sb, row);
-            File.WriteAllText(path, sb.ToString(), new UTF8Encoding(false));
+            File.WriteAllText(path, sb.ToString(), new UTF8Encoding(true));
         }
 
         private static void AppendRow(StringBuilder sb, string[] fields)
