@@ -185,9 +185,11 @@ namespace Overpower.UI
 
         // Task 2.5b review fix 2: a refused click's own reason, shown in the header status line in
         // place of the ordinary gate status until Loadout Blocked Reason Duration Seconds (UiTheme)
-        // runs out - see ShowBlockedReason. Expiry <= 0 means "no override active"; Time.time is
-        // never <= 0 once the game has been running for any length of time, so this doubles as the
-        // "not yet used" sentinel with no separate bool needed.
+        // runs out - see ShowBlockedReason. Expiry <= 0 means "no override active"; Time.unscaledTime
+        // is never <= 0 once the game has been running for any length of time, so this doubles as
+        // the "not yet used" sentinel with no separate bool needed. Unscaled (re-review fix, same
+        // reasoning as PlayerHud's own bountyToastHideAtTime) so a debug Time.timeScale change
+        // cannot freeze this reason on screen forever.
         private string blockedReasonText = "";
         private float blockedReasonExpiryTime = -1f;
 
@@ -441,6 +443,18 @@ namespace Overpower.UI
             IsOpen = false;
             screenRoot.SetActive(false);
             inputRouter?.SetToolFocus(this, false);
+
+            // Re-review fix: a reason shown by ShowBlockedReason must not survive being closed and
+            // reopened - closing mid-window used to leave blockedReasonText/blockedReasonExpiryTime
+            // armed, so reopening within the window (or even long after, since the underlying gate
+            // condition can have changed by then) redrew a stale, possibly now-wrong reason. Clearing
+            // headerInitialized too forces RefreshHeader's very-first-call path on the next Open(),
+            // which unconditionally rewrites both labels - the same guarantee a fresh LoadoutScreen
+            // gets, without which "the normal status hasn't changed since the reason interrupted it"
+            // would again skip the write (the exact bug justExpired fixed for the timer-expiry case).
+            blockedReasonText = "";
+            blockedReasonExpiryTime = -1f;
+            headerInitialized = false;
         }
 
         public void Toggle()
@@ -510,7 +524,7 @@ namespace Overpower.UI
                 lastDisplayedGold = gold;
             }
 
-            bool reasonActive = blockedReasonExpiryTime > 0f && Time.time < blockedReasonExpiryTime;
+            bool reasonActive = blockedReasonExpiryTime > 0f && Time.unscaledTime < blockedReasonExpiryTime;
             if (reasonActive)
             {
                 if (blockedReasonText != lastStatusText)
@@ -560,7 +574,9 @@ namespace Overpower.UI
         private void ShowBlockedReason(ShopContext ctx, PurchaseBlock block, int price)
         {
             blockedReasonText = ctx.ReasonText(block, price);
-            blockedReasonExpiryTime = Time.time + theme.loadoutBlockedReasonDurationSeconds;
+            // Unscaled (re-review fix, project convention - see PlayerHud.bountyToastHideAtTime's own
+            // comment): a debug Time.timeScale change must not freeze this reason on screen forever.
+            blockedReasonExpiryTime = Time.unscaledTime + theme.loadoutBlockedReasonDurationSeconds;
             RefreshHeader(ctx); // Shows it from the same frame as the click, not one frame late.
         }
 
