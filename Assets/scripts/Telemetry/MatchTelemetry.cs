@@ -7,6 +7,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
+using Overpower.Match;
 using Overpower.Net;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
@@ -84,6 +85,15 @@ namespace Overpower.Telemetry
         private Coroutine claimIdentityRoutine;
         private float flushTimer;
 
+        // Task T4: `capture`'s own classifier remembers, per zone, the last team/direction that was
+        // actively capturing or draining it - see ClassifyCaptureTransition's own comment on why
+        // ComputeCurrentProgress (Assets/scripts/Player/Building capture.cs) collapses EVERY
+        // non-active state (paused, on cooldown, just completed, just neutralised) to the same
+        // CaptureProgress.Idle, with no team or progress carried over, so this is the only place
+        // that memory survives to tell "resumed" apart from a fresh "started".
+        private int[] lastCaptureTeam;
+        private bool[] lastCaptureWasDrain;
+
         /// <summary>Match seconds since mStart, wrap-safe and 0-guarded - see MatchClock. -1 until this
         /// client has read the room's match identity.</summary>
         public double Now => MatchClock.Seconds(PhotonNetwork.ServerTimestamp, matchStartMs);
@@ -122,6 +132,28 @@ namespace Overpower.Telemetry
 
         private void Start()
         {
+            // Task T4: subscribed here, not Awake - this component lives on the SAME GameObject as
+            // BuildingManager (T2 step 7's own wiring), and Unity guarantees every object's Awake
+            // runs before any object's Start, so BuildingManager.Instance/ZonePresenceTracker.Instance
+            // are already set by the time this runs, whichever component's Awake happened to run
+            // first. Every one of these is a plain C# event, not a Photon callback, so subscribing
+            // does not depend on PhotonNetwork.InRoom the way the match-identity calls below do.
+            if (BuildingManager.Instance != null)
+            {
+                BuildingManager.Instance.OwnershipChanged += HandleOwnershipChanged;
+                BuildingManager.Instance.CaptureProgressChanged += HandleCaptureProgressChanged;
+                BuildingManager.Instance.BountyPaid += HandleBountyPaid;
+            }
+            else
+            {
+                Debug.LogError("[Telemetry] no BuildingManager in the scene - ownership/capture/bounty events will never be logged.");
+            }
+
+            if (ZonePresenceTracker.Instance != null)
+                ZonePresenceTracker.Instance.UnderAttackChanged += HandleUnderAttackChanged;
+            else
+                Debug.LogError("[Telemetry] no ZonePresenceTracker in the scene - underAttack events will never be logged.");
+
             // Normally the room is joined after this scene has started, and OnJoinedRoom does this -
             // same "might already be in the room" guard as BuildingManager.Start.
             if (PhotonNetwork.InRoom)
@@ -151,6 +183,15 @@ namespace Overpower.Telemetry
 
         private void OnDestroy()
         {
+            if (BuildingManager.Instance != null)
+            {
+                BuildingManager.Instance.OwnershipChanged -= HandleOwnershipChanged;
+                BuildingManager.Instance.CaptureProgressChanged -= HandleCaptureProgressChanged;
+                BuildingManager.Instance.BountyPaid -= HandleBountyPaid;
+            }
+            if (ZonePresenceTracker.Instance != null)
+                ZonePresenceTracker.Instance.UnderAttackChanged -= HandleUnderAttackChanged;
+
             BeforeClose?.Invoke();
             writer.Close();
             if (Instance == this) Instance = null;
@@ -175,6 +216,8 @@ namespace Overpower.Telemetry
             matchId = null;
             matchStartMs = 0;
             pendingLines.Clear();
+            lastCaptureTeam = null;
+            lastCaptureWasDrain = null;
             if (claimIdentityRoutine != null)
             {
                 StopCoroutine(claimIdentityRoutine);
@@ -208,6 +251,194 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.Actor, player.ActorNumber);
             line.Int(TelemetryKeys.Team, Teams.TryGetTeam(player, out int team) ? team : -1);
             Log(line);
+        }
+
+        // ---------------------------------------------------------------- master-only territory events (Task T4)
+        //
+        // Every handler below is subscribed on every client (Start, above) but only ever LOGS while
+        // PhotonNetwork.IsMasterClient is true AT THE MOMENT the event fires - not gated at
+        // subscribe time - so a client that becomes master mid-match starts logging immediately
+        // without needing to resubscribe, and one that stops being master stops just as cleanly.
+        // BuildingManager/ZonePresenceTracker themselves already only ever raise the master-facing
+        // half of these (OwnershipChanged is raised on every client for its own state sync, but
+        // CaptureProgressChanged/BountyPaid/UnderAttackChanged only carry meaning worth recording
+        // once, from the master) - this guard is what turns "every client's copy of this event" into
+        // "logged exactly once, by whichever client currently holds mastership".
+
+        private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot)
+        {
+            if (!PhotonNetwork.IsMasterClient)
+                return;
+
+            var line = new TelemetryLine();
+            line.Begin(TelemetryKeys.Ownership, Now);
+            line.Int(TelemetryKeys.Zone, zone);
+            line.Int(TelemetryKeys.Tier, BuildingManager.Instance != null ? BuildingManager.Instance.TierOf(zone) : 0);
+            line.Int(TelemetryKeys.OldOwner, oldOwner);
+            line.Int(TelemetryKeys.NewOwner, newOwner);
+            // The aggregator's dedupe key (T5): two masters logging the same applied change around a
+            // master switch both stamp the SAME held-since, from the one snapshot they both applied.
+            line.Int(TelemetryKeys.HeldSince, snapshot.HeldSinceMs(zone));
+            Log(line);
+        }
+
+        private void HandleBountyPaid(int zone, int team, int amount, int heldMs)
+        {
+            if (!PhotonNetwork.IsMasterClient)
+                return;
+
+            var line = new TelemetryLine();
+            line.Begin(TelemetryKeys.Bounty, Now);
+            line.Int(TelemetryKeys.Zone, zone);
+            line.Int(TelemetryKeys.Team, team);
+            line.Int(TelemetryKeys.Amount, amount);
+            line.Float(TelemetryKeys.HoldSeconds, heldMs / 1000f);
+            Log(line);
+        }
+
+        private void HandleUnderAttackChanged(int zone, bool underAttack)
+        {
+            if (!PhotonNetwork.IsMasterClient)
+                return;
+
+            int owner = BuildingManager.Instance != null && BuildingManager.Instance.Current != null
+                ? BuildingManager.Instance.Current.OwnerOf(zone)
+                : -1;
+
+            var line = new TelemetryLine();
+            line.Begin(TelemetryKeys.UnderAttack, Now);
+            line.Int(TelemetryKeys.Zone, zone);
+            line.String(TelemetryKeys.State, underAttack ? "start" : "end");
+            // Reusing NewOwner as a plain "this zone's owner right now" - there is no old/new pair
+            // here, only one owner value, the same reuse-a-key reasoning TelemetryKeys' own class
+            // comment describes for Bounty/Refund/UnderAttack.
+            line.Int(TelemetryKeys.NewOwner, owner);
+            Log(line);
+        }
+
+        /// <summary>Task T4: classifies a capture-progress transition per the plan's own table, using
+        /// only what BuildingCapture.ComputeCurrentProgress actually publishes today - see this
+        /// method's own remarks on what that means it CANNOT tell apart.
+        ///
+        /// KNOWN AMBIGUITIES (documented per the task, not fixed - fixing them is the capture-ring/
+        /// minimap spec's job, not telemetry's): ComputeCurrentProgress collapses every state that
+        /// is not actively capturing or actively draining to the exact same CaptureProgress.Idle
+        /// (Team -1, Progress 0, Rate 0) - a capture interrupted by an enemy showing up, a capture
+        /// that just COMPLETED, a drain that just paused because its own way in came under attack,
+        /// and a drain that just neutralised the zone all look identical on the wire the instant
+        /// they happen (old = active, new = Idle). Two best-effort signals recover most of the plan's
+        /// labels from that:
+        /// - "completed" vs "paused": read live off BuildingManager.Current.OwnerOf(zone) - if the
+        ///   zone is NOW owned by the team that was capturing, the transition completed it. This can
+        ///   race the ownership snapshot's own echo (a separate SetCustomProperties call from the
+        ///   capture-progress one - see PublishCaptureProgress's own class comment on why they are
+        ///   deliberately two calls): on the master's OWN completion, SetCaptured already applied the
+        ///   new owner to its local fields before PublishProgressIfNeeded runs the same frame, so
+        ///   Current (which only updates from the room's ECHO) can still show the OLD owner for one
+        ///   frame. In that one-frame window a same-frame "completed" would misclassify as "paused" -
+        ///   accepted rather than chased further; a true multi-frame pause (an enemy actually
+        ///   interrupting a capture) is unaffected.
+        /// - "neutralised" vs "drainPaused": the same OwnerOf(zone) read - neutral now means
+        ///   neutralised, still owned by the draining team's target means paused. Same one-frame race
+        ///   on the master's own neutralisation.
+        /// - "resumed" vs "started" (and "drainStarted" after a pause): recovered by remembering, per
+        ///   zone, the last team/direction (capture vs drain) this classifier saw actively moving the
+        ///   bar (lastCaptureTeam/lastCaptureWasDrain) - if the SAME team resumes the SAME direction
+        ///   after an Idle gap, it reads as "resumed"/"drainStarted" continuing rather than "started"
+        ///   fresh. This is telemetry's own memory, not the game's - a genuinely fresh start by the
+        ///   same team that also drained it once earlier in the match would be misread as "resumed"
+        ///   if nothing else changed hands in between; in practice a capture completing or the zone
+        ///   going neutral between the two both correctly reset the memory (see below), which covers
+        ///   every realistic case.</summary>
+        private void HandleCaptureProgressChanged(int zone, CaptureProgress oldProgress, CaptureProgress newProgress)
+        {
+            if (!PhotonNetwork.IsMasterClient)
+                return;
+
+            EnsureCaptureMemory(zone);
+
+            string state = ClassifyCaptureTransition(zone, oldProgress, newProgress);
+            if (state == null)
+                return; // No case in the plan's table matches - not expected from today's code.
+
+            bool starting = state == "started" || state == "resumed" || state == "drainStarted";
+            int team = starting ? newProgress.Team : oldProgress.Team;
+            float progress = starting ? newProgress.Progress01 : oldProgress.Progress01;
+
+            var line = new TelemetryLine();
+            line.Begin(TelemetryKeys.Capture, Now);
+            line.Int(TelemetryKeys.Zone, zone);
+            line.Int(TelemetryKeys.Team, team);
+            line.String(TelemetryKeys.State, state);
+            line.Float(TelemetryKeys.Progress, progress);
+            line.Int(TelemetryKeys.Players, BuildingManager.Instance != null ? BuildingManager.Instance.PlayersInZone(zone) : 0);
+            Log(line);
+
+            // Remember this zone's own active team/direction for the NEXT transition's own
+            // started-vs-resumed question - see the method doc above. A transition INTO Idle
+            // (paused/completed/neutralised/drainPaused) deliberately does NOT touch this: the whole
+            // point is surviving the Idle gap so the following active transition can compare against
+            // what was active before it, not what just went idle.
+            if (newProgress.RatePerSecond01 > 0f)
+            {
+                lastCaptureTeam[zone] = newProgress.Team;
+                lastCaptureWasDrain[zone] = false;
+            }
+            else if (newProgress.RatePerSecond01 < 0f)
+            {
+                lastCaptureTeam[zone] = newProgress.Team;
+                lastCaptureWasDrain[zone] = true;
+            }
+            else if (state == "completed" || state == "neutralised")
+            {
+                // A finished capture or a full neutralise ends this zone's story cleanly - the next
+                // active transition here is unambiguously a fresh "started"/"drainStarted", never a
+                // "resume" of what just finished.
+                lastCaptureTeam[zone] = -1;
+            }
+        }
+
+        private string ClassifyCaptureTransition(int zone, CaptureProgress oldP, CaptureProgress newP)
+        {
+            bool oldIdle = oldP.Team < 0;
+            bool newIdle = newP.Team < 0;
+
+            if (oldIdle && newP.RatePerSecond01 > 0f)
+                return lastCaptureTeam[zone] == newP.Team && !lastCaptureWasDrain[zone] ? "resumed" : "started";
+
+            if (!oldIdle && oldP.RatePerSecond01 > 0f && newIdle)
+                return OwnedByTeamNow(zone, oldP.Team) ? "completed" : "paused";
+
+            // The plan's own table has no "drain resumed" label distinct from "drainStarted" (unlike
+            // capturing, which distinguishes "started" from "resumed") - every Idle -> draining
+            // transition is "drainStarted", whether or not the same team drained this zone before.
+            if (oldIdle && newP.RatePerSecond01 < 0f)
+                return "drainStarted";
+
+            if (!oldIdle && oldP.RatePerSecond01 < 0f && newIdle)
+                return IsNeutralNow(zone) ? "neutralised" : "drainPaused";
+
+            return null;
+        }
+
+        private static bool OwnedByTeamNow(int zone, int team) =>
+            team >= 0 && BuildingManager.Instance != null && BuildingManager.Instance.Current != null
+            && BuildingManager.Instance.Current.OwnerOf(zone) == team;
+
+        private static bool IsNeutralNow(int zone) =>
+            BuildingManager.Instance != null && BuildingManager.Instance.Current != null
+            && BuildingManager.Instance.Current.OwnerOf(zone) == TerritoryMap.Neutral;
+
+        private void EnsureCaptureMemory(int zone)
+        {
+            int size = BuildingManager.Instance != null ? BuildingManager.Instance.ZoneCount : zone + 1;
+            if (lastCaptureTeam != null && lastCaptureTeam.Length >= size)
+                return;
+
+            var team = new int[size];
+            for (int i = 0; i < size; i++) team[i] = -1;
+            lastCaptureTeam = team;
+            lastCaptureWasDrain = new bool[size];
         }
 
         // ---------------------------------------------------------------- match identity

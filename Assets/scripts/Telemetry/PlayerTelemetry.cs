@@ -5,6 +5,7 @@ using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
+using Overpower.UI;
 using Overpower.Weapons;
 using Overpower.TestRange;
 
@@ -38,6 +39,12 @@ namespace Overpower.Telemetry
                  "separately here since MatchTelemetry keeps its own copy private.")]
         [SerializeField] private TelemetryConfig config;
 
+        [Tooltip("Task T4: the same Territory Config asset GoldWallet reads on this same prefab - " +
+                 "needed here too because per-zone income attribution (IncomeAttribution.Accumulate) " +
+                 "needs each tier's raw team gold/second and Players Per Team, which GoldWallet keeps " +
+                 "as a private field rather than exposing.")]
+        [SerializeField] private TerritoryConfig territoryConfig;
+
         private PlayerHealth playerHealth;
         private PlayerStatusEffects statusEffects;
         private PlayerLifecycle lifecycle;
@@ -48,6 +55,7 @@ namespace Overpower.Telemetry
         private UltimateCharge ultimateCharge;
         private PlayerCombatCredit combatCredit;
         private GoldWallet goldWallet;
+        private LoadoutScreen loadoutScreen;
 
         /// <summary>T3 review fix (item 2): PlayerDisplacement.TeleportTo writes rb.position
         /// directly; Unity does not sync transform.position from it until the next physics step, so
@@ -117,8 +125,50 @@ namespace Overpower.Telemetry
         /// tick - measured at ~129 lines/second for a single burning victim at Editor framerate.
         /// Keyed exactly as the review specified: victim, attacker actor/team, weapon, ability,
         /// source. Same reset-in-place reasoning as shotsByWeapon above.</summary>
-        private readonly Dictionary<(int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, DamageSource Source), DotAccumulator> dotsByKey =
-            new Dictionary<(int, int, int, int, int, DamageSource), DotAccumulator>();
+        // Source is stored as int, not DamageSource - re-review (T3): a DamageSource-valued tuple
+        // field boxes the enum on every Equals/GetHashCode call a Dictionary lookup makes (an enum's
+        // default GetHashCode goes through object.GetHashCode unless the underlying value type
+        // itself is used), which is exactly the kind of per-frame allocation this class otherwise
+        // goes out of its way to avoid (see the class comment's ALLOCATION paragraph). Cast back to
+        // DamageSource only where a name is needed (NameFor) - see WriteDotLine.
+        private readonly Dictionary<(int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, int Source), DotAccumulator> dotsByKey =
+            new Dictionary<(int, int, int, int, int, int), DotAccumulator>();
+
+        // ---------------------------------------------------------------- goldEarned (Task T4)
+        //
+        // Territory/bounty/refund/debug/other totals, summed from GoldWallet.Credited every time it
+        // fires (not once per interval) and flushed to a `goldEarned` line every sample interval -
+        // see FlushGoldEarned. Per-zone attribution is separate: it accumulates every Update, one
+        // frame's delta at a time, against the LIVE owners/tiers (see AccumulateZoneIncome) - the
+        // corrected plan step 3, so a zone that changes hands mid-interval is split correctly instead
+        // of attributed wholesale to whoever owns it at the end of the interval.
+
+        private int territoryCreditedThisInterval;
+        private int bountyCreditedThisInterval;
+        private int refundCreditedThisInterval;
+        private int debugCreditedThisInterval;
+        private int otherCreditedThisInterval;
+
+        // Reused every frame/flush - never reallocated once ZoneCount is known (same reasoning as
+        // GoldWallet's own ownersScratch/teamGoldByTierScratch, which this mirrors exactly so the two
+        // can never disagree about what a frame's income was).
+        private int[] zoneOwnersScratch;
+        private int[] teamGoldByTierScratch;
+        private double[] perZoneGoldScratch;
+        private int[] perZoneGoldWholeScratch;
+
+        // ---------------------------------------------------------------- heal (Task T4)
+        //
+        // Health regenerated while alive and not hit this frame, bucketed by the tier of the zone
+        // stood in at the moment it happened (index 0 = not standing in any zone - not one of the
+        // plan's own tiers, kept so a heal outside any zone is still counted rather than silently
+        // dropped) and flushed per sample interval - see PollHeal/FlushHeal.
+
+        private double[] healByTierScratch;
+        private int[] healByTierWholeScratch;
+        private float lastHealthForHealPoll = -1f;
+        private bool tookDamageThisFrame;
+        private bool wasAliveLastFrameForHealPoll = true;
 
         private void Awake()
         {
@@ -133,6 +183,8 @@ namespace Overpower.Telemetry
 
             if (config == null)
                 Debug.LogError($"[PlayerTelemetry] {name}: TelemetryConfig is not assigned - the sample interval and Record Positions fall back to hardcoded defaults.");
+            if (territoryConfig == null)
+                Debug.LogError($"[PlayerTelemetry] {name}: Territory Config is not assigned - goldEarned's per-zone attribution will always read as empty.");
 
             playerHealth = GetComponent<PlayerHealth>();
             statusEffects = GetComponent<PlayerStatusEffects>();
@@ -143,6 +195,7 @@ namespace Overpower.Telemetry
             ultimateCharge = GetComponent<UltimateCharge>();
             combatCredit = GetComponent<PlayerCombatCredit>();
             goldWallet = GetComponent<GoldWallet>();
+            loadoutScreen = GetComponent<LoadoutScreen>();
             body = GetComponent<Rigidbody>();
             // Not on the root - see WeaponFiring's own siblings (OverPowerBuff, PlayerLifecycle)
             // for the identical GetComponentInChildren lookup.
@@ -173,6 +226,14 @@ namespace Overpower.Telemetry
             {
                 overPowerBuff.Triggered += HandleOverpowerTriggered;
                 overPowerBuff.Ended += HandleOverpowerEnded;
+            }
+            if (goldWallet != null)
+                goldWallet.Credited += HandleCredited;
+            if (loadoutScreen != null)
+            {
+                loadoutScreen.Purchased += HandlePurchased;
+                loadoutScreen.Refunded += HandleRefunded;
+                loadoutScreen.PurchaseRefused += HandlePurchaseRefused;
             }
             // T3 review item 10: flush shots/dots before the writer actually closes, regardless of
             // whether this object's own OnDestroy happens to run before or after MatchTelemetry's -
@@ -206,6 +267,14 @@ namespace Overpower.Telemetry
                 overPowerBuff.Triggered -= HandleOverpowerTriggered;
                 overPowerBuff.Ended -= HandleOverpowerEnded;
             }
+            if (goldWallet != null)
+                goldWallet.Credited -= HandleCredited;
+            if (loadoutScreen != null)
+            {
+                loadoutScreen.Purchased -= HandlePurchased;
+                loadoutScreen.Refunded -= HandleRefunded;
+                loadoutScreen.PurchaseRefused -= HandlePurchaseRefused;
+            }
             if (MatchTelemetry.Instance != null)
                 MatchTelemetry.Instance.BeforeClose -= HandleBeforeClose;
             DummyTarget.AnyDamaged -= HandleDummyDamaged;
@@ -222,6 +291,8 @@ namespace Overpower.Telemetry
         {
             FlushShots();
             FlushDots();
+            FlushGoldEarned();
+            FlushHeal();
         }
 
         private void Update()
@@ -231,6 +302,11 @@ namespace Overpower.Telemetry
 
             PollOverheat();
             PollUltimateCharge();
+            // Every frame, not gated by the sample interval below - see AccumulateZoneIncome's own
+            // comment (T4 corrected plan step 3) and PollHeal's (health can be hit and healed several
+            // times inside one sample interval; only a per-frame poll sees every one of those).
+            AccumulateZoneIncome();
+            PollHeal();
 
             float interval = config != null ? config.SampleIntervalSeconds : 5f;
             sampleTimer += Time.unscaledDeltaTime;
@@ -241,6 +317,8 @@ namespace Overpower.Telemetry
             WriteSample();
             FlushShots();
             FlushDots();
+            FlushGoldEarned();
+            FlushHeal();
         }
 
         // ---------------------------------------------------------------- overheat / ultimate polling
@@ -278,6 +356,265 @@ namespace Overpower.Telemetry
 
             line.Begin(TelemetryKeys.UltimateReady, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.AbilityId, abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Ultimate) : -1);
+            MatchTelemetry.Instance.Log(line);
+        }
+
+        // ---------------------------------------------------------------- economy (Task T4)
+
+        private void HandleCredited(int amount, GoldSource source)
+        {
+            switch (source)
+            {
+                case GoldSource.Territory: territoryCreditedThisInterval += amount; break;
+                case GoldSource.Bounty: bountyCreditedThisInterval += amount; break;
+                case GoldSource.Refund: refundCreditedThisInterval += amount; break;
+                case GoldSource.Debug: debugCreditedThisInterval += amount; break;
+                default: otherCreditedThisInterval += amount; break;
+            }
+        }
+
+        private void HandlePurchased(PurchaseCategory category, int itemId, int price, int balanceAfter, bool free)
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
+            line.Begin(TelemetryKeys.Purchase, MatchTelemetry.Instance.Now);
+            line.String(TelemetryKeys.Category, CategoryName(category));
+            line.Int(TelemetryKeys.ItemId, itemId);
+            line.Int(TelemetryKeys.Price, price);
+            line.Int(TelemetryKeys.BalanceAfter, balanceAfter);
+            line.Int(TelemetryKeys.Zone, CurrentZone());
+            line.Bool(TelemetryKeys.Free, free);
+            MatchTelemetry.Instance.Log(line);
+        }
+
+        private void HandleRefunded(PurchaseCategory category, int amount, int balanceAfter)
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
+            line.Begin(TelemetryKeys.Refund, MatchTelemetry.Instance.Now);
+            line.String(TelemetryKeys.Category, CategoryName(category));
+            line.Int(TelemetryKeys.Amount, amount);
+            line.Int(TelemetryKeys.BalanceAfter, balanceAfter);
+            line.Int(TelemetryKeys.Zone, CurrentZone());
+            MatchTelemetry.Instance.Log(line);
+        }
+
+        private void HandlePurchaseRefused(int itemId, int price, PurchaseBlock reason, int shortfall)
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
+            line.Begin(TelemetryKeys.ShopBlocked, MatchTelemetry.Instance.Now);
+            line.Int(TelemetryKeys.ItemId, itemId);
+            line.Int(TelemetryKeys.Price, price);
+            line.String(TelemetryKeys.Reason, ReasonName(reason));
+            line.Int(TelemetryKeys.Shortfall, shortfall);
+            line.Int(TelemetryKeys.Zone, CurrentZone());
+            MatchTelemetry.Instance.Log(line);
+        }
+
+        private static string CategoryName(PurchaseCategory category)
+        {
+            switch (category)
+            {
+                case PurchaseCategory.Weapon: return "weapon";
+                case PurchaseCategory.Armor: return "armor";
+                case PurchaseCategory.Equipment: return "equipment";
+                case PurchaseCategory.Mobility: return "mobility";
+                case PurchaseCategory.Ultimate: return "ultimate";
+                default: return "other";
+            }
+        }
+
+        private static string ReasonName(PurchaseBlock block)
+        {
+            switch (block)
+            {
+                case PurchaseBlock.NotInOwnTerritory: return "territory";
+                case PurchaseBlock.InCombat: return "combat";
+                case PurchaseBlock.CannotAfford: return "gold";
+                default: return "unknown";
+            }
+        }
+
+        private int CurrentZone()
+        {
+            int zone = -1;
+            BuildingManager.Instance?.TryGetZoneAt(MyPosition, out zone);
+            return zone;
+        }
+
+        /// <summary>Task T4 corrected plan step 3: called every Update (not once per sample interval)
+        /// with THIS FRAME's delta time against the LIVE owners/tiers, exactly as GoldWallet.Update
+        /// accrues its own balance from the same two arrays - so a zone that changes hands mid-
+        /// interval is split correctly between the team that held it before and the team that holds
+        /// it after, instead of the whole interval being misattributed to whichever team happens to
+        /// own it at the moment the interval is flushed.</summary>
+        private void AccumulateZoneIncome()
+        {
+            if (territoryConfig == null || playerHealth == null)
+                return;
+
+            BuildingManager manager = BuildingManager.Instance;
+            if (manager == null || manager.Current == null)
+                return;
+
+            int team = playerHealth.TeamId;
+            if (team < 0)
+                return;
+
+            TerritorySnapshot current = manager.Current;
+            int zoneCount = current.ZoneCount;
+            if (zoneOwnersScratch == null || zoneOwnersScratch.Length != zoneCount)
+                zoneOwnersScratch = new int[zoneCount];
+            if (perZoneGoldScratch == null || perZoneGoldScratch.Length != zoneCount)
+                perZoneGoldScratch = new double[zoneCount];
+
+            for (int zone = 0; zone < zoneCount; zone++)
+                zoneOwnersScratch[zone] = current.OwnerOf(zone);
+
+            int[] tiers = manager.TierByZone();
+            int[] teamGoldByTier = TeamGoldByTierFromConfig();
+
+            IncomeAttribution.Accumulate(team, zoneOwnersScratch, tiers, teamGoldByTier,
+                                         territoryConfig.PlayersPerTeam, Time.unscaledDeltaTime, perZoneGoldScratch);
+        }
+
+        private int[] TeamGoldByTierFromConfig()
+        {
+            int count = territoryConfig.TierCount;
+            if (teamGoldByTierScratch == null || teamGoldByTierScratch.Length != count)
+                teamGoldByTierScratch = new int[count];
+            for (int i = 0; i < count; i++)
+                teamGoldByTierScratch[i] = territoryConfig.ForTier(i + 1).teamGoldPerSecond;
+            return teamGoldByTierScratch;
+        }
+
+        /// <summary>Every sample interval (and once more at BeforeClose, for a trailing partial
+        /// interval): the Territory/bounty/refund/debug/other totals summed since the last flush,
+        /// plus the per-zone split accumulated frame-by-frame above. `zones` is rounded to whole
+        /// gold per zone; the `terr` total (from GoldWallet.Credited(Territory), the same whole-gold
+        /// crossings the wallet itself publishes) stays the authoritative total - see the T4 step 3
+        /// check this is verified against.</summary>
+        private void FlushGoldEarned()
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
+            line.Begin(TelemetryKeys.GoldEarned, MatchTelemetry.Instance.Now);
+            line.Int(TelemetryKeys.Territory, territoryCreditedThisInterval);
+            line.Ints(TelemetryKeys.Zones, RoundedZoneArray());
+            line.Int(TelemetryKeys.Bounty, bountyCreditedThisInterval);
+            line.Int(TelemetryKeys.Refund, refundCreditedThisInterval);
+            line.Int(TelemetryKeys.Debug, debugCreditedThisInterval);
+            line.Int(TelemetryKeys.Other, otherCreditedThisInterval);
+            MatchTelemetry.Instance.Log(line);
+
+            territoryCreditedThisInterval = 0;
+            bountyCreditedThisInterval = 0;
+            refundCreditedThisInterval = 0;
+            debugCreditedThisInterval = 0;
+            otherCreditedThisInterval = 0;
+            if (perZoneGoldScratch != null)
+                for (int i = 0; i < perZoneGoldScratch.Length; i++)
+                    perZoneGoldScratch[i] = 0;
+        }
+
+        private int[] RoundedZoneArray()
+        {
+            int len = perZoneGoldScratch != null ? perZoneGoldScratch.Length : 0;
+            if (perZoneGoldWholeScratch == null || perZoneGoldWholeScratch.Length != len)
+                perZoneGoldWholeScratch = new int[len];
+            for (int i = 0; i < len; i++)
+                perZoneGoldWholeScratch[i] = (int)System.Math.Round(perZoneGoldScratch[i]);
+            return perZoneGoldWholeScratch;
+        }
+
+        // ---------------------------------------------------------------- heal (Task T4)
+
+        /// <summary>Polled every Update: a health increase while alive, not hit this frame (see
+        /// HandleDamaged's own tookDamageThisFrame flag) and not the instantaneous jump a respawn's
+        /// full heal produces (guarded by wasAliveLastFrameForHealPoll - respawn's own `respawn` event
+        /// already records the fact of coming back to life; counting that jump again here as "healing"
+        /// would hugely overstate the zone regen this event exists to measure).</summary>
+        private void PollHeal()
+        {
+            if (playerHealth == null || lifecycle == null)
+                return;
+
+            bool aliveNow = lifecycle.IsAlive;
+            float currentHealth = playerHealth.Health;
+
+            if (!aliveNow)
+            {
+                wasAliveLastFrameForHealPoll = false;
+                lastHealthForHealPoll = currentHealth;
+                tookDamageThisFrame = false;
+                return;
+            }
+
+            bool justRespawned = !wasAliveLastFrameForHealPoll;
+            wasAliveLastFrameForHealPoll = true;
+
+            if (lastHealthForHealPoll < 0f)
+            {
+                lastHealthForHealPoll = currentHealth; // First frame ever - no prior value to diff against.
+            }
+            else if (!justRespawned && !tookDamageThisFrame)
+            {
+                float delta = currentHealth - lastHealthForHealPoll;
+                if (delta > 0.0001f)
+                    AccumulateHeal(delta);
+            }
+
+            lastHealthForHealPoll = currentHealth;
+            tookDamageThisFrame = false;
+        }
+
+        private void AccumulateHeal(float amount)
+        {
+            int tierCount = territoryConfig != null ? territoryConfig.TierCount : 4;
+            if (healByTierScratch == null || healByTierScratch.Length != tierCount + 1)
+                healByTierScratch = new double[tierCount + 1];
+
+            int zone = CurrentZone();
+            int tier = zone >= 0 && BuildingManager.Instance != null ? BuildingManager.Instance.TierOf(zone) : 0;
+            int index = tier >= 1 && tier < healByTierScratch.Length ? tier : 0; // Index 0 = no zone / tier not registered yet.
+            healByTierScratch[index] += amount;
+        }
+
+        /// <summary>Every sample interval (and at BeforeClose): tier -> whole health points
+        /// regenerated, skipped entirely when nothing healed this interval (same "don't write an
+        /// empty line" convention FlushShots already uses).</summary>
+        private void FlushHeal()
+        {
+            if (MatchTelemetry.Instance == null || healByTierScratch == null)
+                return;
+
+            bool any = false;
+            for (int i = 0; i < healByTierScratch.Length; i++)
+            {
+                if (healByTierScratch[i] > 0.0001)
+                {
+                    any = true;
+                    break;
+                }
+            }
+            if (!any)
+                return;
+
+            if (healByTierWholeScratch == null || healByTierWholeScratch.Length != healByTierScratch.Length)
+                healByTierWholeScratch = new int[healByTierScratch.Length];
+            for (int i = 0; i < healByTierScratch.Length; i++)
+            {
+                healByTierWholeScratch[i] = Mathf.RoundToInt((float)healByTierScratch[i]);
+                healByTierScratch[i] = 0;
+            }
+
+            line.Begin(TelemetryKeys.Heal, MatchTelemetry.Instance.Now);
+            line.Ints(TelemetryKeys.HealTiers, healByTierWholeScratch);
             MatchTelemetry.Instance.Log(line);
         }
 
@@ -401,6 +738,11 @@ namespace Overpower.Telemetry
         /// <summary>PlayerHealth.Damaged, on this player's own (victim's) client.</summary>
         private void HandleDamaged(DamageResult result, DamageInfo info)
         {
+            // Task T4: PollHeal's own "not taking damage that frame" guard - see its comment. Set
+            // here rather than read from PlayerHealth directly because nothing else already exposes
+            // "was hit this frame" as a public flag.
+            tookDamageThisFrame = true;
+
             int victimTeam = playerHealth != null ? playerHealth.TeamId : -1;
             float distance = DistanceToAttacker(info.SourceActorNumber);
             float vulnerability = statusEffects != null ? statusEffects.Vulnerability : 0f;
@@ -444,7 +786,7 @@ namespace Overpower.Telemetry
                 return;
             }
 
-            var key = (victim, info.SourceActorNumber, info.SourceTeamId, info.WeaponId, info.AbilityId, info.Source);
+            var key = (victim, info.SourceActorNumber, info.SourceTeamId, info.WeaponId, info.AbilityId, (int)info.Source);
             if (!dotsByKey.TryGetValue(key, out DotAccumulator dot))
             {
                 dot = new DotAccumulator();
@@ -490,7 +832,7 @@ namespace Overpower.Telemetry
             MatchTelemetry.Instance.Log(line);
         }
 
-        private void WriteDotLine((int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, DamageSource Source) key,
+        private void WriteDotLine((int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, int Source) key,
                                   DotAccumulator dot)
         {
             if (MatchTelemetry.Instance == null || !dot.HasData)
@@ -506,7 +848,7 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.VictimTeam, victimTeam);
             line.Int(TelemetryKeys.Weapon, key.WeaponId);
             line.Int(TelemetryKeys.AbilityId, key.AbilityId);
-            line.String(TelemetryKeys.Source, NameFor(key.Source));
+            line.String(TelemetryKeys.Source, NameFor((DamageSource)key.Source));
             line.Int(TelemetryKeys.Ticks, dot.Ticks);
             line.Float(TelemetryKeys.Raw, dot.RawSum);
             line.Float(TelemetryKeys.ArmorAbsorbed, dot.ArmorSum);
