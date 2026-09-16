@@ -140,10 +140,15 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// is what survives a master switch cleanly.</summary>
     public event Action<int, CaptureProgress, CaptureProgress> CaptureProgressChanged;
 
-    /// <summary>Task T4: raised on the master only, from inside SetCaptured, the moment a capture
-    /// actually pays out a bounty (bountyPaid > 0) - see SetCaptured's own comment for why the
-    /// payout is computed there rather than passed in. Not raised for a zero-bounty capture.</summary>
-    public event Action<int, int, int, int> BountyPaid;
+    /// <summary>Task T4 (opus review fix: added the paying team, and only raised once the write that
+    /// carries it actually reaches Photon): raised on the master only, from inside SetCaptured, the
+    /// moment a capture actually pays out a bounty (bountyPaid > 0) - (zone, paidTeam, payingTeam,
+    /// amount, heldMs). paidTeam is who just captured the zone and received the bounty; payingTeam
+    /// is whoever held it too long before losing it (the team the bounty is conceptually paid BY -
+    /// nothing physically leaves their wallet, but they are why this one is non-zero). See
+    /// SetCaptured's own comment for why the payout is computed there rather than passed in. Not
+    /// raised for a zero-bounty capture, or if the room never actually got the write.</summary>
+    public event Action<int, int, int, int, int> BountyPaid;
 
     /// How many OwnershipChanged events this client has raised. Diagnostic only: lets a test read
     /// from outside that a late joiner's first read raised none.
@@ -192,17 +197,17 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             tierByZoneCache[zone] = TierOf(zone);
     }
 
-    /// <summary>Finds which registered zone position stands inside (flat XZ distance to the tower ≤
-    /// its own captureRadius) - the "which zone am I in" question health regen (Task 2.3), the shop
-    /// gate and OverPower's "near a zone" check (Tasks 2.5/2.6) all ask the same way. Capture rings
-    /// are not meant to overlap, but if two ever do the nearest centre wins rather than an arbitrary
-    /// dictionary order. No allocation: a plain foreach over the existing captures dictionary.</summary>
     /// <summary>Task T4: how many players BuildingCapture currently counts inside this zone (its own
     /// PlayersInZoneCount) - the `capture` telemetry event's own "players" field. 0 for a zone id
     /// with no registered tower (not yet started, or a bad id), same convention as TierOf.</summary>
     public int PlayersInZone(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.PlayersInZoneCount : 0;
 
+    /// <summary>Finds which registered zone position stands inside (flat XZ distance to the tower ≤
+    /// its own captureRadius) - the "which zone am I in" question health regen (Task 2.3), the shop
+    /// gate and OverPower's "near a zone" check (Tasks 2.5/2.6) all ask the same way. Capture rings
+    /// are not meant to overlap, but if two ever do the nearest centre wins rather than an arbitrary
+    /// dictionary order. No allocation: a plain foreach over the existing captures dictionary.</summary>
     public bool TryGetZoneAt(Vector3 position, out int zoneId)
     {
         zoneId = -1;
@@ -533,17 +538,20 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             return;
 
         int bountyPaid = BountyRule.PayoutOnCapture(team, basis.LastOwnerOf(zone), basis.LastHeldMs(zone), tierBounty, holdMs);
-        Write(basis.WithCapture(zone, team, ServerNowMs(), bountyPaid));
+        int payingTeam = basis.LastOwnerOf(zone);
+        bool written = Write(basis.WithCapture(zone, team, ServerNowMs(), bountyPaid));
 
-        // Task T4: raised here, not off the replicated snapshot's own BountyPaidOnLastCapture (which
+        // Task T4 (opus review fix: only once the write actually reached Photon - Write returning
+        // false means nothing was sent, so there is nothing real to tell telemetry about) - raised
+        // here, not off the replicated snapshot's own BountyPaidOnLastCapture (which
         // GoldWallet.HandleOwnershipChanged reads on every client to actually pay each player) -
         // this is the single MASTER-side "a bounty was paid" fact for telemetry, independent of
-        // when (or whether) any one client's echo of the write above lands.
-        if (bountyPaid > 0)
-            RaiseBountyPaid(zone, team, bountyPaid, basis.LastHeldMs(zone));
+        // when any one client's echo of the write above lands.
+        if (written && bountyPaid > 0)
+            RaiseBountyPaid(zone, team, payingTeam, bountyPaid, basis.LastHeldMs(zone));
     }
 
-    private void RaiseBountyPaid(int zone, int team, int amount, int heldMs)
+    private void RaiseBountyPaid(int zone, int paidTeam, int payingTeam, int amount, int heldMs)
     {
         if (BountyPaid == null)
             return;
@@ -551,7 +559,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         {
             try
             {
-                ((Action<int, int, int, int>)listener)(zone, team, amount, heldMs);
+                ((Action<int, int, int, int, int>)listener)(zone, paidTeam, payingTeam, amount, heldMs);
             }
             catch (Exception e)
             {
@@ -590,7 +598,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return basis;
     }
 
-    private void Write(TerritorySnapshot next)
+    /// <summary>Returns whether the write actually reached Photon (opus review fix - SetCaptured
+    /// needs this to know whether a bounty it just computed is real or was never sent).</summary>
+    private bool Write(TerritorySnapshot next)
     {
         var props = new Hashtable();
         next.WriteTo(props);   // Photon's Hashtable is a Dictionary<object, object>
@@ -598,11 +608,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props))
         {
             Debug.LogWarning("[TOWER] the territory snapshot could not be sent to the room.");
-            return;
+            return false;
         }
 
         lastWritten = next;
         writesAwaitingEcho++;
+        return true;
     }
 
     private static int ServerNowMs()
