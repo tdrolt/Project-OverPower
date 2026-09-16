@@ -42,6 +42,11 @@ namespace Overpower.Telemetry
         public const string Respawn = "respawn";
         public const string Heal = "heal";
         public const string Overheat = "overheat";
+        /// <summary>T3 review: continuous damage (Burn - status burn and FireField's DoT, both share
+        /// DamageSource.Burn) is bucketed and flushed as one `dot` line instead of one `hit` line per
+        /// tick, which measured ~129 lines/second for a single burning victim at Editor framerate -
+        /// see PlayerTelemetry's dot accumulator.</summary>
+        public const string Dot = "dot";
         public const string UltimateReady = "ultimateReady";
         public const string UltimateUsed = "ultimateUsed";
         public const string Ownership = "ownership";
@@ -93,7 +98,13 @@ namespace Overpower.Telemetry
         public const string AbsorbLevel = "abl";
         public const string RechargeLevel = "rcl";
         public const string Health = "hp";
-        public const string HealthLost = Health;
+        /// <summary>T3 review: its own key, not an alias of Health any more - `hit`/`dot` need to
+        /// report "how much health this hit/bucket cost", which used to collide with `sample`'s
+        /// "current health" under the same "hp" key (harmless there, since they're different event
+        /// types, but confusing to read across the whole schema for no reason - see the review's own
+        /// note). HealthAtTrigger stays aliased to Health: `overpower`'s "health at this moment" is
+        /// the same kind of value `sample`'s "hp" already is.</summary>
+        public const string HealthLost = "hpLost";
         public const string HealthAtTrigger = Health;
         public const string Armor = "armor";
         public const string UltimateCharge = "ultc";
@@ -126,10 +137,26 @@ namespace Overpower.Telemetry
         public const string Lethal = "lethal";
         public const string Distance = "d";
         public const string Vulnerable = "vul";
+        /// <summary>T3 review: dropped from `hit`/`dot` rather than fixed - PlayerHealth.ApplyDamage
+        /// returns BEFORE raising Damaged when the victim is already invulnerable (the funnel is the
+        /// one place that can stop a hit for everyone), so a real player's own `hit` line could never
+        /// read true in the first place; a dummy never checks invulnerability at all, so its own
+        /// reading would not mean "this hit was blocked" either. Left here, unused, rather than
+        /// removed outright, in case a future task finds a place this genuinely belongs.</summary>
         public const string Invulnerable = "inv";
         public const string OverpowerActive = "op";
         public const string Effect = "effect";
+        /// <summary>T3 review: `status` used to report only one of duration/magnitude depending on
+        /// kind, dropping the other. Now both are always written - Duration alongside this, below -
+        /// so T5 can sum seconds across every kind uniformly instead of guessing which field a given
+        /// kind used.</summary>
         public const string DurationOrMagnitude = "mag";
+        public const string Duration = "dur";
+        /// <summary>T3 review: a burst/continuous damage bucket's own tick count and time span -
+        /// `dot` only. See TelemetryKeys.Dot.</summary>
+        public const string Ticks = "ticks";
+        public const string FirstT = "firstT";
+        public const string LastT = "lastT";
         public const string Assists = "assists";
         public const string TimeAlive = "timeAlive";
         public const string UnspentGold = "gold";
@@ -149,8 +176,10 @@ namespace Overpower.Telemetry
         /// <summary>A short string state/label, reused by every event that needs one instead of a
         /// dedicated bool or a bespoke key: overheat's "silenced"/"recovered", capture's
         /// "started"/"paused"/"resumed"/"completed"/"drainStarted"/"neutralised"/"drainPaused",
-        /// overpower's "triggered"/"expired"/"brokenByDistance", underAttack's "start"/"end". The exact
-        /// value strings are each hook's own choice (T3/T4), not fixed here.</summary>
+        /// overpower's "triggered"/"ended" (with Reason "distance"/"death" alongside "ended" - T3
+        /// review correction; an earlier draft of this comment guessed "expired"/"brokenByDistance",
+        /// which is not what the code writes), underAttack's "start"/"end". The exact value strings
+        /// are each hook's own choice (T3/T4), not fixed here.</summary>
         public const string State = "state";
         public const string SecondsSinceReady = "sinceReady";
 
