@@ -295,11 +295,6 @@ public class BuildingCapture : MonoBehaviourPun
     private static readonly System.Func<int, bool> ZoneUnderAttack =
         zone => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(zone);
 
-    // OwnersByZone() builds a new dictionary on every call. Every tower reads the same snapshot, which only changes
-    // when a zone changes hands, so the dictionary is built once per snapshot instead of per tower per frame.
-    private static TerritorySnapshot ownersBuiltFrom;
-    private static IReadOnlyDictionary<int, int> ownersOfSnapshot;
-
     // One answer per team per frame. "Under attack" ends on the server clock, which keeps ticking during a frame, so
     // asking twice (CalculateCaptureProgress, then ComputeCurrentProgress for the bar) could straddle the end of the
     // linger and let the bar claim a capture the tick didn't make.
@@ -324,15 +319,8 @@ public class BuildingCapture : MonoBehaviourPun
 
         BuildingManager manager = BuildingManager.Instance;
         bool answer = true; // Nothing to judge by yet; the entry check already applied the plain rule.
-        if (manager != null && manager.Map != null && manager.Current != null)
-        {
-            if (!ReferenceEquals(ownersBuiltFrom, manager.Current))
-            {
-                ownersOfSnapshot = manager.Current.OwnersByZone();
-                ownersBuiltFrom = manager.Current;
-            }
-            answer = manager.Map.MayCapture(team, buildingID, ownersOfSnapshot, ZoneUnderAttack);
-        }
+        if (manager != null && manager.Map != null && manager.CurrentOwners != null)
+            answer = manager.Map.MayCapture(team, buildingID, manager.CurrentOwners, ZoneUnderAttack);
 
         mayCaptureFrame = Time.frameCount;
         mayCaptureTeam = team;
@@ -340,8 +328,6 @@ public class BuildingCapture : MonoBehaviourPun
         return answer;
     }
 
-
-    // NEW: Modified to handle recapture decay if enemy enters
     void HandleCapturedState()
     {
         // Nobody standing here and no drain to stop: a quiet tower skips every check below.
@@ -411,13 +397,6 @@ public class BuildingCapture : MonoBehaviourPun
             && ZonePresenceTracker.Instance.IsTeamPresent(buildingID, controllingTeam);
     }
 
-
-    void StartDecay()
-    {
-        isDecaying = true;
-        captureProgress = CaptureSeconds;
-        // Decay started � progress resets to threshold.
-    }
 
     void UpdateDecay()
     {

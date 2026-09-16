@@ -74,6 +74,11 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// snapshot (just after joining), so readers must treat null as "not known yet".
     public TerritorySnapshot Current => current;
 
+    /// Current's owner of every zone, as the dictionary TerritoryMap.MayCapture reads. Built once
+    /// per snapshot, because OwnersByZone() allocates a new one on every call and every tower asks
+    /// every frame while someone is capturing. Null whenever Current is. Read-only by convention.
+    public IReadOnlyDictionary<int, int> CurrentOwners { get; private set; }
+
     /// Highest tower id + 1: the length of every array in the snapshot.
     public int ZoneCount { get; private set; }
 
@@ -269,6 +274,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     {
         // The next room is a different match; nothing from this one may leak into it.
         current = null;
+        CurrentOwners = null;
         lastWritten = null;
         writesAwaitingEcho = 0;
         currentProgress = null;
@@ -370,6 +376,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     {
         TerritorySnapshot previous = current;
         current = snapshot;
+        CurrentOwners = snapshot.OwnersByZone();
         bool firstRead = previous == null;
 
         // On the first read every zone counts as changed, so towers and TowerDictionary drop the

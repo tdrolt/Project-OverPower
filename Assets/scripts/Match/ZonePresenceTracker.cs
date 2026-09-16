@@ -32,6 +32,9 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     // false defender that resets a drain), so a player who just came back to life is skipped for this long.
     private const float RespawnSettleSeconds = 0.5f;
 
+    // Used only if territoryConfig is missing (logged as an error in Awake): the linger Tudor chose, 2026-09-16.
+    private const float FallbackLingerSeconds = 3f;
+
     [SerializeField, Tooltip("The shared territory numbers. The under-attack linger time is read from here.")]
     private TerritoryConfig territoryConfig;
 
@@ -60,7 +63,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     {
         Instance = this;
         if (territoryConfig == null)
-            Debug.LogError($"[ZonePresence] {name}: Territory Config is not assigned - the under-attack linger falls back to 3 s.");
+            Debug.LogError($"[ZonePresence] {name}: Territory Config is not assigned - the under-attack linger falls back to {FallbackLingerSeconds} s.");
     }
 
     private void Start()
@@ -82,7 +85,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         BuildingManager manager = BuildingManager.Instance;
         if (manager == null || manager.Current == null || presentMasks == null || zone < 0 || zone >= presentMasks.Length)
             return false;
-        float lingerSeconds = territoryConfig != null ? territoryConfig.UnderAttackLingerSeconds : 3f;
+        float lingerSeconds = territoryConfig != null ? territoryConfig.UnderAttackLingerSeconds : FallbackLingerSeconds;
         return ZoneThreat.IsUnderAttack(manager.Current.OwnerOf(zone), presentMasks[zone], lastSeenMs,
                                         zone * ZoneThreat.MaxTeams, PhotonNetwork.ServerTimestamp,
                                         Mathf.RoundToInt(lingerSeconds * 1000f));
