@@ -19,5 +19,11 @@ namespace Overpower.Tests
             Assert.AreEqual(-1.0, MatchClock.Seconds(0, 100000));
             Assert.AreEqual(-1.0, MatchClock.Seconds(100000, 0));
         }
+
+        [Test]
+        public void SmallNegativeSkewClampsToZeroRatherThanGoingNegative() =>
+            // Both stamps known, nowMs a hair before startMs, no wrap (the values are nowhere near
+            // int.MinValue/MaxValue) - clock-estimate skew, not "before the match started".
+            Assert.AreEqual(0.0, MatchClock.Seconds(nowMs: 99950, startMs: 100000), 1e-9);
     }
 }

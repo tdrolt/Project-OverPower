@@ -8,7 +8,14 @@ namespace Overpower.Telemetry
         public static double Seconds(int nowMs, int startMs)
         {
             if (nowMs == 0 || startMs == 0) return -1.0;
-            return unchecked(nowMs - startMs) / 1000.0;
+
+            double seconds = unchecked(nowMs - startMs) / 1000.0;
+
+            // A genuine wrap produces a small POSITIVE result (the subtraction above already handles
+            // that, unchecked) - this clamp only catches a small NEGATIVE one, which is clock-estimate
+            // skew (nowMs sampled a hair before startMs, no wrap involved) rather than "before the
+            // match started". Match seconds should never read negative once both stamps are known.
+            return seconds < 0.0 ? 0.0 : seconds;
         }
     }
 }

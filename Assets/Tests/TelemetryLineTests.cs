@@ -46,5 +46,30 @@ namespace Overpower.Tests
             line.Begin("b", 2).Int("n", 2);
             Assert.AreEqual("{\"e\":\"b\",\"t\":2,\"n\":2}", line.End());
         }
+
+        [Test]
+        public void NonFiniteMatchSecondsBecomesTheMinusOneSentinel()
+        {
+            var line = new TelemetryLine();
+            line.Begin("x", double.NaN);
+            Assert.AreEqual("{\"e\":\"x\",\"t\":-1}", line.End());
+
+            line.Begin("y", double.PositiveInfinity);
+            Assert.AreEqual("{\"e\":\"y\",\"t\":-1}", line.End());
+
+            line.Begin("z", double.NegativeInfinity);
+            Assert.AreEqual("{\"e\":\"z\",\"t\":-1}", line.End());
+        }
+
+        [Test]
+        public void EndCalledTwiceReturnsTheSameStringInsteadOfAddingASecondBrace()
+        {
+            var line = new TelemetryLine();
+            line.Begin("hit", 1).Int("a", 3);
+            string first = line.End();
+            string second = line.End();
+            Assert.AreEqual("{\"e\":\"hit\",\"t\":1,\"a\":3}", first);
+            Assert.AreEqual(first, second);
+        }
     }
 }

@@ -10,14 +10,19 @@ namespace Overpower.Telemetry
         public static void Accumulate(int team, int[] ownerByZone, int[] tierByZone, int[] teamGoldByTier,
                                       int playersPerTeam, double seconds, double[] perZoneGold)
         {
-            if (team < 0 || playersPerTeam <= 0 || seconds <= 0) return;
+            if (team < 0 || seconds <= 0) return;
+            // Mirrors GoldMath.PlayerIncomePerSecond's Math.Max(1, playersPerTeam) exactly, rather than
+            // skipping the split outright when the room hasn't reported a player count yet (0) or some
+            // future caller passes a negative one - so this split can never disagree with what the
+            // wallet actually pays over the same interval.
+            int playerDivisor = System.Math.Max(1, playersPerTeam);
             int zones = System.Math.Min(System.Math.Min(ownerByZone.Length, tierByZone.Length), perZoneGold.Length);
             for (int zone = 0; zone < zones; zone++)
             {
                 if (ownerByZone[zone] != team) continue;
                 int index = tierByZone[zone] - 1;
                 if (index < 0 || index >= teamGoldByTier.Length) continue;
-                perZoneGold[zone] += teamGoldByTier[index] * seconds / playersPerTeam;
+                perZoneGold[zone] += teamGoldByTier[index] * seconds / playerDivisor;
             }
         }
     }
