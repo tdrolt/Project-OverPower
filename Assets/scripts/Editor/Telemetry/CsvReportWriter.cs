@@ -20,9 +20,38 @@ namespace Overpower.EditorTools.Telemetry
     /// fixes character encoding, not that regional setting.</summary>
     public static class CsvReportWriter
     {
+        /// <summary>The original, pre-T7 entry point - unchanged: exactly the 12 CSVs, straight into
+        /// folder/csv/. Kept for direct single-scope use (and CsvReportWriterTests, which counts
+        /// exactly 12 files) - the T7 three-folder layout is the separate Write(ReportSet, ...)
+        /// overload below, which calls this same per-table writing through WriteTables.</summary>
         public static void Write(ReportTables tables, string folder)
         {
-            string csvFolder = Path.Combine(folder, "csv");
+            WriteTables(tables, Path.Combine(folder, "csv"));
+        }
+
+        /// <summary>Task T7: one folder per scope - csv/whole_match/, csv/phase1_3teams/ and, if the
+        /// match ever had one, csv/phase2_2teams/ - each with the same 12 files as the single-scope
+        /// overload above (no second copy of the writing logic - see WriteTables), plus a 13th file
+        /// in whole_match only: log_coverage.csv (which players' logs are actually in this report -
+        /// a whole-match fact, not scoped to one phase - see LogCoverageRow's own comment).</summary>
+        public static void Write(ReportSet reportSet, string folder)
+        {
+            if (reportSet == null) return;
+
+            string csvRoot = Path.Combine(folder, "csv");
+
+            string wholeMatchFolder = Path.Combine(csvRoot, "whole_match");
+            WriteTables(reportSet.WholeMatch, wholeMatchFolder);
+            WriteLogCoverage(reportSet.WholeMatch?.Header?.LogCoverage, wholeMatchFolder);
+
+            WriteTables(reportSet.Phase1, Path.Combine(csvRoot, "phase1_3teams"));
+
+            if (reportSet.Phase2 != null)
+                WriteTables(reportSet.Phase2, Path.Combine(csvRoot, "phase2_2teams"));
+        }
+
+        private static void WriteTables(ReportTables tables, string csvFolder)
+        {
             Directory.CreateDirectory(csvFolder);
 
             WriteGoldTimeline(tables, csvFolder);
@@ -37,6 +66,19 @@ namespace Overpower.EditorTools.Telemetry
             WriteAbilities(tables, csvFolder);
             WritePlayers(tables, csvFolder);
             WriteDeaths(tables, csvFolder);
+        }
+
+        /// <summary>Task T7, the 13th file - whole_match only (see Write(ReportSet, ...)'s own
+        /// comment). One row per actor seen anywhere in the match; "present" is whether their own log
+        /// file was found.</summary>
+        private static void WriteLogCoverage(System.Collections.Generic.List<LogCoverageRow> rows, string csvFolder)
+        {
+            rows ??= new System.Collections.Generic.List<LogCoverageRow>();
+            Directory.CreateDirectory(csvFolder);
+            WriteCsv(
+                Path.Combine(csvFolder, "log_coverage.csv"),
+                new[] { "actor", "name", "filePresent", "firstT", "lastT" },
+                rows.Select(r => new[] { N(r.Actor), r.Nick, N(r.FilePresent), N(r.FirstT), N(r.LastT) }));
         }
 
         private static void WriteGoldTimeline(ReportTables t, string folder) => WriteCsv(
