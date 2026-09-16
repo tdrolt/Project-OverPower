@@ -183,13 +183,27 @@ public class BuildingCapture : MonoBehaviourPun
 
         if (!PhotonNetwork.IsMasterClient) return;
 
-        // A player who died or disconnected while standing in the ring leaves a destroyed
-        // reference behind: OnTriggerExit cannot fire for an object that no longer exists.
-        // Every consumer below reads p.teamID, so one stale entry throws a
-        // MissingReferenceException every frame and the capture system stops working for the
-        // rest of the match. Unity's == treats a destroyed object as null, so this catches both
-        // the destroyed and the disconnected case.
+        // A player who disconnected while standing in the ring leaves a destroyed reference
+        // behind: OnTriggerExit cannot fire for an object that no longer exists. Every consumer
+        // below reads p.teamID, so one stale entry throws a MissingReferenceException every frame
+        // and the capture system stops working for the rest of the match. Unity's == treats a
+        // destroyed object as null, so this catches both the destroyed and the disconnected case.
         playersInZone.RemoveAll(p => p == null);
+
+        // A player who dies in the ring never leaves it either: death switches their collider off,
+        // which fires no OnTriggerExit. Measured 2026-09-16, two clients: a killed attacker stayed
+        // listed, drained the zone to neutral while dead, then captured it while standing in their
+        // own capital after respawning. So dying counts as leaving. A player who respawns inside a
+        // zone is listed again, because switching their collider back on fires OnTriggerEnter.
+        for (int i = playersInZone.Count - 1; i >= 0; i--)
+        {
+            PlayerTeam player = playersInZone[i];
+            if (player.TryGetComponent(out PlayerLifecycle lifecycle) && !lifecycle.IsAlive)
+            {
+                RemoveFromZone(player);
+                Debug.Log($"[BuildingCapture] tower {buildingID}: a team {player.teamID} player died here - no longer counted.");
+            }
+        }
 
         if (isCaptured)
             HandleCapturedState(); // handles recapture decay if an enemy is present
@@ -583,7 +597,9 @@ public class BuildingCapture : MonoBehaviourPun
 
         PhotonView view = PhotonView.Find(localPlayerViewIdInZone);
         PlayerTeam player = view != null ? view.GetComponent<PlayerTeam>() : null;
-        if (player == null || !view.IsMine)
+        // A player who died here and respawned somewhere else never left as far as the trigger
+        // knows (see Update), so only report a body that really is still inside.
+        if (player == null || !view.IsMine || !StillInside(player))
         {
             localPlayerViewIdInZone = 0;
             return;
@@ -592,6 +608,17 @@ public class BuildingCapture : MonoBehaviourPun
         // Same two calls, same order, as a normal entry in OnTriggerEnter.
         photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, player.teamID);
         photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, localPlayerViewIdInZone);
+    }
+
+    /// Whether the player's body still overlaps this tower's capture trigger - the same test the
+    /// trigger itself makes. A dead body's collider is off, so it never does.
+    private bool StillInside(PlayerTeam player)
+    {
+        var zone = GetComponent<SphereCollider>();
+        var body = player.GetComponent<CapsuleCollider>();
+        return zone != null && body != null && body.enabled
+            && Physics.ComputePenetration(zone, zone.transform.position, zone.transform.rotation,
+                                          body, body.transform.position, body.transform.rotation, out _, out _);
     }
 
     private void ResetToOwner(int owner)
@@ -720,22 +747,27 @@ public class BuildingCapture : MonoBehaviourPun
         var pt = PhotonView.Find(viewID)?.GetComponent<PlayerTeam>();
         if (pt && playersInZone.Contains(pt))
         {
-            playersInZone.Remove(pt);
-
-            // Only a neutral capture ends here. An owned zone's drain is left to HandleCapturedState: resetting it
-            // on a leave wiped a running drain in one frame (see DrainRule.LeavingEndsCapture).
-            if (DrainRule.LeavingEndsCapture(isCaptured, playersInZone.Any(p => p.teamID == capturingID)))
-            {
-                capturingID = -1;
-                captureProgress = 0;
-            }
-
+            RemoveFromZone(pt);
             Debug.Log($"[RPC_RemoveFromZone] Removed player (Team {pt.teamID}) from zone.");
         }
 
         // Nothing to report otherwise: every exit is sent here, including players the territory
         // rule never let register (walking through a zone you may not capture yet), so "not in
         // the zone" is the normal case for them, not a fault.
+    }
+
+    /// Master: a listed player has left the zone - walked out (RPC_RemoveFromZone) or died (Update).
+    private void RemoveFromZone(PlayerTeam pt)
+    {
+        playersInZone.Remove(pt);
+
+        // Only a neutral capture ends here. An owned zone's drain is left to HandleCapturedState: resetting it
+        // on a leave wiped a running drain in one frame (see DrainRule.LeavingEndsCapture).
+        if (DrainRule.LeavingEndsCapture(isCaptured, playersInZone.Any(p => p.teamID == capturingID)))
+        {
+            capturingID = -1;
+            captureProgress = 0;
+        }
     }
 
     [PunRPC]
