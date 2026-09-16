@@ -12,6 +12,8 @@ public class BuildingCapture : MonoBehaviourPun
     public int buildingID;
 
     [Header("Capture Settings")]
+    [Tooltip("World metres from the zone centre to the player's centre. Capturing, zone presence (under attack), " +
+             "health regen and the shop all use it.")]
     public float captureRadius = 10f;
 
     [Header("Territory")]
@@ -143,10 +145,13 @@ public class BuildingCapture : MonoBehaviourPun
         var collider = GetComponent<SphereCollider>();
         if (collider)
         {
-            // Capture Radius is in world metres, the same number zone presence, health regen and the shop measure
-            // with (BuildingManager.TryGetZoneAt). A SphereCollider's radius is in the tower's own units and scales
-            // with it, so on the towers' 0.8 scale a radius of 10 only reached 8 m (measured 2026-09-16).
-            collider.radius = captureRadius / Mathf.Max(0.0001f, transform.lossyScale.x);
+            // Capture Radius is in world metres from the zone centre to the player's centre, the distance zone
+            // presence, health regen and the shop measure (BuildingManager.TryGetZoneAt). A trigger fires as soon as
+            // it touches the edge of the player's body, so it is one body radius smaller: without that, capturing
+            // reached about half a metre further than the rest (measured 2026-09-16: captured at 10.5 m, not 10.7 m).
+            // Its radius is also in the tower's own units, which scale with the tower (0.8 on these towers).
+            float bodyRadius = BuildingManager.Instance != null ? BuildingManager.Instance.PlayerBodyRadius : 0f;
+            collider.radius = Mathf.Max(0f, captureRadius - bodyRadius) / Mathf.Max(0.0001f, transform.lossyScale.x);
         }
         else
         {

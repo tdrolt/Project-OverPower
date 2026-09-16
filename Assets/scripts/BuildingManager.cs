@@ -82,6 +82,43 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// Highest tower id + 1: the length of every array in the snapshot.
     public int ZoneCount { get; private set; }
 
+    /// The player's body radius in world metres, read once from RoomManager's Player Prefab (its
+    /// CapsuleCollider). Capture triggers fire on the edge of a body, so each tower shrinks its
+    /// trigger by this much to count from the player's centre, like presence, regen and the shop.
+    /// 0, with one error, if it can't be read.
+    public float PlayerBodyRadius
+    {
+        get
+        {
+            if (playerBodyRadius < 0f)
+                playerBodyRadius = ReadPlayerBodyRadius();
+            return playerBodyRadius;
+        }
+    }
+
+    private float playerBodyRadius = -1f; // -1 = not read yet
+
+    private static float ReadPlayerBodyRadius()
+    {
+        RoomManager roomManager = FindFirstObjectByType<RoomManager>();
+        GameObject prefab = roomManager != null ? roomManager.playerPrefab : null;
+        CapsuleCollider body = prefab != null ? prefab.GetComponent<CapsuleCollider>() : null;
+        if (body == null)
+        {
+            Debug.LogError("[TOWER] can't read the player's body radius (RoomManager, its Player Prefab, or the " +
+                           "prefab's CapsuleCollider is missing) - capture triggers will reach up to a body's " +
+                           "width further than presence, regen and the shop.");
+            return 0f;
+        }
+
+        // A capsule's radius scales with the larger of the two axes across its length.
+        Vector3 scale = prefab.transform.localScale;
+        float across = body.direction == 0 ? Mathf.Max(Mathf.Abs(scale.y), Mathf.Abs(scale.z))
+                     : body.direction == 1 ? Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z))
+                     : Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.y));
+        return body.radius * across;
+    }
+
     /// This client's last-known capture progress for a zone - CaptureProgress.Idle if nothing has
     /// been read yet or the zone is out of range. Extrapolate the live fill with
     /// progress.Evaluate(PhotonNetwork.ServerTimestamp) - see CaptureProgress's own class comment.
