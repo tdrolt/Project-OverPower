@@ -757,6 +757,66 @@ unsubscriptions in `OnDestroy`). Every event logs through `MatchTelemetry.Instan
 
 ---
 
+### Task T7 (telemetry step 7): 3-team / 2-team phase split and log coverage (Tudor, 2026-09-16)
+
+**Spec:** `docs/superpowers/specs/2026-09-16-telemetry-design.md` **Part 3**.
+- The phase changes **only on an elimination**.
+- Pre-2.7 logs are entirely Phase 1.
+- Output is clearly separated: HTML tabs and CSV folders.
+- The report lists which players' logs are present.
+
+**Design (planning decisions [C]):**
+- **Runtime API for Task 2.7 to call** (`MatchTelemetry`, master-only guard):
+  - `LogElimination(int team, int[] teamsRemaining)` writes an `elimination` line;
+  - `LogPhase(int phaseNumber, int[] teamsRemaining)` writes a `phase` line.
+  - Add the keys to `TelemetryKeys`.
+  - Also log `phase` 1 once, when the master first claims the match identity (a harmless anchor).
+  - Nothing else calls them yet; 2.7 will.
+- **Aggregation by time window: no second copy of the table logic.**
+  - `TelemetryAggregator.Build(TelemetryLog log, TimeWindow window)` filters events to `[window.Start, window.End)`.
+  - Every time integral (sample intervals, ownership stints, alive time, equipped time, zone time) is **clipped** to the window.
+  - The existing `Build(log)` = the whole-match window.
+  - `PhaseTimeline.From(log)`, a pure class, turns `phase` events into windows: Phase 1 `[0, tPhase2)`, Phase 2 `[tPhase2, matchEnd]`. With no `phase` 2 event there is only Phase 1.
+  - `ReportSet { WholeMatch, Phase1, Phase2 (nullable) }`.
+- **The whole-match tables also get a `Phase` column** on time-based rows (gold timeline, economy per minute, hits, deaths, purchases, shop blocked, captures, ownership stints). A stint crossing the boundary is split into two rows.
+- **CSV:** `CsvReportWriter.Write(ReportSet, folder)` writes `csv/whole_match/`, `csv/phase1_3teams/` and, if present, `csv/phase2_2teams/`, the same 12 files each.
+- **HTML:**
+  - The three existing tabs get real content. Each tab renders its own `ReportTables` through the existing `rowsFor(table, scope)`.
+  - Tab labels: "Phase 1: 3 teams", "Phase 2: 2 teams", "Whole match".
+  - The Phase 2 tab with no data says: "No team was eliminated in this match: everything is Phase 1."
+  - Whole-match time charts draw a vertical "Phase 2 starts" line (the existing `timeChartOptions()` injection point).
+  - Tab headers show each phase's duration against its GDD target.
+- **`BalanceTargets`:**
+  - rename the existing scenario set to Phase 1 (keep the values 5/15/23/33, keeping the serialized data via `FormerlySerializedAs`);
+  - add Phase 2 scenarios Losing 5 / Even 15 / Winning 25 (GDD p.38);
+  - add phase durations 900 s / 450 s (p.36);
+  - each tab draws its own phase's lines; Whole match draws Phase 1's lines up to the transition and Phase 2's after.
+- **Log coverage** (the header `log-coverage` container):
+  - every actor seen in the match (any file's `join`, the sessions, `hit` attackers and victims, `death` killers) with a nick if known;
+  - whether a log file from that actor is present;
+  - its covered time range;
+  - an explicit warning line per missing actor: "No log from <nick> (actor N): their damage taken, gold and purchases aren't counted."
+  - The same list goes into `csv/whole_match/log_coverage.csv` (a 13th file).
+
+**Tests (write first):**
+- `PhaseTimeline`: no events → Phase 1 only; a phase 2 event at t=90 → windows [0, 90) and [90, end].
+- A fixture `match_phases/` (2 files) with a `phase` 2 event at t=90:
+  - **the additive totals of Phase 1 + Phase 2 equal whole match** (damage, gold by source, spent, kills, zone gold, equipped time, alive time);
+  - an ownership stint 60→120 splits into 60→90 (P1) and 90→120 (P2);
+  - a sample interval crossing t=90 is clipped;
+  - log coverage lists a third actor seen only in `hit` lines as missing.
+- The CSV writer creates the three folders (two when there's no phase 2).
+- HTML: the phase tabs contain their own section content; with no phase 2 event, the Phase 2 tab shows the "no elimination" note.
+- A runtime unit test for the keys and the `LogElimination`/`LogPhase` line shape. Use the line builder only; no Photon needed.
+
+**Verify:**
+- Build the fixture report (with phases) and the newest real folder's report (no phases). Report both paths; the
+  controller looks at the tabs.
+- Tests pass.
+- Stage only your files.
+
+---
+
 ## Self-review against the spec
 
 | Spec item | Task |
