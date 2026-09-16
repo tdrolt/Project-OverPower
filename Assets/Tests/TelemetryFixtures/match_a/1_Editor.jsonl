@@ -1,0 +1,24 @@
+{"e":"session","t":0.02,"schema":1,"m":"0123456789abcdef0123456789abcdef","a":1,"nick":"Editor","tm":0,"master":true,"commit":"abcdef0123","uv":"6000.0.70f1","plat":"WindowsEditor","tuning":{"territory":{"playersPerTeam":1},"gameplay":{"freeLoadout":false},"weapons":[{"id":1},{"id":2},{"id":3},{"id":4},{"id":5},{"id":6},{"id":7},{"id":8},{"id":9},{"id":10},{"id":11},{"id":12},{"id":13}]}}
+{"e":"join","t":-1,"a":1,"tm":0}
+{"e":"capture","t":15,"zone":0,"tm":0,"state":"started","progress":0.0,"players":1}
+{"e":"ownership","t":20,"zone":0,"tier":2,"old":-1,"new":0,"since":1000}
+{"e":"capture","t":20,"zone":0,"tm":0,"state":"completed","progress":1.0,"players":1}
+{"e":"purchase","t":25,"cat":"weapon","item":2,"price":1200,"balAfter":300,"zone":0,"free":false}
+{"e":"goldEarned","t":25,"terr":25,"zones":[25,0],"bounty":0,"refund":0,"debug":0,"other":0}
+{"e":"ownership","t":40,"zone":1,"tier":3,"old":-1,"new":1,"since":2000}
+{"e":"capture","t":41,"zone":1,"tm":1,"state":"mystery","progress":0.5,"players":2}
+{"e":"hit","t":52,"a":2,"at":1,"v":1,"vt":0,"w":2,"ab":-1,"src":"Projectile","raw":30,"arm":10,"hpLost":20,"lethal":false,"d":20,"vul":0,"op":false}
+{"e":"hit","t":57,"a":2,"at":1,"v":1,"vt":0,"w":2,"ab":-1,"src":"Projectile","raw":30,"arm":10,"hpLost":20,"lethal":false,"d":22,"vul":0,"op":false}
+{"e":"hit","t":62,"a":2,"at":1,"v":1,"vt":0,"w":2,"ab":-1,"src":"Projectile","raw":30,"arm":10,"hpLost":20,"lethal":false,"d":24,"vul":0,"op":false}
+{"e":"cast","t":58,"slot":1,"ab":27,"x":1.0,"z":1.0}
+{"e":"refund","t":100,"cat":"equipment","amount":400,"balAfter":700,"zone":0}
+{"e":"goldEarned","t":100,"terr":25,"zones":[25,0],"bounty":0,"refund":400,"debug":0,"other":0}
+{"e":"shots","t":63,"w":1,"pulls":3,"proj":3}
+{"e":"marker","t":110,"a":1,"note":"check economy"}
+{"e":"sample","t":5,"bal":1500,"x":0,"z":0,"alive":true,"zone":0,"tm":0,"w":1,"eq":-1,"mob":-1,"ult":-1,"abl":0,"rcl":0,"hp":100,"armor":25,"ultc":0,"heat":0,"ping":10}
+{"e":"sample","t":65,"bal":325,"x":1,"z":1,"alive":true,"zone":0,"tm":0,"w":2,"eq":-1,"mob":-1,"ult":-1,"abl":0,"rcl":0,"hp":40,"armor":0,"ultc":0.2,"heat":10,"ping":12}
+{"e":"sample","t":125,"bal":1000,"x":2,"z":2,"alive":true,"zone":1,"tm":0,"w":2,"eq":-1,"mob":-1,"ult":-1,"abl":0,"rcl":0,"hp":100,"armor":25,"ultc":0.3,"heat":0,"ping":11}
+{"e":"thisEventNameDoesNotExist","t":130,"foo":"bar"}
+{"e":"sample","t":178,"bal
+{"e":"goldEarned","t":178,"terr":0,"zones":[],"bounty":0,"refund":0,"debug":0,"other":0}
+{"e":"sample","t":180,"bal":1350,"x":2,"z":2,"alive":true,"zone":1,"tm":0,"w":2,"eq":-1,"mob":-1,"ult":-1,"abl":0,"rcl":0,"hp":100,"armor":25,"ultc":0.5,"heat":0,"ping":9}
