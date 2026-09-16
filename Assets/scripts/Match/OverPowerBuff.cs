@@ -51,8 +51,9 @@ namespace Overpower.Match
         public event System.Action Triggered;
 
         /// <summary>Task T3 (telemetry): raised the instant Deactivate() runs, with "distance" (left
-        /// the territory radius - Update's own check) or "death" (HandleDied) - the same two paths
-        /// the class comment already documents.</summary>
+        /// the territory radius - Update's own check), "death" (HandleDied), or "disabled"
+        /// (GameplayConfig.EnableOverPower went false while Active - Update's own kill-switch
+        /// check).</summary>
         public event System.Action<string> Ended;
 
         private void Awake()
@@ -111,6 +112,19 @@ namespace Overpower.Match
         {
             if (playerHealth == null || state == null)
                 return;
+
+            // Opus review fix (T6 item 1): RegisterHitFrom's gate only stops NEW arming - a player
+            // already Armed or Active when the flag goes false (a mid-match playtest toggle) needs
+            // an immediate, explicit shutdown here, or CheckTrigger below would still fire for an
+            // already-Armed player, and an already-Active one would keep its stat multipliers and
+            // overheat suppression forever (nothing else ever calls Deactivate for it again).
+            if (!gameplayConfig.EnableOverPower)
+            {
+                bool wasActiveWhileDisabled = state.Active;
+                if (state.Active || state.Armed) state.Disable();
+                if (wasActiveWhileDisabled) Deactivate("disabled");
+                return;
+            }
 
             bool wasActive = state.Active;
 

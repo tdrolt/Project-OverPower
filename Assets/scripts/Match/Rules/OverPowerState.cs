@@ -62,6 +62,22 @@ namespace Overpower.Match
         /// </summary>
         public void EndOnDeath()
         {
+            Reset();
+        }
+
+        /// <summary>Opus review fix (T6 item 1): GameplayConfig.EnableOverPower going false mid-match
+        /// must clear Armed/Active immediately, not just stop new arming - RegisterHitFrom's own gate
+        /// only blocks RecordEnemyHit, so without this an already-Armed player would still trigger,
+        /// and an already-Active one would keep its stat multipliers and overheat suppression forever
+        /// (nothing left running Update ever un-arms/deactivates it again). Same reset as EndOnDeath,
+        /// under its own name so a caller/test reads the reason, not just the mechanism.</summary>
+        public void Disable()
+        {
+            Reset();
+        }
+
+        private void Reset()
+        {
             Armed = false;
             Active = false;
             lastHitTimeByTeam.Clear();
