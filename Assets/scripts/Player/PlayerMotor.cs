@@ -3,6 +3,7 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Arena;
 using Overpower.Data;
+using Overpower.Net;
 
 /// <summary>
 /// Ground movement, remote-player interpolation and the fall-through-the-floor safety net for
@@ -28,13 +29,12 @@ public class PlayerMotor : MonoBehaviour
              "smooth on a laggy connection.")]
     private float networkLerpSpeed = 10f;
 
-    [SerializeField, Tooltip("If a remote player's new network position is farther than this from " +
-             "where their body currently sits, snap straight there instead of lerping. A blink or " +
-             "teleport moves the caster many metres in a single network tick; left to the lerp " +
-             "above, every other client would draw that as a slide through anything in between - " +
-             "including walls. At SerializationRate 20 (RoomManager.cs) a dash only covers about " +
-             "0.9m per tick, so ordinary movement never reaches this and only a blink/teleport ever " +
-             "snaps.")]
+    [SerializeField, Tooltip("How far a remote player may move between two network updates before other screens show " +
+             "the move as a jump instead of a glide - a blink, a portal, a respawn or a teleport. Measured between " +
+             "the owner's own consecutive updates (with more allowed when updates were lost), not from where the " +
+             "smoothed copy sits: a zip pull trails its copy by metres. Ordinary movement covers at most about 1.25 m " +
+             "per update (a 25 m/s zip pull at SerializationRate 20, RoomManager.cs). A blink shorter than this still " +
+             "glides.")]
     private float remoteSnapDistance = 3f;
 
     private Rigidbody rb;
@@ -72,6 +72,17 @@ public class PlayerMotor : MonoBehaviour
     // OnPhotonSerializeView.
     private Vector3 networkPosition;
     private Quaternion networkRotation;
+
+    // Movement step 5, remote copies only: the owner's previous update (for RemoteSnapRule) and a snap waiting for the
+    // next physics step.
+    private bool hasNetworkUpdate;
+    private Vector3 previousNetworkPosition;
+    private int previousNetworkStampMs;
+    private bool snapPending;
+
+    /// <summary>How many times this remote copy has jumped to its owner's position. Diagnostic only - the two-client
+    /// harness reads it, like PlayerAim.SetAimOverride; nothing in the game does.</summary>
+    public int RemoteSnapCount { get; private set; }
 
     /// <summary>True while a dash, blink or similar ability owns this player's position for the
     /// frame - Move() is skipped so the two systems cannot fight over the Rigidbody.</summary>
@@ -160,23 +171,44 @@ public class PlayerMotor : MonoBehaviour
         }
         else
         {
-            rb.MovePosition(Vector3.Lerp(transform.position, networkPosition, Time.deltaTime * networkLerpSpeed));
-            rb.MoveRotation(Quaternion.Lerp(transform.rotation, networkRotation, Time.deltaTime * networkLerpSpeed));
+            // Movement step 5: a snap is applied HERE, in the physics step, not where the update arrived. Writing
+            // rb.position on arrival lost to this lerp's own MovePosition in the same step (PhotonHandler and this
+            // component both run at execution order 0), so a blink or a respawn drew as a quarter-second slide.
+            if (snapPending)
+            {
+                snapPending = false;
+                RemoteSnapCount++;
+                rb.position = networkPosition;
+                rb.rotation = networkRotation;
+                if (!rb.isKinematic)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+                return;
+            }
+
+            // From the body's own physics pose, not transform.position: with interpolation on and transform auto-sync
+            // off, the transform trails the body, which is the other half of why a snap used to be undone.
+            float catchUp = Time.deltaTime * networkLerpSpeed;
+            rb.MovePosition(Vector3.Lerp(rb.position, networkPosition, catchUp));
+            rb.MoveRotation(Quaternion.Lerp(rb.rotation, networkRotation, catchUp));
         }
     }
 
-    /// <summary>Called by PlayerNetSync's receive side, so PlayerMotor never has to reach into the
-    /// networking code itself.</summary>
-    public void SetNetworkTarget(Vector3 position, Quaternion rotation)
+    /// <summary>Called by PlayerNetSync's receive side with the update's own server send time, so PlayerMotor never has
+    /// to reach into the networking code itself. Whether this update is a jump rather than a step is
+    /// RemoteSnapRule's decision; the jump itself happens in the next physics step.</summary>
+    public void SetNetworkTarget(Vector3 position, Quaternion rotation, int sentServerTimestampMs)
     {
-        // A jump this big cannot be an ordinary step - see remoteSnapDistance's tooltip. Snapping
-        // the Rigidbody straight away (rather than just letting the lerp target move) means this
-        // remote copy is never seen sliding through the gap on its way there.
-        if (Vector3.Distance(transform.position, position) > remoteSnapDistance)
-        {
-            rb.position = position;
-            rb.rotation = rotation;
-        }
+        float sendIntervalMs = 1000f / Mathf.Max(1, PhotonNetwork.SerializationRate);
+        if (RemoteSnapRule.ShouldSnap(hasNetworkUpdate, previousNetworkPosition, previousNetworkStampMs,
+                position, sentServerTimestampMs, remoteSnapDistance, sendIntervalMs))
+            snapPending = true;
+
+        hasNetworkUpdate = true;
+        previousNetworkPosition = position;
+        previousNetworkStampMs = sentServerTimestampMs;
 
         networkPosition = position;
         networkRotation = rotation;

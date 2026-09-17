@@ -2,7 +2,7 @@ using Photon.Pun;
 using UnityEngine;
 
 /// <summary>
-/// The player's entire network wire format: every serialize tick it sends transform.position,
+/// The player's entire network wire format: every serialize tick it sends the body's physics position (rb.position),
 /// transform.rotation, health and armor, in that order, and on receive hands them straight to
 /// PlayerMotor and PlayerHealth. Split out of Multiplayer.cs (Task 0.11a) so this is the ONE and
 /// ONLY IPunObservable on the player.
@@ -28,6 +28,7 @@ public class PlayerNetSync : MonoBehaviour, IPunObservable
 {
     private PlayerMotor playerMotor;
     private PlayerHealth playerHealth;
+    private Rigidbody rb;
 
     /// <summary>Last position received from the owner over the network.</summary>
     public Vector3 NetworkPosition { get; private set; }
@@ -44,13 +45,17 @@ public class PlayerNetSync : MonoBehaviour, IPunObservable
     {
         playerMotor = GetComponent<PlayerMotor>();
         playerHealth = GetComponent<PlayerHealth>();
+        rb = GetComponent<Rigidbody>();
     }
 
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
         if (stream.IsWriting)
         {
-            stream.SendNext(transform.position);
+            // The body's own physics position, not the transform's: with transform auto-sync off the transform
+            // trails rb.position by up to a physics step, and right after a respawn or a teleport that stale value
+            // is the spot the player just left (movement step 5). Same type and slot on the wire.
+            stream.SendNext(rb != null ? rb.position : transform.position);
             stream.SendNext(transform.rotation);
             stream.SendNext(playerHealth.Health);
             stream.SendNext(playerHealth.Armor);
@@ -65,7 +70,7 @@ public class PlayerNetSync : MonoBehaviour, IPunObservable
             float receivedHealth = (float)stream.ReceiveNext();
             float receivedArmor = (float)stream.ReceiveNext();
 
-            playerMotor.SetNetworkTarget(NetworkPosition, NetworkRotation);
+            playerMotor.SetNetworkTarget(NetworkPosition, NetworkRotation, info.SentServerTimestamp);
 
             // receivedArmor can legitimately clamp down for one frame here if an armor-level
             // Custom Property (which changes ArmorState.Capacity) hasn't arrived on this client
