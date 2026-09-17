@@ -350,15 +350,38 @@ namespace Overpower.UI
                  "second, unrelated overlay.")]
         public Color capitalUnderAttackNoteBackingColor = new Color(0f, 0f, 0f, 0.6f);
 
-        [Header("Capture bar")]
-        [Tooltip("Width of the small world-space bar shown above a tower while it is being captured or drained, in world units (metres) - NOT canvas units, since this bar is not on the screen-space HUD.")]
-        public float captureBarWidth = 2.2f;
-        [Tooltip("Height of the capture bar, in world units (metres).")]
-        public float captureBarHeight = 0.22f;
-        [Tooltip("Height above the tower's own transform (its scene origin, NOT the flag mesh's own height) the capture bar sits at, in world units (metres). Measured against the scene's own towers (Task 2.1d): every tower's roof peaks at ~5.7m and its flag sits at ~5.6-5.7m, so this must clear that or the bar renders behind/inside the roof and never shows.")]
-        public float captureBarHeightOffset = 6.5f;
-        [Tooltip("Empty part of the capture bar, drawn behind the coloured fill - the fill itself uses Shot Color For the capturing (or draining) team, same colours as that team's shots.")]
-        public Color captureBarTrackColor = new Color(0.1f, 0.1f, 0.12f, 0.85f);
+        [Header("Capture ring (2026-09-16)")]
+        [Tooltip("Material every capture ring line draws with. Keep it unlit, transparent, vertex-coloured and its own " +
+                 "colour white: each ring tints itself per team. Points at the Aim Cone Line material, which is exactly that.")]
+        public Material captureRingMaterial;
+        [Tooltip("Thickness of the thin circle on the ground marking the edge of every capture zone, in metres. Its " +
+                 "outer edge sits exactly on the zone's Capture Radius.")]
+        public float captureRingOutlineWidth = 0.15f;
+        [Tooltip("Thickness of the progress band drawn just inside the edge while a zone is being captured or drained, " +
+                 "in metres.")]
+        public float captureRingArcWidth = 0.45f;
+        [Tooltip("Gap between the edge circle and the progress band, in metres.")]
+        public float captureRingArcGap = 0.1f;
+        [Tooltip("How far above the ground the ring floats, in metres. Just enough never to flicker into the ground; " +
+                 "raise it if parts of a ring disappear on uneven ground.")]
+        public float captureRingHeightOffset = 0.06f;
+        [Tooltip("Edge colour of a zone nobody owns: a dim white (GDD p.45, neutral territories use a dim white). Owned " +
+                 "zones use their team colour.")]
+        public Color captureRingNeutralColor = new Color(1f, 1f, 1f, 0.35f);
+        [Tooltip("Blinks per second of a paused progress band (the capture is contested, its link is under attack, or " +
+                 "a drain is on hold). Keep it slower than the pulse below, so a pause reads differently from an attack.")]
+        public float captureRingPausedBlinkSpeed = 0.7f;
+        [Tooltip("Brightest opacity (0-1) of a paused progress band while it blinks. Lower than a moving band, so a " +
+                 "pause reads as 'on hold'. The minimap's progress rings blink the same way.")]
+        [Range(0f, 1f)] public float captureRingPausedOpacity = 0.6f;
+        [Tooltip("Colour an owned zone's edge pulses to while an enemy is inside (under attack), even before anything " +
+                 "drains. The minimap bubble's outline pulses to it too.")]
+        public Color captureRingWarningColor = new Color(1f, 0.2f, 0.15f, 1f);
+        [Tooltip("Pulses per second of a zone's edge while it is under attack, or being drained (a drain pulses in the " +
+                 "draining team's colour instead).")]
+        public float captureRingPulseSpeed = 1.6f;
+        [Tooltip("How many straight pieces make up each ring. More reads as a smoother circle; 96 is smooth at every zoom.")]
+        [Range(16, 256)] public int captureRingSegments = 96;
 
         [Header("OverPower (Task 2.6, GDD p.20)")]
         [Tooltip("Text shown in the HUD's OverPower label while the buff is fully ACTIVE.")]

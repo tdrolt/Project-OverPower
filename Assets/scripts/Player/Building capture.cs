@@ -25,8 +25,7 @@ public class BuildingCapture : MonoBehaviourPun
     public TerritoryConfig territoryConfig;
 
     [Header("UI")]
-    [Tooltip("Colours and world-space bar sprite for the capture progress bar shown above this " +
-             "tower (Task 2.1d) - every tower should point at the same asset, same as Territory Config.")]
+    [Tooltip("Colours, widths and material of the capture ring on the ground around this tower - every tower should point at the same asset, same as Territory Config.")]
     public UiTheme theme;
 
     // Used only if territoryConfig is missing (logged as an error in Start), so a misconfigured
@@ -82,9 +81,9 @@ public class BuildingCapture : MonoBehaviourPun
 
     private List<PlayerTeam> playersInZone = new List<PlayerTeam>();
 
-    // The world-space bar over this tower (Task 2.1d), built in code in Start so every tower gets
-    // one - see CaptureProgressView's own class comment. Null if theme is unassigned.
-    private CaptureProgressView progressView;
+    // The ring on the ground marking this zone and its capture progress (2026-09-16; it replaced the bar that floated
+    // over the tower). Built in Start so every tower gets one - see CaptureRingView. Null if the theme is unassigned.
+    private CaptureRingView ringView;
 
     // The last CaptureProgress THIS client told BuildingManager to publish for this zone - only
     // meaningful while this client is master (only the master ever calls PublishProgressIfNeeded).
@@ -107,9 +106,11 @@ public class BuildingCapture : MonoBehaviourPun
         }
 
         if (theme == null)
-            Debug.LogError($"[BuildingCapture] Tower {buildingID} has no UI Theme assigned - no capture progress bar will be shown.", this);
+            Debug.LogError($"[BuildingCapture] Tower {buildingID} has no UI Theme assigned - no capture ring will be shown.", this);
+        else if (theme.captureRingMaterial == null)
+            Debug.LogError($"[BuildingCapture] Tower {buildingID}: UiTheme's Capture Ring Material is not assigned - no capture ring will be shown.", this);
         else
-            progressView = CaptureProgressView.Create(transform, theme);
+            ringView = CaptureRingView.Create(transform, captureRadius, theme);
 
         ConfigureCollider();
         InitializeAudio();
@@ -180,11 +181,11 @@ public class BuildingCapture : MonoBehaviourPun
 
     void Update()
     {
-        // Runs on EVERY client, master or not - the bar is something everyone watches, not
+        // Runs on EVERY client, master or not - the ring is something everyone watches, not
         // something only the master simulates. Reads whatever BuildingManager last decoded from
         // the room (possibly still this client's own write, echoing back a moment later - see
         // BuildingManager's class comment on the echo window), same as the flag/ownership visuals.
-        RefreshProgressView();
+        RefreshRingView();
 
         if (!PhotonNetwork.IsMasterClient) return;
 
@@ -225,12 +226,19 @@ public class BuildingCapture : MonoBehaviourPun
         PublishProgressIfNeeded();
     }
 
-    private void RefreshProgressView()
+    /// <summary>Every client, every frame: draws this zone's ring from replicated state only (capture progress, the
+    /// owner, under attack), so a late joiner sees exactly what everyone else does.</summary>
+    private void RefreshRingView()
     {
-        if (progressView == null || BuildingManager.Instance == null)
+        BuildingManager manager = BuildingManager.Instance;
+        if (ringView == null || manager == null)
             return;
 
-        progressView.Refresh(BuildingManager.Instance.CaptureProgressOf(buildingID));
+        int owner = manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
+        bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
+        CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
+                                                       PhotonNetwork.ServerTimestamp);
+        ringView.Refresh(state, CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f);
     }
 
     /// <summary>Master only. Works out this zone's CaptureProgress from the same fields
@@ -866,7 +874,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// This tower's own ground-truth fraction (captureProgress / CaptureSeconds) - only meaningful
     /// on whichever client is currently master, the only one that simulates it. Diagnostic only,
     /// for Task 2.1d's own verification: lets a two-client check compare a remote client's
-    /// extrapolated CaptureProgressView fill directly against the number it is supposed to track,
+    /// extrapolated capture ring fill directly against the number it is supposed to track,
     /// instead of reading the private captureProgress field through reflection.
     public float CaptureProgressFraction => CaptureSeconds > 0f ? Mathf.Clamp01(captureProgress / CaptureSeconds) : 0f;
 

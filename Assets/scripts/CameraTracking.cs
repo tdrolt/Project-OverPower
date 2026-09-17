@@ -96,6 +96,28 @@ public class CameraTracking : MonoBehaviour
     private float yaw = 0f;         // degrees rotated around the player
     private bool teamYawResolved = false;
 
+    /// <summary>The camera following the local player (there is one, on the scene's main camera). The capture rings and
+    /// the minimap read its Yaw, so "up" on them is "up" on screen.</summary>
+    public static CameraTracking Instance { get; private set; }
+
+    /// <summary>Degrees this camera is turned about the vertical axis (Unity yaw: clockwise seen from above; 0 = looking
+    /// toward +Z). 0 until this player's team is known - see ResolveTeamYaw - then fixed for the match. World
+    /// direction (sin Yaw, cos Yaw) is the top of the screen.</summary>
+    public float Yaw => yaw;
+
+    public bool YawResolved => teamYawResolved;
+
+    void Awake()
+    {
+        Instance = this;
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this)
+            Instance = null;
+    }
+
     void Start()
     {
         currentOffset = baseOffset;
