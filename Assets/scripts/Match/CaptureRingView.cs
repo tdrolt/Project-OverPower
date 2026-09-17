@@ -9,33 +9,47 @@ namespace Overpower.Match
     /// replaces the small bar that floated above each tower). BuildingCapture.Start builds one per tower, so a new
     /// tower gets one with nothing to wire up.
     ///
-    /// Two flat lines:
+    /// Three flat lines:
     /// - a thin EDGE, always shown, on the Capture Radius: team colour when owned, dim white when neutral;
-    /// - a thicker BAND just inside it that fills clockwise from the top of this player's screen.
+    /// - a dark full-loop TRACK at the band's own radius, shown whenever the band is (readability polish,
+    ///   2026-09-17: a bare band on open ground read poorly as "how full" - a loading bar needs a track behind it);
+    /// - a thicker BAND on top of the track that fills clockwise from the top of this player's screen.
     /// Which colours, fill, pulse and blink to use is decided by the pure CaptureRingState; this class only draws it.
     ///
     /// Line renderers, not a mesh: the same unlit, double-sided, vertex-colour material the aim cone lines use, tinted
-    /// per ring through each line's own colour (no material copies). No collider, no shadows. The band's points are
-    /// rewritten only when its length (in whole pieces) or the camera's yaw changes; pulses and blinks only change a
-    /// colour.
+    /// per ring through each line's own colour (no material copies). No collider, no shadows. The band's and track's
+    /// points are rewritten only when the camera's yaw changes (the band's count also rewrites on a fill change);
+    /// pulses and blinks only change a colour. The track sits a hair below the band in world height, at the exact
+    /// same radius and the exact same per-vertex angles (same step, same yaw-driven start) as the band, so the two
+    /// polygons never cross and never z-fight.
     /// </summary>
     public sealed class CaptureRingView : MonoBehaviour
     {
+        // How far below the band's own height the track sits, in world metres - just enough that the two line
+        // polygons (same radius, same vertex angles) never occupy the same depth, without reading as "floating".
+        private const float TrackHeightBelowBand = 0.01f;
+
         private UiTheme theme;
         private LineRenderer edge;
         private LineRenderer band;
+        private LineRenderer track;
         private Vector3 centre;
+        private Vector3 trackCentre;
         private float bandRadius;
         private int segments;
         private Vector3[] bandPoints;
+        private Vector3[] trackPoints;
 
         // What is currently drawn, so an unchanged frame touches nothing.
         private int shownBandPointCount = -1;
         private float shownBandStartYaw = float.NaN;
+        private float shownTrackStartYaw = float.NaN;
         private Color shownEdgeColor;
         private Color shownBandColor;
+        private Color shownTrackColor;
         private bool edgeColorSet;
         private bool bandColorSet;
+        private bool trackColorSet;
 
         public static CaptureRingView Create(Transform tower, float captureRadius, UiTheme theme)
         {
@@ -50,6 +64,7 @@ namespace Overpower.Match
             Vector3 towerPosition = tower.position;
             view.centre = new Vector3(towerPosition.x, GroundHeight(towerPosition, captureRadius) + theme.captureRingHeightOffset,
                                       towerPosition.z);
+            view.trackCentre = new Vector3(view.centre.x, view.centre.y - TrackHeightBelowBand, view.centre.z);
 
             float edgeRadius = Mathf.Max(0.01f, captureRadius - theme.captureRingOutlineWidth / 2f);
             view.bandRadius = Mathf.Max(0.01f, captureRadius - theme.captureRingOutlineWidth - theme.captureRingArcGap
@@ -63,6 +78,15 @@ namespace Overpower.Match
             for (int i = 0; i < view.segments; i++)
                 edgePoints[i] = CaptureRingGeometry.PointOnRing(view.centre, edgeRadius, 0f, step * i);
             view.edge.SetPositions(edgePoints);
+
+            // A full loop, same radius and same per-vertex angles as the band (both driven by the same yaw and the
+            // same ArcStepDegrees), so it always sits cleanly under the band with no crossing polygon edges - see
+            // TrackHeightBelowBand. Shown/hidden together with the band; never blinks or pulses.
+            view.track = CreateLine(root.transform, "Progress Track", theme.captureRingMaterial, theme.captureRingArcWidth);
+            view.track.loop = true;
+            view.track.positionCount = view.segments;
+            view.track.enabled = false;
+            view.trackPoints = new Vector3[view.segments];
 
             view.band = CreateLine(root.transform, "Progress Band", theme.captureRingMaterial, theme.captureRingArcWidth);
             view.band.loop = false;
@@ -96,8 +120,31 @@ namespace Overpower.Match
             {
                 if (band.enabled)
                     band.enabled = false;
+                if (track.enabled)
+                    track.enabled = false;
                 return;
             }
+
+            // Rewritten only when the camera's yaw actually changes - a full loop looks identical whatever angle its
+            // vertices start at, but keeping that angle equal to the band's own (same step, same start) is what keeps
+            // the two polygons from crossing (see the class comment).
+            if (!Mathf.Approximately(cameraYawDegrees, shownTrackStartYaw))
+            {
+                float trackStep = CaptureRingGeometry.ArcStepDegrees(segments);
+                for (int i = 0; i < segments; i++)
+                    trackPoints[i] = CaptureRingGeometry.PointOnRing(trackCentre, bandRadius, cameraYawDegrees, trackStep * i);
+                track.SetPositions(trackPoints);
+                shownTrackStartYaw = cameraYawDegrees;
+            }
+            if (!trackColorSet || theme.captureRingTrackColor != shownTrackColor)
+            {
+                track.startColor = theme.captureRingTrackColor;
+                track.endColor = theme.captureRingTrackColor;
+                shownTrackColor = theme.captureRingTrackColor;
+                trackColorSet = true;
+            }
+            if (!track.enabled)
+                track.enabled = true;
 
             int count = CaptureRingGeometry.ArcPointCount(state.Fill01, segments);
             if (count != shownBandPointCount || !Mathf.Approximately(cameraYawDegrees, shownBandStartYaw))

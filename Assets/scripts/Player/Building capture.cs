@@ -238,6 +238,9 @@ public class BuildingCapture : MonoBehaviourPun
         bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
         CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
                                                        PhotonNetwork.ServerTimestamp);
+        // Yaw reads 0 (world +Z as "top") until ResolveTeamYaw resolves it for this match - CaptureRingView only
+        // rebuilds the band/track points when this value CHANGES, so the first resolved yaw self-corrects their
+        // rotation the very next frame; nothing here needs to wait for YawResolved.
         ringView.Refresh(state, CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f);
     }
 

@@ -382,6 +382,8 @@ namespace Overpower.UI
         public float captureRingPulseSpeed = 1.6f;
         [Tooltip("How many straight pieces make up each ring. More reads as a smoother circle; 96 is smooth at every zoom.")]
         [Range(16, 256)] public int captureRingSegments = 96;
+        [Tooltip("The dark loop behind a capture's progress band, so how full it is reads like a loading bar.")]
+        public Color captureRingTrackColor = new Color(0f, 0f, 0f, 0.4f);
 
         [Header("OverPower (Task 2.6, GDD p.20)")]
         [Tooltip("Text shown in the HUD's OverPower label while the buff is fully ACTIVE.")]
