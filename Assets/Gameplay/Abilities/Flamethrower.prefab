@@ -55,3 +55,4 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 4294967295
   vfxColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  sprayVfxPrefab: {fileID: 6626281296073720431, guid: 45c08153978ff5d4fa58b93f18d195bc, type: 3}

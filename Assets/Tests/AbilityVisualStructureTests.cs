@@ -25,6 +25,13 @@ namespace Overpower.Tests
         // ready - see this file's own extra test below the marker's.
         private const string ShellPath = "Assets/Gameplay/Projectiles/Splash Shell.prefab";
 
+        // A3 (Tudor 2026-09-17 evening): the flamethrower's fan needs a genuine per-vertex tip-to-edge gradient, and
+        // GlassPath (URP/Unlit) never reads a mesh's vertex colours at all (verified against the shader's own HLSL
+        // source - its Attributes struct has no COLOR semantic). Laser Beam.mat hit exactly this bug on 2026-09-15 and
+        // was moved to Particles/Unlit; the fan below gets its OWN new material for the same reason, rather than
+        // reshading Ability Visual Glass.mat out from under the mine, portal and fence, which already ship with it.
+        private const string FlamePath = "Assets/Gameplay/Abilities/Flame Cone.mat";
+
         private static GameObject Load(string path)
         {
             var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
@@ -221,6 +228,39 @@ namespace Overpower.Tests
             Assert.AreEqual(ThemePath, AssetDatabase.GetAssetPath(Ref(view, "theme")));
             AssertNoCollider(prefab);
             Assert.AreEqual(2, prefab.GetComponentsInChildren<PhotonView>(true).Length, "unchanged - flagged for Tudor, not fixed here");
+        }
+
+        [Test]
+        public void TheFlameConeMaterialIsUnlitParticlesSoItActuallyReadsVertexColours()
+        {
+            // A3: this is the guard against the vertex-colour trap - if someone later "simplifies" the fan back onto
+            // Ability Visual Glass.mat, this fails loudly instead of quietly flattening the tip-to-edge gradient.
+            var flame = AssetDatabase.LoadAssetAtPath<Material>(FlamePath);
+            Assert.IsNotNull(flame, FlamePath);
+            Assert.AreEqual("Universal Render Pipeline/Particles/Unlit", flame.shader.name,
+                "plain URP/Unlit never reads a mesh's vertex colours (Laser Beam.mat's own 2026-09-15 fix) - the " +
+                "fan's tip-to-edge gradient needs this shader, not Ability Visual Glass");
+            Assert.AreEqual(1f, flame.GetFloat("_Surface"), "transparent");
+            Assert.AreEqual(0f, flame.GetFloat("_ZWrite"), "no depth write, so players stay visible through the flame");
+            Assert.AreEqual(0f, flame.GetFloat("_Cull"), "double-sided");
+        }
+
+        [Test]
+        public void TheFlamethrowerDrawsASoftFlameConePrefabWithNoCollider()
+        {
+            GameObject module = Load("Assets/Gameplay/Abilities/Flamethrower.prefab");
+            var cone = Ref(module.GetComponent<FlamethrowerAbility>(), "sprayVfxPrefab") as FlameConeVisual;
+            Assert.IsNotNull(cone, "Flamethrower › Spray Vfx Prefab");
+            Assert.AreEqual("Assets/Gameplay/Abilities/Flamethrower Cone.prefab", AssetDatabase.GetAssetPath(cone));
+            Transform fan = Child(cone.transform, "Fan");
+            // A3: the fan's own material is FlamePath, not GlassPath - see TheFlameConeMaterialIsUnlitParticles... and
+            // this file's own FlamePath comment, above.
+            AssertMesh(fan, null, FlamePath); // the fan mesh is generated from Cone Range/Angle at runtime
+            LineRenderer edge = AssertLine(Child(cone.transform, "Edge"), flat: true);
+            Assert.AreSame(fan.GetComponent<MeshFilter>(), Ref(cone, "fan"));
+            Assert.AreSame(edge, Ref(cone, "edge"));
+            AssertNoCollider(cone.gameObject);
+            AssertNoCollider(module); // AbilityDefinition forbids colliders on a module prefab
         }
     }
 }

@@ -83,7 +83,7 @@ namespace Overpower.Abilities
         private float coneAngle = 45f;
 
         [SerializeField, Tooltip("How far the spray reaches, in metres, measured on the ground plane " +
-                 "from the caster's own muzzle. Controller's call.")]
+                 "from the caster's own position (their root, not the muzzle - see TickCone). Controller's call.")]
         private float coneRange = 7f;
 
         [SerializeField, Tooltip("How long the spray stays live once cast, in seconds - the cone is " +
@@ -97,12 +97,16 @@ namespace Overpower.Abilities
         private LayerMask detectionMask = ~0;
 
         [Header("VFX (cheap, cosmetic only)")]
-        [SerializeField, Tooltip("Colour of the placeholder cone mesh shown on every client for the " +
-                 "duration of Spray Seconds. This is a stretched primitive, not a real particle " +
-                 "system - cheap enough to run for several simultaneous sprays without a hitch. Swap " +
-                 "for real flame art whenever that becomes this project's priority; nothing about the " +
-                 "burn itself depends on it.")]
+        [SerializeField, Tooltip("Colour of the flame cone drawn on the floor on every client for the " +
+                 "duration of Spray Seconds (its per-vertex opacity is on the cone prefab). Nothing " +
+                 "about the burn itself depends on it.")]
         private Color vfxColor = new Color(1f, 0.45f, 0.1f, 1f);
+
+        [SerializeField, Tooltip("The soft flame cone - Assets/Gameplay/Abilities/Flamethrower Cone.prefab. " +
+                 "Drawn from Cone Angle and Cone Range above, with its tip under the caster, so it always " +
+                 "shows exactly the area the burn checks (ability visuals step 5, A3: a soft tip-to-edge " +
+                 "gradient, not a hard outline). Visual only.")]
+        private FlameConeVisual sprayVfxPrefab;
 
         // Not a design tunable: how many overlapping colliders one cone check considers - matches
         // Mine.MaxOverlapColliders' own reasoning, comfortably covering every player plus every
@@ -121,7 +125,7 @@ namespace Overpower.Abilities
         private int buildingMask;
 
         private Coroutine sprayCoroutine;
-        private Transform vfx;
+        private FlameConeVisual vfx;
 
         public override bool IsActive => sprayCoroutine != null;
 
@@ -134,7 +138,7 @@ namespace Overpower.Abilities
         private void OnDestroy()
         {
             // The module prefab has no Collider (AbilityDefinition.Validate forbids one), so the VFX
-            // is a separate, unparented GameObject (see BuildVfx) - it must be cleaned up explicitly
+            // is a separate, unparented GameObject (see ShowVfx) - it must be cleaned up explicitly
             // here, or unequipping/re-equipping the flamethrower would leak one every time.
             if (vfx != null)
                 Destroy(vfx.gameObject);
@@ -293,45 +297,33 @@ namespace Overpower.Abilities
         private void ShowVfx()
         {
             if (vfx == null)
-                vfx = BuildVfx();
+            {
+                if (sprayVfxPrefab == null)
+                    return; // Nothing to draw; the burn works the same without it.
 
+                // Unparented, as before: the module sits under the player, whose hierarchy moves to the
+                // DeadPlayer layer on death. OnDestroy removes it.
+                vfx = Instantiate(sprayVfxPrefab);
+                vfx.name = "Flamethrower Cone VFX (cheap, cosmetic only)";
+            }
+
+            // Re-read on every spray, so an Inspector change to Cone Angle/Range shows on the next cast.
+            // Owner.IsMine (A3): the faint aiming outline is only ever drawn on the caster's OWN screen -
+            // everyone else sees just the soft fan, never a hard edge.
+            vfx.Configure(coneRange, coneAngle, vfxColor, Owner.IsMine);
             vfx.gameObject.SetActive(true);
         }
 
         private void PositionVfx(Vector3 apex, Vector3 forward)
         {
-            if (vfx == null)
-                return;
-
-            // A cylinder's own length runs along its local Y - LookRotation points Z at forward, so
-            // the extra 90 degree tilt lays that length axis flat along the spray direction instead.
-            vfx.position = apex + forward * (coneRange * 0.5f);
-            vfx.rotation = Quaternion.LookRotation(forward) * Quaternion.Euler(90f, 0f, 0f);
-
-            float width = Mathf.Tan(coneAngle * 0.5f * Mathf.Deg2Rad) * coneRange * 2f;
-            vfx.localScale = new Vector3(width, coneRange * 0.5f, width);
+            if (vfx != null)
+                vfx.Place(apex, forward);
         }
 
         private void HideVfx()
         {
             if (vfx != null)
                 vfx.gameObject.SetActive(false);
-        }
-
-        private Transform BuildVfx()
-        {
-            GameObject cone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            cone.name = "Flamethrower Spray VFX (cheap, cosmetic only)";
-            // Removed immediately, not with Destroy, so this never sits in the world as a solid,
-            // physics-blocking object even for one frame - the same trick ZipGunAbility's own tether
-            // marker uses.
-            DestroyImmediate(cone.GetComponent<Collider>());
-
-            var renderer = cone.GetComponent<MeshRenderer>();
-            var material = new Material(Shader.Find("Universal Render Pipeline/Unlit")) { color = vfxColor };
-            renderer.sharedMaterial = material;
-
-            return cone.transform;
         }
     }
 }
