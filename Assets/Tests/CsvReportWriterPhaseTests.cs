@@ -69,6 +69,47 @@ namespace Overpower.Tests
             }
         }
 
+        // Review fix (item 5): the whole-match ownership.csv must carry a "phase" column so a
+        // split stint's two halves (zone 5, 60->90 Phase 1 / 90->120 Phase 2) can be told apart
+        // in a spreadsheet without cross-referencing the phase1_3teams/phase2_2teams folders.
+        [Test]
+        public void WholeMatchOwnershipCsvCarriesAPhaseColumnThatTellsASplitStintsHalvesApart()
+        {
+            string folder = NewTempFolder();
+            Directory.CreateDirectory(folder);
+            try
+            {
+                ReportSet set = TelemetryAggregator.BuildSet(TelemetryLog.Load(PhasesFixturePath));
+                CsvReportWriter.Write(set, folder);
+
+                string ownershipCsv = File.ReadAllText(Path.Combine(folder, "csv", "whole_match", "ownership.csv"));
+                string[] rows = ownershipCsv.Split('\n').Where(l => l.Trim().Length > 0).ToArray();
+                StringAssert.Contains("phase", rows[0]);
+
+                string[] header = rows[0].TrimEnd('\r').Split(',');
+                int zoneIdx = System.Array.IndexOf(header, "zone");
+                int teamIdx = System.Array.IndexOf(header, "team");
+                int fromIdx = System.Array.IndexOf(header, "from");
+                int phaseIdx = System.Array.IndexOf(header, "phase");
+                Assert.AreNotEqual(-1, phaseIdx);
+
+                // Zone 5, team 0: one continuous 60->120 stint in the raw log, split into two CSV
+                // rows by the transition at t=90 (see TelemetryPhaseSplitTests for the full derivation).
+                var zone5Team0Rows = rows.Skip(1)
+                    .Select(r => r.TrimEnd('\r').Split(','))
+                    .Where(f => f[zoneIdx] == "5" && f[teamIdx] == "0")
+                    .OrderBy(f => double.Parse(f[fromIdx], System.Globalization.CultureInfo.InvariantCulture))
+                    .ToList();
+                Assert.AreEqual(2, zone5Team0Rows.Count, "zone 5's team-0 stint must appear as two CSV rows");
+                Assert.AreEqual("1", zone5Team0Rows[0][phaseIdx]);
+                Assert.AreEqual("2", zone5Team0Rows[1][phaseIdx]);
+            }
+            finally
+            {
+                if (Directory.Exists(folder)) Directory.Delete(folder, true);
+            }
+        }
+
         [Test]
         public void AMatchWithNoPhase2WritesOnlyTwoFolders()
         {

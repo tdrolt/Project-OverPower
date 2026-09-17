@@ -88,25 +88,32 @@ namespace Overpower.EditorTools.Telemetry
                 }));
         }
 
+        // Review fix (item 5): the plan's own "the whole-match tables also get a Phase column on
+        // time-based rows" was implemented on ReportTables/the HTML's embedded JSON but never
+        // reached the CSVs - added to the same 8 row types that carry a Phase field. Written for
+        // every scope (not just whole_match), since WriteTables is the one shared writing path for
+        // all three folders (no second copy) - in a phase-scoped folder every row simply reads the
+        // same constant phase, which still lets a spreadsheet pivot/filter uniformly across all
+        // three CSVs by this one column instead of needing scope-specific logic.
         private static void WriteGoldTimeline(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "gold_timeline.csv"),
-            new[] { "t", "actor", "name", "team", "balance", "earnedSoFar", "spentSoFar" },
+            new[] { "t", "actor", "name", "team", "balance", "earnedSoFar", "spentSoFar", "phase" },
             t.GoldTimeline.Select(r => new[]
             {
-                N(r.T), N(r.Actor), r.Nick, N(r.Team), N(r.Balance), N(r.EarnedSoFar), N(r.SpentSoFar),
+                N(r.T), N(r.Actor), r.Nick, N(r.Team), N(r.Balance), N(r.EarnedSoFar), N(r.SpentSoFar), N(r.Phase),
             }));
 
         private static void WriteEconomyByMinute(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "economy_by_minute.csv"),
             new[] { "minute", "team", "incomeTier1", "incomeTier2", "incomeTier3", "incomeTier4", "incomeUnattributed",
-                    "bounty", "refunds", "spent", "zonesTier1", "zonesTier2", "zonesTier3", "zonesTier4", "goldGapToRichest" },
+                    "bounty", "refunds", "spent", "zonesTier1", "zonesTier2", "zonesTier3", "zonesTier4", "goldGapToRichest", "phase" },
             t.EconomyByMinute.Select(r => new[]
             {
                 N(r.Minute), N(r.Team),
                 N(r.IncomeByTier[0]), N(r.IncomeByTier[1]), N(r.IncomeByTier[2]), N(r.IncomeByTier[3]), N(r.UnattributedIncome),
                 N(r.Bounty), N(r.Refund), N(r.Spent),
                 N(r.ZonesHeldByTier[0]), N(r.ZonesHeldByTier[1]), N(r.ZonesHeldByTier[2]), N(r.ZonesHeldByTier[3]),
-                N(r.GoldGapToRichest),
+                N(r.GoldGapToRichest), N(r.Phase),
             }));
 
         private static void WriteZoneIncome(ReportTables t, string folder) => WriteCsv(
@@ -116,36 +123,36 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WriteOwnership(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "ownership.csv"),
-            new[] { "zone", "tier", "team", "from", "to", "duration", "howEnded" },
-            t.Ownership.Select(r => new[] { N(r.Zone), N(r.Tier), N(r.Team), N(r.From), N(r.To), N(r.Duration), r.HowEnded }));
+            new[] { "zone", "tier", "team", "from", "to", "duration", "howEnded", "phase" },
+            t.Ownership.Select(r => new[] { N(r.Zone), N(r.Tier), N(r.Team), N(r.From), N(r.To), N(r.Duration), r.HowEnded, N(r.Phase) }));
 
         private static void WriteCaptures(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "captures.csv"),
-            new[] { "zone", "tier", "team", "start", "end", "outcome", "duration", "players" },
-            t.Captures.Select(r => new[] { N(r.Zone), N(r.Tier), N(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players) }));
+            new[] { "zone", "tier", "team", "start", "end", "outcome", "duration", "players", "phase" },
+            t.Captures.Select(r => new[] { N(r.Zone), N(r.Tier), N(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players), N(r.Phase) }));
 
         private static void WritePurchases(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "purchases.csv"),
-            new[] { "t", "actor", "name", "team", "kind", "category", "item", "price", "balanceAfter", "zone", "free" },
+            new[] { "t", "actor", "name", "team", "kind", "category", "item", "price", "balanceAfter", "zone", "free", "phase" },
             t.Purchases.Select(r => new[]
             {
-                N(r.T), N(r.Actor), r.Nick, N(r.Team), r.Kind, r.Category, N(r.ItemId), N(r.Amount), N(r.BalanceAfter), N(r.Zone), N(r.Free),
+                N(r.T), N(r.Actor), r.Nick, N(r.Team), r.Kind, r.Category, N(r.ItemId), N(r.Amount), N(r.BalanceAfter), N(r.Zone), N(r.Free), N(r.Phase),
             }));
 
         private static void WriteShopBlocked(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "shop_blocked.csv"),
-            new[] { "t", "actor", "name", "item", "price", "reason", "shortfall", "zone" },
-            t.ShopBlocked.Select(r => new[] { N(r.T), N(r.Actor), r.Nick, N(r.ItemId), N(r.Price), r.Reason, N(r.Shortfall), N(r.Zone) }));
+            new[] { "t", "actor", "name", "item", "price", "reason", "shortfall", "zone", "phase" },
+            t.ShopBlocked.Select(r => new[] { N(r.T), N(r.Actor), r.Nick, N(r.ItemId), N(r.Price), r.Reason, N(r.Shortfall), N(r.Zone), N(r.Phase) }));
 
         private static void WriteHits(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "hits.csv"),
             new[] { "t", "attacker", "attackerTeam", "victim", "victimTeam", "weapon", "ability", "source",
-                    "raw", "armor", "healthLost", "lethal", "distance", "vulnerable", "overpower" },
+                    "raw", "armor", "healthLost", "lethal", "distance", "vulnerable", "overpower", "phase" },
             t.Hits.Select(r => new[]
             {
                 N(r.T), N(r.Attacker), N(r.AttackerTeam), N(r.Victim), N(r.VictimTeam), N(r.Weapon), N(r.Ability), r.Source,
                 N(r.Raw), N(r.Armor), N(r.HealthLost), N(r.Lethal), r.Distance.HasValue ? N(r.Distance.Value) : "",
-                N(r.Vulnerable), N(r.Overpower),
+                N(r.Vulnerable), N(r.Overpower), N(r.Phase),
             }));
 
         private static void WriteWeapons(ReportTables t, string folder) => WriteCsv(
@@ -183,13 +190,13 @@ namespace Overpower.EditorTools.Telemetry
             Path.Combine(folder, "deaths.csv"),
             new[] { "t", "victim", "victimName", "victimTeam", "killer", "killerTeam", "assists", "weapon", "ability",
                     "x", "z", "unspentGold", "loadoutWeapon", "loadoutEquipment", "loadoutMobility", "loadoutUltimate",
-                    "absorbLevel", "rechargeLevel" },
+                    "absorbLevel", "rechargeLevel", "phase" },
             t.Deaths.Select(r => new[]
             {
                 N(r.T), N(r.Victim), r.VictimNick, N(r.VictimTeam), N(r.Killer), N(r.KillerTeam),
                 string.Join(";", r.Assists), N(r.Weapon), N(r.Ability), N(r.X), N(r.Z), N(r.UnspentGold),
                 N(r.LoadoutWeapon), N(r.LoadoutEquipment), N(r.LoadoutMobility), N(r.LoadoutUltimate),
-                N(r.AbsorbLevel), N(r.RechargeLevel),
+                N(r.AbsorbLevel), N(r.RechargeLevel), N(r.Phase),
             }));
 
         // ---------------------------------------------------------------- CSV mechanics

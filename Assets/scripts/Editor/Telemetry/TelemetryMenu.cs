@@ -64,6 +64,14 @@ namespace Overpower.EditorTools.Telemetry
                 return null;
             }
 
+            // Review fix (item 7): outputFolder IS sourceFolder for a real match (BuildReport
+            // passes the same folder both ways), which also holds the .jsonl logs themselves -
+            // clean only the report's OWN known output (report.html, the pre-T7 flat csv/*.csv
+            // layout, and the T7 per-scope csv/ subfolders) before writing, so rebuilding after a
+            // schema change never leaves a stale file from an older layout sitting next to a fresh
+            // one. Never touches anything else in the folder.
+            CleanStaleReportOutputs(outputFolder);
+
             TelemetryLog log = TelemetryLog.Load(sourceFolder);
             // Task T7: one log, three scopes (whole match, Phase 1, Phase 2 when the match had one) -
             // see ReportSet's own comment. CsvReportWriter and HtmlReportWriter both take the whole
@@ -85,6 +93,41 @@ namespace Overpower.EditorTools.Telemetry
             // "Open telemetry folder" build path (see assumptions-for-tudor.md, Task T2).
             if (openInBrowser) Application.OpenURL(new Uri(htmlPath).AbsoluteUri);
             return htmlPath;
+        }
+
+        // Review fix (item 7): the exact 12 pre-T7 CSV file names, written flat inside csv/ before
+        // the three-folder layout existed - a report built with an old binary (or a stale cached
+        // one) could still have left these lying around.
+        private static readonly string[] KnownFlatCsvFileNames =
+        {
+            "gold_timeline.csv", "economy_by_minute.csv", "zone_income.csv", "ownership.csv",
+            "captures.csv", "purchases.csv", "shop_blocked.csv", "hits.csv", "weapons.csv",
+            "abilities.csv", "players.csv", "deaths.csv", "log_coverage.csv",
+        };
+
+        private static void CleanStaleReportOutputs(string outputFolder)
+        {
+            string reportHtml = Path.Combine(outputFolder, "report.html");
+            if (File.Exists(reportHtml)) File.Delete(reportHtml);
+
+            string csvFolder = Path.Combine(outputFolder, "csv");
+            if (!Directory.Exists(csvFolder)) return;
+
+            foreach (string fileName in KnownFlatCsvFileNames)
+            {
+                string path = Path.Combine(csvFolder, fileName);
+                if (File.Exists(path)) File.Delete(path);
+            }
+
+            foreach (string scopeFolderName in new[] { "whole_match", "phase1_3teams", "phase2_2teams" })
+            {
+                string scopePath = Path.Combine(csvFolder, scopeFolderName);
+                if (Directory.Exists(scopePath)) Directory.Delete(scopePath, true);
+            }
+
+            // Only remove csv/ itself if cleaning left it empty - never assume it held nothing else.
+            if (Directory.Exists(csvFolder) && Directory.GetFileSystemEntries(csvFolder).Length == 0)
+                Directory.Delete(csvFolder);
         }
 
         private static BalanceTargetsData LoadBalanceTargetsData()
