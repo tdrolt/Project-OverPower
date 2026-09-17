@@ -64,19 +64,42 @@ namespace Overpower.EditorTools.Telemetry
                 return null;
             }
 
-            // Review fix (item 7): outputFolder IS sourceFolder for a real match (BuildReport
-            // passes the same folder both ways), which also holds the .jsonl logs themselves -
-            // clean only the report's OWN known output (report.html, the pre-T7 flat csv/*.csv
-            // layout, and the T7 per-scope csv/ subfolders) before writing, so rebuilding after a
-            // schema change never leaves a stale file from an older layout sitting next to a fresh
-            // one. Never touches anything else in the folder.
-            CleanStaleReportOutputs(outputFolder);
+            // Round-2 review fix (item D, regression): the OLD order cleaned the folder before
+            // even checking it held any logs, and before Load/BuildSet could fail - picking the
+            // wrong folder in "Build Report..." deleted a stray report.html that happened to be
+            // sitting there, and a folder Load threw on was left with no report AND no old one
+            // either. Bail out with NO deletion at all when there are no .jsonl logs here...
+            if (Directory.GetFiles(sourceFolder, "*.jsonl").Length == 0)
+            {
+                Debug.LogError($"[TelemetryMenu] No .jsonl telemetry logs found in '{sourceFolder}' - nothing built, nothing deleted.");
+                return null;
+            }
 
-            TelemetryLog log = TelemetryLog.Load(sourceFolder);
-            // Task T7: one log, three scopes (whole match, Phase 1, Phase 2 when the match had one) -
-            // see ReportSet's own comment. CsvReportWriter and HtmlReportWriter both take the whole
-            // set now, so the CSV folders and the HTML tabs are always built from the exact same data.
-            ReportSet reportSet = TelemetryAggregator.BuildSet(log);
+            // ...and load + aggregate BEFORE cleaning anything, so a folder that fails to parse
+            // keeps whatever report it already had.
+            TelemetryLog log;
+            ReportSet reportSet;
+            try
+            {
+                log = TelemetryLog.Load(sourceFolder);
+                // Task T7: one log, three scopes (whole match, Phase 1, Phase 2 when the match had
+                // one) - see ReportSet's own comment. CsvReportWriter and HtmlReportWriter both take
+                // the whole set now, so the CSV folders and the HTML tabs always match.
+                reportSet = TelemetryAggregator.BuildSet(log);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[TelemetryMenu] Failed to load/aggregate '{sourceFolder}': {ex.Message} - nothing deleted, folder left as-is.");
+                return null;
+            }
+
+            // Only NOW, with a successful build in hand, clean the report's OWN known output
+            // (report.html, the pre-T7 flat csv/*.csv layout, and the T7 per-scope csv/
+            // subfolders) - outputFolder IS sourceFolder for a real match (BuildReport passes the
+            // same folder both ways), which also holds the .jsonl logs and possibly the user's own
+            // unrelated files, so CleanStaleReportOutputs never recurses or deletes anything but
+            // its own known file names (see that method's own comment).
+            CleanStaleReportOutputs(outputFolder);
 
             Directory.CreateDirectory(outputFolder);
             CsvReportWriter.Write(reportSet, outputFolder);
@@ -113,21 +136,32 @@ namespace Overpower.EditorTools.Telemetry
             string csvFolder = Path.Combine(outputFolder, "csv");
             if (!Directory.Exists(csvFolder)) return;
 
-            foreach (string fileName in KnownFlatCsvFileNames)
-            {
-                string path = Path.Combine(csvFolder, fileName);
-                if (File.Exists(path)) File.Delete(path);
-            }
+            // Pre-T7 flat layout: known files directly inside csv/.
+            DeleteKnownCsvFilesOnly(csvFolder);
 
+            // Round-2 review fix (item D, regression): a recursive delete of a whole scope folder
+            // destroyed anything else a user had saved in there too (their own spreadsheet, say).
+            // Delete only the known file names inside each scope folder, and remove the scope
+            // folder itself ONLY if that leaves it completely empty - never recurse.
             foreach (string scopeFolderName in new[] { "whole_match", "phase1_3teams", "phase2_2teams" })
             {
                 string scopePath = Path.Combine(csvFolder, scopeFolderName);
-                if (Directory.Exists(scopePath)) Directory.Delete(scopePath, true);
+                if (!Directory.Exists(scopePath)) continue;
+                DeleteKnownCsvFilesOnly(scopePath);
+                if (Directory.GetFileSystemEntries(scopePath).Length == 0) Directory.Delete(scopePath);
             }
 
             // Only remove csv/ itself if cleaning left it empty - never assume it held nothing else.
-            if (Directory.Exists(csvFolder) && Directory.GetFileSystemEntries(csvFolder).Length == 0)
-                Directory.Delete(csvFolder);
+            if (Directory.GetFileSystemEntries(csvFolder).Length == 0) Directory.Delete(csvFolder);
+        }
+
+        private static void DeleteKnownCsvFilesOnly(string folder)
+        {
+            foreach (string fileName in KnownFlatCsvFileNames)
+            {
+                string path = Path.Combine(folder, fileName);
+                if (File.Exists(path)) File.Delete(path);
+            }
         }
 
         private static BalanceTargetsData LoadBalanceTargetsData()
