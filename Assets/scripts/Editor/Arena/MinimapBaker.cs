@@ -26,7 +26,18 @@ namespace Overpower.EditorTools
         public const string ConfigPath = "Assets/Gameplay/Config/MinimapConfig.asset";
 
         [MenuItem("OverPower/Arena/Bake minimap image")]
-        private static void BakeFromMenu() => Debug.Log("[Minimap] " + BakeOpenScene());
+        private static void BakeFromMenu() => LogResult(BakeOpenScene());
+
+        /// <summary>Logs a Bake/BakeOpenScene result at the right severity, so ArenaSymmetryInspector's two call
+        /// sites (the Rebuild thirds button and its menu item) share it too: a warning for a "not baked: ..."
+        /// outcome (nothing changed - worth the designer's attention), a plain log once it actually baked.</summary>
+        public static void LogResult(string result)
+        {
+            if (result != null && result.StartsWith("not baked"))
+                Debug.LogWarning("[Minimap] " + result);
+            else
+                Debug.Log("[Minimap] " + result);
+        }
 
         /// <summary>Bakes the one ArenaSymmetry in the open scenes. Returns a one-line report (what the menu logs).</summary>
         public static string BakeOpenScene()
@@ -110,8 +121,9 @@ namespace Overpower.EditorTools
             return config;
         }
 
-        // A plain colour picture, sampled smaller on the corner map: clamp so the edges don't wrap, mipmaps so it stays
-        // smooth when shrunk.
+        // A plain colour picture, sampled smaller on the corner map: clamp so the edges don't wrap, mipmaps so it
+        // stays smooth when shrunk, and uncompressed so block compression doesn't blur the hard wall/pocket edges
+        // the minimap's bubbles and links line up against.
         private static void ConfigureImporter(int pixels)
         {
             var importer = (TextureImporter)AssetImporter.GetAtPath(ImagePath);
@@ -120,13 +132,15 @@ namespace Overpower.EditorTools
             bool changed = importer.textureType != TextureImporterType.Default
                            || importer.wrapMode != TextureWrapMode.Clamp
                            || !importer.mipmapEnabled
-                           || importer.maxTextureSize < pixels;
+                           || importer.maxTextureSize < pixels
+                           || importer.textureCompression != TextureImporterCompression.Uncompressed;
             if (!changed)
                 return;
             importer.textureType = TextureImporterType.Default;
             importer.wrapMode = TextureWrapMode.Clamp;
             importer.mipmapEnabled = true;
             importer.maxTextureSize = Mathf.Max(importer.maxTextureSize, pixels);
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.SaveAndReimport();
         }
     }

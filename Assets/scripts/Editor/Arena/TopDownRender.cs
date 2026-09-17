@@ -12,6 +12,10 @@ namespace Overpower.EditorTools
     {
         public static byte[] RenderPng(Vector2 centreXZ, float spanMetres, int pixels)
         {
+            // Captured before the try so `finally` can always restore it - even if ReadPixels/Apply/EncodeToPNG
+            // throws while rt is still the active RenderTexture, leaving RenderTexture.active pointing at rt right
+            // as it's about to be destroyed below.
+            RenderTexture previous = RenderTexture.active;
             GameObject go = null;
             RenderTexture rt = null;
             Texture2D tex = null;
@@ -31,16 +35,16 @@ namespace Overpower.EditorTools
                 cam.targetTexture = rt;
                 cam.Render();
 
-                RenderTexture previous = RenderTexture.active;
                 RenderTexture.active = rt;
                 tex = new Texture2D(pixels, pixels, TextureFormat.RGB24, false);
                 tex.ReadPixels(new Rect(0, 0, pixels, pixels), 0, 0);
                 tex.Apply();
-                RenderTexture.active = previous;
                 return ImageConversion.EncodeToPNG(tex);
             }
             finally
             {
+                // Restore before destroying rt: once destroyed, RenderTexture.active must not still reference it.
+                RenderTexture.active = previous;
                 if (rt != null)
                 {
                     Camera cam = go != null ? go.GetComponent<Camera>() : null;

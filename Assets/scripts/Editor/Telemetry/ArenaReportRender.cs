@@ -61,6 +61,10 @@ namespace Overpower.EditorTools.Telemetry
                 };
             }
 
+            // Captured before the try so `finally` can always restore it - even if ReadPixels/Apply/EncodeToPNG
+            // throws while rt is still the active RenderTexture, leaving RenderTexture.active pointing at rt right
+            // as it's about to be destroyed below.
+            RenderTexture prevActive = RenderTexture.active;
             GameObject go = null;
             RenderTexture rt = null;
             Texture2D tex = null;
@@ -81,12 +85,10 @@ namespace Overpower.EditorTools.Telemetry
                 cam.targetTexture = rt;
                 cam.Render();
 
-                RenderTexture prevActive = RenderTexture.active;
                 RenderTexture.active = rt;
                 tex = new Texture2D(PixelSize, PixelSize, TextureFormat.RGB24, false);
                 tex.ReadPixels(new Rect(0, 0, PixelSize, PixelSize), 0, 0);
                 tex.Apply();
-                RenderTexture.active = prevActive;
 
                 byte[] png = ImageConversion.EncodeToPNG(tex);
                 return new Result
@@ -102,6 +104,8 @@ namespace Overpower.EditorTools.Telemetry
             }
             finally
             {
+                // Restore before destroying rt: once destroyed, RenderTexture.active must not still reference it.
+                RenderTexture.active = prevActive;
                 if (rt != null)
                 {
                     // cam.targetTexture must be cleared before the RenderTexture is released, else the

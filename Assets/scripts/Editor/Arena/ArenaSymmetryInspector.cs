@@ -27,7 +27,7 @@ namespace Overpower.EditorTools
                 Report("Rebuild thirds", ArenaSymmetryBuilder.Rebuild(arena, recordUndo: true));
                 // Here and in the menu item, not inside ArenaSymmetryBuilder.Rebuild: its tests rebuild tiny arenas in
                 // preview scenes and must not overwrite the real minimap image.
-                Debug.Log("[Minimap] " + MinimapBaker.Bake(arena));
+                MinimapBaker.LogResult(MinimapBaker.Bake(arena));
             }
             if (GUILayout.Button("Validate"))
                 Report("Validate", ArenaSymmetryBuilder.Validate(arena));
@@ -40,7 +40,7 @@ namespace Overpower.EditorTools
             if (arena == null)
                 return;
             Report("Rebuild thirds", ArenaSymmetryBuilder.Rebuild(arena, recordUndo: true));
-            Debug.Log("[Minimap] " + MinimapBaker.Bake(arena));
+            MinimapBaker.LogResult(MinimapBaker.Bake(arena));
         }
 
         [MenuItem("OverPower/Arena/Validate")]
