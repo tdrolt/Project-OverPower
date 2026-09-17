@@ -124,11 +124,11 @@ namespace Overpower.Tests
         // FanVertex already describes - no second mesh shape, just two more readings of the same vertex.
 
         [Test]
-        public void FanVertexRangeFractionIsZeroAtTheTipAndOneOnTheArc()
+        public void FanVertexRangeFractionIsZeroAtTheTipAndOneOnTheArcWithTheDefaultSingleRing()
         {
-            Assert.AreEqual(0f, AbilityVisualGeometry.FanVertexRangeFraction(0));
-            Assert.AreEqual(1f, AbilityVisualGeometry.FanVertexRangeFraction(1));
-            Assert.AreEqual(1f, AbilityVisualGeometry.FanVertexRangeFraction(Slices + 1));
+            Assert.AreEqual(0f, AbilityVisualGeometry.FanVertexRangeFraction(0, Slices));
+            Assert.AreEqual(1f, AbilityVisualGeometry.FanVertexRangeFraction(1, Slices));
+            Assert.AreEqual(1f, AbilityVisualGeometry.FanVertexRangeFraction(Slices + 1, Slices));
         }
 
         [Test]
@@ -139,6 +139,70 @@ namespace Overpower.Tests
             Assert.AreEqual(1f, AbilityVisualGeometry.FanVertexSideFraction(Slices + 1, Slices), 1e-5f, "right edge");
             int middle = 1 + Slices / 2;
             Assert.AreEqual(0f, AbilityVisualGeometry.FanVertexSideFraction(middle, Slices), 1e-5f, "the centre arc point");
+        }
+
+        // ---- Multi-ring fan (review finding, 2026-09-18): with the pre-existing default of 1 ring, a soft cone's
+        // radial fade had no vertex to hold a middle value at all - FanVertexRangeFraction was a step function, 0 at
+        // the tip and 1 EVERYWHERE else, whatever a caller's own fade maths tried to do with it. rings > 1 makes it
+        // a real ramp. rings = 1 (every test above) must keep behaving exactly as before this parameter existed.
+
+        [Test]
+        public void MoreRingsAddPointsBetweenTheTipAndTheOuterArcWithoutMovingTheOuterArc()
+        {
+            const int Rings = 3;
+            Assert.AreEqual(1 + Rings * (Slices + 1), AbilityVisualGeometry.FanVertexCount(Slices, Rings));
+            Assert.AreEqual(AbilityVisualGeometry.FanVertexCount(Slices), AbilityVisualGeometry.FanVertexCount(Slices, 1),
+                "the default (no rings argument) must match rings = 1 exactly - this parameter is additive, not a behaviour change for existing callers");
+
+            // Ring 1 (nearest the tip) sits at range/3; ring 3 (outermost) sits at the full range, same as the
+            // single-ring fan's own arc.
+            Vector3 ring1Left = AbilityVisualGeometry.FanVertex(1, Range, Angle, Slices, Rings);
+            Vector3 ring3Left = AbilityVisualGeometry.FanVertex(1 + 2 * (Slices + 1), Range, Angle, Slices, Rings);
+            AssertClose(AbilityVisualGeometry.FanVertex(1, Range, Angle, Slices), ring3Left);
+            Assert.AreEqual(Range / 3f, ring1Left.magnitude, 1e-4f);
+            Assert.AreEqual(Angle * 0.5f, Vector3.Angle(Vector3.forward, ring1Left), 1e-3f, "same angular sweep as ring 3");
+        }
+
+        [Test]
+        public void RingFanTrianglesCoverTipFanPlusAQuadStripPerRingGapAndAllFaceUp()
+        {
+            const int Rings = 3;
+            var triangles = new int[Slices * (2 * Rings - 1) * 3];
+            AbilityVisualGeometry.FillFanTriangles(Slices, triangles, Rings);
+            for (int t = 0; t < triangles.Length / 3; t++)
+            {
+                Vector3 a = AbilityVisualGeometry.FanVertex(triangles[t * 3], Range, Angle, Slices, Rings);
+                Vector3 b = AbilityVisualGeometry.FanVertex(triangles[t * 3 + 1], Range, Angle, Slices, Rings);
+                Vector3 c = AbilityVisualGeometry.FanVertex(triangles[t * 3 + 2], Range, Angle, Slices, Rings);
+                Assert.Greater(Vector3.Cross(b - a, c - a).y, 0f, $"triangle {t} faces up");
+            }
+        }
+
+        [Test]
+        public void FanVertexRangeFractionIsARealRampAcrossEveryRing()
+        {
+            const int Rings = 4;
+            Assert.AreEqual(0f, AbilityVisualGeometry.FanVertexRangeFraction(0, Slices, Rings), "the tip");
+            for (int ring = 1; ring <= Rings; ring++)
+            {
+                int index = 1 + (ring - 1) * (Slices + 1); // that ring's own left-edge vertex
+                Assert.AreEqual(ring / (float)Rings, AbilityVisualGeometry.FanVertexRangeFraction(index, Slices, Rings), 1e-5f, $"ring {ring}");
+            }
+        }
+
+        [Test]
+        public void FanVertexSideFractionIsTheSameShapeOnEveryRing()
+        {
+            const int Rings = 3;
+            for (int ring = 0; ring < Rings; ring++)
+            {
+                int leftEdge = 1 + ring * (Slices + 1);
+                int rightEdge = leftEdge + Slices;
+                int centre = leftEdge + Slices / 2;
+                Assert.AreEqual(1f, AbilityVisualGeometry.FanVertexSideFraction(leftEdge, Slices), 1e-5f, $"ring {ring + 1} left edge");
+                Assert.AreEqual(1f, AbilityVisualGeometry.FanVertexSideFraction(rightEdge, Slices), 1e-5f, $"ring {ring + 1} right edge");
+                Assert.AreEqual(0f, AbilityVisualGeometry.FanVertexSideFraction(centre, Slices), 1e-5f, $"ring {ring + 1} centre");
+            }
         }
     }
 }
