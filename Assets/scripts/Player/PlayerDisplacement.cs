@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
@@ -31,11 +32,6 @@ using Overpower.Combat;
 /// </summary>
 public class PlayerDisplacement : MonoBehaviour, IDisplaceable
 {
-    // Not a tuning value: the line between "a wall in the way" and "the floor underfoot" a sweep
-    // can hit. A wall's surface normal points roughly sideways; a floor's points roughly up, so
-    // anything closer to straight up than this is the ground, not something to stop for.
-    private const float FloorNormalYThreshold = 0.5f;
-
     private PhotonView photonView;
     private Rigidbody rb;
     private PlayerMotor motor;
@@ -53,6 +49,17 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     // itself). Found by playing a dash immediately after landing this file.
     private int blockMask;
 
+    // The player's own capsule: the shape every step is swept with (movement step 2). Read once in Awake, so what a
+    // move is checked against is always the shape physics pushes around, never a second Inspector radius.
+    private CapsuleCollider capsule;
+
+    // Reused every physics step, so a move in flight allocates nothing. A player's capsule never touches 16 things at
+    // once; anything past that is missed rather than allocated for.
+    private readonly Collider[] overlapHits = new Collider[16];
+    private readonly RaycastHit[] sweepHits = new RaycastHit[16];
+    private readonly List<SweepContact> sweepContacts = new List<SweepContact>(16);
+    private readonly List<Collider> sweepColliders = new List<Collider>(16);
+
     // The move in progress, or null when nothing is running. Kept as the three primitives a step
     // needs rather than a struct so FixedUpdate never allocates one every tick.
     private DisplaceKind? activeKind;
@@ -68,6 +75,9 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         motor = GetComponent<PlayerMotor>();
         lifecycle = GetComponent<PlayerLifecycle>();
         blockMask = LayerMask.GetMask("Default", "Building");
+        capsule = GetComponent<CapsuleCollider>();
+        if (capsule == null)
+            Debug.LogError($"[PlayerDisplacement] {name}: CapsuleCollider is missing - no move can be checked against a wall.");
 
         if (rb == null)
             Debug.LogError($"[PlayerDisplacement] {name}: Rigidbody is missing - nothing can be displaced.");
@@ -111,33 +121,26 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         float step = Mathf.Min(speed * Time.fixedDeltaTime, remainingDistance);
         Vector3 fromPosition = rb.position;
 
-        // SweepTest (singular) only ever reports the NEAREST thing it touches, with no layer mask
-        // of its own - so a closer collider this displacement does not stop for (Bullet layer, a
-        // trigger-less prop on an excluded layer, a corpse on DeadPlayer) would mask a real wall
-        // sitting just behind it in the same step, and the dash would sail through the wall on the
-        // step after next. SweepTestAll returns every collider the capsule would touch along the
-        // step; sorted nearest-first, the first one IsBlocker accepts is the correct stop point,
-        // whatever order PhysX happened to report them in. Triggers are still excluded by
-        // QueryTriggerInteraction.Ignore; the floor-normal and own-collider rules stay in IsBlocker.
-        RaycastHit[] hits = rb.SweepTestAll(direction, step, QueryTriggerInteraction.Ignore);
-        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-
-        foreach (RaycastHit hit in hits)
+        // One stop rule for a dash, a zip pull and a knockback (DisplacementSweepRule, movement step 2). The player's
+        // own capsule is swept along the step and stops a skin width short of the first wall, and a wall the capsule
+        // already overlaps blocks only a move deeper into it. Rigidbody.SweepTestAll, which this replaces, stopped
+        // exactly on contact and did not report a wall the capsule had already been pressed into by walking - so a
+        // second dash from there went straight through a thin (0.72 m) wall (measured, movement step 1: at 0.70 m and
+        // 0.60 m from the wall's inner face - touching, then 0.108 m deep - SweepTestAll returned no hit at all).
+        float allowed = AllowedTravel(fromPosition, direction, step, out Collider blocker);
+        if (blocker != null)
         {
-            if (!IsBlocker(hit))
-                continue;
-
-            Vector3 blockedPosition = fromPosition + direction * hit.distance;
+            Vector3 blockedPosition = fromPosition + direction * allowed;
             rb.MovePosition(blockedPosition);
-            Finish(DisplaceOutcome.Blocked, hit.collider, blockedPosition);
+            Finish(DisplaceOutcome.Blocked, blocker, blockedPosition);
             return;
         }
 
-        // MovePosition on this Rigidbody (dynamic, gravity on, not kinematic) is solved by PhysX
-        // alongside whatever contacts it is already resting in - not applied as a bare teleport -
-        // so a run can overshoot its requested distance by a few centimetres (measured: 3.115m for
-        // a requested 3m). Accepted rather than snapped to the exact figure: snapping would fight
-        // the same contact solving that keeps the capsule from sinking into the floor it stands on.
+        // MovePosition on this Rigidbody (dynamic, gravity on, not kinematic) is solved by PhysX alongside whatever
+        // contacts it is already resting in - not applied as a bare teleport - so a run can overshoot its requested
+        // distance by a few centimetres (measured: 3.115m for a requested 3m). Accepted rather than snapped to the
+        // exact figure: snapping would fight the same contact solving that keeps the capsule from sinking into the
+        // floor it stands on.
         Vector3 nextPosition = fromPosition + direction * step;
         rb.MovePosition(nextPosition);
         remainingDistance -= step;
@@ -186,6 +189,25 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     /// TeleportTo itself already checks, not a new rule.
     /// </summary>
     public bool CanTeleport => DisplacementPriority.Accepts(activeKind, DisplaceKind.Teleport);
+
+    /// <summary>
+    /// Read-only query for a dash to check BEFORE it spends its charge (movement step 2): false while a knockback is
+    /// running, and false when a Voluntary move along <paramref name="direction"/> could not cover even a centimetre
+    /// because the player is touching, or pressed into, a wall that way. It asks the same rule the move itself asks
+    /// every step, so "refused" and "would have gone nowhere" cannot disagree.
+    /// </summary>
+    public bool CanStartVoluntary(Vector3 direction)
+    {
+        if (!photonView.IsMine || rb == null)
+            return false;
+
+        if (!DisplacementPriority.Accepts(activeKind, DisplaceKind.Voluntary))
+            return false;
+
+        Vector3 dir = direction.sqrMagnitude > 0.0001f ? direction.normalized : transform.forward;
+        float allowed = AllowedTravel(rb.position, dir, DisplacementSweepRule.MinUsefulTravelMetres, out _);
+        return DisplacementSweepRule.IsUsefulTravel(allowed);
+    }
 
     /// <summary>
     /// Instant reposition for a blink/teleport - no travel time, so nothing here is ever "the move
@@ -259,20 +281,78 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
             Cancel();
     }
 
-    private bool IsBlocker(RaycastHit hit)
+    /// <summary>
+    /// How far the capsule may travel from <paramref name="from"/> along <paramref name="dir"/> (unit length), up to
+    /// <paramref name="distance"/>, and the collider that stops it (null when nothing does). This half only gathers
+    /// physics facts; DisplacementSweepRule makes the decision and is tested in edit mode.
+    /// </summary>
+    private float AllowedTravel(Vector3 from, Vector3 dir, float distance, out Collider blocker)
     {
-        if (hit.collider == null)
-            return false;
+        blocker = null;
+        if (capsule == null)
+            return distance; // Awake already logged it; moving unchecked beats a player who can never dash.
 
-        if ((blockMask & (1 << hit.collider.gameObject.layer)) == 0)
-            return false; // Not a layer a displacement stops for (e.g. Bullet).
+        Quaternion rotation = rb.rotation;
+        // Lifted a little, so the floor the capsule rests on is neither an overlap nor a hit.
+        Vector3 lift = Vector3.up * DisplacementSweepRule.LiftMetres;
+        Vector3 centre = from + rotation * capsule.center + lift;
+        float halfSegment = Mathf.Max(0f, capsule.height * 0.5f - capsule.radius);
+        Vector3 top = centre + Vector3.up * halfSegment;
+        Vector3 bottom = centre - Vector3.up * halfSegment;
+        // Where the push-out is asked for: one skin width along the move. At that pose a capsule merely TOUCHING a wall
+        // it moves into already overlaps it, while one moving away or along it does not overlap it any deeper.
+        Vector3 probe = from + dir * DisplacementSweepRule.SkinMetres + lift;
 
-        if (hit.normal.y > FloorNormalYThreshold)
-            return false; // Ground underfoot, not a wall in the way.
+        sweepContacts.Clear();
+        sweepColliders.Clear();
 
-        if (hit.rigidbody == rb || hit.collider.transform.IsChildOf(transform))
-            return false; // Never blocked by our own body.
+        // Walls the capsule already overlaps, asked for directly rather than left to the cast below: a cast reports a
+        // collider it starts inside with distance 0 and no usable normal, and not dependably at all.
+        int overlapCount = Physics.OverlapCapsuleNonAlloc(bottom, top, capsule.radius, overlapHits, blockMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < overlapCount; i++)
+            AddStartInside(overlapHits[i], probe, rotation);
 
-        return true;
+        int hitCount = Physics.CapsuleCastNonAlloc(bottom, top, capsule.radius, dir, sweepHits,
+            distance + DisplacementSweepRule.SkinMetres, blockMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = sweepHits[i];
+            if (hit.distance <= 0f)
+            {
+                AddStartInside(hit.collider, probe, rotation); // touching at the start: judged the same way
+                continue;
+            }
+
+            if (IsOwnOrGround(hit.collider) || sweepColliders.Contains(hit.collider))
+                continue;
+
+            sweepContacts.Add(SweepContact.Hit(hit.distance, hit.normal));
+            sweepColliders.Add(hit.collider);
+        }
+
+        float allowed = DisplacementSweepRule.AllowedTravel(distance, sweepContacts, dir, out int blockerIndex);
+        if (blockerIndex >= 0)
+            blocker = sweepColliders[blockerIndex];
+        return allowed;
     }
+
+    private void AddStartInside(Collider other, Vector3 probe, Quaternion rotation)
+    {
+        if (IsOwnOrGround(other) || sweepColliders.Contains(other))
+            return;
+
+        Transform otherTransform = other.transform;
+        bool overlapsAhead = Physics.ComputePenetration(capsule, probe, rotation, other, otherTransform.position,
+            otherTransform.rotation, out Vector3 pushOut, out float depth) && depth > 0f;
+
+        sweepContacts.Add(overlapsAhead ? SweepContact.Inside(pushOut) : SweepContact.InsideWithoutPushOut());
+        sweepColliders.Add(other);
+    }
+
+    /// <summary>Never blocked by our own body, and the ground is not a wall - a TerrainCollider is also the one shape
+    /// Physics.ComputePenetration cannot be asked about.</summary>
+    private bool IsOwnOrGround(Collider other) =>
+        other == null
+        || other.attachedRigidbody == rb || other.transform.IsChildOf(transform)
+        || other is TerrainCollider;
 }

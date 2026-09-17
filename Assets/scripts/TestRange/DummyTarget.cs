@@ -121,8 +121,8 @@ namespace Overpower.TestRange
 
         // ---- IDisplaceable (Task 1.10a): sonic pulse knockback ---------------------------------
         //
-        // A dummy has no Rigidbody the way a player does (PlayerDisplacement sweeps a Rigidbody with
-        // Rigidbody.SweepTestAll) - it is plain scenery with a Collider - so this drives the same
+        // A dummy has no Rigidbody the way a player does (PlayerDisplacement sweeps the player's own
+        // capsule and judges it with DisplacementSweepRule) - it is plain scenery with a Collider - so this drives the same
         // "travel N metres, stop at the first wall or body" contract with a bare Physics.CapsuleCast
         // against this dummy's own CapsuleCollider instead, resolved a step at a time in Update.
         // Same blockMask as PlayerDisplacement (Default | Building) for the same reason: Default
@@ -323,7 +323,7 @@ namespace Overpower.TestRange
             FinishDisplacement(DisplaceOutcome.Completed, null);
         }
 
-        /// <summary>Same two exclusions PlayerDisplacement.IsBlocker applies, for the same reasons:
+        /// <summary>The two exclusions PlayerDisplacement applies through DisplacementSweepRule, for the same reasons:
         /// a near-vertical normal is the floor underfoot, not a wall in the way, and a dummy can
         /// never be blocked by its own collider.</summary>
         private bool IsDisplaceBlocker(RaycastHit hit)

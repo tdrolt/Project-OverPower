@@ -84,6 +84,18 @@ namespace Overpower.Abilities
                 ? towardCursor
                 : ctx.AimDirection;
             payload = new CastPayload { Origin = ctx.Origin, Direction = dir.normalized };
+
+            // Movement step 2: a dash that cannot move - the player is touching or pressed into a wall that way, or a
+            // knockback owns the body - is refused HERE, before AbilityRunner spends the charge (the same reason
+            // BlinkAbility checks CanTeleport up front). It used to spend a charge and, from against a thin wall,
+            // carry the player through it.
+            if (Owner.Displacement is PlayerDisplacement self && !self.CanStartVoluntary(payload.Direction))
+            {
+                LogDashRefused(payload.Direction);
+                payload = default;
+                return false;
+            }
+
             return true;
         }
 
@@ -169,6 +181,12 @@ namespace Overpower.Abilities
         private void LogDash(float travelled, DisplaceOutcome outcome)
         {
             Debug.Log($"[DASH] dist={travelled:F2} outcome={outcome}");
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        private void LogDashRefused(Vector3 direction)
+        {
+            Debug.Log($"[DASH] refused dir={direction:F2} (a wall at the start, or a knockback is running)");
         }
     }
 }
