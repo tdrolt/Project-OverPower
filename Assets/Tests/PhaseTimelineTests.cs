@@ -106,5 +106,161 @@ namespace Overpower.Tests
                 Directory.Delete(temp, true);
             }
         }
+
+        // ---------------------------------------------------------------- review fix (item 9): elimination fallback
+
+        [Test]
+        public void AnEliminationWithNoPhaseEventBecomesTheTransitionWithTheFallbackFlagSet()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":1,\"remain\":[]}\n" + // the harmless anchor - never a transition
+                    "{\"e\":\"elimination\",\"t\":75,\"tm\":2,\"remain\":[0,1]}\n" + // 2.7's MatchDirector never got to log the matching `phase` 2
+                    "{\"e\":\"sample\",\"t\":150,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsTrue(timeline.HasPhase2);
+                Assert.IsTrue(timeline.UsedEliminationFallback);
+                Assert.AreEqual(75.0, timeline.TransitionSeconds.Value, 1e-9);
+                Assert.AreEqual(75.0, timeline.Phase1.End, 1e-9);
+                Assert.AreEqual(75.0, timeline.Phase2.Start, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void ARealPhaseEventWinsOverAnEliminationNoFallbackFlag()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"elimination\",\"t\":75,\"tm\":2,\"remain\":[0,1]}\n" +
+                    "{\"e\":\"phase\",\"t\":80,\"num\":2,\"remain\":[0,1]}\n" + // 2.7 DID log the real phase event, slightly later
+                    "{\"e\":\"sample\",\"t\":150,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsFalse(timeline.UsedEliminationFallback, "a real phase event exists - the elimination is not a fallback source");
+                Assert.AreEqual(80.0, timeline.TransitionSeconds.Value, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void TheEarliestOfSeveralEliminationsIsUsedAsTheFallback()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"elimination\",\"t\":95,\"tm\":1,\"remain\":[0,2]}\n" +
+                    "{\"e\":\"elimination\",\"t\":75,\"tm\":2,\"remain\":[0,1]}\n" + // earlier, out of file order
+                    "{\"e\":\"sample\",\"t\":150,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsTrue(timeline.UsedEliminationFallback);
+                Assert.AreEqual(75.0, timeline.TransitionSeconds.Value, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void ANegativeEliminationTimestampMapsToZero()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"elimination\",\"t\":-1,\"tm\":2,\"remain\":[0,1]}\n" +
+                    "{\"e\":\"sample\",\"t\":150,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsTrue(timeline.UsedEliminationFallback);
+                Assert.AreEqual(0.0, timeline.TransitionSeconds.Value, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void ATransitionAtExactlyZeroDoesNotDoubleCountATMinusOneEventIntoBothPhases()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"join\",\"t\":-1,\"a\":1,\"tm\":0}\n" +
+                    "{\"e\":\"elimination\",\"t\":0,\"tm\":2,\"remain\":[0,1]}\n" +
+                    "{\"e\":\"sample\",\"t\":150,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.AreEqual(0.0, timeline.TransitionSeconds.Value, 1e-9);
+                // Phase 1 is now the empty window [0, 0) - it correctly claims nothing, including
+                // the t == -1 join. Phase 2 (the only window with positive length) claims it instead.
+                Assert.IsFalse(timeline.Phase1.Contains(-1), "the empty Phase 1 window must not claim the t=-1 join");
+                Assert.IsTrue(timeline.Phase2.Contains(-1), "Phase 2 is the only window with real length - it owns the t=-1 join instead");
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        // ---------------------------------------------------------------- review fix (item 12): two masters racing
+
+        [Test]
+        public void TwoPhase2EventsFromTwoMastersUseTheEarliestWithNoDoubleSplit()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                // A master-migration race could see two different clients each log their own
+                // `phase` 2 line, milliseconds apart - the earliest must win, and there must be
+                // exactly ONE transition (not two windows chained together).
+                string lines =
+                    Session(1) +
+                    "{\"e\":\"phase\",\"t\":90.05,\"num\":2,\"remain\":[0,1]}\n" +
+                    "{\"e\":\"sample\",\"t\":150,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+                string lines2 =
+                    Session(2) +
+                    "{\"e\":\"phase\",\"t\":90.0,\"num\":2,\"remain\":[0,1]}\n" +
+                    "{\"e\":\"sample\",\"t\":150,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "2.jsonl"), lines2);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsTrue(timeline.HasPhase2);
+                Assert.AreEqual(90.0, timeline.TransitionSeconds.Value, 1e-9);
+                Assert.IsFalse(timeline.UsedEliminationFallback);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
     }
 }

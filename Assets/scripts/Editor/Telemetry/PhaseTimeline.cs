@@ -14,13 +14,26 @@ namespace Overpower.EditorTools.Telemetry
     ///
     /// MatchTelemetry's own `phase` 1 anchor (logged once, the moment the master claims the match
     /// identity) is deliberately NOT a transition - only phase numbers >= 2 count, so that anchor never
-    /// looks like an elimination.</summary>
+    /// looks like an elimination.
+    ///
+    /// Review fix (item 9): a `phase` event is 2.7's own job to raise (see the plan's "changes from
+    /// the spec"), so a log with a real elimination but a MatchDirector that hasn't landed yet (or a
+    /// bug in it) would otherwise stay entirely Phase 1 despite an elimination clearly having
+    /// happened. When no `phase` >= 2 event exists but at least one `elimination` event does, the
+    /// EARLIEST elimination's own t becomes the transition instead - see
+    /// <see cref="UsedEliminationFallback"/>, which the aggregator surfaces as a header warning.</summary>
     public sealed class PhaseTimeline
     {
         public readonly double MatchLength;
 
-        /// <summary>Null when no `phase` event with a number >= 2 exists in the log.</summary>
+        /// <summary>Null when no `phase` event with a number >= 2, and no `elimination` event
+        /// either, exists in the log.</summary>
         public readonly double? TransitionSeconds;
+
+        /// <summary>True when <see cref="TransitionSeconds"/> came from an `elimination` event
+        /// because no `phase` >= 2 event was found at all - see the class comment's review-fix
+        /// paragraph.</summary>
+        public readonly bool UsedEliminationFallback;
 
         public readonly TimeWindow WholeMatch;
         public readonly TimeWindow Phase1;
@@ -30,10 +43,11 @@ namespace Overpower.EditorTools.Telemetry
 
         public bool HasPhase2 => Phase2 != null;
 
-        private PhaseTimeline(double matchLength, double? transitionSeconds)
+        private PhaseTimeline(double matchLength, double? transitionSeconds, bool usedEliminationFallback)
         {
             MatchLength = matchLength;
             TransitionSeconds = transitionSeconds;
+            UsedEliminationFallback = usedEliminationFallback;
             WholeMatch = new TimeWindow(0, matchLength, true);
 
             if (transitionSeconds.HasValue)
@@ -51,7 +65,8 @@ namespace Overpower.EditorTools.Telemetry
         public static PhaseTimeline From(TelemetryLog log)
         {
             double matchLength = 0;
-            double? transition = null;
+            double? phaseTransition = null;
+            double? earliestElimination = null;
 
             if (log != null)
             {
@@ -62,15 +77,28 @@ namespace Overpower.EditorTools.Telemetry
                     // First (log.Events is t-sorted) `phase` event whose own number is >= 2. A
                     // negative t (the -1 "clock not known yet" sentinel) can never be a real
                     // transition instant - ignored rather than producing an inverted [0, -1) window.
-                    if (!transition.HasValue && e.Name == TelemetryKeys.Phase && e.T >= 0)
+                    if (!phaseTransition.HasValue && e.Name == TelemetryKeys.Phase && e.T >= 0)
                     {
                         int num = ReadPhaseNumber(e.Data);
-                        if (num >= 2) transition = e.T;
+                        if (num >= 2) phaseTransition = e.T;
+                    }
+                    else if (e.Name == TelemetryKeys.Elimination)
+                    {
+                        // Review fix (item 9): unlike a `phase` event's own number, an elimination's
+                        // usefulness as a fallback transition doesn't depend on a clean positive t -
+                        // a negative one still means "a team was eliminated essentially at match
+                        // start", so it maps to 0 rather than being discarded outright.
+                        double t = e.T < 0 ? 0 : e.T;
+                        if (!earliestElimination.HasValue || t < earliestElimination.Value)
+                            earliestElimination = t;
                     }
                 }
             }
 
-            return new PhaseTimeline(matchLength, transition);
+            bool usedFallback = !phaseTransition.HasValue && earliestElimination.HasValue;
+            double? transition = phaseTransition ?? earliestElimination;
+
+            return new PhaseTimeline(matchLength, transition, usedFallback);
         }
 
         private static int ReadPhaseNumber(JObject data)

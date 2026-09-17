@@ -32,10 +32,17 @@ namespace Overpower.EditorTools.Telemetry
         /// ("match clock not known yet" - MatchClock's own sentinel, e.g. a `join` logged before the
         /// room's mStart arrives) is treated as the very first instant of the match: it belongs to
         /// whichever window starts at 0 (the whole match, and Phase 1 when there is one), never to a
-        /// later phase window whose own Start is > 0.</summary>
+        /// later phase window whose own Start is > 0.
+        ///
+        /// Review fix (item 9): also requires Start &lt; End - an elimination (or a `phase` >= 2
+        /// event) logged at t == 0 makes Phase 1's own window `[0, 0)`, empty by construction, AND
+        /// Phase 2's window start at 0 too - without this check BOTH windows would read Start &lt;= 0
+        /// and double-count every t == -1 event into both phases. An empty window can never
+        /// meaningfully "start" the match, so it now correctly claims nothing at all, including t ==
+        /// -1; whichever window actually has positive length claims it instead.</summary>
         public bool Contains(double t)
         {
-            if (t < 0) return Start <= 0;
+            if (t < 0) return Start <= 0 && Start < End;
             if (t < Start) return false;
             return EndInclusive ? t <= End : t < End;
         }
@@ -43,12 +50,19 @@ namespace Overpower.EditorTools.Telemetry
         /// <summary>Clips a continuous [from, to) span to this window's own bounds - the shared
         /// mechanism behind every integral this task clips (a sample interval, an ownership stint, a
         /// capture attempt, an alive-time tail). Returns false (and leaves the out params at 0) when
-        /// the span has no overlap with this window at all.</summary>
+        /// the span has no overlap with this window at all.
+        ///
+        /// Review fix (item 8): a ZERO-LENGTH span (from == to) that lies inside the window is kept,
+        /// not rejected - a capture completing and immediately being lost again at the exact same
+        /// instant (or any other same-tick stint) produced a real, Duration == 0 row in every
+        /// pre-T7, unwindowed table; rejecting on `>=` made that row silently vanish the moment ANY
+        /// window (including the whole-match one) was applied. Only a genuinely INVERTED span
+        /// (from &gt; to) is rejected.</summary>
         public bool Clip(double from, double to, out double clippedFrom, out double clippedTo)
         {
             clippedFrom = System.Math.Max(from, Start);
             clippedTo = System.Math.Min(to, End);
-            if (clippedFrom >= clippedTo)
+            if (clippedFrom > clippedTo)
             {
                 clippedFrom = 0;
                 clippedTo = 0;

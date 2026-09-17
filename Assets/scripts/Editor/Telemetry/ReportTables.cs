@@ -65,6 +65,12 @@ namespace Overpower.EditorTools.Telemetry
         /// registered) - skipped rather than indexing out of range, and counted here.</summary>
         public int InvalidTierCount;
 
+        /// <summary>Review fix (item 9): true when the match had an `elimination` event but no
+        /// `phase` >= 2 event at all - PhaseTimeline.UsedEliminationFallback, carried through so the
+        /// HTML can warn that the Phase 2 start came from the elimination instead of a real phase
+        /// change (2.7's MatchDirector should be logging both).</summary>
+        public bool EliminationFallbackUsed;
+
         /// <summary>The primary session's own tuning snapshot, re-serialized flat - T6's HTML report
         /// embeds this verbatim; T5 just carries it through.</summary>
         public string TuningJson;

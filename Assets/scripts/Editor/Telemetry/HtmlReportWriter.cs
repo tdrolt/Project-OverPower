@@ -737,6 +737,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     if (h.unreadableFileCount) warn(h.unreadableFileCount + ' log file(s) could not be read.');
     if (h.newerSchemaCount) warn(h.newerSchemaCount + ' session(s) used a newer schema than this report understands.');
     if (h.otherMatchId) warn('This folder also holds ' + h.otherMatchFileCount + ' file(s) from a different match (' + h.otherMatchId + ') - not merged into this report.');
+    if (h.eliminationFallbackUsed) warn('An elimination was logged without a matching phase event; Phase 2 start was taken from the elimination instead.');
 
     var summary = id('header-summary', suffix);
     function line(label, value) { summary.appendChild(el('div', null, label + ': ' + value)); }

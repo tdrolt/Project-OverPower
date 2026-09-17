@@ -227,6 +227,40 @@ namespace Overpower.Tests
             Assert.AreEqual(0, log.UnknownEventCount);
         }
 
+        // ---------------------------------------------------------------- review fix (item 8): zero-length stints survive
+
+        [Test]
+        public void ZeroLengthOwnershipStintSurvivesWindowClippingOnTheWholeMatchBuild()
+        {
+            // Not the shared match_phases fixture - a small, isolated temp log (same pattern as
+            // TelemetryAggregatorReviewFixesTests), since this is testing TimeWindow.Clip's own
+            // edge case (see TimeWindowTests for the unit-level version) end to end through the
+            // aggregator, not anything about the phase split itself.
+            string temp = Path.Combine(Path.GetTempPath(), "TelemetryZeroLengthStint_" + System.Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(temp);
+            try
+            {
+                string lines =
+                    "{\"e\":\"session\",\"t\":0,\"schema\":1,\"m\":\"M\",\"a\":1,\"nick\":\"n1\",\"tm\":0,\"master\":true,\"commit\":\"c\",\"uv\":\"u\",\"plat\":\"p\",\"tuning\":{}}\n" +
+                    // Zone 0 captured by team 0 at t=30, then captured away by team 1 at the exact
+                    // same instant - a real, zero-length stint for team 0 that every pre-T7,
+                    // unwindowed table already kept.
+                    "{\"e\":\"ownership\",\"t\":30,\"zone\":0,\"tier\":2,\"old\":-1,\"new\":0,\"since\":1000}\n" +
+                    "{\"e\":\"ownership\",\"t\":30,\"zone\":0,\"tier\":2,\"old\":0,\"new\":1,\"since\":1001}\n" +
+                    "{\"e\":\"sample\",\"t\":60,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp));
+                var zeroLength = tables.Ownership.SingleOrDefault(o => o.Zone == 0 && o.Team == 0);
+                Assert.IsNotNull(zeroLength, "the zero-length team-0 stint must still appear, not silently vanish");
+                Assert.AreEqual(0.0, zeroLength.Duration, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
         // ---------------------------------------------------------------- log coverage: a missing actor seen only via `hit`
 
         [Test]

@@ -164,6 +164,7 @@ namespace Overpower.EditorTools.Telemetry
             BuildOwnership(log, tables.Ownership, zoneTier, rawChangesByZone, matchLength, effectiveWindow, tPhase2);
 
             BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow);
+            tables.Header.EliminationFallbackUsed = timeline.UsedEliminationFallback; // review fix item 9
             BuildCaptures(log, rawChangesByZone, zoneTier, matchLength, tables.Header, tables.Captures, effectiveWindow, tPhase2);
             BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables, effectiveWindow, tPhase2);
             BuildHits(log, effectiveTeam, tables.Hits, effectiveWindow, tPhase2);
