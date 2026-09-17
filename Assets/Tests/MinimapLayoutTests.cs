@@ -1,0 +1,154 @@
+using System.Collections.Generic;
+using NUnit.Framework;
+using Overpower.Match;
+using Overpower.UI;
+using UnityEngine;
+
+namespace Overpower.Tests
+{
+    public class MinimapLayoutTests
+    {
+        private static readonly Vector2 Centre = new Vector2(65.05f, 53.34f); // ArenaSymmetry.centre (x, z)
+        private const float WorldSize = 154f;
+        private const float MapSize = 300f;
+
+        private static void AssertClose(Vector2 expected, Vector2 actual, float tolerance = 1e-3f) =>
+            Assert.That(Vector2.Distance(expected, actual), Is.LessThan(tolerance), $"expected {expected:F4} but was {actual:F4}");
+
+        private static Vector3 World(float dx, float dz) => new Vector3(Centre.x + dx, 3f, Centre.y + dz);
+
+        [Test]
+        public void TheBakedCentreIsTheMiddleOfTheMap()
+        {
+            AssertClose(Vector2.zero, MinimapLayout.WorldToMap(World(0f, 0f), Centre, WorldSize, MapSize));
+        }
+
+        [Test]
+        public void EastIsRightAndNorthIsUpBeforeTheMapTurns()
+        {
+            AssertClose(new Vector2(150f, 0f), MinimapLayout.WorldToMap(World(77f, 0f), Centre, WorldSize, MapSize));
+            AssertClose(new Vector2(0f, 150f), MinimapLayout.WorldToMap(World(0f, 77f), Centre, WorldSize, MapSize));
+        }
+
+        [Test]
+        public void OnlyPointsInsideTheBakedSquareCountAsInside()
+        {
+            Assert.IsTrue(MinimapLayout.IsInsideBakedArea(World(77f, -77f), Centre, WorldSize));
+            Assert.IsFalse(MinimapLayout.IsInsideBakedArea(World(77.1f, 0f), Centre, WorldSize));
+            Assert.IsFalse(MinimapLayout.IsInsideBakedArea(World(0f, -77.1f), Centre, WorldSize));
+        }
+
+        [Test]
+        public void TurningPutsTheCamerasUpDirectionAtTheTop()
+        {
+            // A camera turned 90° looks toward +X: +X is at the top of the screen and +Z on the left.
+            AssertClose(new Vector2(0f, 150f), MinimapLayout.TurnWithCamera(new Vector2(150f, 0f), 90f));
+            AssertClose(new Vector2(-150f, 0f), MinimapLayout.TurnWithCamera(new Vector2(0f, 150f), 90f));
+        }
+
+        [Test]
+        public void TurningMatchesWhatTheCameraShows()
+        {
+            const float yaw = 37f;
+            Vector3 offset = new Vector3(12f, 0f, -31f);
+            Vector3 screenRight = Quaternion.AngleAxis(yaw, Vector3.up) * Vector3.right;
+            Vector3 screenUp = Quaternion.AngleAxis(yaw, Vector3.up) * Vector3.forward;
+            float scale = MapSize / WorldSize;
+            var expected = new Vector2(Vector3.Dot(offset, screenRight), Vector3.Dot(offset, screenUp)) * scale;
+
+            Vector2 map = MinimapLayout.WorldToMap(World(offset.x, offset.z), Centre, WorldSize, MapSize);
+            AssertClose(expected, MinimapLayout.TurnWithCamera(map, yaw));
+        }
+
+        [Test]
+        public void EachTeamSeesItsOwnCapitalInTheSamePlace()
+        {
+            // Capitals sit 57.66 m from the centre at map angles 90/210/330 (arena symmetry). CameraTracking.ResolveTeamYaw
+            // turns each team's camera to atan2(toSpawn) + Team Yaw Offset (120 in Game Scene).
+            const float radius = 57.66f;
+            var expected = new Vector2(-0.8660254f, -0.5f) * (radius * MapSize / WorldSize); // 120° counter-clockwise from up
+            foreach (float mapAngle in new[] { 90f, 210f, 330f })
+            {
+                float rad = mapAngle * Mathf.Deg2Rad;
+                Vector3 capital = World(Mathf.Cos(rad) * radius, Mathf.Sin(rad) * radius);
+                float yaw = Mathf.Atan2(capital.x - Centre.x, capital.z - Centre.y) * Mathf.Rad2Deg + 120f;
+                Vector2 onScreen = MinimapLayout.TurnWithCamera(MinimapLayout.WorldToMap(capital, Centre, WorldSize, MapSize), yaw);
+                AssertClose(expected, onScreen, 0.01f);
+            }
+        }
+
+        [Test]
+        public void LabelsAndRingsStayUprightWhateverTheYaw()
+        {
+            foreach (float yaw in new[] { 0f, 37f, 120f, 240f, -75f })
+                Assert.AreEqual(0f, Mathf.DeltaAngle(0f, MinimapLayout.MapRotationDegrees(yaw) + MinimapLayout.UprightRotationDegrees(yaw)), 1e-3f);
+        }
+
+        [Test]
+        public void YourMarkerPointsWhereYouFaceOnScreen()
+        {
+            const float cameraYaw = 37f;
+            // Facing the camera's own direction points straight up.
+            Assert.AreEqual(0f, Mathf.DeltaAngle(0f, MinimapLayout.MapRotationDegrees(cameraYaw) + MinimapLayout.FacingRotationDegrees(cameraYaw)), 1e-3f);
+            // Facing 90° clockwise from it points right: a UI rotation of -90.
+            Assert.AreEqual(-90f, Mathf.DeltaAngle(0f, MinimapLayout.MapRotationDegrees(cameraYaw) + MinimapLayout.FacingRotationDegrees(cameraYaw + 90f)), 1e-3f);
+        }
+
+        [Test]
+        public void ASegmentHasItsMiddleLengthAndAngle()
+        {
+            var (centre, length, angle) = MinimapLayout.Segment(new Vector2(0f, 0f), new Vector2(0f, 10f));
+            AssertClose(new Vector2(0f, 5f), centre);
+            Assert.AreEqual(10f, length, 1e-4f);
+            Assert.AreEqual(90f, angle, 1e-3f);
+            Assert.AreEqual(180f, MinimapLayout.Segment(new Vector2(10f, 0f), Vector2.zero).AngleDegrees, 1e-3f);
+        }
+
+        [Test]
+        public void AnArrowheadStopsShortOfTheZoneItPointsAt()
+        {
+            AssertClose(new Vector2(7f, 0f), MinimapLayout.PointBeforeEnd(Vector2.zero, new Vector2(10f, 0f), 3f));
+            AssertClose(new Vector2(5f, 5f), MinimapLayout.PointBeforeEnd(new Vector2(5f, 5f), new Vector2(5f, 5f), 3f));
+        }
+
+        [Test]
+        public void TheFramedSquareClearsTheArenaOnEverySide()
+        {
+            Assert.AreEqual(154.4f, MinimapLayout.FramedSizeMetres(73.2f, 4f), 1e-3f);
+            Assert.AreEqual(8f, MinimapLayout.FramedSizeMetres(-1f, 4f), 1e-3f);
+        }
+
+        [Test]
+        public void TheGddLinksMakeFifteenLinesWithNoDuplicates()
+        {
+            var map = new TerritoryMap(
+                new List<(int, IEnumerable<int>)>
+                {
+                    (0, new[] { 6, 3, 5 }), (1, new[] { 7, 3, 4 }), (2, new[] { 8, 4, 5 }),
+                    (3, new[] { 0, 1, 9 }), (4, new[] { 1, 2, 9 }), (5, new[] { 0, 2, 9 }),
+                    (6, new[] { 0 }), (7, new[] { 1 }), (8, new[] { 2 }),
+                    (9, new[] { 3, 4, 5, 0, 1, 2 }),
+                },
+                new List<(int, int)> { (6, 0), (7, 1), (8, 2) });
+
+            List<(int A, int B)> pairs = MinimapLayout.LinkPairs(map, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
+
+            Assert.AreEqual(15, pairs.Count);
+            CollectionAssert.Contains(pairs, (0, 9));
+            CollectionAssert.Contains(pairs, (2, 9));
+            CollectionAssert.DoesNotContain(pairs, (6, 9));
+            foreach ((int a, int b) in pairs)
+                Assert.Less(a, b);
+        }
+
+        [Test]
+        public void TierLabelsAreRomanNumerals()
+        {
+            Assert.AreEqual("I", MinimapLayout.TierLabel(1));
+            Assert.AreEqual("II", MinimapLayout.TierLabel(2));
+            Assert.AreEqual("III", MinimapLayout.TierLabel(3));
+            Assert.AreEqual("IV", MinimapLayout.TierLabel(4));
+            Assert.AreEqual("5", MinimapLayout.TierLabel(5));
+        }
+    }
+}
