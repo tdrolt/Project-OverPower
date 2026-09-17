@@ -56,19 +56,57 @@ namespace Overpower.EditorTools.Telemetry
         /// not rejected - a capture completing and immediately being lost again at the exact same
         /// instant (or any other same-tick stint) produced a real, Duration == 0 row in every
         /// pre-T7, unwindowed table; rejecting on `>=` made that row silently vanish the moment ANY
-        /// window (including the whole-match one) was applied. Only a genuinely INVERTED span
-        /// (from &gt; to) is rejected.</summary>
+        /// window (including the whole-match one) was applied.
+        ///
+        /// Round-2 review fix (regression in the above): using a bare `>` let a REAL, non-zero-length
+        /// span that only TOUCHES this window's boundary from outside (e.g. a stint [10, 90) against
+        /// a Phase 2 window starting at 90) produce a spurious zero-length row too - Max/Min clamping
+        /// has no notion that the span's own `to` is exclusive, so clamping [10, 90) against Start=90
+        /// gives clippedFrom == clippedTo == 90 even though the span never actually reaches 90. Now:
+        /// a genuine positive-length overlap (clippedFrom &lt; clippedTo) is always kept; a touching
+        /// result (clippedFrom == clippedTo) is kept ONLY when the ORIGINAL span was itself
+        /// zero-length (from == to) AND this window's own Contains says it owns that exact instant
+        /// (the half-open tie-break, so exactly one window ever claims it) - never for a real span
+        /// that merely grazes the edge.</summary>
         public bool Clip(double from, double to, out double clippedFrom, out double clippedTo)
         {
-            clippedFrom = System.Math.Max(from, Start);
-            clippedTo = System.Math.Min(to, End);
-            if (clippedFrom > clippedTo)
+            double candidateFrom = System.Math.Max(from, Start);
+            double candidateTo = System.Math.Min(to, End);
+
+            if (candidateFrom < candidateTo)
             {
-                clippedFrom = 0;
-                clippedTo = 0;
-                return false;
+                clippedFrom = candidateFrom;
+                clippedTo = candidateTo;
+                return true;
             }
-            return true;
+
+            if (from == to && Contains(from))
+            {
+                clippedFrom = from;
+                clippedTo = to;
+                return true;
+            }
+
+            clippedFrom = 0;
+            clippedTo = 0;
+            return false;
+        }
+
+        /// <summary>Round-2 review fix (item B): like Clip, but for a continuous span whose own
+        /// ends can legitimately fall OUTSIDE the timeline altogether - a player's life, which can
+        /// start before the match clock was known (timeAlive &gt; deathT) or (via the t == -1
+        /// sentinel) end there too. Clip's plain Start/End would truncate such a span at the
+        /// literal 0/matchLength wall, which is wrong: everything before t=0 and after the log's own
+        /// last instant still legitimately belongs to whichever window actually covers that edge of
+        /// the timeline - the window starting at 0 (the whole match, and Phase 1 when there is one)
+        /// therefore treats its own lower bound as -infinity, and the LAST window in the timeline
+        /// (whichever one is EndInclusive) treats its own upper bound as +infinity. Returns 0 (never
+        /// negative) when the span doesn't reach this window at all.</summary>
+        public double OverlapWithUnboundedEdges(double spanStart, double spanEnd)
+        {
+            double lo = Start <= 0 ? double.NegativeInfinity : Start;
+            double hi = EndInclusive ? double.PositiveInfinity : End;
+            return System.Math.Max(0.0, System.Math.Min(spanEnd, hi) - System.Math.Max(spanStart, lo));
         }
     }
 }

@@ -361,6 +361,46 @@ namespace Overpower.Tests
             }
         }
 
+        // Round-2 review fix (item E): joinedAndLeft ignored the actual timing - a player who
+        // joined at t=5 and played all the way to t=600 with a missing file (a genuinely
+        // uncounted chunk of the match) got the same soft "joined and left before logging
+        // started" wording as someone who was only ever around for a few seconds. Soft wording
+        // is used only when the join->leave span is SHORTER than the sample interval (chosen over
+        // "before the first line of any present log" - a long AFK player with a missing file could
+        // join before anyone else's first line and still matter for a long time) - a span that long
+        // means real, uncounted gameplay happened, which deserves the harsher warning instead.
+        [Test]
+        public void LogCoverageUsesTheHarshWarningWhenTheMissingSpanIsLongerThanOneSampleInterval()
+        {
+            string temp = NewIsolatedTempFolder();
+            Directory.CreateDirectory(temp);
+            try
+            {
+                string lines =
+                    "{\"e\":\"session\",\"t\":0,\"schema\":1,\"m\":\"M\",\"a\":1,\"nick\":\"Editor\",\"tm\":0,\"master\":true,\"commit\":\"c\",\"uv\":\"u\",\"plat\":\"p\",\"tuning\":{\"telemetry\":{\"sampleIntervalSeconds\":5}}}\n" +
+                    "{\"e\":\"join\",\"t\":-1,\"a\":1,\"tm\":0}\n" +
+                    // Actor 2: joined at t=5, left at t=600 - a 595s span, far longer than the 5s
+                    // sample interval. Their own file is missing, so 595s of real gameplay (damage,
+                    // gold, purchases) went uncounted - this must get the HARSH warning, not the soft one.
+                    "{\"e\":\"join\",\"t\":5,\"a\":2,\"tm\":1,\"nick\":\"Ghost\"}\n" +
+                    "{\"e\":\"leave\",\"t\":600,\"a\":2,\"tm\":1}\n" +
+                    "{\"e\":\"sample\",\"t\":650,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp));
+                var missing = tables.Header.LogCoverage.Single(r => r.Actor == 2);
+                Assert.IsFalse(missing.FilePresent);
+                Assert.AreEqual(5.0, missing.FirstT.Value, 1e-9);
+                Assert.AreEqual(600.0, missing.LastT.Value, 1e-9);
+                Assert.IsFalse(missing.JoinedAndLeftBeforeLoggingStarted,
+                    "595s of real, uncounted gameplay is not 'gone before logging started' - it needs the harsh warning");
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
         [Test]
         public void LogCoverageFlagsAnActorWhoJoinedAndLeftBeforeLoggingStarted()
         {

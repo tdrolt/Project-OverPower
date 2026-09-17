@@ -163,7 +163,7 @@ namespace Overpower.EditorTools.Telemetry
             var rawChangesByZone = new Dictionary<int, List<(double T, int New)>>();
             BuildOwnership(log, tables.Ownership, zoneTier, rawChangesByZone, matchLength, effectiveWindow, tPhase2);
 
-            BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow);
+            BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow, sampleInterval);
             tables.Header.EliminationFallbackUsed = timeline.UsedEliminationFallback; // review fix item 9
             BuildCaptures(log, rawChangesByZone, zoneTier, matchLength, tables.Header, tables.Captures, effectiveWindow, tPhase2);
             BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables, effectiveWindow, tPhase2);
@@ -232,7 +232,7 @@ namespace Overpower.EditorTools.Telemetry
         // ==================================================================== header
 
         private static void BuildHeader(ReportHeader header, TelemetryLog log, Dictionary<int, TelemetrySession> sessionByActor,
-            Dictionary<int, (double First, double Last)> coverageByActor, TimeWindow window)
+            Dictionary<int, (double First, double Last)> coverageByActor, TimeWindow window, double sampleInterval)
         {
             header.MatchId = log.MatchId;
             // Task T7: THIS window's own duration - the whole match's length when window is the
@@ -317,7 +317,7 @@ namespace Overpower.EditorTools.Telemetry
             // Task T7: log coverage - every actor seen ANYWHERE (not just those with their own
             // file), always whole-match regardless of this build's own window - see
             // LogCoverageRow's own comment.
-            BuildLogCoverage(log, sessionByActor, coverageByActor, header.LogCoverage);
+            BuildLogCoverage(log, sessionByActor, coverageByActor, header.LogCoverage, sampleInterval);
         }
 
         /// <summary>Task T7: every actor seen anywhere in the match - joins, sessions, `hit`
@@ -325,7 +325,7 @@ namespace Overpower.EditorTools.Telemetry
         /// the report can say "no log from actor N" instead of silently under-counting their damage,
         /// gold and purchases.</summary>
         private static void BuildLogCoverage(TelemetryLog log, Dictionary<int, TelemetrySession> sessionByActor,
-            Dictionary<int, (double First, double Last)> coverageByActor, List<LogCoverageRow> outRows)
+            Dictionary<int, (double First, double Last)> coverageByActor, List<LogCoverageRow> outRows, double sampleInterval)
         {
             var seen = new HashSet<int>(sessionByActor.Keys);
             // Review fix (item 10): a MISSING actor's own nick/first-seen/last-seen now come from
@@ -400,7 +400,13 @@ namespace Overpower.EditorTools.Telemetry
                     bool hasLeave = latestLeaveByActor.TryGetValue(actor, out double leaveT);
                     firstT = hasJoin ? joinT : (double?)null;
                     lastT = hasLeave ? leaveT : (double?)null;
-                    joinedAndLeft = hasJoin && hasLeave && leaveT >= joinT;
+                    // Round-2 review fix (item E): the span itself must be genuinely short, not
+                    // just present - a join->leave gap of minutes still means real, uncounted
+                    // gameplay happened (damage, gold, purchases nobody's file recorded), which
+                    // deserves the harsh warning, not the soft "gone before logging started" one.
+                    // Chosen threshold: shorter than one sample interval - long enough that even a
+                    // single `sample` line never had a chance to flush before they left.
+                    joinedAndLeft = hasJoin && hasLeave && leaveT >= joinT && (leaveT - joinT) < sampleInterval;
                 }
 
                 outRows.Add(new LogCoverageRow
@@ -1549,9 +1555,18 @@ namespace Overpower.EditorTools.Telemetry
                     if (ActorOf(e, fileActor) != actor) continue;
                     if (!lastDeathT.HasValue || e.T > lastDeathT.Value) lastDeathT = e.T; // unwindowed - the TRUE last death
 
+                    // Round-2 review fix (item B): plain window.Clip treats 0/matchLength as hard
+                    // walls, which truncated a life that started before the match clock (timeAlive
+                    // > deathT) at 0, and dropped a death logged at the t == -1 sentinel outright
+                    // (window.Clip(-1-timeAlive, -1, ...) never overlaps a window whose own Start is
+                    // 0). OverlapWithUnboundedEdges treats the very first/last window's own edge as
+                    // unbounded instead, matching how Contains(-1) always counted a t == -1 death
+                    // before this whole life-span-clipping mechanism existed. The death's OWN t maps
+                    // negative-to-0 first, consistently with item 9's own convention, before being
+                    // used as the span's upper end.
                     float lifeTimeAlive = ReadFloat(e.Data, TelemetryKeys.TimeAlive);
-                    if (window.Clip(e.T - lifeTimeAlive, e.T, out double lifeFrom, out double lifeTo))
-                        timeAlive += lifeTo - lifeFrom;
+                    double deathTForSpan = e.T < 0 ? 0 : e.T;
+                    timeAlive += window.OverlapWithUnboundedEdges(deathTForSpan - lifeTimeAlive, deathTForSpan);
                 }
 
                 double tailStart;
