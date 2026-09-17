@@ -125,6 +125,13 @@ namespace Overpower.Abilities
 
         public int Seq { get; private set; }
 
+        /// <summary>Trigger Radius, read-only - MineView (ability visuals step 3) draws the owner team's trigger ring
+        /// from this one number.</summary>
+        public float TriggerRadius => triggerRadius;
+
+        /// <summary>Explosion Radius, read-only - MineView flashes the blast ring at this size.</summary>
+        public float ExplosionRadius => explosionRadius;
+
         /// <summary>Task T3 (telemetry): the id of the MineAbility that placed this, threaded through
         /// instantiationData (MineAbility.PlaceMine appends Definition.Id right after Seq) since this
         /// deployable is a separate prefab with no AbilityDefinition of its own to read. -1 if the

@@ -131,5 +131,63 @@ namespace Overpower.Tests
         }
 
         // ---- ability visuals steps 3-7 add their tests below this line ----
+
+        [Test]
+        public void TheMineIsADarkSpikedPuckWithATeamStudAndNoCollider()
+        {
+            GameObject prefab = Load("Assets/Resources/Mine.prefab");
+            Transform visual = Child(prefab.transform, "Visual");
+            Assert.AreSame(visual, Ref(prefab.GetComponent<Mine>(), "visual"), "Mine hides this the instant it detonates");
+            Assert.AreEqual(Vector3.zero, visual.localPosition);
+            Assert.AreEqual(Vector3.one, visual.localScale);
+            Assert.IsNotNull(visual.GetComponent<SnapVisualToGround>());
+            // "pCylinder1" is the REAL name of Unity's builtin Cylinder.fbx mesh on this engine version
+            // (verified live: Resources.GetBuiltinResource<Mesh>("Cylinder.fbx").name) - same finding as
+            // the Blast Marker's and Splash Shell's own tests, above. Cube.fbx really is "Cube" here.
+            AssertMesh(Child(visual, "Body"), "pCylinder1", SolidPath);
+            AssertMesh(Child(visual, "Stud"), "Cube", SolidPath);
+            for (int i = 1; i <= 4; i++)
+                AssertMesh(Child(visual, "Spike " + i), "Cube", SolidPath);
+            LineRenderer ring = AssertLine(Child(visual, "Trigger Ring"), flat: true);
+
+            var view = prefab.GetComponent<MineView>();
+            Assert.IsNotNull(view);
+            var so = new SerializedObject(view);
+            Assert.AreEqual(5, so.FindProperty("bodyParts").arraySize, "puck + 4 spikes");
+            Assert.AreEqual(1, so.FindProperty("teamParts").arraySize, "the stud");
+            Assert.AreSame(ring, Ref(view, "triggerRing"));
+            Assert.AreSame(visual, Ref(view, "visualRoot"));
+            Assert.AreEqual(MarkerPath, AssetDatabase.GetAssetPath(Ref(view, "blastMarkerPrefab")));
+            Assert.AreEqual(ThemePath, AssetDatabase.GetAssetPath(Ref(view, "theme")));
+            AssertNoCollider(prefab);
+            Assert.AreEqual(1, prefab.GetComponentsInChildren<PhotonView>(true).Length);
+        }
+
+        [Test]
+        public void ThePortalIsALightRimmedDiscWithAnOwnerOnlyBeaconAndNoCollider()
+        {
+            GameObject prefab = Load("Assets/Resources/Portal.prefab");
+            Assert.IsNull(prefab.transform.Find("Visual"), "the old grey cylinder is gone");
+            Transform footprint = Child(prefab.transform, "Footprint");
+            // "pCylinder1" - see the mine test's own comment, above.
+            AssertMesh(footprint, "pCylinder1", GlassPath);
+            Assert.AreEqual(1f, footprint.localScale.x, 1e-5f, "unit diameter - Portal scales it to Portal Diameter");
+            Assert.AreSame(footprint, Ref(prefab.GetComponent<Portal>(), "visual"));
+            LineRenderer rim = AssertLine(Child(prefab.transform, "Rim"), flat: true);
+            Transform beacon = Child(prefab.transform, "Owner Beacon");
+            AssertMesh(Child(beacon, "Diamond"), "Cube", SolidPath);
+            AssertMesh(Child(beacon, "Stem"), "pCylinder1", GlassPath);
+
+            var view = prefab.GetComponent<PortalView>();
+            Assert.IsNotNull(view);
+            Assert.AreSame(footprint.GetComponent<MeshRenderer>(), Ref(view, "footprint"));
+            Assert.AreSame(rim, Ref(view, "rim"));
+            Assert.AreSame(beacon.gameObject, Ref(view, "ownerBeacon"));
+            Assert.AreSame(Child(beacon, "Diamond").GetComponent<MeshRenderer>(), Ref(view, "beacon"));
+            Assert.AreSame(Child(beacon, "Stem").GetComponent<MeshRenderer>(), Ref(view, "stem"));
+            Assert.AreEqual(ThemePath, AssetDatabase.GetAssetPath(Ref(view, "theme")));
+            AssertNoCollider(prefab);
+            Assert.AreEqual(1, prefab.GetComponentsInChildren<PhotonView>(true).Length);
+        }
     }
 }
