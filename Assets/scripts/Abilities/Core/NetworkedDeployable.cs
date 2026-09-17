@@ -202,6 +202,10 @@ namespace Overpower.Abilities
 
             OnPlaced(subclassData, info);
 
+            // Ability visuals step 2: visual-only views build here - after OnPlaced, so a portal's diameter has
+            // arrived, and before the IsExpired hide below, so an already-expired copy hides them too.
+            NotifyViews();
+
             if (IsExpired)
             {
                 // Defensive backstop for the cache-removal/destroy race the class comment describes -
@@ -260,6 +264,18 @@ namespace Overpower.Abilities
             var subclassData = new object[rawData.Length - 1];
             System.Array.Copy(rawData, subclassData, subclassData.Length);
             return subclassData;
+        }
+
+        /// <summary>Ability visuals step 2: hands the placed object to every visual-only IDeployableView on it. A broken
+        /// visual must never stop what follows it here (the IsExpired hide, the owner's lifetime destroy), so each
+        /// view's exception is logged and swallowed.</summary>
+        private void NotifyViews()
+        {
+            foreach (IDeployableView view in GetComponentsInChildren<IDeployableView>(true))
+            {
+                try { view.OnDeployablePlaced(this); }
+                catch (System.Exception e) { Debug.LogException(e, this); }
+            }
         }
 
         /// <summary>The IsExpired backstop's only visible effect: every Renderer and Collider under
