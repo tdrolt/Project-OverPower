@@ -182,11 +182,15 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             if (pressBuffers[i].IsPending(now, window) &&
                 CastGate.ForAbility(actorBlock, module.HasChargeGate, module.HasCharge, module.IsReady) == CastBlock.None)
             {
-                // Consumed whether or not the module then agrees to cast: a module refusing (no
-                // valid target) is an answer, and retrying it every frame for the rest of the
-                // window would just ask the same question again.
-                pressBuffers[i].TryConsume(now, window);
-                TryCast(module);
+                bool cast = TryCast(module);
+
+                // Consumed on an actual cast, or on a refusal from a module that does not ask to retry: a module
+                // refusing (no valid target) is normally an answer, and retrying it every frame for the rest of the
+                // window would just ask the same question again. A module that opts into
+                // RetriesRefusalWithinBuffer (Dash: review fix) keeps the press alive instead, so the SAME press
+                // still fires the moment the refusal's own reason clears within the window.
+                if (cast || !module.RetriesRefusalWithinBuffer)
+                    pressBuffers[i].TryConsume(now, window);
             }
 
             // held is only ever true while the player can act, so a channel or sprint ends the
@@ -227,20 +231,22 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         toolHoldUntil[index] = Time.time + Mathf.Max(0f, seconds);
     }
 
-    private void TryCast(AbilityModule module)
+    /// <summary>True when the cast actually happened - the buffered press consumption above reads this.</summary>
+    private bool TryCast(AbilityModule module)
     {
         CastContext ctx = BuildContext();
         if (!module.TryBuildCast(ctx, out CastPayload payload))
-            return;
+            return false;
 
         // Spent BEFORE the RPC goes out. With RpcTarget.All the caster's own copy of the RPC runs
         // synchronously inside photonView.RPC, so ExecuteCast must already see the charge gone -
         // a module reading ChargesAvailable there would otherwise count a charge it just used.
         if (module.SpendsChargeWhenCast && !module.TrySpendChargeForCast())
-            return;
+            return false;
 
         SendCast(module, 0, payload);
         Cast?.Invoke(module.Definition.Slot, module.Definition.Id);
+        return true;
     }
 
     /// <summary>What the caster's machine knows at the press, gathered in one place so no module

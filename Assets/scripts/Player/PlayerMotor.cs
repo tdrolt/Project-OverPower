@@ -161,7 +161,11 @@ public class PlayerMotor : MonoBehaviour
             // Falling off the map costs nothing and needs no keybind, which beats a manual
             // respawn button: someone falling should not have to know a shortcut, and a free
             // respawn key would be an escape hatch out of a losing fight.
-            if (transform.position.y < killHeight)
+            //
+            // rb.position, not transform.position (review fix): with transform auto-sync off (movement step 5) the
+            // transform can trail the body by up to a physics step, which could read this check and CheckArenaBounds
+            // below against two different, momentarily disagreeing positions.
+            if (rb.position.y < killHeight)
                 FellBelowKillHeight?.Invoke();
 
             CheckArenaBounds();

@@ -91,7 +91,12 @@ namespace Overpower.Arena
         }
 
         // Reused every call: a portal's path check runs on the caster's own client, one at a time, on the main thread.
-        private static readonly RaycastHit[] boundaryPathHits = new RaycastHit[8];
+        // Sized generously (review fix): SphereCastNonAlloc's hits are not sorted or prioritised by relevance, so a
+        // full buffer over a placement range this small (up to Placement Range + a player's width) risks dropping the
+        // one boundary-wall hit that mattered behind unrelated clutter (crates, houses, cover) rather than a farther,
+        // less important one.
+        private const int BoundaryPathHitCapacity = 32;
+        private static readonly RaycastHit[] boundaryPathHits = new RaycastHit[BoundaryPathHitCapacity];
 
         /// <summary>
         /// True when a sphere of <paramref name="radius"/> swept from <paramref name="from"/> to <paramref name="to"/>
@@ -115,6 +120,9 @@ namespace Overpower.Arena
             int mask = LayerMask.GetMask("Building");
             int count = Physics.SphereCastNonAlloc(from, radius, delta / distance, boundaryPathHits, distance, mask,
                 QueryTriggerInteraction.Ignore);
+            if (count >= BoundaryPathHitCapacity)
+                Debug.LogError($"[Arena] PathCrossesBoundary: {count} hits filled the buffer - some may have been " +
+                                "dropped. Raise BoundaryPathHitCapacity if this fires for real placements.");
             for (int i = 0; i < count; i++)
                 if (IsUnderBoundary(arena, boundaryPathHits[i].collider))
                     return true;

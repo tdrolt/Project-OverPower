@@ -310,7 +310,7 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         // collider it starts inside with distance 0 and no usable normal, and not dependably at all.
         int overlapCount = Physics.OverlapCapsuleNonAlloc(bottom, top, capsule.radius, overlapHits, blockMask, QueryTriggerInteraction.Ignore);
         for (int i = 0; i < overlapCount; i++)
-            AddStartInside(overlapHits[i], probe, rotation);
+            AddStartInside(overlapHits[i], probe, rotation, dir);
 
         int hitCount = Physics.CapsuleCastNonAlloc(bottom, top, capsule.radius, dir, sweepHits,
             distance + DisplacementSweepRule.SkinMetres, blockMask, QueryTriggerInteraction.Ignore);
@@ -319,7 +319,7 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
             RaycastHit hit = sweepHits[i];
             if (hit.distance <= 0f)
             {
-                AddStartInside(hit.collider, probe, rotation); // touching at the start: judged the same way
+                AddStartInside(hit.collider, probe, rotation, dir); // touching at the start: judged the same way
                 continue;
             }
 
@@ -336,21 +336,57 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         return allowed;
     }
 
-    private void AddStartInside(Collider other, Vector3 probe, Quaternion rotation)
+    private void AddStartInside(Collider other, Vector3 probe, Quaternion rotation, Vector3 dir)
     {
         if (IsOwnOrGround(other) || sweepColliders.Contains(other))
+            return;
+
+        // [C] Controller decision (movement step 2 opus review): only static geometry may refuse a dash outright -
+        // see DisplacementSweepRule.CanBlockAsStartInside. A living player (or anything else physics-driven) has a
+        // Rigidbody; a wall does not. Without this, standing flush against an enemy read exactly like standing flush
+        // against a wall and refused the dash - a player brawling in melee could never dash away from someone they
+        // were touching. A dash travelling TOWARD a player from a distance still stops at their body (see the cast
+        // loop above), which is unaffected.
+        if (!DisplacementSweepRule.CanBlockAsStartInside(other.attachedRigidbody != null))
             return;
 
         Transform otherTransform = other.transform;
         bool overlapsAhead = Physics.ComputePenetration(capsule, probe, rotation, other, otherTransform.position,
             otherTransform.rotation, out Vector3 pushOut, out float depth) && depth > 0f;
 
+        if (!overlapsAhead && IsNonConvexMesh(other))
+        {
+            // Physics.ComputePenetration is unsupported for a non-convex MeshCollider and always returns false for
+            // one - found by movement step 2's opus review: a player pressed into a non-convex mesh (a door frame,
+            // Door_01 and its kin - 22 enabled on Building, 43 on Default in this scene) was invisible to the overlap
+            // check the exact same way a wall used to be invisible to Rigidbody.SweepTestAll, so a second dash sailed
+            // straight through it. A raycast toward the move, starting just short of the capsule so it does not
+            // start embedded in the mesh itself (a raycast that starts inside a shape does not report a hit on that
+            // shape either - the same limitation ComputePenetration and the old SweepTestAll both had), stands in
+            // for ComputePenetration's push-out direction here.
+            Vector3 rayStart = probe + capsule.center - dir * (capsule.radius + DisplacementSweepRule.SkinMetres);
+            float rayDistance = 2f * (capsule.radius + DisplacementSweepRule.SkinMetres);
+            if (other.Raycast(new Ray(rayStart, dir), out RaycastHit meshHit, rayDistance)
+                && meshHit.normal.y <= DisplacementSweepRule.FloorNormalY
+                && Vector3.Dot(dir, meshHit.normal) < DisplacementSweepRule.IntoSurfaceDot)
+            {
+                sweepContacts.Add(SweepContact.Inside(-meshHit.normal));
+                sweepColliders.Add(other);
+                return;
+            }
+        }
+
         sweepContacts.Add(overlapsAhead ? SweepContact.Inside(pushOut) : SweepContact.InsideWithoutPushOut());
         sweepColliders.Add(other);
     }
 
-    /// <summary>Never blocked by our own body, and the ground is not a wall - a TerrainCollider is also the one shape
-    /// Physics.ComputePenetration cannot be asked about.</summary>
+    /// <summary>A non-convex MeshCollider - a door frame, Door_01 and its kin - can never overlap via
+    /// Physics.ComputePenetration (Unity does not support it for that shape; the call simply returns false).</summary>
+    private static bool IsNonConvexMesh(Collider collider) => collider is MeshCollider mesh && !mesh.convex;
+
+    /// <summary>Never blocked by our own body, and the ground is not a wall - a TerrainCollider and a non-convex
+    /// MeshCollider are the two shapes Physics.ComputePenetration cannot be asked about (see AddStartInside's own
+    /// fallback for the mesh case).</summary>
     private bool IsOwnOrGround(Collider other) =>
         other == null
         || other.attachedRigidbody == rb || other.transform.IsChildOf(transform)

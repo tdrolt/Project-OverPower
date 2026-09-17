@@ -113,5 +113,15 @@ namespace Overpower.Tests
             Assert.IsFalse(DisplacementSweepRule.IsUsefulTravel(0.009f));
             Assert.IsTrue(DisplacementSweepRule.IsUsefulTravel(0.01f));
         }
+
+        [Test]
+        public void OnlyStaticGeometryCanBlockAsStartInside()
+        {
+            // Controller decision (movement step 2 opus review): a living player - or anything else physics-driven -
+            // has a Rigidbody; a wall or a non-convex mesh does not. Standing flush against an enemy must not refuse
+            // a dash the way standing flush against a wall does.
+            Assert.IsTrue(DisplacementSweepRule.CanBlockAsStartInside(false));
+            Assert.IsFalse(DisplacementSweepRule.CanBlockAsStartInside(true));
+        }
     }
 }

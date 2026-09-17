@@ -149,6 +149,17 @@ namespace Overpower.Abilities
         internal bool SpendsChargeWhenCast => SpendsChargeOnCast;
         internal bool TrySpendChargeForCast() => SpendCharge();
 
+        /// <summary>
+        /// Review fix (movement step 2): true if a TryBuildCast refusal should leave the buffered press pending
+        /// instead of consuming it, so the SAME press retries every remaining frame of the buffer window rather than
+        /// being spent on one failed attempt. False (the default) for almost every module: a target that will not
+        /// exist next frame either is not worth re-asking about for the rest of the window - see AbilityRunner's own
+        /// comment on why a refusal is normally consumed. Dash overrides this true: the wall you are touching, or a
+        /// knockback that is running, can stop applying a few frames later within the same buffered press, without
+        /// the player pressing the key again.
+        /// </summary>
+        internal virtual bool RetriesRefusalWithinBuffer => false;
+
         internal void Bind(AbilityRunner owningRunner, AbilityOwner owner, AbilityDefinition definition)
         {
             runner = owningRunner;

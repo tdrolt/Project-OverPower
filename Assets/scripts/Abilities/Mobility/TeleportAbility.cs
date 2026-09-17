@@ -383,8 +383,12 @@ namespace Overpower.Abilities
                     }
                     else
                     {
+                        // Both rings at floor level (review fix, movement step 3): Point now carries the ARRIVAL ROOT
+                        // height (0.5 m above the floor, so the caster's own TeleportTo above lands standing), but
+                        // these two markers are cosmetic ground rings, not standing heights - PlayerSpaceProbe.FeetOf
+                        // derives the floor back out of it so it still matches Origin's own floor-level point.
                         PlayArrivalVfx(cast.Payload.Origin);
-                        PlayArrivalVfx(cast.Payload.Point);
+                        PlayArrivalVfx(capsule != null ? PlayerSpaceProbe.FeetOf(capsule, cast.Payload.Point) : cast.Payload.Point);
                     }
                     return;
 
@@ -420,6 +424,23 @@ namespace Overpower.Abilities
             return new Vector3(clampedXZ.x, requested.y, clampedXZ.z);
         }
 
+        /// <summary>Where a traveller's root lands on a portal: standing on its floor point, the same height Blink
+        /// uses. Travelling to the raw ground point sank the capsule half a metre into the floor, and physics popped
+        /// it out in whatever direction it could.</summary>
+        private Vector3 ArrivalRoot(Portal to) => PlayerSpaceProbe.RootOnGround(capsule, to.transform.position);
+
+        /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare, and
+        /// not inside a wall, house, crate or cover. Other players don't count (see buildingMask).</summary>
+        private bool IsExitClear(Portal to)
+        {
+            if (capsule == null)
+                return false;
+
+            Vector3 root = ArrivalRoot(to);
+            return Overpower.Arena.ArenaSymmetry.IsInsideArena(root, capsule.radius)
+                   && !PlayerSpaceProbe.IsCapsuleBlocked(capsule, root, buildingMask, Owner.Root.transform);
+        }
+
         // The check volume's vertical band above the grounded point - not a design tunable, the
         // same reasoning as blockMask: an arbitrary human-height band, not something a designer
         // should be able to mis-set into checking the wrong height entirely.
@@ -442,23 +463,6 @@ namespace Overpower.Abilities
         /// flat faces have no such overshoot - found by a live placement test refusing a portal on
         /// perfectly open ground once this mask changed to match Blink's.
         /// </summary>
-        /// <summary>Where a traveller's root lands on a portal: standing on its floor point, the same height Blink
-        /// uses. Travelling to the raw ground point sank the capsule half a metre into the floor, and physics popped
-        /// it out in whatever direction it could.</summary>
-        private Vector3 ArrivalRoot(Portal to) => PlayerSpaceProbe.RootOnGround(capsule, to.transform.position);
-
-        /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare, and
-        /// not inside a wall, house, crate or cover. Other players don't count (see buildingMask).</summary>
-        private bool IsExitClear(Portal to)
-        {
-            if (capsule == null)
-                return false;
-
-            Vector3 root = ArrivalRoot(to);
-            return Overpower.Arena.ArenaSymmetry.IsInsideArena(root, capsule.radius)
-                   && !PlayerSpaceProbe.IsCapsuleBlocked(capsule, root, buildingMask, Owner.Root.transform);
-        }
-
         private bool IsBlocked(Vector3 groundPoint)
         {
             float radius = portalTemplate.Radius;

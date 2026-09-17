@@ -124,5 +124,15 @@ namespace Overpower.Combat
 
         /// <summary>Worth starting at all - see MinUsefulTravelMetres.</summary>
         public static bool IsUsefulTravel(float allowed) => allowed >= MinUsefulTravelMetres;
+
+        /// <summary>
+        /// [C] Controller decision (movement step 2 opus review): only static geometry may refuse a dash outright by
+        /// being a "start already inside" blocker. A collider attached to a Rigidbody - a living player, or anything
+        /// else physics-driven - never counts, so standing flush against an enemy cannot refuse a dash the way
+        /// standing flush against a wall does; walls and non-convex meshes have no Rigidbody and are unaffected. A
+        /// dash travelling TOWARD a player from a distance still stops at their body - this only guards the
+        /// "touching, so the whole move is refused before it starts" case.
+        /// </summary>
+        public static bool CanBlockAsStartInside(bool colliderHasAttachedRigidbody) => !colliderHasAttachedRigidbody;
     }
 }

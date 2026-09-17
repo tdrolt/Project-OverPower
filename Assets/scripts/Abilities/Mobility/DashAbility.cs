@@ -62,6 +62,13 @@ namespace Overpower.Abilities
 
         public override bool IsActive => travelling;
 
+        /// <summary>Review fix: a dash refused for the wall you're touching, or a knockback that's running, is
+        /// worth re-asking about for the rest of the press-buffer window - unlike most refusals, the reason can
+        /// clear a few frames later (you turn to face open ground, or the knockback ends) without a fresh key
+        /// press. Silent otherwise in a build (LogDashRefused is Editor-only): this is what actually makes mashing
+        /// dash against a wall, then turning away, still dash.</summary>
+        internal override bool RetriesRefusalWithinBuffer => true;
+
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
             payload = default;
