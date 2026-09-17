@@ -3550,10 +3550,9 @@ return "minimap centre x=" + (int)centre.x + " y=" + (int)centre.y;
      - `t2A`: `started` → `paused` at progress ≈ 1 (completed);
      - zone 9: `started` → `paused` (the link came under attack) → `resumed` → `paused` (A left);
      - `t3AB`: A `started` → `paused` ≈ 0.3 (contested) → B `started` → `paused` ≈ 1;
-     - `t2A` drain: B `drainResumed` → `drainPaused` ≈ 0 (neutralised).
-  4. The drain opens with `drainResumed`, not `drainStarted`. This is **older than this plan**: a drain starts from a
-     full hold (progress ≈ 1), and the classifier's 0.01 "resume" threshold (`CaptureTransitionClassifier.cs:56-58`)
-     reads that as a resume. Report it; don't fix it here.
+     - `t2A` drain: B `drainStarted` → `drainPaused` ≈ 0 (neutralised).
+  4. The drain must open with `drainStarted` (fixed in ring/minimap step 2, controller amendment 3). A `drainResumed`
+     here is a regression: report it.
   5. No `capture` line may appear for a hold ending in Idle.
   6. If telemetry is disabled (`no telemetry` or an empty folder), report that R5 could not run, and why.
 
