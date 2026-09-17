@@ -11828,7 +11828,7 @@ MonoBehaviour:
         Building: {fileID: 0}
         isCaptured: 0
         controllingTeam: -1
-        Adjacents: 030000000400000005000000
+        Adjacents: 030000000400000005000000000000000100000002000000
       index: 9
       isKeyDuplicated: 0
 --- !u!4 &822750204

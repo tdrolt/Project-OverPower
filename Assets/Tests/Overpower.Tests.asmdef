@@ -7,7 +7,8 @@
     "Overpower.Runtime",
     "Overpower.Editor",
     "PhotonUnityNetworking",
-    "PhotonRealtime"
+    "PhotonRealtime",
+    "Project.Tools"
   ],
   "includePlatforms": [ "Editor" ],
   "excludePlatforms": [],

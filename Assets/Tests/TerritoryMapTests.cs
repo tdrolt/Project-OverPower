@@ -6,14 +6,15 @@ namespace Overpower.Tests
 {
     public class TerritoryMapTests
     {
-        // The scene's real adjacency (phase2-code-survey.md) plus the planned centre 9 -> {3,4,5}.
+        // The scene's real adjacency, including the GDD p.27 links (Tudor, 2026-09-16): the centre (9) links to every
+        // Tier 2 zone as well as every Tier 3. TerritoryAdjacencySceneTests checks the saved scene matches this copy.
         private static TerritoryMap RealMap() => new TerritoryMap(
             new List<(int, IEnumerable<int>)>
             {
                 (0, new[] { 6, 3, 5 }), (1, new[] { 7, 3, 4 }), (2, new[] { 8, 4, 5 }),
                 (3, new[] { 0, 1 }), (4, new[] { 1, 2 }), (5, new[] { 0, 2 }),
                 (6, new[] { 0 }), (7, new[] { 1 }), (8, new[] { 2 }),
-                (9, new[] { 3, 4, 5 }),
+                (9, new[] { 3, 4, 5, 0, 1, 2 }),
             },
             new List<(int, int)> { (6, 0), (7, 1), (8, 2) });
 
@@ -55,13 +56,46 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheCentreNeedsAFlankingZone()
+        public void TheCentreIsCapturableFromATier2Alone()
         {
             var owners = StartOwners();
             owners[0] = 0;
-            Assert.IsFalse(RealMap().MayCapture(0, 9, owners));
+            Assert.IsTrue(RealMap().MayCapture(0, 9, owners));
+        }
+
+        [Test]
+        public void TheCentreIsStillCapturableFromAFlankingZone()
+        {
+            var owners = StartOwners();
             owners[3] = 0;
             Assert.IsTrue(RealMap().MayCapture(0, 9, owners));
+        }
+
+        [Test]
+        public void TheCentreStillNeedsAZoneOfYoursNextToIt()
+        {
+            // Team 0 owns only its capital 6, which isn't next to the centre.
+            Assert.IsFalse(RealMap().MayCapture(0, 9, StartOwners()));
+        }
+
+        [Test]
+        public void ACapitalStillLinksOnlyToItsOwnTier2()
+        {
+            TerritoryMap map = RealMap();
+            CollectionAssert.AreEqual(new[] { 0 }, map.AdjacentTo(6));
+            CollectionAssert.AreEqual(new[] { 1 }, map.AdjacentTo(7));
+            CollectionAssert.AreEqual(new[] { 2 }, map.AdjacentTo(8));
+        }
+
+        [Test]
+        public void ATier2UnderAttackIsNotAWayIntoTheCentre()
+        {
+            // The capital-under-attack link block (2026-09-16) applies to the new T2 -> T4 link too.
+            var owners = StartOwners();
+            owners[0] = 0;
+            Assert.IsFalse(RealMap().MayCapture(0, 9, owners, zone => zone == 0));
+            owners[3] = 0;
+            Assert.IsTrue(RealMap().MayCapture(0, 9, owners, zone => zone == 0), "a second, safe link still works");
         }
 
         [Test]
