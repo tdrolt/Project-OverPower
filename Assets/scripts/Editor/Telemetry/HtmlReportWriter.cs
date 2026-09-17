@@ -666,10 +666,15 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       var ctx = chart.ctx;
       var xScale = chart.scales.x, yScale = chart.scales.y;
       if (!xScale || !yScale) return;
+      var area = chart.chartArea;
 
       function pixelForX(spec) {
         if (spec.categoryMinutes) {
-          var target = spec.value, idx = 0, best = Infinity;
+          // Round-2 review fix (item C minor): economy_by_minute buckets are FLOORED
+          // (Math.floor(t / 60)), so a transition at 114s (1.9 minutes) belongs to minute 1's
+          // bucket - snapping to the nearest label instead (round(1.9) = 2) put the line one
+          // bucket late. Snap to the label nearest Math.floor(the raw minutes value) instead.
+          var target = Math.floor(spec.value), idx = 0, best = Infinity;
           for (var i = 0; i < spec.categoryMinutes.length; i++) {
             var d = Math.abs(spec.categoryMinutes[i] - target);
             if (d < best) { best = d; idx = i; }
@@ -679,26 +684,36 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         return xScale.getPixelForValue(spec.value);
       }
 
+      // Round-2 review fix (item C): clip the LINE geometry to the chart's own plot area, so a
+      // band whose value the y-axis doesn't actually cover (see the suggestedMax fix at the
+      // team-income chart's own construction, below) draws a clearly-truncated line at the edge
+      // instead of one that floats above the plot or off the canvas entirely. Labels are drawn
+      // in a second, UNCLIPPED pass (clipping would just make an edge label disappear instead of
+      // fixing anything), each x-position clamped to stay just inside the area.
       var boundaryPx = null;
+      var labels = [];
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+      ctx.clip();
+
       if (cfg.boundary) {
         boundaryPx = pixelForX(cfg.boundary);
         ctx.save();
         ctx.strokeStyle = '#c0392b';
         ctx.setLineDash([2, 2]);
         ctx.beginPath();
-        ctx.moveTo(boundaryPx, yScale.top);
-        ctx.lineTo(boundaryPx, yScale.bottom);
+        ctx.moveTo(boundaryPx, area.top);
+        ctx.lineTo(boundaryPx, area.bottom);
         ctx.stroke();
-        ctx.fillStyle = '#c0392b';
-        ctx.font = '11px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Phase 2 starts', boundaryPx, yScale.top - 4);
         ctx.restore();
+        labels.push({ x: boundaryPx, y: area.top + 10, text: 'Phase 2 starts', color: '#c0392b', align: 'center' });
       }
 
       (cfg.bands || []).forEach(function (b) {
-        var xFrom = (b.side === 'after') ? (boundaryPx != null ? boundaryPx : xScale.left) : xScale.left;
-        var xTo = (b.side === 'before') ? (boundaryPx != null ? boundaryPx : xScale.right) : xScale.right;
+        var xFrom = (b.side === 'after') ? (boundaryPx != null ? boundaryPx : area.left) : area.left;
+        var xTo = (b.side === 'before') ? (boundaryPx != null ? boundaryPx : area.right) : area.right;
         if (xTo <= xFrom) return;
         var y = yScale.getPixelForValue(b.value);
         ctx.save();
@@ -708,10 +723,18 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         ctx.moveTo(xFrom, y);
         ctx.lineTo(xTo, y);
         ctx.stroke();
-        ctx.fillStyle = '#888';
+        ctx.restore();
+        labels.push({ x: Math.min(xTo + 4, area.right - 2), y: Math.max(area.top + 8, Math.min(y + 3, area.bottom - 2)), text: b.label, color: '#888', align: 'left' });
+      });
+
+      ctx.restore(); // undo the clip - labels below are drawn unclipped, positions already clamped inside the area.
+
+      labels.forEach(function (l) {
+        ctx.save();
+        ctx.fillStyle = l.color;
         ctx.font = '11px system-ui, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(b.label, xTo + 4, y + 3);
+        ctx.textAlign = l.align;
+        ctx.fillText(l.text, l.x, l.y);
         ctx.restore();
       });
     },
@@ -895,10 +918,19 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         // scenario bands and the 'Phase 2 starts' line are both drawn as canvas overlays now, snapped
         // to the nearest category label, instead of {x,y} datasets a category axis can't place.
         var teamOpts = chartOptions('minute', 'gold/s', { stacked: true });
+        var teamBands = scenarioBandsForScope(scope);
+        // Round-2 review fix (item C regression): a band is drawn as an overlay now (not a
+        // dataset), so it no longer contributes to Chart.js's own auto-scaling - with bands up to
+        // 33 and a team earning ~10 gold/s, the 15/23/33 lines used to draw above the plot or off
+        // the canvas. suggestedMax only ever RAISES the ceiling (Chart.js still expands further if
+        // the stacked data itself is taller), so this is a floor, not a hard cap.
+        var maxBandValue = 0;
+        teamBands.forEach(function (b) { if (b.value > maxBandValue) maxBandValue = b.value; });
+        if (maxBandValue > 0) teamOpts.scales.y.suggestedMax = maxBandValue * 1.05;
         teamOpts.plugins = {
           overlayLines: {
             boundary: boundaryOverlaySpec(scope, 'minutes', minutesList),
-            bands: scenarioBandsForScope(scope),
+            bands: teamBands,
           },
         };
         new Chart(canvas, {
