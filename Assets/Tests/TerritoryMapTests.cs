@@ -6,15 +6,16 @@ namespace Overpower.Tests
 {
     public class TerritoryMapTests
     {
-        // The scene's real adjacency, including the GDD p.27 links (Tudor, 2026-09-16): the centre (9) links to every
-        // Tier 2 zone as well as every Tier 3. TerritoryAdjacencySceneTests checks the saved scene matches this copy.
+        // The scene's real adjacency (Tudor, 2026-09-17): the centre (9) links to every Tier 2 zone only. The
+        // GDD p.27 T3<->T4 link from 2026-09-16 is removed. TerritoryAdjacencySceneTests checks the saved scene
+        // matches this copy.
         private static TerritoryMap RealMap() => new TerritoryMap(
             new List<(int, IEnumerable<int>)>
             {
                 (0, new[] { 6, 3, 5 }), (1, new[] { 7, 3, 4 }), (2, new[] { 8, 4, 5 }),
                 (3, new[] { 0, 1 }), (4, new[] { 1, 2 }), (5, new[] { 0, 2 }),
                 (6, new[] { 0 }), (7, new[] { 1 }), (8, new[] { 2 }),
-                (9, new[] { 3, 4, 5, 0, 1, 2 }),
+                (9, new[] { 0, 1, 2 }),
             },
             new List<(int, int)> { (6, 0), (7, 1), (8, 2) });
 
@@ -64,11 +65,12 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheCentreIsStillCapturableFromAFlankingZone()
+        public void ATier3ZoneAloneIsNoLongerAWayIntoTheCentre()
         {
+            // Tudor's 2026-09-17 redesign: the T3<->T4 link is gone. Only a T2 links to the centre now.
             var owners = StartOwners();
             owners[3] = 0;
-            Assert.IsTrue(RealMap().MayCapture(0, 9, owners));
+            Assert.IsFalse(RealMap().MayCapture(0, 9, owners));
         }
 
         [Test]
@@ -90,11 +92,11 @@ namespace Overpower.Tests
         [Test]
         public void ATier2UnderAttackIsNotAWayIntoTheCentre()
         {
-            // The capital-under-attack link block (2026-09-16) applies to the new T2 -> T4 link too.
+            // The capital-under-attack link block (2026-09-16) applies to the T2 -> T4 link too.
             var owners = StartOwners();
             owners[0] = 0;
             Assert.IsFalse(RealMap().MayCapture(0, 9, owners, zone => zone == 0));
-            owners[3] = 0;
+            owners[1] = 0; // a second T2, safe (the T3<->T4 link is gone, so this must be another T2 now)
             Assert.IsTrue(RealMap().MayCapture(0, 9, owners, zone => zone == 0), "a second, safe link still works");
         }
 

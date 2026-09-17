@@ -10,8 +10,9 @@ using UnityEngine.SceneManagement;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Guards Game Scene's own territory links (GDD p.27, Tudor 2026-09-16). TerritoryMapTests test the capture rule on
-    /// a copy of these links; this test fails if the scene's BuildingManager.TowerDictionary drifts from that copy.
+    /// Guards Game Scene's own territory links (Tudor 2026-09-17: the centre links to every Tier 2 zone only, the
+    /// GDD p.27 T3&lt;-&gt;T4 link from 2026-09-16 is removed). TerritoryMapTests test the capture rule on a copy of
+    /// these links; this test fails if the scene's BuildingManager.TowerDictionary drifts from that copy.
     /// Read-only: the scene is used as it is loaded, or opened additively and closed again without saving.
     /// </summary>
     public class TerritoryAdjacencySceneTests
@@ -19,12 +20,12 @@ namespace Overpower.Tests
         private const string ScenePath = "Assets/Scenes/Game Scene.unity";
 
         [Test]
-        public void TheSceneLinksTheCentreToEveryTier2AndTier3()
+        public void TheSceneLinksTheCentreToEveryTier2Only()
         {
             WithGameScene(scene =>
             {
                 TerritoryMap map = MapOf(Find<BuildingManager>(scene).Single());
-                CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5 }, map.AdjacentTo(9));
+                CollectionAssert.AreEqual(new[] { 0, 1, 2 }, map.AdjacentTo(9));
             });
         }
 

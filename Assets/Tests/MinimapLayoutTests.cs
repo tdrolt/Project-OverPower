@@ -119,24 +119,27 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheGddLinksMakeFifteenLinesWithNoDuplicates()
+        public void TheGddLinksMakeTwelveLinesWithNoDuplicates()
         {
+            // Tudor's 2026-09-17 redesign: the T3<->T4 link is gone, so the centre (9) links to every Tier 2 zone
+            // only (this drops 3 of the previous 15 links: (3,9), (4,9), (5,9)).
             var map = new TerritoryMap(
                 new List<(int, IEnumerable<int>)>
                 {
                     (0, new[] { 6, 3, 5 }), (1, new[] { 7, 3, 4 }), (2, new[] { 8, 4, 5 }),
-                    (3, new[] { 0, 1, 9 }), (4, new[] { 1, 2, 9 }), (5, new[] { 0, 2, 9 }),
+                    (3, new[] { 0, 1 }), (4, new[] { 1, 2 }), (5, new[] { 0, 2 }),
                     (6, new[] { 0 }), (7, new[] { 1 }), (8, new[] { 2 }),
-                    (9, new[] { 3, 4, 5, 0, 1, 2 }),
+                    (9, new[] { 0, 1, 2 }),
                 },
                 new List<(int, int)> { (6, 0), (7, 1), (8, 2) });
 
             List<(int A, int B)> pairs = MinimapLayout.LinkPairs(map, new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 });
 
-            Assert.AreEqual(15, pairs.Count);
+            Assert.AreEqual(12, pairs.Count);
             CollectionAssert.Contains(pairs, (0, 9));
             CollectionAssert.Contains(pairs, (2, 9));
             CollectionAssert.DoesNotContain(pairs, (6, 9));
+            CollectionAssert.DoesNotContain(pairs, (3, 9));
             foreach ((int a, int b) in pairs)
                 Assert.Less(a, b);
         }
