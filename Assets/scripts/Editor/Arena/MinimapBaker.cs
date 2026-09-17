@@ -14,8 +14,9 @@ namespace Overpower.EditorTools
     /// and records the world square it covers on Assets/Gameplay/Config/MinimapConfig.asset (created if missing).
     ///
     /// Framing: a square centred on ArenaSymmetry's centre, whose side clears the farthest mesh under Source and both
-    /// generated thirds by the config's margin. Centring on the symmetry centre (not the bounding box) means turning
-    /// the map to any team's camera yaw keeps the arena inside the round minimap, and all three teams see the same map.
+    /// generated thirds by the config's margin on every side of the triangular mask (Tudor, 2026-09-17; see
+    /// MinimapLayout.TriangleCircumradius). Centring on the symmetry centre (not the bounding box) means turning the
+    /// map to any team's camera yaw keeps the arena inside the triangular minimap, and all three teams see the same map.
     ///
     /// Rebuild thirds calls this too (ArenaSymmetryInspector), so the image can't go stale after an arena edit. It
     /// never touches the scene. It saves only the config asset, never SaveAssets(), which would also write any other
@@ -69,7 +70,7 @@ namespace Overpower.EditorTools
             // capital) - see MinimapLayout.TriangleCircumradius for the maths. vertexDirections come from a real
             // Tier 1 tower when one exists (never hard-coded to +Z); ArenaSymmetry's 3-fold layout means the other
             // two sit 120 degrees from it either way, so deriving them by rotation is exact, not an approximation.
-            Vector2[] vertexDirections = CapitalDirections(arena);
+            Vector2[] vertexDirections = CapitalDirections(arena, out string towerUsed);
             List<Vector2> points = ArenaPoints(arena);
             float circumradius = MinimapLayout.TriangleCircumradius(points, vertexDirections, config.MarginMetres);
             float size = 2f * circumradius;
@@ -88,7 +89,8 @@ namespace Overpower.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
             AssetDatabase.SaveAssetIfDirty(config);
 
-            return $"baked {ImagePath} ({pixels} px) covering {size:0.00} m (triangle circumradius {circumradius:0.00} m) " +
+            return $"baked {ImagePath} ({pixels} px) covering {size:0.00} m (triangle circumradius {circumradius:0.00} m, " +
+                   $"vertex direction ({vertexDirections[0].x:0.000}, {vertexDirections[0].y:0.000}) from {towerUsed}) " +
                    $"centred on ({centre.x:0.00}, {centre.y:0.00}); farthest mesh corner {radius:0.00} m, set by '{farthest}'.";
         }
 
@@ -97,18 +99,26 @@ namespace Overpower.EditorTools
         /// convention. Reads a real Tier 1 BuildingCapture when one exists in the open scenes (never hard-codes
         /// +Z); the other two directions are then exactly 120 degrees from it either way, since ArenaSymmetry's
         /// generated120/generated240 thirds guarantee the arena - and so its towers - repeat with that symmetry.
-        /// Falls back to a plain "up" (0,1) reference only when no Tier 1 tower exists yet to read (e.g. a bare
-        /// preview scene in a test) so baking never throws.</summary>
-        public static Vector2[] CapitalDirections(ArenaSymmetry arena)
+        /// Falls back to a plain "up" (0,1) reference (and logs a warning) only when no Tier 1 tower exists yet to
+        /// read (e.g. a bare preview scene in a test) so baking never throws.</summary>
+        public static Vector2[] CapitalDirections(ArenaSymmetry arena, out string towerUsed)
         {
             Vector2 reference = new Vector2(0f, 1f);
+            towerUsed = null;
             foreach (BuildingCapture capture in UnityEngine.Object.FindObjectsByType<BuildingCapture>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
                 if (capture.tier != 1) continue;
                 Vector2 direction = new Vector2(capture.transform.position.x - arena.centre.x, capture.transform.position.z - arena.centre.z);
                 if (direction.sqrMagnitude <= 0.0001f) continue;
                 reference = direction.normalized;
+                towerUsed = $"tower {capture.buildingID} ('{capture.name}')";
                 break;
+            }
+            if (towerUsed == null)
+            {
+                towerUsed = "no Tier 1 tower found - fell back to (0,1)";
+                Debug.LogWarning("[Minimap] No Tier 1 BuildingCapture found in the open scenes - the triangle's vertex " +
+                                  "direction falls back to a plain 'up' (0,1) reference instead of a real capital.");
             }
             const float cos120 = -0.5f, sin120 = 0.8660254f;
             return new[]
@@ -120,22 +130,12 @@ namespace Overpower.EditorTools
         }
 
         /// <summary>Every MeshRenderer bounds corner under Source or a generated third, relative to the arena
-        /// centre, in (world X, world Z) - the point set TriangleCircumradius frames. Same meshes ArenaRadius
-        /// walks, just collected instead of reduced to a single farthest distance.</summary>
+        /// centre, in (world X, world Z) - the point set TriangleCircumradius frames.</summary>
         public static List<Vector2> ArenaPoints(ArenaSymmetry arena)
         {
             var points = new List<Vector2>();
-            foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
-            {
-                if (third == null) continue;
-                foreach (MeshRenderer renderer in third.GetComponentsInChildren<MeshRenderer>(true))
-                {
-                    Bounds bounds = renderer.bounds;
-                    foreach (float x in new[] { bounds.min.x, bounds.max.x })
-                        foreach (float z in new[] { bounds.min.z, bounds.max.z })
-                            points.Add(new Vector2(x - arena.centre.x, z - arena.centre.z));
-                }
-            }
+            foreach ((Vector2 point, string _) in WalkMeshCorners(arena))
+                points.Add(point);
             return points;
         }
 
@@ -145,6 +145,23 @@ namespace Overpower.EditorTools
         {
             float best = 0f;
             farthestName = "";
+            foreach ((Vector2 point, string name) in WalkMeshCorners(arena))
+            {
+                float distance = point.magnitude;
+                if (distance > best)
+                {
+                    best = distance;
+                    farthestName = name;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>Shared by ArenaPoints and ArenaRadius (review fix, 2026-09-17: they used to repeat the same
+        /// mesh-corner loop): every MeshRenderer bounds corner under Source or a generated third, relative to the
+        /// arena centre, paired with that renderer's name.</summary>
+        private static IEnumerable<(Vector2 Point, string RendererName)> WalkMeshCorners(ArenaSymmetry arena)
+        {
             foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
             {
                 if (third == null) continue;
@@ -153,17 +170,9 @@ namespace Overpower.EditorTools
                     Bounds bounds = renderer.bounds;
                     foreach (float x in new[] { bounds.min.x, bounds.max.x })
                         foreach (float z in new[] { bounds.min.z, bounds.max.z })
-                        {
-                            float distance = new Vector2(x - arena.centre.x, z - arena.centre.z).magnitude;
-                            if (distance > best)
-                            {
-                                best = distance;
-                                farthestName = renderer.name;
-                            }
-                        }
+                            yield return (new Vector2(x - arena.centre.x, z - arena.centre.z), renderer.name);
                 }
             }
-            return best;
         }
 
         private static MinimapConfig LoadOrCreateConfig()

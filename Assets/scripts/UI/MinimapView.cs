@@ -11,8 +11,8 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The minimap (Tudor, 2026-09-16; it looks like GDD p.27): a round map in the top-right corner, and a large one
-    /// in the middle of the screen while M is toggled on. What it shows:
+    /// The minimap (Tudor, 2026-09-16; it looks like GDD p.27): a triangular map in the top-right corner, one vertex
+    /// toward each capital, and a large one in the middle of the screen while M is toggled on. What it shows:
     /// - a baked top-down picture of the arena (MinimapConfig);
     /// - a bubble per zone, sized by tier, filled in the owner's colour and labelled I-IV;
     /// - the links between zones (see MinimapLinkStyle): solid when one team owns both ends, an arrowhead when a
@@ -317,7 +317,11 @@ namespace Overpower.UI
                 float directionDegrees = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
                 return directionDegrees - 90f;
             }
-            return 0f; // no Tier 1 zone found (shouldn't happen, TryBuild already required tier > 0 on every zone)
+            // No Tier 1 zone found among the registered zones. TryBuild only requires tier > 0 on every zone (so
+            // every tower has registered), which does NOT guarantee one of them is specifically a capital (tier ==
+            // 1) - so this fallback is reachable, not dead code. Identity (0 degrees) leaves the apex at map-space
+            // "up", the same default CapitalDirections falls back to when it can't find a real Tier 1 tower either.
+            return 0f;
         }
 
         private void BuildFrame()
@@ -343,12 +347,18 @@ namespace Overpower.UI
 
             // No round backdrop (review fix, 2026-09-17): nothing may be visible outside the triangle at all, not
             // even a dark disc peeking out around it - only the triangle window and its EdgeTriangle frame below.
+            // The frame's visible band width in canvas units is minimapFrameWidth at the corner size (review fix,
+            // 2026-09-17: it used to be a hard-coded fraction that field no longer controlled) - see
+            // GeneratedSprites.BuildTriangleEdge's own comment for why this fraction produces that width.
+            float frameBandFraction = theme.minimapFrameWidth / Mathf.Max(1f, theme.minimapCornerSize);
             // MaskTriangle (512 px, one vertex toward each capital - Tudor, 2026-09-17), not a disc: a UGUI Mask
             // reads its sprite's alpha as a 1-bit stencil test, and the finer source traces a smoother contour
-            // before that test runs. viewport itself carries the yaw+base rotation (ApplyYawIfChanged) so the
-            // triangle turns with the map; map's own rotation only ever cancels viewport's constant part (set once
-            // in TryBuild), so the picture/bubbles/links/markers underneath still turn by exactly the camera yaw.
-            Image viewportImage = NewImage("Viewport", root, GeneratedSprites.MaskTriangle, Color.white, theme.minimapCornerSize);
+            // before that test runs. Shrunk inward by half the frame band so that stencil cut sits under solid
+            // frame colour, not right at the frame's own outer, visible edge (review fix, 2026-09-17). viewport
+            // itself carries the yaw+base rotation (ApplyYawIfChanged) so the triangle turns with the map; map's
+            // own rotation only ever cancels viewport's constant part (set once in TryBuild), so the picture/
+            // bubbles/links/markers underneath still turn by exactly the camera yaw.
+            Image viewportImage = NewImage("Viewport", root, GeneratedSprites.BuildTriangleMask(frameBandFraction), Color.white, theme.minimapCornerSize);
             viewport = viewportImage.rectTransform;
             // Triangular mask: the turned square picture never shows a corner, and the shape frames the arena.
             viewportImage.gameObject.AddComponent<Mask>().showMaskGraphic = false;
@@ -378,7 +388,7 @@ namespace Overpower.UI
             // ordinarily anti-aliased triangular ring covering the mask's remaining stencil seam (review fix,
             // 2026-09-17). Rotated the same as viewport (ApplyYawIfChanged), independently of it (a sibling, not a
             // child, so it isn't itself masked), to stay aligned with the triangle underneath.
-            edgeShape = NewImage("Edge Triangle", root, GeneratedSprites.EdgeTriangle, theme.minimapFrameColor, theme.minimapCornerSize).rectTransform;
+            edgeShape = NewImage("Edge Triangle", root, GeneratedSprites.BuildTriangleEdge(frameBandFraction), theme.minimapFrameColor, theme.minimapCornerSize).rectTransform;
         }
 
         private void BuildZone(int zone)

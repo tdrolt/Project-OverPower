@@ -386,7 +386,7 @@ namespace Overpower.UI
         public Color captureRingTrackColor = new Color(0f, 0f, 0f, 0.4f);
 
         [Header("Minimap (2026-09-16)")]
-        [Tooltip("Diameter of the round minimap in the top-right corner, in canvas units.")]
+        [Tooltip("Size (bounding diameter) of the triangular minimap in the top-right corner, in canvas units.")]
         public float minimapCornerSize = 340f;
         [Tooltip("Gap between the corner minimap's frame and the top and right screen edges, in canvas units.")]
         public float minimapCornerMargin = 24f;
@@ -399,7 +399,9 @@ namespace Overpower.UI
                  "large map's diameter shrinks below Large Size if it would otherwise overlap this strip, and the map " +
                  "centres itself in whatever space remains above it.")]
         public float minimapLargeBottomClearance = 380f;
-        [Tooltip("Width of the dark ring framing the minimap, in canvas units.")]
+        [Tooltip("Width of the dark anti-aliased band framing the triangular minimap's edge, in canvas units at the " +
+                 "corner size (it scales up with everything else on the large map). Also used as the corner map's " +
+                 "inset from the screen edges.")]
         public float minimapFrameWidth = 5f;
         [Tooltip("Colour of the minimap's frame (and its background if the baked arena image is missing).")]
         public Color minimapFrameColor = new Color(0.06f, 0.06f, 0.08f, 0.9f);

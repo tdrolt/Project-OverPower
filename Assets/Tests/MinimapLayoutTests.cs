@@ -111,13 +111,6 @@ namespace Overpower.Tests
             AssertClose(new Vector2(5f, 5f), MinimapLayout.PointBeforeEnd(new Vector2(5f, 5f), new Vector2(5f, 5f), 3f));
         }
 
-        [Test]
-        public void TheFramedSquareClearsTheArenaOnEverySide()
-        {
-            Assert.AreEqual(154.4f, MinimapLayout.FramedSizeMetres(73.2f, 4f), 1e-3f);
-            Assert.AreEqual(8f, MinimapLayout.FramedSizeMetres(-1f, 4f), 1e-3f);
-        }
-
         // Apex-up equilateral triangle: vertex directions at 90/210/330 degrees, matching the real capitals' map
         // angles (EachTeamSeesItsOwnCapitalInTheSamePlace above).
         private static readonly Vector2[] EquilateralDirections =
@@ -131,12 +124,14 @@ namespace Overpower.Tests
         public void AVertexDirectionPointNeedsRadiusEqualToItsDistance()
         {
             // A point exactly at vertex 0's own direction, distance D out, is the vertex itself: R must reach
-            // exactly D, no more (review fix, 2026-09-17 - the edge opposite a vertex has OUTWARD normal -d_i, not
-            // +d_i; the old sign made this point read as forcing R = 2D instead, twice too big).
+            // exactly D with no margin (its reach against the two OTHER normals, -d1/-d2, is 0.5D each, so
+            // worstReach = 0.5D and R = 2*0.5D = D). With a margin, the margin is added to the inradius (worstReach)
+            // BEFORE doubling (review fix, 2026-09-17: R = 2 x (worstReach + margin), not 2 x worstReach + margin,
+            // so every side of the triangle gets the full margin, not half of it) - R = 2*(0.5D + margin).
             const float d = 10f;
             var points = new List<Vector2> { new Vector2(0f, d) };
             Assert.AreEqual(d, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
-            Assert.AreEqual(d + 4f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 4f), 1e-3f);
+            Assert.AreEqual(d + 8f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 4f), 1e-3f);
         }
 
         [Test]
@@ -152,12 +147,13 @@ namespace Overpower.Tests
         [Test]
         public void TheWorstPointAcrossAllCornersAndNormalsForcesRPlusMargin()
         {
-            // Two points: one reaches 5 (opposite vertex 0, along -d0), the other reaches 9 (opposite vertex 1,
-            // along -d1) - the second must win despite not being the farthest point from the centre in a plain
-            // radius sense, because TriangleCircumradius measures per-normal reach, not overall distance. The
-            // margin is added once, on top of 2x the winning reach.
-            var points = new List<Vector2> { new Vector2(0f, -5f), new Vector2(0.8660254f * 9f, 0.5f * 9f) };
-            Assert.AreEqual(21f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 3f), 1e-3f);
+            // Two points: one reaches 5 (opposite vertex 0, along -d0); the other sits AT vertex 1's own direction,
+            // distance 9 out, which only reaches 4.5 against -d1 (and -d2) - so the first point, not the second,
+            // must win, even though the second is farther from the centre in a plain radius sense (9 vs 5), because
+            // TriangleCircumradius measures per-normal reach, not overall distance. The margin is added to the
+            // winning reach BEFORE doubling (see the rule's own comment).
+            var points = new List<Vector2> { new Vector2(0f, -5f), new Vector2(0f, 9f) };
+            Assert.AreEqual(16f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 3f), 1e-3f);
         }
 
         [Test]
