@@ -96,6 +96,9 @@ namespace Overpower.Tests
             Int(ability, "charges", 2);
             Int(ability, "maxActiveMines", 4);
             AssetAt(ability, "minePrefab", "Assets/Resources/Mine.prefab");
+            // A9 (Tudor 2026-09-17 evening): mines can be placed anywhere within 2 m of the player now, not only at
+            // their feet - an INTENDED gameplay change, so this pin moves on purpose (see the commit message).
+            Float(ability, "placementRange", 2f);
         }
 
         [Test]

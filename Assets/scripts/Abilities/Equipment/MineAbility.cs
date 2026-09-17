@@ -5,9 +5,10 @@ using Overpower.Combat;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Drops a proximity mine at the caster's feet - Tudor's Equipment spec: 2 charges, 10 seconds
-    /// each. This module only decides WHEN and WHERE (always "right here, right now" - there is no
-    /// aiming); everything about what the mine actually does once it exists lives on Mine.cs.
+    /// Drops a proximity mine - Tudor's Equipment spec: 2 charges, 10 seconds each. WHERE changed
+    /// (A9, Tudor 2026-09-17 evening): a mine used to always land at the caster's own feet, with no
+    /// aiming at all; it now lands at the player's aim point on the floor, clamped to Placement Range
+    /// metres from the player - see TryBuildCast and MinePlacementRule (Assets/scripts/Combat).
     ///
     /// A MINE IS A REAL NETWORKED OBJECT, placed in ExecuteCast's IsCasterClient branch exactly like
     /// TeleportAbility places a Portal - a player joining mid-match has to see mines that have been
@@ -40,6 +41,22 @@ namespace Overpower.Abilities
                  "fuse would otherwise let mines pile up indefinitely over a long match.")]
         private int maxActiveMines = 4;
 
+        [Header("Placement (A9, Tudor 2026-09-17 evening)")]
+        [SerializeField, Tooltip("How far from the player, in metres, a mine can be placed - horizontal " +
+                 "distance from the player's centre, along the aim direction. The cursor's floor point " +
+                 "is clamped to this distance when it points further away - see MinePlacementRule.")]
+        private float placementRange = 2f;
+
+        [SerializeField, Tooltip("How far, in metres, a blocked or floor-less placement is walked back " +
+                 "toward the player before giving up and dropping the mine at the caster's own feet " +
+                 "instead - same idea as BlinkAbility's own Search Step.")]
+        private float placementSearchStep = 0.25f;
+
+        // The caster's own capsule, read once in OnEquip like Blink's and Teleport's - a mine's safety pull-back
+        // needs the real player shape to find "the caster's own feet" (PlayerSpaceProbe.FeetOf) and to stand a
+        // candidate point the same way a player would (PlayerSpaceProbe.RootOnGround).
+        private CapsuleCollider capsule;
+
         // Owner only: increments once per successful placement, travels as CastPayload.IntArg so
         // every client's Mine.Seq (and this owner's own pruning) agree on placement order - same
         // counter shape as TeleportAbility.nextSeq, and safe to restart at 0 on every fresh equip
@@ -55,12 +72,19 @@ namespace Overpower.Abilities
                 Debug.LogError($"[MineAbility] {name}: Mine Prefab is not assigned - mines cannot be placed.");
             else if (minePrefab.GetComponent<Mine>() == null)
                 Debug.LogError($"[MineAbility] {name}: Mine Prefab '{minePrefab.name}' has no Mine component.");
+
+            capsule = Owner.Root.GetComponent<CapsuleCollider>();
+            if (capsule == null)
+                Debug.LogError($"[MineAbility] {name}: the player has no CapsuleCollider - a mine's " +
+                                "placement safety check cannot run, so every mine falls back to the caster's own feet.");
         }
 
         protected override void OnValidate()
         {
             base.OnValidate();
             maxActiveMines = Mathf.Max(1, maxActiveMines);
+            placementRange = Mathf.Max(0f, placementRange);
+            placementSearchStep = Mathf.Max(0.01f, placementSearchStep); // never 0 or negative - that would search forever.
         }
 
         // ---- owner only ---------------------------------------------------------------------------
@@ -72,11 +96,54 @@ namespace Overpower.Abilities
             if (minePrefab == null)
                 return false; // OnEquip already logged why.
 
-            // Feet, not aim - Tudor's spec places a mine where the caster is standing, never where
-            // they are looking. ctx.Origin is the player root's own position (CastContext's own doc).
-            payload = new CastPayload { Point = ctx.Origin, IntArg = nextSeq };
+            // A9: the aim point on the floor (ctx.TargetPoint - PlayerAim.GroundPointUnderCursor, the same point
+            // weapons and TeleportAbility already use), clamped to Placement Range - not the caster's own feet any
+            // more (see the class comment for why that changed).
+            Vector3 requested = MinePlacementRule.ClampToRange(ctx.Origin, ctx.TargetPoint, placementRange);
+            Vector3 point = FindSafePlacement(ctx.Origin, requested);
+
+            payload = new CastPayload { Point = point, IntArg = nextSeq };
             nextSeq++;
             return true;
+        }
+
+        /// <summary>
+        /// Walks the clamped point back toward the player, in Placement Search Step increments, until one is on real
+        /// floor with nothing on the Building layer between the caster and it - the same "clamp, then walk back
+        /// toward the caster until something works" idea BlinkDestinationSearch already proves pure, just against a
+        /// different pair of checks (a straight-line path and a floor point, not an arena-bounded capsule check). No
+        /// new path/ground primitives: GroundSnap.TryFindGroundY is the Task 2 floor finder, and
+        /// PlayerSpaceProbe.IsPathClear is the same knee-height sphere cast Blink's and Teleport's own destination
+        /// checks are built from. Falls back to the caster's own position - today's placement - if even that fails.
+        /// </summary>
+        private Vector3 FindSafePlacement(Vector3 origin, Vector3 requestedPoint)
+        {
+            if (capsule == null)
+                return origin; // OnEquip already logged why - no capsule to check feet/floor with.
+
+            Vector3 originXZ = new Vector3(origin.x, 0f, origin.z);
+            Vector3 requestedXZ = new Vector3(requestedPoint.x, 0f, requestedPoint.z);
+            Vector3 toRequested = requestedXZ - originXZ;
+            float requestedDistance = toRequested.magnitude;
+            Vector3 direction = requestedDistance > 0.0001f ? toRequested / requestedDistance : Vector3.zero;
+            Vector3 casterFeet = PlayerSpaceProbe.FeetOf(capsule, origin);
+
+            float distance = requestedDistance;
+            while (true)
+            {
+                Vector3 candidateXZ = originXZ + direction * distance;
+                if (GroundSnap.TryFindGroundY(candidateXZ, out float groundY))
+                {
+                    Vector3 candidateFeet = new Vector3(candidateXZ.x, groundY, candidateXZ.z);
+                    if (PlayerSpaceProbe.IsPathClear(casterFeet, candidateFeet))
+                        return PlayerSpaceProbe.RootOnGround(capsule, candidateFeet);
+                }
+
+                if (distance <= 0f)
+                    return origin; // even the caster's own spot failed - fall back to today's placement.
+
+                distance = Mathf.Max(0f, distance - placementSearchStep);
+            }
         }
 
         // ---- every client -------------------------------------------------------------------------
