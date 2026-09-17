@@ -174,3 +174,22 @@ Shared rules [C]:
 - **Two clients:** B's mine, portals and cage on A's screen (no trigger ring, no diamond, B's colour). A's flame fan,
   hook, blast ring, mine and cage on B's screen (A's colour, measured). Then the regression recorder again, compared
   with the baseline.
+
+---
+
+## Tudor's answers (2026-09-17 morning)
+
+1. **Electric Fence cage:** it doesn't block shots (or players). It only slows and damages players who pass through
+   it, which is today's behaviour, drawn as bars.
+2. **Cursor rocket fire field:** it sits on the floor and burns every enemy who stays in the area for the whole
+   duration. The burn area becomes an upright cylinder over the drawn disc (gameplay change).
+3. **Flamethrower:** range is still measured from the player's centre. The look becomes a soft cone that fades out
+   toward its edges, so it doesn't clutter the screen. Only the caster sees a faint outline, as an aiming aid.
+4. **Grappling hook:** its hit size grows by 50%, radius 0.15 → 0.225 m (gameplay change). The square head matches the
+   new hit size.
+5. **Mines turn invisible after 1 s**, as the GDD says (gameplay change). Enemies no longer see them; the owner's team
+   sees a faded "ghost"; everyone sees the detonation.
+6. **Rocket explosions stay at their current height.** Every blast, including airbursts, shows a short see-through
+   shell at the real splash radius, instead of a lingering floor ring.
+
+The implementation details are in the plan's "Tudor's answers" section (A0–A7).

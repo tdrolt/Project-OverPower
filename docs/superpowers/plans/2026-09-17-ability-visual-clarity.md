@@ -32,6 +32,90 @@ in reports, commits and `progress.md`.
 
 ---
 
+## Tudor's answers (2026-09-17 morning) — these OVERRIDE the decisions and task text below
+
+Tudor answered the six questions. Items A2, A4 and A5 are **intended gameplay changes**. Everything else stays
+visual only. The task that builds each item also updates its pin tests on purpose, and says so in its commit message.
+
+- **A0 — the baseline is recorded again first (Task 1 follow-up, before any other task).**
+  - The step 1 baseline is unusable: the rocket direct hit and the cursor rocket splash dealt 0 damage in both runs,
+    and the mine was flaky (0 then 20). The practice dummy near team 0's spawn stands against `Cathedral_Team0`.
+  - Re-record every number in open floor space, well clear of buildings: teleport the shooter and target to free
+    points found with the harness's free-point probe.
+  - Record it before A2 and A4 change anything, and report the spread over 2 runs.
+- **A1 — Electric Fence (Task 4): no change to the plan.** The bars block nothing: no shots, no players. The fence only
+  slows and damages players who pass through its band, which is exactly today's behaviour.
+- **A2 — The cursor rocket's Fire Field sits on the floor and burns everyone standing in it (Task 6). Gameplay change.**
+  - **Placement:** `DetonateAtCursor` spawns the field at the floor point below the burst, found with the Task 2 floor
+    finder. The spawn position is chosen by the caster and replicated as it is today, so every client agrees.
+  - **The burn area becomes an upright cylinder over the drawn disc**, so "standing in the circle" is exactly "being
+    burned":
+    - Replace the `OverlapSphereNonAlloc(transform.position, radius)` at `FireField.cs:220` with
+      `OverlapCapsuleNonAlloc(floor, floor + up × 2.0 m, radius)`.
+    - Name the height a constant with a why-comment: it covers a standing player's whole body.
+  - **Every enemy standing inside burns on every tick for the whole duration** (3 s, 12/s). Keep the existing
+    team/self filter.
+  - **Tests:** a Play Mode or edit-mode check that an enemy standing at 0.9 × radius from the centre, on the floor,
+    takes every tick, and one at 1.2 × radius takes none. The Fire Field pin test gains the spawn-on-floor fact.
+  - The field's own visual disc sits on the floor with it. There is no separate "visual child snap" any more.
+- **A3 — The flamethrower keeps measuring range from the player's centre, with a new, softer look (Task 5).**
+  - The hit shape is unchanged (`ConeFilter`, from the root). Fix the Cone Range tooltip to say "from the player's
+    centre".
+  - **Replace the planned flat fan + outline with a soft flame cone.** It is a flat cone mesh at the real 7 m / 45°,
+    with the tip at the player's centre projected on the floor:
+    - vertex colours run warm yellow-orange at the tip to transparent at the far edge (alpha about 0.45 at the tip to
+      0 at range) and fade toward the side edges;
+    - a subtle alpha flicker, with vertex colours updated at most about 15 times a second, no allocation;
+    - no hard outline for other players.
+  - **Only the caster's own screen** also shows a faint thin outline at the true range and angle, as an aiming aid.
+    Everyone else sees only the soft cone.
+  - It only exists while spraying. The old cylinder is removed.
+  - **Goal:** you can tell where the flames reach without the screen filling with orange. Judge it from 616×576
+    captures on both the caster's and an enemy's screen.
+- **A4 — The grappling hook's hit size grows by 50% (Task 7). Gameplay change.**
+  - Projectile Radius goes from 0.15 to **0.225** m, wherever the zip gun's radius is authored (find the real field).
+    Update its pin test on purpose.
+  - The head cube is sized to the new hit diameter, 0.45 m. It is no longer a visual-only scale: the look now matches
+    the hit.
+  - Pull speed, range and hit mask are unchanged.
+- **A5 — Mines turn invisible 1 s after placement, as in the GDD (Task 3). Gameplay change.**
+  - **Pure rule** `MineVisibilityRule.For(localTeam, ownerTeam, secondsSincePlaced, invisibleAfterSeconds)` → `Visible`
+    / `Ghost` / `Hidden`:
+    - before `invisibleAfterSeconds`, everyone sees the mine;
+    - after it, enemies see nothing (`Hidden`);
+    - the owner's team sees a faded `Ghost` (alpha about 0.35) with its trigger ring, so teammates know where their
+      own mines are;
+    - spectators or no team count as enemies.
+  - **Timing:**
+    - Use a network-agreed placement time: the mine's instantiation timestamp, or `PhotonNetwork.Time` sent at spawn,
+      whichever the real `Mine` already has. Every client must switch at the same moment, whatever its lag.
+    - The mine gets a new serialized `invisibleAfterSeconds = 1` with a plain designer tooltip. Pin it.
+  - **Detonation shows to everyone:** the blast ring is visible to all clients, including enemies who couldn't see the
+    mine.
+  - **Tests:** a test for every rule branch. The Task 8 two-client check captures the mine on the enemy's screen (gone
+    after 1 s) and the owner's screen (ghost).
+  - No RPC is added. This is a local render decision on each client.
+- **A6 — Rocket blasts stay at their real height and get an uncluttered effect (Task 6).**
+  - The detonation height is unchanged: it replaces the planned floor `BlastMarker`.
+  - **On every detonation, impact and airburst alike:**
+    - show a short see-through **splash shell** at the real burst point, sized to the real Splash Radius, in the
+      shooter's team colour at low alpha;
+    - it grows from about 60% to 100% of the radius while fading out over about 0.3 s;
+    - it uses one pooled or cheap object per blast, with no lingering floor ring.
+  - `ExplodeOnImpact` raises `Detonated(centre)` as planned. The airburst path must raise it too, since today it shows
+    nothing (`ProjectileMotor.cs:137,144,169,259-273`).
+  - The existing particle puff stays.
+- **A7 — Task 8 compares against the A0 baseline.**
+  - These numbers must be equal:
+    - fence 8 × 25;
+    - mine blast damage;
+    - rocket direct and splash damage;
+    - zip pull distance.
+  - The cursor rocket burn is **36** for an enemy standing inside the floor disc, and must not drop for an enemy
+    standing at the burst point's floor position.
+  - The zip gun hit radius reads 0.225.
+  - Any other difference is a regression to report.
+
 ## Decisions [C] (Tudor delegated; all logged in `assumptions-for-tudor.md` by the task that builds them)
 
 - **Order [C]:** start after the capture ring + minimap plan's step 7 is approved. Same single Editor; no shared files
