@@ -62,5 +62,29 @@ namespace Overpower.Tests
             line.Ints(TelemetryKeys.TeamsRemaining, new[] { 0, 2 });
             Assert.AreEqual("{\"e\":\"elimination\",\"t\":812.25,\"tm\":1,\"remain\":[0,2]}", line.End());
         }
+
+        // Review fix (item 10): MatchTelemetry.LogJoinOrLeave now appends the player's own nick to
+        // the `join` line only - reproduced here the same way, standalone, no Photon needed.
+
+        [Test]
+        public void JoinLineNowCarriesTheNick()
+        {
+            var line = new TelemetryLine();
+            line.Begin(TelemetryKeys.Join, -1);
+            line.Int(TelemetryKeys.Actor, 3);
+            line.Int(TelemetryKeys.Team, 2);
+            line.String(TelemetryKeys.Nick, "Riven");
+            Assert.AreEqual("{\"e\":\"join\",\"t\":-1,\"a\":3,\"tm\":2,\"nick\":\"Riven\"}", line.End());
+        }
+
+        [Test]
+        public void LeaveLineShapeIsUnchangedNoNick()
+        {
+            var line = new TelemetryLine();
+            line.Begin(TelemetryKeys.Leave, 42.0);
+            line.Int(TelemetryKeys.Actor, 3);
+            line.Int(TelemetryKeys.Team, 2);
+            Assert.AreEqual("{\"e\":\"leave\",\"t\":42,\"a\":3,\"tm\":2}", line.End());
+        }
     }
 }

@@ -25,13 +25,23 @@ namespace Overpower.EditorTools.Telemetry
     public sealed class LogCoverageRow
     {
         public int Actor;
-        /// <summary>Empty when this actor's own nick is unknown - which happens exactly when
-        /// <see cref="FilePresent"/> is false: nobody else's log line carries another actor's nickname.</summary>
+        /// <summary>Review fix (item 10): for a missing actor (no file of their own), this now
+        /// comes from another client's own `join` line, which carries the nick - empty only when
+        /// no one's `join` line for this actor was found either (an old log written before that
+        /// field existed, or an actor only ever seen via a `hit`/`death` line, never a `join`).</summary>
         public string Nick = "";
         /// <summary>Whether a `session` line (so, a whole log file) for this actor was found.</summary>
         public bool FilePresent;
-        public double FirstT;
-        public double LastT;
+        /// <summary>Review fix (item 10): null (renders as "-") rather than 0 when there is nothing
+        /// to show - a missing actor's own First/Last t come from their `join`/`leave` events (logged
+        /// by whichever OTHER client saw them), not from a file they never wrote.</summary>
+        public double? FirstT;
+        public double? LastT;
+        /// <summary>Review fix (item 10): true for a missing actor whose `join` AND `leave` were both
+        /// seen (by other clients) - they were very likely gone again before their own telemetry
+        /// file ever opened, which is a much softer story than "no log from them at all" and gets its
+        /// own, gentler warning wording.</summary>
+        public bool JoinedAndLeftBeforeLoggingStarted;
     }
 
     /// <summary>Everything that isn't one of the 12 tables: match-wide facts and the quality counters

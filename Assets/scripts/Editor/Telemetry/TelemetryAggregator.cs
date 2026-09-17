@@ -328,13 +328,32 @@ namespace Overpower.EditorTools.Telemetry
             Dictionary<int, (double First, double Last)> coverageByActor, List<LogCoverageRow> outRows)
         {
             var seen = new HashSet<int>(sessionByActor.Keys);
+            // Review fix (item 10): a MISSING actor's own nick/first-seen/last-seen now come from
+            // whoever else logged their `join`/`leave` (every client logs every OTHER player's join
+            // and leave, even one whose own file never opened).
+            var nickByActor = new Dictionary<int, string>();
+            var earliestJoinByActor = new Dictionary<int, double>();
+            var latestLeaveByActor = new Dictionary<int, double>();
 
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name == TelemetryKeys.Join)
                 {
                     int a = ReadInt(e.Data, TelemetryKeys.Actor, -1);
-                    if (a >= 0) seen.Add(a);
+                    if (a < 0) continue;
+                    seen.Add(a);
+                    string nick = e.Data[TelemetryKeys.Nick]?.ToString();
+                    if (!string.IsNullOrEmpty(nick) && !nickByActor.ContainsKey(a))
+                        nickByActor[a] = nick;
+                    if (!earliestJoinByActor.TryGetValue(a, out double existingJoin) || e.T < existingJoin)
+                        earliestJoinByActor[a] = e.T;
+                }
+                else if (e.Name == TelemetryKeys.Leave)
+                {
+                    int a = ReadInt(e.Data, TelemetryKeys.Actor, -1);
+                    if (a < 0) continue;
+                    if (!latestLeaveByActor.TryGetValue(a, out double existingLeave) || e.T > existingLeave)
+                        latestLeaveByActor[a] = e.T;
                 }
                 else if (e.Name == TelemetryKeys.Hit)
                 {
@@ -362,14 +381,36 @@ namespace Overpower.EditorTools.Telemetry
             foreach (int actor in seen.OrderBy(a => a))
             {
                 bool filePresent = sessionByActor.TryGetValue(actor, out TelemetrySession session);
-                (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
+
+                string nick;
+                double? firstT, lastT;
+                bool joinedAndLeft = false;
+
+                if (filePresent)
+                {
+                    nick = session.Nick;
+                    (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
+                    firstT = coverage.First;
+                    lastT = coverage.Last;
+                }
+                else
+                {
+                    nick = nickByActor.GetValueOrDefault(actor, "");
+                    bool hasJoin = earliestJoinByActor.TryGetValue(actor, out double joinT);
+                    bool hasLeave = latestLeaveByActor.TryGetValue(actor, out double leaveT);
+                    firstT = hasJoin ? joinT : (double?)null;
+                    lastT = hasLeave ? leaveT : (double?)null;
+                    joinedAndLeft = hasJoin && hasLeave && leaveT >= joinT;
+                }
+
                 outRows.Add(new LogCoverageRow
                 {
                     Actor = actor,
-                    Nick = filePresent ? session.Nick : "",
+                    Nick = nick,
                     FilePresent = filePresent,
-                    FirstT = coverage.First,
-                    LastT = coverage.Last,
+                    FirstT = firstT,
+                    LastT = lastT,
+                    JoinedAndLeftBeforeLoggingStarted = joinedAndLeft,
                 });
             }
         }

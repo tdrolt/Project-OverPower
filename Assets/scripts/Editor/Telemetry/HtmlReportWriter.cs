@@ -762,14 +762,20 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var logCoverage = h.logCoverage || [];
     logCoverage.filter(function (r) { return !r.filePresent; }).forEach(function (r) {
       var label2 = r.nick ? (r.nick + ' (actor ' + r.actor + ')') : ('actor ' + r.actor);
-      coverageHost.appendChild(el('div', { class: 'warn' }, 'No log from ' + label2 + ': their damage taken, gold and purchases aren\u2019t counted.'));
+      // Review fix (item 10): a softer message for an actor who joined and left (per OTHER
+      // clients' own join/leave lines) before their own file ever opened - a much less alarming
+      // story than 'no log from them at all, nothing about them is counted'.
+      var message = r.joinedAndLeftBeforeLoggingStarted
+        ? label2 + ' joined and left before logging started.'
+        : 'No log from ' + label2 + ': their damage taken, gold and purchases aren\u2019t counted.';
+      coverageHost.appendChild(el('div', { class: 'warn' }, message));
     });
     buildTable(coverageHost, [
       { label: 'Actor', value: function (r) { return r.actor; } },
       { label: 'Nick', value: function (r) { return r.nick; } },
       { label: 'File present', value: function (r) { return r.filePresent ? 'yes' : 'no'; } },
-      { label: 'First t', value: function (r) { return r.firstT; } },
-      { label: 'Last t', value: function (r) { return r.lastT; } },
+      { label: 'First t', value: function (r) { return (r.firstT === null || r.firstT === undefined) ? '-' : r.firstT; } },
+      { label: 'Last t', value: function (r) { return (r.lastT === null || r.lastT === undefined) ? '-' : r.lastT; } },
     ], logCoverage);
   }
 

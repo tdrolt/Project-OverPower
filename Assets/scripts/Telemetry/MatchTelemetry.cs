@@ -244,6 +244,13 @@ namespace Overpower.Telemetry
             line.Begin(eventName, Now);
             line.Int(TelemetryKeys.Actor, player.ActorNumber);
             line.Int(TelemetryKeys.Team, Teams.TryGetTeam(player, out int team) ? team : -1);
+            // Review fix (item 10): `join` also carries the player's own nickname - appending a
+            // field is safe for an old log without it (a missing key just reads back as null/absent).
+            // This is what lets the report's log coverage name a MISSING actor (no file of their
+            // own - TelemetryAggregator.BuildLogCoverage) instead of just "actor N". `leave` doesn't
+            // need it: by the time anyone leaves, whichever client logged their join already has it.
+            if (eventName == TelemetryKeys.Join)
+                line.String(TelemetryKeys.Nick, player.NickName ?? "");
             Log(line);
         }
 

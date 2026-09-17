@@ -78,7 +78,14 @@ namespace Overpower.EditorTools.Telemetry
             WriteCsv(
                 Path.Combine(csvFolder, "log_coverage.csv"),
                 new[] { "actor", "name", "filePresent", "firstT", "lastT" },
-                rows.Select(r => new[] { N(r.Actor), r.Nick, N(r.FilePresent), N(r.FirstT), N(r.LastT) }));
+                // Review fix (item 10): a missing actor with no join/leave info at all writes "-"
+                // for firstT/lastT rather than a misleading "0".
+                rows.Select(r => new[]
+                {
+                    N(r.Actor), r.Nick, N(r.FilePresent),
+                    r.FirstT.HasValue ? N(r.FirstT.Value) : "-",
+                    r.LastT.HasValue ? N(r.LastT.Value) : "-",
+                }));
         }
 
         private static void WriteGoldTimeline(ReportTables t, string folder) => WriteCsv(

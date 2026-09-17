@@ -277,5 +277,82 @@ namespace Overpower.Tests
             Assert.IsTrue(tables.Header.LogCoverage.Single(r => r.Actor == 1).FilePresent);
             Assert.IsTrue(tables.Header.LogCoverage.Single(r => r.Actor == 2).FilePresent);
         }
+
+        // Review fix (item 10): actor 3 in the shared fixture is seen ONLY via a `hit` line (no
+        // join/leave at all) - First/Last t must read null (the HTML/CSV render "-"), not 0/0.
+        [Test]
+        public void LogCoverageShowsNullFirstLastTForAnActorWithNoJoinOrLeaveEventAtAll()
+        {
+            var log = TelemetryLog.Load(FixturePath);
+            var tables = TelemetryAggregator.Build(log);
+
+            var actor3 = tables.Header.LogCoverage.Single(r => r.Actor == 3);
+            Assert.IsNull(actor3.FirstT);
+            Assert.IsNull(actor3.LastT);
+            Assert.IsFalse(actor3.JoinedAndLeftBeforeLoggingStarted);
+            Assert.AreEqual("", actor3.Nick, "no join line ever named actor 3 in this fixture");
+        }
+
+        private static string NewIsolatedTempFolder() =>
+            Path.Combine(Path.GetTempPath(), "TelemetryLogCoverageTests_" + System.Guid.NewGuid().ToString("N"));
+
+        [Test]
+        public void LogCoverageUsesTheJoinLinesNickForAMissingActor()
+        {
+            string temp = NewIsolatedTempFolder();
+            Directory.CreateDirectory(temp);
+            try
+            {
+                string lines =
+                    "{\"e\":\"session\",\"t\":0,\"schema\":1,\"m\":\"M\",\"a\":1,\"nick\":\"Editor\",\"tm\":0,\"master\":true,\"commit\":\"c\",\"uv\":\"u\",\"plat\":\"p\",\"tuning\":{}}\n" +
+                    "{\"e\":\"join\",\"t\":-1,\"a\":1,\"tm\":0}\n" +
+                    // Actor 2 has no file of their own - only OTHER clients' join/hit lines mention them.
+                    "{\"e\":\"join\",\"t\":-1,\"a\":2,\"tm\":1,\"nick\":\"Ghost\"}\n" +
+                    "{\"e\":\"hit\",\"t\":10,\"a\":2,\"at\":1,\"v\":1,\"vt\":0,\"w\":1,\"ab\":-1,\"src\":\"Projectile\",\"raw\":10,\"arm\":0,\"hpLost\":10,\"lethal\":false,\"d\":5,\"vul\":0,\"op\":false}\n" +
+                    "{\"e\":\"sample\",\"t\":30,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp));
+                var missing = tables.Header.LogCoverage.Single(r => r.Actor == 2);
+                Assert.IsFalse(missing.FilePresent);
+                Assert.AreEqual("Ghost", missing.Nick);
+                Assert.AreEqual(-1.0, missing.FirstT.Value, 1e-9); // their own earliest join, t=-1
+                Assert.IsNull(missing.LastT); // no leave line at all
+                Assert.IsFalse(missing.JoinedAndLeftBeforeLoggingStarted);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void LogCoverageFlagsAnActorWhoJoinedAndLeftBeforeLoggingStarted()
+        {
+            string temp = NewIsolatedTempFolder();
+            Directory.CreateDirectory(temp);
+            try
+            {
+                string lines =
+                    "{\"e\":\"session\",\"t\":0,\"schema\":1,\"m\":\"M\",\"a\":1,\"nick\":\"Editor\",\"tm\":0,\"master\":true,\"commit\":\"c\",\"uv\":\"u\",\"plat\":\"p\",\"tuning\":{}}\n" +
+                    "{\"e\":\"join\",\"t\":-1,\"a\":1,\"tm\":0}\n" +
+                    "{\"e\":\"join\",\"t\":5,\"a\":2,\"tm\":1,\"nick\":\"Ghost\"}\n" +
+                    "{\"e\":\"leave\",\"t\":8,\"a\":2,\"tm\":1}\n" +
+                    "{\"e\":\"sample\",\"t\":30,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp));
+                var missing = tables.Header.LogCoverage.Single(r => r.Actor == 2);
+                Assert.IsFalse(missing.FilePresent);
+                Assert.AreEqual("Ghost", missing.Nick);
+                Assert.AreEqual(5.0, missing.FirstT.Value, 1e-9);
+                Assert.AreEqual(8.0, missing.LastT.Value, 1e-9);
+                Assert.IsTrue(missing.JoinedAndLeftBeforeLoggingStarted, "joined at 5 and left at 8 - gone before their own file could ever open");
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
     }
 }
