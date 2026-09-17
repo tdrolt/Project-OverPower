@@ -116,6 +116,36 @@ visual only. The task that builds each item also updates its pin tests on purpos
   - The zip gun hit radius reads 0.225.
   - Any other difference is a regression to report.
 
+- **A8 — Mine vs portal look (Tudor, 2026-09-17 evening; confirms and sharpens Task 3).** They "still look similar" in
+  the current build (Task 3 isn't built yet). Build Task 3 so the difference reads at a glance from the game camera:
+  - **Portal:** coloured **outer edge** like a portal: a bright rim ring in the **placing player's team colour**, and
+    a see-through, darker centre. The rim is the dominant colour.
+  - **Mine:** a dark body with the colour **in the middle**: a stud or glowing core in the **placing player's team
+    colour**, and no coloured rim.
+  - Judge it from a 616×576 capture with a mine and a portal side by side; both must be obvious at a glance.
+- **A9 — Mines can be placed anywhere within 2 m of the player (Task 3). Gameplay change.**
+  - **Today:** the mine drops at the caster's root (`MineAbility.cs:77`).
+  - **New:** the mine goes to the player's **aim point on the floor**, clamped to a **Placement Range of 2 m** from
+    the player's centre (horizontal distance) along the aim direction.
+    - New serialized field on the mine ability: `placementRange = 2`, with a plain designer tooltip. Pin it in the
+      guard tests.
+  - **Safety:**
+    - if the clamped point is blocked (a wall or building between the player and the point, or no floor under it),
+      pull it back along the line to the last free floor point, found with a knee-height sphere cast and the Task 2
+      floor finder;
+    - never place it inside geometry;
+    - if even the player's own position fails, fall back to today's placement.
+  - The aim point is the one the weapons use (`PlayerAim`). Read it at cast time on the caster, and send the final
+    position the way the mine is spawned today (instantiation data or position), so every client agrees.
+    **No new RPC.**
+  - **Tests:** a pure `MinePlacementRule` (aim point, player position, range → clamped point) with branch tests:
+    inside range, beyond range, zero-length aim.
+  - **Play Mode check:** cast with `SetAimOverride` at 1 m (lands there) and at 5 m (lands at 2 m).
+- **A10 — Tudor uses the computer while agents work.** Never rely on the real mouse or keyboard, and never assume the
+  Unity window has focus. Aim only with `PlayerAim.SetAimOverride`. Don't call `editor_focus`. Prefer
+  in-process/CLI actions to simulated input. If a capture looks wrong because another window covered it, retake it
+  rather than describing a covered frame.
+
 ## Decisions [C] (Tudor delegated; all logged in `assumptions-for-tudor.md` by the task that builds them)
 
 - **Order [C]:** start after the capture ring + minimap plan's step 7 is approved. Same single Editor; no shared files
