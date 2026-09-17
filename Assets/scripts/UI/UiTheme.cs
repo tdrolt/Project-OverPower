@@ -391,8 +391,14 @@ namespace Overpower.UI
         [Tooltip("Gap between the corner minimap's frame and the top and right screen edges, in canvas units.")]
         public float minimapCornerMargin = 24f;
         [Tooltip("Diameter of the large map shown in the middle of the screen while M is toggled on, in canvas units. " +
-                 "Everything on it (bubbles, lines, labels) scales up from the corner sizes by the same amount.")]
+                 "Everything on it (bubbles, lines, labels) scales up from the corner sizes by the same amount. Shrinks " +
+                 "to fit above Large Bottom Clearance if this would otherwise overlap it.")]
         public float minimapLargeSize = 860f;
+        [Tooltip("Height of the strip left clear at the bottom of the screen for the HUD's ability bar while the large " +
+                 "map (M) is open, in canvas units (controller review, 2026-09-17: the map used to cover the HUD). The " +
+                 "large map's diameter shrinks below Large Size if it would otherwise overlap this strip, and the map " +
+                 "centres itself in whatever space remains above it.")]
+        public float minimapLargeBottomClearance = 380f;
         [Tooltip("Width of the dark ring framing the minimap, in canvas units.")]
         public float minimapFrameWidth = 5f;
         [Tooltip("Colour of the minimap's frame (and its background if the baked arena image is missing).")]
@@ -421,7 +427,8 @@ namespace Overpower.UI
         [Tooltip("Thickness of the capture progress ring around a bubble, in canvas units. It fills and blinks like " +
                  "the ring on the ground.")]
         public float minimapProgressRingWidth = 4f;
-        [Tooltip("Width of a link one team owns both ends of, or a way-in link with its arrowhead, in canvas units.")]
+        [Tooltip("Width of a link one team owns both ends of, a way-in link with its arrowhead, or each half of a " +
+                 "Border link (two different teams' zones), in canvas units.")]
         public float minimapOwnedLinkWidth = 4f;
         [Tooltip("Width of a link nobody owns (a thin grey line), in canvas units.")]
         public float minimapNeutralLinkWidth = 2f;

@@ -126,6 +126,7 @@ MonoBehaviour:
   minimapCornerSize: 340
   minimapCornerMargin: 24
   minimapLargeSize: 860
+  minimapLargeBottomClearance: 380
   minimapFrameWidth: 5
   minimapFrameColor: {r: 0.06, g: 0.06, b: 0.08, a: 0.9}
   minimapBackgroundTint: {r: 1, g: 1, b: 1, a: 0.9}

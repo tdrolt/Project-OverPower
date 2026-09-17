@@ -34,17 +34,23 @@ namespace Overpower.UI
     /// TURNS WITH YOUR CAMERA: the map turns by CameraTracking's team yaw, so "up" on the map is "up" on screen. Labels,
     /// progress rings and markers are turned back so they read upright (maths and tests: MinimapLayout).
     ///
-    /// EVERY LINK IS TWO HALVES: built once as two Image rectangles, from each end to the link's midpoint. Owned and
-    /// Neutral colour both halves the same (their two ends share one colour or none), so this reads exactly like one
-    /// line; only Border ends up two-toned. This keeps ApplyLinkStyle a single code path for every MinimapLinkKind
-    /// instead of a special case for Border.
+    /// EVERY LINK IS TWO HALVES: built once as two Image rectangles, split in the middle of the visible GAP between
+    /// the two bubbles' edges (review fix, 2026-09-17; not the midpoint between their centres, which starved the
+    /// capital's half of a busy border down to well under a unit once its progress ring showed). Owned and Neutral
+    /// colour both halves the same (their two ends share one colour or none), so this reads exactly like one line;
+    /// only Border ends up two-toned. This keeps ApplyLinkStyle a single code path for every MinimapLinkKind instead
+    /// of a special case for Border.
     ///
     /// COST: bubbles and lines are built once. Bubble and link colours change only when ownership changes
     /// (BuildingManager.OwnershipChanged, plus the first territory read, which raises no event). Each zone's ring and
     /// outline are worked out every frame from CaptureRingState, but written to the UI only when they change, so an
-    /// idle zone touches nothing. Player markers move every frame. Nothing here allocates per frame.
+    /// idle zone touches nothing. Player markers move every frame, but on their own nested Canvas (review fix,
+    /// 2026-09-17), so moving them re-batches only that Canvas, not the whole minimap. Nothing here allocates per
+    /// frame outside a one-time warning if the map is still waiting to build after 5s (WarnIfSlowToBuild).
     ///
-    /// M and P: opening the large map closes the loadout screen, and opening the loadout screen closes the large map.
+    /// M and P: opening the large map closes the loadout screen, and opening the loadout screen closes the large
+    /// map. The large map fits itself into the space above the HUD (controller review, 2026-09-17) rather than
+    /// covering it - see SetLarge and UiTheme.minimapLargeBottomClearance.
     ///
     /// PHASES (2.7): call MinimapView.Local.SetZoneShown(zone, false) for each zone taken out of play; it hides the
     /// bubble and every link to it.
@@ -108,9 +114,11 @@ namespace Overpower.UI
         private BuildingManager manager;
 
         private RectTransform root;
+        private RectTransform canvasRect;
         private RectTransform map;
         private RectTransform linksLayer;
         private RectTransform zonesLayer;
+        private RectTransform markersLayer;
         private RectTransform teammatesLayer;
         private RectTransform ownMarker;
         private Material textMaterial;
@@ -119,6 +127,10 @@ namespace Overpower.UI
         private bool largeOpen;
         private bool ownershipDirty = true;
         private float appliedYaw = float.NaN;
+        // Review fix, 2026-09-17: TryBuild waits (returns false) until every tower has registered; without this, a
+        // tower that never does left the minimap silently blank forever with nothing in the console to say why.
+        private float buildWaitStartTime = -1f;
+        private bool warnedSlowBuild;
 
         private void Awake()
         {
@@ -215,13 +227,22 @@ namespace Overpower.UI
 
         private bool TryBuild()
         {
+            if (buildWaitStartTime < 0f)
+                buildWaitStartTime = Time.unscaledTime;
+
             manager = BuildingManager.Instance;
             if (manager == null || manager.Map == null || manager.TowerDictionary == null || manager.TowerDictionary.Count == 0)
+            {
+                WarnIfSlowToBuild();
                 return false;
+            }
             // Towers register in their own Start; wait until every zone has, so no bubble is missing.
             foreach (int zone in manager.TowerDictionary.Keys)
                 if (manager.TierOf(zone) <= 0 || !manager.TryGetZoneCentre(zone, out _))
+                {
+                    WarnIfSlowToBuild();
                     return false;
+                }
 
             BuildFrame();
             var zoneIds = new List<int>(manager.TowerDictionary.Keys);
@@ -231,12 +252,35 @@ namespace Overpower.UI
             foreach ((int a, int b) in MinimapLayout.LinkPairs(manager.Map, zoneIds))
                 BuildLink(a, b);
 
-            ownMarker = BuildMarker("You", map, GeneratedSprites.Triangle, theme.minimapOwnMarkerColor, theme.minimapOwnMarkerSize);
+            ownMarker = BuildMarker("You", markersLayer, GeneratedSprites.Triangle, theme.minimapOwnMarkerColor, theme.minimapOwnMarkerSize);
 
             manager.OwnershipChanged += HandleOwnershipChanged;
             built = true;
             SetLarge(false);
             return true;
+        }
+
+        /// <summary>Logs once, only after ~5s of the map still not building (review fix, 2026-09-17): before this, a
+        /// tower that never registered (RegisterCapture never ran) left the minimap silently blank forever, with
+        /// nothing in the console to say why.</summary>
+        private void WarnIfSlowToBuild()
+        {
+            if (warnedSlowBuild || Time.unscaledTime - buildWaitStartTime < 5f)
+                return;
+            warnedSlowBuild = true;
+
+            if (manager == null || manager.Map == null || manager.TowerDictionary == null || manager.TowerDictionary.Count == 0)
+            {
+                Debug.LogWarning("[Minimap] Still waiting to build after 5s - BuildingManager, its territory map or " +
+                                  "TowerDictionary is not ready yet.");
+                return;
+            }
+            var missing = new List<int>();
+            foreach (int zone in manager.TowerDictionary.Keys)
+                if (manager.TierOf(zone) <= 0 || !manager.TryGetZoneCentre(zone, out _))
+                    missing.Add(zone);
+            Debug.LogWarning($"[Minimap] Still waiting to build after 5s - zone(s) not yet registered: " +
+                              $"{string.Join(",", missing)}. Check that each tower's BuildingCapture has run its Start.");
         }
 
         private void BuildFrame()
@@ -255,12 +299,16 @@ namespace Overpower.UI
             // No GraphicRaycaster, on purpose: see the class comment. Adding one would make every shot fired with the
             // cursor over the map silently fail.
 
+            canvasRect = (RectTransform)canvasGo.transform;
+
             root = NewRect("Minimap", canvasGo.transform);
             root.sizeDelta = Vector2.one * theme.minimapCornerSize;
 
             NewImage("Frame", root, GeneratedSprites.Disc, theme.minimapFrameColor, theme.minimapCornerSize + 2f * theme.minimapFrameWidth);
 
-            Image viewport = NewImage("Viewport", root, GeneratedSprites.Disc, Color.white, theme.minimapCornerSize);
+            // MaskDisc (512 px, review fix 2026-09-17), not the shared 128 px Disc: a UGUI Mask reads its sprite's
+            // alpha as a 1-bit stencil test, and the finer source traces a rounder contour before that test runs.
+            Image viewport = NewImage("Viewport", root, GeneratedSprites.MaskDisc, Color.white, theme.minimapCornerSize);
             // Round mask: the turned square picture never shows its corners.
             viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
 
@@ -278,7 +326,16 @@ namespace Overpower.UI
             // Sibling order is draw order: lines under bubbles, bubbles under player markers.
             linksLayer = NewLayer("Links", map);
             zonesLayer = NewLayer("Zones", map);
-            teammatesLayer = NewLayer("Teammates", map);
+            markersLayer = NewLayer("Markers", map);
+            // A nested Canvas (review fix, 2026-09-17): player markers move every frame, and without this UGUI had
+            // to rebuild the WHOLE minimap's batched mesh (links, zone bubbles, labels) each frame just to redraw
+            // two tiny dots. A separate Canvas here gives markers their own batch, so an idle map never rebuilds.
+            markersLayer.gameObject.AddComponent<Canvas>();
+            teammatesLayer = NewLayer("Teammates", markersLayer);
+
+            // Drawn LAST, so on top of and outside the mask (a sibling of Viewport, not a child): a thin,
+            // ordinarily anti-aliased ring covering the mask's remaining stencil seam (review fix, 2026-09-17).
+            NewImage("Edge Ring", root, GeneratedSprites.EdgeRing, theme.minimapFrameColor, theme.minimapCornerSize);
         }
 
         private void BuildZone(int zone)
@@ -315,16 +372,28 @@ namespace Overpower.UI
             zoneById[zone] = ui;
         }
 
-        /// <summary>Every link is two half-line Images, split at the midpoint (controller amendment 2, 2026-09-17):
-        /// Owned/WayIn/Neutral colour both halves the same in ApplyLinkStyle (their two ends share one team or
-        /// none), and only Border ends up two-toned. Geometry (position/length/angle) is fixed here at build time -
-        /// only colour and width change later, on ownership change.</summary>
+        /// <summary>Every link is two half-line Images, split in the middle of the VISIBLE gap between the two
+        /// bubbles' edges - not at the midpoint between their centres (review fix, 2026-09-17): splitting at the
+        /// centre midpoint gave the capital's half only ~0.6 units of visible line once its progress ring was
+        /// showing, on the border that matters most. Owned/WayIn/Neutral colour both halves the same in
+        /// ApplyLinkStyle (their two ends share one team or none), and only Border ends up two-toned. Geometry
+        /// (position/length/angle) is fixed here at build time - only colour and width change later, on ownership
+        /// change.</summary>
         private void BuildLink(int a, int b)
         {
             var link = new LinkUi { A = a, B = b };
             Vector2 posA = zoneById[a].MapPosition;
             Vector2 posB = zoneById[b].MapPosition;
-            Vector2 mid = (posA + posB) / 2f;
+            Vector2 delta = posB - posA;
+            float length = delta.magnitude;
+            Vector2 direction = length > 0.0001f ? delta / length : Vector2.right;
+            // rA/rB: the same "just outside the bubble, outline and progress ring" radius the arrowhead uses
+            // (ZoneRadius). Splitting at posA + direction * (rA + gap/2) puts the seam in the middle of the gap
+            // between the two bubbles' edges, so each visible half gets an equal share regardless of bubble size.
+            float rA = ZoneRadius(zoneById[a]);
+            float rB = ZoneRadius(zoneById[b]);
+            float gap = Mathf.Max(0f, length - rA - rB);
+            Vector2 mid = posA + direction * (rA + gap / 2f);
 
             link.LineA = NewImage($"Link {a}-{b} A", linksLayer, null, theme.minimapNeutralColor, 0f);
             PlaceHalfSegment(link.LineA, posA, mid, theme.minimapNeutralLinkWidth);
@@ -336,6 +405,12 @@ namespace Overpower.UI
             links.Add(link);
         }
 
+        /// <summary>A bubble's visible radius: its own fill plus the outline and progress ring drawn around it - the
+        /// point a link or arrowhead should stop just outside of. Shared by BuildLink's gap split and
+        /// ApplyLinkStyle's arrowhead placement, so the two always agree on where a bubble "ends".</summary>
+        private float ZoneRadius(ZoneUi zone) =>
+            zone.Diameter / 2f + theme.minimapBubbleOutlineWidth + theme.minimapProgressRingWidth;
+
         // ---------------------------------------------------------------- per-frame updates
 
         private void SetLarge(bool open)
@@ -345,10 +420,24 @@ namespace Overpower.UI
             root.anchorMin = anchor;
             root.anchorMax = anchor;
             root.pivot = anchor;
-            float inset = theme.minimapCornerMargin + theme.minimapFrameWidth;
-            root.anchoredPosition = open ? Vector2.zero : new Vector2(-inset, -inset);
-            // One hierarchy for both views: the large map is the corner map scaled up, so every size scales together.
-            root.localScale = Vector3.one * (open ? theme.minimapLargeSize / Mathf.Max(1f, theme.minimapCornerSize) : 1f);
+            if (open)
+            {
+                // Fits above the HUD instead of covering it (controller review, 2026-09-17): the available band runs
+                // from the top margin down to Bottom Clearance above the screen's bottom edge, and the map (at
+                // whatever diameter fits) sits centred inside that band, not at the screen's true centre.
+                float canvasHeight = canvasRect != null ? canvasRect.rect.height : theme.minimapLargeSize;
+                float largeDiameter = Mathf.Min(theme.minimapLargeSize,
+                    canvasHeight - theme.minimapLargeBottomClearance - 2f * theme.minimapCornerMargin);
+                root.anchoredPosition = new Vector2(0f, theme.minimapLargeBottomClearance / 2f);
+                // One hierarchy for both views: the large map is the corner map scaled up, so every size scales together.
+                root.localScale = Vector3.one * (largeDiameter / Mathf.Max(1f, theme.minimapCornerSize));
+            }
+            else
+            {
+                float inset = theme.minimapCornerMargin + theme.minimapFrameWidth;
+                root.anchoredPosition = new Vector2(-inset, -inset);
+                root.localScale = Vector3.one;
+            }
         }
 
         private void ApplyYawIfChanged()
@@ -404,8 +493,8 @@ namespace Overpower.UI
                 return;
             ZoneUi from = style.TowardB ? a : b;
             ZoneUi to = style.TowardB ? b : a;
-            // Just outside the target's bubble, outline and progress ring, pointing at it.
-            float stop = to.Diameter / 2f + theme.minimapBubbleOutlineWidth + theme.minimapProgressRingWidth + theme.minimapArrowheadSize / 2f;
+            // Just outside the target's bubble (ZoneRadius - the same radius BuildLink's gap split uses), pointing at it.
+            float stop = ZoneRadius(to) + theme.minimapArrowheadSize / 2f;
             RectTransform arrowRect = link.Arrow.rectTransform;
             arrowRect.anchoredPosition = MinimapLayout.PointBeforeEnd(from.MapPosition, to.MapPosition, stop);
             // The triangle sprite points up (+y); a segment's angle is measured from +x.
