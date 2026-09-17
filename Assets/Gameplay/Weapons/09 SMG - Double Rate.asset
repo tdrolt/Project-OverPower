@@ -29,13 +29,13 @@ MonoBehaviour:
   projectileSpeed: 52
   projectileRadius: 0.08
   maxRange: 20
-  minConeAngle: 4
-  maxConeAngle: 20
+  minConeAngle: 7
+  maxConeAngle: 28
   bloomPerShot: 1.6
-  recoveryPerSecond: 9
-  standingStillMultiplier: 1.5
-  movingSpreadDegrees: 4
-  movingBloomPerSecond: 10
+  recoveryPerSecond: 4
+  standingStillMultiplier: 1.2
+  movingSpreadDegrees: 6
+  movingBloomPerSecond: 6
   overheatPerShot: 2.2
   overheatRefundOnHit: 0
   canCharge: 0

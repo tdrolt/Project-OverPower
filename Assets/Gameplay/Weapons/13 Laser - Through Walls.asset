@@ -18,8 +18,8 @@ MonoBehaviour:
   parent: {fileID: 11400000, guid: 8fa3cfc5d5169494cb5251a678cca581, type: 2}
   icon: {fileID: 0}
   goldCost: 1600
-  damage: 16
-  fireInterval: 0.5
+  damage: 21
+  fireInterval: 0.7
   projectilesPerShot: 1
   simultaneous: 0
   sequentialDelay: 0.07
@@ -36,8 +36,8 @@ MonoBehaviour:
   standingStillMultiplier: 1.5
   movingSpreadDegrees: 2
   movingBloomPerSecond: 2.5
-  overheatPerShot: 14
-  overheatRefundOnHit: 7
+  overheatPerShot: 20
+  overheatRefundOnHit: 10
   canCharge: 0
   maxChargeSeconds: 0
   chargeSteps: 0
