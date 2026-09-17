@@ -128,35 +128,36 @@ namespace Overpower.Tests
         };
 
         [Test]
-        public void AKnownEquilateralCaseMatchesHandMaths()
+        public void AVertexDirectionPointNeedsRadiusEqualToItsDistance()
         {
-            // A single point straight along vertex 0's own direction, at distance 10: the worst-case reach is along
-            // n0 (dot = 10; dot with n1/n2 is -5), so R = 2*10 + margin.
-            var points = new List<Vector2> { new Vector2(0f, 10f) };
-            Assert.AreEqual(20f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
-            Assert.AreEqual(24f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 4f), 1e-3f);
+            // A point exactly at vertex 0's own direction, distance D out, is the vertex itself: R must reach
+            // exactly D, no more (review fix, 2026-09-17 - the edge opposite a vertex has OUTWARD normal -d_i, not
+            // +d_i; the old sign made this point read as forcing R = 2D instead, twice too big).
+            const float d = 10f;
+            var points = new List<Vector2> { new Vector2(0f, d) };
+            Assert.AreEqual(d, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
+            Assert.AreEqual(d + 4f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 4f), 1e-3f);
         }
 
         [Test]
-        public void APointExactlyOnAnEdgeStillMatchesItsNormal()
+        public void AnOppositePointNeedsRadiusTwiceItsDistance()
         {
-            // A point sitting exactly on the (extended) edge opposite vertex 0 - i.e. at inradius distance along n0,
-            // zero along the edge's own direction - still measures correctly via the plain dot product.
-            const float inradius = 6f;
-            Vector2 edgeDirection = new Vector2(1f, 0f); // perpendicular to n0 = (0,1)
-            var points = new List<Vector2> { new Vector2(edgeDirection.x * 3f, inradius) };
-            Assert.AreEqual(12f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
+            // A point straight OPPOSITE vertex 0 (along -d0), distance D out, touches the edge facing vertex 0 at
+            // exactly its inradius: R/2 = D, so R = 2D.
+            const float d = 10f;
+            var points = new List<Vector2> { new Vector2(0f, -d) };
+            Assert.AreEqual(2f * d, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
         }
 
         [Test]
-        public void ThePointThatForcesRIsWhicheverReachesFarthestOnAnyNormal()
+        public void TheWorstPointAcrossAllCornersAndNormalsForcesRPlusMargin()
         {
-            // Two points: one reaches 5 along n0, the other reaches 9 along n1 - the second one must win, even
-            // though it is not the farthest point from the centre in a plain radius sense (its distance is
-            // Sqrt(9^2 + small) rather than a clean number), because TriangleCircumradius measures per-normal reach,
-            // not overall distance.
-            var points = new List<Vector2> { new Vector2(0f, 5f), new Vector2(-0.8660254f * 9f, -0.5f * 9f) };
-            Assert.AreEqual(18f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
+            // Two points: one reaches 5 (opposite vertex 0, along -d0), the other reaches 9 (opposite vertex 1,
+            // along -d1) - the second must win despite not being the farthest point from the centre in a plain
+            // radius sense, because TriangleCircumradius measures per-normal reach, not overall distance. The
+            // margin is added once, on top of 2x the winning reach.
+            var points = new List<Vector2> { new Vector2(0f, -5f), new Vector2(0.8660254f * 9f, 0.5f * 9f) };
+            Assert.AreEqual(21f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 3f), 1e-3f);
         }
 
         [Test]

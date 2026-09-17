@@ -341,10 +341,8 @@ namespace Overpower.UI
             root = NewRect("Minimap", canvasGo.transform);
             root.sizeDelta = Vector2.one * theme.minimapCornerSize;
 
-            // The dark disc backdrop stays round on purpose: only the mask itself becomes a triangle (Tudor,
-            // 2026-09-17), so a round frame shows around it, like a triangular window in a round surround.
-            NewImage("Frame", root, GeneratedSprites.Disc, theme.minimapFrameColor, theme.minimapCornerSize + 2f * theme.minimapFrameWidth);
-
+            // No round backdrop (review fix, 2026-09-17): nothing may be visible outside the triangle at all, not
+            // even a dark disc peeking out around it - only the triangle window and its EdgeTriangle frame below.
             // MaskTriangle (512 px, one vertex toward each capital - Tudor, 2026-09-17), not a disc: a UGUI Mask
             // reads its sprite's alpha as a 1-bit stencil test, and the finer source traces a smoother contour
             // before that test runs. viewport itself carries the yaw+base rotation (ApplyYawIfChanged) so the
