@@ -477,11 +477,16 @@ public class BuildingCapture : MonoBehaviourPun
             return;
         }
 
-        if (capturingID == -1)
-        {
-            capturingID = playersInZone[0].teamID;
-            captureProgress = 0;
-        }
+        // Re-decided from the listed players every tick (bug fix, 2026-09-17), not just when unset: a
+        // trigger event used to be able to set capturingID to a team with nobody listed at all, which
+        // then locked out a lone real capturer until they stepped out and back in - see CaptureClaimRule's
+        // own comment. teamsInZone is the same reusable buffer HandleCapturedState uses for DrainRule;
+        // the two never run in the same frame (Update calls one or the other), so reusing it here adds
+        // no per-frame allocation.
+        teamsInZone.Clear();
+        foreach (PlayerTeam p in playersInZone)
+            teamsInZone.Add(p.teamID);
+        (capturingID, captureProgress) = CaptureClaimRule.Resolve(capturingID, captureProgress, teamsInZone);
 
         var eligiblePlayers = playersInZone.Where(p => p.teamID == capturingID).ToList();
         var enemyPlayers = playersInZone.Any(p => p.teamID != capturingID);
@@ -620,8 +625,8 @@ public class BuildingCapture : MonoBehaviourPun
             return;
         }
 
-        // Same two calls, same order, as a normal entry in OnTriggerEnter.
-        photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, player.teamID);
+        // Same report as a normal entry in OnTriggerEnter - the claim itself is no longer set from
+        // here either (bug fix, 2026-09-17): CalculateCaptureProgress re-decides it every tick.
         photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, localPlayerViewIdInZone);
     }
 
@@ -686,15 +691,15 @@ public class BuildingCapture : MonoBehaviourPun
         if (!manager.Map.MayCapture(player.teamID, buildingID, manager.Current.OwnersByZone()))
             return;
 
-        if (capturingID == -1)
-            capturingID = player.teamID;
-
-        // No immediate reset if an enemy enters; recapture decay is handled in HandleCapturedState.
-        photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, player.teamID);
-
+        // capturingID is no longer set from here (bug fix, 2026-09-17): this runs on EVERY client for
+        // EVERY player's collider, remote copies included, with no IsMine check - on the master, that
+        // used to write the real claim from a player nobody had actually listed yet (or ever would,
+        // for a remote copy grazing the trigger on lag/teleport/dash), which could lock out a lone
+        // real capturer until they stepped out and back in. CalculateCaptureProgress now re-decides
+        // the claim every tick from who is actually listed (CaptureClaimRule) instead.
         if (player.photonView.IsMine)
         {
-            Debug.Log($"[BuildingCapture] Team {player.teamID} entered tower {buildingID} (capturingID {capturingID}).");
+            Debug.Log($"[BuildingCapture] Team {player.teamID} entered tower {buildingID}.");
             localPlayerViewIdInZone = player.photonView.ViewID;
             photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, player.photonView.ViewID);
         }
@@ -719,6 +724,12 @@ public class BuildingCapture : MonoBehaviourPun
         }
     }
 
+    // Kept for RpcList index stability (Photon's RPC list is index-based; never rename or remove an
+    // RPC) even though the neutral-capture bug fix (2026-09-17) removed its OnTriggerEnter and
+    // OnMasterClientChanged sends - CalculateCaptureProgress re-decides a neutral claim every tick
+    // instead (CaptureClaimRule). Still sent once, from HandleCapturedState's drain-start case: that
+    // path is untouched here (DrainRule already decides a drain from the listed players, the same
+    // fix this RPC no longer needs for a neutral claim).
     [PunRPC]
     void RPC_UpdateCapturingID(int teamID)
     {
