@@ -708,7 +708,11 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         ctx.lineTo(boundaryPx, area.bottom);
         ctx.stroke();
         ctx.restore();
-        labels.push({ x: boundaryPx, y: area.top + 10, text: 'Phase 2 starts', color: '#c0392b', align: 'center' });
+        // Round-3 review fix (item 3): the top of the plot is exactly where a full-width band's
+        // own label sits too (the highest reference value, e.g. 'Dom1') - drawn at the BOTTOM of
+        // the plot instead, on every chart that has a boundary line, so the two can never collide
+        // regardless of which bands (if any) that particular chart also draws.
+        labels.push({ x: boundaryPx, y: area.bottom - 4, text: 'Phase 2 starts', color: '#c0392b', align: 'center' });
       }
 
       (cfg.bands || []).forEach(function (b) {
@@ -724,7 +728,16 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         ctx.lineTo(xTo, y);
         ctx.stroke();
         ctx.restore();
-        labels.push({ x: Math.min(xTo + 4, area.right - 2), y: Math.max(area.top + 8, Math.min(y + 3, area.bottom - 2)), text: b.label, color: '#888', align: 'left' });
+        var labelY = Math.max(area.top + 8, Math.min(y + 3, area.bottom - 2));
+        // Round-3 review fix (item 2): a band reaching the chart's own right edge (side 'full' or
+        // 'after') was still left-aligned at area.right - 2, so its text ran off the right of the
+        // plot and got cut at the canvas edge - right-align it there instead. A 'before' band ends
+        // at the boundary line, comfortably inside the plot, so it stays left-aligned just past it.
+        if (xTo >= area.right - 0.5) {
+          labels.push({ x: area.right - 2, y: labelY, text: b.label, color: '#888', align: 'right' });
+        } else {
+          labels.push({ x: Math.min(xTo + 4, area.right - 2), y: labelY, text: b.label, color: '#888', align: 'left' });
+        }
       });
 
       ctx.restore(); // undo the clip - labels below are drawn unclipped, positions already clamped inside the area.

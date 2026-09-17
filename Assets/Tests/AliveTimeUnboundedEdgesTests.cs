@@ -115,5 +115,34 @@ namespace Overpower.Tests
                 Directory.Delete(temp, true);
             }
         }
+
+        // Round-3 review fix: OverlapWithUnboundedEdges mirrored Contains' OLD (pre-item-9) rule -
+        // `Start <= 0` alone - so a transition at exactly t=0 gave BOTH Phase 1 (now the empty
+        // [0,0) window) and Phase 2 an unbounded lower edge, double-counting a t=-1 death into
+        // both instead of the one window that actually owns it.
+        [Test]
+        public void ATransitionAtExactlyZeroDoesNotDoubleCountATMinusOneDeathsLifeIntoBothPhases()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session() + "{\"e\":\"phase\",\"t\":0,\"num\":2,\"remain\":[0]}\n" + Death(-1, 30f) + "{\"e\":\"sample\",\"t\":50,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var set = TelemetryAggregator.BuildSet(TelemetryLog.Load(temp));
+                double whole = set.WholeMatch.Players.Single(p => p.Actor == 1).TimeAlive;
+                double p1 = set.Phase1.Players.Single(p => p.Actor == 1).TimeAlive;
+                double p2 = set.Phase2.Players.Single(p => p.Actor == 1).TimeAlive;
+
+                Assert.AreEqual(30.0, whole, 1e-6);
+                Assert.AreEqual(0.0, p1, 1e-6, "Phase 1 is the empty [0,0) window when the transition is at 0 - it must not also claim this life");
+                Assert.AreEqual(30.0, p2, 1e-6);
+                Assert.AreEqual(whole, p1 + p2, 0.01);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
     }
 }

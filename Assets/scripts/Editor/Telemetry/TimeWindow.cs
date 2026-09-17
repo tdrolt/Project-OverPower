@@ -104,7 +104,13 @@ namespace Overpower.EditorTools.Telemetry
         /// negative) when the span doesn't reach this window at all.</summary>
         public double OverlapWithUnboundedEdges(double spanStart, double spanEnd)
         {
-            double lo = Start <= 0 ? double.NegativeInfinity : Start;
+            // Round-3 review fix: `Start <= 0` alone gave the SAME -infinity lower bound to both
+            // Phase 1 and Phase 2 when the transition lands at exactly t == 0 - Phase 1 becomes
+            // the empty [0, 0) window in that case, and an empty window must not claim a life
+            // that only exists via the unbounded edge either. Mirrors Contains' own item-9 guard
+            // (Start < End), plus EndInclusive for the degenerate case where the last window is
+            // ALSO zero-length (Start == End) but is still the only window there is.
+            double lo = (Start <= 0 && (Start < End || EndInclusive)) ? double.NegativeInfinity : Start;
             double hi = EndInclusive ? double.PositiveInfinity : End;
             return System.Math.Max(0.0, System.Math.Min(spanEnd, hi) - System.Math.Max(spanStart, lo));
         }
