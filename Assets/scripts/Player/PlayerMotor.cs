@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Data;
 
 /// <summary>
@@ -55,6 +56,18 @@ public class PlayerMotor : MonoBehaviour
     // without needing to know about each other or fight over a single number.
     private readonly Dictionary<object, float> speedMultipliers = new Dictionary<object, float>();
 
+    // Movement step 4, owner only: the last spot this player stood on floor with a player's width inside the arena
+    // outline - where the safety net puts them back - and the shapes the check needs.
+    private Vector3 lastSafePosition;
+    private bool hasLastSafePosition;
+    private CapsuleCollider capsule;
+    private int groundMask;
+    private float groundedProbeMetres;
+
+    // Not a tuning value: how far BELOW the capsule's own bottom still counts as standing on something, so a small
+    // bump or a step doesn't read as being in mid-air.
+    private const float GroundedSlackMetres = 0.3f;
+
     // Where a remote (non-owner) copy of this player lerps toward. Pushed in by PlayerNetSync's
     // OnPhotonSerializeView.
     private Vector3 networkPosition;
@@ -89,6 +102,11 @@ public class PlayerMotor : MonoBehaviour
     /// stays an event rather than a direct call.</summary>
     public event System.Action FellBelowKillHeight;
 
+    /// <summary>Fired when this (locally owned) player's centre ends up outside the arena outline, with the last spot
+    /// they stood safely inside. Like FellBelowKillHeight, PlayerMotor only notices - PlayerLifecycle decides what to
+    /// do about it.</summary>
+    public event System.Action<Vector3> LeftArena;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -102,6 +120,13 @@ public class PlayerMotor : MonoBehaviour
             Debug.LogError($"[PlayerMotor] {name}: GameplayConfig is not assigned - falling back " +
                             "to a kill height of -10.");
         killHeight = gameplayConfig != null ? gameplayConfig.KillHeight : -10f;
+
+        capsule = GetComponent<CapsuleCollider>();
+        groundMask = LayerMask.GetMask("Default", "Building");
+        // The capsule's bottom sits (height/2 - centre.y) below the root; the slack is what a bump or a step may add.
+        groundedProbeMetres = capsule != null
+            ? capsule.height * 0.5f - capsule.center.y + GroundedSlackMetres
+            : 1f;
     }
 
     private void Start()
@@ -127,6 +152,8 @@ public class PlayerMotor : MonoBehaviour
             // respawn key would be an escape hatch out of a losing fight.
             if (transform.position.y < killHeight)
                 FellBelowKillHeight?.Invoke();
+
+            CheckArenaBounds();
 
             if (!ExternalMotionControl)
                 Move();
@@ -154,6 +181,37 @@ public class PlayerMotor : MonoBehaviour
         networkPosition = position;
         networkRotation = rotation;
     }
+
+    /// <summary>Movement step 4, owner only: remembers where this player last stood safely inside the arena, and
+    /// reports it when they end up outside (OutOfArenaRule). A scene without an arena outline - the test range, a
+    /// preview scene - has nothing to check.</summary>
+    private void CheckArenaBounds()
+    {
+        ArenaBounds bounds = ArenaSymmetry.ActiveBounds;
+        if (bounds == null || capsule == null)
+            return;
+
+        Vector3 position = rb.position;
+        float signed = bounds.SignedDistance(position);
+        // The ray only matters for a spot that could be remembered, so it is skipped everywhere else.
+        bool grounded = signed >= capsule.radius && IsStandingOnFloor(position);
+
+        switch (OutOfArenaRule.Decide(signed, capsule.radius, grounded, hasLastSafePosition))
+        {
+            case OutOfArenaAction.RememberAsSafe:
+                lastSafePosition = position;
+                hasLastSafePosition = true;
+                break;
+
+            case OutOfArenaAction.ReturnToLastSafe:
+                LeftArena?.Invoke(lastSafePosition);
+                break;
+        }
+    }
+
+    // The ray starts inside this player's own capsule, which a raycast never reports, so only real floor below counts.
+    private bool IsStandingOnFloor(Vector3 rootPosition) =>
+        Physics.Raycast(rootPosition, Vector3.down, groundedProbeMetres, groundMask, QueryTriggerInteraction.Ignore);
 
     public void AddSpeedMultiplier(object key, float multiplier) => speedMultipliers[key] = multiplier;
 

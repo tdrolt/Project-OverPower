@@ -140,6 +140,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         playerHealth.Died += HandlePlayerHealthDied;
         playerMotor = GetComponent<PlayerMotor>();
         playerMotor.FellBelowKillHeight += HandleFellBelowKillHeight;
+        playerMotor.LeftArena += HandleLeftArena;
         playerDisplacement = GetComponent<PlayerDisplacement>();
 
         // How the master client finds a specific victim's PhotonView in RPC_HandleDeathMaster
@@ -202,7 +203,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (playerHealth != null)
             playerHealth.Died -= HandlePlayerHealthDied;
         if (playerMotor != null)
+        {
             playerMotor.FellBelowKillHeight -= HandleFellBelowKillHeight;
+            playerMotor.LeftArena -= HandleLeftArena;
+        }
     }
 
     /// Reacts to PlayerHealth reporting a lethal hit, rather than polling health every frame.
@@ -223,6 +227,22 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     {
         if (isAlive)
             ReturnToSpawn();
+    }
+
+    /// Movement step 4: PlayerMotor found this player's centre outside the arena outline - through a boundary wall, or
+    /// by some way out nobody has found yet - and hands over the last spot they stood safely inside. Deliberately NOT a
+    /// death, exactly like falling out of the world: leaving the arena is a level problem, not a play outcome. Whatever
+    /// move is running is cancelled first, so it can't carry the body on from outside and so a knockback can't make
+    /// TeleportTo refuse.
+    private void HandleLeftArena(Vector3 lastSafePosition)
+    {
+        if (!isAlive || playerDisplacement == null)
+            return;
+
+        Vector3 outside = rigidbody != null ? rigidbody.position : transform.position;
+        playerDisplacement.Cancel();
+        if (playerDisplacement.TeleportTo(lastSafePosition))
+            Debug.Log($"[VIS] left the arena at {outside}, returned to {lastSafePosition}");
     }
 
     void PlayerDied()
