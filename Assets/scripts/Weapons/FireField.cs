@@ -72,6 +72,13 @@ namespace Overpower.Weapons
         private const int MaxBurningColliders = 32;
         private static readonly Collider[] OverlapBuffer = new Collider[MaxBurningColliders];
 
+        // Not a design tunable: A2 (Tudor 2026-09-17 evening, gameplay change) turned the burn area into an upright
+        // cylinder standing on the field's own floor position, so "standing in the drawn circle" is exactly "being
+        // burned" whatever a player's exact height is - 2 m comfortably covers a standing player's whole body
+        // (ankles to well over head), not just one fixed altitude the way the old sphere at the field's own
+        // (previously floating) centre was.
+        private const float BurnHeightMetres = 2f;
+
         // One tick, one hit per victim - a player is several colliders to Physics. Same reasoning
         // as ExplodeOnImpact.caught, and reused across ticks rather than reallocated per tick.
         private readonly HashSet<IDamageable> burning = new HashSet<IDamageable>();
@@ -217,8 +224,11 @@ namespace Overpower.Weapons
 
             burning.Clear();
 
-            int count = Physics.OverlapSphereNonAlloc(transform.position, radius, OverlapBuffer,
-                                                       burnMask, QueryTriggerInteraction.Ignore);
+            // A2: an upright capsule over the drawn disc, not a sphere at this field's own centre - see
+            // OverlapBurnZone's own comment. Still runs on every client, same as before: damage below is still
+            // victim-side (this class's own comment), so this only changes WHICH colliders the query considers,
+            // never who applies the result.
+            int count = OverlapBurnZone(Physics.defaultPhysicsScene, transform.position, radius, OverlapBuffer, burnMask);
 
             for (int i = 0; i < count; i++)
             {
@@ -236,6 +246,20 @@ namespace Overpower.Weapons
                                                    DamageSource.Burn, false, transform.position, -1));
             }
         }
+
+        /// <summary>
+        /// The upright capsule a standing player's whole body sits in, over the field's own drawn disc - A2's
+        /// replacement for the old sphere at this field's floating centre. <paramref name="floorCentre"/> is this
+        /// field's own transform.position, which A2 also moved onto the floor (DetonateAtCursor.OnExpired), so the
+        /// capsule's own base already sits on the ground it burns.
+        ///
+        /// A static method taking an explicit PhysicsScene - the same seam GroundSnap.TryFindGroundY uses - purely
+        /// so FireFieldBurnZoneTests can query it against real colliders in an edit-mode preview scene rather than
+        /// the live Game Scene; BurnEveryoneInside above calls it with Physics.defaultPhysicsScene at runtime.
+        /// </summary>
+        public static int OverlapBurnZone(PhysicsScene physics, Vector3 floorCentre, float radius, Collider[] results, int mask) =>
+            physics.OverlapCapsule(floorCentre, floorCentre + Vector3.up * BurnHeightMetres, radius, results, mask,
+                                    QueryTriggerInteraction.Ignore);
 
         /// <summary>The same no-friendly-fire rule as the rest of the damage paths, so you cannot
         /// set your own team on fire. Unknown teams fail OPEN and stay valid targets, matching

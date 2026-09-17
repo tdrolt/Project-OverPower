@@ -152,6 +152,22 @@ namespace Overpower.Tests
             AssertNoCollider(prefab);
         }
 
+        [Test]
+        public void TheFireFieldHasNoVisualChildSnapItAlreadySpawnsOnTheFloor()
+        {
+            // A2 (Tudor 2026-09-17 evening, gameplay change): DetonateAtCursor now spawns this prefab's ROOT at the
+            // floor point below the burst (GroundSnap.TryFindGroundY, read on the shooter's own client and
+            // replicated by PhotonNetwork.Instantiate's own position argument - no new RPC), so the disc already
+            // riding on that root needs no floor-snap of its own. The plan's printed Task 6 Step 1 put a
+            // SnapVisualToGround on this prefab's Visual child instead; A2 supersedes that - a second, independent
+            // floor probe on the disc would fight the root's own placement every frame for no reason.
+            GameObject prefab = Load("Assets/Resources/Fire Field.prefab");
+            Transform visual = Child(prefab.transform, "Visual");
+            Assert.IsNull(visual.GetComponent<SnapVisualToGround>(),
+                "the field's root is placed on the floor at spawn time - see DetonateAtCursor.OnExpired");
+            AssertNoCollider(prefab);
+        }
+
         // ---- ability visuals steps 3-7 add their tests below this line ----
 
         [Test]

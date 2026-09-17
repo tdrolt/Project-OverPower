@@ -1,5 +1,6 @@
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Abilities;
 using Overpower.Combat;
 
 namespace Overpower.Weapons
@@ -135,11 +136,21 @@ namespace Overpower.Weapons
                 PhotonNetwork.LocalPlayer.ActorNumber != context.ShooterActorNumber)
                 return;
 
+            // A2 (Tudor 2026-09-17 evening, gameplay change): the field goes on the FLOOR below the burst, not at
+            // the rocket's own muzzle-height position - found here, on the shooter's own client, with the same
+            // floor finder every other ability visual uses (GroundSnap). PhotonNetwork.Instantiate's own position
+            // argument below replicates whatever this client decided to every other machine exactly as it does
+            // today, so no new RPC is needed for every client to agree on where the field sits. Falls back to the
+            // rocket's own position over a void, the same fallback every other GroundSnap caller uses.
+            Vector3 spawnPosition = transform.position;
+            if (GroundSnap.TryFindGroundY(transform.position, out float groundY))
+                spawnPosition = new Vector3(transform.position.x, groundY, transform.position.z);
+
             // Task 2.6 review: the combined multiplier (behaviour-scaling * OverPower's fire-time
             // bonus) - the same product Damage and SplashDamageAt already apply, so the burning
             // ground this rocket leaves scales with the shot exactly like its direct hit and its
             // splash do, instead of always burning at the prefab's bare damagePerSecond.
-            FireField.Spawn(fireFieldPrefab, transform.position, context.Weapon.Id,
+            FireField.Spawn(fireFieldPrefab, spawnPosition, context.Weapon.Id,
                              context.DamageMultiplier * context.FireTimeDamageMultiplier);
         }
     }

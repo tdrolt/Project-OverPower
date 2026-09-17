@@ -199,6 +199,14 @@ namespace Overpower.Tests
         [Test]
         public void CursorRocketFireFieldNumbersAreUnchanged()
         {
+            // A2 (Tudor 2026-09-17 evening, gameplay change) fact, recorded here rather than as a new assertion:
+            // DetonateAtCursor.OnExpired now spawns this prefab at the FLOOR point below the burst
+            // (GroundSnap.TryFindGroundY on the shooter's own client, replicated by PhotonNetwork.Instantiate's own
+            // position argument - no new RPC), not at the rocket's own muzzle-height position, and
+            // FireField.BurnEveryoneInside now burns an upright capsule over the drawn disc instead of a sphere at
+            // the field's old floating centre (FireField.OverlapBurnZone, pinned in FireFieldBurnZoneTests against
+            // real colliders - a capsule query needs a live PhysicsScene, which this asset-only pin test never
+            // opens). None of the serialized numbers below moved; only where the field spawns and what shape burns.
             AssetAt(Fields<DetonateAtCursor>("Assets/Gameplay/Projectiles/Rocket Cursor.prefab"), "fireFieldPrefab",
                 "Assets/Resources/Fire Field.prefab");
             SerializedObject field = Fields<FireField>("Assets/Resources/Fire Field.prefab");
