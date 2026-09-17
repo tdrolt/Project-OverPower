@@ -385,6 +385,66 @@ namespace Overpower.UI
         [Tooltip("The dark loop behind a capture's progress band, so how full it is reads like a loading bar.")]
         public Color captureRingTrackColor = new Color(0f, 0f, 0f, 0.4f);
 
+        [Header("Minimap (2026-09-16)")]
+        [Tooltip("Diameter of the round minimap in the top-right corner, in canvas units.")]
+        public float minimapCornerSize = 340f;
+        [Tooltip("Gap between the corner minimap's frame and the top and right screen edges, in canvas units.")]
+        public float minimapCornerMargin = 24f;
+        [Tooltip("Diameter of the large map shown in the middle of the screen while M is toggled on, in canvas units. " +
+                 "Everything on it (bubbles, lines, labels) scales up from the corner sizes by the same amount.")]
+        public float minimapLargeSize = 860f;
+        [Tooltip("Width of the dark ring framing the minimap, in canvas units.")]
+        public float minimapFrameWidth = 5f;
+        [Tooltip("Colour of the minimap's frame (and its background if the baked arena image is missing).")]
+        public Color minimapFrameColor = new Color(0.06f, 0.06f, 0.08f, 0.9f);
+        [Tooltip("Tint and opacity of the baked arena picture under the minimap. Lower the alpha or darken it so the " +
+                 "bubbles and lines stand out more.")]
+        public Color minimapBackgroundTint = new Color(1f, 1f, 1f, 0.9f);
+        [Tooltip("Bubble diameter of a Tier 1 zone (capital) on the corner minimap, in canvas units. The GDD draws " +
+                 "capitals largest.")]
+        public float minimapBubbleDiameterTier1 = 36f;
+        [Tooltip("Bubble diameter of a Tier 2 zone on the corner minimap, in canvas units (small in the GDD).")]
+        public float minimapBubbleDiameterTier2 = 24f;
+        [Tooltip("Bubble diameter of a Tier 3 zone on the corner minimap, in canvas units (small in the GDD).")]
+        public float minimapBubbleDiameterTier3 = 24f;
+        [Tooltip("Bubble diameter of the Tier 4 centre zone on the corner minimap, in canvas units (medium in the GDD).")]
+        public float minimapBubbleDiameterTier4 = 30f;
+        [Tooltip("Width of the dark outline around each zone bubble, in canvas units. It pulses to Capture Ring Warning " +
+                 "Colour while the zone is under attack.")]
+        public float minimapBubbleOutlineWidth = 3f;
+        [Tooltip("Colour of a zone bubble's outline when nothing is attacking it.")]
+        public Color minimapBubbleOutlineColor = new Color(0f, 0f, 0f, 0.85f);
+        [Tooltip("Fill of a neutral zone's bubble, and colour of a link nobody owns.")]
+        public Color minimapNeutralColor = new Color(0.55f, 0.55f, 0.55f, 1f);
+        [Tooltip("Font size of the I / II / III / IV label on each bubble, in canvas units.")]
+        public float minimapLabelSize = 16f;
+        [Tooltip("Thickness of the capture progress ring around a bubble, in canvas units. It fills and blinks like " +
+                 "the ring on the ground.")]
+        public float minimapProgressRingWidth = 4f;
+        [Tooltip("Width of a link one team owns both ends of, or a way-in link with its arrowhead, in canvas units.")]
+        public float minimapOwnedLinkWidth = 4f;
+        [Tooltip("Width of a link nobody owns (a thin grey line), in canvas units.")]
+        public float minimapNeutralLinkWidth = 2f;
+        [Tooltip("Size of a way-in arrowhead, in canvas units. It points from a team's zone toward the neutral zone next to it.")]
+        public float minimapArrowheadSize = 12f;
+        [Tooltip("Size of your own arrow on the minimap, in canvas units. It points where you face.")]
+        public float minimapOwnMarkerSize = 18f;
+        [Tooltip("Colour of your own arrow on the minimap.")]
+        public Color minimapOwnMarkerColor = new Color(1f, 0.85f, 0.25f, 1f);
+        [Tooltip("Diameter of a teammate's dot on the minimap, in canvas units. Enemies aren't shown.")]
+        public float minimapTeammateDotSize = 10f;
+        [Tooltip("Colour of a teammate's dot on the minimap.")]
+        public Color minimapTeammateDotColor = new Color(0.45f, 1f, 0.45f, 1f);
+
+        /// <summary>The corner-map bubble diameter for a zone tier (1 capital ... 4 centre).</summary>
+        public float MinimapBubbleDiameter(int tier) => tier switch
+        {
+            1 => minimapBubbleDiameterTier1,
+            3 => minimapBubbleDiameterTier3,
+            4 => minimapBubbleDiameterTier4,
+            _ => minimapBubbleDiameterTier2,
+        };
+
         [Header("OverPower (Task 2.6, GDD p.20)")]
         [Tooltip("Text shown in the HUD's OverPower label while the buff is fully ACTIVE.")]
         public string overPowerActiveText = "OVERPOWER";

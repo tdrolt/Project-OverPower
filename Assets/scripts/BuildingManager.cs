@@ -228,6 +228,19 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return zoneId >= 0;
     }
 
+    /// <summary>The world position of a zone's tower, its capture centre. False while that tower hasn't registered
+    /// yet (RegisterCapture runs in BuildingCapture.Start). The minimap places its bubbles from this.</summary>
+    public bool TryGetZoneCentre(int zone, out Vector3 centre)
+    {
+        if (captures.TryGetValue(zone, out BuildingCapture capture) && capture != null)
+        {
+            centre = capture.transform.position;
+            return true;
+        }
+        centre = default;
+        return false;
+    }
+
     /// <summary>How far position is from the edge of the nearest zone teamId owns - 0 while standing
     /// inside one, PositiveInfinity if the team owns nothing (or the room's territory state has not
     /// been read yet). Same building block as TryGetZoneAt, reused by the shop's "in your own

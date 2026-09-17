@@ -71,10 +71,8 @@ public class PlayerInputRouter : MonoBehaviour
     public event System.Action MobilityPressed;
     public event System.Action MobilityReleased;
 
-    // Map and Scoreboard still have nothing subscribed - those UIs do not exist yet, and are wired
-    // here so they have a gated input source to subscribe to on day one instead of adding their
-    // own Input.GetKeyDown. Shop now has a subscriber (Task 9's LoadoutScreen), and is raised
-    // through EmitShop below rather than the general Emit every other event uses - see its comment.
+    // Scoreboard still has nothing subscribed. Shop (LoadoutScreen) and Map (MinimapView) each have their own,
+    // narrower emit gate - see ShopSuppressed and MapSuppressed.
     public event System.Action MapToggled;
     public event System.Action ShopToggled;
     public event System.Action ScoreboardPressed;
@@ -97,6 +95,11 @@ public class PlayerInputRouter : MonoBehaviour
     /// must leave InputSuppressed true, which only works if opening/closing the loadout while F1
     /// holds focus works at all).</summary>
     private bool ShopSuppressed => !isAlive || IsTypingInChat();
+
+    /// <summary>MapToggled's gate: the same as ShopSuppressed, and for the same reason. The loadout screen holds tool
+    /// focus while open, and M must still work then, because opening the large map closes the P screen (capture ring
+    /// + minimap spec, 2026-09-16). The map is only something to look at; it claims no focus of its own.</summary>
+    private bool MapSuppressed => !isAlive || IsTypingInChat();
 
     /// <summary>
     /// General-purpose input lock for anything that is a tool rather than gameplay - the F1 test
@@ -165,7 +168,7 @@ public class PlayerInputRouter : MonoBehaviour
         primaryAction.started += _ => EmitPointerGated(PrimaryPressed); primaryAction.canceled += _ => Emit(PrimaryReleased);
         equipmentAction.started += _ => EmitPointerGated(EquipmentPressed); ultimateAction.started += _ => Emit(UltimatePressed);
         mobilityAction.started += _ => Emit(MobilityPressed); mobilityAction.canceled += _ => Emit(MobilityReleased);
-        mapAction.started += _ => Emit(MapToggled); shopAction.started += _ => EmitShop();
+        mapAction.started += _ => EmitMap(); shopAction.started += _ => EmitShop();
         scoreboardAction.started += _ => Emit(ScoreboardPressed); scoreboardAction.canceled += _ => Emit(ScoreboardReleased);
     }
 
@@ -245,6 +248,13 @@ public class PlayerInputRouter : MonoBehaviour
     {
         if (!ShopSuppressed)
             ShopToggled?.Invoke();
+    }
+
+    /// <summary>MapToggled's own emit path - see MapSuppressed.</summary>
+    private void EmitMap()
+    {
+        if (!MapSuppressed)
+            MapToggled?.Invoke();
     }
 
     /// <summary>Suppresses input the instant a text field takes focus - e.g. the chat box under

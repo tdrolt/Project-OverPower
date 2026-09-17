@@ -123,6 +123,28 @@ MonoBehaviour:
   captureRingPulseSpeed: 1.6
   captureRingSegments: 96
   captureRingTrackColor: {r: 0, g: 0, b: 0, a: 0.4}
+  minimapCornerSize: 340
+  minimapCornerMargin: 24
+  minimapLargeSize: 860
+  minimapFrameWidth: 5
+  minimapFrameColor: {r: 0.06, g: 0.06, b: 0.08, a: 0.9}
+  minimapBackgroundTint: {r: 1, g: 1, b: 1, a: 0.9}
+  minimapBubbleDiameterTier1: 36
+  minimapBubbleDiameterTier2: 24
+  minimapBubbleDiameterTier3: 24
+  minimapBubbleDiameterTier4: 30
+  minimapBubbleOutlineWidth: 3
+  minimapBubbleOutlineColor: {r: 0, g: 0, b: 0, a: 0.85}
+  minimapNeutralColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
+  minimapLabelSize: 16
+  minimapProgressRingWidth: 4
+  minimapOwnedLinkWidth: 4
+  minimapNeutralLinkWidth: 2
+  minimapArrowheadSize: 12
+  minimapOwnMarkerSize: 18
+  minimapOwnMarkerColor: {r: 1, g: 0.85, b: 0.25, a: 1}
+  minimapTeammateDotSize: 10
+  minimapTeammateDotColor: {r: 0.45, g: 1, b: 0.45, a: 1}
   overPowerActiveText: OVERPOWER
   overPowerArmedText: OverPower ready
   overPowerActiveColor: {r: 1, g: 0.25, b: 0.55, a: 1}
