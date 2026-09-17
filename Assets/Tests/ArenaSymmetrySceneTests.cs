@@ -4,6 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using Overpower.Arena;
 using Overpower.EditorTools;
+using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -54,6 +55,33 @@ namespace Overpower.Tests
 
                 BuildingCapture centre = towers.Single(b => b.tier == 4);
                 Assert.IsTrue(arena.centred.Contains(centre.transform), "The Tier 4 tower is not in Centred.");
+            });
+        }
+
+        [Test]
+        public void EverySpawnPointAndTowerIsInsideTheArenaOutline()
+        {
+            WithGameScene(scene =>
+            {
+                ArenaSymmetry arena = Find<ArenaSymmetry>(scene).Single();
+                ArenaBounds bounds = ArenaBounds.FromSourceOutline(arena.sourceOutline, arena.centre);
+                Assert.IsNotNull(bounds, "Source Outline is empty: set it to the boundary walls' inner faces.");
+
+                // The real player's own capsule, so this test can't disagree with what blink and portals check against.
+                float radius = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Multiplayer Player.prefab")
+                    .GetComponent<CapsuleCollider>().radius;
+
+                RoomManager rooms = Find<RoomManager>(scene).Single();
+                foreach (Transform spawn in rooms.teamSpawnPoints.Concat(rooms.capitalUnderAttackSpawnPoints))
+                {
+                    if (spawn == null) continue;
+                    Assert.GreaterOrEqual(bounds.SignedDistance(spawn.position), radius,
+                        $"{spawn.name} is not a player's width inside the arena outline.");
+                }
+
+                foreach (BuildingCapture tower in Find<BuildingCapture>(scene))
+                    Assert.Greater(bounds.SignedDistance(tower.transform.position), 0f,
+                        $"Tower {tower.buildingID} is outside the arena outline.");
             });
         }
 

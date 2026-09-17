@@ -19,6 +19,15 @@ namespace Overpower.EditorTools
         public const float PositionToleranceMetres = 0.05f;
         public const float AngleToleranceDegrees = 0.5f;
 
+        /// <summary>How far a boundary wall's inner face may sit from Source Outline before Validate reports it. Loose
+        /// enough for a corner where two pieces meet, tight enough that a wall moved by hand is caught.</summary>
+        public const float OutlineToleranceMetres = 0.15f;
+
+        /// <summary>The child of Source (and of each generated third) holding the boundary walls. Kept on ArenaSymmetry
+        /// itself (a runtime class) rather than defined here, because the portal path check (movement step 3) needs
+        /// the same name from gameplay code, which cannot reference this Editor-only class.</summary>
+        public const string BoundaryGroupName = ArenaSymmetry.BoundaryGroupName;
+
         private const string UndoName = "Rebuild arena thirds";
 
         /// <summary>Deletes both generated thirds, copies Source into them turned 120° and 240°, moves snapped
@@ -141,7 +150,44 @@ namespace Overpower.EditorTools
                     problems.Add($"{middle.name} is {off:0.00} m from the centre.");
             }
 
+            CheckOutline(arena, problems);
+
             return problems;
+        }
+
+        /// <summary>Every boundary wall must sit on Source Outline (movement step 3). A designer who moves a wall and
+        /// forgets the outline would otherwise leave blink, portals and the safety net working off the old edge.</summary>
+        private static void CheckOutline(ArenaSymmetry arena, List<string> problems)
+        {
+            // A tiny arena with no boundary walls (the builder's own tests) has nothing to check.
+            if (arena.source.Find(BoundaryGroupName) == null)
+                return;
+
+            ArenaBounds outline = ArenaBounds.FromSourceOutline(arena.sourceOutline, arena.centre);
+            if (outline == null)
+            {
+                problems.Add("Source has boundary walls but Source Outline has fewer than two points: set it to the " +
+                             "inner faces of the walls under Source/" + BoundaryGroupName + ".");
+                return;
+            }
+
+            foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
+            {
+                Transform walls = third.Find(BoundaryGroupName);
+                if (walls == null)
+                    continue; // The copy check above already says a rebuild is needed.
+
+                foreach (BoxCollider box in walls.GetComponentsInChildren<BoxCollider>(true))
+                {
+                    // A boundary piece's pivot is its outer face and its local +Z faces the arena, so the inner face
+                    // is the box's +Z side.
+                    Vector3 face = box.transform.TransformPoint(box.center + new Vector3(0f, 0f, box.size.z * 0.5f));
+                    float off = Mathf.Abs(outline.SignedDistance(face));
+                    if (off > OutlineToleranceMetres)
+                        problems.Add($"{box.name} ({third.name}) has its inner face {off:0.00} m off Source Outline: " +
+                                      "move the outline points onto the boundary walls' inner faces.");
+                }
+            }
         }
 
         private static List<string> CheckSetup(ArenaSymmetry arena)

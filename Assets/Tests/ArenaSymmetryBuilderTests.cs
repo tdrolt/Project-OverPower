@@ -214,6 +214,61 @@ namespace Overpower.Tests
             Assert.AreEqual(2, problems.Count); // one line per generated third, not one per shifted object
         }
 
+        // The Source third's share of a triangle arena's outline (circumradius 10, inradius 5): the right edge's
+        // midpoint at map angle 30, and the top vertex.
+        private static readonly Vector2[] TriangleSourceOutline =
+        {
+            new Vector2(Centre.x + 4.330127f, Centre.z + 2.5f),
+            new Vector2(Centre.x, Centre.z + 10f),
+        };
+
+        // A boundary wall on that edge, 3 m along it, facing the centre with its local +Z like the real walls. Its box
+        // is 0.5 m thick from the pivot, so its inner face lands exactly on the edge.
+        private Transform MakeBoundaryWall()
+        {
+            Transform wall = MakeChild("Wall", MakeChild(ArenaSymmetryBuilder.BoundaryGroupName, arena.source));
+            BoxCollider box = wall.gameObject.AddComponent<BoxCollider>();
+            box.size = new Vector3(2f, 3f, 0.5f);
+            box.center = new Vector3(0f, 1.5f, 0.25f);
+            var outward = new Vector3(0.8660254f, 0f, 0.5f);
+            var along = new Vector3(-0.5f, 0f, 0.8660254f);
+            wall.SetPositionAndRotation(Centre + outward * 5.5f + along * 3f, Quaternion.LookRotation(-outward));
+            return wall;
+        }
+
+        [Test]
+        public void ValidateAcceptsBoundaryWallsSittingOnTheOutlineInEveryThird()
+        {
+            arena.sourceOutline = new List<Vector2>(TriangleSourceOutline);
+            MakeBoundaryWall();
+
+            Assert.IsEmpty(ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false));
+        }
+
+        [Test]
+        public void ValidateReportsABoundaryWallMovedOffTheOutline()
+        {
+            arena.sourceOutline = new List<Vector2>(TriangleSourceOutline);
+            Transform wall = MakeBoundaryWall();
+            wall.position += new Vector3(0.8660254f, 0f, 0.5f);   // 1 m further out
+
+            List<string> problems = ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false);
+
+            Assert.AreEqual(3, problems.Count, string.Join("\n", problems));   // the Source wall and both copies
+            StringAssert.Contains("1.00 m off Source Outline", problems[0]);
+        }
+
+        [Test]
+        public void ValidateReportsBoundaryWallsWithNoOutlineAtAll()
+        {
+            MakeBoundaryWall();
+
+            List<string> problems = ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false);
+
+            Assert.AreEqual(1, problems.Count, string.Join("\n", problems));
+            StringAssert.Contains("Source Outline", problems[0]);
+        }
+
         [Test]
         public void RebuildRecordsAnUndoableStep()
         {

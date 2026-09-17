@@ -96,6 +96,15 @@ namespace Overpower.Abilities
         // Fixed here rather than exposed, the same reasoning PlayerDisplacement gives for its mask.
         private int blockMask;
 
+        // Building only, for the two checks added in movement step 3: what may stand between the caster and a
+        // placement, and what makes an exit unusable. Players are deliberately NOT in it - an enemy standing on your
+        // exit must not lock your portal.
+        private int buildingMask;
+
+        // The caster's own capsule, read in OnEquip like Blink's: a portal is placed for a player to arrive on, so it
+        // is checked against the real player shape.
+        private CapsuleCollider capsule;
+
         // Owner only: the portal template's own numbers (diameter), read once so TryBuildCast's
         // validity check and ExecuteCast's spawn agree on the same radius without a second
         // GetComponent every cast. Also doubles as the "is Portal Prefab actually usable" check.
@@ -126,6 +135,7 @@ namespace Overpower.Abilities
         private void Awake()
         {
             blockMask = LayerMask.GetMask("Default", "Building");
+            buildingMask = LayerMask.GetMask("Building");
             channelState = new PortalChannelState(channelSeconds);
         }
 
@@ -137,6 +147,11 @@ namespace Overpower.Abilities
                 Debug.LogError($"[TeleportAbility] {name}: Portal Prefab is not assigned - teleport cannot place anything.");
             else if (portalTemplate == null)
                 Debug.LogError($"[TeleportAbility] {name}: Portal Prefab '{portalPrefab.name}' has no Portal component.");
+
+            capsule = Owner.Root.GetComponent<CapsuleCollider>();
+            if (capsule == null)
+                Debug.LogError($"[TeleportAbility] {name}: the player has no CapsuleCollider - a portal cannot be " +
+                                "checked for the player who would arrive on it, so placing will always refuse.");
         }
 
         protected override void OnValidate()
@@ -156,8 +171,8 @@ namespace Overpower.Abilities
         {
             payload = default;
 
-            if (portalTemplate == null || Owner.Motor == null)
-                return false; // OnEquip already logged the missing prefab; a missing Motor means no KillHeight to check the ground against.
+            if (portalTemplate == null || Owner.Motor == null || capsule == null)
+                return false; // OnEquip already logged the missing prefab or capsule; a missing Motor means no KillHeight to check the ground against.
 
             Vector3 flatXZ = ClampToRange(ctx.Origin, ctx.TargetPoint, placementRange);
 
@@ -173,6 +188,20 @@ namespace Overpower.Abilities
             if (IsBlocked(ground))
                 return false; // refuse, nothing spent - see the class comment on why placing never spends the gate charge anyway.
 
+            // Movement step 3: inside the arena with room for the player who arrives on it. The terrain carries on
+            // past the boundary walls, so the ground probe alone happily placed a gate outside the arena.
+            if (!Overpower.Arena.ArenaSymmetry.IsInsideArena(ground, capsule.radius))
+                return false;
+
+            // Controller decision R1 (2026-09-17): a portal's path is blocked by the arena's own boundary walls only -
+            // never by a crate, a house or deployable cover, which stays exactly as placeable behind as it is today.
+            // PlayerSpaceProbe.IsPathClear checks the whole Building layer (right for a mine, ability visuals step 3),
+            // so this asks ArenaSymmetry's boundary-only sweep instead, at the same knee height and probe radius.
+            Vector3 feetKnee = PlayerSpaceProbe.FeetOf(capsule, ctx.Origin) + Vector3.up * PlayerSpaceProbe.KneeHeightMetres;
+            Vector3 groundKnee = ground + Vector3.up * PlayerSpaceProbe.KneeHeightMetres;
+            if (Overpower.Arena.ArenaSymmetry.PathCrossesBoundary(feetKnee, groundKnee, PlayerSpaceProbe.PathProbeRadiusMetres))
+                return false;
+
             payload = new CastPayload { Origin = ctx.Origin, Point = ground, IntArg = nextSeq };
             nextSeq++;
             return true;
@@ -184,7 +213,10 @@ namespace Overpower.Abilities
             Portal current = FindStandingPortal(mine);
             Portal other = current != null ? FindOther(mine, current) : null;
 
-            bool canChannel = canAct && other != null && HasCharge;
+            // Movement step 3: the exit is re-checked every tick, so a wall, crate or cover built on it later - or a
+            // portal placed before this check existed - can't channel anyone into geometry or out of the arena. It is
+            // part of the gate rather than a refusal at travel time, because by then the charge is already spent.
+            bool canChannel = canAct && other != null && HasCharge && IsExitClear(other);
             PortalChannelState.Result result = channelState.Tick(deltaTime, current, canChannel);
 
             switch (result)
@@ -238,7 +270,7 @@ namespace Overpower.Abilities
             // race BlinkAbility.ExecuteCast's own comment documents for its jump.
             SpendCharge();
             channelState.LatchArrival(to);
-            SendPhase(PhaseTravelled, new CastPayload { Origin = from.transform.position, Point = to.transform.position });
+            SendPhase(PhaseTravelled, new CastPayload { Origin = from.transform.position, Point = ArrivalRoot(to) });
         }
 
         private void PruneOldest()
@@ -410,6 +442,23 @@ namespace Overpower.Abilities
         /// flat faces have no such overshoot - found by a live placement test refusing a portal on
         /// perfectly open ground once this mask changed to match Blink's.
         /// </summary>
+        /// <summary>Where a traveller's root lands on a portal: standing on its floor point, the same height Blink
+        /// uses. Travelling to the raw ground point sank the capsule half a metre into the floor, and physics popped
+        /// it out in whatever direction it could.</summary>
+        private Vector3 ArrivalRoot(Portal to) => PlayerSpaceProbe.RootOnGround(capsule, to.transform.position);
+
+        /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare, and
+        /// not inside a wall, house, crate or cover. Other players don't count (see buildingMask).</summary>
+        private bool IsExitClear(Portal to)
+        {
+            if (capsule == null)
+                return false;
+
+            Vector3 root = ArrivalRoot(to);
+            return Overpower.Arena.ArenaSymmetry.IsInsideArena(root, capsule.radius)
+                   && !PlayerSpaceProbe.IsCapsuleBlocked(capsule, root, buildingMask, Owner.Root.transform);
+        }
+
         private bool IsBlocked(Vector3 groundPoint)
         {
             float radius = portalTemplate.Radius;

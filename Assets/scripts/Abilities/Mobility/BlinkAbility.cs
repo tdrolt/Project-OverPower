@@ -8,7 +8,7 @@ namespace Overpower.Abilities
     /// on the cursor point when the cursor is within range, and the point `range` metres toward it
     /// otherwise [C]. Unlike a dash it never travels the space in between, so a wall between the
     /// caster and a valid spot on the far side does not stop it - only the destination itself has to
-    /// be somewhere a player could actually stand.
+    /// be somewhere a player could actually stand, and inside the arena outline (movement step 3).
     ///
     /// The destination search (clamp to range, then walk back toward the caster in fixed steps until
     /// a spot is clear) is pure logic in BlinkDestinationSearch (Assets/scripts/Combat), unit tested
@@ -109,19 +109,23 @@ namespace Overpower.Abilities
             {
                 landingPoint = default;
 
+                // Movement step 3: never outside the arena. The terrain carries on past the boundary walls, so the
+                // ground probe alone can't tell; the search's own walk back toward the caster then finds the last spot
+                // inside. Blinking PAST a crate or a house inside the arena is unchanged (Task 1.6b).
+                if (!Overpower.Arena.ArenaSymmetry.IsInsideArena(candidateXZ, capsule.radius))
+                    return false;
+
                 // See GroundProbe's own class comment for why the ray starts only maxStepUp above the
                 // CASTER'S OWN current height (not the candidate's unknown one) rather than further up.
                 if (!GroundProbe.TryFindGround(originHeight, candidateXZ, maxStepUp, groundProbeDistance,
                         killHeight, blockMask, Owner.Root.transform, out Vector3 ground))
                     return false; // no ground within reach, or it sits at/below the kill plane.
 
-                // Root position such that the capsule's OWN bottom sits exactly on the ground found
-                // above - the same derivation TestRangeSpawner uses to stop dummies standing buried,
-                // rather than a second hardcoded "player stands 0.5m above its root" number.
-                float capsuleBottomOffset = capsule.center.y - capsule.height * 0.5f; // negative.
-                Vector3 rootPosition = new Vector3(candidateXZ.x, ground.y - capsuleBottomOffset, candidateXZ.z);
+                // Root position such that the capsule's OWN bottom sits exactly on the ground found above - shared with
+                // portal arrival since movement step 3, so the two can't drift apart.
+                Vector3 rootPosition = PlayerSpaceProbe.RootOnGround(capsule, new Vector3(candidateXZ.x, ground.y, candidateXZ.z));
 
-                if (IsCapsuleBlocked(rootPosition))
+                if (PlayerSpaceProbe.IsCapsuleBlocked(capsule, rootPosition, blockMask, Owner.Root.transform))
                     return false;
 
                 landingPoint = rootPosition;
@@ -157,34 +161,6 @@ namespace Overpower.Abilities
 
             PlayRemoteVfx(cast.Payload.Origin);
             PlayRemoteVfx(cast.Payload.Point);
-        }
-
-        /// <summary>
-        /// True if a player-sized capsule rooted here would overlap a wall or another player's body.
-        /// Uses OverlapCapsule rather than CheckCapsule so the caster's own colliders can be excluded
-        /// from the result - CheckCapsule's bool answer has no way to say "except this one".
-        /// Assumes the player prefab is not scaled and the capsule's direction is the Y axis, the
-        /// same simplification PlayerDisplacement and the test-range dummy already make for this
-        /// exact capsule.
-        /// </summary>
-        private bool IsCapsuleBlocked(Vector3 rootPosition)
-        {
-            Vector3 center = rootPosition + capsule.center;
-            float halfSegment = Mathf.Max(capsule.height * 0.5f - capsule.radius, 0f);
-            Vector3 top = center + Vector3.up * halfSegment;
-            Vector3 bottom = center - Vector3.up * halfSegment;
-
-            Collider[] overlaps = Physics.OverlapCapsule(top, bottom, capsule.radius, blockMask,
-                                                          QueryTriggerInteraction.Ignore);
-            foreach (Collider overlap in overlaps)
-            {
-                if (overlap.transform.IsChildOf(Owner.Root.transform))
-                    continue; // never blocked by the caster's own body.
-
-                return true;
-            }
-
-            return false;
         }
 
         private void PlayRemoteVfx(Vector3 point)
