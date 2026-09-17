@@ -102,6 +102,12 @@ namespace Overpower.Abilities
         /// property's own comment. -1 if the data is missing.</summary>
         public int AbilityId { get; private set; } = -1;
 
+        /// <summary>Radius, read-only - FenceCageView (ability visuals step 4) builds the cage on this one number.</summary>
+        public float Radius => radius;
+
+        /// <summary>Ring Thickness, read-only - FenceCageView draws the floor band exactly this wide.</summary>
+        public float RingThickness => ringThickness;
+
         private void OnValidate()
         {
             radius = Mathf.Max(0.1f, radius);

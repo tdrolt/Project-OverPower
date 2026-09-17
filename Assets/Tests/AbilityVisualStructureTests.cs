@@ -189,5 +189,38 @@ namespace Overpower.Tests
             AssertNoCollider(prefab);
             Assert.AreEqual(1, prefab.GetComponentsInChildren<PhotonView>(true).Length);
         }
+
+        [Test]
+        public void TheElectricFenceIsACageOfPostsAndBarsWithNoCollider()
+        {
+            GameObject prefab = Load("Assets/Resources/Electric Fence.prefab");
+            Assert.IsNull(Ref(prefab.GetComponent<ElectricFence>(), "visual"), "nothing is stretched to the radius any more");
+            Assert.IsNull(prefab.transform.Find("Visual"), "the old flat disc is gone");
+            Transform cage = Child(prefab.transform, "Cage");
+            Assert.IsNotNull(cage.GetComponent<SnapVisualToGround>());
+            Transform post = Child(cage, "Post");
+            AssertMesh(post, "Cube", GlassPath);
+
+            var view = prefab.GetComponent<FenceCageView>();
+            Assert.IsNotNull(view);
+            SerializedProperty bars = new SerializedObject(view).FindProperty("bars");
+            string[] names = { "Bar Low", "Bar Mid", "Bar Top" };
+            Assert.AreEqual(names.Length, bars.arraySize);
+            float below = 0f;
+            for (int i = 0; i < names.Length; i++)
+            {
+                LineRenderer bar = AssertLine(Child(cage, names[i]), flat: false);
+                Assert.Greater(bar.transform.localPosition.y, below, names[i] + " is above the bar below it");
+                below = bar.transform.localPosition.y;
+                Assert.AreSame(bar, bars.GetArrayElementAtIndex(i).objectReferenceValue);
+            }
+            Assert.LessOrEqual(below, post.localPosition.y * 2f, "the top bar is no higher than the posts");
+            LineRenderer band = AssertLine(Child(cage, "Band"), flat: true);
+            Assert.AreSame(post, Ref(view, "post"));
+            Assert.AreSame(band, Ref(view, "band"));
+            Assert.AreEqual(ThemePath, AssetDatabase.GetAssetPath(Ref(view, "theme")));
+            AssertNoCollider(prefab);
+            Assert.AreEqual(2, prefab.GetComponentsInChildren<PhotonView>(true).Length, "unchanged - flagged for Tudor, not fixed here");
+        }
     }
 }
