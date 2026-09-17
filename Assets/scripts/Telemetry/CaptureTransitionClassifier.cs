@@ -27,11 +27,16 @@ namespace Overpower.Telemetry
         public const string DrainResumed = "drainResumed";
         public const string DrainPaused = "drainPaused";
 
-        /// <summary>A capture/drain bar starting already above this much fill reads as resuming
-        /// progress already banked, not a fresh start from zero. Set comfortably above one frame's
-        /// own contribution at any realistic frame rate or capture speed: a solo Tier 2 capture (15s
-        /// for one player, the fastest single-player rate TerritoryConfig ships by default) fills
-        /// about 0.0011 in one frame at 60 Hz - two orders of magnitude below this.</summary>
+        /// <summary>A capture bar starting already above this much fill reads as resuming progress
+        /// already banked, not a fresh start from zero. Set comfortably above one frame's own
+        /// contribution at any realistic frame rate or capture speed: a solo Tier 2 capture (15s for
+        /// one player, the fastest single-player rate TerritoryConfig ships by default) fills about
+        /// 0.0011 in one frame at 60 Hz - two orders of magnitude below this. A drain bar mirrors
+        /// this around 1.0 instead of 0: its Progress01 is the OWNER's remaining hold, so a fresh
+        /// drain starts at 1.0 and a drain already below 1 - ResumeThreshold01 is resuming a hold
+        /// already partly drained (fix, 2026-09-17: the old single "> ResumeThreshold01" rule read
+        /// every fresh drain, which starts near 1.0, as a resume - see Building capture.cs:275 and
+        /// this file's own tests for the real-world value that hid the bug).</summary>
         public const float ResumeThreshold01 = 0.01f;
 
         /// <summary>The `capture` event this transition should log - Started/Resumed/Paused or
@@ -39,11 +44,12 @@ namespace Overpower.Telemetry
         /// if neither side is "active" (both old and new read rate 0; not expected from a real
         /// publish, since nothing would have changed to trigger one, but guarded rather than
         /// assumed). "Active" is judged purely by RatePerSecond01 being non-zero, not by comparing
-        /// against <c>CaptureProgress.Idle</c> - a future task that publishes a genuinely paused,
-        /// rate-0 hold with its team and progress still set (rather than collapsing to Idle) is
-        /// handled the same way: it reads as "not active" here exactly as Idle does, so a stop into
-        /// that hold still logs Paused/DrainPaused with the fill it stopped at, and a resume out of
-        /// it is told apart from a fresh start by the same fill-above-threshold rule.</summary>
+        /// against <c>CaptureProgress.Idle</c> - a held capture or drain (CaptureProgress.Held,
+        /// published since the capture ring change, 2026-09-17) is handled the same way: it reads as
+        /// "not active" here exactly as Idle does, so a stop into that hold still logs
+        /// Paused/DrainPaused with the fill it stopped at, and a resume out of it is told apart from
+        /// a fresh start by the same fill-above-threshold rule (below 1 - ResumeThreshold01 for a
+        /// drain, since its fill counts down from 1.0, not up from 0).</summary>
         public static string Classify(Overpower.Match.CaptureProgress oldProgress, Overpower.Match.CaptureProgress newProgress,
                                       int nowMs, out int team, out float progress)
         {
@@ -54,7 +60,10 @@ namespace Overpower.Telemetry
                 team = newProgress.Team;
                 progress = newProgress.Progress01;
                 bool draining = newProgress.RatePerSecond01 < 0f;
-                bool resuming = newProgress.Progress01 > ResumeThreshold01;
+                // A capture resumes when it starts already banked (progress counts UP from 0); a
+                // drain resumes when it starts already partly drained (its progress is the owner's
+                // remaining hold, counting DOWN from 1.0) - see ResumeThreshold01's own comment.
+                bool resuming = draining ? newProgress.Progress01 < 1f - ResumeThreshold01 : newProgress.Progress01 > ResumeThreshold01;
                 if (draining) return resuming ? DrainResumed : DrainStarted;
                 return resuming ? Resumed : Started;
             }

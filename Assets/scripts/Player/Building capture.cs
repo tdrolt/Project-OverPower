@@ -239,8 +239,10 @@ public class BuildingCapture : MonoBehaviourPun
     /// CaptureProgress.NeedsRepublishComparedTo. A capture in progress: team = the capturing team,
     /// progress01/rate scaled by CaptureSeconds (one-player-seconds, same units captureProgress is
     /// already tracked in). A decay in progress: team = the ENEMY doing the draining, rate =
-    /// -1/DecaySeconds (matches UpdateDecay's own maths - see its comment). Anything else (idle,
-    /// on cooldown, captured with nobody contesting it): Idle, which hides the bar.</summary>
+    /// -1/DecaySeconds (matches UpdateDecay's own maths - see its comment). A capture or drain on
+    /// hold with something banked (contested, its link under attack, a paused drain):
+    /// CaptureProgress.Held, rate 0. Nothing in progress (idle, on cooldown, captured with nobody
+    /// contesting it): Idle.</summary>
     private void PublishProgressIfNeeded()
     {
         int nowMs = PhotonNetwork.ServerTimestamp;
@@ -265,20 +267,29 @@ public class BuildingCapture : MonoBehaviourPun
     private CaptureProgress ComputeCurrentProgress(int nowMs)
     {
         float captureSeconds = CaptureSeconds;
+        if (captureSeconds <= 0f)
+            return CaptureProgress.Idle;
 
         if (isCaptured)
         {
-            // A paused drain shows no bar, the same as a blocked neutral capture.
-            if (!isDecaying || isDrainPaused || captureSeconds <= 0f)
+            if (!isDecaying)
                 return CaptureProgress.Idle;
 
             float decayProgress01 = captureProgress / captureSeconds;
+            // A paused drain (its drainers' way in is under attack - see DrainRule) keeps its team and the owner's
+            // remaining hold at rate 0, so every client's capture ring can show it paused (2026-09-17). It used to go
+            // Idle, which hid how far the drain had got.
+            if (isDrainPaused)
+                return CaptureProgress.Held(capturingID, decayProgress01, nowMs);
+
             float decayRate = DecaySeconds > 0f ? -1f / DecaySeconds : 0f;
             return new CaptureProgress(capturingID, decayProgress01, decayRate, nowMs);
         }
 
-        if (isOnCooldown || capturingID == -1 || captureSeconds <= 0f || playersInZone.Count == 0)
+        if (isOnCooldown || capturingID == -1 || playersInZone.Count == 0)
             return CaptureProgress.Idle;
+
+        float progress01 = captureProgress / captureSeconds;
 
         // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
         // else, and still allowed to capture" actually moves the bar - otherwise
@@ -287,9 +298,11 @@ public class BuildingCapture : MonoBehaviourPun
         var eligiblePlayers = playersInZone.Where(p => p.teamID == capturingID).ToList();
         bool enemyPresent = playersInZone.Any(p => p.teamID != capturingID);
         if (!eligiblePlayers.Any() || enemyPresent || !TeamMayCaptureNow(capturingID))
-            return CaptureProgress.Idle;
+            // Held, not Idle (2026-09-17): a contested or link-blocked capture keeps what it has banked, and the
+            // ring shows it paused. Capturers who LEAVE still reset it (EndCaptureIfCapturersLeft), so this is
+            // Idle then: Held returns Idle when nothing is banked.
+            return CaptureProgress.Held(capturingID, progress01, nowMs);
 
-        float progress01 = captureProgress / captureSeconds;
         float rate = eligiblePlayers.Count / captureSeconds;
         return new CaptureProgress(capturingID, progress01, rate, nowMs);
     }

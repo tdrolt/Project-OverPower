@@ -51,5 +51,15 @@ namespace Overpower.Match
 
         public static CaptureProgress Decode(int team, int progress, int rate, int stampMs) =>
             new CaptureProgress(team, progress / Scale, rate / Scale, stampMs);
+
+        /// <summary>A capture or drain on hold (Tudor, 2026-09-16 capture ring): a contested capture, one whose link is
+        /// under attack, or a paused drain. It keeps its team and how far it got, at rate 0, so every client can draw
+        /// the paused band. The same team at the same rate never republishes, and a hold never moves, so its
+        /// progress can't go stale on the wire. Idle when there is no team or nothing banked.</summary>
+        public static CaptureProgress Held(int team, float progress01, int stampMs) =>
+            team < 0 || progress01 <= 0f ? Idle : new CaptureProgress(team, Math.Min(1f, progress01), 0f, stampMs);
+
+        /// <summary>A team with progress that isn't moving - see Held.</summary>
+        public bool IsHeld => Team >= 0 && RatePerSecond01 == 0f;
     }
 }

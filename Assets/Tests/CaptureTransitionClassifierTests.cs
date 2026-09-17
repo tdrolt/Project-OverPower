@@ -21,8 +21,10 @@ namespace Overpower.Tests
         [Test]
         public void IdleToDrainingIsDrainStarted()
         {
+            // A drain's Progress01 is the owner's REMAINING hold (Building capture.cs:275), so a fresh drain starts
+            // at 1.0, not 0 - the realistic value the drain-start-label bug (2026-09-17) hid.
             string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
-                new CaptureProgress(1, 0.0f, -1f / 5f, 1000), 1000, out int team, out float progress);
+                new CaptureProgress(1, 1.0f, -1f / 5f, 1000), 1000, out int team, out float progress);
             Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
             Assert.AreEqual(1, team);
         }
@@ -92,17 +94,17 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ActiveToARateZeroHoldStillLogsPausedNotSilence()
+        public void ActiveToAHeldStateLogsPaused()
         {
-            // The "future rate-0 hold" the review asked to already be handled: a capture-ring task
-            // may later publish a paused state that keeps its team and progress (rate 0, Team >= 0)
-            // instead of collapsing to CaptureProgress.Idle. Classify must treat "not active" purely
-            // by RatePerSecond01 == 0, not by comparing against the Idle sentinel, so this still
-            // reads as Paused with the real stop progress - not silently dropped, and not misread as
-            // a fresh Idle->Idle no-event.
+            // The rate-0 hold the review asked to already be handled, now real: CaptureProgress.Held
+            // (published since the capture ring change, 2026-09-17) keeps its team and progress (rate
+            // 0, Team >= 0) instead of collapsing to CaptureProgress.Idle. Classify must treat "not
+            // active" purely by RatePerSecond01 == 0, not by comparing against the Idle sentinel, so
+            // this still reads as Paused with the real stop progress - not silently dropped, and not
+            // misread as a fresh Idle->Idle no-event.
             var wasCapturing = new CaptureProgress(0, 0.2f, 1f / 15f, 1000);
-            var futureHeldState = new CaptureProgress(0, 0.2f + 2f / 15f, 0f, 3000);
-            string state = CaptureTransitionClassifier.Classify(wasCapturing, futureHeldState,
+            CaptureProgress heldState = CaptureProgress.Held(0, 0.2f + 2f / 15f, 3000);
+            string state = CaptureTransitionClassifier.Classify(wasCapturing, heldState,
                 3000, out int team, out float progress);
             Assert.AreEqual(CaptureTransitionClassifier.Paused, state);
             Assert.AreEqual(0, team);
@@ -110,18 +112,87 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ResumingOutOfAFutureHeldStateIsResumedNotStarted()
+        public void ResumingOutOfAHeldStateIsResumed()
         {
-            // The mirror case: leaving that same future held state (team kept, progress kept, rate
-            // 0) and moving again reads as Resumed, exactly as leaving today's Idle-with-memory-lost
-            // would if the progress carried over were above the threshold.
-            var heldState = new CaptureProgress(0, 0.35f, 0f, 3000);
+            // The mirror case: leaving that same held (published since the capture ring change,
+            // 2026-09-17) state (team kept, progress kept, rate 0) and moving again reads as Resumed,
+            // exactly as leaving today's Idle-with-memory-lost would if the progress carried over
+            // were above the threshold.
+            CaptureProgress heldState = CaptureProgress.Held(0, 0.35f, 3000);
             var movingAgain = new CaptureProgress(0, 0.35f, 1f / 15f, 5000);
             string state = CaptureTransitionClassifier.Classify(heldState, movingAgain,
                 5000, out int team, out float progress);
             Assert.AreEqual(CaptureTransitionClassifier.Resumed, state);
             Assert.AreEqual(0, team);
             Assert.AreEqual(0.35f, progress, 1e-6f);
+        }
+
+        [Test]
+        public void DrainingIntoAHeldDrainIsDrainPaused()
+        {
+            var wasDraining = new CaptureProgress(2, 0.8f, -0.2f, 1000);
+            string state = CaptureTransitionClassifier.Classify(wasDraining, CaptureProgress.Held(2, 0.6f, 2000),
+                2000, out int team, out float progress);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainPaused, state);
+            Assert.AreEqual(2, team);
+            Assert.AreEqual(0.6f, progress, 1e-4f);
+        }
+
+        [Test]
+        public void AHeldDrainMovingAgainIsDrainResumed()
+        {
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Held(2, 0.6f, 2000),
+                new CaptureProgress(2, 0.6f, -0.2f, 5000), 5000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainResumed, state);
+            Assert.AreEqual(2, team);
+        }
+
+        [Test]
+        public void AHoldEndingInIdleLogsNothing()
+        {
+            // Capturers left a held capture (it resets) or a defender stopped a held drain: the pause was already logged.
+            Assert.IsNull(CaptureTransitionClassifier.Classify(CaptureProgress.Held(0, 0.4f, 3000), CaptureProgress.Idle,
+                4000, out _, out _));
+        }
+
+        [Test]
+        public void IdleIntoAHoldLogsNothing()
+        {
+            Assert.IsNull(CaptureTransitionClassifier.Classify(CaptureProgress.Idle, CaptureProgress.Held(0, 0.4f, 3000),
+                3000, out _, out _));
+        }
+
+        [Test]
+        public void AnotherTeamsFreshCaptureAfterAHoldIsStartedForThatTeam()
+        {
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Held(0, 0.4f, 3000),
+                new CaptureProgress(1, 0.001f, 1f / 15f, 4000), 4000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.Started, state);
+            Assert.AreEqual(1, team);
+        }
+
+        [Test]
+        public void DrainStartingAtFullHoldIsDrainStarted()
+        {
+            // The real-world case the drain-start-label bug hid: a drain's Progress01 is the owner's
+            // REMAINING hold, so a fresh drain starts at 1.0, not 0 - see Building capture.cs:275.
+            // Under the old single "Progress01 > ResumeThreshold01" rule this misread as a resume
+            // every single time, and the aggregator never saw a drainStarted (2026-09-17).
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
+                new CaptureProgress(1, 1.0f, -1f / 5f, 1000), 1000, out int team, out float progress);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
+            Assert.AreEqual(1, team);
+            Assert.AreEqual(1.0f, progress, 1e-6f);
+        }
+
+        [Test]
+        public void DrainOneFrameIntoItsHoldStillReadsDrainStarted()
+        {
+            // One frame's own drain off a full hold (comfortably above 1 - ResumeThreshold01) must
+            // not misread as a resume, mirroring StartingJustAboveZeroStaysStarted for the capture side.
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
+                new CaptureProgress(1, 0.995f, -1f / 5f, 1000), 1000, out _, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
         }
     }
 }

@@ -54,5 +54,41 @@ namespace Overpower.Tests
             Assert.IsTrue(a.NeedsRepublishComparedTo(new CaptureProgress(1, 0.5f, 0.2f, 3000)));
             Assert.IsTrue(a.NeedsRepublishComparedTo(new CaptureProgress(2, 0.5f, 0.1f, 3000)));
         }
+
+        [Test]
+        public void HeldKeepsTeamAndProgressAtRateZeroAndDoesNotMove()
+        {
+            CaptureProgress held = CaptureProgress.Held(1, 0.4f, 500);
+            Assert.AreEqual(1, held.Team);
+            Assert.AreEqual(0.4f, held.Progress01, 1e-5f);
+            Assert.AreEqual(0f, held.RatePerSecond01);
+            Assert.IsTrue(held.IsHeld);
+            Assert.AreEqual(0.4f, held.Evaluate(99999), 1e-5f);
+        }
+
+        [Test]
+        public void HeldWithNothingBankedOrNoTeamIsIdle()
+        {
+            Assert.AreEqual(-1, CaptureProgress.Held(1, 0f, 500).Team);
+            Assert.AreEqual(-1, CaptureProgress.Held(-1, 0.5f, 500).Team);
+            Assert.IsFalse(CaptureProgress.Held(1, 0f, 500).IsHeld);
+        }
+
+        [Test]
+        public void MovingIntoOrOutOfAHoldNeedsARepublish()
+        {
+            var moving = new CaptureProgress(1, 0.2f, 0.1f, 0);
+            CaptureProgress held = CaptureProgress.Held(1, 0.3f, 1000);
+            Assert.IsTrue(moving.NeedsRepublishComparedTo(held));
+            Assert.IsTrue(held.NeedsRepublishComparedTo(moving));
+            Assert.IsTrue(held.NeedsRepublishComparedTo(CaptureProgress.Idle), "a hold ending in Idle changes the team");
+        }
+
+        [Test]
+        public void IdleAndMovingProgressAreNotHeld()
+        {
+            Assert.IsFalse(CaptureProgress.Idle.IsHeld);
+            Assert.IsFalse(new CaptureProgress(0, 0.5f, -0.2f, 0).IsHeld);
+        }
     }
 }
