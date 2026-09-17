@@ -93,6 +93,15 @@ namespace Overpower.Weapons
         /// once from the despawn that followed it.
         private bool detonated;
 
+        /// <summary>Splash Radius, read-only - RocketBlastView (ability visuals step 6) sizes the splash shell from
+        /// this one number.</summary>
+        public float SplashRadius => splashRadius;
+
+        /// <summary>Raised once per rocket, on every client, right after the splash has been applied, with the blast
+        /// centre - a hit or an airburst alike (both paths run through Detonate below). Visual only: RocketBlastView
+        /// draws the splash shell from it. Nothing that affects damage listens.</summary>
+        public event System.Action<Vector3> Detonated;
+
         private void Awake()
         {
             // Guarded the same way IgnoreWalls guards its own NameToLayer lookup: a missing layer
@@ -201,6 +210,11 @@ namespace Overpower.Weapons
                                                    context.ShooterTeamId, context.Weapon.Id,
                                                    DamageSource.Splash, false, at, -1));
             }
+
+            // Ability visuals step 6: after every splash hit above, so a visual listener can't affect one. Runs for
+            // an airburst too - OnExpired calls this same method, so a rocket that reaches its range end (or the
+            // cursor rocket reaching the cursor) raises Detonated exactly like a direct hit does.
+            Detonated?.Invoke(at);
         }
 
         /// <summary>

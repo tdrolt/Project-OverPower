@@ -137,6 +137,21 @@ namespace Overpower.Tests
             Assert.IsNull(prefab.GetComponent<SnapVisualToGround>(), "the shell stays at the real burst height - never snapped to the floor");
         }
 
+        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab")]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab")]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab")]
+        public void EveryRocketShowsASplashShellAtItsRealBurstPoint(string path)
+        {
+            // A6: replaces the plan's own printed RocketBlastView (a floor BlastMarker) - the shell stays at the
+            // real, off-the-floor burst height instead, so this checks the shell wiring, not a floor marker.
+            GameObject prefab = Load(path);
+            var view = prefab.GetComponent<RocketBlastView>();
+            Assert.IsNotNull(view, path);
+            Assert.AreEqual(ShellPath, AssetDatabase.GetAssetPath(Ref(view, "splashShellPrefab")));
+            Assert.AreEqual(ThemePath, AssetDatabase.GetAssetPath(Ref(view, "theme")));
+            AssertNoCollider(prefab);
+        }
+
         // ---- ability visuals steps 3-7 add their tests below this line ----
 
         [Test]

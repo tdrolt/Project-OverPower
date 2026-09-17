@@ -163,6 +163,7 @@ GameObject:
   - component: {fileID: 2576041332795114680}
   - component: {fileID: 2168385092256753860}
   - component: {fileID: 2211510295263149659}
+  - component: {fileID: 7716740796235362145}
   m_Layer: 7
   m_Name: Rocket Cursor
   m_TagString: Bullet
@@ -324,4 +325,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 00827b3b37fae444a883384a298d7b81, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
+--- !u!114 &7716740796235362145
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3472910922280904258}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b78f31617872884882c5296bb9617b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  splashShellPrefab: {fileID: 1629349034070262263, guid: 68d5434e314c71b43825149e2671fcc5, type: 3}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
