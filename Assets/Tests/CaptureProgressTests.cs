@@ -90,5 +90,15 @@ namespace Overpower.Tests
             Assert.IsFalse(CaptureProgress.Idle.IsHeld);
             Assert.IsFalse(new CaptureProgress(0, 0.5f, -0.2f, 0).IsHeld);
         }
+
+        [Test]
+        public void ATeamWithZeroProgressAtRateZeroIsNotHeld()
+        {
+            // Decoded from the room: a hold under 1/10000 of a capture rounds to 0 on the wire
+            // (review fix, 2026-09-17) - IsHeld must agree with CaptureRingState, which already
+            // reads team>=0, progress 0, rate 0 as Idle, not Paused.
+            var roundedAwayHold = new CaptureProgress(1, 0f, 0f, 1000);
+            Assert.IsFalse(roundedAwayHold.IsHeld);
+        }
     }
 }

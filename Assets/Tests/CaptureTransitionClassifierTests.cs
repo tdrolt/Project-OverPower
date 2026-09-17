@@ -21,12 +21,15 @@ namespace Overpower.Tests
         [Test]
         public void IdleToDrainingIsDrainStarted()
         {
-            // A drain's Progress01 is the owner's REMAINING hold (Building capture.cs:275), so a fresh drain starts
-            // at 1.0, not 0 - the realistic value the drain-start-label bug (2026-09-17) hid.
+            // A drain's Progress01 is the owner's REMAINING hold, so a fresh drain starts at 1.0, not
+            // 0 - see HandleCapturedState's DrainRule.Step.Start case, which sets captureProgress =
+            // CaptureSeconds when a drain starts. 1.0 is the realistic value the drain-start-label bug
+            // (2026-09-17) hid.
             string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
                 new CaptureProgress(1, 1.0f, -1f / 5f, 1000), 1000, out int team, out float progress);
             Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
             Assert.AreEqual(1, team);
+            Assert.AreEqual(1.0f, progress, 1e-6f);
         }
 
         [Test]
@@ -172,20 +175,6 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void DrainStartingAtFullHoldIsDrainStarted()
-        {
-            // The real-world case the drain-start-label bug hid: a drain's Progress01 is the owner's
-            // REMAINING hold, so a fresh drain starts at 1.0, not 0 - see Building capture.cs:275.
-            // Under the old single "Progress01 > ResumeThreshold01" rule this misread as a resume
-            // every single time, and the aggregator never saw a drainStarted (2026-09-17).
-            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
-                new CaptureProgress(1, 1.0f, -1f / 5f, 1000), 1000, out int team, out float progress);
-            Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
-            Assert.AreEqual(1, team);
-            Assert.AreEqual(1.0f, progress, 1e-6f);
-        }
-
-        [Test]
         public void DrainOneFrameIntoItsHoldStillReadsDrainStarted()
         {
             // One frame's own drain off a full hold (comfortably above 1 - ResumeThreshold01) must
@@ -193,6 +182,53 @@ namespace Overpower.Tests
             string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
                 new CaptureProgress(1, 0.995f, -1f / 5f, 1000), 1000, out _, out _);
             Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
+        }
+
+        [Test]
+        public void ASlowMasterFramesFreshDrainIsStillDrainStarted()
+        {
+            // Review fix, 2026-09-17: a fresh drain's first publish is 1 - dt/DecaySeconds, not exactly
+            // 1.0 - a master frame of >= 50ms at DecaySeconds 5 already lands below the plain 1%
+            // static margin (1 - 0.05/5 = 0.99), so the old fixed ResumeThreshold01 misread this as a
+            // resume. The rate-aware margin (ResumeThreshold01 vs |rate| * FirstFrameAllowanceSeconds)
+            // must still call this a fresh start.
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
+                new CaptureProgress(1, 0.985f, -1f / 5f, 1000), 1000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
+            Assert.AreEqual(1, team);
+        }
+
+        [Test]
+        public void ASlowMasterFramesFreshCaptureIsStillStarted()
+        {
+            // Mirror on the capture side: Tier 3 (10s, the fastest tier) with 3 capturers has rate
+            // 0.3/s - a single frame around 67ms already fills past the plain 1% static margin
+            // (0.3 * 0.067 ~= 0.02), which the old fixed ResumeThreshold01 misread as a resume.
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Idle,
+                new CaptureProgress(0, 0.02f, 0.3f, 1000), 1000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.Started, state);
+            Assert.AreEqual(0, team);
+        }
+
+        [Test]
+        public void ARealDrainResumeJustPastTheAllowanceIsStillDrainResumed()
+        {
+            // A drain paused at a 0.9 remaining hold (well past what any single frame at this rate
+            // could have contributed) resuming must still read as DrainResumed, not swallowed by a
+            // margin sized generously for the fresh-start case above.
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Held(2, 0.9f, 2000),
+                new CaptureProgress(2, 0.9f, -1f / 5f, 5000), 5000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainResumed, state);
+            Assert.AreEqual(2, team);
+        }
+
+        [Test]
+        public void ARealCaptureResumeJustPastTheAllowanceIsStillResumed()
+        {
+            string state = CaptureTransitionClassifier.Classify(CaptureProgress.Held(0, 0.1f, 2000),
+                new CaptureProgress(0, 0.1f, 0.1f, 5000), 5000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.Resumed, state);
+            Assert.AreEqual(0, team);
         }
     }
 }

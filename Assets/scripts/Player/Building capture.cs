@@ -264,47 +264,30 @@ public class BuildingCapture : MonoBehaviourPun
         BuildingManager.Instance.PublishCaptureProgress(buildingID, current);
     }
 
+    /// <summary>Gathers this frame's inputs and asks the pure CaptureProgressPublishRule what to publish (review
+    /// fix, 2026-09-17: the decision used to live here inline, untestable - reverting either Held branch to Idle
+    /// still passed every test in the project). eligibleCount/enemyPresent/mayCaptureNow are only worth computing
+    /// in the same case the old inline version did: a neutral capture in progress, not on cooldown and not
+    /// already abandoned (EndCaptureIfCapturersLeft resets capturingID to -1 the same frame the zone empties, so
+    /// this exactly mirrors the guard the inline version used to early-return Idle on).</summary>
     private CaptureProgress ComputeCurrentProgress(int nowMs)
     {
-        float captureSeconds = CaptureSeconds;
-        if (captureSeconds <= 0f)
-            return CaptureProgress.Idle;
-
-        if (isCaptured)
+        int eligibleCount = 0;
+        bool enemyPresent = false;
+        bool mayCaptureNow = false;
+        if (!isCaptured && !isOnCooldown && capturingID != -1 && playersInZone.Count != 0)
         {
-            if (!isDecaying)
-                return CaptureProgress.Idle;
-
-            float decayProgress01 = captureProgress / captureSeconds;
-            // A paused drain (its drainers' way in is under attack - see DrainRule) keeps its team and the owner's
-            // remaining hold at rate 0, so every client's capture ring can show it paused (2026-09-17). It used to go
-            // Idle, which hid how far the drain had got.
-            if (isDrainPaused)
-                return CaptureProgress.Held(capturingID, decayProgress01, nowMs);
-
-            float decayRate = DecaySeconds > 0f ? -1f / DecaySeconds : 0f;
-            return new CaptureProgress(capturingID, decayProgress01, decayRate, nowMs);
+            // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
+            // else, and still allowed to capture" actually moves the bar - otherwise
+            // CalculateCaptureProgress itself is not advancing captureProgress this frame either, so the
+            // bar must not claim it is. TeamMayCaptureNow gives both the same answer within a frame.
+            eligibleCount = playersInZone.Count(p => p.teamID == capturingID);
+            enemyPresent = playersInZone.Any(p => p.teamID != capturingID);
+            mayCaptureNow = TeamMayCaptureNow(capturingID);
         }
 
-        if (isOnCooldown || capturingID == -1 || playersInZone.Count == 0)
-            return CaptureProgress.Idle;
-
-        float progress01 = captureProgress / captureSeconds;
-
-        // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
-        // else, and still allowed to capture" actually moves the bar - otherwise
-        // CalculateCaptureProgress itself is not advancing captureProgress this frame either, so the
-        // bar must not claim it is. TeamMayCaptureNow gives both the same answer within a frame.
-        var eligiblePlayers = playersInZone.Where(p => p.teamID == capturingID).ToList();
-        bool enemyPresent = playersInZone.Any(p => p.teamID != capturingID);
-        if (!eligiblePlayers.Any() || enemyPresent || !TeamMayCaptureNow(capturingID))
-            // Held, not Idle (2026-09-17): a contested or link-blocked capture keeps what it has banked, and the
-            // ring shows it paused. Capturers who LEAVE still reset it (EndCaptureIfCapturersLeft), so this is
-            // Idle then: Held returns Idle when nothing is banked.
-            return CaptureProgress.Held(capturingID, progress01, nowMs);
-
-        float rate = eligiblePlayers.Count / captureSeconds;
-        return new CaptureProgress(capturingID, progress01, rate, nowMs);
+        return CaptureProgressPublishRule.Decide(isCaptured, isDecaying, isDrainPaused, CaptureSeconds, DecaySeconds,
+            isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs);
     }
 
     /// <summary>Forces this tower to tell the room its current capture progress right now,

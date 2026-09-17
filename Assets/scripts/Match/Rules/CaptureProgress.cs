@@ -59,7 +59,9 @@ namespace Overpower.Match
         public static CaptureProgress Held(int team, float progress01, int stampMs) =>
             team < 0 || progress01 <= 0f ? Idle : new CaptureProgress(team, Math.Min(1f, progress01), 0f, stampMs);
 
-        /// <summary>A team with progress that isn't moving - see Held.</summary>
-        public bool IsHeld => Team >= 0 && RatePerSecond01 == 0f;
+        /// <summary>A team with progress that isn't moving - see Held. Requires real progress banked (review fix,
+        /// 2026-09-17): a hold under 1/10000 of a capture rounds to 0 on the wire, and CaptureRingState already
+        /// reads that as Idle, not Paused - IsHeld must agree.</summary>
+        public bool IsHeld => Team >= 0 && RatePerSecond01 == 0f && Progress01 > 0f;
     }
 }
