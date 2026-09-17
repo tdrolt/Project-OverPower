@@ -61,6 +61,76 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void DocumentsTheBug546ad44WhereANonChargeWeaponsFreshClickWronglyReadsAsHeldContinuously()
+        {
+            // Tudor: "the laser was firing way too fast". A beam fires at t=0 with interval 0.5,
+            // leaving the deadline at 0.5. The player releases and re-presses at t=0.9 - short of a
+            // full interval after that deadline. WeaponFiring.TryFire (546ad44) computed
+            // triggerHeldContinuously as simply "!weapon.CanCharge", true for every non-charge
+            // weapon regardless of whether the trigger was actually held on the previous frame - so
+            // a brand new click read exactly the same as a genuine continuing hold, reproduced
+            // literally here. That carries the STALE 0.5 deadline forward (0.5 + 0.5 = 1.0, only
+            // 0.1s after the click) instead of the correct 0.9 + 0.5 = 1.4 a fresh click must get -
+            // see FreshReClickUsesTheFixedDecisionAndRebasesCorrectly for the fix, which is that a
+            // fresh click's heldLastFrame must be false, never the bare "!weapon.CanCharge" this
+            // pins as wrong.
+            float next = FireScheduleRule.NextFireTime(previousNextFireTime: 0.5f, now: 0.9f, interval: 0.5f,
+                                                        triggerHeldContinuously: true, blockedThisTick: false);
+            Assert.AreEqual(1.0f, next, 1e-5f);
+        }
+
+        [Test]
+        public void IsContinuingHoldIsFalseForAFreshClickEvenOnANonChargeWeapon()
+        {
+            // The decision WeaponFiring.TryFire's click handler and its own public TryFire() must
+            // both make: heldLastFrame is false for anything that isn't a continuing hold (a fresh
+            // click, or the frame right after a release) - the weapon's CanCharge does not matter.
+            Assert.IsFalse(FireScheduleRule.IsContinuingHold(heldLastFrame: false, weaponCanCharge: false));
+        }
+
+        [Test]
+        public void IsContinuingHoldIsTrueOnceHeldAcrossAFrameBoundaryOnANonChargeWeapon()
+        {
+            // Update's held-fire path only ever sees this true once the trigger was ALSO held on
+            // the immediately preceding frame - never on the frame of the press itself.
+            Assert.IsTrue(FireScheduleRule.IsContinuingHold(heldLastFrame: true, weaponCanCharge: false));
+        }
+
+        [Test]
+        public void IsContinuingHoldIsAlwaysFalseForAChargeWeapon()
+        {
+            // A charge weapon's one-off release must still simply rebase, exactly as before -
+            // heldLastFrame is irrelevant for it (Update's own held-fire path never calls TryFire
+            // for a CanCharge weapon in the first place, but the decision stays defensive either way).
+            Assert.IsFalse(FireScheduleRule.IsContinuingHold(heldLastFrame: true, weaponCanCharge: true));
+        }
+
+        [Test]
+        public void FreshReClickUsesTheFixedDecisionAndRebasesCorrectly()
+        {
+            // The fixed end-to-end sequence: same numbers as the bug reproduction above, but fed
+            // through IsContinuingHold the way the fixed WeaponFiring.TryFire now does - a fresh
+            // click's heldLastFrame is false, so the schedule rebases off the re-click at 0.9
+            // instead of carrying the stale deadline forward.
+            bool continuingHold = FireScheduleRule.IsContinuingHold(heldLastFrame: false, weaponCanCharge: false);
+            float next = FireScheduleRule.NextFireTime(previousNextFireTime: 0.5f, now: 0.9f, interval: 0.5f,
+                                                        triggerHeldContinuously: continuingHold, blockedThisTick: false);
+            Assert.AreEqual(1.4f, next, 1e-5f);
+        }
+
+        [Test]
+        public void ASteadyHoldStillCarriesOverAtExactlyTheFireRateThroughTheFixedDecision()
+        {
+            // The 2.6 behaviour that must not regress: once genuinely held across a frame
+            // boundary, the schedule still carries forward by exactly one interval, frame-rate
+            // independent - see the class comment on why that matters for a buffed fast weapon.
+            bool continuingHold = FireScheduleRule.IsContinuingHold(heldLastFrame: true, weaponCanCharge: false);
+            float next = FireScheduleRule.NextFireTime(previousNextFireTime: 1f, now: 1f, interval: 0.5f,
+                                                        triggerHeldContinuously: continuingHold, blockedThisTick: false);
+            Assert.AreEqual(1.5f, next, 1e-5f);
+        }
+
+        [Test]
         public void ACastGateInterruptionDoesNotLeaveACatchUpShotOneTickAfterItLifts()
         {
             // Reproduces the review's own numbers: a real shot at t=0 with interval I=1 leaves the

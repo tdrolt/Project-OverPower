@@ -52,5 +52,28 @@ namespace Overpower.Weapons
 
             return now + interval;
         }
+
+        /// <summary>
+        /// Decides NextFireTime's own triggerHeldContinuously parameter for one TryFire call.
+        /// Pulled out on its own (bug found 2026-09-17, introduced by 546ad44) because the decision
+        /// used to live inline in WeaponFiring.TryFire as just "!weapon.CanCharge" - true for every
+        /// non-charge weapon's call, including a brand new click, with no way to tell that apart
+        /// from a trigger that had genuinely already been held across a frame boundary. A re-click
+        /// less than one interval after the previous shot's deadline then read as "still mid-
+        /// cadence" and carried the OLD deadline forward instead of rebasing off the click, so the
+        /// very next held-fire tick could fire again almost immediately (Tudor: "the laser was
+        /// firing way too fast").
+        /// </summary>
+        /// <param name="heldLastFrame">True only when the trigger was ALSO down on the immediately
+        /// preceding Update tick - never true for the press/click that starts a hold, and never
+        /// true again once the trigger has been released, even briefly.</param>
+        /// <param name="weaponCanCharge">A charge weapon's one-off release (HandlePrimaryReleased)
+        /// must always simply rebase, exactly as before this fix - see NextFireTime's own
+        /// triggerHeldContinuously comment. Update's held-fire path never calls this for a charge
+        /// weapon in the first place, but the decision stays defensive either way.</param>
+        public static bool IsContinuingHold(bool heldLastFrame, bool weaponCanCharge)
+        {
+            return heldLastFrame && !weaponCanCharge;
+        }
     }
 }

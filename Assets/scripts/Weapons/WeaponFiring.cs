@@ -82,6 +82,14 @@ namespace Overpower.Weapons
         private float nextFireTime;
         private float triggerHeldSince;
 
+        /// <summary>Bug fix (546ad44, 2026-09-17): true only when input.PrimaryHeld was ALSO true
+        /// on the immediately preceding Update tick - never on the tick a press or a re-click
+        /// starts a hold. Update's held-fire path is the only reader; it feeds this into
+        /// FireScheduleRule.IsContinuingHold so a fresh click can never be mistaken for a
+        /// continuing hold the way "!weapon.CanCharge" alone used to (see that method's own
+        /// comment for the full bug story - Tudor: "the laser was firing way too fast").</summary>
+        private bool heldLastFrame;
+
         // Task 2.6 (GDD p.20): OverPower's comeback buff scales this player's own damage, fire
         // rate and range while active. Owner state only, set through SetStatMultipliers below - a
         // shot's damage and range must still be IDENTICAL on every client, so they cross the wire
@@ -227,6 +235,11 @@ namespace Overpower.Weapons
             // regardless of whether input ever resolved.
             triggerHeldSince = 0f;
 
+            // Same reasoning as triggerHeldSince above: a stale true here would let re-enabling
+            // (e.g. on respawn) treat the very first frame as a continuing hold before the trigger
+            // has actually been held across a frame boundary on the new life.
+            heldLastFrame = false;
+
             if (input == null)
                 return;
 
@@ -255,9 +268,17 @@ namespace Overpower.Weapons
             if (photonView.IsMine && input != null && input.InputSuppressed && triggerHeldSince != 0f)
                 triggerHeldSince = 0f;
 
-            if (photonView.IsMine && input != null && input.PrimaryHeld &&
-                (weapon == null || !weapon.CanCharge))
-                TryFire();
+            // Bug fix (546ad44): heldNow captures whether THIS tick's automatic-fire poll should
+            // run at all - unchanged from before. What changed is that the call below now tells
+            // TryFire whether the trigger was ALSO held on the PREVIOUS tick (heldLastFrame, read
+            // before it is overwritten just below) rather than just "this weapon can't charge", so
+            // a fresh click's own first held-fire tick is never mistaken for a continuing hold - see
+            // FireScheduleRule.IsContinuingHold's own comment.
+            bool heldNow = photonView.IsMine && input != null && input.PrimaryHeld &&
+                          (weapon == null || !weapon.CanCharge);
+            if (heldNow)
+                TryFire(continuingHold: heldLastFrame);
+            heldLastFrame = heldNow;
         }
 
         /// <summary>A charging weapon fires nothing on press - it only starts the clock
@@ -330,9 +351,14 @@ namespace Overpower.Weapons
         /// <summary>
         /// Fires if the weapon is ready, this player owns it, is alive and is not overheated.
         /// Public so the test range can drive the exact same path a mouse click does - there is no
-        /// second firing route that could behave differently.
+        /// second firing route that could behave differently. Always a fresh, non-continuing call:
+        /// a click is never a continuing hold by definition, and neither is the test range's own
+        /// direct call - see the private overload below, which Update's held-fire path calls
+        /// instead with whatever heldLastFrame actually is.
         /// </summary>
-        public bool TryFire()
+        public bool TryFire() => TryFire(continuingHold: false);
+
+        private bool TryFire(bool continuingHold)
         {
             if (!photonView.IsMine || weapon == null || Time.time < nextFireTime)
                 return false;
@@ -382,8 +408,18 @@ namespace Overpower.Weapons
             // rate even though any one frame can only ever catch up to wherever that schedule
             // currently sits; averaged over many shots the measured rate matches the multiplier
             // (see fire_driver_tpl.cs, weapon 09).
+            //
+            // Bug fix (546ad44, 2026-09-17): triggerHeldContinuously used to be just
+            // "!weapon.CanCharge", true for every non-charge weapon's call including a fresh click,
+            // so a re-click less than one interval late read as "still mid-cadence" and carried the
+            // OLD deadline forward - the held-fire path then fired again almost immediately once
+            // that too-early deadline arrived (Tudor: "the laser was firing way too fast"). Routed
+            // through IsContinuingHold instead, which only reads true when continuingHold (this
+            // call's own heldLastFrame, always false for a fresh click - see the public TryFire()
+            // wrapper) says the trigger was ALSO held on the previous frame.
             nextFireTime = FireScheduleRule.NextFireTime(nextFireTime, Time.time, interval,
-                                                          triggerHeldContinuously: !weapon.CanCharge, blockedThisTick: false);
+                                                          triggerHeldContinuously: FireScheduleRule.IsContinuingHold(continuingHold, weapon.CanCharge),
+                                                          blockedThisTick: false);
 
             // Heat is charged once per TRIGGER PULL, not once per projectile - see the tooltip on
             // Overheat Per Shot. A five-pellet shotgun costs the same heat as a single bullet.
