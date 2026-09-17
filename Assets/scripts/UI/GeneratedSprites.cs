@@ -3,9 +3,9 @@ using UnityEngine;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Plain white shapes the minimap draws with - a disc, an upward triangle, a larger disc for the round Mask,
-    /// and a thin edge ring - generated once in code, so there's no sprite asset to keep in sync, and each is
-    /// tinted by its Image's colour.
+    /// Plain white shapes the minimap draws with - a disc, an upward triangle, and the triangular Mask plus its
+    /// edge shape - generated once in code, so there's no sprite asset to keep in sync, and each is tinted by
+    /// its Image's colour.
     ///
     /// A sprite is required, not decoration: a Filled Image without one ignores its fill amount and draws full (a
     /// bug this project has hit before). The capture progress ring is a Filled disc. Every shape now carries a mip
@@ -22,29 +22,17 @@ namespace Overpower.UI
     public static class GeneratedSprites
     {
         private const int Size = 128;
-        // The Mask's stencil test and the edge ring that covers its seam (BuildFrame) both want the smoothest
+        // The Mask's stencil test and the edge shape that covers its seam (BuildFrame) both want the smoothest
         // possible source contour, so they get a dedicated, higher-resolution texture rather than sharing Size.
         private const int LargeSize = 512;
 
         private static Sprite disc;
         private static Sprite triangle;
-        private static Sprite maskDisc;
-        private static Sprite edgeRing;
         private static Sprite maskTriangle;
         private static Sprite edgeTriangle;
 
         public static Sprite Disc => disc != null ? disc : (disc = Build("Generated Disc", Size, (x, y) => DiscAlpha(x, y, Size)));
         public static Sprite Triangle => triangle != null ? triangle : (triangle = Build("Generated Triangle", Size, (x, y) => TriangleAlpha(x, y, Size)));
-
-        /// <summary>A 512 px disc used only for the minimap's round Mask (review fix, 2026-09-17): a UGUI Mask reads
-        /// its sprite's alpha as a 1-bit stencil test, so the shared 128 px Disc's contour visibly stepped at
-        /// minimap sizes. The finer source texture traces a rounder circle before the threshold test ever runs.</summary>
-        public static Sprite MaskDisc => maskDisc != null ? maskDisc : (maskDisc = Build("Generated Mask Disc", LargeSize, (x, y) => DiscAlpha(x, y, LargeSize)));
-
-        /// <summary>A thin ring at the very outer edge (~2% of the radius in from it), drawn UNMASKED on top of the
-        /// minimap's masked content (review fix, 2026-09-17): even MaskDisc's finer contour is still a 1-bit test,
-        /// so this covers whatever step remains with a normally anti-aliased edge instead of a stencilled one.</summary>
-        public static Sprite EdgeRing => edgeRing != null ? edgeRing : (edgeRing = Build("Generated Edge Ring", LargeSize, (x, y) => RingAlpha(x, y, LargeSize)));
 
         /// <summary>A 512 px equilateral triangle, apex up, used for the minimap's Mask (Tudor, 2026-09-17: the mask
         /// becomes a triangle, one vertex toward each capital). Unlike Triangle above, its 3 vertices sit at equal
@@ -53,8 +41,8 @@ namespace Overpower.UI
         /// rigidly in place instead of swinging it off-centre.</summary>
         public static Sprite MaskTriangle => maskTriangle != null ? maskTriangle : (maskTriangle = Build("Generated Mask Triangle", LargeSize, (x, y) => TriangleMaskAlpha(x, y, LargeSize)));
 
-        /// <summary>A thin triangular ring following MaskTriangle's own edge, drawn UNMASKED on top (same idea as
-        /// EdgeRing): covers the Mask's 1-bit stencil seam with a normally anti-aliased edge instead.</summary>
+        /// <summary>A thin triangular ring following MaskTriangle's own edge, drawn UNMASKED on top: covers the
+        /// Mask's 1-bit stencil seam with a normally anti-aliased edge instead.</summary>
         public static Sprite EdgeTriangle => edgeTriangle != null ? edgeTriangle : (edgeTriangle = Build("Generated Edge Triangle", LargeSize, (x, y) => TriangleEdgeAlpha(x, y, LargeSize)));
 
         private static Sprite Build(string name, int size, System.Func<float, float, float> alphaAt)
@@ -84,18 +72,6 @@ namespace Overpower.UI
             float half = size / 2f;
             float distance = Mathf.Sqrt((x - half) * (x - half) + (y - half) * (y - half));
             return (half - 1f) - distance + 0.5f;
-        }
-
-        // The outer edge feathers exactly like DiscAlpha; the inner cutoff sits ~2% of the radius in from it, so at
-        // the minimap's default corner size (340 units) the visible band is roughly 3 canvas units wide - just
-        // enough to sit over the mask's seam without eating into the bubbles and links it frames.
-        private static float RingAlpha(float x, float y, int size)
-        {
-            float half = size / 2f;
-            float distance = Mathf.Sqrt((x - half) * (x - half) + (y - half) * (y - half));
-            float outerEdge = (half - 1f) - distance + 0.5f;
-            float innerEdge = distance - half * 0.98f + 0.5f;
-            return Mathf.Min(outerEdge, innerEdge);
         }
 
         // Apex at the top centre, base along the bottom: points up (+y) before any rotation.
@@ -129,8 +105,9 @@ namespace Overpower.UI
             return Mathf.Min(EdgeDistance(p, v0, v1), Mathf.Min(EdgeDistance(p, v1, v2), EdgeDistance(p, v2, v0))) + 0.5f;
         }
 
-        // Same band idea as RingAlpha, but measured as a straight perpendicular distance to the nearest edge rather
-        // than a radius - the natural measure for a polygon, and gives a uniform-width band on every side.
+        // The same ~2%-of-radius band idea as the old round edge ring, but measured as a straight perpendicular
+        // distance to the nearest edge rather than a radius - the natural measure for a polygon, and gives a
+        // uniform-width band on every side.
         private static float TriangleEdgeAlpha(float x, float y, int size)
         {
             CentredTriangleVertices(size, out Vector2 v0, out Vector2 v1, out Vector2 v2);

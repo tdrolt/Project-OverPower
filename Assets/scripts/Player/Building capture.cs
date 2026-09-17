@@ -724,12 +724,15 @@ public class BuildingCapture : MonoBehaviourPun
         }
     }
 
-    // Kept for RpcList index stability (Photon's RPC list is index-based; never rename or remove an
-    // RPC) even though the neutral-capture bug fix (2026-09-17) removed its OnTriggerEnter and
+    // Kept only for RpcList index stability (Photon's RPC list is index-based; never rename or remove
+    // an RPC), even though the neutral-capture bug fix (2026-09-17) removed its OnTriggerEnter and
     // OnMasterClientChanged sends - CalculateCaptureProgress re-decides a neutral claim every tick
-    // instead (CaptureClaimRule). Still sent once, from HandleCapturedState's drain-start case: that
-    // path is untouched here (DrainRule already decides a drain from the listed players, the same
-    // fix this RPC no longer needs for a neutral claim).
+    // instead (CaptureClaimRule). The one remaining send, from HandleCapturedState's drain-start case,
+    // is redundant but harmless: HandleCapturedState only runs on the master client (guarded above),
+    // which sets capturingID itself the line before this RPC fires, and PUN runs a master's own
+    // RpcTarget.MasterClient call locally rather than over the network (PhotonNetworkPart.cs ~1292) -
+    // so by the time this body runs, capturingID is never -1 and the "if unset" guard below never has
+    // anything left to do.
     [PunRPC]
     void RPC_UpdateCapturingID(int teamID)
     {
