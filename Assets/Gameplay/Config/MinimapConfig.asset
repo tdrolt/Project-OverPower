@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04771d58e75f44344a3482b48a1c888e, type: 3}
+  m_Name: MinimapConfig
+  m_EditorClassIdentifier: 
+  arenaImage: {fileID: 2800000, guid: 9650c53ce06c1cd4282c913199a7291f, type: 3}
+  worldCentre: {x: 65.05, y: 53.34}
+  worldSizeMetres: 153.18687
+  imagePixels: 1024
+  marginMetres: 4

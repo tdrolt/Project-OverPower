@@ -14,14 +14,21 @@ namespace Overpower.EditorTools
         {
             EditorGUILayout.HelpBox(
                 "Edit only the objects under Source, then press Rebuild thirds, check the arena, and save the scene. " +
-                "The two generated thirds are rebuilt from Source every time, so edits made to them are thrown away.",
+                "The two generated thirds are rebuilt from Source every time, so edits made to them are thrown away. " +
+                "Rebuild thirds also re-bakes the minimap image; for other changes you can see from above, use " +
+                "OverPower > Arena > Bake minimap image.",
                 MessageType.Info);
             DrawDefaultInspector();
 
             var arena = (ArenaSymmetry)target;
             EditorGUILayout.Space();
             if (GUILayout.Button("Rebuild thirds"))
+            {
                 Report("Rebuild thirds", ArenaSymmetryBuilder.Rebuild(arena, recordUndo: true));
+                // Here and in the menu item, not inside ArenaSymmetryBuilder.Rebuild: its tests rebuild tiny arenas in
+                // preview scenes and must not overwrite the real minimap image.
+                Debug.Log("[Minimap] " + MinimapBaker.Bake(arena));
+            }
             if (GUILayout.Button("Validate"))
                 Report("Validate", ArenaSymmetryBuilder.Validate(arena));
         }
@@ -30,8 +37,10 @@ namespace Overpower.EditorTools
         private static void RebuildFromMenu()
         {
             ArenaSymmetry arena = FindArena();
-            if (arena != null)
-                Report("Rebuild thirds", ArenaSymmetryBuilder.Rebuild(arena, recordUndo: true));
+            if (arena == null)
+                return;
+            Report("Rebuild thirds", ArenaSymmetryBuilder.Rebuild(arena, recordUndo: true));
+            Debug.Log("[Minimap] " + MinimapBaker.Bake(arena));
         }
 
         [MenuItem("OverPower/Arena/Validate")]
