@@ -645,7 +645,77 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     return table;
   }
 
-  // ---------------------------------------------------------------- Task T7: per-scope reference lines
+  // ---------------------------------------------------------------- Task T7 (review fix): reference overlays
+  //
+  // Drawn directly on the canvas (afterDraw), never as Chart.js datasets. A dataset-based
+  // vertical/horizontal line only positions correctly when it shares its sibling datasets' own
+  // axis TYPE and UNIT - a review found the old phaseBoundaryDataset using minutes on a
+  // seconds-axis chart (gold per player), and using {x,y} points on a CATEGORY axis at all (gold
+  // gap, zones held, team income), which Chart.js reads as a bare index and draws diagonally
+  // instead of vertically. A canvas overlay only needs the scale's own getPixelForValue - for a
+  // category axis, that means snapping to the nearest actual label's index. A horizontal
+  // reference band drawn this way also needs no minimum number of data points to appear (the old
+  // dataset-based scenario bands silently vanished whenever fewer than 2 minute labels fell after
+  // the transition) - it spans from the scale's own left/right pixel bounds instead.
+
+  var overlayPlugin = {
+    id: 'overlayLines',
+    afterDraw: function (chart) {
+      var cfg = chart.options.plugins && chart.options.plugins.overlayLines;
+      if (!cfg) return;
+      var ctx = chart.ctx;
+      var xScale = chart.scales.x, yScale = chart.scales.y;
+      if (!xScale || !yScale) return;
+
+      function pixelForX(spec) {
+        if (spec.categoryMinutes) {
+          var target = spec.value, idx = 0, best = Infinity;
+          for (var i = 0; i < spec.categoryMinutes.length; i++) {
+            var d = Math.abs(spec.categoryMinutes[i] - target);
+            if (d < best) { best = d; idx = i; }
+          }
+          return xScale.getPixelForValue(idx);
+        }
+        return xScale.getPixelForValue(spec.value);
+      }
+
+      var boundaryPx = null;
+      if (cfg.boundary) {
+        boundaryPx = pixelForX(cfg.boundary);
+        ctx.save();
+        ctx.strokeStyle = '#c0392b';
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.moveTo(boundaryPx, yScale.top);
+        ctx.lineTo(boundaryPx, yScale.bottom);
+        ctx.stroke();
+        ctx.fillStyle = '#c0392b';
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Phase 2 starts', boundaryPx, yScale.top - 4);
+        ctx.restore();
+      }
+
+      (cfg.bands || []).forEach(function (b) {
+        var xFrom = (b.side === 'after') ? (boundaryPx != null ? boundaryPx : xScale.left) : xScale.left;
+        var xTo = (b.side === 'before') ? (boundaryPx != null ? boundaryPx : xScale.right) : xScale.right;
+        if (xTo <= xFrom) return;
+        var y = yScale.getPixelForValue(b.value);
+        ctx.save();
+        ctx.strokeStyle = '#888';
+        ctx.setLineDash(b.dash || [5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(xFrom, y);
+        ctx.lineTo(xTo, y);
+        ctx.stroke();
+        ctx.fillStyle = '#888';
+        ctx.font = '11px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(b.label, xTo + 4, y + 3);
+        ctx.restore();
+      });
+    },
+  };
 
   function phase1ScenarioLines() {
     var t = DATA.targets;
@@ -660,62 +730,45 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     return [['Lo', s.losing], ['Ev', s.even], ['Wi', s.winning]];
   }
 
-  // Whole-match team-income chart: Phase 1's own bands drawn only up to the transition, Phase 2's
-  // only from it - two short dashed segments instead of one continuous (and wrong, once the phase
-  // changes) line across the whole chart.
-  function scenarioDatasetsForScope(scope, minutesList) {
-    var datasets = [];
-    var transitionMinutes = (DATA.transitionSeconds != null) ? minutes(DATA.transitionSeconds) : null;
-
-    function segment(lines, xs, dashLen) {
-      if (xs.length < 2) return;
-      lines.forEach(function (band) {
-        datasets.push({
-          type: 'line', label: band[0], refLabel: band[0],
-          data: xs.map(function (m) { return { x: m, y: band[1] }; }),
-          borderColor: '#888', borderDash: dashLen, pointRadius: 0, fill: false,
-        });
-      });
-    }
-
-    if (scope === 'phase-1') {
-      segment(phase1ScenarioLines(), minutesList, [5, 4]);
-    } else if (scope === 'phase-2') {
-      segment(phase2ScenarioLines(), minutesList, [5, 4]);
-    } else {
-      var beforeXs = minutesList.filter(function (m) { return transitionMinutes === null || m <= transitionMinutes; });
-      var afterXs = minutesList.filter(function (m) { return transitionMinutes !== null && m >= transitionMinutes; });
-      segment(phase1ScenarioLines(), beforeXs, [5, 4]);
-      if (transitionMinutes !== null) segment(phase2ScenarioLines(), afterXs, [2, 3]);
-    }
-    return datasets;
-  }
-
-  // Task T7: the whole-match tab's time charts draw a vertical 'Phase 2 starts' line at the
-  // transition - the individual Phase 1/Phase 2 tabs never do (there is nothing to mark on either
-  // half alone).
-  function phaseBoundaryDataset(scope, maxY) {
+  // Overlay boundary spec for a given chart's own x-axis unit - 'seconds'/'minutes' for a linear
+  // axis, or pass categoryMinutes (that chart's own minutesList) to snap to the nearest label on a
+  // category axis. Null (no boundary drawn at all) on the Phase 1/Phase 2 tabs, and on the
+  // whole-match tab when the match never had a Phase 2.
+  function boundaryOverlaySpec(scope, unit, categoryMinutes) {
     if (scope !== 'whole-match' || DATA.transitionSeconds == null) return null;
-    var x = minutes(DATA.transitionSeconds);
-    return {
-      type: 'line', label: 'Phase 2 starts', refLabel: 'Phase 2 starts',
-      data: [{ x: x, y: 0 }, { x: x, y: maxY }],
-      borderColor: '#c0392b', borderDash: [2, 2], pointRadius: 0, fill: false,
-    };
+    if (unit === 'seconds') return { value: DATA.transitionSeconds };
+    var m = minutes(DATA.transitionSeconds);
+    return categoryMinutes ? { value: m, categoryMinutes: categoryMinutes } : { value: m };
   }
 
+  // Scenario income bands as overlay bands instead of datasets - see the class comment above.
+  // Phase 1/Phase 2 tabs draw their own single set across the whole chart; the whole-match tab
+  // draws Phase 1's set up to the transition and Phase 2's after (labelled …1/…2 to tell them
+  // apart, since both tabs' bands share short codes like 'Lo').
+  function scenarioBandsForScope(scope) {
+    if (scope === 'phase-1') return phase1ScenarioLines().map(function (b) { return { label: b[0], value: b[1], side: 'full', dash: [5, 4] }; });
+    if (scope === 'phase-2') return phase2ScenarioLines().map(function (b) { return { label: b[0], value: b[1], side: 'full', dash: [5, 4] }; });
+    var bands = phase1ScenarioLines().map(function (b) { return { label: b[0] + '1', value: b[1], side: 'before', dash: [5, 4] }; });
+    if (DATA.transitionSeconds != null)
+      bands = bands.concat(phase2ScenarioLines().map(function (b) { return { label: b[0] + '2', value: b[1], side: 'after', dash: [2, 3] }; }));
+    return bands;
+  }
+
+  // Review fix (item 11): called for EVERY scope, even Phase 2 with no data - the tab still gets a
+  // proper heading ('Phase 2 (2 teams)') above the 'no elimination' note, instead of staying a
+  // blank paragraph next to it.
   function renderPhaseDuration(scope, suffix) {
     var bucket = bucketFor(scope);
     var host = id('phase-duration', suffix);
-    if (!bucket) { host.textContent = ''; return; }
-
-    var length = bucket.header.matchLengthSeconds;
     var targets = DATA.targets;
     var label, targetSeconds;
     if (scope === 'phase-1') { label = 'Phase 1 (3 teams)'; targetSeconds = targets && targets.phase1DurationSeconds; }
     else if (scope === 'phase-2') { label = 'Phase 2 (2 teams)'; targetSeconds = targets && targets.phase2DurationSeconds; }
     else { label = 'Whole match'; targetSeconds = targets && targets.targetMatchSeconds; }
 
+    if (!bucket) { host.textContent = label; return; }
+
+    var length = bucket.header.matchLengthSeconds;
     var text = label + ': ' + fmt(length) + 's';
     if (targetSeconds) text += ' (GDD target ' + fmt(targetSeconds) + 's)';
     host.textContent = text;
@@ -796,15 +849,15 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         var a = byActor[actorKeys[k]];
         goldDatasets.push({ label: a.nick + ' (team ' + a.team + ')', data: a.points, borderColor: teamColor(a.team), backgroundColor: teamColor(a.team), fill: false, pointRadius: 1, tension: 0.1 });
       }
-      var maxBalance = 1;
-      for (var gb = 0; gb < gt.length; gb++) if ((gt[gb].balance || 0) > maxBalance) maxBalance = gt[gb].balance;
-      var boundary1 = phaseBoundaryDataset(scope, maxBalance * 1.05);
-      if (boundary1) goldDatasets.push(boundary1);
+      // Review fix (item 3a): this chart's own x axis is SECONDS (row.t, above), not minutes -
+      // the boundary overlay must use the same unit.
+      var goldOpts = chartOptions('seconds', 'gold', { xType: 'linear', parsing: false });
+      goldOpts.plugins = { overlayLines: { boundary: boundaryOverlaySpec(scope, 'seconds') } };
       new Chart(id('chart-gold-per-player', suffix), {
         type: 'line',
         data: { datasets: goldDatasets },
-        options: chartOptions('seconds', 'gold', { xType: 'linear', parsing: false, hideRefLinesFromLegend: true }),
-        plugins: [refLineLabelPlugin],
+        options: goldOpts,
+        plugins: [overlayPlugin],
       });
     }
 
@@ -838,12 +891,21 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
             }),
           });
         }
-        scenarioDatasetsForScope(scope, minutesList).forEach(function (ds) { teamDatasets.push(ds); });
+        // Review fix (item 3): this chart uses a CATEGORY x-axis (labels: minutesList below) - the
+        // scenario bands and the 'Phase 2 starts' line are both drawn as canvas overlays now, snapped
+        // to the nearest category label, instead of {x,y} datasets a category axis can't place.
+        var teamOpts = chartOptions('minute', 'gold/s', { stacked: true });
+        teamOpts.plugins = {
+          overlayLines: {
+            boundary: boundaryOverlaySpec(scope, 'minutes', minutesList),
+            bands: scenarioBandsForScope(scope),
+          },
+        };
         new Chart(canvas, {
           type: 'bar',
           data: { labels: minutesList, datasets: teamDatasets },
-          options: chartOptions('minute', 'gold/s', { stacked: true, hideRefLinesFromLegend: true }),
-          plugins: [refLineLabelPlugin],
+          options: teamOpts,
+          plugins: [overlayPlugin],
         });
       }
     }
@@ -882,15 +944,16 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
           }),
         });
       }
-      var maxGap = 1;
-      for (var gg = 0; gg < eb.length; gg++) if ((eb[gg].goldGapToRichest || 0) > maxGap) maxGap = eb[gg].goldGapToRichest;
-      var boundary2 = phaseBoundaryDataset(scope, maxGap * 1.05);
-      if (boundary2) gapDatasets.push(boundary2);
+      // Review fix (item 3b): category axis (labels: minutesList) - snap the boundary to the
+      // nearest label instead of a {x,y} dataset point, which Chart.js read as a bare index and
+      // drew diagonally.
+      var gapOpts = chartOptions('minute', 'gold behind richest team');
+      gapOpts.plugins = { overlayLines: { boundary: boundaryOverlaySpec(scope, 'minutes', minutesList) } };
       new Chart(id('chart-gold-gap', suffix), {
         type: 'line',
         data: { labels: minutesList, datasets: gapDatasets },
-        options: chartOptions('minute', 'gold behind richest team', { hideRefLinesFromLegend: true }),
-        plugins: [refLineLabelPlugin],
+        options: gapOpts,
+        plugins: [overlayPlugin],
       });
     }
 
@@ -930,13 +993,16 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
           });
         }
       }
-      var boundary3 = phaseBoundaryDataset(scope, maxAmount);
-      if (boundary3) purchaseDatasets.push(boundary3);
+      // The P1/A1/Ult/P2/A2 target lines above stay dataset-based (a real, always-2-point line on
+      // this chart's own genuinely linear/minutes axis, which was never the bug here) - only the
+      // 'Phase 2 starts' marker moves to the overlay plugin, alongside them.
+      var purchaseOpts = chartOptions('minute', 'price', { hideRefLinesFromLegend: true });
+      purchaseOpts.plugins.overlayLines = { boundary: boundaryOverlaySpec(scope, 'minutes') };
       new Chart(id('chart-purchase-timeline', suffix), {
         type: 'scatter',
         data: { datasets: purchaseDatasets },
-        options: chartOptions('minute', 'price', { hideRefLinesFromLegend: true }),
-        plugins: [refLineLabelPlugin],
+        options: purchaseOpts,
+        plugins: [refLineLabelPlugin, overlayPlugin],
       });
     }
 
@@ -987,6 +1053,11 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var ownership = rowsFor('ownership', scope);
     var bucket = bucketFor(scope);
     var matchLen = (bucket && bucket.header && bucket.header.matchLengthSeconds) || 1;
+    // Review fix (item 2): a Phase-2-scoped row's own from/to are ABSOLUTE match seconds (e.g.
+    // 90->120), while matchLen here is that PHASE's own length (e.g. 90) - drawing at
+    // st.from / matchLen put every Phase 2 bar off the right edge of its own track (900/450 =
+    // 200% in the fixture). Offset both ends by this scope's own window start before dividing.
+    var winStart = (scope === 'phase-2' && DATA.transitionSeconds != null) ? DATA.transitionSeconds : 0;
     var ganttDiv = id('ownership-gantt', suffix);
     var zones = uniqueSorted(ownership.map(function (r) { return r.zone; }));
     for (var zi = 0; zi < zones.length; zi++) {
@@ -997,7 +1068,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       var stints = ownership.filter(function (r) { return r.zone === zone; });
       for (var si = 0; si < stints.length; si++) {
         var st = stints[si];
-        var leftPct = (st.from / matchLen) * 100;
+        var leftPct = ((st.from - winStart) / matchLen) * 100;
         var widthPct = Math.max(0.3, ((st.to - st.from) / matchLen) * 100);
         var bar = el('div', {
           class: 'gantt-bar',
@@ -1028,15 +1099,15 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
           }),
         });
       }
-      var maxZones = 1;
-      zoneHeldDatasets.forEach(function (ds) { ds.data.forEach(function (v) { if (v > maxZones) maxZones = v; }); });
-      var boundary = phaseBoundaryDataset(scope, maxZones);
-      if (boundary) zoneHeldDatasets.push(boundary);
+      // Review fix (item 3b): category axis (labels: minutesList) - same snap-to-nearest-label
+      // overlay as the gold-gap chart above, instead of a {x,y} dataset point.
+      var heldOpts = chartOptions('minute', 'zones held');
+      heldOpts.plugins = { overlayLines: { boundary: boundaryOverlaySpec(scope, 'minutes', minutesList) } };
       new Chart(id('chart-zones-held', suffix), {
         type: 'line',
         data: { labels: minutesList, datasets: zoneHeldDatasets },
-        options: chartOptions('minute', 'zones held', { hideRefLinesFromLegend: true }),
-        plugins: [refLineLabelPlugin],
+        options: heldOpts,
+        plugins: [overlayPlugin],
       });
     }
 
@@ -1288,15 +1359,19 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var suffix = scope;
     var bucket = bucketFor(scope);
 
+    // Review fix (item 11): the heading renders regardless (a plain 'Phase 2 (2 teams)' label
+    // when there's no data at all), so an empty Phase 2 tab still reads as 'this tab exists and
+    // here's why it's empty' rather than a blank line above the note.
+    renderPhaseDuration(scope, suffix);
+
     if (scope === 'phase-2' && !bucket) {
-      // No elimination in this match: the whole-match/Phase-1 tabs already show everything, and
-      // Phase 2 has nothing of its own to show.
+      // No elimination in this match: hide the Header/Tuning/coverage/section content entirely -
+      // only the heading (above) and this note show, nothing empty underneath.
       id('tab-content', suffix).style.display = 'none';
       id('phase2-empty-note', suffix).style.display = 'block';
       return;
     }
 
-    renderPhaseDuration(scope, suffix);
     safeRun('header (' + scope + ')', function () { renderHeader(scope, suffix); });
     safeRun('economy (' + scope + ')', function () { renderEconomy(scope, suffix); });
     safeRun('territory (' + scope + ')', function () { renderTerritory(scope, suffix); });

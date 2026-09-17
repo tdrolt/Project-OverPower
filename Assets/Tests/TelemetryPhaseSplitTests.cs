@@ -261,6 +261,41 @@ namespace Overpower.Tests
             }
         }
 
+        // ---------------------------------------------------------------- review fix (item 12): the boundary instant itself
+
+        [Test]
+        public void AnEventAtExactlyTheTransitionInstantLandsInPhase2OnlyNeverPhase1()
+        {
+            string temp = NewIsolatedTempFolder();
+            Directory.CreateDirectory(temp);
+            try
+            {
+                string lines =
+                    "{\"e\":\"session\",\"t\":0,\"schema\":1,\"m\":\"M\",\"a\":1,\"nick\":\"n1\",\"tm\":0,\"master\":true,\"commit\":\"c\",\"uv\":\"u\",\"plat\":\"p\",\"tuning\":{}}\n" +
+                    "{\"e\":\"phase\",\"t\":90,\"num\":2,\"remain\":[0,1]}\n" +
+                    // A hit logged at EXACTLY t=90 - the transition instant itself. Phase 1 is
+                    // [0, 90) (half-open, excludes 90); Phase 2 is [90, end] (closed) - so this
+                    // must land in Phase 2 only, never Phase 1, and never in both.
+                    "{\"e\":\"hit\",\"t\":90,\"a\":1,\"at\":0,\"v\":1,\"vt\":1,\"w\":1,\"ab\":-1,\"src\":\"Projectile\",\"raw\":10,\"arm\":0,\"hpLost\":10,\"lethal\":false,\"d\":5,\"vul\":0,\"op\":false}\n" +
+                    "{\"e\":\"sample\",\"t\":120,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var set = TelemetryAggregator.BuildSet(TelemetryLog.Load(temp));
+                Assert.AreEqual(0, set.Phase1.Hits.Count, "the boundary instant belongs to Phase 2, not Phase 1");
+                Assert.AreEqual(1, set.Phase2.Hits.Count);
+                Assert.AreEqual(90.0, set.Phase2.Hits[0].T, 1e-9);
+                Assert.AreEqual(2, set.Phase2.Hits[0].Phase);
+
+                // The same hit, tagged Phase 2, on the whole-match build too.
+                Assert.AreEqual(1, set.WholeMatch.Hits.Count);
+                Assert.AreEqual(2, set.WholeMatch.Hits[0].Phase);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
         // ---------------------------------------------------------------- log coverage: a missing actor seen only via `hit`
 
         [Test]

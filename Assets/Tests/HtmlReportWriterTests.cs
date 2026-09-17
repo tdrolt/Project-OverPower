@@ -46,9 +46,15 @@ namespace Overpower.Tests
                     StringAssert.Contains("id='" + sectionId + "-" + scope + "'", html);
                 }
 
-                // match_a has no phase event at all, so the Phase 2 tab must show the "no
-                // elimination" note and hide its own content.
-                StringAssert.Contains("No team was eliminated in this match", html);
+                // Review fix (item 12): the 'no elimination' note's TEXT lives in every tab's
+                // static template (hidden by default) - its mere presence in the HTML source
+                // proves nothing about which tab the page's own JS actually shows it in at
+                // runtime (this test never executes that JS). What IS verifiable statically:
+                // (a) the embedded DATA's own phase2 is null for match_a (the exact signal the
+                // page branches on), and (b) the Phase 2 tab's own copy of the note starts
+                // hidden by default in the markup, same as every other tab's copy.
+                StringAssert.Contains("\"phase2\":null", html);
+                StringAssert.Contains("<div id='phase2-empty-note-phase-2' class='warn' style='display:none'>", html);
             }
             finally
             {
