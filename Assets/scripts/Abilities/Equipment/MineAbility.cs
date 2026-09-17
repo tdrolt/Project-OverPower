@@ -52,10 +52,33 @@ namespace Overpower.Abilities
                  "instead - same idea as BlinkAbility's own Search Step.")]
         private float placementSearchStep = 0.25f;
 
+        [Header("Placement - ground probe (same rule as Blink and Teleport)")]
+        [SerializeField, Tooltip("How far, in metres, BELOW the player's OWN current height the " +
+                 "ground is allowed to be for a candidate spot to count as solid ground. Too small " +
+                 "refuses a valid spot on a gentle slope or a step down; too large can accept a spot " +
+                 "far below the arena - past a thin floor - as if it were ground.")]
+        private float groundProbeDistance = 2f;
+
+        [SerializeField, Tooltip("How far, in metres, ABOVE the player's OWN current height the " +
+                 "ground is allowed to be - a small step or curb, not a roof. A mine stays at roughly " +
+                 "the caster's own level, the same reason Blink's own step-up is small.")]
+        private float maxStepUp = 0.6f;
+
         // The caster's own capsule, read once in OnEquip like Blink's and Teleport's - a mine's safety pull-back
         // needs the real player shape to find "the caster's own feet" (PlayerSpaceProbe.FeetOf) and to stand a
         // candidate point the same way a player would (PlayerSpaceProbe.RootOnGround).
         private CapsuleCollider capsule;
+
+        // Not a design tunable, like Blink's/Teleport's own blockMask: which layers count as ground and what a
+        // placement may not overlap is fixed here rather than exposed for a designer to mis-set into something that
+        // places a mine through the arena floor. Computed in Awake, not a static field initializer - the same
+        // LayerMask.GetMask crash-on-spawn PlayerDisplacement's class comment documents.
+        private int blockMask;
+
+        private void Awake()
+        {
+            blockMask = LayerMask.GetMask("Default", "Building");
+        }
 
         // Owner only: increments once per successful placement, travels as CastPayload.IntArg so
         // every client's Mine.Seq (and this owner's own pruning) agree on placement order - same
@@ -85,6 +108,8 @@ namespace Overpower.Abilities
             maxActiveMines = Mathf.Max(1, maxActiveMines);
             placementRange = Mathf.Max(0f, placementRange);
             placementSearchStep = Mathf.Max(0.01f, placementSearchStep); // never 0 or negative - that would search forever.
+            groundProbeDistance = Mathf.Max(0f, groundProbeDistance);
+            maxStepUp = Mathf.Max(0f, maxStepUp);
         }
 
         // ---- owner only ---------------------------------------------------------------------------
@@ -112,9 +137,14 @@ namespace Overpower.Abilities
         /// floor with nothing on the Building layer between the caster and it - the same "clamp, then walk back
         /// toward the caster until something works" idea BlinkDestinationSearch already proves pure, just against a
         /// different pair of checks (a straight-line path and a floor point, not an arena-bounded capsule check). No
-        /// new path/ground primitives: GroundSnap.TryFindGroundY is the Task 2 floor finder, and
-        /// PlayerSpaceProbe.IsPathClear is the same knee-height sphere cast Blink's and Teleport's own destination
-        /// checks are built from. Falls back to the caster's own position - today's placement - if even that fails.
+        /// new path/ground primitives: GroundProbe.TryFindGround is the SAME gameplay floor finder Blink's and
+        /// Teleport's own destination checks already use - not GroundSnap, which is visual-only (its own class
+        /// comment says so) and probes an ABSOLUTE world-Y band, not one relative to the caster's actual height; a
+        /// caster on a ledge, ramp, crate or roof would have every candidate fail and silently fall back to their own
+        /// feet (found in review, before the first playtest). GroundProbe's own refHeight parameter is exactly the
+        /// caster's current height, which is what fixes that. PlayerSpaceProbe.IsPathClear is the same knee-height
+        /// sphere cast Blink's and Teleport's own destination checks are built from. Falls back to the caster's own
+        /// position - today's placement - if even that fails.
         /// </summary>
         private Vector3 FindSafePlacement(Vector3 origin, Vector3 requestedPoint)
         {
@@ -127,14 +157,16 @@ namespace Overpower.Abilities
             float requestedDistance = toRequested.magnitude;
             Vector3 direction = requestedDistance > 0.0001f ? toRequested / requestedDistance : Vector3.zero;
             Vector3 casterFeet = PlayerSpaceProbe.FeetOf(capsule, origin);
+            float killHeight = Owner.Motor != null ? Owner.Motor.KillHeight : float.NegativeInfinity;
 
             float distance = requestedDistance;
             while (true)
             {
                 Vector3 candidateXZ = originXZ + direction * distance;
-                if (GroundSnap.TryFindGroundY(candidateXZ, out float groundY))
+                if (GroundProbe.TryFindGround(origin.y, candidateXZ, maxStepUp, groundProbeDistance,
+                        killHeight, blockMask, Owner.Root.transform, out Vector3 ground))
                 {
-                    Vector3 candidateFeet = new Vector3(candidateXZ.x, groundY, candidateXZ.z);
+                    Vector3 candidateFeet = ground;
                     if (PlayerSpaceProbe.IsPathClear(casterFeet, candidateFeet))
                         return PlayerSpaceProbe.RootOnGround(capsule, candidateFeet);
                 }

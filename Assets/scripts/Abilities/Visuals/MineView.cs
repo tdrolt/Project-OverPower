@@ -17,10 +17,9 @@ namespace Overpower.Abilities
     /// A5 (Tudor 2026-09-17 evening, GDD spec): once Mine.InvisibleAfterSeconds has passed, an enemy sees nothing at
     /// all, and the owner's own team sees a faded, translucent Ghost instead - MineVisibilityRule decides which, from
     /// Mine.SecondsSincePlaced (Age, a network-agreed snapshot, so every client switches at the true placement moment
-    /// regardless of its own lag - no timestamp or RPC of this view's own). HIDING TOGGLES RENDERER.enabled ON EACH
-    /// PART, NEVER THE VISUAL ROOT'S GameObject: LateUpdate below already tells a real detonation apart from
-    /// everything else purely by visualRoot.gameObject.activeSelf going false (Mine.RPC_Detonate is the only thing
-    /// that ever does that), so a fade-driven SetActive(false) here would be read as a blast that never happened.
+    /// regardless of its own lag - no timestamp or RPC of this view's own). Hiding toggles each part's own
+    /// Renderer.enabled rather than the Visual root's GameObject, so it never collides with LateUpdate's own
+    /// detonation check below (Mine.Detonated, not the Visual's active state).
     ///
     /// Visual only. Every size comes from Mine itself, and the detonation is noticed without touching the detonation
     /// code: Mine hides its own Visual on every client the instant it goes off.
@@ -92,9 +91,8 @@ namespace Overpower.Abilities
             {
                 VisualTint.FillFlatCircle(triggerRing, mine.TriggerRadius, triggerRingSegments);
                 VisualTint.SetLineColor(triggerRing, VisualTint.WithAlpha(teamColor, triggerRingOpacity));
-                // Enemies never saw the trigger ring before A5 either - MineVisibility.Hidden needs no extra gating
-                // here, because an enemy's own copy was already false from the moment it was placed.
-                triggerRing.enabled = IsLocalPlayersTeam(deployable.OwnerTeam);
+                // Enabled live in UpdateVisibility, not here - see that method's own comment for why "is this my own
+                // team" cannot be decided once, at placement time, and left alone.
             }
         }
 
@@ -108,11 +106,10 @@ namespace Overpower.Abilities
             if (mine == null || visualRoot == null)
                 return;
 
-            // Mine.RPC_Detonate hides the Visual on every client the instant it goes off - the ONLY thing that ever
-            // does, so this is a reliable "has it detonated" check (see the class comment on why A5's own hiding
-            // must never do the same). A lifetime expiry or a prune destroys the mine instead, and an expired
-            // late-join copy only switches its renderers off, so neither of those flashes a blast either.
-            if (!visualRoot.gameObject.activeSelf)
+            // Mine.Detonated - MineDetonationState's own flag, set on every client inside RPC_Detonate - not the
+            // Visual's own GameObject.activeSelf (review finding: that also flips false under the Lifetime Seconds
+            // expiry backstop, which is not a detonation, so watching it could show a blast that never happened).
+            if (mine.Detonated)
             {
                 if (!blastShown)
                 {
@@ -126,14 +123,26 @@ namespace Overpower.Abilities
             UpdateVisibility();
         }
 
-        /// <summary>A5: switches this mine's look between Visible/Ghost/Hidden. Only touches renderers when the rule's
-        /// answer actually changed, since time only moves forward - Visible can become Ghost or Hidden, but never the
-        /// reverse, so re-applying the same answer every frame would just be wasted work.</summary>
+        /// <summary>A5: switches this mine's look between Visible/Ghost/Hidden, and keeps the trigger ring's own
+        /// enabled state in sync with the LOCAL PLAYER'S OWN TEAM, read live every frame rather than decided once at
+        /// placement. Review finding: a late joiner replays this mine's placement from the room cache before their
+        /// own teamID custom property has arrived (RoomManager only writes it once, on spawn), so a one-time "is this
+        /// my own team" decision made inside OnDeployablePlaced permanently reads false for every one of their own
+        /// mines - even though MineVisibilityRule.For, evaluated fresh every frame below, already resolves correctly
+        /// the moment the team property lands. The ring's own enabled flag needs the same live treatment, since it can
+        /// flip true from a stale false without the Visible/Ghost/Hidden answer itself changing at all (both team
+        /// values give the identical MineVisibility.Visible answer before Invisible After Seconds elapses).</summary>
         private void UpdateVisibility()
         {
+            if (mine.HasExpired)
+                return; // NetworkedDeployable's own Lifetime Seconds backstop already hid every renderer here - never re-enable one for the owner's own team.
+
+            if (triggerRing != null)
+                triggerRing.enabled = IsLocalPlayersTeam(mine.OwnerTeam);
+
             MineVisibility visibility = MineVisibilityRule.For(LocalTeam(), mine.OwnerTeam, mine.SecondsSincePlaced, mine.InvisibleAfterSeconds);
             if (visibilityApplied && visibility == lastVisibility)
-                return;
+                return; // Only the body/stud recolour below is worth gating - Visible can become Ghost or Hidden but never the reverse.
 
             lastVisibility = visibility;
             visibilityApplied = true;

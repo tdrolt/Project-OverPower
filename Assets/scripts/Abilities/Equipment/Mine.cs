@@ -149,6 +149,19 @@ namespace Overpower.Abilities
         /// can never disagree about "how old is this mine right now" - see localPlacedRealTime's own comment.</summary>
         public float SecondsSincePlaced => (float)Age + (Time.time - localPlacedRealTime);
 
+        /// <summary>True once RPC_Detonate has actually run on THIS client - read-only mirror of
+        /// MineDetonationState.Detonated, the single source of truth for "has this mine already gone off" (review
+        /// finding: MineView used to infer this from the Visual's own GameObject.activeSelf, which is also what
+        /// Lifetime Seconds' expiry backstop touches - a real detonation and an unrelated hide were indistinguishable
+        /// from outside this class). False before OnPlaced has run at all, same as MineDetonationState's own default.</summary>
+        public bool Detonated => detonation != null && detonation.Detonated;
+
+        /// <summary>True once this copy has read itself as already past Lifetime Seconds (NetworkedDeployable's own
+        /// IsExpired, exposed read-only) - the defensive backstop for a late-join/cache-removal race, not a real
+        /// detonation. MineView (A5) must not fade an expired mine back in for the owner's own team once
+        /// NetworkedDeployable has already hidden its renderers.</summary>
+        public bool HasExpired => IsExpired;
+
         /// <summary>Task T3 (telemetry): the id of the MineAbility that placed this, threaded through
         /// instantiationData (MineAbility.PlaceMine appends Definition.Id right after Seq) since this
         /// deployable is a separate prefab with no AbilityDefinition of its own to read. -1 if the
