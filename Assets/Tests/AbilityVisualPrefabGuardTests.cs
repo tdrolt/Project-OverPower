@@ -89,6 +89,9 @@ namespace Overpower.Tests
             Float(mine, "armDelaySeconds", 0.5f);
             Float(mine, "destroyDelaySeconds", 0.5f);
             Int(mine, "detectionMask", -1);
+            // A5 (Tudor 2026-09-17 evening): mines turn invisible 1 s after placement, as the GDD always said - an
+            // INTENDED gameplay change, so this pin is new on purpose (see the commit message).
+            Float(mine, "invisibleAfterSeconds", 1f);
             PhotonViews("Assets/Resources/Mine.prefab", 1);
 
             SerializedObject ability = Fields<MineAbility>("Assets/Gameplay/Abilities/Mines.prefab");

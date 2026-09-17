@@ -225,6 +225,7 @@ MonoBehaviour:
   detectionMask:
     serializedVersion: 2
     m_Bits: 4294967295
+  invisibleAfterSeconds: 1
   destroyDelaySeconds: 0.5
   visual: {fileID: 3506694883596941363}
 --- !u!114 &4100086648196810113
@@ -254,6 +255,8 @@ MonoBehaviour:
   triggerRingSegments: 48
   blastMarkerPrefab: {fileID: 4484379497969467019, guid: f6f96cd4a72656e43a5e8e6b01dad146, type: 3}
   visualRoot: {fileID: 3506694883596941363}
+  ghostMaterial: {fileID: 2100000, guid: b1fa6d1a2701d7f45813b46f21093654, type: 2}
+  ghostAlpha: 0.35
 --- !u!1 &2664259370264489237
 GameObject:
   m_ObjectHideFlags: 0

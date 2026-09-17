@@ -80,6 +80,13 @@ namespace Overpower.Abilities
                  "layer has an IDamageable to find, so widening this only costs performance.")]
         private LayerMask detectionMask = ~0;
 
+        [Header("Visibility (A5, Tudor 2026-09-17 evening - GDD spec)")]
+        [SerializeField, Tooltip("Seconds after being placed before this mine turns invisible to the " +
+                 "enemy team and fades to a translucent ghost for its own team, so only teammates can " +
+                 "still tell where it is. Distinct from Arm Delay Seconds above: a mine can still " +
+                 "detonate on an enemy who walked in before it vanished. See MineVisibilityRule.")]
+        private float invisibleAfterSeconds = 1f;
+
         [Header("Destruction")]
         [SerializeField, Tooltip("Seconds between this mine detonating and its object actually " +
                  "leaving the game - not zero. RPC_Detonate is what applies the damage and slow, on " +
@@ -132,6 +139,16 @@ namespace Overpower.Abilities
         /// <summary>Explosion Radius, read-only - MineView flashes the blast ring at this size.</summary>
         public float ExplosionRadius => explosionRadius;
 
+        /// <summary>Invisible After Seconds, read-only - MineView (A5) switches every viewer's MineVisibility at
+        /// this age.</summary>
+        public float InvisibleAfterSeconds => invisibleAfterSeconds;
+
+        /// <summary>Seconds since this mine was ACTUALLY placed, continuously updated on THIS client - Age (a
+        /// one-time network-agreed snapshot) plus real time elapsed since OnPlaced ran here. FixedUpdate's own arm-
+        /// delay check and MineView's own visibility check (A5) are two readers of the exact same number, so they
+        /// can never disagree about "how old is this mine right now" - see localPlacedRealTime's own comment.</summary>
+        public float SecondsSincePlaced => (float)Age + (Time.time - localPlacedRealTime);
+
         /// <summary>Task T3 (telemetry): the id of the MineAbility that placed this, threaded through
         /// instantiationData (MineAbility.PlaceMine appends Definition.Id right after Seq) since this
         /// deployable is a separate prefab with no AbilityDefinition of its own to read. -1 if the
@@ -174,8 +191,7 @@ namespace Overpower.Abilities
             if (detonation == null || detonation.Detonated || triggerSent)
                 return;
 
-            float secondsSincePlaced = (float)Age + (Time.time - localPlacedRealTime);
-            if (!detonation.IsArmed(secondsSincePlaced))
+            if (!detonation.IsArmed(SecondsSincePlaced))
                 return;
 
             if (!AnyEnemyWithin(triggerRadius))
