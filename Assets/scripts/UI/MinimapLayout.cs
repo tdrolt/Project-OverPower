@@ -77,6 +77,30 @@ namespace Overpower.UI
         public static float FramedSizeMetres(float arenaRadiusMetres, float marginMetres) =>
             2f * (Mathf.Max(0f, arenaRadiusMetres) + Mathf.Max(0f, marginMetres));
 
+        /// <summary>The triangular mask's circumradius (Tudor, 2026-09-17: the mask becomes a triangle, one vertex
+        /// toward each capital): the smallest R such that a point is inside the triangle (p . n_i &lt;= R/2 for
+        /// every inward edge normal n_i) for every given point, plus a margin. Each vertexDirection IS the inward
+        /// normal of the opposite edge (true for an equilateral triangle, guaranteed by ArenaSymmetry's 3-fold
+        /// layout) - n_i = vertexDirections[i], normalised. R = 2 x the worst-case reach (the farthest any point
+        /// extends along any one of the 3 normals), so the inradius (R/2) alone decides the size; the factor of 2
+        /// is the equilateral triangle's fixed circumradius/inradius ratio.</summary>
+        public static float TriangleCircumradius(IReadOnlyList<Vector2> points, IReadOnlyList<Vector2> vertexDirections, float marginMetres)
+        {
+            float worstReach = 0f;
+            foreach (Vector2 rawDirection in vertexDirections)
+            {
+                Vector2 n = rawDirection.normalized;
+                float reach = 0f;
+                foreach (Vector2 p in points)
+                {
+                    float along = Vector2.Dot(p, n);
+                    if (along > reach) reach = along;
+                }
+                if (reach > worstReach) worstReach = reach;
+            }
+            return 2f * worstReach + Mathf.Max(0f, marginMetres);
+        }
+
         /// <summary>The bubble label for a tier, as in the GDD (I = capital ... IV = centre).</summary>
         public static string TierLabel(int tier) => tier switch
         {

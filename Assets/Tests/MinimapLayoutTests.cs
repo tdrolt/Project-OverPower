@@ -118,6 +118,47 @@ namespace Overpower.Tests
             Assert.AreEqual(8f, MinimapLayout.FramedSizeMetres(-1f, 4f), 1e-3f);
         }
 
+        // Apex-up equilateral triangle: vertex directions at 90/210/330 degrees, matching the real capitals' map
+        // angles (EachTeamSeesItsOwnCapitalInTheSamePlace above).
+        private static readonly Vector2[] EquilateralDirections =
+        {
+            new Vector2(0f, 1f),
+            new Vector2(-0.8660254f, -0.5f),
+            new Vector2(0.8660254f, -0.5f),
+        };
+
+        [Test]
+        public void AKnownEquilateralCaseMatchesHandMaths()
+        {
+            // A single point straight along vertex 0's own direction, at distance 10: the worst-case reach is along
+            // n0 (dot = 10; dot with n1/n2 is -5), so R = 2*10 + margin.
+            var points = new List<Vector2> { new Vector2(0f, 10f) };
+            Assert.AreEqual(20f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
+            Assert.AreEqual(24f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 4f), 1e-3f);
+        }
+
+        [Test]
+        public void APointExactlyOnAnEdgeStillMatchesItsNormal()
+        {
+            // A point sitting exactly on the (extended) edge opposite vertex 0 - i.e. at inradius distance along n0,
+            // zero along the edge's own direction - still measures correctly via the plain dot product.
+            const float inradius = 6f;
+            Vector2 edgeDirection = new Vector2(1f, 0f); // perpendicular to n0 = (0,1)
+            var points = new List<Vector2> { new Vector2(edgeDirection.x * 3f, inradius) };
+            Assert.AreEqual(12f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
+        }
+
+        [Test]
+        public void ThePointThatForcesRIsWhicheverReachesFarthestOnAnyNormal()
+        {
+            // Two points: one reaches 5 along n0, the other reaches 9 along n1 - the second one must win, even
+            // though it is not the farthest point from the centre in a plain radius sense (its distance is
+            // Sqrt(9^2 + small) rather than a clean number), because TriangleCircumradius measures per-normal reach,
+            // not overall distance.
+            var points = new List<Vector2> { new Vector2(0f, 5f), new Vector2(-0.8660254f * 9f, -0.5f * 9f) };
+            Assert.AreEqual(18f, MinimapLayout.TriangleCircumradius(points, EquilateralDirections, 0f), 1e-3f);
+        }
+
         [Test]
         public void TheGddLinksMakeTwelveLinesWithNoDuplicates()
         {

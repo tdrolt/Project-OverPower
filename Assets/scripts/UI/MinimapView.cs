@@ -115,6 +115,8 @@ namespace Overpower.UI
 
         private RectTransform root;
         private RectTransform canvasRect;
+        private RectTransform viewport;
+        private RectTransform edgeShape;
         private RectTransform map;
         private RectTransform linksLayer;
         private RectTransform zonesLayer;
@@ -127,6 +129,11 @@ namespace Overpower.UI
         private bool largeOpen;
         private bool ownershipDirty = true;
         private float appliedYaw = float.NaN;
+        // The triangular mask/edge's constant offset from the map's own yaw rotation (Tudor, 2026-09-17: the mask
+        // becomes a triangle, one vertex toward each capital). Computed once in TryBuild from real capital
+        // positions - see ComputeTriangleBaseRotation. 0 for the shipped arena (its "up" capital already sits at
+        // map-space (0,1), matching the generated triangle's own apex), but never hard-coded as 0.
+        private float triangleBaseRotationDegrees;
         // Review fix, 2026-09-17: TryBuild waits (returns false) until every tower has registered; without this, a
         // tower that never does left the minimap silently blank forever with nothing in the console to say why.
         private float buildWaitStartTime = -1f;
@@ -247,6 +254,14 @@ namespace Overpower.UI
             BuildFrame();
             var zoneIds = new List<int>(manager.TowerDictionary.Keys);
             zoneIds.Sort();
+
+            // The triangular mask/edge's own constant rotation (Tudor, 2026-09-17), so their vertex stays aligned
+            // with the capital it targets at every yaw - see the field's own comment. map keeps turning by exactly
+            // the camera yaw (nothing else moves): its constant offset here just cancels viewport's own constant
+            // part, set once rather than every frame because it never changes after this.
+            triangleBaseRotationDegrees = ComputeTriangleBaseRotationDegrees(zoneIds);
+            map.localEulerAngles = new Vector3(0f, 0f, -triangleBaseRotationDegrees);
+
             foreach (int zone in zoneIds)
                 BuildZone(zone);
             foreach ((int a, int b) in MinimapLayout.LinkPairs(manager.Map, zoneIds))
@@ -283,6 +298,28 @@ namespace Overpower.UI
                               $"{string.Join(",", missing)}. Check that each tower's BuildingCapture has run its Start.");
         }
 
+        /// <summary>The constant UI rotation (degrees) that turns the generated apex-up MaskTriangle/EdgeTriangle so
+        /// their "up" vertex points at a real Tier 1 capital's own map-space direction (Tudor, 2026-09-17) - not
+        /// hard-coded to +Z, read from BuildingManager's own zone centres. Picks whichever Tier 1 zone comes first
+        /// by id; ArenaSymmetry's 3-fold layout guarantees the other two capitals sit ~120 degrees from it either
+        /// way, so any one of the three works as the reference vertex.</summary>
+        private float ComputeTriangleBaseRotationDegrees(List<int> zoneIds)
+        {
+            foreach (int zone in zoneIds)
+            {
+                if (manager.TierOf(zone) != 1 || !manager.TryGetZoneCentre(zone, out Vector3 centre))
+                    continue;
+                Vector2 direction = new Vector2(centre.x - config.WorldCentre.x, centre.z - config.WorldCentre.y);
+                if (direction.sqrMagnitude <= 0.0001f)
+                    continue;
+                // The generated triangle's own apex sits at map-space (0,1) (90 degrees) before any rotation; turn
+                // it by (direction's angle - 90) so the apex lands on this capital's real direction instead.
+                float directionDegrees = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+                return directionDegrees - 90f;
+            }
+            return 0f; // no Tier 1 zone found (shouldn't happen, TryBuild already required tier > 0 on every zone)
+        }
+
         private void BuildFrame()
         {
             var canvasGo = new GameObject("Minimap Canvas", typeof(RectTransform));
@@ -304,15 +341,21 @@ namespace Overpower.UI
             root = NewRect("Minimap", canvasGo.transform);
             root.sizeDelta = Vector2.one * theme.minimapCornerSize;
 
+            // The dark disc backdrop stays round on purpose: only the mask itself becomes a triangle (Tudor,
+            // 2026-09-17), so a round frame shows around it, like a triangular window in a round surround.
             NewImage("Frame", root, GeneratedSprites.Disc, theme.minimapFrameColor, theme.minimapCornerSize + 2f * theme.minimapFrameWidth);
 
-            // MaskDisc (512 px, review fix 2026-09-17), not the shared 128 px Disc: a UGUI Mask reads its sprite's
-            // alpha as a 1-bit stencil test, and the finer source traces a rounder contour before that test runs.
-            Image viewport = NewImage("Viewport", root, GeneratedSprites.MaskDisc, Color.white, theme.minimapCornerSize);
-            // Round mask: the turned square picture never shows its corners.
-            viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            // MaskTriangle (512 px, one vertex toward each capital - Tudor, 2026-09-17), not a disc: a UGUI Mask
+            // reads its sprite's alpha as a 1-bit stencil test, and the finer source traces a smoother contour
+            // before that test runs. viewport itself carries the yaw+base rotation (ApplyYawIfChanged) so the
+            // triangle turns with the map; map's own rotation only ever cancels viewport's constant part (set once
+            // in TryBuild), so the picture/bubbles/links/markers underneath still turn by exactly the camera yaw.
+            Image viewportImage = NewImage("Viewport", root, GeneratedSprites.MaskTriangle, Color.white, theme.minimapCornerSize);
+            viewport = viewportImage.rectTransform;
+            // Triangular mask: the turned square picture never shows a corner, and the shape frames the arena.
+            viewportImage.gameObject.AddComponent<Mask>().showMaskGraphic = false;
 
-            map = NewRect("Map", viewport.transform);
+            map = NewRect("Map", viewport);
             map.sizeDelta = Vector2.one * theme.minimapCornerSize;
 
             var pictureGo = new GameObject("Arena Picture", typeof(RectTransform));
@@ -334,8 +377,10 @@ namespace Overpower.UI
             teammatesLayer = NewLayer("Teammates", markersLayer);
 
             // Drawn LAST, so on top of and outside the mask (a sibling of Viewport, not a child): a thin,
-            // ordinarily anti-aliased ring covering the mask's remaining stencil seam (review fix, 2026-09-17).
-            NewImage("Edge Ring", root, GeneratedSprites.EdgeRing, theme.minimapFrameColor, theme.minimapCornerSize);
+            // ordinarily anti-aliased triangular ring covering the mask's remaining stencil seam (review fix,
+            // 2026-09-17). Rotated the same as viewport (ApplyYawIfChanged), independently of it (a sibling, not a
+            // child, so it isn't itself masked), to stay aligned with the triangle underneath.
+            edgeShape = NewImage("Edge Triangle", root, GeneratedSprites.EdgeTriangle, theme.minimapFrameColor, theme.minimapCornerSize).rectTransform;
         }
 
         private void BuildZone(int zone)
@@ -446,7 +491,12 @@ namespace Overpower.UI
             if (Mathf.Approximately(yaw, appliedYaw))
                 return;
             appliedYaw = yaw;
-            map.localEulerAngles = new Vector3(0f, 0f, MinimapLayout.MapRotationDegrees(yaw));
+            // viewport (mask+edge) carries the triangle's constant base rotation on top of yaw; map's own local
+            // rotation was set once in TryBuild to exactly cancel that constant part, so the picture/bubbles/links/
+            // markers it holds still turn by exactly the camera yaw, same as when the mask was a circle.
+            float triangleRotation = triangleBaseRotationDegrees + MinimapLayout.MapRotationDegrees(yaw);
+            viewport.localEulerAngles = new Vector3(0f, 0f, triangleRotation);
+            edgeShape.localEulerAngles = new Vector3(0f, 0f, triangleRotation);
             var upright = Quaternion.Euler(0f, 0f, MinimapLayout.UprightRotationDegrees(yaw));
             foreach (ZoneUi zone in zones)
                 zone.Upright.localRotation = upright;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Overpower.Arena;
 using Overpower.Data;
@@ -64,7 +65,14 @@ namespace Overpower.EditorTools
             if (radius <= 0f)
                 return "not baked: there are no meshes under Source or the generated thirds.";
 
-            float size = MinimapLayout.FramedSizeMetres(radius, config.MarginMetres);
+            // Triangular framing (Tudor, 2026-09-17: the minimap mask becomes a triangle, one vertex toward each
+            // capital) - see MinimapLayout.TriangleCircumradius for the maths. vertexDirections come from a real
+            // Tier 1 tower when one exists (never hard-coded to +Z); ArenaSymmetry's 3-fold layout means the other
+            // two sit 120 degrees from it either way, so deriving them by rotation is exact, not an approximation.
+            Vector2[] vertexDirections = CapitalDirections(arena);
+            List<Vector2> points = ArenaPoints(arena);
+            float circumradius = MinimapLayout.TriangleCircumradius(points, vertexDirections, config.MarginMetres);
+            float size = 2f * circumradius;
             var centre = new Vector2(arena.centre.x, arena.centre.z);
             int pixels = Mathf.Clamp(config.ImagePixels, 256, 2048);
 
@@ -80,8 +88,55 @@ namespace Overpower.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
             AssetDatabase.SaveAssetIfDirty(config);
 
-            return $"baked {ImagePath} ({pixels} px) covering {size:0.00} m centred on ({centre.x:0.00}, {centre.y:0.00}); " +
-                   $"arena radius {radius:0.00} m set by '{farthest}'.";
+            return $"baked {ImagePath} ({pixels} px) covering {size:0.00} m (triangle circumradius {circumradius:0.00} m) " +
+                   $"centred on ({centre.x:0.00}, {centre.y:0.00}); farthest mesh corner {radius:0.00} m, set by '{farthest}'.";
+        }
+
+        /// <summary>The three vertex directions the triangular mask points its corners along (Tudor, 2026-09-17),
+        /// unit vectors relative to the arena centre in (world X, world Z) - MinimapLayout's own map-space
+        /// convention. Reads a real Tier 1 BuildingCapture when one exists in the open scenes (never hard-codes
+        /// +Z); the other two directions are then exactly 120 degrees from it either way, since ArenaSymmetry's
+        /// generated120/generated240 thirds guarantee the arena - and so its towers - repeat with that symmetry.
+        /// Falls back to a plain "up" (0,1) reference only when no Tier 1 tower exists yet to read (e.g. a bare
+        /// preview scene in a test) so baking never throws.</summary>
+        public static Vector2[] CapitalDirections(ArenaSymmetry arena)
+        {
+            Vector2 reference = new Vector2(0f, 1f);
+            foreach (BuildingCapture capture in UnityEngine.Object.FindObjectsByType<BuildingCapture>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (capture.tier != 1) continue;
+                Vector2 direction = new Vector2(capture.transform.position.x - arena.centre.x, capture.transform.position.z - arena.centre.z);
+                if (direction.sqrMagnitude <= 0.0001f) continue;
+                reference = direction.normalized;
+                break;
+            }
+            const float cos120 = -0.5f, sin120 = 0.8660254f;
+            return new[]
+            {
+                reference,
+                new Vector2(reference.x * cos120 - reference.y * sin120, reference.x * sin120 + reference.y * cos120),
+                new Vector2(reference.x * cos120 + reference.y * sin120, -reference.x * sin120 + reference.y * cos120),
+            };
+        }
+
+        /// <summary>Every MeshRenderer bounds corner under Source or a generated third, relative to the arena
+        /// centre, in (world X, world Z) - the point set TriangleCircumradius frames. Same meshes ArenaRadius
+        /// walks, just collected instead of reduced to a single farthest distance.</summary>
+        public static List<Vector2> ArenaPoints(ArenaSymmetry arena)
+        {
+            var points = new List<Vector2>();
+            foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
+            {
+                if (third == null) continue;
+                foreach (MeshRenderer renderer in third.GetComponentsInChildren<MeshRenderer>(true))
+                {
+                    Bounds bounds = renderer.bounds;
+                    foreach (float x in new[] { bounds.min.x, bounds.max.x })
+                        foreach (float z in new[] { bounds.min.z, bounds.max.z })
+                            points.Add(new Vector2(x - arena.centre.x, z - arena.centre.z));
+                }
+            }
+            return points;
         }
 
         /// <summary>The farthest flat distance from the arena centre to any corner of a MeshRenderer's bounds under

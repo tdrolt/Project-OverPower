@@ -30,6 +30,8 @@ namespace Overpower.UI
         private static Sprite triangle;
         private static Sprite maskDisc;
         private static Sprite edgeRing;
+        private static Sprite maskTriangle;
+        private static Sprite edgeTriangle;
 
         public static Sprite Disc => disc != null ? disc : (disc = Build("Generated Disc", Size, (x, y) => DiscAlpha(x, y, Size)));
         public static Sprite Triangle => triangle != null ? triangle : (triangle = Build("Generated Triangle", Size, (x, y) => TriangleAlpha(x, y, Size)));
@@ -43,6 +45,17 @@ namespace Overpower.UI
         /// minimap's masked content (review fix, 2026-09-17): even MaskDisc's finer contour is still a 1-bit test,
         /// so this covers whatever step remains with a normally anti-aliased edge instead of a stencilled one.</summary>
         public static Sprite EdgeRing => edgeRing != null ? edgeRing : (edgeRing = Build("Generated Edge Ring", LargeSize, (x, y) => RingAlpha(x, y, LargeSize)));
+
+        /// <summary>A 512 px equilateral triangle, apex up, used for the minimap's Mask (Tudor, 2026-09-17: the mask
+        /// becomes a triangle, one vertex toward each capital). Unlike Triangle above, its 3 vertices sit at equal
+        /// distance from the sprite's own pixel centre - its centroid, incentre and circumcentre all coincide for
+        /// an equilateral triangle, so rotating the Image (about its pivot, the sprite's centre) turns the triangle
+        /// rigidly in place instead of swinging it off-centre.</summary>
+        public static Sprite MaskTriangle => maskTriangle != null ? maskTriangle : (maskTriangle = Build("Generated Mask Triangle", LargeSize, (x, y) => TriangleMaskAlpha(x, y, LargeSize)));
+
+        /// <summary>A thin triangular ring following MaskTriangle's own edge, drawn UNMASKED on top (same idea as
+        /// EdgeRing): covers the Mask's 1-bit stencil seam with a normally anti-aliased edge instead.</summary>
+        public static Sprite EdgeTriangle => edgeTriangle != null ? edgeTriangle : (edgeTriangle = Build("Generated Edge Triangle", LargeSize, (x, y) => TriangleEdgeAlpha(x, y, LargeSize)));
 
         private static Sprite Build(string name, int size, System.Func<float, float, float> alphaAt)
         {
@@ -94,6 +107,39 @@ namespace Overpower.UI
             var apex = new Vector2(size / 2f, size - 2f);
             float inside = Mathf.Min(EdgeDistance(p, left, right), Mathf.Min(EdgeDistance(p, right, apex), EdgeDistance(p, apex, left)));
             return inside + 0.5f;
+        }
+
+        // The 3 vertices of an apex-up equilateral triangle centred on the sprite's own pixel centre (unlike
+        // TriangleAlpha's left/right/apex, whose centroid sits off the sprite's centre - fine for a static marker,
+        // wrong for a mask that has to rotate in place). v0 top, v1 bottom-left, v2 bottom-right - that order is
+        // counter-clockwise (same winding EdgeDistance already assumes).
+        private static void CentredTriangleVertices(int size, out Vector2 v0, out Vector2 v1, out Vector2 v2)
+        {
+            float half = size / 2f;
+            float r = half - 2f;
+            v0 = new Vector2(half, half + r);
+            v1 = new Vector2(half - r * 0.8660254f, half - r * 0.5f);
+            v2 = new Vector2(half + r * 0.8660254f, half - r * 0.5f);
+        }
+
+        private static float TriangleMaskAlpha(float x, float y, int size)
+        {
+            CentredTriangleVertices(size, out Vector2 v0, out Vector2 v1, out Vector2 v2);
+            var p = new Vector2(x, y);
+            return Mathf.Min(EdgeDistance(p, v0, v1), Mathf.Min(EdgeDistance(p, v1, v2), EdgeDistance(p, v2, v0))) + 0.5f;
+        }
+
+        // Same band idea as RingAlpha, but measured as a straight perpendicular distance to the nearest edge rather
+        // than a radius - the natural measure for a polygon, and gives a uniform-width band on every side.
+        private static float TriangleEdgeAlpha(float x, float y, int size)
+        {
+            CentredTriangleVertices(size, out Vector2 v0, out Vector2 v1, out Vector2 v2);
+            var p = new Vector2(x, y);
+            float inside = Mathf.Min(EdgeDistance(p, v0, v1), Mathf.Min(EdgeDistance(p, v1, v2), EdgeDistance(p, v2, v0)));
+            float bandWidth = size * 0.02f;
+            float outerEdge = inside + 0.5f;
+            float innerEdge = bandWidth - inside + 0.5f;
+            return Mathf.Min(outerEdge, innerEdge);
         }
 
         // Signed distance from p to the line a->b, positive on the inside of a counter-clockwise triangle.
