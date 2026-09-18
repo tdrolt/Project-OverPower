@@ -140,6 +140,25 @@ namespace Overpower.Match
 
         public override void OnJoinedRoom() => ReactToRoomState(firstRead: true);
 
+        /// <summary>The next room is a different match; nothing from this one may leak into it - same
+        /// reasoning as BuildingManager.OnLeftRoom. Found missing live (Task 2.7 review re-
+        /// verification): without this, a client that leaves a finished match and joins another
+        /// inside the same running process keeps this object's stale lastWrittenPhase/lastApplied*
+        /// from the match it just left - RoomManager.PickSmallestTeam then reads a stale
+        /// IsEliminated for a team that was never even in the new room, and a promoted master's own
+        /// MasterRecompute can refuse to ever write again because it still believes Over.</summary>
+        public override void OnLeftRoom()
+        {
+            lastWrittenEliminated = null;
+            lastWrittenPhase = MatchPhase.ThreeTeams;
+            lastWrittenWinner = -1;
+            writesAwaitingEcho = 0;
+
+            lastAppliedEliminated = new List<int>();
+            lastAppliedPhase = MatchPhase.ThreeTeams;
+            lastAppliedWinner = -1;
+        }
+
         /// <summary>Called by BuildingManager.CheckTerritoryWin when one team holds every capital -
         /// the second, GDD-external win condition alongside elimination (an earlier project decision,
         /// kept as an extra win condition per this plan's own "Decisions taken" table). Master only:
@@ -249,15 +268,19 @@ namespace Overpower.Match
             LogTelemetry(newlyEliminated, previousPhase, result, statuses);
         }
 
-        /// GDD p.20-21: the first elimination sends every Tier-3 zone neutral. SetNeutral is already
-        /// a no-op on an already-neutral zone (its own guard) and master-only (WriteBasis's guard), so
-        /// looping every zone here is safe even if this runs more than once.
+        /// GDD p.20-21: the first elimination sends every Tier-3 zone neutral. Uses
+        /// SetNeutralWithoutBountyHistory, not the ordinary SetNeutral: the GDD's bounty (p.20) is for
+        /// taking a zone FROM the team that held it, and this reset takes every Tier-3 zone from
+        /// nobody - the next team to capture one must not be paid for a multi-minute hold that was
+        /// reset out from under its owner, not fought for. Already a no-op on an already-neutral zone
+        /// (its own guard) and master-only (WriteBasis's guard), so looping every zone here is safe
+        /// even if this runs more than once.
         private static void NeutraliseTierThreeZones(BuildingManager buildings)
         {
             int[] tiers = buildings.TierByZone();
             for (int zone = 0; zone < tiers.Length; zone++)
                 if (tiers[zone] == 3)
-                    buildings.SetNeutral(zone);
+                    buildings.SetNeutralWithoutBountyHistory(zone);
         }
 
         /// A decided match's room must not keep taking new players - RoomManager.JoinRandomRoom would

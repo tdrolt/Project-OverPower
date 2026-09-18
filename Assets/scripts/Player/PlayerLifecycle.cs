@@ -333,10 +333,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             Debug.Log($"[VIS] cathedral-recapture death {deathCount}, respawning in {delay}s");
             StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         }
-        else
-        {
-            Debug.Log("[PlayerDied] Player NOT Respawn Entered");
-        }
+        // else: still waiting - the waiting panel itself already shows that, every FixedUpdate this
+        // runs (Task 2.7 review: this used to log "Player NOT Respawn Entered" here every physics
+        // step while waiting - a build's stack trace on every line made two minutes of a genuine
+        // last stand into about 6,000 log lines).
     }
 
     /// Both death paths (and CheckForCathedralCapture below) need this team's capital. Task 2.7:

@@ -600,6 +600,18 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         Write(basis.WithNeutral(zone, ServerNowMs()));
     }
 
+    /// <summary>Master only: same effect as SetNeutral, but wipes the zone's bounty-eligible history
+    /// instead of recording it (Task 2.7 review) - for MatchDirector's Tier-3 reset at the three-to-
+    /// two team transition, which takes every Tier-3 zone from nobody, not from whoever held it.</summary>
+    public void SetNeutralWithoutBountyHistory(int zone)
+    {
+        TerritorySnapshot basis = WriteBasis(nameof(SetNeutralWithoutBountyHistory), zone);
+        if (basis == null || basis.OwnerOf(zone) == TerritoryMap.Neutral)
+            return;
+
+        Write(basis.WithNeutralReset(zone, ServerNowMs()));
+    }
+
     private TerritorySnapshot WriteBasis(string caller, int zone)
     {
         if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)

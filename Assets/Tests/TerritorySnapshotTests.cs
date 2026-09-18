@@ -44,6 +44,25 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ResetNeutralisingWipesTheBountyHistoryInstead()
+        {
+            // Task 2.7 review: the Tier-3 reset takes a zone from nobody, so unlike an ordinary
+            // WithNeutral, it must not leave anything for BountyRule.PayoutOnCapture to pay out on.
+            var s = new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).WithNeutralReset(3, nowMs: 305000);
+            Assert.AreEqual(TerritoryMap.Neutral, s.OwnerOf(3));
+            Assert.AreEqual(TerritoryMap.Neutral, s.LastOwnerOf(3));
+            Assert.AreEqual(0, s.LastHeldMs(3));
+        }
+
+        [Test]
+        public void ANextCaptureAfterAResetNeutralisePaysNoBounty()
+        {
+            var s = new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).WithNeutralReset(3, nowMs: 305000);
+            int pay = BountyRule.PayoutOnCapture(newOwner: 2, s.LastOwnerOf(3), s.LastHeldMs(3), bounty: 900, holdMs: 300000);
+            Assert.AreEqual(0, pay);
+        }
+
+        [Test]
         public void HoldTimeSurvivesServerTimestampWrapAround()
         {
             // PhotonNetwork.ServerTimestamp is an int that wraps; unchecked subtraction still gives the gap.

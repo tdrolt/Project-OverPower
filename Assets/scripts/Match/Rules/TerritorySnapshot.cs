@@ -79,6 +79,23 @@ namespace Overpower.Match
             return next;
         }
 
+        /// <summary>Same effect as WithNeutral, but WIPES the zone's bounty-eligible history (lastOwner/
+        /// lastHeldMs) instead of recording it (Task 2.7 review). The GDD's bounty is for taking a zone
+        /// FROM the team that held it (p.20); the Tier-3 reset at the three-to-two team transition
+        /// takes a zone from nobody, so the next team to capture it must not be paid for a hold that
+        /// was reset out from under its owner, not fought for.</summary>
+        public TerritorySnapshot WithNeutralReset(int zone, int nowMs)
+        {
+            TerritorySnapshot next = Copy();
+            if (!InRange(zone)) return next;
+            next.owners[zone] = TerritoryMap.Neutral;
+            next.heldSinceMs[zone] = nowMs;
+            next.lastOwner[zone] = TerritoryMap.Neutral;
+            next.lastHeldMs[zone] = 0;
+            next.bountyPaid[zone] = 0;
+            return next;
+        }
+
         public List<int> ZonesWhoseOwnerChangedSince(TerritorySnapshot previous)
         {
             var changed = new List<int>();
