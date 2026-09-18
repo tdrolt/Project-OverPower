@@ -483,5 +483,40 @@ namespace Overpower.UI
         [Range(4, 64)] public int coneArcSegments = 24;
         [Tooltip("Shared unlit material every aim-cone line and arc draw with. Keep its own colour white - each line tints itself through its own LineRenderer start/end colour above, which is what lets one material serve every line on this list.")]
         public Material coneLineMaterial;
+
+        [Header("Charge ring (2026-09-17)")]
+        [Tooltip("Show the ring at your own feet while you hold a charging weapon's trigger. Off draws nothing at " +
+                 "all; the weapon still charges exactly the same.")]
+        public bool showChargeRing = true;
+        [Tooltip("Material the charge ring draws with. Keep it unlit, transparent, vertex-coloured and its own " +
+                 "colour white - the ring tints itself through each line's colour. Points at the Aim Cone Line " +
+                 "material, which is exactly that and is what the capture ring uses too.")]
+        public Material chargeRingMaterial;
+        [Tooltip("Distance from the player's centre to the middle of the charge ring, in metres. The player's own " +
+                 "body is 0.7 m across, so anything below about 0.8 draws inside their feet.")]
+        public float chargeRingRadius = 1.15f;
+        [Tooltip("Thickness of the charge ring's band, in metres.")]
+        public float chargeRingWidth = 0.22f;
+        [Tooltip("How far above the floor the charge ring floats, in metres. Just enough never to flicker into the " +
+                 "ground; raise it if parts of the ring disappear on a slope.")]
+        public float chargeRingHeightOffset = 0.06f;
+        [Tooltip("How many straight pieces make up the charge ring. More reads as a smoother circle.")]
+        [Range(16, 256)] public int chargeRingSegments = 64;
+        [Tooltip("The dark loop behind the charge ring's fill, so how full it is reads like a loading bar. Without " +
+                 "it a part-filled band on open ground reads as a stray arc rather than a meter.")]
+        public Color chargeRingTrackColor = new Color(0f, 0f, 0f, 0.45f);
+        [Tooltip("Colour of the charge ring's fill while it is still filling.")]
+        public Color chargeRingFillColor = new Color(1f, 0.82f, 0.2f, 0.85f);
+        [Tooltip("Colour the charge ring's fill switches to the moment the charge is full, so the ceiling is " +
+                 "unmistakable without having to judge a closed circle by eye.")]
+        public Color chargeRingFullColor = new Color(1f, 0.95f, 0.6f, 1f);
+        [Tooltip("Colour of the ticks marking where the next round is earned. A weapon whose charge has no steps " +
+                 "(the laser's, which ramps damage and range smoothly) shows no ticks at all.")]
+        public Color chargeRingStepTickColor = new Color(1f, 1f, 1f, 0.85f);
+        [Tooltip("How far a step tick reaches across the ring, in metres - centred on the ring, so a little more " +
+                 "than Charge Ring Width makes it read as a notch cut through the band.")]
+        public float chargeRingStepTickLength = 0.3f;
+        [Tooltip("Thickness of a step tick, in metres.")]
+        public float chargeRingStepTickWidth = 0.05f;
     }
 }

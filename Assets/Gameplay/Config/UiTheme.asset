@@ -157,3 +157,15 @@ MonoBehaviour:
   coneArcColor: {r: 1, g: 1, b: 1, a: 0.35}
   coneArcSegments: 24
   coneLineMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
+  showChargeRing: 1
+  chargeRingMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
+  chargeRingRadius: 1.15
+  chargeRingWidth: 0.22
+  chargeRingHeightOffset: 0.06
+  chargeRingSegments: 64
+  chargeRingTrackColor: {r: 0, g: 0, b: 0, a: 0.45}
+  chargeRingFillColor: {r: 1, g: 0.82, b: 0.2, a: 0.85}
+  chargeRingFullColor: {r: 1, g: 0.95, b: 0.6, a: 1}
+  chargeRingStepTickColor: {r: 1, g: 1, b: 1, a: 0.85}
+  chargeRingStepTickLength: 0.3
+  chargeRingStepTickWidth: 0.05

@@ -536,6 +536,13 @@ namespace Overpower.Weapons
         /// does not touch either way).</summary>
         public float CurrentChargeFraction => ChargeFraction();
 
+        /// <summary>True while this player is holding a charging weapon's trigger - owner-only state, exactly like
+        /// CurrentChargeFraction above. ChargeRingView is the only reader: the ring has to appear the moment the
+        /// trigger goes down, not only once the charge is above zero, because ChargeFraction() reports 0 for the whole
+        /// Fire Interval a hold has to wait out first (see its own comment). An empty ring during that wait is the
+        /// point - it is what tells the player the gun is not charging yet.</summary>
+        public bool ChargeHeld => weapon != null && weapon.CanCharge && triggerHeldSince > 0f;
+
         /// <summary>
         /// Builds this shot on EVERY client, including the shooter's own. Every value it needs
         /// arrives as a parameter or from info.Sender; nothing in this body reads local state that
