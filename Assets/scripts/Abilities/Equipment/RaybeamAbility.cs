@@ -76,11 +76,14 @@ namespace Overpower.Abilities
         private float beamOriginSpacing = 0.75f;
 
         [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in " +
-                 "metres - not how far you can place the cursor. The cursor's own reach is set by " +
-                 "the camera, not by this number: at default zoom the camera already lets you aim " +
-                 "roughly 19m out (up to 38m fully zoomed out), so this range mostly controls how " +
-                 "far past the cursor a beam keeps hitting things, pierce included. Tudor, " +
-                 "2026-09-18: \"i want for the beams to traverse\" - doubled from 12 to 24.")]
+                 "metres, pierce included. Two things at once: the CAMERA sets how far out you can " +
+                 "place the cursor on screen (roughly 19m out at default zoom, up to 38m fully " +
+                 "zoomed out) - but TryBuildCast pulls the convergence point back to THIS number " +
+                 "whenever the cursor sits further away than it, so the beams meet at this distance " +
+                 "instead of at the cursor. That makes this both how far a beam keeps hitting things " +
+                 "past its target AND the furthest point the three beams can ever converge, whatever " +
+                 "the camera would otherwise let you reach. Tudor, 2026-09-18: \"i want for the " +
+                 "beams to traverse\" - doubled from 12 to 24.")]
         private float beamRange = 12f;
 
         [SerializeField, Tooltip("Diameter of each beam, in metres - BOTH what it hits (the " +
@@ -179,6 +182,8 @@ namespace Overpower.Abilities
             if (Owner.UltimateCharge == null || !Owner.UltimateCharge.Spend())
                 return false;
 
+            // Past this point the meter is already spent - no early return may follow, or a later
+            // `return false` would eat a full ultimate meter with no cast to show for it.
             Vector3 origin = ctx.Muzzle;
 
             Vector3 rawPoint = ctx.TargetPoint;
