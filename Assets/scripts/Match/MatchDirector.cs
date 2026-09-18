@@ -527,6 +527,9 @@ namespace Overpower.Match
                 {
                     int team = FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch() ?? myTeam;
                     lifecycle.ResetForMatchStart(team);
+                    // 2.7b step 8: the live toast, right after the fresh start - two-team text for a host start,
+                    // the ordinary text for the automatic three-team start.
+                    localView?.GetComponent<PlayerHud>()?.ShowMatchLiveToast(phase == MatchPhase.TwoTeams);
                 }
 
                 if (myTeamJustEliminated)

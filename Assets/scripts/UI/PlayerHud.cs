@@ -354,6 +354,10 @@ namespace Overpower.UI
         /// already follows.</summary>
         public void ShowTwoTeamsLeftBanner() => ShowToast(theme.twoTeamsLeftBannerText);
 
+        /// <summary>2.7b step 8: the toast shown the instant MatchDirector.ReactToRoomState sees this client's own
+        /// live edge - the ordinary three-team text, or the host-start two-team text (Decision 22).</summary>
+        public void ShowMatchLiveToast(bool twoTeams) => ShowToast(twoTeams ? theme.matchLiveTwoTeamsToastText : theme.matchLiveToastText);
+
         private void UpdateToast()
         {
             if (toastHideAtTime < 0f || Time.unscaledTime < toastHideAtTime)
@@ -870,6 +874,37 @@ namespace Overpower.UI
 
             BuildGoldCorner(canvasGo.transform);
             BuildToast(canvasGo.transform);
+
+            // 2.7b step 8: the warm-up/countdown/host line, built here (so it shares the HUD's own font/shadow/
+            // outline material like every other HUD text) and handed to MatchStartPanel, which decides what it
+            // says and whether it shows, and separately builds its own clickable button canvas alongside it.
+            TextMeshProUGUI warmupLabel = BuildWarmupLine(canvasGo.transform);
+            MatchStartPanel.Create(transform, theme, warmupLabel);
+        }
+
+        /// <summary>2.7b step 8: the warm-up/countdown/host line, top-centre - same construction as BuildToast just
+        /// above (see its own comment for why a toast-style label is parented directly to the canvas rather than
+        /// into Hud Panel's layout group), but at its own anchor (Warmup Top Offset) and size (Warmup Line Size) so
+        /// it sits clear above the toast instead of overlapping it. Returns the built label; MatchStartPanel owns
+        /// its text/active state from here on - this method only builds it.</summary>
+        private TextMeshProUGUI BuildWarmupLine(Transform canvasParent)
+        {
+            GameObject go = new GameObject("Warmup Line", typeof(RectTransform));
+            go.transform.SetParent(canvasParent, false);
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -theme.warmupTopOffset);
+            rt.sizeDelta = theme.warmupLineSize;
+
+            TextMeshProUGUI text = AddLabel(go.transform, "", theme.titleTextSize, FontStyles.Bold);
+            RectTransform textRt = text.rectTransform;
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+
+            return text;
         }
 
         /// <summary>The gold readout, bottom-right, directly above the "Loadout (P)" button (Tudor, 2026-09-17:

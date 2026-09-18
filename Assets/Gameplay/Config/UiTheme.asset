@@ -198,3 +198,14 @@ MonoBehaviour:
   debugLogScreenMarginPixels: 8
   debugLogGapBelowMinimapPixels: 6
   outOfPlayZoneColor: {r: 0.12, g: 0.12, b: 0.12, a: 0.45}
+  warmupWaitingText: 'Warm-up: nothing counts yet and the shop is free. The match starts when all three teams have a player.'
+  warmupHostText: 'Warm-up: two teams are here. Start now with two teams, or wait for a third.'
+  warmupGuestText: 'Warm-up: waiting for the host to start, or for a third team.'
+  matchCountdownText: Match starts in {0}
+  matchStartButtonText: Start match (2 teams)
+  matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
+  matchStartButtonSize: {x: 260, y: 52}
+  warmupTopOffset: 80
+  warmupLineSize: {x: 900, y: 64}
+  matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
+  matchLiveTwoTeamsToastText: 'The match is live with two teams: lose your capital and you''re out.'

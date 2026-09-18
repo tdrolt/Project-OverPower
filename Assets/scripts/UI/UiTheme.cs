@@ -645,6 +645,38 @@ namespace Overpower.UI
                  "ground and its minimap bubble take this colour. Keep it darker and more see-through than the neutral grey, " +
                  "so it reads as closed, not as ground you can take.")]
         public Color outOfPlayZoneColor = new Color(0.12f, 0.12f, 0.12f, 0.45f);
+        [Tooltip("Warm-up line shown to everyone while fewer than two teams have a player yet - nothing counts, the shop is " +
+                 "free, and the match starts on its own once all three teams are here.")]
+        public string warmupWaitingText = "Warm-up: nothing counts yet and the shop is free. The match starts when all three teams have a player.";
+        [Tooltip("Warm-up line shown to the HOST once exactly two teams have a player - Start now with two, or wait for a " +
+                 "third team to arrive.")]
+        public string warmupHostText = "Warm-up: two teams are here. Start now with two teams, or wait for a third.";
+        [Tooltip("Warm-up line shown to everyone ELSE once exactly two teams have a player - the host has the Start button, " +
+                 "not you.")]
+        public string warmupGuestText = "Warm-up: waiting for the host to start, or for a third team.";
+        [Tooltip("Shown to everyone while the countdown counts down to going live. {0} is the whole seconds left, on this " +
+                 "client's own synced server clock - it MUST stay in the text, or the number never shows. The countdown's " +
+                 "own length is GameplayConfig > Match Start Countdown Seconds.")]
+        public string matchCountdownText = "Match starts in {0}";
+        [Tooltip("The host's Start button label - shown only while exactly two teams have a player and nobody is still " +
+                 "team-less.")]
+        public string matchStartButtonText = "Start match (2 teams)";
+        [Tooltip("Fill colour of the host's Start button. Deliberately its own colour, not Bar Track Colour (the ordinary " +
+                 "grey button fill, e.g. Loadout) - Start is the one button that begins the match, so it must stand out.")]
+        public Color matchStartButtonColor = new Color(0.16f, 0.45f, 0.25f, 0.95f);
+        [Tooltip("Width/height of the host's Start button, in canvas units.")]
+        public Vector2 matchStartButtonSize = new Vector2(260f, 52f);
+        [Tooltip("Gap from the top of the screen to the top of the warm-up/countdown line, in canvas units - clears the " +
+                 "bounty/status toast, which sits lower, so the two never overlap.")]
+        public float warmupTopOffset = 80f;
+        [Tooltip("Width/height of the warm-up/countdown line's own box, in canvas units - the text wraps inside it. The " +
+                 "host's Start button sits directly below this box.")]
+        public Vector2 warmupLineSize = new Vector2(900f, 64f);
+        [Tooltip("Toast shown the instant the match goes live with all three teams - the ordinary case.")]
+        public string matchLiveToastText = "The match is live! Zones, gold, loadouts and respawn timers are reset.";
+        [Tooltip("Toast shown the instant a host-started match goes live with two teams - losing your capital now means " +
+                 "you're out.")]
+        public string matchLiveTwoTeamsToastText = "The match is live with two teams: lose your capital and you're out.";
 
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
