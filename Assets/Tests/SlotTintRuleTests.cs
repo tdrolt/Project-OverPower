@@ -22,16 +22,30 @@ namespace Overpower.Tests
         [Test]
         public void ActiveWinsOverStunnedToo()
         {
-            // Flamethrower/Dash/ZipGun/Invulnerability all keep IsActive true through a Stunned or Silenced
-            // interrupt by design (see each module's own Interrupt comment) - active must win there too,
-            // not only over NotReady.
+            // Flamethrower and Invulnerability both keep IsActive true through a Stunned interrupt by design
+            // (see each module's own Interrupt comment) - active must win there too, not only over NotReady.
+            // (Dash/ZipGun do NOT stay active through Stunned - their own code cancels on it, same as Died -
+            // so this case never actually reaches the rule with active=true for those two; it is still a
+            // real case for Flamethrower/Invulnerability, which is what this test pins.)
             Assert.AreEqual(Active, SlotTintRule.BorderColor(active: true, CastBlock.Stunned, Active, Blocked, Ready));
         }
 
         [Test]
         public void ActiveWinsOverSilencedToo()
         {
+            // All four of Flamethrower/Dash/ZipGun/Invulnerability keep IsActive true through Silenced.
             Assert.AreEqual(Active, SlotTintRule.BorderColor(active: true, CastBlock.Silenced, Active, Blocked, Ready));
+        }
+
+        [Test]
+        public void DeadWinsOverActive()
+        {
+            // HUD review fix, 2026-09-18: the one exception to "active always wins". Invulnerability.IsActive
+            // reads the armed/invulnerable status flags directly, and those flags do not clear on death (only
+            // on respawn) - without this, a dead player whose shield was armed or running would keep glowing
+            // amber. A corpse cannot be un-blocked by anything, so Dead beats active, not just every other
+            // block reason.
+            Assert.AreEqual(Blocked, SlotTintRule.BorderColor(active: true, CastBlock.Dead, Active, Blocked, Ready));
         }
 
         [Test]
@@ -63,6 +77,14 @@ namespace Overpower.Tests
         public void NoBlockReasonWhenClear()
         {
             Assert.IsFalse(SlotTintRule.ShowsBlockReason(active: false, CastBlock.None));
+        }
+
+        [Test]
+        public void DeadReasonShownEvenWhileActive()
+        {
+            // The border goes grey (DeadWinsOverActive above), and the "dead" text must show under it too -
+            // otherwise a grey square with no reason text would read as a drawing bug, not as a corpse.
+            Assert.IsTrue(SlotTintRule.ShowsBlockReason(active: true, CastBlock.Dead));
         }
     }
 }

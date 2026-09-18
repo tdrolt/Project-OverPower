@@ -33,9 +33,21 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheMinimapBandIsItsMarginPlusItsSizeInPixels()
+        public void TheMinimapBandIsItsMarginPlusFrameWidthPlusItsSizeInPixels()
         {
-            Assert.AreEqual(182f, HudScreenLayout.MinimapBandBottomPixels(24f, 340f, 0.5f), 1e-3f);
+            Assert.AreEqual(184.5f, HudScreenLayout.MinimapBandBottomPixels(24f, 5f, 340f, 0.5f), 1e-3f);
+        }
+
+        [Test]
+        public void TheFrameWidthWidensTheBandEnoughToMatterAtALargeScale()
+        {
+            // HUD review fix, 2026-09-18: frame width used to be left out of the band entirely, which under-
+            // measured it by frameWidth * scaleFactor - invisible up to about scale 1.2 (5 * 1.2 = 6, hidden
+            // by the 6px debugLogGapBelowMinimapPixels default), but on a screen twice the reference size
+            // (e.g. 3840x2160 against the 1920x1080 reference) the shortfall is a full 10px, eating the whole
+            // gap and overlapping the minimap's own frame by about 4px. Scale is passed directly here (not
+            // derived through CanvasScaleFactor) so this test isolates the band formula itself.
+            Assert.AreEqual((24f + 5f + 340f) * 2f, HudScreenLayout.MinimapBandBottomPixels(24f, 5f, 340f, 2f), 1e-3f);
         }
 
         [Test]

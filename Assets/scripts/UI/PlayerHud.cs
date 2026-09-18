@@ -594,13 +594,15 @@ namespace Overpower.UI
 
                 if (active != lastActive[i] || block != lastBlock[i])
                 {
-                    // Active wins over blocked (invulnerability rework follow-up, 2026-09-18): several
-                    // modules are deliberately still IsActive while blocked (Silenced/Stunned), and every
-                    // ultimate reads NotReady the instant a real cast spends its meter - checking block
-                    // first hid the one thing "active" exists to show. See SlotTintRule's own class
-                    // comment for the per-module survey. The reason text is hidden while active for the
-                    // same cause: "not ready" under a glowing, running ultimate is noise once the meter's
-                    // own fill already shows it refilling.
+                    // Active wins over blocked (invulnerability rework follow-up, 2026-09-18; Dead-wins
+                    // exception added by review the same day): several modules are deliberately still
+                    // IsActive while blocked - Flamethrower/Invulnerability through Stunned or Silenced,
+                    // Dash/ZipGun through Silenced only - and every ultimate reads NotReady the instant a
+                    // real cast spends its meter - checking block first hid the one thing "active" exists
+                    // to show. See SlotTintRule's own class comment for the per-module survey and why Dead
+                    // is the one block reason that still wins over active. The reason text is hidden while
+                    // active (Dead excepted) for the same cause: "not ready" under a glowing, running
+                    // ultimate is noise once the meter's own fill already shows it refilling.
                     ui.background.color = SlotTintRule.BorderColor(active, block, theme.slotActiveGlowColor,
                                                                     theme.slotBlockedColor, theme.slotReadyColor);
                     ui.blockReasonText.text = SlotTintRule.ShowsBlockReason(active, block) ? BlockReasonLabel(block) : "";

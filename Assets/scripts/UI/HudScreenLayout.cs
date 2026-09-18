@@ -31,9 +31,17 @@ namespace Overpower.UI
         }
 
         /// <summary>How far down from the top of the screen, in pixels, the corner minimap's reserved band ends:
-        /// its margin from the screen edge plus its own bounding size, both in canvas units, scaled.</summary>
-        public static float MinimapBandBottomPixels(float cornerMargin, float cornerSize, float scaleFactor) =>
-            Mathf.Max(0f, (cornerMargin + cornerSize) * Mathf.Max(0f, scaleFactor));
+        /// its margin from the screen edge, plus its frame width, plus its own bounding size - all in canvas
+        /// units, scaled. Frame width is in the sum because it doubles as part of the map's own inset from the
+        /// screen edge (MinimapView.cs: "inset = cornerMargin + frameWidth"), not just as a cosmetic border
+        /// drawn inward - the map's real bottom edge sits a whole frame width further down than margin+size
+        /// alone would say. Omitting it (HUD review fix, 2026-09-18) under-measured the band by frameWidth *
+        /// scaleFactor: invisible at today's numbers up to about scale 1.2, but the log started overlapping
+        /// the minimap's own frame on screens larger than 1920x1080 (about 1 px at 2560x1440, about 4 px at
+        /// 3840x2160).</summary>
+        public static float MinimapBandBottomPixels(float cornerMargin, float frameWidth, float cornerSize,
+                                                     float scaleFactor) =>
+            Mathf.Max(0f, (cornerMargin + frameWidth + cornerSize) * Mathf.Max(0f, scaleFactor));
 
         /// <summary>The debug log's rectangle in GUI space (y grows DOWNWARD, which is what GUI.Box wants): along
         /// the right edge inside margin, starting gap pixels below the minimap band, never taller than
