@@ -49,7 +49,11 @@ MonoBehaviour:
   fan: {fileID: 1675750443514494734}
   edge: {fileID: 6555290004608086723}
   tipAlpha: 0.45
+  coreColor: {r: 1, g: 0.95, b: 0.78, a: 1}
+  radialRings: 6
+  radialHoldFraction: 0.55
   edgeOpacity: 0.9
+  nonCasterEdgeOpacity: 0.35
   arcSegments: 24
   heightAboveGround: 0.05
   flickerDepth: 0.25

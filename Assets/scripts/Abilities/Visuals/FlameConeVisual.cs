@@ -10,9 +10,10 @@ namespace Overpower.Abilities
     /// exactly the shape ConeFilter.IsWithinCone tests (flat, measured from the caster's root) - warm at the tip,
     /// fading to fully transparent at the far edge and toward the side edges, with a subtle flicker, so a player can
     /// tell where the flames reach without the screen filling with a flat orange wash. The hard outline from the
-    /// original plan is gone for everyone except the caster by default, who still sees a faint aiming ring at the
-    /// true range and angle - FlamethrowerAbility.ShowVfx reads Owner.IsMine once per cast and passes it in; this
-    /// class has no network state of its own.
+    /// original plan started caster-only (A3: "no hard outline for other players"); ability visuals step 7 (Tudor:
+    /// "you can turn it on") turned it back on for everyone at a lower opacity than the caster's own line - see Non
+    /// Caster Edge Opacity's own tooltip for the value and why. FlamethrowerAbility.ShowVfx reads Owner.IsMine once
+    /// per cast and passes it in; this class has no network state of its own.
     ///
     /// VERTEX-COLOUR TRAP (found while building this): the shared Ability Visual Glass.mat is URP/Unlit, and that
     /// shader's Attributes struct (Packages/com.unity.render-pipelines.universal/Shaders/UnlitForwardPass.hlsl) has no
@@ -90,12 +91,13 @@ namespace Overpower.Abilities
         [SerializeField, Range(0f, 1f), Tooltip("Opacity of the aiming outline on the CASTER's own screen.")]
         private float edgeOpacity = 0.9f;
 
-        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the SAME aiming outline on everyone ELSE's screen. " +
-                 "Defaults to 0 because A3 (Tudor, 2026-09-17 evening) asked for casters only (\"no hard outline for " +
-                 "other players\") - this is OFF on purpose, not an oversight. Raise it if the soft fill alone (Tip " +
-                 "Alpha / Core Colour / Radial Hold Fraction) still doesn't read clearly enough for enemies on some " +
-                 "arena floor; 0 keeps Tudor's original answer exactly as written.")]
-        private float nonCasterEdgeOpacity = 0f;
+        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the SAME aiming outline on everyone ELSE's screen. A3 " +
+                 "(Tudor, 2026-09-17 evening) originally asked for casters only (\"no hard outline for other " +
+                 "players\") and this was 0. Ability visuals step 7 (Tudor: \"you can turn it on\") turned it back " +
+                 "on at 0.35 - clearly under Edge Opacity's 0.9 above, so the caster's own line still reads as " +
+                 "THEIR aid, but enough for an enemy to read the cone's true boundary instead of only the soft " +
+                 "fill.")]
+        private float nonCasterEdgeOpacity = 0.35f;
 
         [SerializeField, Tooltip("Straight pieces the arc is made of. 24 keeps the drawn edge within 1 cm of the real " +
                  "arc at 7 m.")]
