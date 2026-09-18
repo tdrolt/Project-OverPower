@@ -1575,6 +1575,66 @@ namespace Overpower.Match
 
 ### Task 2.7: Elimination and phase transitions (cuttable — bottom of the list)
 
+**Controller amendments (2026-09-18) — read these first; they override the task text below where they differ.**
+A read-only check of this task against `8c0fd78` (three days and ~30 commits after it was written) found the
+following. Decisions marked [C] are the controller's (Tudor asleep, standing instruction "decide when unsure, log it").
+
+*Things the task gets wrong about the code today*
+1. **`MatchUI.ShowYouLost` does not exist.** Only the `[PunRPC] RPC_ShowYouLostPanel` (`MatchUI.cs:286`) does. Add a
+   public, local, no-RPC `ShowYouLost()` holding that body, and make `RPC_ShowYouLostPanel` call it (the RPC stays
+   in the RpcList, commented "kept only for the RpcList" like `BuildingManager.RPC_UpdateTowerDictionary:808-811`).
+   `ShowMatchResult(int)` (`MatchUI.cs:187`) is already public and local — use as is.
+2. **Deleting the three static tallies (`PlayerLifecycle.cs:97-99`) also breaks `RPC_HandleRespawnMaster`
+   (`:682-694`)**, whose whole body uses them. Gut it the same way as `RPC_HandleDeathMaster` (keep the method for the
+   RpcList, log only, say why).
+3. **`PlayerLifecycle.ReturnToSpawn` (`:451`) is private.** Make it public and update its comment for the second
+   caller. It sends a player to `roomManager.teamSpawnPoints[team]`, which is where "return to your capital" lands
+   today — [C] that is the destination for the phase change. It already moves through `PlayerDisplacement`, so the
+   movement-integrity rules hold.
+4. **Step 7's `--instance` flag does not exist.** Harness §8: a third client is a **separate build folder**
+   (`Builds/ClientB3` exists from an earlier session). Use that if you verify three clients.
+5. **The stale "RpcTarget.All (not AllBuffered)" comment** HANDOFF asks to fix is at `PlayerLifecycle.cs:264-266`,
+   inside `PlayerDied`. Tower state is no longer written by any RPC; it is the `Apply`-from-Room-Properties mirror
+   (`BuildingManager.cs:19-20`). Rewrite the comment to say that.
+
+*Decisions [C]*
+6. **Capital adoption is cut tonight** (the task marks it cuttable). So `MatchDirector.CapitalOf(team)` is the
+   team's own capital, `mCap` is not needed, and `ChooseSpawnPoint` (`PlayerLifecycle.cs:473-502`, which reads the
+   static `TerritoryMap.CapitalOf`) needs no change. Test `ALastStandTeamThatTakesAnEnemyCapitalAdoptsIt` and
+   `CapitalAfterCapture` are dropped. Log it for Tudor.
+7. **No scene change: `MatchDirector` is created at runtime**, not placed in `Game Scene.unity`. Tudor rebuilds the
+   arena from primitives in a separate session tomorrow; a zero-footprint director cannot be lost or conflicted in
+   that rebuild, and the scene gate stays byte-unchanged. Add it with `AddComponent` from the object that already
+   hosts `BuildingManager`/`MatchTelemetry` (`BuildingManager.Awake`, or wherever that object's own setup lives), with
+   a comment saying why it isn't a scene object. It uses Room Properties only, so it needs no `PhotonView`. Any
+   designer-facing value it needs (banner text colour, duration) goes on `UiTheme` with a tooltip, not on the
+   director.
+8. **Room-property keys follow the house convention:** `public const string` keys on the class that owns the state
+   (`CaptureProgress.TeamKey`, `TerritorySnapshot.OwnersKey`, `GoldWallet.GoldKey`...). So `MatchDirector.PhaseKey`,
+   `EliminatedKey`, `WinnerKey`. `grep` found no collision with `mPhase`/`mElim`/`mWin`; keep those short strings
+   (room properties go over the wire).
+9. **The minimap hides nothing tonight.** The GDD removes an eliminated team's capital and route from the map (p.20),
+   but Tudor cut the map-geometry reduction, so those zones stay in the world and stay capturable. Hiding them on the
+   minimap alone would show a map that disagrees with the arena. `MinimapView.SetZoneShown` stays an unused hook, and
+   a QUESTION goes to Tudor: *"When a team is knocked out, should its capital and lane leave play (can't be captured,
+   gone from the minimap), or stay as ground anyone can take?"* [default: stay]. The Tier-3 zones going neutral is
+   done through `BuildingManager.SetNeutral` (`:585`), which already resets their capture rings — nothing ring- or
+   minimap-specific to add for that.
+10. **Gold for an eliminated player keeps accruing** (`GoldWallet.Update`, `:183-224`, no alive gate, by an earlier
+    [C]). An eliminated player can never spend it, so it changes nothing in play; leave it and note it for the
+    telemetry report (gold earned by eliminated players is not a signal).
+
+*Wiring the task didn't know about*
+11. **Telemetry:** the master calls `MatchTelemetry.LogElimination(int team, int[] teamsRemaining)` once per newly
+    eliminated team, then `MatchTelemetry.LogPhase(int phaseNumber, int[] teamsRemaining)` (`MatchTelemetry.cs:605,
+    620`; both no-op off the master). **`LogPhase(2, ...)` must be called at the exact three-teams → two-teams
+    transition**: the report's `PhaseTimeline.From` (`Assets/scripts/Editor/Telemetry/PhaseTimeline.cs`) opens its
+    "Phase 2" window on the first `phase` event numbered ≥ 2 (without it, the report falls back to the first
+    elimination and prints a header warning). Read both methods' comments for what `Over` should log.
+12. **After this task `RPC_ShowYouLostPanel` and `RPC_ShowWaitingPanel` are called by nothing.** Keep them (RpcList)
+    with the same "kept only for the RpcList" comment. **Add no RPC, remove none, rename none.**
+
+
 **Files:**
 - Create: `Assets/scripts/Match/Rules/MatchPhaseRules.cs`, `Assets/Tests/MatchPhaseRulesTests.cs`, `Assets/scripts/Match/MatchDirector.cs`
 - Modify: `Assets/scripts/Player/PlayerLifecycle.cs`, `Assets/scripts/Player/MatchUI.cs`, `Assets/scripts/BuildingManager.cs`, `Assets/Scenes/Game Scene.unity` (a `MatchDirector` object)

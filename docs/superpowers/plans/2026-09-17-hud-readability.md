@@ -302,7 +302,11 @@ New fields, all on `UiTheme` under Minimap:
    Scratch scripts in `SCRATCH\hud-readability\`, captures in `SCRATCH\hud-readability\captures\`. Never under
    `Assets/`.
 9. **Captures:**
-   - Size **616×576**, from the real Game view.
+   - Size: **whatever the real Game view is at Task 1 Step 0 — record it, and every capture in this plan uses that
+     same size.** *(Amended 2026-09-18: this plan was written when the Game view was 616×576; on the night of
+     2026-09-18 it reports **1920×1080** (`UnityEditor.Handles.GetMainGameViewSize()`), and Tudor may set it himself.
+     Never change the Game view's resolution setting. If it changes between the BEFORE captures and a later one,
+     say so and compare proportions, not pixels.)*
    - Screen Space Overlay UI needs `--source screen` (Play Mode only); the default `--source camera` misses the whole
      HUD.
    - Always saved to an explicit path: `--save_path "Temp/hud/<name>.png"` goes under the project `Temp/`; copy the
