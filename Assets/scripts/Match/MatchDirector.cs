@@ -28,7 +28,7 @@ namespace Overpower.Match
     /// PhotonView is needed because this only ever reads and writes Room Properties, the same
     /// authority model BuildingManager's own territory state uses (CODING-STANDARDS.md section 5).
     /// </summary>
-    public class MatchDirector : MonoBehaviourPunCallbacks
+    public partial class MatchDirector : MonoBehaviourPunCallbacks
     {
         public static MatchDirector Instance { get; private set; }
 
@@ -50,15 +50,19 @@ namespace Overpower.Match
         // OwnershipChanged) must build on the write this client already sent, not on the room's own
         // still-stale copy, or it would silently undo it.
         private List<int> lastWrittenEliminated;
-        private MatchPhase lastWrittenPhase = MatchPhase.ThreeTeams;
+        private MatchPhase lastWrittenPhase = MatchPhase.Warmup;
         private int lastWrittenWinner = -1;
         private int writesAwaitingEcho;
 
         // ---- every client: the read side, so OnRoomPropertiesUpdate can tell a genuinely new
         // elimination or phase change from Photon re-sending a value this client already reacted to.
         private List<int> lastAppliedEliminated = new List<int>();
-        private MatchPhase lastAppliedPhase = MatchPhase.ThreeTeams;
+        private MatchPhase lastAppliedPhase = MatchPhase.Warmup;
         private int lastAppliedWinner = -1;
+        // 2.7b step 5: the countdown/live edges ReactToRoomState reacts to - see that method's own comment.
+        private bool lastAppliedTeamsFixed;
+        private bool lastAppliedLive;
+        private int lastAppliedLiveAtMs;
 
         /// <summary>The phase this client has last read from the room. ThreeTeams before the first read.</summary>
         public MatchPhase Phase => lastAppliedPhase;
@@ -122,6 +126,13 @@ namespace Overpower.Match
             lastWrittenEliminated = null;
             writesAwaitingEcho = 0;
 
+            // 2.7b step 5 (Decision 22, R2): the countdown/live echo wait was this client's own, as master - the
+            // new master needs nothing else. Its own Update() poll sees mTeams/mLiveAt/mPhase fresh from the room
+            // on its very next frame and carries on (a countdown continues; a moment already passed goes live at
+            // once).
+            waitForEchoUntil = -1f;
+            liveWritten = false;
+
             // The promoted master must not wait for the next capture or death to catch up - it has to
             // be ready to decide the very next elimination on its own.
             if (PhotonNetwork.IsMasterClient)
@@ -133,13 +144,25 @@ namespace Overpower.Match
             if (propertiesThatChanged == null)
                 return;
 
-            bool touchesMatchState = propertiesThatChanged.ContainsKey(PhaseKey)
+            bool touchesElimination = propertiesThatChanged.ContainsKey(PhaseKey)
                 || propertiesThatChanged.ContainsKey(EliminatedKey) || propertiesThatChanged.ContainsKey(WinnerKey);
-            if (!touchesMatchState)
+            // 2.7b step 5: mTeams/mLiveAt (Decision 1) are the countdown's own two keys - a separate write from
+            // the elimination triad above, so they get their own check rather than folding into touchesElimination
+            // and mis-decrementing writesAwaitingEcho, which only ever counts THIS client's own
+            // MasterRecompute/GoLive writes of Phase/Eliminated/Winner.
+            bool touchesCountdown = propertiesThatChanged.ContainsKey(TeamsInMatchKey) || propertiesThatChanged.ContainsKey(LiveAtKey);
+            if (!touchesElimination && !touchesCountdown)
                 return;
 
-            if (writesAwaitingEcho > 0)
+            if (touchesElimination && writesAwaitingEcho > 0)
                 writesAwaitingEcho--;
+
+            // R1: MasterRecompute must NEVER be triggered from here - only from HandleOwnershipChanged,
+            // OnPlayerPropertiesUpdate and OnPlayerLeftRoom (its three wired triggers, unchanged) and the
+            // countdown's own Update() poll going live (MatchDirector.Live.cs). This callback only ever reacts
+            // (ReactToRoomState) or clears the countdown/live echo wait below - it never recomputes.
+            if (touchesCountdown || propertiesThatChanged.ContainsKey(PhaseKey))
+                waitForEchoUntil = -1f;
 
             ReactToRoomState(firstRead: false);
         }
@@ -156,13 +179,20 @@ namespace Overpower.Match
         public override void OnLeftRoom()
         {
             lastWrittenEliminated = null;
-            lastWrittenPhase = MatchPhase.ThreeTeams;
+            lastWrittenPhase = MatchPhase.Warmup;
             lastWrittenWinner = -1;
             writesAwaitingEcho = 0;
 
             lastAppliedEliminated = new List<int>();
-            lastAppliedPhase = MatchPhase.ThreeTeams;
+            lastAppliedPhase = MatchPhase.Warmup;
             lastAppliedWinner = -1;
+            // 2.7b step 5: the countdown/live edges, and this client's own master-side countdown bookkeeping if it
+            // was master - the next room starts its own from scratch (Decision 22).
+            lastAppliedTeamsFixed = false;
+            lastAppliedLive = false;
+            lastAppliedLiveAtMs = 0;
+            waitForEchoUntil = -1f;
+            liveWritten = false;
         }
 
         /// <summary>Called by BuildingManager.CheckTerritoryWin when one team holds every capital -
@@ -223,6 +253,16 @@ namespace Overpower.Match
         private void MasterRecompute()
         {
             if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom)
+                return;
+
+            // 2.7b step 5 (Decision 3): nothing counts before the match is live - gated on IsLive, the room's own
+            // ECHOED mPhase (MatchDirector.Live.cs), never on liveWritten (set the instant THIS client's own live
+            // write is SENT, before the round trip) and never on any client's own countdown clock. The countdown
+            // is still warm-up. R1: this method must never be called from OnRoomPropertiesUpdate itself - only
+            // from HandleOwnershipChanged/OnPlayerPropertiesUpdate/OnPlayerLeftRoom (wired below) and the
+            // countdown's own Update() poll going live, which writes territory and then mPhase as two separate,
+            // ordered events (Decision 5) - never from reacting to either write's own echo.
+            if (!IsLive)
                 return;
 
             // A decided match is final - it must never be rebuilt from whoever happens to still be
@@ -326,12 +366,14 @@ namespace Overpower.Match
                 MatchTelemetry.Instance.LogPhase((int)result.Phase, teamsRemaining);
         }
 
-        /// <summary>2.7b step 3 [InMatch is interim, replaced in step 5 by mTeams - every team reads true until the
-        /// countdown/live system exists]. HoldsOwnCapital/HoldsAnyCapitalInPlay/LastOutAtMs are final: LastOutAtMs is
-        /// the latest lastStandAt Player Property (Decision 23) among the team's members currently out for the last
-        /// stand, compared wrap-safe like every other server-clock stamp in this codebase - read only by
-        /// MatchPhaseRules' no-draw rule.</summary>
-        private static TeamStatus[] BuildTeamStatuses(BuildingManager buildings)
+        /// <summary>2.7b step 5: InMatch now comes from mTeams (IsInMatch) - the interim "every team reads true"
+        /// stand-in from step 3 is gone. HoldsAnyCapitalInPlay only counts a capital whose OWN team is in mTeams
+        /// (Decision 4: the third capital of a host start is never in play, so owning it - which cannot actually
+        /// happen once TerritoryMap's out-of-play check is wired in step 6, but this reads correct even before
+        /// that lands) must not count as "having a capital"). LastOutAtMs is the latest lastStandAt Player Property
+        /// (Decision 23) among the team's members currently out for the last stand, compared wrap-safe like every
+        /// other server-clock stamp in this codebase - read only by MatchPhaseRules' no-draw rule.</summary>
+        private TeamStatus[] BuildTeamStatuses(BuildingManager buildings)
         {
             var statuses = new TeamStatus[TeamCount];
             TerritoryMap map = buildings.Map;
@@ -363,12 +405,13 @@ namespace Overpower.Match
                 bool holdsOwnCapital = capital >= 0 && current.OwnerOf(capital) == team;
                 bool holdsAnyCapitalInPlay = false;
                 foreach (KeyValuePair<int, int> ownCapital in map.Capitals)
-                    if (current.OwnerOf(ownCapital.Key) == team) { holdsAnyCapitalInPlay = true; break; }
+                    if (current.OwnerOf(ownCapital.Key) == team && IsInMatch(ownCapital.Value))
+                    { holdsAnyCapitalInPlay = true; break; }
 
                 statuses[team] = new TeamStatus
                 {
                     TeamId = team,
-                    InMatch = true, // [interim, 2.7b step 3 - replaced in step 5 by mTeams]
+                    InMatch = IsInMatch(team),
                     Members = members,
                     MembersOutForLastStand = outForLastStand,
                     HoldsOwnCapital = holdsOwnCapital,
@@ -381,7 +424,7 @@ namespace Overpower.Match
 
         // ---------------------------------------------------------------- every client: react
 
-        /// Reads the room's mPhase/mElim/mWin and applies whatever changed since this client last
+        /// Reads the room's mPhase/mElim/mWin/mTeams/mLiveAt and applies whatever changed since this client last
         /// looked - the lost panel for a newly eliminated own team, the Tier-3 "two teams left" spawn-
         /// home + banner the first time this client itself sees the ThreeTeams -> TwoTeams edge (never
         /// for a client whose own team was eliminated in that same transition - it is already getting
@@ -391,6 +434,16 @@ namespace Overpower.Match
         /// should not be sent "home" or told the two-team rule "just" changed for a transition that
         /// already happened before they connected; MatchUI.ShowMatchResult alone already answers a
         /// late joiner reading Over and the winner, whether they were eliminated earlier or not.
+        ///
+        /// 2.7b step 5 adds two more edges, both !firstRead only (a joiner mid-countdown or mid-match gets the
+        /// SAME effect through the ordinary spawn path, not by replaying an edge that already happened):
+        /// - the teams-fixed edge (Decision 4/17, R3): the countdown write arrives - a player the server placed on
+        ///   the left-out team before it saw the teams fixed re-picks onto a real team at once.
+        /// - the live edge (Decision 5): this client's own fresh start, the instant it sees mPhase - by
+        ///   construction AFTER it already applied the territory reset (BuildingManager's own, separate,
+        ///   earlier-sent OnRoomPropertiesUpdate - see MatchDirector.Live.cs's GoLive). Warmup -> ... only
+        ///   (lastAppliedPhase starts at Warmup), so a host start - which goes live directly from Warmup - never
+        ///   also fires the ThreeTeams -> TwoTeams branch below.
         private void ReactToRoomState(bool firstRead)
         {
             if (!PhotonNetwork.InRoom)
@@ -400,21 +453,33 @@ namespace Overpower.Match
             MatchPhase phase = ReadPhase(props);
             List<int> eliminated = ReadEliminated(props);
             int winner = ReadWinner(props);
+            bool teamsFixed = TeamsFixed;
+            bool live = IsLive;
+            int liveAtMs = LiveAtMs;
 
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
+            PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
 
             bool myTeamKnown = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam);
             bool myTeamJustEliminated = myTeamKnown && !lastAppliedEliminated.Contains(myTeam) && eliminated.Contains(myTeam);
 
             if (!firstRead)
             {
+                if (teamsFixed && !lastAppliedTeamsFixed)
+                    FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch();
+
+                if (live && !lastAppliedLive && lifecycle != null)
+                {
+                    int team = FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch() ?? myTeam;
+                    lifecycle.ResetForMatchStart(team);
+                }
+
                 if (myTeamJustEliminated)
                     localView?.GetComponent<MatchUI>()?.ShowYouLost();
 
                 if (lastAppliedPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams && !myTeamJustEliminated)
                 {
-                    PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
                     if (lifecycle != null && lifecycle.IsAlive)
                         lifecycle.ReturnToSpawnForPhaseChange();
                     localView?.GetComponent<PlayerHud>()?.ShowTwoTeamsLeftBanner();
@@ -424,13 +489,19 @@ namespace Overpower.Match
             if (winner >= 0 && winner != lastAppliedWinner)
                 localView?.GetComponent<MatchUI>()?.ShowMatchResult(winner);
 
+            if (firstRead || teamsFixed != lastAppliedTeamsFixed || liveAtMs != lastAppliedLiveAtMs || live != lastAppliedLive)
+                LiveStateChanged?.Invoke();
+
             lastAppliedEliminated = eliminated;
             lastAppliedPhase = phase;
             lastAppliedWinner = winner;
+            lastAppliedTeamsFixed = teamsFixed;
+            lastAppliedLive = live;
+            lastAppliedLiveAtMs = liveAtMs;
         }
 
         private static MatchPhase ReadPhase(Hashtable props) =>
-            props.TryGetValue(PhaseKey, out object raw) && raw is int p ? (MatchPhase)p : MatchPhase.ThreeTeams;
+            props.TryGetValue(PhaseKey, out object raw) && raw is int p ? (MatchPhase)p : MatchPhase.Warmup;
 
         private static List<int> ReadEliminated(Hashtable props) =>
             props.TryGetValue(EliminatedKey, out object raw) && raw is int[] arr ? new List<int>(arr) : new List<int>();

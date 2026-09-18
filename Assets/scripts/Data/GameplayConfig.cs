@@ -57,6 +57,14 @@ namespace Overpower.Data
         [SerializeField] private float killHeight = -10f;
         public float KillHeight => killHeight;
 
+        [Header("Match start (2.7b)")]
+        [Tooltip("Seconds between the match being started - by the third team's first player arriving, or by the " +
+                 "host's Start button - and it going live. 'Match starts in N' shows on every screen meanwhile, and " +
+                 "nothing counts yet. Going live is a fresh start: zones, gold, loadouts and respawn timers reset. " +
+                 "0 = no countdown.")]
+        [SerializeField, Min(0f)] private float matchStartCountdownSeconds = 5f;
+        public float MatchStartCountdownSeconds => matchStartCountdownSeconds;
+
         [Header("Combat state")]
         [Tooltip("Seconds you must go without dealing or taking any damage before you count as " +
                  "out of combat. Three separate systems read this one timer: armor begins " +

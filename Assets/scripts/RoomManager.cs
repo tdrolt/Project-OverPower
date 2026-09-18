@@ -173,15 +173,17 @@ public class RoomManager : MonoBehaviourPunCallbacks
             }
         }
 
-        // Task 2.7 review: a team that is out of the match never gets a new player, even if it is
-        // sitting at 0 - MatchDirector.IsEliminated is the room's own answer, read live so a team
-        // eliminated mid-session is skipped for every join after it.
+        // 2.7b step 5 (MatchStartRules.MayJoin, Decision 4/17): before the teams are fixed, any team may be
+        // joined; from the countdown on, only a team in the match and not knocked out - which also covers the
+        // Task 2.7 review's original case (a team out of the match, sitting at 0, never gets a new player) since
+        // an eliminated team is never in MayJoinTeam's "in match and not eliminated" answer either. Read live, so
+        // a team fixed out or eliminated mid-session is skipped for every join after it.
         MatchDirector director = MatchDirector.Instance;
 
         int smallest = NoFreeTeam;
         for (int i = 0; i < counts.Length; i++)
         {
-            if (director != null && director.IsEliminated(i))
+            if (director != null && !director.MayJoinTeam(i))
                 continue;
             if (smallest == NoFreeTeam || counts[i] < counts[smallest])
                 smallest = i;
@@ -189,7 +191,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         if (smallest == NoFreeTeam)
         {
-            Debug.LogWarning("[TEAM] every team is eliminated -- refusing to spawn");
+            Debug.LogWarning("[TEAM] no team may be joined right now (every team eliminated, or the match started without a free one) -- refusing to spawn");
             return NoFreeTeam;
         }
 
@@ -223,5 +225,33 @@ public class RoomManager : MonoBehaviourPunCallbacks
         Hashtable teamProperty = new Hashtable();
         teamProperty.Add("teamID", teamID);
         PhotonNetwork.LocalPlayer.SetCustomProperties(teamProperty);
+    }
+
+    /// <summary>2.7b step 5 (Decision 17, R3): closes the joiner race on the joining side - a player the server
+    /// placed on a team before the countdown write reached them, but whose team is not in mTeams, re-picks the
+    /// moment they see the teams fixed (MatchDirector.ReactToRoomState's teams-fixed edge) or the match go live
+    /// (the live edge, for a player who joined mid-countdown - not firstRead there, so this covers them too).
+    /// Idempotent: a player already on a real team, or before the teams are fixed at all, just returns the
+    /// current team - so MatchDirector's live edge can call this unconditionally to learn which team
+    /// ResetForMatchStart should use.</summary>
+    public int EnsureLocalTeamInMatch()
+    {
+        MatchDirector director = MatchDirector.Instance;
+        if (director == null || !Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam))
+            return -1;
+
+        if (!director.TeamsFixed || director.MayJoinTeam(myTeam))
+            return myTeam;
+
+        int picked = PickSmallestTeam();
+        if (picked == NoFreeTeam)
+        {
+            Debug.LogWarning("[TEAM] joined the left-out team and no other team has room to re-pick into -- staying put");
+            return myTeam;
+        }
+
+        Debug.Log($"[TEAM] re-picked {myTeam} -> {picked} (joined the left-out team as the host started)");
+        UpdateNetworkProperties(picked);
+        return picked;
     }
 }

@@ -705,6 +705,34 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         Write(start);
     }
 
+    /// <summary>2.7b Decision 5: the live reset's territory half, master only - MatchDirector.Live.cs's GoLive
+    /// calls this BEFORE writing mPhase, in the SAME frame, so Photon delivers this write to every client before
+    /// it sees the match go live (the ordering MatchDirector.ReactToRoomState's live edge and every knockout
+    /// check, MasterRecompute, rely on). Builds a WHOLE NEW starting snapshot from scratch - not from WriteBasis
+    /// - so a warm-up capture still echoing when live arrives is deliberately thrown away and no warm-up progress
+    /// can complete after this. Returns false while the room's snapshot has never been read or the server clock
+    /// has not synced yet; GoLive's own comment says the next frame tries again.</summary>
+    public bool ResetForMatchStart(IReadOnlyList<int> teamsInMatch)
+    {
+        if (!PhotonNetwork.IsMasterClient || current == null || PhotonNetwork.ServerTimestamp == 0)
+            return false;
+
+        var capitals = new List<(int zone, int team)>(CathedralBuildingIDs.Count);
+        foreach (KeyValuePair<int, int> capital in CathedralBuildingIDs)
+            capitals.Add((capital.Key, capital.Value));
+        TerritorySnapshot start = TerritorySnapshot.Starting(ZoneCount, capitals, teamsInMatch, PhotonNetwork.ServerTimestamp);
+
+        if (!Write(start))
+            return false;
+
+        foreach (KeyValuePair<int, BuildingCapture> pair in captures)
+            pair.Value?.ResetForMatchStart(start.OwnerOf(pair.Key));
+
+        territoryWinAnnounced = false; // A latch from the warm-up (or a prior match, in principle) must not block this one's own territory win.
+        Debug.Log($"[MATCH] territory reset for the live match: teams [{string.Join(",", teamsInMatch)}], owners [{string.Join(",", OwnersOf(start))}]");
+        return true;
+    }
+
     // ---------------------------------------------------------------- capture progress (Task 2.1d)
 
     /// Master only: publishes zone's new CaptureProgress to the room, in its OWN SetCustomProperties
@@ -848,43 +876,41 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// The match previously ended only when every player of every other team was dead at the same
     /// instant, which almost never happens once people are respawning. Holding all three capitals
     /// now also wins. Both conditions are live: whichever happens first ends the match.
+    ///
+    /// 2.7b step 5: "live" is MatchDirector.IsLive (the room's own echoed mPhase) - before the match is live
+    /// nothing counts (Decision 3), and once live at least two teams were in it by construction (Decision 4), so
+    /// the old CountTeamsWithPlayers ">= 2" guard - which only ever approximated that before mTeams existed - is
+    /// gone. A capital out of play (Decision 8: a host start's cut third capital) is left out of the owners list
+    /// entirely, not just excluded from counting as a win: TerritoryWinner reads Neutral as "not everyone agrees",
+    /// which an out-of-play capital's real (neutral) owner already is, but leaving it out is the clearer intent.
     void CheckTerritoryWin()
     {
         if (!PhotonNetwork.IsMasterClient || territoryWinAnnounced)
             return;
 
+        MatchDirector director = MatchDirector.Instance;
+        if (director == null)
+        {
+            Debug.LogError("[TOWER] territory win decided, but no MatchDirector exists to announce it.");
+            return;
+        }
+
         var owners = new List<int>(CathedralBuildingIDs.Count);
         foreach (var capital in CathedralBuildingIDs)
+        {
+            if (director.IsOutOfPlay(capital.Key))
+                continue;
             owners.Add(current != null ? current.OwnerOf(capital.Key) : TerritoryMap.Neutral);
+        }
 
-        // 2.7b step 3 [interim, replaced in step 5]: "live" is CountTeamsWithPlayers() >= 2 until the match-start
-        // warm-up/countdown system exists (MatchDirector.IsLive replaces this in step 5) - before then, nothing else
-        // distinguishes a real match from an empty room. This keeps the old guard's intent: a lone player must not
-        // win by draining and taking capitals nobody is defending.
-        int winner = MatchPhaseRules.TerritoryWinner(live: CountTeamsWithPlayers() >= 2, owners);
+        int winner = MatchPhaseRules.TerritoryWinner(director.IsLive, owners);
         if (winner < 0)
             return;
 
         territoryWinAnnounced = true;
         // Task 2.7: MatchDirector owns mWin/mPhase now, and every client reacts to a win (win/lose
         // panels) through that one replicated-state path - RPC_TerritoryWin below is retired.
-        if (MatchDirector.Instance != null)
-            MatchDirector.Instance.AnnounceTerritoryWin(winner);
-        else
-            Debug.LogError("[TOWER] territory win decided, but no MatchDirector exists to announce it.");
-    }
-
-    private static int CountTeamsWithPlayers()
-    {
-        bool[] hasPlayer = new bool[3];
-        foreach (Player p in PhotonNetwork.PlayerList)
-            if (Teams.TryGetTeam(p, out int t) && t >= 0 && t < hasPlayer.Length)
-                hasPlayer[t] = true;
-
-        int count = 0;
-        foreach (bool b in hasPlayer)
-            if (b) count++;
-        return count;
+        director.AnnounceTerritoryWin(winner);
     }
 
     /// Kept only for the committed RpcList (Task 2.7 retired its only caller, CheckTerritoryWin above,

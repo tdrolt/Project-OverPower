@@ -18,6 +18,7 @@ MonoBehaviour:
   respawnPerDeathSeconds: 1
   respawnMaxSeconds: 10
   killHeight: -10
+  matchStartCountdownSeconds: 5
   outOfCombatSeconds: 6
   shopOutOfCombatSeconds: 5
   overheatMax: 100

@@ -641,6 +641,19 @@ public class BuildingCapture : MonoBehaviourPun
                                           body, body.transform.position, body.transform.rotation, out _, out _);
     }
 
+    /// <summary>2.7b Decision 5: master only, called once per zone by BuildingManager.ResetForMatchStart at going
+    /// live. Resets this tower's master-side capture state straight to the live snapshot's owner (ResetToOwner -
+    /// the same reset a master switch already runs) and republishes progress at once, so no warm-up capture in
+    /// flight - even one whose own write is still echoing - can complete after this line.</summary>
+    public void ResetForMatchStart(int owner)
+    {
+        if (!PhotonNetwork.IsMasterClient)
+            return;
+
+        ResetToOwner(owner);
+        RepublishProgressNow();
+    }
+
     private void ResetToOwner(int owner)
     {
         bool captured = owner >= 0;

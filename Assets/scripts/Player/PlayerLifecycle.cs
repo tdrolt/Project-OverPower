@@ -54,6 +54,12 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
              "everything else a designer tunes.")]
     private GameplayConfig gameplayConfig;
 
+    /// <summary>2.7b step 5: MatchDirector has no serialized fields of its own (BuildingManager.Awake adds it at
+    /// runtime), so it reads the countdown length through the master's own player - this getter over the
+    /// reference this class already holds, rather than a second GameplayConfig reference living on the
+    /// director.</summary>
+    public GameplayConfig Config => gameplayConfig;
+
     [SerializeField, Tooltip("The character model, hidden while this player is dead and shown " +
              "again on respawn. Must be the parent of the visible meshes, not the player root - " +
              "disabling the root would switch this whole component off with it.")]
@@ -267,9 +273,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         bool capitalHeld = cathedralTower.isCaptured && cathedralTower.controllingTeam == teamID;
 
-        // [interim, 2.7b step 3 - replaced in step 5]: live is hardcoded true because the match-start warm-up/
-        // countdown doesn't exist yet (MatchDirector.IsLive lands in step 5). Every death is a live death until then.
-        if (MatchPhaseRules.IsLastStandDeath(live: true, teamHasACapital: capitalHeld))
+        // 2.7b step 5 (Decision 3): live comes from MatchDirector.IsLive, the room's own echoed mPhase - a
+        // countdown death is still a warm-up death (mPhase is not written until GoLive), whatever the capital
+        // situation, so IsLastStandDeath can never fire during it.
+        bool live = MatchDirector.Instance != null && MatchDirector.Instance.IsLive;
+        if (MatchPhaseRules.IsLastStandDeath(live, teamHasACapital: capitalHeld))
         {
             // DELIBERATE: dying with your capital already lost is a last-stand death - no respawn
             // countdown, a wait for a teammate to take the capital back instead (GDD p.20). This
@@ -290,7 +298,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return;
         }
 
-        if (capitalHeld && !respawnStarted)
+        // 2.7b step 5: a warm-up death (countdown included) is always an ordinary respawn, capital lost or not -
+        // IsLastStandDeath above already sent every LIVE capital-less death down the other branch, so reaching
+        // here means either the warm-up (any capital state) or a live death with the capital still held.
+        if (!respawnStarted)
         {
             respawnStarted = true;
 
