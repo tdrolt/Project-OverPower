@@ -457,5 +457,36 @@ namespace Overpower.Tests
                 Directory.Delete(temp, true);
             }
         }
+
+        // ---------------------------------------------------------------- 2.7b step 9: the warm-up is left out
+
+        [Test]
+        public void AWarmupDeathIsNotCountedInTheMatch()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                // Death-line shape matches the fixtures (e.g. TelemetryFixtures/match_phases/1_Editor.jsonl):
+                // "a"/"at" are the KILLER's own actor/team (TelemetryKeys.Killer aliases Actor); the victim is
+                // the file owner (actor 1, from Session below).
+                string lines = Session(1, 0, true, "{}") +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}\n" + // the warm-up anchor
+                    "{\"e\":\"death\",\"t\":20,\"a\":-1,\"at\":-1,\"w\":-1,\"ab\":-1,\"assists\":[],\"x\":0,\"z\":0,\"timeAlive\":20,\"gold\":0,\"lw\":-1,\"leq\":-1,\"lmob\":-1,\"lult\":-1,\"abl\":0,\"rcl\":0}\n" + // warm-up death - must be left out
+                    "{\"e\":\"phase\",\"t\":60,\"num\":1,\"remain\":[0]}\n" + // live at t=60
+                    "{\"e\":\"death\",\"t\":80,\"a\":-1,\"at\":-1,\"w\":-1,\"ab\":-1,\"assists\":[],\"x\":0,\"z\":0,\"timeAlive\":20,\"gold\":0,\"lw\":-1,\"leq\":-1,\"lmob\":-1,\"lult\":-1,\"abl\":0,\"rcl\":0}\n" + // a real, in-match death
+                    "{\"e\":\"sample\",\"t\":100,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                ReportSet set = TelemetryAggregator.BuildSet(TelemetryLog.Load(temp));
+
+                Assert.AreEqual(1, set.WholeMatch.Deaths.Count, "only the t=80 live death counts - the t=20 warm-up one is left out");
+                Assert.AreEqual(80.0, set.WholeMatch.Deaths[0].T, 1e-9);
+                Assert.AreEqual(60.0, set.WholeMatch.Header.WarmupSeconds, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
     }
 }

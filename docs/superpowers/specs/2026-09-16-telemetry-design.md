@@ -216,6 +216,16 @@ Tudor wants the data for the 3-team phase kept separate from the data after the 
   gold and purchases aren't counted." One PC shares one folder automatically. For several PCs, copy every PC's match
   folder into one before building.
 
+### Warm-up (2.7b)
+
+The countdown is part of the warm-up: "live" is not the countdown starting, it is the master's own `phase` line
+(number 1 for a three-team start, 2 for a host start) logged the instant the match actually goes live. Nothing before
+that counts - fights, captures, deaths and purchases during the warm-up (countdown included) all happen, but none of
+them appear in the report. Phase 1 and Phase 2 both start at the live moment, never at 0; the header shows how many
+seconds the warm-up lasted instead. A match that never goes live has nothing else to show - every table is empty, and
+the header warns instead. Legacy logs (recorded before this feature - no `phase` 0 anchor at all) are read exactly as
+before: Phase 1 still starts at 0.
+
 ## Error handling
 
 - Disk or IO failure: one error log, telemetry disabled for the session, gameplay unaffected.

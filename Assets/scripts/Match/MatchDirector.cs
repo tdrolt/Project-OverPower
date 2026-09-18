@@ -169,8 +169,43 @@ namespace Overpower.Match
                 BuildingManager.Instance.OwnershipChanged -= HandleOwnershipChanged;
         }
 
-        private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot) =>
+        private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot)
+        {
             MasterRecompute();
+
+            // 2.7b step 9: the telemetry `adopt` line. OwnershipChanged fires on every client (T4's own
+            // comment on this class), so this is master-only like every other territory logger; live-only,
+            // since an ownership change during the warm-up sandbox (or the countdown, still warm-up - Decision
+            // 3) means nothing yet.
+            if (PhotonNetwork.IsMasterClient && IsLive)
+                LogAdoptionIfAny(zone, newOwner);
+        }
+
+        /// <summary>MatchPhaseRules.IsAdoption reads whether newOwner held NO other in-play capital already
+        /// (this zone excluded, since buildings.Current already reflects the change that just happened) - the
+        /// per-capital-count version of TeamHasACapital's own "any capital in play" loop above.</summary>
+        private void LogAdoptionIfAny(int zone, int newOwner)
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
+            BuildingManager buildings = BuildingManager.Instance;
+            if (buildings == null || buildings.Map == null || buildings.Current == null)
+                return;
+
+            int capitalTeamOfZone = buildings.Map.CapitalTeamOf(zone);
+            int otherCapitalsInPlay = 0;
+            foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
+            {
+                if (capital.Key == zone || !IsInMatch(capital.Value))
+                    continue;
+                if (buildings.Current.OwnerOf(capital.Key) == newOwner)
+                    otherCapitalsInPlay++;
+            }
+
+            if (MatchPhaseRules.IsAdoption(newOwner, capitalTeamOfZone, otherCapitalsInPlay))
+                MatchTelemetry.Instance.LogAdoption(newOwner, zone);
+        }
 
         public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
         {

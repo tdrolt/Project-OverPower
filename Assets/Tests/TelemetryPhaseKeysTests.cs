@@ -42,15 +42,28 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void PhaseOneAnchorLineShape()
+        public void WarmupAnchorLineShape()
         {
-            // MatchTelemetry's own anchor call: LogPhase(1, Array.Empty<int>()), usually before the
-            // match clock is known yet (t reads -1, same sentinel `join` uses in the same window).
+            // 2.7b step 9: MatchTelemetry's own anchor call: LogPhase(0, Array.Empty<int>()), usually
+            // before the match clock is known yet (t reads -1, same sentinel `join` uses in the same
+            // window). Phase 0 marks a new-style log for PhaseTimeline.From - never itself a live
+            // moment or a transition (going live logs 1 or 2, for real, from MatchDirector.GoLive).
             var line = new TelemetryLine();
             line.Begin(TelemetryKeys.Phase, -1);
-            line.Int(TelemetryKeys.PhaseNumber, 1);
+            line.Int(TelemetryKeys.PhaseNumber, 0);
             line.Ints(TelemetryKeys.TeamsRemaining, System.Array.Empty<int>());
-            Assert.AreEqual("{\"e\":\"phase\",\"t\":-1,\"num\":1,\"remain\":[]}", line.End());
+            Assert.AreEqual("{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}", line.End());
+        }
+
+        [Test]
+        public void AdoptLineShape()
+        {
+            // 2.7b step 9: MatchDirector.HandleOwnershipChanged -> MatchTelemetry.LogAdoption's own shape.
+            var line = new TelemetryLine();
+            line.Begin(TelemetryKeys.Adopt, 0);
+            line.Int(TelemetryKeys.Team, 0);
+            line.Int(TelemetryKeys.Zone, 7);
+            Assert.AreEqual("{\"e\":\"adopt\",\"t\":0,\"tm\":0,\"zone\":7}", line.End());
         }
 
         [Test]

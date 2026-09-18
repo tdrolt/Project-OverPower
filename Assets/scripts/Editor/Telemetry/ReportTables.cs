@@ -81,6 +81,18 @@ namespace Overpower.EditorTools.Telemetry
         /// change (2.7's MatchDirector should be logging both).</summary>
         public bool EliminationFallbackUsed;
 
+        /// <summary>2.7b step 9: how long the warm-up lasted before this match went live
+        /// (PhaseTimeline.LiveSeconds) - 0 for a legacy log, which never had a warm-up to measure. Set
+        /// from the SAME match-wide PhaseTimeline on every scope's own header, like
+        /// EliminationFallbackUsed - not this scope's own (possibly warm-up-excluding) window.</summary>
+        public double WarmupSeconds;
+
+        /// <summary>2.7b step 9: true for a new-style log (one with its own `phase` 0 warm-up anchor)
+        /// whose match never actually went live - PhaseTimeline.HasWarmup &amp;&amp; !WentLive. The HTML
+        /// shows a red warning instead of the ordinary warm-up line, and every table is empty (Phase 1/2
+        /// collapse to nothing - see PhaseTimeline's own "never went live" windows).</summary>
+        public bool NeverWentLive;
+
         /// <summary>The primary session's own tuning snapshot, re-serialized flat - T6's HTML report
         /// embeds this verbatim; T5 just carries it through.</summary>
         public string TuningJson;
@@ -350,5 +362,13 @@ namespace Overpower.EditorTools.Telemetry
         public ReportTables WholeMatch = new ReportTables();
         public ReportTables Phase1 = new ReportTables();
         public ReportTables Phase2;
+
+        /// <summary>2.7b step 9: carried straight from PhaseTimeline.LiveSeconds/WentLive/TransitionSeconds -
+        /// HtmlReportWriter reads these instead of re-deriving the transition instant from Phase1's own
+        /// MatchLengthSeconds, which broke once Phase 1 stopped starting at 0 for a new-style log (see
+        /// HtmlReportWriter.Build's own comment).</summary>
+        public double LiveSeconds;
+        public bool WentLive;
+        public double? TransitionSeconds;
     }
 }

@@ -77,6 +77,10 @@ namespace Overpower.Telemetry
         /// <summary>Task T7: the runtime API (MatchTelemetry.LogElimination) exists; nothing calls it
         /// yet with a real elimination - that is 2.7's job (its MatchDirector).</summary>
         public const string Elimination = "elimination";
+        /// <summary>2.7b step 9: a team holding no other capital in play just took one that isn't its own
+        /// (MatchPhaseRules.IsAdoption) - logged master-only from MatchDirector.HandleOwnershipChanged,
+        /// live only (the warm-up sandbox never adopts anything).</summary>
+        public const string Adopt = "adopt";
 
         // ---------------------------------------------------------------- session (line 1)
         public const string Schema = "schema";
@@ -228,5 +232,15 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- marker
         public const string Note = "note";
+
+        // ---------------------------------------------------------------- respawn (2.7b step 9)
+        /// <summary>`respawn`'s own field: true only for the ONE respawn line ResetForMatchStart can
+        /// produce - a player who was dead the instant the match goes live is brought back by SetAlive(true),
+        /// which raises the same AliveChanged(true) an ordinary respawn does. Absent (reads false/missing) on
+        /// every real respawn. See PlayerLifecycle.LastAliveChangeWasFreshStart and PlayerTelemetry.
+        /// HandleAliveChanged's own comment for why this is a field on the ordinary `respawn` line rather than
+        /// a suppressed line or a new event type: the aggregator's alive-time-tail math needs the real respawn
+        /// timestamp either way, and no table anywhere counts `respawn` lines as a stat - only reads their t.</summary>
+        public const string Fresh = "fresh";
     }
 }

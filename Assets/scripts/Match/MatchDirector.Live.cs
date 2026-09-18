@@ -3,6 +3,7 @@ using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
 using Overpower.Net;
+using Overpower.Telemetry;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 namespace Overpower.Match
@@ -159,6 +160,10 @@ namespace Overpower.Match
             waitForEchoUntil = Time.unscaledTime + EchoWaitSeconds;
             // A host-started match holds six, not nine (Decision 7).
             PhotonNetwork.CurrentRoom.MaxPlayers = (byte)(teams.Length * RoomManager.TeamSize);
+            // 2.7b step 9: the countdown starting is a marker, not a phase change - going live is still what
+            // logs the real `phase` line (below, in GoLive). The existing F1 marker shape, so the report's
+            // Markers section shows it with no new event type.
+            MatchTelemetry.Instance?.DropMarker("countdown start");
             Debug.Log($"[MATCH] countdown: teams [{string.Join(",", teams)}], live at {liveAt}");
         }
 
@@ -172,6 +177,7 @@ namespace Overpower.Match
                 return;
             waitForEchoUntil = Time.unscaledTime + EchoWaitSeconds;
             PhotonNetwork.CurrentRoom.MaxPlayers = (byte)(MatchStartRules.TeamCount * RoomManager.TeamSize);
+            MatchTelemetry.Instance?.DropMarker("countdown cancelled"); // 2.7b step 9 - see StartCountdown's own comment.
             Debug.Log("[MATCH] countdown cancelled: a team in it emptied - back to the warm-up");
         }
 
@@ -217,6 +223,12 @@ namespace Overpower.Match
             // client including this one) and OnRoomPropertiesUpdate decrements it there. It heals itself; no
             // action needed.
             writesAwaitingEcho++;
+            // 2.7b step 9: the telemetry live line, right after the write - PhaseTimeline.From reads the first
+            // `phase` >= 1 event as the live moment (the countdown itself is still warm-up - Decision 3), so
+            // this must land here, in the master's own live write, not in StartCountdown. `phase` 1 (three
+            // teams) or 2 (a host start) - never logged twice, since GoLive itself only ever runs once
+            // (liveWritten/IsLive guard at the top).
+            MatchTelemetry.Instance?.LogPhase((int)phase, teams);
             Debug.Log($"[MATCH] live: teams [{string.Join(",", teams)}], {phase}");
         }
 

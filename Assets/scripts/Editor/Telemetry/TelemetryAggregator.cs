@@ -165,6 +165,8 @@ namespace Overpower.EditorTools.Telemetry
 
             BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow, sampleInterval);
             tables.Header.EliminationFallbackUsed = timeline.UsedEliminationFallback; // review fix item 9
+            tables.Header.WarmupSeconds = timeline.LiveSeconds; // 2.7b step 9
+            tables.Header.NeverWentLive = timeline.HasWarmup && !timeline.WentLive; // 2.7b step 9
             BuildCaptures(log, rawChangesByZone, zoneTier, matchLength, tables.Header, tables.Captures, effectiveWindow, tPhase2);
             BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables, effectiveWindow, tPhase2);
             BuildHits(log, effectiveTeam, tables.Hits, effectiveWindow, tPhase2);
@@ -189,6 +191,9 @@ namespace Overpower.EditorTools.Telemetry
                 WholeMatch = Build(log, timeline.WholeMatch),
                 Phase1 = Build(log, timeline.Phase1),
                 Phase2 = timeline.HasPhase2 ? Build(log, timeline.Phase2) : null,
+                LiveSeconds = timeline.LiveSeconds, // 2.7b step 9
+                WentLive = timeline.WentLive,
+                TransitionSeconds = timeline.TransitionSeconds,
             };
         }
 

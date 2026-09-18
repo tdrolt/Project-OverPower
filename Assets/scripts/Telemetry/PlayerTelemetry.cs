@@ -1032,11 +1032,22 @@ namespace Overpower.Telemetry
             if (MatchTelemetry.Instance == null)
                 return;
 
+            // 2.7b step 9 fold-in: a fresh start (ResetForMatchStart reviving a player who was dead when the
+            // match went live) fires this same AliveChanged(true) - see PlayerLifecycle.
+            // LastAliveChangeWasFreshStart's own comment. Its own LastRespawnWasUnderAttackSpawn is never
+            // touched by a fresh start, so it would otherwise read as whatever this player's last REAL
+            // respawn happened to be - written false here instead (a fresh start always lands at the plain
+            // team spawn, never the under-attack one), and the line itself is marked `fresh:true` so the
+            // report reads it as "brought back by going live", not an ordinary respawn at that exact instant.
+            bool freshStart = lifecycle != null && lifecycle.LastAliveChangeWasFreshStart;
+
             line.Begin(TelemetryKeys.Respawn, MatchTelemetry.Instance.Now);
             line.Float(TelemetryKeys.X, MyPosition.x);
             line.Float(TelemetryKeys.Z, MyPosition.z);
             line.Float(TelemetryKeys.TimeDead, timeDead);
-            line.Bool(TelemetryKeys.UnderAttackSpawn, lifecycle != null && lifecycle.LastRespawnWasUnderAttackSpawn);
+            line.Bool(TelemetryKeys.UnderAttackSpawn, !freshStart && lifecycle != null && lifecycle.LastRespawnWasUnderAttackSpawn);
+            if (freshStart)
+                line.Bool(TelemetryKeys.Fresh, true);
             MatchTelemetry.Instance.Log(line);
         }
 

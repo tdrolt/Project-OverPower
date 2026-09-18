@@ -107,6 +107,8 @@ namespace Overpower.EditorTools.Telemetry
             // MatchTelemetry's own phase-1 anchor is unconditional - showed a false "unknown
             // event(s) were skipped" warning.
             TelemetryKeys.Phase, TelemetryKeys.Elimination,
+            // 2.7b step 9: the telemetry `adopt` line.
+            TelemetryKeys.Adopt,
         };
 
         public static TelemetryLog Load(string folder)

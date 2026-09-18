@@ -420,14 +420,16 @@ namespace Overpower.Telemetry
             var expectedAbsent = new Hashtable { { TelemetryKeys.RoomMatchId, null } };
             PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent);
 
-            // Task T7: log the phase 1 anchor right here, once - this IS the master claiming the
-            // match identity (whether or not this particular write ends up being the one the CAS
-            // accepts; see the fallback branch below, which is the SAME claim attempt retried, not a
-            // second claim, so it does not log again). Queues into pendingLines like every other line
-            // logged before the file opens (Log's own doc comment) - matchId/matchStartMs may still be
-            // unset here, which is fine (Now reads -1, the same "before the match clock was known"
-            // sentinel `join` already uses).
-            LogPhase(1, System.Array.Empty<int>());
+            // Task T7 / 2.7b step 9: log the phase 0 WARM-UP anchor right here, once - this IS the master
+            // claiming the match identity (whether or not this particular write ends up being the one the CAS
+            // accepts; see the fallback branch below, which is the SAME claim attempt retried, not a second
+            // claim, so it does not log again). Queues into pendingLines like every other line logged before
+            // the file opens (Log's own doc comment) - matchId/matchStartMs may still be unset here, which is
+            // fine (Now reads -1, the same "before the match clock was known" sentinel `join` already uses).
+            // Phase 0 marks a NEW-STYLE log for PhaseTimeline.From - going live (2.7b's MatchDirector.GoLive)
+            // is what logs phase 1 (three teams) or 2 (a host start) for real; this anchor is never a live
+            // moment or a transition, just the same harmless "this log exists" marker phase 1 used to be.
+            LogPhase(0, System.Array.Empty<int>());
 
             // Wait for mId to actually show up - see TryClaimMatchIdentity's own comment on why the call
             // above's return value is not the signal to wait for.
@@ -591,13 +593,14 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        // ---------------------------------------------------------------- phase / elimination (Task T7)
+        // ---------------------------------------------------------------- phase / elimination / adoption (Task T7, 2.7b)
         //
-        // Both are the runtime API Task 2.7's own MatchDirector will call once it exists - nothing in
-        // this codebase calls LogElimination yet, and the only caller of LogPhase today is this class's
-        // own phase-1 anchor above. Master-only, matching every other territory event this class logs
-        // (see the "master-only territory events" region's own comment on why the guard is read live
-        // rather than at subscribe time).
+        // LogElimination/LogPhase(>=1) are 2.7's own MatchDirector's job; LogPhase(0) is this class's own
+        // warm-up anchor above. Master-only, matching every other territory event this class logs (see the
+        // "master-only territory events" region's own comment on why the guard is read live rather than at
+        // subscribe time). 2.7b step 9: phase 0 is the warm-up (never a live moment or a transition); 1
+        // (three teams) or 2 (a host start) is MatchDirector.GoLive's own live write; 2 (after a knockout) or
+        // 3 (Over) is an elimination-driven phase change, exactly as before this step.
 
         /// <summary>2.7 calls this the instant a team is eliminated. <paramref name="team"/> is the
         /// team just knocked out; <paramref name="teamsRemaining"/> is who's left. Master-only - a
@@ -613,10 +616,12 @@ namespace Overpower.Telemetry
         }
 
         /// <summary>2.7 calls this right after LogElimination, with the phase number the match just
-        /// entered (2, 3, ...) and who's still in it. This class calls it once itself, with phaseNumber
-        /// 1, the moment it claims the match identity (see ClaimMatchIdentityWhenClockIsReady) - a
-        /// harmless anchor line PhaseTimeline.From (T7's aggregator) ignores when looking for the
-        /// first REAL phase change (any phase >= 2). Master-only, same reasoning as LogElimination.</summary>
+        /// entered (2, 3, ...) and who's still in it. 2.7b's MatchDirector.GoLive also calls this once,
+        /// right after its live write, with 1 (three teams) or 2 (a host start). This class calls it once
+        /// itself, with phaseNumber 0, the moment it claims the match identity (see
+        /// ClaimMatchIdentityWhenClockIsReady) - a harmless warm-up anchor line PhaseTimeline.From (T7's
+        /// aggregator) ignores when looking for the live moment (any phase >= 1) or the phase-2 transition
+        /// (any phase >= 2 at or after it). Master-only, same reasoning as LogElimination.</summary>
         public void LogPhase(int phaseNumber, int[] teamsRemaining)
         {
             if (!PhotonNetwork.IsMasterClient) return;
@@ -624,6 +629,20 @@ namespace Overpower.Telemetry
             line.Begin(TelemetryKeys.Phase, Now);
             line.Int(TelemetryKeys.PhaseNumber, phaseNumber);
             line.Ints(TelemetryKeys.TeamsRemaining, teamsRemaining ?? System.Array.Empty<int>());
+            Log(line);
+        }
+
+        /// <summary>2.7b step 9: the telemetry `adopt` line - MatchDirector.HandleOwnershipChanged calls
+        /// this, master-only and live only, when MatchPhaseRules.IsAdoption says the team that just took
+        /// <paramref name="zone"/> held no OTHER capital in play already. Master-only, same reasoning as
+        /// every other territory logger here.</summary>
+        public void LogAdoption(int team, int zone)
+        {
+            if (!PhotonNetwork.IsMasterClient) return;
+
+            line.Begin(TelemetryKeys.Adopt, Now);
+            line.Int(TelemetryKeys.Team, team);
+            line.Int(TelemetryKeys.Zone, zone);
             Log(line);
         }
     }

@@ -133,6 +133,17 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// can read it. Meaningless before the first respawn; false until then.</summary>
     public bool LastRespawnWasUnderAttackSpawn { get; private set; }
 
+    /// <summary>2.7b step 9 fold-in: true when the most recent AliveChanged(true) came from
+    /// ResetForMatchStart reviving a player who was dead the instant the match went live, not from an
+    /// ordinary respawn. PlayerTelemetry's `respawn` line (raised from that same AliveChanged event)
+    /// reads this to mark itself `fresh:true` instead of reading like an ordinary - possibly
+    /// under-attack - respawn at the exact live instant: LastRespawnWasUnderAttackSpawn is never
+    /// touched by ResetForMatchStart, so it would otherwise carry over whatever this player's last
+    /// REAL respawn happened to be. Set true immediately before ResetForMatchStart's own SetAlive(true);
+    /// set back false before RespawnPlayer's own SetAlive(true) (the one real-respawn path, ordinary or
+    /// capital-recapture), so it always reflects the truth for whichever call raised the event.</summary>
+    public bool LastAliveChangeWasFreshStart { get; private set; }
+
     void Start()
     {
         // A silent null here would make every respawn use the hardcoded fallbacks in
@@ -445,9 +456,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         // 5. Alive with no last stand. An already-alive player gets no AliveChanged here (SetAlive is only
         // called when isAlive was false), which avoids a telemetry `respawn` line firing for everyone at once
-        // just because the match went live.
+        // just because the match went live. A player who WAS dead does get one - marked fresh (step 9 fold-in,
+        // see LastAliveChangeWasFreshStart's own comment) so the report never reads it as an ordinary respawn.
         if (!isAlive)
+        {
+            LastAliveChangeWasFreshStart = true;
             SetAlive(true);
+        }
         SetLastStandOut(false);
 
         Debug.Log($"[MATCH] fresh start team={team} position={rigidbody.position} " +
@@ -520,8 +535,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             TeleportToSpawnPoint(spawn.position, spawn.rotation);
 
         // Set before SetAlive(true) below raises AliveChanged - PlayerTelemetry's `respawn` line
-        // reads this from that same event.
+        // reads this from that same event. This is the one real-respawn path (ordinary or capital
+        // recapture - Decision 12), so LastAliveChangeWasFreshStart is always false here (step 9 fold-in).
         LastRespawnWasUnderAttackSpawn = atUnderAttackSpawn;
+        LastAliveChangeWasFreshStart = false;
 
         playerHealth.ResetForRespawn();
 

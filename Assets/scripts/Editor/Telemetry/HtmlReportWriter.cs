@@ -77,7 +77,8 @@ namespace Overpower.EditorTools.Telemetry
             var result = new List<PositionSample>();
             if (log == null) return result;
 
-            double? tPhase2 = PhaseTimeline.From(log).TransitionSeconds;
+            PhaseTimeline timeline = PhaseTimeline.From(log);
+            double? tPhase2 = timeline.TransitionSeconds;
 
             var fileActor = new Dictionary<string, int>();
             foreach (TelemetrySession s in log.Sessions)
@@ -88,6 +89,9 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Sample) continue;
+                // 2.7b step 9: the report's windows start at going live - a warm-up position has no
+                // business on any tab's heatmap (nothing counts before live - Decision 3).
+                if (timeline.WentLive && e.T < timeline.LiveSeconds) continue;
 
                 var xToken = e.Data[TelemetryKeys.X];
                 var zToken = e.Data[TelemetryKeys.Z];
@@ -120,10 +124,11 @@ namespace Overpower.EditorTools.Telemetry
 
         private static string Build(ReportSet reportSet, List<PositionSample> positions, int positionsKeptEveryN, BalanceTargetsData targets, ArenaReportRender.Result arena)
         {
-            // Task T7: Phase 1's OWN window is [0, tPhase2) starting at 0, so its own
-            // MatchLengthSeconds (End - Start) equals tPhase2 exactly - the transition instant,
-            // without needing the log or PhaseTimeline again here.
-            double? transitionSeconds = reportSet.Phase2 != null ? reportSet.Phase1?.Header.MatchLengthSeconds : (double?)null;
+            // 2.7b step 9: Phase 1 no longer starts at 0 once the match has a warm-up - it starts at
+            // LiveSeconds instead (PhaseTimeline), so its own MatchLengthSeconds (End - Start) is no
+            // longer the transition instant on its own. Read straight from ReportSet.TransitionSeconds
+            // (carried from PhaseTimeline.From) instead of re-deriving it from Phase1's window here.
+            double? transitionSeconds = reportSet.TransitionSeconds;
 
             var payload = new
             {
@@ -827,11 +832,18 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     if (h.newerSchemaCount) warn(h.newerSchemaCount + ' session(s) used a newer schema than this report understands.');
     if (h.otherMatchId) warn('This folder also holds ' + h.otherMatchFileCount + ' file(s) from a different match (' + h.otherMatchId + ') - not merged into this report.');
     if (h.eliminationFallbackUsed) warn('An elimination was logged without a matching phase event; Phase 2 start was taken from the elimination instead.');
+    // 2.7b step 9: a new-style log whose match never went live - every table is empty (the whole log
+    // is warm-up, left out of every window), so this is the one warning that actually matters here.
+    if (h.neverWentLive) warn('This match never went live - the whole log is warm-up; nothing in it counts toward a real match.');
 
     var summary = id('header-summary', suffix);
     function line(label, value) { summary.appendChild(el('div', null, label + ': ' + value)); }
     line('Match id', h.matchId || '(none)');
     line('Length', fmt(h.matchLengthSeconds) + 's (' + fmt(minutes(h.matchLengthSeconds)) + ' min)');
+    // 2.7b step 9: only a new-style log carries a real WarmupSeconds > 0 (a legacy log, or a new-style
+    // one that went live in the very same instant it claimed its match identity, reads 0 here and gets
+    // no line - there is nothing worth reporting either way).
+    if (h.warmupSeconds > 0) line('Warm-up', fmt(h.warmupSeconds) + 's before the match went live (left out)');
     line('Players per team', h.playersPerTeam);
     line('Commits', (h.commits || []).join(', ') || '(none)');
 

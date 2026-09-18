@@ -262,5 +262,150 @@ namespace Overpower.Tests
                 Directory.Delete(temp, true);
             }
         }
+
+        // ---------------------------------------------------------------- 2.7b step 9: the warm-up (new-style logs)
+
+        [Test]
+        public void AWarmupThenAThreeTeamStartOpensPhase1AtLive()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}\n" + // the warm-up anchor
+                    "{\"e\":\"phase\",\"t\":60,\"num\":1,\"remain\":[0,1,2]}\n" + // live: three teams
+                    "{\"e\":\"phase\",\"t\":200,\"num\":2,\"remain\":[0,1]}\n" + // the first knockout
+                    "{\"e\":\"sample\",\"t\":300,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsTrue(timeline.WentLive);
+                Assert.AreEqual(60.0, timeline.LiveSeconds, 1e-9);
+                Assert.IsTrue(timeline.HasWarmup);
+
+                Assert.AreEqual(0.0, timeline.Warmup.Start, 1e-9);
+                Assert.AreEqual(60.0, timeline.Warmup.End, 1e-9);
+                Assert.IsFalse(timeline.Warmup.EndInclusive);
+
+                Assert.AreEqual(60.0, timeline.WholeMatch.Start, 1e-9);
+                Assert.AreEqual(300.0, timeline.WholeMatch.End, 1e-9);
+                Assert.IsTrue(timeline.WholeMatch.EndInclusive);
+
+                Assert.AreEqual(60.0, timeline.Phase1.Start, 1e-9);
+                Assert.AreEqual(200.0, timeline.Phase1.End, 1e-9);
+                Assert.IsFalse(timeline.Phase1.EndInclusive);
+
+                Assert.AreEqual(200.0, timeline.Phase2.Start, 1e-9);
+                Assert.AreEqual(300.0, timeline.Phase2.End, 1e-9);
+                Assert.IsTrue(timeline.Phase2.EndInclusive);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void AHostStartedTwoTeamMatchIsAllPhase2()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}\n" +
+                    "{\"e\":\"phase\",\"t\":45,\"num\":2,\"remain\":[0,1]}\n" + // live: a host start begins TwoTeams
+                    "{\"e\":\"sample\",\"t\":200,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.AreEqual(45.0, timeline.LiveSeconds, 1e-9);
+                Assert.AreEqual(45.0, timeline.TransitionSeconds.Value, 1e-9);
+                Assert.IsFalse(timeline.Phase1.Contains(100));
+
+                Assert.AreEqual(45.0, timeline.Phase2.Start, 1e-9);
+                Assert.AreEqual(200.0, timeline.Phase2.End, 1e-9);
+                Assert.IsTrue(timeline.Phase2.EndInclusive);
+
+                Assert.AreEqual(45.0, timeline.WholeMatch.Start, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void ASessionThatNeverWentLiveIsAllWarmup()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}\n" +
+                    "{\"e\":\"sample\",\"t\":80,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsFalse(timeline.WentLive);
+                Assert.AreEqual(0.0, timeline.Warmup.Start, 1e-9);
+                Assert.AreEqual(80.0, timeline.Warmup.End, 1e-9);
+                Assert.IsTrue(timeline.Warmup.EndInclusive);
+                Assert.IsFalse(timeline.HasPhase2);
+                Assert.IsFalse(timeline.Phase1.Contains(10));
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void AWarmupEliminationIsNeverTheTransition()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}\n" +
+                    "{\"e\":\"elimination\",\"t\":20,\"tm\":2,\"remain\":[0,1]}\n" + // before live - never a transition
+                    "{\"e\":\"phase\",\"t\":60,\"num\":1,\"remain\":[0,1]}\n" +
+                    "{\"e\":\"sample\",\"t\":100,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.IsNull(timeline.TransitionSeconds);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
+
+        [Test]
+        public void ALateDuplicateWarmupAnchorDoesNotMoveLive()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1) +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}\n" +
+                    "{\"e\":\"phase\",\"t\":30,\"num\":1,\"remain\":[0,1]}\n" +
+                    "{\"e\":\"phase\",\"t\":50,\"num\":0,\"remain\":[]}\n" + // a stray late/duplicate anchor
+                    "{\"e\":\"sample\",\"t\":90,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                var timeline = PhaseTimeline.From(TelemetryLog.Load(temp));
+
+                Assert.AreEqual(30.0, timeline.LiveSeconds, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
     }
 }
