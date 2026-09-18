@@ -71,6 +71,15 @@ namespace Overpower.UI
         private RectTransform overheatTickRect; // Repositioned live - see UpdateOverheat.
         private Image armorFill;
         private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
+
+        // Mark plan step 1 (Tudor's override, top-of-plan table #6): the yellow immunity look is a
+        // translucent OVERLAY per bar, not a recolour of healthFill/armorFill - "so it doesn't mess
+        // with the shield". One overlay each, since the HUD's health and armor bars are two separate
+        // tracks (unlike the overhead bar, where shield is drawn over health in the SAME rect - see
+        // PlayerHealth's single overlay there). Both built in BuildUi, both start inactive.
+        private Image healthImmuneOverlay;
+        private Image armorImmuneOverlay;
+        private bool lastImmuneLook;
         private GameObject silencedBanner;
         private TextMeshProUGUI goldText; // "Gold 1234" over "+7.7/s", bottom-right - see BuildGoldCorner.
 
@@ -426,6 +435,20 @@ namespace Overpower.UI
             {
                 armorFill.fillAmount = armorFraction;
                 lastArmorFraction = armorFraction;
+            }
+
+            // Mark plan step 1: both bars turn yellow together, only while PlayerHealth's own clock
+            // says the immunity (not merely the armed trap) is running - see that class's ShowsImmuneLook.
+            // Guarded on change, same as every other write in this method: an unmoving overlay must
+            // not re-touch two Graphics and two GameObjects sixty times a second.
+            bool immune = playerHealth.ShowsImmuneLook;
+            if (immune != lastImmuneLook)
+            {
+                lastImmuneLook = immune;
+                healthImmuneOverlay.color = theme.immuneBarColor;
+                armorImmuneOverlay.color = theme.immuneBarColor;
+                healthImmuneOverlay.gameObject.SetActive(immune);
+                armorImmuneOverlay.gameObject.SetActive(immune);
             }
         }
 
@@ -870,7 +893,12 @@ namespace Overpower.UI
             overheatFill = BuildBar(panel.transform, "Overheat Bar", theme.barWidth, theme.overheatBarHeight, theme.overheatColor, out Image overheatTrack);
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
+            // armorExtentRect.parent is the armor bar's own TRACK root (BuildArmorBar parents the
+            // extent, which parents Fill, under it) - the overlay goes there, not on the extent
+            // itself, so it covers the WHOLE bar rather than shrinking with a part-empty capacity.
+            armorImmuneOverlay = CreateImmuneOverlay(armorExtentRect.parent);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
+            healthImmuneOverlay = CreateImmuneOverlay(healthFill.transform.parent);
 
             BuildGoldCorner(canvasGo.transform);
             BuildToast(canvasGo.transform);
@@ -1013,6 +1041,26 @@ namespace Overpower.UI
             fillImg.fillAmount = 1f;
             fillImg.raycastTarget = false;
             return fillImg;
+        }
+
+        /// <summary>Mark plan step 1: the yellow immunity overlay for ONE bar - a plain Image the
+        /// size of the whole bar (not the fill's own 2px-inset rect), added as the LAST child of
+        /// barRoot so it always draws over whatever fill(s) already sit there. Starts inactive;
+        /// UpdateHealthAndArmor is the only thing that ever shows it.</summary>
+        private static Image CreateImmuneOverlay(Transform barRoot)
+        {
+            var overlayGo = new GameObject("Immune Overlay", typeof(RectTransform));
+            overlayGo.transform.SetParent(barRoot, false);
+            RectTransform rect = overlayGo.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            Image overlay = overlayGo.AddComponent<Image>();
+            overlay.raycastTarget = false;
+            overlayGo.SetActive(false);
+            return overlay;
         }
 
         /// <summary>A thin vertical mark on the overheat track showing exactly where the warning

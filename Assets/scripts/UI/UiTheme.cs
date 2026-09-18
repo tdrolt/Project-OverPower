@@ -76,6 +76,13 @@ namespace Overpower.UI
         public float barWidth = 590f;
         [Tooltip("Health fill.")] public Color healthColor = new Color(0.39f, 0.8f, 0.25f, 1f);
         [Tooltip("Shield fill.")] public Color shieldColor = new Color(0.25f, 0.6f, 1f, 1f);
+        [Tooltip("Colour of the translucent OVERLAY drawn over a whole bar - both HUD bars (health, armor) and " +
+                 "the shared bar over your head, on every screen - while the Invulnerability shield's immunity is " +
+                 "running (the seconds after it triggers, not while it is only armed). Tudor's override [T]: " +
+                 "\"make it so there's an overlay so it doesn't mess with the shield\" - the health/shield fills " +
+                 "underneath keep their own colours always; this is a separate Image drawn on top of them, so " +
+                 "keep the alpha well under 1 or the fills stop showing through it.")]
+        public Color immuneBarColor = new Color(1f, 0.86f, 0.1f, 0.45f);
         [Tooltip("Overheat fill below the warning threshold.")] public Color overheatColor = new Color(0.95f, 0.62f, 0.15f, 1f);
         [Tooltip("Overheat fill at or above the warning threshold.")] public Color overheatWarningColor = new Color(1f, 0.35f, 0.1f, 1f);
         [Tooltip("Overheat fill while silenced.")] public Color overheatSilencedColor = new Color(0.9f, 0.1f, 0.1f, 1f);

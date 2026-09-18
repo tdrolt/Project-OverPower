@@ -62,6 +62,22 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     // visible over a corpse. See SetOverheadBarVisible.
     private GameObject overheadBarRoot;
 
+    // Mark plan step 1 (Tudor's override, top-of-plan table #6): the yellow "shield immunity" look is
+    // a translucent OVERLAY on top of the shared health/shield rect, not a recolour of either fill -
+    // "so it doesn't mess with the shield". Built lazily (EnsureImmuneOverlay) the first time it is
+    // actually needed, as the LAST child of overheadBarRoot, copying healthFillImage's own rect: the
+    // shield fill already draws in that identical rect (Task 6 [T], full armour over full health), so
+    // one overlay covers both. No prefab change - this Image exists only at runtime.
+    private Image overheadImmuneOverlay;
+    private readonly ImmuneLookClock immuneLook = new ImmuneLookClock();
+    // Latches ApplyImmuneLook's last value so a remote copy's Update tick (below) and an owner's
+    // ShowImmuneLook/ClearImmuneLook calls never redo the SetActive/color work when nothing changed.
+    private bool immuneLookApplied;
+
+    /// <summary>True while the yellow immunity overlay is showing - PlayerHud reads this for the
+    /// owner's own screen-space bars (the overhead bar above needs no such read: it drives itself).</summary>
+    public bool ShowsImmuneLook => immuneLookApplied;
+
     private PhotonView photonView;
 
     private float health;
@@ -150,6 +166,79 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         if (overheadBarRoot != null)
             overheadBarRoot.SetActive(visible);
+        // No separate hide for overheadImmuneOverlay: it is a CHILD of overheadBarRoot, so
+        // SetActive(false) above already takes it out of the hierarchy with everything else on the
+        // bar - Unity does not run a hidden child's Update either, so ApplyImmuneLook still fires
+        // correctly (see Update below) the moment the bar - and the overlay under it - reappear.
+    }
+
+    /// <summary>Builds the immunity overlay the first time ApplyImmuneLook actually needs one - never
+    /// eagerly in Awake, since most lives never trigger the shield at all. Copies healthFillImage's
+    /// own RectTransform exactly (anchors, offsets, pivot) rather than stretching to fill
+    /// overheadBarRoot, so it lines up with the fills pixel-for-pixel even if a future prefab edit
+    /// insets them. Starts inactive; ApplyImmuneLook is the only thing that ever shows it.</summary>
+    private void EnsureImmuneOverlay()
+    {
+        if (overheadImmuneOverlay != null || overheadBarRoot == null || healthFillImage == null)
+            return;
+
+        var overlayGo = new GameObject("Immune Overlay", typeof(RectTransform));
+        overlayGo.transform.SetParent(overheadBarRoot.transform, false);
+
+        RectTransform overlayRect = overlayGo.GetComponent<RectTransform>();
+        RectTransform sourceRect = healthFillImage.rectTransform;
+        overlayRect.anchorMin = sourceRect.anchorMin;
+        overlayRect.anchorMax = sourceRect.anchorMax;
+        overlayRect.offsetMin = sourceRect.offsetMin;
+        overlayRect.offsetMax = sourceRect.offsetMax;
+        overlayRect.pivot = sourceRect.pivot;
+
+        Image overlay = overlayGo.AddComponent<Image>();
+        overlay.raycastTarget = false;
+        overlayGo.SetActive(false);
+
+        overheadImmuneOverlay = overlay;
+    }
+
+    /// <summary>The one source for "immune right now" on the overhead bar - driven by
+    /// InvulnerabilityAbility's ShowShield/ClearShield, which run on every client (What exists D: a
+    /// remote copy's own IsInvulnerable is always false, so the shield's replicated phase message is
+    /// the only signal that reaches every screen). Starts (or restarts) the clock from Time.time.</summary>
+    public void ShowImmuneLook(float seconds)
+    {
+        immuneLook.Show(Time.time, seconds);
+        ApplyImmuneLook(immuneLook.IsOn(Time.time));
+    }
+
+    /// <summary>Ends the look at once - called from InvulnerabilityAbility.ClearShield and from
+    /// ResetForRespawn (a fresh spawn, or the 2.7b match-start fresh start, must never carry a stale
+    /// yellow bar into the next life - PlayerLifecycle.ResetForMatchStart already calls
+    /// ResetForRespawn, so nothing extra was needed there).</summary>
+    public void ClearImmuneLook()
+    {
+        immuneLook.Clear();
+        ApplyImmuneLook(false);
+    }
+
+    /// <summary>Tudor's override on the Mark plan (top-of-plan table, #6): toggles the OVERLAY only -
+    /// healthFillImage/shieldFillImage are never touched here, so they always keep whatever
+    /// ApplyTheme set them to. Guarded on the latched value so a remote copy's per-frame Update check
+    /// (below) and repeated ShowImmuneLook calls while already on do no redundant work.</summary>
+    private void ApplyImmuneLook(bool on)
+    {
+        if (on == immuneLookApplied)
+            return;
+        immuneLookApplied = on;
+
+        if (theme == null)
+            return;
+
+        EnsureImmuneOverlay();
+        if (overheadImmuneOverlay == null)
+            return;
+
+        overheadImmuneOverlay.color = theme.immuneBarColor;
+        overheadImmuneOverlay.gameObject.SetActive(on);
     }
 
     /// <summary>Applies the theme's bar sprite and colours to the three overhead-bar Images once,
@@ -222,6 +311,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     private void Update()
     {
+        // Mark plan step 1: a REMOTE copy's look must expire on its own clock too, which is why this
+        // sits ABOVE the owner-only return below. ShowImmuneLook/ClearImmuneLook already run on every
+        // client (InvulnerabilityAbility's RpcTarget.All), so the only thing a remote copy cannot do
+        // for itself is notice time passing without ticking anything - this one line is that tick.
+        if (immuneLookApplied && !immuneLook.IsOn(Time.time))
+            ApplyImmuneLook(false);
+
         // No other client should simulate your health or tick your armor recharge. isDead is
         // checked too: without it, armor kept climbing on a corpse (Update never used to look at
         // isDead), so how much armor you respawned with silently depended on how long the respawn
@@ -417,6 +513,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             armor.Clear();
 
         UpdateOverheadBar();
+        // Mark plan step 1: a fresh spawn must never carry a stale yellow bar into the next life -
+        // and PlayerLifecycle.ResetForMatchStart (the 2.7b fresh start) already calls this same method
+        // (PlayerLifecycle.cs:446), so the match-start case is covered for free, with no extra call.
+        ClearImmuneLook();
     }
 
     /// Call when this player deals damage, so dealing it keeps you "in combat" the same way
