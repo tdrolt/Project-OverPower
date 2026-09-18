@@ -759,34 +759,21 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// How many projectiles this trigger pull sends out. Weapons that cannot charge, or that
-        /// charge something other than their projectile count (Charge Max Projectiles left at 0),
-        /// are untouched - they always send Projectiles Per Shot.
+        /// How many projectiles this trigger pull sends out. Weapons that cannot charge, or that charge something
+        /// other than their projectile count (Charge Max Projectiles left at 0), are untouched - they always send
+        /// Projectiles Per Shot.
         ///
-        /// Charge Steps quantises the ramp into readable stages rather than a smooth count a
-        /// player cannot react to - see the tooltip on WeaponDefinition.ChargeSteps. Two steps
-        /// means three levels (0, 1, 2), which for the burst charge path reads as 3 -> 4 -> 5
-        /// projectiles: a HALF charge is a real, intentional middle step, not a rounding accident.
+        /// The arithmetic lives in ChargeCountRule so the charge ring on the ground marks the same steps (charge
+        /// step 1). Runs on every client from the chargeFraction RPC parameter, so every client must be on the same
+        /// build to agree on the count - see RPC_FireWeapon.
         /// </summary>
         private static int ChargedProjectileCount(WeaponDefinition weapon, float chargeFraction)
         {
-            if (!weapon.CanCharge || weapon.ChargeMaxProjectiles <= weapon.ProjectilesPerShot)
+            if (!weapon.CanCharge)
                 return Mathf.Max(1, weapon.ProjectilesPerShot);
 
-            float quantised = QuantiseChargeFraction(chargeFraction, weapon.ChargeSteps);
-            return Mathf.Max(1, Mathf.RoundToInt(
-                Mathf.Lerp(weapon.ProjectilesPerShot, weapon.ChargeMaxProjectiles, quantised)));
-        }
-
-        /// <summary>Snaps a continuous 0..1 hold to the nearest of Charge Steps + 1 even levels
-        /// (0, 1/steps, 2/steps, ... 1), so a half-second hold on a 1-second charge lands on
-        /// exactly the same level every time rather than drifting with frame timing. Steps of 0
-        /// or less leaves the fraction smooth, for a weapon that charges something continuous
-        /// (damage only) rather than in stages.</summary>
-        private static float QuantiseChargeFraction(float chargeFraction, int steps)
-        {
-            float clamped = Mathf.Clamp01(chargeFraction);
-            return steps > 0 ? Mathf.RoundToInt(clamped * steps) / (float)steps : clamped;
+            return ChargeCountRule.Rounds(weapon.ProjectilesPerShot, weapon.ChargeMaxProjectiles,
+                                           weapon.ChargeSteps, chargeFraction);
         }
 
         /// <summary>Damage ramps smoothly (not stepped) towards Charge Damage Multiplier, since
