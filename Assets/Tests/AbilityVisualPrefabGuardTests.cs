@@ -177,14 +177,16 @@ namespace Overpower.Tests
             Assert.IsNotNull(Load("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab").GetComponent<AbilityHitRelay>());
         }
 
-        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab")]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab")]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab")]
-        public void RocketSplashNumbersAreUnchanged(string path)
+        // The Cursor rocket's blast is 2.5 m on purpose (Tudor, 2026-09-18): it matches the Fire Field it leaves on the
+        // ground (radius 2.5), so the blast and the fire read as one area. The other two stay at 3 m.
+        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 3f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 3f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 2.5f)]
+        public void RocketSplashNumbersAreUnchanged(string path, float splashRadius)
         {
             SerializedObject explode = Fields<ExplodeOnImpact>(path);
             Float(explode, "splashDamage", 20f);
-            Float(explode, "splashRadius", 3f);
+            Float(explode, "splashRadius", splashRadius);
             Float(explode, "occlusionNudge", 0.1f);
             Int(explode, "splashMask", 1);
             Keyframe[] keys = Field(explode, "falloff").animationCurveValue.keys;
