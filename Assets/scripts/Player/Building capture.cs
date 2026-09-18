@@ -688,7 +688,9 @@ public class BuildingCapture : MonoBehaviourPun
         // The one territory rule (TerritoryMap, tested in edit mode): not a zone you already own,
         // and next to one you do - except your own capital, which is always capturable. Reads the
         // replicated owners rather than controllingTeam, which is only correct on the master.
-        if (!manager.Map.MayCapture(player.teamID, buildingID, manager.Current.OwnersByZone()))
+        // CurrentOwners is the cached dictionary (BuildingManager.cs ~77-80) - OwnersByZone() builds
+        // a fresh one on every call, and every player's collider fires this on every zone entry.
+        if (!manager.Map.MayCapture(player.teamID, buildingID, manager.CurrentOwners))
             return;
 
         // capturingID is no longer set from here (bug fix, 2026-09-17): this runs on EVERY client for
