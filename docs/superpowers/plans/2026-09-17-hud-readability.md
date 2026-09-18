@@ -297,7 +297,8 @@ New fields, all on `UiTheme` under Minimap:
    ```
    Expected: `1 | <n>:EditorHost(me)`. Anything else — a second client, a leftover Player build — **stop and report**;
    another agent may be mid-task on the one Editor.
-8. **SCRATCH** = `C:\Users\bascu\AppData\Local\Temp\claude\C--UniStuff-Y3-MinorSkilled-GitAccess-Project-OverPower\8bc97fd1-4270-4ef4-9013-ae2fb391f99d\scratchpad`.
+8. **SCRATCH** = `C:\Users\bascu\AppData\Local\Temp\claude\C--UniStuff-Y3-MinorSkilled-GitAccess-Project-OverPower\ff89ef31-6781-4dad-a39f-d996ebdaf3fa\scratchpad`
+   (amended 2026-09-18: the session that wrote this plan, `8bc97fd1-...`, is gone).
    Scratch scripts in `SCRATCH\hud-readability\`, captures in `SCRATCH\hud-readability\captures\`. Never under
    `Assets/`.
 9. **Captures:**
@@ -310,7 +311,10 @@ New fields, all on `UiTheme` under Minimap:
    - **Read every PNG yourself and describe what you actually see, honestly**, before claiming anything about it.
      Agents on this project have claimed "no overlap", "clearly distinct" and "fill works" and all three were wrong
      until someone looked (trap 5).
-10. **`UiTheme.asset` is edited BY HAND** (trap 8c). Per task, in this order:
+10. **`UiTheme.asset` is edited BY HAND** (trap 8c). *(Amended 2026-09-18: trap 8c's reason — the asset being stale
+    against the class — no longer holds. At `cd7b8c4` every field in `UiTheme.cs` has its key in the asset, in
+    declaration order, with no orphans. The hand-edit procedure stays anyway: it is cheap, and it keeps each diff
+    to exactly the intended lines.)* Per task, in this order:
     1. Add / change / remove the C# fields in `UiTheme.cs`.
     2. `unity command recompile`, poll `recompile_status` to `errors: []`.
     3. Hand-edit `Assets/Gameplay/Config/UiTheme.asset` YAML, inserting each new key **in field-declaration order**
@@ -371,15 +375,12 @@ New fields, all on `UiTheme` under Minimap:
 - [ ] **Step 0: Record `BASE` and take the BEFORE captures.**
 
   1. `git rev-parse HEAD` → put the hash in your report as `BASE`. Task 7 diffs assets against it.
-  2. `git status` — **none of this plan's files** (the file map above) may have uncommitted changes. As of writing,
-     another agent has uncommitted work in `Assets/scripts/Player/PlayerDisplacement.cs`,
-     `Assets/scripts/Player/PlayerMotor.cs`, `Assets/scripts/Player/AbilityRunner.cs`,
-     `Assets/scripts/Abilities/**`, `Assets/scripts/Arena/ArenaSymmetry.cs`,
-     `Assets/scripts/Combat/DisplacementSweepRule.cs` and `Assets/Tests/DisplacementSweepRuleTests.cs`. That is
-     fine — **never stage it** (rule 15) — but note two things in your report: the Task 2/3 test totals are measured
-     against whatever that work leaves in the tree, and Task 5's scratch script calls
-     `PlayerDisplacement.TeleportTo`, whose signature that agent may be changing. Re-check it (rule 12) rather than
-     assuming. If any of THIS plan's files is dirty, stop and report.
+  2. `git status` — **none of this plan's files** (the file map above) may have uncommitted changes. *(Amended
+     2026-09-18: the list of another agent's files that stood here is stale — the movement work it named was
+     committed long ago.)* Read `git status` fresh: anything it shows that is not yours is **never staged** (rule
+     15), and say in your report what was there. `PlayerDisplacement.TeleportTo(Vector3)` is stable at the
+     amendment's HEAD; still re-check it (rule 12) rather than assuming. If any of THIS plan's files is dirty, stop
+     and report.
   3. Dirty-scene check (rule 5). Read the answer. Continue only on `False`.
   4. `unity command editor_play`, poll `editor_status` until playing.
   5. Join the room:
@@ -1690,9 +1691,14 @@ public static class MapOpacityRun
      - `s5-map-corner.png` — is the corner map visibly more see-through than `before-map-corner.png`, and is it
        still readable?
      - `s5-map-large.png` — is the big map solid?
-     - `s5-map-large-moving.png` — take this one from inside the coroutine if a CLI round trip cannot catch the
-       moving window: add a `ScreenCapture.CaptureScreenshot("Temp/hud/s5-map-large-moving.png")` call in the
-       moving loop at `movedFor > 0.6f` (once), and say that is what you did.
+     - `s5-map-large-moving.png` — *(amended 2026-09-18: capture method pinned.)* Use the **same**
+       `capture_game_view --source screen` at **616×576** as every other capture in this plan. **Never** fall back
+       to an in-process `ScreenCapture.CaptureScreenshot`: on this machine it comes out **1920×1080**, which cannot
+       be compared with the 616×576 `before-map-*.png`. To give the CLI round trip time to land, keep the player
+       walking with the big map open for **8 s** in a separate run of the moving coroutine (after the alpha
+       recording, not during it), take the CLI capture about 2 s in, and confirm from the coroutine's own log that
+       `IsMoving` was `True` at the capture's timestamp. If it still cannot be caught, say so plainly and skip this
+       one capture rather than change capture path.
      - `s5-map-large-hud.png` — does the big map still clear the (now smaller) HUD, with no overlap?
   5. Stop; dirty check → `False`.
 
