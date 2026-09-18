@@ -2,8 +2,10 @@ using System.Collections;
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Net;
+using Overpower.UI;
 
 namespace Overpower.Weapons
 {
@@ -67,6 +69,32 @@ namespace Overpower.Weapons
                  "lights up, so one prefab covers every size of fire; its height is left alone " +
                  "and is yours to author here.")]
         private Transform visual;
+
+        [Header("Look (visual only - ability visuals step 6 amendment, 2026-09-18)")]
+        [SerializeField, Tooltip("The bright ring drawn at the fire's true edge - Assets/Gameplay/UI/AimConeLine.mat. " +
+                 "This carries most of the 'don't stand here' read alongside the filled disc's own team colour.")]
+        private LineRenderer rim;
+
+        [SerializeField, Tooltip("Team colours - Assets/Gameplay/Config/UiTheme.asset (Shot Color For). Tudor's " +
+                 "call: the disc is the SHOOTER's team colour, not a fixed fire palette - a first attempt at a " +
+                 "hot pale orange still blended into this arena's own tan/orange ground (the same trap team 0's " +
+                 "near-white and the flamethrower's orange both hit), and a fixed colour cannot tell a player " +
+                 "whose fire they are standing in anyway. Matches MineView/PortalView/FenceCageView/SplashShell, " +
+                 "which all read the shooter/owner's team the same way.")]
+        private UiTheme theme;
+
+        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the filled disc. Kept modest on purpose so the ground " +
+                 "reads as a translucent hazard, not a solid slab - the rim below carries the strong edge.")]
+        private float fillOpacity = 0.55f;
+
+        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the rim outline - higher than the fill, since the rim " +
+                 "carries most of the 'don't stand here' read.")]
+        private float rimOpacity = 0.95f;
+
+        [SerializeField, Tooltip("Points on the rim circle. 48 reads as round at the game camera's distance.")]
+        private int rimSegments = 48;
+
+        private MaterialPropertyBlock block;
 
         // Not a tuning value: how many colliders one tick considers, matching ExplodeOnImpact.
         private const int MaxBurningColliders = 32;
@@ -169,12 +197,28 @@ namespace Overpower.Weapons
             }
 
             // The owner of the object is whoever fired the shot that left it, so kill credit and
-            // the no-friendly-fire rule both come from there rather than being sent again.
+            // the no-friendly-fire rule both come from there rather than being sent again. The same lookup
+            // also resolves the shooter's TEAM COLOUR below - no new RPC or instantiationData slot needed, this
+            // is exactly how MineView/PortalView/FenceCageView already read an owner's team for their own look.
             sourceActorNumber = info.Sender != null ? info.Sender.ActorNumber : -1;
             Teams.TryGetTeam(info.Sender, out sourceTeamId);
 
+            Color teamColor = theme != null ? theme.ShotColorFor(sourceTeamId) : Color.white;
+
             if (visual != null)
+            {
                 visual.localScale = new Vector3(radius * 2f, visual.localScale.y, radius * 2f);
+
+                if (block == null)
+                    block = new MaterialPropertyBlock();
+                VisualTint.SetMeshColor(visual.GetComponent<Renderer>(), block, VisualTint.WithAlpha(teamColor, fillOpacity));
+            }
+
+            if (rim != null)
+            {
+                VisualTint.FillFlatCircle(rim, radius, rimSegments);
+                VisualTint.SetLineColor(rim, VisualTint.WithAlpha(teamColor, rimOpacity));
+            }
 
             Debug.Log($"[FireField] lit at {transform.position} - {radius:0.##}m, " +
                        $"{damagePerSecond:0.#} dmg/s for {duration:0.##}s");

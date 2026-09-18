@@ -168,6 +168,28 @@ namespace Overpower.Tests
             AssertNoCollider(prefab);
         }
 
+        [Test]
+        public void TheFireFieldDiscHasAGlassMaterialAndABrightRimSoItReadsAsFireNotAShadow()
+        {
+            // Ability visuals step 6 amendment (2026-09-18, review findings): the disc shipped as an UNSTYLED
+            // default-grey URP/Lit cylinder - at the mercy of scene lighting, it read as a shadow or scorch mark,
+            // not fire, against this arena's own tan/orange ground (pixel-sampled within 5-15 RGB units of bare
+            // ground). Moved to the shared Ability Visual Glass.mat (unlit, immune to scene lighting) plus a bright
+            // Rim outline, the same fill+rim shape Blast Marker and Portal already use. Tudor's second answer
+            // replaced a fixed hot-orange palette with the SHOOTER'S TEAM colour (theme.ShotColorFor) - matching
+            // MineView/PortalView/FenceCageView/SplashShell, and telling a player whose fire they are standing in,
+            // which no fixed colour could.
+            GameObject prefab = Load("Assets/Resources/Fire Field.prefab");
+            Transform visual = Child(prefab.transform, "Visual");
+            Assert.AreEqual(GlassPath, AssetDatabase.GetAssetPath(visual.GetComponent<MeshRenderer>().sharedMaterial),
+                "the disc must not still be Unity's own default Lit material");
+            LineRenderer rim = AssertLine(Child(prefab.transform, "Rim"), flat: true);
+            var field = prefab.GetComponent<FireField>();
+            Assert.AreSame(rim, Ref(field, "rim"));
+            Assert.AreEqual(ThemePath, AssetDatabase.GetAssetPath(Ref(field, "theme")));
+            AssertNoCollider(prefab);
+        }
+
         // ---- ability visuals steps 3-7 add their tests below this line ----
 
         [Test]
