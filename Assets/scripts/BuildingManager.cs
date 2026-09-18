@@ -615,7 +615,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // an already-neutral zone that still carries bounty-eligible history - a flank drained to
         // neutral naturally, just before this reset runs, kept its lastOwner/lastHeldMs otherwise
         // (review round 2). Only a zone with genuinely nothing to wipe is skipped.
-        if (basis.OwnerOf(zone) == TerritoryMap.Neutral && basis.LastOwnerOf(zone) == TerritoryMap.Neutral)
+        if (!basis.NeedsNeutralReset(zone))
             return;
 
         Write(basis.WithNeutralReset(zone, ServerNowMs()));

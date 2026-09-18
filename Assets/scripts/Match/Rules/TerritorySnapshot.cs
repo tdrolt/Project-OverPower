@@ -96,6 +96,13 @@ namespace Overpower.Match
             return next;
         }
 
+        /// <summary>2.7b step 2: true when the zone still has something a neutral reset would change - either it is
+        /// currently owned, or it is already neutral but still carries bounty-eligible history (lastOwner/
+        /// lastHeldMs) from a hold that was reset out from under its owner rather than fought for. False only for a
+        /// zone that is neutral with no history at all, so BuildingManager.SetNeutralWithoutBountyHistory's guard
+        /// can skip it and MatchDirector's Tier-3 reset is safe to run over every zone, more than once.</summary>
+        public bool NeedsNeutralReset(int zone) => OwnerOf(zone) != TerritoryMap.Neutral || LastOwnerOf(zone) != TerritoryMap.Neutral;
+
         public List<int> ZonesWhoseOwnerChangedSince(TerritorySnapshot previous)
         {
             var changed = new List<int>();

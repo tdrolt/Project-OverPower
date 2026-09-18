@@ -75,20 +75,28 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// armor levels they never earned in it.
     ///
     /// Reset: "alive" (PlayerLifecycle) - a last-stand death otherwise spawns the next match dead;
-    /// "lastStand" (PlayerLifecycle) - otherwise counts as already out; "gold" (GoldWallet) and the
-    /// two armor upgrade levels (LoadoutProperties) - all three are this match's economy, bought with
-    /// gold that match paid out, same as gold itself.
+    /// "lastStand" (PlayerLifecycle) - otherwise counts as already out; the two armor upgrade levels
+    /// (LoadoutProperties) - bought with gold that match paid out, same as gold itself.
+    ///
+    /// "gold" (GoldWallet) is REMOVED (a null value), not written to 0 (2.7b leftover). GoldWallet.Start
+    /// reads an EXISTING gold key as the balance - a written 0 would beat a future non-zero
+    /// TerritoryConfig.StartingGold, the one home for what a fresh player starts with. Photon strips a
+    /// null-valued key from the local player's Custom Properties, so the next room's GoldWallet.Start
+    /// finds no key at all and falls through to StartingGold, exactly like a first-time joiner.
+    ///
     /// Kept: "teamID" - PickSmallestTeam overwrites it on the very next join anyway, nothing to reset.
-    /// Kept: weapon/equipment/ultimate/mobility (LoadoutProperties) - a loadout PICK, not a fact about
-    /// the match just played; treated the same as the nickname, a player-level preference that
-    /// carries forward until the player changes it themselves.</summary>
+    /// Kept: weapon/equipment/ultimate/mobility (LoadoutProperties) - PlayerLoadout.Start republishes
+    /// the whole starting kit for every newly spawned player regardless of what is still on the local
+    /// Custom Properties, so there is nothing here for a stale pick to leak into a new match. Treated
+    /// the same as the nickname: a player-level preference that carries forward until the player
+    /// changes it themselves, not a fact about the match just played.</summary>
     public override void OnLeftRoom()
     {
         var props = new Hashtable
         {
             { PlayerLifecycle.AliveKey, true },
             { PlayerLifecycle.LastStandKey, false },
-            { GoldWallet.GoldKey, 0 },
+            { GoldWallet.GoldKey, null },
             { LoadoutProperties.ArmorAbsorbLevelKey, 0 },
             { LoadoutProperties.ArmorRechargeLevelKey, 0 },
         };

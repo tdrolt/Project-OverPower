@@ -131,5 +131,28 @@ namespace Overpower.Tests
             Assert.AreEqual(0, owners[6]);
             Assert.AreEqual(TerritoryMap.Neutral, owners[0]);
         }
+
+        [Test]
+        public void AnOwnedZoneNeedsANeutralReset()
+        {
+            Assert.IsTrue(new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).NeedsNeutralReset(3));
+        }
+
+        [Test]
+        public void AZoneDrainedToNeutralStillNeedsItsHistoryWiped()
+        {
+            // The exact case BuildingManager.SetNeutralWithoutBountyHistory's guard exists for (2.7 review round 2):
+            // a flank drained to neutral just before the Tier-3 reset still carries a payable hold.
+            var s = new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).WithNeutral(3, nowMs: 305000);
+            Assert.IsTrue(s.NeedsNeutralReset(3));
+        }
+
+        [Test]
+        public void ANeutralZoneWithNoHistoryIsLeftAlone()
+        {
+            Assert.IsFalse(new TerritorySnapshot(10).NeedsNeutralReset(3));
+            var reset = new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).WithNeutralReset(3, nowMs: 305000);
+            Assert.IsFalse(reset.NeedsNeutralReset(3), "a second reset in a row writes nothing");
+        }
     }
 }

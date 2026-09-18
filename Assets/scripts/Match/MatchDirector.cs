@@ -279,9 +279,10 @@ namespace Overpower.Match
         /// SetNeutralWithoutBountyHistory, not the ordinary SetNeutral: the GDD's bounty (p.20) is for
         /// taking a zone FROM the team that held it, and this reset takes every Tier-3 zone from
         /// nobody - the next team to capture one must not be paid for a multi-minute hold that was
-        /// reset out from under its owner, not fought for. Already a no-op on an already-neutral zone
-        /// (its own guard) and master-only (WriteBasis's guard), so looping every zone here is safe
-        /// even if this runs more than once.
+        /// reset out from under its owner, not fought for. Master-only (WriteBasis's guard) and safe
+        /// to loop every zone even if this runs more than once: a zone already neutral with no hold
+        /// history is skipped (TerritorySnapshot.NeedsNeutralReset), and one that drained to neutral
+        /// naturally but still carries history is wiped - which is the whole point of this method.
         private static void NeutraliseTierThreeZones(BuildingManager buildings)
         {
             int[] tiers = buildings.TierByZone();
