@@ -310,7 +310,7 @@ namespace Overpower.Match
             if (MatchTelemetry.Instance == null)
                 return;
 
-            int[] teamsRemaining = statuses.Where(s => s.Members > 0 && !result.Eliminated.Contains(s.TeamId))
+            int[] teamsRemaining = statuses.Where(s => s.InMatch && !result.Eliminated.Contains(s.TeamId))
                                             .Select(s => s.TeamId).ToArray();
 
             foreach (int team in newlyEliminated)
@@ -326,6 +326,11 @@ namespace Overpower.Match
                 MatchTelemetry.Instance.LogPhase((int)result.Phase, teamsRemaining);
         }
 
+        /// <summary>2.7b step 3 [InMatch is interim, replaced in step 5 by mTeams - every team reads true until the
+        /// countdown/live system exists]. HoldsOwnCapital/HoldsAnyCapitalInPlay/LastOutAtMs are final: LastOutAtMs is
+        /// the latest lastStandAt Player Property (Decision 23) among the team's members currently out for the last
+        /// stand, compared wrap-safe like every other server-clock stamp in this codebase - read only by
+        /// MatchPhaseRules' no-draw rule.</summary>
         private static TeamStatus[] BuildTeamStatuses(BuildingManager buildings)
         {
             var statuses = new TeamStatus[TeamCount];
@@ -335,6 +340,7 @@ namespace Overpower.Match
             for (int team = 0; team < TeamCount; team++)
             {
                 int members = 0, outForLastStand = 0;
+                int? lastOutAtMs = null;
                 foreach (Player p in PhotonNetwork.PlayerList)
                 {
                     if (!Teams.TryGetTeam(p, out int t) || t != team)
@@ -344,14 +350,31 @@ namespace Overpower.Match
                     // Missing property means this player has never died with their capital lost -
                     // PlayerLifecycle only ever publishes it true on a last-stand death, false again
                     // the moment that player is back on their way into the match.
-                    if (p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool b && b)
-                        outForLastStand++;
+                    if (!(p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool b && b))
+                        continue;
+                    outForLastStand++;
+
+                    if (p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandAtKey, out object stampRaw) && stampRaw is int stamp)
+                        if (lastOutAtMs == null || unchecked(stamp - lastOutAtMs.Value) > 0)
+                            lastOutAtMs = stamp;
                 }
 
                 int capital = map.CapitalOf(team);
-                bool holdsCapital = capital >= 0 && current.OwnerOf(capital) == team;
+                bool holdsOwnCapital = capital >= 0 && current.OwnerOf(capital) == team;
+                bool holdsAnyCapitalInPlay = false;
+                foreach (KeyValuePair<int, int> ownCapital in map.Capitals)
+                    if (current.OwnerOf(ownCapital.Key) == team) { holdsAnyCapitalInPlay = true; break; }
 
-                statuses[team] = new TeamStatus { TeamId = team, Members = members, MembersOutForLastStand = outForLastStand, HoldsItsCapital = holdsCapital };
+                statuses[team] = new TeamStatus
+                {
+                    TeamId = team,
+                    InMatch = true, // [interim, 2.7b step 3 - replaced in step 5 by mTeams]
+                    Members = members,
+                    MembersOutForLastStand = outForLastStand,
+                    HoldsOwnCapital = holdsOwnCapital,
+                    HoldsAnyCapitalInPlay = holdsAnyCapitalInPlay,
+                    LastOutAtMs = lastOutAtMs,
+                };
             }
             return statuses;
         }

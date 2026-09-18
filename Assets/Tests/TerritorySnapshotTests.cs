@@ -154,5 +154,31 @@ namespace Overpower.Tests
             var reset = new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).WithNeutralReset(3, nowMs: 305000);
             Assert.IsFalse(reset.NeedsNeutralReset(3), "a second reset in a row writes nothing");
         }
+
+        // ---- 2.7b step 3: the starting snapshot for going live
+
+        private static readonly (int, int)[] Capitals = { (6, 0), (7, 1), (8, 2) };
+
+        [Test]
+        public void TheStartingSnapshotGivesEveryTeamInTheMatchItsCapitalAndNothingElse()
+        {
+            var s = TerritorySnapshot.Starting(10, Capitals, new[] { 0, 1 }, nowMs: 5000);
+            Assert.AreEqual(0, s.OwnerOf(6));
+            Assert.AreEqual(1, s.OwnerOf(7));
+            Assert.AreEqual(5000, s.HeldSinceMs(6));
+            Assert.AreEqual(TerritoryMap.Neutral, s.OwnerOf(8), "the left-out team's capital is owned by nobody");
+            for (int zone = 0; zone < 10; zone++)
+            {
+                if (zone != 6 && zone != 7) Assert.AreEqual(TerritoryMap.Neutral, s.OwnerOf(zone));
+                Assert.AreEqual(0, s.BountyPaidOnLastCapture(zone), "a fresh start pays no bounty");
+                Assert.AreEqual(TerritoryMap.Neutral, s.LastOwnerOf(zone), "and leaves no hold to pay one later");
+            }
+        }
+
+        [Test]
+        public void WithEveryTeamTheStartingSnapshotIsTheWarmupStart()
+        {
+            Assert.AreEqual(2, TerritorySnapshot.Starting(10, Capitals, teamsInMatch: null, nowMs: 5000).OwnerOf(8));
+        }
     }
 }

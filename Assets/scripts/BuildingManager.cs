@@ -694,9 +694,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         }
 
         int now = ServerNowMs();
-        TerritorySnapshot start = new TerritorySnapshot(ZoneCount);
+        var capitals = new List<(int zone, int team)>(CathedralBuildingIDs.Count);
         foreach (KeyValuePair<int, int> capital in CathedralBuildingIDs)
-            start = start.WithCapture(capital.Key, capital.Value, now, bountyPaid: 0);
+            capitals.Add((capital.Key, capital.Value));
+        // 2.7b step 3: teamsInMatch null means every team - the real list arrives with the countdown/live
+        // system in step 5. Until then this is exactly the old "every capital owned" starting write.
+        TerritorySnapshot start = TerritorySnapshot.Starting(ZoneCount, capitals, null, now);
 
         Debug.Log($"[TOWER] master wrote the starting territory snapshot ({ZoneCount} zones, capitals owned).");
         Write(start);
@@ -850,33 +853,23 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         if (!PhotonNetwork.IsMasterClient || territoryWinAnnounced)
             return;
 
-        int owner = -1;
-
+        var owners = new List<int>(CathedralBuildingIDs.Count);
         foreach (var capital in CathedralBuildingIDs)
-        {
-            if (!TowerDictionary.TryGetValue(capital.Key, out TowerData tower) || !tower.isCaptured)
-                return;
+            owners.Add(current != null ? current.OwnerOf(capital.Key) : TerritoryMap.Neutral);
 
-            if (owner == -1)
-                owner = tower.controllingTeam;
-            else if (owner != tower.controllingTeam)
-                return;
-        }
-
-        if (owner < 0)
-            return;
-
-        // Review round 2: elimination already requires two teams by construction (MatchPhaseRules),
-        // but this, the GDD-external win condition, had no such guard - a lone player could drain
-        // and take capitals nobody was defending and win alone.
-        if (!MatchPhaseRules.TerritoryWinCounts(CountTeamsWithPlayers()))
+        // 2.7b step 3 [interim, replaced in step 5]: "live" is CountTeamsWithPlayers() >= 2 until the match-start
+        // warm-up/countdown system exists (MatchDirector.IsLive replaces this in step 5) - before then, nothing else
+        // distinguishes a real match from an empty room. This keeps the old guard's intent: a lone player must not
+        // win by draining and taking capitals nobody is defending.
+        int winner = MatchPhaseRules.TerritoryWinner(live: CountTeamsWithPlayers() >= 2, owners);
+        if (winner < 0)
             return;
 
         territoryWinAnnounced = true;
         // Task 2.7: MatchDirector owns mWin/mPhase now, and every client reacts to a win (win/lose
         // panels) through that one replicated-state path - RPC_TerritoryWin below is retired.
         if (MatchDirector.Instance != null)
-            MatchDirector.Instance.AnnounceTerritoryWin(owner);
+            MatchDirector.Instance.AnnounceTerritoryWin(winner);
         else
             Debug.LogError("[TOWER] territory win decided, but no MatchDirector exists to announce it.");
     }

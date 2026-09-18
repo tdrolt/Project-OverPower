@@ -45,6 +45,30 @@ namespace Overpower.Match
             this.bountyPaid = bountyPaid;
         }
 
+        /// <summary>2.7b Decision 5/8: the live reset's starting snapshot - every team in the match gets its own
+        /// capital and nothing else; a team NOT in the match (a host start's third team) gets none, so its capital
+        /// starts (and, since nothing else ever captures it once TerritoryMap.MayCapture's out-of-play check is wired
+        /// in, stays) neutral with no history. A fresh start pays no bounty and leaves no hold to pay one later - it is
+        /// a loop of WithCapture(..., bountyPaid: 0), never touching lastOwner/lastHeldMs.
+        /// teamsInMatch null means every team - used for the ordinary match-start write until the countdown/live
+        /// system (step 5) has a real list to pass.</summary>
+        public static TerritorySnapshot Starting(int zoneCount, IEnumerable<(int zone, int team)> capitals,
+                                                  IReadOnlyList<int> teamsInMatch, int nowMs)
+        {
+            TerritorySnapshot snapshot = new TerritorySnapshot(zoneCount);
+            foreach ((int zone, int team) in capitals)
+                if (teamsInMatch == null || Contains(teamsInMatch, team))
+                    snapshot = snapshot.WithCapture(zone, team, nowMs, bountyPaid: 0);
+            return snapshot;
+        }
+
+        private static bool Contains(IReadOnlyList<int> list, int value)
+        {
+            for (int i = 0; i < list.Count; i++)
+                if (list[i] == value) return true;
+            return false;
+        }
+
         public int OwnerOf(int zone) => InRange(zone) ? owners[zone] : TerritoryMap.Neutral;
         public int HeldSinceMs(int zone) => InRange(zone) ? heldSinceMs[zone] : 0;
         /// <summary>Who owned the zone before it last went neutral.</summary>

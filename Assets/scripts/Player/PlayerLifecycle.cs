@@ -40,6 +40,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// toward their team's last stand.</summary>
     public const string LastStandKey = "lastStand";
 
+    /// <summary>2.7b Decision 23: the server ms of this player's last last-stand death, written by the owner in the
+    /// SAME call as LastStandKey (SetLastStandOut) so the two can never disagree - a sibling key rather than a
+    /// retyped LastStandKey, so every existing LastStandKey reader keeps working unchanged. Read only by
+    /// MatchDirector.BuildTeamStatuses into TeamStatus.LastOutAtMs, for the no-draw rule: in a same-instant wipe the
+    /// team whose last player died LATEST stays in and wins.</summary>
+    public const string LastStandAtKey = "lastStandAt";
+
     [Header("Respawn")]
     [SerializeField, Tooltip("Match tuning asset. The base respawn wait, the per-death increase " +
              "and the cap all come from here, so all three respawn numbers live in one place with " +
@@ -253,7 +260,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         bool capitalHeld = cathedralTower.isCaptured && cathedralTower.controllingTeam == teamID;
 
-        if (MatchPhaseRules.IsLastStandDeath(capitalHeld))
+        // [interim, 2.7b step 3 - replaced in step 5]: live is hardcoded true because the match-start warm-up/
+        // countdown doesn't exist yet (MatchDirector.IsLive lands in step 5). Every death is a live death until then.
+        if (MatchPhaseRules.IsLastStandDeath(live: true, teamHasACapital: capitalHeld))
         {
             // DELIBERATE: dying with your capital already lost is a last-stand death - no respawn
             // countdown, a wait for a teammate to take the capital back instead (GDD p.20). This
@@ -603,12 +612,19 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// last stand" fact MatchDirector's own team recompute reads, set true exactly on a last-stand
     /// death and cleared the moment this player is on their way back into the match (RespawnPlayer),
     /// whichever path got them there.
+    ///
+    /// 2.7b Decision 23: writes LastStandAtKey in the SAME call - PhotonNetwork.ServerTimestamp on a last-stand
+    /// death, cleared (null) alongside LastStandKey going false - so a reader can never see one without the other.
     void SetLastStandOut(bool outForLastStand)
     {
         if (!photonView.IsMine)
             return;
 
-        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { LastStandKey, outForLastStand } });
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+        {
+            { LastStandKey, outForLastStand },
+            { LastStandAtKey, outForLastStand ? (object)PhotonNetwork.ServerTimestamp : null },
+        });
     }
 
     /// Everything that used to live in RPC_HandleDeath and RPC_ShowPlayer, in one place so hide

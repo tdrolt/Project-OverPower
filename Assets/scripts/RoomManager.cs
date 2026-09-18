@@ -96,6 +96,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
         {
             { PlayerLifecycle.AliveKey, true },
             { PlayerLifecycle.LastStandKey, false },
+            { PlayerLifecycle.LastStandAtKey, null },
             { GoldWallet.GoldKey, null },
             { LoadoutProperties.ArmorAbsorbLevelKey, 0 },
             { LoadoutProperties.ArmorRechargeLevelKey, 0 },

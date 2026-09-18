@@ -63,6 +63,14 @@ namespace Overpower.Match
             return Neutral;
         }
 
+        /// <summary>2.7b: the reverse of CapitalOf - whose capital a zone is, or Neutral if it isn't one. Used by the
+        /// out-of-play check (MatchStartRules.IsCapitalOutOfPlay) and the minimap/ring "greyed out" look.</summary>
+        public int CapitalTeamOf(int zoneId) => capitalOwnerByZone.TryGetValue(zoneId, out int team) ? team : Neutral;
+
+        /// <summary>2.7b: every capital zone and the team it belongs to - the live reset's starting snapshot
+        /// (TerritorySnapshot.Starting) loops this to seed every team's capital at once.</summary>
+        public IEnumerable<KeyValuePair<int, int>> Capitals => capitalOwnerByZone;
+
         /// <param name="ownerByZone">Current owner per zone; a missing zone or Neutral means nobody.</param>
         public bool MayCapture(int teamId, int zoneId, IReadOnlyDictionary<int, int> ownerByZone) =>
             MayCapture(teamId, zoneId, ownerByZone, null);
@@ -86,6 +94,21 @@ namespace Overpower.Match
                     && (isUnderAttack == null || !isUnderAttack(neighbour)))
                     return true;
             return false;
+        }
+
+        /// <summary>
+        /// 2.7b Decision 8: the cut capital of a host-started match (its third team was never in the match) is never
+        /// capturable, not even by its own team - checked BEFORE the own-capital exception above, or a team standing
+        /// next to it would reopen it. A separate overload, not an optional parameter, so every existing 3- and
+        /// 4-argument call site stays unambiguous and unchanged.
+        /// </summary>
+        /// <param name="isOutOfPlay">Asked for zoneId only; null behaves exactly like the 4-argument overload.</param>
+        public bool MayCapture(int teamId, int zoneId, IReadOnlyDictionary<int, int> ownerByZone,
+                                System.Func<int, bool> isUnderAttack, System.Func<int, bool> isOutOfPlay)
+        {
+            if (isOutOfPlay != null && isOutOfPlay(zoneId))
+                return false;
+            return MayCapture(teamId, zoneId, ownerByZone, isUnderAttack);
         }
     }
 }

@@ -150,5 +150,35 @@ namespace Overpower.Tests
             Assert.IsTrue(RealMap().MayCapture(0, 0, StartOwners(), null));
             Assert.IsFalse(RealMap().MayCapture(0, 3, StartOwners(), null));
         }
+
+        // ---- 2.7b step 3: the out-of-play capital (a host start's third team)
+
+        [Test]
+        public void AnOutOfPlayCapitalIsNeverCapturableNotEvenByItsOwnTeam()
+        {
+            // The own-capital exception must not reopen the third capital of a host-started match.
+            Assert.IsFalse(RealMap().MayCapture(2, 8, new Dictionary<int, int> { { 6, 0 }, { 7, 1 } }, null, zone => zone == 8));
+        }
+
+        [Test]
+        public void AnOutOfPlayCapitalRefusesATeamNextToIt()
+        {
+            var owners = new Dictionary<int, int> { { 6, 0 }, { 7, 1 }, { 2, 0 } };
+            Assert.IsTrue(RealMap().MayCapture(0, 8, owners), "without the check, zone 2 is a way in");
+            Assert.IsFalse(RealMap().MayCapture(0, 8, owners, null, zone => zone == 8));
+        }
+
+        [Test]
+        public void TheOutOfPlayCheckLeavesEveryOtherZoneAlone()
+        {
+            Assert.IsTrue(RealMap().MayCapture(0, 0, StartOwners(), null, zone => zone == 8));
+        }
+
+        [Test]
+        public void CapitalTeamOfNamesWhoseCapitalAZoneIs()
+        {
+            Assert.AreEqual(2, RealMap().CapitalTeamOf(8));
+            Assert.AreEqual(TerritoryMap.Neutral, RealMap().CapitalTeamOf(3));
+        }
     }
 }
