@@ -64,9 +64,16 @@ namespace Overpower.Match
         public static bool HasReached(int nowMs, int momentMs) => unchecked(nowMs - momentMs) >= 0;
 
         /// <summary>"Match starts in N" (Decision 22): whole seconds, rounded up, and never 0 - it holds at 1 until the
-        /// master's live write actually arrives, even a little past the moment.</summary>
-        public static int CountdownSecondsShown(int nowMs, int liveAtMs) =>
-            Math.Max(1, (int)Math.Ceiling(unchecked(liveAtMs - nowMs) / 1000.0));
+        /// master's live write actually arrives, even a little past the moment.
+        /// Review fix: nowMs reads 0 for a joiner's first few frames, before PhotonNetwork.ServerTimestamp has synced
+        /// (BuildingManager's own "FAIL #15" comment already records this elsewhere) - liveAtMs - 0 would read as a
+        /// nonsense huge number of seconds, so while the clock hasn't synced this shows countdownSecondsIfUnsynced
+        /// instead (MatchDirector.Live.cs's getter passes the local player's own configured countdown length),
+        /// rounded up and floored at 1 the same way as the normal path.</summary>
+        public static int CountdownSecondsShown(int nowMs, int liveAtMs, float countdownSecondsIfUnsynced = 0f) =>
+            nowMs == 0
+                ? Math.Max(1, (int)Math.Ceiling(Math.Max(0, countdownSecondsIfUnsynced)))
+                : Math.Max(1, (int)Math.Ceiling(unchecked(liveAtMs - nowMs) / 1000.0));
 
         /// <summary>Decision 22: a team fixed into the countdown emptying cancels it - back to the warm-up.</summary>
         public static bool CountdownShouldCancel(IReadOnlyList<int> teamsInMatch, IReadOnlyList<int> membersPerTeam)

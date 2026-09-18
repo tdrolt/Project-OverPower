@@ -197,7 +197,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         if (counts[smallest] >= TeamSize)
         {
-            Debug.LogWarning($"[TEAM] every team is full ({counts[0]}/{counts[1]}/{counts[2]}, cap {TeamSize}) -- refusing to spawn");
+            // Review fix: this used to say "every team is full", which read wrong once a host-started match can
+            // leave a team out of mTeams entirely - that team can sit at 0/3 and still never be smallest, because
+            // MayJoinTeam skipped it above. The raw counts below may include a team that isn't full at all, just
+            // not one you may join.
+            Debug.LogWarning($"[TEAM] no room on a team you may join ({counts[0]}/{counts[1]}/{counts[2]}, cap {TeamSize}) -- every joinable team is full, or the rest are left out of the match -- refusing to spawn");
             return NoFreeTeam;
         }
 

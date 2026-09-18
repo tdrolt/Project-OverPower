@@ -582,14 +582,19 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // 2.7b step 7 (Decision 11): a fall or the three-to-two trip home goes to the RESPAWN capital's own spawn
         // point - this team's own while it holds it, else the in-play capital it adopted - falling back to the
         // team's own spawn index (unchanged 2.7 behaviour) when it holds no capital at all.
+        // Review fix: SpawnCapitalFor, not RespawnCapitalOf - matching the plan's own CapitalTeamOf(SpawnCapitalFor
+        // (team)) (step 7). The difference is the warm-up and the countdown: SpawnCapitalFor pins the team's own
+        // capital there ("nothing counts yet"), where RespawnCapitalOf already honours a warm-up capture of
+        // another capital. Without this, a player who falls off the arena during the countdown, after a warm-up
+        // capture of another capital, was sent to that capital instead of home.
         int spawnIndex = pt.teamID;
         MatchDirector director = MatchDirector.Instance;
         BuildingManager buildings = BuildingManager.Instance;
         if (director != null && buildings != null && buildings.Map != null)
         {
-            int respawnCapital = director.RespawnCapitalOf(pt.teamID);
-            if (respawnCapital != TerritoryMap.Neutral)
-                spawnIndex = buildings.Map.CapitalTeamOf(respawnCapital);
+            int spawnCapital = director.SpawnCapitalFor(pt.teamID);
+            if (spawnCapital != TerritoryMap.Neutral)
+                spawnIndex = buildings.Map.CapitalTeamOf(spawnCapital);
         }
 
         if (spawnIndex < 0 || spawnIndex >= roomManager.teamSpawnPoints.Length || roomManager.teamSpawnPoints[spawnIndex] == null)

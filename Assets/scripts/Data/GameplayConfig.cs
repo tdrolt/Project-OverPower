@@ -127,9 +127,9 @@ namespace Overpower.Data
         public float AbilityPressBufferSeconds => abilityPressBufferSeconds;
 
         [Header("Shop")]
-        [Tooltip("On = the P screen changes anything for free, anywhere - for testing weapons. " +
-                 "Off = the full match economy: prices, territory and out-of-combat rules, " +
-                 "ultimate bought.")]
+        [Tooltip("On = everything is free all match, anywhere - test mode. Off = the warm-up before the match " +
+                 "goes live is still a free sandbox (2.7b), and the real economy - prices, territory and " +
+                 "out-of-combat rules, ultimate bought - starts the moment the match goes live.")]
         [SerializeField] private bool freeLoadout = true;
         public bool FreeLoadout => freeLoadout;
 

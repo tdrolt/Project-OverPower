@@ -52,6 +52,17 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ReviewFix2_AnUnsyncedClockShowsTheConfiguredCountdownLengthInstead()
+        {
+            // Review fix 2: nowMs == 0 means PhotonNetwork.ServerTimestamp has not synced yet (a joiner's first
+            // frames) - liveAtMs - 0 would otherwise read as a nonsense huge number of seconds.
+            Assert.AreEqual(5, MatchStartRules.CountdownSecondsShown(nowMs: 0, liveAtMs: 999999999, countdownSecondsIfUnsynced: 5f));
+            Assert.AreEqual(6, MatchStartRules.CountdownSecondsShown(0, 999999999, 5.2f), "rounds up, same as the normal path");
+            Assert.AreEqual(1, MatchStartRules.CountdownSecondsShown(0, 999999999, 0f), "never 0, same floor as the normal path");
+            Assert.AreEqual(5, MatchStartRules.CountdownSecondsShown(10000, 15000), "nowMs != 0: unaffected, fallback defaults to unused");
+        }
+
+        [Test]
         public void ACountdownIsCancelledTheMomentATeamInItEmpties()
         {
             Assert.IsFalse(MatchStartRules.CountdownShouldCancel(new[] { 0, 1, 2 }, new[] { 1, 2, 1 }));

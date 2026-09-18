@@ -69,7 +69,7 @@ namespace Overpower.Match
         private bool lastAppliedLive;
         private int lastAppliedLiveAtMs;
 
-        /// <summary>The phase this client has last read from the room. ThreeTeams before the first read.</summary>
+        /// <summary>The phase this client has last read from the room. Warmup before the first read.</summary>
         public MatchPhase Phase => lastAppliedPhase;
         /// <summary>The winning team once the match is over, else -1. Tracks the room, not this client's own team.</summary>
         public int Winner => lastAppliedWinner;
@@ -102,6 +102,13 @@ namespace Overpower.Match
             return MatchPhaseRules.CountsAsHavingACapital(Phase, holdsOwn, holdsAny);
         }
 
+        // Review fix (step 7 review): reused across every RespawnCapitalOf call instead of a fresh List every
+        // time - this runs every FixedUpdate per waiting player (PlayerLifecycle.CheckForCathedralCapture) and
+        // every frame per player on a respawn countdown (UpdateRespawnNote -> SpawnCapitalFor), the same
+        // allocation reasoning as GoldWallet's own ownersScratch. Cleared and refilled at the top of every call;
+        // nothing holds a reference to it past that same call.
+        private readonly List<MatchPhaseRules.CapitalHold> respawnCapitalScratch = new List<MatchPhaseRules.CapitalHold>();
+
         /// <summary>2.7b step 7 (Decision 11): where this team respawns - its own capital while it holds it, else
         /// the in-play capital it has held longest (the one it adopted first, by MatchPhaseRules.RespawnCapital's
         /// wrap-safe HeldSinceMs comparison). TerritoryMap.Neutral if it holds none. Derived from the replicated
@@ -112,7 +119,7 @@ namespace Overpower.Match
             if (buildings == null || buildings.Map == null || buildings.Current == null)
                 return TerritoryMap.Neutral;
 
-            var inPlay = new List<MatchPhaseRules.CapitalHold>();
+            respawnCapitalScratch.Clear();
             foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
             {
                 if (!IsInMatch(capital.Value))
@@ -120,14 +127,14 @@ namespace Overpower.Match
                 int owner = buildings.Current.OwnerOf(capital.Key);
                 if (owner < 0)
                     continue;
-                inPlay.Add(new MatchPhaseRules.CapitalHold
+                respawnCapitalScratch.Add(new MatchPhaseRules.CapitalHold
                 {
                     Zone = capital.Key,
                     Owner = owner,
                     HeldSinceMs = buildings.Current.HeldSinceMs(capital.Key),
                 });
             }
-            return MatchPhaseRules.RespawnCapital(team, buildings.Map.CapitalOf(team), inPlay);
+            return MatchPhaseRules.RespawnCapital(team, buildings.Map.CapitalOf(team), respawnCapitalScratch);
         }
 
         /// <summary>2.7b step 7: where an ended respawn countdown puts this team's player, as a capital zone -
@@ -498,6 +505,16 @@ namespace Overpower.Match
         ///   earlier-sent OnRoomPropertiesUpdate - see MatchDirector.Live.cs's GoLive). Warmup -> ... only
         ///   (lastAppliedPhase starts at Warmup), so a host start - which goes live directly from Warmup - never
         ///   also fires the ThreeTeams -> TwoTeams branch below.
+        ///
+        /// Review fix: every lastApplied* field is written BEFORE any reaction below runs, from locals holding
+        /// the PREVIOUS values (prev*) - not at the end, from the fresh room values, as this used to do. If a
+        /// reaction throws (ResetForMatchStart, a LiveStateChanged subscriber, a themed string.Format...) with
+        /// the old end-of-method order, lastAppliedLive would stay false forever: the next echo (e.g. the first
+        /// knockout's mPhase, which also touches this same Hashtable) would then see live && !lastAppliedLive
+        /// all over again and re-run the WHOLE fresh start mid-match (gold to 0, kit emptied, sent home) while
+        /// skipping the three-to-two banner it should have shown instead. Recording the state first and reacting
+        /// against the untouched prev* locals afterward makes that impossible - there is no behaviour change on
+        /// the normal (non-throwing) path.
         private void ReactToRoomState(bool firstRead)
         {
             if (!PhotonNetwork.InRoom)
@@ -511,19 +528,33 @@ namespace Overpower.Match
             bool live = IsLive;
             int liveAtMs = LiveAtMs;
 
+            List<int> prevEliminated = lastAppliedEliminated;
+            MatchPhase prevPhase = lastAppliedPhase;
+            int prevWinner = lastAppliedWinner;
+            bool prevTeamsFixed = lastAppliedTeamsFixed;
+            bool prevLive = lastAppliedLive;
+            int prevLiveAtMs = lastAppliedLiveAtMs;
+
+            lastAppliedEliminated = eliminated;
+            lastAppliedPhase = phase;
+            lastAppliedWinner = winner;
+            lastAppliedTeamsFixed = teamsFixed;
+            lastAppliedLive = live;
+            lastAppliedLiveAtMs = liveAtMs;
+
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
             PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
 
             bool myTeamKnown = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam);
-            bool myTeamJustEliminated = myTeamKnown && !lastAppliedEliminated.Contains(myTeam) && eliminated.Contains(myTeam);
+            bool myTeamJustEliminated = myTeamKnown && !prevEliminated.Contains(myTeam) && eliminated.Contains(myTeam);
 
             if (!firstRead)
             {
-                if (teamsFixed && !lastAppliedTeamsFixed)
+                if (teamsFixed && !prevTeamsFixed)
                     FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch();
 
-                if (live && !lastAppliedLive && lifecycle != null)
+                if (live && !prevLive && lifecycle != null)
                 {
                     int team = FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch() ?? myTeam;
                     lifecycle.ResetForMatchStart(team);
@@ -535,7 +566,7 @@ namespace Overpower.Match
                 if (myTeamJustEliminated)
                     localView?.GetComponent<MatchUI>()?.ShowYouLost();
 
-                if (lastAppliedPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams && !myTeamJustEliminated)
+                if (prevPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams && !myTeamJustEliminated)
                 {
                     if (lifecycle != null && lifecycle.IsAlive)
                         lifecycle.ReturnToSpawnForPhaseChange();
@@ -543,18 +574,11 @@ namespace Overpower.Match
                 }
             }
 
-            if (winner >= 0 && winner != lastAppliedWinner)
+            if (winner >= 0 && winner != prevWinner)
                 localView?.GetComponent<MatchUI>()?.ShowMatchResult(winner);
 
-            if (firstRead || teamsFixed != lastAppliedTeamsFixed || liveAtMs != lastAppliedLiveAtMs || live != lastAppliedLive)
+            if (firstRead || teamsFixed != prevTeamsFixed || liveAtMs != prevLiveAtMs || live != prevLive)
                 LiveStateChanged?.Invoke();
-
-            lastAppliedEliminated = eliminated;
-            lastAppliedPhase = phase;
-            lastAppliedWinner = winner;
-            lastAppliedTeamsFixed = teamsFixed;
-            lastAppliedLive = live;
-            lastAppliedLiveAtMs = liveAtMs;
         }
 
         private static MatchPhase ReadPhase(Hashtable props) =>

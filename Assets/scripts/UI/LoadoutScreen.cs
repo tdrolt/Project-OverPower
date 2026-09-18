@@ -594,10 +594,14 @@ namespace Overpower.UI
             PurchaseBlock block = ctx.IsFree ? PurchaseBlock.None : ctx.Check(0);
             int tenths = block == PurchaseBlock.InCombat ? Mathf.RoundToInt(ctx.SecondsUntilOutOfCombat * 10f) : 0;
 
-            // 2.7b step 5b: IsWarmupSandbox joins the change check too, so the header re-draws the moment the
-            // match goes live even with Free Loadout on ("Free (test mode)" never itself changes IsFree, but
-            // IsWarmupSandbox flips false at that instant and the wording underneath it is about to change too -
-            // ResetForMatchStart is about to empty the loadout this same frame).
+            // 2.7b step 5b: IsWarmupSandbox joins the change check too - review fix, the reason is NOT going
+            // live. With Free Loadout ON, IsWarmupSandbox (isFree && !freeLoadout) is false throughout and never
+            // flips at going live at all - IsFree alone already covers that edge on its own (it stays true, so
+            // nothing redraws, which is correct: the header still reads "Free (test mode)"). The comparison
+            // matters only when Free Loadout is toggled DURING the warm-up (Rule 13: a ScriptableObject field
+            // flipped by reflection in Play Mode) - that leaves IsFree unchanged (free either way) but flips
+            // IsWarmupSandbox, which is the only thing telling "Free (warm-up)" and "Free (test mode)" apart.
+            // Without this comparison that toggle would leave the wrong wording on screen.
             if (justExpired || !headerInitialized || ctx.IsFree != lastDisplayedIsFree
                 || ctx.IsWarmupSandbox != lastDisplayedIsWarmupSandbox || block != lastDisplayedBlock || tenths != lastDisplayedTenths)
             {

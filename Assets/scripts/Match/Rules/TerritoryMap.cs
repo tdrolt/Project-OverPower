@@ -68,8 +68,12 @@ namespace Overpower.Match
         public int CapitalTeamOf(int zoneId) => capitalOwnerByZone.TryGetValue(zoneId, out int team) ? team : Neutral;
 
         /// <summary>2.7b: every capital zone and the team it belongs to - the live reset's starting snapshot
-        /// (TerritorySnapshot.Starting) loops this to seed every team's capital at once.</summary>
-        public IEnumerable<KeyValuePair<int, int>> Capitals => capitalOwnerByZone;
+        /// (TerritorySnapshot.Starting) loops this to seed every team's capital at once. Review fix: typed as the
+        /// concrete Dictionary, not IEnumerable&lt;KeyValuePair&lt;int,int&gt;&gt; - a foreach over the interface
+        /// boxes Dictionary's own struct enumerator on every call, and MatchDirector.RespawnCapitalOf/
+        /// TeamHasACapital walk this every FixedUpdate per waiting player and every frame per player on a respawn
+        /// countdown.</summary>
+        public Dictionary<int, int> Capitals => capitalOwnerByZone;
 
         /// <param name="ownerByZone">Current owner per zone; a missing zone or Neutral means nobody.</param>
         public bool MayCapture(int teamId, int zoneId, IReadOnlyDictionary<int, int> ownerByZone) =>

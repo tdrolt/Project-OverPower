@@ -19,10 +19,12 @@ namespace Overpower.Match
     public partial class MatchDirector
     {
         /// Room Property key: int[], the teams fixed into the match, ascending (Decision 1/4). Present from the
-        /// countdown start until the match ends; absent again only if the countdown is cancelled.
+        /// countdown start for the rest of the room's life (a decided match closes the room rather than clearing
+        /// it - Decision 1) - absent again only if the countdown is cancelled.
         public const string TeamsInMatchKey = "mTeams";
-        /// Room Property key: int, the server ms the match goes live (Decision 1). Present only while counting
-        /// down - the master writes it once, alongside TeamsInMatchKey, and never again.
+        /// Room Property key: int, the server ms the match goes live (Decision 1). Present from the countdown
+        /// start on, and STAYS present after going live too (GoLive's own write never touches this key, so it is
+        /// simply never removed) - the master writes it once, alongside TeamsInMatchKey, and never again.
         public const string LiveAtKey = "mLiveAt";
 
         // Not gameplay values. The master re-checks every 0.5 s in the warm-up (a callback alone can be missed -
@@ -56,8 +58,15 @@ namespace Overpower.Match
             PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LiveAtKey, out object raw) && raw is int v
                 ? v : 0;
 
-        /// <summary>"Match starts in N" (Decision 22) on this client's own synced clock.</summary>
-        public int CountdownSecondsShown => MatchStartRules.CountdownSecondsShown(PhotonNetwork.ServerTimestamp, LiveAtMs);
+        /// <summary>"Match starts in N" (Decision 22) on this client's own synced clock. Review fix: before this
+        /// client's own clock has synced, PhotonNetwork.ServerTimestamp reads 0 for its first frames (BuildingManager's
+        /// own "FAIL #15" comment already records this) - liveAtMs - 0 would read as a nonsense huge number, so the
+        /// pure rule takes the configured countdown length as a fallback for exactly that case, sourced here from the
+        /// local player's own GameplayConfig (LocalPlayerConfig, the same getter StartCountdown already uses - it
+        /// needs no server clock, just the serialized reference on this player's own prefab).</summary>
+        public int CountdownSecondsShown =>
+            MatchStartRules.CountdownSecondsShown(PhotonNetwork.ServerTimestamp, LiveAtMs,
+                LocalPlayerConfig()?.MatchStartCountdownSeconds ?? 0f);
 
         /// <summary>The teams fixed into the match (Decision 4), ascending - empty before the countdown starts.</summary>
         public int[] TeamsInMatch =>
@@ -84,11 +93,12 @@ namespace Overpower.Match
         /// <summary>How many of the three teams currently have a player - the warm-up line's own question,
         /// polled every frame (MatchStartPanel, step 8), so counted through PhotonNetwork.CurrentRoom.Players
         /// (a Dictionary; its enumerator is a struct, unlike PhotonNetwork.PlayerList's freshly sorted array -
-        /// same reasoning as MinimapView.UpdatePlayers) rather than allocating a new array every frame.</summary>
+        /// same reasoning as MinimapView.UpdatePlayers) and CountMembers' own reused array, so this allocates
+        /// nothing per frame.</summary>
         public int TeamsWithPlayersNow => MatchStartRules.CountTeamsWithPlayers(CountMembers());
 
         /// <summary>Tudor: with only two teams, the host gets a Start button - polled every frame the warm-up
-        /// panel is open (step 8), same allocation reasoning as TeamsWithPlayersNow.</summary>
+        /// panel is open (step 8), same allocation reasoning as TeamsWithPlayersNow (nothing per frame).</summary>
         public bool HostMayStartNow =>
             PhotonNetwork.IsMasterClient && MatchStartRules.HostMayStart(TeamsFixed, CountMembers(), PlayersWithoutATeam());
 
@@ -198,24 +208,38 @@ namespace Overpower.Match
             lastWrittenEliminated = new System.Collections.Generic.List<int>();
             lastWrittenPhase = phase;
             lastWrittenWinner = -1;
+            // R2: check-and-set means the live write can only ever succeed once (above), but near a master
+            // switch two clients can both believe they are master and both send it. The loser's own client-side
+            // check passes (its cached room properties still show mPhase absent) and it optimistically counts
+            // writesAwaitingEcho here exactly like the winner does - the server then refuses ITS write once the
+            // winner's has already landed. writesAwaitingEcho stays at 1 on the losing client until the WINNING
+            // master's own write echoes back to it too (a genuine room property change, delivered to every
+            // client including this one) and OnRoomPropertiesUpdate decrements it there. It heals itself; no
+            // action needed.
             writesAwaitingEcho++;
             Debug.Log($"[MATCH] live: teams [{string.Join(",", teams)}], {phase}");
         }
+
+        // Reused across every CountMembers() call - Update's own poll, HostStartMatch, StartCountdown, and
+        // (step 8) TeamsWithPlayersNow/HostMayStartNow, both polled every frame the warm-up panel is open. Not
+        // static any more (it wraps an instance field now), but MatchDirector is a singleton (Instance), so this
+        // still costs nothing per frame instead of a fresh int[3] every single call.
+        private readonly int[] countMembersScratch = new int[MatchStartRules.TeamCount];
 
         /// <summary>How many players are on each of the three teams right now - counted through
         /// PhotonNetwork.CurrentRoom.Players (a Dictionary, struct enumerator) rather than PhotonNetwork.
         /// PlayerList, which sorts into a fresh array every call. Shared by every caller in this file:
         /// Update's own poll, HostStartMatch and StartCountdown.</summary>
-        private static int[] CountMembers()
+        private int[] CountMembers()
         {
-            var counts = new int[MatchStartRules.TeamCount];
+            System.Array.Clear(countMembersScratch, 0, countMembersScratch.Length);
             Room room = PhotonNetwork.CurrentRoom;
             if (room == null)
-                return counts;
+                return countMembersScratch;
             foreach (System.Collections.Generic.KeyValuePair<int, Player> pair in room.Players)
-                if (Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < counts.Length)
-                    counts[t]++;
-            return counts;
+                if (Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < countMembersScratch.Length)
+                    countMembersScratch[t]++;
+            return countMembersScratch;
         }
 
         /// <summary>How many players in the room have no team Custom Property yet (Decision 17, R3) - the host
