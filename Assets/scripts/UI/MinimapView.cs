@@ -740,8 +740,7 @@ namespace Overpower.UI
             if (textMaterial == null)
             {
                 textMaterial = new Material(tmp.fontSharedMaterial);
-                textMaterial.SetFloat(ShaderUtilities.ID_OutlineWidth, theme.textOutlineWidth);
-                textMaterial.SetColor(ShaderUtilities.ID_OutlineColor, theme.textOutlineColor);
+                theme.ApplyHudTextStyle(textMaterial);
             }
             tmp.fontSharedMaterial = textMaterial;
             Stretch(tmp.rectTransform);

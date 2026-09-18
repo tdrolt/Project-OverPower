@@ -22,8 +22,12 @@ MonoBehaviour:
   textColor: {r: 1, g: 1, b: 1, a: 1}
   mutedTextColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
   textOutlineColor: {r: 0, g: 0, b: 0, a: 0.9}
-  textOutlineWidth: 0.2
-  panelColor: {r: 0.06, g: 0.06, b: 0.08, a: 0.85}
+  textOutlineWidth: 0.26
+  hudTextFaceDilate: 0.08
+  hudTextShadowColor: {r: 0, g: 0, b: 0, a: 0.75}
+  hudTextShadowOffset: {x: 0.5, y: -0.5}
+  hudTextShadowSoftness: 0.25
+  hudTextShadowDilate: 0.1
   highlightColor: {r: 1, g: 0.78, b: 0.25, a: 1}
   lockedColor: {r: 0.09, g: 0.09, b: 0.1, a: 0.92}
   hudPanelPadding: 16
@@ -49,8 +53,10 @@ MonoBehaviour:
   slotCooldownAreaHeight: 58
   slotKeyRowHeight: 30
   slotReasonTextHeight: 26
-  slotReadyColor: {r: 0, g: 0, b: 0, a: 0.6}
-  slotBlockedColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.85}
+  slotBorderWidth: 3
+  slotFillColor: {r: 0, g: 0, b: 0, a: 0.22}
+  slotReadyColor: {r: 0.05, g: 0.05, b: 0.07, a: 0.9}
+  slotBlockedColor: {r: 0.45, g: 0.45, b: 0.45, a: 0.95}
   slotActiveGlowColor: {r: 1, g: 0.85, b: 0.25, a: 1}
   pipAvailableColor: {r: 1, g: 1, b: 1, a: 1}
   pipSpentColor: {r: 1, g: 1, b: 1, a: 0.15}

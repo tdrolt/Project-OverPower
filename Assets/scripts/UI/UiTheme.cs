@@ -37,11 +37,25 @@ namespace Overpower.UI
         [Tooltip("Secondary text colour (descriptions, locked items).")] public Color mutedTextColor = new Color(0.75f, 0.75f, 0.75f, 1f);
         [Tooltip("Dark outline around text so it stays readable over bright ground.")] public Color textOutlineColor = new Color(0f, 0f, 0f, 0.9f);
         [Tooltip("Outline thickness, 0 to 1. Around 0.2 reads well without looking bold.")] [Range(0f, 1f)] public float textOutlineWidth = 0.2f;
+        [Tooltip("How much thicker every glyph is drawn, 0 to 1 (TextMeshPro's Face Dilate). This is the weight " +
+                 "control for the font the project already uses - there is no second, bolder font asset - and it " +
+                 "was raised in HUD step 2 because the dark panel that used to sit behind the HUD is gone. Around " +
+                 "0.08 reads as a firmer version of the same letters; past ~0.2 they start to close up.")]
+        [Range(0f, 0.5f)] public float hudTextFaceDilate = 0.08f;
+        [Tooltip("Colour of the soft shadow dropped under every UI text, so a word keeps its shape over the " +
+                 "arena's bright sand without a panel behind it. Alpha 0 turns the shadow off.")]
+        public Color hudTextShadowColor = new Color(0f, 0f, 0f, 0.75f);
+        [Tooltip("How far the shadow is offset from the text, in font units (x right, y up - so a negative y " +
+                 "drops it below the letters, which is what reads as a shadow rather than a halo).")]
+        public Vector2 hudTextShadowOffset = new Vector2(0.5f, -0.5f);
+        [Tooltip("How blurred the shadow's edge is, 0 to 1. Soft enough not to read as a second, offset copy of " +
+                 "the text; hard enough to still darken the ground under it.")]
+        [Range(0f, 1f)] public float hudTextShadowSoftness = 0.25f;
+        [Tooltip("How far the shadow spreads outward from the glyph before it fades, 0 to 1. Together with " +
+                 "Softness this is what makes the shadow a pool under the word rather than an outline of it.")]
+        [Range(0f, 1f)] public float hudTextShadowDilate = 0.1f;
 
         [Header("Panels")]
-        [Tooltip("Background behind HUD groups (the slots row, the bars panel). NOT the loadout screen - that " +
-                 "reads its own Loadout Panel Colour below instead; see that field's tooltip for why the two are " +
-                 "kept separate.")] public Color panelColor = new Color(0.06f, 0.06f, 0.08f, 0.85f);
         [Tooltip("Border / highlight for the equipped or selected item.")] public Color highlightColor = new Color(1f, 0.78f, 0.25f, 1f);
         [Tooltip("Colour of items you cannot pick yet - a dark, mostly-opaque fill with muted text on top (Muted Text Colour), not a near-transparent wash: at low alpha over a translucent panel this read as barely-there rather than clearly locked (Task 9a review, 616x576 capture).")]
         public Color lockedColor = new Color(0.09f, 0.09f, 0.10f, 0.92f);
@@ -109,12 +123,25 @@ namespace Overpower.UI
         [Tooltip("Height of the block-reason line (\"recharging\", \"stunned\") under a slot's charge pips, in " +
                  "canvas units. Together with the pip row it has to fit inside Slot Cooldown Area Height above.")]
         public float slotReasonTextHeight = 26f;
-        [Tooltip("Slot background when the slot can be used right now.")]
-        public Color slotReadyColor = new Color(0f, 0f, 0f, 0.6f);
-        [Tooltip("Slot background when the slot is blocked - dead, stunned, silenced, recharging, or an " +
-                 "empty/not-ready slot.")]
-        public Color slotBlockedColor = new Color(0.30f, 0.30f, 0.30f, 0.85f);
-        [Tooltip("Slot background while the ability is active - a channel, a dash mid-flight, sprint held.")]
+        [Tooltip("Thickness of the border drawn around a weapon/ability slot, in canvas units (HUD step 2). The " +
+                 "border is what carries the ready / blocked / active colour now: Tudor asked for the dark box " +
+                 "behind the abilities to go, so the slot is a thin frame over a faint wash instead of a filled " +
+                 "square. Raise it if the state colour is hard to see at a glance.")]
+        public float slotBorderWidth = 3f;
+        [Tooltip("The faint wash inside a slot's border (HUD step 2) - just enough to keep an icon or an ability " +
+                 "name readable over the arena's bright sand, low enough to see the ground through. Raise the " +
+                 "alpha if names are hard to read; drop it to 0 for a frame with nothing inside it at all.")]
+        public Color slotFillColor = new Color(0f, 0f, 0f, 0.22f);
+        [Tooltip("Slot BORDER colour when the slot can be used right now (HUD step 2 - it used to be the whole " +
+                 "square's fill). Dark and near-opaque: a thin dark line is the most legible frame on the arena's " +
+                 "bright sand.")]
+        public Color slotReadyColor = new Color(0.05f, 0.05f, 0.07f, 0.9f);
+        [Tooltip("Slot BORDER colour when the slot is blocked - dead, stunned, silenced, recharging, or an " +
+                 "empty/not-ready slot. Brighter than it was as a full-square fill (HUD step 2): three canvas " +
+                 "units of mid-grey has to work harder than a hundred and forty did.")]
+        public Color slotBlockedColor = new Color(0.45f, 0.45f, 0.45f, 0.95f);
+        [Tooltip("Slot BORDER colour while the ability is active - a channel, a dash mid-flight, sprint held. " +
+                 "Unchanged by HUD step 2: at full alpha it already reads as a lit frame.")]
         public Color slotActiveGlowColor = new Color(1f, 0.85f, 0.25f, 1f);
         [Tooltip("Charge pip colour when that charge is available.")]
         public Color pipAvailableColor = Color.white;
@@ -533,5 +560,31 @@ namespace Overpower.UI
         public float chargeRingStepTickLength = 0.3f;
         [Tooltip("Thickness of a step tick, in metres.")]
         public float chargeRingStepTickWidth = 0.05f;
+
+        /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
+        /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
+        /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why
+        /// one shared material beats letting TMP clone one per label).
+        ///
+        /// The keyword is the part that is easy to get wrong: setting _UnderlayColor and friends does nothing at
+        /// all until UNDERLAY_ON is enabled on the material, so the shadow silently never appears.</summary>
+        public void ApplyHudTextStyle(Material material)
+        {
+            if (material == null)
+                return;
+
+            material.SetFloat(ShaderUtilities.ID_OutlineWidth, textOutlineWidth);
+            material.SetColor(ShaderUtilities.ID_OutlineColor, textOutlineColor);
+            material.SetFloat(ShaderUtilities.ID_FaceDilate, hudTextFaceDilate);
+            material.SetColor(ShaderUtilities.ID_UnderlayColor, hudTextShadowColor);
+            material.SetFloat(ShaderUtilities.ID_UnderlayOffsetX, hudTextShadowOffset.x);
+            material.SetFloat(ShaderUtilities.ID_UnderlayOffsetY, hudTextShadowOffset.y);
+            material.SetFloat(ShaderUtilities.ID_UnderlaySoftness, hudTextShadowSoftness);
+            material.SetFloat(ShaderUtilities.ID_UnderlayDilate, hudTextShadowDilate);
+            if (hudTextShadowColor.a > 0f)
+                material.EnableKeyword(ShaderUtilities.Keyword_Underlay);
+            else
+                material.DisableKeyword(ShaderUtilities.Keyword_Underlay);
+        }
     }
 }

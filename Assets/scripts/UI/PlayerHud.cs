@@ -696,11 +696,11 @@ namespace Overpower.UI
             panel.transform.localScale = Vector3.one * theme.hudScale;
             // Sized by the ContentSizeFitter below, not by hand - see its comment.
 
-            // A visible background so the bars and slots read as one HUD group instead of floating
-            // text over the game world (Step 2 - "add a panel background if none exists").
-            Image panelBackground = panel.AddComponent<Image>();
-            panelBackground.color = theme.panelColor;
-            panelBackground.raycastTarget = false;
+            // NO background image (Tudor, 2026-09-17): the near-opaque slab that used to sit behind the bars and
+            // slots was the single biggest thing between a player and the arena. What replaces it is the text
+            // treatment itself - a heavier face, a dark outline and a soft drop shadow, all from UiTheme's Text
+            // section - plus each bar's own track and each slot's own border. One fewer Graphic here also means
+            // one fewer thing in the HUD's draw batch.
 
             VerticalLayoutGroup panelLayout = panel.AddComponent<VerticalLayoutGroup>();
             panelLayout.spacing = 6f;
@@ -1059,8 +1059,27 @@ namespace Overpower.UI
             // LayoutElement alone becomes the slot's actual rendered size - everything inside it
             // (Icon Box, pips, text) then stretches or anchors relative to that rect as normal.
 
+            // The slot's own Image is now the BORDER (HUD step 2): it still carries the ready / blocked / active
+            // tint that UpdateAbilitySlots writes, but it is only visible as a Slot Border Width frame, because
+            // the Slot Fill child below covers everything inside it. raycastTarget off like every other HUD
+            // Graphic - this canvas has no GraphicRaycaster, but a stray raycast target here is exactly the kind
+            // of thing that later blocks a shot when someone adds one.
             ui.background = go.AddComponent<Image>();
             ui.background.color = theme.slotReadyColor;
+            ui.background.raycastTarget = false;
+
+            // The only fill a slot has left: a faint wash inset by the border width, so an icon or an ability
+            // name still has something to sit on without hiding the arena behind it.
+            GameObject slotFillGo = new GameObject("Slot Fill", typeof(RectTransform));
+            slotFillGo.transform.SetParent(go.transform, false);
+            RectTransform slotFillRt = slotFillGo.GetComponent<RectTransform>();
+            slotFillRt.anchorMin = Vector2.zero;
+            slotFillRt.anchorMax = Vector2.one;
+            slotFillRt.offsetMin = new Vector2(theme.slotBorderWidth, theme.slotBorderWidth);
+            slotFillRt.offsetMax = new Vector2(-theme.slotBorderWidth, -theme.slotBorderWidth);
+            Image slotFill = slotFillGo.AddComponent<Image>();
+            slotFill.color = theme.slotFillColor;
+            slotFill.raycastTarget = false;
 
             // The icon box occupies the top Slot Icon Box Height units - the only part that exists
             // at all on the weapon slot, which has no pip row or recharge sweep below it.
@@ -1256,14 +1275,15 @@ namespace Overpower.UI
         /// Setting the shared material's shader properties once up front and handing every label the
         /// SAME instance avoids that, and lets every HUD text batch into fewer draw calls besides.
         /// Built lazily from the first label's font (all HUD labels share theme.font, so the shader
-        /// this material's cloned from is the same for every text this method is ever called for).</summary>
+        /// this material's cloned from is the same for every text this method is ever called for).
+        /// The outline, weight and shadow numbers themselves live on UiTheme.ApplyHudTextStyle (HUD
+        /// step 2) - one home, shared with the loadout screen and the minimap.</summary>
         private void ApplyOutline(TextMeshProUGUI tmp)
         {
             if (hudTextMaterial == null)
             {
                 hudTextMaterial = new Material(tmp.fontSharedMaterial);
-                hudTextMaterial.SetFloat(ShaderUtilities.ID_OutlineWidth, theme.textOutlineWidth);
-                hudTextMaterial.SetColor(ShaderUtilities.ID_OutlineColor, theme.textOutlineColor);
+                theme.ApplyHudTextStyle(hudTextMaterial);
             }
             tmp.fontSharedMaterial = hudTextMaterial;
         }

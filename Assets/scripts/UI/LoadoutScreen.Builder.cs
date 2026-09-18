@@ -369,7 +369,8 @@ namespace Overpower.UI
             panelRt.pivot = new Vector2(0.5f, 1f);
             panelRt.anchoredPosition = new Vector2(0f, -theme.loadoutPanelTopMargin);
             Image panelBackground = panel.AddComponent<Image>();
-            // Its OWN colour, not the HUD's theme.panelColor - see Loadout Panel Colour's tooltip.
+            // Its OWN colour - see Loadout Panel Colour's tooltip. The HUD has no panel behind it at all any more
+            // (HUD step 2); this modal still does, because it deliberately hides the world behind it.
             panelBackground.color = theme.loadoutPanelColor;
             panelBackground.raycastTarget = true;
 
@@ -621,14 +622,14 @@ namespace Overpower.UI
         }
 
         /// <summary>See PlayerHud.ApplyOutline's class comment for why every text this screen builds
-        /// shares ONE Material instance instead of letting TMP auto-clone one per label.</summary>
+        /// shares ONE Material instance instead of letting TMP auto-clone one per label. The outline,
+        /// weight and shadow numbers live on UiTheme.ApplyHudTextStyle (HUD step 2).</summary>
         private void ApplyOutline(TextMeshProUGUI tmp)
         {
             if (loadoutTextMaterial == null)
             {
                 loadoutTextMaterial = new Material(tmp.fontSharedMaterial);
-                loadoutTextMaterial.SetFloat(ShaderUtilities.ID_OutlineWidth, theme.textOutlineWidth);
-                loadoutTextMaterial.SetColor(ShaderUtilities.ID_OutlineColor, theme.textOutlineColor);
+                theme.ApplyHudTextStyle(loadoutTextMaterial);
             }
             tmp.fontSharedMaterial = loadoutTextMaterial;
         }
