@@ -64,8 +64,14 @@ namespace Overpower.Match
         public MatchPhase Phase => lastAppliedPhase;
         /// <summary>The winning team once the match is over, else -1. Tracks the room, not this client's own team.</summary>
         public int Winner => lastAppliedWinner;
-        /// <summary>Whether team is on the room's own eliminated list, as last read by this client.</summary>
-        public bool IsEliminated(int team) => lastAppliedEliminated.Contains(team);
+        /// <summary>Whether team is on the room's own eliminated list. Reads PhotonNetwork.CurrentRoom.
+        /// CustomProperties directly rather than the cached lastAppliedEliminated (review round 2):
+        /// RoomManager.PickSmallestTeam calls this from ITS OWN OnJoinedRoom, which Photon dispatches
+        /// BEFORE this class's OnJoinedRoom runs ReactToRoomState - the room's own properties are
+        /// already filled in by then (they arrive as part of the join itself), but the cached field
+        /// is not written until this object's own callback gets its turn.</summary>
+        public bool IsEliminated(int team) =>
+            PhotonNetwork.InRoom && ReadEliminated(PhotonNetwork.CurrentRoom.CustomProperties).Contains(team);
 
         /// <summary>This team's capital zone id (GDD-fixed: 6/7/8 for teams 0/1/2 - see BuildingManager.
         /// CathedralBuildingIDs, which TerritoryMap.CapitalOf was built from). Capital adoption - a
@@ -239,8 +245,9 @@ namespace Overpower.Match
 
             // Recompute always starts from previousEliminated's own items (Recompute's first line is
             // AddRange(alreadyEliminated)), so anything after that prefix is newly found this call -
-            // possibly more than one team at once (a last-stand team can be swept in by the very
-            // elimination that narrows the match to two teams).
+            // possibly more than one team at once (GDD p.21: the instant an elimination narrows the
+            // match to two teams, a further capital-less team is swept in by that same call, not next
+            // tick - MatchPhaseRules.Recompute's own fixpoint, restored in the review round-2 fix).
             List<int> newlyEliminated = result.Eliminated.Skip(previousEliminated.Count).ToList();
             bool changed = newlyEliminated.Count > 0 || result.Phase != previousPhase || result.Winner != previousWinner;
             if (!changed)

@@ -3,6 +3,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using Overpower.Match;
+using Overpower.Net;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 public class RoomManager : MonoBehaviourPunCallbacks
@@ -64,6 +65,34 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         Debug.Log($"Joined Room: {PhotonNetwork.CurrentRoom.Name}");
         AssignTeamAndSpawnPlayer();
+    }
+
+    /// <summary>Review round 2: Photon carries the local player's own Custom Properties into the
+    /// NEXT room they join - the game's own Quit button disconnects and exits, so play never reaches
+    /// this, but the harness leaves and rejoins a lot inside one running process. Reset here, on the
+    /// LOCAL player, everything that belongs to the match just left rather than to this player across
+    /// matches, so a fresh room never starts with a dead, last-standing player carrying gold and
+    /// armor levels they never earned in it.
+    ///
+    /// Reset: "alive" (PlayerLifecycle) - a last-stand death otherwise spawns the next match dead;
+    /// "lastStand" (PlayerLifecycle) - otherwise counts as already out; "gold" (GoldWallet) and the
+    /// two armor upgrade levels (LoadoutProperties) - all three are this match's economy, bought with
+    /// gold that match paid out, same as gold itself.
+    /// Kept: "teamID" - PickSmallestTeam overwrites it on the very next join anyway, nothing to reset.
+    /// Kept: weapon/equipment/ultimate/mobility (LoadoutProperties) - a loadout PICK, not a fact about
+    /// the match just played; treated the same as the nickname, a player-level preference that
+    /// carries forward until the player changes it themselves.</summary>
+    public override void OnLeftRoom()
+    {
+        var props = new Hashtable
+        {
+            { PlayerLifecycle.AliveKey, true },
+            { PlayerLifecycle.LastStandKey, false },
+            { GoldWallet.GoldKey, 0 },
+            { LoadoutProperties.ArmorAbsorbLevelKey, 0 },
+            { LoadoutProperties.ArmorRechargeLevelKey, 0 },
+        };
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
     void AssignTeamAndSpawnPlayer()

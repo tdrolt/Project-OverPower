@@ -55,6 +55,19 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ResetNeutralisingWipesHistoryEvenWhenAlreadyNeutral()
+        {
+            // Review round 2: a flank drained to neutral naturally, just before the Tier-3 reset,
+            // must not keep its bounty history either - WithNeutralReset does not gate on the zone's
+            // CURRENT owner the way WithNeutral does.
+            var s = new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).WithNeutral(3, nowMs: 305000)
+                                              .WithNeutralReset(3, nowMs: 306000);
+            Assert.AreEqual(TerritoryMap.Neutral, s.OwnerOf(3));
+            Assert.AreEqual(TerritoryMap.Neutral, s.LastOwnerOf(3));
+            Assert.AreEqual(0, s.LastHeldMs(3));
+        }
+
+        [Test]
         public void ANextCaptureAfterAResetNeutralisePaysNoBounty()
         {
             var s = new TerritorySnapshot(10).WithCapture(3, 1, 5000, 0).WithNeutralReset(3, nowMs: 305000);

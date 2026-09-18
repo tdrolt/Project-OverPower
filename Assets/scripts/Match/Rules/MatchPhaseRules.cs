@@ -36,11 +36,14 @@ namespace Overpower.Match
     /// machine keeps. That is what lets a new master after a disconnect - or a second match - reach
     /// the same answer.
     ///
-    /// Tudor's own rule: the phase changes ONLY on an elimination, never on who is connected - a
-    /// player joining or leaving can never move it, and a lone player can never win the match by
-    /// simply being the only one in the room. A team is eliminated once it has lost its capital AND
-    /// every one of its members has died since - the same last-stand rule at every phase (GDD p.20);
-    /// there is no separate "instant elimination" once only two teams remain.
+    /// Two separate rules, not one, review round 2: Tudor's rule governs what MOVES the phase - the
+    /// phase changes ONLY on an elimination, never on who is connected, so a player joining or
+    /// leaving can never move it and a lone player can never win by simply being the only one in the
+    /// room. GDD p.21 governs what an already-decided phase MEANS: while the phase is ThreeTeams, a
+    /// team without its capital is only out once every one of its members has died since (the last
+    /// stand); the INSTANT the phase truly is TwoTeams, losing your capital is enough on its own - no
+    /// last stand. A two-player test never reaches that second rule on its own, because it stays
+    /// ThreeTeams (Tudor's rule) until an actual third team is eliminated.
     ///
     /// Capital adoption (a last-stand team keeping an enemy capital it just captures, GDD p.20) was
     /// cut for this task; if it is ever built, it changes what MatchDirector treats as "this team's
@@ -53,15 +56,25 @@ namespace Overpower.Match
             var result = new MatchPhaseResult();
             result.Eliminated.AddRange(alreadyEliminated);
 
-            // No fixpoint needed: unlike the old phase-driven rule, whether team X is newly
-            // eliminated depends only on team X's own fields (capital held, members out), never on
-            // what this same call just decided about any OTHER team.
-            foreach (TeamStatus team in teams)
+            // Fixpoint: eliminating a team can move the phase itself to TwoTeams, and the instant it
+            // does, GDD p.21's rule applies to every OTHER capital-less team at once, not next tick -
+            // so a second pass may find more once the first pass's own phase change is known.
+            bool changed = true;
+            while (changed)
             {
-                if (team.Members <= 0 || result.Eliminated.Contains(team.TeamId) || team.HoldsItsCapital)
-                    continue;
-                if (team.MembersOutForLastStand >= team.Members)
-                    result.Eliminated.Add(team.TeamId);
+                changed = false;
+                MatchPhase phase = PhaseFor(teams, result.Eliminated);
+                foreach (TeamStatus team in teams)
+                {
+                    if (team.Members <= 0 || result.Eliminated.Contains(team.TeamId) || team.HoldsItsCapital)
+                        continue;
+                    bool eliminatedNow = phase == MatchPhase.TwoTeams || team.MembersOutForLastStand >= team.Members;
+                    if (eliminatedNow)
+                    {
+                        result.Eliminated.Add(team.TeamId);
+                        changed = true;
+                    }
+                }
             }
 
             result.Phase = PhaseFor(teams, result.Eliminated);
@@ -90,5 +103,11 @@ namespace Overpower.Match
         /// held) never counts, even though the player is briefly not alive either way. The single
         /// source of truth for the branch PlayerLifecycle.PlayerDied takes.</summary>
         public static bool IsLastStandDeath(bool teamHoldsCapitalAtDeath) => !teamHoldsCapitalAtDeath;
+
+        /// <summary>Review round 2: BuildingManager's other win condition (holding every capital) has
+        /// no player-count check of its own, unlike elimination, which requires two teams by
+        /// construction. A lone player must not win by draining and taking capitals nobody is
+        /// defending.</summary>
+        public static bool TerritoryWinCounts(int teamsWithPlayers) => teamsWithPlayers >= 2;
     }
 }

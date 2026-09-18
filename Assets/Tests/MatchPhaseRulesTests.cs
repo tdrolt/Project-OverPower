@@ -41,6 +41,19 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void InPhaseTwoLosingTheCapitalEliminatesAtOnce()
+        {
+            // GDD p.21 / plan 2026-09-15-phase2-match-loop.md:1642: once the phase actually IS two
+            // teams, losing your capital is instant - no last stand, unlike ThreeTeams. Restored
+            // (review round 2): "the phase changes only on an elimination" governs what MOVES the
+            // phase, never what happens once it truly is TwoTeams.
+            var r = MatchPhaseRules.Recompute(new List<int> { 2 }, new[] { Team(0, 3, 0, false), Team(1, 3, 0, true), Team(2, 3, 3, false) });
+            CollectionAssert.AreEquivalent(new[] { 2, 0 }, r.Eliminated);
+            Assert.AreEqual(MatchPhase.Over, r.Phase);
+            Assert.AreEqual(1, r.Winner);
+        }
+
+        [Test]
         public void EliminationIsPermanent()
         {
             var r = MatchPhaseRules.Recompute(new List<int> { 0 }, new[] { Team(0, 3, 0, true), Team(1, 3, 0, true), Team(2, 3, 0, true) });
@@ -122,6 +135,18 @@ namespace Overpower.Tests
         {
             Assert.IsFalse(MatchPhaseRules.IsLastStandDeath(teamHoldsCapitalAtDeath: true));
             Assert.IsTrue(MatchPhaseRules.IsLastStandDeath(teamHoldsCapitalAtDeath: false));
+        }
+
+        [Test]
+        public void ATerritoryWinNeedsAtLeastTwoTeamsWithPlayers()
+        {
+            // Review round 2: a lone player draining and taking every capital must not win - the
+            // GDD's other win condition (elimination) already requires two teams by construction;
+            // territory did not.
+            Assert.IsFalse(MatchPhaseRules.TerritoryWinCounts(teamsWithPlayers: 1));
+            Assert.IsFalse(MatchPhaseRules.TerritoryWinCounts(teamsWithPlayers: 0));
+            Assert.IsTrue(MatchPhaseRules.TerritoryWinCounts(teamsWithPlayers: 2));
+            Assert.IsTrue(MatchPhaseRules.TerritoryWinCounts(teamsWithPlayers: 3));
         }
     }
 }

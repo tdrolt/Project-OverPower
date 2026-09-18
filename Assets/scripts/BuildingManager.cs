@@ -6,6 +6,7 @@ using Project.Tools.DictionaryHelp;
 using Photon.Pun;
 using Photon.Realtime;
 using Overpower.Match;
+using Overpower.Net;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// Territory state for the whole match: who owns each zone, since when, who held it before.
@@ -369,6 +370,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         currentProgress = null;
         progressLastWritten = null;
         progressWritesAwaitingEcho = 0;
+        territoryWinAnnounced = false; // Review round 2: a latch from the match just left must not block the next one's own territory win.
         if (initialWrite != null)
         {
             StopCoroutine(initialWrite);
@@ -606,7 +608,14 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public void SetNeutralWithoutBountyHistory(int zone)
     {
         TerritorySnapshot basis = WriteBasis(nameof(SetNeutralWithoutBountyHistory), zone);
-        if (basis == null || basis.OwnerOf(zone) == TerritoryMap.Neutral)
+        if (basis == null)
+            return;
+
+        // Unlike SetNeutral (a real no-op once a zone is already neutral), this must still fire for
+        // an already-neutral zone that still carries bounty-eligible history - a flank drained to
+        // neutral naturally, just before this reset runs, kept its lastOwner/lastHeldMs otherwise
+        // (review round 2). Only a zone with genuinely nothing to wipe is skipped.
+        if (basis.OwnerOf(zone) == TerritoryMap.Neutral && basis.LastOwnerOf(zone) == TerritoryMap.Neutral)
             return;
 
         Write(basis.WithNeutralReset(zone, ServerNowMs()));
@@ -857,6 +866,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         if (owner < 0)
             return;
 
+        // Review round 2: elimination already requires two teams by construction (MatchPhaseRules),
+        // but this, the GDD-external win condition, had no such guard - a lone player could drain
+        // and take capitals nobody was defending and win alone.
+        if (!MatchPhaseRules.TerritoryWinCounts(CountTeamsWithPlayers()))
+            return;
+
         territoryWinAnnounced = true;
         // Task 2.7: MatchDirector owns mWin/mPhase now, and every client reacts to a win (win/lose
         // panels) through that one replicated-state path - RPC_TerritoryWin below is retired.
@@ -864,6 +879,19 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             MatchDirector.Instance.AnnounceTerritoryWin(owner);
         else
             Debug.LogError("[TOWER] territory win decided, but no MatchDirector exists to announce it.");
+    }
+
+    private static int CountTeamsWithPlayers()
+    {
+        bool[] hasPlayer = new bool[3];
+        foreach (Player p in PhotonNetwork.PlayerList)
+            if (Teams.TryGetTeam(p, out int t) && t >= 0 && t < hasPlayer.Length)
+                hasPlayer[t] = true;
+
+        int count = 0;
+        foreach (bool b in hasPlayer)
+            if (b) count++;
+        return count;
     }
 
     /// Kept only for the committed RpcList (Task 2.7 retired its only caller, CheckTerritoryWin above,
