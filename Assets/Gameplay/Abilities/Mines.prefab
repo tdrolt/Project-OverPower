@@ -48,3 +48,7 @@ MonoBehaviour:
   charges: 2
   minePrefab: {fileID: 1978646125587449957, guid: 1d970946620e95940939ce0ac3fa4430, type: 3}
   maxActiveMines: 4
+  placementRange: 2
+  placementSearchStep: 0.25
+  groundProbeDistance: 2
+  maxStepUp: 0.6
