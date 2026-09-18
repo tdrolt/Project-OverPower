@@ -192,3 +192,7 @@ MonoBehaviour:
   chargeRingStepTickColor: {r: 1, g: 1, b: 1, a: 0.85}
   chargeRingStepTickLength: 0.3
   chargeRingStepTickWidth: 0.05
+  debugLogWidthPixels: 420
+  debugLogMaxHeightFraction: 0.45
+  debugLogScreenMarginPixels: 8
+  debugLogGapBelowMinimapPixels: 6

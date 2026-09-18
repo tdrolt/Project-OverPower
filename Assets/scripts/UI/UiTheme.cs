@@ -616,6 +616,23 @@ namespace Overpower.UI
         [Tooltip("Thickness of a step tick, in metres.")]
         public float chargeRingStepTickWidth = 0.05f;
 
+        [Header("Debug log (F1)")]
+        // These four are in SCREEN PIXELS, not canvas units, and deliberately so: the debug log is IMGUI, which
+        // has no CanvasScaler to scale anything for it. Everything else on this asset is in canvas units.
+        [Tooltip("Width of the F1 debug log panel, in SCREEN PIXELS (the log is IMGUI - it has no canvas, so it " +
+                 "does not scale with the rest of the UI). It shrinks on a screen too narrow to hold it.")]
+        public float debugLogWidthPixels = 420f;
+        [Tooltip("The tallest the F1 debug log may get, as a fraction of the screen height. It is shortened " +
+                 "further if there is not that much room left under the minimap.")]
+        [Range(0.1f, 1f)] public float debugLogMaxHeightFraction = 0.45f;
+        [Tooltip("Gap between the F1 debug log and the edges of the screen, in SCREEN PIXELS.")]
+        public float debugLogScreenMarginPixels = 8f;
+        [Tooltip("Gap between the bottom of the corner minimap and the top of the F1 debug log, in SCREEN " +
+                 "PIXELS (Tudor, 2026-09-17: the log used to open in the top-left corner, on top of the F1 test " +
+                 "range panel). The gap is measured against the CORNER map's reserved space even while the large " +
+                 "map is open, so the log does not jump every time someone presses M.")]
+        public float debugLogGapBelowMinimapPixels = 6f;
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why
