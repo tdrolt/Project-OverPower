@@ -96,11 +96,42 @@ namespace Overpower.UI
 
         // ---- built UI: slots -----------------------------------------------------------------------
 
+        /// <summary>The tint target for one slot's border (HUD step 2 follow-up): four thin Image
+        /// strips, one per edge, instead of a single Image filling the whole slot rect. A translucent
+        /// child can never hide what is under it, so a full-rect Image at near-opaque alpha - what
+        /// this used to be - always reads as a solid box no matter how faint the wash on top of it is.
+        /// Wrapping the four strips behind one `color` property keeps every call site ("ui.background
+        /// .color = ...") the exact one-liner it was when background was a plain Image.</summary>
+        private sealed class SlotFrame
+        {
+            private readonly Image top, bottom, left, right;
+
+            public SlotFrame(Image top, Image bottom, Image left, Image right)
+            {
+                this.top = top;
+                this.bottom = bottom;
+                this.left = left;
+                this.right = right;
+            }
+
+            public Color color
+            {
+                get => top.color;
+                set
+                {
+                    top.color = value;
+                    bottom.color = value;
+                    left.color = value;
+                    right.color = value;
+                }
+            }
+        }
+
         /// <summary>One slot's widgets. A class, not a struct, purely so BuildSlot/SetPips can mutate
         /// it in place through the arrays below without juggling copies back and forth.</summary>
         private sealed class SlotUi
         {
-            public Image background;      // Doubles as the ready/blocked/active-glow tint.
+            public SlotFrame background; // The border strips - doubles as the ready/blocked/active-glow tint.
             public Image icon;
             public TextMeshProUGUI fallbackNameText;
             public Image cooldownCover;   // Null for the weapon slot - it has no cooldown sweep.
@@ -1063,6 +1094,27 @@ namespace Overpower.UI
             return row;
         }
 
+        /// <summary>One edge strip of a slot's border frame (HUD step 2 follow-up) - see SlotFrame's
+        /// class comment for why the frame is four thin Images instead of one filling the whole rect.
+        /// anchorMin/anchorMax stretch the strip along the edge it sits on (equal min/max on one axis
+        /// pins it to that edge with zero size, which sizeDelta on that same axis then supplies); the
+        /// other axis's anchors already span the full slot, so its sizeDelta stays 0.</summary>
+        private Image BuildFrameStrip(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax,
+                                      Vector2 pivot, Vector2 sizeDelta)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.pivot = pivot;
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = sizeDelta;
+            Image img = go.AddComponent<Image>();
+            img.raycastTarget = false;
+            return img;
+        }
+
         /// <summary>One weapon or ability box: a tinted background (ready/blocked/active), an icon
         /// that falls back to the ability's display name when it has none, and - for the three
         /// ability slots only - a charge pip row and a recharge cover sweep. isUltimate additionally
@@ -1083,14 +1135,24 @@ namespace Overpower.UI
             // LayoutElement alone becomes the slot's actual rendered size - everything inside it
             // (Icon Box, pips, text) then stretches or anchors relative to that rect as normal.
 
-            // The slot's own Image is now the BORDER (HUD step 2): it still carries the ready / blocked / active
-            // tint that UpdateAbilitySlots writes, but it is only visible as a Slot Border Width frame, because
-            // the Slot Fill child below covers everything inside it. raycastTarget off like every other HUD
-            // Graphic - this canvas has no GraphicRaycaster, but a stray raycast target here is exactly the kind
-            // of thing that later blocks a shot when someone adds one.
-            ui.background = go.AddComponent<Image>();
+            // The slot's border (HUD step 2 follow-up): four thin strips, one per edge, each Slot Border
+            // Width thick, carrying the ready / blocked / active tint that UpdateAbilitySlots writes. NOT
+            // a single Image filling the whole rect - a translucent child (Slot Fill, below) can never hide
+            // what's under it, so a full-rect Image at 0.9-0.95 alpha always read as a near-opaque box no
+            // matter how faint the wash on top of it was, which is the opposite of what Tudor asked for
+            // ("no dark opaque background... it takes away from the visibility"). raycastTarget off on all
+            // four like every other HUD Graphic - this canvas has no GraphicRaycaster, but a stray raycast
+            // target here is exactly the kind of thing that later blocks a shot when someone adds one.
+            Image frameTop = BuildFrameStrip(go.transform, "Frame Top", new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(0.5f, 1f), new Vector2(0f, theme.slotBorderWidth));
+            Image frameBottom = BuildFrameStrip(go.transform, "Frame Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(0.5f, 0f), new Vector2(0f, theme.slotBorderWidth));
+            Image frameLeft = BuildFrameStrip(go.transform, "Frame Left", new Vector2(0f, 0f), new Vector2(0f, 1f),
+                new Vector2(0f, 0.5f), new Vector2(theme.slotBorderWidth, 0f));
+            Image frameRight = BuildFrameStrip(go.transform, "Frame Right", new Vector2(1f, 0f), new Vector2(1f, 1f),
+                new Vector2(1f, 0.5f), new Vector2(theme.slotBorderWidth, 0f));
+            ui.background = new SlotFrame(frameTop, frameBottom, frameLeft, frameRight);
             ui.background.color = theme.slotReadyColor;
-            ui.background.raycastTarget = false;
 
             // The only fill a slot has left: a faint wash inset by the border width, so an icon or an ability
             // name still has something to sit on without hiding the arena behind it.
