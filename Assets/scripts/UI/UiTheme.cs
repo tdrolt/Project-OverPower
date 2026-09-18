@@ -466,8 +466,9 @@ namespace Overpower.UI
         [Tooltip("Height of the strip left clear at the bottom of the screen for the HUD's ability bar while the large " +
                  "map (M) is open, in canvas units (controller review, 2026-09-17: the map used to cover the HUD). The " +
                  "large map's diameter shrinks below Large Size if it would otherwise overlap this strip, and the map " +
-                 "centres itself in whatever space remains above it.")]
-        public float minimapLargeBottomClearance = 380f;
+                 "centres itself in whatever space remains above it. HUD step 5 lowered it from 380 to 300 because the " +
+                 "HUD itself is 20% smaller (Hud Scale) and the gold row left it.")]
+        public float minimapLargeBottomClearance = 300f;
         [Tooltip("Width of the dark anti-aliased band framing the triangular minimap's edge, in canvas units at the " +
                  "corner size (it scales up with everything else on the large map). Also used as the corner map's " +
                  "inset from the screen edges.")]
@@ -513,6 +514,33 @@ namespace Overpower.UI
         public float minimapTeammateDotSize = 10f;
         [Tooltip("Colour of a teammate's dot on the minimap.")]
         public Color minimapTeammateDotColor = new Color(0.45f, 1f, 0.45f, 1f);
+        [Tooltip("How solid the small corner map is, 0 is invisible and 1 is fully opaque (Tudor, 2026-09-17: " +
+                 "the corner map should be 20% more see-through, so 0.8). It multiplies everything on the map at " +
+                 "once - the picture, the bubbles, the links and the markers.")]
+        [Range(0f, 1f)] public float minimapCornerOpacity = 0.8f;
+        [Tooltip("How solid the large map is while M is held open, 0 to 1. Tudor asked for full opacity here: " +
+                 "you opened it on purpose, so nothing is hiding behind it that you would rather be looking at.")]
+        [Range(0f, 1f)] public float minimapLargeOpacity = 1f;
+        [Tooltip("How much opacity the large map gives up while you are moving, 0 to 1 (Tudor, 2026-09-17: " +
+                 "\"decrease the opacity by 30%\"), so you can still see where you are running. Subtracted from " +
+                 "Large Opacity above; the corner map never dims for movement.")]
+        [Range(0f, 1f)] public float minimapLargeMovingOpacityDrop = 0.3f;
+        [Tooltip("Seconds a full fade from invisible to solid takes. The map fades between its opacity states " +
+                 "rather than snapping, so starting and stopping reads as a change of state, not a flicker. 0 " +
+                 "turns the fade off.")]
+        public float minimapOpacityFadeSeconds = 0.25f;
+        [Tooltip("How fast you have to be going, in metres per second, before the large map counts you as " +
+                 "MOVING. The base move speed is 5, so 1 is a fifth of walking pace. It is deliberately higher " +
+                 "than Moving Exit Speed below - see that field.")]
+        public float minimapMovingEnterSpeed = 1f;
+        [Tooltip("How slow you have to be going, in metres per second, before the large map counts you as " +
+                 "STOPPED. Deliberately lower than Moving Enter Speed: between the two the map keeps whatever " +
+                 "state it already had, so a player drifting around one single threshold cannot make it strobe.")]
+        public float minimapMovingExitSpeed = 0.35f;
+        [Tooltip("Seconds of smoothing on the measured speed before it is compared with the two speeds above. " +
+                 "Frame-to-frame position deltas are noisy enough on their own to tip a threshold back and " +
+                 "forth. 0 uses the raw per-frame speed.")]
+        public float minimapSpeedSmoothingSeconds = 0.15f;
 
         /// <summary>The corner-map bubble diameter for a zone tier (1 capital ... 4 centre).</summary>
         public float MinimapBubbleDiameter(int tier) => tier switch

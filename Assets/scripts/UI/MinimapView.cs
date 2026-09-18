@@ -52,6 +52,9 @@ namespace Overpower.UI
     /// map. The large map fits itself into the space above the HUD (controller review, 2026-09-17) rather than
     /// covering it - see SetLarge and UiTheme.minimapLargeBottomClearance.
     ///
+    /// OPACITY: the corner map is drawn a little see-through, M makes it solid, and moving with M open dims it
+    /// again (UiTheme > Minimap, and the MinimapOpacity rule). One CanvasGroup on the map's root carries all of it.
+    ///
     /// PHASES (2.7): call MinimapView.Local.SetZoneShown(zone, false) for each zone taken out of play; it hides the
     /// bubble and every link to it.
     /// </summary>
@@ -75,6 +78,17 @@ namespace Overpower.UI
         public RectTransform MapRoot => root;
         public int ZoneBubbleCount => zones.Count;
         public int LinkCount => links.Count;
+        /// <summary>The opacity the map is actually drawn at this frame (HUD step 5) - for harness checks, so a
+        /// capture is not the only way to tell the three states apart.</summary>
+        public float CurrentOpacity => fade != null ? fade.alpha : 1f;
+        /// <summary>The smoothed planar speed the moving/stopped test is made against, in metres per second.</summary>
+        public float MeasuredSpeed => smoothedSpeed;
+        /// <summary>Whether the map currently counts the player as moving.</summary>
+        public bool IsMoving => moving;
+        /// <summary>The theme this map is laid out from. Read-only, and for one caller: the F1 debug log overlay
+        /// (HUD step 6) has to clear the corner map's reserved band, and this is the only live handle on the
+        /// numbers that band is computed from - it installs itself at runtime and has nothing serialized.</summary>
+        public UiTheme Theme => theme;
 
         private sealed class ZoneUi
         {
@@ -127,6 +141,12 @@ namespace Overpower.UI
 
         private bool built;
         private bool largeOpen;
+        private CanvasGroup fade;
+        private float shownAlpha = -1f;   // < 0 = "not set yet", so the first frame snaps instead of fading in.
+        private float smoothedSpeed;
+        private bool moving;
+        private Vector3 lastSamplePosition;
+        private bool hasSamplePosition;
         private bool ownershipDirty = true;
         private float appliedYaw = float.NaN;
         // The triangular mask/edge's constant offset from the map's own yaw rotation (Tudor, 2026-09-17: the mask
@@ -225,6 +245,48 @@ namespace Overpower.UI
 
             UpdateZones();
             UpdatePlayers();
+            UpdateOpacity();
+        }
+
+        /// <summary>Tudor, 2026-09-17: the corner map is a little see-through, M makes it solid, and moving with
+        /// M open dims it again. The rule (including the deadzone that stops it strobing) is MinimapOpacity, so
+        /// it is tested in edit mode; this method only measures the speed and hands the answer to a CanvasGroup.
+        ///
+        /// Speed is MEASURED from this player's own position, not read from PlayerMotor.CurrentSpeed: that
+        /// property is the CONFIGURED speed, which still reads 5 m/s while a stunned player stands perfectly
+        /// still. A position delta is true for a dash, a knockback and a stun alike.</summary>
+        private void UpdateOpacity()
+        {
+            if (fade == null)
+                return;
+
+            float deltaTime = Time.unscaledDeltaTime;
+            Vector3 position = transform.position;
+            if (hasSamplePosition && deltaTime > 0f)
+            {
+                Vector3 step = position - lastSamplePosition;
+                step.y = 0f; // Planar: falling off the arena is not "moving with the map open".
+                smoothedSpeed = MinimapOpacity.SmoothSpeed(smoothedSpeed, step.magnitude / deltaTime,
+                                                           deltaTime, theme.minimapSpeedSmoothingSeconds);
+            }
+            lastSamplePosition = position;
+            hasSamplePosition = true;
+
+            moving = MinimapOpacity.IsMoving(moving, smoothedSpeed,
+                                             theme.minimapMovingEnterSpeed, theme.minimapMovingExitSpeed);
+            float target = MinimapOpacity.TargetAlpha(largeOpen, moving, theme.minimapCornerOpacity,
+                                                      theme.minimapLargeOpacity,
+                                                      theme.minimapLargeMovingOpacityDrop);
+            // The very first frame snaps: a map that faded up from nothing every time a player spawned would
+            // read as a bug, not as a nicety.
+            float next = shownAlpha < 0f
+                ? target
+                : MinimapOpacity.Step(shownAlpha, target, deltaTime, theme.minimapOpacityFadeSeconds);
+            if (!Mathf.Approximately(next, shownAlpha))
+            {
+                fade.alpha = next;
+                shownAlpha = next;
+            }
         }
 
         private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot) =>
@@ -344,6 +406,15 @@ namespace Overpower.UI
 
             root = NewRect("Minimap", canvasGo.transform);
             root.sizeDelta = Vector2.one * theme.minimapCornerSize;
+
+            // One CanvasGroup over the whole map is what makes Tudor's three opacity states a single number
+            // (HUD step 5): it multiplies every Graphic underneath, including the ones on the markers' own nested
+            // Canvas, so the picture, the bubbles, the links and the dots all fade together and nothing has to
+            // remember its own colour's alpha. Interactable and blocksRaycasts are both off, so the class
+            // comment's "NEVER BLOCKS A SHOT" guarantee holds through this component too.
+            fade = root.gameObject.AddComponent<CanvasGroup>();
+            fade.interactable = false;
+            fade.blocksRaycasts = false;
 
             // No round backdrop (review fix, 2026-09-17): nothing may be visible outside the triangle at all, not
             // even a dark disc peeking out around it - only the triangle window and its EdgeTriangle frame below.

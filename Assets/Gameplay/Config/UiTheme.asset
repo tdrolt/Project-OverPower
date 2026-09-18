@@ -142,7 +142,7 @@ MonoBehaviour:
   minimapCornerSize: 340
   minimapCornerMargin: 24
   minimapLargeSize: 860
-  minimapLargeBottomClearance: 380
+  minimapLargeBottomClearance: 300
   minimapFrameWidth: 5
   minimapFrameColor: {r: 0.06, g: 0.06, b: 0.08, a: 0.9}
   minimapBackgroundTint: {r: 1, g: 1, b: 1, a: 0.9}
@@ -162,6 +162,13 @@ MonoBehaviour:
   minimapOwnMarkerColor: {r: 1, g: 0.85, b: 0.25, a: 1}
   minimapTeammateDotSize: 10
   minimapTeammateDotColor: {r: 0.45, g: 1, b: 0.45, a: 1}
+  minimapCornerOpacity: 0.8
+  minimapLargeOpacity: 1
+  minimapLargeMovingOpacityDrop: 0.3
+  minimapOpacityFadeSeconds: 0.25
+  minimapMovingEnterSpeed: 1
+  minimapMovingExitSpeed: 0.35
+  minimapSpeedSmoothingSeconds: 0.15
   overPowerActiveText: OVERPOWER
   overPowerArmedText: OverPower ready
   overPowerActiveColor: {r: 1, g: 0.25, b: 0.55, a: 1}
