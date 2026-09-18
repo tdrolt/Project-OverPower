@@ -197,3 +197,4 @@ MonoBehaviour:
   debugLogMaxHeightFraction: 0.45
   debugLogScreenMarginPixels: 8
   debugLogGapBelowMinimapPixels: 6
+  outOfPlayZoneColor: {r: 0.12, g: 0.12, b: 0.12, a: 0.45}

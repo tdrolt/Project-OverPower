@@ -31,8 +31,12 @@ namespace Overpower.Match
         public readonly int DrainerTeam;
         /// <summary>An owned zone with a living enemy inside or just gone (ZonePresenceTracker).</summary>
         public readonly bool UnderAttack;
+        /// <summary>2.7b Decision 8: a capital nobody is playing for - the third capital when the host starts a
+        /// two-team match. Checked before every other branch of From, so an out-of-play zone always shows Idle
+        /// with a neutral edge and no arc, whatever capture progress or attack state the room still carries for it.</summary>
+        public readonly bool OutOfPlay;
 
-        public CaptureRingState(CaptureRingPhase phase, float fill01, int arcTeam, int outlineTeam, int drainerTeam, bool underAttack)
+        public CaptureRingState(CaptureRingPhase phase, float fill01, int arcTeam, int outlineTeam, int drainerTeam, bool underAttack, bool outOfPlay = false)
         {
             Phase = phase;
             Fill01 = fill01;
@@ -40,6 +44,7 @@ namespace Overpower.Match
             OutlineTeam = outlineTeam;
             DrainerTeam = drainerTeam;
             UnderAttack = underAttack;
+            OutOfPlay = outOfPlay;
         }
 
         public bool ShowsArc => Phase != CaptureRingPhase.Idle && Fill01 > 0f;
@@ -47,8 +52,13 @@ namespace Overpower.Match
         /// <param name="owner">The zone's owner, or -1 for neutral.</param>
         /// <param name="underAttack">ZonePresenceTracker.IsUnderAttack(zone). Ignored for a neutral zone.</param>
         /// <param name="nowMs">PhotonNetwork.ServerTimestamp; 0 = not synced yet.</param>
-        public static CaptureRingState From(CaptureProgress progress, int owner, bool underAttack, int nowMs)
+        /// <param name="outOfPlay">MatchDirector.IsOutOfPlay(zone) (2.7b Decision 8). Wins over every other branch.</param>
+        public static CaptureRingState From(CaptureProgress progress, int owner, bool underAttack, int nowMs, bool outOfPlay = false)
         {
+            if (outOfPlay)
+                return new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, TerritoryMap.Neutral,
+                                            TerritoryMap.Neutral, false, outOfPlay: true);
+
             int outlineTeam = owner >= 0 ? owner : TerritoryMap.Neutral;
             bool attacked = owner >= 0 && underAttack;
 

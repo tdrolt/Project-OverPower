@@ -640,6 +640,12 @@ namespace Overpower.UI
                  "map is open, so the log does not jump every time someone presses M.")]
         public float debugLogGapBelowMinimapPixels = 6f;
 
+        [Header("Match start (2.7b)")]
+        [Tooltip("A capital nobody is playing for - the third capital when the host starts a two-team match. Its ring on the " +
+                 "ground and its minimap bubble take this colour. Keep it darker and more see-through than the neutral grey, " +
+                 "so it reads as closed, not as ground you can take.")]
+        public Color outOfPlayZoneColor = new Color(0.12f, 0.12f, 0.12f, 0.45f);
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why

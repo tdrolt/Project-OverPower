@@ -55,8 +55,11 @@ namespace Overpower.UI
     /// OPACITY: the corner map is drawn a little see-through, M makes it solid, and moving with M open dims it
     /// again (UiTheme > Minimap, and the MinimapOpacity rule). One CanvasGroup on the map's root carries all of it.
     ///
-    /// PHASES (2.7): call MinimapView.Local.SetZoneShown(zone, false) for each zone taken out of play; it hides the
-    /// bubble and every link to it.
+    /// OUT OF PLAY (2.7b Decision 8): the third capital of a host-started match reads its own look straight from
+    /// MatchDirector.IsOutOfPlay, every LateUpdate its ownership is next re-coloured - its bubble fills
+    /// UiTheme.outOfPlayZoneColor and every link to it is hidden, so no route reads as a way in. This is separate
+    /// from SetZoneShown just below, an unused hook that hides a zone (and its links) entirely: out of play is a
+    /// still-visible, unreachable capital, not a hidden one.
     /// </summary>
     public sealed class MinimapView : MonoBehaviourPun
     {
@@ -100,6 +103,9 @@ namespace Overpower.UI
             public Image Outline;
             public Image Fill;
             public bool Shown = true;
+            /// <summary>2.7b Decision 8: MatchDirector.IsOutOfPlay(Zone), refreshed by RecolourOwnership. Read by
+            /// ApplyLinkStyle (no link touches an out-of-play zone) and UpdateZones (CaptureRingState.From).</summary>
+            public bool OutOfPlay;
             public float ShownRingFill = -1f;
             public Color ShownRingColor;
             public Color ShownOutlineColor;
@@ -191,6 +197,8 @@ namespace Overpower.UI
                 inputRouter.MapToggled -= ToggleLarge;
             if (manager != null)
                 manager.OwnershipChanged -= HandleOwnershipChanged;
+            if (MatchDirector.Instance != null)
+                MatchDirector.Instance.LiveStateChanged -= HandleLiveStateChanged;
             if (Local == this)
                 Local = null;
             if (textMaterial != null)
@@ -292,6 +300,10 @@ namespace Overpower.UI
         private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot) =>
             ownershipDirty = true;
 
+        /// <summary>2.7b Decision 8: the countdown starting/cancelling or the match going live - see TryBuild's own
+        /// comment on why the out-of-play look needs this on top of OwnershipChanged.</summary>
+        private void HandleLiveStateChanged() => ownershipDirty = true;
+
         // ---------------------------------------------------------------- build (once)
 
         private bool TryBuild()
@@ -332,6 +344,12 @@ namespace Overpower.UI
             ownMarker = BuildMarker("You", markersLayer, GeneratedSprites.Triangle, theme.minimapOwnMarkerColor, theme.minimapOwnMarkerSize);
 
             manager.OwnershipChanged += HandleOwnershipChanged;
+            // 2.7b Decision 8: the out-of-play look depends on MatchDirector.IsOutOfPlay, which changes on the
+            // live edge (Warmup -> ...) without any BuildingManager.OwnershipChanged event of its own (a host
+            // start's third capital was already neutral before AND after going live) - so re-colour on that edge
+            // too, or the third capital's minimap look would never update off its default (in-play) colour.
+            if (MatchDirector.Instance != null)
+                MatchDirector.Instance.LiveStateChanged += HandleLiveStateChanged;
             built = true;
             SetLarge(false);
             return true;
@@ -584,10 +602,15 @@ namespace Overpower.UI
         private void RecolourOwnership()
         {
             TerritorySnapshot snapshot = manager.Current;
+            MatchDirector director = MatchDirector.Instance;
             foreach (ZoneUi zone in zones)
             {
+                // 2.7b Decision 8: out of play wins over ownership - the cut capital is neutral underneath (nobody
+                // can ever capture it), but must not read as ordinary neutral grey.
+                zone.OutOfPlay = director != null && director.IsOutOfPlay(zone.Zone);
                 int owner = snapshot.OwnerOf(zone.Zone);
-                zone.Fill.color = owner >= 0 ? theme.ShotColorFor(owner) : theme.minimapNeutralColor;
+                zone.Fill.color = zone.OutOfPlay ? theme.outOfPlayZoneColor
+                    : owner >= 0 ? theme.ShotColorFor(owner) : theme.minimapNeutralColor;
             }
             foreach (LinkUi link in links)
                 ApplyLinkStyle(link, MinimapLinkStyle.For(snapshot.OwnerOf(link.A), snapshot.OwnerOf(link.B)));
@@ -601,7 +624,9 @@ namespace Overpower.UI
         {
             ZoneUi a = zoneById[link.A];
             ZoneUi b = zoneById[link.B];
-            bool shown = a.Shown && b.Shown;
+            // 2.7b Decision 8: a link touching an out-of-play zone is hidden too - no route may lead into it, and a
+            // grey line would read as a way in.
+            bool shown = a.Shown && b.Shown && !a.OutOfPlay && !b.OutOfPlay;
             link.LineA.gameObject.SetActive(shown);
             link.LineB.gameObject.SetActive(shown);
             bool arrow = shown && style.Kind == MinimapLinkKind.WayIn;
@@ -647,7 +672,8 @@ namespace Overpower.UI
 
                 int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;
                 bool attacked = presence != null && presence.IsUnderAttack(zone.Zone);
-                CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(zone.Zone), owner, attacked, nowMs);
+                CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(zone.Zone), owner, attacked, nowMs,
+                                                                outOfPlay: zone.OutOfPlay);
 
                 Color outline = state.UnderAttack
                     ? Color.Lerp(theme.minimapBubbleOutlineColor, theme.captureRingWarningColor, pulse)

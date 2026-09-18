@@ -237,7 +237,7 @@ public class BuildingCapture : MonoBehaviourPun
         int owner = manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
         bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
         CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
-                                                       PhotonNetwork.ServerTimestamp);
+                                                       PhotonNetwork.ServerTimestamp, outOfPlay: ZoneOutOfPlay(buildingID));
         // Yaw reads 0 (world +Z as "top") until ResolveTeamYaw resolves it for this match - CaptureRingView only
         // rebuilds the band/track points when this value CHANGES, so the first resolved yaw self-corrects their
         // rotation the very next frame; nothing here needs to wait for YawResolved.
@@ -324,6 +324,13 @@ public class BuildingCapture : MonoBehaviourPun
     private static readonly System.Func<int, bool> ZoneUnderAttack =
         zone => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(zone);
 
+    // 2.7b Decision 8: the cut capital of a host-started match (its third team was never in the match) is never
+    // capturable, not even by its own team - checked before the own-capital exception, in every MayCapture call
+    // site (TeamMayCaptureNow, so a drain in progress is covered too; OnTriggerEnter) plus the ring itself
+    // (RefreshRingView). Cached for the same allocation reason as ZoneUnderAttack above.
+    private static readonly System.Func<int, bool> ZoneOutOfPlay =
+        zone => MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(zone);
+
     // One answer per team per frame. "Under attack" ends on the server clock, which keeps ticking during a frame, so
     // asking twice (CalculateCaptureProgress, then ComputeCurrentProgress for the bar) could straddle the end of the
     // linger and let the bar claim a capture the tick didn't make.
@@ -349,7 +356,7 @@ public class BuildingCapture : MonoBehaviourPun
         BuildingManager manager = BuildingManager.Instance;
         bool answer = true; // Nothing to judge by yet; the entry check already applied the plain rule.
         if (manager != null && manager.Map != null && manager.CurrentOwners != null)
-            answer = manager.Map.MayCapture(team, buildingID, manager.CurrentOwners, ZoneUnderAttack);
+            answer = manager.Map.MayCapture(team, buildingID, manager.CurrentOwners, ZoneUnderAttack, ZoneOutOfPlay);
 
         mayCaptureFrame = Time.frameCount;
         mayCaptureTeam = team;
@@ -699,11 +706,12 @@ public class BuildingCapture : MonoBehaviourPun
         if (manager.Current == null) return;
 
         // The one territory rule (TerritoryMap, tested in edit mode): not a zone you already own,
-        // and next to one you do - except your own capital, which is always capturable. Reads the
+        // and next to one you do - except your own capital, which is always capturable - and never a zone
+        // that is out of play (2.7b Decision 8, checked before that own-capital exception). Reads the
         // replicated owners rather than controllingTeam, which is only correct on the master.
         // CurrentOwners is the cached dictionary (BuildingManager.cs ~77-80) - OwnersByZone() builds
         // a fresh one on every call, and every player's collider fires this on every zone entry.
-        if (!manager.Map.MayCapture(player.teamID, buildingID, manager.CurrentOwners))
+        if (!manager.Map.MayCapture(player.teamID, buildingID, manager.CurrentOwners, null, ZoneOutOfPlay))
             return;
 
         // capturingID is no longer set from here (bug fix, 2026-09-17): this runs on EVERY client for

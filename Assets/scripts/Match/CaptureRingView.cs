@@ -101,7 +101,11 @@ namespace Overpower.Match
         {
             float time = Time.unscaledTime; // presentation only: a paused Time.timeScale must not freeze a pulse
 
-            Color edgeColor = state.OutlineTeam >= 0 ? theme.ShotColorFor(state.OutlineTeam) : theme.captureRingNeutralColor;
+            // 2.7b Decision 8: an out-of-play zone's edge is the theme's own colour, with no pulse - state.Phase is
+            // always Idle and state.UnderAttack always false for an out-of-play state (CaptureRingState.From), so
+            // neither branch below can touch it once this wins.
+            Color edgeColor = state.OutOfPlay ? theme.outOfPlayZoneColor
+                : state.OutlineTeam >= 0 ? theme.ShotColorFor(state.OutlineTeam) : theme.captureRingNeutralColor;
             if (state.Phase == CaptureRingPhase.Draining && state.DrainerTeam >= 0)
                 edgeColor = Color.Lerp(edgeColor, theme.ShotColorFor(state.DrainerTeam),
                                        CaptureRingGeometry.Pulse01(time, theme.captureRingPulseSpeed));

@@ -107,5 +107,18 @@ namespace Overpower.Tests
             CaptureRingState s = CaptureRingState.From(new CaptureProgress(1, 0.25f, 1f / 15f, 1000), -1, false, 0);
             Assert.AreEqual(0.25f, s.Fill01, 1e-5f);
         }
+
+        [Test]
+        public void AnOutOfPlayZoneShowsNoArcWhateverTheRoomSays()
+        {
+            // A capturing progress for team 0, an owner and an under-attack flag that would otherwise draw
+            // something - out of play must win over all three.
+            CaptureRingState s = CaptureRingState.From(new CaptureProgress(0, 0.5f, 1f / 15f, 1000), 1, true, 4000, outOfPlay: true);
+            Assert.AreEqual(CaptureRingPhase.Idle, s.Phase);
+            Assert.IsFalse(s.ShowsArc);
+            Assert.IsTrue(s.OutOfPlay);
+            Assert.AreEqual(-1, s.OutlineTeam);
+            Assert.IsFalse(s.UnderAttack);
+        }
     }
 }
