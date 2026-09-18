@@ -351,6 +351,20 @@ namespace Overpower.Abilities
             return PhotonNetwork.Instantiate(prefabName, position, rotation, 0, dataWithPlacedMs);
         }
 
+        /// <summary>2.7b Decision 6: the fresh start at match-live destroys every deployable THIS client
+        /// placed - a mine, a cover wall, a portal, a fence, an AoE zone - through the single-destroyer path
+        /// (RequestDestroy) every other end-of-life route already goes through, so nothing here needs its own
+        /// destroy logic. Fire fields are deliberately left alone: Decision 6's "kept" list gives already-in-
+        /// flight fire the same few seconds' grace as any other projectile.</summary>
+        public static void DestroyAllPlacedByLocalPlayer()
+        {
+            foreach (NetworkedDeployable deployable in FindObjectsByType<NetworkedDeployable>(FindObjectsSortMode.None))
+            {
+                if (deployable.IsOwnerClient)
+                    deployable.RequestDestroy();
+            }
+        }
+
         private IEnumerator DestroyAfter(float seconds)
         {
             if (seconds > 0f)

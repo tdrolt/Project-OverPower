@@ -462,6 +462,21 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     /// <summary>F1's "Reset Cooldowns". Registered for the owner only.</summary>
     public void ResetForTestRange() => ResetCooldowns();
 
+    /// <summary>2.7b Decision 6: the same cleanup a death-then-respawn already runs through
+    /// HandleAliveChanged, without ever publishing a death - interrupt every module (there is no
+    /// InterruptReason for "the match reset", so this reuses Died, exactly as the plan specifies),
+    /// reset every cooldown, then let each module react to "respawned" so it rearms whatever OnRespawned
+    /// means to it. Owner only: only the owner ever ticks or resets these modules.</summary>
+    public void ResetForMatchStart()
+    {
+        if (!photonView.IsMine)
+            return;
+
+        ForEachModule(module => module.Interrupt(InterruptReason.Died));
+        ResetCooldowns();
+        ForEachModule(module => module.OnRespawned());
+    }
+
     // ---- death, stun, silence -----------------------------------------------------------------
 
     /// <summary>

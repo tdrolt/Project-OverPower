@@ -2,6 +2,7 @@ using System.Collections;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
@@ -95,6 +96,12 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     private bool death = false;
     private bool respawnStarted = false;
     private int deathCount = 0;
+
+    /// <summary>2.7b step 4: the running RespawnPlayer coroutine, or null when nothing is waiting - both
+    /// StartCoroutine sites below assign it, and RespawnPlayer itself nulls it at the end. Without a handle
+    /// nothing could stop it; ResetForMatchStart needs to, so a countdown that was already running when the
+    /// match went live cannot teleport the player a second time once it finishes.</summary>
+    private Coroutine respawnRoutine;
 
     // Caches the last value shown on the respawn note so UpdateRespawnNote only touches MatchUI's
     // text when the under-attack state actually flips, not every frame it is polled.
@@ -294,7 +301,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             float delay = NextRespawnDelay();
             Debug.Log($"[VIS] death {deathCount}, respawning in {delay}s");
 
-            StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
+            respawnRoutine = StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         }
 
         Debug.Log($"{photonView.Owner?.NickName} respawned at team {teamID} spawn point.");
@@ -340,7 +347,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             // NextRespawnDelay is the one place both paths compute this now.
             float delay = NextRespawnDelay();
             Debug.Log($"[VIS] cathedral-recapture death {deathCount}, respawning in {delay}s");
-            StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
+            respawnRoutine = StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         }
         // else: still waiting - the waiting panel itself already shows that, every FixedUpdate this
         // runs (Task 2.7 review: this used to log "Player NOT Respawn Entered" here every physics
@@ -367,6 +374,89 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// 2.7b Decision 5/6: the owner-side "fresh start" that runs on this client the instant it sees the match
+    /// go live. Nothing calls this yet (step 4) - MatchDirector's own live write is what will trigger it,
+    /// wired in step 5, after the master's territory reset (BuildingManager.ResetForMatchStart) has already
+    /// been applied on every client (Decision 5's "territory first, then live" ordering).
+    ///
+    /// THE ONE HOME for Decision 6's reset/kept lists:
+    ///
+    /// RESET here, in this order: any respawn wait or countdown (stopped before anything moves the player);
+    /// every ability's interrupt/cooldown/respawn cleanup and this player's own deployables (destroyed); the
+    /// loadout - weapon, and all three ability slots (Mobility, Equipment, Ultimate) back to the starter kit,
+    /// "back to empty" per Tudor's amended answer 2 - and armour to level 0/0; gold to TerritoryConfig.
+    /// StartingGold; the ultimate meter; overheat; the purchase ledger and the loadout screen (closed); full
+    /// health and armour, every status effect cleared (an armed shield included), the combat clock; deathCount;
+    /// position (this player's own team spawn); alive with lastStand false.
+    ///
+    /// RESET ELSEWHERE, not by this method: territory, towers and capture progress (the master, before the
+    /// live write lands here - Decision 5) and the Photon score (nothing reads it, so nothing clears it).
+    ///
+    /// KEPT: the team and the name (this method does not touch either). Fire fields/projectiles already in
+    /// flight (Decision 6) - they last only a few seconds regardless.
+    ///
+    /// ORDER MATTERS. The respawn routine is stopped and every panel hidden BEFORE anything below can move the
+    /// player, or a coroutine still counting down past this point could teleport the player again once its own
+    /// wait ends (the "no second teleport" case the Play Mode check verifies). The loadout resets BEFORE
+    /// playerHealth.ResetForRespawn(), because armour capacity must already be at level 0 when that refill
+    /// decides what "full" means.
+    /// </summary>
+    public void ResetForMatchStart(int team)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        // 1. Stop any respawn wait/countdown and hide every panel it was driving, before anything below can
+        // move the player.
+        if (respawnRoutine != null)
+        {
+            StopCoroutine(respawnRoutine);
+            respawnRoutine = null;
+        }
+        death = false;
+        respawnStarted = false;
+        deathCount = 0;
+        matchUI?.SetRespawnPanelVisible(false);
+        matchUI?.HideWaitingPanel();
+        matchUI?.SetRespawnNote("");
+        respawnNoteShowing = false;
+
+        // 2. Interrupt everything the player was doing.
+        GetComponent<AbilityRunner>()?.ResetForMatchStart();
+        playerDisplacement?.Cancel();
+        NetworkedDeployable.DestroyAllPlacedByLocalPlayer();
+
+        // 3. The economy and loadout, back to the starter kit - loadout BEFORE health, so armour capacity is
+        // already at level 0 when ResetForRespawn decides what "full armour" means (Decision 6).
+        GetComponent<PlayerLoadout>()?.ResetForMatchStart();
+        GoldWallet goldWallet = GetComponent<GoldWallet>();
+        goldWallet?.ResetForMatchStart();
+        GetComponent<UltimateCharge>()?.ResetForMatchStart();
+        GetComponentInChildren<PlayerOverheat>(true)?.Clear();
+        GetComponent<LoadoutScreen>()?.ResetForMatchStart();
+        playerHealth.ResetForRespawn();
+
+        // 4. Back to your own team's spawn - guarded like MoveToSpawnPoint.
+        RoomManager roomManager = FindObjectOfType<RoomManager>();
+        if (roomManager != null && roomManager.teamSpawnPoints != null
+            && team >= 0 && team < roomManager.teamSpawnPoints.Length && roomManager.teamSpawnPoints[team] != null)
+        {
+            Transform spawn = roomManager.teamSpawnPoints[team];
+            TeleportToSpawnPoint(spawn.position, spawn.rotation);
+        }
+
+        // 5. Alive with no last stand. An already-alive player gets no AliveChanged here (SetAlive is only
+        // called when isAlive was false), which avoids a telemetry `respawn` line firing for everyone at once
+        // just because the match went live.
+        if (!isAlive)
+            SetAlive(true);
+        SetLastStandOut(false);
+
+        Debug.Log($"[MATCH] fresh start team={team} position={rigidbody.position} " +
+                  $"gold={(goldWallet != null ? goldWallet.Balance : 0)} deathCount={deathCount}");
     }
 
     /// The one place the respawn wait is computed, called from both death paths (a normal death in
@@ -451,6 +541,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         death = false;
         respawnStarted = false;
+        respawnRoutine = null;
 
         matchUI?.SetRespawnPanelVisible(false);
     }

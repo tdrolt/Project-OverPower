@@ -273,6 +273,20 @@ namespace Overpower.Match
             Credited?.Invoke(amount, source);
         }
 
+        /// <summary>2.7b Decision 6: the fresh start at match-live - gold back to TerritoryConfig.StartingGold
+        /// (a brand new GoldAccrual, so the fractional carry drops with it, same as a genuinely new player's
+        /// first Start), no income rate carried over, and published at once rather than waiting for
+        /// PublishIfDue's own throttle. Owner only, like every other mutator on this class.</summary>
+        public void ResetForMatchStart()
+        {
+            if (!photonView.IsMine)
+                return;
+
+            accrual = new GoldAccrual(territoryConfig != null ? territoryConfig.StartingGold : 0);
+            IncomePerSecond = 0.0;
+            PublishBalance();
+        }
+
         private void PublishIfDue()
         {
             if (accrual.Balance == lastPublishedBalance)

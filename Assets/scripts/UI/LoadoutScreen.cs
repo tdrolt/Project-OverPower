@@ -495,6 +495,20 @@ namespace Overpower.UI
                 Open();
         }
 
+        /// <summary>2.7b Decision 6: the fresh start at match-live forgets everything this player spent (so
+        /// neither reset button can refund warm-up spending once the real economy starts) and closes the
+        /// screen if it happened to be open at the live instant - Close() is already a no-op when it isn't.
+        /// Owner only; this component already disables itself for every non-owner copy in Awake (see the class
+        /// comment), but the guard matches every other ResetForMatchStart on this player.</summary>
+        public void ResetForMatchStart()
+        {
+            if (!photonView.IsMine)
+                return;
+
+            ledger.Clear();
+            Close();
+        }
+
         /// <summary>Re-reads everything this screen shows from the live player state. Called on
         /// Open and after every click that changes something on THIS screen. Also called from
         /// Update()'s own poll (see its comment, Task 9a review finding 2) while the screen stays

@@ -90,13 +90,9 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             // starts at the prefab's free default. A late joiner reads whichever id this publish
             // ends up writing below, and a respawn never re-runs Start() (this component lives on
             // the same player object for the whole match), so a bought ultimate is never lost.
-            bool ultimateStartsEmpty = gameplayConfig != null && !gameplayConfig.FreeLoadout;
-
             foreach (AbilitySlot slot in AbilitySlots)
             {
-                int startingId = ultimateStartsEmpty && slot == AbilitySlot.Ultimate
-                    ? LoadoutProperties.Empty
-                    : (abilityRunner != null ? abilityRunner.StartingId(slot) : LoadoutProperties.Empty);
+                int startingId = StartingAbilityId(slot);
                 ApplyAbility(slot, startingId);
                 props[LoadoutProperties.KeyFor(slot)] = EquippedAbilityId(slot);
             }
@@ -116,6 +112,58 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             // current values, falling back to the prefab's defaults for anything missing.
             ApplyFromProperties(photonView.Owner.CustomProperties, onlyKeysPresent: false);
         }
+    }
+
+    /// <summary>The starting kit's own id for one ability slot - Start (above) publishes this at spawn, and
+    /// ResetForMatchStart (2.7b step 4) puts it back at the fresh start, so there is exactly ONE definition of
+    /// "what the starting kit looks like" for both callers to share. Task 2.5a: the ultimate is the one
+    /// exception - it starts EMPTY under the real economy (Free Loadout off) and only carries the prefab's own
+    /// assigned starting ultimate (if any) under Free Loadout, a testing convenience; every other slot always
+    /// starts at the prefab's default. [2.7b step 5b will read ShopPricing.IsFreeNow here instead of
+    /// gameplayConfig.FreeLoadout directly, so the warm-up sandbox gets the same convenience - not built yet.]</summary>
+    private int StartingAbilityId(AbilitySlot slot)
+    {
+        bool ultimateStartsEmpty = gameplayConfig != null && !gameplayConfig.FreeLoadout;
+        if (ultimateStartsEmpty && slot == AbilitySlot.Ultimate)
+            return LoadoutProperties.Empty;
+
+        return abilityRunner != null ? abilityRunner.StartingId(slot) : LoadoutProperties.Empty;
+    }
+
+    /// <summary>2.7b Decision 6 (Tudor answer 2, amended): the fresh start at match-live puts EVERY slot back
+    /// to the starter kit - the weapon, AND all three ability slots (Mobility, Equipment, Ultimate) to
+    /// StartingAbilityId, not weapon+armour only as the pre-amendment plan text said. The prefab ships every
+    /// ability slot empty, so this is "back to empty" for Mobility and Equipment too: the first pick into
+    /// either is free again, exactly like a brand new player (ShopRules.AbilityPrice). Armour drops to level
+    /// 0/0 here too - PlayerLifecycle.ResetForMatchStart calls this BEFORE PlayerHealth.ResetForRespawn, so the
+    /// capacity is already at 0 when that refill decides what "full" means. One Hashtable publish, the same
+    /// apply-then-publish shape as every other write in this class. Owner only.</summary>
+    public void ResetForMatchStart()
+    {
+        if (!photonView.IsMine)
+            return;
+
+        var props = new Hashtable();
+
+        if (startingWeaponId != LoadoutProperties.Empty && weaponFiring != null && weaponFiring.SetWeapon(startingWeaponId))
+            props[LoadoutProperties.WeaponKey] = startingWeaponId;
+
+        foreach (AbilitySlot slot in AbilitySlots)
+        {
+            int startingId = StartingAbilityId(slot);
+            ApplyAbility(slot, startingId);
+            props[LoadoutProperties.KeyFor(slot)] = EquippedAbilityId(slot);
+        }
+
+        if (playerHealth != null)
+        {
+            playerHealth.SetArmorLevels(0, 0);
+            props[LoadoutProperties.ArmorAbsorbLevelKey] = playerHealth.AbsorbLevel;
+            props[LoadoutProperties.ArmorRechargeLevelKey] = playerHealth.RechargeLevel;
+        }
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
+        LogLoadout();
     }
 
     // ---- the owner's two writes ------------------------------------------------------------------

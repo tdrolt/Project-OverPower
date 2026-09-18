@@ -78,6 +78,10 @@ namespace Overpower.Combat
         /// <summary>F1's "Fill Ultimate" - instantly full, for testing without farming a dummy.</summary>
         public void Fill() => Current = maxCharge;
 
+        /// <summary>2.7b fresh start (Decision 6): empties the meter back to 0, the same as never having
+        /// earned anything this match - called once, at match-live, never mid-match.</summary>
+        public void Clear() => Current = 0f;
+
         /// <summary>
         /// Applies a live Inspector retune. Current is clamped to the new cap (down, never up) rather
         /// than reset - a designer lowering the cap mid-session should not hand out a free ultimate

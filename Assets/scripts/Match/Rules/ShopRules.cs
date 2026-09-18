@@ -71,5 +71,13 @@ namespace Overpower.Match
             ArmorSpent = 0;
             return refund;
         }
+
+        /// <summary>2.7b fresh start (Decision 6): forgets everything spent this match, so neither reset
+        /// button can refund warm-up spending once the real economy starts.</summary>
+        public void Clear()
+        {
+            WeaponSpent = 0;
+            ArmorSpent = 0;
+        }
     }
 }

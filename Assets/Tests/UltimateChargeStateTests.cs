@@ -157,5 +157,18 @@ namespace Overpower.Tests
 
             Assert.AreEqual(200f, s.Current, 0.001f);
         }
+
+        [Test]
+        public void ClearEmptiesTheMeterForAFreshStart()
+        {
+            // 2.7b step 4: the owner-side fresh start (Decision 6) empties the ultimate meter.
+            var s = NewState();
+            s.Fill();
+
+            s.Clear();
+
+            Assert.AreEqual(0f, s.Current);
+            Assert.IsFalse(s.IsFull);
+        }
     }
 }

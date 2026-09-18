@@ -107,6 +107,17 @@ public class UltimateCharge : MonoBehaviour
     /// <summary>Owner only. F1's "Fill Ultimate" - see TestRangePanel.</summary>
     public void Fill() => state.Fill();
 
+    /// <summary>2.7b Decision 6: the fresh start at match-live empties the meter built up during the match
+    /// (warm-up combat included) - the one call to UltimateChargeState.Clear(). Owner only, like Fill/Spend
+    /// above; a remote copy has nothing of its own to clear.</summary>
+    public void ResetForMatchStart()
+    {
+        if (photonView == null || !photonView.IsMine)
+            return;
+
+        state.Clear();
+    }
+
     private void HandleDamaged(DamageResult result, DamageInfo info) => state.AddDamageTaken(result.Total);
     private void HandleDamageDealt(float amount) => state.AddDamageDealt(amount);
 

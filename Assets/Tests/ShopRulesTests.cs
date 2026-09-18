@@ -64,6 +64,21 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ClearForgetsEverythingSpent()
+        {
+            // 2.7b step 4: the owner-side fresh start (Decision 6) - the purchase ledger is cleared so
+            // neither reset button can refund warm-up spending once the real economy starts.
+            var ledger = new PurchaseLedger();
+            ledger.RecordWeapon(600);
+            ledger.RecordArmor(1400);
+
+            ledger.Clear();
+
+            Assert.AreEqual(0, ledger.SellWeapon(0.5));
+            Assert.AreEqual(0, ledger.SellArmor(0.5));
+        }
+
+        [Test]
         public void FirstPickIntoAnEmptyMobilityOrEquipmentSlotIsFree()
         {
             Assert.AreEqual(0, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Mobility, goldCost: 800));
