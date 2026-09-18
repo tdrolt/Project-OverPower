@@ -93,6 +93,11 @@ namespace Overpower.TestRange
         private readonly TMP_Dropdown[] abilityDropdowns = new TMP_Dropdown[AbilitySlots.Length];
         private TextMeshProUGUI readoutText;
         private TextMeshProUGUI telemetryStatusText;
+
+        // RefreshTelemetryStatus's own cache of the last string it actually wrote - it runs every
+        // frame the panel is open (Update, guarded on visible), and a TMP text write is not free
+        // even when the value did not change. Null so the very first call always writes.
+        private string lastTelemetryStatusText;
         private readonly List<WeaponDefinition> weaponOptions = new List<WeaponDefinition>();
 
         // Per ability dropdown, the ability behind each option. Option 0 is always "(none)", so an
@@ -598,9 +603,17 @@ namespace Overpower.TestRange
         private void RefreshTelemetryStatus()
         {
             MatchTelemetry telemetry = MatchTelemetry.Instance;
-            telemetryStatusText.text = telemetry != null && telemetry.IsRecording
+            string text = telemetry != null && telemetry.IsRecording
                 ? $"Telemetry: {telemetry.LineCount} lines -> {telemetry.CurrentFolder}"
                 : "Telemetry: off";
+
+            // Only touch .text when the value actually changed - this runs every frame the panel
+            // is open, and LineCount only changes once per telemetry line, far slower than 60Hz.
+            if (text == lastTelemetryStatusText)
+                return;
+
+            telemetryStatusText.text = text;
+            lastTelemetryStatusText = text;
         }
     }
 }
