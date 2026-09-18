@@ -127,6 +127,7 @@ MonoBehaviour:
   capitalUnderAttackNoteFontSize: 30
   capitalUnderAttackNoteColor: {r: 1, g: 1, b: 1, a: 1}
   capitalUnderAttackNoteBackingColor: {r: 0, g: 0, b: 0, a: 0.6}
+  twoTeamsLeftBannerText: Two teams left - losing your capital now eliminates you
   captureRingMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
   captureRingOutlineWidth: 0.15
   captureRingArcWidth: 0.45

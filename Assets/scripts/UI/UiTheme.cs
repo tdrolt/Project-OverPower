@@ -419,6 +419,13 @@ namespace Overpower.UI
                  "second, unrelated overlay.")]
         public Color capitalUnderAttackNoteBackingColor = new Color(0f, 0f, 0f, 0.6f);
 
+        [Header("Phase transition (Task 2.7)")]
+        [Tooltip("HUD toast shown to every surviving player the instant the match narrows from three " +
+                 "teams to two (GDD p.20-21: losing your capital now eliminates your team at once, " +
+                 "instead of starting a last stand). Uses the same toast label and duration as the " +
+                 "bounty payout (Bounty Toast Duration Seconds above).")]
+        public string twoTeamsLeftBannerText = "Two teams left - losing your capital now eliminates you";
+
         [Header("Capture ring (2026-09-16)")]
         [Tooltip("Material every capture ring line draws with. Keep it unlit, transparent, vertex-coloured and its own " +
                  "colour white: each ring tints itself per team. Points at the Aim Cone Line material, which is exactly that.")]

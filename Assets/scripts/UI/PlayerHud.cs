@@ -346,6 +346,14 @@ namespace Overpower.UI
             toastHideAtTime = Time.unscaledTime + theme.bountyToastDurationSeconds;
         }
 
+        /// <summary>Task 2.7: the "Two teams left" banner shown to every surviving player the instant
+        /// the match narrows from three teams to two. Same transient label ShowToast always uses -
+        /// MatchDirector calls this instead of ShowToast directly because it is added at runtime with
+        /// no Inspector of its own to hold a UiTheme reference; theme stays private and single-owned
+        /// here, the same "one source of truth" convention every other theme-driven text on this HUD
+        /// already follows.</summary>
+        public void ShowTwoTeamsLeftBanner() => ShowToast(theme.twoTeamsLeftBannerText);
+
         private void UpdateToast()
         {
             if (toastHideAtTime < 0f || Time.unscaledTime < toastHideAtTime)
