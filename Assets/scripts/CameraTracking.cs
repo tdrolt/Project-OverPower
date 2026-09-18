@@ -101,6 +101,14 @@ public class CameraTracking : MonoBehaviour
     private float yaw = 0f;         // degrees rotated around the player
     private bool teamYawResolved = false;
 
+    // Scope ability (Tudor, 2026-09-18): a SEPARATE keyed stack from currentZoom above, on purpose - see
+    // CameraZoomStack's class comment for why an extra-zoom multiplier must never be folded into currentZoom
+    // itself. Mirrors PlayerMotor.speedMultipliers exactly (PlayerMotor.cs:57, 252-254): a dictionary indexer, so
+    // a duplicate key overwrites rather than stacking, and removing an absent key is a no-op. Keyed so two
+    // independent systems could each own one entry without knowing about each other, the same reason
+    // PlayerMotor's stack is keyed rather than a single float.
+    private readonly Dictionary<object, float> zoomMultipliers = new Dictionary<object, float>();
+
     /// <summary>The camera following the local player (there is one, on the scene's main camera). The capture rings and
     /// the minimap read its Yaw, so "up" on them is "up" on screen.</summary>
     public static CameraTracking Instance { get; private set; }
@@ -111,6 +119,28 @@ public class CameraTracking : MonoBehaviour
     public float Yaw => yaw;
 
     public bool YawResolved => teamYawResolved;
+
+    /// <summary>Diagnostic only, like RemoteSnapCount above - the product of every active extra-zoom multiplier
+    /// (1 when nothing is scoping). Tests read this instead of reflecting into the private stack.</summary>
+    public float ZoomMultiplierProduct => CameraZoomStack.Product(zoomMultipliers.Values);
+
+    /// <summary>Diagnostic only - how many keyed extra-zoom multipliers are active right now. 0 means the stack is
+    /// genuinely empty, not merely "at 1x" - a snap-back test checks this, not just the product.</summary>
+    public int ActiveZoomMultiplierCount => zoomMultipliers.Count;
+
+    /// <summary>
+    /// Lets another component (the Scope ability) add an extra zoom-out on top of the scroll wheel's own clamp,
+    /// without that component needing to know about anyone else doing the same. A duplicate key overwrites its
+    /// previous value rather than stacking - same semantics as PlayerMotor.AddSpeedMultiplier. Composes with the
+    /// scroll zoom AFTER its clamp (CameraZoomStack.ApplyZoom, called from LateUpdate below), and is NEVER folded
+    /// into currentZoom - see CameraZoomStack's class comment for why that ordering is the whole point.
+    /// </summary>
+    public void AddZoomMultiplier(object key, float multiplier) => zoomMultipliers[key] = multiplier;
+
+    /// <summary>Removing a key that was never added (or already removed) is a no-op - same semantics as
+    /// PlayerMotor.RemoveSpeedMultiplier, so a module can always call this defensively (e.g. on every Interrupt
+    /// reason) without first checking whether it had actually added anything.</summary>
+    public void RemoveZoomMultiplier(object key) => zoomMultipliers.Remove(key);
 
     void Awake()
     {
@@ -143,8 +173,10 @@ public class CameraTracking : MonoBehaviour
 
         ResolveTeamYaw();
 
-        // Apply zoom, then rotation.
-        currentOffset = Quaternion.AngleAxis(yaw, Vector3.up) * (baseOffset * currentZoom);
+        // Apply zoom (scroll clamp, then every active extra-zoom multiplier - CameraZoomStack's class comment has
+        // the full reasoning), then rotation.
+        Vector3 zoomedOffset = CameraZoomStack.ApplyZoom(baseOffset, currentZoom, CameraZoomStack.Product(zoomMultipliers.Values));
+        currentOffset = Quaternion.AngleAxis(yaw, Vector3.up) * zoomedOffset;
 
         // Update camera position
         transform.position = target.position + currentOffset;
