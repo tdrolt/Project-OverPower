@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 13
   displayName: X-Ray
-  description: The beam passes through walls.
+  description: The beam passes through walls, after a short warning.
   parent: {fileID: 11400000, guid: 8fa3cfc5d5169494cb5251a678cca581, type: 2}
   icon: {fileID: 0}
   goldCost: 1600
