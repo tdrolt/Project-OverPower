@@ -185,6 +185,28 @@ namespace Overpower.Match
         /// own guard), so safe to call from anywhere.</summary>
         public void RequestRecompute() => MasterRecompute();
 
+        /// <summary>PlayerLifecycle.Start calls this once (photonView.IsMine, right after registering
+        /// itself in PlayerLookup) - found live, verifying this task: OnJoinedRoom is a room-level
+        /// callback that can run BEFORE this client's own player object is network-instantiated,
+        /// especially for a late joiner, so ReactToRoomState's very first call can find no local view
+        /// to react on and its winner reaction is silently skipped. That first call still updates
+        /// lastAppliedWinner, so a plain retry of ReactToRoomState would see winner == lastAppliedWinner
+        /// and do nothing - this applies the CURRENT winner unconditionally instead. A match that is
+        /// already over does not change again, so there is nothing else worth catching up here.</summary>
+        public void CatchUpLocalPlayer()
+        {
+            if (!PhotonNetwork.InRoom)
+                return;
+
+            int winner = ReadWinner(PhotonNetwork.CurrentRoom.CustomProperties);
+            if (winner < 0)
+                return;
+
+            PhotonView localView = PhotonNetwork.LocalPlayer != null
+                ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
+            localView?.GetComponent<MatchUI>()?.ShowMatchResult(winner);
+        }
+
         // ---------------------------------------------------------------- master: recompute + write
 
         private void MasterRecompute()

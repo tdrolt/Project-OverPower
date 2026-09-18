@@ -140,6 +140,14 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // already rely on for their own actor number.
         PlayerLookup.Register(photonView.OwnerActorNr, photonView);
 
+        // Task 2.7, found live verifying this task: MatchDirector.OnJoinedRoom is a room-level Photon
+        // callback that can run BEFORE this network-instantiated player object exists - reliably so
+        // for a late joiner - so its very first attempt to show an already-decided match result can
+        // find no local view yet and silently skip it. Catching up here, once this player object
+        // (and the PlayerLookup registration just above) definitely exists, closes that gap.
+        if (photonView.IsMine)
+            MatchDirector.Instance?.CatchUpLocalPlayer();
+
         // Once per player per match. A team of -1 here means the Custom Property had not arrived
         // yet, which is the thing to look for if teams or friendly fire ever behave oddly.
         PlayerTeam pt = GetComponent<PlayerTeam>();
