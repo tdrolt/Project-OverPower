@@ -28,11 +28,14 @@ namespace Overpower.Tests
         {
             cameraGo = new GameObject("TestCamera_Scope");
             camera = cameraGo.AddComponent<CameraTracking>();
-            // Edit-mode components never run Awake (confirmed by eval against this exact Unity version) - only
-            // Play Mode's player loop calls it, and CameraTracking is not [ExecuteAlways]. Set the static Instance
-            // the same Awake would, so ScopeAbility - which only ever reads CameraTracking.Instance, the same as
-            // it would find the real local player's camera in Play Mode - has something to talk to here.
-            // OnDestroy DOES run on DestroyImmediate (also confirmed), so TearDown's destroy alone clears it again.
+            // Edit-mode components never run Awake, OnEnable OR OnDestroy automatically (confirmed by a clean
+            // run_script probe against this exact Unity version: a bare MonoBehaviour's own OnDestroy never set
+            // its static flag after DestroyImmediate) - only Play Mode's player loop calls any of them, and
+            // CameraTracking is not [ExecuteAlways]. Set the static Instance the same Awake would, so ScopeAbility
+            // - which only ever reads CameraTracking.Instance, the same as it would find the real local player's
+            // camera in Play Mode - has something to talk to here. TearDown's DestroyImmediate does NOT clear
+            // Instance by itself (CameraTracking.OnDestroy never runs to do it) - each test's own SetStaticInstance
+            // call is what keeps Instance pointed at a live camera, not the previous test's destroyed one.
             SetStaticInstance(camera);
 
             scopeGo = new GameObject("TestScope");
@@ -137,6 +140,32 @@ namespace Overpower.Tests
 
             Assert.DoesNotThrow(() => scope.OwnerTick(1f, held: true, canAct: true));
             Assert.DoesNotThrow(() => scope.Interrupt(InterruptReason.Died));
+        }
+
+        [Test]
+        public void DestroyingTheModuleDirectlyStillClearsTheCamera()
+        {
+            // Scope review (2026-09-18): the player root can be destroyed directly (e.g. leaving the room while
+            // holding RMB), skipping AbilityRunner.Equip's own Interrupt(Unequipped) entirely - neither Interrupt
+            // nor OnRespawned ever runs. CameraTracking outlives the player and its stack is keyed by object
+            // reference, so without an OnDestroy safety net the 1.2 entry would stay forever.
+            scope.OwnerTick(1f, held: true, canAct: true); // fully scoped
+            Assert.AreEqual(1, camera.ActiveZoomMultiplierCount, "held for a full second must have added it");
+
+            // DestroyImmediate alone does not call OnDestroy here - edit-mode components never run ANY Unity
+            // lifecycle method automatically (same gap CreateRig's own comment documents for Awake; confirmed
+            // again by a clean run_script probe for OnDestroy specifically). Only Play Mode's real player loop
+            // does that. Destroy the GameObject (so it is genuinely gone, matching the real scenario) AND invoke
+            // the private OnDestroy directly, so this test exercises exactly what Play Mode would call without
+            // depending on an edit-mode guarantee Unity does not make.
+            Object.DestroyImmediate(scopeGo); // no Interrupt, no OnRespawned - just gone
+            scopeGo = null;
+            MethodInfo onDestroy = typeof(ScopeAbility).GetMethod("OnDestroy", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(onDestroy, "ScopeAbility.OnDestroy");
+            onDestroy.Invoke(scope, null);
+
+            Assert.AreEqual(1f, camera.ZoomMultiplierProduct);
+            Assert.AreEqual(0, camera.ActiveZoomMultiplierCount);
         }
     }
 }

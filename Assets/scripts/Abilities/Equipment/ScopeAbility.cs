@@ -76,6 +76,17 @@ namespace Overpower.Abilities
 
         public override void OnRespawned() => SnapBack();
 
+        /// <summary>A player root destroyed directly (leaving the room while holding RMB, say) skips
+        /// AbilityRunner.Equip's own Interrupt(Unequipped) entirely - neither Interrupt nor OnRespawned ever
+        /// runs. CameraTracking outlives this module and its stack is keyed by object reference, so without this
+        /// the 1.2 entry would stay forever and the local camera would sit ~20% further out for the rest of the
+        /// session. Same fix as InvulnerabilityAbility.OnDestroy/ClearShield for the same class of bug. Safe to
+        /// run twice - Interrupt(Unequipped) already calls SnapBack before this module is destroyed, and removing
+        /// an absent key is a no-op (CameraTracking.RemoveZoomMultiplier's own contract). Real Play Mode/build
+        /// destruction (leaving the room) DOES call this normally; only this project's edit-mode test harness has
+        /// to invoke it explicitly (see ScopeAbilityTests' own comment on why).</summary>
+        private void OnDestroy() => SnapBack();
+
         /// <summary>Removes the multiplier at once rather than easing it out - see the class comment on why every
         /// interrupt reason and a respawn both skip the ease entirely.</summary>
         private void SnapBack()
