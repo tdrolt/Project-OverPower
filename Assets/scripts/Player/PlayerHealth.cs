@@ -285,14 +285,23 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (!photonView.IsMine || isDead)
             return default;
 
-        // The Invulnerability ultimate depends on this: the funnel is the only place that can stop a hit for everyone.
-        if (statusEffects != null && statusEffects.IsInvulnerable)
-            return default;
-
+        // Shield combat order (2.7b, Tudor 2026-09-18): self, then teammate, then an immunity already running,
+        // then the armed trap, then the hit lands - HitVerdictRule.Classify is the one home for this order, so
+        // a self or teammate hit can never spring the trap or touch the combat clock below.
         Photon.Realtime.Player sourcePlayer = PhotonNetwork.CurrentRoom?.GetPlayer(info.SourceActorNumber);
+        bool fromSelf = sourcePlayer != null && sourcePlayer == photonView.Owner;
+        // AreSameTeam deliberately fails OPEN: an unknown team must never silently make someone invulnerable.
+        bool fromTeammate = !fromSelf && Teams.AreSameTeam(sourcePlayer, photonView.Owner);
 
-        // Your own damage cannot hurt you (e.g. dashing into your own shot).
-        if (sourcePlayer != null && sourcePlayer == photonView.Owner)
+        HitVerdict verdict = HitVerdictRule.Classify(fromSelf, fromTeammate,
+            statusEffects != null && statusEffects.IsInvulnerable, statusEffects, info.Amount);
+
+        // Tudor, 2026-09-18: being shot while the shield is up IS combat (no armour recharge, no shop, no
+        // regen while being shot). A self or teammate hit is thrown away above and never reaches here.
+        if (HitVerdictRule.CountsAsCombat(verdict))
+            secondsSinceCombat = 0f;
+
+        if (verdict == HitVerdict.IgnoredSelf)
         {
             if (!loggedSelfHitBlocked)
             {
@@ -302,9 +311,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return default;
         }
 
-        // No friendly fire. AreSameTeam deliberately fails OPEN: an unknown team must never
-        // silently make someone invulnerable.
-        if (Teams.AreSameTeam(sourcePlayer, photonView.Owner))
+        if (verdict == HitVerdict.IgnoredTeammate)
         {
             if (!loggedFriendlyFireBlocked)
             {
@@ -314,13 +321,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return default;
         }
 
-        // The Invulnerability ultimate's armed window (rework step 2). DELIBERATELY HERE, not up beside the
-        // IsInvulnerable check: this one CONSUMES the arm, and at that check a teammate's stray shot or your
-        // own splash would burn a whole ultimate on a hit that was going to be blocked anyway. By this line
-        // the hit is real, from a real enemy. Returning default() before DamageResolver ever runs is what
-        // nullifies the triggering hit itself - which costs nothing on the wire, because this whole method
-        // only ever runs on the victim's own machine (the IsMine guard at the top).
-        if (statusEffects != null && statusEffects.TryConsumeReactiveInvulnerability(info.Amount))
+        if (verdict == HitVerdict.Shielded)
             return default;
 
         float vulnerability = statusEffects != null ? statusEffects.Vulnerability : 0f;
@@ -328,7 +329,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
                                                        armor.Current, vulnerability, CurrentDamageReduction());
         armor.Absorb(result.ArmorAbsorbed);
         health -= result.HealthLost;
-        secondsSinceCombat = 0f;
 
         UpdateOverheadBar();
 

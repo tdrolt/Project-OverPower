@@ -14,7 +14,7 @@ using Overpower.Net;
 /// never expires on its own"), so it gets its own small stack alongside the timed effects rather
 /// than being forced into StatusKind.
 /// </summary>
-public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
+public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
 {
     [SerializeField, Tooltip("Match tuning asset. Caps how far Slow and Vulnerability can stack, " +
              "however many effects are landing at once.")]
@@ -211,6 +211,11 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
         reactiveInvulnerabilityJustTriggered = true;
         return true;
     }
+
+    /// <summary>HitVerdictRule.Classify's IArmedShield, 2.7b: the damage funnel asks through the interface
+    /// so it can be tested with a fake. Explicit so ordinary callers keep using the named
+    /// TryConsumeReactiveInvulnerability above.</summary>
+    bool IArmedShield.TryConsume(float damageAmount) => TryConsumeReactiveInvulnerability(damageAmount);
 
     /// <summary>Owner only, read once. InvulnerabilityAbility's OwnerTick asks this so it can send the
     /// shield's phase to every client - the one thing about this ability the other machines cannot work
