@@ -19,6 +19,13 @@ namespace Overpower.UI
         public Vector2 referenceResolution = new Vector2(1920f, 1080f);
         [Tooltip("0 = scale with screen width, 1 = with height, 0.5 = a mix. 0.5 keeps ultrawide and 16:10 readable.")]
         [Range(0f, 1f)] public float matchWidthOrHeight = 0.5f;
+        [Tooltip("How big the whole HUD is drawn, as a fraction of the sizes below: 1 is full size, 0.8 is 20% " +
+                 "smaller (Tudor, 2026-09-17). Applied ONCE, as a scale on the HUD panel and on the gold/shop " +
+                 "block in the bottom-right corner - every other size on this asset stays in its own units, so a " +
+                 "designer tunes Bar Width or Slot Width normally and this one number makes the whole group " +
+                 "bigger or smaller. It does NOT scale the minimap, the toast, the match panels, the chat or the " +
+                 "F1 test range panel, which each sit on their own.")]
+        [Range(0.5f, 1.5f)] public float hudScale = 0.8f;
 
         [Header("Text")]
         [Tooltip("Font for all UI text. Leave empty to use TextMeshPro's default font.")]
@@ -94,6 +101,14 @@ namespace Overpower.UI
         [Tooltip("Extra height below the icon box, in canvas units, reserved for the charge pips and the " +
                  "block-reason text on the three ability slots. The weapon slot has neither and never adds this.")]
         public float slotCooldownAreaHeight = 58f;
+        [Tooltip("Height of the key strip (LMB / RMB / SPACE / SHIFT) across the top of a slot, in canvas units " +
+                 "(Tudor, 2026-09-17: the key used to sit in the top-left corner). The icon and the ability name " +
+                 "centre themselves in whatever is left of the icon box below it, so both read as centred in the " +
+                 "square at once - which one shared rect could never do.")]
+        public float slotKeyRowHeight = 30f;
+        [Tooltip("Height of the block-reason line (\"recharging\", \"stunned\") under a slot's charge pips, in " +
+                 "canvas units. Together with the pip row it has to fit inside Slot Cooldown Area Height above.")]
+        public float slotReasonTextHeight = 26f;
         [Tooltip("Slot background when the slot can be used right now.")]
         public Color slotReadyColor = new Color(0f, 0f, 0f, 0.6f);
         [Tooltip("Slot background when the slot is blocked - dead, stunned, silenced, recharging, or an " +

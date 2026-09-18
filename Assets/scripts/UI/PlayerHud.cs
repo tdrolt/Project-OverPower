@@ -688,6 +688,12 @@ namespace Overpower.UI
             panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 0f);
             panelRt.pivot = new Vector2(0.5f, 0f);
             panelRt.anchoredPosition = new Vector2(0f, theme.hudBottomOffset);
+            // Tudor, 2026-09-17: one 20% reduction of the whole HUD, applied ONCE here as a scale rather than by
+            // re-typing every size on UiTheme at 80% - a designer still tunes Bar Width, Slot Width and the text
+            // sizes in their own units, and Hud Scale is the single number that makes the group smaller or
+            // bigger. The pivot above is bottom-centre, so shrinking keeps the HUD's bottom edge exactly Hud
+            // Bottom Offset above the screen edge instead of floating up off it.
+            panel.transform.localScale = Vector3.one * theme.hudScale;
             // Sized by the ContentSizeFitter below, not by hand - see its comment.
 
             // A visible background so the bars and slots read as one HUD group instead of floating
@@ -1022,10 +1028,12 @@ namespace Overpower.UI
             // same reasoning Overheat Bar Height gets its own taller-than-the-rest treatment.
             TextMeshProUGUI text = AddLabel(content.transform, "WEAPON SILENCED", theme.bodyTextSize, FontStyles.Bold);
             LayoutElement textLe = text.gameObject.AddComponent<LayoutElement>();
-            textLe.preferredWidth = 260f;
             textLe.preferredHeight = 30f;
             text.color = theme.overheatSilencedColor;
-            text.alignment = TextAlignmentOptions.MidlineLeft;
+            // Centred, and no pinned preferred WIDTH (Tudor, 2026-09-17): a left-aligned label inside a fixed
+            // 260-unit box let the layout group centre the box while the words sat against its left edge, so the
+            // banner read as off-centre over the slot row. The group now sizes the label to the words themselves.
+            text.alignment = TextAlignmentOptions.Center;
 
             row.SetActive(false);
             return row;
@@ -1065,8 +1073,20 @@ namespace Overpower.UI
             iconBoxRt.anchoredPosition = Vector2.zero;
             iconBoxRt.sizeDelta = new Vector2(0f, theme.slotIconBoxHeight);
 
+            // Everything the eye reads as "the ability" lives here, under the key strip: the icon, the fallback
+            // name, and (for the ultimate) its READY label. Its own rect - rather than the whole icon box - is
+            // what makes them centred in the SQUARE a player sees, instead of centred in a box whose top strip
+            // is the key label (Tudor, 2026-09-17: "the text should be in the middle of the ability square").
+            GameObject contentBox = new GameObject("Content Box", typeof(RectTransform));
+            contentBox.transform.SetParent(iconBox.transform, false);
+            RectTransform contentRt = contentBox.GetComponent<RectTransform>();
+            contentRt.anchorMin = Vector2.zero;
+            contentRt.anchorMax = Vector2.one;
+            contentRt.offsetMin = Vector2.zero;
+            contentRt.offsetMax = new Vector2(0f, -theme.slotKeyRowHeight);
+
             GameObject iconGo = new GameObject("Icon", typeof(RectTransform));
-            iconGo.transform.SetParent(iconBox.transform, false);
+            iconGo.transform.SetParent(contentBox.transform, false);
             RectTransform iconRt = iconGo.GetComponent<RectTransform>();
             iconRt.anchorMin = Vector2.zero;
             iconRt.anchorMax = Vector2.one;
@@ -1079,7 +1099,7 @@ namespace Overpower.UI
 
             // Body Text Size - Step 2's explicit call: the icon box is sized (Slot Width/Slot Icon
             // Box Height) so the longest short names (Raybeam, Shotgun, Baseline) fit at this size.
-            ui.fallbackNameText = AddLabel(iconBox.transform, "", theme.bodyTextSize, FontStyles.Normal);
+            ui.fallbackNameText = AddLabel(contentBox.transform, "", theme.bodyTextSize, FontStyles.Normal);
             RectTransform nameRt = ui.fallbackNameText.rectTransform;
             nameRt.anchorMin = Vector2.zero;
             nameRt.anchorMax = Vector2.one;
@@ -1090,6 +1110,9 @@ namespace Overpower.UI
 
             if (withCooldown)
             {
+                // Still the WHOLE icon box, not Content Box: a recharge sweep that stopped short of the key strip
+                // would read as a drawing bug, not as a cooldown. It is built after Content Box (so it covers the
+                // icon and name) and before the key strip below (so the key stays readable while recharging).
                 GameObject coverGo = new GameObject("Cooldown Cover", typeof(RectTransform));
                 coverGo.transform.SetParent(iconBox.transform, false);
                 RectTransform coverRt = coverGo.GetComponent<RectTransform>();
@@ -1107,13 +1130,13 @@ namespace Overpower.UI
                 ui.cooldownCover.fillAmount = 0f;
                 ui.cooldownCover.raycastTarget = false;
 
-                // Pip row and block-reason text sit BELOW the icon box, in the Slot Cooldown Area
-                // Height band reserved for them - positions derive from Slot Icon Box Height so they
-                // never drift out of sync with it.
-                const float PipRowHeight = 14f;
-                const float ReasonTextHeight = 26f;
+                // Pip row and block-reason text sit BELOW the icon box, in the Slot Cooldown Area Height band
+                // reserved for them - positions derive from Slot Icon Box Height so they never drift out of sync
+                // with it. Both heights moved onto UiTheme in HUD step 1/3: they were the last two sizes in this
+                // file a designer could not reach.
+                float pipRowHeight = 14f; // HUD step 3 moves this onto UiTheme.
                 float pipRowY = -(theme.slotIconBoxHeight + 2f);
-                float reasonY = pipRowY - PipRowHeight - 2f;
+                float reasonY = pipRowY - pipRowHeight - 2f;
 
                 GameObject pipRow = new GameObject("Pips", typeof(RectTransform));
                 pipRow.transform.SetParent(go.transform, false);
@@ -1122,7 +1145,7 @@ namespace Overpower.UI
                 pipRt.anchorMax = new Vector2(1f, 1f);
                 pipRt.pivot = new Vector2(0.5f, 1f);
                 pipRt.anchoredPosition = new Vector2(0f, pipRowY);
-                pipRt.sizeDelta = new Vector2(0f, PipRowHeight);
+                pipRt.sizeDelta = new Vector2(0f, pipRowHeight);
                 HorizontalLayoutGroup pipLayout = pipRow.AddComponent<HorizontalLayoutGroup>();
                 pipLayout.spacing = 2f;
                 pipLayout.childAlignment = TextAnchor.MiddleCenter;
@@ -1141,7 +1164,7 @@ namespace Overpower.UI
                 reasonRt.anchorMax = new Vector2(1f, 1f);
                 reasonRt.pivot = new Vector2(0.5f, 1f);
                 reasonRt.anchoredPosition = new Vector2(0f, reasonY);
-                reasonRt.sizeDelta = new Vector2(0f, ReasonTextHeight);
+                reasonRt.sizeDelta = new Vector2(0f, theme.slotReasonTextHeight);
                 ui.blockReasonText.alignment = TextAlignmentOptions.Center;
                 ui.blockReasonText.color = theme.overheatWarningColor;
 
@@ -1174,22 +1197,27 @@ namespace Overpower.UI
                     readyRt.anchorMin = Vector2.zero;
                     readyRt.anchorMax = Vector2.one;
                     readyRt.offsetMin = Vector2.zero;
-                    readyRt.offsetMax = Vector2.zero;
+                    // The same inset Content Box uses, so READY lands in the middle of the square a player sees
+                    // rather than in the middle of a box whose top strip is the key label (HUD step 1).
+                    readyRt.offsetMax = new Vector2(0f, -theme.slotKeyRowHeight);
                     ui.readyLabel.color = theme.ultimateReadyTextColor;
                     ui.readyLabel.gameObject.SetActive(false); // UpdateUltimateMeter turns this on once IsFull.
                 }
             }
 
-            // Body Text Size - Step 2's explicit call, alongside the fallback name above: the
-            // longest key label (SPACE) has to fit here too.
-            TextMeshProUGUI keyText = AddLabel(go.transform, keyLabel, theme.bodyTextSize, FontStyles.Bold);
+            // Tudor, 2026-09-17: centred, not tucked in a corner. A full-width strip across the TOP of the icon
+            // box, so the icon/name below it stay centred in the rest of the square (Content Box above). Built
+            // last inside the icon box, so it draws over the recharge sweep and the ultimate meter and the key
+            // stays readable in every state. Body Text Size, as before: the longest label (SPACE) must fit.
+            TextMeshProUGUI keyText = AddLabel(iconBox.transform, keyLabel, theme.bodyTextSize, FontStyles.Bold);
             RectTransform keyRt = keyText.rectTransform;
             keyRt.anchorMin = new Vector2(0f, 1f);
-            keyRt.anchorMax = new Vector2(0f, 1f);
-            keyRt.pivot = new Vector2(0f, 1f);
-            keyRt.anchoredPosition = new Vector2(2f, -2f);
-            keyRt.sizeDelta = new Vector2(90f, 32f);
-            keyText.alignment = TextAlignmentOptions.TopLeft;
+            keyRt.anchorMax = new Vector2(1f, 1f);
+            keyRt.pivot = new Vector2(0.5f, 1f);
+            keyRt.anchoredPosition = Vector2.zero;
+            keyRt.sizeDelta = new Vector2(0f, theme.slotKeyRowHeight);
+            keyText.alignment = TextAlignmentOptions.Center;
+            keyText.enableWordWrapping = false;
 
             return ui;
         }

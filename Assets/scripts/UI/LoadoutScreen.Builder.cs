@@ -512,9 +512,22 @@ namespace Overpower.UI
             scaler.matchWidthOrHeight = theme.matchWidthOrHeight;
             canvasGo.AddComponent<GraphicRaycaster>();
 
+            // The bottom-right corner group, scaled by the same Hud Scale as the HUD panel (Tudor, 2026-09-17).
+            // A wrapper rather than a scale on the button itself, because HUD step 4 hangs the gold readout above
+            // this button from PlayerHud's own canvas with an identical wrapper: two roots with the same anchor,
+            // the same pivot and the same scale stay aligned at any screen size, where two independently scaled
+            // children would drift apart the moment either size changed.
+            GameObject corner = new GameObject("Shop Corner", typeof(RectTransform));
+            corner.transform.SetParent(canvasGo.transform, false);
+            RectTransform cornerRt = corner.GetComponent<RectTransform>();
+            cornerRt.anchorMin = cornerRt.anchorMax = cornerRt.pivot = new Vector2(1f, 0f);
+            cornerRt.anchoredPosition = Vector2.zero;
+            cornerRt.sizeDelta = Vector2.zero;
+            corner.transform.localScale = Vector3.one * theme.hudScale;
+
             GameObject buttonGo = TMP_DefaultControls.CreateButton(new TMP_DefaultControls.Resources());
             buttonGo.name = "Loadout Toggle Button";
-            buttonGo.transform.SetParent(canvasGo.transform, false);
+            buttonGo.transform.SetParent(corner.transform, false);
             RectTransform buttonRt = buttonGo.GetComponent<RectTransform>();
             buttonRt.anchorMin = buttonRt.anchorMax = buttonRt.pivot = new Vector2(1f, 0f);
             buttonRt.sizeDelta = new Vector2(theme.loadoutToggleButtonWidth, theme.loadoutToggleButtonHeight);

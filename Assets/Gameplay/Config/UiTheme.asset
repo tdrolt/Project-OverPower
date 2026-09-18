@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   referenceResolution: {x: 1920, y: 1080}
   matchWidthOrHeight: 0.5
+  hudScale: 0.8
   font: {fileID: 0}
   smallTextSize: 20
   bodyTextSize: 24
@@ -46,6 +47,8 @@ MonoBehaviour:
   hudSlotSpacing: 10
   slotIconBoxHeight: 104
   slotCooldownAreaHeight: 58
+  slotKeyRowHeight: 30
+  slotReasonTextHeight: 26
   slotReadyColor: {r: 0, g: 0, b: 0, a: 0.6}
   slotBlockedColor: {r: 0.3, g: 0.3, b: 0.3, a: 0.85}
   slotActiveGlowColor: {r: 1, g: 0.85, b: 0.25, a: 1}
