@@ -11,7 +11,13 @@ namespace Overpower.Abilities
     /// is +60%. THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT EXTRA DAMAGE: all three
     /// land only at the convergence point, so the skill is placing the cursor at the right
     /// distance, not spamming the key. Zero damage - this is a debuff, not a weapon (addendum,
-    /// [C, plan]). 20s cooldown.
+    /// [C, plan]).
+    ///
+    /// REWORK STEP 5 (Tudor, 2026-09-18): moved from Equipment to the Ultimate slot. Readiness comes
+    /// entirely from Owner.UltimateCharge - see IsReady/TryBuildCast below, the identical pattern
+    /// InvulnerabilityAbility, ElectricFenceAbility and AoeZoneAbility already use - NOT the base
+    /// class's own charge/cooldown pool (1 charge, 0s cooldown on this prefab; that recovers the
+    /// instant it is spent, so it is never itself a gate). No cooldown of its own any more.
     ///
     /// RUNS ON EVERY CLIENT, INCLUDING THE CASTER'S OWN, exactly once per cast - the beams are
     /// instant, so there is no coroutine the way the flamethrower's spray needs one. DAMAGE (well,
@@ -129,6 +135,13 @@ namespace Overpower.Abilities
 
         // ---- owner only ---------------------------------------------------------------------------
 
+        /// <summary>Full meter only (rework step 5) - same reasoning and same call as the other three
+        /// ultimates (InvulnerabilityAbility, ElectricFenceAbility, AoeZoneAbility): 1 charge and a
+        /// 0s cooldown on the base class recover instantly, so without this override that pool would
+        /// never actually refuse a cast and Raybeam would be spammable regardless of the ultimate
+        /// meter, ultimate slot or not.</summary>
+        public override bool IsReady => Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull;
+
         /// <summary>
         /// Origin is the MUZZLE (ctx.Muzzle, the wall-safe one - addendum, overriding the plan's
         /// plain ctx.Origin), not the body: three beams starting from the gun read better than three
@@ -139,9 +152,17 @@ namespace Overpower.Abilities
         /// point would send every beam angling down into the floor the instant the cursor is more
         /// than a few metres away - then clamped to Beam Range from the muzzle so a cursor far
         /// across the map cannot make the beams reach further than the tuned distance.
+        ///
+        /// Refuses the cast (rework step 5) unless UltimateCharge itself agrees to spend - the same
+        /// "proceed only if true" the other three ultimates use, so the runner's own base-class
+        /// SpendCharge (the 1-charge/0s pool below) never runs on a meter that was not actually full.
         /// </summary>
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
+            payload = default;
+            if (Owner.UltimateCharge == null || !Owner.UltimateCharge.Spend())
+                return false;
+
             Vector3 origin = ctx.Muzzle;
 
             Vector3 rawPoint = ctx.TargetPoint;

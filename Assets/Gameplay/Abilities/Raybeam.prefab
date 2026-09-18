@@ -44,7 +44,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7c9920c60e303f348b69566d2e9c57f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cooldownSeconds: 20
+  cooldownSeconds: 0
   charges: 1
   vulnerabilityPerBeam: 0.3
   vulnerabilitySeconds: 4

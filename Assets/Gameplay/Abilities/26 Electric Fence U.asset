@@ -17,5 +17,5 @@ MonoBehaviour:
   description: An electric ring that hurts and slows anyone crossing it.
   slot: 2
   icon: {fileID: 0}
-  goldCost: 1550
+  goldCost: 800
   modulePrefab: {fileID: 5314752651773599598, guid: b26932de4408e1f48bb892abf78c8566, type: 3}
