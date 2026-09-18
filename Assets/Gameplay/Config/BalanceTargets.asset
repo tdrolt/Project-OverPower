@@ -16,9 +16,14 @@ MonoBehaviour:
   strugglingIncomePerSecond: 15
   averageIncomePerSecond: 23
   dominantIncomePerSecond: 33
+  phase2LosingIncomePerSecond: 5
+  phase2EvenIncomePerSecond: 15
+  phase2WinningIncomePerSecond: 25
   primaryUpgrade1TargetMinutes: 6.5
   armor1TargetMinutes: 10
   ultimateTargetMinutes: 13.5
   primaryUpgrade2TargetMinutes: 16.5
   armor2TargetMinutes: 20
+  phase1DurationSeconds: 900
+  phase2DurationSeconds: 450
   targetMatchSeconds: 1350
