@@ -21,6 +21,11 @@ namespace Overpower.Match
     /// player who joins mid-match reads one value instead of replaying the match, and the state
     /// survives the master leaving.
     ///
+    /// 2.7b step 7: capital adoption is BUILT, not cut - TeamHasACapital/RespawnCapitalOf/SpawnCapitalFor answer
+    /// "any capital in play", not just each team's own static one (the deleted CapitalOf's old "adoption hook"
+    /// comment is gone with it). PlayerLifecycle asks these three, never TerritoryMap.CapitalOf directly, for
+    /// anything that must honour an adopted capital.
+    ///
     /// NOT a scene object: the arena is being rebuilt from primitives in a separate session, so
     /// anything placed in Game Scene.unity right now could be lost or conflict with that rebuild.
     /// BuildingManager.Awake adds this component at runtime instead, onto the same GameObject that
@@ -77,14 +82,63 @@ namespace Overpower.Match
         public bool IsEliminated(int team) =>
             PhotonNetwork.InRoom && ReadEliminated(PhotonNetwork.CurrentRoom.CustomProperties).Contains(team);
 
-        /// <summary>This team's capital zone id (GDD-fixed: 6/7/8 for teams 0/1/2 - see BuildingManager.
-        /// CathedralBuildingIDs, which TerritoryMap.CapitalOf was built from). Capital adoption - a
-        /// last-stand team keeping an enemy capital it just captures, GDD p.20 - was cut for this
-        /// task; if it is ever built, this is the one place PlayerLifecycle and BuildingManager should
-        /// keep asking, so adoption only has to change this method.</summary>
-        public int CapitalOf(int team) =>
-            BuildingManager.Instance != null && BuildingManager.Instance.Map != null
-                ? BuildingManager.Instance.Map.CapitalOf(team) : TerritoryMap.Neutral;
+        /// <summary>2.7b step 7 (Decision 10): does this team have a capital right now - its own, an enemy's, or a
+        /// knocked-out team's? Tudor answer 1: adoption counts in both phases, so this is just
+        /// MatchPhaseRules.CountsAsHavingACapital fed from the replicated snapshot. A missing map or snapshot reads
+        /// as false rather than throwing.</summary>
+        public bool TeamHasACapital(int team)
+        {
+            BuildingManager buildings = BuildingManager.Instance;
+            if (buildings == null || buildings.Map == null || buildings.Current == null)
+                return false;
+
+            int ownCapital = buildings.Map.CapitalOf(team);
+            bool holdsOwn = ownCapital >= 0 && buildings.Current.OwnerOf(ownCapital) == team;
+            bool holdsAny = false;
+            foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
+                if (buildings.Current.OwnerOf(capital.Key) == team && IsInMatch(capital.Value))
+                { holdsAny = true; break; }
+
+            return MatchPhaseRules.CountsAsHavingACapital(Phase, holdsOwn, holdsAny);
+        }
+
+        /// <summary>2.7b step 7 (Decision 11): where this team respawns - its own capital while it holds it, else
+        /// the in-play capital it has held longest (the one it adopted first, by MatchPhaseRules.RespawnCapital's
+        /// wrap-safe HeldSinceMs comparison). TerritoryMap.Neutral if it holds none. Derived from the replicated
+        /// snapshot alone, so a new master and a late joiner compute the same answer with no extra state.</summary>
+        public int RespawnCapitalOf(int team)
+        {
+            BuildingManager buildings = BuildingManager.Instance;
+            if (buildings == null || buildings.Map == null || buildings.Current == null)
+                return TerritoryMap.Neutral;
+
+            var inPlay = new List<MatchPhaseRules.CapitalHold>();
+            foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
+            {
+                if (!IsInMatch(capital.Value))
+                    continue;
+                int owner = buildings.Current.OwnerOf(capital.Key);
+                if (owner < 0)
+                    continue;
+                inPlay.Add(new MatchPhaseRules.CapitalHold
+                {
+                    Zone = capital.Key,
+                    Owner = owner,
+                    HeldSinceMs = buildings.Current.HeldSinceMs(capital.Key),
+                });
+            }
+            return MatchPhaseRules.RespawnCapital(team, buildings.Map.CapitalOf(team), inPlay);
+        }
+
+        /// <summary>2.7b step 7: where an ended respawn countdown puts this team's player, as a capital zone -
+        /// TerritoryMap.Neutral means don't respawn, wait (Decision 12: two teams left with no capital, the dead
+        /// can't respawn; a knocked-out team never respawns).</summary>
+        public int SpawnCapitalFor(int team)
+        {
+            BuildingManager buildings = BuildingManager.Instance;
+            int ownCapital = buildings != null && buildings.Map != null ? buildings.Map.CapitalOf(team) : TerritoryMap.Neutral;
+            return MatchPhaseRules.SpawnCapitalFor(Phase, IsEliminated(team), ownCapital, RespawnCapitalOf(team));
+        }
 
         private void Awake()
         {

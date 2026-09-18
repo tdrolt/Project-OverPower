@@ -268,28 +268,29 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         int teamID = (int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey];
         int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
 
-        if (!TryGetOwnCathedral(teamID, out int baseBuildingID, out TowerData cathedralTower))
-            return;
+        MatchDirector director = MatchDirector.Instance;
 
-        bool capitalHeld = cathedralTower.isCaptured && cathedralTower.controllingTeam == teamID;
+        // 2.7b step 7 (Decision 10): TeamHasACapital already reads "any capital in play" - this team's own, an
+        // enemy's, or a knocked-out team's (adoption) - in both phases, so IsLastStandDeath's own capital-less
+        // check below covers adoption for free; nothing here has to special-case it.
+        bool live = director != null && director.IsLive;
+        bool hasCapital = director != null && director.TeamHasACapital(teamID);
 
         // 2.7b step 5 (Decision 3): live comes from MatchDirector.IsLive, the room's own echoed mPhase - a
         // countdown death is still a warm-up death (mPhase is not written until GoLive), whatever the capital
         // situation, so IsLastStandDeath can never fire during it.
-        bool live = MatchDirector.Instance != null && MatchDirector.Instance.IsLive;
-        if (MatchPhaseRules.IsLastStandDeath(live, teamHasACapital: capitalHeld))
+        if (MatchPhaseRules.IsLastStandDeath(live, teamHasACapital: hasCapital))
         {
-            // DELIBERATE: dying with your capital already lost is a last-stand death - no respawn
-            // countdown, a wait for a teammate to take the capital back instead (GDD p.20). This
+            // DELIBERATE: dying with your team holding no capital in play is a last-stand death - no
+            // respawn countdown, a wait for a teammate to retake or adopt one instead (GDD p.20). This
             // branch was once misdiagnosed as a networking bug ("players sometimes go invisible") and
-            // nearly removed. It is the design. It reads TowerDictionary, which is no longer written
-            // by any RPC - it is BuildingManager's in-memory mirror of the room's replicated
-            // TerritorySnapshot (BuildingManager.Apply; see that class's own comment), updated the
-            // moment this client's own copy of the snapshot changes. A client whose copy of the
-            // snapshot is still stale could take this branch early - that staleness is the thing to
-            // fix if this ever fires when it should not, not the branch itself.
-            Debug.LogWarning($"[VIS] LAST-STAND DEATH  team={teamID} base={baseBuildingID} " +
-                             $"isCaptured={cathedralTower.isCaptured} controllingTeam={cathedralTower.controllingTeam}");
+            // nearly removed. It is the design. TeamHasACapital reads BuildingManager's in-memory
+            // mirror of the room's replicated TerritorySnapshot (BuildingManager.Apply; see that
+            // class's own comment), updated the moment this client's own copy of the snapshot changes.
+            // A client whose copy of the snapshot is still stale could take this branch early - that
+            // staleness is the thing to fix if this ever fires when it should not, not the branch itself.
+            int respawnCapital = director != null ? director.RespawnCapitalOf(teamID) : TerritoryMap.Neutral;
+            Debug.LogWarning($"[VIS] LAST-STAND DEATH  team={teamID} respawnCapital={respawnCapital}");
 
             SetAlive(false);
             SetLastStandOut(true);
@@ -343,10 +344,14 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return;
         }
 
-        if (!TryGetOwnCathedral(teamID, out _, out TowerData cathedralTower))
+        MatchDirector director = MatchDirector.Instance;
+        if (director == null)
             return;
 
-        if (cathedralTower.isCaptured && cathedralTower.controllingTeam == teamID && !respawnStarted)
+        // 2.7b step 7 (Decision 9/10): ANY capital in play, not just this team's own - a last-stand team that
+        // adopts an enemy's (or a knocked-out team's) capital comes back the same way a recapture of its own
+        // used to. A knocked-out team never respawns, whatever it captures.
+        if (director.RespawnCapitalOf(teamID) != TerritoryMap.Neutral && !director.IsEliminated(teamID) && !respawnStarted)
         {
             Debug.Log("[PlayerDied] Player Respawn Entered");
             matchUI?.SetRespawnPanelVisible(true);
@@ -364,27 +369,6 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // runs (Task 2.7 review: this used to log "Player NOT Respawn Entered" here every physics
         // step while waiting - a build's stack trace on every line made two minutes of a genuine
         // last stand into about 6,000 log lines).
-    }
-
-    /// Both death paths (and CheckForCathedralCapture below) need this team's capital. Task 2.7:
-    /// reads it from MatchDirector.CapitalOf rather than scanning BuildingManager.CathedralBuildingIDs
-    /// directly - MatchDirector is the one place that answer would change if capital adoption (a
-    /// last-stand team keeping an enemy capital it captures, GDD p.20, cut for this task [C]) is ever
-    /// built. Returns false and logs if the team has no capital at all, which is a map or
-    /// BuildingManager setup problem, not something a player can cause.
-    private bool TryGetOwnCathedral(int teamID, out int baseBuildingID, out TowerData cathedralTower)
-    {
-        baseBuildingID = MatchDirector.Instance != null ? MatchDirector.Instance.CapitalOf(teamID) : -1;
-        cathedralTower = default;
-
-        if (baseBuildingID < 0 || BuildingManager.Instance == null
-            || !BuildingManager.Instance.TowerDictionary.TryGetValue(baseBuildingID, out cathedralTower))
-        {
-            Debug.LogError($"[PlayerLifecycle] No base building found for team {teamID}.");
-            return false;
-        }
-
-        return true;
     }
 
     /// <summary>
@@ -500,11 +484,28 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             elapsed += Time.deltaTime;
         }
 
+        // 2.7b step 7 (Decision 12): the decision is made now, when the timer ends, not when the player died -
+        // already true for the under-attack spawn choice below, now also for whether they respawn at all. Three
+        // teams: SpawnCapitalFor returns the own capital regardless (GDD p.20's last stand counts only deaths
+        // AFTER the fall, so a countdown begun before it still ends at home). Two teams left with no capital in
+        // play: last man standing, the dead can't respawn (Tudor) - this converts the countdown into the same
+        // wait a last-stand death starts. A knocked-out team never respawns either (SpawnCapitalFor's own
+        // Eliminated check).
+        int capital = MatchDirector.Instance != null ? MatchDirector.Instance.SpawnCapitalFor(teamID) : TerritoryMap.Neutral;
+        if (capital == TerritoryMap.Neutral)
+        {
+            matchUI?.SetRespawnPanelVisible(false);
+            matchUI?.ShowWaitingPanel();
+            SetLastStandOut(true);
+            respawnStarted = false;
+            respawnRoutine = null;
+            yield break; // death stays true - this player is still dead, now waiting instead of counting down.
+        }
+
         Debug.Log($"{photonView.Owner?.NickName} has been revived after recapture!");
 
-        // The decision is made now, when the timer ends, not when the player died - the attack may
-        // be over by then (Tudor, 2026-09-16). Cleared here regardless of the outcome: whichever
-        // spawn is chosen, the preview note no longer applies once the respawn actually happens.
+        // Cleared here regardless of the outcome: whichever spawn is chosen, the preview note no
+        // longer applies once the respawn actually happens.
         matchUI?.SetRespawnNote("");
         respawnNoteShowing = false;
 
@@ -514,7 +515,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         RoomManager roomManager = FindObjectOfType<RoomManager>();
         bool atUnderAttackSpawn = false;
-        Transform spawn = roomManager != null ? ChooseSpawnPoint(roomManager, teamID, out atUnderAttackSpawn) : null;
+        Transform spawn = roomManager != null ? ChooseSpawnPoint(roomManager, teamID, capital, out atUnderAttackSpawn) : null;
         if (spawn != null)
             TeleportToSpawnPoint(spawn.position, spawn.rotation);
 
@@ -575,15 +576,27 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         PlayerTeam pt = GetComponent<PlayerTeam>();
         RoomManager roomManager = FindObjectOfType<RoomManager>();
 
-        if (pt == null || !pt.HasTeam || roomManager == null
-            || roomManager.teamSpawnPoints == null
-            || pt.teamID >= roomManager.teamSpawnPoints.Length)
-        {
+        if (pt == null || !pt.HasTeam || roomManager == null || roomManager.teamSpawnPoints == null)
             return;
+
+        // 2.7b step 7 (Decision 11): a fall or the three-to-two trip home goes to the RESPAWN capital's own spawn
+        // point - this team's own while it holds it, else the in-play capital it adopted - falling back to the
+        // team's own spawn index (unchanged 2.7 behaviour) when it holds no capital at all.
+        int spawnIndex = pt.teamID;
+        MatchDirector director = MatchDirector.Instance;
+        BuildingManager buildings = BuildingManager.Instance;
+        if (director != null && buildings != null && buildings.Map != null)
+        {
+            int respawnCapital = director.RespawnCapitalOf(pt.teamID);
+            if (respawnCapital != TerritoryMap.Neutral)
+                spawnIndex = buildings.Map.CapitalTeamOf(respawnCapital);
         }
 
-        TeleportToSpawnPoint(roomManager.teamSpawnPoints[pt.teamID].position,
-                              roomManager.teamSpawnPoints[pt.teamID].rotation);
+        if (spawnIndex < 0 || spawnIndex >= roomManager.teamSpawnPoints.Length || roomManager.teamSpawnPoints[spawnIndex] == null)
+            return;
+
+        TeleportToSpawnPoint(roomManager.teamSpawnPoints[spawnIndex].position,
+                              roomManager.teamSpawnPoints[spawnIndex].rotation);
 
         Debug.Log($"[VIS] {logReason}, returned to spawn at {rigidbody.position}");
     }
@@ -592,35 +605,42 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// ZonePresenceTracker) you come back at your capital's Tier 2 zone instead, whoever owns it, rather than
     /// straight into the fight. Decided when the timer ends, not when you died, because the attack may be over by
     /// then.
-    private Transform ChooseSpawnPoint(RoomManager roomManager, int teamID, out bool atUnderAttackSpawn)
+    ///
+    /// 2.7b step 7 (Decision 11): "capital" is now whichever zone the caller (RespawnPlayer, from
+    /// MatchDirector.SpawnCapitalFor) decided this player respawns at - this team's own, or an in-play capital it
+    /// adopted. The spawn point used is the one belonging to THAT capital's own team (Map.CapitalTeamOf), not
+    /// necessarily teamID's own - respawning at an adopted capital puts you where that capital's team spawns,
+    /// physically next to the zone you actually hold.
+    private Transform ChooseSpawnPoint(RoomManager roomManager, int teamID, int capital, out bool atUnderAttackSpawn)
     {
         atUnderAttackSpawn = false;
-        Transform normal = roomManager.teamSpawnPoints != null && roomManager.teamSpawnPoints.Length > teamID
-            ? roomManager.teamSpawnPoints[teamID] : null;
-
         BuildingManager manager = BuildingManager.Instance;
+        if (manager == null || manager.Map == null)
+            return null;
+
+        int spawnIndex = manager.Map.CapitalTeamOf(capital);
+        Transform normal = spawnIndex >= 0 && roomManager.teamSpawnPoints != null && roomManager.teamSpawnPoints.Length > spawnIndex
+            ? roomManager.teamSpawnPoints[spawnIndex] : null;
+
         ZonePresenceTracker presence = ZonePresenceTracker.Instance;
-        if (manager == null || manager.Map == null || presence == null)
+        if (presence == null)
             return normal;
 
-        int capital = manager.Map.CapitalOf(teamID);
-        // CapitalOf is the STATIC capital zone id; IsUnderAttack judges the CURRENT owner of that zone id,
-        // which is not necessarily this team any more (B3 review, 2026-09-16: the capital can flip - a real
-        // capture, not merely an attack - while this player is on the respawn wait). Trust the presence check
-        // only while this team still owns it, or a team that just lost its capital outright could still be
-        // routed to a T2 spawn on the strength of an attack against a zone that is no longer theirs.
-        if (capital < 0 || manager.Current == null || manager.Current.OwnerOf(capital) != teamID || !presence.IsUnderAttack(capital))
+        // IsUnderAttack judges the CURRENT owner of the capital; a respawn capital already read as "this team
+        // holds it" a moment ago (SpawnCapitalFor), but the attack/capture race is the same one B3 review
+        // (2026-09-16) found for the static case: trust the presence check only while this team STILL owns it.
+        if (manager.Current == null || manager.Current.OwnerOf(capital) != teamID || !presence.IsUnderAttack(capital))
             return normal;
 
         Transform[] underAttack = roomManager.capitalUnderAttackSpawnPoints;
-        if (underAttack == null || underAttack.Length <= teamID || underAttack[teamID] == null)
+        if (underAttack == null || underAttack.Length <= spawnIndex || underAttack[spawnIndex] == null)
         {
-            Debug.LogWarning($"[PlayerLifecycle] team {teamID}'s capital is under attack but RoomManager has no Capital Under Attack Spawn Point for it - respawning at the capital.");
+            Debug.LogWarning($"[PlayerLifecycle] team {teamID}'s capital (zone {capital}) is under attack but RoomManager has no Capital Under Attack Spawn Point for spawn index {spawnIndex} - respawning at the capital.");
             return normal;
         }
 
         atUnderAttackSpawn = true;
-        return underAttack[teamID];
+        return underAttack[spawnIndex];
     }
 
     /// <summary>Refreshes the "your capital is under attack" line on the respawn panel (Tudor, 2026-09-16),
@@ -635,11 +655,16 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (matchUI == null || theme == null)
             return;
 
+        // 2.7b step 7: the same capital ChooseSpawnPoint will use if the wait ends right now - this team's own,
+        // or an adopted one - not just teamID's static capital, so the live preview during the wait matches what
+        // actually happens at the end of it (SpawnCapitalFor's own Decision 12 rules already cover "wait instead"
+        // by reading Neutral here, which never matches any owner below).
+        MatchDirector director = MatchDirector.Instance;
         BuildingManager manager = BuildingManager.Instance;
         ZonePresenceTracker presence = ZonePresenceTracker.Instance;
-        int capital = manager != null && manager.Map != null ? manager.Map.CapitalOf(teamID) : -1;
-        bool underAttack = capital >= 0 && manager.Current != null && manager.Current.OwnerOf(capital) == teamID
-            && presence != null && presence.IsUnderAttack(capital);
+        int capital = director != null ? director.SpawnCapitalFor(teamID) : TerritoryMap.Neutral;
+        bool underAttack = capital != TerritoryMap.Neutral && manager != null && manager.Current != null
+            && manager.Current.OwnerOf(capital) == teamID && presence != null && presence.IsUnderAttack(capital);
 
         if (underAttack == respawnNoteShowing)
             return;
