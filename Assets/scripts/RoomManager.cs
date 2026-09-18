@@ -2,6 +2,7 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
+using Overpower.Match;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 public class RoomManager : MonoBehaviourPunCallbacks
@@ -133,11 +134,24 @@ public class RoomManager : MonoBehaviourPunCallbacks
             }
         }
 
-        int smallest = 0;
-        for (int i = 1; i < counts.Length; i++)
+        // Task 2.7 review: a team that is out of the match never gets a new player, even if it is
+        // sitting at 0 - MatchDirector.IsEliminated is the room's own answer, read live so a team
+        // eliminated mid-session is skipped for every join after it.
+        MatchDirector director = MatchDirector.Instance;
+
+        int smallest = NoFreeTeam;
+        for (int i = 0; i < counts.Length; i++)
         {
-            if (counts[i] < counts[smallest])
+            if (director != null && director.IsEliminated(i))
+                continue;
+            if (smallest == NoFreeTeam || counts[i] < counts[smallest])
                 smallest = i;
+        }
+
+        if (smallest == NoFreeTeam)
+        {
+            Debug.LogWarning("[TEAM] every team is eliminated -- refusing to spawn");
+            return NoFreeTeam;
         }
 
         if (counts[smallest] >= TeamSize)

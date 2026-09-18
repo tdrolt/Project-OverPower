@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Photon.Pun;
@@ -14,19 +13,20 @@ namespace Overpower.Match
     /// <summary>
     /// Task 2.7: who is still in the match and which phase it is in. MatchPhaseRules.cs holds the
     /// actual rule as pure, tested C#; this class is only the Photon wiring around it - reading
-    /// PhotonNetwork.PlayerList and BuildingManager.Current into one TeamStatus per team, letting
-    /// the master write the result into Room Properties, and reacting to whatever the room says on
-    /// every client (the lost panel, the match-result panel, the Tier-3 reset). Room Properties, not
-    /// an RPC, for the same reason BuildingManager's territory is: a player who joins mid-match reads
-    /// one value instead of replaying the match, and the state survives the master leaving.
+    /// PhotonNetwork.PlayerList and BuildingManager.Current into one TeamStatus per team, letting the
+    /// master write the result into Room Properties (and, master-only, neutralising Tier-3 zones on
+    /// the first elimination and closing a finished room), and reacting to whatever the room says on
+    /// every client (the lost panel, the "two teams left" banner and trip home, the match-result
+    /// panel). Room Properties, not an RPC, for the same reason BuildingManager's territory is: a
+    /// player who joins mid-match reads one value instead of replaying the match, and the state
+    /// survives the master leaving.
     ///
-    /// NOT a scene object [C, controller decision, 2026-09-18]: Tudor is rebuilding the arena from
-    /// primitives in a separate session, so anything placed in Game Scene.unity right now could be
-    /// lost or conflict with that rebuild. BuildingManager.Awake adds this component at runtime
-    /// instead, onto the same GameObject that already hosts BuildingManager/ZonePresenceTracker/
-    /// MatchTelemetry - zero scene footprint, and no PhotonView is needed because this only ever
-    /// reads and writes Room Properties, the same authority model BuildingManager's own territory
-    /// state uses (CODING-STANDARDS.md section 5).
+    /// NOT a scene object: the arena is being rebuilt from primitives in a separate session, so
+    /// anything placed in Game Scene.unity right now could be lost or conflict with that rebuild.
+    /// BuildingManager.Awake adds this component at runtime instead, onto the same GameObject that
+    /// already hosts BuildingManager/ZonePresenceTracker/MatchTelemetry - zero scene footprint, and no
+    /// PhotonView is needed because this only ever reads and writes Room Properties, the same
+    /// authority model BuildingManager's own territory state uses (CODING-STANDARDS.md section 5).
     /// </summary>
     public class MatchDirector : MonoBehaviourPunCallbacks
     {
@@ -64,12 +64,14 @@ namespace Overpower.Match
         public MatchPhase Phase => lastAppliedPhase;
         /// <summary>The winning team once the match is over, else -1. Tracks the room, not this client's own team.</summary>
         public int Winner => lastAppliedWinner;
+        /// <summary>Whether team is on the room's own eliminated list, as last read by this client.</summary>
+        public bool IsEliminated(int team) => lastAppliedEliminated.Contains(team);
 
         /// <summary>This team's capital zone id (GDD-fixed: 6/7/8 for teams 0/1/2 - see BuildingManager.
         /// CathedralBuildingIDs, which TerritoryMap.CapitalOf was built from). Capital adoption - a
-        /// last-stand team keeping an enemy capital it just captures, GDD p.20 - was cut for this task
-        /// [C, 2026-09-18]; if it is ever built, this is the one place PlayerLifecycle and
-        /// BuildingManager should keep asking, so adoption only has to change this method.</summary>
+        /// last-stand team keeping an enemy capital it just captures, GDD p.20 - was cut for this
+        /// task; if it is ever built, this is the one place PlayerLifecycle and BuildingManager should
+        /// keep asking, so adoption only has to change this method.</summary>
         public int CapitalOf(int team) =>
             BuildingManager.Instance != null && BuildingManager.Instance.Map != null
                 ? BuildingManager.Instance.Map.CapitalOf(team) : TerritoryMap.Neutral;
@@ -82,35 +84,18 @@ namespace Overpower.Match
                 Destroy(this); // Should not happen - BuildingManager.Awake adds exactly one of these.
         }
 
-        private void OnEnable()
+        public override void OnEnable()
         {
-            PhotonNetwork.AddCallbackTarget(this);
+            base.OnEnable(); // Registers this as a Photon callback target - see MonoBehaviourPunCallbacks's own class comment.
             if (BuildingManager.Instance != null)
                 BuildingManager.Instance.OwnershipChanged += HandleOwnershipChanged;
         }
 
-        private void OnDisable()
+        public override void OnDisable()
         {
-            PhotonNetwork.RemoveCallbackTarget(this);
+            base.OnDisable();
             if (BuildingManager.Instance != null)
                 BuildingManager.Instance.OwnershipChanged -= HandleOwnershipChanged;
-        }
-
-        private void Start()
-        {
-            if (PhotonNetwork.IsMasterClient)
-                StartCoroutine(InitialRecomputeWhenTerritoryIsReady());
-        }
-
-        /// BuildingManager's own initial snapshot write applies with raiseEvents:false (its "the match
-        /// as it already is" comment), so OwnershipChanged never fires for it - without this wait, a
-        /// match that starts with only two real teams (the two-player test) would sit at the
-        /// ThreeTeams default until the first capture or death happened to trigger a recompute.
-        private IEnumerator InitialRecomputeWhenTerritoryIsReady()
-        {
-            while (BuildingManager.Instance == null || BuildingManager.Instance.Current == null || BuildingManager.Instance.Map == null)
-                yield return null;
-            MasterRecompute();
         }
 
         private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot) =>
@@ -118,7 +103,7 @@ namespace Overpower.Match
 
         public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
         {
-            if (changedProps.ContainsKey(PlayerLifecycle.AliveKey) || changedProps.ContainsKey(Teams.TeamKey))
+            if (changedProps.ContainsKey(PlayerLifecycle.LastStandKey) || changedProps.ContainsKey(Teams.TeamKey))
                 MasterRecompute();
         }
 
@@ -131,8 +116,8 @@ namespace Overpower.Match
             lastWrittenEliminated = null;
             writesAwaitingEcho = 0;
 
-            // The promoted master must not wait for the next capture or death to catch up - it has
-            // to be ready to decide the very next elimination on its own (verification 3).
+            // The promoted master must not wait for the next capture or death to catch up - it has to
+            // be ready to decide the very next elimination on its own.
             if (PhotonNetwork.IsMasterClient)
                 MasterRecompute();
         }
@@ -177,6 +162,7 @@ namespace Overpower.Match
             lastWrittenPhase = MatchPhase.Over;
             lastWrittenWinner = winningTeam;
             writesAwaitingEcho++;
+            CloseFinishedRoom();
         }
 
         /// <summary>Nudges a recompute from outside the four wired triggers - PlayerLifecycle.
@@ -186,13 +172,13 @@ namespace Overpower.Match
         public void RequestRecompute() => MasterRecompute();
 
         /// <summary>PlayerLifecycle.Start calls this once (photonView.IsMine, right after registering
-        /// itself in PlayerLookup) - found live, verifying this task: OnJoinedRoom is a room-level
-        /// callback that can run BEFORE this client's own player object is network-instantiated,
-        /// especially for a late joiner, so ReactToRoomState's very first call can find no local view
-        /// to react on and its winner reaction is silently skipped. That first call still updates
-        /// lastAppliedWinner, so a plain retry of ReactToRoomState would see winner == lastAppliedWinner
-        /// and do nothing - this applies the CURRENT winner unconditionally instead. A match that is
-        /// already over does not change again, so there is nothing else worth catching up here.</summary>
+        /// itself in PlayerLookup): OnJoinedRoom is a room-level callback that can run BEFORE this
+        /// client's own player object is network-instantiated, especially for a late joiner, so
+        /// ReactToRoomState's very first call can find no local view to react on and its winner
+        /// reaction is silently skipped. That first call still updates lastAppliedWinner, so a plain
+        /// retry of ReactToRoomState would see winner == lastAppliedWinner and do nothing - this
+        /// applies the CURRENT winner unconditionally instead. A match that is already over does not
+        /// change again, so there is nothing else worth catching up here.</summary>
         public void CatchUpLocalPlayer()
         {
             if (!PhotonNetwork.InRoom)
@@ -212,6 +198,11 @@ namespace Overpower.Match
         private void MasterRecompute()
         {
             if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom)
+                return;
+
+            // A decided match is final - it must never be rebuilt from whoever happens to still be
+            // connected (a later leave or join is not a new fact MatchPhaseRules needs to hear about).
+            if (lastWrittenPhase == MatchPhase.Over || ReadPhase(PhotonNetwork.CurrentRoom.CustomProperties) == MatchPhase.Over)
                 return;
 
             BuildingManager buildings = BuildingManager.Instance;
@@ -252,6 +243,8 @@ namespace Overpower.Match
 
             if (previousPhase == MatchPhase.ThreeTeams && result.Phase == MatchPhase.TwoTeams)
                 NeutraliseTierThreeZones(buildings);
+            if (result.Phase == MatchPhase.Over)
+                CloseFinishedRoom();
 
             LogTelemetry(newlyEliminated, previousPhase, result, statuses);
         }
@@ -265,6 +258,20 @@ namespace Overpower.Match
             for (int zone = 0; zone < tiers.Length; zone++)
                 if (tiers[zone] == 3)
                     buildings.SetNeutral(zone);
+        }
+
+        /// A decided match's room must not keep taking new players - RoomManager.JoinRandomRoom would
+        /// otherwise place a fresh joiner straight into a frozen, finished match. Photon's own server-
+        /// side room flags: no new Room Property, no RPC, and they survive a master change since they
+        /// live on the room itself, not on any one client. A random joiner then gets
+        /// OnJoinRandomFailed and RoomManager creates a fresh room.
+        private static void CloseFinishedRoom()
+        {
+            Photon.Realtime.Room room = PhotonNetwork.CurrentRoom;
+            if (room == null)
+                return;
+            room.IsOpen = false;
+            room.IsVisible = false;
         }
 
         private static void LogTelemetry(List<int> newlyEliminated, MatchPhase previousPhase, MatchPhaseResult result, TeamStatus[] statuses)
@@ -281,8 +288,9 @@ namespace Overpower.Match
             // LogPhase(2, ...) must land exactly at the three-to-two transition (PhaseTimeline.From
             // opens its "Phase 2" window on the first phase event numbered >= 2) - firing it whenever
             // either an elimination happened or the phase number itself moved (a team's last player
-            // leaving the room can drop the phase with no new elimination - see BuildTeamStatuses)
-            // covers both ways the transition can actually happen.
+            // leaving the room, once at least one elimination has already happened, can drop the phase
+            // with no new elimination of its own - see MatchPhaseRules.PhaseFor) covers both ways the
+            // transition can actually happen.
             if (newlyEliminated.Count > 0 || result.Phase != previousPhase)
                 MatchTelemetry.Instance.LogPhase((int)result.Phase, teamsRemaining);
         }
@@ -295,26 +303,24 @@ namespace Overpower.Match
 
             for (int team = 0; team < TeamCount; team++)
             {
-                int members = 0, alive = 0;
+                int members = 0, outForLastStand = 0;
                 foreach (Player p in PhotonNetwork.PlayerList)
                 {
                     if (!Teams.TryGetTeam(p, out int t) || t != team)
                         continue;
                     members++;
 
-                    // Missing "alive" property means this player has never died yet (PlayerLifecycle
-                    // only ever publishes it on the first death/respawn) - the same default isAlive
-                    // = true PlayerLifecycle itself starts with.
-                    bool isAlive = true;
-                    if (p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool b)
-                        isAlive = b;
-                    if (isAlive) alive++;
+                    // Missing property means this player has never died with their capital lost -
+                    // PlayerLifecycle only ever publishes it true on a last-stand death, false again
+                    // the moment that player is back on their way into the match.
+                    if (p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool b && b)
+                        outForLastStand++;
                 }
 
                 int capital = map.CapitalOf(team);
                 bool holdsCapital = capital >= 0 && current.OwnerOf(capital) == team;
 
-                statuses[team] = new TeamStatus { TeamId = team, Members = members, AliveMembers = alive, HoldsItsCapital = holdsCapital };
+                statuses[team] = new TeamStatus { TeamId = team, Members = members, MembersOutForLastStand = outForLastStand, HoldsItsCapital = holdsCapital };
             }
             return statuses;
         }
@@ -323,12 +329,14 @@ namespace Overpower.Match
 
         /// Reads the room's mPhase/mElim/mWin and applies whatever changed since this client last
         /// looked - the lost panel for a newly eliminated own team, the Tier-3 "two teams left" spawn-
-        /// home + banner the first time this client itself sees the ThreeTeams -> TwoTeams edge, and
-        /// the match-result panel once a winner exists. firstRead (OnJoinedRoom, including a late
-        /// joiner) only ever applies the winner reaction - a joiner arriving mid-match should not be
-        /// sent "home" or told the two-team rule "just" changed for a transition that already happened
-        /// before they connected; MatchUI.ShowMatchResult alone already answers requirement 2 (a late
-        /// joiner reads Over and the winner) whether they were eliminated earlier or not.
+        /// home + banner the first time this client itself sees the ThreeTeams -> TwoTeams edge (never
+        /// for a client whose own team was eliminated in that same transition - it is already getting
+        /// the lost panel and does not need sending home or told a rule "just" changed for a match it
+        /// is no longer in), and the match-result panel once a winner exists. firstRead (OnJoinedRoom,
+        /// including a late joiner) only ever applies the winner reaction - a joiner arriving mid-match
+        /// should not be sent "home" or told the two-team rule "just" changed for a transition that
+        /// already happened before they connected; MatchUI.ShowMatchResult alone already answers a
+        /// late joiner reading Over and the winner, whether they were eliminated earlier or not.
         private void ReactToRoomState(bool firstRead)
         {
             if (!PhotonNetwork.InRoom)
@@ -342,19 +350,19 @@ namespace Overpower.Match
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
 
+            bool myTeamKnown = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam);
+            bool myTeamJustEliminated = myTeamKnown && !lastAppliedEliminated.Contains(myTeam) && eliminated.Contains(myTeam);
+
             if (!firstRead)
             {
-                if (Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam)
-                    && !lastAppliedEliminated.Contains(myTeam) && eliminated.Contains(myTeam))
-                {
+                if (myTeamJustEliminated)
                     localView?.GetComponent<MatchUI>()?.ShowYouLost();
-                }
 
-                if (lastAppliedPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams)
+                if (lastAppliedPhase == MatchPhase.ThreeTeams && phase == MatchPhase.TwoTeams && !myTeamJustEliminated)
                 {
                     PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
                     if (lifecycle != null && lifecycle.IsAlive)
-                        lifecycle.ReturnToSpawn();
+                        lifecycle.ReturnToSpawnForPhaseChange();
                     localView?.GetComponent<PlayerHud>()?.ShowTwoTeamsLeftBanner();
                 }
             }
