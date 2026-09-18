@@ -208,7 +208,8 @@ namespace Overpower.UI
         // text as one another.
         private bool headerInitialized;
         private int lastDisplayedGold;
-        private bool lastDisplayedFreeLoadout;
+        private bool lastDisplayedIsFree;
+        private bool lastDisplayedIsWarmupSandbox;
         private PurchaseBlock lastDisplayedBlock;
         private int lastDisplayedTenths;
         private string lastStatusText;
@@ -590,19 +591,25 @@ namespace Overpower.UI
             bool justExpired = blockedReasonExpiryTime > 0f;
             blockedReasonExpiryTime = -1f;
 
-            PurchaseBlock block = ctx.FreeLoadout ? PurchaseBlock.None : ctx.Check(0);
+            PurchaseBlock block = ctx.IsFree ? PurchaseBlock.None : ctx.Check(0);
             int tenths = block == PurchaseBlock.InCombat ? Mathf.RoundToInt(ctx.SecondsUntilOutOfCombat * 10f) : 0;
 
-            if (justExpired || !headerInitialized || ctx.FreeLoadout != lastDisplayedFreeLoadout || block != lastDisplayedBlock || tenths != lastDisplayedTenths)
+            // 2.7b step 5b: IsWarmupSandbox joins the change check too, so the header re-draws the moment the
+            // match goes live even with Free Loadout on ("Free (test mode)" never itself changes IsFree, but
+            // IsWarmupSandbox flips false at that instant and the wording underneath it is about to change too -
+            // ResetForMatchStart is about to empty the loadout this same frame).
+            if (justExpired || !headerInitialized || ctx.IsFree != lastDisplayedIsFree
+                || ctx.IsWarmupSandbox != lastDisplayedIsWarmupSandbox || block != lastDisplayedBlock || tenths != lastDisplayedTenths)
             {
                 string statusText = ctx.StatusText();
                 statusLabel.text = statusText;
-                // Free Loadout's note and "all clear" (empty string) both read as a plain aside;
-                // an actual block reason borrows the overheat-warning amber so it reads as the same
+                // A free shop's note and "all clear" (empty string) both read as a plain aside; an
+                // actual block reason borrows the overheat-warning amber so it reads as the same
                 // kind of "something is stopping you" signal the HUD already uses elsewhere.
-                statusLabel.color = statusText.Length == 0 || ctx.FreeLoadout ? theme.mutedTextColor : theme.overheatWarningColor;
+                statusLabel.color = statusText.Length == 0 || ctx.IsFree ? theme.mutedTextColor : theme.overheatWarningColor;
                 lastStatusText = statusText;
-                lastDisplayedFreeLoadout = ctx.FreeLoadout;
+                lastDisplayedIsFree = ctx.IsFree;
+                lastDisplayedIsWarmupSandbox = ctx.IsWarmupSandbox;
                 lastDisplayedBlock = block;
                 lastDisplayedTenths = tenths;
             }
@@ -684,7 +691,7 @@ namespace Overpower.UI
             WeaponDefinition target = weapons.Resolve(weaponId);
             int price = target != null ? target.GoldCost : 0;
             ShopContext ctx = CurrentShopContext();
-            bool free = ctx.FreeLoadout;
+            bool free = ctx.IsFree;
             int chargedPrice = 0;
 
             if (!free)
@@ -715,7 +722,7 @@ namespace Overpower.UI
             // never trips CannotAfford) - so the same Check(0) the header status line reads decides
             // whether the refund is allowed here too.
             ShopContext ctx = CurrentShopContext();
-            if (!ctx.FreeLoadout)
+            if (!ctx.IsFree)
             {
                 PurchaseBlock block = ctx.Check(0);
                 if (block != PurchaseBlock.None)
@@ -823,7 +830,7 @@ namespace Overpower.UI
 
             int price = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
             ShopContext ctx = CurrentShopContext();
-            bool free = ctx.FreeLoadout;
+            bool free = ctx.IsFree;
             int chargedPrice = 0;
 
             // Task T4: armor has no item id of its own (unlike a weapon or ability), only a path
@@ -861,7 +868,7 @@ namespace Overpower.UI
         {
             // Same "no price of its own, only the gate applies" reasoning as OnResetWeaponClicked.
             ShopContext ctx = CurrentShopContext();
-            if (!ctx.FreeLoadout)
+            if (!ctx.IsFree)
             {
                 PurchaseBlock block = ctx.Check(0);
                 if (block != PurchaseBlock.None)
@@ -939,7 +946,7 @@ namespace Overpower.UI
             bool slotIsEmpty = equippedId == LoadoutProperties.Empty;
             int price = ShopRules.AbilityPrice(slotIsEmpty, slot, goldCost);
             ShopContext ctx = CurrentShopContext();
-            bool free = ctx.FreeLoadout;
+            bool free = ctx.IsFree;
             int chargedPrice = 0;
 
             if (!free)

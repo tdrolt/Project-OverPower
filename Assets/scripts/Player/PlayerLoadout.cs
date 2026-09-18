@@ -4,6 +4,7 @@ using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
 using Overpower.Net;
+using Overpower.UI;
 using Overpower.Weapons;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
@@ -117,13 +118,15 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
     /// <summary>The starting kit's own id for one ability slot - Start (above) publishes this at spawn, and
     /// ResetForMatchStart (2.7b step 4) puts it back at the fresh start, so there is exactly ONE definition of
     /// "what the starting kit looks like" for both callers to share. Task 2.5a: the ultimate is the one
-    /// exception - it starts EMPTY under the real economy (Free Loadout off) and only carries the prefab's own
-    /// assigned starting ultimate (if any) under Free Loadout, a testing convenience; every other slot always
-    /// starts at the prefab's default. [2.7b step 5b will read ShopPricing.IsFreeNow here instead of
-    /// gameplayConfig.FreeLoadout directly, so the warm-up sandbox gets the same convenience - not built yet.]</summary>
+    /// exception - it starts EMPTY under the real economy and only carries the prefab's own assigned starting
+    /// ultimate (if any) while the shop is free (ShopPricing.IsFreeNow, 2.7b step 5b: Free Loadout OR the
+    /// pre-live warm-up sandbox), a testing convenience; every other slot always starts at the prefab's default.
+    /// At spawn in the warm-up the prefab's starting ultimate is handed out, as a free shop would; the live reset
+    /// (ResetForMatchStart) calls this again once the shop is no longer free, so it starts empty from there on -
+    /// the prefab ships it empty either way today, so this only matters once a starting ultimate is ever set.</summary>
     private int StartingAbilityId(AbilitySlot slot)
     {
-        bool ultimateStartsEmpty = gameplayConfig != null && !gameplayConfig.FreeLoadout;
+        bool ultimateStartsEmpty = !ShopPricing.IsFreeNow(gameplayConfig);
         if (ultimateStartsEmpty && slot == AbilitySlot.Ultimate)
             return LoadoutProperties.Empty;
 

@@ -36,6 +36,13 @@ namespace Overpower.Match
         public static float SecondsUntilOutOfCombat(float secondsSinceCombat, float requiredOutOfCombatSeconds) =>
             Math.Max(0f, requiredOutOfCombatSeconds - secondsSinceCombat);
 
+        /// <summary>2.7b step 5b (Tudor answer 2): the ONE place "is the shop free right now?" is decided. The
+        /// warm-up (countdown included) is a sandbox so testers can experiment - buy anything, reset for free,
+        /// with no gate - and going live empties every loadout (PlayerLifecycle.ResetForMatchStart), so nothing
+        /// bought free in the warm-up survives into the real match. Free Loadout keeps the whole match free, as
+        /// before, whether or not the match is live.</summary>
+        public static bool IsFree(bool freeLoadout, bool matchLive) => freeLoadout || !matchLive;
+
         /// <summary>What one ability pick actually costs. The prefab ships with the Mobility and
         /// Equipment slots EMPTY (Task 2.5a) rather than pre-loaded with a free starting pick, so
         /// the GDD's "starting kit is free" [G p.17-18] has to be read here instead: the FIRST pick

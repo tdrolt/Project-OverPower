@@ -100,6 +100,16 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheShopIsFreeInTheWarmupOrWithFreeLoadout()
+        {
+            // Tudor, 2026-09-18: before the match goes live the shop is a sandbox - free, unlimited, resettable.
+            Assert.IsTrue(ShopRules.IsFree(freeLoadout: false, matchLive: false), "the warm-up, countdown included");
+            Assert.IsFalse(ShopRules.IsFree(false, true), "the real economy once live");
+            Assert.IsTrue(ShopRules.IsFree(true, true), "Free Loadout keeps the whole match free, as before");
+            Assert.IsTrue(ShopRules.IsFree(true, false));
+        }
+
+        [Test]
         public void EmptyPrimarySlotIsNotFree()
         {
             // Task 2.5b review fix 5: AbilitySlot has FOUR values (Primary, Equipment, Ultimate,

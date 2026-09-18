@@ -20,29 +20,38 @@ namespace Overpower.UI
     /// </summary>
     public readonly struct ShopContext
     {
-        public readonly bool FreeLoadout;
+        /// <summary>2.7b step 5b: renamed from FreeLoadout so the name stops lying - true for the ordinary Free
+        /// Loadout test mode AND for the pre-live warm-up sandbox (ShopRules.IsFree). Every shop decision already
+        /// read the old field, so every purchase, reset and header follows with no per-handler change.</summary>
+        public readonly bool IsFree;
         public readonly bool InOwnTerritory;
         public readonly float SecondsSinceCombat;
         public readonly float RequiredOutOfCombatSeconds;
         public readonly int Balance;
 
-        public ShopContext(bool freeLoadout, bool inOwnTerritory, float secondsSinceCombat,
+        /// <summary>2.7b step 5b: true when IsFree is true ONLY because the match isn't live yet - Free Loadout
+        /// itself is off. Distinguishes the header's two free-shop reasons ("Free (warm-up)" vs "Free (test
+        /// mode)"); nothing else needs to tell them apart.</summary>
+        public readonly bool IsWarmupSandbox;
+
+        public ShopContext(bool isFree, bool isWarmupSandbox, bool inOwnTerritory, float secondsSinceCombat,
                             float requiredOutOfCombatSeconds, int balance)
         {
-            FreeLoadout = freeLoadout;
+            IsFree = isFree;
+            IsWarmupSandbox = isWarmupSandbox;
             InOwnTerritory = inOwnTerritory;
             SecondsSinceCombat = secondsSinceCombat;
             RequiredOutOfCombatSeconds = requiredOutOfCombatSeconds;
             Balance = balance;
         }
 
-        /// <summary>None outright when Free Loadout is on (GameplayConfig.FreeLoadout's own
-        /// tooltip: "changes anything for free, anywhere") - every click handler still calls this
-        /// rather than checking the flag itself, so there is exactly one place that decides what
-        /// Free Loadout means for a purchase.</summary>
+        /// <summary>None outright while IsFree (GameplayConfig.FreeLoadout's own tooltip: "changes anything for
+        /// free, anywhere" - or, before live, the warm-up sandbox) - every click handler still calls this rather
+        /// than checking either flag itself, so there is exactly one place that decides what a free shop means
+        /// for a purchase.</summary>
         public PurchaseBlock Check(int price) =>
-            FreeLoadout ? PurchaseBlock.None
-                        : ShopRules.Check(InOwnTerritory, SecondsSinceCombat, RequiredOutOfCombatSeconds, Balance, price);
+            IsFree ? PurchaseBlock.None
+                   : ShopRules.Check(InOwnTerritory, SecondsSinceCombat, RequiredOutOfCombatSeconds, Balance, price);
 
         public float SecondsUntilOutOfCombat => ShopRules.SecondsUntilOutOfCombat(SecondsSinceCombat, RequiredOutOfCombatSeconds);
 
@@ -66,26 +75,34 @@ namespace Overpower.UI
 
         /// <summary>The header's status line: why nothing can be bought here right now (checked with
         /// no price of its own, so CannotAfford never fires for this generic question - that is
-        /// per-item, shown on the node/card itself instead), or "" once the gate holds. Free Loadout
-        /// gets its own single note here instead of a block reason, matching the header's brief.</summary>
-        public string StatusText() => FreeLoadout ? "Free (test mode)" : ReasonText(Check(0), 0);
+        /// per-item, shown on the node/card itself instead), or "" once the gate holds. A free shop
+        /// gets its own single note here instead of a block reason (Task 2.5b), split 2.7b step 5b
+        /// between the warm-up sandbox and Free Loadout's own test mode.</summary>
+        public string StatusText() => IsFree ? (IsWarmupSandbox ? "Free (warm-up)" : "Free (test mode)") : ReasonText(Check(0), 0);
     }
 
     /// <summary>Builds a ShopContext from live player state - the one place LoadoutScreen asks
     /// BuildingManager/Teams/GoldWallet/PlayerHealth the same questions every purchase check needs.</summary>
     public static class ShopPricing
     {
+        /// <summary>2.7b step 5b: the one gatherer for ShopRules.IsFree - a missing config fails OPEN to free,
+        /// same as PlayerLoadout/AbilityRunner do for their own GameplayConfig reads (a missing reference
+        /// degrades to "everything free", never to "everything locked with no explanation"), and a missing
+        /// MatchDirector reads as the warm-up (also free) - a test scene with no director, for instance.</summary>
+        public static bool IsFreeNow(GameplayConfig config) =>
+            ShopRules.IsFree(config == null || config.FreeLoadout,
+                MatchDirector.Instance != null && MatchDirector.Instance.IsLive);
+
         public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position)
         {
-            // Fails OPEN to Free Loadout on a missing config, same as PlayerLoadout/AbilityRunner do
-            // for their own GameplayConfig reads - a missing reference degrades to "everything free",
-            // never to "everything locked with no explanation".
             bool freeLoadout = config == null || config.FreeLoadout;
+            bool isFree = IsFreeNow(config);
+            bool isWarmupSandbox = isFree && !freeLoadout;
             bool inOwnTerritory = InOwnTerritory(owner, position);
             float secondsSinceCombat = health != null ? health.SecondsSinceCombat : 0f;
             float required = config != null ? config.ShopOutOfCombatSeconds : 0f;
             int balance = wallet != null ? wallet.Balance : 0;
-            return new ShopContext(freeLoadout, inOwnTerritory, secondsSinceCombat, required, balance);
+            return new ShopContext(isFree, isWarmupSandbox, inOwnTerritory, secondsSinceCombat, required, balance);
         }
 
         private static bool InOwnTerritory(Player owner, Vector3 position)
