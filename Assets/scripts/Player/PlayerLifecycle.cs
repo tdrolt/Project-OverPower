@@ -651,6 +651,14 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (weaponFiring != null)
             weaponFiring.enabled = alive;
 
+        // Cleanup batch item 7: the overhead bar's own fills already read 0/0 correctly while dead
+        // (PlayerHealth.UpdateOverheadBar), but the bar itself never hid - a correct-but-empty bar
+        // floated visibly over a corpse for the whole respawn wait on every OTHER client's screen.
+        // This method runs on every client (see the class comment above), so this is the one place
+        // that fixes it for a remote copy, not just the owner's own screen.
+        if (playerHealth != null)
+            playerHealth.SetOverheadBarVisible(alive);
+
         // A dash already in flight kept moving the body after death and could land it somewhere
         // other than the spawn point, so the running coroutine was cancelled here. The four
         // Space-bound dash/AoE scripts were deleted in Task 0.11b and their replacement does not

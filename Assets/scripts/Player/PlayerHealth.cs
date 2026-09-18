@@ -55,6 +55,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private float lastHealthFraction = -1f;
     private float lastShieldFraction = -1f;
 
+    // The whole overhead bar's root GameObject ("Bar", the shared parent of the three Images above
+    // on HealthBarCanvas) - cached in Awake from healthFillImage's own parent rather than a new
+    // serialized field, so wiring this needs no prefab edit. Deliberately NOT HealthBarCanvas
+    // itself: that canvas also carries the floating name text (PlayerNameTag), which must stay
+    // visible over a corpse. See SetOverheadBarVisible.
+    private GameObject overheadBarRoot;
+
     private PhotonView photonView;
 
     private float health;
@@ -126,8 +133,23 @@ public class PlayerHealth : MonoBehaviour, IDamageable
                                 armorConfig != null ? armorConfig.RechargeSecondsFor(rechargeLevel) : 6f,
                                 armorConfig != null ? armorConfig.RefillSeconds : 2.5f);
 
+        overheadBarRoot = healthFillImage != null ? healthFillImage.transform.parent?.gameObject : null;
+
         ApplyTheme();
         UpdateOverheadBar();
+    }
+
+    /// <summary>Hides (or shows) the whole overhead bar - called from PlayerLifecycle.ApplyAliveState,
+    /// which runs on every client for every player, not just the owner (see that method's own class
+    /// comment). Deliberately keyed off the caller's own alive value rather than this class's IsAlive:
+    /// PlayerHealth.isDead is only ever written on the owner's machine (ApplyDamage's IsMine guard),
+    /// so a remote copy's IsAlive silently reads true for the whole time that player is actually
+    /// dead - the exact trap this method exists to route around. Callers must pass
+    /// PlayerLifecycle.IsAlive (replicated), never PlayerHealth.IsAlive.</summary>
+    public void SetOverheadBarVisible(bool visible)
+    {
+        if (overheadBarRoot != null)
+            overheadBarRoot.SetActive(visible);
     }
 
     /// <summary>Applies the theme's bar sprite and colours to the three overhead-bar Images once,
