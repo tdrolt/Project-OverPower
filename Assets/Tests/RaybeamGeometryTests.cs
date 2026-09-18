@@ -13,8 +13,8 @@ namespace Overpower.Tests
     public class RaybeamGeometryTests
     {
         private const float Spacing = 0.75f;
-        private const float Range = 12f;
-        private const float Radius = 0.175f; // beamWidth 0.35 / 2
+        private const float Range = 24f;      // beamRange (rework step 6: 12 -> 24, Tudor's "traverse" x2)
+        private const float Radius = 0.2625f; // beamWidth 0.525 / 2 (rework step 6: 0.35 -> 0.525)
 
         [Test]
         public void BeamOriginsAreSpacedPerpendicularToDirectionWithTheCentreAtOrigin()
@@ -78,6 +78,29 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ThreeBeamsStillConvergeAtTheFarEndOfTheDoubledRange()
+        {
+            // Rework step 6: beamRange doubled 12 -> 24. At double the depth, the outer beams' own
+            // inward angle away from Direction is roughly half what it was at the old range (the
+            // same Spacing spread over twice the distance) - the convergence claim this whole file
+            // pins is most likely to quietly stop holding right here, so it gets its own test at the
+            // new range rather than trusting the old 8m-depth case to still say something meaningful.
+            Vector3 origin = Vector3.zero;
+            Vector3 direction = Vector3.forward;
+            Vector3 point = new Vector3(0f, 0f, Range);
+
+            RaybeamGeometry.BeamOrigins(origin, direction, Spacing, out Vector3 left, out Vector3 centre, out Vector3 right);
+
+            Vector3 leftDir = RaybeamGeometry.AimFromOriginToPoint(left, point, direction);
+            Vector3 centreDir = RaybeamGeometry.AimFromOriginToPoint(centre, point, direction);
+            Vector3 rightDir = RaybeamGeometry.AimFromOriginToPoint(right, point, direction);
+
+            Assert.IsTrue(RaybeamGeometry.BeamCrosses(left, leftDir, Range, Radius, point), "Left beam must reach the convergence point at the doubled range.");
+            Assert.IsTrue(RaybeamGeometry.BeamCrosses(centre, centreDir, Range, Radius, point), "Centre beam must reach the convergence point at the doubled range.");
+            Assert.IsTrue(RaybeamGeometry.BeamCrosses(right, rightDir, Range, Radius, point), "Right beam must reach the convergence point at the doubled range.");
+        }
+
+        [Test]
         public void OnlyTheBeamAimedThereCrossesAPointThatSitsOnItsOwnLineButNotTheOthers()
         {
             // Verify scenario 2: cursor a few metres past the dummy, dummy offset laterally so
@@ -108,7 +131,7 @@ namespace Overpower.Tests
         [Test]
         public void BeamCrossesReturnsFalseBeyondItsRange()
         {
-            Vector3 farTarget = new Vector3(0f, 0f, 20f); // past a 12m range
+            Vector3 farTarget = new Vector3(0f, 0f, 30f); // past the rework-step-6 24m range (was 20f past 12m)
             Assert.IsFalse(RaybeamGeometry.BeamCrosses(Vector3.zero, Vector3.forward, Range, Radius, farTarget));
         }
 
@@ -122,7 +145,7 @@ namespace Overpower.Tests
         [Test]
         public void BeamCrossesAcceptsATargetExactlyOnTheAxisAtHalfRange()
         {
-            Vector3 onAxis = new Vector3(0f, 0f, 6f);
+            Vector3 onAxis = new Vector3(0f, 0f, Range / 2f); // rework step 6: half of 24, not the old half of 12
             Assert.IsTrue(RaybeamGeometry.BeamCrosses(Vector3.zero, Vector3.forward, Range, Radius, onAxis));
         }
     }

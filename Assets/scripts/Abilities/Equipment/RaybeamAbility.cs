@@ -8,16 +8,26 @@ namespace Overpower.Abilities
     /// <summary>
     /// Three beams converging on the cursor. Tudor's spec: each beam that crosses an enemy applies
     /// +30% damage taken for 4 seconds, stacking to a cap of +60% - one beam is +30%, two or three
-    /// is +60%. THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT EXTRA DAMAGE: all three
-    /// land only at the convergence point, so the skill is placing the cursor at the right
-    /// distance, not spamming the key. Zero damage - this is a debuff, not a weapon (addendum,
-    /// [C, plan]).
+    /// is +60%. THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT EXTRA DAMAGE: aiming at the
+    /// convergence point is what lands all three, so the skill is placing the cursor at the right
+    /// distance, not spamming the key - but PIERCE IS ON (see FireOneBeam below), so this is NOT the
+    /// only place a beam can land. With `beamRange` doubled to 24m (rework step 6) each beam debuffs
+    /// every enemy anywhere along its own 24m line, convergence point or not; three separate targets
+    /// spread along one beam's path all take that beam's debuff, not just whichever one sits at the
+    /// cursor. Zero damage - this is a debuff, not a weapon (addendum, [C, plan]).
     ///
     /// REWORK STEP 5 (Tudor, 2026-09-18): moved from Equipment to the Ultimate slot. Readiness comes
     /// entirely from Owner.UltimateCharge - see IsReady/TryBuildCast below, the identical pattern
     /// InvulnerabilityAbility, ElectricFenceAbility and AoeZoneAbility already use - NOT the base
     /// class's own charge/cooldown pool (1 charge, 0s cooldown on this prefab; that recovers the
     /// instant it is spent, so it is never itself a gate). No cooldown of its own any more.
+    ///
+    /// REWORK STEP 6 (Tudor, 2026-09-18): "increase its range 2 times and thickness of the beam 1.5
+    /// times" - beamRange 12 -> 24, beamWidth 0.35 -> 0.525. beamWidth is now the ONE home for both
+    /// the hit diameter (the SphereCast radius below, unchanged) and the drawn diameter (DrawBeam
+    /// now sets the instantiated clone's LineRenderer width from it) - before this the drawn line was
+    /// a flat 0.08m from the shared Laser Beam VFX prefab regardless of beamWidth, a 4.4x mismatch
+    /// between what a player saw and what actually hit them.
     ///
     /// RUNS ON EVERY CLIENT, INCLUDING THE CASTER'S OWN, exactly once per cast - the beams are
     /// instant, so there is no coroutine the way the flamethrower's spray needs one. DAMAGE (well,
@@ -65,14 +75,20 @@ namespace Overpower.Abilities
                  "the tuned range below.")]
         private float beamOriginSpacing = 0.75f;
 
-        [SerializeField, Tooltip("How far each beam reaches from its OWN origin, in metres, not from " +
-                 "the cursor - the cursor point itself is also clamped to this distance from the " +
-                 "muzzle. Controller's call.")]
+        [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in " +
+                 "metres - not how far you can place the cursor. The cursor's own reach is set by " +
+                 "the camera, not by this number: at default zoom the camera already lets you aim " +
+                 "roughly 19m out (up to 38m fully zoomed out), so this range mostly controls how " +
+                 "far past the cursor a beam keeps hitting things, pierce included. Tudor, " +
+                 "2026-09-18: \"i want for the beams to traverse\" - doubled from 12 to 24.")]
         private float beamRange = 12f;
 
-        [SerializeField, Tooltip("Diameter of each beam's hit-check, in metres - a thin line would " +
-                 "miss a target standing a few centimetres off the exact convergence point. " +
-                 "Controller's call.")]
+        [SerializeField, Tooltip("Diameter of each beam, in metres - BOTH what it hits (the " +
+                 "SphereCast radius below) AND what you see (DrawBeam sets the drawn line's width " +
+                 "from this same number, on the instantiated clone only - never on the shared Laser " +
+                 "Beam VFX prefab, which the two laser weapons also use). One number, one home: " +
+                 "before rework step 6 the drawn line was a flat 0.08m regardless of this value. " +
+                 "Tudor, 2026-09-18: \"thickness of the beam 1.5 times\" - 0.35 -> 0.525.")]
         private float beamWidth = 0.35f;
 
         [SerializeField, Tooltip("Which layers a beam can hit. Default is where living players and " +
@@ -257,6 +273,15 @@ namespace Overpower.Abilities
             if (line != null)
             {
                 line.useWorldSpace = true;
+
+                // The drawn beam is exactly as wide as the beam that actually hits (rework step 6).
+                // Before this, beamWidth was a pure hit diameter and the visible line was whatever
+                // width the shared VFX prefab happened to carry - 0.08m against a 0.35m hitbox, so
+                // the thing the player aimed by was four times thinner than the thing that struck.
+                // Set on the INSTANTIATED CLONE, never on the prefab asset: Laser Beam VFX is shared
+                // with both laser weapons, and widening it there would widen those too.
+                line.startWidth = line.endWidth = beamWidth;
+
                 line.positionCount = 2;
                 line.SetPosition(0, from);
                 line.SetPosition(1, to);

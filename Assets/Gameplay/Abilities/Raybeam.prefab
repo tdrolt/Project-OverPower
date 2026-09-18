@@ -49,8 +49,8 @@ MonoBehaviour:
   vulnerabilityPerBeam: 0.3
   vulnerabilitySeconds: 4
   beamOriginSpacing: 0.75
-  beamRange: 12
-  beamWidth: 0.35
+  beamRange: 24
+  beamWidth: 0.525
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295
