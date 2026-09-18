@@ -30,4 +30,19 @@ public static class CameraZoomStack
             product *= multiplier;
         return product;
     }
+
+    /// <summary>Concrete-typed overload for CameraTracking's own multiplier dictionary
+    /// (zoomMultipliers.Values) - called every LateUpdate plus every read of ZoomMultiplierProduct,
+    /// so it must not allocate. Overload resolution picks this over the IEnumerable&lt;float&gt;
+    /// version above for an exact Dictionary&lt;object, float&gt;.ValueCollection argument, so the
+    /// foreach below binds to ValueCollection's own struct enumerator directly instead of boxing it
+    /// through the interface - same maths, kept as a literal copy rather than forwarding to the
+    /// general overload, which would box right back.</summary>
+    public static float Product(Dictionary<object, float>.ValueCollection multipliers)
+    {
+        float product = 1f;
+        foreach (float multiplier in multipliers)
+            product *= multiplier;
+        return product;
+    }
 }

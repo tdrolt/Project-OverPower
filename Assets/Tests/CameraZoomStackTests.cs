@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -53,6 +54,35 @@ namespace Overpower.Tests
         public void TwoActiveMultipliersMultiplyTogether()
         {
             float product = CameraZoomStack.Product(new[] { 1.2f, 1.5f });
+
+            Assert.AreEqual(1.2f * 1.5f, product, 1e-6f);
+        }
+
+        // CameraTracking's own per-frame call site (zoomMultipliers.Values) is a
+        // Dictionary<object, float>.ValueCollection, not a bare array - pins the concrete-typed
+        // overload (the LateUpdate/ZoomMultiplierProduct allocation fix) computes the identical
+        // product as the general IEnumerable<float> overload above, for both an empty and a
+        // populated dictionary.
+        [Test]
+        public void TheConcreteDictionaryOverloadMatchesTheGeneralOverloadWhenEmpty()
+        {
+            var empty = new Dictionary<object, float>();
+
+            float product = CameraZoomStack.Product(empty.Values);
+
+            Assert.AreEqual(1f, product);
+        }
+
+        [Test]
+        public void TheConcreteDictionaryOverloadMatchesTheGeneralOverloadWithValues()
+        {
+            var multipliers = new Dictionary<object, float>
+            {
+                { new object(), 1.2f },
+                { new object(), 1.5f },
+            };
+
+            float product = CameraZoomStack.Product(multipliers.Values);
 
             Assert.AreEqual(1.2f * 1.5f, product, 1e-6f);
         }
