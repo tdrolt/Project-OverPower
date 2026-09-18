@@ -147,6 +147,25 @@ namespace Overpower.UI
         public Color pipAvailableColor = Color.white;
         [Tooltip("Charge pip colour when that charge is spent.")]
         public Color pipSpentColor = new Color(1f, 1f, 1f, 0.15f);
+        [Tooltip("Width and height of one charge pip, in canvas units (HUD step 3 - this used to be a number " +
+                 "typed into PlayerHud where no designer could reach it). Tudor asked for bigger indicators: at " +
+                 "14 a pip is a tenth of a 140-unit slot, where the old 8 was a seventeenth. The pips sit in a " +
+                 "row Pip Row Height tall, which has to be at least this plus twice Pip Outline Width.")]
+        public float pipSize = 14f;
+        [Tooltip("Gap between two charge pips, in canvas units. Wide enough to count them at a glance without " +
+                 "the row running past the slot's edge.")]
+        public float pipSpacing = 4f;
+        [Tooltip("Height of the charge pip row under a slot's icon, in canvas units. Must be at least Pip Size " +
+                 "plus twice Pip Outline Width, or the pips are squashed. Together with Slot Reason Text Height " +
+                 "it has to fit inside Slot Cooldown Area Height.")]
+        public float pipRowHeight = 20f;
+        [Tooltip("Thickness of the dark rim around each charge pip, in canvas units - the same trick the " +
+                 "minimap's markers use. Without the HUD's old dark panel behind it, a plain white pip on the " +
+                 "arena's bright sand has nothing to read against.")]
+        public float pipOutlineWidth = 2f;
+        [Tooltip("Colour of that rim. Dark and near-opaque, so it works under both the available and the spent " +
+                 "pip colour above.")]
+        public Color pipOutlineColor = new Color(0f, 0f, 0f, 0.85f);
         [Tooltip("Colour of the dark cover that wipes off an ability icon as it recharges - fully covered the " +
                  "instant a charge is spent, gone the instant it returns.")]
         public Color cooldownCoverColor = new Color(0f, 0f, 0f, 0.65f);

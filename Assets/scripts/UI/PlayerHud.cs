@@ -105,7 +105,13 @@ namespace Overpower.UI
             public TextMeshProUGUI fallbackNameText;
             public Image cooldownCover;   // Null for the weapon slot - it has no cooldown sweep.
             public Transform pipRow;      // Null for the weapon slot.
+            // The coloured FACE of each pip - what SetPips tints. Each face is a child of its own pip root
+            // below, because a pip is two Images now (a dark rim and a face on top of it, HUD step 3).
             public readonly List<Image> pips = new List<Image>();
+            // The pip roots, in the same order - what SetPips destroys when the charge count changes. Kept
+            // separately rather than walking up from a face's parent: one list that owns the lifetime is
+            // harder to get wrong than a transform.parent hop that silently orphans the rim.
+            public readonly List<GameObject> pipRoots = new List<GameObject>();
             public TextMeshProUGUI blockReasonText; // Null for the weapon slot.
 
             // Ultimate slot only (Task 1.11) - null for every other slot. A separate overlay from
@@ -624,22 +630,40 @@ namespace Overpower.UI
 
             if (ui.pips.Count != maxCharges)
             {
-                foreach (Image old in ui.pips)
-                    Destroy(old.gameObject);
+                foreach (GameObject old in ui.pipRoots)
+                    Destroy(old);
+                ui.pipRoots.Clear();
                 ui.pips.Clear();
 
                 for (int i = 0; i < maxCharges; i++)
                 {
+                    // The pip root IS the dark rim: one Image sized Pip Size + twice the rim, with the coloured
+                    // face inset inside it. Two Images per pip instead of one, and no extra layout columns - the
+                    // rim is the thing the layout group measures, and the face is its child.
                     GameObject pip = new GameObject("Pip", typeof(RectTransform));
                     pip.transform.SetParent(ui.pipRow, false);
                     LayoutElement le = pip.AddComponent<LayoutElement>();
-                    le.preferredWidth = 8f;
-                    le.preferredHeight = 8f;
+                    float outer = theme.pipSize + 2f * theme.pipOutlineWidth;
+                    le.preferredWidth = outer;
+                    le.preferredHeight = outer;
                     // See panelLayout's comment in BuildUi: pipRow's child control is ON, so this
                     // LayoutElement alone becomes the pip's actual rendered size.
-                    Image img = pip.AddComponent<Image>();
-                    img.raycastTarget = false;
-                    ui.pips.Add(img);
+                    Image rim = pip.AddComponent<Image>();
+                    rim.color = theme.pipOutlineColor;
+                    rim.raycastTarget = false;
+
+                    GameObject faceGo = new GameObject("Face", typeof(RectTransform));
+                    faceGo.transform.SetParent(pip.transform, false);
+                    RectTransform faceRt = faceGo.GetComponent<RectTransform>();
+                    faceRt.anchorMin = Vector2.zero;
+                    faceRt.anchorMax = Vector2.one;
+                    faceRt.offsetMin = new Vector2(theme.pipOutlineWidth, theme.pipOutlineWidth);
+                    faceRt.offsetMax = new Vector2(-theme.pipOutlineWidth, -theme.pipOutlineWidth);
+                    Image face = faceGo.AddComponent<Image>();
+                    face.raycastTarget = false;
+
+                    ui.pipRoots.Add(pip);
+                    ui.pips.Add(face);
                 }
             }
 
@@ -1153,9 +1177,12 @@ namespace Overpower.UI
                 // reserved for them - positions derive from Slot Icon Box Height so they never drift out of sync
                 // with it. Both heights moved onto UiTheme in HUD step 1/3: they were the last two sizes in this
                 // file a designer could not reach.
-                float pipRowHeight = 14f; // HUD step 3 moves this onto UiTheme.
+                // 2 + Pip Row Height + 2 + Slot Reason Text Height has to stay inside Slot Cooldown Area Height
+                // (58 today: 2 + 20 + 2 + 26 = 50). If a designer raises the pips past that, the reason line
+                // starts overhanging the bottom of the slot - which is why all four numbers are on UiTheme, and
+                // why each of their tooltips names this sum.
                 float pipRowY = -(theme.slotIconBoxHeight + 2f);
-                float reasonY = pipRowY - pipRowHeight - 2f;
+                float reasonY = pipRowY - theme.pipRowHeight - 2f;
 
                 GameObject pipRow = new GameObject("Pips", typeof(RectTransform));
                 pipRow.transform.SetParent(go.transform, false);
@@ -1164,9 +1191,9 @@ namespace Overpower.UI
                 pipRt.anchorMax = new Vector2(1f, 1f);
                 pipRt.pivot = new Vector2(0.5f, 1f);
                 pipRt.anchoredPosition = new Vector2(0f, pipRowY);
-                pipRt.sizeDelta = new Vector2(0f, pipRowHeight);
+                pipRt.sizeDelta = new Vector2(0f, theme.pipRowHeight);
                 HorizontalLayoutGroup pipLayout = pipRow.AddComponent<HorizontalLayoutGroup>();
-                pipLayout.spacing = 2f;
+                pipLayout.spacing = theme.pipSpacing;
                 pipLayout.childAlignment = TextAnchor.MiddleCenter;
                 // ON for the same reason as panelLayout in BuildUi - SetPips's own LayoutElement per
                 // pip is now the one place their size lives, not a duplicated sizeDelta.
