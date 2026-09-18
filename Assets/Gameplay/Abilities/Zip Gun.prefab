@@ -48,8 +48,11 @@ MonoBehaviour:
   charges: 1
   range: 15
   projectileSpeed: 40
-  projectileRadius: 0.15
+  projectileRadius: 0.225
   projectilePrefab: {fileID: 6878105816844376405, guid: 660b1e8a46ceadb4daf99ccdd72cf425, type: 3}
   pullSpeed: 25
   tetherMarkerRadius: 0.35
   tetherMarkerSeconds: 0.3
+  anchorMaterial: {fileID: 2100000, guid: 0fce28b9fb8854e43ad9452f200ea99b, type: 2}
+  ropeMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
+  ropeWidth: 0.05

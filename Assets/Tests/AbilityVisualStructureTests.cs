@@ -315,5 +315,34 @@ namespace Overpower.Tests
             AssertNoCollider(cone.gameObject);
             AssertNoCollider(module); // AbilityDefinition forbids colliders on a module prefab
         }
+
+        [Test]
+        public void TheZipHookIsASquareHeadOnARopeWithNoCollider()
+        {
+            GameObject prefab = Load("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab");
+            Assert.AreEqual(Vector3.one, prefab.transform.localScale, "the old 0.2 sphere scale is gone");
+            Assert.IsNull(prefab.GetComponent<MeshRenderer>(), "the head is a child now");
+            Assert.IsNotNull(prefab.GetComponent<ProjectileMotor>());
+            Assert.IsNotNull(prefab.GetComponent<AbilityHitRelay>());
+            Transform head = Child(prefab.transform, "Head");
+            // A4 (Tudor 2026-09-17 evening): the head is sized to the NEW 0.45 m hit diameter - no longer a
+            // visual-only scale, the look now matches the hit (see ZipGunNumbersAreUnchanged's projectileRadius pin).
+            AssertMesh(head, "Cube", SolidPath);
+            Assert.AreEqual(0.45f, head.localScale.x, 1e-5f, "matches the hit diameter - Zip Gun.prefab's projectileRadius x2");
+            var rope = Child(prefab.transform, "Rope").GetComponent<LineRenderer>();
+            Assert.IsNotNull(rope);
+            Assert.IsTrue(rope.useWorldSpace);
+            Assert.AreEqual(2, rope.positionCount);
+            Assert.AreEqual(LinePath, AssetDatabase.GetAssetPath(rope.sharedMaterial));
+            var view = prefab.GetComponent<ZipBoltView>();
+            Assert.IsNotNull(view);
+            Assert.AreSame(head.GetComponent<MeshRenderer>(), Ref(view, "head"));
+            Assert.AreSame(rope, Ref(view, "rope"));
+            AssertNoCollider(prefab);
+
+            var ability = Load("Assets/Gameplay/Abilities/Zip Gun.prefab").GetComponent<ZipGunAbility>();
+            Assert.AreEqual(SolidPath, AssetDatabase.GetAssetPath(Ref(ability, "anchorMaterial")));
+            Assert.AreEqual(LinePath, AssetDatabase.GetAssetPath(Ref(ability, "ropeMaterial")));
+        }
     }
 }

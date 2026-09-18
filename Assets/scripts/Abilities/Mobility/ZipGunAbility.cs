@@ -47,8 +47,10 @@ namespace Overpower.Abilities
         private float projectileSpeed = 40f;
 
         [SerializeField, Tooltip("Radius in metres of the bolt's own hit-detection sphere - the " +
-                 "same idea as a weapon's Projectile Radius.")]
-        private float projectileRadius = 0.15f;
+                 "same idea as a weapon's Projectile Radius. A4 (Tudor 2026-09-17 evening, gameplay " +
+                 "change): raised from 0.15 to 0.225 so the hit finally matches the hook's own look " +
+                 "(0.45 m head, Zip Bolt View) - the head used to be drawn bigger than what it hit.")]
+        private float projectileRadius = 0.225f;
 
         [SerializeField, Tooltip("The projectile this ability fires - a ProjectileMotor plus " +
                  "AbilityHitRelay, no WeaponDefinition involved. Lives in Assets/Gameplay/Projectiles " +
@@ -62,15 +64,25 @@ namespace Overpower.Abilities
                  "further, both at this same speed.")]
         private float pullSpeed = 25f;
 
-        [Header("Remote tether (cosmetic only)")]
-        [SerializeField, Tooltip("Radius in metres of the cheap marker shown at the impact point on " +
-                 "every OTHER client's screen when your bolt lands a hit, so the shot reads as " +
-                 "landing somewhere real even though only your own screen shows the actual pull. 0 " +
-                 "shows nothing.")]
+        [Header("Tether (cosmetic only)")]
+        [SerializeField, Tooltip("Half the side, in metres, of the square anchor shown where your bolt bit, on " +
+                 "every client (yours included). 0 shows no anchor.")]
         private float tetherMarkerRadius = 0.35f;
 
-        [SerializeField, Tooltip("Seconds the impact marker stays up before it disappears on its own.")]
+        [SerializeField, Tooltip("Shortest time, in seconds, the anchor and the rope stay up. They stay longer " +
+                 "when the pull itself takes longer (distance ÷ Pull Speed).")]
         private float tetherMarkerSeconds = 0.3f;
+
+        [SerializeField, Tooltip("Material of the square anchor - Assets/Gameplay/Abilities/Ability Visual Solid.mat. " +
+                 "Its colour is the hook colour on the projectile prefab (Zip Bolt View).")]
+        private Material anchorMaterial;
+
+        [SerializeField, Tooltip("Material of the rope from you to the anchor during the pull - " +
+                 "Assets/Gameplay/UI/AimConeLine.mat.")]
+        private Material ropeMaterial;
+
+        [SerializeField, Tooltip("Rope thickness, in metres.")]
+        private float ropeWidth = 0.05f;
 
         // Owner only: the player's own capsule, read once so the pull can stop the requested
         // distance short of the impact point instead of driving the player's centre straight into
@@ -82,6 +94,13 @@ namespace Overpower.Abilities
         // running at the same moment - see PlayerDisplacement's priority rules, and DashAbility's
         // identical reasoning.
         private bool pulling;
+
+        // Every client: the pull rope, built once and reused. Unparented, like the flamethrower's cone, because this
+        // module sits under the player, whose hierarchy changes layer on death.
+        private LineRenderer pullRope;
+        private Vector3 tetherPoint;
+        private float ropeUntil;
+        private MaterialPropertyBlock anchorBlock;
 
         public override bool IsActive => pulling;
 
@@ -109,6 +128,8 @@ namespace Overpower.Abilities
         private void OnDestroy()
         {
             CombatEvents.LocalTakedown -= HandleLocalTakedown;
+            if (pullRope != null)
+                Destroy(pullRope.gameObject);
         }
 
         protected override void OnValidate()
@@ -167,10 +188,10 @@ namespace Overpower.Abilities
                     return;
 
                 case PhaseTether:
-                    // The caster's own screen already shows the real pull; this marker is only for
-                    // everyone else, exactly like TeleportAbility's arrival VFX.
-                    if (!cast.IsCasterClient)
-                        PlayTetherMarker(cast.Payload.Point);
+                    // Ability visuals step 7: every client, the caster's own included, draws the square
+                    // anchor and a rope for as long as the pull takes. The caster used to see the pull
+                    // with nothing connecting them to where the hook bit.
+                    PlayTether(cast.Payload.Point);
                     return;
             }
         }
@@ -248,20 +269,84 @@ namespace Overpower.Abilities
             pulling = false;
         }
 
-        private void PlayTetherMarker(Vector3 point)
+        private void PlayTether(Vector3 point)
         {
-            if (tetherMarkerRadius <= 0f)
-                return;
+            Vector3 toPoint = point - Owner.Root.transform.position;
+            toPoint.y = 0f;
+            float travel = Mathf.Max(0f, toPoint.magnitude - (capsule != null ? capsule.radius : 0f));
+            float seconds = Mathf.Max(tetherMarkerSeconds, AbilityVisualGeometry.PullSeconds(travel, pullSpeed));
+            Color color = HookColor();
 
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.name = "Zip Tether VFX (cheap, cosmetic only)";
-            // Removed immediately, not with Destroy, which waits for the end of the frame - see
-            // TeleportAbility.SpawnMarker's identical trick: for that one frame the sphere would
-            // otherwise be a solid object sitting in the world.
-            DestroyImmediate(marker.GetComponent<Collider>());
-            marker.transform.position = point;
-            marker.transform.localScale = Vector3.one * tetherMarkerRadius * 2f;
-            Destroy(marker, tetherMarkerSeconds);
+            if (tetherMarkerRadius > 0f)
+            {
+                GameObject anchor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                anchor.name = "Zip Anchor VFX (cheap, cosmetic only)";
+                // Removed immediately, not with Destroy, so the cube is never a solid object in the world, even
+                // for one frame - the same trick the old sphere marker used.
+                DestroyImmediate(anchor.GetComponent<Collider>());
+                anchor.transform.SetPositionAndRotation(point,
+                    toPoint.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(toPoint) : Quaternion.identity);
+                anchor.transform.localScale = Vector3.one * tetherMarkerRadius * 2f;
+                var renderer = anchor.GetComponent<MeshRenderer>();
+                if (anchorMaterial != null)
+                    renderer.sharedMaterial = anchorMaterial;
+                if (anchorBlock == null)
+                    anchorBlock = new MaterialPropertyBlock();
+                VisualTint.SetMeshColor(renderer, anchorBlock, color);
+                Destroy(anchor, seconds);
+            }
+
+            if (ropeMaterial == null)
+                return;
+            if (pullRope == null)
+                pullRope = BuildRope();
+            VisualTint.SetLineColor(pullRope, color);
+            tetherPoint = point;
+            ropeUntil = Time.time + seconds;
+            pullRope.enabled = true;
+            UpdateRope();
+        }
+
+        private Color HookColor()
+        {
+            ZipBoltView view = projectilePrefab != null ? projectilePrefab.GetComponent<ZipBoltView>() : null;
+            return view != null ? view.HookColor : Color.white;
+        }
+
+        private LineRenderer BuildRope()
+        {
+            var go = new GameObject("Zip Rope VFX (cheap, cosmetic only)");
+            var line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = ropeMaterial;
+            line.useWorldSpace = true;
+            line.positionCount = 2;
+            line.startWidth = ropeWidth;
+            line.endWidth = ropeWidth;
+            line.numCapVertices = 0;
+            line.numCornerVertices = 0;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            line.enabled = false;
+            return line;
+        }
+
+        private void LateUpdate()
+        {
+            if (pullRope == null || !pullRope.enabled)
+                return;
+            if (Time.time >= ropeUntil)
+            {
+                pullRope.enabled = false;
+                return;
+            }
+            UpdateRope();
+        }
+
+        private void UpdateRope()
+        {
+            Vector3 start = Owner.Weapon != null ? Owner.Weapon.MuzzlePosition : Owner.Root.transform.position;
+            pullRope.SetPosition(0, start);
+            pullRope.SetPosition(1, tetherPoint);
         }
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]
