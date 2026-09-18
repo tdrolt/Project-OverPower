@@ -33,6 +33,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// property and not an RPC.
     public const string AliveKey = "alive";
 
+    /// <summary>The Custom Property key marking this player "out for the last stand" (Task 2.7
+    /// review) - dead with the capital already lost, waiting for a teammate to take it back
+    /// (MatchPhaseRules.IsLastStandDeath). Distinct from AliveKey: a player on an ordinary respawn
+    /// countdown is not alive either, but their capital was never lost, so they must not count
+    /// toward their team's last stand.</summary>
+    public const string LastStandKey = "lastStand";
+
     [Header("Respawn")]
     [SerializeField, Tooltip("Match tuning asset. The base respawn wait, the per-death increase " +
              "and the cap all come from here, so all three respawn numbers live in one place with " +
@@ -244,26 +251,30 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (!TryGetOwnCathedral(teamID, out int baseBuildingID, out TowerData cathedralTower))
             return;
 
-        if (!cathedralTower.isCaptured || cathedralTower.controllingTeam != teamID)
+        bool capitalHeld = cathedralTower.isCaptured && cathedralTower.controllingTeam == teamID;
+
+        if (MatchPhaseRules.IsLastStandDeath(capitalHeld))
         {
-            // DELIBERATE: losing your capital eliminates your team permanently - no respawn, no
-            // re-show. This branch was once misdiagnosed as a networking bug ("players sometimes
-            // go invisible") and nearly removed. It is the design. It reads TowerDictionary, which
-            // is no longer written by any RPC - it is BuildingManager's in-memory mirror of the
-            // room's replicated TerritorySnapshot (BuildingManager.Apply; see that class's own
-            // comment), updated the moment this client's own copy of the snapshot changes. A client
-            // whose copy of the snapshot is still stale could take this branch early - that
-            // staleness is the thing to fix if this ever fires when it should not, not the branch
-            // itself.
-            Debug.LogWarning($"[VIS] PERMANENT DEATH  team={teamID} base={baseBuildingID} " +
+            // DELIBERATE: dying with your capital already lost is a last-stand death - no respawn
+            // countdown, a wait for a teammate to take the capital back instead (GDD p.20). This
+            // branch was once misdiagnosed as a networking bug ("players sometimes go invisible") and
+            // nearly removed. It is the design. It reads TowerDictionary, which is no longer written
+            // by any RPC - it is BuildingManager's in-memory mirror of the room's replicated
+            // TerritorySnapshot (BuildingManager.Apply; see that class's own comment), updated the
+            // moment this client's own copy of the snapshot changes. A client whose copy of the
+            // snapshot is still stale could take this branch early - that staleness is the thing to
+            // fix if this ever fires when it should not, not the branch itself.
+            Debug.LogWarning($"[VIS] LAST-STAND DEATH  team={teamID} base={baseBuildingID} " +
                              $"isCaptured={cathedralTower.isCaptured} controllingTeam={cathedralTower.controllingTeam}");
 
             SetAlive(false);
+            SetLastStandOut(true);
+            matchUI?.ShowWaitingPanel();
             photonView.RPC("RPC_HandleDeathMaster", RpcTarget.MasterClient, teamID, actorNumber);
             return;
         }
 
-        if (cathedralTower.isCaptured && cathedralTower.controllingTeam == teamID && !respawnStarted)
+        if (capitalHeld && !respawnStarted)
         {
             respawnStarted = true;
 
@@ -408,6 +419,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // that wrote a speed value here is exactly how "you move faster after respawning" happened.
         SetAlive(true);
 
+        // Whichever path got this player here (an ordinary respawn never set it true in the first
+        // place - this is then a harmless repeat write - or a last-stand recapture), they are back in
+        // the fight and no longer count toward their team's last stand.
+        SetLastStandOut(false);
+
         // No fallback string: theme's own null already logged an error in Start, and playerHud's a
         // second one - showing wrong or missing-theme text here would just be a second symptom.
         if (atUnderAttackSpawn && theme != null)
@@ -430,13 +446,20 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         matchUI?.SetRespawnPanelVisible(false);
     }
 
-    /// Puts a player back on their team's spawn point - which today is also where "return to your
-    /// capital" lands (RoomManager.teamSpawnPoints). Originally only for a player who fell out of the
-    /// world (deliberately NOT a death: falling is a level problem, not a play outcome, so it must
-    /// not feed the respawn timer or the elimination count). Task 2.7 adds a second caller:
-    /// MatchDirector, on the three-to-two team transition, sends every living player home the same
-    /// way - made public for that call, everything else about this method is unchanged.
-    public void ReturnToSpawn()
+    /// Puts a player who fell out of the world back on their team's spawn point. Deliberately NOT a
+    /// death: falling is a level problem, not a play outcome, so it must not feed the respawn timer
+    /// or the elimination count.
+    public void ReturnToSpawn() =>
+        MoveToSpawnPoint($"fell below y={playerMotor.KillHeight}");
+
+    /// <summary>MatchDirector's own second caller (Task 2.7 review): on the three-to-two team
+    /// transition, every living player's own client sends them home to their team's spawn point -
+    /// which today is also where "return to your capital" lands (RoomManager.teamSpawnPoints) - the
+    /// same move ReturnToSpawn makes, just with a log line that does not claim they fell.</summary>
+    public void ReturnToSpawnForPhaseChange() =>
+        MoveToSpawnPoint("sent home for the two-team phase change");
+
+    private void MoveToSpawnPoint(string logReason)
     {
         PlayerTeam pt = GetComponent<PlayerTeam>();
         RoomManager roomManager = FindObjectOfType<RoomManager>();
@@ -451,7 +474,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         TeleportToSpawnPoint(roomManager.teamSpawnPoints[pt.teamID].position,
                               roomManager.teamSpawnPoints[pt.teamID].rotation);
 
-        Debug.Log($"[VIS] fell below y={playerMotor.KillHeight}, returned to spawn at {rigidbody.position}");
+        Debug.Log($"[VIS] {logReason}, returned to spawn at {rigidbody.position}");
     }
 
     /// Tudor, 2026-09-16: while your capital is under attack (an enemy standing in it, or who just left - see
@@ -576,6 +599,18 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { AliveKey, alive } });
     }
 
+    /// Owner-only, published the same way SetAlive is just above (Task 2.7 review) - the "out for the
+    /// last stand" fact MatchDirector's own team recompute reads, set true exactly on a last-stand
+    /// death and cleared the moment this player is on their way back into the match (RespawnPlayer),
+    /// whichever path got them there.
+    void SetLastStandOut(bool outForLastStand)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { LastStandKey, outForLastStand } });
+    }
+
     /// Everything that used to live in RPC_HandleDeath and RPC_ShowPlayer, in one place so hide
     /// and show cannot drift apart. The old pair did not: RPC_HandleDeath moved the hierarchy to
     /// the DeadPlayer layer on every client, but only the owner ever moved it back.
@@ -685,8 +720,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     {
         if (!PhotonNetwork.IsMasterClient) return;
         Debug.Log($"[PlayerLifecycle] (Master) RPC_HandleDeathMaster retired (Task 2.7) - actor {actorNumber} " +
-                  $"team {teamID}; asking MatchDirector to recompute in case this RPC beats the \"alive\" " +
-                  "Player Property SetAlive(false) already published across the wire.");
+                  $"team {teamID}; asking MatchDirector to recompute in case this RPC beats the \"lastStand\" " +
+                  "Player Property SetLastStandOut(true) already published across the wire.");
         MatchDirector.Instance?.RequestRecompute();
     }
 }

@@ -270,24 +270,31 @@ public class MatchUI : MonoBehaviour
         }
     }
 
-    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, PlayerLifecycle.
-    /// RPC_HandleDeathMaster's gutted body no longer sends it - a non-eliminated victim's "waiting for
-    /// my capital back" state does not change with this task, it just no longer needs announcing).
-    [PunRPC]
-    void RPC_ShowWaitingPanel(int teamID)
+    /// <summary>Shows this player their "waiting for a teammate to retake the capital" panel,
+    /// locally (Task 2.7 review). PlayerLifecycle calls this directly the instant a death becomes a
+    /// last-stand death - no RPC needed, the same local-call pattern ShowYouLost uses. The old RPC
+    /// below is kept only for the committed RpcList and now just forwards here.</summary>
+    public void ShowWaitingPanel()
     {
-        int localTeamID = (int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey];
-        if (teamID != localTeamID) return;
-
         Debug.Log("[MatchUI] Show Waiting Panel Entered");
 
         // Never over the top of "you lost": being eliminated outranks waiting for a respawn that
         // is no longer coming.
-        if (waitingPanel != null && !waitingPanel.activeSelf && !youLostPanel.activeSelf)
+        if (waitingPanel != null && !waitingPanel.activeSelf && (youLostPanel == null || !youLostPanel.activeSelf))
         {
             waitingPanel.SetActive(true);
-            Debug.Log($"[MatchUI] (RPC) Showing Waiting panel for player on Team {teamID}.");
+            Debug.Log("[MatchUI] (local) Showing Waiting panel.");
         }
+    }
+
+    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, PlayerLifecycle.
+    /// RPC_HandleDeathMaster) - an older client could still send it, so the body stays, just
+    /// forwarding to the local method above instead of duplicating it.
+    [PunRPC]
+    void RPC_ShowWaitingPanel(int teamID)
+    {
+        if ((int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey] != teamID) return;
+        ShowWaitingPanel();
     }
 
     /// <summary>Shows this player their team-eliminated panel, locally. Task 2.7: MatchDirector calls
