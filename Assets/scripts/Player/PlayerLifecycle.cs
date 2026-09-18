@@ -1,11 +1,10 @@
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Match;
 using Overpower.UI;
 using Overpower.Weapons;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -90,14 +89,6 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // Mirrors the replicated alive state so input and physics can be gated on it locally.
     private bool isAlive = true;
 
-    // Master-client-only bookkeeping of how many players on each team are currently dead, so the
-    // master can tell when a whole team is out and the match is over. Static because it is one
-    // tally per match, not per player, and every player object on the master client feeds the
-    // same tally.
-    private static Dictionary<int, int> teamDeadCount = new Dictionary<int, int>();
-    private static HashSet<int> processedDeaths = new HashSet<int>();
-    private static List<int> deadTeams = new List<int>();
-
     /// <summary>False from the moment a lethal hit lands until the respawn completes. Gate any
     /// ability, dash or input on this: without that gate a player could act during the respawn
     /// wait and, in the dash's case, reappear where they died instead of at their base.</summary>
@@ -143,22 +134,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         playerMotor.LeftArena += HandleLeftArena;
         playerDisplacement = GetComponent<PlayerDisplacement>();
 
-        // How the master client finds a specific victim's PhotonView in RPC_HandleDeathMaster
-        // below, and how BuildingManager finds the local player to show a match result.
+        // How an actor number is turned back into a PhotonView across the codebase - MatchDirector
+        // (Task 2.7) uses this to find each client's own player and react locally to a phase or
+        // elimination change, the same lookup ZipBoltView/MinimapView/PlayerTelemetry and others
+        // already rely on for their own actor number.
         PlayerLookup.Register(photonView.OwnerActorNr, photonView);
-
-        // Determine local player's team from Photon custom properties
-        int localTeam = -1;
-        if (PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey(PlayerTeam.TeamKey))
-        {
-            localTeam = (int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey];
-        }
-
-        // Initialize dead count for this team if it hasn't been set
-        if (!teamDeadCount.ContainsKey(localTeam))
-        {
-            teamDeadCount[localTeam] = 0;
-        }
 
         // Once per player per match. A team of -1 here means the Custom Property had not arrived
         // yet, which is the thing to look for if teams or friendly fire ever behave oddly.
@@ -260,10 +240,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         {
             // DELIBERATE: losing your capital eliminates your team permanently - no respawn, no
             // re-show. This branch was once misdiagnosed as a networking bug ("players sometimes
-            // go invisible") and nearly removed. It is the design. It does read TowerDictionary,
-            // which is replicated with RpcTarget.All (not AllBuffered), so a client with a stale
-            // tower state could take this branch early - that staleness is the thing to fix if
-            // this ever fires when it should not, not the branch itself.
+            // go invisible") and nearly removed. It is the design. It reads TowerDictionary, which
+            // is no longer written by any RPC - it is BuildingManager's in-memory mirror of the
+            // room's replicated TerritorySnapshot (BuildingManager.Apply; see that class's own
+            // comment), updated the moment this client's own copy of the snapshot changes. A client
+            // whose copy of the snapshot is still stale could take this branch early - that
+            // staleness is the thing to fix if this ever fires when it should not, not the branch
+            // itself.
             Debug.LogWarning($"[VIS] PERMANENT DEATH  team={teamID} base={baseBuildingID} " +
                              $"isCaptured={cathedralTower.isCaptured} controllingTeam={cathedralTower.controllingTeam}");
 
@@ -337,30 +320,24 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         }
     }
 
-    /// Both death paths need this team's capital and both used to look it up with their own copy of
-    /// the same loop. Returns false and logs if the team has no capital at all, which is a map or
+    /// Both death paths (and CheckForCathedralCapture below) need this team's capital. Task 2.7:
+    /// reads it from MatchDirector.CapitalOf rather than scanning BuildingManager.CathedralBuildingIDs
+    /// directly - MatchDirector is the one place that answer would change if capital adoption (a
+    /// last-stand team keeping an enemy capital it captures, GDD p.20, cut for this task [C]) is ever
+    /// built. Returns false and logs if the team has no capital at all, which is a map or
     /// BuildingManager setup problem, not something a player can cause.
     private bool TryGetOwnCathedral(int teamID, out int baseBuildingID, out TowerData cathedralTower)
     {
-        baseBuildingID = -1;
+        baseBuildingID = MatchDirector.Instance != null ? MatchDirector.Instance.CapitalOf(teamID) : -1;
         cathedralTower = default;
 
-        foreach (KeyValuePair<int, int> kvp in BuildingManager.Instance.CathedralBuildingIDs)
-        {
-            if (kvp.Value == teamID)
-            {
-                baseBuildingID = kvp.Key;
-                break;
-            }
-        }
-
-        if (baseBuildingID == -1)
+        if (baseBuildingID < 0 || BuildingManager.Instance == null
+            || !BuildingManager.Instance.TowerDictionary.TryGetValue(baseBuildingID, out cathedralTower))
         {
             Debug.LogError($"[PlayerLifecycle] No base building found for team {teamID}.");
             return false;
         }
 
-        cathedralTower = BuildingManager.Instance.TowerDictionary[baseBuildingID];
         return true;
     }
 
@@ -445,10 +422,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         matchUI?.SetRespawnPanelVisible(false);
     }
 
-    /// Puts a player who fell out of the world back on their spawn point. Deliberately NOT a
-    /// death: falling is a level problem, not a play outcome, so it should not feed the respawn
-    /// timer or the elimination count.
-    void ReturnToSpawn()
+    /// Puts a player back on their team's spawn point - which today is also where "return to your
+    /// capital" lands (RoomManager.teamSpawnPoints). Originally only for a player who fell out of the
+    /// world (deliberately NOT a death: falling is a level problem, not a play outcome, so it must
+    /// not feed the respawn timer or the elimination count). Task 2.7 adds a second caller:
+    /// MatchDirector, on the three-to-two team transition, sends every living player home the same
+    /// way - made public for that call, everything else about this method is unchanged.
+    public void ReturnToSpawn()
     {
         PlayerTeam pt = GetComponent<PlayerTeam>();
         RoomManager roomManager = FindObjectOfType<RoomManager>();
@@ -673,100 +653,32 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) { }
     public void OnMasterClientSwitched(Player newMasterClient) { }
 
-    // ---- master-client elimination bookkeeping --------------------------------------------
-    // Both RPCs below run ONLY on the master client, which owns the one authoritative tally of
-    // who is dead. Names are fixed: PUN sends an index into the RpcList in PhotonServerSettings,
-    // so renaming either one mis-dispatches on every client that already shipped.
+    // ---- master-client elimination bookkeeping (retired, Task 2.7) -------------------------
+    // Both RPCs below used to run ONLY on the master client, which kept the one authoritative tally
+    // of who was dead, in the three static fields this task deleted (teamDeadCount, processedDeaths,
+    // deadTeams) - a tally that lived on one machine's heap did not survive that machine losing
+    // master, or a second match starting in the same session. Elimination and the match phase are
+    // recomputed instead by MatchDirector, from replicated state (team rosters, the "alive" Player
+    // Property SetAlive already publishes, and capital ownership) - see MatchDirector.MasterRecompute.
+    // Both methods are kept only because PUN dispatches an RPC by its index into the committed RpcList
+    // in PhotonServerSettings.asset: removing or renaming either one would mis-dispatch every RPC
+    // listed after it, on any client that already shipped.
 
     [PunRPC]
     public void RPC_HandleRespawnMaster(int teamID, int actorNumber)
     {
         if (!PhotonNetwork.IsMasterClient) return;
-
-        int prev = teamDeadCount.TryGetValue(teamID, out var val) ? val : 0;
-        int now = Mathf.Max(0, prev - 1);
-        teamDeadCount[teamID] = now;
-
-        processedDeaths.Remove(actorNumber);
-
-        if (now == 0)
-            deadTeams.Remove(teamID);
+        Debug.Log($"[PlayerLifecycle] (Master) RPC_HandleRespawnMaster retired (Task 2.7) - actor {actorNumber} " +
+                  $"team {teamID}; MatchDirector already reacted to this player's own \"alive\" Player Property.");
     }
 
     [PunRPC]
     public void RPC_HandleDeathMaster(int teamID, int actorNumber)
     {
-        if (!processedDeaths.Add(actorNumber))
-        {
-            Debug.Log($"[Master] Actor {actorNumber} already processed.");
-            return;
-        }
-
-        int totalTeamPlayers = 0;
-
-        foreach (var p in PhotonNetwork.PlayerList)
-        {
-            if (p.CustomProperties.ContainsKey(PlayerTeam.TeamKey) &&
-                (int)p.CustomProperties[PlayerTeam.TeamKey] == teamID)
-            {
-                totalTeamPlayers++;
-            }
-        }
-
-        int previousDead = teamDeadCount.ContainsKey(teamID) ? teamDeadCount[teamID] : 0;
-        int newDeadCount = previousDead + 1;
-        teamDeadCount[teamID] = newDeadCount;
-
-        int remaining = totalTeamPlayers - newDeadCount;
-
-        Debug.Log($"[PlayerLifecycle] (Master) Team {teamID} has {remaining} player(s) remaining.");
-
-        if (remaining <= 0)
-        {
-            deadTeams.Add(teamID);
-
-            Debug.Log($"[PlayerLifecycle] Team Dead : {teamID}");
-
-            // Each victim is told on their own PhotonView, not this one: the panels live on the
-            // dead player's own object, and "local" inside an RPC body means the receiver.
-            foreach (var p in PhotonNetwork.PlayerList
-                    .Where(p => (int)p.CustomProperties[PlayerTeam.TeamKey] == teamID))
-            {
-                PhotonView victimView = PlayerLookup.GetPhotonViewFor(p.ActorNumber);
-                if (victimView != null)
-                {
-                    victimView.RPC("RPC_ShowYouLostPanel", p, teamID);
-                }
-            }
-        }
-        else
-        {
-            var victimView = PlayerLookup.GetPhotonViewFor(actorNumber);
-            if (victimView != null)
-                victimView.RPC("RPC_ShowWaitingPanel",
-                               PhotonNetwork.CurrentRoom.GetPlayer(actorNumber),
-                               teamID);
-        }
-
-        Debug.Log($"[PlayerLifecycle] (Master) Dead Teams Count {deadTeams.Count}");
-
-        HashSet<int> allTeamIDs = new HashSet<int>();
-
-        foreach (var player in PhotonNetwork.PlayerList)
-        {
-            if (player.CustomProperties.ContainsKey(PlayerTeam.TeamKey))
-                allTeamIDs.Add((int)player.CustomProperties[PlayerTeam.TeamKey]);
-        }
-
-        List<int> remainingTeams = allTeamIDs.Where(tid => !deadTeams.Contains(tid)).ToList();
-
-        if (remainingTeams.Count == 1)
-        {
-            int winningTeam = remainingTeams[0];
-
-            Debug.Log($"[PlayerLifecycle] Team {winningTeam} has WON the match!");
-
-            photonView.RPC("RPC_ShowYouWonPanel", RpcTarget.All, winningTeam);
-        }
+        if (!PhotonNetwork.IsMasterClient) return;
+        Debug.Log($"[PlayerLifecycle] (Master) RPC_HandleDeathMaster retired (Task 2.7) - actor {actorNumber} " +
+                  $"team {teamID}; asking MatchDirector to recompute in case this RPC beats the \"alive\" " +
+                  "Player Property SetAlive(false) already published across the wire.");
+        MatchDirector.Instance?.RequestRecompute();
     }
 }

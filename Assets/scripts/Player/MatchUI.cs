@@ -225,16 +225,21 @@ public class MatchUI : MonoBehaviour
         playerMotor.AddSpeedMultiplier(this, 0f);
     }
 
-    // ---- RPCs -----------------------------------------------------------------------------
-    // Sent by the master client's elimination bookkeeping in PlayerLifecycle, and targeted at one
-    // player's own PhotonView. Inside these bodies "local" means the RECEIVER: every
-    // PhotonNetwork.LocalPlayer read below is the player being told, not the master client that
-    // sent it. The teamID the sender meant therefore has to travel as a parameter.
+    // ---- RPCs (retired, Task 2.7) -----------------------------------------------------------
+    // Used to be sent by the master client's elimination bookkeeping in PlayerLifecycle, targeted at
+    // one player's own PhotonView. Elimination and the match result are decided from replicated Room
+    // Properties now (MatchDirector), which every client - including a late joiner - already reads,
+    // so none of these four are called any more; each forwards to (or was replaced by) a plain local
+    // method MatchDirector calls directly. Inside a body that still runs, "local" means the RECEIVER:
+    // every PhotonNetwork.LocalPlayer read below is the player being told, not whoever sent it.
     //
-    // None of these four names may be renamed. PUN sends an index into the RpcList in
-    // PhotonServerSettings.asset, which is a committed list of method NAMES, so a rename
-    // mis-dispatches on every client that already shipped. Moving them between files is safe.
+    // None of these four names may be renamed or removed. PUN sends an index into the RpcList in
+    // PhotonServerSettings.asset, which is a committed list of method NAMES, so a rename or removal
+    // mis-dispatches every RPC listed after it on any client that already shipped.
 
+    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, PlayerLifecycle.
+    /// RPC_HandleDeathMaster's old winner announcement) - MatchDirector now writes mWin and every
+    /// client reacts through ShowMatchResult instead.
     [PunRPC]
     public void RPC_ShowYouWonPanel(int teamID)
     {
@@ -265,6 +270,9 @@ public class MatchUI : MonoBehaviour
         }
     }
 
+    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, PlayerLifecycle.
+    /// RPC_HandleDeathMaster's gutted body no longer sends it - a non-eliminated victim's "waiting for
+    /// my capital back" state does not change with this task, it just no longer needs announcing).
     [PunRPC]
     void RPC_ShowWaitingPanel(int teamID)
     {
@@ -282,12 +290,13 @@ public class MatchUI : MonoBehaviour
         }
     }
 
-    [PunRPC]
-    void RPC_ShowYouLostPanel(int teamID)
+    /// <summary>Shows this player their team-eliminated panel, locally. Task 2.7: MatchDirector calls
+    /// this directly, on each newly-eliminated team's own client, once elimination is decided from
+    /// replicated state - no RPC needed any more, since the state (mElim) already replicated itself.
+    /// The old RPC below is kept only for the committed RpcList and now just forwards here.</summary>
+    public void ShowYouLost()
     {
-        if ((int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey] != teamID) return;
-
-        Debug.Log("[MatchUI] RPC_ShowYouLostPanel running");
+        Debug.Log("[MatchUI] ShowYouLost running");
 
         Debug.Log($"waitingPanel: {(waitingPanel == null ? "null" : waitingPanel.name)}, activeInHierarchy: {waitingPanel?.activeInHierarchy}");
         Debug.Log($"youLostPanel: {(youLostPanel == null ? "null" : youLostPanel.name)}, activeInHierarchy: {youLostPanel?.activeInHierarchy}");
@@ -310,6 +319,16 @@ public class MatchUI : MonoBehaviour
         // StartCoroutine(DelayedShowLose());
 
         FreezeForRestOfMatch();
+    }
+
+    /// Kept only for the committed RpcList (Task 2.7 retired its caller, PlayerLifecycle.
+    /// RPC_HandleDeathMaster) - an older client could still send it, so the body stays, just
+    /// forwarding to the local method above instead of duplicating it.
+    [PunRPC]
+    void RPC_ShowYouLostPanel(int teamID)
+    {
+        if ((int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey] != teamID) return;
+        ShowYouLost();
     }
 
     /// Currently unreachable: its only call site is the commented-out line above. It exists because

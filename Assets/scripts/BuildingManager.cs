@@ -312,6 +312,15 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         }
 
         BuildMap();
+
+        // Task 2.7: MatchDirector needs no scene footprint and no PhotonView - it only ever reads
+        // and writes Room Properties, the same authority model this class's own territory state
+        // uses. Added here, at runtime, on this same GameObject (which already hosts MatchTelemetry
+        // and ZonePresenceTracker) rather than placed in Game Scene.unity, because the arena is being
+        // rebuilt from primitives in a separate session and anything placed in the scene right now
+        // could be lost or conflict with that rebuild [C, controller decision, 2026-09-18].
+        if (GetComponent<MatchDirector>() == null)
+            gameObject.AddComponent<MatchDirector>();
     }
 
     void Start()
@@ -837,20 +846,20 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             return;
 
         territoryWinAnnounced = true;
-        photonView.RPC("RPC_TerritoryWin", RpcTarget.All, owner);
+        // Task 2.7: MatchDirector owns mWin/mPhase now, and every client reacts to a win (win/lose
+        // panels) through that one replicated-state path - RPC_TerritoryWin below is retired.
+        if (MatchDirector.Instance != null)
+            MatchDirector.Instance.AnnounceTerritoryWin(owner);
+        else
+            Debug.LogError("[TOWER] territory win decided, but no MatchDirector exists to announce it.");
     }
 
+    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, CheckTerritoryWin above,
+    /// which now calls MatchDirector.AnnounceTerritoryWin instead) - an older client could still send
+    /// it, same "kept only for the RpcList" reasoning as RPC_UpdateTowerDictionary above.
     [PunRPC]
     private void RPC_TerritoryWin(int winningTeam)
     {
-        Debug.Log($"[TOWER] territory win: team {winningTeam} holds every capital");
-
-        PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
-        // MatchUI owns the win/lose panels now that Multiplayer.cs has been split up (Task 0.11b).
-        MatchUI local = localView != null ? localView.GetComponent<MatchUI>() : null;
-
-        if (local != null)
-            local.ShowMatchResult(winningTeam);
     }
 }
 
