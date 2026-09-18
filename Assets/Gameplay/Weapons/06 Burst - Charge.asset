@@ -39,7 +39,7 @@ MonoBehaviour:
   overheatPerShot: 12
   overheatRefundOnHit: 0
   canCharge: 1
-  maxChargeSeconds: 0.35
+  maxChargeSeconds: 0.7
   chargeSteps: 2
   chargeDamageMultiplier: 1.5
   chargeRangeMultiplier: 1

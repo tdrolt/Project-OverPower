@@ -189,13 +189,18 @@ namespace Overpower.Data
         [SerializeField] private bool canCharge = false;
         public bool CanCharge => canCharge;
 
-        [Tooltip("Seconds of holding the trigger to reach a full charge.")]
+        [Tooltip("Seconds of holding the trigger to reach a full charge. The clock only starts once " +
+                 "the weapon is off cooldown (see WeaponFiring.ChargeFraction), so this is the price " +
+                 "on top of Fire Interval, not inside it.")]
         [SerializeField] private float maxChargeSeconds = 0f;
         public float MaxChargeSeconds => maxChargeSeconds;
 
         [Tooltip("How many distinct charge levels the hold passes through on its way to full. " +
                  "Steps give the player readable stages to react to instead of a smooth ramp " +
-                 "they have to guess the timing of.")]
+                 "they have to guess the timing of. Keep this equal to Charge Max Projectiles minus " +
+                 "Projectiles Per Shot on a weapon that stacks rounds, so every step is exactly one " +
+                 "more round. A step is reached by COMPLETING it: at 2 steps, a hold under half fires " +
+                 "the base count, half or more fires one extra, and only a full hold fires them all.")]
         [SerializeField] private int chargeSteps = 0;
         public int ChargeSteps => chargeSteps;
 
