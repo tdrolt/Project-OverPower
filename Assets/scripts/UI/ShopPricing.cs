@@ -119,5 +119,20 @@ namespace Overpower.UI
         /// PlayerHud.UpdateGold's own gold formatting so the HUD and this header never disagree on
         /// a decimal/thousands separator on a non-English Windows locale.</summary>
         public static string GoldLabel(int balance) => $"Gold {balance.ToString(CultureInfo.InvariantCulture)}";
+
+        /// <summary>The HUD's own two-line gold readout, next to the shop button (HUD step 4): the balance on
+        /// top, this second's income under it at sizePercent of the balance's size. InvariantCulture on BOTH
+        /// numbers, and pinned by a test rather than by a comment: on a machine whose culture uses a comma as the
+        /// decimal separator, "+7,7/s" reads as a thousands separator, i.e. as an income seventy times too big.
+        ///
+        /// The shop screen's own header keeps GoldLabel above - inside the shop you are reading a balance you are
+        /// about to spend, not watching it tick up, and the two are never on screen at the same time (the shop's
+        /// dim covers the HUD's canvas).</summary>
+        public static string GoldHudLabel(int balance, double incomePerSecond, float sizePercent)
+        {
+            int percent = Mathf.Clamp(Mathf.RoundToInt(sizePercent), 1, 100);
+            string income = incomePerSecond.ToString("0.0", CultureInfo.InvariantCulture);
+            return $"{GoldLabel(balance)}\n<size={percent.ToString(CultureInfo.InvariantCulture)}%>+{income}/s</size>";
+        }
     }
 }

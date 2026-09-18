@@ -117,6 +117,8 @@ MonoBehaviour:
   laserBeamEmission: 1.6
   laserBeamLingerSeconds: 0.18
   goldTextColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+  goldShopGap: 8
+  goldIncomeSizePercent: 75
   bountyToastColor: {r: 1, g: 0.82, b: 0.2, a: 1}
   bountyToastDurationSeconds: 3
   capitalUnderAttackRespawnNote: Your capital is under attack - you will respawn

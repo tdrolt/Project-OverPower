@@ -380,6 +380,14 @@ namespace Overpower.UI
                  "family as Highlight Colour/Ultimate Charge Colour, so gold reads as a reward the " +
                  "same way the ultimate-ready glow does, not just another stat.")]
         public Color goldTextColor = new Color(1f, 0.82f, 0.2f, 1f);
+        [Tooltip("Gap between the top of the 'Loadout (P)' button and the gold readout sitting above it, in " +
+                 "canvas units. Tudor, 2026-09-17: gold and the shop are the same system, so the readout moved " +
+                 "out of the ability bar and up against the button that spends it.")]
+        public float goldShopGap = 8f;
+        [Tooltip("Font size of the income line (\"+7.7/s\") as a percentage of the balance line above it. The " +
+                 "balance is the number you act on; the income is context, so it is deliberately smaller - the " +
+                 "same relationship Loadout Price Line Size Percent gives a shop item's price.")]
+        [Range(30f, 100f)] public float goldIncomeSizePercent = 75f;
 
         [Header("Bounty toast")]
         [Tooltip("Text colour of the transient \"Bounty +900\" toast shown when a capture pays your " +

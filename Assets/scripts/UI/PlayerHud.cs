@@ -72,7 +72,7 @@ namespace Overpower.UI
         private Image armorFill;
         private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
         private GameObject silencedBanner;
-        private TextMeshProUGUI goldText; // "Gold 1234  +7.7/s" - see BuildUi's placement comment.
+        private TextMeshProUGUI goldText; // "Gold 1234" over "+7.7/s", bottom-right - see BuildGoldCorner.
 
         // Task 2.4: the transient toast - originally just "Bounty +900", generalised (Task B3,
         // 2026-09-16) into ShowToast(string) so "Respawned at Tier 2: capital under attack" can reuse
@@ -359,9 +359,10 @@ namespace Overpower.UI
         // Gold (Task 2.2)
         // ============================================================================================
 
-        /// <summary>"Gold 1234  +7.7/s" - InvariantCulture so the decimal point in the income figure
-        /// never turns into a comma on a machine set to a culture that uses one (a stray comma there
-        /// would read as a thousands separator, not a decimal point).</summary>
+        /// <summary>The bottom-right readout next to the shop button - "Gold 1234" over "+7.7/s". The formatting
+        /// (and the InvariantCulture rule behind it) lives in ShopPricing.GoldHudLabel, where a test pins it.
+        /// Still gated on the balance AND the income both being unchanged, so an idle wallet never re-allocates
+        /// a string or re-lays-out a text sixty times a second.</summary>
         private void UpdateGold()
         {
             if (goldWallet == null)
@@ -372,7 +373,7 @@ namespace Overpower.UI
             if (balance == lastGoldBalance && income == lastGoldIncome)
                 return;
 
-            goldText.text = $"Gold {balance.ToString(CultureInfo.InvariantCulture)}  +{income.ToString("0.0", CultureInfo.InvariantCulture)}/s";
+            goldText.text = ShopPricing.GoldHudLabel(balance, income, theme.goldIncomeSizePercent);
             lastGoldBalance = balance;
             lastGoldIncome = income;
         }
@@ -783,21 +784,10 @@ namespace Overpower.UI
             panelFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            // Gold row (Task 2.2), added FIRST so it sits above everything else - a judgement call
-            // [C, assumptions-for-tudor.md]: Tudor's own approved mockup (below) predates the
-            // economy, so there was no slot reserved for it. Placed above the slots row rather than
-            // wedged between the bars, since it is closer to a status readout (like a score) than to
-            // a combat stat.
-            goldText = AddLabel(panel.transform, "Gold 0  +0.0/s", theme.bodyTextSize, FontStyles.Bold);
-            LayoutElement goldLe = goldText.gameObject.AddComponent<LayoutElement>();
-            goldLe.preferredWidth = theme.barWidth;
-            goldLe.preferredHeight = theme.bodyTextSize + 8f;
-            goldText.color = theme.goldTextColor;
-            goldText.alignment = TextAlignmentOptions.Center;
-
             // Task 2.6: the OverPower label - persistent (see the field's own comment), hidden
-            // until UpdateOverPower's first armed/active frame, placed directly under the gold row
-            // since both are status readouts rather than combat stats like the bars/slots below.
+            // until UpdateOverPower's first armed/active frame, at the top of the HUD panel (HUD
+            // step 4 moved the gold row that used to sit above it into its own Gold Corner, bottom-
+            // right next to the shop button - see BuildGoldCorner).
             overPowerLabel = AddLabel(panel.transform, "", theme.bodyTextSize, FontStyles.Bold);
             LayoutElement overPowerLe = overPowerLabel.gameObject.AddComponent<LayoutElement>();
             overPowerLe.preferredWidth = theme.barWidth;
@@ -862,7 +852,43 @@ namespace Overpower.UI
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
 
+            BuildGoldCorner(canvasGo.transform);
             BuildToast(canvasGo.transform);
+        }
+
+        /// <summary>The gold readout, bottom-right, directly above the "Loadout (P)" button (Tudor, 2026-09-17:
+        /// "display the gold generation next to the shop since these systems are tied together"). It used to be
+        /// the first row of Hud Panel, where it pushed the bars and slots down and had nothing to do with either.
+        ///
+        /// It lives on THIS canvas, not on the loadout screen's own toggle canvas, because PlayerHud is what
+        /// already holds the GoldWallet and the change caches that keep an unmoving number from re-allocating a
+        /// string sixty times a second - see UpdateGold. The two canvases line up because both put their content
+        /// inside an identical (1, 0)-anchored, (1, 0)-pivoted root scaled by Hud Scale, so the gap between the
+        /// readout and the button is Gold Shop Gap at every screen size and every scale (see
+        /// LoadoutScreen.BuildToggleButtonCanvas's Shop Corner).</summary>
+        private void BuildGoldCorner(Transform canvasParent)
+        {
+            GameObject corner = new GameObject("Gold Corner", typeof(RectTransform));
+            corner.transform.SetParent(canvasParent, false);
+            RectTransform cornerRt = corner.GetComponent<RectTransform>();
+            cornerRt.anchorMin = cornerRt.anchorMax = cornerRt.pivot = new Vector2(1f, 0f);
+            cornerRt.anchoredPosition = Vector2.zero;
+            cornerRt.sizeDelta = Vector2.zero;
+            corner.transform.localScale = Vector3.one * theme.hudScale;
+
+            goldText = AddLabel(corner.transform, "", theme.bodyTextSize, FontStyles.Bold);
+            RectTransform goldRt = goldText.rectTransform;
+            goldRt.anchorMin = goldRt.anchorMax = goldRt.pivot = new Vector2(1f, 0f);
+            // Sits on top of the button: the button's own margin, plus the button, plus the gap.
+            goldRt.anchoredPosition = new Vector2(
+                -theme.loadoutToggleButtonMargin,
+                theme.loadoutToggleButtonMargin + theme.loadoutToggleButtonHeight + theme.goldShopGap);
+            // Two lines of Body Text Size, the second one smaller - the label writes its own <size> tag, so one
+            // TextMeshProUGUI serves both instead of a second one to keep in step.
+            goldRt.sizeDelta = new Vector2(theme.loadoutToggleButtonWidth, 2f * theme.bodyTextSize + 10f);
+            goldText.color = theme.goldTextColor;
+            goldText.alignment = TextAlignmentOptions.Right;
+            goldText.enableWordWrapping = false;
         }
 
         /// <summary>Task 2.4's transient toast (originally just "Bounty +900", generalised in Task B3,
