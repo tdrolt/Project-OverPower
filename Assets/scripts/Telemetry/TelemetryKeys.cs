@@ -48,6 +48,13 @@ namespace Overpower.Telemetry
         /// see PlayerTelemetry's dot accumulator.</summary>
         public const string Dot = "dot";
         public const string UltimateReady = "ultimateReady";
+        /// <summary>Rework step 4 (2026-09-18): for the Invulnerability ultimate (id 25), this now means
+        /// "committed" at the moment of the press, NOT "was protected" - the rework arms a trap for
+        /// armedSeconds rather than shielding immediately, so whether that press ever protected anyone
+        /// is decided later, by whether a hit lands inside the window. Its own SecondsSinceReady is
+        /// unaffected by that change (still "how long they held a full meter before committing"); what
+        /// changed is only what committing now guarantees. See PlayerTelemetry.HandleCast's own
+        /// comment for how to read the two lines together.</summary>
         public const string UltimateUsed = "ultimateUsed";
         public const string Ownership = "ownership";
         public const string Capture = "capture";

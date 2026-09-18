@@ -735,6 +735,15 @@ namespace Overpower.Telemetry
             float sinceReady = ultimateReadyTime >= 0f ? Time.time - ultimateReadyTime : -1f;
             ultimateReadyTime = -1f; // Spent - the next `ultimateReady` starts a fresh wait.
 
+            // Rework step 4 (2026-09-18): for Invulnerability (id 25) specifically, this `ultimateUsed`
+            // line now means "committed at this instant", not "was protected at this instant" - the
+            // rework arms a trap for armedSeconds instead of shielding right away, and the commit may
+            // end up protecting nobody at all (an unanswered cast is wasted, no refund). Whether it DID
+            // protect anyone is answered by the `status` line that follows (or doesn't):
+            // TryConsumeReactiveInvulnerability applies StatusKind.Invulnerability with abilityId 25 the
+            // moment a hit triggers it, so `ultimateUsed(ab=25)` count minus `status(ab=25)` count over
+            // a match IS the wasted-cast rate, for free, with no new key here. Every other ultimate's
+            // line is unaffected - this one only changed because the ability's own timing did.
             line.Begin(TelemetryKeys.UltimateUsed, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.AbilityId, abilityId);
             line.Float(TelemetryKeys.SecondsSinceReady, sinceReady);
