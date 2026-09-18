@@ -13061,7 +13061,7 @@ PrefabInstance:
     - target: {fileID: 4583322330311546549, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
       propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
-      objectReference: {fileID: 941603639}
+      objectReference: {fileID: 941603643}
     - target: {fileID: 4583322330311546549, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
       propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
       value: TypeChatOnValueChange
@@ -13097,7 +13097,7 @@ PrefabInstance:
     - target: {fileID: 7609880200376306182, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
-      objectReference: {fileID: 941603639}
+      objectReference: {fileID: 941603643}
     - target: {fileID: 7609880200376306182, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
       value: SubmitPublicChatOnClick
@@ -13111,9 +13111,6 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 3478814641139743335, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 941603639}
     - targetCorrespondingSourceObject: {fileID: 5165643279370163622, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1828822120}
@@ -13123,38 +13120,10 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 3478814641139743335, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
   m_PrefabInstance: {fileID: 941603634}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &941603636 stripped
+--- !u!114 &941603643 stripped
 MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 5955021184521103324, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
+  m_CorrespondingSourceObject: {fileID: 2560413150253137795, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
   m_PrefabInstance: {fileID: 941603634}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &941603637 stripped
-MonoBehaviour:
-  m_CorrespondingSourceObject: {fileID: 4583322330311546549, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
-  m_PrefabInstance: {fileID: 941603634}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2da0c512f12947e489f739169773d7ca, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!1 &941603638 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5214122138414532893, guid: 56a4dbf4c80aa3a4f8e5ba8d38a683be, type: 3}
-  m_PrefabInstance: {fileID: 941603634}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &941603639
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 941603635}
   m_Enabled: 1
@@ -13162,10 +13131,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9a87ec2a7e139de4fbf6d8402663c4c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  chatPanel: {fileID: 941603638}
-  text: {fileID: 1105604635}
-  chatField: {fileID: 941603637}
-  chatDisplay: {fileID: 941603636}
 --- !u!1001 &949905538
 PrefabInstance:
   m_ObjectHideFlags: 0
