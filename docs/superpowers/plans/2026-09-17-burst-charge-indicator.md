@@ -80,7 +80,7 @@
 1. **[C] `FloorToInt`, and the rule is pure and shared.** A step is *earned* by completing it. Floor means a hold must actually reach 50% for the 4th round and 100% for the 5th — the honest reading of "charge time is the price". `ChargeCountRule` lives beside `FireScheduleRule` in `Assets/scripts/Weapons/`, takes plain numbers (no `ScriptableObject`), and is the **only** place that knows where a step sits — the gun reads it for the count, the ring reads it for the tick positions.
 2. **[C] 06 `maxChargeSeconds` 0.35 → 0.7.** With floor: 0.09 s → 3, 0.35 s → 4, 0.70 s → 5.
 3. **[C] Laser `windupSeconds` 0.25 → 0.6 on all three of 11, 12, 13.** 0.6 < `fireInterval` 0.7 with a 0.1 s (14%) margin, the largest round value clearly under the line. All three lasers carry their own copy; all three move together so the family reads the same.
-4. **[C] Weapon 12's own `maxChargeSeconds` (0.45) is NOT changed here.** See "Question for Tudor" — this is the one place the brief's reading might not be what he meant.
+4. **[T] Weapon 12's own `maxChargeSeconds` 0.45 → 0.9 as well.** Tudor, asked 2026-09-18 whether "the laser's charge time" meant the forced wind-up or weapon 12's optional hold, answered **both** — with the ~1.5 s press-to-damage consequence stated in the question he answered. So all three lasers get the 0.6 s wind-up, and weapon 12's hold doubles on top.
 5. **[C] The ring shows the RAW fraction, with ticks at the quantised steps.** A stepped fill would hide the approach to the next round; a smooth fill with a tick tells the player both "how far" and "how far to the next round". The band flips to `chargeRingFullColor` at full so the ceiling is unmistakable.
 6. **[C] The ring is visible whenever a charge weapon's trigger is held**, not only when the fraction is above 0. This requires one new owner-only read on `WeaponFiring` (`ChargeHeld`). It is what makes the cooldown wait legible: the ring appears empty, then starts filling once `nextFireTime` passes (`WeaponFiring.cs:528`). It is also what makes the 0% capture in Task 5 possible.
 7. **[C] Ticks at the internal step boundaries only** (`i = 1..steps-1`). For weapon 06 that is exactly one tick, at 50%. The `steps`-th boundary is the closed ring itself and needs no mark. Weapon 12 (`chargeSteps 0`) gets no ticks and a smooth ring, which is correct — its charge ramps damage and range smoothly.
@@ -95,7 +95,7 @@
 1. **A click on weapon 06 fires 3 rounds, not 4**, for the same 12 heat. A 90 ms click drops from ~19.9 to ~14.0 damage.
 2. **A full charge takes twice as long** (0.7 s of holding after the 0.38 s cooldown) and still pays 5 rounds at ×1.5 damage — 33 damage for 12 heat.
 3. **The 4th round now needs a real half-second-ish hold.** The tick on the ring is where it lands.
-4. **Every laser fires 0.6 s after the click instead of 0.25 s.** This is a large change: the beam lands 0.6 s late and the gun is free again 0.1 s after that. A full-charge weapon-12 shot is now ~1.05 s from press to damage (0.45 s hold + 0.6 s wind-up). The warning line every player sees grows over the whole 0.6 s, so the telegraph is much fairer — that is the point — but it will feel sluggish, and it is the change most likely to come back for retuning.
+4. **Every laser fires 0.6 s after the click instead of 0.25 s.** This is a large change: the beam lands 0.6 s late and the gun is free again 0.1 s after that. A full-charge weapon-12 shot is now **~1.5 s** from press to damage (0.9 s hold + 0.6 s wind-up) — Tudor chose this knowingly. The warning line every player sees grows over the whole 0.6 s, so the telegraph is much fairer — that is the point — but it will feel sluggish, and it is the change most likely to come back for retuning.
 5. **A ring appears at your feet while you hold a charge weapon** — owner-only; nobody else sees yours.
 6. **Known and accepted, unchanged by this plan:** two weapon-06 bursts can still overlap if a frame hitch longer than 0.10 s lands mid-burst (5 rounds × 0.07 s = 0.28 s of spawning inside a 0.38 s interval). `SpawnSequentially` still has no guard. This margin exists today and is not made worse.
 
@@ -109,7 +109,7 @@
 ## Risks for the controller
 
 - **R1 — 0.6 s wind-up is a big feel change** (feel change 4). If it plays badly, it is a one-line asset edit on three files; nothing in code depends on the number.
-- **R2 — weapon 12's `maxChargeSeconds`** may be what Tudor actually meant by "the laser's charge time". See the question below. Deferring it costs one asset line later.
+- **R2 — weapon 12 is now the slowest weapon in the game** at ~1.5 s press-to-damage (0.9 s hold + 0.6 s wind-up). Tudor chose this knowingly; if it plays badly it is two asset lines.
 - **R3 — the ring may fight the capture ring** when a player charges while standing in a capture zone: two flat rings on the ground at once. The charge ring is 1.15 m and the capture ring is many metres, so they should read as clearly different objects, but Task 5's captures are the check.
 - **R4 — another agent is on this branch.** Every task stages only its own listed files.
 
@@ -147,7 +147,7 @@
 | `Assets/Tests/ChargeCountRuleTests.cs` (create) | Its tests, red first | 1 |
 | `Assets/scripts/Weapons/WeaponFiring.cs` (modify) | Call the rule; `ChargeHeld` | 1, 3 |
 | `Assets/Gameplay/Weapons/06 Burst - Charge.asset` (modify, by hand) | `maxChargeSeconds 0.35 → 0.7` | 2 |
-| `Assets/Gameplay/Weapons/11 Laser.asset`, `12 Laser - Charge.asset`, `13 Laser - Through Walls.asset` (modify, by hand) | `windupSeconds 0.25 → 0.6` | 2 |
+| `Assets/Gameplay/Weapons/11 Laser.asset`, `12 Laser - Charge.asset`, `13 Laser - Through Walls.asset` (modify, by hand) | `windupSeconds 0.25 → 0.6`; weapon 12 also `maxChargeSeconds 0.45 → 0.9` | 2 |
 | `Assets/Tests/WeaponConfigRuleTests.cs` (create) | Relationship invariants over the real catalogue | 2 |
 | `Assets/scripts/Data/WeaponDefinition.cs` (modify) | Two tooltip clarifications | 2 |
 | `Assets/scripts/UI/UiTheme.cs` (modify) | `[Header("Charge ring")]`, 12 fields | 3 |
@@ -412,13 +412,14 @@ namespace Overpower.Tests
 
 - [ ] **Step 1: Start state.** Rules 1, 3, 5. `git status --short` clean of this plan's files. Record the current test total as **T1 TESTS** (Task 1's green total).
 
-- [ ] **Step 2: Hand-edit the four weapon assets.** One line each, nothing else:
+- [ ] **Step 2: Hand-edit the four weapon assets.** One line each, except weapon 12 which gets two; nothing else:
   - `06 Burst - Charge.asset`: `  maxChargeSeconds: 0.35` → `  maxChargeSeconds: 0.7`
   - `11 Laser.asset`: `  windupSeconds: 0.25` → `  windupSeconds: 0.6`
   - `12 Laser - Charge.asset`: `  windupSeconds: 0.25` → `  windupSeconds: 0.6`
   - `13 Laser - Through Walls.asset`: `  windupSeconds: 0.25` → `  windupSeconds: 0.6`
+  - `12 Laser - Charge.asset` **also**: `  maxChargeSeconds: 0.45` → `  maxChargeSeconds: 0.9` (decision 4, Tudor's "both")
 
-  **Do not touch** `12 Laser - Charge.asset`'s `maxChargeSeconds: 0.45` (decision 4). Then re-import all four:
+  Then re-import all four:
   ```
   unity command eval -- --code "foreach (var p in new[]{\"Assets/Gameplay/Weapons/06 Burst - Charge.asset\",\"Assets/Gameplay/Weapons/11 Laser.asset\",\"Assets/Gameplay/Weapons/12 Laser - Charge.asset\",\"Assets/Gameplay/Weapons/13 Laser - Through Walls.asset\"}) UnityEditor.AssetDatabase.ImportAsset(p, UnityEditor.ImportAssetOptions.ForceUpdate); return \"imported\";"
   ```
@@ -429,8 +430,8 @@ namespace Overpower.Tests
   ```
   unity command eval -- --code "var s=\"\"; foreach (var p in new[]{\"Assets/Gameplay/Weapons/06 Burst - Charge.asset\",\"Assets/Gameplay/Weapons/11 Laser.asset\",\"Assets/Gameplay/Weapons/12 Laser - Charge.asset\",\"Assets/Gameplay/Weapons/13 Laser - Through Walls.asset\"}) { var w = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.Data.WeaponDefinition>(p); s += w.name + \" interval=\" + w.FireInterval + \" windup=\" + w.WindupSeconds + \" charge=\" + w.MaxChargeSeconds + \" steps=\" + w.ChargeSteps + \" | \"; } return s;"
   ```
-  Expected: `06 Burst - Charge interval=0.38 windup=0 charge=0.7 steps=2 | 11 Laser interval=0.7 windup=0.6 charge=0 steps=0 | 12 Laser - Charge interval=0.7 windup=0.6 charge=0.45 steps=0 | 13 Laser - Through Walls interval=0.7 windup=0.6 charge=0 steps=0 |`
-  3. `git diff -- Assets/Gameplay/Weapons/` shows **exactly four changed lines**.
+  Expected: `06 Burst - Charge interval=0.38 windup=0 charge=0.7 steps=2 | 11 Laser interval=0.7 windup=0.6 charge=0 steps=0 | 12 Laser - Charge interval=0.7 windup=0.6 charge=0.9 steps=0 | 13 Laser - Through Walls interval=0.7 windup=0.6 charge=0 steps=0 |`
+  3. `git diff -- Assets/Gameplay/Weapons/` shows **exactly five changed lines** (one each on 06, 11, 13; two on 12).
 
 - [ ] **Step 4: Make the wind-up rule a test, not just a warning.** Today nothing fails when a designer sets `windupSeconds >= fireInterval`; a Console warning is easy to miss, and Task 2 moves the value to within 0.1 s of the line. Create `Assets/Tests/WeaponConfigRuleTests.cs`:
 
@@ -515,7 +516,7 @@ namespace Overpower.Tests
 
 - [ ] **Step 6: Recompile, test, commit.** Recompile → `errors: []`. Run tests. **Expected: T1 TESTS + 3, all green.** Then:
   `git add Assets/Gameplay/Weapons/*.asset Assets/scripts/Data/WeaponDefinition.cs Assets/Tests/WeaponConfigRuleTests.cs Assets/Tests/WeaponConfigRuleTests.cs.meta`
-  Message: `data(weapons): longer burst charge and laser wind-up (charge step 2)`. Body: the four numbers, that the wind-up rule is now a test rather than only a Console warning, and feel change 4 in full.
+  Message: `data(weapons): longer burst charge, laser wind-up and laser charge hold (charge step 2)`. Body: the five numbers, crediting Tudor's "both" for weapon 12's hold, that the wind-up rule is now a test rather than only a Console warning, and feel change 4 in full.
 
 ---
 
@@ -1035,7 +1036,7 @@ System.Collections.IEnumerator Run()
         yield return new WaitForSeconds(0.5f);
         Out($"weapon = {firing.Weapon.name}: windup={firing.Weapon.WindupSeconds} interval={firing.Weapon.FireInterval} maxCharge={firing.Weapon.MaxChargeSeconds}");
         yield return Pull("12 laser click", 0.09f);
-        yield return Pull("12 laser full charge", 0.55f);
+        yield return Pull("12 laser full charge", 0.95f);   // the bar is 0.9 s since Tudor's "both"
     }
     finally
     {
@@ -1059,7 +1060,7 @@ return "charge recorder started";
   | 06 past half (0.40 s) | ≈ 0.57 | **4** | +12 |
   | 06 full (0.75 s) | **1.000** | **5** | +12 |
   | 05 plain burst, either hold | 0.000 | **3** both times | +9 |
-  | 12 laser, either hold | 0.13 / 1.000 | **1** both times | +20 (a beam that connects refunds 10; aimed at open ground it should not) |
+  | 12 laser, click (0.09 s) / full (0.95 s) | ≈ 0.10 / **1.000** | **1** both times | +20 (a beam that connects refunds 10; aimed at open ground it should not) |
 
   - **`pulls=1` on every line.** A number above 1 means a second pull got in; below 1 means nothing fired.
   - If a 06 line reports 4 rounds at fraction < 0.5 or 5 at fraction < 1.0, **Task 1's fix is not in this build** — check `git log` and stop.
@@ -1073,15 +1074,15 @@ return "charge recorder started";
 
 - [ ] **Step 5: Stop Play Mode and confirm the tree.** `unity command editor_stop`, poll until `playMode: "stopped"` and `compiling: false`. Dirty check reads `False`. `git status --short` lists nothing new of this plan's (the `Temp/` captures are outside `Assets/`; if a path outside `Assets/` was refused and you used `Assets/Temp/burst-charge/`, delete that folder **and its `.meta`**).
 
-- [ ] **Step 6: Assumptions.** Rule 15 — append to `assumptions-for-tudor.md` under `## Burst charge and charge indicator (2026-09-17)`, as short `[C]` lines: the floor rule (a step is earned by completing it), 0.7 s and 0.6 s, weapon 12's own 0.45 s charge left alone, the ring's size and colours, and that the ring is owner-only. Then list the file's `## ` headings to confirm none was lost.
+- [ ] **Step 6: Assumptions.** Rule 15 — append to `assumptions-for-tudor.md` under `## Burst charge and charge indicator (2026-09-17)`, as short `[C]` lines: the floor rule (a step is earned by completing it), 0.7 s and 0.6 s, weapon 12's hold raised 0.45 → 0.9 on Tudor's "both", the ring's size and colours, and that the ring is owner-only. Then list the file's `## ` headings to confirm none was lost.
 
 - [ ] **Step 7: Final report to the controller.** The measured table from Step 3, the three captures with your own honest description of each, the final test total, and the four commit hashes.
 
 ---
 
-## Question genuinely worth asking Tudor
+## Tudor's answer on the laser (2026-09-18)
 
-**"When you said the laser's charge time, did you mean the wind-up — the delay between the click and the beam — or the hold on weapon 12 (Laser → Charge)?"** This plan raises the wind-up 0.25 → 0.6 on all three lasers (11, 12, 13) and leaves weapon 12's own `maxChargeSeconds` at 0.45. Both are "the laser's charge time" in plain English and they are different fields. If he meant the hold, 0.45 → 0.9 is the matching move and it is one more hand-edited line in Task 2. If he meant both, note that a full-charge weapon-12 shot would then be 0.9 s of holding plus a 0.6 s wind-up — about 1.5 s from press to damage, which is a very long time in this game.
+Asked in play terms — the forced delay between click and beam on all three lasers, versus the optional hold on weapon 12 that buys damage and range — Tudor answered **both**, with the consequence in front of him: a fully charged weapon-12 shot now takes about **1.5 s** from pressing the button to dealing damage (0.9 s hold + 0.6 s wind-up), the slowest shot in the game. Decision 4, feel change 4, R2 and Task 2 are updated to match.
 
 ---
 
