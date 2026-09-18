@@ -741,9 +741,18 @@ namespace Overpower.Telemetry
             // end up protecting nobody at all (an unanswered cast is wasted, no refund). Whether it DID
             // protect anyone is answered by the `status` line that follows (or doesn't):
             // TryConsumeReactiveInvulnerability applies StatusKind.Invulnerability with abilityId 25 the
-            // moment a hit triggers it, so `ultimateUsed(ab=25)` count minus `status(ab=25)` count over
-            // a match IS the wasted-cast rate, for free, with no new key here. Every other ultimate's
-            // line is unaffected - this one only changed because the ability's own timing did.
+            // moment a hit triggers it, so `ultimateUsed(ab=25)` count minus `status(ab=25, effect=
+            // invulnerability)` count over a match IS the wasted-cast rate, for free, with no new key
+            // here.
+            //
+            // Review fix (2026-09-18): count only the status line whose `effect` field - the same field
+            // HandleStatusApplied below always names a status line's kind with, via NameFor(kind) - reads
+            // "invulnerability". If cachedStunSeconds is ever dialled up from its 0 default, the SAME
+            // trigger also writes a SECOND status line, for StatusKind.Stun, with the SAME abilityId 25
+            // (TryConsumeReactiveInvulnerability applies both from one trigger) - counting every
+            // `status(ab=25)` line regardless of effect would then double-count each trigger and could
+            // push the wasted-cast rate negative. Every other ultimate's line is unaffected - this one
+            // only changed because the ability's own timing did.
             line.Begin(TelemetryKeys.UltimateUsed, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.AbilityId, abilityId);
             line.Float(TelemetryKeys.SecondsSinceReady, sinceReady);

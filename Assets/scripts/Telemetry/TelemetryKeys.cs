@@ -53,8 +53,11 @@ namespace Overpower.Telemetry
         /// armedSeconds rather than shielding immediately, so whether that press ever protected anyone
         /// is decided later, by whether a hit lands inside the window. Its own SecondsSinceReady is
         /// unaffected by that change (still "how long they held a full meter before committing"); what
-        /// changed is only what committing now guarantees. See PlayerTelemetry.HandleCast's own
-        /// comment for how to read the two lines together.</summary>
+        /// changed is only what committing now guarantees. See PlayerTelemetry.HandleCast's own comment
+        /// for how to read the two lines together - review fix (2026-09-18): that pairing must count
+        /// only the `status` line whose effect field reads "invulnerability", never every status(ab=25)
+        /// line regardless of effect, or a future stunSeconds > 0 retune double-counts each trigger and
+        /// can push the rate negative.</summary>
         public const string UltimateUsed = "ultimateUsed";
         public const string Ownership = "ownership";
         public const string Capture = "capture";

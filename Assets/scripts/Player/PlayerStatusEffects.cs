@@ -186,10 +186,13 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     /// PlayerHealth.ApplyDamage's one consuming veto. True means "this hit never happened": the caller
     /// must return default() before resolving any of it, which is what nullifies the triggering hit.
     ///
-    /// On a trigger this applies the ordinary Invulnerability and Stun statuses for their own spans, so
-    /// everything downstream - the funnel's own IsInvulnerable check, the `status` telemetry line, the
-    /// motor freeze - keeps working with no new concept at all. BOTH SPANS START HERE, AT THE HIT, never
-    /// at the cast: freezing a caster during the armed window would punish a cast nobody answered.
+    /// On a trigger this applies the ordinary Invulnerability status for its own span, so everything
+    /// downstream - the funnel's own IsInvulnerable check, the `status` telemetry line, the motor
+    /// freeze - keeps working with no new concept at all. Stun is NOT part of that by default: it is
+    /// only applied when cachedStunSeconds is above its 0 default (Tudor, 2026-09-18: "no stun" - see
+    /// InvulnerabilityAbility's own stunSeconds field for when a designer might dial a drawback back
+    /// in). Whichever spans DO apply start HERE, AT THE HIT, never at the cast: freezing a caster
+    /// during the armed window would punish a cast nobody answered.
     /// </summary>
     public bool TryConsumeReactiveInvulnerability(float damageAmount)
     {
@@ -217,6 +220,34 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
         bool triggered = reactiveInvulnerabilityJustTriggered;
         reactiveInvulnerabilityJustTriggered = false;
         return triggered;
+    }
+
+    /// <summary>
+    /// Review fix (Finding 2, 2026-09-18). Clears the arm AND any pending trigger, but leaves an
+    /// immunity that has ALREADY started alone - by then it is an ordinary StatusKind.Invulnerability
+    /// status running on its own timer (see TryConsumeReactiveInvulnerability above), and this method
+    /// has no opinion on it. [C]: the reviewer's finding was about disarming an UNANSWERED cast -
+    /// swap the ultimate away inside the 2.5s armed window, and without this fix a later hit was still
+    /// wrongly nullified with no sphere on any screen, and the stale trigger flag could draw a sphere
+    /// on a player who is not immune once Invulnerability is re-equipped. Cutting a running 4-second
+    /// immunity short was not asked for and would be a brand new way to lose the shield's protection,
+    /// so it is left running on purpose.
+    ///
+    /// Owner only, same guard as ArmReactiveInvulnerability - called from InvulnerabilityAbility's
+    /// Interrupt(Unequipped), which fires on EVERY client: AbilityRunner.Equip only ever changes its
+    /// own machine, but PlayerLoadout calls it from a synced room property, so every client (not just
+    /// the one who owns this player) applies the same slot change and so runs the same Interrupt. That
+    /// makes calling this on a remote copy harmless rather than merely tolerated: nothing but the
+    /// owner's own Update/Apply ever arms this in the first place (see ArmReactiveInvulnerability's own
+    /// guard), so a remote copy's arm is already cleared and Clear() on it changes nothing.
+    /// </summary>
+    public void DisarmReactiveInvulnerability()
+    {
+        if (!photonView.IsMine)
+            return;
+
+        reactiveInvulnerability.Clear();
+        reactiveInvulnerabilityJustTriggered = false;
     }
 
     /// <summary>
@@ -285,8 +316,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
         burnSourceActorNumber = -1;
         burnAbilityId = -1;
         reductionStack.Clear();
-        reactiveInvulnerability.Clear(); // Death and respawn must never carry an armed shield forward.
-        reactiveInvulnerabilityJustTriggered = false;
+        DisarmReactiveInvulnerability(); // Death and respawn must never carry an armed shield or a stale trigger forward - one home for that, see its own comment.
         ApplySlowToMotor(); // Slow is now 0 - make sure the motor's multiplier is dropped with it.
         ApplyStunToMotor(); // Same for stun - a death or respawn must not leave the freeze behind.
     }
