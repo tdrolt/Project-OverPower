@@ -586,10 +586,16 @@ namespace Overpower.UI
 
                 if (active != lastActive[i] || block != lastBlock[i])
                 {
-                    ui.background.color = block != CastBlock.None ? theme.slotBlockedColor
-                                         : active ? theme.slotActiveGlowColor
-                                         : theme.slotReadyColor;
-                    ui.blockReasonText.text = block == CastBlock.None ? "" : BlockReasonLabel(block);
+                    // Active wins over blocked (invulnerability rework follow-up, 2026-09-18): several
+                    // modules are deliberately still IsActive while blocked (Silenced/Stunned), and every
+                    // ultimate reads NotReady the instant a real cast spends its meter - checking block
+                    // first hid the one thing "active" exists to show. See SlotTintRule's own class
+                    // comment for the per-module survey. The reason text is hidden while active for the
+                    // same cause: "not ready" under a glowing, running ultimate is noise once the meter's
+                    // own fill already shows it refilling.
+                    ui.background.color = SlotTintRule.BorderColor(active, block, theme.slotActiveGlowColor,
+                                                                    theme.slotBlockedColor, theme.slotReadyColor);
+                    ui.blockReasonText.text = SlotTintRule.ShowsBlockReason(active, block) ? BlockReasonLabel(block) : "";
                     lastActive[i] = active;
                     lastBlock[i] = block;
                 }
@@ -1173,10 +1179,15 @@ namespace Overpower.UI
                 new Vector2(0.5f, 1f), new Vector2(0f, theme.slotBorderWidth));
             Image frameBottom = BuildFrameStrip(go.transform, "Frame Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(0.5f, 0f), new Vector2(0f, theme.slotBorderWidth));
+            // Left/Right are inset vertically by Slot Border Width top and bottom (review fix, 2026-09-18) so
+            // they sit BETWEEN Frame Top/Bottom instead of running corner to corner - all four strips used to
+            // span the full rect on their long axis, so every corner had two strips stacked. Invisible at
+            // today's thin width, but the tooltip on Slot Border Width invites raising it, and a raised width
+            // would turn every corner into a visibly darker square without this.
             Image frameLeft = BuildFrameStrip(go.transform, "Frame Left", new Vector2(0f, 0f), new Vector2(0f, 1f),
-                new Vector2(0f, 0.5f), new Vector2(theme.slotBorderWidth, 0f));
+                new Vector2(0f, 0.5f), new Vector2(theme.slotBorderWidth, -2f * theme.slotBorderWidth));
             Image frameRight = BuildFrameStrip(go.transform, "Frame Right", new Vector2(1f, 0f), new Vector2(1f, 1f),
-                new Vector2(1f, 0.5f), new Vector2(theme.slotBorderWidth, 0f));
+                new Vector2(1f, 0.5f), new Vector2(theme.slotBorderWidth, -2f * theme.slotBorderWidth));
             ui.background = new SlotFrame(frameTop, frameBottom, frameLeft, frameRight);
             ui.background.color = theme.slotReadyColor;
 
@@ -1241,16 +1252,21 @@ namespace Overpower.UI
 
             if (withCooldown)
             {
-                // Still the WHOLE icon box, not Content Box: a recharge sweep that stopped short of the key strip
+                // The WHOLE icon box, not Content Box: a recharge sweep that stopped short of the key strip
                 // would read as a drawing bug, not as a cooldown. It is built after Content Box (so it covers the
                 // icon and name) and before the key strip below (so the key stays readable while recharging).
+                // Inset by Slot Border Width on all four sides (review fix, 2026-09-18), the same as Slot Fill:
+                // the cover used to run edge to edge, painting straight over the frame strips built above for
+                // most of every cooldown - the dark box Tudor asked to lose came right back, and the frame's
+                // own ready/blocked/active tint disappeared exactly while an ability recharged. The Ultimate
+                // Charge Fill below stays full-square on purpose (D5) - only this cover is inset.
                 GameObject coverGo = new GameObject("Cooldown Cover", typeof(RectTransform));
                 coverGo.transform.SetParent(iconBox.transform, false);
                 RectTransform coverRt = coverGo.GetComponent<RectTransform>();
                 coverRt.anchorMin = Vector2.zero;
                 coverRt.anchorMax = Vector2.one;
-                coverRt.offsetMin = Vector2.zero;
-                coverRt.offsetMax = Vector2.zero;
+                coverRt.offsetMin = new Vector2(theme.slotBorderWidth, theme.slotBorderWidth);
+                coverRt.offsetMax = new Vector2(-theme.slotBorderWidth, -theme.slotBorderWidth);
                 ui.cooldownCover = coverGo.AddComponent<Image>();
                 ui.cooldownCover.color = theme.cooldownCoverColor;
                 // See BuildBar's comment: sprite before type, or fillAmount is ignored.
