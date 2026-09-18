@@ -78,8 +78,13 @@ public class CameraTracking : MonoBehaviour
     public Transform target;
     public Vector3 baseOffset = new Vector3(0f, 10f, -5f); // Base offset
     public float zoomSpeed = 2f; // How fast zoom adjusts
-    public float minZoomDistance = 10f; // Closest zoom
-    public float maxZoomDistance = 16f; // Farthest zoom
+    [Tooltip("Closest the camera can zoom in with the scroll wheel, as a multiple of Base Offset. " +
+             "0.5 = half the normal distance.")]
+    public float minZoomMultiplier = 0.5f;
+    [Tooltip("Farthest the camera can zoom out with the scroll wheel, as a multiple of Base Offset. " +
+             "2 = twice the normal distance. Zooming out also lets the cursor reach further from the " +
+             "player, so this limits how far cursor-aimed abilities can be placed.")]
+    public float maxZoomMultiplier = 2f;
 
     [Header("Per-team orientation")]
     // Every team should see the arena from the same relative angle, so that "toward the centre"
@@ -134,7 +139,7 @@ public class CameraTracking : MonoBehaviour
 
         // Zoom in/out with Mouse Scroll
         float scroll = Input.GetAxis("Mouse ScrollWheel");
-        currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, 0.5f, 2f); // Adjust multiplier as needed
+        currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, minZoomMultiplier, maxZoomMultiplier);
 
         ResolveTeamYaw();
 

@@ -4814,8 +4814,8 @@ MonoBehaviour:
   target: {fileID: 0}
   baseOffset: {x: 0, y: 10, z: -5}
   zoomSpeed: 5
-  minZoomDistance: 5
-  maxZoomDistance: 20
+  minZoomMultiplier: 0.5
+  maxZoomMultiplier: 2
   teamYawOffset: 120
 --- !u!1 &334480042
 GameObject:
