@@ -292,6 +292,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return default;
         }
 
+        // The Invulnerability ultimate's armed window (rework step 2). DELIBERATELY HERE, not up beside the
+        // IsInvulnerable check: this one CONSUMES the arm, and at that check a teammate's stray shot or your
+        // own splash would burn a whole ultimate on a hit that was going to be blocked anyway. By this line
+        // the hit is real, from a real enemy. Returning default() before DamageResolver ever runs is what
+        // nullifies the triggering hit itself - which costs nothing on the wire, because this whole method
+        // only ever runs on the victim's own machine (the IsMine guard at the top).
+        if (statusEffects != null && statusEffects.TryConsumeReactiveInvulnerability(info.Amount))
+            return default;
+
         float vulnerability = statusEffects != null ? statusEffects.Vulnerability : 0f;
         DamageResult result = DamageResolver.Resolve(info.Amount, info.IgnoresArmor, health,
                                                        armor.Current, vulnerability, CurrentDamageReduction());

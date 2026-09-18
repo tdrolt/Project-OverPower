@@ -26,6 +26,25 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     private StatusEffectState state;
     private DamageReductionStack reductionStack;
 
+    // Rework step 2 (Tudor, 2026-09-18): the Invulnerability ultimate's armed window - see
+    // ReactiveInvulnerabilityState's own class comment for why this is not a StatusKind.
+    private readonly ReactiveInvulnerabilityState reactiveInvulnerability = new ReactiveInvulnerabilityState();
+
+    // Set by TryConsumeReactiveInvulnerability and read (and cleared) once by InvulnerabilityAbility's
+    // next OwnerTick. A flag rather than an event: the trigger happens deep inside PlayerHealth.ApplyDamage,
+    // which can itself be reached from this class's own Update (a burn tick), and an event raised from there
+    // would let a subscriber re-enter the damage funnel mid-frame. One frame of latency on a cosmetic shield
+    // is invisible; a re-entrant ApplyDamage is not.
+    private bool reactiveInvulnerabilityJustTriggered;
+
+    // The four tuning numbers the arm was last cast with, cached until TryConsumeReactiveInvulnerability
+    // consumes it - see ArmReactiveInvulnerability's own comment for why they live here rather than on
+    // PlayerHealth.
+    private float cachedInvincibleSeconds;
+    private float cachedStunSeconds;
+    private float cachedMinimumTriggerDamage;
+    private int cachedAbilityId = -1;
+
     // A key of its own, distinct from `this` - Slow already keys its multiplier on `this`, and a
     // stunned, slowed player needs both multipliers to compose (0 speed either way) rather than
     // one silently overwriting the other's dictionary entry.
@@ -94,7 +113,12 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
         // step, then Tick ages every status - including that same burn - by the same deltaTime.
         float burn = state.ConsumeBurnDamage(Time.deltaTime);
         state.Tick(Time.deltaTime);
+        reactiveInvulnerability.Tick(Time.deltaTime);
 
+        // ORDER MATTERS AND IS LOAD-BEARING (rework step 2). ApplyBurnDamage below re-enters
+        // PlayerHealth.ApplyDamage, which can call TryConsumeReactiveInvulnerability, which calls Apply()
+        // above, which ADDS A DICTIONARY ENTRY to `state`. That is only safe because both Tick calls have
+        // already returned by this line. Do not move ApplyBurnDamage above them.
         if (burn > 0f)
             ApplyBurnDamage(burn);
 
@@ -138,6 +162,62 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
     /// through GetComponentInParent&lt;IStatusReceiver&gt; without knowing it is a
     /// PlayerStatusEffects underneath. Forwards straight to Apply.</summary>
     public void ApplyStatus(in StatusEffectSpec spec, int sourceActor) => Apply(spec, sourceActor);
+
+    /// <summary>Owner only. The Invulnerability ultimate's cast - see ReactiveInvulnerabilityState.
+    /// Arms nothing on any other machine, exactly like Apply above. The ability passes every number it owns,
+    /// so they stay in one home on its prefab and PlayerHealth never has to know any of them.</summary>
+    public void ArmReactiveInvulnerability(float armedSeconds, float invincibleSeconds, float stunSeconds,
+                                           float minimumTriggerDamage, int abilityId)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        cachedInvincibleSeconds = invincibleSeconds;
+        cachedStunSeconds = stunSeconds;
+        cachedMinimumTriggerDamage = minimumTriggerDamage;
+        cachedAbilityId = abilityId;
+        reactiveInvulnerability.Arm(armedSeconds);
+    }
+
+    /// <summary>True while a cast is waiting for a hit - for the caster's own HUD glow only.</summary>
+    public bool IsReactiveInvulnerabilityArmed => reactiveInvulnerability.IsArmed;
+
+    /// <summary>
+    /// PlayerHealth.ApplyDamage's one consuming veto. True means "this hit never happened": the caller
+    /// must return default() before resolving any of it, which is what nullifies the triggering hit.
+    ///
+    /// On a trigger this applies the ordinary Invulnerability and Stun statuses for their own spans, so
+    /// everything downstream - the funnel's own IsInvulnerable check, the `status` telemetry line, the
+    /// motor freeze - keeps working with no new concept at all. BOTH SPANS START HERE, AT THE HIT, never
+    /// at the cast: freezing a caster during the armed window would punish a cast nobody answered.
+    /// </summary>
+    public bool TryConsumeReactiveInvulnerability(float damageAmount)
+    {
+        if (!photonView.IsMine)
+            return false;
+
+        if (!reactiveInvulnerability.TryConsume(damageAmount, cachedMinimumTriggerDamage))
+            return false;
+
+        Apply(new StatusEffectSpec { kind = StatusKind.Invulnerability, duration = cachedInvincibleSeconds, abilityId = cachedAbilityId },
+              photonView.OwnerActorNr);
+        if (cachedStunSeconds > 0f)
+            Apply(new StatusEffectSpec { kind = StatusKind.Stun, duration = cachedStunSeconds, abilityId = cachedAbilityId },
+                  photonView.OwnerActorNr);
+
+        reactiveInvulnerabilityJustTriggered = true;
+        return true;
+    }
+
+    /// <summary>Owner only, read once. InvulnerabilityAbility's OwnerTick asks this so it can send the
+    /// shield's phase to every client - the one thing about this ability the other machines cannot work
+    /// out for themselves.</summary>
+    public bool ConsumeReactiveInvulnerabilityTrigger()
+    {
+        bool triggered = reactiveInvulnerabilityJustTriggered;
+        reactiveInvulnerabilityJustTriggered = false;
+        return triggered;
+    }
 
     /// <summary>
     /// The one-caster-decides path: for an effect that only ONE client resolves and tells the
@@ -205,6 +285,8 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver
         burnSourceActorNumber = -1;
         burnAbilityId = -1;
         reductionStack.Clear();
+        reactiveInvulnerability.Clear(); // Death and respawn must never carry an armed shield forward.
+        reactiveInvulnerabilityJustTriggered = false;
         ApplySlowToMotor(); // Slow is now 0 - make sure the motor's multiplier is dropped with it.
         ApplyStunToMotor(); // Same for stun - a death or respawn must not leave the freeze behind.
     }
