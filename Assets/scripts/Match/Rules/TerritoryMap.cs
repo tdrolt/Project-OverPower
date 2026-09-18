@@ -68,12 +68,22 @@ namespace Overpower.Match
         public int CapitalTeamOf(int zoneId) => capitalOwnerByZone.TryGetValue(zoneId, out int team) ? team : Neutral;
 
         /// <summary>2.7b: every capital zone and the team it belongs to - the live reset's starting snapshot
-        /// (TerritorySnapshot.Starting) loops this to seed every team's capital at once. Review fix: typed as the
-        /// concrete Dictionary, not IEnumerable&lt;KeyValuePair&lt;int,int&gt;&gt; - a foreach over the interface
-        /// boxes Dictionary's own struct enumerator on every call, and MatchDirector.RespawnCapitalOf/
-        /// TeamHasACapital walk this every FixedUpdate per waiting player and every frame per player on a respawn
-        /// countdown.</summary>
-        public Dictionary<int, int> Capitals => capitalOwnerByZone;
+        /// (TerritorySnapshot.Starting) loops this to seed every team's capital at once. A read-only view rather than
+        /// the Dictionary itself (step 8 review: handing out the live dictionary let any caller rewrite which capital
+        /// belongs to whom) and rather than an IEnumerable (a foreach over the interface boxes the enumerator, and
+        /// MatchDirector walks this every FixedUpdate per waiting player and every frame per respawn countdown).
+        /// </summary>
+        public CapitalsView Capitals => new CapitalsView(capitalOwnerByZone);
+
+        /// <summary>A foreach-able, read-only look at the capitals: GetEnumerator returns Dictionary's own struct
+        /// enumerator, so walking it allocates nothing and offers no way to change the map.</summary>
+        public readonly struct CapitalsView
+        {
+            private readonly Dictionary<int, int> byZone;
+            internal CapitalsView(Dictionary<int, int> byZone) { this.byZone = byZone; }
+            public Dictionary<int, int>.Enumerator GetEnumerator() => byZone.GetEnumerator();
+            public int Count => byZone.Count;
+        }
 
         /// <param name="ownerByZone">Current owner per zone; a missing zone or Neutral means nobody.</param>
         public bool MayCapture(int teamId, int zoneId, IReadOnlyDictionary<int, int> ownerByZone) =>

@@ -666,9 +666,10 @@ namespace Overpower.UI
         public Color matchStartButtonColor = new Color(0.16f, 0.45f, 0.25f, 0.95f);
         [Tooltip("Width/height of the host's Start button, in canvas units.")]
         public Vector2 matchStartButtonSize = new Vector2(260f, 52f);
-        [Tooltip("Gap from the top of the screen to the top of the warm-up/countdown line, in canvas units - clears the " +
-                 "bounty/status toast, which sits lower, so the two never overlap.")]
-        public float warmupTopOffset = 80f;
+        [Tooltip("Gap from the top of the screen to the top of the warm-up/countdown line, in canvas units. It must clear " +
+                 "a two-line toast above it (the longest a warm-up can raise is the 'capital under attack' respawn " +
+                 "toast), or the two run into each other.")]
+        public float warmupTopOffset = 130f;
         [Tooltip("Width/height of the warm-up/countdown line's own box, in canvas units - the text wraps inside it. The " +
                  "host's Start button sits directly below this box.")]
         public Vector2 warmupLineSize = new Vector2(900f, 64f);
