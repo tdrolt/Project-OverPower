@@ -76,7 +76,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
     ///
     /// Reset: "alive" (PlayerLifecycle) - a last-stand death otherwise spawns the next match dead;
     /// "lastStand" (PlayerLifecycle) - otherwise counts as already out; the two armor upgrade levels
-    /// (LoadoutProperties) - bought with gold that match paid out, same as gold itself.
+    /// (LoadoutProperties) - PlayerLoadout.Start republishes them too, same as every other loadout pick
+    /// below, so this is reset here only so a player turned away before spawning doesn't carry them.
     ///
     /// "gold" (GoldWallet) is REMOVED (a null value), not written to 0 (2.7b leftover). GoldWallet.Start
     /// reads an EXISTING gold key as the balance - a written 0 would beat a future non-zero

@@ -297,7 +297,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             statusEffects != null && statusEffects.IsInvulnerable, statusEffects, info.Amount);
 
         // Tudor, 2026-09-18: being shot while the shield is up IS combat (no armour recharge, no shop, no
-        // regen while being shot). A self or teammate hit is thrown away above and never reaches here.
+        // regen while being shot). Self and teammate hits are classified above, but CountsAsCombat is false
+        // for them, so they never touch the clock.
         if (HitVerdictRule.CountsAsCombat(verdict))
             secondsSinceCombat = 0f;
 
