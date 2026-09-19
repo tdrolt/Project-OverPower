@@ -447,11 +447,27 @@ namespace Overpower.TestRange
             health -= result.HealthLost;
 
             // Mark plan step 2: a dummy has no owner/IsMine concept at all (HasLocalAuthority is
-            // always true - the class comment), so unlike PlayerHealth.ApplyDamage there is no "copy
-            // the shooter does not own" to special-case here - every hit on a dummy IS the local
-            // player's own shot, so this always fires. DamageNumberView anchors this dummy's next
-            // number here, the same as it does for a real victim's impact.
-            CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
+            // always true - the class comment). DamageNumberView anchors this dummy's next number
+            // here, the same as it does for a real victim's impact.
+            //
+            // Review fix (steps 1-2): the original comment here claimed "every hit on a dummy IS the
+            // local player's own shot", which is NOT true in a live match - a dummy is unnetworked, but
+            // "every client simulates every shot" (PlayerHealth.ApplyDamage's own comment) applies just
+            // as much to a dummy standing in the test range as to a real player: Hitscan/ProjectileMotor
+            // filter on nothing but overlap, so a REMOTE player's weapon fire, simulated locally on
+            // every client, can hit a dummy sitting in MY copy of the scene with info.SourceActorNumber
+            // being THEIR actor, not mine. Guarded here the same way NotifyLocalCombatCredit below
+            // already is, so a shot I did not fire cannot re-anchor MY next number at someone else's
+            // impact point. Also, as with PlayerHealth.ApplyDamage's equivalent raise, only for a source
+            // whose HitPoint is a genuine point of impact (Projectile, Splash, Contact) - a burn tick's
+            // HitPoint is this dummy's own transform.position (ApplyBurnDamage above), which would
+            // anchor the number at the body's centre instead of falling back to it the same way a
+            // stale/no impact already does.
+            if (PhotonNetwork.LocalPlayer != null && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
+                && info.Source != DamageSource.Burn && info.Source != DamageSource.Zone)
+            {
+                CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
+            }
 
             NotifyLocalCombatCredit(info, result);
             AnyDamaged?.Invoke(this, result, info);

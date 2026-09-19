@@ -699,14 +699,16 @@ namespace Overpower.UI
         public float damageNumberTextSize = 30f;
         [Tooltip("An ordinary hit's number.")]
         public Color damageNumberColor = new Color(1f, 1f, 1f, 1f);
-        [Tooltip("A hit that used up your mark (+50%, mark step 4) - both the bigger number and the mark diamond over " +
-                 "an enemy you've marked (mark step 5) share this colour. Keep it apart from the team colours and " +
+        [Tooltip("A hit that used up your mark (+50% damage) - both the bigger number and the mark diamond over " +
+                 "an enemy you've marked share this colour. Keep it apart from the team colours and " +
                  "Immune Bar Colour.")]
         public Color markColor = new Color(1f, 0.45f, 0.1f, 1f);
         [Tooltip("How much bigger a marked hit's number is than an ordinary one, for its whole life.")]
         public float damageNumberMarkedScale = 1.4f;
-        [Tooltip("From the moment a number stops rising and fading starts to the moment it's gone - see Damage Number " +
-                 "Hold Seconds below for what happens before this even begins.")]
+        [Tooltip("How long the number takes to rise and fade away once it starts moving - it stays put and solid " +
+                 "for Damage Number Hold Seconds first, then over this many seconds it rises smoothly the whole " +
+                 "way (see Damage Number Rise) while fading out starting at Damage Number Fade Start, ending " +
+                 "fully gone.")]
         public float damageNumberLifetimeSeconds = 0.8f;
         [Tooltip("How long the pop (the number starting oversized and settling down) takes, in seconds.")]
         public float damageNumberPopSeconds = 0.12f;

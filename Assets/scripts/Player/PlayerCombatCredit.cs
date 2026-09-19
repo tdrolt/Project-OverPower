@@ -14,10 +14,10 @@ using Overpower.Combat;
 /// (Task 1.11).
 ///
 /// Runs entirely from the VICTIM's own client: it listens to its own PlayerHealth, accumulates how
-/// much each attacker actually took off in a DamageCreditLedger, and periodically - or immediately
-/// on death - tells each attacker their share through a targeted RPC. Only the victim's owner ever
-/// runs this (OnEnable below returns for a non-owner), so credit is counted exactly once no matter
-/// how many clients simulated the hit.
+/// much each attacker actually took off in a DamageCreditLedger, and tells each attacker their share
+/// through a targeted RPC - the same frame an isolated hit lands, or immediately on death. Only the
+/// victim's owner ever runs this (OnEnable below returns for a non-owner), so credit is counted
+/// exactly once no matter how many clients simulated the hit.
 ///
 /// Lives on the player ROOT, beside PlayerHealth: PUN only ever delivers an RPC to a component on
 /// the PhotonView's own GameObject, which is the root - not PBRCharacter, which has its own
@@ -29,9 +29,8 @@ using Overpower.Combat;
 public class PlayerCombatCredit : MonoBehaviourPun
 {
     [SerializeField, Tooltip("The shortest gap between two credit reports to the SAME attacker, in " +
-             "seconds (Mark plan step 2, Decision 11). An isolated hit is no longer held back by this " +
-             "at all - LateUpdate below sends it the same frame it lands - so this only ever throttles " +
-             "a rapid follow-up: a second hit within this many seconds of the last report waits and " +
+             "seconds. An isolated hit is sent the same frame it lands, so this only ever throttles a " +
+             "rapid follow-up: a second hit within this many seconds of the last report waits and " +
              "merges into the next one. Lower is more responsive at the cost of more RPCs per fight.")]
     private float creditFlushSeconds = 0.25f;
 
@@ -135,7 +134,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
     /// LETHAL hit - the exact same value PlayerHealth.ApplyDamage already used for
     /// sourcePlayer?.AddScore(1) a moment earlier, so kill credit here can never disagree with the
     /// scoreboard's. Every other actor who hit this player within the assist window gets a takedown
-    /// marker too, even if their damage was already flushed out by an earlier periodic tick -
+    /// marker too, even if their damage was already flushed out by an earlier LateUpdate flush -
     /// AssistersSince answers from last-hit time alone, independent of what has been paid out.
     /// </summary>
     private void HandleDied(DamageInfo info)
@@ -163,8 +162,8 @@ public class PlayerCombatCredit : MonoBehaviourPun
         }
 
         // Anyone who dealt damage this fight but neither landed the kill nor stayed within the
-        // assist window still earns the credit for the damage itself - the periodic flush's own
-        // contract, just settled immediately rather than waiting for the next tick.
+        // assist window still earns the credit for the damage itself - the ordinary flush's own
+        // contract, just settled immediately rather than waiting for LateUpdate to notice it.
         foreach (var entry in drained)
         {
             if (notified.Add(entry.actor))

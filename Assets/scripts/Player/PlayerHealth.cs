@@ -168,8 +168,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             overheadBarRoot.SetActive(visible);
         // No separate hide for overheadImmuneOverlay: it is a CHILD of overheadBarRoot, so
         // SetActive(false) above already takes it out of the hierarchy with everything else on the
-        // bar - Unity does not run a hidden child's Update either, so ApplyImmuneLook still fires
-        // correctly (see Update below) the moment the bar - and the overlay under it - reappear.
+        // bar. Review fix (steps 1-2): the overlay itself has no Update - PlayerHealth's own Update
+        // (below) is what ticks the immune-look expiry, and it lives on the PLAYER root, which stays
+        // active the whole time (only the bar child is toggled), so it keeps running and the overlay's
+        // colour/active state is already correct by the time the bar - and the overlay under it -
+        // reappear.
     }
 
     /// <summary>Builds the immunity overlay the first time ApplyImmuneLook actually needs one - never
@@ -383,8 +386,17 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // on the victim's own machine. Raised BEFORE the IsMine/isDead return on purpose: it must fire
         // on a copy the shooter does not own. A self-hit (IsMine true here) raises nothing - the
         // shooter already knows exactly where it is standing.
+        //
+        // Review fix (steps 1-2): only for a source whose HitPoint is a genuine point of impact
+        // (Projectile, Splash, Contact). Burn and Zone carry the FIELD's or ZONE's own position as
+        // HitPoint (FireField.cs, AoeZone.cs, ElectricFence.cs all pass their own centre, not where
+        // damage actually touched the victim) - raising for those anchored the next number at that
+        // stationary point instead of falling back to the victim's own centre like any other
+        // not-simulated-here hit (a burn tick, anything older than DamageNumberView's freshness
+        // window already falls back correctly; this keeps a field/zone hit falling back the same way).
         if (!photonView.IsMine && PhotonNetwork.LocalPlayer != null
-            && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber)
+            && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
+            && info.Source != DamageSource.Burn && info.Source != DamageSource.Zone)
         {
             CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
         }

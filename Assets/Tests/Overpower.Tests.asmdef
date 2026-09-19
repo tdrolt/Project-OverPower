@@ -8,7 +8,8 @@
     "Overpower.Editor",
     "PhotonUnityNetworking",
     "PhotonRealtime",
-    "Project.Tools"
+    "Project.Tools",
+    "Unity.TextMeshPro"
   ],
   "includePlatforms": [ "Editor" ],
   "excludePlatforms": [],
