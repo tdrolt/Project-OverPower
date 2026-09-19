@@ -132,5 +132,30 @@ namespace Overpower.Tests
             Assert.AreEqual(0, ledger.Drain().Count);
             Assert.IsFalse(ledger.AssistersSince(now: 0.5f, window: 8f, excludeActor: -1).Any());
         }
+
+        // Mark plan step 2: PlayerCombatCredit's leading-edge LateUpdate flush (Decision 11) needs to
+        // know "is there anything to send" WITHOUT draining - HasPending is that read-only question.
+        [Test]
+        public void HasPendingOnlyWhileUnsentDamageWaits()
+        {
+            var ledger = new DamageCreditLedger();
+            Assert.IsFalse(ledger.HasPending);
+
+            ledger.Record(2, 10f, now: 0f);
+            Assert.IsTrue(ledger.HasPending);
+
+            ledger.Drain();
+            Assert.IsFalse(ledger.HasPending);
+
+            ledger.Record(2, 0f, now: 1f);
+            Assert.IsFalse(ledger.HasPending);
+            ledger.Record(0, 5f, now: 1f);
+            Assert.IsFalse(ledger.HasPending);
+
+            ledger.Record(3, 7f, now: 2f);
+            Assert.IsTrue(ledger.HasPending);
+            ledger.Clear();
+            Assert.IsFalse(ledger.HasPending);
+        }
     }
 }

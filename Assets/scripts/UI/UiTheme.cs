@@ -686,6 +686,46 @@ namespace Overpower.UI
                  "you're out.")]
         public string matchLiveTwoTeamsToastText = "The match is live with two teams: lose your capital and you're out.";
 
+        [Header("Damage numbers (2026-09-18)")]
+        [Tooltip("Pop a number beside an enemy each time your damage lands on them. Off hides them; nothing else about " +
+                 "combat changes.")]
+        public bool showDamageNumbers = true;
+        [Tooltip("Canvas units, at the number's settled (post-pop) size.")]
+        public float damageNumberTextSize = 30f;
+        [Tooltip("An ordinary hit's number.")]
+        public Color damageNumberColor = new Color(1f, 1f, 1f, 1f);
+        [Tooltip("A hit that used up your mark (+50%, mark step 4) - both the bigger number and the mark diamond over " +
+                 "an enemy you've marked (mark step 5) share this colour. Keep it apart from the team colours and " +
+                 "Immune Bar Colour.")]
+        public Color markColor = new Color(1f, 0.45f, 0.1f, 1f);
+        [Tooltip("How much bigger a marked hit's number is than an ordinary one, for its whole life.")]
+        public float damageNumberMarkedScale = 1.4f;
+        [Tooltip("From the moment a number stops rising and fading starts to the moment it's gone - see Damage Number " +
+                 "Hold Seconds below for what happens before this even begins.")]
+        public float damageNumberLifetimeSeconds = 0.8f;
+        [Tooltip("How long the pop (the number starting oversized and settling down) takes, in seconds.")]
+        public float damageNumberPopSeconds = 0.12f;
+        [Tooltip("How big a number starts, as a multiple of its settled size.")]
+        public float damageNumberPopScale = 1.5f;
+        [Tooltip("Tudor's override on the Mark plan (2026-09-18): one live number per enemy, not one per hit - every " +
+                 "new hit on the same enemy ADDS to its number, re-pops it and restarts this clock. This is how long " +
+                 "the number stays fully solid (no rise, no fade) after the LAST hit that touched it before it starts " +
+                 "rising and fading over Damage Number Lifetime Seconds above. While you keep damaging one enemy its " +
+                 "number just keeps counting up in place.")]
+        public float damageNumberHoldSeconds = 0.6f;
+        [Tooltip("Canvas units a number floats up over its post-hold life.")]
+        public float damageNumberRise = 60f;
+        [Range(0f, 1f)]
+        [Tooltip("Fraction of the post-hold life before a number starts to fade.")]
+        public float damageNumberFadeStart = 0.55f;
+        [Tooltip("Metres above a target where its number is anchored when there's no fresher local impact point to use " +
+                 "instead (a burn tick, a fire field, a mine - anything not simulated on the shooter's own screen, or " +
+                 "an impact older than about a second). The bar over a head sits at about 3.")]
+        public float damageNumberAnchorHeight = 2f;
+        [Tooltip("Canvas units the number is nudged from its anchor point - positive x to the right - so it sits " +
+                 "beside the impact rather than exactly on top of it.")]
+        public Vector2 damageNumberScreenOffset = new Vector2(50f, 0f);
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why

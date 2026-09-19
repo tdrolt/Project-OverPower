@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace Overpower.Combat
 {
@@ -8,6 +9,7 @@ namespace Overpower.Combat
     /// client. That is what makes this safe to be static: unlike PlayerHealth.Damaged (which fires
     /// on the victim, once per victim per client), there is exactly one machine per hit that should
     /// ever raise these, so there is no cross-player ambiguity a singleton would normally risk.
+    /// UnityEngine is used only for Transform/Vector3 below - still no Photon and no MonoBehaviour.
     ///
     /// Two paths raise these today:
     ///  - PlayerCombatCredit.RPC_DamageCredit, on the attacker's own machine, once the victim's
@@ -30,8 +32,33 @@ namespace Overpower.Combat
         /// else landed the killing blow).</summary>
         public static event Action<bool> LocalTakedown;
 
+        /// <summary>Mark plan step 2: raised on the attacker's machine with the damage that actually
+        /// LANDED on `victim` (the victim's own truth) - `cashedMark` is false until mark step 4 wires
+        /// a real mark. Two raisers: PlayerCombatCredit.RPC_DamageCredit (a real, networked victim,
+        /// `transform` being that victim as THIS attacker sees it - the RPC runs on the victim's own
+        /// object) and DummyTarget (single-client, its own transform). DamageNumberView is the one
+        /// subscriber: this is "how much", paired with LocalImpactSeen below for "where".</summary>
+        public static event Action<Transform, float, bool> LocalHitReported;
+
+        /// <summary>Mark plan step 2 (Tudor's override, answer 2): raised on the SHOOTER's own machine
+        /// the instant its own shot is simulated landing on `victim` - before any credit message could
+        /// possibly have arrived, since that's a separate round trip. A real player's PlayerHealth
+        /// raises this on a copy it does NOT own, from inside ApplyDamage, BEFORE that method's
+        /// IsMine/isDead return - the one place the shooter's own client ever sees where its shot hit.
+        /// A DummyTarget raises it unconditionally (it has no owner to be "not mine" about). Not the
+        /// same information as LocalHitReported: this carries no damage amount, only a point, and can
+        /// arrive on its own with nothing to report yet (a shot that gets blocked, or against a target
+        /// no local weapon actually damaged).</summary>
+        public static event Action<Transform, Vector3> LocalImpactSeen;
+
         public static void RaiseDamageDealt(float amount) => LocalDamageDealt?.Invoke(amount);
 
         public static void RaiseTakedown(bool isKill) => LocalTakedown?.Invoke(isKill);
+
+        public static void RaiseHitReported(Transform victim, float amount, bool cashedMark) =>
+            LocalHitReported?.Invoke(victim, amount, cashedMark);
+
+        public static void RaiseImpactSeen(Transform victim, Vector3 hitPoint) =>
+            LocalImpactSeen?.Invoke(victim, hitPoint);
     }
 }

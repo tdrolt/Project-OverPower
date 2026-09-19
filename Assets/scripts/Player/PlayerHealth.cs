@@ -376,6 +376,19 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// The one funnel every damage source goes through - see the class comment.
     public DamageResult ApplyDamage(in DamageInfo info)
     {
+        // Mark plan step 2 (Tudor's override, answer 2): every client simulates every shot fired at
+        // every player, including its own shots against an enemy it does NOT own - this is the one
+        // moment the SHOOTER's own client can learn where its shot actually landed, since the real
+        // damage math below (and PlayerHealth.Damaged/the credit RPC that follows it) only ever runs
+        // on the victim's own machine. Raised BEFORE the IsMine/isDead return on purpose: it must fire
+        // on a copy the shooter does not own. A self-hit (IsMine true here) raises nothing - the
+        // shooter already knows exactly where it is standing.
+        if (!photonView.IsMine && PhotonNetwork.LocalPlayer != null
+            && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber)
+        {
+            CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
+        }
+
         // Bug 1.1: the victim is the sole authority on its own health, or every client would
         // subtract from its own copy and the owner's next serialization would fight it back.
         if (!photonView.IsMine || isDead)

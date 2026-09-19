@@ -210,3 +210,16 @@ MonoBehaviour:
   warmupLineSize: {x: 900, y: 64}
   matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
   matchLiveTwoTeamsToastText: 'The match is live with two teams: lose your capital and you''re out.'
+  showDamageNumbers: 1
+  damageNumberTextSize: 30
+  damageNumberColor: {r: 1, g: 1, b: 1, a: 1}
+  markColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  damageNumberMarkedScale: 1.4
+  damageNumberLifetimeSeconds: 0.8
+  damageNumberPopSeconds: 0.12
+  damageNumberPopScale: 1.5
+  damageNumberHoldSeconds: 0.6
+  damageNumberRise: 60
+  damageNumberFadeStart: 0.55
+  damageNumberAnchorHeight: 2
+  damageNumberScreenOffset: {x: 50, y: 0}

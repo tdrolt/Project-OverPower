@@ -80,6 +80,12 @@ namespace Overpower.UI
         private Image healthImmuneOverlay;
         private Image armorImmuneOverlay;
         private bool lastImmuneLook;
+
+        // ---- built UI: damage numbers (Mark plan step 2) --------------------------------------------
+
+        // Kept for step 5 (the mark diamond, which shares this same overlay canvas/rect - see the file
+        // map): its own canvas needs no other reference held past BuildUi today.
+        private RectTransform hitFeedbackCanvasRect;
         private GameObject silencedBanner;
         private TextMeshProUGUI goldText; // "Gold 1234" over "+7.7/s", bottom-right - see BuildGoldCorner.
 
@@ -908,6 +914,47 @@ namespace Overpower.UI
             // says and whether it shows, and separately builds its own clickable button canvas alongside it.
             TextMeshProUGUI warmupLabel = BuildWarmupLine(canvasGo.transform);
             MatchStartPanel.Create(transform, theme, warmupLabel);
+
+            BuildHitFeedbackCanvas();
+        }
+
+        /// <summary>Mark plan step 2: a SEPARATE overlay canvas for damage numbers, below the HUD
+        /// (order -20 vs the HUD's -10, so a number never draws over a slot/bar) and with no
+        /// GraphicRaycaster - same reasoning as the HUD's own canvas (BuildUi's comment): nothing here
+        /// is clickable, and a world-space raycaster trap has already bitten this project once
+        /// (ApplyTheme's comment on HealthBarCanvas). Pools DamageNumberView.PoolSize labels up front
+        /// so popping a number is never a GameObject.Instantiate - see that class's own "no allocation
+        /// per hit" comment.</summary>
+        private void BuildHitFeedbackCanvas()
+        {
+            GameObject canvasGo = new GameObject("Hit Feedback Canvas", typeof(RectTransform));
+            canvasGo.transform.SetParent(transform, false);
+            Canvas canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.overrideSorting = true;
+            canvas.sortingOrder = -20;
+            CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = theme.referenceResolution;
+            scaler.matchWidthOrHeight = theme.matchWidthOrHeight;
+            // No GraphicRaycaster: nothing on this canvas is ever clickable.
+
+            hitFeedbackCanvasRect = canvasGo.GetComponent<RectTransform>();
+
+            var labels = new TextMeshProUGUI[DamageNumberView.PoolSize];
+            for (int i = 0; i < labels.Length; i++)
+            {
+                TextMeshProUGUI label = AddLabel(canvasGo.transform, "", theme.damageNumberTextSize, FontStyles.Bold);
+                label.enableWordWrapping = false;
+                RectTransform rect = label.rectTransform;
+                rect.sizeDelta = new Vector2(200f, 60f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+                label.gameObject.SetActive(false);
+                labels[i] = label;
+            }
+
+            DamageNumberView.Create(transform, theme, hitFeedbackCanvasRect, labels);
         }
 
         /// <summary>2.7b step 8: the warm-up/countdown/host line, top-centre - same construction as BuildToast just

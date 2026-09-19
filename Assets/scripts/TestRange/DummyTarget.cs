@@ -446,6 +446,13 @@ namespace Overpower.TestRange
             armor.Absorb(result.ArmorAbsorbed);
             health -= result.HealthLost;
 
+            // Mark plan step 2: a dummy has no owner/IsMine concept at all (HasLocalAuthority is
+            // always true - the class comment), so unlike PlayerHealth.ApplyDamage there is no "copy
+            // the shooter does not own" to special-case here - every hit on a dummy IS the local
+            // player's own shot, so this always fires. DamageNumberView anchors this dummy's next
+            // number here, the same as it does for a real victim's impact.
+            CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
+
             NotifyLocalCombatCredit(info, result);
             AnyDamaged?.Invoke(this, result, info);
 
@@ -480,6 +487,10 @@ namespace Overpower.TestRange
                 return;
 
             CombatEvents.RaiseDamageDealt(result.Total);
+            // Mark plan step 2: the same "how much" event PlayerCombatCredit.RPC_DamageCredit raises
+            // for a real victim - DamageNumberView doesn't need to know whether transform belongs to a
+            // player or a dummy. cashedMark false until mark step 4.
+            CombatEvents.RaiseHitReported(transform, result.Total, false);
 
             PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
             PlayerHealth localHealth = localView != null ? localView.GetComponent<PlayerHealth>() : null;

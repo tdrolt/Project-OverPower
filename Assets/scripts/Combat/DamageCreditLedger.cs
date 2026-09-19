@@ -31,6 +31,15 @@ namespace Overpower.Combat
 
         private readonly Dictionary<int, Entry> byActor = new Dictionary<int, Entry>();
 
+        // Mark plan step 2 (Decision 11): PlayerCombatCredit's leading-edge LateUpdate flush needs to
+        // ask "is there anything to send" every frame without draining just to find out. Counting
+        // "how many actors currently have sum > 0" here, kept in step with Record/Drain/Clear, makes
+        // that a plain field read instead of an allocation-per-frame scan of every entry.
+        private int pendingCount;
+
+        /// <summary>True while at least one actor has un-drained damage waiting - see the field comment.</summary>
+        public bool HasPending => pendingCount > 0;
+
         /// <summary>Adds one hit's damage to its source actor's running total. Ignored outright for
         /// an actor number that cannot be a real attacker (<= 0) or an amount that could not have
         /// hurt anyone (<= 0) - see the class comment for why self-damage is not checked here.</summary>
@@ -40,9 +49,12 @@ namespace Overpower.Combat
                 return;
 
             Entry entry = byActor.TryGetValue(sourceActor, out Entry existing) ? existing : default;
+            bool wasPending = entry.sum > 0f;
             entry.sum += amount;
             entry.lastHitTime = now;
             byActor[sourceActor] = entry;
+            if (!wasPending && entry.sum > 0f)
+                pendingCount++;
         }
 
         /// <summary>Returns every actor with an un-flushed positive sum, then resets every sum to
@@ -60,7 +72,10 @@ namespace Overpower.Combat
             {
                 Entry entry = byActor[actor];
                 if (entry.sum > 0f)
+                {
                     drained.Add((actor, entry.sum));
+                    pendingCount--;
+                }
 
                 entry.sum = 0f;
                 byActor[actor] = entry;
@@ -88,6 +103,10 @@ namespace Overpower.Combat
         /// <summary>Forgets every attacker entirely, sums and last-hit times alike - called once a
         /// death has been fully resolved, so the next life starts owing nobody and crediting
         /// nobody for an assist window that closed with the last fight.</summary>
-        public void Clear() => byActor.Clear();
+        public void Clear()
+        {
+            byActor.Clear();
+            pendingCount = 0;
+        }
     }
 }

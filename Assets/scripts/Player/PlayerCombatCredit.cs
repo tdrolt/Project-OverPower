@@ -28,9 +28,11 @@ using Overpower.Combat;
 /// </summary>
 public class PlayerCombatCredit : MonoBehaviourPun
 {
-    [SerializeField, Tooltip("How often the victim reports accumulated damage back to each " +
-             "attacker while a fight is still going, in seconds. Lower is more responsive - armor " +
-             "recharge and ultimate charge react sooner - at the cost of more RPCs per fight.")]
+    [SerializeField, Tooltip("The shortest gap between two credit reports to the SAME attacker, in " +
+             "seconds (Mark plan step 2, Decision 11). An isolated hit is no longer held back by this " +
+             "at all - LateUpdate below sends it the same frame it lands - so this only ever throttles " +
+             "a rapid follow-up: a second hit within this many seconds of the last report waits and " +
+             "merges into the next one. Lower is more responsive at the cost of more RPCs per fight.")]
     private float creditFlushSeconds = 0.25f;
 
     [SerializeField, Tooltip("How long before a kill an attacker's last hit still counts toward an " +
@@ -95,9 +97,17 @@ public class PlayerCombatCredit : MonoBehaviourPun
         playerHealth.Died -= HandleDied;
     }
 
-    private void Update()
+    /// <summary>Mark plan step 2, Decision 11: the flush is now LEADING-EDGE, and moved to LateUpdate
+    /// so every hit this frame (a shotgun's whole pellet spread included) is already in the ledger
+    /// before this runs. `ledger.HasPending` is the change from before: an isolated hit's credit now
+    /// leaves at the END OF THE SAME FRAME it landed, where the old fixed 0.25s tick could add up to
+    /// 0.25s of pure latency for a hit that happened to land right after the tick had just fired. A
+    /// follow-up hit within creditFlushSeconds of the last SENT report still waits and merges into the
+    /// next one - same rate cap, same totals, only the isolated case got faster. Ultimate charge and
+    /// armour recharge just hear sooner; nothing about what they hear changed.</summary>
+    private void LateUpdate()
     {
-        if (!photonView.IsMine || Time.time < nextFlushTime)
+        if (!photonView.IsMine || !ledger.HasPending || Time.time < nextFlushTime)
             return;
 
         nextFlushTime = Time.time + creditFlushSeconds;
@@ -212,6 +222,10 @@ public class PlayerCombatCredit : MonoBehaviourPun
         {
             localHealth?.NoteDealtDamage();
             CombatEvents.RaiseDamageDealt(amount);
+            // Mark plan step 2: `transform` here is the VICTIM as this attacker sees it - this RPC
+            // runs on the victim's own replicated object, merely targeted at the attacker (the class
+            // comment above). `cashedMark` is false until mark step 4 appends it to this same RPC.
+            CombatEvents.RaiseHitReported(transform, amount, false);
         }
 
         if (takedown == 1)
