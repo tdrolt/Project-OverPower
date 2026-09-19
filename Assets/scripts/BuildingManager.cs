@@ -317,9 +317,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // Task 2.7: MatchDirector needs no scene footprint and no PhotonView - it only ever reads
         // and writes Room Properties, the same authority model this class's own territory state
         // uses. Added here, at runtime, on this same GameObject (which already hosts MatchTelemetry
-        // and ZonePresenceTracker) rather than placed in Game Scene.unity, because the arena is being
-        // rebuilt from primitives in a separate session and anything placed in the scene right now
-        // could be lost or conflict with that rebuild [C, controller decision, 2026-09-18].
+        // and ZonePresenceTracker) rather than placed in Game Scene.unity: the arena rebuild from
+        // primitives is done (arena step 5), but MatchDirector still has nothing scene-specific to
+        // read or write, so there is no reason to move it into the scene now either
+        // [C, controller decision, 2026-09-18; arena step 5, 2026-09-19].
         if (GetComponent<MatchDirector>() == null)
             gameObject.AddComponent<MatchDirector>();
     }

@@ -13,15 +13,21 @@ namespace Overpower.EditorTools
         public override void OnInspectorGUI()
         {
             EditorGUILayout.HelpBox(
-                "Edit only the objects under Source, then press Rebuild thirds, check the arena, and save the scene. " +
-                "The two generated thirds are rebuilt from Source every time, so edits made to them are thrown away. " +
-                "Rebuild thirds also re-bakes the minimap image; for other changes you can see from above, use " +
-                "OverPower > Arena > Bake minimap image.",
+                "Source's boundary walls, blocks and barriers come from Assets/Gameplay/Config/ArenaLayout.asset, " +
+                "never hand-placed. Edit a row there, or move a block or barrier in the Scene view and press " +
+                "'Capture layout from Source', then press 'Build primitive arena' below to rebuild Source from the " +
+                "layout, copy it into both generated thirds and re-bake the minimap, all at once. 'Rebuild thirds' " +
+                "alone still works for a quick look after moving a tower or a spawn point, without touching Source's " +
+                "own walls/blocks/barriers - it also re-bakes the minimap; for other changes you can see from above, " +
+                "use OverPower > Arena > Bake minimap image. The two generated thirds are rebuilt from Source every " +
+                "time either button runs, so edits made to them are thrown away.",
                 MessageType.Info);
             DrawDefaultInspector();
 
             var arena = (ArenaSymmetry)target;
             EditorGUILayout.Space();
+            if (GUILayout.Button("Build primitive arena"))
+                Report("Build primitive arena", ArenaPrimitiveBuilder.BuildAll(arena.gameObject.scene));
             if (GUILayout.Button("Rebuild thirds"))
             {
                 Report("Rebuild thirds", ArenaSymmetryBuilder.Rebuild(arena, recordUndo: true));

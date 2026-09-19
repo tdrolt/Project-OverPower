@@ -12,13 +12,15 @@ namespace Overpower.EditorTools
     /// <summary>
     /// The arena rebuild's Editor tool. Step 3 built BuildTowerLooks (stamps Tower Look.prefab onto every
     /// BuildingCapture and hides that tower's old house and flag carpet - never removes them, base plan Decision 5).
-    /// Step 4 adds the rest, not yet run on Game Scene: MoveOldArtAside (moves everything old under Source and the
-    /// generated thirds into an inactive Old Arena (off), keeping world positions, base plan Decision 13), BuildSource
-    /// (the boundary walls fresh from Arena Symmetry's Source Outline, plus every Block and Barrier row from
-    /// ArenaLayout, base plan Decision 4 and Amendment 1's D3/D11/D24/D25), and BuildFloor (one flat slab). None of
-    /// these ever run in Play Mode (a live, networked tower or a live boundary wall would change on this client only
-    /// and desync the match), and none of them save the scene themselves - the caller looks at the report first,
-    /// then saves.
+    /// Step 4 added the rest as separate phases, not yet run on Game Scene: MoveOldArtAside (moves everything old
+    /// under Source and the generated thirds into an inactive Old Arena (off), keeping world positions, base plan
+    /// Decision 13), BuildSource (the boundary walls fresh from Arena Symmetry's Source Outline, plus every Block and
+    /// Barrier row from ArenaLayout, base plan Decision 4 and Amendment 1's D3/D11/D24/D25), and BuildFloor (one flat
+    /// slab). Step 5's BuildAll runs every phase in order, then Rebuild thirds and the minimap bake, so the menu
+    /// applies the whole primitive arena in one call ("OverPower > Arena > Build primitive arena"). None of these
+    /// ever run in Play Mode (a live, networked tower or a live boundary wall would change on this client only and
+    /// desync the match), and none of them save the scene themselves - the caller looks at the report first, then
+    /// saves.
     /// </summary>
     public static class ArenaPrimitiveBuilder
     {
@@ -131,16 +133,6 @@ namespace Overpower.EditorTools
         {
             if (PrefabUtility.IsPartOfPrefabInstance(target))
                 PrefabUtility.RecordPrefabInstancePropertyModifications(target);
-        }
-
-        // Temporary: folded into BuildAll's menu in arena step 5.
-        [MenuItem("OverPower/Arena/Build tower looks")]
-        private static void MenuBuildTowerLooks()
-        {
-            Scene scene = SceneManager.GetActiveScene();
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Arena/Tower Look.prefab");
-            List<string> report = BuildTowerLooks(scene, prefab);
-            Debug.Log("[ArenaPrimitiveBuilder] Build tower looks:\n" + string.Join("\n", report));
         }
 
         // ---- arena step 4: move the old art aside, build Source from the layout, lay the floor -------------------
@@ -366,6 +358,89 @@ namespace Overpower.EditorTools
 
             floor.transform.SetPositionAndRotation(new Vector3(centre.x, -layout.FloorThickness * 0.5f, centre.z), Quaternion.identity);
             floor.transform.localScale = new Vector3(layout.FloorSize.x, layout.FloorThickness, layout.FloorSize.y);
+        }
+
+        // ---- arena step 5: everything, in one call, applied to the real scene -------------------------------------
+
+        /// <summary>
+        /// Arena step 5: runs every phase, in order, on the one ArenaSymmetry found in <paramref name="scene"/> -
+        /// 1) BuildTowerLooks, 2) MoveOldArtAside, 3) BuildSource, 4) BuildFloor, 5) ArenaSymmetryBuilder.Rebuild,
+        /// 6) MinimapBaker.Bake, 7) the report and a final Validate. Stops before touching the floor or the copies if
+        /// BuildSource reports a PROBLEM (Source held something it doesn't own) - never a partial build. Never runs
+        /// in Play Mode; never saves the scene itself.
+        /// </summary>
+        public static List<string> BuildAll(Scene scene)
+        {
+            var report = new List<string>();
+            if (EditorApplication.isPlaying)
+            {
+                report.Add(PlayModeRefusal);
+                return report;
+            }
+
+            List<ArenaSymmetry> arenas = scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<ArenaSymmetry>(true))
+                .ToList();
+            if (arenas.Count != 1)
+            {
+                report.Add($"PROBLEM: found {arenas.Count} ArenaSymmetry components in the scene (need exactly one).");
+                return report;
+            }
+            ArenaSymmetry arena = arenas[0];
+
+            ArenaLayout layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/Gameplay/Config/ArenaLayout.asset");
+            if (layout == null)
+            {
+                report.Add("PROBLEM: Assets/Gameplay/Config/ArenaLayout.asset does not exist - run Capture layout from Source first.");
+                return report;
+            }
+            GameObject towerLookPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Arena/Tower Look.prefab");
+            Transform environment = arena.transform.parent;
+            if (environment == null)
+            {
+                report.Add($"PROBLEM: '{arena.name}' has no parent to hold Old Arena (off), the floor and the scenery.");
+                return report;
+            }
+
+            report.Add("--- 1. BuildTowerLooks ---");
+            report.AddRange(BuildTowerLooks(scene, towerLookPrefab));
+
+            report.Add("--- 2. MoveOldArtAside ---");
+            report.AddRange(MoveOldArtAside(arena, environment));
+
+            report.Add("--- 3. BuildSource ---");
+            List<string> sourceReport = BuildSource(arena, layout);
+            report.AddRange(sourceReport);
+            if (sourceReport.Any(l => l.Contains("PROBLEM")))
+            {
+                report.Add("Stopped: BuildSource reported a PROBLEM, so the floor, the copies and the minimap were not touched.");
+                return report;
+            }
+
+            report.Add("--- 4. BuildFloor ---");
+            BuildFloor(environment, layout, arena.centre);
+            report.Add("Floor built.");
+
+            report.Add("--- 5. ArenaSymmetryBuilder.Rebuild ---");
+            report.AddRange(ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false));
+
+            report.Add("--- 6. MinimapBaker.Bake ---");
+            string bakeResult = MinimapBaker.Bake(arena);
+            MinimapBaker.LogResult(bakeResult);
+            report.Add(bakeResult);
+
+            report.Add("--- 7. Final Validate ---");
+            report.AddRange(ArenaSymmetryBuilder.Validate(arena));
+
+            return report;
+        }
+
+        [MenuItem("OverPower/Arena/Build primitive arena")]
+        private static void MenuBuildAll()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            List<string> report = BuildAll(scene);
+            Debug.Log("[ArenaPrimitiveBuilder] Build primitive arena:\n" + string.Join("\n", report));
         }
     }
 }

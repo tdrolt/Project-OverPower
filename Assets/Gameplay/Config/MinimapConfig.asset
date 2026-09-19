@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   arenaImage: {fileID: 2800000, guid: 9650c53ce06c1cd4282c913199a7291f, type: 3}
   worldCentre: {x: 65.05, y: 53.34}
-  worldSizeMetres: 198.61874
+  worldSizeMetres: 218.28915
   imagePixels: 1024
   marginMetres: 4

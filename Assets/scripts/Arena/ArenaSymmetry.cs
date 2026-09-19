@@ -7,8 +7,12 @@ namespace Overpower.Arena
     /// <summary>
     /// Makes the arena three identical thirds, turned 120° apart about Centre.
     ///
-    /// HOW TO EDIT THE ARENA: change only the objects under Source. Then press "Rebuild thirds" on this component
-    /// (or OverPower > Arena > Rebuild thirds), look at the result, and save the scene. The two generated thirds are
+    /// HOW TO EDIT THE ARENA (arena step 5): Source's boundary walls, blocks and barriers are built from
+    /// Assets/Gameplay/Config/ArenaLayout.asset, never hand-placed - edit a row there, or move a block or barrier in
+    /// the Scene view and press "Capture layout from Source" to write its new row back, then press "Build primitive
+    /// arena" (OverPower > Arena), which rebuilds Source from the layout, copies it into both generated thirds and
+    /// re-bakes the minimap, all in one step. "Rebuild thirds" alone still works for a quick look after moving a
+    /// tower or a spawn point, without touching Source's own walls/blocks/barriers. The two generated thirds are
     /// deleted and copied again from Source on every rebuild, so an edit made directly to them is thrown away. The
     /// Inspector greys them out to make that obvious.
     ///
