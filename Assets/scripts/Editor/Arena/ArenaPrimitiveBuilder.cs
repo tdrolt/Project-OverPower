@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Overpower.Arena;
+using Overpower.Data;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -9,17 +10,28 @@ using UnityEngine.SceneManagement;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// Arena rebuild step 3: stamps Tower Look.prefab onto every BuildingCapture already in the scene, and hides
-    /// (never removes) that tower's old house and flag carpet. The networked tower keeps its transform, PhotonView,
-    /// capture trigger and BuildingCapture exactly as they are (base plan Decision 5) - only what a player SEES
-    /// changes. Re-runnable: a second run replaces its own Tower Look child and re-hides the same pieces, so it is
-    /// safe to call again after a tuning change to the prefab. Never runs in Play Mode (it would change a live,
-    /// networked tower on this client only and desync the match), and never saves the scene itself - the caller
-    /// looks at the report first, then saves.
+    /// The arena rebuild's Editor tool. Step 3 built BuildTowerLooks (stamps Tower Look.prefab onto every
+    /// BuildingCapture and hides that tower's old house and flag carpet - never removes them, base plan Decision 5).
+    /// Step 4 adds the rest, not yet run on Game Scene: MoveOldArtAside (moves everything old under Source and the
+    /// generated thirds into an inactive Old Arena (off), keeping world positions, base plan Decision 13), BuildSource
+    /// (the boundary walls fresh from Arena Symmetry's Source Outline, plus every Block and Barrier row from
+    /// ArenaLayout, base plan Decision 4 and Amendment 1's D3/D11/D24/D25), and BuildFloor (one flat slab). None of
+    /// these ever run in Play Mode (a live, networked tower or a live boundary wall would change on this client only
+    /// and desync the match), and none of them save the scene themselves - the caller looks at the report first,
+    /// then saves.
     /// </summary>
     public static class ArenaPrimitiveBuilder
     {
         public const string TowerLookChildName = "Tower Look";
+        public const string OldArtGroupName = "Old Arena (off)";
+        public const string SceneryGroupName = "Scenery";
+        public const string BoundryGroupName = ArenaSymmetry.BoundaryGroupName;
+        public const string BlocksGroupName = "Blocks";
+        public const string BarriersGroupName = "Barriers";
+        public const string FloorObjectName = "Arena Floor";
+
+        private const string PlayModeRefusal = "Can't build the arena in Play Mode: it would change live, networked " +
+                                                "objects on this client only and desync the match. Stop Play Mode first.";
 
         public static List<string> BuildTowerLooks(Scene scene, GameObject towerLookPrefab)
         {
@@ -129,6 +141,231 @@ namespace Overpower.EditorTools
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Arena/Tower Look.prefab");
             List<string> report = BuildTowerLooks(scene, prefab);
             Debug.Log("[ArenaPrimitiveBuilder] Build tower looks:\n" + string.Join("\n", report));
+        }
+
+        // ---- arena step 4: move the old art aside, build Source from the layout, lay the floor -------------------
+
+        /// <summary>
+        /// Moves everything old aside into an inactive "Old Arena (off)" under <paramref name="environment"/>,
+        /// keeping every object's world position (base plan Decision 13). Never deletes anything. Idempotent: once
+        /// an object has been moved, it is no longer a child of Source/a generated third/environment, so a second
+        /// run finds nothing left to move there and reports nothing for it.
+        /// </summary>
+        public static List<string> MoveOldArtAside(ArenaSymmetry arena, Transform environment)
+        {
+            var report = new List<string>();
+            if (EditorApplication.isPlaying) { report.Add(PlayModeRefusal); return report; }
+            if (arena == null || arena.source == null || arena.generated120 == null || arena.generated240 == null)
+            {
+                report.Add("PROBLEM: ArenaSymmetry's Source and both generated thirds must all be assigned.");
+                return report;
+            }
+            if (environment == null) { report.Add("PROBLEM: no Enviorment root given."); return report; }
+
+            Transform oldArt = environment.Find(OldArtGroupName);
+            if (oldArt == null)
+            {
+                var go = new GameObject(OldArtGroupName);
+                Undo.RegisterCreatedObjectUndo(go, "Move old arena art aside");
+                go.transform.SetParent(environment, false);
+                oldArt = go.transform;
+            }
+            oldArt.gameObject.SetActive(false);
+
+            MoveUnmarkedChildren(arena.source, GetOrCreateChild(oldArt, arena.source.name), report);
+            MoveUnmarkedChildren(arena.generated120, GetOrCreateChild(oldArt, arena.generated120.name), report);
+            MoveUnmarkedChildren(arena.generated240, GetOrCreateChild(oldArt, arena.generated240.name), report);
+
+            Transform scenery = GetOrCreateChild(oldArt, SceneryGroupName);
+            foreach (string name in new[] { "Mountains", "Props", "Nature" })
+            {
+                Transform t = environment.Find(name);
+                if (t != null && t != oldArt)
+                    MoveOneKeepingWorld(t, scenery, report);
+            }
+            for (int i = environment.childCount - 1; i >= 0; i--)
+            {
+                Transform child = environment.GetChild(i);
+                if (child == oldArt || !child.name.StartsWith("Terrain"))
+                    continue;
+                MoveOneKeepingWorld(child, scenery, report);
+            }
+
+            return report;
+        }
+
+        private static void MoveUnmarkedChildren(Transform group, Transform destination, List<string> report)
+        {
+            for (int i = group.childCount - 1; i >= 0; i--)
+            {
+                Transform child = group.GetChild(i);
+                if (child.GetComponent<ArenaBuiltGroup>() != null)
+                    continue; // the builder's own group from an earlier run: leave it for BuildSource to replace.
+                MoveOneKeepingWorld(child, destination, report);
+            }
+        }
+
+        private static Transform GetOrCreateChild(Transform parent, string childName)
+        {
+            Transform existing = parent.Find(childName);
+            if (existing != null)
+                return existing;
+            var go = new GameObject(childName);
+            go.transform.SetParent(parent, false);
+            return go.transform;
+        }
+
+        private static void MoveOneKeepingWorld(Transform child, Transform destination, List<string> report)
+        {
+            child.SetParent(destination, true); // worldPositionStays: true
+            report.Add($"moved '{child.name}' -> {destination.name}");
+        }
+
+        /// <summary>
+        /// Rebuilds Source from <paramref name="layout"/>: the boundary walls fresh from
+        /// <paramref name="arena"/>.sourceOutline (ArenaWallPlan - never captured, so "no gaps at the corners" can
+        /// never go stale against a moved outline), then every Block and Barrier row from the layout, box for box
+        /// (base plan Decision 3, Amendment 1 D24). Refuses outright while Source holds anything that isn't the
+        /// builder's own (call MoveOldArtAside first) - the builder must never delete a hand-placed piece or old art
+        /// that hasn't been moved aside yet (base plan Decision 4).
+        /// </summary>
+        public static List<string> BuildSource(ArenaSymmetry arena, ArenaLayout layout)
+        {
+            var report = new List<string>();
+            if (EditorApplication.isPlaying) { report.Add(PlayModeRefusal); return report; }
+            if (arena == null || arena.source == null)
+            {
+                report.Add("PROBLEM: ArenaSymmetry's Source must be assigned.");
+                return report;
+            }
+            if (layout == null) { report.Add("PROBLEM: no ArenaLayout given."); return report; }
+
+            for (int i = 0; i < arena.source.childCount; i++)
+            {
+                Transform child = arena.source.GetChild(i);
+                if (child.GetComponent<ArenaBuiltGroup>() == null)
+                {
+                    report.Add($"PROBLEM: '{child.name}' under Source is not the builder's own - move the old art " +
+                               "aside first (MoveOldArtAside) before building.");
+                    return report;
+                }
+            }
+
+            for (int i = arena.source.childCount - 1; i >= 0; i--)
+                Object.DestroyImmediate(arena.source.GetChild(i).gameObject);
+
+            Transform boundry = NewMarkedGroup(arena.source, BoundryGroupName);
+            Transform blocks = NewMarkedGroup(arena.source, BlocksGroupName);
+            Transform barriers = NewMarkedGroup(arena.source, BarriersGroupName);
+
+            ArenaBounds wholeOutline = ArenaBounds.FromSourceOutline(arena.sourceOutline, arena.centre);
+            int wallCount = 0;
+            if (wholeOutline == null)
+            {
+                report.Add("PROBLEM: Source Outline has fewer than two points - no boundary walls were built.");
+            }
+            else
+            {
+                List<ArenaWallPlan.Run> runs = ArenaWallPlan.ForSource(wholeOutline.Polygon, arena.sourceOutline.Count, layout.WallThickness);
+                float wallCentreY = (layout.WallBottomY + layout.WallTopY) * 0.5f;
+                float wallHeight = layout.WallTopY - layout.WallBottomY;
+                for (int i = 0; i < runs.Count; i++)
+                {
+                    ArenaWallPlan.Run run = runs[i];
+                    Vector2 centreXZ = run.Centre(layout.WallThickness);
+                    GameObject wall = NewPrimitiveChild(boundry, $"Wall {i}", layout.WallMaterial, "Building");
+                    wall.transform.SetPositionAndRotation(new Vector3(centreXZ.x, wallCentreY, centreXZ.y),
+                        Quaternion.Euler(0f, run.UnityYawDegrees, 0f));
+                    wall.transform.localScale = new Vector3(run.Length, wallHeight, layout.WallThickness);
+                    wallCount++;
+                }
+            }
+            report.Add($"Boundry: {wallCount} walls built from the outline.");
+
+            int blockCount = 0, barrierCount = 0;
+            foreach (ArenaLayout.Piece piece in layout.Pieces)
+            {
+                if (piece.kind == ArenaLayout.PieceKind.Block)
+                {
+                    GameObject block = NewPrimitiveChild(blocks, piece.name, layout.BlockMaterial, "Building");
+                    block.transform.SetPositionAndRotation(piece.centre, Quaternion.Euler(0f, piece.yawDegrees, 0f));
+                    block.transform.localScale = piece.size;
+                    blockCount++;
+                }
+                else
+                {
+                    GameObject barrier = NewPrimitiveChild(barriers, piece.name, layout.BarrierMaterial, ArenaLayers.BarrierLayerName);
+                    Vector3 position = new Vector3(piece.centre.x, 0f, piece.centre.z);
+                    barrier.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, piece.yawDegrees, 0f));
+                    barrier.transform.localScale = piece.size; // x = length, y = look height, z = thickness
+
+                    BoxCollider box = barrier.GetComponent<BoxCollider>();
+                    float blockingCentreYWorld = (layout.BarrierBlockingBottomY + layout.BarrierBlockingTopY) * 0.5f;
+                    float blockingHeightWorld = layout.BarrierBlockingTopY - layout.BarrierBlockingBottomY;
+                    float scaleY = Mathf.Max(0.0001f, piece.size.y);
+                    box.center = new Vector3(0f, (blockingCentreYWorld - position.y) / scaleY, 0f);
+                    box.size = new Vector3(1f, blockingHeightWorld / scaleY, 1f);
+                    barrierCount++;
+                }
+            }
+            report.Add($"Blocks: {blockCount} built. Barriers: {barrierCount} built.");
+
+            EditorSceneManager.MarkSceneDirty(arena.gameObject.scene);
+            return report;
+        }
+
+        private static Transform NewMarkedGroup(Transform parent, string groupName)
+        {
+            var go = new GameObject(groupName);
+            go.transform.SetParent(parent, false);
+            go.AddComponent<ArenaBuiltGroup>();
+            return go.transform;
+        }
+
+        private static GameObject NewPrimitiveChild(Transform parent, string childName, Material material, string layerName)
+        {
+            var go = new GameObject(childName);
+            go.transform.SetParent(parent, false);
+            go.layer = LayerMask.NameToLayer(layerName);
+            go.AddComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            go.AddComponent<MeshRenderer>().sharedMaterial = material;
+            go.AddComponent<BoxCollider>();
+            GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic);
+            return go;
+        }
+
+        /// <summary>Replaces the single marked floor slab under <paramref name="environment"/> (a sibling of Source,
+        /// never inside it - Rebuild thirds would otherwise copy it three times, base plan Decision 12). One flat
+        /// Default-layer cube, its top at world Y 0.</summary>
+        public static void BuildFloor(Transform environment, ArenaLayout layout, Vector3 centre)
+        {
+            Transform existing = environment.Find(FloorObjectName);
+            GameObject floor;
+            if (existing != null)
+            {
+                floor = existing.gameObject;
+                if (floor.GetComponent<MeshFilter>() == null) floor.AddComponent<MeshFilter>();
+                if (floor.GetComponent<MeshRenderer>() == null) floor.AddComponent<MeshRenderer>();
+                if (floor.GetComponent<BoxCollider>() == null) floor.AddComponent<BoxCollider>();
+                if (floor.GetComponent<ArenaBuiltGroup>() == null) floor.AddComponent<ArenaBuiltGroup>();
+            }
+            else
+            {
+                floor = new GameObject(FloorObjectName);
+                floor.transform.SetParent(environment, false);
+                floor.AddComponent<ArenaBuiltGroup>();
+                floor.AddComponent<MeshFilter>();
+                floor.AddComponent<MeshRenderer>();
+                floor.AddComponent<BoxCollider>();
+            }
+
+            floor.layer = LayerMask.NameToLayer("Default");
+            floor.GetComponent<MeshFilter>().sharedMesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+            floor.GetComponent<MeshRenderer>().sharedMaterial = layout.FloorMaterial;
+            GameObjectUtility.SetStaticEditorFlags(floor, StaticEditorFlags.BatchingStatic);
+
+            floor.transform.SetPositionAndRotation(new Vector3(centre.x, -layout.FloorThickness * 0.5f, centre.z), Quaternion.identity);
+            floor.transform.localScale = new Vector3(layout.FloorSize.x, layout.FloorThickness, layout.FloorSize.y);
         }
     }
 }

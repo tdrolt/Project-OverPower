@@ -1,0 +1,161 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02938c5e14f758149b13429fe6ed1806, type: 3}
+  m_Name: ArenaLayout
+  m_EditorClassIdentifier: 
+  pieces:
+  - name: House_06L (4)
+    kind: 0
+    centre: {x: 85.35736, y: 2.773521, z: 72.77114}
+    yawDegrees: 58.41552
+    size: {x: 2.6092231, y: 5.7285337, z: 7.1808767}
+  - name: House_06L (6)
+    kind: 0
+    centre: {x: 44.246147, y: 2.694683, z: 71.919174}
+    yawDegrees: 298.9656
+    size: {x: 2.6092224, y: 5.7285357, z: 7.1808753}
+  - name: House_03 (2)
+    kind: 0
+    centre: {x: 74.401245, y: 1.3000016, z: 77.89627}
+    yawDegrees: 61.2292
+    size: {x: 8.450748, y: 2.8000083, z: 5.3268147}
+  - name: House_03 (4)
+    kind: 0
+    centre: {x: 55.301132, y: 1.3000064, z: 77.70094}
+    yawDegrees: 299.60715
+    size: {x: 8.4507475, y: 2.8000083, z: 5.326815}
+  - name: Plant_01 (34)
+    kind: 0
+    centre: {x: 86.10432, y: 0.21594726, z: 67.90429}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Plant_01 (64)
+    kind: 0
+    centre: {x: 49.06432, y: 0.21594726, z: 73.26429}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Plant_01 (66)
+    kind: 0
+    centre: {x: 62.27432, y: 0.21594726, z: 73.26429}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Plant_01 (68)
+    kind: 0
+    centre: {x: 71.744316, y: 0.21594726, z: 79.274284}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Plant_01 (70)
+    kind: 0
+    centre: {x: 84.03432, y: 0.21594726, z: 79.82429}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Plant_01 (72)
+    kind: 0
+    centre: {x: 62.47432, y: 0.21594726, z: 85.61429}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Plant_01 (79)
+    kind: 0
+    centre: {x: 71.10432, y: 0.21594726, z: 61.204285}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Plant_01 (87)
+    kind: 0
+    centre: {x: 57.604317, y: 0.21594726, z: 88.704285}
+    yawDegrees: 0
+    size: {x: 0.93373203, y: 0.44655016, z: 0.94704413}
+  - name: Rock_03 (36)
+    kind: 0
+    centre: {x: 55.391384, y: 0.010458727, z: 79.40095}
+    yawDegrees: 0
+    size: {x: 0.7197382, y: 0.45640445, z: 0.6784313}
+  - name: Rock_03 (38)
+    kind: 0
+    centre: {x: 46.76138, y: 0.010458727, z: 88.95694}
+    yawDegrees: 0
+    size: {x: 0.7197382, y: 0.45640445, z: 0.6784313}
+  - name: Rock_03 (24)
+    kind: 0
+    centre: {x: 71.22139, y: 0.010458727, z: 61.626945}
+    yawDegrees: 0
+    size: {x: 0.7197382, y: 0.45640445, z: 0.6784313}
+  - name: Rock_03 (29)
+    kind: 0
+    centre: {x: 59.921383, y: 0.010458727, z: 88.52695}
+    yawDegrees: 0
+    size: {x: 0.7197382, y: 0.45640445, z: 0.6784313}
+  - name: Rock_03 (30)
+    kind: 0
+    centre: {x: 69.71138, y: 0.010458727, z: 88.60695}
+    yawDegrees: 0
+    size: {x: 0.7197382, y: 0.45640445, z: 0.6784313}
+  - name: Rock_03 (40)
+    kind: 0
+    centre: {x: 52.51138, y: 0.010458727, z: 82.70695}
+    yawDegrees: 0
+    size: {x: 0.7197382, y: 0.45640445, z: 0.6784313}
+  - name: House_04R (3)
+    kind: 0
+    centre: {x: 66.66976, y: 3.5000048, z: 67.927025}
+    yawDegrees: 312.79303
+    size: {x: 10.200001, y: 7.0000095, z: 5.5507407}
+  - name: House_05 (2)
+    kind: 0
+    centre: {x: 61.118443, y: 3.5803294, z: 69.64506}
+    yawDegrees: 312.79303
+    size: {x: 5.723678, y: 7.160659, z: 5.74206}
+  - name: Cover Crate Defender Front
+    kind: 0
+    centre: {x: 65.018265, y: 1.3096044, z: 100.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Defender Left
+    kind: 0
+    centre: {x: 58.818256, y: 1.3096044, z: 110.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Defender Right
+    kind: 0
+    centre: {x: 71.21826, y: 1.3096044, z: 110.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Attacker Front
+    kind: 0
+    centre: {x: 65.018265, y: 1.3096044, z: 94.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Attacker Left
+    kind: 0
+    centre: {x: 58.818256, y: 1.3096044, z: 90.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Attacker Right
+    kind: 0
+    centre: {x: 71.21826, y: 1.3096044, z: 90.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Jersey Barrier (Zone 4 recess)
+    kind: 1
+    centre: {x: 91.320885, y: 0, z: 69.05708}
+    yawDegrees: 239.9998
+    size: {x: 9.789737, y: 1, z: 0.6}
+  wallMaterial: {fileID: 2100000, guid: 0ddd8131a35b6b94aa03ab4a047f0576, type: 2}
+  wallThickness: 0.724
+  wallBottomY: -1
+  wallTopY: 6.036
+  blockMaterial: {fileID: 2100000, guid: 59b7b28c52fde124385cba4a07f9a7fd, type: 2}
+  barrierMaterial: {fileID: 2100000, guid: 3e7d20497c1677746a42854803b8ec1c, type: 2}
+  barrierBlockingBottomY: -1
+  barrierBlockingTopY: 3
+  floorMaterial: {fileID: 2100000, guid: e12a545e5e683ca41b2ddc9370eedb4a, type: 2}
+  floorSize: {x: 220, y: 220}
+  floorThickness: 4

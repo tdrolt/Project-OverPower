@@ -45,6 +45,19 @@ namespace Overpower.Arena
             return new ArenaBounds(points);
         }
 
+        /// <summary>An outline that is already the whole closed polygon (arena step 4's wall-plan tests use any
+        /// outline, real or synthetic, without going through the three-fold symmetry FromSourceOutline assumes).
+        /// Null for fewer than three points: two points make an edge, not an enclosed area.</summary>
+        public static ArenaBounds FromPolygon(IReadOnlyList<Vector2> polygon)
+        {
+            if (polygon == null || polygon.Count < 3)
+                return null;
+            var points = new Vector2[polygon.Count];
+            for (int i = 0; i < polygon.Count; i++)
+                points[i] = polygon[i];
+            return new ArenaBounds(points);
+        }
+
         /// <summary>Metres to the nearest edge: positive inside the outline, negative outside it.</summary>
         public float SignedDistance(Vector2 pointXZ)
         {
