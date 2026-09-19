@@ -960,7 +960,10 @@ namespace Overpower.UI
         /// is clickable, and a world-space raycaster trap has already bitten this project once
         /// (ApplyTheme's comment on HealthBarCanvas). Pools DamageNumberView.PoolSize labels up front
         /// so popping a number is never a GameObject.Instantiate - see that class's own "no allocation
-        /// per hit" comment.</summary>
+        /// per hit" comment. Mark plan step 5: also pools MarkIndicatorView.PoolSize diamonds (the
+        /// shooter's own marks on other enemies) plus ONE more for SelfMarkIndicatorView (Tudor's
+        /// answer 1: the marked player's own diamond over their own head) - same canvas, same pooling
+        /// reasoning, both built from the same theme values so a retune moves every diamond at once.</summary>
         private void BuildHitFeedbackCanvas()
         {
             GameObject canvasGo = new GameObject("Hit Feedback Canvas", typeof(RectTransform));
@@ -991,6 +994,38 @@ namespace Overpower.UI
             }
 
             DamageNumberView.Create(transform, theme, hitFeedbackCanvasRect, labels);
+
+            var markDiamonds = new Image[MarkIndicatorView.PoolSize];
+            for (int i = 0; i < markDiamonds.Length; i++)
+                markDiamonds[i] = BuildMarkDiamond(canvasGo.transform, "Mark Diamond " + i);
+            MarkIndicatorView.Create(transform, theme, hitFeedbackCanvasRect, markDiamonds);
+
+            Image selfDiamond = BuildMarkDiamond(canvasGo.transform, "Self Mark Diamond");
+            SelfMarkIndicatorView.Create(transform, playerHealth, theme, hitFeedbackCanvasRect, selfDiamond);
+        }
+
+        /// <summary>One mark diamond: a plain Image from the theme's own bar sprite, rotated 45 degrees
+        /// (so a square Image reads as a diamond), sized Mark Indicator Size, tinted Mark Colour (the
+        /// same colour a marked hit's own damage number uses - the two teach each other). Shared recipe
+        /// for both MarkIndicatorView's pooled enemy diamonds and SelfMarkIndicatorView's own single
+        /// one - built inactive, centre-pivoted/anchored so LateUpdate can freely reposition it by
+        /// anchoredPosition alone.</summary>
+        private Image BuildMarkDiamond(Transform parent, string name)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(theme.markIndicatorSize, theme.markIndicatorSize);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.localRotation = Quaternion.Euler(0f, 0f, 45f);
+
+            Image image = go.AddComponent<Image>();
+            image.sprite = theme.barSprite;
+            image.color = theme.markColor;
+            image.raycastTarget = false;
+            go.SetActive(false);
+            return image;
         }
 
         /// <summary>2.7b step 8: the warm-up/countdown/host line, top-centre - same construction as BuildToast just

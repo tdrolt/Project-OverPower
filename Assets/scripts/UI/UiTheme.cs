@@ -758,6 +758,23 @@ namespace Overpower.UI
                  "one. Grey on purpose: it is a guess, not a confirmed hit.")]
         public Color blockedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
 
+        [Header("Mark (2026-09-18)")]
+        [Tooltip("Canvas units, the mark diamond's width and height (both the shooter's own diamond over an " +
+                 "enemy, and the marked player's own diamond over their own head - Tudor's answer 1). Its colour " +
+                 "is Mark Colour above, shared with a marked hit's own damage number so the two teach each other.")]
+        public float markIndicatorSize = 22f;
+        [Tooltip("Metres above a player the mark diamond sits at - just above the bar over their head. The same " +
+                 "value anchors both diamonds: the shooter's own, over the enemy they marked, and the marked " +
+                 "player's own, over their own head (Tudor's answer 1) - one number, so retuning it moves both.")]
+        public float markIndicatorAnchorHeight = 3.6f;
+        [Tooltip("Pulses per second while a mark is live; 0 = steady (no pulsing at all, just the plain fade as " +
+                 "the mark runs out).")]
+        public float markIndicatorPulseSpeed = 2.5f;
+        [Range(0f, 1f)]
+        [Tooltip("How faint the diamond gets as the mark runs low, or at the pulse's own dimmest point; 1 turns " +
+                 "off the fade and the pulse both (always full strength while the mark is live at all).")]
+        public float markIndicatorMinAlpha = 0.35f;
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why

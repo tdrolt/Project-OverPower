@@ -228,3 +228,7 @@ MonoBehaviour:
   damageNumberScreenOffset: {x: 50, y: 0}
   blockedText: Blocked
   blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
+  markIndicatorSize: 22
+  markIndicatorAnchorHeight: 3.6
+  markIndicatorPulseSpeed: 2.5
+  markIndicatorMinAlpha: 0.35
