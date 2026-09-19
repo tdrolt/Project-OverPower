@@ -76,18 +76,36 @@ namespace Overpower.UI
         public float barWidth = 590f;
         [Tooltip("Health fill.")] public Color healthColor = new Color(0.39f, 0.8f, 0.25f, 1f);
         [Tooltip("Shield fill.")] public Color shieldColor = new Color(0.25f, 0.6f, 1f, 1f);
-        [Tooltip("Colour of the translucent OVERLAY drawn over a whole bar - both HUD bars (health, armor) and " +
-                 "the shared bar over your head, on every screen - while the Invulnerability shield's immunity is " +
-                 "running (the seconds after it triggers, not while it is only armed). Tudor's override [T]: " +
-                 "\"make it so there's an overlay so it doesn't mess with the shield\" - the health/shield fills " +
-                 "underneath keep their own colours always; this is a separate Image drawn on top of them, so " +
-                 "keep the alpha well under 1 or the fills stop showing through it. Retuned from an earlier 0.45 " +
-                 "(measured to read as a flat, low-saturation grey/blue over a full shield - yellow and blue are " +
-                 "complementary): real screen samples across 0.45-0.8 show a genuine trade-off, higher alpha reads " +
-                 "more clearly yellow/amber but flattens the HUD bars' filled-vs-empty contrast. 0.55 is the lowest " +
-                 "value where the shield-blue backdrop no longer reads grey (hue and, more weakly, saturation both " +
-                 "improve with alpha); pushing higher looks more vividly yellow but starts hiding how full a bar is.")]
-        public Color immuneBarColor = new Color(1f, 0.86f, 0.1f, 0.55f);
+        [Tooltip("FRAME colour drawn around a bar - both HUD bars (health, armor) and the shared bar over your " +
+                 "head, on every screen - while the Invulnerability shield's immunity is running (the seconds " +
+                 "after it triggers, not while it is only armed). Carry-over C, the controller's decision (evidence: " +
+                 "captures/immune-overlay-alpha-montage.png): a translucent WASH over the whole bar could never read " +
+                 "yellow over the blue shield fill - measured across alpha 0.45-0.8, the overhead bar's shield part " +
+                 "stayed a flat grey-beige/khaki, and on the HUD armour bar the FILLED part read PALER than the " +
+                 "EMPTY part (backwards - fuller looked LESS full). Tudor's words: \"an overlay so it doesn't mess " +
+                 "with the shield\" - a frame round the bar's own outside edge never sits over the blue/green fills " +
+                 "at all, so it can run at full alpha (1) and the fills underneath are simply never touched. See " +
+                 "Immune Bar Wash Alpha below for an optional faint reinforcement UNDER the frame, off by default.")]
+        public Color immuneBarColor = new Color(1f, 0.86f, 0.1f, 1f);
+        [Tooltip("Thickness of the yellow frame drawn around a HUD bar (health, armour) while Immune Bar Colour's " +
+                 "look is showing, in HUD canvas units (same unit as Slot Border Width). Four thin edge Images " +
+                 "built in code round the bar's own rect (PlayerHud.BuildImmuneFrame - reuses BuildFrameStrip, the " +
+                 "same recipe a slot's own border already uses) and drawn OVER the fills, not a recolour of either.")]
+        public float immuneBarFrameThickness = 4f;
+        [Tooltip("Thickness of the yellow frame drawn around the bar over a player's head while the look is " +
+                 "showing, in THAT bar's own local RectTransform units (its \"Bar\" rect is 15 x 3 of these, scaled " +
+                 "x0.05 to world metres by HealthBarCanvas's own transform - Multiplayer Player.prefab). Chosen by " +
+                 "capture, not calculation (Rule 6): 0.6 reads clearly yellow at ordinary combat range in the game " +
+                 "camera without swallowing the bar's own fills underneath - see PlayerHealth.EnsureImmuneFrame and " +
+                 "carry-over C's Play Mode captures for the comparison this was picked from.")]
+        public float immuneOverheadFrameThickness = 0.6f;
+        [Range(0f, 1f)]
+        [Tooltip("Alpha of an optional faint WASH covering the whole bar in Immune Bar Colour, UNDER the frame, " +
+                 "while the look is showing. 0 (the default) means no wash at all - frame only. Keep any non-zero " +
+                 "value low: a wash strong enough to read on its own recreates the exact flattening effect that " +
+                 "moved this look from a wash to a frame in the first place (see Immune Bar Colour's own tooltip) - " +
+                 "it is offered only as a subtle reinforcement, never the primary signal.")]
+        public float immuneBarWashAlpha = 0.15f;
         [Tooltip("Overheat fill below the warning threshold.")] public Color overheatColor = new Color(0.95f, 0.62f, 0.15f, 1f);
         [Tooltip("Overheat fill at or above the warning threshold.")] public Color overheatWarningColor = new Color(1f, 0.35f, 0.1f, 1f);
         [Tooltip("Overheat fill while silenced.")] public Color overheatSilencedColor = new Color(0.9f, 0.1f, 0.1f, 1f);

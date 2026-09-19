@@ -72,13 +72,14 @@ namespace Overpower.UI
         private Image armorFill;
         private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
 
-        // Mark plan step 1 (Tudor's override, top-of-plan table #6): the yellow immunity look is a
-        // translucent OVERLAY per bar, not a recolour of healthFill/armorFill - "so it doesn't mess
-        // with the shield". One overlay each, since the HUD's health and armor bars are two separate
-        // tracks (unlike the overhead bar, where shield is drawn over health in the SAME rect - see
-        // PlayerHealth's single overlay there). Both built in BuildUi, both start inactive.
-        private Image healthImmuneOverlay;
-        private Image armorImmuneOverlay;
+        // Carry-over C: the yellow immunity look is a FRAME round each bar (four thin edge Images),
+        // not a recolour of healthFill/armorFill and not a translucent overlay over the whole bar
+        // either (see UiTheme.immuneBarColor's tooltip for why the original overlay was retired - a
+        // wash over blue read grey). One frame each, since the HUD's health and armor bars are two
+        // separate tracks (unlike the overhead bar, where shield is drawn over health in the SAME
+        // rect - see PlayerHealth's single frame there). Both built in BuildUi, both start inactive.
+        private ImmuneFrame healthImmuneFrame;
+        private ImmuneFrame armorImmuneFrame;
         private bool lastImmuneLook;
 
         // ---- built UI: damage numbers (Mark plan step 2) --------------------------------------------
@@ -140,6 +141,41 @@ namespace Overpower.UI
                     right.color = value;
                 }
             }
+        }
+
+        /// <summary>Carry-over C: what carries the yellow "shield immunity" look for ONE HUD bar (the
+        /// health bar or the armour bar) - see UiTheme.immuneBarColor's own tooltip for why this
+        /// replaced a translucent whole-bar overlay (CreateImmuneOverlay, retired): a wash could never
+        /// read yellow over the blue shield fill. `edges` reuses SlotFrame - the exact same four-thin-
+        /// Images-round-a-rect recipe a slot's own border already uses (BuildFrameStrip) - and `wash`
+        /// is the optional faint reinforcement UNDER them (Immune Bar Wash Alpha, 0 by default). Both
+        /// live under one root GameObject so UpdateHealthAndArmor can show/hide the whole look with a
+        /// single SetActive, the same shape the old single-Image overlay had.</summary>
+        private sealed class ImmuneFrame
+        {
+            public readonly GameObject root;
+            private readonly SlotFrame edges;
+            private readonly Image wash;
+
+            public ImmuneFrame(GameObject root, SlotFrame edges, Image wash)
+            {
+                this.root = root;
+                this.edges = edges;
+                this.wash = wash;
+            }
+
+            /// <summary>frameColor is applied at ITS OWN alpha (now 1 by default - Immune Bar Colour);
+            /// washAlpha overrides the wash's own alpha independently, so the two can never fight over
+            /// one shared alpha the way a single Image's colour used to have to serve both jobs.</summary>
+            public void Apply(Color frameColor, float washAlpha)
+            {
+                edges.color = frameColor;
+                Color washColor = frameColor;
+                washColor.a = washAlpha;
+                wash.color = washColor;
+            }
+
+            public void SetShown(bool shown) => root.SetActive(shown);
         }
 
         /// <summary>One slot's widgets. A class, not a struct, purely so BuildSlot/SetPips can mutate
@@ -443,18 +479,18 @@ namespace Overpower.UI
                 lastArmorFraction = armorFraction;
             }
 
-            // Mark plan step 1: both bars turn yellow together, only while PlayerHealth's own clock
-            // says the immunity (not merely the armed trap) is running - see that class's ShowsImmuneLook.
-            // Guarded on change, same as every other write in this method: an unmoving overlay must
-            // not re-touch two Graphics and two GameObjects sixty times a second.
+            // Both bars turn yellow together, only while PlayerHealth's own clock says the immunity
+            // (not merely the armed trap) is running - see that class's ShowsImmuneLook. Guarded on
+            // change, same as every other write in this method: an unmoving frame must not re-touch
+            // its Graphics and GameObjects sixty times a second.
             bool immune = playerHealth.ShowsImmuneLook;
             if (immune != lastImmuneLook)
             {
                 lastImmuneLook = immune;
-                healthImmuneOverlay.color = theme.immuneBarColor;
-                armorImmuneOverlay.color = theme.immuneBarColor;
-                healthImmuneOverlay.gameObject.SetActive(immune);
-                armorImmuneOverlay.gameObject.SetActive(immune);
+                healthImmuneFrame.Apply(theme.immuneBarColor, theme.immuneBarWashAlpha);
+                armorImmuneFrame.Apply(theme.immuneBarColor, theme.immuneBarWashAlpha);
+                healthImmuneFrame.SetShown(immune);
+                armorImmuneFrame.SetShown(immune);
             }
         }
 
@@ -900,11 +936,11 @@ namespace Overpower.UI
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
             // armorExtentRect.parent is the armor bar's own TRACK root (BuildArmorBar parents the
-            // extent, which parents Fill, under it) - the overlay goes there, not on the extent
+            // extent, which parents Fill, under it) - the frame goes there, not on the extent
             // itself, so it covers the WHOLE bar rather than shrinking with a part-empty capacity.
-            armorImmuneOverlay = CreateImmuneOverlay(armorExtentRect.parent);
+            armorImmuneFrame = BuildImmuneFrame(armorExtentRect.parent);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
-            healthImmuneOverlay = CreateImmuneOverlay(healthFill.transform.parent);
+            healthImmuneFrame = BuildImmuneFrame(healthFill.transform.parent);
 
             BuildGoldCorner(canvasGo.transform);
             BuildToast(canvasGo.transform);
@@ -1090,24 +1126,50 @@ namespace Overpower.UI
             return fillImg;
         }
 
-        /// <summary>Mark plan step 1: the yellow immunity overlay for ONE bar - a plain Image the
-        /// size of the whole bar (not the fill's own 2px-inset rect), added as the LAST child of
-        /// barRoot so it always draws over whatever fill(s) already sit there. Starts inactive;
-        /// UpdateHealthAndArmor is the only thing that ever shows it.</summary>
-        private static Image CreateImmuneOverlay(Transform barRoot)
+        /// <summary>Carry-over C: the yellow immunity FRAME for ONE bar - four thin edge Images round
+        /// the whole bar's rect (not the fill's own 2px-inset rect), reusing BuildFrameStrip (the same
+        /// recipe a slot's own border already uses), plus an optional faint wash under them. All built
+        /// under one root, added as the LAST child of barRoot so the frame always draws over whatever
+        /// fill(s) already sit there. Starts inactive; UpdateHealthAndArmor is the only thing that ever
+        /// shows it. Replaces CreateImmuneOverlay (a single translucent Image covering the whole bar) -
+        /// see UiTheme.immuneBarColor's tooltip for why that read grey over the blue shield fill.</summary>
+        private ImmuneFrame BuildImmuneFrame(Transform barRoot)
         {
-            var overlayGo = new GameObject("Immune Overlay", typeof(RectTransform));
-            overlayGo.transform.SetParent(barRoot, false);
-            RectTransform rect = overlayGo.GetComponent<RectTransform>();
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            GameObject root = new GameObject("Immune Frame", typeof(RectTransform));
+            root.transform.SetParent(barRoot, false);
+            RectTransform rootRect = root.GetComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
 
-            Image overlay = overlayGo.AddComponent<Image>();
-            overlay.raycastTarget = false;
-            overlayGo.SetActive(false);
-            return overlay;
+            // Built FIRST (so it sits UNDER the frame edges below in draw order) - a non-zero Immune
+            // Bar Wash Alpha must never paint over the frame's own crisp edge.
+            GameObject washGo = new GameObject("Wash", typeof(RectTransform));
+            washGo.transform.SetParent(root.transform, false);
+            RectTransform washRect = washGo.GetComponent<RectTransform>();
+            washRect.anchorMin = Vector2.zero;
+            washRect.anchorMax = Vector2.one;
+            washRect.offsetMin = Vector2.zero;
+            washRect.offsetMax = Vector2.zero;
+            Image wash = washGo.AddComponent<Image>();
+            wash.raycastTarget = false;
+
+            float t = theme.immuneBarFrameThickness;
+            Image frameTop = BuildFrameStrip(root.transform, "Frame Top", new Vector2(0f, 1f), new Vector2(1f, 1f),
+                new Vector2(0.5f, 1f), new Vector2(0f, t));
+            Image frameBottom = BuildFrameStrip(root.transform, "Frame Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f),
+                new Vector2(0.5f, 0f), new Vector2(0f, t));
+            // Left/Right inset vertically by the frame's own thickness top and bottom, same reasoning
+            // as BuildSlot's own Frame Left/Right (2026-09-18 review fix): without the inset every
+            // corner would carry two strips stacked on top of each other.
+            Image frameLeft = BuildFrameStrip(root.transform, "Frame Left", new Vector2(0f, 0f), new Vector2(0f, 1f),
+                new Vector2(0f, 0.5f), new Vector2(t, -2f * t));
+            Image frameRight = BuildFrameStrip(root.transform, "Frame Right", new Vector2(1f, 0f), new Vector2(1f, 1f),
+                new Vector2(1f, 0.5f), new Vector2(t, -2f * t));
+
+            root.SetActive(false);
+            return new ImmuneFrame(root, new SlotFrame(frameTop, frameBottom, frameLeft, frameRight), wash);
         }
 
         /// <summary>A thin vertical mark on the overheat track showing exactly where the warning

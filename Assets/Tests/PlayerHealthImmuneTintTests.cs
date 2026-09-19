@@ -9,12 +9,17 @@ using Overpower.UI;
 namespace Overpower.Tests
 {
     /// <summary>Mark plan step 1, Tudor's override (the table at the top of the plan, answer 6):
-    /// "make it so there's an overlay so it doesn't mess with the shield" - the yellow look is a
-    /// translucent OVERLAY drawn over the shared health/shield rect, not a recolour of either fill.
-    /// These tests assert the overlay switches on with Immune Bar Colour and off again, and that
-    /// healthFillImage/shieldFillImage never move off the theme's own Health/Shield Colour regardless -
-    /// the overlay is the ONLY thing that changes. Same rig as PlayerHealthOverheadBarTests, plus a
-    /// real UiTheme instance (Awake needs one to theme the overhead bar at all).</summary>
+    /// "make it so there's an overlay so it doesn't mess with the shield". Carry-over C supersedes the
+    /// ORIGINAL look (a translucent overlay over the whole bar): a montage of real screen captures
+    /// (captures/immune-overlay-alpha-montage.png) showed a wash could not read yellow over the blue
+    /// shield fill at any usable alpha, and on the HUD armour bar the FILLED part read PALER than the
+    /// EMPTY part - backwards. The look is now a solid yellow FRAME (four thin edge Images) round the
+    /// shared health/shield rect, plus an optional faint WASH under it (off by default). These tests
+    /// assert the frame switches on with Immune Bar Colour and off again, that a non-zero wash alpha
+    /// tints the wash and a zero one leaves it invisible, and that healthFillImage/shieldFillImage
+    /// never move off the theme's own Health/Shield Colour regardless - the frame (and wash) are the
+    /// ONLY things that change. Same rig as PlayerHealthOverheadBarTests, plus a real UiTheme instance
+    /// (Awake needs one to theme the overhead bar at all).</summary>
     public class PlayerHealthImmuneTintTests
     {
         private GameObject playerGo;
@@ -47,7 +52,9 @@ namespace Overpower.Tests
             theme.barSprite = barSprite;
             theme.healthColor = new Color(0.1f, 0.9f, 0.1f, 1f);
             theme.shieldColor = new Color(0.1f, 0.1f, 0.9f, 1f);
-            theme.immuneBarColor = new Color(1f, 0.86f, 0.1f, 0.45f);
+            theme.immuneBarColor = new Color(1f, 0.86f, 0.1f, 1f);
+            theme.immuneOverheadFrameThickness = 0.6f;
+            theme.immuneBarWashAlpha = 0f;
             SetField("theme", theme);
 
             // gameplayConfig/armorConfig are deliberately left unassigned (as PlayerHealthOverheadBarTests
@@ -86,22 +93,46 @@ namespace Overpower.Tests
             awake.Invoke(health, null);
         }
 
-        private Image FindOverlay()
+        /// <summary>Carry-over C: the private nested ImmuneFrame instance PlayerHealth builds lazily -
+        /// reached the same way FindOverlay used to reach the old single overlay Image, just one hop
+        /// further in (the frame object itself, then one of ITS fields).</summary>
+        private object FindFrame()
         {
-            FieldInfo field = typeof(PlayerHealth).GetField("overheadImmuneOverlay", BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.NotNull(field, "overheadImmuneOverlay");
-            return (Image)field.GetValue(health);
+            FieldInfo field = typeof(PlayerHealth).GetField("overheadImmuneFrame", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(field, "overheadImmuneFrame");
+            object frame = field.GetValue(health);
+            Assert.NotNull(frame, "the frame is built the first time it's actually needed");
+            return frame;
+        }
+
+        private GameObject FindFrameRoot()
+        {
+            object frame = FindFrame();
+            FieldInfo rootField = frame.GetType().GetField("root", BindingFlags.Public | BindingFlags.Instance);
+            Assert.NotNull(rootField, "ImmuneFrame.root");
+            return (GameObject)rootField.GetValue(frame);
+        }
+
+        /// <summary>fieldName is one of "top", "bottom", "left", "right" (the four edge strips) or
+        /// "wash" (the optional faint reinforcement under them) - see PlayerHealth.ImmuneFrame.</summary>
+        private Image FindFramePart(string fieldName)
+        {
+            object frame = FindFrame();
+            FieldInfo partField = frame.GetType().GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(partField, fieldName);
+            return (Image)partField.GetValue(frame);
         }
 
         [Test]
-        public void ShowImmuneLookActivatesTheOverlayWithTheImmuneColourAndLeavesTheFillsAlone()
+        public void ShowImmuneLookActivatesTheFrameWithTheImmuneColourAndLeavesTheFillsAlone()
         {
             health.ShowImmuneLook(4f);
 
-            Image overlay = FindOverlay();
-            Assert.NotNull(overlay, "the overlay is built the first time it's actually needed");
-            Assert.IsTrue(overlay.gameObject.activeSelf);
-            Assert.AreEqual(theme.immuneBarColor, overlay.color);
+            Assert.IsTrue(FindFrameRoot().activeSelf);
+            Assert.AreEqual(theme.immuneBarColor, FindFramePart("top").color, "the frame's four edges all carry Immune Bar Colour");
+            Assert.AreEqual(theme.immuneBarColor, FindFramePart("bottom").color);
+            Assert.AreEqual(theme.immuneBarColor, FindFramePart("left").color);
+            Assert.AreEqual(theme.immuneBarColor, FindFramePart("right").color);
 
             Assert.AreEqual(theme.healthColor, healthFill.color, "the health fill must stay untouched");
             Assert.AreEqual(theme.shieldColor, shieldFill.color, "the shield fill must stay untouched");
@@ -109,16 +140,37 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ClearImmuneLookHidesTheOverlayAndTheFillsStayUntouched()
+        public void ClearImmuneLookHidesTheFrameAndTheFillsStayUntouched()
         {
             health.ShowImmuneLook(4f);
             health.ClearImmuneLook();
 
-            Image overlay = FindOverlay();
-            Assert.IsFalse(overlay.gameObject.activeSelf);
+            Assert.IsFalse(FindFrameRoot().activeSelf);
             Assert.AreEqual(theme.healthColor, healthFill.color);
             Assert.AreEqual(theme.shieldColor, shieldFill.color);
             Assert.IsFalse(health.ShowsImmuneLook);
+        }
+
+        [Test]
+        public void AZeroWashAlphaLeavesTheWashInvisible()
+        {
+            theme.immuneBarWashAlpha = 0f;
+            health.ShowImmuneLook(4f);
+
+            Assert.AreEqual(0f, FindFramePart("wash").color.a, 1e-4f, "off by default - carry-over C, Immune Bar Wash Alpha");
+        }
+
+        [Test]
+        public void ANonZeroWashAlphaTintsTheWashInImmuneBarColourAtThatAlpha()
+        {
+            theme.immuneBarWashAlpha = 0.15f;
+            health.ShowImmuneLook(4f);
+
+            Color wash = FindFramePart("wash").color;
+            Assert.AreEqual(theme.immuneBarColor.r, wash.r, 1e-4f);
+            Assert.AreEqual(theme.immuneBarColor.g, wash.g, 1e-4f);
+            Assert.AreEqual(theme.immuneBarColor.b, wash.b, 1e-4f);
+            Assert.AreEqual(0.15f, wash.a, 1e-4f, "the wash's OWN alpha, independent of Immune Bar Colour's own alpha (now 1)");
         }
     }
 }

@@ -62,13 +62,49 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     // visible over a corpse. See SetOverheadBarVisible.
     private GameObject overheadBarRoot;
 
-    // Mark plan step 1 (Tudor's override, top-of-plan table #6): the yellow "shield immunity" look is
-    // a translucent OVERLAY on top of the shared health/shield rect, not a recolour of either fill -
-    // "so it doesn't mess with the shield". Built lazily (EnsureImmuneOverlay) the first time it is
-    // actually needed, as the LAST child of overheadBarRoot, copying healthFillImage's own rect: the
-    // shield fill already draws in that identical rect (Task 6 [T], full armour over full health), so
-    // one overlay covers both. No prefab change - this Image exists only at runtime.
-    private Image overheadImmuneOverlay;
+    // Carry-over C: the yellow "shield immunity" look is a FRAME (four thin edge Images) round the
+    // shared health/shield rect, not a recolour of either fill and not a translucent whole-bar overlay
+    // either - "so it doesn't mess with the shield" (Tudor); a wash over the blue shield fill read
+    // grey (see UiTheme.immuneBarColor's tooltip and captures/immune-overlay-alpha-montage.png). Built
+    // lazily (EnsureImmuneFrame) the first time it is actually needed, as the LAST child of
+    // overheadBarRoot, copying healthFillImage's own rect: the shield fill already draws in that
+    // identical rect (Task 6 [T], full armour over full health), so one frame covers both. No prefab
+    // change - every Image here exists only at runtime.
+    private ImmuneFrame overheadImmuneFrame;
+
+    /// <summary>Carry-over C: the overhead bar's own immune-look frame - four thin edge Images round
+    /// the shared health/shield rect (the same "four strips round a rect" shape PlayerHud.ImmuneFrame
+    /// uses for the HUD bars, kept as a SEPARATE small class here rather than shared: the two build in
+    /// different coordinate spaces - HUD canvas units there, THIS bar's own local RectTransform units
+    /// here, see UiTheme.immuneOverheadFrameThickness) plus an optional faint wash under them. One
+    /// root GameObject so ApplyImmuneLook can show/hide the whole look with a single SetActive.</summary>
+    private sealed class ImmuneFrame
+    {
+        public readonly GameObject root;
+        private readonly Image top, bottom, left, right, wash;
+
+        public ImmuneFrame(GameObject root, Image top, Image bottom, Image left, Image right, Image wash)
+        {
+            this.root = root;
+            this.top = top;
+            this.bottom = bottom;
+            this.left = left;
+            this.right = right;
+            this.wash = wash;
+        }
+
+        /// <summary>frameColor is applied at ITS OWN alpha (now 1 by default - Immune Bar Colour);
+        /// washAlpha overrides the wash's own alpha independently.</summary>
+        public void Apply(Color frameColor, float washAlpha)
+        {
+            top.color = bottom.color = left.color = right.color = frameColor;
+            Color washColor = frameColor;
+            washColor.a = washAlpha;
+            wash.color = washColor;
+        }
+
+        public void SetShown(bool shown) => root.SetActive(shown);
+    }
     private readonly ImmuneLookClock immuneLook = new ImmuneLookClock();
     // Latches ApplyImmuneLook's last value so a remote copy's Update tick (below) and an owner's
     // ShowImmuneLook/ClearImmuneLook calls never redo the SetActive/color work when nothing changed.
@@ -171,41 +207,88 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         if (overheadBarRoot != null)
             overheadBarRoot.SetActive(visible);
-        // No separate hide for overheadImmuneOverlay: it is a CHILD of overheadBarRoot, so
+        // No separate hide for overheadImmuneFrame: it is a CHILD of overheadBarRoot, so
         // SetActive(false) above already takes it out of the hierarchy with everything else on the
-        // bar. Review fix (steps 1-2): the overlay itself has no Update - PlayerHealth's own Update
-        // (below) is what ticks the immune-look expiry, and it lives on the PLAYER root, which stays
-        // active the whole time (only the bar child is toggled), so it keeps running and the overlay's
-        // colour/active state is already correct by the time the bar - and the overlay under it -
-        // reappear.
+        // bar. Review fix (steps 1-2), still true of the frame (carry-over C): the frame itself has no
+        // Update - PlayerHealth's own Update (below) is what ticks the immune-look expiry, and it
+        // lives on the PLAYER root, which stays active the whole time (only the bar child is toggled),
+        // so it keeps running and the frame's colour/active state is already correct by the time the
+        // bar - and the frame under it - reappear.
     }
 
-    /// <summary>Builds the immunity overlay the first time ApplyImmuneLook actually needs one - never
+    /// <summary>Builds the immunity frame the first time ApplyImmuneLook actually needs one - never
     /// eagerly in Awake, since most lives never trigger the shield at all. Copies healthFillImage's
     /// own RectTransform exactly (anchors, offsets, pivot) rather than stretching to fill
     /// overheadBarRoot, so it lines up with the fills pixel-for-pixel even if a future prefab edit
-    /// insets them. Starts inactive; ApplyImmuneLook is the only thing that ever shows it.</summary>
-    private void EnsureImmuneOverlay()
+    /// insets them. Starts inactive; ApplyImmuneLook is the only thing that ever shows it. Replaces
+    /// EnsureImmuneOverlay (a single translucent Image covering the whole bar) - carry-over C, see
+    /// UiTheme.immuneBarColor's tooltip for why that read grey over the blue shield fill.</summary>
+    private void EnsureImmuneFrame()
     {
-        if (overheadImmuneOverlay != null || overheadBarRoot == null || healthFillImage == null)
+        if (overheadImmuneFrame != null || overheadBarRoot == null || healthFillImage == null)
             return;
 
-        var overlayGo = new GameObject("Immune Overlay", typeof(RectTransform));
-        overlayGo.transform.SetParent(overheadBarRoot.transform, false);
+        var frameGo = new GameObject("Immune Frame", typeof(RectTransform));
+        frameGo.transform.SetParent(overheadBarRoot.transform, false);
 
-        RectTransform overlayRect = overlayGo.GetComponent<RectTransform>();
+        RectTransform frameRect = frameGo.GetComponent<RectTransform>();
         RectTransform sourceRect = healthFillImage.rectTransform;
-        overlayRect.anchorMin = sourceRect.anchorMin;
-        overlayRect.anchorMax = sourceRect.anchorMax;
-        overlayRect.offsetMin = sourceRect.offsetMin;
-        overlayRect.offsetMax = sourceRect.offsetMax;
-        overlayRect.pivot = sourceRect.pivot;
+        frameRect.anchorMin = sourceRect.anchorMin;
+        frameRect.anchorMax = sourceRect.anchorMax;
+        frameRect.offsetMin = sourceRect.offsetMin;
+        frameRect.offsetMax = sourceRect.offsetMax;
+        frameRect.pivot = sourceRect.pivot;
 
-        Image overlay = overlayGo.AddComponent<Image>();
-        overlay.raycastTarget = false;
-        overlayGo.SetActive(false);
+        // Built FIRST (so it sits UNDER the frame edges below in draw order) - a non-zero Immune Bar
+        // Wash Alpha must never paint over the frame's own crisp edge.
+        Image wash = BuildFullRectImage(frameGo.transform, "Wash");
 
-        overheadImmuneOverlay = overlay;
+        float t = theme != null ? theme.immuneOverheadFrameThickness : 0.6f;
+        Image top = BuildFrameEdge(frameGo.transform, "Frame Top", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, t));
+        Image bottom = BuildFrameEdge(frameGo.transform, "Frame Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, t));
+        // Left/Right inset vertically by the frame's own thickness top and bottom, same reasoning as
+        // PlayerHud.BuildSlot's own Frame Left/Right: without the inset every corner would carry two
+        // strips stacked on top of each other.
+        Image left = BuildFrameEdge(frameGo.transform, "Frame Left", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(t, -2f * t));
+        Image right = BuildFrameEdge(frameGo.transform, "Frame Right", new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(1f, 0.5f), new Vector2(t, -2f * t));
+
+        frameGo.SetActive(false);
+        overheadImmuneFrame = new ImmuneFrame(frameGo, top, bottom, left, right, wash);
+    }
+
+    /// <summary>A plain Image stretched to fill its parent's whole rect - the wash's own shape.</summary>
+    private static Image BuildFullRectImage(Transform parent, string name)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        RectTransform rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        Image img = go.AddComponent<Image>();
+        img.raycastTarget = false;
+        return img;
+    }
+
+    /// <summary>One thin edge strip of the overhead frame - the same shape PlayerHud.BuildFrameStrip
+    /// builds for a HUD bar/slot border, kept separate here since this class has no PlayerHud instance
+    /// to call it on. anchorMin/anchorMax stretch the strip along the edge it sits on (equal min/max on
+    /// one axis pins it to that edge with zero size, which sizeDelta on that axis then supplies); the
+    /// other axis's anchors already span the full rect, so its sizeDelta stays 0.</summary>
+    private static Image BuildFrameEdge(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 sizeDelta)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        RectTransform rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.pivot = pivot;
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = sizeDelta;
+        Image img = go.AddComponent<Image>();
+        img.raycastTarget = false;
+        return img;
     }
 
     /// <summary>The one source for "immune right now" on the overhead bar - driven by
@@ -228,10 +311,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         ApplyImmuneLook(false);
     }
 
-    /// <summary>Tudor's override on the Mark plan (top-of-plan table, #6): toggles the OVERLAY only -
-    /// healthFillImage/shieldFillImage are never touched here, so they always keep whatever
-    /// ApplyTheme set them to. Guarded on the latched value so a remote copy's per-frame Update check
-    /// (below) and repeated ShowImmuneLook calls while already on do no redundant work.</summary>
+    /// <summary>Tudor's override on the Mark plan (top-of-plan table, #6), now a FRAME (carry-over C) -
+    /// toggles the FRAME only. healthFillImage/shieldFillImage are never touched here, so they always
+    /// keep whatever ApplyTheme set them to. Guarded on the latched value so a remote copy's per-frame
+    /// Update check (below) and repeated ShowImmuneLook calls while already on do no redundant work.</summary>
     private void ApplyImmuneLook(bool on)
     {
         if (on == immuneLookApplied)
@@ -241,12 +324,12 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (theme == null)
             return;
 
-        EnsureImmuneOverlay();
-        if (overheadImmuneOverlay == null)
+        EnsureImmuneFrame();
+        if (overheadImmuneFrame == null)
             return;
 
-        overheadImmuneOverlay.color = theme.immuneBarColor;
-        overheadImmuneOverlay.gameObject.SetActive(on);
+        overheadImmuneFrame.Apply(theme.immuneBarColor, theme.immuneBarWashAlpha);
+        overheadImmuneFrame.SetShown(on);
     }
 
     /// <summary>Applies the theme's bar sprite and colours to the three overhead-bar Images once,
