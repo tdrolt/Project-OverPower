@@ -46,13 +46,15 @@ namespace Overpower.Arena
         [Tooltip("The crown on top of the tower - painted with the owner's colour, like the shown caps.")]
         public Renderer crown;
 
-        [Tooltip("Shaft radius, in metres, for every tier except the capital (the plan's 0.35 m). The cap is drawn " +
-                 "wider automatically, in the same proportion as the plan's 0.35 m shaft / 0.45 m cap.")]
+        // The plan's starting value (Decision 6, 2026-09-18): 0.35 m shaft / 0.45 m cap. The cap above is drawn
+        // wider automatically, in that same proportion, whichever shaft radius is showing.
+        [Tooltip("Shaft radius, in metres, for every tier except the capital. The cap is drawn wider automatically, " +
+                 "in a fixed proportion to this radius.")]
         public float columnRadius = 0.35f;
 
-        [Tooltip("Shaft radius, in metres, for the capital's single column (Tudor, 2026-09-19: \"the capital gets " +
-                 "1 big column\") - about 1.7x columnRadius. The cap keeps the same shaft:cap proportion as every " +
-                 "other tier's columns.")]
+        // Tudor, 2026-09-19: "the capital gets 1 big column" - about 1.7x columnRadius, so it reads as the grandest.
+        [Tooltip("Shaft radius, in metres, for the capital's single column - bigger than columnRadius, so it reads " +
+                 "as the grandest. The cap keeps the same shaft:cap proportion as every other tier's columns.")]
         public float capitalColumnRadius = 0.6f;
 
         private MaterialPropertyBlock block;
