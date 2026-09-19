@@ -247,6 +247,10 @@ namespace Overpower.EditorTools.Telemetry
         public float? Distance;
         public float Vulnerable;
         public bool Overpower;
+        /// <summary>Mark plan step 6: 0 (no key on the raw line - a non-marking hit) / 1 (Applied) / 2
+        /// (Cashed). Read with a default of 0, matching every hit line written before this field
+        /// existed.</summary>
+        public int Mark;
         /// <summary>Task T7: 1 or 2, from this hit's own t.</summary>
         public int Phase = 1;
     }
@@ -274,6 +278,13 @@ namespace Overpower.EditorTools.Telemetry
         public int Kills;
         public double? MeanDistance;
         public double? MedianDistance;
+        /// <summary>Mark plan step 6: how many hits from THIS weapon placed a fresh mark (HitRow.Mark
+        /// == 1) in the window. Answers "how often do players cash the mark?" alongside MarksCashed
+        /// below (Decision 18).</summary>
+        public int MarksPlaced;
+        /// <summary>Mark plan step 6: how many hits from THIS weapon cashed an existing mark in
+        /// (HitRow.Mark == 2) in the window.</summary>
+        public int MarksCashed;
     }
 
     public sealed class AbilityRow

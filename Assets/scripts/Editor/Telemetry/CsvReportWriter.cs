@@ -146,27 +146,32 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WriteHits(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "hits.csv"),
+            // mark (mark plan step 6): appended at the END, found by header name like every other
+            // column here - 0 for a non-marking hit (or any hit line written before this step existed).
             new[] { "t", "attacker", "attackerTeam", "victim", "victimTeam", "weapon", "ability", "source",
-                    "raw", "armor", "healthLost", "lethal", "distance", "vulnerable", "overpower", "phase" },
+                    "raw", "armor", "healthLost", "lethal", "distance", "vulnerable", "overpower", "phase", "mark" },
             t.Hits.Select(r => new[]
             {
                 N(r.T), N(r.Attacker), N(r.AttackerTeam), N(r.Victim), N(r.VictimTeam), N(r.Weapon), N(r.Ability), r.Source,
                 N(r.Raw), N(r.Armor), N(r.HealthLost), N(r.Lethal), r.Distance.HasValue ? N(r.Distance.Value) : "",
-                N(r.Vulnerable), N(r.Overpower), N(r.Phase),
+                N(r.Vulnerable), N(r.Overpower), N(r.Phase), N(r.Mark),
             }));
 
         private static void WriteWeapons(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "weapons.csv"),
             // splashHits (opus review item 6): counted separately from hits/accuracy, which are
             // Projectile-source only - a rocket's own splash falloff no longer inflates accuracy past 100%.
+            // marksPlaced/marksCashed (mark plan step 6): appended at the END, found by header name.
             new[] { "weapon", "timeEquippedSeconds", "pulls", "projectiles", "hits", "splashHits", "accuracy",
-                    "damageRaw", "armorDamage", "healthDamage", "damagePerEquippedMinute", "kills", "meanDistance", "medianDistance" },
+                    "damageRaw", "armorDamage", "healthDamage", "damagePerEquippedMinute", "kills", "meanDistance", "medianDistance",
+                    "marksPlaced", "marksCashed" },
             t.Weapons.Select(r => new[]
             {
                 N(r.WeaponId), N(r.TimeEquippedSeconds), N(r.Pulls), N(r.Projectiles), N(r.Hits), N(r.SplashHits), N(r.Accuracy),
                 N(r.DamageRaw), N(r.ArmorDamage), N(r.HealthDamage), N(r.DamagePerEquippedMinute), N(r.Kills),
                 r.MeanDistance.HasValue ? N(r.MeanDistance.Value) : "",
                 r.MedianDistance.HasValue ? N(r.MedianDistance.Value) : "",
+                N(r.MarksPlaced), N(r.MarksCashed),
             }));
 
         private static void WriteAbilities(ReportTables t, string folder) => WriteCsv(

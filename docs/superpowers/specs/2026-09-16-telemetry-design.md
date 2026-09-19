@@ -81,7 +81,7 @@ In the Editor the commit is read from `.git`. Builds get it written into a Resou
 | `shots` | shooter, every sample interval (summed per weapon) | weapon id, trigger pulls, projectiles spawned (pellets and burst rounds counted singly) |
 | `cast` | caster, on a successful cast | slot, ability id, x, z |
 | `dot` | victim, **every sample interval, summed** (added in T3 review: burn ticks every frame, one `hit` line each would be ~120 lines/s per burning victim) | per (attacker actor/team, weapon, ability, source): tick count, raw/armor/health sums, first/last t. Continuous source: `Burn` (status burn, fire field). A lethal burn tick flushes its bucket and is also logged as a normal `hit` |
-| `hit` | victim, per applied hit (friendly-fire blocks excluded; **continuous `Burn` damage goes to `dot` instead**) | attacker actor and team, weapon id, **ability id**, damage source, raw amount, armor absorbed, health lost, lethal, distance to the attacker's replicated position, vulnerability active, invulnerable, OverPower active on victim |
+| `hit` | victim, per applied hit (friendly-fire blocks excluded; **continuous `Burn` damage goes to `dot` instead**) | attacker actor and team, weapon id, **ability id**, damage source, raw amount, armor absorbed, health lost, lethal, distance to the attacker's replicated position, vulnerability active, invulnerable, OverPower active on victim, **mark (1 placed / 2 cashed, mark plan step 6 - present only when non-zero)** |
 | `status` | victim, when applied | effect (stun/slow/vulnerability/knockback/burn), source actor, ability id, duration or magnitude |
 | `death` | victim | killer, assists (from the existing `DamageCreditLedger`, same assist window), killing weapon/ability, x, z, time alive, unspent gold, full loadout |
 | `respawn` | owner | x, z, time dead |
@@ -146,8 +146,8 @@ events into tables. `CsvWriter` and `HtmlReportWriter` only format those tables,
 | `captures.csv` | capture attempt: zone, team, start, end, outcome, duration, players |
 | `purchases.csv` | purchase or refund: time, player, team, category, item, price, balance after, zone |
 | `shop_blocked.csv` | refused click: time, player, item, reason, shortfall |
-| `hits.csv` | hit, raw |
-| `weapons.csv` | weapon state (all 13): time equipped, trigger pulls, projectiles, hits, accuracy, damage, damage per equipped minute, armor vs health split, kills, mean and median hit distance |
+| `hits.csv` | hit, raw, **mark (mark plan step 6)** |
+| `weapons.csv` | weapon state (all 13): time equipped, trigger pulls, projectiles, hits, accuracy, damage, damage per equipped minute, armor vs health split, kills, mean and median hit distance, **marks placed and cashed (mark plan step 6)** |
 | `abilities.csv` | ability: casts, damage, kills, status applied (count and seconds) |
 | `players.csv` | player: kills, deaths, assists, damage dealt/taken, gold earned by source, gold spent, time alive, time in own/enemy/neutral zones, healing |
 | `deaths.csv` | death: time, victim, killer, assists, cause, x, z, unspent gold, loadout |
@@ -225,6 +225,18 @@ them appear in the report. Phase 1 and Phase 2 both start at the live moment, ne
 seconds the warm-up lasted instead. A match that never goes live has nothing else to show - every table is empty, and
 the header warns instead. Legacy logs (recorded before this feature - no `phase` 0 anchor at all) are read exactly as
 before: Phase 1 still starts at 0.
+
+### The Mark (mark step 6, 2026-09-19)
+
+`hit` lines gain one field, `mark`: 1 when that hit placed a fresh mark, 2 when it cashed an existing one
+in (a cashed hit's own `raw` already includes the +50% - Decision 5/18 of the mark plan). It is written
+only when the hit actually touched a mark, so a non-marking weapon's hit line, a self/teammate/shielded
+hit, and every hit logged before this step existed all stay byte-for-byte identical. `weapons.csv` and
+the HTML weapon table gain `marksPlaced`/`marksCashed` ("Marks cashed" next to Accuracy), counted per
+weapon from the same window-filtered `hits` rows every other weapon stat already comes from - **a
+warm-up hit's mark is excluded from the match window exactly like every other stat** (Warm-up (2.7b)
+above): `mark` is a field on the existing `hit` event, not a new event, so it inherits that event's own
+window filter with no extra code.
 
 ## Error handling
 

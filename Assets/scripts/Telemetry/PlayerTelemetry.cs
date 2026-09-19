@@ -906,6 +906,11 @@ namespace Overpower.Telemetry
             // could never read true; a dummy never checks invulnerability at all, so its own reading
             // would not mean "this hit was blocked" either. See TelemetryKeys.Invulnerable's comment.
             line.Bool(TelemetryKeys.OverpowerActive, overpowerActive);
+            // Mark plan step 6 (Decision 18): appended LAST, and only when this hit actually touched a
+            // mark, so every hit line from a non-marking weapon (or predating mark step 4) is written
+            // byte-identical to before this line existed.
+            if (result.Mark != MarkOutcome.None)
+                line.Int(TelemetryKeys.Mark, (int)result.Mark);
             MatchTelemetry.Instance.Log(line);
         }
 

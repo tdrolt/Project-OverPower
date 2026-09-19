@@ -24,7 +24,7 @@ namespace Overpower.Tests
             var tables = new ReportTables();
             tables.Players.Add(new PlayerRow { Actor = 1, Nick = "Smith, \"Ace\" John", Team = 0 });
             tables.Purchases.Add(new PurchaseRow { T = 1.5, Actor = 1, Nick = "Editor", Team = 0, Kind = "purchase", Category = "weapon", ItemId = 2, Amount = 1200, BalanceAfter = 300, Zone = 0, Free = false });
-            tables.Weapons.Add(new WeaponRow { WeaponId = 5, Hits = 1, SplashHits = 2 });
+            tables.Weapons.Add(new WeaponRow { WeaponId = 5, Hits = 1, SplashHits = 2, MarksPlaced = 3, MarksCashed = 1 });
             return tables;
         }
 
@@ -88,6 +88,34 @@ namespace Overpower.Tests
                 string[] row = lines[1].Split(',');
                 Assert.AreEqual("1", row[hitsIndex]);
                 Assert.AreEqual("2", row[splashIndex]);
+            }
+            finally
+            {
+                Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
+        public void WeaponsCsvHasMarkColumnsAtTheEnd()
+        {
+            string folder = Path.Combine(Path.GetTempPath(), "CsvReportWriterTests_" + System.Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
+            try
+            {
+                CsvReportWriter.Write(MinimalTables(), folder);
+
+                string[] lines = File.ReadAllLines(Path.Combine(folder, "csv", "weapons.csv"));
+                string[] header = lines[0].Split(',');
+                // "At the end": both new columns are the LAST two header cells - CsvReportWriterTests
+                // finds columns by header name, so appending never breaks an older reader that also does.
+                Assert.AreEqual("marksPlaced", header[header.Length - 2]);
+                Assert.AreEqual("marksCashed", header[header.Length - 1]);
+
+                int placedIndex = System.Array.IndexOf(header, "marksPlaced");
+                int cashedIndex = System.Array.IndexOf(header, "marksCashed");
+                string[] row = lines[1].Split(',');
+                Assert.AreEqual("3", row[placedIndex]);
+                Assert.AreEqual("1", row[cashedIndex]);
             }
             finally
             {

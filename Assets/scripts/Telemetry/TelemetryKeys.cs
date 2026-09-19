@@ -164,6 +164,13 @@ namespace Overpower.Telemetry
         public const string Raw = "raw";
         public const string ArmorAbsorbed = "arm";
         public const string Lethal = "lethal";
+        /// <summary>Mark plan step 6: `hit`'s own mark outcome - 1 (MarkOutcome.Applied) placed a mark,
+        /// 2 (MarkOutcome.Cashed) cashed one in. Written only when the hit actually touched a mark
+        /// (Decision 18), so every hit line from a non-marking weapon, self/teammate/shielded hits, or
+        /// anything predating mark step 4 stays byte-identical. A cashed hit's own Raw already includes
+        /// the +50% (MarkLedger.ScaledAmount runs before DamageResolver, so Raw reports what actually
+        /// landed) - this key exists to say WHY that hit was bigger, not to hold a second amount.</summary>
+        public const string Mark = "mark";
         public const string Distance = "d";
         public const string Vulnerable = "vul";
         /// <summary>T3 review: dropped from `hit`/`dot` rather than fixed - PlayerHealth.ApplyDamage

@@ -823,6 +823,9 @@ namespace Overpower.EditorTools.Telemetry
                     Distance = distance,
                     Vulnerable = ReadFloat(e.Data, TelemetryKeys.Vulnerable),
                     Overpower = e.Data[TelemetryKeys.OverpowerActive]?.ToObject<bool?>() ?? false,
+                    // Mark plan step 6: absent key (a non-marking hit, or any hit logged before this
+                    // step existed) reads 0, same convention as every other "only when non-zero" field.
+                    Mark = ReadInt(e.Data, TelemetryKeys.Mark, 0),
                     Phase = PhaseOf(e.T, tPhase2),
                 });
             }
@@ -1272,6 +1275,11 @@ namespace Overpower.EditorTools.Telemetry
             var armorByWeapon = new Dictionary<int, float>();
             var healthByWeapon = new Dictionary<int, float>();
             var damageRawByAbility = new Dictionary<int, float>();
+            // Mark plan step 6: counted regardless of Source (Projectile/Splash both apply as long as
+            // the firing weapon marks - Decision 6 keys the mark on the WEAPON's own stat block, not on
+            // how the damage arrived), unlike Hits/SplashHits above which are split by Source.
+            var marksPlacedByWeapon = new Dictionary<int, int>();
+            var marksCashedByWeapon = new Dictionary<int, int>();
 
             foreach (HitRow h in hits)
             {
@@ -1298,6 +1306,13 @@ namespace Overpower.EditorTools.Telemetry
                         armorByWeapon[h.Weapon] = armorByWeapon.GetValueOrDefault(h.Weapon) + h.Armor;
                         healthByWeapon[h.Weapon] = healthByWeapon.GetValueOrDefault(h.Weapon) + h.HealthLost;
                     }
+
+                    // Mark plan step 6: 1 == MarkOutcome.Applied, 2 == MarkOutcome.Cashed (HitRow.Mark's
+                    // own comment) - 0 (no key on the line) is neither and is simply never counted.
+                    if (h.Mark == 1)
+                        marksPlacedByWeapon[h.Weapon] = marksPlacedByWeapon.GetValueOrDefault(h.Weapon) + 1;
+                    else if (h.Mark == 2)
+                        marksCashedByWeapon[h.Weapon] = marksCashedByWeapon.GetValueOrDefault(h.Weapon) + 1;
                 }
                 if (h.Ability >= 0 && CountsTowardDamageSums(h))
                     damageRawByAbility[h.Ability] = damageRawByAbility.GetValueOrDefault(h.Ability) + h.Raw;
@@ -1364,6 +1379,8 @@ namespace Overpower.EditorTools.Telemetry
                     Kills = killsByWeapon.GetValueOrDefault(weaponId),
                     MeanDistance = (distances != null && distances.Count > 0) ? distances.Average() : (double?)null,
                     MedianDistance = Median(distances),
+                    MarksPlaced = marksPlacedByWeapon.GetValueOrDefault(weaponId),
+                    MarksCashed = marksCashedByWeapon.GetValueOrDefault(weaponId),
                 });
             }
 

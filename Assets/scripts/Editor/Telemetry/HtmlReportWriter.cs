@@ -1211,6 +1211,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       { label: 'Hits', value: function (r) { return r.hits; } },
       { label: 'Splash hits', value: function (r) { return r.splashHits; } },
       { label: 'Accuracy', value: function (r) { return r.accuracy; } },
+      { label: 'Marks cashed', value: function (r) { return r.marksCashed; } },
       { label: 'Damage', value: function (r) { return r.damageRaw; } },
       { label: 'Armor dmg', value: function (r) { return r.armorDamage; } },
       { label: 'Health dmg', value: function (r) { return r.healthDamage; } },
