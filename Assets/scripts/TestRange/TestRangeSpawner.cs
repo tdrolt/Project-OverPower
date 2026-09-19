@@ -39,6 +39,16 @@ namespace Overpower.TestRange
                  "on the same line.")]
         private float lateralSpacing = 4f;
 
+        [SerializeField, Tooltip("Sideways offset in metres (along the spawn's right) for the whole " +
+                 "range's baseline, before any of the distances above are applied. Team 0's spawn " +
+                 "faces almost straight at its own capital's centre (measured: the capital sits " +
+                 "about 0.6 m off that line, well inside the tower's own 2.6 m collider), so the " +
+                 "'5 m' dummy used to spawn inside the capital tower. Shifting the whole line " +
+                 "sideways by this much clears the tower (2.6 m radius + a dummy's own ~0.7 m + a " +
+                 "safety margin) while keeping every configured distance meaningful, instead of " +
+                 "eating into the close-range test by starting the line further out.")]
+        private float rangeSidewaysOffsetMetres = 3.5f;
+
         [Header("Strafing dummy")]
         [SerializeField, Tooltip("How many strafing dummies to spawn, each patrolling " +
                  "independently. 1 is enough to practice leading a moving target.")]
@@ -85,21 +95,38 @@ namespace Overpower.TestRange
             Transform spawn = roomManager.teamSpawnPoints[0];
             Vector3 forward = spawn.forward;
             Vector3 right = spawn.right;
+            Vector3 baseline = Baseline(spawn.position, right, rangeSidewaysOffsetMetres);
 
             for (int i = 0; i < stationaryDistances.Length; i++)
             {
-                Vector3 pos = Grounded(spawn.position + forward * stationaryDistances[i] + right * (i * lateralSpacing));
+                Vector3 pos = Grounded(StationaryPoint(baseline, forward, right, stationaryDistances[i], lateralSpacing, i), dummyTargetPrefab);
                 SpawnDummy(pos, spawn.rotation);
             }
 
             float moveSpeed = gameplayConfig.BaseMoveSpeed;
             for (int i = 0; i < strafingDummyCount; i++)
             {
-                Vector3 center = Grounded(spawn.position + forward * strafeRowDistance + right * (i * lateralSpacing * 2f));
+                Vector3 center = Grounded(StrafeCentre(baseline, forward, right, strafeRowDistance, lateralSpacing, i), dummyTargetPrefab);
                 GameObject dummy = SpawnDummy(center, spawn.rotation);
                 dummy.AddComponent<Strafer>().Configure(center, right, strafeDistance, moveSpeed);
             }
         }
+
+        // ---- Pure position math (Decision 20 fix, item A) -------------------------------------------
+        // Kept as small static methods, shared by SpawnRange (which turns each into a live DummyTarget)
+        // and TestRangeSpawnerTests (which pins every one of them clear of solid geometry) - so the test
+        // can never silently drift from what actually spawns.
+
+        /// <summary>The range's baseline: the spawn point, shifted sideways clear of team 0's own capital.
+        /// See rangeSidewaysOffsetMetres's own tooltip for why this exists.</summary>
+        public static Vector3 Baseline(Vector3 spawnPosition, Vector3 right, float sidewaysOffsetMetres) =>
+            spawnPosition + right * sidewaysOffsetMetres;
+
+        public static Vector3 StationaryPoint(Vector3 baseline, Vector3 forward, Vector3 right, float distance, float lateralSpacing, int index) =>
+            baseline + forward * distance + right * (index * lateralSpacing);
+
+        public static Vector3 StrafeCentre(Vector3 baseline, Vector3 forward, Vector3 right, float strafeRowDistance, float lateralSpacing, int index) =>
+            baseline + forward * strafeRowDistance + right * (index * lateralSpacing * 2f);
 
         /// <summary>
         /// Lifts a point on the ground to where the dummy's ROOT must sit for its collider to stand on
@@ -112,7 +139,7 @@ namespace Overpower.TestRange
         /// Derived from the collider rather than a hardcoded 0.5, so it stays right if the capsule changes.
         /// Also applied to the strafer's centre, which re-applies its position every frame.
         /// </summary>
-        private Vector3 Grounded(Vector3 groundPoint)
+        public static Vector3 Grounded(Vector3 groundPoint, GameObject dummyTargetPrefab)
         {
             CapsuleCollider capsule = dummyTargetPrefab.GetComponent<CapsuleCollider>();
             if (capsule == null)
