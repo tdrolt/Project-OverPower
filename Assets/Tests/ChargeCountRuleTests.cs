@@ -69,7 +69,7 @@ namespace Overpower.Tests
         [Test]
         public void AWeaponThatStacksNoRoundsIgnoresTheChargeEntirely()
         {
-            // Weapon 12: canCharge, but Charge Max Projectiles 0 - it charges damage and range, not a count.
+            // A weapon that charges damage or range, not a count.
             Assert.AreEqual(1, ChargeCountRule.Rounds(1, 0, 0, 1f));
             // And weapons 05 / 07, which cannot charge at all, never reach this rule - guarded again anyway.
             Assert.AreEqual(3, ChargeCountRule.Rounds(3, 3, 0, 1f));

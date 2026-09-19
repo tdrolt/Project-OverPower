@@ -51,6 +51,20 @@ namespace Overpower.Combat
         /// no local weapon actually damaged).</summary>
         public static event Action<Transform, Vector3> LocalImpactSeen;
 
+        /// <summary>Mark plan step 4: seconds YOUR mark on `victim` has left, from the victim's own
+        /// truth (every credit message carries this, always, after the sender check) - 0 means none
+        /// (cashed, expired, or the victim died). Nothing subscribes until mark step 5's diamond.</summary>
+        public static event Action<Transform, float> LocalMarkReported;
+
+        /// <summary>Mark step 4, Tudor's answer 7 (a "Blocked" hit, option (b) - no network): raised on
+        /// the SHOOTER's own machine, from the exact same spot LocalImpactSeen fires from, when this
+        /// shot's target already shows the yellow immune look. A shooter-side guess, not the victim's
+        /// truth: the hit that actually SPRINGS the trap shows nothing (the yellow look's own bubble
+        /// arrives a round trip later), and the edges of the window lag by that same round trip. Never
+        /// raised for a teammate (friendly fire already shows nothing, whether or not they happen to
+        /// be shielded) - see PlayerHealth.ApplyDamage's own guard.</summary>
+        public static event Action<Transform> LocalBlockedSeen;
+
         public static void RaiseDamageDealt(float amount) => LocalDamageDealt?.Invoke(amount);
 
         public static void RaiseTakedown(bool isKill) => LocalTakedown?.Invoke(isKill);
@@ -60,5 +74,10 @@ namespace Overpower.Combat
 
         public static void RaiseImpactSeen(Transform victim, Vector3 hitPoint) =>
             LocalImpactSeen?.Invoke(victim, hitPoint);
+
+        public static void RaiseMarkReported(Transform victim, float markSecondsLeft) =>
+            LocalMarkReported?.Invoke(victim, markSecondsLeft);
+
+        public static void RaiseBlockedSeen(Transform victim) => LocalBlockedSeen?.Invoke(victim);
     }
 }

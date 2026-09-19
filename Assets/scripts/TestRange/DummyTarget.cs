@@ -62,6 +62,11 @@ namespace Overpower.TestRange
         private ArmorState armor;
         private bool isDead;
 
+        // Mark plan step 4: this dummy's own marks, keyed by attacker actor - the same ledger a real
+        // player's PlayerHealth keeps, since a dummy is a real, single victim for this purpose even
+        // though it is unnetworked (What exists B: no owner, but still one target with its own state).
+        private readonly MarkLedger marks = new MarkLedger();
+
         // The dummy's own status timers - Slow, Stun, Vulnerability, Burn - built with the same
         // caps a real player's PlayerStatusEffects uses, so a designer testing a slow or a
         // vulnerability debuff against a dummy sees exactly the number a player would take.
@@ -410,6 +415,7 @@ namespace Overpower.TestRange
             statusState.ClearAll(); // Awake builds statusState before ever calling this, so it is never null here.
             burnSourceActorNumber = -1;
             burnAbilityId = -1;
+            marks.Clear(); // Mark plan step 4 (Decision 8): a reset dummy starts owing nobody a mark.
 
             // After everything above is back to spawn values, not before - a listener (the
             // Strafer's own centre) should see a fully-reset dummy, not one mid-restore.
@@ -441,8 +447,17 @@ namespace Overpower.TestRange
                 firstHitTime = Time.time;
             hits++;
 
-            DamageResult result = DamageResolver.Resolve(info.Amount, info.IgnoresArmor, health,
-                                                          armor.Current, statusState.Magnitude(StatusKind.Vulnerability), 0f);
+            // Mark plan step 4: the same rule PlayerHealth.ApplyDamage applies after its verdict, minus
+            // the verdict machinery itself - this class's own funnel has none (What exists B: no self/
+            // teammate/shield concept for a dummy), so every hit that reaches here already "lands".
+            MarkOutcome mark = marks.OnLandedHit(info.SourceActorNumber, Time.time, info.MarkWindowSeconds);
+            DamageInfo landed = mark == MarkOutcome.Cashed
+                ? info.WithAmount(MarkLedger.ScaledAmount(info.Amount, mark, info.MarkedDamageMultiplier))
+                : info;
+
+            DamageResult result = DamageResolver.Resolve(landed.Amount, landed.IgnoresArmor, health,
+                                                          armor.Current, statusState.Magnitude(StatusKind.Vulnerability), 0f)
+                                                 .WithMark(mark);
             armor.Absorb(result.ArmorAbsorbed);
             health -= result.HealthLost;
 
@@ -463,14 +478,21 @@ namespace Overpower.TestRange
             // HitPoint is this dummy's own transform.position (ApplyBurnDamage above), which would
             // anchor the number at the body's centre instead of falling back to it the same way a
             // stale/no impact already does.
-            if (PhotonNetwork.LocalPlayer != null && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
-                && info.Source != DamageSource.Burn && info.Source != DamageSource.Zone)
+            if (PhotonNetwork.LocalPlayer != null && landed.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
+                && landed.Source != DamageSource.Burn && landed.Source != DamageSource.Zone)
             {
-                CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
+                CombatEvents.RaiseImpactSeen(transform, landed.HitPoint);
             }
 
-            NotifyLocalCombatCredit(info, result);
-            AnyDamaged?.Invoke(this, result, info);
+            // Mark plan step 4 (Decision 8): clear BEFORE notifying, on the killing blow, so this same
+            // hit's own credit report (NotifyLocalCombatCredit, below) already reads an empty ledger
+            // and correctly carries markSecondsLeft 0 - the same ordering PlayerHealth's lethal block
+            // uses ahead of its own Died event.
+            if (result.Lethal)
+                marks.Clear();
+
+            NotifyLocalCombatCredit(landed, result);
+            AnyDamaged?.Invoke(this, result, landed);
 
             if (result.Lethal)
             {
@@ -503,10 +525,14 @@ namespace Overpower.TestRange
                 return;
 
             CombatEvents.RaiseDamageDealt(result.Total);
-            // Mark plan step 2: the same "how much" event PlayerCombatCredit.RPC_DamageCredit raises
-            // for a real victim - DamageNumberView doesn't need to know whether transform belongs to a
-            // player or a dummy. cashedMark false until mark step 4.
-            CombatEvents.RaiseHitReported(transform, result.Total, false);
+            // The same "how much" event PlayerCombatCredit.RPC_DamageCredit raises for a real victim -
+            // DamageNumberView doesn't need to know whether transform belongs to a player or a dummy.
+            // Mark plan step 4: result.Mark is already this hit's own outcome, decided above.
+            CombatEvents.RaiseHitReported(transform, result.Total, result.Mark == MarkOutcome.Cashed);
+            // The local player's OWN mark on this dummy, if any - the same "how long" a real credit
+            // RPC now always carries (PlayerCombatCredit.RPC_DamageCredit), so mark step 5's diamond
+            // works identically against a dummy and a real player.
+            CombatEvents.RaiseMarkReported(transform, marks.SecondsLeft(PhotonNetwork.LocalPlayer.ActorNumber, Time.time));
 
             PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
             PlayerHealth localHealth = localView != null ? localView.GetComponent<PlayerHealth>() : null;

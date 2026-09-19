@@ -327,9 +327,10 @@ namespace Overpower.TestRange
                         continue;
 
                     weaponOptions.Add(weapon);
-                    // Id prefix, matching the ability dropdown below (fix 5) - weapons 6 (Burst -
-                    // Charge) and 12 (Laser - Charge) both have DisplayName "Charge", which read
-                    // as the same weapon listed twice before the id was added to tell them apart.
+                    // Id prefix, matching the ability dropdown below (fix 5) - the id prefix still
+                    // separates any two weapons that share a DisplayName (weapon 6, "Burst - Charge",
+                    // was once one of two "Charge" entries that read as the same weapon listed twice
+                    // before the id was added to tell them apart; mark step 4 renamed the other one).
                     labels.Add($"{weapon.Id} {weapon.DisplayName}");
                 }
             }

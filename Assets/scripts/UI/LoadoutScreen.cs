@@ -1066,6 +1066,10 @@ namespace Overpower.UI
             // before they equip one, the same way "hold to charge" already is above.
             if (def.WindupSeconds > 0f)
                 sb.Append($" · {Compact(def.WindupSeconds)}s wind-up");
+            // Mark plan step 4: "hold to charge" disappears from weapon 12 by itself (CanCharge is
+            // now off), and this takes its place on any weapon whose mark actually does something.
+            if (def.MarkWindowSeconds > 0f)
+                sb.Append($" · mark: next hit within {Compact(def.MarkWindowSeconds)}s +{Compact((def.MarkedDamageMultiplier - 1f) * 100f)}%");
 
             return sb.ToString();
         }

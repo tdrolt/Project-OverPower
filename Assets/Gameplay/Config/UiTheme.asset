@@ -223,3 +223,5 @@ MonoBehaviour:
   damageNumberFadeStart: 0.55
   damageNumberAnchorHeight: 2
   damageNumberScreenOffset: {x: 50, y: 0}
+  blockedText: Blocked
+  blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}

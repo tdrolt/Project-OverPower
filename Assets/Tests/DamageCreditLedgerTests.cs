@@ -157,5 +157,22 @@ namespace Overpower.Tests
             ledger.Clear();
             Assert.IsFalse(ledger.HasPending);
         }
+
+        // Mark plan step 4: Drain becomes a named 3-tuple, actor/amount unchanged, cashedMark added.
+        [Test]
+        public void ACashedMarkRidesOnlyWithItsOwnAttackersNextDrain()
+        {
+            var ledger = new DamageCreditLedger();
+            ledger.Record(2, 21f, 0f, cashedMark: false);
+            ledger.Record(3, 31.5f, 0f, cashedMark: true);
+
+            var drained = ledger.Drain().ToDictionary(e => e.actor, e => e.cashedMark);
+            Assert.IsFalse(drained[2]);
+            Assert.IsTrue(drained[3]);
+
+            ledger.Record(3, 21f, 1f, cashedMark: false);
+            var second = ledger.Drain().ToDictionary(e => e.actor, e => e.cashedMark);
+            Assert.IsFalse(second[3], "the flag resets with the sum, it does not stick to the actor forever");
+        }
     }
 }

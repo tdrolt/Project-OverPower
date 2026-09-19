@@ -67,6 +67,12 @@ namespace Overpower.UI
             public float lastHitTime;      // Time.time of the most recent hit added to this number - also this label's own last (re)pop time, since every write to one is paired with the other (see ApplyLabel's callers).
             public float amount;           // Running total shown.
             public bool marked;
+            // Mark plan step 4, Tudor's answer 7: true for a one-off "Blocked" pop (HandleBlockedSeen)
+            // rather than a running damage total. A blocked slot is never registered in
+            // activeByTarget, so ApplyLabel (which redraws from amount/marked) is never called on it
+            // again after it is claimed - it just rides LateUpdate's ordinary hold/rise/fade like any
+            // other slot, with its text and colour set once, up front.
+            public bool blocked;
         }
 
         private UiTheme theme;
@@ -109,12 +115,14 @@ namespace Overpower.UI
         {
             CombatEvents.LocalHitReported += HandleHitReported;
             CombatEvents.LocalImpactSeen += HandleImpactSeen;
+            CombatEvents.LocalBlockedSeen += HandleBlockedSeen;
         }
 
         private void OnDisable()
         {
             CombatEvents.LocalHitReported -= HandleHitReported;
             CombatEvents.LocalImpactSeen -= HandleImpactSeen;
+            CombatEvents.LocalBlockedSeen -= HandleBlockedSeen;
         }
 
         private void HandleImpactSeen(Transform victim, Vector3 hitPoint)
@@ -148,10 +156,33 @@ namespace Overpower.UI
             slots[slot].anchorOffset = anchorOffset;
             slots[slot].amount = amount;
             slots[slot].marked = cashedMark;
+            slots[slot].blocked = false; // In case this slot was stolen from an old "Blocked" pop.
             slots[slot].lastHitTime = Time.time;
             slots[slot].label.gameObject.SetActive(true);
             ApplyLabel(slot);
             activeByTarget[victim] = slot;
+        }
+
+        /// <summary>Tudor's answer 7 ("Blocked"), option (b): a one-off pop at the impact, never a
+        /// running total - deliberately NOT looked up in or added to activeByTarget (see Slot.blocked),
+        /// so a later real hit on the same victim always starts its own fresh number rather than
+        /// inheriting this slot's zero amount or grey colour.</summary>
+        private void HandleBlockedSeen(Transform victim)
+        {
+            if (!theme.showDamageNumbers || victim == null)
+                return;
+
+            int slot = ClaimSlot(victim);
+            slots[slot].active = true;
+            slots[slot].target = victim;
+            slots[slot].anchorOffset = ResolveAnchorOffset(victim);
+            slots[slot].amount = 0f;
+            slots[slot].marked = false;
+            slots[slot].blocked = true;
+            slots[slot].lastHitTime = Time.time;
+            slots[slot].label.gameObject.SetActive(true);
+            slots[slot].label.SetText(theme.blockedText);
+            slots[slot].label.color = theme.blockedColor;
         }
 
         private Vector3 ResolveAnchorOffset(Transform victim)

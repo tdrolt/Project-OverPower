@@ -220,6 +220,22 @@ namespace Overpower.Data
         [SerializeField] private int chargeMaxProjectiles = 0;
         public int ChargeMaxProjectiles => chargeMaxProjectiles;
 
+        [Header("Mark")]
+        [Tooltip("Seconds a mark lasts. Hitting an enemy marks them; your NEXT hit on them within " +
+                 "this many seconds deals Marked Damage Multiplier times the damage and uses the " +
+                 "mark up, and the hit after that marks them again. Only you can use your own mark, " +
+                 "and marks never stack. Measured between the two hits landing, on the target's own " +
+                 "game, so the wind-up doesn't eat into it. 0 = this weapon does not mark. Only beam " +
+                 "weapons (a Hitscan component on the Projectile Prefab) read this today.")]
+        [SerializeField] private float markWindowSeconds = 0f;
+        public float MarkWindowSeconds => markWindowSeconds;
+
+        [Tooltip("Damage of the hit that uses up a mark, as a multiple of Damage: 1.5 is 50% more. " +
+                 "Applied before armour, like any hit's damage, and on top of OverPower's bonus. " +
+                 "Ignored while Mark Window Seconds is 0.")]
+        [SerializeField] private float markedDamageMultiplier = 1f;
+        public float MarkedDamageMultiplier => markedDamageMultiplier;
+
         [Header("Feedback")]
         [Tooltip("Effect spawned at the barrel each time the weapon fires. Leave it empty for no " +
                  "muzzle effect.")]
@@ -285,6 +301,25 @@ namespace Overpower.Data
                     $"({fireInterval}), so a second trigger pull can start a new warning line before " +
                     "this one's beam has fired - the warnings would overlap. Lower Windup Seconds " +
                     $"below {fireInterval}, or raise Fire Interval above {windupSeconds}.", this);
+            }
+
+            // Mark plan step 4: the two ways a marking weapon can be misconfigured into doing
+            // nothing useful - the same "warn in the Console, pin no number" spirit as every other
+            // check here (WeaponConfigRuleTests pins the SHAPE of these rules, never a tuning value).
+            if (markWindowSeconds > 0f && markedDamageMultiplier <= 1f)
+            {
+                Debug.LogWarning(
+                    $"{name}: Mark Window Seconds is {markWindowSeconds} but Marked Damage Multiplier " +
+                    $"is {markedDamageMultiplier} - the mark pays nothing. Raise Marked Damage " +
+                    "Multiplier above 1, or set Mark Window Seconds to 0 on purpose.", this);
+            }
+
+            if (markWindowSeconds > 0f && (projectilePrefab == null || projectilePrefab.GetComponent<Overpower.Weapons.Hitscan>() == null))
+            {
+                Debug.LogWarning(
+                    $"{name}: Mark Window Seconds is {markWindowSeconds} but the Projectile Prefab has " +
+                    "no Hitscan component - only beams read the mark fields today, so this weapon's " +
+                    "mark will never apply.", this);
             }
         }
 #endif

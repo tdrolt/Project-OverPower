@@ -303,8 +303,9 @@ namespace Overpower.Weapons
         /// a stuck-held weapon) - so releasing the mouse over the "Loadout (P)" button still reaches
         /// here even though the matching PRESS was blocked and never ran HandlePrimaryPressed.
         /// Without the triggerHeldSince > 0f guard below, that blocked-press-but-unblocked-release
-        /// pair fired an uncharged shot through the button on every click (weapons 6 and 12 - the
-        /// only two that CanCharge). triggerHeldSince is 0 whenever the matching press never ran
+        /// pair fired an uncharged shot through the button on every click (weapon 6 - the only one
+        /// that CanCharge since the laser tree dropped charging, 2026-09-18). triggerHeldSince is 0
+        /// whenever the matching press never ran
         /// (HandlePrimaryPressed is the only place that sets it, other than this method's own
         /// unconditional clear below and Update's InputSuppressed clear, both of which always leave
         /// it at 0), so this is exactly "did a real press start this hold".</summary>

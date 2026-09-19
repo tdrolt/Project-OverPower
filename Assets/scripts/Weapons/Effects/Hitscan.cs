@@ -184,10 +184,14 @@ namespace Overpower.Weapons
             {
                 BeamContact contact = beam.Struck[i];
                 // abilityId -1: a beam is always a weapon's own (shot.Weapon read directly) - see
-                // DamageInfo.AbilityId's own comment.
+                // DamageInfo.AbilityId's own comment. Mark plan step 4: the mark fields come straight
+                // off the same weapon stat block, read here on the VICTIM's own copy of the asset -
+                // the identical build every client runs, so every client's Hitscan agrees on whether
+                // and how much this shot marks, with no separate message for it.
                 contact.Target.ApplyDamage(new DamageInfo(shot.Damage, shot.ShooterActorNumber,
                                                           shot.ShooterTeamId, shot.Weapon.Id,
-                                                          DamageSource.Projectile, false, contact.Point, -1));
+                                                          DamageSource.Projectile, false, contact.Point, -1,
+                                                          shot.Weapon.MarkWindowSeconds, shot.Weapon.MarkedDamageMultiplier));
                 PlayImpact(shot.Weapon, contact.Point);
             }
 
@@ -199,7 +203,7 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// How far a beam reaches. A charging laser reaches further the longer the trigger was
+        /// How far a beam reaches. A charging beam weapon reaches further the longer the trigger was
         /// held, up to Max Range x Charge Range Multiplier at full charge - ramping smoothly, the
         /// same way WeaponFiring ramps charged damage, so both halves of the charge payoff grow
         /// together. A weapon that cannot charge always reaches exactly Max Range.

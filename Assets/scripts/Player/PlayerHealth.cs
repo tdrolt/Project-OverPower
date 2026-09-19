@@ -84,6 +84,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private ArmorState armor;
     private PlayerStatusEffects statusEffects; // A status is not health - see PlayerStatusEffects.cs.
 
+    // Mark plan step 4: this VICTIM's own marks, keyed by attacker - see MarkLedger's own class
+    // comment for why it lives here rather than anywhere network-visible (damage is victim-side, so
+    // this is the one client that can ever decide the +50% with no message).
+    private readonly MarkLedger marks = new MarkLedger();
+
     // The two independent armor upgrade paths (Combat/ArmorUpgradePath), each an index into
     // ArmorConfig's own array. Everyone starts at level 0 on both, not on no armor. These survive
     // death - only the current fill of the pool (armor.Clear(), below) resets - because an upgrade
@@ -398,7 +403,18 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
             && info.Source != DamageSource.Burn && info.Source != DamageSource.Zone)
         {
-            CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
+            // Mark plan step 4, Tudor's answer 7 ("Blocked"), option (b) - no network: a shooter-side
+            // guess, not the victim's truth (see CombatEvents.LocalBlockedSeen's own comment for the
+            // accuracy trade-off this accepts). ShowsImmuneLook already replicates to every client
+            // (step 1's bubble), so the shooter's own copy of the victim knows this without a message.
+            // Guarded off a teammate hit the same way the real funnel is below (AreSameTeam fails the
+            // identical direction on an unknown team): friendly fire already shows nothing regardless
+            // of whether the "victim" happens to be shielded, so it must never read as "Blocked" here.
+            Photon.Realtime.Player shooterSidePlayer = PhotonNetwork.CurrentRoom?.GetPlayer(info.SourceActorNumber);
+            if (ShowsImmuneLook && !Teams.AreSameTeam(shooterSidePlayer, photonView.Owner))
+                CombatEvents.RaiseBlockedSeen(transform);
+            else
+                CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
         }
 
         // Bug 1.1: the victim is the sole authority on its own health, or every client would
@@ -446,26 +462,53 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (verdict == HitVerdict.Shielded)
             return default;
 
+        // Mark plan step 4 (Tudor, 2026-09-18): the mark is decided ONLY for a hit that reaches this
+        // point - HitVerdict.Lands, on the VICTIM's own client, which is the one machine that can
+        // decide the +50% with no extra message (Decision 1). Self, teammate, shield-blocked and
+        // dead-player hits all returned above already (Decision 2), so none of them ever mark or cash
+        // in - a live mark simply survives a blocked hit and expires on its own. info.MarkWindowSeconds
+        // is 0 for every non-marking source, which OnLandedHit already treats as "touch nothing".
+        MarkOutcome mark = marks.OnLandedHit(info.SourceActorNumber, Time.time, info.MarkWindowSeconds);
+        DamageInfo landed = mark == MarkOutcome.Cashed
+            ? info.WithAmount(MarkLedger.ScaledAmount(info.Amount, mark, info.MarkedDamageMultiplier))
+            : info;
+
         float vulnerability = statusEffects != null ? statusEffects.Vulnerability : 0f;
-        DamageResult result = DamageResolver.Resolve(info.Amount, info.IgnoresArmor, health,
-                                                       armor.Current, vulnerability, CurrentDamageReduction());
+        DamageResult result = DamageResolver.Resolve(landed.Amount, landed.IgnoresArmor, health,
+                                                       armor.Current, vulnerability, CurrentDamageReduction())
+                                             .WithMark(mark);
         armor.Absorb(result.ArmorAbsorbed);
         health -= result.HealthLost;
 
         UpdateOverheadBar();
 
-        Damaged?.Invoke(result, info);
+        Damaged?.Invoke(result, landed);
 
         if (result.Lethal)
         {
             isDead = true;   // Latched before raising Died so a re-entrant hit cannot double-kill.
             armor.Clear();   // A corpse has no armor; ResetForRespawn decides what comes back.
             sourcePlayer?.AddScore(1);
-            Died?.Invoke(info);
+            // Death clears the victim's marks (Decision 8) BEFORE Died fires, so the death credit
+            // flush (PlayerCombatCredit.HandleDied, which reads MarkSecondsLeftFor per attacker while
+            // building each message) reports 0 for everyone and every diamond hides on the kill.
+            marks.Clear();
+            Died?.Invoke(landed);
         }
 
         return result;
     }
+
+    /// <summary>Mark plan step 4: seconds left on THIS attacker's own mark on me, 0 if they have none
+    /// live (never marked, expired, or already cashed) - read by PlayerCombatCredit.SendCredit so the
+    /// attacker's own diamond (mark step 5) always rides on the same credit message as the damage or
+    /// takedown it goes with.</summary>
+    public float MarkSecondsLeftFor(int attackerActor) => marks.SecondsLeft(attackerActor, Time.time);
+
+    /// <summary>Tudor's answer 1: the marked player also sees it, over their own head - at most one
+    /// diamond regardless of how many attackers currently have me marked, so the LONGEST live mark
+    /// (whoever placed it) is enough. Read by mark step 5's victim-side view.</summary>
+    public float LongestMarkSecondsLeft => marks.LongestSecondsLeft(Time.time);
 
     /// The one place damage reduction is read, as a 0..1 fraction for DamageResolver. That single
     /// location is the point of the damage funnel: the reduction used to be applied on the bullet
@@ -542,6 +585,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // and PlayerLifecycle.ResetForMatchStart (the 2.7b fresh start) already calls this same method
         // (PlayerLifecycle.cs:446), so the match-start case is covered for free, with no extra call.
         ClearImmuneLook();
+        // Mark plan step 4 (Decision 8): a fresh life must not carry marks from the last one either -
+        // the same ResetForRespawn call the 2.7b fresh start already goes through covers this for free.
+        marks.Clear();
     }
 
     /// Call when this player deals damage, so dealing it keeps you "in combat" the same way

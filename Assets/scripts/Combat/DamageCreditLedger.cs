@@ -27,6 +27,11 @@ namespace Overpower.Combat
         {
             public float sum;
             public float lastHitTime;
+            // Mark plan step 4: ORs together across every Record call this actor makes before the
+            // next Drain, exactly like sum does - one attacker landing a plain hit and a cashed one
+            // in the same window still reports "yes, some of this was a cashed mark", the same way
+            // their damage already adds into one combined amount rather than two separate messages.
+            public bool cashedMark;
         }
 
         private readonly Dictionary<int, Entry> byActor = new Dictionary<int, Entry>();
@@ -42,8 +47,10 @@ namespace Overpower.Combat
 
         /// <summary>Adds one hit's damage to its source actor's running total. Ignored outright for
         /// an actor number that cannot be a real attacker (<= 0) or an amount that could not have
-        /// hurt anyone (<= 0) - see the class comment for why self-damage is not checked here.</summary>
-        public void Record(int sourceActor, float amount, float now)
+        /// hurt anyone (<= 0) - see the class comment for why self-damage is not checked here.
+        /// Mark plan step 4: cashedMark ORs into the actor's own flag, reset by Drain along with the
+        /// sum - see Entry.cashedMark's own comment.</summary>
+        public void Record(int sourceActor, float amount, float now, bool cashedMark = false)
         {
             if (sourceActor <= 0 || amount <= 0f)
                 return;
@@ -52,18 +59,19 @@ namespace Overpower.Combat
             bool wasPending = entry.sum > 0f;
             entry.sum += amount;
             entry.lastHitTime = now;
+            entry.cashedMark |= cashedMark;
             byActor[sourceActor] = entry;
             if (!wasPending && entry.sum > 0f)
                 pendingCount++;
         }
 
-        /// <summary>Returns every actor with an un-flushed positive sum, then resets every sum to
-        /// zero - the "tell them, then stop owing them" half of a flush. Last-hit times are kept
-        /// (see the class comment), so calling this repeatedly with no new Record calls in between
-        /// returns an empty list every time after the first.</summary>
-        public IReadOnlyList<(int actor, float amount)> Drain()
+        /// <summary>Returns every actor with an un-flushed positive sum, then resets every sum (and
+        /// cashedMark) to its zero value - the "tell them, then stop owing them" half of a flush.
+        /// Last-hit times are kept (see the class comment), so calling this repeatedly with no new
+        /// Record calls in between returns an empty list every time after the first.</summary>
+        public IReadOnlyList<(int actor, float amount, bool cashedMark)> Drain()
         {
-            var drained = new List<(int actor, float amount)>();
+            var drained = new List<(int actor, float amount, bool cashedMark)>();
 
             // Collected into a separate list before writing back: mutating byActor's values while
             // enumerating it is invalid in C#.
@@ -73,11 +81,12 @@ namespace Overpower.Combat
                 Entry entry = byActor[actor];
                 if (entry.sum > 0f)
                 {
-                    drained.Add((actor, entry.sum));
+                    drained.Add((actor, entry.sum, entry.cashedMark));
                     pendingCount--;
                 }
 
                 entry.sum = 0f;
+                entry.cashedMark = false;
                 byActor[actor] = entry;
             }
 

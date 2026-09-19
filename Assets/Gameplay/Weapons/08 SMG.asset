@@ -44,6 +44,8 @@ MonoBehaviour:
   chargeDamageMultiplier: 1
   chargeRangeMultiplier: 1
   chargeMaxProjectiles: 0
+  markWindowSeconds: 0
+  markedDamageMultiplier: 1
   muzzleVfx: {fileID: 1000011513120438, guid: 8d9a47f111c9e1247a1f24953cd07236, type: 3}
   fireSfx: {fileID: 8300000, guid: b1a32d3a3ec4c6e499fa65ce1e60b663, type: 3}
   impactVfx: {fileID: 1000010321467122, guid: c108d1bfc37c0494daea3e4e53c3c16e, type: 3}

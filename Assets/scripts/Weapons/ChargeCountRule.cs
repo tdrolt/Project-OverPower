@@ -15,8 +15,8 @@ namespace Overpower.Weapons
     public static class ChargeCountRule
     {
         /// <summary>The quantised hold, 0..1: which of the Steps + 1 even levels this fraction has REACHED.
-        /// steps of 0 or less leaves the hold smooth, for a weapon that charges something continuous (weapon 12
-        /// charges damage and range, not a round count).</summary>
+        /// steps of 0 or less leaves the hold smooth, for a weapon that charges something continuous
+        /// (damage or range, not a round count).</summary>
         public static float QuantisedFraction(float chargeFraction, int steps)
         {
             // NaN is possible: chargeFraction arrives as an RPC parameter, so a broken or mismatched client can put
