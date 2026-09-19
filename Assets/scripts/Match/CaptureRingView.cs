@@ -103,15 +103,11 @@ namespace Overpower.Match
 
             // 2.7b Decision 8: an out-of-play zone's edge is the theme's own colour, with no pulse - state.Phase is
             // always Idle and state.UnderAttack always false for an out-of-play state (CaptureRingState.From), so
-            // neither branch below can touch it once this wins.
-            Color edgeColor = state.OutOfPlay ? theme.outOfPlayZoneColor
-                : state.OutlineTeam >= 0 ? theme.ShotColorFor(state.OutlineTeam) : theme.captureRingNeutralColor;
-            if (state.Phase == CaptureRingPhase.Draining && state.DrainerTeam >= 0)
-                edgeColor = Color.Lerp(edgeColor, theme.ShotColorFor(state.DrainerTeam),
-                                       CaptureRingGeometry.Pulse01(time, theme.captureRingPulseSpeed));
-            else if (state.UnderAttack)
-                edgeColor = Color.Lerp(edgeColor, theme.captureRingWarningColor,
-                                       CaptureRingGeometry.Pulse01(time, theme.captureRingPulseSpeed));
+            // neither pulse below can touch it once OwnerPaint.From's own OutOfPlay branch wins.
+            // Arena rebuild step 2: moved onto the same rule a tower's crown and caps use (OwnerPaint/
+            // OwnerPaintColours), so the ring and the tower can never disagree. Behaviour is unchanged - every branch
+            // was checked against the code this replaced (TowerLookPrefabTests/OwnerPaintColoursTests, ring-before.txt).
+            Color edgeColor = OwnerPaintColours.For(OwnerPaint.From(state), theme, theme.captureRingNeutralColor, time);
             if (!edgeColorSet || edgeColor != shownEdgeColor)
             {
                 edge.startColor = edgeColor;

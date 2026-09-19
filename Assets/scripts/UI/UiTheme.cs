@@ -775,6 +775,13 @@ namespace Overpower.UI
                  "off the fade and the pulse both (always full strength while the mark is live at all).")]
         public float markIndicatorMinAlpha = 0.35f;
 
+        [Header("Towers (arena rebuild)")]
+        [Tooltip("Colour of a tower's crown and column caps while nobody owns its zone. Owned towers use their team's " +
+                 "colour (Team Shot Colors), a capital cut from a two-team match uses Out Of Play Zone Colour, and an " +
+                 "attacked or drained tower pulses exactly like its ring on the ground. Keep it a plain mid grey: " +
+                 "team 0 is near-white, so a light neutral would read as owned by team 0.")]
+        public Color towerNeutralColor = new Color(0.42f, 0.42f, 0.42f, 1f);
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why

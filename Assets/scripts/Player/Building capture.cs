@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 using System.Linq;
+using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.UI;
@@ -85,6 +86,11 @@ public class BuildingCapture : MonoBehaviourPun
     // over the tower). Built in Start so every tower gets one - see CaptureRingView. Null if the theme is unassigned.
     private CaptureRingView ringView;
 
+    // The tower's owner-coloured crown and column caps (arena step 2) - found once in Start; painted every frame
+    // from the ring's own state (RefreshRingView), never rebuilt here. Null on a tower with no Tower Look child
+    // (e.g. before arena step 3 stamps one), which simply skips it.
+    private TowerLook towerLook;
+
     // The last CaptureProgress THIS client told BuildingManager to publish for this zone - only
     // meaningful while this client is master (only the master ever calls PublishProgressIfNeeded).
     // Starts Idle, matching a fresh, never-captured zone, so a genuinely idle tower never publishes
@@ -111,6 +117,12 @@ public class BuildingCapture : MonoBehaviourPun
             Debug.LogError($"[BuildingCapture] Tower {buildingID}: UiTheme's Capture Ring Material is not assigned - no capture ring will be shown.", this);
         else
             ringView = CaptureRingView.Create(transform, captureRadius, theme);
+
+        // Arena rebuild step 2: found once here, painted every frame from the ring's own state
+        // (RefreshRingView) - null on a tower without a Tower Look child, which just skips it.
+        towerLook = GetComponentInChildren<TowerLook>(true);
+        if (towerLook != null && theme != null)
+            towerLook.Bind(theme);
 
         ConfigureCollider();
         InitializeAudio();
@@ -226,22 +238,29 @@ public class BuildingCapture : MonoBehaviourPun
         PublishProgressIfNeeded();
     }
 
-    /// <summary>Every client, every frame: draws this zone's ring from replicated state only (capture progress, the
-    /// owner, under attack), so a late joiner sees exactly what everyone else does.</summary>
+    /// <summary>Every client, every frame: draws this zone's ring and its tower's owner-coloured crown/caps (arena
+    /// step 2) from replicated state only (capture progress, the owner, under attack), so a late joiner sees exactly
+    /// what everyone else does. Both read the very same CaptureRingState, so they can never disagree.</summary>
     private void RefreshRingView()
     {
         BuildingManager manager = BuildingManager.Instance;
-        if (ringView == null || manager == null)
+        if (manager == null || (ringView == null && towerLook == null))
             return;
 
         int owner = manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
         bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
         CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
                                                        PhotonNetwork.ServerTimestamp, outOfPlay: ZoneOutOfPlay(buildingID));
-        // Yaw reads 0 (world +Z as "top") until ResolveTeamYaw resolves it for this match - CaptureRingView only
-        // rebuilds the band/track points when this value CHANGES, so the first resolved yaw self-corrects their
-        // rotation the very next frame; nothing here needs to wait for YawResolved.
-        ringView.Refresh(state, CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f);
+
+        if (ringView != null)
+        {
+            // Yaw reads 0 (world +Z as "top") until ResolveTeamYaw resolves it for this match - CaptureRingView only
+            // rebuilds the band/track points when this value CHANGES, so the first resolved yaw self-corrects their
+            // rotation the very next frame; nothing here needs to wait for YawResolved.
+            ringView.Refresh(state, CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f);
+        }
+
+        towerLook?.Refresh(state, Time.unscaledTime);
     }
 
     /// <summary>Master only. Works out this zone's CaptureProgress from the same fields
