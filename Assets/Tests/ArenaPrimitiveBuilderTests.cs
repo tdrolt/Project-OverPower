@@ -176,7 +176,15 @@ namespace Overpower.Tests
             Transform barrier = barriers.GetChild(0);
             int barrierLayer = LayerMask.NameToLayer(ArenaLayers.BarrierLayerName);
             Assert.AreEqual(barrierLayer, barrier.gameObject.layer);
-            Assert.AreEqual(0f, barrier.position.y, 0.001f, "a barrier sits on the floor");
+
+            // The RENDERER's world bounds are what a player actually sees, not the transform's own position - a
+            // review finding (2026-09-19) caught position.y == 0 passing while only half the look (0..0.5 m, the
+            // knee-high option Tudor rejected) actually showed, because the built-in cube is centred on its origin.
+            MeshRenderer barrierRenderer = barrier.GetComponent<MeshRenderer>();
+            Bounds barrierBounds = barrierRenderer.bounds;
+            Assert.AreEqual(0f, barrierBounds.min.y, 0.001f, "a barrier's look should sit on the floor");
+            Assert.AreEqual(pieces[1].size.y, barrierBounds.max.y, 0.001f, "a barrier's look should reach its own configured height (waist-high)");
+
             BoxCollider barrierBox = barrier.GetComponent<BoxCollider>();
             float scaleY = barrier.localScale.y;
             float worldBottom = barrier.position.y + (barrierBox.center.y - barrierBox.size.y * 0.5f) * scaleY;
@@ -214,6 +222,36 @@ namespace Overpower.Tests
             List<string> problems = ArenaSymmetryBuilder.Rebuild(arena, recordUndo: false);
 
             Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        [Test]
+        public void BuildSourceThenCaptureRoundTripsABarrierRowUnchanged()
+        {
+            // Review finding (2026-09-19): a built barrier's own BoxCollider spans the BLOCKING band, not the look,
+            // so reading it back naively (as every other piece kind's box is read) turned a 1 m-tall row into a 4 m
+            // one - "move a barrier, Capture, Build" would then build a wall shots don't pass through. This is the
+            // documented edit loop (base plan Decision 4): move a block, Capture, Build must reproduce it.
+            ArenaSymmetry arena = MakeArena();
+            var original = new ArenaLayout.Piece
+            {
+                name = "Jersey Barrier", kind = ArenaLayout.PieceKind.Barrier,
+                centre = new Vector3(10f, 0f, 0.3f), yawDegrees = 15f, size = new Vector3(9.8f, 1f, 0.6f),
+            };
+            ArenaLayout layout = MakeLayout(new List<ArenaLayout.Piece> { original });
+
+            ArenaPrimitiveBuilder.BuildSource(arena, layout);
+
+            var report = new List<string>();
+            List<ArenaLayout.Piece> captured = ArenaLayoutCapture.Capture(arena.source, new List<(Vector3, float)>(), report);
+
+            Assert.AreEqual(1, captured.Count, string.Join("\n", report));
+            ArenaLayout.Piece round = captured[0];
+            Assert.AreEqual(ArenaLayout.PieceKind.Barrier, round.kind);
+            Assert.That(Vector3.Distance(round.centre, original.centre), Is.LessThan(1e-3f),
+                $"centre round-tripped to {round.centre}, expected {original.centre}");
+            Assert.That(Vector3.Distance(round.size, original.size), Is.LessThan(1e-3f),
+                $"size round-tripped to {round.size}, expected {original.size} (a naive box read would give y={original.size.z + 4f:F1}-ish)");
+            Assert.AreEqual(original.yawDegrees, round.yawDegrees, 0.01f);
         }
     }
 }

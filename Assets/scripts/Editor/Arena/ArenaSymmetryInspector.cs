@@ -13,14 +13,20 @@ namespace Overpower.EditorTools
         public override void OnInspectorGUI()
         {
             EditorGUILayout.HelpBox(
-                "Source's boundary walls, blocks and barriers come from Assets/Gameplay/Config/ArenaLayout.asset, " +
-                "never hand-placed. Edit a row there, or move a block or barrier in the Scene view and press " +
-                "'Capture layout from Source', then press 'Build primitive arena' below to rebuild Source from the " +
-                "layout, copy it into both generated thirds and re-bake the minimap, all at once. 'Rebuild thirds' " +
-                "alone still works for a quick look after moving a tower or a spawn point, without touching Source's " +
-                "own walls/blocks/barriers - it also re-bakes the minimap; for other changes you can see from above, " +
-                "use OverPower > Arena > Bake minimap image. The two generated thirds are rebuilt from Source every " +
-                "time either button runs, so edits made to them are thrown away.",
+                "Boundary walls come from Source Outline above, corner to corner - NOT from ArenaLayout.asset, " +
+                "which only holds their thickness and height. To move a wall, move its outline points, then press " +
+                "'Build primitive arena' below. Blocks and barriers DO come from Assets/Gameplay/Config/" +
+                "ArenaLayout.asset, never hand-placed for real. Edit a row there, or move a block or barrier in the " +
+                "Scene view and use the OverPower > Arena > 'Capture layout from Source' MENU ITEM (there is no " +
+                "button for it here) to write its new row back, then press 'Build primitive arena' below to rebuild " +
+                "Source's walls/blocks/barriers, copy Source into both generated thirds and re-bake the minimap, " +
+                "all at once. A new block placed directly under Source must go inside one of its existing groups " +
+                "(e.g. Blocks) before Capture, or the next Build treats it as foreign art and moves it into Old " +
+                "Arena (off) instead of reading it. 'Rebuild thirds' alone still works for a quick look after " +
+                "moving a tower or a spawn point, without touching Source's own walls/blocks/barriers - it also " +
+                "re-bakes the minimap; for other changes you can see from above, use OverPower > Arena > Bake " +
+                "minimap image. The two generated thirds are rebuilt from Source every time either button runs, so " +
+                "edits made to them are thrown away.",
                 MessageType.Info);
             DrawDefaultInspector();
 

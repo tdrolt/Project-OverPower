@@ -145,9 +145,9 @@ MonoBehaviour:
     size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
   - name: Jersey Barrier (Zone 4 recess)
     kind: 1
-    centre: {x: 91.320885, y: 0, z: 69.05708}
+    centre: {x: 91.20298, y: 0, z: 68.99132}
     yawDegrees: 239.9998
-    size: {x: 9.989737, y: 1, z: 0.6}
+    size: {x: 10.181736, y: 1, z: 0.6}
   wallMaterial: {fileID: 2100000, guid: 0ddd8131a35b6b94aa03ab4a047f0576, type: 2}
   wallThickness: 0.724
   wallBottomY: -1

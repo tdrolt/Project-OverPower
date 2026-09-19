@@ -201,13 +201,24 @@ namespace Overpower.Tests
                         bestDistance = Mathf.Min(bestDistance, ArenaBounds.DistanceToSegment(centreXZ, a, b));
                     Assert.LessOrEqual(bestDistance, 1f, $"'{barrier.name}' should sit within 1 m of a recess mouth line");
 
+                    // Review finding (2026-09-19): a 5 cm circle at the END'S CENTRE passes even when a CORNER of
+                    // that end (offset by the barrier's own half-thickness across its width) pokes past a plank's
+                    // edge - the planks sit at a real angle to the mouth line, so the two corners of an end do not
+                    // clear by the same margin. Check both corners of both ends, each >= 0.10 m inside a plank's
+                    // OWN rotated footprint: ContainsWithMargin uses the plank's own long axis, so "never past its
+                    // far end" is enforced by the same check, not a separate one.
+                    const float CornerMarginMetres = 0.10f;
                     BoxFootprint footprint = BoxFootprintFromBox(barrier);
-                    Vector2 endA = footprint.Centre - footprint.Along * footprint.HalfLength;
-                    Vector2 endB = footprint.Centre + footprint.Along * footprint.HalfLength;
-                    Assert.IsTrue(allBuildingBoxes.Any(f => f.OverlapsCircle(endA, 0.05f)),
-                        $"'{barrier.name}' end A should meet a Building box (a plank)");
-                    Assert.IsTrue(allBuildingBoxes.Any(f => f.OverlapsCircle(endB, 0.05f)),
-                        $"'{barrier.name}' end B should meet a Building box (a plank)");
+                    Vector2 endACentre = footprint.Centre - footprint.Along * footprint.HalfLength;
+                    Vector2 endBCentre = footprint.Centre + footprint.Along * footprint.HalfLength;
+                    Vector2[] endACorners = { endACentre + footprint.Across * footprint.HalfWidth, endACentre - footprint.Across * footprint.HalfWidth };
+                    Vector2[] endBCorners = { endBCentre + footprint.Across * footprint.HalfWidth, endBCentre - footprint.Across * footprint.HalfWidth };
+                    for (int i = 0; i < endACorners.Length; i++)
+                        Assert.IsTrue(allBuildingBoxes.Any(f => ContainsWithMargin(f, endACorners[i], CornerMarginMetres)),
+                            $"'{barrier.name}' end A corner {i + 1} ({endACorners[i]}) should sit >= {CornerMarginMetres} m inside a plank's own footprint");
+                    for (int i = 0; i < endBCorners.Length; i++)
+                        Assert.IsTrue(allBuildingBoxes.Any(f => ContainsWithMargin(f, endBCorners[i], CornerMarginMetres)),
+                            $"'{barrier.name}' end B corner {i + 1} ({endBCorners[i]}) should sit >= {CornerMarginMetres} m inside a plank's own footprint");
                 }
             });
         }
@@ -217,6 +228,18 @@ namespace Overpower.Tests
             Vector3 worldSize = Vector3.Scale(box.size, box.transform.lossyScale);
             Vector3 worldCentre = box.transform.TransformPoint(box.center);
             return BoxFootprint.FromBox(worldCentre, box.transform.rotation, worldSize);
+        }
+
+        // BoxFootprint.Contains has no margin of its own (it is shared, pure geometry used by the wall-coverage
+        // hole finder and the barrier crossing rule, where an exact edge means something different). A margin
+        // shrinks the box on all four sides in ITS OWN axes, so checking against the plank's own footprint also
+        // catches "past its far end" for free - the far end is just one more side of the same box.
+        private static bool ContainsWithMargin(BoxFootprint fp, Vector2 point, float margin)
+        {
+            Vector2 d = point - fp.Centre;
+            float along = Vector2.Dot(d, fp.Along);
+            float across = Vector2.Dot(d, fp.Across);
+            return Mathf.Abs(along) <= fp.HalfLength - margin && Mathf.Abs(across) <= fp.HalfWidth - margin;
         }
 
         private static Transform FindEnvironment(Scene scene) => FindArena(scene).transform.parent;

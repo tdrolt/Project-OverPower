@@ -82,8 +82,8 @@ namespace Overpower.Data
         [SerializeField] private Material barrierMaterial;
 
         [Tooltip("A barrier's BLOCKING collider bottom, in world Y metres. Reaches well below the floor, same " +
-                 "reasoning as a wall: only a living player's body is ever on this layer, so extra height costs " +
-                 "nothing and a body can never be lifted onto the barrier by standing on its own collider's edge.")]
+                 "reasoning as a wall: only a living player's body ever collides with this layer, so extra height " +
+                 "costs nothing and a body can never be lifted onto the barrier by standing on its own collider's edge.")]
         [SerializeField] private float barrierBlockingBottomY = -1f;
 
         [Tooltip("A barrier's BLOCKING collider top, in world Y metres - well above the 1.0 m look, so nobody can " +

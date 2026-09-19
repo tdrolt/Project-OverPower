@@ -287,7 +287,12 @@ namespace Overpower.EditorTools
                 else
                 {
                     GameObject barrier = NewPrimitiveChild(barriers, piece.name, layout.BarrierMaterial, ArenaLayers.BarrierLayerName);
-                    Vector3 position = new Vector3(piece.centre.x, 0f, piece.centre.z);
+                    // The built-in cube is centred on its own origin, so sitting it AT y 0 would bury half its look
+                    // below the floor (0.5 m would show: the knee-high option Tudor rejected). Lifting the origin by
+                    // half the look height puts the RENDERED mesh at y 0..size.y, i.e. waist-high as chosen (review,
+                    // 2026-09-19). The blocking-band math below already subtracts position.y, so the collider's
+                    // world −1..3 band is unaffected by this.
+                    Vector3 position = new Vector3(piece.centre.x, piece.size.y * 0.5f, piece.centre.z);
                     barrier.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, piece.yawDegrees, 0f));
                     barrier.transform.localScale = piece.size; // x = length, y = look height, z = thickness
 
@@ -365,9 +370,11 @@ namespace Overpower.EditorTools
         /// <summary>
         /// Arena step 5: runs every phase, in order, on the one ArenaSymmetry found in <paramref name="scene"/> -
         /// 1) BuildTowerLooks, 2) MoveOldArtAside, 3) BuildSource, 4) BuildFloor, 5) ArenaSymmetryBuilder.Rebuild,
-        /// 6) MinimapBaker.Bake, 7) the report and a final Validate. Stops before touching the floor or the copies if
-        /// BuildSource reports a PROBLEM (Source held something it doesn't own) - never a partial build. Never runs
-        /// in Play Mode; never saves the scene itself.
+        /// 6) MinimapBaker.Bake, 7) the report and a final Validate. NOT an atomic all-or-nothing build (corrected
+        /// 2026-09-19 review): phases 1 and 2 have already run, and stay run, by the time BuildSource can refuse
+        /// (Source held something it doesn't own) - only the floor and the generated-thirds copies are skipped from
+        /// there, to stop the damage compounding rather than prevent it. Never runs in Play Mode; never saves the
+        /// scene itself.
         /// </summary>
         public static List<string> BuildAll(Scene scene)
         {

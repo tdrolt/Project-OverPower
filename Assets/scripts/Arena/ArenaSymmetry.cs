@@ -7,12 +7,18 @@ namespace Overpower.Arena
     /// <summary>
     /// Makes the arena three identical thirds, turned 120° apart about Centre.
     ///
-    /// HOW TO EDIT THE ARENA (arena step 5): Source's boundary walls, blocks and barriers are built from
-    /// Assets/Gameplay/Config/ArenaLayout.asset, never hand-placed - edit a row there, or move a block or barrier in
-    /// the Scene view and press "Capture layout from Source" to write its new row back, then press "Build primitive
-    /// arena" (OverPower > Arena), which rebuilds Source from the layout, copies it into both generated thirds and
-    /// re-bakes the minimap, all in one step. "Rebuild thirds" alone still works for a quick look after moving a
-    /// tower or a spawn point, without touching Source's own walls/blocks/barriers. The two generated thirds are
+    /// HOW TO EDIT THE ARENA (arena step 5, corrected 2026-09-19 review): boundary walls come from Source Outline
+    /// (below), corner to corner - NOT from ArenaLayout.asset, which only holds their thickness and height. To move
+    /// a wall, move its outline points, then run "Build primitive arena" (a hand-moved wall is thrown away by the
+    /// next build, since walls are always rebuilt fresh from the outline). Blocks and barriers ARE built from
+    /// Assets/Gameplay/Config/ArenaLayout.asset, never hand-placed for real - edit a row there, or move a block or
+    /// barrier in the Scene view and use the OverPower > Arena > "Capture layout from Source" MENU ITEM (not a
+    /// button on this Inspector) to write its new row back, then run "Build primitive arena" (OverPower > Arena or
+    /// the button below), which rebuilds Source's walls, blocks and barriers, copies Source into both generated
+    /// thirds and re-bakes the minimap, all in one step. A new block placed directly under Source must go inside one
+    /// of its existing groups (e.g. Blocks) before Capture, or the next Build treats it as foreign art and moves it
+    /// into Old Arena (off) instead of reading it. "Rebuild thirds" alone still works for a quick look after moving
+    /// a tower or a spawn point, without touching Source's own walls/blocks/barriers. The two generated thirds are
     /// deleted and copied again from Source on every rebuild, so an edit made directly to them is thrown away. The
     /// Inspector greys them out to make that obvious.
     ///
@@ -72,8 +78,9 @@ namespace Overpower.Arena
         [Tooltip("The arena's outer edge in the Source third, seen from above: the inner faces of the boundary walls " +
                  "under Source/Boundry, in order round the edge (x = world X, y = world Z). The other two thirds use " +
                  "it turned 120 and 240 degrees. Blink and portals can't land outside it, and a player who ends up " +
-                 "outside is put back. Move a boundary wall and you must move these points onto its new inner face: " +
-                 "Validate reports any wall more than 15 cm off this outline.")]
+                 "outside is put back. This is the SOURCE of a wall's position, not the other way round (corrected " +
+                 "2026-09-19 review): move these points, then run Build primitive arena to rebuild the wall from " +
+                 "them. Validate still reports any built wall more than 15 cm off this outline, as a sanity check.")]
         public List<Vector2> sourceOutline = new List<Vector2>();
 
         /// <summary>The arena in the running game, or null outside Play Mode and in a scene without one.</summary>

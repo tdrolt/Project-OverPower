@@ -75,7 +75,7 @@ namespace Overpower.EditorTools
                         continue;
                     }
 
-                    if (!TryReadBox(unit, out Vector3 centre, out Vector3 size, out float yaw, out int ignoredOnChildren, report))
+                    if (!TryReadBox(unit, kind, out Vector3 centre, out Vector3 size, out float yaw, out int ignoredOnChildren, report))
                     {
                         noBoxSkipped++;
                         report.Add($"skipped '{unit.name}' (in {group.name}): no BoxCollider or MeshCollider of its own.");
@@ -100,13 +100,33 @@ namespace Overpower.EditorTools
             return pieces;
         }
 
-        private static bool TryReadBox(Transform unit, out Vector3 centre, out Vector3 size, out float yawDegrees,
-                                        out int ignoredOnChildren, List<string> report)
+        private static bool TryReadBox(Transform unit, ArenaLayout.PieceKind kind, out Vector3 centre, out Vector3 size,
+                                        out float yawDegrees, out int ignoredOnChildren, List<string> report)
         {
             centre = unit.position;
             size = Vector3.zero;
             yawDegrees = unit.eulerAngles.y;
             ignoredOnChildren = 0;
+
+            ReportTilt(unit, report);
+
+            if (kind == ArenaLayout.PieceKind.Barrier)
+            {
+                // A built barrier's own BoxCollider spans the BLOCKING band (e.g. world y -1..3), not the look - it
+                // is set from ArenaLayout's separate barrierBlockingBottomY/TopY, not from the row's own size.
+                // Reading it back as the row's size would inflate a 1 m look into a multi-metre one, and the next
+                // Build would show a wall shots pass through where a barrier should be (review, 2026-09-19). The
+                // look IS exactly the unit's own scale (x=length, y=look height, z=thickness); the centre's Y is
+                // ignored because Build always re-derives a barrier's vertical position from size.y itself.
+                Vector3 barrierLossy = unit.lossyScale;
+                size = new Vector3(Mathf.Abs(barrierLossy.x), Mathf.Abs(barrierLossy.y), Mathf.Abs(barrierLossy.z));
+                centre = new Vector3(unit.position.x, 0f, unit.position.z);
+                foreach (BoxCollider box in unit.GetComponentsInChildren<BoxCollider>(true))
+                    if (box.transform != unit) ignoredOnChildren++;
+                foreach (MeshCollider mesh in unit.GetComponentsInChildren<MeshCollider>(true))
+                    if (mesh.transform != unit) ignoredOnChildren++;
+                return true;
+            }
 
             // No "break" on finding the unit's own box: every OTHER collider found while scanning (on a child, or a
             // second one on the unit itself) must still be counted as ignored, not left uncounted just because the
@@ -124,8 +144,6 @@ namespace Overpower.EditorTools
                     continue;
                 ownBox = box;
             }
-
-            ReportTilt(unit, report);
 
             if (ownBox != null)
             {
