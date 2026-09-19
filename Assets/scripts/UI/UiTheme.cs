@@ -81,8 +81,13 @@ namespace Overpower.UI
                  "running (the seconds after it triggers, not while it is only armed). Tudor's override [T]: " +
                  "\"make it so there's an overlay so it doesn't mess with the shield\" - the health/shield fills " +
                  "underneath keep their own colours always; this is a separate Image drawn on top of them, so " +
-                 "keep the alpha well under 1 or the fills stop showing through it.")]
-        public Color immuneBarColor = new Color(1f, 0.86f, 0.1f, 0.45f);
+                 "keep the alpha well under 1 or the fills stop showing through it. Retuned from an earlier 0.45 " +
+                 "(measured to read as a flat, low-saturation grey/blue over a full shield - yellow and blue are " +
+                 "complementary): real screen samples across 0.45-0.8 show a genuine trade-off, higher alpha reads " +
+                 "more clearly yellow/amber but flattens the HUD bars' filled-vs-empty contrast. 0.55 is the lowest " +
+                 "value where the shield-blue backdrop no longer reads grey (hue and, more weakly, saturation both " +
+                 "improve with alpha); pushing higher looks more vividly yellow but starts hiding how full a bar is.")]
+        public Color immuneBarColor = new Color(1f, 0.86f, 0.1f, 0.55f);
         [Tooltip("Overheat fill below the warning threshold.")] public Color overheatColor = new Color(0.95f, 0.62f, 0.15f, 1f);
         [Tooltip("Overheat fill at or above the warning threshold.")] public Color overheatWarningColor = new Color(1f, 0.35f, 0.1f, 1f);
         [Tooltip("Overheat fill while silenced.")] public Color overheatSilencedColor = new Color(0.9f, 0.1f, 0.1f, 1f);
