@@ -35,8 +35,23 @@ namespace Overpower.Combat
         /// </summary>
         public readonly int AbilityId;
 
+        /// <summary>Mark plan step 3: seconds a mark from this hit's weapon lasts, straight off the
+        /// firing weapon's own stat block (WeaponDefinition.MarkWindowSeconds), read on the victim's
+        /// client since that is the one place a hit's mark is ever decided. 0 means this hit's source
+        /// does not mark at all - MarkLedger.OnLandedHit treats 0 (or less) as "never touch marks",
+        /// so a non-marking hit neither places nor cashes one. Appended after AbilityId, following
+        /// that field's own precedent, so every existing call site keeps compiling unchanged.</summary>
+        public readonly float MarkWindowSeconds;
+
+        /// <summary>Mark plan step 3: this hit's damage, as a multiple of Damage, IF it turns out to
+        /// cash an existing mark (MarkLedger.ScaledAmount only ever applies it on a Cashed outcome).
+        /// Also off the firing weapon's own stat block (WeaponDefinition.MarkedDamageMultiplier).
+        /// Defaults to 1 (no change) for every call site that never mentions marks at all.</summary>
+        public readonly float MarkedDamageMultiplier;
+
         public DamageInfo(float amount, int sourceActorNumber, int sourceTeamId, int weaponId,
-                          DamageSource source, bool ignoresArmor, Vector3 hitPoint, int abilityId = -1)
+                          DamageSource source, bool ignoresArmor, Vector3 hitPoint, int abilityId = -1,
+                          float markWindowSeconds = 0f, float markedDamageMultiplier = 1f)
         {
             Amount = amount;
             SourceActorNumber = sourceActorNumber;
@@ -46,7 +61,17 @@ namespace Overpower.Combat
             IgnoresArmor = ignoresArmor;
             HitPoint = hitPoint;
             AbilityId = abilityId;
+            MarkWindowSeconds = markWindowSeconds;
+            MarkedDamageMultiplier = markedDamageMultiplier;
         }
+
+        /// <summary>Mark plan step 3: a copy of this hit with only Amount changed - PlayerHealth/
+        /// DummyTarget use this to scale a cashed hit's damage up before resolving it, without
+        /// disturbing anything else about where the hit came from or what it can still do (its own
+        /// mark fields included, so a scaled DamageInfo still reports truthfully what marked it).</summary>
+        public DamageInfo WithAmount(float amount) =>
+            new DamageInfo(amount, SourceActorNumber, SourceTeamId, WeaponId, Source, IgnoresArmor,
+                           HitPoint, AbilityId, MarkWindowSeconds, MarkedDamageMultiplier);
     }
 
     public readonly struct DamageResult
@@ -56,15 +81,26 @@ namespace Overpower.Combat
         public readonly bool ArmorBroke;
         public readonly bool Lethal;
 
-        public DamageResult(float armorAbsorbed, float healthLost, bool armorBroke, bool lethal)
+        /// <summary>Mark plan step 3: what this hit did to the attacker's mark on the victim - None
+        /// for every damage source that predates marks, or that simply doesn't mark (its DamageInfo's
+        /// MarkWindowSeconds was 0). Read by the credit path (mark step 4) and telemetry (mark step 6).</summary>
+        public readonly MarkOutcome Mark;
+
+        public DamageResult(float armorAbsorbed, float healthLost, bool armorBroke, bool lethal, MarkOutcome mark = MarkOutcome.None)
         {
             ArmorAbsorbed = armorAbsorbed;
             HealthLost = healthLost;
             ArmorBroke = armorBroke;
             Lethal = lethal;
+            Mark = mark;
         }
 
         public float Total => ArmorAbsorbed + HealthLost;
+
+        /// <summary>Mark plan step 3: a copy of this result with only Mark changed - the funnel builds
+        /// the plain damage result first (DamageResolver knows nothing about marks) and stamps the
+        /// outcome on afterward, once MarkLedger has decided it.</summary>
+        public DamageResult WithMark(MarkOutcome mark) => new DamageResult(ArmorAbsorbed, HealthLost, ArmorBroke, Lethal, mark);
     }
 
     public interface IDamageable
