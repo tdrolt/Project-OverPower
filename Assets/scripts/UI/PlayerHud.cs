@@ -148,7 +148,8 @@ namespace Overpower.UI
         /// replaced a translucent whole-bar overlay (CreateImmuneOverlay, retired): a wash could never
         /// read yellow over the blue shield fill. `edges` reuses SlotFrame - the exact same four-thin-
         /// Images-round-a-rect recipe a slot's own border already uses (BuildFrameStrip) - and `wash`
-        /// is the optional faint reinforcement UNDER them (Immune Bar Wash Alpha, 0 by default). Both
+        /// is the optional faint reinforcement UNDER them (Immune Bar Wash Alpha, 0.15 by default: a faint wash
+        /// that reinforces the frame; 0 = frame only). Both
         /// live under one root GameObject so UpdateHealthAndArmor can show/hide the whole look with a
         /// single SetActive, the same shape the old single-Image overlay had.</summary>
         private sealed class ImmuneFrame

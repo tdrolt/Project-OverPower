@@ -101,8 +101,8 @@ namespace Overpower.UI
         public float immuneOverheadFrameThickness = 0.6f;
         [Range(0f, 1f)]
         [Tooltip("Alpha of an optional faint WASH covering the whole bar in Immune Bar Colour, UNDER the frame, " +
-                 "while the look is showing. 0 (the default) means no wash at all - frame only. Keep any non-zero " +
-                 "value low: a wash strong enough to read on its own recreates the exact flattening effect that " +
+                 "while the look is showing. 0.15 by default: a faint wash that reinforces the frame; 0 = frame " +
+                 "only. Keep any non-zero value low: a wash strong enough to read on its own recreates the exact flattening effect that " +
                  "moved this look from a wash to a frame in the first place (see Immune Bar Colour's own tooltip) - " +
                  "it is offered only as a subtle reinforcement, never the primary signal.")]
         public float immuneBarWashAlpha = 0.15f;

@@ -157,7 +157,7 @@ namespace Overpower.Tests
             theme.immuneBarWashAlpha = 0f;
             health.ShowImmuneLook(4f);
 
-            Assert.AreEqual(0f, FindFramePart("wash").color.a, 1e-4f, "off by default - carry-over C, Immune Bar Wash Alpha");
+            Assert.AreEqual(0f, FindFramePart("wash").color.a, 1e-4f, "this test forces the frame-only setting (Immune Bar Wash Alpha 0) - carry-over C");
         }
 
         [Test]
