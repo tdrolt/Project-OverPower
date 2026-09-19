@@ -466,15 +466,26 @@ namespace Overpower.Abilities
             Vector3 center = groundPoint + Vector3.up * ((BlockCheckBottom + BlockCheckTop) * 0.5f);
             Vector3 halfExtents = new Vector3(radius, (BlockCheckTop - BlockCheckBottom) * 0.5f, radius);
 
-            // Amendment 1: BodiesWallsAndBarriers, not blockMask - a portal placed overlapping a barrier could put a
-            // traveller who arrives on it fused into the barrier's own collider.
-            Collider[] overlaps = Physics.OverlapBox(center, halfExtents, Quaternion.identity, ArenaLayers.BodiesWallsAndBarriers, QueryTriggerInteraction.Ignore);
+            // Default|Building only, as before Amendment 1 - NOT BodiesWallsAndBarriers here (arena step 5 review
+            // fix, R-3): this box is wide (a 2.5 m portal diameter), and a Tier III recess is only ~3 m deep, so
+            // checking the whole box against a barrier too refused almost every spot in the recess - a barrier
+            // anywhere near its mouth falls within 2.5 m of nearly the whole pocket behind it. That silently undid
+            // "a portal crosses a barrier" (GDD p.29) at the one place a barrier actually stands. A barrier is
+            // instead refused below, at the tighter, player-sized capsule a traveller will really arrive in.
+            Collider[] overlaps = Physics.OverlapBox(center, halfExtents, Quaternion.identity, blockMask, QueryTriggerInteraction.Ignore);
             foreach (Collider overlap in overlaps)
             {
                 if (overlap.transform.IsChildOf(Owner.Root.transform))
                     continue; // never blocked by the caster's own body.
                 return true;
             }
+
+            // Still refuse a portal placed square on a barrier: a traveller arriving on it would land fused into
+            // the barrier's own collider, exactly like arriving inside a wall - but this check is only the player's
+            // own capsule width, not the whole wide placement box, so it never refuses the rest of a recess.
+            if (capsule != null && PlayerSpaceProbe.IsInsideBarrier(capsule, PlayerSpaceProbe.RootOnGround(capsule, groundPoint), Owner.Root.transform))
+                return true;
+
             return false;
         }
 

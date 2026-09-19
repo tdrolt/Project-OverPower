@@ -35,8 +35,9 @@ namespace Overpower.Weapons
     public class ProjectileMotor : MonoBehaviour
     {
         [SerializeField, Tooltip("Which layers this projectile may hit. Building and Default cover " +
-                 "level geometry and players (a living player sits on Default). Bullet and " +
-                 "DeadPlayer are stripped in code whatever you tick here - see BuildMask.")]
+                 "level geometry and players (a living player sits on Default). Bullet, DeadPlayer and " +
+                 "Barrier are stripped in code whatever you tick here - a shot always passes a jersey " +
+                 "barrier (GDD p.29) - see BuildMask.")]
         private LayerMask hitMask = ~0;
 
         [SerializeField, Tooltip("Hard cap in seconds on how long a projectile may exist, whatever " +
@@ -278,7 +279,7 @@ namespace Overpower.Weapons
             Destroy(gameObject);
         }
 
-        /// <summary>The designer's layer choices, minus the two invariants HitMasks enforces for
+        /// <summary>The designer's layer choices, minus the three invariants HitMasks enforces for
         /// every shot - see HitMasks.StripNonNegotiableLayers.</summary>
         private int BuildMask()
         {

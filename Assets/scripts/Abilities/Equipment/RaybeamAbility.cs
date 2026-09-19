@@ -262,8 +262,9 @@ namespace Overpower.Abilities
             DrawBeam(beamOrigin, end);
         }
 
-        /// <summary>Hitscan.BuildMask's identical reasoning: the designer's layers minus the two
-        /// invariants (Bullet, DeadPlayer) that are never negotiable for any hit-detecting shot.</summary>
+        /// <summary>Hitscan.BuildMask's identical reasoning: the designer's layers minus the three
+        /// invariants (Bullet, DeadPlayer, Barrier) that are never negotiable for any hit-detecting
+        /// shot - Raybeam always passes a jersey barrier (GDD p.29), whatever its own hitMask ticks.</summary>
         private int BuildMask() => HitMasks.StripNonNegotiableLayers(hitMask);
 
         /// <summary>A local, throwaway effect on each client, matching Hitscan.DrawBeam - never a

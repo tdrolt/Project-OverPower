@@ -35,9 +35,10 @@ namespace Overpower.Weapons
     public class Hitscan : MonoBehaviour
     {
         [SerializeField, Tooltip("Which layers the beam can hit. Default is where living players " +
-                 "and dummies are; Building is the walls. Bullet and DeadPlayer are always removed " +
-                 "whatever you tick here. To let the beam pass through walls, add an Ignore Walls " +
-                 "component rather than unticking Building, so the leaf reads as a leaf.")]
+                 "and dummies are; Building is the walls. Bullet, DeadPlayer and Barrier are always " +
+                 "removed whatever you tick here - a beam always passes a jersey barrier (GDD p.29). " +
+                 "To let the beam pass through walls, add an Ignore Walls component rather than " +
+                 "unticking Building, so the leaf reads as a leaf.")]
         private LayerMask hitMask = ~0;
 
         [SerializeField, Tooltip("The visible beam. A prefab with a Line Renderer on it - its two " +
@@ -240,7 +241,7 @@ namespace Overpower.Weapons
         /// </summary>
         public float PredictBeamLength(Vector3 origin, ProjectileContext shot) => Resolve(origin, shot).Length;
 
-        /// <summary>The designer's layers, minus the two invariants HitMasks enforces for every
+        /// <summary>The designer's layers, minus the three invariants HitMasks enforces for every
         /// shot - see HitMasks.StripNonNegotiableLayers, shared with ProjectileMotor - minus walls
         /// if this is the through-walls leaf.</summary>
         private int BuildMask()

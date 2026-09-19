@@ -327,9 +327,16 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
             // move, not just the instant it would have hit one, so the sweep never sees it at all. moveStart is
             // Settle's last resort if neither exit candidate is clear; a fresh Voluntary move owns the crossing from
             // here, so any settle the PREVIOUS move left pending is superseded, not raced against.
+            //
+            // Review fix (arena step 4a): only capture moveStart when a crossing isn't ALREADY running - a dash
+            // chained straight off one that ended inside a barrier's footprint (a fresh Voluntary cast from the
+            // onEnd callback, before Settle ever got a step to run) would otherwise overwrite moveStart with a
+            // position that is itself inside the barrier, so the both-candidates-blocked fallback returns the body
+            // right back into it instead of to a genuinely clear starting point.
+            if (!ignoringBarriers)
+                moveStart = rb.position;
             ignoringBarriers = true;
             rb.excludeLayers |= ArenaLayers.Barrier;
-            moveStart = rb.position;
             settlePending = false;
             settleStepCount = 0;
         }
@@ -349,7 +356,16 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         // Amendment 1: a Voluntary move that ended still inside a barrier's footprint (it crossed but stopped
         // partway, or was cancelled mid-crossing) needs a settle before the exclusion and ExternalMotionControl can
         // come back off - releasing them now would let the body rest fused into the barrier's own collider.
-        if (ignoringBarriers && capsule != null && PlayerSpaceProbe.IsInsideBarrier(capsule, rb.position, transform))
+        //
+        // Review fix (arena step 4a): also check endPosition, not just rb.position. rb.MovePosition just above
+        // schedules the move for PhysX to apply on the NEXT step, so rb.position here still reads last step's pose -
+        // a move that lands ~0.3 m inside a barrier (e.g. a 3.5 m dash) would read as already clear one step early,
+        // releasing control before physics has actually pushed the body anywhere. Settle re-checks the real,
+        // physics-applied pose on its own next step regardless, so checking the intended end position too only
+        // widens when a settle correctly starts - it never narrows it.
+        if (ignoringBarriers && capsule != null &&
+            (PlayerSpaceProbe.IsInsideBarrier(capsule, rb.position, transform) ||
+             PlayerSpaceProbe.IsInsideBarrier(capsule, endPosition, transform)))
         {
             settlePending = true;
             settleStepCount = 0;
@@ -375,7 +391,16 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         }
         settlePending = false;
         settleStepCount = 0;
-        if (motor != null)
+
+        // Review fix (arena step 4a bug, required): only release ExternalMotionControl while no move is running.
+        // Finish already nulls activeKind before calling this, so an ordinary end (or Settle finding the body
+        // clear after its OWN move ended) is unaffected. But Settle can also run while a DIFFERENT, still-active
+        // move owns activeKind - a Forced knockback that cancelled a dash mid-crossing leaves settlePending true
+        // and immediately becomes the new active move (StartMove doesn't clear settlePending for a Forced kind).
+        // Releasing control unconditionally here, the moment that settle clears, let PlayerMotor's own walking
+        // resume in parallel with the knockback still in flight - two MovePosition calls fighting over the same
+        // Rigidbody for the rest of the shove.
+        if (motor != null && activeKind == null)
             motor.ExternalMotionControl = false;
     }
 
@@ -436,7 +461,11 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         }
 
         Transform barrierTransform = box.transform;
-        BoxFootprint footprint = BoxFootprint.FromBox(barrierTransform.position, barrierTransform.rotation,
+        // Review fix (arena step 4a nit): TransformPoint(box.center), not the transform's bare position - a
+        // BoxCollider whose own centre is offset from its transform's origin (the built barrier's collider is
+        // recentred on the blocking band, separate from its look) would otherwise build the footprint around the
+        // wrong point entirely.
+        BoxFootprint footprint = BoxFootprint.FromBox(barrierTransform.TransformPoint(box.center), barrierTransform.rotation,
             Vector3.Scale(box.size, barrierTransform.lossyScale));
 
         Vector2 centreXZ = new Vector2(rb.position.x, rb.position.z);
