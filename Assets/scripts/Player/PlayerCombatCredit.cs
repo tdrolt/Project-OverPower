@@ -222,9 +222,12 @@ public class PlayerCombatCredit : MonoBehaviourPun
     /// Mark plan step 4 (the one RPC signature change in this whole plan): cashedMark and
     /// markSecondsLeft are APPENDED after the existing two parameters, same name, same [PunRPC]
     /// count - appending parameters does not touch the RpcList (it indexes method NAMES, not
-    /// signatures, same as WeaponFiring's own appended-parameters note on RPC_FireWeapon), but every
-    /// client build must be running this exact signature from this commit on, or the extra
-    /// parameters silently misalign.
+    /// signatures, same as WeaponFiring's own appended-parameters note on RPC_FireWeapon). Review fix
+    /// (opus review, mark steps 3-4): a build from before this commit and one after cannot exchange
+    /// damage credit at all - PUN type-checks an incoming RPC's arguments against the receiver's own
+    /// method signature, logs "RPC method ... not found" for the mismatch, and drops the call outright,
+    /// rather than the parameters "silently misaligning" as an earlier version of this comment claimed.
+    /// Every client build must come from this exact commit on.
     /// </summary>
     [PunRPC]
     private void RPC_DamageCredit(float amount, byte takedown, bool cashedMark, float markSecondsLeft, PhotonMessageInfo info)

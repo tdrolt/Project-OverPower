@@ -197,7 +197,8 @@ public class ChargeRingView : MonoBehaviourPun
         }
 
         // A tick at each INTERNAL step boundary: the fraction where one more round is earned. The last boundary is the
-        // closed ring itself and needs no mark, and a weapon with no steps (the laser's smooth charge) gets none.
+        // closed ring itself and needs no mark, and a weapon with no steps (weapon 6's own smooth burst charge - the
+        // only weapon that still charges since the laser tree dropped it, mark plan step 4 review) gets none.
         Vector3 tickCentre = new Vector3(centre.x, centre.y + TicksAboveBand, centre.z);
         float half = theme.chargeRingStepTickLength * 0.5f;
         int wanted = Mathf.Clamp(weapon.ChargeSteps - 1, 0, MaxTicks);

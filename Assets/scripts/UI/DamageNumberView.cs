@@ -166,23 +166,47 @@ namespace Overpower.UI
         /// <summary>Tudor's answer 7 ("Blocked"), option (b): a one-off pop at the impact, never a
         /// running total - deliberately NOT looked up in or added to activeByTarget (see Slot.blocked),
         /// so a later real hit on the same victim always starts its own fresh number rather than
-        /// inheriting this slot's zero amount or grey colour.</summary>
+        /// inheriting this slot's zero amount or grey colour.
+        ///
+        /// Review fix (opus review, mark steps 3-4): a fast weapon (SMG Double Rate, a shotgun's own
+        /// pellet spread) can raise this many times against the SAME shielded victim in a single burst -
+        /// refresh the one Blocked pop already showing for them instead of claiming a fresh slot per
+        /// projectile, which used to stack up to a whole pellet spread's worth of "Blocked" labels on
+        /// one enemy and could fill the entire 24-slot pool. FindActiveBlockedSlot is a linear scan, not
+        /// a second dictionary: Blocked pops are rare (only while a victim's shield immunity is up), so
+        /// a 24-slot scan costs nothing, and a second Dictionary&lt;Transform,int&gt; just for this would
+        /// have to stay in lockstep with slots[] every time a Blocked slot got evicted for something
+        /// else.</summary>
         private void HandleBlockedSeen(Transform victim)
         {
             if (!theme.showDamageNumbers || victim == null)
                 return;
 
-            int slot = ClaimSlot(victim);
+            int existing = FindActiveBlockedSlot(victim);
+            int slot = existing >= 0 ? existing : ClaimSlot(victim);
             slots[slot].active = true;
             slots[slot].target = victim;
-            slots[slot].anchorOffset = ResolveAnchorOffset(victim);
+            slots[slot].anchorOffset = ResolveAnchorOffset(victim); // Refreshed even for a reused slot.
             slots[slot].amount = 0f;
             slots[slot].marked = false;
             slots[slot].blocked = true;
-            slots[slot].lastHitTime = Time.time;
+            slots[slot].lastHitTime = Time.time; // Refreshed even for a reused slot - restarts its own hold/fade life.
             slots[slot].label.gameObject.SetActive(true);
             slots[slot].label.SetText(theme.blockedText);
             slots[slot].label.color = theme.blockedColor;
+        }
+
+        /// <summary>-1 if `victim` has no active Blocked pop right now. Never matches a REAL number's
+        /// slot (Slot.blocked is false for those), so this can never accidentally hand a running total
+        /// over to HandleBlockedSeen to overwrite.</summary>
+        private int FindActiveBlockedSlot(Transform victim)
+        {
+            for (int i = 0; i < slots.Length; i++)
+            {
+                if (slots[i].active && slots[i].blocked && slots[i].target == victim)
+                    return i;
+            }
+            return -1;
         }
 
         private Vector3 ResolveAnchorOffset(Transform victim)
@@ -229,15 +253,36 @@ namespace Overpower.UI
                 }
             }
 
-            ReleaseTarget(slots[oldest].target);
+            // Review fix (opus review, mark steps 3-4): only release THIS slot's own registration -
+            // see OwnsRegistration's own comment for the bug this guards against.
+            if (OwnsRegistration(oldest, slots[oldest].target))
+                ReleaseTarget(slots[oldest].target);
             return oldest;
         }
+
+        /// <summary>Review fix (opus review, mark steps 3-4): true only when SLOT slotIndex is the one
+        /// activeByTarget currently credits with `target`'s running number - false for a "Blocked" pop
+        /// (HandleBlockedSeen never registers one - see its own comment) that merely happens to share a
+        /// victim with a real, still-live number sitting in a DIFFERENT slot. Bug this fixes: FreeSlot
+        /// and ClaimSlot's eviction used to call ReleaseTarget(slots[i].target) UNCONDITIONALLY, so
+        /// freeing an expired Blocked slot for a victim who ALSO had a live real number used to
+        /// unregister that OTHER slot's own activeByTarget/lastImpactByTarget entries the moment the
+        /// Blocked pop's own (independent) lifetime ran out - opening a duplicate slot for the very
+        /// next real hit on that victim and restarting its total. Deliberately does NOT special-case a
+        /// destroyed `target`: Dictionary<Transform,int> looks keys up by Equals/GetHashCode, which (unlike
+        /// the `==`/`!=` operators Unity overloads) does not treat a destroyed-but-not-yet-collected
+        /// Transform as null, so TryGetValue still finds a destroyed target's own real registration -
+        /// the steps-1-2 review's destroyed-victim fix (Slot.active) keeps working unchanged.</summary>
+        private bool OwnsRegistration(int slotIndex, Transform target) =>
+            activeByTarget.TryGetValue(target, out int registeredSlot) && registeredSlot == slotIndex;
 
         /// <summary>The bookkeeping a target's number no longer owns a slot needs, shared by FreeSlot
         /// (a number that finished its life) and ClaimSlot (a slot forcibly stolen from a still-live
         /// number to serve a new target) - review fix, steps 1-2: ClaimSlot used to remove only
         /// activeByTarget and leave lastImpactByTarget growing exactly the way ResolveAnchorOffset's
-        /// own fix above addresses for the read path.</summary>
+        /// own fix above addresses for the read path. Callers must check OwnsRegistration first (steps
+        /// 3-4 review) - this method itself does not, so it must never be called for a slot that does
+        /// not actually own the registration it would otherwise delete out from under someone else.</summary>
         private void ReleaseTarget(Transform target)
         {
             activeByTarget.Remove(target);
@@ -308,7 +353,10 @@ namespace Overpower.UI
 
         private void FreeSlot(int i)
         {
-            ReleaseTarget(slots[i].target);
+            // Review fix (opus review, mark steps 3-4): only release THIS slot's own registration -
+            // see OwnsRegistration's own comment for the bug this guards against.
+            if (OwnsRegistration(i, slots[i].target))
+                ReleaseTarget(slots[i].target);
             slots[i].active = false;
             slots[i].target = null;
             slots[i].label.gameObject.SetActive(false);

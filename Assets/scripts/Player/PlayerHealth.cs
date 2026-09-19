@@ -403,6 +403,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
             && info.Source != DamageSource.Burn && info.Source != DamageSource.Zone)
         {
+            // Review fix (opus review, mark steps 3-4): ImpactSeen used to be raised ONLY in the
+            // else branch below, so a Blocked hit never refreshed this victim's latest-impact record -
+            // once the last REAL impact aged out (DamageNumberView.ImpactFreshnessSeconds, ~1s), every
+            // later "Blocked" pop fell back to the victim's own centre instead of the actual impact
+            // point, even though "Blocked" is drawn "at the impact" the same as every other number
+            // (DamageNumberView.HandleBlockedSeen). Raised unconditionally now, before the Blocked
+            // decision, so a Blocked pop always has a fresh anchor to read from.
+            CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
+
             // Mark plan step 4, Tudor's answer 7 ("Blocked"), option (b) - no network: a shooter-side
             // guess, not the victim's truth (see CombatEvents.LocalBlockedSeen's own comment for the
             // accuracy trade-off this accepts). ShowsImmuneLook already replicates to every client
@@ -413,8 +422,6 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             Photon.Realtime.Player shooterSidePlayer = PhotonNetwork.CurrentRoom?.GetPlayer(info.SourceActorNumber);
             if (ShowsImmuneLook && !Teams.AreSameTeam(shooterSidePlayer, photonView.Owner))
                 CombatEvents.RaiseBlockedSeen(transform);
-            else
-                CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
         }
 
         // Bug 1.1: the victim is the sole authority on its own health, or every client would

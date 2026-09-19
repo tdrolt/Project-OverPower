@@ -33,11 +33,12 @@ namespace Overpower.Combat
         public static event Action<bool> LocalTakedown;
 
         /// <summary>Mark plan step 2: raised on the attacker's machine with the damage that actually
-        /// LANDED on `victim` (the victim's own truth) - `cashedMark` is false until mark step 4 wires
-        /// a real mark. Two raisers: PlayerCombatCredit.RPC_DamageCredit (a real, networked victim,
-        /// `transform` being that victim as THIS attacker sees it - the RPC runs on the victim's own
-        /// object) and DummyTarget (single-client, its own transform). DamageNumberView is the one
-        /// subscriber: this is "how much", paired with LocalImpactSeen below for "where".</summary>
+        /// LANDED on `victim` (the victim's own truth). `cashedMark` is true exactly when this hit used
+        /// up the attacker's own mark (mark step 4 wires this through both raisers below as
+        /// MarkOutcome.Cashed). Two raisers: PlayerCombatCredit.RPC_DamageCredit (a real, networked
+        /// victim, `transform` being that victim as THIS attacker sees it - the RPC runs on the
+        /// victim's own object) and DummyTarget (single-client, its own transform). DamageNumberView is
+        /// the one subscriber: this is "how much", paired with LocalImpactSeen below for "where".</summary>
         public static event Action<Transform, float, bool> LocalHitReported;
 
         /// <summary>Mark plan step 2 (Tudor's override, answer 2): raised on the SHOOTER's own machine
@@ -45,10 +46,15 @@ namespace Overpower.Combat
         /// possibly have arrived, since that's a separate round trip. A real player's PlayerHealth
         /// raises this on a copy it does NOT own, from inside ApplyDamage, BEFORE that method's
         /// IsMine/isDead return - the one place the shooter's own client ever sees where its shot hit.
-        /// A DummyTarget raises it unconditionally (it has no owner to be "not mine" about). Not the
-        /// same information as LocalHitReported: this carries no damage amount, only a point, and can
-        /// arrive on its own with nothing to report yet (a shot that gets blocked, or against a target
-        /// no local weapon actually damaged).</summary>
+        /// Review fix (opus review, mark steps 3-4): raised even when the hit is about to read as
+        /// "Blocked" (LocalBlockedSeen below fires separately, right after this one) - a Blocked pop is
+        /// drawn "at the impact" too, so it needs the same fresh anchor a real number gets. A
+        /// DummyTarget raises this too, guarded the same way (its own local-actor-and-point-source
+        /// check, added by the steps 1-2 review) - not "unconditionally" as an earlier version of this
+        /// comment claimed, since a dummy still must not re-anchor from a shot fired by someone else's
+        /// simulated copy. Not the same information as LocalHitReported: this carries no damage amount,
+        /// only a point, and can arrive on its own with nothing to report yet (a shot that gets
+        /// blocked, or against a target no local weapon actually damaged).</summary>
         public static event Action<Transform, Vector3> LocalImpactSeen;
 
         /// <summary>Mark plan step 4: seconds YOUR mark on `victim` has left, from the victim's own

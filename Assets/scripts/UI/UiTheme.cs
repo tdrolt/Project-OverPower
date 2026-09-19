@@ -732,11 +732,12 @@ namespace Overpower.UI
         [Tooltip("Canvas units the number is nudged from its anchor point - positive x to the right - so it sits " +
                  "beside the impact rather than exactly on top of it.")]
         public Vector2 damageNumberScreenOffset = new Vector2(50f, 0f);
-        [Tooltip("Text shown at the impact when your own shot is blocked by the enemy's shield (Tudor's answer 7). " +
+        [Tooltip("Text shown at the impact when your own shot is blocked by the enemy's shield. " +
                  "Shooter-side only - your own screen's best guess from the enemy's replicated shield look, not a " +
                  "message from them, so it can lag or miss right at the edges of the window.")]
         public string blockedText = "Blocked";
-        [Tooltip("Colour of the Blocked text above. Small and grey on purpose - it is a guess, not a confirmed hit.")]
+        [Tooltip("Colour of the Blocked text above - drawn at the ordinary Damage Number Text Size, not a smaller " +
+                 "one. Grey on purpose: it is a guess, not a confirmed hit.")]
         public Color blockedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
 
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
