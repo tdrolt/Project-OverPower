@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Abilities;
 using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Net;
@@ -230,7 +231,11 @@ public class PlayerMotor : MonoBehaviour
         Vector3 position = rb.position;
         float signed = bounds.SignedDistance(position);
         // The ray only matters for a spot that could be remembered, so it is skipped everywhere else.
-        bool grounded = signed >= capsule.radius && IsStandingOnFloor(position);
+        // Amendment 1: never remembered while standing on a barrier - a spot mid-crossing could otherwise be
+        // remembered as "safe" and the safety net would return a later fall here, back inside the barrier's own
+        // footprint.
+        bool grounded = signed >= capsule.radius && IsStandingOnFloor(position)
+                         && !PlayerSpaceProbe.IsInsideBarrier(capsule, position, transform);
 
         switch (OutOfArenaRule.Decide(signed, capsule.radius, grounded, hasLastSafePosition))
         {

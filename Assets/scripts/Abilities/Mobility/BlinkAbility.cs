@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Combat;
 
 namespace Overpower.Abilities
@@ -125,7 +126,10 @@ namespace Overpower.Abilities
                 // portal arrival since movement step 3, so the two can't drift apart.
                 Vector3 rootPosition = PlayerSpaceProbe.RootOnGround(capsule, new Vector3(candidateXZ.x, ground.y, candidateXZ.z));
 
-                if (PlayerSpaceProbe.IsCapsuleBlocked(capsule, rootPosition, blockMask, Owner.Root.transform))
+                // Amendment 1: the fit check sees barriers (BodiesWallsAndBarriers) even though the ground probe
+                // just above keeps blockMask (a barrier's top is never floor) - a blink aimed into one lands on the
+                // near side instead, the same walk-back BlinkDestinationSearch already does for a wall.
+                if (PlayerSpaceProbe.IsCapsuleBlocked(capsule, rootPosition, ArenaLayers.BodiesWallsAndBarriers, Owner.Root.transform))
                     return false;
 
                 landingPoint = rootPosition;

@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Arena;
 
 namespace Overpower.Weapons
 {
@@ -10,13 +11,15 @@ namespace Overpower.Weapons
     /// </summary>
     public static class HitMasks
     {
-        /// <summary>The designer's layer choices, minus two that are never negotiable: Bullet
-        /// (bullets colliding with each other was a fixed playtest bug) and DeadPlayer (a corpse
-        /// blocking shots was another). Both are correctness invariants rather than tuning, so they
-        /// are stripped here instead of trusted to the Inspector dropdown.</summary>
+        /// <summary>The designer's layer choices, minus three that are never negotiable: Bullet
+        /// (bullets colliding with each other was a fixed playtest bug), DeadPlayer (a corpse
+        /// blocking shots was another), and Barrier (GDD p.29: a jersey barrier blocks movement
+        /// only - every projectile passes it, including Stun Gun Bullet and Raybeam, whose own
+        /// hitMask ticks every layer). All three are correctness invariants rather than tuning, so
+        /// they are stripped here instead of trusted to the Inspector dropdown.</summary>
         public static int StripNonNegotiableLayers(LayerMask designerMask)
         {
-            return designerMask.value & ~LayerBit("Bullet") & ~LayerBit("DeadPlayer");
+            return designerMask.value & ~LayerBit("Bullet") & ~LayerBit("DeadPlayer") & ~ArenaLayers.Barrier;
         }
 
         private static int LayerBit(string layerName)

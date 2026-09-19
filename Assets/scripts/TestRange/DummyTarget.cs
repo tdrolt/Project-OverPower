@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
@@ -130,9 +131,9 @@ namespace Overpower.TestRange
         // capsule and judges it with DisplacementSweepRule) - it is plain scenery with a Collider - so this drives the same
         // "travel N metres, stop at the first wall or body" contract with a bare Physics.CapsuleCast
         // against this dummy's own CapsuleCollider instead, resolved a step at a time in Update.
-        // Same blockMask as PlayerDisplacement (Default | Building) for the same reason: Default
-        // carries every living player AND every other dummy, Building carries the walls and
-        // deployable cover.
+        // Same mask as PlayerDisplacement's own forcedBlockMask (Default | Building | Barrier, Amendment 1) for the
+        // same reason: Default carries every living player AND every other dummy, Building carries the walls and
+        // deployable cover, and a sonic pulse's shove stops a dummy at a barrier exactly like it stops a real player.
         private CapsuleCollider capsule;
         private int displaceBlockMask;
         private Coroutine displaceCoroutine;
@@ -206,7 +207,7 @@ namespace Overpower.TestRange
             capsule = GetComponent<CapsuleCollider>();
             if (capsule == null)
                 Debug.LogError($"[DummyTarget] {name}: no CapsuleCollider - a sonic pulse cannot knock this dummy back.");
-            displaceBlockMask = LayerMask.GetMask("Default", "Building");
+            displaceBlockMask = ArenaLayers.BodiesWallsAndBarriers;
 
             ResetToFull();
         }

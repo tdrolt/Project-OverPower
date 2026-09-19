@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Arena;
 
 namespace Overpower.Abilities
 {
@@ -59,6 +60,13 @@ namespace Overpower.Abilities
 
             return false;
         }
+
+        /// <summary>Amendment 1 (arena step 4a): true when a player-sized capsule rooted here overlaps a jersey
+        /// barrier. One name for the one check every barrier-aware caller needs (PlayerMotor's grounded check,
+        /// PlayerDisplacement's Finish/Settle), so "is this player inside a barrier" is never re-spelled as its own
+        /// IsCapsuleBlocked call with the mask typed out by hand.</summary>
+        public static bool IsInsideBarrier(CapsuleCollider capsule, Vector3 rootPosition, Transform self) =>
+            IsCapsuleBlocked(capsule, rootPosition, ArenaLayers.Barrier, self);
 
         /// <summary>
         /// True when nothing on the Building layer - a wall, a house, a crate, deployable cover - stands between two

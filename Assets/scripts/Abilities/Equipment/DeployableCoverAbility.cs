@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Arena;
 
 namespace Overpower.Abilities
 {
@@ -41,19 +42,10 @@ namespace Overpower.Abilities
                  "aim direction, the wall is centred. Tudor's spec: 3m.")]
         private float placementDistance = 3f;
 
-        // Default|Building - the same "what counts as solid" mask TeleportAbility.blockMask uses for
-        // its own placement check; not a design tunable, for the same reason that field is not one.
-        private int blockMask;
-
         // Owner only: the prefab's own CoverWall, read once so TryBuildCast's placement check and
         // ExecuteCast's spawn agree on the same size without a GetComponent every cast. Also doubles
         // as the "is Cover Prefab actually usable" check, the same shape as Portal's portalTemplate.
         private CoverWall coverTemplate;
-
-        private void Awake()
-        {
-            blockMask = LayerMask.GetMask("Default", "Building");
-        }
 
         public override void OnEquip()
         {
@@ -102,10 +94,11 @@ namespace Overpower.Abilities
         }
 
         /// <summary>
-        /// True if a wall-sized box at this point, facing direction, would overlap a wall or a
-        /// player's body. Uses CoverWall.GroundLift - the exact lift the real collider is built with
-        /// (CoverWall.ApplyDimensions) - so the check volume and the real one agree on the same
-        /// geometry; see the class comment for why no explicit self-exclusion is needed on top of it.
+        /// True if a wall-sized box at this point, facing direction, would overlap a wall, a barrier or a player's
+        /// body (Amendment 1: BodiesWallsAndBarriers, not just Default|Building - placing cover overlapping a
+        /// barrier would leave part of the wall fused into it). Uses CoverWall.GroundLift - the exact lift the real
+        /// collider is built with (CoverWall.ApplyDimensions) - so the check volume and the real one agree on the
+        /// same geometry; see the class comment for why no explicit self-exclusion is needed on top of it.
         /// </summary>
         private bool IsBlocked(Vector3 point, Vector3 direction)
         {
@@ -114,7 +107,7 @@ namespace Overpower.Abilities
             Vector3 halfExtents = new Vector3(coverTemplate.Width * 0.5f, halfHeight, coverTemplate.Thickness * 0.5f);
             Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
 
-            return Physics.CheckBox(center, halfExtents, rotation, blockMask, QueryTriggerInteraction.Ignore);
+            return Physics.CheckBox(center, halfExtents, rotation, ArenaLayers.BodiesWallsAndBarriers, QueryTriggerInteraction.Ignore);
         }
     }
 }

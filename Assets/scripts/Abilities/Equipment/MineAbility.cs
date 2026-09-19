@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Combat;
 
 namespace Overpower.Abilities
@@ -74,6 +75,11 @@ namespace Overpower.Abilities
         // places a mine through the arena floor. Computed in Awake, not a static field initializer - the same
         // LayerMask.GetMask crash-on-spawn PlayerDisplacement's class comment documents.
         private int blockMask;
+
+        // Amendment 1: the sphere FindSafePlacement checks a candidate's feet with, so a mine is never hidden
+        // inside a barrier's own concrete - not a design tunable, the same reasoning as blockMask.
+        private const float BarrierCheckUpMetres = 0.3f;
+        private const float BarrierCheckRadiusMetres = 0.3f;
 
         private void Awake()
         {
@@ -167,7 +173,15 @@ namespace Overpower.Abilities
                         killHeight, blockMask, Owner.Root.transform, out Vector3 ground))
                 {
                     Vector3 candidateFeet = ground;
-                    if (PlayerSpaceProbe.IsPathClear(casterFeet, candidateFeet))
+
+                    // Amendment 1: rejected the same as a blocked path - neither the ground probe (blockMask) nor
+                    // IsPathClear (Building only) sees a barrier, so without this a mine could land hidden inside
+                    // one. The walk-back this loop already does then lands it in front of the barrier instead; a
+                    // mine deliberately thrown OVER one (a candidate beyond it, with a clear path) still lands there.
+                    bool insideBarrier = Physics.CheckSphere(candidateFeet + Vector3.up * BarrierCheckUpMetres,
+                        BarrierCheckRadiusMetres, ArenaLayers.Barrier, QueryTriggerInteraction.Ignore);
+
+                    if (!insideBarrier && PlayerSpaceProbe.IsPathClear(casterFeet, candidateFeet))
                         return PlayerSpaceProbe.RootOnGround(capsule, candidateFeet);
                 }
 

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Combat;
 
 namespace Overpower.Abilities
@@ -96,11 +97,6 @@ namespace Overpower.Abilities
         // Fixed here rather than exposed, the same reasoning PlayerDisplacement gives for its mask.
         private int blockMask;
 
-        // Building only, for the two checks added in movement step 3: what may stand between the caster and a
-        // placement, and what makes an exit unusable. Players are deliberately NOT in it - an enemy standing on your
-        // exit must not lock your portal.
-        private int buildingMask;
-
         // The caster's own capsule, read in OnEquip like Blink's: a portal is placed for a player to arrive on, so it
         // is checked against the real player shape.
         private CapsuleCollider capsule;
@@ -135,7 +131,6 @@ namespace Overpower.Abilities
         private void Awake()
         {
             blockMask = LayerMask.GetMask("Default", "Building");
-            buildingMask = LayerMask.GetMask("Building");
             channelState = new PortalChannelState(channelSeconds);
         }
 
@@ -429,8 +424,10 @@ namespace Overpower.Abilities
         /// it out in whatever direction it could.</summary>
         private Vector3 ArrivalRoot(Portal to) => PlayerSpaceProbe.RootOnGround(capsule, to.transform.position);
 
-        /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare, and
-        /// not inside a wall, house, crate or cover. Other players don't count (see buildingMask).</summary>
+        /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare,
+        /// and not inside a wall, house, crate, cover or (Amendment 1) a barrier - crossing by portal is allowed, so
+        /// arriving fused into one is refused the same way arriving inside a wall already was. Other players don't
+        /// count (Building | Barrier, not a body layer).</summary>
         private bool IsExitClear(Portal to)
         {
             if (capsule == null)
@@ -438,7 +435,7 @@ namespace Overpower.Abilities
 
             Vector3 root = ArrivalRoot(to);
             return Overpower.Arena.ArenaSymmetry.IsInsideArena(root, capsule.radius)
-                   && !PlayerSpaceProbe.IsCapsuleBlocked(capsule, root, buildingMask, Owner.Root.transform);
+                   && !PlayerSpaceProbe.IsCapsuleBlocked(capsule, root, ArenaLayers.WallsAndBarriers, Owner.Root.transform);
         }
 
         // The check volume's vertical band above the grounded point - not a design tunable, the
@@ -469,7 +466,9 @@ namespace Overpower.Abilities
             Vector3 center = groundPoint + Vector3.up * ((BlockCheckBottom + BlockCheckTop) * 0.5f);
             Vector3 halfExtents = new Vector3(radius, (BlockCheckTop - BlockCheckBottom) * 0.5f, radius);
 
-            Collider[] overlaps = Physics.OverlapBox(center, halfExtents, Quaternion.identity, blockMask, QueryTriggerInteraction.Ignore);
+            // Amendment 1: BodiesWallsAndBarriers, not blockMask - a portal placed overlapping a barrier could put a
+            // traveller who arrives on it fused into the barrier's own collider.
+            Collider[] overlaps = Physics.OverlapBox(center, halfExtents, Quaternion.identity, ArenaLayers.BodiesWallsAndBarriers, QueryTriggerInteraction.Ignore);
             foreach (Collider overlap in overlaps)
             {
                 if (overlap.transform.IsChildOf(Owner.Root.transform))
