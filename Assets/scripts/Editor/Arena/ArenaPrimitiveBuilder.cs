@@ -17,10 +17,11 @@ namespace Overpower.EditorTools
     /// Decision 13), BuildSource (the boundary walls fresh from Arena Symmetry's Source Outline, plus every Block and
     /// Barrier row from ArenaLayout, base plan Decision 4 and Amendment 1's D3/D11/D24/D25), and BuildFloor (one flat
     /// slab). Step 5's BuildAll runs every phase in order, then Rebuild thirds and the minimap bake, so the menu
-    /// applies the whole primitive arena in one call ("OverPower > Arena > Build primitive arena"). None of these
-    /// ever run in Play Mode (a live, networked tower or a live boundary wall would change on this client only and
-    /// desync the match), and none of them save the scene themselves - the caller looks at the report first, then
-    /// saves.
+    /// applies the whole primitive arena in one call ("OverPower > Arena > Build primitive arena"). Step 9 (only
+    /// after Tudor says so) adds DeleteOldArt, which permanently removes the "Old Arena (off)" group MoveOldArtAside
+    /// made. None of these ever run in Play Mode (a live, networked tower or a live boundary wall would change on
+    /// this client only and desync the match), and none of them save the scene themselves - the caller looks at the
+    /// report first, then saves.
     /// </summary>
     public static class ArenaPrimitiveBuilder
     {
@@ -211,6 +212,33 @@ namespace Overpower.EditorTools
         {
             child.SetParent(destination, true); // worldPositionStays: true
             report.Add($"moved '{child.name}' -> {destination.name}");
+        }
+
+        /// <summary>
+        /// Arena step 9 (only after Tudor says so, base plan Decision 13's rollback note): permanently destroys the
+        /// "Old Arena (off)" group made by <see cref="MoveOldArtAside"/>, and nothing else. The towers' own disabled
+        /// house components and the hidden carpets are never part of that group - they stay on the tower objects
+        /// themselves (Decision 5/10) - so they are untouched. A no-op (not a refusal) if the group doesn't exist:
+        /// nothing to delete. Never runs in Play Mode; never saves the scene itself.
+        /// </summary>
+        public static List<string> DeleteOldArt(Transform environment)
+        {
+            var report = new List<string>();
+            if (EditorApplication.isPlaying) { report.Add(PlayModeRefusal); return report; }
+            if (environment == null) { report.Add("PROBLEM: no Enviorment root given."); return report; }
+
+            Transform oldArt = environment.Find(OldArtGroupName);
+            if (oldArt == null)
+            {
+                report.Add($"'{OldArtGroupName}' not found under '{environment.name}' - nothing to delete.");
+                return report;
+            }
+
+            int directChildren = oldArt.childCount;
+            Object.DestroyImmediate(oldArt.gameObject);
+            report.Add($"Destroyed '{OldArtGroupName}' ({directChildren} direct children).");
+            EditorSceneManager.MarkSceneDirty(environment.gameObject.scene);
+            return report;
         }
 
         /// <summary>

@@ -68,10 +68,14 @@ namespace Overpower.Tests
 
                 Transform environment = FindEnvironment(scene);
                 Assert.IsNotNull(environment, "no 'Enviorment' root found");
+                // Arena step 9: 'Old Arena (off)' is permanently deleted once Tudor says so, so it may legitimately
+                // be absent - unlike step 4/5, where it existed but was switched off. IsChildOf(null) throws, so
+                // guard it instead of assuming the group is still there.
+                Transform oldArt = environment.Find(OldArtGroupName);
                 foreach (Renderer renderer in environment.GetComponentsInChildren<Renderer>(true))
                 {
                     if (!renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
-                    if (renderer.transform.IsChildOf(environment.Find(OldArtGroupName))) continue;
+                    if (oldArt != null && renderer.transform.IsChildOf(oldArt)) continue;
 
                     MeshFilter filter = renderer.GetComponent<MeshFilter>();
                     if (filter != null && filter.sharedMesh != null)

@@ -225,6 +225,36 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void DeleteOldArtDestroysOnlyTheOldArtGroup()
+        {
+            // Arena step 9: MoveOldArtAside's own group goes; a tower's disabled house parts and hidden carpets are
+            // never inside it (Decision 5/10 keep them on the tower object itself), modelled here by an unrelated
+            // sibling under the same environment root that must survive untouched.
+            Transform environment = MakeRoot("Enviorment").transform;
+            Transform oldArt = MakeChild(ArenaPrimitiveBuilder.OldArtGroupName, environment);
+            oldArt.gameObject.SetActive(false);
+            MakeChild("Source (old copy)", oldArt);
+            MakeChild("Some Other Sibling", environment);
+
+            List<string> report = ArenaPrimitiveBuilder.DeleteOldArt(environment);
+
+            Assert.IsFalse(report.Any(l => l.Contains("PROBLEM")), string.Join("\n", report));
+            Assert.IsNull(environment.Find(ArenaPrimitiveBuilder.OldArtGroupName), "'Old Arena (off)' should be gone");
+            Assert.IsNotNull(environment.Find("Some Other Sibling"), "nothing else under Enviorment should be touched");
+        }
+
+        [Test]
+        public void DeleteOldArtIsANoOpWhenThereIsNothingToDelete()
+        {
+            Transform environment = MakeRoot("Enviorment").transform;
+
+            List<string> report = ArenaPrimitiveBuilder.DeleteOldArt(environment);
+
+            Assert.IsFalse(report.Any(l => l.Contains("PROBLEM")), string.Join("\n", report));
+            Assert.IsNull(environment.Find(ArenaPrimitiveBuilder.OldArtGroupName));
+        }
+
+        [Test]
         public void BuildSourceThenCaptureRoundTripsABarrierRowUnchanged()
         {
             // Review finding (2026-09-19): a built barrier's own BoxCollider spans the BLOCKING band, not the look,
