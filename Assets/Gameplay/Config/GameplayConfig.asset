@@ -28,7 +28,7 @@ MonoBehaviour:
   slowCap: 0.6
   vulnerabilityCap: 0.6
   abilityPressBufferSeconds: 0.12
-  freeLoadout: 1
+  freeLoadout: 0
   sellRefundRate: 0.5
   enableOverPower: 1
   overPowerWindowSeconds: 3
