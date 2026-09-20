@@ -22,6 +22,12 @@ namespace Overpower.Weapons
     /// comments). Before Detonated existed, an airburst (a rocket reaching its range end, or the cursor rocket
     /// reaching the cursor) showed nothing at all; wiring up to that one event is what makes the airburst half of A6
     /// real, not a second code path here. Visual only - an IProjectileBehaviour that never keeps a shot flying.
+    ///
+    /// 2026-09-20 (Tudor: "show what actually got hit" over the full ring every time): Detonated now also carries
+    /// the radius that actually applied damage this blast - 0 for a glancing hit that caught nobody, or a shot that
+    /// found nothing at all. SplashShell.Spawn already refuses a radius &lt;= 0 (draws nothing), so the fix is
+    /// entirely in what gets passed here - see ExplodeOnImpact.Detonated's own comment for where that number comes
+    /// from and why it needs no new networked state.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(ExplodeOnImpact))]
@@ -55,10 +61,12 @@ namespace Overpower.Weapons
 
         public void OnExpired(ProjectileMotor projectileMotor, ProjectileContext context) { }
 
-        private void HandleDetonated(Vector3 centre)
+        private void HandleDetonated(Vector3 centre, float actualRadius)
         {
+            // actualRadius is already 0 for a blast that hit nothing it could damage - SplashShell.Spawn
+            // refuses that on its own, so there is nothing else to gate here.
             Color color = theme != null ? theme.ShotColorFor(shooterTeam) : Color.white;
-            SplashShell.Spawn(splashShellPrefab, centre, explode.SplashRadius, color);
+            SplashShell.Spawn(splashShellPrefab, centre, actualRadius, color);
         }
     }
 }
