@@ -48,9 +48,10 @@ MonoBehaviour:
   charges: 1
   vulnerabilityPerBeam: 0.3
   vulnerabilitySeconds: 4
-  beamOriginSpacing: 0.75
-  beamRange: 24
-  beamWidth: 0.525
+  beamOriginSpacing: 0.9
+  beamRange: 28.8
+  beamWidth: 0.6825
+  beamConvergenceRange: 15
   hitMask:
     serializedVersion: 2
     m_Bits: 4294967295

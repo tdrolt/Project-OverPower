@@ -12,9 +12,15 @@ namespace Overpower.Tests
     /// </summary>
     public class RaybeamGeometryTests
     {
-        private const float Spacing = 0.75f;
-        private const float Range = 24f;      // beamRange (rework step 6: 12 -> 24, Tudor's "traverse" x2)
-        private const float Radius = 0.2625f; // beamWidth 0.525 / 2 (rework step 6: 0.35 -> 0.525)
+        // 2026-09-20 rework, Tudor: "the raybeam is supposed to be a long range ultimate... make the
+        // beams a bit thicker (30%) and give them 20% more range" - these three constants are a
+        // design pin on RaybeamAbility's own prefab values, updated alongside them (beamRange 24 ->
+        // 28.8, beamWidth 0.525 -> 0.6825, beamOriginSpacing 0.75 -> 0.9 to keep the same visible
+        // gap between the now-fatter beam edges). RaybeamGeometry itself is unchanged - only the
+        // numbers these tests exercise it with moved.
+        private const float Spacing = 0.9f;
+        private const float Range = 28.8f;     // beamRange
+        private const float Radius = 0.34125f; // beamWidth 0.6825 / 2
 
         [Test]
         public void BeamOriginsAreSpacedPerpendicularToDirectionWithTheCentreAtOrigin()
@@ -103,12 +109,19 @@ namespace Overpower.Tests
         [Test]
         public void OnlyTheBeamAimedThereCrossesAPointThatSitsOnItsOwnLineButNotTheOthers()
         {
-            // Verify scenario 2: cursor a few metres past the dummy, dummy offset laterally so
-            // only the beam aimed through it actually crosses - the other two, aimed at the same
-            // convergence Point from a different origin, pass nowhere near.
+            // Verify scenario 2: cursor further past the dummy, dummy offset laterally so only the
+            // beam aimed through it actually crosses - the other two, aimed at the same convergence
+            // Point from a different origin, pass nowhere near.
+            // 2026-09-20 rework: point.z moved 8 -> 16 (dummy depth kept at 5). At the old 8m the
+            // "miss" margin for the centre beam was only 0.3375m against the old 0.2625m radius - a
+            // 1.29x buffer that the new, 30%-thicker 0.34125m radius (Tudor: "make the beams a bit
+            // thicker (30%)") ate into and flipped to a false positive. Pushing the cursor point out
+            // to 16m widens that same lateral gap to 0.619m, a 1.8x buffer against the new radius -
+            // this test is about the aim-from-a-different-origin claim, not about pinning a specific
+            // range, so widening the scenario's own geometry is the fix, not a design change.
             Vector3 origin = Vector3.zero;
             Vector3 direction = Vector3.forward;
-            Vector3 point = new Vector3(0f, 0f, 8f); // cursor 3m past the dummy's own depth (5m)
+            Vector3 point = new Vector3(0f, 0f, 16f); // cursor 11m past the dummy's own depth (5m)
 
             RaybeamGeometry.BeamOrigins(origin, direction, Spacing, out Vector3 left, out Vector3 centre, out Vector3 right);
 
@@ -116,7 +129,7 @@ namespace Overpower.Tests
             Vector3 centreDir = RaybeamGeometry.AimFromOriginToPoint(centre, point, direction);
             Vector3 leftDir = RaybeamGeometry.AimFromOriginToPoint(left, point, direction);
 
-            // A point exactly on the right beam's own segment, at 5m of the 8m depth to Point.
+            // A point exactly on the right beam's own segment, at 5m of the 16m depth to Point.
             float t = 5f / point.z;
             Vector3 onRightBeamOnly = Vector3.Lerp(right, point, t);
 
@@ -131,7 +144,7 @@ namespace Overpower.Tests
         [Test]
         public void BeamCrossesReturnsFalseBeyondItsRange()
         {
-            Vector3 farTarget = new Vector3(0f, 0f, 30f); // past the rework-step-6 24m range (was 20f past 12m)
+            Vector3 farTarget = new Vector3(0f, 0f, 35f); // past the 2026-09-20 28.8m range (was 30f past 24m)
             Assert.IsFalse(RaybeamGeometry.BeamCrosses(Vector3.zero, Vector3.forward, Range, Radius, farTarget));
         }
 

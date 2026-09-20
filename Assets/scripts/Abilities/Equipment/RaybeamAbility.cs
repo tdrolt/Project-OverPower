@@ -29,6 +29,31 @@ namespace Overpower.Abilities
     /// a flat 0.08m from the shared Laser Beam VFX prefab regardless of beamWidth, a 4.4x mismatch
     /// between what a player saw and what actually hit them.
     ///
+    /// REWORK 2026-09-20 (Tudor: "the raybeam is supposed to be a long range ultimate... make the
+    /// beams a bit thicker (30%) and give them 20% more range"): beamRange 24 -> 28.8 (+20%),
+    /// beamWidth 0.525 -> 0.6825 (+30%). The 30% thickness alone leaves only ~6.75cm of gap between
+    /// adjacent beam edges at the muzzle (spacing 0.75 - beamWidth 0.6825) - close to fusing into one
+    /// fat beam - so beamOriginSpacing also moves 0.75 -> 0.9, which puts the edge gap back to almost
+    /// exactly what it was before this rework (0.225 -> 0.2175m), i.e. the three beams read exactly
+    /// as distinguishable as they always did, just each one fatter.
+    ///
+    /// THE SPREAD (this rework's second half, a controller judgement call, not Tudor's literal
+    /// words): converging the outer beams on the CURSOR's exact depth (the pre-existing mechanic,
+    /// AimFromOriginToPoint) already lands all three beams exactly on target at ANY range for a
+    /// pixel-perfect click - RaybeamGeometryTests proves this holds unchanged from muzzle to the far
+    /// end of the range. The catch is that a real player cannot click a ground-plane cursor
+    /// pixel-perfectly on a distant target: the further out the cursor sits, the more a small
+    /// screen-space slip becomes a large world-space depth error, which is what actually produced
+    /// "only works within ~3m" in practice, not a flaw in the convergence maths itself. Making the
+    /// bonus reliable at REAL FIGHTING RANGE (10-20m) therefore means no longer trusting the cursor's
+    /// exact depth for the two outer beams: they now always converge at beamConvergenceRange metres
+    /// straight down the shooter's own aim direction, regardless of exactly where the cursor sits.
+    /// The centre beam is unaffected (its origin already sits on the aim line, so aiming it at that
+    /// same fixed point is identical to firing it straight down Direction). Tudor's own "lining up"
+    /// skill becomes about closing to roughly the right distance and firing along the target, not
+    /// about clicking a specific metre of ground - which fits an ultimate Tudor now calls "long
+    /// range" better than a mechanic that quietly punished exactly the players fighting at range.
+    ///
     /// RUNS ON EVERY CLIENT, INCLUDING THE CASTER'S OWN, exactly once per cast - the beams are
     /// instant, so there is no coroutine the way the flamethrower's spray needs one. DAMAGE (well,
     /// STATUS) IS VICTIM-SIDE, EXACTLY LIKE HITSCAN: every client resolves the same three rays from
@@ -72,8 +97,10 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("How far apart the two outer beams start either side of the muzzle, " +
                  "in metres. Controller's call: wide enough that the three beams read as separate " +
                  "shots at close range, narrow enough that all three still converge on one target at " +
-                 "the tuned range below.")]
-        private float beamOriginSpacing = 0.75f;
+                 "the tuned range below. 2026-09-20: nudged 0.75 -> 0.9 to keep the same visible gap " +
+                 "between beam edges now that Beam Width is 30% fatter (see its own tooltip) - purely " +
+                 "a readability correction, not an attempt to change the spread.")]
+        private float beamOriginSpacing = 0.9f;
 
         [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in " +
                  "metres, pierce included. Two things at once: the CAMERA sets how far out you can " +
@@ -83,16 +110,32 @@ namespace Overpower.Abilities
                  "instead of at the cursor. That makes this both how far a beam keeps hitting things " +
                  "past its target AND the furthest point the three beams can ever converge, whatever " +
                  "the camera would otherwise let you reach. Tudor, 2026-09-18: \"i want for the " +
-                 "beams to traverse\" - doubled from 12 to 24.")]
-        private float beamRange = 12f;
+                 "beams to traverse\" - doubled from 12 to 24. Tudor, 2026-09-20: \"give them 20% " +
+                 "more range\" - 24 -> 28.8.")]
+        private float beamRange = 28.8f;
 
         [SerializeField, Tooltip("Diameter of each beam, in metres - BOTH what it hits (the " +
                  "SphereCast radius below) AND what you see (DrawBeam sets the drawn line's width " +
                  "from this same number, on the instantiated clone only - never on the shared Laser " +
                  "Beam VFX prefab, which the two laser weapons also use). One number, one home: " +
                  "before rework step 6 the drawn line was a flat 0.08m regardless of this value. " +
-                 "Tudor, 2026-09-18: \"thickness of the beam 1.5 times\" - 0.35 -> 0.525.")]
-        private float beamWidth = 0.35f;
+                 "Tudor, 2026-09-18: \"thickness of the beam 1.5 times\" - 0.35 -> 0.525. Tudor, " +
+                 "2026-09-20: \"make the beams a bit thicker (30%)\" - 0.525 -> 0.6825.")]
+        private float beamWidth = 0.6825f;
+
+        [SerializeField, Tooltip("How far downrange, in metres, the two OUTER beams are aimed to " +
+                 "cross the centre beam's line - a fixed distance along the shooter's own aim " +
+                 "direction, not wherever the cursor happens to sit. 2026-09-20: this is the fix for " +
+                 "\"the raybeam is supposed to be a long range ultimate\" - converging on the cursor's " +
+                 "exact depth already works at any range for a pixel-perfect click, but a ground " +
+                 "cursor cannot deliver pixel-perfect depth at range, which is what actually limited " +
+                 "the old stacked-vulnerability bonus to close quarters. Fixing the crossing point " +
+                 "here instead means catching two or three beams is about closing to roughly this " +
+                 "distance and firing along the target, not about clicking one exact metre of ground. " +
+                 "Default 15 sits in the middle of the 10-20m band Tudor's ultimate is meant to reward; " +
+                 "clamped to Beam Range so it can never ask a beam to converge past where it stops " +
+                 "existing.")]
+        private float beamConvergenceRange = 15f;
 
         [SerializeField, Tooltip("Which layers a beam can hit. Default is where living players and " +
                  "dummies sit; Building is the walls a beam must stop at. Deployable cover is found " +
@@ -127,6 +170,7 @@ namespace Overpower.Abilities
             beamOriginSpacing = Mathf.Max(0f, beamOriginSpacing);
             beamRange = Mathf.Max(0.1f, beamRange);
             beamWidth = Mathf.Max(0.01f, beamWidth);
+            beamConvergenceRange = Mathf.Clamp(beamConvergenceRange, 0.1f, beamRange);
             beamVisualSeconds = Mathf.Max(0f, beamVisualSeconds);
             RebuildSpec();
         }
@@ -208,16 +252,24 @@ namespace Overpower.Abilities
 
             Vector3 origin = cast.Payload.Origin;
             Vector3 direction = cast.Payload.Direction;
-            Vector3 point = cast.Payload.Point;
             int casterActor = cast.CasterActor;
             int casterTeam = cast.CasterTeam;
 
             RaybeamGeometry.BeamOrigins(origin, direction, beamOriginSpacing,
                 out Vector3 left, out Vector3 centre, out Vector3 right);
 
-            FireOneBeam(left, point, direction, casterActor, casterTeam);
-            FireOneBeam(centre, point, direction, casterActor, casterTeam);
-            FireOneBeam(right, point, direction, casterActor, casterTeam);
+            // 2026-09-20 rework (see beamConvergenceRange's own tooltip): the outer beams converge
+            // on a FIXED point straight down the shooter's own aim direction, never on the cursor's
+            // cast.Payload.Point - that field is still computed and sent (other systems may still
+            // want it), it just no longer decides where these beams cross. The centre beam's origin
+            // already sits on the aim line, so aiming it at the same fixed point is identical to
+            // firing it straight down direction - passing the same point to all three keeps this one
+            // formula instead of special-casing the centre beam.
+            Vector3 convergePoint = origin + direction * Mathf.Min(beamConvergenceRange, beamRange);
+
+            FireOneBeam(left, convergePoint, direction, casterActor, casterTeam);
+            FireOneBeam(centre, convergePoint, direction, casterActor, casterTeam);
+            FireOneBeam(right, convergePoint, direction, casterActor, casterTeam);
         }
 
         /// <summary>
