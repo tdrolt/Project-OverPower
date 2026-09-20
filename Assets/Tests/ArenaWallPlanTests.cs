@@ -86,12 +86,19 @@ namespace Overpower.Tests
         // one of Amendment 1 section A's two real kinds: a 90 degree outward corner, or one of the six 270 degree
         // reflex corners (three of them seams onto the next third) - the exact shape the BEFORE coverage record
         // (coverage-before.txt) finds 12 notches in today's captured walls.
+        //
+        // P1 and P2 (the Tier III recess's back edge) updated 2026-09-20: Tudor - "increase the pocket size by a
+        // small bit (0.2-0.3)" so a portal (needs 2.5 m of floor) fits behind the recess's jersey barrier (it had
+        // ~2.4 m). Both points moved 0.25 m further from RealCentre, along the P0->P1 direction (already exactly
+        // perpendicular to the P0-P3 mouth line), which is also the P3->P2 direction - so the back edge stays
+        // parallel to the mouth line, the same length, just 0.25 m further out. P0 and P3 (the mouth corners, one of
+        // them a third-to-third seam) are untouched, so every other corner's angle and extension is unchanged.
         private static readonly Vector3 RealCentre = new Vector3(65.05f, 0f, 53.34f);
         private static readonly List<Vector2> RealSourceOutline = new List<Vector2>
         {
             new Vector2(96.184f, 60.034f),
-            new Vector2(98.782f, 61.534f),
-            new Vector2(89.012f, 78.456f),
+            new Vector2(98.9985046f, 61.6590042f),
+            new Vector2(89.22851f, 78.581f),
             new Vector2(86.414f, 76.956f),
             new Vector2(75.451f, 95.944f),
             new Vector2(75.451f, 121.401f),
