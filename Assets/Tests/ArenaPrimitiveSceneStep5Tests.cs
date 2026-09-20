@@ -223,6 +223,41 @@ namespace Overpower.Tests
             });
         }
 
+        /// <summary>Load-time-and-stones brief (2026-09-20): Tudor - "please also remove the little cubes (i
+        /// think they are supposed to represent the stones from the map) since they really dont add anything."
+        /// Written red against the pre-removal scene (it still had 6 Rock_03 + 8 Plant_01 blocks per third),
+        /// green once ArenaLayout.asset drops those rows and the builder re-runs. The six Cover Crate blocks
+        /// and every house block are real cover and must survive untouched.</summary>
+        [Test]
+        public void TheOldStoneAndBushBlocksAreGoneButCoverCratesAndHousesRemain()
+        {
+            WithGameScene(scene =>
+            {
+                Transform[] thirds = FindThirds(scene);
+                Assert.AreEqual(3, thirds.Length);
+
+                foreach (Transform third in thirds)
+                {
+                    Transform blocks = third.Find(ArenaPrimitiveBuilder.BlocksGroupName);
+                    Assert.IsNotNull(blocks, $"{third.name} has no Blocks group");
+
+                    int crateCount = 0, houseCount = 0;
+                    foreach (Transform block in blocks)
+                    {
+                        Assert.IsFalse(block.name.StartsWith("Rock_03"),
+                            $"'{block.name}' under {third.name} should have been removed (Tudor: the stones add nothing)");
+                        Assert.IsFalse(block.name.StartsWith("Plant_01"),
+                            $"'{block.name}' under {third.name} should have been removed (Tudor: the bushes add nothing)");
+
+                        if (block.name.StartsWith("Cover Crate")) crateCount++;
+                        else houseCount++;
+                    }
+                    Assert.AreEqual(6, crateCount, $"{third.name} should still have all six Cover Crate blocks");
+                    Assert.AreEqual(6, houseCount, $"{third.name} should still have all six house blocks");
+                }
+            });
+        }
+
         private static BoxFootprint BoxFootprintFromBox(BoxCollider box)
         {
             Vector3 worldSize = Vector3.Scale(box.size, box.transform.lossyScale);
