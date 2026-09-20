@@ -152,6 +152,26 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void DyingHidesTheImmuneFrameEvenBeforeItsOwnFourSecondsAreUp()
+        {
+            // Item 3, 2026-09-20 (Tudor: the bar over a dead player hides with the body): the frame is
+            // a CHILD of overheadBarRoot, so SetOverheadBarVisible(false) already takes it out of the
+            // hierarchy visually - but its own activeSelf stayed true, relying entirely on Update's
+            // background tick (immuneLook running out on its own clock) to have already cleared it by
+            // the time a respawn shows the bar again. A respawn faster than the immune window's own
+            // remaining time - and a remote client never calls ResetForRespawn for someone else's
+            // PlayerHealth at all, only Update's tick - meant the frame could still be "on" the instant
+            // the bar reappears. Dying must force it off outright, not race a 4-second clock.
+            health.ShowImmuneLook(4f);
+            Assert.IsTrue(FindFrameRoot().activeSelf, "arm the frame first, or this test proves nothing");
+
+            health.SetOverheadBarVisible(false);
+
+            Assert.IsFalse(FindFrameRoot().activeSelf, "a dead player must not carry the immune frame into their next life");
+            Assert.IsFalse(health.ShowsImmuneLook);
+        }
+
+        [Test]
         public void AZeroWashAlphaLeavesTheWashInvisible()
         {
             theme.immuneBarWashAlpha = 0f;

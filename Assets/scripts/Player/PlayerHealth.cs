@@ -207,13 +207,20 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         if (overheadBarRoot != null)
             overheadBarRoot.SetActive(visible);
-        // No separate hide for overheadImmuneFrame: it is a CHILD of overheadBarRoot, so
-        // SetActive(false) above already takes it out of the hierarchy with everything else on the
-        // bar. Review fix (steps 1-2), still true of the frame (carry-over C): the frame itself has no
-        // Update - PlayerHealth's own Update (below) is what ticks the immune-look expiry, and it
-        // lives on the PLAYER root, which stays active the whole time (only the bar child is toggled),
-        // so it keeps running and the frame's colour/active state is already correct by the time the
-        // bar - and the frame under it - reappear.
+
+        // 2026-09-20 (Tudor: the bar over a dead player hides with the body - the immune frame must
+        // not survive either): being a CHILD of overheadBarRoot already takes the frame out of the
+        // hierarchy VISUALLY the instant the bar hides, but its own activeSelf stayed true - the
+        // relied-on fix was PlayerHealth's own Update ticking immuneLook's 4-second clock down to
+        // false in the background before the bar reappears. That is a race, not a guarantee: a
+        // respawn faster than the immune window's own remaining time reappears with the frame still
+        // "on", and a REMOTE client never calls ResetForRespawn for someone else's PlayerHealth at
+        // all (only the owner's does, so only the owner's clear was ever unconditional) - only
+        // Update's background tick protected a remote's own view of that player. Forcing it off here,
+        // on every client (SetOverheadBarVisible already runs on every client - see this method's own
+        // class comment), removes the race instead of hoping the clock always wins it.
+        if (!visible)
+            ClearImmuneLook();
     }
 
     /// <summary>Builds the immunity frame the first time ApplyImmuneLook actually needs one - never
