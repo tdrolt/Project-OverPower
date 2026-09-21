@@ -297,7 +297,7 @@ namespace Overpower.Weapons
                 if (candidate.distance < best)
                 {
                     best = candidate.distance;
-                    nearest = candidate;
+                    nearest = FixOriginHitPoint(candidate, collider);
                     found = true;
                 }
             }
@@ -327,6 +327,31 @@ namespace Overpower.Weapons
                 return false;
 
             return Vector3.Dot(candidate.normal, direction) < OppositeDirectionDot;
+        }
+
+        /// <summary>
+        /// P2 (review follow-up, 2026-09-21). Unity's documented behaviour for a sweep that STARTS
+        /// already overlapping a collider - an enemy stands at the muzzle, or steps into a
+        /// projectile between frames - is hit.point == Vector3.zero and hit.distance == 0, whatever
+        /// the collider's real position is (the same signature IsRestingOverlapOnLastBounce reads,
+        /// but here for a collider this projectile has never bounced off, so the hit is real and
+        /// must still be reported, just not at the origin). Left unfixed, that (0,0,0) point becomes
+        /// the impact VFX/SFX position (Despawn), the damage marker (DamageInfo.HitPoint), a
+        /// rocket's splash centre (ExplodeOnImpact.Detonate) and the zip gun's pull target
+        /// (ZipGunAbility.HandleZipHit) - all snapping to the world origin instead of the real hit.
+        ///
+        /// collider.ClosestPoint(transform.position) is used rather than the projectile's own
+        /// transform.position: a sphere sweep that starts inside a collider is reporting THAT
+        /// COLLIDER's surface as "where it got hit", the same thing hit.point already means for a
+        /// normal, non-overlapping sweep, whereas transform.position could sit anywhere inside a
+        /// large collider's volume and would not read as "the surface that was struck."
+        /// </summary>
+        private RaycastHit FixOriginHitPoint(RaycastHit hit, Collider collider)
+        {
+            if (hit.distance <= RestingOverlapDistance && hit.point == Vector3.zero)
+                hit.point = collider.ClosestPoint(transform.position);
+
+            return hit;
         }
 
         /// <summary>You cannot shoot yourself and you cannot shoot a teammate; in both cases the

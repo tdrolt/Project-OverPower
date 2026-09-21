@@ -111,6 +111,42 @@ namespace Overpower.Tests
             public void OnExpired(ProjectileMotor motor, ProjectileContext shot) { }
         }
 
+        // ---- P2 (review follow-up, 2026-09-21): a sweep that starts already overlapping something ----
+
+        /// <summary>
+        /// Unity's documented behaviour for a sweep that starts already overlapping a collider - "an
+        /// enemy stands at the muzzle, or steps into a projectile between frames" - is hit.point ==
+        /// Vector3.zero and hit.distance == 0, whatever the collider's real position is. Left as-is,
+        /// that (0,0,0) point becomes the impact VFX/SFX position (Despawn), the damage marker
+        /// (DamageInfo.HitPoint, PlayerHealth.cs's own impact-anchor comment), a rocket's splash
+        /// centre (ExplodeOnImpact.Detonate) and the zip gun's pull target (ZipGunAbility.HandleZipHit)
+        /// - all of them snapping to the world origin instead of where the hit actually happened.
+        /// Placed far from the origin on purpose, so a fix that quietly fell back to Vector3.zero
+        /// anyway could never pass by coincidence.
+        /// </summary>
+        [Test]
+        public void AProjectileThatStartsOverlappingAColliderDetonatesAtItselfNeverAtTheWorldOrigin()
+        {
+            Vector3 colliderCentre = new Vector3(90f, 2f, 115f);
+            Wall(colliderCentre, new Vector3(2f, 2f, 2f), "OverlappedCollider");
+
+            GameObject bulletGo = MakeBullet(colliderCentre, Vector3.forward, go => go.AddComponent<ExplodeOnImpact>());
+            ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
+            ExplodeOnImpact rocket = bulletGo.GetComponent<ExplodeOnImpact>();
+            PhysicsScene physicsScene = scene.GetPhysicsScene();
+
+            Vector3? detonatedAt = null;
+            rocket.Detonated += (at, radius) => detonatedAt = at;
+
+            motor.Step(1f / 60f, physicsScene);
+
+            Assert.IsTrue(detonatedAt.HasValue, "the rocket never detonated on a collider it started inside");
+            Assert.Greater(Vector3.Distance(detonatedAt.Value, Vector3.zero), 50f,
+                $"detonated at {detonatedAt.Value:F3} - looks like the unfixed hit.point snapped to the world origin");
+            Assert.Less(Vector3.Distance(detonatedAt.Value, colliderCentre), 2f,
+                $"detonated at {detonatedAt.Value:F3}, nowhere near the collider at {colliderCentre:F3}");
+        }
+
         // ---- the red test: many oblique angles, several deltaTimes, all at large coordinates ----
 
         /// <summary>
