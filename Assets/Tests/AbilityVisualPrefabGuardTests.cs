@@ -179,13 +179,17 @@ namespace Overpower.Tests
 
         // The Cursor rocket's blast is 2.5 m on purpose (Tudor, 2026-09-18): it matches the Fire Field it leaves on the
         // ground (radius 2.5), so the blast and the fire read as one area. The other two stay at 3 m.
+        //
+        // splashDamage moved 20 -> 28 on 2026-09-21 (Tudor: "the explosion radius should deal more damage"), a
+        // deliberate design pin update, not a regression - see RocketSplashDamageValueTests for the resulting
+        // damage-at-distance numbers and the brief's own worked example (13.3 -> 18.7 at 1m, 6.7 -> 9.3 at 2m).
         [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 3f)]
         [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 3f)]
         [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 2.5f)]
         public void RocketSplashNumbersAreUnchanged(string path, float splashRadius)
         {
             SerializedObject explode = Fields<ExplodeOnImpact>(path);
-            Float(explode, "splashDamage", 20f);
+            Float(explode, "splashDamage", 28f);
             Float(explode, "splashRadius", splashRadius);
             Float(explode, "occlusionNudge", 0.1f);
             Int(explode, "splashMask", 1);

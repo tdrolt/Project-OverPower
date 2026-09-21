@@ -270,7 +270,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c075b8b63a595940abf544dcde2a126, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  splashDamage: 20
+  splashDamage: 28
   splashRadius: 2.5
   falloff:
     serializedVersion: 2
