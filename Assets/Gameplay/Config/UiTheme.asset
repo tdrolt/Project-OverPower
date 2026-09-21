@@ -233,3 +233,4 @@ MonoBehaviour:
   markIndicatorPulseSpeed: 2.5
   markIndicatorMinAlpha: 0.35
   towerNeutralColor: {r: 0.42, g: 0.42, b: 0.42, a: 1}
+  towerBodyShade: 0.8

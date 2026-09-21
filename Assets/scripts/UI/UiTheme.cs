@@ -781,6 +781,14 @@ namespace Overpower.UI
                  "attacked or drained tower pulses exactly like its ring on the ground. Keep it a plain mid grey: " +
                  "team 0 is near-white, so a light neutral would read as owned by team 0.")]
         public Color towerNeutralColor = new Color(0.42f, 0.42f, 0.42f, 1f);
+        [Tooltip("Multiplies the owner's colour before TowerLook paints the Plinth, Drum and each SHOWN column " +
+                 "shaft - those stay on the Lit 'Tower Stone' material, so the body reads as the team colour with " +
+                 "its own lighting/shading intact instead of going flat like the Crown/caps (the Unlit 'Tower " +
+                 "Owner' material, painted at the full colour, no shade). 1 would make the body just as bright/flat " +
+                 "as the crown; kept here next to Tower Neutral Colour because the two are only ever read together " +
+                 "through OwnerPaintColours - chosen by capture, not calculation (Rule 6), see " +
+                 "captures/towers-2026-09-21.")]
+        [Range(0f, 1f)] public float towerBodyShade = 0.8f;
 
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which

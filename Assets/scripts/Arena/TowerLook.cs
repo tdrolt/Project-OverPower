@@ -24,6 +24,10 @@ namespace Overpower.Arena
     /// CaptureRingState the ring on the ground already gets every frame (via OwnerPaint.From /
     /// OwnerPaintColours.For), so the tower and the ring can never disagree and a late joiner is right at once. The
     /// pieces are grey (the material's own colour) until the first Refresh; no collider here depends on the tier.
+    ///
+    /// Tudor, 2026-09-21: "currently its only the top" - the Plinth, Drum and every SHOWN shaft (the Lit "Tower
+    /// Stone" material) are painted too, through the very same Refresh call and the very same one colour, times
+    /// UiTheme's Tower Body Shade so the stone keeps its own lighting instead of going flat like the crown/caps.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TowerLook : MonoBehaviour
@@ -45,6 +49,27 @@ namespace Overpower.Arena
 
         [Tooltip("The crown on top of the tower - painted with the owner's colour, like the shown caps.")]
         public Renderer crown;
+
+        // Trap, found by capturing and looking (2026-09-21): these pieces (and Plinth/Drum below) used to be
+        // marked Batching Static, same as any stone that "never repaints" - which was true before this change.
+        // A statically-batched renderer draws through its BATCH ROOT's combined mesh, so SetPropertyBlock on the
+        // ORIGINAL renderer (what VisualTint.SetMeshColor calls) never reaches the screen, even though
+        // GetPropertyBlock/SetPropertyBlock both succeed and a test reading the renderer's own block back looks
+        // green. The prefab's flag is off now for these pieces (TowerLookPrefabTests pins it) - never turn it
+        // back on for anything Refresh paints.
+        [Tooltip("Each slot's Shaft renderer, in the same order as columnSlots - the Lit 'Tower Stone' material, " +
+                 "so Refresh paints it (like Plinth/Drum below) with the owner's colour times UiTheme's Tower " +
+                 "Body Shade rather than the flat colour the Crown/caps get. Only a SHOWN slot's shaft is painted, " +
+                 "same rule as columnCaps. Must not be Batching Static - see the comment above.")]
+        public Renderer[] columnShafts = new Renderer[4];
+
+        [Tooltip("The tower's base (Lit 'Tower Stone' material) - painted with the owner's colour times UiTheme's " +
+                 "Tower Body Shade, same as Drum and the shown shafts. Must not be Batching Static.")]
+        public Renderer plinth;
+
+        [Tooltip("The tower's body (Lit 'Tower Stone' material) - painted with the owner's colour times UiTheme's " +
+                 "Tower Body Shade, same as Plinth and the shown shafts. Must not be Batching Static.")]
+        public Renderer drum;
 
         // The plan's starting value (Decision 6, 2026-09-18): 0.35 m shaft / 0.45 m cap. The cap above is drawn
         // wider automatically, in that same proportion, whichever shaft radius is showing.
@@ -151,6 +176,24 @@ namespace Overpower.Arena
                 Renderer cap = columnCaps[i];
                 if (cap != null && cap.gameObject.activeInHierarchy)
                     VisualTint.SetMeshColor(cap, block, colour);
+            }
+
+            // The stone body (Plinth, Drum, every SHOWN shaft) stays on the Lit "Tower Stone" material and is
+            // tinted rather than flat-repainted, so its own shading survives - the owner's colour times UiTheme's
+            // Tower Body Shade (default 0.8), always dimmer than the Crown/caps' flat colour above. Alpha is put
+            // back afterwards because Color * float scales every channel, alpha included.
+            Color bodyColour = colour * theme.towerBodyShade;
+            bodyColour.a = colour.a;
+
+            if (plinth != null)
+                VisualTint.SetMeshColor(plinth, block, bodyColour);
+            if (drum != null)
+                VisualTint.SetMeshColor(drum, block, bodyColour);
+            for (int i = 0; i < columnShafts.Length; i++)
+            {
+                Renderer shaft = columnShafts[i];
+                if (shaft != null && shaft.gameObject.activeInHierarchy)
+                    VisualTint.SetMeshColor(shaft, block, bodyColour);
             }
         }
     }

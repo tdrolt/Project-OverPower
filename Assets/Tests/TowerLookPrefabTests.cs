@@ -5,6 +5,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Overpower.Arena;
+using Overpower.Match;
+using Overpower.UI;
 
 namespace Overpower.Tests
 {
@@ -58,12 +60,25 @@ namespace Overpower.Tests
 
                 Renderer shaftRenderer = shaft.GetComponent<Renderer>();
                 Assert.AreEqual("Tower Stone", shaftRenderer.sharedMaterial.name, $"slot {i} shaft material");
-                Assert.IsTrue(IsBatchingStatic(shaft.gameObject), $"slot {i} shaft should be static (it never repaints)");
+                // 2026-09-21: the shaft is painted too now (Tudor: "currently its only the top"), through the same
+                // Refresh call - so, like the cap, it must NOT be static-batched. Measured in Play Mode (captures
+                // under captures/towers-2026-09-21/): a statically-batched renderer draws through its batch
+                // root's combined mesh, so SetPropertyBlock on the ORIGINAL renderer never reaches the screen -
+                // the crown/caps (never batched) repainted correctly while the batched shaft/plinth/drum silently
+                // kept showing the material's own colour. Without this assertion the earlier version of this test
+                // stayed green while the real render was still broken (GetPropertyBlock/SetPropertyBlock succeed
+                // on a batched renderer even though nothing draws with them).
+                Assert.IsFalse(IsBatchingStatic(shaft.gameObject), $"slot {i} shaft is repainted per owner, so it must not be static-batched");
 
                 Renderer capRenderer = look.columnCaps[i];
                 Assert.AreSame(cap.GetComponent<Renderer>(), capRenderer, $"slot {i}: columnCaps must point at the slot's own Cap renderer");
                 Assert.AreEqual("Tower Owner", capRenderer.sharedMaterial.name, $"slot {i} cap material");
                 Assert.IsFalse(IsBatchingStatic(cap.gameObject), $"slot {i} cap is repainted per owner, so it must not be static-batched");
+
+                Assert.AreEqual(4, look.columnShafts.Length);
+                Renderer wiredShaftRenderer = look.columnShafts[i];
+                Assert.AreSame(shaft.GetComponent<Renderer>(), wiredShaftRenderer, $"slot {i}: columnShafts must point at the slot's own Shaft renderer");
+                Assert.AreEqual("Tower Stone", wiredShaftRenderer.sharedMaterial.name, $"slot {i} shaft material (columnShafts)");
             }
 
             Transform plinth = instance.transform.Find("Plinth");
@@ -72,8 +87,15 @@ namespace Overpower.Tests
             Assert.IsNotNull(drum);
             Assert.AreEqual("Tower Stone", plinth.GetComponent<Renderer>().sharedMaterial.name);
             Assert.AreEqual("Tower Stone", drum.GetComponent<Renderer>().sharedMaterial.name);
-            Assert.IsTrue(IsBatchingStatic(plinth.gameObject));
-            Assert.IsTrue(IsBatchingStatic(drum.gameObject));
+            // 2026-09-21: the base takes the owner's colour too, so - same reasoning as the shaft above -
+            // Plinth/Drum must not be static-batched, or Refresh's SetPropertyBlock calls never reach the screen.
+            Assert.IsFalse(IsBatchingStatic(plinth.gameObject), "the plinth is repainted per owner, so it must not be static-batched");
+            Assert.IsFalse(IsBatchingStatic(drum.gameObject), "the drum is repainted per owner, so it must not be static-batched");
+
+            // 2026-09-21: the base takes the owner's colour too - TowerLook.plinth/drum must point at these same
+            // renderers, or Refresh has nothing to paint.
+            Assert.AreSame(plinth.GetComponent<Renderer>(), look.plinth, "look.plinth must point at the Plinth's own renderer");
+            Assert.AreSame(drum.GetComponent<Renderer>(), look.drum, "look.drum must point at the Drum's own renderer");
         }
 
         [Test]
@@ -154,6 +176,84 @@ namespace Overpower.Tests
                 else
                     Assert.AreEqual(look.columnRadius, expectedShaftRadius);
             }
+        }
+
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
+        private static void AssertBaseColor(Renderer renderer, Color expected, string label)
+        {
+            Assert.IsNotNull(renderer, label);
+            var block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            Color actual = block.GetColor(BaseColorId);
+            Assert.AreEqual(expected.r, actual.r, 0.001f, $"{label} r");
+            Assert.AreEqual(expected.g, actual.g, 0.001f, $"{label} g");
+            Assert.AreEqual(expected.b, actual.b, 0.001f, $"{label} b");
+            Assert.AreEqual(expected.a, actual.a, 0.001f, $"{label} a");
+        }
+
+        private static void AssertNeverPainted(Renderer renderer, string label)
+        {
+            Assert.IsNotNull(renderer, label);
+            var block = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(block);
+            Assert.IsTrue(block.isEmpty, $"{label}: must never be given a property block while its slot is hidden");
+        }
+
+        /// <summary>2026-09-21: "currently its only the top" - Refresh must paint the Plinth, Drum and every SHOWN
+        /// shaft too, through the very same one colour the crown/caps get, times UiTheme.towerBodyShade so the Lit
+        /// stone keeps its own shading instead of going flat. A HIDDEN shaft (tier 2 shows only 2 of 4 slots) must
+        /// never be painted at all, same rule ApplyColumns already applies to a hidden cap.</summary>
+        [Test]
+        public void RefreshPaintsThePlinthDrumAndShownShaftsWithTheOwnerColourTimesBodyShade()
+        {
+            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
+
+            look.Bind(theme);
+            look.ApplyColumns(2); // TowerLookRules: tier 2 shows 2 of the 4 slots - slots 2/3 stay hidden.
+
+            const int team = 1;
+            var state = new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, team, TerritoryMap.Neutral, false);
+            look.Refresh(state, 0f);
+
+            Color expectedFlat = theme.ShotColorFor(team);
+            Color expectedBody = expectedFlat * theme.towerBodyShade;
+            expectedBody.a = expectedFlat.a;
+
+            // The crown/caps stay the flat, unshaded colour - unaffected by this change.
+            AssertBaseColor(look.crown, expectedFlat, "crown");
+            AssertBaseColor(look.columnCaps[0], expectedFlat, "shown cap 0");
+
+            AssertBaseColor(look.plinth, expectedBody, "plinth");
+            AssertBaseColor(look.drum, expectedBody, "drum");
+            AssertBaseColor(look.columnShafts[0], expectedBody, "shown shaft 0");
+            AssertBaseColor(look.columnShafts[1], expectedBody, "shown shaft 1");
+            AssertNeverPainted(look.columnShafts[2], "hidden shaft 2");
+            AssertNeverPainted(look.columnShafts[3], "hidden shaft 3");
+        }
+
+        /// <summary>Pins the controller's neutral choice (Rule 6, chosen by capture): the body follows the exact
+        /// same formula as an owned tower, just with UiTheme.towerNeutralColor as the base colour instead of a
+        /// team's - so a neutral tower's body is never left on the stone's own unpainted colour, and the ring and
+        /// the whole tower can never disagree about what "nobody owns this" looks like.</summary>
+        [Test]
+        public void RefreshPaintsTheBodyNeutralGreyTimesShadeWhenNobodyOwnsTheZone()
+        {
+            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
+
+            look.Bind(theme);
+            look.ApplyColumns(4);
+
+            var state = new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, TerritoryMap.Neutral, TerritoryMap.Neutral, false);
+            look.Refresh(state, 0f);
+
+            Color expectedBody = theme.towerNeutralColor * theme.towerBodyShade;
+            expectedBody.a = theme.towerNeutralColor.a;
+
+            AssertBaseColor(look.plinth, expectedBody, "neutral plinth");
+            AssertBaseColor(look.drum, expectedBody, "neutral drum");
         }
     }
 }
