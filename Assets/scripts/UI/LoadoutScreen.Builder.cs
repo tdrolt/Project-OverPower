@@ -420,6 +420,22 @@ namespace Overpower.UI
             LayoutElement descriptionLe = descriptionPanel.AddComponent<LayoutElement>();
             descriptionLe.preferredHeight = theme.loadoutDescriptionPanelHeight;
             descriptionLe.minHeight = theme.loadoutDescriptionPanelHeight;
+            // Tudor, 2026-09-21: "when you hover over the mark upgrade from the laser tree it expands
+            // the shop menu for no reason". A TextMeshProUGUI's own preferred width is its UNWRAPPED
+            // single-line width, and with no width pinned here, this panel's own VerticalLayoutGroup
+            // (below) reported the longest hovered description's full length up to the outer Panel's
+            // ContentSizeFitter (PreferredSize, both axes), which then grew sideways to fit it - worst
+            // with 12 Laser - Mark, the shop's longest description at 168 characters (measured: panel
+            // grew from 1340 to 1575.95 canvas units while it was hovered; every other weapon and
+            // ability stayed at exactly 1340). Pinning preferredWidth here is the same recipe
+            // BuildColumn already uses for the two content columns above (a LayoutElement and a
+            // LayoutGroup on the same GameObject, the LayoutElement's explicit value winning).
+            // Derived from the columns' own widths rather than a new UiTheme field - Content's
+            // HorizontalLayoutGroup above is exactly leftColumn + spacing + rightColumn wide, so this
+            // strip lines up flush under them and never depends on what text happens to be showing.
+            // The text children already wrap (AddLabel sets enableWordWrapping = true), so once the
+            // panel stops growing to fit them, they wrap inside it instead.
+            descriptionLe.preferredWidth = theme.loadoutLeftColumnWidth + theme.loadoutPanelPadding + theme.loadoutRightColumnWidth;
             Image descriptionBackground = descriptionPanel.AddComponent<Image>();
             descriptionBackground.color = theme.barTrackColor;
             descriptionBackground.raycastTarget = false;
