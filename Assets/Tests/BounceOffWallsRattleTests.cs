@@ -184,6 +184,46 @@ namespace Overpower.Tests
                 $"detonated at {detonatedAt.Value:F3}, nowhere near the collider at {colliderCentre:F3}");
         }
 
+        /// <summary>
+        /// P2's more ordinary case than starting deep inside a small box: a bigger-radius projectile
+        /// (0.22m - still smaller than a player) spawned just 0.15m outside a flat wall's face, so
+        /// the sphere pokes 0.07m into the wall - a shallow overlap a large-radius or ability
+        /// projectile spawned close to geometry can hit in play, not only the fully-inside-a-box
+        /// case above. FixOriginHitPoint reads collider.ClosestPoint(transform.position), so the
+        /// fixed hit point must land ON the wall's face directly in front of the sphere - distinct
+        /// from both the collider's centre (a large flat wall's centre is far from its own face) and
+        /// the world origin (the bug this whole file exists to catch).
+        /// </summary>
+        [Test]
+        public void AProjectileThatStartsSlightlyOverlappingAWallFaceDetonatesOnThatFaceNotTheCentreOrOrigin()
+        {
+            Vector3 wallCentre = new Vector3(80f, 2f, 100f);
+            Wall(wallCentre, new Vector3(40f, 6f, 1f), "Wall"); // near face at z=99.5
+
+            const float radius = 0.22f;
+            const float distanceFromFace = 0.15f; // < radius, so the sphere overlaps the face by 0.07m.
+            Vector3 spawnPosition = new Vector3(80f, 2f, 99.5f - distanceFromFace);
+            Vector3 expectedFacePoint = new Vector3(80f, 2f, 99.5f);
+
+            GameObject bulletGo = MakeBullet(spawnPosition, Vector3.forward, go => go.AddComponent<ExplodeOnImpact>(), radius: radius);
+            ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
+            ExplodeOnImpact rocket = bulletGo.GetComponent<ExplodeOnImpact>();
+            PhysicsScene physicsScene = scene.GetPhysicsScene();
+
+            Vector3? detonatedAt = null;
+            rocket.Detonated += (at, splashRadius) => detonatedAt = at;
+
+            motor.Step(1f / 60f, physicsScene);
+
+            Assert.IsTrue(detonatedAt.HasValue, "the rocket never detonated on a wall it started overlapping");
+            Assert.Less(Vector3.Distance(detonatedAt.Value, expectedFacePoint), 0.01f,
+                $"detonated at {detonatedAt.Value:F3}, expected the wall's own face at {expectedFacePoint:F3}");
+            Assert.Greater(Vector3.Distance(detonatedAt.Value, wallCentre), 0.1f,
+                $"detonated at {detonatedAt.Value:F3} - too close to the collider's CENTRE {wallCentre:F3}, not its face");
+            Assert.Greater(Vector3.Distance(detonatedAt.Value, Vector3.zero), 50f,
+                $"detonated at {detonatedAt.Value:F3} - looks like the unfixed hit.point snapped to the world origin");
+        }
+
         // ---- the red test: many oblique angles, several deltaTimes, all at large coordinates ----
 
         /// <summary>
@@ -360,11 +400,19 @@ namespace Overpower.Tests
         ///
         /// M2 (review follow-up, 2026-09-21): the original aim (a plain 3:1 slope) hit Wall A at
         /// roughly (100, *, 80) - 20m short of Wall B's own z=100 plane, so the second hit arrived
-        /// from ~62m away and the per-collider guard was never actually exercised near a corner at
-        /// all. Aimed instead at a point just 0.1m short of Wall B's face, so the FIRST bounce lands
-        /// close enough that the guard's "same collider, resting-touch signature" check has a real
-        /// chance to misfire against Wall B if it were scoped wrong (e.g. by distance alone rather
-        /// than by collider identity).
+        /// from ~62m away, nowhere near "the very next sweep". Aimed instead at a point just 0.1m
+        /// short of Wall B's face, so the first bounce lands close enough that the second wall's
+        /// genuine hit follows within a handful of sweeps rather than dozens.
+        ///
+        /// CORRECTION (follow-ups H, 2026-09-21): despite the paragraph above, this does NOT
+        /// exercise the guard's same-collider check the way an earlier version of this comment
+        /// claimed - Wall B is hit about 0.14m into its own sweep, so
+        /// IsRestingOverlapOnLastBounce's distance check (candidate.distance >
+        /// RestingOverlapDistance) already rejects it on distance alone, whatever collider it hit;
+        /// the collider-identity check is never actually reached here. What this test really
+        /// proves is that a genuine second-wall hit shortly after a bounce still registers at all.
+        /// TheGuardNeverExemptsADifferentColliderEvenAtZeroDistance below is the test that puts the
+        /// collider-identity check itself on the spot, at true (sub-millimetre) resting distance.
         /// </summary>
         [Test]
         public void AnInsideCornerGivesTwoGenuineBounces()
@@ -420,6 +468,50 @@ namespace Overpower.Tests
             Assert.Greater(maxAfter, WeaponRadius * 4f, "never moved away from the corner after its second bounce");
         }
 
+        // ---- follow-ups H (2026-09-21): the guard's same-collider check, exercised directly ----
+
+        /// <summary>
+        /// AnInsideCornerGivesTwoGenuineBounces above hits its second wall about 0.14m into that
+        /// sweep, so IsRestingOverlapOnLastBounce's distance check already rejects it, whatever
+        /// collider it hit - it never actually puts the guard's OTHER condition, collider identity,
+        /// on the spot. This test does: Redirect the projectile against Wall A (arming
+        /// justBouncedOffCollider to Wall A only), then place it 1mm INSIDE Wall B - a genuinely
+        /// different collider - and step further in, reproducing the exact zero-distance,
+        /// reversed-normal signature IsRestingOverlapOnLastBounce is built to recognise, but against
+        /// a collider it was never armed for. The guard must never exempt anything but the one
+        /// collider it was just told to distrust, so this must register as a real bounce.
+        /// </summary>
+        [Test]
+        public void TheGuardNeverExemptsADifferentColliderEvenAtZeroDistance()
+        {
+            GameObject wallAGo = Wall(new Vector3(90f, 2f, 115f), new Vector3(400f, 6f, 1f), "WallA");
+            Collider wallACollider = wallAGo.GetComponent<Collider>();
+
+            const float wallBNearFaceX = 109.5f; // Wall B centre x=110, size.x=1 -> near face at 109.5.
+            GameObject wallBGo = Wall(new Vector3(110f, 2f, 115f), new Vector3(1f, 6f, 400f), "WallB");
+            Collider wallBCollider = wallBGo.GetComponent<Collider>();
+
+            GameObject bulletGo = MakeBullet(new Vector3(90f, 2f, 100f), Vector3.forward, go => go.AddComponent<BounceOffWalls>());
+            ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
+            PhysicsScene physicsScene = scene.GetPhysicsScene();
+
+            // Simulate having just bounced off Wall A - arms justBouncedOffCollider to WALL A only.
+            motor.Redirect(Vector3.right, Vector3.left, wallACollider);
+
+            // Place the ball 1mm INSIDE Wall B - a genuinely different collider - aimed straight
+            // further into it: the same zero-distance, reversed-normal signature the guard reads,
+            // but for a collider the guard was never told to distrust.
+            motor.transform.position = new Vector3(wallBNearFaceX + 0.001f, 2f, 115f);
+
+            float multiplierBefore = motor.Context.DamageMultiplier;
+            motor.Step(1f / 60f, physicsScene);
+
+            Assert.Greater(motor.Context.DamageMultiplier, multiplierBefore,
+                "Wall B must still register as a real bounce - the guard is armed for Wall A only " +
+                $"(collider {wallBCollider.name} is not {wallACollider.name}), so its resting-overlap " +
+                "signature against Wall B must never be exempted");
+        }
+
         // ---- M1 (review follow-up, 2026-09-21): the guard disarms itself, "the very next sweep" ----
 
         /// <summary>
@@ -465,8 +557,10 @@ namespace Overpower.Tests
         [Test]
         public void RedirectAfterABounceLiftsTheProjectileAtLeastBounceSurfaceSkinOffTheWall()
         {
-            // The designer's own authored constant, pinned here the same way other tests pin a real
-            // weapon number - see ProjectileMotor's BounceSurfaceSkin field for the source of truth.
+            // NOT a designer-tunable value - a physics constant scoped to fixing the wall-rattle
+            // bug, pinned here the same way other tests pin a real weapon number. See
+            // ProjectileMotor's own BounceSurfaceSkin field comment for why it exists at all and why
+            // it is not something a designer would ever want to change.
             const float BounceSurfaceSkin = 0.02f;
 
             GameObject wallGo = Wall(new Vector3(90f, 2f, 115f), new Vector3(400f, 6f, 1f), "Wall");
@@ -480,30 +574,40 @@ namespace Overpower.Tests
 
             motor.Redirect(Vector3.back, hitNormal, wallCollider);
 
-            float lift = Vector3.Distance(motor.transform.position, beforeRedirect);
-            Assert.GreaterOrEqual(lift, BounceSurfaceSkin - 0.0001f,
-                $"Redirect only lifted the projectile {lift:F4}m off the wall - must be at least BounceSurfaceSkin " +
-                "or the very next sweep reads the resting touch as a fresh hit (the wall-rattle bug)");
+            // The move's component ALONG hitNormal, not just its total size - Redirect's own code is
+            // "position += hitNormal * BounceSurfaceSkin", a lift in a specific DIRECTION, and a
+            // pure-distance check would pass even if some unrelated bug moved the projectile a
+            // sufficient distance in a totally different direction, off the wall's own normal.
+            Vector3 moved = motor.transform.position - beforeRedirect;
+            float liftAlongNormal = Vector3.Dot(moved, hitNormal);
+            Assert.GreaterOrEqual(liftAlongNormal, BounceSurfaceSkin - 0.0001f,
+                $"Redirect only lifted the projectile {liftAlongNormal:F4}m along hitNormal - must be at least " +
+                "BounceSurfaceSkin or the very next sweep reads the resting touch as a fresh hit (the wall-rattle bug)");
         }
 
         [Test]
-        public void ARedirectedShotMovedBackToExactlyTouchingTheWallTakesNoSecondBounceAndMovesAway()
+        public void ARedirectedShotMovedBackInsideTheWallTakesNoSecondBounceAndMovesAway()
         {
             // The lift half of the fix is a distance, not a guarantee (Redirect's own comment) - this
-            // test undoes it on purpose, putting the sphere back to EXACTLY touching the wall, so
-            // only the per-collider guard (not the lift) is what has to hold here.
+            // test undoes it on purpose, so only the per-collider guard (not the lift) is what has to
+            // hold here. "Exactly touching" (the earlier version of this test) is a boundary case a
+            // physics engine is free to read as NOT overlapping at all - which would let this test
+            // pass even with the guard deleted, since a sweep that never sees an overlap has nothing
+            // to filter and just glides on. 1mm genuinely INSIDE the wall guarantees Physics.SphereCast
+            // reports the resting-overlap signature every time, so only the guard can be what keeps it
+            // from counting as a second bounce.
             float wallNearFaceZ = 114.5f; // Wall centre z=115, size.z=1 -> near face at 114.5.
             GameObject wallGo = Wall(new Vector3(90f, 2f, 115f), new Vector3(400f, 6f, 1f), "Wall");
             Collider wallCollider = wallGo.GetComponent<Collider>();
 
-            Vector3 touchingPosition = new Vector3(90f, 2f, wallNearFaceZ - WeaponRadius);
-            GameObject bulletGo = MakeBullet(touchingPosition, Vector3.forward, go => go.AddComponent<BounceOffWalls>());
+            Vector3 insidePosition = new Vector3(90f, 2f, wallNearFaceZ - WeaponRadius + 0.001f); // 1mm inside.
+            GameObject bulletGo = MakeBullet(insidePosition, Vector3.forward, go => go.AddComponent<BounceOffWalls>());
             ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
             PhysicsScene physicsScene = scene.GetPhysicsScene();
 
             // Simulate a real bounce having just happened against this exact wall, then undo the lift.
             motor.Redirect(Vector3.back, Vector3.back, wallCollider);
-            motor.transform.position = touchingPosition;
+            motor.transform.position = insidePosition;
 
             float multiplierBefore = motor.Context.DamageMultiplier;
             Vector3 positionBeforeStep = motor.transform.position;
@@ -515,6 +619,10 @@ namespace Overpower.Tests
                 "must not count a second bounce off the exact same resting touch");
             Assert.Greater(Vector3.Distance(motor.transform.position, positionBeforeStep), 0f,
                 "must move away from the wall, not sit still on it");
+            Assert.NotNull(GetJustBouncedOffCollider(motor),
+                "the guard should have fired against this step's resting overlap - if it had nothing " +
+                "to exempt, the three assertions above could all pass on luck (no hit reported at all) " +
+                "rather than on the guard actually recognising and filtering the resting touch");
         }
 
         // ---- regression guarantees: a non-bouncing bullet, and one that starts touching a wall ----

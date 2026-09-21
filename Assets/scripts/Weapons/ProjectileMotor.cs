@@ -120,11 +120,14 @@ namespace Overpower.Weapons
         private float ageSeconds;
         private bool initialised;
 
-        // The collider a bounce most recently redirected this projectile away from, or null
-        // before any bounce. Set only by Redirect below; used only by IsRestingOverlapOnLastBounce
-        // to recognise ITS OWN resting-touch artifact on the very next sweep, never any other
-        // collider - a shot that genuinely starts inside a wall it has never bounced off (or hits
-        // a second wall at a corner) must still register normally. See the class comment.
+        // The collider a bounce most recently redirected this projectile away from, or null before
+        // any bounce and once the guard's exemption window has passed. Set by Redirect below;
+        // ALSO cleared again by TrySweep, on the first sweep the resting-overlap artifact is no
+        // longer seen (M1, review follow-up 2026-09-21) - it does not stay armed for the rest of
+        // the projectile's life. Used only by IsRestingOverlapOnLastBounce to recognise ITS OWN
+        // resting-touch artifact on the very next sweep, never any other collider - a shot that
+        // genuinely starts inside a wall it has never bounced off (or hits a second wall at a
+        // corner) must still register normally. See the class comment.
         private Collider justBouncedOffCollider;
 
         /// <summary>True until this projectile has been told to go away - flips at the very start
@@ -348,8 +351,8 @@ namespace Overpower.Weapons
         /// already overlapping a collider - an enemy stands at the muzzle, or steps into a
         /// projectile between frames - is hit.point == Vector3.zero and hit.distance == 0, whatever
         /// the collider's real position is (the same signature IsRestingOverlapOnLastBounce reads,
-        /// but here for a collider this projectile has never bounced off, so the hit is real and
-        /// must still be reported, just not at the origin). Left unfixed, that (0,0,0) point becomes
+        /// but here for a collider that is not the one this projectile most recently bounced off, so
+        /// the hit is real and must still be reported, just not at the origin). Left unfixed, that (0,0,0) point becomes
         /// the impact VFX/SFX position (Despawn), the damage marker (DamageInfo.HitPoint), a
         /// rocket's splash centre (ExplodeOnImpact.Detonate) and the zip gun's pull target
         /// (ZipGunAbility.HandleZipHit) - all snapping to the world origin instead of the real hit.
