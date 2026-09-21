@@ -16,7 +16,6 @@ namespace Overpower.EditorTools
     /// </summary>
     public static class ArenaLayoutCapture
     {
-        private const string BarriersGroupName = "Barriers";
         private const float MaxTiltDegrees = 0.5f;
         private const float TowerKeepClearMarginMetres = 0.5f;
 
@@ -43,7 +42,7 @@ namespace Overpower.EditorTools
             {
                 Transform group = root.GetChild(g);
                 bool isBoundary = group.name == ArenaSymmetry.BoundaryGroupName;
-                bool isBarriers = group.name == BarriersGroupName;
+                bool isBarriers = group.name == ArenaPrimitiveBuilder.BarriersGroupName;
                 ArenaLayout.PieceKind kind = isBarriers ? ArenaLayout.PieceKind.Barrier : ArenaLayout.PieceKind.Block;
 
                 for (int u = 0; u < group.childCount; u++)

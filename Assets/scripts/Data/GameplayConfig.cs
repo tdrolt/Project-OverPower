@@ -130,7 +130,7 @@ namespace Overpower.Data
         [Tooltip("On = everything is free all match, anywhere - test mode. Off = the warm-up before the match " +
                  "goes live is still a free sandbox (2.7b), and the real economy - prices, territory and " +
                  "out-of-combat rules, ultimate bought - starts the moment the match goes live.")]
-        [SerializeField] private bool freeLoadout = true;
+        [SerializeField] private bool freeLoadout = false;
         public bool FreeLoadout => freeLoadout;
 
         [Tooltip("Fraction of what you paid that a weapon or armor reset refunds. 0.5 = half " +
