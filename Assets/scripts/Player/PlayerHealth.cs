@@ -209,16 +209,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             overheadBarRoot.SetActive(visible);
 
         // 2026-09-20 (Tudor: the bar over a dead player hides with the body - the immune frame must
-        // not survive either): being a CHILD of overheadBarRoot already takes the frame out of the
-        // hierarchy VISUALLY the instant the bar hides, but its own activeSelf stayed true - the
-        // relied-on fix was PlayerHealth's own Update ticking immuneLook's 4-second clock down to
-        // false in the background before the bar reappears. That is a race, not a guarantee: a
-        // respawn faster than the immune window's own remaining time reappears with the frame still
-        // "on", and a REMOTE client never calls ResetForRespawn for someone else's PlayerHealth at
-        // all (only the owner's does, so only the owner's clear was ever unconditional) - only
-        // Update's background tick protected a remote's own view of that player. Forcing it off here,
-        // on every client (SetOverheadBarVisible already runs on every client - see this method's own
-        // class comment), removes the race instead of hoping the clock always wins it.
+        // not survive either). REVIEW 2026-09-21 (opus): the race this comment used to describe
+        // cannot actually happen in play. On death, on EVERY client, PlayerLifecycle.ApplyAliveState
+        // (false) raises AliveChanged, and AbilityRunner.HandleAliveChanged -> Interrupt(Died) ->
+        // InvulnerabilityAbility.ClearShield() -> PlayerHealth.ClearImmuneLook() already clears the
+        // frame before this method is even reached - the look is only ever switched ON by that same
+        // module, and the shortest respawn (5s) outlasts the longest immune look (4s), so there is no
+        // window where a stale "on" frame could reappear. This call is a harmless SECOND GUARD that
+        // makes PlayerHealth independent of the ultimate module rather than a fix for a real bug -
+        // don't remove it (it costs nothing), but don't mistake it for the load-bearing path either.
         if (!visible)
             ClearImmuneLook();
     }
@@ -308,10 +307,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         ApplyImmuneLook(immuneLook.IsOn(Time.time));
     }
 
-    /// <summary>Ends the look at once - called from InvulnerabilityAbility.ClearShield and from
+    /// <summary>Ends the look at once - called from InvulnerabilityAbility.ClearShield (the real path
+    /// off a death: AbilityRunner.HandleAliveChanged -> Interrupt(Died) -> ClearShield -> here), from
     /// ResetForRespawn (a fresh spawn, or the 2.7b match-start fresh start, must never carry a stale
     /// yellow bar into the next life - PlayerLifecycle.ResetForMatchStart already calls
-    /// ResetForRespawn, so nothing extra was needed there).</summary>
+    /// ResetForRespawn, so nothing extra was needed there), and from SetOverheadBarVisible(false) (a
+    /// harmless second guard - see that method's own comment for why it is never the load-bearing
+    /// path).</summary>
     public void ClearImmuneLook()
     {
         immuneLook.Clear();

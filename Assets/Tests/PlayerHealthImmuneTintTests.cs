@@ -156,12 +156,14 @@ namespace Overpower.Tests
         {
             // Item 3, 2026-09-20 (Tudor: the bar over a dead player hides with the body): the frame is
             // a CHILD of overheadBarRoot, so SetOverheadBarVisible(false) already takes it out of the
-            // hierarchy visually - but its own activeSelf stayed true, relying entirely on Update's
-            // background tick (immuneLook running out on its own clock) to have already cleared it by
-            // the time a respawn shows the bar again. A respawn faster than the immune window's own
-            // remaining time - and a remote client never calls ResetForRespawn for someone else's
-            // PlayerHealth at all, only Update's tick - meant the frame could still be "on" the instant
-            // the bar reappears. Dying must force it off outright, not race a 4-second clock.
+            // hierarchy visually. REVIEW 2026-09-21 (opus): its own activeSelf being forced off here is
+            // a harmless SECOND GUARD, not a fix for a real race - on death, on every client,
+            // PlayerLifecycle.ApplyAliveState(false) raises AliveChanged, and
+            // AbilityRunner.HandleAliveChanged -> Interrupt(Died) -> InvulnerabilityAbility.ClearShield
+            // -> PlayerHealth.ClearImmuneLook() already clears the frame before SetOverheadBarVisible
+            // is even reached, and the shortest respawn (5s) outlasts the longest immune look (4s).
+            // This test still pins SetOverheadBarVisible(false) clearing the frame on its own, since
+            // that guard is real code this class relies on, even though the real path clears it first.
             health.ShowImmuneLook(4f);
             Assert.IsTrue(FindFrameRoot().activeSelf, "arm the frame first, or this test proves nothing");
 
@@ -169,6 +171,22 @@ namespace Overpower.Tests
 
             Assert.IsFalse(FindFrameRoot().activeSelf, "a dead player must not carry the immune frame into their next life");
             Assert.IsFalse(health.ShowsImmuneLook);
+        }
+
+        [Test]
+        public void ShowingTheOverheadBarNeverClearsARunningImmuneLook()
+        {
+            // Review follow-up, 2026-09-21: SetOverheadBarVisible(false) clears the frame (a harmless
+            // second guard - see that method's own comment), but the same method must not also clear
+            // it on the OPPOSITE call. Showing the bar back (a respawn, or a corpse's bar reappearing)
+            // must never itself end a look that is still legitimately running.
+            health.ShowImmuneLook(4f);
+            Assert.IsTrue(FindFrameRoot().activeSelf, "arm the frame first, or this test proves nothing");
+
+            health.SetOverheadBarVisible(true);
+
+            Assert.IsTrue(FindFrameRoot().activeSelf, "showing the bar must never clear a running look");
+            Assert.IsTrue(health.ShowsImmuneLook);
         }
 
         [Test]
