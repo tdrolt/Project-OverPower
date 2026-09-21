@@ -20,10 +20,23 @@ namespace Overpower.Weapons
     /// re-multiplying - is what keeps that true.
     ///
     /// A bounced shot gets NO extra range. ProjectileMotor creates one RangeBudget in Initialize
-    /// and Redirect only ever changes direction, never touches it, so the metres already flown
-    /// before a bounce stay spent and the total distance travelled is still capped at Max Range.
-    /// Nothing in this file has to enforce that - it falls out of not touching ProjectileMotor at
-    /// all, which is the entire point of the IProjectileBehaviour seam.
+    /// and Redirect only ever changes direction (and, since the fix below, lifts the projectile a
+    /// couple of centimetres off the wall - never touches RangeBudget), so the metres already
+    /// flown before a bounce stay spent and the total distance travelled is still capped at Max
+    /// Range. Nothing in this file has to enforce that - it falls out of not touching
+    /// ProjectileMotor's range bookkeeping at all, which is the entire point of the
+    /// IProjectileBehaviour seam.
+    ///
+    /// THE WALL-RATTLE FIX (2026-09-21). Tudor measured bounced shots dealing LESS per trigger
+    /// pull than direct ones - the opposite of this file's own "+20% per bounce" intent. The cause
+    /// lived in ProjectileMotor, not here: a bullet left resting exactly on the wall it just
+    /// bounced off was read as hitting that SAME wall again on the very next sweep (Unity's
+    /// documented "initial overlap" signature - distance 0, normal the sweep direction reversed),
+    /// so this OnHit kept reflecting about an artifact instead of a real second wall, until the
+    /// bounce budget ran out on the wall it should have flown away from. The only change here is
+    /// which Redirect overload is called - the one that also lifts the projectile off the surface
+    /// and remembers which collider to distrust on the next sweep. See ProjectileMotor's class
+    /// comment and Redirect's own comment for the mechanism.
     /// </summary>
     [DisallowMultipleComponent]
     public class BounceOffWalls : MonoBehaviour, IProjectileBehaviour
@@ -63,7 +76,7 @@ namespace Overpower.Weapons
 
             bounces++;
             shot.SetDamageMultiplier(1f + damagePerBounce * bounces);
-            motor.Redirect(Vector3.Reflect(motor.Direction, hit.normal));
+            motor.Redirect(Vector3.Reflect(motor.Direction, hit.normal), hit.normal, hit.collider);
             return ProjectileHitResponse.KeepFlying;
         }
 

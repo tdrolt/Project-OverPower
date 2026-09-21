@@ -31,6 +31,26 @@ namespace Overpower.Weapons
     ///
     /// Pierce, explode and bounce are added as IProjectileBehaviour components on their own
     /// projectile prefab - never by editing this file. See IProjectileBehaviour.
+    ///
+    /// THE WALL-RATTLE FIX (2026-09-21). Tudor measured a bounced Bounce-gun shot dealing LESS
+    /// per trigger pull than a direct one, the opposite of what three bounces at +20% each should
+    /// do. The cause: after a bounce this motor left the sphere exactly touching the wall (moved
+    /// to hit.distance), and on the VERY NEXT sweep Physics.SphereCast reported that same wall
+    /// again - Unity's own documented behaviour for a collider already overlapping the sphere at
+    /// the start of a sweep is distance 0, point Vector3.zero, and normal the sweep direction
+    /// REVERSED. This motor could not tell that apart from a genuine new wall, so BounceOffWalls
+    /// reflected about the reversed normal (exactly re-reversing the direction), the next sweep
+    /// repeated the same false overlap with the normal flipped back again, and the bullet
+    /// "rattled" in place until its bounce budget ran out on the wall it should have flown away
+    /// from - worse at 65-120m from the origin where float precision is looser, which is why an
+    /// earlier probe near the world origin failed to reproduce it. Two changes fix it, both
+    /// scoped to the collider a bounce just happened against, never to every wall a shot meets:
+    /// Redirect (below) lifts the projectile off the surface by BounceSurfaceSkin along the hit
+    /// normal, and TrySweep's IsRestingOverlapOnLastBounce refuses to count a same-collider,
+    /// zero-distance, reversed-normal result as a new hit. Update was split into Step(deltaTime,
+    /// physicsScene) so an edit-mode test could drive a real ProjectileMotor against an isolated
+    /// preview scene and reproduce the exact rattle before touching either fix - see
+    /// BounceOffWallsRattleTests.
     /// </summary>
     public class ProjectileMotor : MonoBehaviour
     {
@@ -61,6 +81,29 @@ namespace Overpower.Weapons
         private const int MaxHitsPerStep = 8;
         private static readonly RaycastHit[] HitBuffer = new RaycastHit[MaxHitsPerStep];
 
+        // Not a design tunable: how far, in metres, a bounce lifts the projectile off the wall it
+        // just left, along that wall's own normal, before the next sweep. See the class comment's
+        // "WALL-RATTLE FIX" for why a sphere left exactly touching a collider needs this at all -
+        // Physics.SphereCast reads that resting touch as a brand new overlap on the very next
+        // sweep. 0.02m is small enough that nobody watching a bounced shot sees it pop sideways,
+        // and comfortably larger than the float-precision band (measured at 65-120m from the
+        // origin) that caused the false overlap in the first place.
+        private const float BounceSurfaceSkin = 0.02f;
+
+        // Not a design tunable: how close to zero a sweep's reported distance must be to count as
+        // "this sweep started already touching the collider" - see BounceSurfaceSkin's comment.
+        // Unity reports an initial overlap at exactly 0; this only absorbs float noise around
+        // that, the same reasoning RangeBudget.ReachedTolerance uses for its own zero.
+        private const float RestingOverlapDistance = 0.0001f;
+
+        // Not a design tunable: how close two directions must be to "exactly opposite" to count as
+        // the resting-overlap signature Unity documents (RaycastHit.normal is the sweep direction
+        // reversed for an initial overlap) - not an approximation a designer would ever tune.
+        // cos(5 degrees) leaves headroom around the bit-for-bit opposite the investigation's own
+        // log showed, without swallowing a shallow graze that happens to be nearly opposite for
+        // real geometric reasons.
+        private const float OppositeDirectionDot = -0.996f;
+
         private ProjectileContext context;
         private RangeBudget range;
         private IProjectileBehaviour[] behaviours;
@@ -71,6 +114,19 @@ namespace Overpower.Weapons
         private int mask;
         private float ageSeconds;
         private bool initialised;
+
+        // The collider a bounce most recently redirected this projectile away from, or null
+        // before any bounce. Set only by Redirect below; used only by IsRestingOverlapOnLastBounce
+        // to recognise ITS OWN resting-touch artifact on the very next sweep, never any other
+        // collider - a shot that genuinely starts inside a wall it has never bounced off (or hits
+        // a second wall at a corner) must still register normally. See the class comment.
+        private Collider justBouncedOffCollider;
+
+        /// <summary>True until this projectile has been told to go away - flips at the very start
+        /// of Despawn, before OnExpired or the actual Destroy/DestroyImmediate call, so a caller
+        /// driving Step() directly (an edit-mode test; Update never needs this) can stop cleanly
+        /// instead of ticking a projectile that has already ended its flight.</summary>
+        public bool IsAlive { get; private set; } = true;
 
         // Everything this projectile flies through: the shooter, teammates, and anything a pierce
         // behaviour waves past.
@@ -100,11 +156,32 @@ namespace Overpower.Weapons
                 behaviours[i].OnSpawned(this, context);
         }
 
-        /// <summary>Turn the projectile. The seam a bounce behaviour uses; nothing bounces yet.</summary>
+        /// <summary>Turn the projectile without any surface to lift off of - kept for a future
+        /// behaviour that redirects without having just bounced off a collider. Every bounce today
+        /// goes through the overload below instead.</summary>
         public void Redirect(Vector3 newDirection)
         {
             direction = newDirection.normalized;
             transform.forward = direction;
+        }
+
+        /// <summary>
+        /// Turn the projectile after a bounce, and lift it off the surface it was resting against -
+        /// the seam BounceOffWalls uses. hitNormal/hitCollider are the same RaycastHit the bounce
+        /// just resolved. See the class comment's "WALL-RATTLE FIX": without the lift, the sphere is
+        /// left exactly touching hitCollider, and the very next sweep reads that resting touch as a
+        /// fresh hit on the same collider forever. justBouncedOffCollider is remembered too, so
+        /// TrySweep's IsRestingOverlapOnLastBounce can refuse to count THIS SPECIFIC collider's
+        /// resting-touch signature as a new hit next frame - belt and braces alongside the lift,
+        /// since the lift is a distance, not a guarantee, at the float precision this bug was
+        /// measured at (65-120m from the origin).
+        /// </summary>
+        public void Redirect(Vector3 newDirection, Vector3 hitNormal, Collider hitCollider)
+        {
+            direction = newDirection.normalized;
+            transform.forward = direction;
+            transform.position += hitNormal * BounceSurfaceSkin;
+            justBouncedOffCollider = hitCollider;
         }
 
         /// <summary>Fly through this collider from now on. The seam a pierce behaviour uses.</summary>
@@ -132,21 +209,39 @@ namespace Overpower.Weapons
             if (!initialised)
                 return;
 
-            ageSeconds += Time.deltaTime;
+            // gameObject.scene's PhysicsScene IS Physics.defaultPhysicsScene for every projectile
+            // that has ever existed in real play - a normal Instantiate lands in the loaded Game
+            // Scene, never a preview scene - so this is not a behaviour change. It is the seam an
+            // edit-mode test uses to call Step() directly against an isolated preview scene's own
+            // PhysicsScene instead, which the old Physics.SphereCastNonAlloc could never see at
+            // all (the same reason FireField.OverlapBurnZone and GroundSnap.TryFindGroundY take an
+            // explicit PhysicsScene - see their own comments).
+            Step(Time.deltaTime, gameObject.scene.GetPhysicsScene());
+        }
+
+        /// <summary>One frame of flight - everything Update used to do inline, taking deltaTime and
+        /// the PhysicsScene to sweep against as parameters instead of reading Time.deltaTime and
+        /// the static Physics class directly. See Update's own comment for why.</summary>
+        public void Step(float deltaTime, PhysicsScene physicsScene)
+        {
+            if (!initialised || !IsAlive)
+                return;
+
+            ageSeconds += deltaTime;
             if (ageSeconds >= maxLifetimeSeconds)
             {
                 Despawn(false, transform.position);
                 return;
             }
 
-            float step = range.Consume(speed * Time.deltaTime);
+            float step = range.Consume(speed * deltaTime);
             if (step <= 0f)
             {
                 Despawn(false, transform.position);
                 return;
             }
 
-            if (TrySweep(step, out RaycastHit hit))
+            if (TrySweep(physicsScene, step, out RaycastHit hit))
             {
                 // Stop where the sphere first touches, not where its centre would have ended up.
                 transform.position += direction * hit.distance;
@@ -173,21 +268,25 @@ namespace Overpower.Weapons
         /// <summary>The nearest thing in the way this step, skipping everything this projectile
         /// flies through. Scanning for the nearest ACCEPTABLE hit, rather than taking the single
         /// nearest hit, is what lets a shot pass a teammate standing in front of an enemy.</summary>
-        private bool TrySweep(float step, out RaycastHit nearest)
+        private bool TrySweep(PhysicsScene physicsScene, float step, out RaycastHit nearest)
         {
             nearest = default;
 
-            int count = Physics.SphereCastNonAlloc(transform.position, radius, direction, HitBuffer,
-                                                    step, mask, QueryTriggerInteraction.Ignore);
+            int count = physicsScene.SphereCast(transform.position, radius, direction, HitBuffer,
+                                                 step, mask, QueryTriggerInteraction.Ignore);
 
             bool found = false;
             float best = float.MaxValue;
 
             for (int i = 0; i < count; i++)
             {
-                Collider collider = HitBuffer[i].collider;
+                RaycastHit candidate = HitBuffer[i];
+                Collider collider = candidate.collider;
                 if (collider == null || ignored.Contains(collider))
                     continue;
+
+                if (IsRestingOverlapOnLastBounce(candidate, collider))
+                    continue; // The wall we just bounced off, reporting the resting touch as a new hit - not real.
 
                 if (FliesThrough(collider))
                 {
@@ -195,15 +294,39 @@ namespace Overpower.Weapons
                     continue;
                 }
 
-                if (HitBuffer[i].distance < best)
+                if (candidate.distance < best)
                 {
-                    best = HitBuffer[i].distance;
-                    nearest = HitBuffer[i];
+                    best = candidate.distance;
+                    nearest = candidate;
                     found = true;
                 }
             }
 
             return found;
+        }
+
+        /// <summary>
+        /// True when candidate is Unity's documented signature for "the sphere already overlapped
+        /// this collider at the start of the sweep" (distance ~0, normal the sweep direction
+        /// reversed) AND collider is the exact one this projectile most recently bounced off - see
+        /// the class comment's "WALL-RATTLE FIX" and justBouncedOffCollider's own comment.
+        ///
+        /// Deliberately NOT "every initial overlap": a projectile that starts touching or inside a
+        /// wall it has never bounced off - a shot fired flush against one (SafeMuzzlePosition
+        /// already pulls the MUZZLE back off a wall, but a hand-placed or ability projectile is not
+        /// guaranteed the same), or the second wall of an inside corner - must still register that
+        /// hit normally, which is exactly what leaving collider != justBouncedOffCollider unfiltered
+        /// achieves.
+        /// </summary>
+        private bool IsRestingOverlapOnLastBounce(RaycastHit candidate, Collider collider)
+        {
+            if (collider != justBouncedOffCollider)
+                return false;
+
+            if (candidate.distance > RestingOverlapDistance)
+                return false;
+
+            return Vector3.Dot(candidate.normal, direction) < OppositeDirectionDot;
         }
 
         /// <summary>You cannot shoot yourself and you cannot shoot a teammate; in both cases the
@@ -259,6 +382,8 @@ namespace Overpower.Weapons
 
         private void Despawn(bool onImpact, Vector3 at)
         {
+            IsAlive = false;
+
             if (onImpact)
             {
                 // context.Weapon is null for an ability shot (Task 1.7b) - the fallback below is
@@ -276,7 +401,16 @@ namespace Overpower.Weapons
             for (int i = 0; i < behaviours.Length; i++)
                 behaviours[i].OnExpired(this, context);
 
-            Destroy(gameObject);
+            // Destroy is always what real play uses (Application.isPlaying is true in every actual
+            // Play Mode session and every build) - this is not a behaviour change there. The
+            // DestroyImmediate branch exists only so BounceOffWallsRattleTests can drive a real
+            // ProjectileMotor to a genuine despawn from an edit-mode test: Object.Destroy logs an
+            // error when called outside Play Mode ("Destroy may not be called from edit mode!"),
+            // which Unity's edit-mode test runner treats as a failure.
+            if (Application.isPlaying)
+                Destroy(gameObject);
+            else
+                DestroyImmediate(gameObject);
         }
 
         /// <summary>The designer's layer choices, minus the three invariants HitMasks enforces for
