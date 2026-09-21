@@ -23,11 +23,13 @@ namespace Overpower.Weapons
     /// reaching the cursor) showed nothing at all; wiring up to that one event is what makes the airburst half of A6
     /// real, not a second code path here. Visual only - an IProjectileBehaviour that never keeps a shot flying.
     ///
-    /// 2026-09-20 (Tudor: "show what actually got hit" over the full ring every time): Detonated now also carries
-    /// the radius that actually applied damage this blast - 0 for a glancing hit that caught nobody, or a shot that
-    /// found nothing at all. SplashShell.Spawn already refuses a radius &lt;= 0 (draws nothing), so the fix is
-    /// entirely in what gets passed here - see ExplodeOnImpact.Detonated's own comment for where that number comes
-    /// from and why it needs no new networked state.
+    /// 2026-09-20 (Tudor: "show what actually got hit" over the full ring every time): Detonated briefly carried 0
+    /// whenever nothing took splash damage, so a wall hit or a range-end airburst detonated but drew nothing.
+    /// 2026-09-21 (Tudor: "it should always explode on contact/projectile end"): reversed - Detonated always carries
+    /// the rocket's own full Splash Radius now, so every detonation shows the blast; see ExplodeOnImpact.Detonated's
+    /// own comment for the full history. SplashShell.Spawn's own radius &lt;= 0 guard stays as a general safety net
+    /// (a designer could still author a zero-radius rocket by mistake), not as a gate on "did this blast hit
+    /// anything."
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(ExplodeOnImpact))]
@@ -61,12 +63,13 @@ namespace Overpower.Weapons
 
         public void OnExpired(ProjectileMotor projectileMotor, ProjectileContext context) { }
 
-        private void HandleDetonated(Vector3 centre, float actualRadius)
+        private void HandleDetonated(Vector3 centre, float radius)
         {
-            // actualRadius is already 0 for a blast that hit nothing it could damage - SplashShell.Spawn
-            // refuses that on its own, so there is nothing else to gate here.
+            // 2026-09-21: radius is always the rocket's own full Splash Radius now (ExplodeOnImpact.Detonated's own
+            // comment has the full history) - nothing left to gate here beyond SplashShell.Spawn's own defensive
+            // radius <= 0 check.
             Color color = theme != null ? theme.ShotColorFor(shooterTeam) : Color.white;
-            SplashShell.Spawn(splashShellPrefab, centre, actualRadius, color);
+            SplashShell.Spawn(splashShellPrefab, centre, radius, color);
         }
     }
 }

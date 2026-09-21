@@ -98,13 +98,17 @@ namespace Overpower.Weapons
         public float SplashRadius => splashRadius;
 
         /// <summary>Raised once per rocket, on every client, right after the splash has been applied, with the blast
-        /// centre and the radius that ACTUALLY reached something it could damage - a hit or an airburst alike (both
-        /// paths run through Detonate below). 0 means nothing real was hit: no direct victim, and nothing caught by
-        /// the splash cleared its own Falloff/occlusion/friendly-fire checks (2026-09-20, Tudor: "show what actually
-        /// got hit" over the full ring every time). Visual only: RocketBlastView reads this to decide whether to draw
-        /// a shell at all, and how big. No new networked state - every client already computes this identically,
-        /// the same "SPLASH IS APPLIED ON EVERY CLIENT" reasoning this class's own comment gives for the damage
-        /// itself. Nothing that affects damage listens.</summary>
+        /// centre and the rocket's own Splash Radius - ALWAYS the full radius, whatever the blast actually caught.
+        /// 2026-09-17 (A6): first raised, so the blast could be drawn at the real burst point instead of a floor
+        /// ring. 2026-09-20 (Tudor: "show what actually got hit"): this briefly carried 0 whenever nothing took
+        /// splash damage, so a wall hit or a range-end airburst still detonated (splash still applied) but drew
+        /// nothing - which read, to a player, as "the rocket only explodes on or near someone." 2026-09-21 (Tudor:
+        /// "it should always explode on contact/projectile end"): reversed back to the full radius every time - the
+        /// damage numbers on whoever actually got hurt already show what the blast caught, so the ring doesn't need
+        /// to say it again. Visual only: RocketBlastView reads this to decide where and how big to draw the shell.
+        /// No new networked state - every client already computes this identically, the same "SPLASH IS APPLIED ON
+        /// EVERY CLIENT" reasoning this class's own comment gives for the damage itself. Nothing that affects
+        /// damage listens.</summary>
         public event System.Action<Vector3, float> Detonated;
 
         private void Awake()
@@ -180,12 +184,6 @@ namespace Overpower.Weapons
             // impact point (at), so nudging this never changes a single damage number.
             Vector3 occlusionOrigin = directHitCollider != null ? at + surfaceNormal * occlusionNudge : at;
 
-            // 2026-09-20 (Tudor: "show what actually got hit"): a direct victim already took the
-            // weapon's own full Damage, a real hit whether or not anything nearby also caught splash -
-            // see Detonated's own comment for why this alone is enough to size the ring at the full
-            // Splash Radius rather than inventing a second, smaller "how far did it really reach" figure.
-            bool anyDamageApplied = directVictim != null;
-
             int count = Physics.OverlapSphereNonAlloc(at, splashRadius, OverlapBuffer, splashMask,
                                                        QueryTriggerInteraction.Ignore);
 
@@ -215,8 +213,6 @@ namespace Overpower.Weapons
                 if (amount <= 0f)
                     continue;
 
-                anyDamageApplied = true;
-
                 // abilityId -1: this splash always comes from a weapon's own rocket (context.Weapon
                 // is read directly, never AbilityId) - see DamageInfo.AbilityId's own comment.
                 target.ApplyDamage(new DamageInfo(amount, context.ShooterActorNumber,
@@ -226,10 +222,10 @@ namespace Overpower.Weapons
 
             // Ability visuals step 6: after every splash hit above, so a visual listener can't affect one. Runs for
             // an airburst too - OnExpired calls this same method, so a rocket that reaches its range end (or the
-            // cursor rocket reaching the cursor) raises Detonated exactly like a direct hit does. 2026-09-20: the
-            // radius is 0 (draw nothing - SplashShell.Spawn already treats <= 0 that way) unless this blast actually
-            // damaged something, direct victim or splash alike.
-            Detonated?.Invoke(at, anyDamageApplied ? splashRadius : 0f);
+            // cursor rocket reaching the cursor) raises Detonated exactly like a direct hit does. 2026-09-21 (Tudor:
+            // "it should always explode on contact/projectile end"): always the full Splash Radius, never gated on
+            // whether anything actually took damage - see Detonated's own comment for the full history of why.
+            Detonated?.Invoke(at, splashRadius);
         }
 
         /// <summary>
