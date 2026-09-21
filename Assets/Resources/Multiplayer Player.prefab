@@ -3448,7 +3448,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8170903716044679203}
-  - component: {fileID: 8275497955977905471}
   m_Layer: 0
   m_Name: BulletOriginPoint
   m_TagString: Bullet
@@ -3471,22 +3470,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 3859189088569932943}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &8275497955977905471
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2741422025056904628}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6153636851db84c41bec33915b96e4d8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  bulletSpeed: 15
-  bulletImpactEffect: {fileID: 1000010321467122, guid: c108d1bfc37c0494daea3e4e53c3c16e, type: 3}
-  BulletHitAudio: {fileID: 8300000, guid: d6bb1df959326064a8f5fcc97b8e436f, type: 3}
-  damage: 10
 --- !u!1 &3553536924629032644
 GameObject:
   m_ObjectHideFlags: 0
