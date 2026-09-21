@@ -12,14 +12,15 @@ namespace Overpower.Tests
     /// <summary>
     /// THE WALL-RATTLE FIX (2026-09-21). Tudor measured the Bounce gun (weapon 7) dealing LESS
     /// damage per trigger pull after a bounce than a direct hit does - the opposite of
-    /// BounceOffWalls' own "+20% per bounce" design. The investigation (scratchpad/bounce/) found
-    /// the cause in ProjectileMotor: a bullet left resting exactly on the wall it just bounced off
-    /// was read as hitting that SAME wall again on the very next sweep - Unity's documented
-    /// "initial overlap" signature (RaycastHit.distance 0, normal the sweep direction reversed) -
-    /// so it kept reflecting about an artifact instead of flying away, burning its bounce budget on
-    /// the wall it should have left. Measured worse at 65-120m from the origin (float precision),
-    /// which is why every test below places its geometry out there rather than near (0,0,0) - a
-    /// probe near the origin (scratchpad/bounce_overlap_probe.cs) did not reproduce it at all.
+    /// BounceOffWalls' own "+20% per bounce" design. The investigation (per-frame logging of a live
+    /// bounced shot, not kept in the repo) found the cause in ProjectileMotor: a bullet left resting
+    /// exactly on the wall it just bounced off was read as hitting that SAME wall again on the very
+    /// next sweep - Unity's documented "initial overlap" signature (RaycastHit.distance 0, normal
+    /// the sweep direction reversed) - so it kept reflecting about an artifact instead of flying
+    /// away, burning its bounce budget on the wall it should have left. Measured worse at 65-120m
+    /// from the origin (float precision), which is why every test below places its geometry out
+    /// there rather than near (0,0,0) - the same scenario run near the origin instead did not
+    /// reproduce it at all.
     ///
     /// Drives a REAL ProjectileMotor + BounceOffWalls (and, for the pierce test, a minimal stand-in
     /// for a projectile that pierces) against real BoxColliders in an edit-mode preview scene, the
@@ -67,6 +68,15 @@ namespace Overpower.Tests
             awake.Invoke(motor, null);
         }
 
+        /// <summary>M1: reads the private field the wall-rattle guard reads, so a test can confirm
+        /// it actually disarms itself instead of only inferring it indirectly.</summary>
+        private static Collider GetJustBouncedOffCollider(ProjectileMotor motor)
+        {
+            FieldInfo field = typeof(ProjectileMotor).GetField("justBouncedOffCollider", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(field, "ProjectileMotor.justBouncedOffCollider");
+            return (Collider)field.GetValue(motor);
+        }
+
         private GameObject MakeBullet(Vector3 position, Vector3 direction, System.Action<GameObject> addBehaviours = null,
                                       float speed = WeaponSpeed, float radius = WeaponRadius,
                                       float maxRange = WeaponMaxRange, float damage = WeaponDamage)
@@ -109,6 +119,33 @@ namespace Overpower.Tests
             }
 
             public void OnExpired(ProjectileMotor motor, ProjectileContext shot) { }
+        }
+
+        /// <summary>
+        /// P1's own rig: records the exact point of the first surviving hit (the bounce) and the
+        /// exact point the projectile finally comes to rest at (impact or range/lifetime expiry),
+        /// so a test can measure the REAL arc length actually travelled without ever touching
+        /// motor.transform after Despawn destroys the GameObject. Both IProjectileBehaviour.OnHit
+        /// and OnExpired are called BEFORE Despawn's Destroy/DestroyImmediate call (see
+        /// ProjectileMotor.Despawn's own ordering), so reading position here is always safe. Never
+        /// votes KeepFlying itself (returns Despawn, "no opinion") so it cannot change what
+        /// BounceOffWalls or any other behaviour decides.
+        /// </summary>
+        private class PositionRecorder : MonoBehaviour, IProjectileBehaviour
+        {
+            public Vector3? FirstHitPoint;
+            public Vector3 FinalPosition;
+
+            public void OnSpawned(ProjectileMotor motor, ProjectileContext shot) => FirstHitPoint = null;
+
+            public ProjectileHitResponse OnHit(ProjectileMotor motor, ProjectileContext shot, RaycastHit hit, IDamageable victim)
+            {
+                if (FirstHitPoint == null)
+                    FirstHitPoint = hit.point;
+                return ProjectileHitResponse.Despawn;
+            }
+
+            public void OnExpired(ProjectileMotor motor, ProjectileContext shot) => FinalPosition = motor.transform.position;
         }
 
         // ---- P2 (review follow-up, 2026-09-21): a sweep that starts already overlapping something ----
@@ -154,9 +191,9 @@ namespace Overpower.Tests
         /// measured the rattle in - hit from 20m south at angleDeg off head-on, stepped at dt. On
         /// today's (pre-fix) code this fails: the first bounce is real, but the very next Step call
         /// reads the resting sphere as hitting the same wall again (DamageMultiplier climbs a
-        /// second time at essentially the same point), which is exactly the BOUNCE log signature
-        /// the investigation captured (events.log / realgeo.log: repeated bounces at one point with
-        /// the normal flipping sign each time). After the fix, exactly one bounce fires, the
+        /// second time at essentially the same point), which is exactly what the investigation's own
+        /// per-frame log showed: repeated bounces at one point with the normal flipping sign each
+        /// time. After the fix, exactly one bounce fires, the
         /// resulting direction matches Vector3.Reflect off the wall's own normal, and the bullet
         /// keeps moving away from its own bounce point instead of rattling.
         /// </summary>
@@ -258,6 +295,60 @@ namespace Overpower.Tests
                 "stuck rather than flying on");
         }
 
+        // ---- P1 (review follow-up, 2026-09-21): a survived hit must refund its step's remainder ----
+
+        /// <summary>
+        /// Pre-existing bug, now reachable more often once the rattle no longer eats a shot's whole
+        /// bounce budget on one wall: ProjectileMotor.Step charges a step's FULL nominal distance to
+        /// RangeBudget via Consume even when the sweep stops early on a hit the shot survives (a
+        /// bounce), throwing away only the MOVEMENT past hit.distance while still keeping the CHARGE
+        /// for it. A bigger nominal step (a lower frame rate) forfeits more per bounce than a smaller
+        /// one does, so the identical bounced path used to travel a measurably different total real
+        /// distance depending on the client's frame rate - exactly Tudor's "a triple-bounced shot's
+        /// reach differs by ~2.5m between a 60fps and a 470fps client."
+        /// </summary>
+        [Test]
+        public void ABouncedShotTravelsTheSameTotalDistanceAtDifferentFrameRates()
+        {
+            float travelled60 = RunBouncedPathToExpiryAndMeasureRealDistance(1f / 60f);
+            float travelled470 = RunBouncedPathToExpiryAndMeasureRealDistance(1f / 470f);
+
+            Assert.AreEqual(travelled60, travelled470, 0.05f,
+                $"a 60fps client travelled {travelled60:F3}m and a 470fps client {travelled470:F3}m on the " +
+                "identical bounced path before expiring - RangeBudget must refund a survived hit's unused " +
+                "step, not forfeit it, or the two frame rates disagree on the shot's real reach");
+        }
+
+        /// <summary>Fires one bullet head-on into a flat wall (so it bounces exactly once, straight
+        /// back the way it came) until it expires on its own range, and returns the REAL arc length
+        /// travelled: distance(shooter, bounce point) + distance(bounce point, final resting point).
+        /// Both points come from PositionRecorder, which reads them from inside OnHit/OnExpired -
+        /// before Despawn destroys the GameObject - so this never touches motor.transform after the
+        /// projectile has despawned on its very last Step call.</summary>
+        private float RunBouncedPathToExpiryAndMeasureRealDistance(float dt)
+        {
+            Wall(new Vector3(90f, 2f, 115f), new Vector3(400f, 6f, 1f), "Wall");
+
+            Vector3 shooter = new Vector3(90f, 2f, 90f); // head-on, well inside the 65-120m band
+            PositionRecorder recorder = null;
+            GameObject bulletGo = MakeBullet(shooter, Vector3.forward, go =>
+            {
+                go.AddComponent<BounceOffWalls>();
+                recorder = go.AddComponent<PositionRecorder>();
+            });
+            ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
+            PhysicsScene physicsScene = scene.GetPhysicsScene();
+
+            for (int i = 0; i < 5000 && motor.IsAlive; i++)
+                motor.Step(dt, physicsScene);
+
+            Assert.IsFalse(motor.IsAlive, $"dt={dt:F5}: never expired within the step budget");
+            Assert.IsTrue(recorder.FirstHitPoint.HasValue, $"dt={dt:F5}: never registered the bounce at all");
+
+            return Vector3.Distance(shooter, recorder.FirstHitPoint.Value) +
+                   Vector3.Distance(recorder.FirstHitPoint.Value, recorder.FinalPosition);
+        }
+
         // ---- an inside corner: two real walls, two genuine bounces --------------------------
 
         /// <summary>
@@ -266,6 +357,14 @@ namespace Overpower.Tests
         /// each wall, and the fix's per-collider guard (IsRestingOverlapOnLastBounce only ever
         /// exempts the wall a bounce JUST happened against) must not swallow the second wall's
         /// genuine hit just because it follows a bounce closely.
+        ///
+        /// M2 (review follow-up, 2026-09-21): the original aim (a plain 3:1 slope) hit Wall A at
+        /// roughly (100, *, 80) - 20m short of Wall B's own z=100 plane, so the second hit arrived
+        /// from ~62m away and the per-collider guard was never actually exercised near a corner at
+        /// all. Aimed instead at a point just 0.1m short of Wall B's face, so the FIRST bounce lands
+        /// close enough that the guard's "same collider, resting-touch signature" check has a real
+        /// chance to misfire against Wall B if it were scoped wrong (e.g. by distance alone rather
+        /// than by collider identity).
         /// </summary>
         [Test]
         public void AnInsideCornerGivesTwoGenuineBounces()
@@ -274,7 +373,10 @@ namespace Overpower.Tests
             Wall(new Vector3(70f, 2f, 100f), new Vector3(100f, 8f, 1f), "CornerWallB"); // z=100 plane, spans x 20..120
 
             Vector3 shooter = new Vector3(70f, 2f, 70f);
-            Vector3 incidentDir = new Vector3(3f, 0f, 1f).normalized; // hits Wall A (x=100) well before reaching z=100.
+            // Aimed at (99.5, *, 99.4): Wall A's near face (x=99.5), 0.1m short of Wall B's own near
+            // face (z=99.5) - the first bounce lands within ~0.1m of the second wall.
+            Vector3 nearCornerAimPoint = new Vector3(99.5f, 2f, 99.4f);
+            Vector3 incidentDir = (nearCornerAimPoint - shooter).normalized;
 
             GameObject bulletGo = MakeBullet(shooter, incidentDir, go => go.AddComponent<BounceOffWalls>(), maxRange: 150f);
             ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
@@ -316,6 +418,103 @@ namespace Overpower.Tests
             }
 
             Assert.Greater(maxAfter, WeaponRadius * 4f, "never moved away from the corner after its second bounce");
+        }
+
+        // ---- M1 (review follow-up, 2026-09-21): the guard disarms itself, "the very next sweep" ----
+
+        /// <summary>
+        /// The comments on IsRestingOverlapOnLastBounce and Redirect both say the guard exempts
+        /// "the very next sweep", but justBouncedOffCollider itself was never actually cleared - a
+        /// much later sweep that happened to reproduce the exact same resting-overlap signature
+        /// against the SAME collider (however unlikely in practice) would be silently swallowed
+        /// forever instead of just once. Confirm the field disarms itself instead of staying armed.
+        /// </summary>
+        [Test]
+        public void JustBouncedOffColliderClearsOnTheFirstSweepTheGuardDoesNotFire()
+        {
+            Wall(new Vector3(90f, 2f, 115f), new Vector3(400f, 6f, 1f), "Wall");
+
+            Vector3 shooter = new Vector3(90f, 2f, 90f);
+            GameObject bulletGo = MakeBullet(shooter, Vector3.forward, go => go.AddComponent<BounceOffWalls>());
+            ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
+            PhysicsScene physicsScene = scene.GetPhysicsScene();
+
+            float lastMultiplier = 1f;
+            bool bounced = false;
+            for (int i = 0; i < 2000 && motor.IsAlive && !bounced; i++)
+            {
+                motor.Step(1f / 60f, physicsScene);
+                if (motor.Context.DamageMultiplier > lastMultiplier + 0.001f)
+                    bounced = true;
+            }
+
+            Assert.IsTrue(bounced, "never bounced off the wall at all");
+            Assert.NotNull(GetJustBouncedOffCollider(motor), "the field should be armed right after a bounce");
+
+            // The very next sweep: the lift (BounceSurfaceSkin) plus a full step of movement in the
+            // new direction should clear the sphere of the wall entirely, so the guard no longer has
+            // anything to exempt - which is exactly when the field must disarm.
+            motor.Step(1f / 60f, physicsScene);
+
+            Assert.IsNull(GetJustBouncedOffCollider(motor),
+                "justBouncedOffCollider must clear once the guard no longer fires, not stay armed forever");
+        }
+
+        // ---- M3 (review follow-up, 2026-09-21): the fix's two halves, tested on their own --------
+
+        [Test]
+        public void RedirectAfterABounceLiftsTheProjectileAtLeastBounceSurfaceSkinOffTheWall()
+        {
+            // The designer's own authored constant, pinned here the same way other tests pin a real
+            // weapon number - see ProjectileMotor's BounceSurfaceSkin field for the source of truth.
+            const float BounceSurfaceSkin = 0.02f;
+
+            GameObject wallGo = Wall(new Vector3(90f, 2f, 115f), new Vector3(400f, 6f, 1f), "Wall");
+            Collider wallCollider = wallGo.GetComponent<Collider>();
+
+            GameObject bulletGo = MakeBullet(new Vector3(90f, 2f, 100f), Vector3.forward);
+            ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
+
+            Vector3 beforeRedirect = motor.transform.position;
+            Vector3 hitNormal = Vector3.back; // the wall's own outward face normal, approached from -z
+
+            motor.Redirect(Vector3.back, hitNormal, wallCollider);
+
+            float lift = Vector3.Distance(motor.transform.position, beforeRedirect);
+            Assert.GreaterOrEqual(lift, BounceSurfaceSkin - 0.0001f,
+                $"Redirect only lifted the projectile {lift:F4}m off the wall - must be at least BounceSurfaceSkin " +
+                "or the very next sweep reads the resting touch as a fresh hit (the wall-rattle bug)");
+        }
+
+        [Test]
+        public void ARedirectedShotMovedBackToExactlyTouchingTheWallTakesNoSecondBounceAndMovesAway()
+        {
+            // The lift half of the fix is a distance, not a guarantee (Redirect's own comment) - this
+            // test undoes it on purpose, putting the sphere back to EXACTLY touching the wall, so
+            // only the per-collider guard (not the lift) is what has to hold here.
+            float wallNearFaceZ = 114.5f; // Wall centre z=115, size.z=1 -> near face at 114.5.
+            GameObject wallGo = Wall(new Vector3(90f, 2f, 115f), new Vector3(400f, 6f, 1f), "Wall");
+            Collider wallCollider = wallGo.GetComponent<Collider>();
+
+            Vector3 touchingPosition = new Vector3(90f, 2f, wallNearFaceZ - WeaponRadius);
+            GameObject bulletGo = MakeBullet(touchingPosition, Vector3.forward, go => go.AddComponent<BounceOffWalls>());
+            ProjectileMotor motor = bulletGo.GetComponent<ProjectileMotor>();
+            PhysicsScene physicsScene = scene.GetPhysicsScene();
+
+            // Simulate a real bounce having just happened against this exact wall, then undo the lift.
+            motor.Redirect(Vector3.back, Vector3.back, wallCollider);
+            motor.transform.position = touchingPosition;
+
+            float multiplierBefore = motor.Context.DamageMultiplier;
+            Vector3 positionBeforeStep = motor.transform.position;
+
+            motor.Step(1f / 60f, physicsScene);
+
+            Assert.IsTrue(motor.IsAlive, "should not have despawned - a genuine bounce keeps flying");
+            Assert.AreEqual(multiplierBefore, motor.Context.DamageMultiplier, 0.0001f,
+                "must not count a second bounce off the exact same resting touch");
+            Assert.Greater(Vector3.Distance(motor.transform.position, positionBeforeStep), 0f,
+                "must move away from the wall, not sit still on it");
         }
 
         // ---- regression guarantees: a non-bouncing bullet, and one that starts touching a wall ----

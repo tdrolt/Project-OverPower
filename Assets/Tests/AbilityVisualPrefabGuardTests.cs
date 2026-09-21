@@ -166,7 +166,8 @@ namespace Overpower.Tests
             Float(zip, "projectileSpeed", 40f);
             // A4 (Tudor 2026-09-17 evening): the hook's hit size grows by 50% - an INTENDED gameplay change, so
             // this pin moves on purpose (see the commit message). 0.15 -> 0.225 m, the real authored field
-            // (ProjectileMotor.cs:179 reads THIS value into its sphere cast; nothing else holds a copy).
+            // (ProjectileMotor.Initialize reads THIS value into its own `radius` field, used by TrySweep's
+            // sphere cast; nothing else holds a copy).
             Float(zip, "projectileRadius", 0.225f);
             Float(zip, "pullSpeed", 25f);
             AssetAt(zip, "projectilePrefab", "Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab");

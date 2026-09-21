@@ -154,5 +154,60 @@ namespace Overpower.Tests
             Assert.AreEqual(30f, b.Travelled, 0.001f);
             Assert.IsTrue(b.IsSpent);
         }
+
+        // ---- P1 (review follow-up, 2026-09-21): Refund gives back a step's unused remainder ----
+
+        [Test]
+        public void RefundGivesBackDistanceThatWasBookedButNeverActuallyTravelled()
+        {
+            // ProjectileMotor.Step's own bug: on a hit the shot survives (a bounce, a pierce), the
+            // whole nominal step was already charged to Consume even though only hit.distance of it
+            // was actually moved. Refund is how the unused remainder gets handed back.
+            var b = NewBudget();
+            b.Consume(10f); // a step that travelled the full 10m, nothing to refund yet
+
+            b.Refund(4f); // only 6m of THIS step was real; hand back the other 4m
+
+            Assert.AreEqual(6f, b.Travelled, 0.0001f);
+            Assert.IsFalse(b.IsSpent);
+        }
+
+        [Test]
+        public void RefundNeverTakesTravelledBelowZero()
+        {
+            // A caller refunding more than was ever consumed must not hand back range the
+            // projectile never spent in the first place - same "never buy extra range" rule
+            // Consume's own negative-distance guard enforces from the other direction.
+            var b = NewBudget();
+            b.Consume(3f);
+
+            b.Refund(100f);
+
+            Assert.AreEqual(0f, b.Travelled, 0.0001f);
+        }
+
+        [Test]
+        public void RefundingBelowZeroIsIgnored()
+        {
+            var b = NewBudget();
+            b.Consume(10f);
+
+            b.Refund(-5f);
+
+            Assert.AreEqual(10f, b.Travelled, 0.0001f, "a negative refund must not charge MORE distance");
+        }
+
+        [Test]
+        public void ARefundCanUnspendABudgetThatHadJustBeenMarkedSpent()
+        {
+            var b = NewBudget();
+            b.Consume(30f);
+            Assert.IsTrue(b.IsSpent);
+
+            b.Refund(5f);
+
+            Assert.AreEqual(25f, b.Travelled, 0.0001f);
+            Assert.IsFalse(b.IsSpent);
+        }
     }
 }

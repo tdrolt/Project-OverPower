@@ -274,9 +274,13 @@ namespace Overpower.Weapons
 
         /// <summary>
         /// Called for every hit the sweep stops on, after damage has already been applied. Use
-        /// motor.Ignore(hit.collider) then return KeepFlying to pierce; motor.Redirect(...) then
-        /// KeepFlying to bounce; spawn an explosion and return Despawn to detonate. When several
-        /// behaviours are attached, any single KeepFlying wins.
+        /// motor.Ignore(hit.collider) then return KeepFlying to pierce; motor.Redirect(newDirection,
+        /// hitNormal, hitCollider) then KeepFlying to bounce (the one-argument overload was deleted,
+        /// 2026-09-21 review follow-up - it had no callers, and using it to bounce would bring back
+        /// the wall-rattle bug ProjectileMotor's class comment describes, since it never lifts the
+        /// projectile off the surface or arms the resting-overlap guard); spawn an explosion and
+        /// return Despawn to detonate. When several behaviours are attached, any single KeepFlying
+        /// wins.
         /// </summary>
         /// <param name="victim">The thing that took the damage, or null when the shot hit level
         /// geometry.</param>

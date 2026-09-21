@@ -91,5 +91,26 @@ namespace Overpower.Combat
 
             return allowed;
         }
+
+        /// <summary>
+        /// Gives back distance that was booked by Consume but never actually travelled - the review
+        /// follow-up fix (2026-09-21, P1) for ProjectileMotor.Step: a step that ends in KeepFlying (a
+        /// bounce, a pierce) charges the WHOLE nominal step to Consume up front, then only moves the
+        /// projectile by hit.distance if a hit cut the step short. Without handing the difference
+        /// back here, that unused remainder stayed charged anyway - a bigger nominal step (a lower
+        /// frame rate) forfeits more of it per hit than a smaller one does, so the identical bounced
+        /// path used to travel a different total real distance depending on the client's frame rate.
+        ///
+        /// Clamped to zero rather than letting Travelled go negative, for the same reason Consume
+        /// clamps a negative distance to zero: a caller must not be able to buy a projectile extra
+        /// range it never had by refunding more than it ever spent.
+        /// </summary>
+        public void Refund(float distance)
+        {
+            if (distance <= 0f)
+                return;
+
+            Travelled = Mathf.Max(0f, Travelled - distance);
+        }
     }
 }

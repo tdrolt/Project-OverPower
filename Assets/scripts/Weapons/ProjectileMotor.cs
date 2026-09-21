@@ -100,8 +100,13 @@ namespace Overpower.Weapons
         // the resting-overlap signature Unity documents (RaycastHit.normal is the sweep direction
         // reversed for an initial overlap) - not an approximation a designer would ever tune.
         // cos(5 degrees) leaves headroom around the bit-for-bit opposite the investigation's own
-        // log showed, without swallowing a shallow graze that happens to be nearly opposite for
-        // real geometric reasons.
+        // log showed. M4 correction (2026-09-21 review): this threshold is NOT what tells the
+        // artifact apart from a genuine head-on hit - a real head-on hit against a DIFFERENT wall
+        // produces the exact same "nearly opposite" normal, and a shallow graze produces a normal
+        // nowhere near opposite the travel direction regardless of which collider it hits, so
+        // grazes were never a risk here at all. What actually tells the artifact apart is
+        // IsRestingOverlapOnLastBounce's other two conditions: the SAME collider this projectile
+        // most recently bounced off, and essentially zero distance travelled this sweep.
         private const float OppositeDirectionDot = -0.996f;
 
         private ProjectileContext context;
@@ -154,15 +159,6 @@ namespace Overpower.Weapons
 
             for (int i = 0; i < behaviours.Length; i++)
                 behaviours[i].OnSpawned(this, context);
-        }
-
-        /// <summary>Turn the projectile without any surface to lift off of - kept for a future
-        /// behaviour that redirects without having just bounced off a collider. Every bounce today
-        /// goes through the overload below instead.</summary>
-        public void Redirect(Vector3 newDirection)
-        {
-            direction = newDirection.normalized;
-            transform.forward = direction;
         }
 
         /// <summary>
@@ -252,9 +248,12 @@ namespace Overpower.Weapons
                     return;
                 }
 
-                // A behaviour kept it alive; it resumes from the contact point next frame. The
-                // unused remainder of this step is forfeited - at most one frame of travel, and it
-                // keeps the range budget honest.
+                // P1 (review follow-up, 2026-09-21): a behaviour kept it alive, so it resumes from
+                // the contact point next frame - but Consume above already charged this WHOLE step,
+                // even though only hit.distance of it was actually moved. Refund the difference, or
+                // a bounced/pierced shot's total reach would depend on how big the frame's own step
+                // happened to be (a lower frame rate forfeits more per hit than a higher one).
+                range.Refund(step - hit.distance);
             }
             else
             {
@@ -278,6 +277,10 @@ namespace Overpower.Weapons
             bool found = false;
             float best = float.MaxValue;
 
+            // M1 (review follow-up, 2026-09-21): whether THIS sweep actually saw the resting-overlap
+            // artifact against justBouncedOffCollider - see the field clear below.
+            bool restingArtifactStillPresent = false;
+
             for (int i = 0; i < count; i++)
             {
                 RaycastHit candidate = HitBuffer[i];
@@ -286,7 +289,10 @@ namespace Overpower.Weapons
                     continue;
 
                 if (IsRestingOverlapOnLastBounce(candidate, collider))
+                {
+                    restingArtifactStillPresent = true;
                     continue; // The wall we just bounced off, reporting the resting touch as a new hit - not real.
+                }
 
                 if (FliesThrough(collider))
                 {
@@ -301,6 +307,14 @@ namespace Overpower.Weapons
                     found = true;
                 }
             }
+
+            // M1: the guard is only ever meant to exempt "the very next sweep" (Redirect's own
+            // comment), never every sweep for the rest of this projectile's life - a much later
+            // sweep that happened to reproduce the exact same signature against the SAME collider
+            // must register as a genuine hit. The first sweep where the artifact is no longer seen
+            // is exactly when it is safe to disarm.
+            if (justBouncedOffCollider != null && !restingArtifactStillPresent)
+                justBouncedOffCollider = null;
 
             return found;
         }

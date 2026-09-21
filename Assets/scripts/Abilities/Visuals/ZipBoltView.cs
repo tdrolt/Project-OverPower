@@ -13,8 +13,9 @@ namespace Overpower.Abilities
     /// A4 (Tudor 2026-09-17 evening, gameplay change): the hook's hit size grows by 50% - Zip Gun.prefab's own
     /// Projectile Radius goes from 0.15 to 0.225 m - and the head below is sized to match the new 0.45 m hit
     /// diameter exactly, so the look finally tells the truth about the hit instead of being a purely cosmetic
-    /// oversize. The hit itself is still ProjectileMotor's sphere of that same Projectile Radius field
-    /// (ProjectileMotor.cs:179) - this class never reads or touches it.
+    /// oversize. The hit itself is still ProjectileMotor's own `radius` field (set from
+    /// ProjectileContext.ProjectileRadius in Initialize, read by TrySweep's SphereCast) - this class never reads
+    /// or touches it.
     ///
     /// Visual only beyond that: an IProjectileBehaviour that never keeps a shot flying and never touches the sweep.
     /// </summary>
