@@ -258,8 +258,8 @@ namespace Overpower.UI
         [Range(10f, 100f)] public float loadoutPriceLineSizePercent = 70f;
         [Tooltip("Seconds a refused click's reason (\"Need 700 more gold\", \"Out of combat in 2.4s\"...) stays shown in the header status line before it reverts to the ordinary gate status - Task 2.5b review fix 2. A click on a shop-blocked item used to do nothing visible at all.")]
         public float loadoutBlockedReasonDurationSeconds = 2f;
-        [Tooltip("Fixed height of the hover-description strip under the weapon/ability columns, in canvas units - fixed so switching between a short weapon hover and a long ability description never resizes the panel around it. Generous enough for a three-line name/description/numbers block; a longer hover string overflows past it rather than growing it.")]
-        public float loadoutDescriptionPanelHeight = 150f;
+        [Tooltip("Fixed height of the hover-description strip under the weapon/ability columns, in canvas units - fixed so switching between a short weapon hover and a long ability description never resizes the panel around it. G1 review follow-up, 2026-09-21: 150 measured 14.5 units too short for 12 Laser - Mark's own 168-character description (needs 164.5 once its own pinned width forces it to wrap); raised to 190, a line's headroom (~23 units at Small Text Size) above that measured worst case, since the strip has no mask and content past its own box would silently draw over whatever sits below it.")]
+        public float loadoutDescriptionPanelHeight = 190f;
         [Tooltip("Width of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
         public float loadoutToggleButtonWidth = 190f;
         [Tooltip("Height of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]

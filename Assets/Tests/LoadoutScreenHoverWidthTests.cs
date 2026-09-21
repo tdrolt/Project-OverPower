@@ -2,6 +2,7 @@ using System.Reflection;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using Overpower.Data;
 using Overpower.UI;
@@ -48,11 +49,21 @@ namespace Overpower.Tests
         private RectTransform panelRect;
         private WeaponCatalogue weapons;
         private AbilityCatalogue abilities;
+        private UiTheme theme;
+        private VerticalLayoutGroup descriptionPanelLayout;
+
+        // G2 (review follow-up, 2026-09-21): BuildUi -> EnsureEventSystem creates an EventSystem root
+        // in the active scene when none exists there yet - true for an edit-mode test run with no
+        // scene of its own. Recorded here so TearDown can clean up only the one THIS test created,
+        // never an EventSystem some other test (or the real scene) already had.
+        private bool createdEventSystem;
 
         [SetUp]
         public void BuildScreen()
         {
-            var theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            createdEventSystem = EventSystem.current == null;
+
+            theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
             weapons = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/Gameplay/Weapons/WeaponCatalogue.asset");
             abilities = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/Gameplay/Config/AbilityCatalogue.asset");
             Assert.NotNull(theme, "UiTheme.asset");
@@ -75,10 +86,23 @@ namespace Overpower.Tests
             Transform panel = screenRoot.transform.Find("Panel");
             Assert.NotNull(panel, "BuildScreenCanvas should have created a child named 'Panel'");
             panelRect = (RectTransform)panel;
+
+            Transform descriptionPanel = panel.Find("Description Panel");
+            Assert.NotNull(descriptionPanel, "BuildScreenCanvas should have created a child named 'Description Panel'");
+            descriptionPanelLayout = descriptionPanel.GetComponent<VerticalLayoutGroup>();
+            Assert.NotNull(descriptionPanelLayout, "Description Panel's VerticalLayoutGroup");
         }
 
         [TearDown]
-        public void DestroyScreen() => Object.DestroyImmediate(screenGo);
+        public void DestroyScreen()
+        {
+            Object.DestroyImmediate(screenGo);
+
+            // G2: only destroy the EventSystem this test's own BuildUi call created - never one that
+            // was already there (the real scene, or another test's own rig) before this test ran.
+            if (createdEventSystem && EventSystem.current != null)
+                Object.DestroyImmediate(EventSystem.current.gameObject);
+        }
 
         private void SetField(string name, object value)
         {
@@ -151,6 +175,53 @@ namespace Overpower.Tests
                 Assert.AreEqual(baseline, cleared, WidthTolerance,
                     $"panel width did not return to baseline after clearing ability '{ability.name}'");
             }
+        }
+
+        /// <summary>
+        /// G1 (review follow-up, 2026-09-21): pinning the strip's WIDTH (the test above) does not by
+        /// itself guarantee its fixed HEIGHT (Loadout Description Panel Height, 150 units) is still
+        /// enough now that a long description wraps to several lines instead of reporting one long
+        /// unwrapped line - the panel has no mask, so content that no longer fits would silently draw
+        /// past its own box instead of resizing or clipping. descriptionPanelLayout.preferredHeight
+        /// is the VerticalLayoutGroup's own intrinsic "how tall do my children actually need me to
+        /// be" figure (name + description + numbers labels, their own spacing and padding) -
+        /// independent of the LayoutElement's fixed clamp on the same GameObject, so it reports the
+        /// real overflow instead of silently reading back the clamp itself.
+        /// </summary>
+        [Test]
+        public void TheDescriptionStripsContentAlwaysFitsInsideItsFixedHeight()
+        {
+            AssertContentFitsHeight("(cleared)", () => ClearHover());
+
+            foreach (WeaponDefinition weapon in weapons.Weapons)
+            {
+                if (weapon == null)
+                    continue;
+
+                AssertContentFitsHeight($"weapon '{weapon.name}' ({weapon.Description?.Length ?? 0} chars)",
+                    () => ShowWeaponHover(weapon));
+            }
+
+            foreach (AbilityDefinition ability in abilities.Abilities)
+            {
+                if (ability == null)
+                    continue;
+
+                AssertContentFitsHeight($"ability '{ability.name}' ({ability.Description?.Length ?? 0} chars)",
+                    () => ShowAbilityHover(ability));
+            }
+        }
+
+        private void AssertContentFitsHeight(string label, System.Action setHover)
+        {
+            setHover();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(panelRect);
+
+            float contentPreferredHeight = descriptionPanelLayout.preferredHeight;
+            Assert.LessOrEqual(contentPreferredHeight, theme.loadoutDescriptionPanelHeight,
+                $"hovering {label}: the description strip's content needs {contentPreferredHeight:F1} units, " +
+                $"more than Loadout Description Panel Height ({theme.loadoutDescriptionPanelHeight:F1}) - it " +
+                "would draw past the strip's own box, since it has no mask");
         }
 
         /// <summary>The bug report's own example, called out on its own: 170 characters, the shop's

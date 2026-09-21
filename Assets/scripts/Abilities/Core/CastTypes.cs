@@ -23,8 +23,10 @@ namespace Overpower.Abilities
         /// <summary>Where the cursor meets the ground - PlayerAim.GroundPointUnderCursor.</summary>
         public readonly Vector3 TargetPoint;
 
-        /// <summary>The WASD direction, camera-relative, at most length 1. Zero when standing still,
-        /// which is how a dash knows to fall back to the aim direction.</summary>
+        /// <summary>The WASD direction, camera-relative, at most length 1. Zero when standing still -
+        /// since 921bb71 that is how a dash knows to fall back to the cursor first, and only to the
+        /// aim direction once the cursor sits too close to the caster to mean anything
+        /// (DashDirectionRule.Choose).</summary>
         public readonly Vector3 MoveDirection;
 
         public CastContext(Vector3 origin, Vector3 muzzle, Vector3 aimDirection, Vector3 targetPoint,

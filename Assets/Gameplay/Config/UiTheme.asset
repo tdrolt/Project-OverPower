@@ -97,7 +97,7 @@ MonoBehaviour:
   loadoutShopBlockedColor: {r: 0.22, g: 0.14, b: 0.05, a: 0.92}
   loadoutPriceLineSizePercent: 70
   loadoutBlockedReasonDurationSeconds: 2
-  loadoutDescriptionPanelHeight: 150
+  loadoutDescriptionPanelHeight: 190
   loadoutToggleButtonWidth: 190
   loadoutToggleButtonHeight: 48
   loadoutToggleButtonMargin: 24
