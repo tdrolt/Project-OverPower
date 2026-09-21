@@ -6,15 +6,16 @@ using Overpower.Weapons;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Three beams converging on the cursor. Tudor's spec: each beam that crosses an enemy applies
-    /// +30% damage taken for 4 seconds, stacking to a cap of +60% - one beam is +30%, two or three
-    /// is +60%. THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT EXTRA DAMAGE: aiming at the
-    /// convergence point is what lands all three, so the skill is placing the cursor at the right
-    /// distance, not spamming the key - but PIERCE IS ON (see FireOneBeam below), so this is NOT the
-    /// only place a beam can land. With `beamRange` doubled to 24m (rework step 6) each beam debuffs
-    /// every enemy anywhere along its own 24m line, convergence point or not; three separate targets
-    /// spread along one beam's path all take that beam's debuff, not just whichever one sits at the
-    /// cursor. Zero damage - this is a debuff, not a weapon (addendum, [C, plan]).
+    /// Three beams converging at a fixed range along the shooter's own aim direction, not at the
+    /// cursor (2026-09-20 rework - see THE SPREAD below for why). Tudor's spec: each beam that
+    /// crosses an enemy applies +30% damage taken for 4 seconds, stacking to a cap of +60% - one
+    /// beam is +30%, two or three is +60%. THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT
+    /// EXTRA DAMAGE: closing to roughly the convergence range and firing along the target is what
+    /// lands all three, not spamming the key - but PIERCE IS ON (see FireOneBeam below), so this is
+    /// NOT the only place a beam can land. With `beamRange` doubled to 24m (rework step 6) each beam
+    /// debuffs every enemy anywhere along its own 24m line, convergence point or not; three separate
+    /// targets spread along one beam's path all take that beam's debuff, not just whichever one sits
+    /// at the convergence point. Zero damage - this is a debuff, not a weapon (addendum, [C, plan]).
     ///
     /// REWORK STEP 5 (Tudor, 2026-09-18): moved from Equipment to the Ultimate slot. Readiness comes
     /// entirely from Owner.UltimateCharge - see IsReady/TryBuildCast below, the identical pattern
@@ -264,8 +265,10 @@ namespace Overpower.Abilities
             // want it), it just no longer decides where these beams cross. The centre beam's origin
             // already sits on the aim line, so aiming it at the same fixed point is identical to
             // firing it straight down direction - passing the same point to all three keeps this one
-            // formula instead of special-casing the centre beam.
-            Vector3 convergePoint = origin + direction * Mathf.Min(beamConvergenceRange, beamRange);
+            // formula instead of special-casing the centre beam. The formula itself lives in
+            // RaybeamGeometry (review follow-up, 66324c1) so it has its own test independent of the
+            // three-beams-cross-it cases.
+            Vector3 convergePoint = RaybeamGeometry.ConvergencePoint(origin, direction, beamConvergenceRange, beamRange);
 
             FireOneBeam(left, convergePoint, direction, casterActor, casterTeam);
             FireOneBeam(centre, convergePoint, direction, casterActor, casterTeam);

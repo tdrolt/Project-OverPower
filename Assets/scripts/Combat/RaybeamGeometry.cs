@@ -6,8 +6,13 @@ namespace Overpower.Combat
     /// The pure geometry behind the raybeam's three converging shots - where each beam starts and
     /// which way it aims, and whether a given beam actually passes close enough to strike a point.
     /// Pulled out of RaybeamAbility (a MonoBehaviour, untestable in edit mode without a scene)
-    /// exactly the way BeamResolver sits apart from Hitscan: "three beams converge at the cursor"
-    /// is the one claim in this ability that a test can pin down instead of eyeballing in Play mode.
+    /// exactly the way BeamResolver sits apart from Hitscan: "three beams converge at a fixed range
+    /// along the shooter's own aim direction" (2026-09-20 rework - see RaybeamAbility's own class
+    /// comment, "THE SPREAD") is the one claim in this ability that a test can pin down instead of
+    /// eyeballing in Play mode. Before that rework the two outer beams chased the cursor's own exact
+    /// depth instead; that worked at any range for a pixel-perfect click, but a real player cannot
+    /// place a ground cursor pixel-perfectly at distance, so the old ~3m working range was the
+    /// cursor's own depth precision running out, not a limit of this geometry.
     ///
     /// Every method here is a plain function of its arguments - no Physics call, no MonoBehaviour
     /// state - so every client that runs it against the same synced Origin/Direction/Point agrees,
@@ -67,6 +72,19 @@ namespace Overpower.Combat
 
             Vector3 closestPointOnBeam = beamOrigin + direction * Mathf.Clamp(along, 0f, range);
             return Vector3.Distance(closestPointOnBeam, targetPosition) <= beamRadius;
+        }
+
+        /// <summary>
+        /// Where the two outer beams are aimed to cross the centre beam's line: a fixed distance
+        /// along the shooter's own aim direction, clamped to beamRange so a beam is never asked to
+        /// converge past where it stops existing (RaybeamAbility's beamConvergenceRange tooltip
+        /// explains why this is fixed rather than the cursor's own depth). Pulled out of
+        /// RaybeamAbility.ExecuteCast, which used to inline this one formula, so the convergence
+        /// point itself has a test independent of the three-beams-cross-it cases above.
+        /// </summary>
+        public static Vector3 ConvergencePoint(Vector3 origin, Vector3 aimDirection, float convergenceRange, float beamRange)
+        {
+            return origin + aimDirection * Mathf.Min(convergenceRange, beamRange);
         }
 
         /// <summary>Perpendicular to Direction, flattened onto the ground plane and normalised -

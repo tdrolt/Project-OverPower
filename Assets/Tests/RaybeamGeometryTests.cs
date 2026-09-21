@@ -5,10 +5,13 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Pins down the raybeam's own claim - "three beams converge at the cursor, so the skill is
-    /// placing the cursor at the right distance" - as maths rather than something only verified by
-    /// eye in Play mode. See RaybeamGeometry's class comment for why this is separated from the
-    /// MonoBehaviour that actually fires the beams.
+    /// Pins down the raybeam's own claim - "three beams converge at a fixed range along the
+    /// shooter's own aim direction, so the skill is closing to roughly that distance and firing
+    /// along the target" (2026-09-20 rework) - as maths rather than something only verified by eye
+    /// in Play mode. Before the rework the outer beams chased the cursor's own exact depth instead;
+    /// the old ~3m working range was the ground cursor's depth precision running out at distance,
+    /// not a flaw in this geometry. See RaybeamGeometry's class comment for why this is separated
+    /// from the MonoBehaviour that actually fires the beams.
     /// </summary>
     public class RaybeamGeometryTests
     {
@@ -160,6 +163,53 @@ namespace Overpower.Tests
         {
             Vector3 onAxis = new Vector3(0f, 0f, Range / 2f); // rework step 6: half of 24, not the old half of 12
             Assert.IsTrue(RaybeamGeometry.BeamCrosses(Vector3.zero, Vector3.forward, Range, Radius, onAxis));
+        }
+
+        // Review follow-up (66324c1, 2026-09-21): the fixed-range convergence point was computed
+        // inline in RaybeamAbility.ExecuteCast (`origin + direction * Mathf.Min(beamConvergenceRange,
+        // beamRange)`). Pulling it into RaybeamGeometry as a pure static gives it its own tests
+        // instead of only being exercised indirectly through the three-beams-cross-it cases above.
+        [Test]
+        public void ConvergencePointSitsOnTheAimLineAtTheConvergenceRange()
+        {
+            Vector3 origin = new Vector3(2f, 0f, 3f);
+            Vector3 direction = Vector3.forward;
+            const float convergenceRange = 15f; // less than Range (28.8), so no clamping happens
+
+            Vector3 point = RaybeamGeometry.ConvergencePoint(origin, direction, convergenceRange, Range);
+
+            Assert.AreEqual(origin + direction * convergenceRange, point);
+        }
+
+        [Test]
+        public void ConvergencePointClampsToTheBeamRangeWhenTheConvergenceRangeIsFurther()
+        {
+            Vector3 origin = Vector3.zero;
+            Vector3 direction = Vector3.forward;
+            const float convergenceRange = 50f; // further downrange than Range (28.8)
+
+            Vector3 point = RaybeamGeometry.ConvergencePoint(origin, direction, convergenceRange, Range);
+
+            Assert.AreEqual(origin + direction * Range, point);
+        }
+
+        [Test]
+        public void TheThreeBeamsBuiltFromTheConvergencePointAllCrossIt()
+        {
+            Vector3 origin = Vector3.zero;
+            Vector3 direction = Vector3.forward;
+            const float convergenceRange = 15f;
+
+            Vector3 point = RaybeamGeometry.ConvergencePoint(origin, direction, convergenceRange, Range);
+            RaybeamGeometry.BeamOrigins(origin, direction, Spacing, out Vector3 left, out Vector3 centre, out Vector3 right);
+
+            Vector3 leftDir = RaybeamGeometry.AimFromOriginToPoint(left, point, direction);
+            Vector3 centreDir = RaybeamGeometry.AimFromOriginToPoint(centre, point, direction);
+            Vector3 rightDir = RaybeamGeometry.AimFromOriginToPoint(right, point, direction);
+
+            Assert.IsTrue(RaybeamGeometry.BeamCrosses(left, leftDir, Range, Radius, point), "Left beam must reach the convergence point.");
+            Assert.IsTrue(RaybeamGeometry.BeamCrosses(centre, centreDir, Range, Radius, point), "Centre beam must reach the convergence point.");
+            Assert.IsTrue(RaybeamGeometry.BeamCrosses(right, rightDir, Range, Radius, point), "Right beam must reach the convergence point.");
         }
     }
 }
