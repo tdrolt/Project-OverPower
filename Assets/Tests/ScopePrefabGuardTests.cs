@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using Overpower.Abilities;
 using Overpower.Data;
@@ -12,12 +13,21 @@ namespace Overpower.Tests
     /// number - extraZoomOutPercent must stay retunable in the Inspector without turning this test red (Tudor:
     /// "so I can retune it in the Inspector without touching code"). Same recipe as
     /// InvulnerabilityPrefabGuardTests: the asset/prefab are loaded, never instantiated or saved.
+    ///
+    /// 2026-09-24 (Tudor: "remove tests that are outdated"): ScopeCostsTheSameAsEveryOtherEquipmentAbility used to
+    /// pin the literal 800; rewritten to the same catalogue-relationship pattern
+    /// RaybeamUltimateGuardTests.EveryUltimateCostsTheSameGold uses, since every real Equipment ability shares one
+    /// price today (Mines/Deployable Cover/Flamethrower/Stun Gun/Sonic Pulse/Scope all 800, measured 2026-09-24).
     /// </summary>
     public class ScopePrefabGuardTests
     {
         private const string DefinitionPath = "Assets/Gameplay/Abilities/28 Scope E.asset";
         private const string PrefabPath = "Assets/Gameplay/Abilities/Scope.prefab";
         private const string CataloguePath = "Assets/Gameplay/Config/AbilityCatalogue.asset";
+
+        // The shop's own cutoff (LoadoutScreen.Builder.cs:237, LoadoutScreen.cs:65, and
+        // RaybeamUltimateGuardTests's own copy of this same rule) - test content, not a real ability.
+        private const int FirstDebugAbilityId = 900;
 
         private static AbilityDefinition LoadDefinition()
         {
@@ -54,7 +64,23 @@ namespace Overpower.Tests
         [Test]
         public void ScopeCostsTheSameAsEveryOtherEquipmentAbility()
         {
-            Assert.AreEqual(800, LoadDefinition().GoldCost);
+            // A relationship, not a pinned number (RaybeamUltimateGuardTests.EveryUltimateCostsTheSameGold's own
+            // pattern): every real (non-debug) Equipment-slot ability costs the same gold, whatever that shared
+            // price is - Tudor can retune it freely without this test going red.
+            var catalogue = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>(CataloguePath);
+            Assert.IsNotNull(catalogue, CataloguePath);
+
+            var equipment = new List<AbilityDefinition>();
+            foreach (AbilityDefinition ability in catalogue.ForSlot(AbilitySlot.Equipment))
+                if (ability.Id < FirstDebugAbilityId)
+                    equipment.Add(ability);
+
+            Assert.IsNotEmpty(equipment, "No real (non-debug) Equipment-slot ability found in the catalogue.");
+            Assert.Contains(LoadDefinition(), equipment, "Scope itself should be one of them.");
+
+            int expected = equipment[0].GoldCost;
+            foreach (AbilityDefinition ability in equipment)
+                Assert.AreEqual(expected, ability.GoldCost, $"{ability.name}.goldCost");
         }
 
         [Test]

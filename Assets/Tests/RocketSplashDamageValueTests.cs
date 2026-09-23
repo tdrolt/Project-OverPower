@@ -9,20 +9,23 @@ using Overpower.Weapons;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Tudor, 2026-09-21: "the explosion radius should deal more damage". The controller's default:
-    /// splashDamage 20 -&gt; 28 (+40%) on all three rocket prefabs, falloff and radius unchanged - a near
-    /// miss should hurt enough to matter (13.3 -&gt; 18.7 at 1m, 6.7 -&gt; 9.3 at 2m, on the 3m-radius
-    /// prefabs) while a direct hit (38, or 30 on the cursor rocket) still pays more than any splash.
+    /// Tudor, 2026-09-21: "the explosion radius should deal more damage" (the controller's default: splashDamage
+    /// 20 -&gt; 28 on all three rocket prefabs, falloff and radius unchanged). Rewritten 2026-09-24 (Tudor: "remove
+    /// tests that are outdated" - he keeps tuning splashDamage/splashRadius/weapon Damage from the Inspector, so
+    /// pinning either the raw numbers or a distance's literal resulting damage went red on every tuning pass with
+    /// nothing actually broken).
     ///
-    /// AbilityVisualPrefabGuardTests.RocketSplashNumbersAreUnchanged already pins the raw authored
-    /// numbers (splashDamage/splashRadius/the falloff curve's own keys) read-only off the prefab
-    /// assets - this file does not repeat that. What it adds: the actual damage ExplodeOnImpact's own
-    /// SplashDamageAt computes at specific distances, so a change to the falloff FORMULA (not just the
-    /// tunable numbers) would also be caught. Each prefab's real splashDamage/splashRadius/falloff are
-    /// read off its asset first (so this fails the same way the guard test does if a value drifts),
-    /// then fed into a throwaway ExplodeOnImpact built fresh in an isolated preview scene (never the
-    /// prefab's own cached instance) - the same isolation RocketAlwaysExplodesTests uses - so nothing
-    /// here touches the real, currently-open Game Scene.
+    /// What is left guards the RULES, not the numbers, both read fresh off the real assets every run:
+    /// - SplashDamageAtDistanceFractionMatchesTheFalloffFormula: ExplodeOnImpact.SplashDamageAt's own formula
+    ///   (splashDamage * falloff.Evaluate(distance / splashRadius)) still matches an independent recomputation of
+    ///   that same formula from the prefab's OWN current splashDamage/splashRadius/falloff - so a change to the
+    ///   FORMULA itself (not the tunable numbers) is still caught, at whatever numbers Tudor has set.
+    /// - ADirectHitPaysMoreThanTheBestSplash: a direct hit must still pay more than the best possible splash (the
+    ///   whole "aiming still matters" argument depends on this), never a fixed number.
+    ///
+    /// Each prefab's real splashDamage/splashRadius/falloff are read off its asset, then fed into a throwaway
+    /// ExplodeOnImpact built fresh in an isolated preview scene (never the prefab's own cached instance) - the same
+    /// isolation RocketAlwaysExplodesTests uses - so nothing here touches the real, currently-open Game Scene.
     /// </summary>
     public class RocketSplashDamageValueTests
     {
@@ -84,40 +87,57 @@ namespace Overpower.Tests
             return (float)method.Invoke(explode, new object[] { Vector3.zero, new Vector3(distance, 0f, 0f) });
         }
 
-        // Rocket.prefab / Rocket Distance.prefab: radius 3m. At the new 28 splashDamage: full at the centre,
-        // 18.667 at 1m (13.333 at the old 20), 9.333 at 2m (6.667 at the old 20), 0 at the 3m edge - the exact
-        // worked numbers in the controller's own brief.
-        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 0f, 28f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 1f, 18.6667f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 2f, 9.3333f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 3f, 0f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 0f, 28f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 1f, 18.6667f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 2f, 9.3333f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 3f, 0f)]
-        // Rocket Cursor.prefab: radius 2.5m, so the same normalised (distance/radius) points land at 1m and 2m
-        // differently - 16.8 at 1m, 5.6 at 2m, 0 at the 2.5m edge.
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 0f, 28f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 1f, 16.8f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 2f, 5.6f)]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 2.5f, 0f)]
-        public void SplashDamageAtDistanceMatchesTheNewValue(string prefabPath, float distance, float expected)
+        // Four points across the blast (centre, a third out, two thirds out, the edge), as a FRACTION of whatever
+        // splashRadius the prefab currently has - not a fixed metre distance - so this keeps testing the same four
+        // meaningful points on the curve no matter how Tudor retunes splashRadius.
+        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 0f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 0.3333333f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 0.6666667f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab", 1f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 0f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 0.3333333f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 0.6666667f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab", 1f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 0f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 0.3333333f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 0.6666667f)]
+        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab", 1f)]
+        public void SplashDamageAtDistanceFractionMatchesTheFalloffFormula(string prefabPath, float radiusFraction)
         {
+            ExplodeOnImpact source = LoadPrefab(prefabPath).GetComponent<ExplodeOnImpact>();
+            Assert.IsNotNull(source, $"{prefabPath} has no ExplodeOnImpact");
+            float radius = Field<float>(source, "splashRadius");
+            float damage = Field<float>(source, "splashDamage");
+            AnimationCurve falloff = Field<AnimationCurve>(source, "falloff");
+
+            float distance = radius * radiusFraction;
+            // The same formula ExplodeOnImpact.SplashDamageAt itself uses (see its own comment), recomputed here
+            // independently from the prefab's live numbers rather than compared against a hardcoded result.
+            float expected = damage * Mathf.Max(0f, falloff.Evaluate(Mathf.Clamp01(radiusFraction)));
+
             ExplodeOnImpact explode = BuildFromPrefab(prefabPath);
-            float amount = SplashDamageAt(explode, distance);
-            Assert.AreEqual(expected, amount, 0.01f, $"{prefabPath} at {distance}m");
+            float actual = SplashDamageAt(explode, distance);
+            Assert.AreEqual(expected, actual, 0.01f, $"{prefabPath} at {radiusFraction:P0} of splashRadius ({distance:F2}m)");
         }
 
-        // Direct damage must be untouched by the splash retune - Tudor asked for more splash, not more direct
-        // damage, and the whole "aiming still matters" argument in the brief depends on this staying put.
-        [TestCase("Assets/Gameplay/Weapons/02 Rocket.asset", 38f)]
-        [TestCase("Assets/Gameplay/Weapons/03 Rocket - Distance.asset", 38f)]
-        [TestCase("Assets/Gameplay/Weapons/04 Rocket - Cursor Fire.asset", 30f)]
-        public void DirectWeaponDamageIsUntouchedByTheSplashRetune(string weaponPath, float expectedDamage)
+        // Direct damage must always pay more than the best possible splash - Tudor asked for more splash, not more
+        // direct damage, and the whole "aiming still matters" argument depends on this relationship, not on either
+        // number's actual value.
+        [TestCase("Assets/Gameplay/Weapons/02 Rocket.asset")]
+        [TestCase("Assets/Gameplay/Weapons/03 Rocket - Distance.asset")]
+        [TestCase("Assets/Gameplay/Weapons/04 Rocket - Cursor Fire.asset")]
+        public void ADirectHitPaysMoreThanTheBestSplash(string weaponPath)
         {
             var weapon = AssetDatabase.LoadAssetAtPath<Overpower.Data.WeaponDefinition>(weaponPath);
             Assert.IsNotNull(weapon, weaponPath);
-            Assert.AreEqual(expectedDamage, weapon.Damage, 0.01f, weaponPath);
+            Assert.IsNotNull(weapon.ProjectilePrefab, $"{weaponPath}.ProjectilePrefab");
+
+            string projectilePrefabPath = AssetDatabase.GetAssetPath(weapon.ProjectilePrefab);
+            ExplodeOnImpact explode = BuildFromPrefab(projectilePrefabPath);
+            float bestSplash = SplashDamageAt(explode, 0f); // distance 0 = the strongest a splash hit can ever be
+
+            Assert.Greater(weapon.Damage, bestSplash,
+                $"{weaponPath}.Damage ({weapon.Damage}) should pay more than {projectilePrefabPath}'s best splash ({bestSplash})");
         }
     }
 }
