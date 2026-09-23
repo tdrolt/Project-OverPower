@@ -12,11 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e82e59811b1c17149b3111647c0e9348, type: 3}
   m_Name: GameplayConfig
   m_EditorClassIdentifier: 
-  baseMoveSpeed: 5
+  baseMoveSpeed: 7
   maxHealth: 100
   respawnBaseSeconds: 5
-  respawnPerDeathSeconds: 1
-  respawnMaxSeconds: 10
+  respawnPerDeathSeconds: 2
+  respawnMaxSeconds: 20
   killHeight: -10
   matchStartCountdownSeconds: 5
   outOfCombatSeconds: 6
@@ -27,14 +27,14 @@ MonoBehaviour:
   overheatWarningThreshold: 80
   ventDelay: 2
   ventWindow: 0.8
-  slowCap: 0.6
+  slowCap: 0.9
   vulnerabilityCap: 0.6
   abilityPressBufferSeconds: 0.12
   freeLoadout: 0
   sellRefundRate: 0.5
   enableOverPower: 1
   overPowerWindowSeconds: 3
-  overPowerRadius: 15
+  overPowerRadius: 10
   overPowerHealthThreshold: 35
   overPowerStatBonus: 0.1
   testRangeEnabled: 1

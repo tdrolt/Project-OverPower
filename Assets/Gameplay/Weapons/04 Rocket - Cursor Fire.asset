@@ -18,17 +18,17 @@ MonoBehaviour:
   parent: {fileID: 11400000, guid: 73e5ab1af24e5fa44b3323918b8d42ee, type: 2}
   icon: {fileID: 0}
   goldCost: 1600
-  damage: 30
-  fireInterval: 1.1
+  damage: 35
+  fireInterval: 1.4
   projectilesPerShot: 1
   simultaneous: 0
   sequentialDelay: 0.07
   spreadDegrees: 0
   windupSeconds: 0
   projectilePrefab: {fileID: 3472910922280904258, guid: 63efebc3facaa954eadf1fafd76d7011, type: 3}
-  projectileSpeed: 18
-  projectileRadius: 0.22
-  maxRange: 32
+  projectileSpeed: 15
+  projectileRadius: 0.3
+  maxRange: 20
   minConeAngle: 1
   maxConeAngle: 14
   bloomPerShot: 6

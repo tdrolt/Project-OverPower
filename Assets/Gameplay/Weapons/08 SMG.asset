@@ -28,13 +28,13 @@ MonoBehaviour:
   projectilePrefab: {fileID: 1623706127264014633, guid: 9a053dd5e9b0eeb448b577cf0d6c424c, type: 3}
   projectileSpeed: 52
   projectileRadius: 0.08
-  maxRange: 22
+  maxRange: 13
   minConeAngle: 5
   maxConeAngle: 20
-  bloomPerShot: 1.4
+  bloomPerShot: 2
   recoveryPerSecond: 3
   standingStillMultiplier: 1.2
-  movingSpreadDegrees: 4
+  movingSpreadDegrees: 6
   movingBloomPerSecond: 4
   overheatPerShot: 3.5
   overheatRefundOnHit: 0

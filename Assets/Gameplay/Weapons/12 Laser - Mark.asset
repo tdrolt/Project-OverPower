@@ -14,21 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: 12
   displayName: Mark
-  description: Hitting an enemy marks them. Your next hit on them soon after deals bonus damage and uses the mark up; the hit after that marks them again. Fires after a short warning.
+  description: Hitting an enemy marks them. Your next hit on them soon after deals
+    bonus damage and uses the mark up; the hit after that marks them again. Fires
+    after a short warning.
   parent: {fileID: 11400000, guid: 8fa3cfc5d5169494cb5251a678cca581, type: 2}
   icon: {fileID: 0}
   goldCost: 1600
   damage: 21
-  fireInterval: 0.7
+  fireInterval: 1
   projectilesPerShot: 1
   simultaneous: 0
   sequentialDelay: 0.07
   spreadDegrees: 0
-  windupSeconds: 0.6
+  windupSeconds: 0.15
   projectilePrefab: {fileID: 6611911768405770581, guid: 42f3e68e15ceece449e348d8abfc881e, type: 3}
   projectileSpeed: 55
   projectileRadius: 0.1
-  maxRange: 26
+  maxRange: 28
   minConeAngle: 0.8
   maxConeAngle: 6
   bloomPerShot: 1.5

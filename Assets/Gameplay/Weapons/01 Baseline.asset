@@ -19,18 +19,19 @@ MonoBehaviour:
   icon: {fileID: 0}
   goldCost: 0
   damage: 11
-  fireInterval: 0.32
+  fireInterval: 0.4
   projectilesPerShot: 1
   simultaneous: 0
   sequentialDelay: 0.07
   spreadDegrees: 0
+  windupSeconds: 0
   projectilePrefab: {fileID: 1623706127264014633, guid: 63c51692d08317f4fa141f5524c8f695, type: 3}
   projectileSpeed: 55
   projectileRadius: 0.1
-  maxRange: 30
-  minConeAngle: 1.5
+  maxRange: 15
+  minConeAngle: 2.5
   maxConeAngle: 7
-  bloomPerShot: 0.8
+  bloomPerShot: 1
   recoveryPerSecond: 2
   standingStillMultiplier: 1.5
   movingSpreadDegrees: 4

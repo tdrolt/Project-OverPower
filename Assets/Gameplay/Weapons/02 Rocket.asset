@@ -28,7 +28,7 @@ MonoBehaviour:
   projectilePrefab: {fileID: 537786092872534407, guid: fa51684d100c6044aa2fdc8bdc3f695b, type: 3}
   projectileSpeed: 28
   projectileRadius: 0.22
-  maxRange: 32
+  maxRange: 22
   minConeAngle: 1
   maxConeAngle: 14
   bloomPerShot: 6

@@ -19,12 +19,12 @@ MonoBehaviour:
   icon: {fileID: 0}
   goldCost: 1200
   damage: 21
-  fireInterval: 0.7
+  fireInterval: 1
   projectilesPerShot: 1
   simultaneous: 0
   sequentialDelay: 0.07
   spreadDegrees: 0
-  windupSeconds: 0.6
+  windupSeconds: 0.15
   projectilePrefab: {fileID: 6611911768405770581, guid: 42f3e68e15ceece449e348d8abfc881e, type: 3}
   projectileSpeed: 55
   projectileRadius: 0.1
