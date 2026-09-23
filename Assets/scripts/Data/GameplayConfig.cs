@@ -120,6 +120,26 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float ventWindow = 0.8f;
         public float VentWindow => ventWindow;
 
+        [Tooltip("Off by default: every silence's Vent window opens at exactly Vent Delay. On, each " +
+                 "silence instead opens its window at a random moment between Vent Random Delay Min " +
+                 "and Vent Random Delay Max, picked fresh every time you overheat - Vent stays a " +
+                 "reaction check but you can no longer memorise the exact beat to press R on.")]
+        [SerializeField] private bool ventRandomTiming = false;
+        public bool VentRandomTiming => ventRandomTiming;
+
+        [Tooltip("Random timing only: the earliest the window can open. Below Overheat Decay Delay " +
+                 "(1.5) a hit saves less than half the remaining lockout, the same caveat Vent Delay's " +
+                 "own tooltip gives - decay hasn't actually started yet, so halving heat halves a clock " +
+                 "that has barely moved. If this ends up larger than Vent Random Delay Max, the smaller " +
+                 "of the two is always used as the minimum.")]
+        [SerializeField, Min(0f)] private float ventRandomDelayMin = 1.5f;
+        public float VentRandomDelayMin => ventRandomDelayMin;
+
+        [Tooltip("Random timing only: the latest the window can open. Swapped below Vent Random Delay " +
+                 "Min? The smaller value is always used as the minimum, so the range stays sane either way.")]
+        [SerializeField, Min(0f)] private float ventRandomDelayMax = 3f;
+        public float VentRandomDelayMax => ventRandomDelayMax;
+
         [Header("Status caps")]
         [Tooltip("The most a player can ever be slowed, counting every slow effect stacked " +
                  "together. 0.6 means 60 percent slower at worst, so no combination of slows " +

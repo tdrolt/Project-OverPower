@@ -554,5 +554,163 @@ namespace Overpower.Tests
             Assert.AreEqual(0.875f, s.VentBandHighFraction, 0.001f);
             Assert.AreEqual(0.675f, s.VentBandLowFraction, 0.001f);
         }
+
+        // ================================================================================
+        // Vent random timing (Tudor, 2026-09-24: "lets keep it always 2s but the option to make
+        // it random"). ventRandomTiming picks THIS silence's own vent delay from
+        // [ventRandomDelayMin, ventRandomDelayMax] the instant a fresh silence starts (where
+        // silenceClock resets in Add), from an injected 0..1 source so tests are deterministic.
+        // Fixed mode (every test above this region) is unaffected: ventRandomTiming defaults to
+        // false, and every one of those tests keeps passing unchanged.
+        // ================================================================================
+
+        private static OverheatState NewRandomState(float ventRandomDelayMin, float ventRandomDelayMax,
+            System.Func<float> randomSource, float ventDelay = 2f, float ventWindow = 0.8f) => new OverheatState(
+            max: 100f, decayDelay: 1.5f, decayPerSecond: 25f, warningThreshold: 80f,
+            ventDelay: ventDelay, ventWindow: ventWindow, ventRandomTiming: true,
+            ventRandomDelayMin: ventRandomDelayMin, ventRandomDelayMax: ventRandomDelayMax, randomSource: randomSource);
+
+        [Test]
+        public void FixedModeIgnoresAnInjectedRandomSourceEntirely()
+        {
+            // ventRandomTiming false must ignore the source even when one IS provided - not just
+            // when it's null - so flipping the flag off in the Inspector is the only thing that
+            // matters, nothing about whether a source happens to be wired up.
+            var s = new OverheatState(max: 100f, decayDelay: 1.5f, decayPerSecond: 25f, warningThreshold: 80f,
+                ventDelay: 2f, ventWindow: 0.8f, ventRandomTiming: false,
+                ventRandomDelayMin: 1.5f, ventRandomDelayMax: 3f, randomSource: () => 1f); // would pick 3.0 if random were on
+            s.Add(100f);
+
+            Assert.AreEqual(2f, s.CurrentVentDelay, 0.001f);
+        }
+
+        [Test]
+        public void RandomTimingSourceZeroPicksTheMinimumDelay()
+        {
+            var s = NewRandomState(1.5f, 3f, () => 0f);
+            s.Add(100f);
+
+            Assert.AreEqual(1.5f, s.CurrentVentDelay, 0.001f);
+        }
+
+        [Test]
+        public void RandomTimingSourceOnePicksTheMaximumDelay()
+        {
+            var s = NewRandomState(1.5f, 3f, () => 1f);
+            s.Add(100f);
+
+            Assert.AreEqual(3f, s.CurrentVentDelay, 0.001f);
+        }
+
+        [Test]
+        public void RandomTimingSourceHalfPicksTheMidpoint()
+        {
+            var s = NewRandomState(1.5f, 3f, () => 0.5f);
+            s.Add(100f);
+
+            Assert.AreEqual(2.25f, s.CurrentVentDelay, 0.001f);
+        }
+
+        [Test]
+        public void ANewSilencePicksANewRandomDelay()
+        {
+            float[] values = { 0f, 1f };
+            int call = 0;
+            var s = NewRandomState(1.5f, 3f, () => values[call++]);
+
+            s.Add(100f); // first silence - source returns 0 -> the minimum, 1.5
+            Assert.AreEqual(1.5f, s.CurrentVentDelay, 0.001f);
+
+            while (s.IsSilenced)
+                s.Tick(0.5f); // run the whole silence out
+
+            s.Add(100f); // second silence - source returns 1 -> the maximum, 3.0
+            Assert.AreEqual(3f, s.CurrentVentDelay, 0.001f, "a new silence must pick its own, fresh delay");
+        }
+
+        [Test]
+        public void PressBeforeThePickedWindowIsEarly()
+        {
+            var s = NewRandomState(1.5f, 3f, () => 1f); // picked delay = the maximum, 3.0
+            s.Add(100f);
+            s.Tick(2.9f); // past the fixed 2.0, but still short of the picked window's 3.0
+
+            Assert.AreEqual(VentResult.Early, s.TryVent());
+        }
+
+        [Test]
+        public void PressInsideThePickedWindowHits()
+        {
+            var s = NewRandomState(1.5f, 3f, () => 1f); // picked delay = 3.0, window [3.0, 3.8]
+            s.Add(100f);
+            s.Tick(3.2f);
+
+            Assert.AreEqual(VentResult.Hit, s.TryVent());
+        }
+
+        [Test]
+        public void PressAfterThePickedWindowIsLate()
+        {
+            var s = NewRandomState(1.5f, 3f, () => 1f); // picked delay = 3.0, window closes at 3.8
+            s.Add(100f);
+            s.Tick(4f);
+
+            Assert.AreEqual(VentResult.Late, s.TryVent());
+        }
+
+        [Test]
+        public void BandFractionsFollowThePickedDelay()
+        {
+            // max 100, decayDelay 1.5, 25/s, picked delay 3.0 (source=1, min 1.5, max 3), window 0.8:
+            // high = HeatAtSilenceTime(3.0) = 100 - 25*(3.0-1.5) = 62.5 -> 0.625
+            // low  = HeatAtSilenceTime(3.8) = 100 - 25*(3.8-1.5) = 42.5 -> 0.425
+            var s = NewRandomState(1.5f, 3f, () => 1f);
+            s.Add(100f);
+
+            Assert.AreEqual(0.625f, s.VentBandHighFraction, 0.001f);
+            Assert.AreEqual(0.425f, s.VentBandLowFraction, 0.001f);
+        }
+
+        [Test]
+        public void ClearThenANewSilencePicksAgain()
+        {
+            float[] values = { 0f, 1f };
+            int call = 0;
+            var s = NewRandomState(1.5f, 3f, () => values[call++]);
+
+            s.Add(100f);
+            Assert.AreEqual(1.5f, s.CurrentVentDelay, 0.001f);
+
+            s.Clear();
+            s.Add(100f);
+            Assert.AreEqual(3f, s.CurrentVentDelay, 0.001f, "Clear must free up a fresh pick for the next silence");
+        }
+
+        [Test]
+        public void SwappedMinMaxUsesTheSmallerAsMinimum()
+        {
+            // ventRandomDelayMin=3, ventRandomDelayMax=1.5 (a designer swapped them) - source=0
+            // still lands on the smaller value and source=1 on the larger, per the field's own
+            // tooltip ("if swapped, the smaller value is always used as the minimum").
+            var atZero = NewRandomState(3f, 1.5f, () => 0f);
+            atZero.Add(100f);
+            Assert.AreEqual(1.5f, atZero.CurrentVentDelay, 0.001f);
+
+            var atOne = NewRandomState(3f, 1.5f, () => 1f);
+            atOne.Add(100f);
+            Assert.AreEqual(3f, atOne.CurrentVentDelay, 0.001f);
+        }
+
+        [Test]
+        public void VentWindowZeroStillOffInRandomMode()
+        {
+            var s = NewRandomState(1.5f, 3f, () => 0.5f, ventWindow: 0f); // picked delay 2.25, window off
+            s.Add(100f);
+
+            Assert.IsFalse(s.VentEnabled);
+            s.Tick(2.25f); // exactly the picked delay - where the window would open if it could
+            Assert.IsFalse(s.IsVentWindowOpen);
+            Assert.AreEqual(VentResult.Late, s.TryVent());
+        }
     }
 }

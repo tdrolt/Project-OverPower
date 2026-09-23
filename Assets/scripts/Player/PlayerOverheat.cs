@@ -87,7 +87,15 @@ public class PlayerOverheat : MonoBehaviour
             gameplayConfig != null ? gameplayConfig.OverheatDecayPerSecond : 25f,
             gameplayConfig != null ? gameplayConfig.OverheatWarningThreshold : 80f,
             gameplayConfig != null ? gameplayConfig.VentDelay : 2f,
-            gameplayConfig != null ? gameplayConfig.VentWindow : 0.8f);
+            gameplayConfig != null ? gameplayConfig.VentWindow : 0.8f,
+            gameplayConfig != null && gameplayConfig.VentRandomTiming,
+            gameplayConfig != null ? gameplayConfig.VentRandomDelayMin : 1.5f,
+            gameplayConfig != null ? gameplayConfig.VentRandomDelayMax : 3f,
+            // Heat is owner-only and never replicated (see the class comment), so reading
+            // UnityEngine.Random here is exactly as local as everything else this class does -
+            // no network change. OverheatState never calls UnityEngine directly itself (see its
+            // own class comment); this is the one real source it gets injected with.
+            () => UnityEngine.Random.value);
     }
 
     private void Update()

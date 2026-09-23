@@ -54,6 +54,18 @@ namespace Overpower.Combat
         private readonly float warningThreshold;
         private readonly float ventDelay;
         private readonly float ventWindow;
+        private readonly bool ventRandomTiming;
+        private readonly float ventRandomDelayMin;
+        private readonly float ventRandomDelayMax;
+        private readonly System.Func<float> randomSource;
+
+        // THIS silence's own vent delay - ventDelay in fixed mode, or a value picked from
+        // [ventRandomDelayMin, ventRandomDelayMax] the instant the silence started (see
+        // PickVentDelay). Everything that used to read ventDelay directly (WindowCloseEdge,
+        // WindowOpenAt, the band fractions, TryVent's Early/Late split) reads this instead, so a
+        // silence keeps the same window for its whole duration even though the next one may pick
+        // a different one.
+        private float currentVentDelay;
 
         // Counts down from decayDelay every time heat is added, and only once it reaches zero
         // does Tick start removing heat. This is what makes rapid, repeated firing feel like it
@@ -117,16 +129,16 @@ namespace Overpower.Combat
         /// open (see the class comment on ventWindow).</summary>
         public bool IsVentWindowOpen => IsSilenced && WindowOpenAt(silenceClock);
 
-        /// <summary>ventDelay + ventWindow + WindowCloseSlack - the window's closing instant, with its
-        /// hair of float tolerance. WindowOpenAt and Outcome both used to spell this out separately;
+        /// <summary>currentVentDelay + ventWindow + WindowCloseSlack - the window's closing instant, with
+        /// its hair of float tolerance. WindowOpenAt and Outcome both used to spell this out separately;
         /// one shared property means they can never drift apart on where the window actually ends.</summary>
-        private float WindowCloseEdge => ventDelay + ventWindow + WindowCloseSlack;
+        private float WindowCloseEdge => currentVentDelay + ventWindow + WindowCloseSlack;
 
         /// <summary>The shared inclusive-both-ends range check TryVent, IsVentWindowOpen and Outcome
         /// all use, so they can never disagree about where the window sits (see WindowCloseSlack's
         /// own comment for why the close edge alone carries a hair of tolerance).</summary>
         private bool WindowOpenAt(float clock) =>
-            ventWindow > 0f && clock >= ventDelay && clock <= WindowCloseEdge;
+            ventWindow > 0f && clock >= currentVentDelay && clock <= WindowCloseEdge;
 
         /// <summary>The current attempt's outcome, for the HUD band: None for the whole silence when
         /// VentEnabled is false (review fix - Vent turned off, GameplayConfig's "0 = off" tooltip,
@@ -156,12 +168,19 @@ namespace Overpower.Combat
         /// bandOriginHeat (see its own comment), how much of the decay delay is left, the decay rate
         /// and how long this silence has run - not a fixed pair of numbers - so the band still lines
         /// up with the fill even if a future change ever silenced a player below max heat, or a
-        /// laser's refund lowers heat before the window opens (review fix, see Refund).</summary>
-        public float VentBandHighFraction => max > 0f ? HeatAtSilenceTime(ventDelay) / max : 0f;
+        /// laser's refund lowers heat before the window opens (review fix, see Refund). Uses THIS
+        /// silence's own currentVentDelay, so the band tracks wherever the window actually opened
+        /// this time in random mode, not the fixed ventDelay.</summary>
+        public float VentBandHighFraction => max > 0f ? HeatAtSilenceTime(currentVentDelay) / max : 0f;
 
         /// <summary>Heat fraction (0..1 of max) the fill sits at the instant the vent window closes -
         /// the band's lower edge. See VentBandHighFraction.</summary>
-        public float VentBandLowFraction => max > 0f ? HeatAtSilenceTime(ventDelay + ventWindow) / max : 0f;
+        public float VentBandLowFraction => max > 0f ? HeatAtSilenceTime(currentVentDelay + ventWindow) / max : 0f;
+
+        /// <summary>THIS silence's own vent delay - ventDelay in fixed mode, or the value random
+        /// mode picked when the silence started (see PickVentDelay). Exposed read-only for the HUD
+        /// and for tests; nothing external ever sets it directly.</summary>
+        public float CurrentVentDelay => currentVentDelay;
 
         /// <summary>What the band is projected FROM (see HeatAtSilenceTime) - set to Heat (i.e. max,
         /// since IsSilenced only ever goes false-&gt;true inside Add() the moment Heat reaches max) the
@@ -190,8 +209,16 @@ namespace Overpower.Combat
             return Mathf.Max(0f, bandOriginHeat - decayPerSecond * decayingTime);
         }
 
+        /// <summary>
+        /// ventRandomTiming/ventRandomDelayMin/ventRandomDelayMax/randomSource are all optional so
+        /// every existing call site (fixed mode) compiles and behaves unchanged. randomSource
+        /// returns 0..1 (e.g. () =&gt; UnityEngine.Random.value, or a System.Random's NextDouble) -
+        /// injected rather than read from UnityEngine.Random directly, so this stays plain,
+        /// deterministically testable C# like the rest of the class (see the class comment).
+        /// </summary>
         public OverheatState(float max, float decayDelay, float decayPerSecond, float warningThreshold,
-            float ventDelay, float ventWindow)
+            float ventDelay, float ventWindow, bool ventRandomTiming = false, float ventRandomDelayMin = 0f,
+            float ventRandomDelayMax = 0f, System.Func<float> randomSource = null)
         {
             this.max = max;
             this.decayDelay = decayDelay;
@@ -199,6 +226,28 @@ namespace Overpower.Combat
             this.warningThreshold = warningThreshold;
             this.ventDelay = ventDelay;
             this.ventWindow = ventWindow;
+            this.ventRandomTiming = ventRandomTiming;
+            this.ventRandomDelayMin = ventRandomDelayMin;
+            this.ventRandomDelayMax = ventRandomDelayMax;
+            this.randomSource = randomSource;
+            currentVentDelay = ventDelay;
+        }
+
+        /// <summary>THIS silence's vent delay: ventDelay in fixed mode (or if random mode has no
+        /// source to draw from - a safe fallback, never a null-reference), otherwise randomSource's
+        /// next 0..1 value mapped onto [min(ventRandomDelayMin, ventRandomDelayMax),
+        /// max(ventRandomDelayMin, ventRandomDelayMax)] - the smaller of the two is always the
+        /// minimum, so a designer swapping them in the Inspector still gets a sane range rather than
+        /// an empty/reversed one.</summary>
+        private float PickVentDelay()
+        {
+            if (!ventRandomTiming || randomSource == null)
+                return ventDelay;
+
+            float lo = Mathf.Min(ventRandomDelayMin, ventRandomDelayMax);
+            float hi = Mathf.Max(ventRandomDelayMin, ventRandomDelayMax);
+            float t = Mathf.Clamp01(randomSource());
+            return Mathf.Lerp(lo, hi, t);
         }
 
         /// <summary>Spend heat: a shot, or a second of sprinting.</summary>
@@ -221,6 +270,7 @@ namespace Overpower.Combat
                 ventAttempted = false;
                 ventHit = false;
                 bandOriginHeat = Heat;
+                currentVentDelay = PickVentDelay();
             }
         }
 
@@ -301,7 +351,7 @@ namespace Overpower.Combat
                 return VentResult.Hit;
             }
 
-            return silenceClock < ventDelay ? VentResult.Early : VentResult.Late;
+            return silenceClock < currentVentDelay ? VentResult.Early : VentResult.Late;
         }
 
         /// <summary>On death: zero the bar and lift any silence with it.</summary>
@@ -314,6 +364,7 @@ namespace Overpower.Combat
             ventAttempted = false;
             ventHit = false;
             bandOriginHeat = 0f;
+            currentVentDelay = ventDelay; // the next silence's Add() picks its own fresh one anyway
         }
     }
 }
