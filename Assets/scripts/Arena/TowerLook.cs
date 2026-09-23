@@ -19,15 +19,23 @@ namespace Overpower.Arena
     /// #3). TowerLookRules.ColumnRingRadius keeps a column's outer edge tangent to this prefab's own collider radius
     /// - never past it - so columns never add cover over the plain round tower (Decision 6), at either size.
     ///
-    /// The crown and every SHOWN cap share one Unlit material ("Tower Owner"), tinted through one reused
-    /// MaterialPropertyBlock (VisualTint.SetMeshColor) - no material copy per tower. Refresh gets exactly the same
-    /// CaptureRingState the ring on the ground already gets every frame (via OwnerPaint.From /
-    /// OwnerPaintColours.For), so the tower and the ring can never disagree and a late joiner is right at once. The
-    /// pieces are grey (the material's own colour) until the first Refresh; no collider here depends on the tier.
+    /// The crown, every SHOWN cap, the Plinth (the base) and every SHOWN shaft share one Unlit material ("Tower
+    /// Owner"), tinted through one reused MaterialPropertyBlock (VisualTint.SetMeshColor) - no material copy per
+    /// tower. Refresh gets exactly the same CaptureRingState the ring on the ground already gets every frame (via
+    /// OwnerPaint.From / OwnerPaintColours.For), so the tower and the ring can never disagree and a late joiner is
+    /// right at once. The pieces are grey (the material's own colour) until the first Refresh; no collider here
+    /// depends on the tier.
     ///
-    /// Tudor, 2026-09-21: "currently its only the top" - the Plinth, Drum and every SHOWN shaft (the Lit "Tower
-    /// Stone" material) are painted too, through the very same Refresh call and the very same one colour, times
-    /// UiTheme's Tower Body Shade so the stone keeps its own lighting instead of going flat like the crown/caps.
+    /// Tudor, 2026-09-21: "currently its only the top" - the Plinth, Drum and every SHOWN shaft were painted too,
+    /// through the very same Refresh call, times UiTheme's Tower Body Shade so the stone kept its own lighting
+    /// instead of going flat like the crown/caps.
+    ///
+    /// Tudor, 2026-09-23: "the exterior collumns and the base of the territory prefab glow the same color as the
+    /// top if possible" - the Plinth and every SHOWN shaft moved from the Lit "Tower Stone" material to the Unlit
+    /// "Tower Owner" material and are now painted at the FULL colour, exactly like the crown/caps (no shade). The
+    /// Drum keeps the Lit "Tower Stone" material and UiTheme's Tower Body Shade: Tudor named "the exterior columns
+    /// and the base", and shading the drum too is what keeps the tower reading as a silhouette instead of one flat
+    /// block of colour with no depth.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TowerLook : MonoBehaviour
@@ -57,18 +65,19 @@ namespace Overpower.Arena
         // GetPropertyBlock/SetPropertyBlock both succeed and a test reading the renderer's own block back looks
         // green. The prefab's flag is off now for these pieces (TowerLookPrefabTests pins it) - never turn it
         // back on for anything Refresh paints.
-        [Tooltip("Each slot's Shaft renderer, in the same order as columnSlots - the Lit 'Tower Stone' material, " +
-                 "so Refresh paints it (like Plinth/Drum below) with the owner's colour times UiTheme's Tower " +
-                 "Body Shade rather than the flat colour the Crown/caps get. Only a SHOWN slot's shaft is painted, " +
-                 "same rule as columnCaps. Must not be Batching Static - see the comment above.")]
+        [Tooltip("Each slot's Shaft renderer, in the same order as columnSlots - the Unlit 'Tower Owner' material, " +
+                 "so Refresh paints it (like Plinth below) at the full owner colour, exactly like the crown/caps " +
+                 "(no shade - Tudor, 2026-09-23). Only a SHOWN slot's shaft is painted, same rule as columnCaps. " +
+                 "Must not be Batching Static - see the comment above.")]
         public Renderer[] columnShafts = new Renderer[4];
 
-        [Tooltip("The tower's base (Lit 'Tower Stone' material) - painted with the owner's colour times UiTheme's " +
-                 "Tower Body Shade, same as Drum and the shown shafts. Must not be Batching Static.")]
+        [Tooltip("The tower's base (Unlit 'Tower Owner' material, since 2026-09-23) - painted with the full owner " +
+                 "colour, exactly like the crown/caps/shown shafts (no shade). Must not be Batching Static.")]
         public Renderer plinth;
 
         [Tooltip("The tower's body (Lit 'Tower Stone' material) - painted with the owner's colour times UiTheme's " +
-                 "Tower Body Shade, same as Plinth and the shown shafts. Must not be Batching Static.")]
+                 "Tower Body Shade (the only piece this shade still applies to, since 2026-09-23), so the tower " +
+                 "keeps a silhouette instead of turning into one flat block of colour. Must not be Batching Static.")]
         public Renderer drum;
 
         // The plan's starting value (Decision 6, 2026-09-18): 0.35 m shaft / 0.45 m cap. The cap above is drawn
@@ -178,22 +187,28 @@ namespace Overpower.Arena
                     VisualTint.SetMeshColor(cap, block, colour);
             }
 
-            // The stone body (Plinth, Drum, every SHOWN shaft) stays on the Lit "Tower Stone" material and is
-            // tinted rather than flat-repainted, so its own shading survives - the owner's colour times UiTheme's
-            // Tower Body Shade (default 0.8), always dimmer than the Crown/caps' flat colour above. Alpha is put
-            // back afterwards because Color * float scales every channel, alpha included.
-            Color bodyColour = colour * theme.towerBodyShade;
-            bodyColour.a = colour.a;
-
+            // Tudor, 2026-09-23: the Plinth and every SHOWN shaft are on the Unlit "Tower Owner" material now, so
+            // they get exactly the same flat, full colour as the crown/caps above - no shade.
             if (plinth != null)
-                VisualTint.SetMeshColor(plinth, block, bodyColour);
-            if (drum != null)
-                VisualTint.SetMeshColor(drum, block, bodyColour);
+                VisualTint.SetMeshColor(plinth, block, colour);
             for (int i = 0; i < columnShafts.Length; i++)
             {
                 Renderer shaft = columnShafts[i];
                 if (shaft != null && shaft.gameObject.activeInHierarchy)
-                    VisualTint.SetMeshColor(shaft, block, bodyColour);
+                    VisualTint.SetMeshColor(shaft, block, colour);
+            }
+
+            // The Drum alone stays on the Lit "Tower Stone" material and is tinted rather than flat-repainted, so
+            // its own shading survives - the owner's colour times UiTheme's Tower Body Shade (default 0.8), always
+            // dimmer than the flat colour every other painted piece gets above. This is what keeps the tower
+            // reading as a silhouette rather than one flat block of colour (Tudor named "the exterior columns and
+            // the base", not the whole tower). Alpha is put back afterwards because Color * float scales every
+            // channel, alpha included.
+            if (drum != null)
+            {
+                Color bodyColour = colour * theme.towerBodyShade;
+                bodyColour.a = colour.a;
+                VisualTint.SetMeshColor(drum, block, bodyColour);
             }
         }
     }

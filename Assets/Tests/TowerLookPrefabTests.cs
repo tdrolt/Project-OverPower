@@ -59,7 +59,10 @@ namespace Overpower.Tests
                 Assert.IsNotNull(cap, $"slot {i} Cap");
 
                 Renderer shaftRenderer = shaft.GetComponent<Renderer>();
-                Assert.AreEqual("Tower Stone", shaftRenderer.sharedMaterial.name, $"slot {i} shaft material");
+                // 2026-09-23 (Tudor: "the exterior collumns and the base... glow the same color as the top"): the
+                // shaft moved to the Unlit "Tower Owner" material, exactly like the crown/caps, so it reads at the
+                // full owner colour instead of the Lit stone's shaded one.
+                Assert.AreEqual("Tower Owner", shaftRenderer.sharedMaterial.name, $"slot {i} shaft material");
                 // 2026-09-21: the shaft is painted too now (Tudor: "currently its only the top"), through the same
                 // Refresh call - so, like the cap, it must NOT be static-batched. Measured in Play Mode (captures
                 // under captures/towers-2026-09-21/): a statically-batched renderer draws through its batch
@@ -78,14 +81,18 @@ namespace Overpower.Tests
                 Assert.AreEqual(4, look.columnShafts.Length);
                 Renderer wiredShaftRenderer = look.columnShafts[i];
                 Assert.AreSame(shaft.GetComponent<Renderer>(), wiredShaftRenderer, $"slot {i}: columnShafts must point at the slot's own Shaft renderer");
-                Assert.AreEqual("Tower Stone", wiredShaftRenderer.sharedMaterial.name, $"slot {i} shaft material (columnShafts)");
+                Assert.AreEqual("Tower Owner", wiredShaftRenderer.sharedMaterial.name, $"slot {i} shaft material (columnShafts)");
             }
 
             Transform plinth = instance.transform.Find("Plinth");
             Transform drum = instance.transform.Find("Drum");
             Assert.IsNotNull(plinth);
             Assert.IsNotNull(drum);
-            Assert.AreEqual("Tower Stone", plinth.GetComponent<Renderer>().sharedMaterial.name);
+            // 2026-09-23: the plinth (the base) joins the shafts on the Unlit "Tower Owner" material at the full
+            // owner colour; the drum (the body) keeps the Lit "Tower Stone" material and the shade, so the tower
+            // keeps a silhouette instead of becoming one flat block (Tudor named "the exterior collumns and the
+            // base", not the whole tower).
+            Assert.AreEqual("Tower Owner", plinth.GetComponent<Renderer>().sharedMaterial.name);
             Assert.AreEqual("Tower Stone", drum.GetComponent<Renderer>().sharedMaterial.name);
             // 2026-09-21: the base takes the owner's colour too, so - same reasoning as the shaft above -
             // Plinth/Drum must not be static-batched, or Refresh's SetPropertyBlock calls never reach the screen.
@@ -200,12 +207,14 @@ namespace Overpower.Tests
             Assert.IsTrue(block.isEmpty, $"{label}: must never be given a property block while its slot is hidden");
         }
 
-        /// <summary>2026-09-21: "currently its only the top" - Refresh must paint the Plinth, Drum and every SHOWN
-        /// shaft too, through the very same one colour the crown/caps get, times UiTheme.towerBodyShade so the Lit
-        /// stone keeps its own shading instead of going flat. A HIDDEN shaft (tier 2 shows only 2 of 4 slots) must
-        /// never be painted at all, same rule ApplyColumns already applies to a hidden cap.</summary>
+        /// <summary>2026-09-23 (Tudor: "the exterior collumns and the base of the territory prefab glow the same
+        /// color as the top"): Refresh must paint the Plinth and every SHOWN shaft at the very same FULL colour the
+        /// crown/caps get - no shade - now that they are on the Unlit "Tower Owner" material. The Drum keeps the
+        /// Lit "Tower Stone" material and is still painted at colour times UiTheme.towerBodyShade, so the tower
+        /// keeps a silhouette. A HIDDEN shaft (tier 2 shows only 2 of 4 slots) must never be painted at all, same
+        /// rule ApplyColumns already applies to a hidden cap.</summary>
         [Test]
-        public void RefreshPaintsThePlinthDrumAndShownShaftsWithTheOwnerColourTimesBodyShade()
+        public void RefreshPaintsShaftsAndPlinthAtFullColourAndTheDrumAtColourTimesBodyShade()
         {
             UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
             Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
@@ -225,20 +234,24 @@ namespace Overpower.Tests
             AssertBaseColor(look.crown, expectedFlat, "crown");
             AssertBaseColor(look.columnCaps[0], expectedFlat, "shown cap 0");
 
-            AssertBaseColor(look.plinth, expectedBody, "plinth");
-            AssertBaseColor(look.drum, expectedBody, "drum");
-            AssertBaseColor(look.columnShafts[0], expectedBody, "shown shaft 0");
-            AssertBaseColor(look.columnShafts[1], expectedBody, "shown shaft 1");
+            // The plinth and shown shafts now match the crown/caps exactly: the full colour, no shade.
+            AssertBaseColor(look.plinth, expectedFlat, "plinth");
+            AssertBaseColor(look.columnShafts[0], expectedFlat, "shown shaft 0");
+            AssertBaseColor(look.columnShafts[1], expectedFlat, "shown shaft 1");
             AssertNeverPainted(look.columnShafts[2], "hidden shaft 2");
             AssertNeverPainted(look.columnShafts[3], "hidden shaft 3");
+
+            // Only the drum keeps the shade.
+            AssertBaseColor(look.drum, expectedBody, "drum");
         }
 
-        /// <summary>Pins the controller's neutral choice (Rule 6, chosen by capture): the body follows the exact
-        /// same formula as an owned tower, just with UiTheme.towerNeutralColor as the base colour instead of a
-        /// team's - so a neutral tower's body is never left on the stone's own unpainted colour, and the ring and
-        /// the whole tower can never disagree about what "nobody owns this" looks like.</summary>
+        /// <summary>Pins the controller's neutral choice (Rule 6, chosen by capture): the plinth follows the exact
+        /// same rule as an owned tower's plinth (the full UiTheme.towerNeutralColor, no shade, since 2026-09-23),
+        /// and the drum keeps the shaded formula - so a neutral tower is never left on the stone's own unpainted
+        /// colour, and the ring and the whole tower can never disagree about what "nobody owns this" looks like.
+        /// </summary>
         [Test]
-        public void RefreshPaintsTheBodyNeutralGreyTimesShadeWhenNobodyOwnsTheZone()
+        public void RefreshPaintsThePlinthFullNeutralGreyAndTheDrumNeutralGreyTimesShadeWhenNobodyOwnsTheZone()
         {
             UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
             Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
@@ -252,7 +265,7 @@ namespace Overpower.Tests
             Color expectedBody = theme.towerNeutralColor * theme.towerBodyShade;
             expectedBody.a = theme.towerNeutralColor.a;
 
-            AssertBaseColor(look.plinth, expectedBody, "neutral plinth");
+            AssertBaseColor(look.plinth, theme.towerNeutralColor, "neutral plinth");
             AssertBaseColor(look.drum, expectedBody, "neutral drum");
         }
     }

@@ -801,13 +801,15 @@ namespace Overpower.UI
                  "attacked or drained tower pulses exactly like its ring on the ground. Keep it a plain mid grey: " +
                  "team 0 is near-white, so a light neutral would read as owned by team 0.")]
         public Color towerNeutralColor = new Color(0.42f, 0.42f, 0.42f, 1f);
-        [Tooltip("Multiplies the owner's colour before TowerLook paints the Plinth, Drum and each SHOWN column " +
-                 "shaft - those stay on the Lit 'Tower Stone' material, so the body reads as the team colour with " +
-                 "its own lighting/shading intact instead of going flat like the Crown/caps (the Unlit 'Tower " +
-                 "Owner' material, painted at the full colour, no shade). 1 would make the body just as bright/flat " +
-                 "as the crown; kept here next to Tower Neutral Colour because the two are only ever read together " +
-                 "through OwnerPaintColours - chosen by capture, not calculation (Rule 6), see " +
-                 "captures/towers-2026-09-21.")]
+        [Tooltip("Multiplies the owner's colour before TowerLook paints the Drum only (the tower's body) - the one " +
+                 "piece still on the Lit 'Tower Stone' material, so it reads as the team colour with its own " +
+                 "lighting/shading intact instead of going flat like everything else TowerLook paints (the Crown, " +
+                 "caps, Plinth and shown shafts, all on the Unlit 'Tower Owner' material at the full colour, no " +
+                 "shade - Tudor, 2026-09-23: 'the exterior collumns and the base... glow the same color as the " +
+                 "top'). 1 would make the Drum just as bright/flat as the rest and lose the tower's silhouette; " +
+                 "kept here next to Tower Neutral Colour because the two are only ever read together through " +
+                 "OwnerPaintColours - chosen by capture, not calculation (Rule 6), see captures/towers-2026-09-21 " +
+                 "and captures/tower-glow-2026-09-23.")]
         [Range(0f, 1f)] public float towerBodyShade = 0.8f;
 
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
