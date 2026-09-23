@@ -815,6 +815,10 @@ namespace Overpower.UI
                  "OwnerPaintColours - chosen by capture, not calculation (Rule 6), see captures/towers-2026-09-21 " +
                  "and captures/tower-glow-2026-09-23.")]
         [Range(0f, 1f)] public float towerBodyShade = 0.8f;
+        [Tooltip("How brightly an OWNED tower's crown, caps, columns and base glow in the owner's colour. 1 = " +
+                 "flat colour, no glow; 1.3 = soft; 1.5 = clear glow; 1.75+ = strong, and violet starts turning " +
+                 "lilac. Neutral and out-of-play towers never glow, so a glow means owned. The drum never glows.")]
+        [Range(1f, 2.5f)] public float towerOwnerGlow = 1.5f;
 
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which

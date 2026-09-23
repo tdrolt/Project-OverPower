@@ -165,45 +165,58 @@ namespace Overpower.Arena
         }
 
         /// <summary>Called every frame by BuildingCapture.RefreshRingView, with exactly the same state and time the
-        /// ring on the ground gets. Writes the property block only when the colour actually changed.</summary>
+        /// ring on the ground gets. Writes the property block only when the painted colour actually changed.</summary>
         public void Refresh(CaptureRingState state, float timeSeconds)
         {
             if (!bound)
                 return;
 
-            Color colour = OwnerPaintColours.For(OwnerPaint.From(state), theme, theme.towerNeutralColor, timeSeconds);
-            if (shownColorSet && colour == shownColor)
+            OwnerPaint paint = OwnerPaint.From(state);
+            Color colour = OwnerPaintColours.For(paint, theme, theme.towerNeutralColor, timeSeconds);
+
+            // Tudor, 2026-09-24 ("add bloom on the towers"): an OWNED tower glows - its flat colour is multiplied
+            // past 1 so a bright enough channel clears the scene's Bloom threshold. Neutral and out-of-play towers
+            // never glow (glow stays 1, i.e. the plain flat colour), so a glow always means "this is owned".
+            float glow = paint.Base == OwnerPaintBase.Team ? theme.towerOwnerGlow : 1f;
+            Color lit = colour * glow;
+            lit.a = colour.a; // Color * float scales every channel, alpha included - put it back.
+
+            // The cache compares the PAINTED colour (lit), not the raw owner colour - so tuning Tower Owner Glow
+            // in the Inspector while Play Mode is running repaints at once instead of waiting for the next real
+            // colour change (a capture, a drain, an attack pulse).
+            if (shownColorSet && lit == shownColor)
                 return;
 
-            shownColor = colour;
+            shownColor = lit;
             shownColorSet = true;
 
             if (crown != null)
-                VisualTint.SetMeshColor(crown, block, colour);
+                VisualTint.SetMeshColor(crown, block, lit);
             for (int i = 0; i < columnCaps.Length; i++)
             {
                 Renderer cap = columnCaps[i];
                 if (cap != null && cap.gameObject.activeInHierarchy)
-                    VisualTint.SetMeshColor(cap, block, colour);
+                    VisualTint.SetMeshColor(cap, block, lit);
             }
 
             // Tudor, 2026-09-23: the Plinth and every SHOWN shaft are on the Unlit "Tower Owner" material now, so
-            // they get exactly the same flat, full colour as the crown/caps above - no shade.
+            // they get exactly the same colour as the crown/caps above (2026-09-24: including the glow).
             if (plinth != null)
-                VisualTint.SetMeshColor(plinth, block, colour);
+                VisualTint.SetMeshColor(plinth, block, lit);
             for (int i = 0; i < columnShafts.Length; i++)
             {
                 Renderer shaft = columnShafts[i];
                 if (shaft != null && shaft.gameObject.activeInHierarchy)
-                    VisualTint.SetMeshColor(shaft, block, colour);
+                    VisualTint.SetMeshColor(shaft, block, lit);
             }
 
             // The Drum alone stays on the Lit "Tower Stone" material and is tinted rather than flat-repainted, so
-            // its own shading survives - the owner's colour times UiTheme's Tower Body Shade (default 0.8), always
-            // dimmer than the flat colour every other painted piece gets above. This is what keeps the tower
-            // reading as a silhouette rather than one flat block of colour (Tudor named "the exterior columns and
-            // the base", not the whole tower). Alpha is put back afterwards because Color * float scales every
-            // channel, alpha included.
+            // its own shading survives - the owner's RAW colour (never the glow) times UiTheme's Tower Body Shade
+            // (default 0.8, so never above 1) - always dimmer than the glow every other painted piece gets above.
+            // This is what keeps the tower reading as a silhouette rather than one flat block of colour (Tudor
+            // named "the exterior columns and the base", not the whole tower); 2026-09-24: the Drum staying off
+            // the glow entirely is also what keeps it from blooming, on purpose - see UiTheme.towerOwnerGlow's
+            // tooltip ("the drum never glows"). Alpha is put back afterwards, same reason as above.
             if (drum != null)
             {
                 Color bodyColour = colour * theme.towerBodyShade;
