@@ -127,6 +127,26 @@ namespace Overpower.UI
         [Tooltip("Pulse the overheat bar while it is at the warning level.")] public bool pulseAtWarning = true;
         [Tooltip("Pulses per second when Pulse At Warning is on. Keep it slow - fast reads as flicker.")] public float pulseSpeed = 1.2f;
 
+        [Header("Vent (the overheat sweetspot)")]
+        [Tooltip("Colour of the Vent band on the overheat track before its window has opened - dim, so it reads " +
+                 "as 'coming up' rather than 'press now'. Only shown while silenced and this silence's Vent " +
+                 "attempt is still unspent.")]
+        public Color ventBandDimColor = new Color(1f, 1f, 1f, 0.28f);
+        [Tooltip("Colour of the Vent band while its window is open - bright, the one moment R actually does " +
+                 "something. Distinct from every other bar colour so it reads as 'act now' at a glance.")]
+        public Color ventBandOpenColor = new Color(1f, 0.95f, 0.35f, 0.95f);
+        [Tooltip("Colour the Vent band flashes the instant R lands inside the window, before it disappears - " +
+                 "the bar itself visibly dropping by half is the main feedback, this is just the extra beat " +
+                 "that says 'that was you'.")]
+        public Color ventBandHitColor = new Color(0.4f, 1f, 0.55f, 1f);
+        [Tooltip("How long the hit flash (Vent Band Hit Colour) stays up before the band disappears, in " +
+                 "seconds. Short on purpose - the bar dropping by half is the read, not the flash.")]
+        public float ventHitFlashSeconds = 0.25f;
+        [Tooltip("Colour the Vent band turns on a miss (pressed early, pressed late, or the window passed " +
+                 "with nothing pressed) - stays this colour for the rest of the silence, so a player who " +
+                 "pressed early knows at once rather than wondering if it is still coming.")]
+        public Color ventBandMissColor = new Color(0.6f, 0.6f, 0.6f, 0.7f);
+
         [Header("HUD slots")]
         [Tooltip("Width of one weapon/ability slot box, in canvas units - sized so the longest short names " +
                  "(Raybeam, Shotgun, Baseline) and the longest key label (SPACE) both fit at Body Text Size. " +

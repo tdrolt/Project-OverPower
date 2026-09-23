@@ -26,7 +26,7 @@ public class PlayerInputRouter : MonoBehaviour
     private PlayerLifecycle playerLifecycle;
     private InputActionMap gameplayMap;
     private InputAction moveAction, primaryAction, equipmentAction, ultimateAction;
-    private InputAction mobilityAction, mapAction, shopAction, scoreboardAction;
+    private InputAction mobilityAction, mapAction, shopAction, scoreboardAction, ventAction;
 
     // Mirrors PlayerLifecycle.IsAlive rather than polling it on every property read - updated once
     // per AliveChanged event instead.
@@ -70,6 +70,11 @@ public class PlayerInputRouter : MonoBehaviour
     public event System.Action UltimatePressed;
     public event System.Action MobilityPressed;
     public event System.Action MobilityReleased;
+
+    /// <summary>The overheat Vent button (R) - gated exactly like MobilityPressed (see Emit/
+    /// InputSuppressed): dead, typing in chat, or a tool holding focus all swallow it. PlayerOverheat
+    /// is the only subscriber (owner only), and forwards it to OverheatState.TryVent().</summary>
+    public event System.Action VentPressed;
 
     // Scoreboard still has nothing subscribed. Shop (LoadoutScreen) and Map (MinimapView) each have their own,
     // narrower emit gate - see ShopSuppressed and MapSuppressed.
@@ -149,12 +154,14 @@ public class PlayerInputRouter : MonoBehaviour
         equipmentAction = gameplayMap.FindAction("Equipment"); ultimateAction = gameplayMap.FindAction("Ultimate");
         mobilityAction = gameplayMap.FindAction("Mobility"); mapAction = gameplayMap.FindAction("ExpandMap");
         shopAction = gameplayMap.FindAction("Shop"); scoreboardAction = gameplayMap.FindAction("Scoreboard");
+        ventAction = gameplayMap.FindAction("Vent");
 
         if (moveAction == null || primaryAction == null || equipmentAction == null || ultimateAction == null ||
-            mobilityAction == null || mapAction == null || shopAction == null || scoreboardAction == null)
+            mobilityAction == null || mapAction == null || shopAction == null || scoreboardAction == null ||
+            ventAction == null)
         {
             Debug.LogError($"[PlayerInputRouter] {name}: Gameplay map is missing one or more of the " +
-                            "eight expected actions - check OverpowerControls.inputactions.");
+                            "nine expected actions - check OverpowerControls.inputactions.");
             gameplayMap = null; // Marks setup as failed; every property above already checks this.
             return;
         }
@@ -172,6 +179,7 @@ public class PlayerInputRouter : MonoBehaviour
         mobilityAction.started += _ => Emit(MobilityPressed); mobilityAction.canceled += _ => Emit(MobilityReleased);
         mapAction.started += _ => EmitMap(); shopAction.started += _ => EmitShop();
         scoreboardAction.started += _ => Emit(ScoreboardPressed); scoreboardAction.canceled += _ => Emit(ScoreboardReleased);
+        ventAction.started += _ => Emit(VentPressed);
     }
 
     private void OnEnable()

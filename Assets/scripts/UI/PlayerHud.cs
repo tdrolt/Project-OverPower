@@ -69,6 +69,7 @@ namespace Overpower.UI
         private Image healthFill;
         private Image overheatFill;
         private RectTransform overheatTickRect; // Repositioned live - see UpdateOverheat.
+        private Image ventBandImage; // The Vent window band - repositioned/recoloured live, see UpdateVentBand.
         private Image armorFill;
         private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
 
@@ -226,6 +227,8 @@ namespace Overpower.UI
         private float lastOverheatFraction = -1f;
         private float lastWarningThreshold01 = -1f;
         private bool lastSilenced;
+        private VentOutcome lastVentOutcome = VentOutcome.None; // Detects the instant a Hit lands - see UpdateVentBand.
+        private float ventHitFlashHideAtTime = -1f; // Time.unscaledTime the hit flash should hide by.
         private bool lastWeaponBlocked;
         private WeaponDefinition lastWeaponDef;
         private readonly int[] lastCharges = { -1, -1, -1 };
@@ -557,6 +560,54 @@ namespace Overpower.UI
                 silencedBanner.SetActive(silenced);
                 lastSilenced = silenced;
             }
+
+            UpdateVentBand(silenced);
+        }
+
+        /// <summary>The Vent band's live look and position - see VentBandLookRule for the pure
+        /// dim/bright/hit/miss decision this just draws. Read every frame (not change-guarded like
+        /// most of UpdateOverheat above): the band's own X anchors already move every frame the
+        /// window is open (the fill drains under it), so there is no unmoving case to protect.</summary>
+        private void UpdateVentBand(bool silenced)
+        {
+            bool windowOpen = playerOverheat.IsVentWindowOpen;
+            VentOutcome outcome = playerOverheat.VentOutcome;
+            VentBandLook look = VentBandLookRule.Determine(silenced, windowOpen, outcome);
+
+            // The hit flash is the one look that expires on its own (UiTheme.ventHitFlashSeconds)
+            // rather than lasting for the rest of the silence like a miss does - arm the countdown
+            // the instant Outcome first reads Hit, unscaled so a debug Time.timeScale change can't
+            // freeze it on screen forever (same reasoning as the toast's own timer).
+            if (outcome == VentOutcome.Hit && lastVentOutcome != VentOutcome.Hit)
+                ventHitFlashHideAtTime = Time.unscaledTime + theme.ventHitFlashSeconds;
+            lastVentOutcome = outcome;
+
+            if (look == VentBandLook.Hit && Time.unscaledTime >= ventHitFlashHideAtTime)
+                look = VentBandLook.Hidden; // flash ran its course - the bar itself already halved, that's the read
+
+            if (look == VentBandLook.Hidden)
+            {
+                if (ventBandImage.gameObject.activeSelf)
+                    ventBandImage.gameObject.SetActive(false);
+                return;
+            }
+
+            if (!ventBandImage.gameObject.activeSelf)
+                ventBandImage.gameObject.SetActive(true);
+
+            float high = Mathf.Clamp01(playerOverheat.VentBandHighFraction);
+            float low = Mathf.Clamp01(playerOverheat.VentBandLowFraction);
+            RectTransform bandRt = (RectTransform)ventBandImage.transform;
+            bandRt.anchorMin = new Vector2(low, 0f);
+            bandRt.anchorMax = new Vector2(high, 1f);
+
+            ventBandImage.color = look switch
+            {
+                VentBandLook.Bright => theme.ventBandOpenColor,
+                VentBandLook.Hit => theme.ventBandHitColor,
+                VentBandLook.Miss => theme.ventBandMissColor,
+                _ => theme.ventBandDimColor,
+            };
         }
 
         // ============================================================================================
@@ -935,6 +986,7 @@ namespace Overpower.UI
 
             overheatFill = BuildBar(panel.transform, "Overheat Bar", theme.barWidth, theme.overheatBarHeight, theme.overheatColor, out Image overheatTrack);
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
+            ventBandImage = BuildVentBand(overheatTrack.transform);
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
             // armorExtentRect.parent is the armor bar's own TRACK root (BuildArmorBar parents the
             // extent, which parents Fill, under it) - the frame goes there, not on the extent
@@ -1228,6 +1280,31 @@ namespace Overpower.UI
             tickImg.color = theme.overheatTickColor;
             tickImg.raycastTarget = false;
             return tickRt;
+        }
+
+        /// <summary>The Vent band: a rectangle over the stretch of the overheat track the fill will
+        /// be draining through while the vent window is open - the same "child of the track, X
+        /// anchored 0..1" trick BuildOverheatTick uses for its single point, just spanning a RANGE
+        /// instead. Parented after the tick (drawn on top of it - the tick is a thin, mostly-static
+        /// reference mark; the band is the thing that actually needs to read clearly in the moment
+        /// that matters). Starts inactive and at zero width; UpdateVentBand is what turns it on,
+        /// positions and colours it every frame the underlying state actually changes.</summary>
+        private Image BuildVentBand(Transform trackParent)
+        {
+            GameObject band = new GameObject("Vent Band", typeof(RectTransform));
+            band.transform.SetParent(trackParent, false);
+            RectTransform bandRt = band.GetComponent<RectTransform>();
+            // X is a RANGE anchor (min != max, unlike the tick's point anchor) - UpdateVentBand
+            // moves min/max to the live band fractions every frame they change. Y stretches the
+            // full track height, same as the tick.
+            bandRt.anchorMin = new Vector2(0f, 0f);
+            bandRt.anchorMax = new Vector2(0f, 1f);
+            bandRt.sizeDelta = Vector2.zero;
+            bandRt.anchoredPosition = Vector2.zero;
+            Image bandImg = band.AddComponent<Image>();
+            bandImg.raycastTarget = false;
+            band.SetActive(false);
+            return bandImg;
         }
 
         /// <summary>The armor bar is a fixed-width track (like the other two) holding a "capacity

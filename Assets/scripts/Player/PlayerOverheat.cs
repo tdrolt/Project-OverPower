@@ -26,6 +26,7 @@ public class PlayerOverheat : MonoBehaviour
 
     private PhotonView photonView;
     private OverheatState overheat;
+    private PlayerInputRouter input;
 
     // Task 2.6 (GDD p.20): OverPower "nullif[ies] the overheat mechanic" while active. Keyed the
     // same way PlayerMotor's speedMultipliers stack is (see its class comment) rather than a
@@ -51,9 +52,24 @@ public class PlayerOverheat : MonoBehaviour
 
     public bool CanAct => overheat.CanAct;
 
+    /// <summary>True exactly while the vent window is open right now - for the HUD band.</summary>
+    public bool IsVentWindowOpen => overheat.IsVentWindowOpen;
+
+    /// <summary>This silence's vent attempt outcome so far (none/hit/missed) - for the HUD band.</summary>
+    public VentOutcome VentOutcome => overheat.Outcome;
+
+    /// <summary>Heat fraction (0..1) the fill sits at when the vent window opens - the band's upper
+    /// edge, for the HUD.</summary>
+    public float VentBandHighFraction => overheat.VentBandHighFraction;
+
+    /// <summary>Heat fraction (0..1) the fill sits at when the vent window closes - the band's
+    /// lower edge, for the HUD.</summary>
+    public float VentBandLowFraction => overheat.VentBandLowFraction;
+
     private void Awake()
     {
         photonView = GetComponent<PhotonView>();
+        input = GetComponent<PlayerInputRouter>();
 
         // A silent null here would make this player's weapon and abilities never overheat -
         // effectively free, permanent access to everything. Loud on purpose, matching PlayerHealth.
@@ -64,7 +80,9 @@ public class PlayerOverheat : MonoBehaviour
             gameplayConfig != null ? gameplayConfig.OverheatMax : 100f,
             gameplayConfig != null ? gameplayConfig.OverheatDecayDelay : 1.5f,
             gameplayConfig != null ? gameplayConfig.OverheatDecayPerSecond : 25f,
-            gameplayConfig != null ? gameplayConfig.OverheatWarningThreshold : 80f);
+            gameplayConfig != null ? gameplayConfig.OverheatWarningThreshold : 80f,
+            gameplayConfig != null ? gameplayConfig.VentDelay : 2f,
+            gameplayConfig != null ? gameplayConfig.VentWindow : 0.8f);
     }
 
     private void Update()
@@ -74,6 +92,23 @@ public class PlayerOverheat : MonoBehaviour
 
         overheat.Tick(Time.deltaTime);
     }
+
+    private void OnEnable()
+    {
+        // Same reasoning as AbilityRunner's own MobilityPressed subscription: safe to subscribe
+        // unconditionally, since a remote copy's PlayerInputRouter has its gameplayMap disabled and
+        // never raises VentPressed at all.
+        if (input != null)
+            input.VentPressed += HandleVentPressed;
+    }
+
+    private void OnDisable()
+    {
+        if (input != null)
+            input.VentPressed -= HandleVentPressed;
+    }
+
+    private void HandleVentPressed() => TryVent();
 
     /// <summary>Does nothing while IsSuppressed (Task 2.6) - a shot fired during OverPower must
     /// cost no heat at all, not merely decay faster.</summary>
@@ -90,6 +125,11 @@ public class PlayerOverheat : MonoBehaviour
 
     /// <summary>On death: zero the bar and lift any silence with it.</summary>
     public void Clear() => overheat.Clear();
+
+    /// <summary>Vent's own button (R): forwards straight to OverheatState.TryVent(), whether it was
+    /// called from the real VentPressed event or (Play Mode verification, trap 11 - the Input
+    /// System does not update while the Editor is unfocused) directly by a script.</summary>
+    public VentResult TryVent() => overheat.TryVent();
 
     /// <summary>
     /// OverPowerBuff's hook (Task 2.6, GDD p.20): keyed exactly like PlayerMotor.AddSpeedMultiplier/
