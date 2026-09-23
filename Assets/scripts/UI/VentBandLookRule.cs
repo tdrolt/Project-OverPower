@@ -23,14 +23,18 @@ namespace Overpower.UI
     public static class VentBandLookRule
     {
         /// <summary>Hidden whenever not silenced (which also covers death - OverheatState.Clear
-        /// drops IsSilenced along with everything else). While silenced: the outcome, once there is
-        /// one, always wins over the window being open or closed (a hit or a miss is a settled fact
-        /// for the rest of this silence, per PlayerHud's own "miss stays until the silence ends"
-        /// rule); with no outcome yet, Bright exactly while the window is open, Dim the rest of the
-        /// silence.</summary>
-        public static VentBandLook Determine(bool isSilenced, bool windowOpen, VentOutcome outcome)
+        /// drops IsSilenced along with everything else) OR whenever ventEnabled is false (review fix:
+        /// ventWindow &lt;= 0 means Vent is off - GameplayConfig's own "0 = off" tooltip - so the band
+        /// must never appear at all, not even a Missed one; OverheatState.Outcome already reads None
+        /// throughout in this case, but windowOpen alone can't be told apart from an ordinary
+        /// "silenced, window hasn't opened yet" - hence the explicit flag). While silenced and
+        /// enabled: the outcome, once there is one, always wins over the window being open or closed
+        /// (a hit or a miss is a settled fact for the rest of this silence, per PlayerHud's own "miss
+        /// stays until the silence ends" rule); with no outcome yet, Bright exactly while the window
+        /// is open, Dim the rest of the silence.</summary>
+        public static VentBandLook Determine(bool isSilenced, bool windowOpen, VentOutcome outcome, bool ventEnabled = true)
         {
-            if (!isSilenced)
+            if (!isSilenced || !ventEnabled)
                 return VentBandLook.Hidden;
 
             switch (outcome)

@@ -572,7 +572,7 @@ namespace Overpower.UI
         {
             bool windowOpen = playerOverheat.IsVentWindowOpen;
             VentOutcome outcome = playerOverheat.VentOutcome;
-            VentBandLook look = VentBandLookRule.Determine(silenced, windowOpen, outcome);
+            VentBandLook look = VentBandLookRule.Determine(silenced, windowOpen, outcome, playerOverheat.VentEnabled);
 
             // The hit flash is the one look that expires on its own (UiTheme.ventHitFlashSeconds)
             // rather than lasting for the rest of the silence like a miss does - arm the countdown

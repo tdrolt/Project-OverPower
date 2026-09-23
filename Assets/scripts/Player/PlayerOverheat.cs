@@ -52,6 +52,11 @@ public class PlayerOverheat : MonoBehaviour
 
     public bool CanAct => overheat.CanAct;
 
+    /// <summary>False when ventWindow &lt;= 0 (Vent turned off) - for the HUD band, so it can hide
+    /// itself entirely instead of reading a stale Missed for the rest of every silence (review
+    /// fix, see OverheatState.VentEnabled/VentBandLookRule).</summary>
+    public bool VentEnabled => overheat.VentEnabled;
+
     /// <summary>True exactly while the vent window is open right now - for the HUD band.</summary>
     public bool IsVentWindowOpen => overheat.IsVentWindowOpen;
 

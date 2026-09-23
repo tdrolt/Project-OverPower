@@ -48,5 +48,19 @@ namespace Overpower.Tests
             Assert.AreEqual(VentBandLook.Miss,
                 VentBandLookRule.Determine(isSilenced: true, windowOpen: false, outcome: VentOutcome.Missed));
         }
+
+        [Test]
+        public void HiddenWhenVentIsDisabledRegardlessOfOutcomeOrWindowState()
+        {
+            // Review fix: ventWindow <= 0 (OverheatState.VentEnabled false) means Vent is off -
+            // the band must never appear, even though windowOpen/outcome alone can't tell this
+            // case apart from "silenced, no outcome yet" (which is legitimately Dim).
+            Assert.AreEqual(VentBandLook.Hidden,
+                VentBandLookRule.Determine(isSilenced: true, windowOpen: false, outcome: VentOutcome.None, ventEnabled: false));
+            Assert.AreEqual(VentBandLook.Hidden,
+                VentBandLookRule.Determine(isSilenced: true, windowOpen: false, outcome: VentOutcome.Missed, ventEnabled: false));
+            Assert.AreEqual(VentBandLook.Hidden,
+                VentBandLookRule.Determine(isSilenced: true, windowOpen: true, outcome: VentOutcome.Hit, ventEnabled: false));
+        }
     }
 }

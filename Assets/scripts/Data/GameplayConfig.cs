@@ -105,7 +105,12 @@ namespace Overpower.Data
 
         [Tooltip("Seconds into a silence before the Vent window opens - the extra beat you sit " +
                  "locked out before you get a chance to shorten it. 2 means the first two seconds " +
-                 "of every silence are unskippable no matter how fast you react.")]
+                 "of every silence are unskippable no matter how fast you react. Keep this at " +
+                 "least as long as Overheat Decay Delay (1.5) - a hit only cuts the REMAINING " +
+                 "lockout exactly in half once decay has actually started, which is guaranteed by " +
+                 "the time the window can open when Vent Delay >= Overheat Decay Delay. Shorter " +
+                 "still works, it just saves less: a hit landing before decay starts halves a " +
+                 "clock that has not moved yet.")]
         [SerializeField, Min(0f)] private float ventDelay = 2f;
         public float VentDelay => ventDelay;
 

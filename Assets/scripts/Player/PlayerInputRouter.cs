@@ -8,7 +8,7 @@ using TMPro;
 
 /// <summary>
 /// The one place gameplay input enters the game. Reads the OverpowerControls actions asset and
-/// exposes each of the eight design-doc bindings as a property/event pair - nothing else in the
+/// exposes each of the nine design-doc bindings as a property/event pair - nothing else in the
 /// project should call Input or an InputAction directly (Task 0.12, replacing the old per-script
 /// Input.GetKey/GetAxisRaw polling).
 ///

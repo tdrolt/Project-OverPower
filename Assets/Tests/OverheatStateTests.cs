@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Overpower.Combat;
+using Overpower.UI;
 
 namespace Overpower.Tests
 {
@@ -419,6 +420,139 @@ namespace Overpower.Tests
             s.Tick(1f);
             s.TryVent(); // Early
             Assert.AreEqual(VentOutcome.Missed, s.Outcome);
+        }
+
+        // ================================================================================
+        // Review fix (Important): ventWindow <= 0 means Vent is off (GameplayConfig's own
+        // tooltip: "0 turns Vent off entirely"). Outcome used to keep reading Missed for the
+        // rest of the silence the instant silenceClock passed the (zero-width, already-closed)
+        // window, painting a permanent grey band a designer who disabled Vent never asked for.
+        // ================================================================================
+
+        [Test]
+        public void VentWindowZeroKeepsOutcomeNoneForTheWholeSilence()
+        {
+            var s = Silenced(ventWindow: 0f);
+
+            Assert.AreEqual(VentOutcome.None, s.Outcome, "t=0");
+            s.Tick(1f);
+            Assert.AreEqual(VentOutcome.None, s.Outcome, "before ventDelay");
+            s.Tick(1f); // t=2.0 == ventDelay: exactly where the old bug started reading Missed
+            Assert.AreEqual(VentOutcome.None, s.Outcome, "at ventDelay");
+            s.Tick(1f); // t=3.0, well past ventDelay
+            Assert.AreEqual(VentOutcome.None, s.Outcome, "mid-silence");
+            s.Tick(1.4f); // t=4.4, just short of the silence clearing at 5.5s (100/25 + 1.5)
+            Assert.IsTrue(s.IsSilenced);
+            Assert.AreEqual(VentOutcome.None, s.Outcome, "right up to the silence clearing");
+        }
+
+        [Test]
+        public void VentWindowZeroNeverOpensTheWindow()
+        {
+            var s = Silenced(ventWindow: 0f);
+            s.Tick(2f); // exactly ventDelay - where the window would open if it could
+
+            Assert.IsFalse(s.IsVentWindowOpen);
+        }
+
+        [Test]
+        public void VentWindowZeroReadsAsDisabled()
+        {
+            var s = NewState(ventWindow: 0f);
+            Assert.IsFalse(s.VentEnabled);
+
+            var enabled = NewState(ventWindow: 0.8f);
+            Assert.IsTrue(enabled.VentEnabled);
+        }
+
+        [Test]
+        public void VentWindowZeroLookRuleIsHiddenEvenAfterAPressSpendsTheAttempt()
+        {
+            // Ties straight to the actual HUD symptom: VentBandLookRule.Determine returning
+            // Miss (a persistent grey band) is exactly what a disabled Vent must never show.
+            var s = Silenced(ventWindow: 0f);
+            s.Tick(3f); // well past where the (disabled) window would have been
+
+            // Pinned: TryVent still spends the one attempt and reads Late for window 0 (the
+            // early/late split falls through to "silenceClock < ventDelay", which a zero-width
+            // window can never make Early once silenceClock has reached ventDelay) - unaffected
+            // by this fix, which only changes Outcome/the HUD band, not TryVent's own result.
+            Assert.AreEqual(VentResult.Late, s.TryVent());
+
+            VentBandLook look = VentBandLookRule.Determine(s.IsSilenced, s.IsVentWindowOpen, s.Outcome, s.VentEnabled);
+            Assert.AreEqual(VentBandLook.Hidden, look);
+        }
+
+        // ================================================================================
+        // Review fix (Important, reachable today): a laser's Refund(OverheatRefundOnHit) can
+        // land in the same trigger pull that caused the overheat (WeaponFiring.
+        // RefundHeatIfBeamConnects runs right after the Add that silenced the player), while
+        // still silenced and before any Vent attempt. The band used to always project from
+        // max, so a refunded fill was already partway through a band drawn as if nothing had
+        // been refunded at all.
+        // ================================================================================
+
+        [Test]
+        public void ARefundAtSilenceStartMovesTheBandDownWithIt()
+        {
+            // max 100, decay delay 1.5, 25/s, vent delay 2.0, window 0.8; refund 10 at t=0 (the
+            // same trigger pull that caused the overheat) drops the band's projection origin
+            // from 100 to 90: high = (90 - 25*0.5)/100 = 0.775, low = (90 - 25*1.3)/100 = 0.575.
+            var s = Silenced();
+            s.Refund(10f);
+
+            Assert.AreEqual(0.775f, s.VentBandHighFraction, 0.001f);
+            Assert.AreEqual(0.575f, s.VentBandLowFraction, 0.001f);
+        }
+
+        [Test]
+        public void AtTheInstantTheWindowOpensNormalisedMatchesTheBandsHighEdge()
+        {
+            var s = Silenced();
+            s.Refund(10f);
+            s.Tick(2f); // window opens
+
+            Assert.AreEqual(s.VentBandHighFraction, s.Normalised, 0.001f);
+        }
+
+        [Test]
+        public void AHitDoesNotMoveTheBand()
+        {
+            var s = Silenced();
+            s.Refund(10f);
+            float highBefore = s.VentBandHighFraction;
+            float lowBefore = s.VentBandLowFraction;
+
+            s.Tick(2.2f); // inside the window
+            Assert.AreEqual(VentResult.Hit, s.TryVent());
+
+            Assert.AreEqual(highBefore, s.VentBandHighFraction, 0.0001f);
+            Assert.AreEqual(lowBefore, s.VentBandLowFraction, 0.0001f);
+        }
+
+        [Test]
+        public void ARefundAfterAHitNoLongerMovesTheBand()
+        {
+            var s = Silenced();
+            s.Tick(2.2f);
+            Assert.AreEqual(VentResult.Hit, s.TryVent());
+            float highAfterHit = s.VentBandHighFraction;
+
+            s.Refund(10f); // a later refund (e.g. another beam this same frame) must not move it
+
+            Assert.AreEqual(highAfterHit, s.VentBandHighFraction, 0.0001f);
+        }
+
+        [Test]
+        public void WithNoRefundTheBandStillMatchesTheWorkedExample()
+        {
+            // Same numbers as TheBandsHeatRangeMatchesTheWorkedExampleForTheDefaultNumbers -
+            // guards that projecting from "band origin heat" instead of max changes nothing
+            // for the ordinary no-refund case.
+            var s = Silenced();
+
+            Assert.AreEqual(0.875f, s.VentBandHighFraction, 0.001f);
+            Assert.AreEqual(0.675f, s.VentBandLowFraction, 0.001f);
         }
     }
 }

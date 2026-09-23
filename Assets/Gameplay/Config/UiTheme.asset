@@ -55,7 +55,7 @@ MonoBehaviour:
   ventBandOpenColor: {r: 1, g: 0.95, b: 0.35, a: 0.95}
   ventBandHitColor: {r: 0.4, g: 1, b: 0.55, a: 1}
   ventHitFlashSeconds: 0.25
-  ventBandMissColor: {r: 0.6, g: 0.6, b: 0.6, a: 0.7}
+  ventBandMissColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
   slotWidth: 140
   hudSlotSpacing: 10
   slotIconBoxHeight: 104

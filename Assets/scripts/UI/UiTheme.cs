@@ -144,8 +144,12 @@ namespace Overpower.UI
         public float ventHitFlashSeconds = 0.25f;
         [Tooltip("Colour the Vent band turns on a miss (pressed early, pressed late, or the window passed " +
                  "with nothing pressed) - stays this colour for the rest of the silence, so a player who " +
-                 "pressed early knows at once rather than wondering if it is still coming.")]
-        public Color ventBandMissColor = new Color(0.6f, 0.6f, 0.6f, 0.7f);
+                 "pressed early knows at once rather than wondering if it is still coming. Opaque dark grey " +
+                 "on purpose (review fix, captures d2/a2 2026-09-23): the earlier translucent mid-grey sat " +
+                 "over the red silenced fill and read pinkish, almost the same as the dim 'not yet' look " +
+                 "(white at 0.28 alpha over red also reads pink) - a player who pressed early could not " +
+                 "tell they had missed. Opaque so it reads as 'closed' regardless of what is under it.")]
+        public Color ventBandMissColor = new Color(0.3f, 0.3f, 0.3f, 1f);
 
         [Header("HUD slots")]
         [Tooltip("Width of one weapon/ability slot box, in canvas units - sized so the longest short names " +
