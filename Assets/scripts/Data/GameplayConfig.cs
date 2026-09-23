@@ -103,6 +103,18 @@ namespace Overpower.Data
         [SerializeField] private float overheatWarningThreshold = 80f;
         public float OverheatWarningThreshold => overheatWarningThreshold;
 
+        [Tooltip("Seconds into a silence before the Vent window opens - the extra beat you sit " +
+                 "locked out before you get a chance to shorten it. 2 means the first two seconds " +
+                 "of every silence are unskippable no matter how fast you react.")]
+        [SerializeField, Min(0f)] private float ventDelay = 2f;
+        public float VentDelay => ventDelay;
+
+        [Tooltip("How long the Vent window stays open, in seconds, once it opens. Press R while " +
+                 "it's open and the rest of your silence is cut in half; miss it and you serve the " +
+                 "full lockout. 0 turns Vent off entirely - the window never opens, so R never hits.")]
+        [SerializeField, Min(0f)] private float ventWindow = 0.8f;
+        public float VentWindow => ventWindow;
+
         [Header("Status caps")]
         [Tooltip("The most a player can ever be slowed, counting every slow effect stacked " +
                  "together. 0.6 means 60 percent slower at worst, so no combination of slows " +

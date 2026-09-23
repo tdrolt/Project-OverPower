@@ -25,6 +25,8 @@ MonoBehaviour:
   overheatDecayDelay: 1.5
   overheatDecayPerSecond: 25
   overheatWarningThreshold: 80
+  ventDelay: 2
+  ventWindow: 0.8
   slowCap: 0.6
   vulnerabilityCap: 0.6
   abilityPressBufferSeconds: 0.12
