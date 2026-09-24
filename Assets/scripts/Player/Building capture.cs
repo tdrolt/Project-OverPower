@@ -532,9 +532,32 @@ public class BuildingCapture : MonoBehaviourPun
         // whoever is actually listed now - nobody, or the team that pushed it down.
         if (CaptureFadeRule.CapturingTeamAbsent(capturingID, teamsInZone))
         {
-            captureProgress = CaptureFadeRule.Step(captureProgress, FadeRatePerSecond, Time.deltaTime);
+            // Review fix, 2026-09-24: at fade speed 0 this used to hold the claim at the SAME value forever the
+            // instant another team stood here alone - that team could never claim it without the plain fade ever
+            // moving. teamsInZone.Count here is always that other team's own player count (CapturingTeamAbsent
+            // already guarantees nobody of capturingID's own team is listed), so EffectiveFadeRate pushes the
+            // claim down at least as fast as they could capture it themselves - three players three times as
+            // fast as one, like capturing. An empty zone (teamsInZone.Count 0) is untouched: the plain
+            // FadeRatePerSecond, unchanged.
+            float rate = CaptureFadeRule.EffectiveFadeRate(FadeRatePerSecond, teamsInZone.Count, ProgressPerPlayerPerSecond);
+            captureProgress = CaptureFadeRule.Step(captureProgress, rate, Time.deltaTime);
             if (captureProgress <= 0f)
                 (capturingID, captureProgress) = CaptureClaimRule.Resolve(-1, 0f, teamsInZone);
+            if (audioSource.isPlaying)
+                StopCapturingSound();
+            return;
+        }
+
+        // Nothing left to advance or fade: an empty, unclaimed zone (capturingID is always -1 here - the branch
+        // above already caught and returned on a claimed-but-empty zone). Restored (review fix, 2026-09-24) after
+        // the fade block above, not before it, so an empty zone WITH progress still fades to 0 first instead of
+        // skipping straight past it: this early return only ever fires once there is truly nothing left to do,
+        // same as the old pre-captureFadeSpeed early return - avoids Where(...).ToList()/Any() below allocating
+        // every master frame for every idle empty neutral tower.
+        if (playersInZone.Count == 0)
+        {
+            capturingID = -1;
+            captureProgress = 0f;
             if (audioSource.isPlaying)
                 StopCapturingSound();
             return;

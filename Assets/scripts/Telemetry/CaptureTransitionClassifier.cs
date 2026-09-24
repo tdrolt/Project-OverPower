@@ -88,6 +88,16 @@ namespace Overpower.Telemetry
                 // drain resumes when it starts already partly drained (its progress is the owner's
                 // remaining hold, counting DOWN from 1.0).
                 bool resuming = draining ? newProgress.Progress01 < 1f - margin : newProgress.Progress01 > margin;
+                // Review fix, 2026-09-24: a fade/refill was never THIS team's own capture/drain to resume (see
+                // CaptureFadeRule.CapturingTeamAbsent - it only ever fades/refills a claim nobody of its own team
+                // is standing in). A different team taking the claim over from a fade/refill inherits its
+                // progress fraction (captureFadeSpeed's whole point), which used to read as "resuming" purely by
+                // that fraction and credit the OLD team (TelemetryAggregator ~640-666 only swaps the credited team
+                // on a fresh start, never on a resume - "resumed/drainResumed: continues the SAME open attempt").
+                // The SAME team resuming its own interrupted fade/refill is untouched: only a team change forces
+                // a fresh start here.
+                if (oldProgress.Fading && newProgress.Team != oldProgress.Team)
+                    resuming = false;
                 if (draining) return resuming ? DrainResumed : DrainStarted;
                 return resuming ? Resumed : Started;
             }

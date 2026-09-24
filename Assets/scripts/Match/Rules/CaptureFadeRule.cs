@@ -25,6 +25,21 @@ namespace Overpower.Match
         public static bool CapturingTeamAbsent(int capturingId, IReadOnlyList<int> teamsInZone) =>
             capturingId >= 0 && !Contains(teamsInZone, capturingId);
 
+        /// <summary>Review fix, 2026-09-24: at captureFadeSpeed 0, a neutral zone whose claiming team left stayed
+        /// locked to that team forever once ANOTHER team stood there alone - CalculateCaptureProgress's own fade
+        /// check kept it at the same progress every tick (Step with rate 0), so the other team could never claim
+        /// it without the plain fade ever moving. Decided: when another team stands in the zone ALONE (nobody of
+        /// them the caller only calls this with otherTeamPlayersInZone > 0 to begin with), it pushes the old claim
+        /// down at least as fast as it could capture the zone itself - never slower than
+        /// otherTeamPlayersInZone x progressPerPlayerPerSecond, and never slower than the configured fadeRatePerSecond
+        /// either, so N players still push N times as fast as one, exactly like capturing. The plain fade (nobody
+        /// in the zone at all - otherTeamPlayersInZone 0) is untouched: it keeps fadeRatePerSecond exactly, so
+        /// fade speed 0 still means "holds while nobody's there".</summary>
+        public static float EffectiveFadeRate(float fadeRatePerSecond, int otherTeamPlayersInZone, float progressPerPlayerPerSecond) =>
+            otherTeamPlayersInZone > 0
+                ? System.Math.Max(fadeRatePerSecond, otherTeamPlayersInZone * progressPerPlayerPerSecond)
+                : fadeRatePerSecond;
+
         /// <summary>One tick of a neutral zone's claim fading toward 0, never past it.</summary>
         public static float Step(float captureProgress, float fadeRatePerSecond, float deltaTime) =>
             System.Math.Max(0f, captureProgress - fadeRatePerSecond * deltaTime);

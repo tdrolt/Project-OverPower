@@ -66,14 +66,28 @@ namespace Overpower.Match
             int outlineTeam = owner >= 0 ? owner : TerritoryMap.Neutral;
             bool attacked = owner >= 0 && underAttack;
 
-            // captureFadeSpeed (2026-09-24): checked before every guard below, on purpose - a fade/refill's own
-            // Team/rate-sign shape (a negative rate on a still-neutral owner; a positive rate under an owner that
-            // never released ownership) is EXACTLY the shape the echo-race guards further down exist to catch (a
-            // real drain/capture whose separate owner-update write arrived before or after its progress update -
-            // see their own comments), so without this explicit flag a genuine fade/refill would misread as that
-            // race and flash Idle instead of animating.
+            // captureFadeSpeed (2026-09-24): checked before every guard below, on purpose. Those guards
+            // (progress.Team < 0 || progress.Team == owner just below; the owner < 0 check inside the
+            // RatePerSecond01 < 0 branch further down) exist for a real capture/drain's OWN two-update echo race,
+            // and were never written to recognise a fade/refill's shape at all: a neutral fade (negative rate,
+            // neutral owner) happens to land on the owner < 0 check and reads Idle, but an owned refill (positive
+            // rate, Team = the last drainer, not the owner) matches NEITHER guard and falls through to Capturing,
+            // in the drainer's own colour, not Idle. Checking Fading first sidesteps both mismatches so a genuine
+            // fade/refill always animates correctly.
             if (progress.Fading)
             {
+                // Review fix, 2026-09-24: the two shapes that can never be a genuine fade/refill
+                // (CaptureProgressPublishRule.Decide only ever fades a NEUTRAL zone's claim - negative rate - or
+                // refills an OWNED one - positive rate; never the other way round). Seeing one here means this
+                // progress snapshot and a separate owner write haven't both landed yet - the exact one-round-trip
+                // race the brief describes: a team knocked out mid-refill (MatchDirector.cs:427 resets the zone
+                // neutral) shows a growing band in the old drainer's colour on every OTHER client until the
+                // master's neutral reset echoes back. Idle for that one frame instead of the phantom band.
+                if (progress.RatePerSecond01 > 0f && owner < 0)
+                    return Idle(outlineTeam, attacked);
+                if (progress.RatePerSecond01 < 0f && owner >= 0)
+                    return Idle(outlineTeam, attacked);
+
                 float fadeFill = nowMs == 0 || progress.StampMs == 0 ? Clamp01(progress.Progress01) : progress.Evaluate(nowMs);
                 if (fadeFill <= 0f)
                     return Idle(outlineTeam, attacked);

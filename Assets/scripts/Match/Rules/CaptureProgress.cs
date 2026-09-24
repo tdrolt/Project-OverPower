@@ -16,10 +16,13 @@ namespace Overpower.Match
         public const string StampKey = "cStamp";
         // captureFadeSpeed (2026-09-24): a fifth room-properties key. Old code that doesn't know this key simply
         // never reads it - ReadIntArray/BuildingManager's decode loop default a missing array to 0 (not fading)
-        // per zone, so an old client just falls back to the pre-fix behaviour (the ring reads a fade/refill's
-        // negative-on-neutral or positive-on-owned rate through the SAME echo-race guards a real drain/capture
-        // already had, and shows it as Idle instead of animating) rather than crashing or misreading it as a real
-        // capture/drain. Every build in one match must still match, though - see the capture-fade brief's report.
+        // per zone, so an old client falls back to reading a fade/refill's plain Team/rate/owner shape as if it
+        // were a live capture/drain (CaptureRingState.From, without the Fading check). The two directions land
+        // differently: a neutral zone's fade (negative rate, neutral owner) still happens to hit that file's own
+        // owner < 0 guard and shows Idle, but an owned zone's refill (positive rate, Team = the last drainer, not
+        // the owner) matches none of its guards and reads as THE DRAINER capturing the zone - a stale,
+        // wrong-coloured growing band, not a blank one - until this client updates. Every build in one match must
+        // still match, though - see the capture-fade brief's report.
         public const string FadingKey = "cFade";
 
         // Ints on the wire: Photon handles int[] natively, and 1/10000 of a capture is finer than a pixel.

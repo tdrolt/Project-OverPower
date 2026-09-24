@@ -151,6 +151,28 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ARefillRaceWhoseOwnerAlreadyWentNeutralShowsIdleNotAPhantomBand()
+        {
+            // Review fix, 2026-09-24: a one-round-trip race (e.g. a team knocked out mid-refill,
+            // MatchDirector.cs:427, writes the zone neutral before this progress echo catches up). A refill
+            // (positive rate) can never legitimately land on a neutral snapshot owner - CaptureProgressPublishRule.
+            // Decide only ever fades a NEUTRAL zone's claim (negative) or refills an OWNED one (positive) - so this
+            // impossible shape must show Idle for that one frame instead of a growing band in the old drainer's
+            // colour.
+            CaptureRingState s = CaptureRingState.From(new CaptureProgress(2, 0.4f, 0.1f, 1000, fading: true), -1, false, 2000);
+            Assert.AreEqual(CaptureRingPhase.Idle, s.Phase);
+        }
+
+        [Test]
+        public void AFadeRaceWhoseOwnerIsStillSetShowsIdleNotAPhantomBand()
+        {
+            // The mirror race: a fade (negative rate) can never legitimately land on an owned snapshot owner - Idle,
+            // not a shrinking band in a team's colour under an owner that's already set.
+            CaptureRingState s = CaptureRingState.From(new CaptureProgress(1, 0.4f, -0.1f, 1000, fading: true), 0, false, 2000);
+            Assert.AreEqual(CaptureRingPhase.Idle, s.Phase);
+        }
+
+        [Test]
         public void AnOutOfPlayZoneShowsNoArcWhateverTheRoomSays()
         {
             // A capturing progress for team 0, an owner and an under-attack flag that would otherwise draw

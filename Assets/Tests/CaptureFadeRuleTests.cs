@@ -121,5 +121,66 @@ namespace Overpower.Tests
             Assert.AreEqual(1, capturingId);
             Assert.AreEqual(0f, fresh);
         }
+
+        // --------------------------------------------------------- review fix: fade speed 0 locking a neutral
+        // zone to the first team forever once ANOTHER team stands there alone (2026-09-24). Decided: it pushes the
+        // old claim down at max(fadeRate, N x ProgressPerPlayerPerSecond), N = that team's player count - never
+        // slower than their own capture speed, and N players push N times as fast, like capturing. The plain fade
+        // (nobody inside at all) is unaffected: it still keeps fadeRate exactly.
+
+        [Test]
+        public void EffectiveFadeRateWithNobodyElseIsThePlainFadeRateUnchanged()
+        {
+            Assert.AreEqual(0f, CaptureFadeRule.EffectiveFadeRate(0f, otherTeamPlayersInZone: 0, progressPerPlayerPerSecond: 1f));
+            Assert.AreEqual(2f, CaptureFadeRule.EffectiveFadeRate(2f, otherTeamPlayersInZone: 0, progressPerPlayerPerSecond: 1f));
+        }
+
+        [Test]
+        public void EffectiveFadeRateAtSpeedOneWithOnePlayerIsUnchangedFromToday()
+        {
+            // fadeRatePerSecond already at one player's own speed: max(1, 1) is still 1 - no regression for the
+            // default/common case (captureFadeSpeed 1, one enemy standing alone).
+            Assert.AreEqual(1f, CaptureFadeRule.EffectiveFadeRate(1f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f));
+        }
+
+        [Test]
+        public void EffectiveFadeRateAtSpeedZeroStillPushesAtTheOtherTeamsOwnCaptureSpeed()
+        {
+            // The "important" fix itself: speed 0 must not hold forever once another team is actually here alone.
+            Assert.AreEqual(1f, CaptureFadeRule.EffectiveFadeRate(0f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f));
+        }
+
+        [Test]
+        public void EffectiveFadeRateForThreePlayersIsThreeTimesOnePlayersWhenThatBeatsTheFadeRate()
+        {
+            float rateForOne = CaptureFadeRule.EffectiveFadeRate(0.5f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f);
+            float rateForThree = CaptureFadeRule.EffectiveFadeRate(0.5f, otherTeamPlayersInZone: 3, progressPerPlayerPerSecond: 1f);
+            Assert.AreEqual(1f, rateForOne, 1e-5f);
+            Assert.AreEqual(3f, rateForThree, 1e-5f);
+            Assert.AreEqual(3f, rateForThree / rateForOne, 1e-5f, "three push three times as fast as one, like capturing");
+        }
+
+        [Test]
+        public void EffectiveFadeRateNeverGoesBelowTheConfiguredFadeRate()
+        {
+            // A slow lone enemy (0.2 progress/s) must never slow the fade below the configured speed.
+            Assert.AreEqual(2f, CaptureFadeRule.EffectiveFadeRate(2f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 0.2f));
+        }
+
+        [Test]
+        public void FadeSpeedZeroWithAnotherTeamAloneStillReachesZeroAndHandsOver()
+        {
+            // Speed 0, one enemy player alone in the zone: must still reach 0 (not hold forever) and let
+            // CaptureClaimRule.Resolve hand the claim to the team actually there - the bug this fixes.
+            float rate = CaptureFadeRule.EffectiveFadeRate(0f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f);
+            float progress = 2f;
+            for (int i = 0; i < 2; i++)
+                progress = CaptureFadeRule.Step(progress, rate, 1f);
+            Assert.AreEqual(0f, progress, 1e-5f);
+
+            var (capturingId, fresh) = CaptureClaimRule.Resolve(-1, 0f, new List<int> { 1 });
+            Assert.AreEqual(1, capturingId);
+            Assert.AreEqual(0f, fresh);
+        }
     }
 }

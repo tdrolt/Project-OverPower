@@ -288,16 +288,31 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ANewDrainDuringARefillContinuesFromTheCurrentValueAsDrainResumed()
+        public void ANewDrainDuringARefillByADifferentTeamIsDrainStartedNotResumed()
         {
-            // Refilling (team 2, the last drainer, now gone) at 0.5, a fresh enemy (team 1) starts draining again -
-            // captureFadeSpeed's OTHER half (BuildingCapture no longer resets captureProgress to full on
-            // DrainRule.Step.Start): the new drain continues from 0.5, so this reads DrainResumed, not DrainStarted.
+            // Review fix, 2026-09-24: this used to read DrainResumed, which made TelemetryAggregator (~640-666)
+            // keep crediting team 2 (the OLD drainer, now gone) - it only swaps the credited team on a fresh
+            // start/drainStarted, never on a resumed/drainResumed ("continues the SAME open attempt"). A refill was
+            // never team 1's own capture/drain to resume, so a DIFFERENT team taking it over must always read as a
+            // fresh drain start, whatever fraction of progress it inherits (captureFadeSpeed's own refill still
+            // hands it that progress - see BuildingCapture.HandleCapturedState - just credited to the right team).
             var refilling = new CaptureProgress(2, 0.5f, 0.1f, 1000, fading: true);
             var newDrain = new CaptureProgress(1, 0.5f, -0.2f, 3000);
             string state = CaptureTransitionClassifier.Classify(refilling, newDrain, 3000, out int team, out _);
-            Assert.AreEqual(CaptureTransitionClassifier.DrainResumed, state);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, state);
             Assert.AreEqual(1, team);
+        }
+
+        [Test]
+        public void ANewDrainDuringARefillBySameTeamIsStillDrainResumed()
+        {
+            // The mirror case: the SAME team that was refilling stops and drains again before the refill finished -
+            // that is genuinely resuming its own attempt, so it must still read DrainResumed, not a fresh start.
+            var refilling = new CaptureProgress(2, 0.5f, 0.1f, 1000, fading: true);
+            var sameTeamDrainsAgain = new CaptureProgress(2, 0.5f, -0.2f, 3000);
+            string state = CaptureTransitionClassifier.Classify(refilling, sameTeamDrainsAgain, 3000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainResumed, state);
+            Assert.AreEqual(2, team);
         }
     }
 }

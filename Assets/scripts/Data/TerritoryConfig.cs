@@ -67,9 +67,11 @@ namespace Overpower.Data
                  "it's under attack. Stops both from flickering when someone steps on and off the edge.")]
         [SerializeField, Min(0f)] private float underAttackLingerSeconds = 3f;
 
-        [Tooltip("How fast unfinished capture progress slides back when nobody is capturing it, as a fraction of " +
-                 "one player's capture speed. 1 = as fast as one player builds it; 0.5 = half as fast; 0 = it " +
-                 "holds where it was.")]
+        [Tooltip("How fast unfinished capture progress slides back when its team has left, as a fraction of " +
+                 "one player's capture speed (1 = as fast as one player builds it; 0.5 = half as fast; 0 = it " +
+                 "holds until someone acts). The same speed refills an owned zone that was partly drained once " +
+                 "the attackers leave. An enemy standing in the zone alone always pushes it down at least as " +
+                 "fast as it could capture.")]
         [SerializeField, Min(0f)] private float captureFadeSpeed = 1f;
 
         public int PlayersPerTeam => playersPerTeam;
