@@ -127,52 +127,121 @@ namespace Overpower.Tests
         // old claim down at max(fadeRate, N x ProgressPerPlayerPerSecond), N = that team's player count - never
         // slower than their own capture speed, and N players push N times as fast, like capturing. The plain fade
         // (nobody inside at all) is unaffected: it still keeps fadeRate exactly.
+        //
+        // --------------------------------------------------------- opus re-review, same day: EffectiveFadeRate
+        // (above) counted every non-claim player, so two DIFFERENT enemy teams fighting inside a faded claim
+        // pushed it at their combined speed, and it ignored TeamMayCaptureNow, so a team whose only way in was
+        // itself under attack still pushed the claim down. Replaced by NeutralFadeRate, which takes the zone's
+        // actual team list and a caller-supplied "may the single pusher capture right now" answer instead of a
+        // raw headcount - see its own doc comment for the full decision table.
 
         [Test]
-        public void EffectiveFadeRateWithNobodyElseIsThePlainFadeRateUnchanged()
+        public void SinglePushingTeamIsMinusOneWhenTheZoneIsEmpty()
         {
-            Assert.AreEqual(0f, CaptureFadeRule.EffectiveFadeRate(0f, otherTeamPlayersInZone: 0, progressPerPlayerPerSecond: 1f));
-            Assert.AreEqual(2f, CaptureFadeRule.EffectiveFadeRate(2f, otherTeamPlayersInZone: 0, progressPerPlayerPerSecond: 1f));
+            Assert.AreEqual(-1, CaptureFadeRule.SinglePushingTeam(0, new List<int>()));
         }
 
         [Test]
-        public void EffectiveFadeRateAtSpeedOneWithOnePlayerIsUnchangedFromToday()
+        public void SinglePushingTeamIsMinusOneWithOnlyTheClaimTeamPresent()
         {
-            // fadeRatePerSecond already at one player's own speed: max(1, 1) is still 1 - no regression for the
-            // default/common case (captureFadeSpeed 1, one enemy standing alone).
-            Assert.AreEqual(1f, CaptureFadeRule.EffectiveFadeRate(1f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f));
+            Assert.AreEqual(-1, CaptureFadeRule.SinglePushingTeam(0, new List<int> { 0, 0 }));
         }
 
         [Test]
-        public void EffectiveFadeRateAtSpeedZeroStillPushesAtTheOtherTeamsOwnCaptureSpeed()
+        public void SinglePushingTeamIsTheOtherTeamWhenItStandsAloneWithSeveralPlayers()
         {
-            // The "important" fix itself: speed 0 must not hold forever once another team is actually here alone.
-            Assert.AreEqual(1f, CaptureFadeRule.EffectiveFadeRate(0f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f));
+            Assert.AreEqual(2, CaptureFadeRule.SinglePushingTeam(1, new List<int> { 2, 2, 2 }));
         }
 
         [Test]
-        public void EffectiveFadeRateForThreePlayersIsThreeTimesOnePlayersWhenThatBeatsTheFadeRate()
+        public void SinglePushingTeamIgnoresTheClaimTeamsOwnPlayersMixedIn()
         {
-            float rateForOne = CaptureFadeRule.EffectiveFadeRate(0.5f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f);
-            float rateForThree = CaptureFadeRule.EffectiveFadeRate(0.5f, otherTeamPlayersInZone: 3, progressPerPlayerPerSecond: 1f);
+            // Not a shape either production caller ever passes (they only call this once CapturingTeamAbsent is
+            // true), but the pure function is well-defined here too: it skips claimTeam's own entries.
+            Assert.AreEqual(2, CaptureFadeRule.SinglePushingTeam(1, new List<int> { 1, 2, 2 }));
+        }
+
+        [Test]
+        public void SinglePushingTeamIsMinusOneWithTwoDifferentOtherTeams()
+        {
+            Assert.AreEqual(-1, CaptureFadeRule.SinglePushingTeam(1, new List<int> { 2, 3 }));
+        }
+
+        [Test]
+        public void NeutralFadeRateWithNobodyElseIsThePlainFadeRateUnchanged()
+        {
+            Assert.AreEqual(0f, CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 1, new List<int>(), perPlayerSpeed: 1f, pushersMayCapture: true));
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int>(), perPlayerSpeed: 1f, pushersMayCapture: true));
+        }
+
+        [Test]
+        public void NeutralFadeRateWithTheClaimTeamStillPresentIsThePlainFadeRate()
+        {
+            // The claim team standing there (alone, or contested with an enemy too) is never a fade at all - the
+            // caller's ordinary capture/contest logic runs instead (CapturingTeamAbsent gates it out before this
+            // is ever called in production); this pure function still returns a well-defined, harmless value.
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 1 }, perPlayerSpeed: 1f, pushersMayCapture: true));
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 1, 2 }, perPlayerSpeed: 1f, pushersMayCapture: true));
+        }
+
+        [Test]
+        public void NeutralFadeRateAtSpeedOneWithOnePlayerIsUnchangedFromToday()
+        {
+            // fadeRate already at one player's own speed: max(1, 1) is still 1 - no regression for the
+            // default/common case (captureFadeSpeed 1, one enemy standing alone who may capture).
+            Assert.AreEqual(1f, CaptureFadeRule.NeutralFadeRate(1f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, pushersMayCapture: true));
+        }
+
+        [Test]
+        public void NeutralFadeRateAtSpeedZeroStillPushesAtTheOtherTeamsOwnCaptureSpeed()
+        {
+            // The "important" fix itself: speed 0 must not hold forever once another team is actually here alone
+            // and may capture.
+            Assert.AreEqual(1f, CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, pushersMayCapture: true));
+        }
+
+        [Test]
+        public void NeutralFadeRateForThreePlayersIsThreeTimesOnePlayersWhenThatBeatsTheFadeRate()
+        {
+            float rateForOne = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, pushersMayCapture: true);
+            float rateForThree = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, pushersMayCapture: true);
             Assert.AreEqual(1f, rateForOne, 1e-5f);
             Assert.AreEqual(3f, rateForThree, 1e-5f);
             Assert.AreEqual(3f, rateForThree / rateForOne, 1e-5f, "three push three times as fast as one, like capturing");
         }
 
         [Test]
-        public void EffectiveFadeRateNeverGoesBelowTheConfiguredFadeRate()
+        public void NeutralFadeRateNeverGoesBelowTheConfiguredFadeRate()
         {
             // A slow lone enemy (0.2 progress/s) must never slow the fade below the configured speed.
-            Assert.AreEqual(2f, CaptureFadeRule.EffectiveFadeRate(2f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 0.2f));
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 0.2f, pushersMayCapture: true));
+        }
+
+        [Test]
+        public void NeutralFadeRateWithTwoDifferentOtherTeamsIsThePlainFadeRateNotTheirCombinedSpeed()
+        {
+            // Review fix (minor 2): two DIFFERENT enemy teams fighting inside a faded claim (3 total players, two
+            // different teams) must NOT push at their combined headcount - contested among the pushers, plain
+            // fade only, same as EffectiveFadeRate's old bug (N counted every non-claim player regardless of team).
+            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 3 }, perPlayerSpeed: 1f, pushersMayCapture: true);
+            Assert.AreEqual(0.5f, rate);
+        }
+
+        [Test]
+        public void NeutralFadeRateWhenTheSinglePusherMayNotCaptureIsThePlainFadeRate()
+        {
+            // Review fix (minor 3): a lone pushing team whose only way in is itself under attack (TeamMayCaptureNow
+            // false) must not push the claim down at all - plain fade only, same as it can't capture the zone.
+            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, pushersMayCapture: false);
+            Assert.AreEqual(0.5f, rate);
         }
 
         [Test]
         public void FadeSpeedZeroWithAnotherTeamAloneStillReachesZeroAndHandsOver()
         {
-            // Speed 0, one enemy player alone in the zone: must still reach 0 (not hold forever) and let
-            // CaptureClaimRule.Resolve hand the claim to the team actually there - the bug this fixes.
-            float rate = CaptureFadeRule.EffectiveFadeRate(0f, otherTeamPlayersInZone: 1, progressPerPlayerPerSecond: 1f);
+            // Speed 0, one enemy player alone in the zone who may capture: must still reach 0 (not hold forever)
+            // and let CaptureClaimRule.Resolve hand the claim to the team actually there - the bug this fixes.
+            float rate = CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 0, new List<int> { 1 }, perPlayerSpeed: 1f, pushersMayCapture: true);
             float progress = 2f;
             for (int i = 0; i < 2; i++)
                 progress = CaptureFadeRule.Step(progress, rate, 1f);

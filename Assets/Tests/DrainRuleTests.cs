@@ -72,7 +72,8 @@ namespace Overpower.Tests
         public void APausedDrainCarriesOnRatherThanStartingAgainOnceItsWayInIsSafe()
         {
             // Pause keeps "draining" true on the tower, so the next safe frame is Continue (progress kept), not Start
-            // (progress back to full).
+            // (a fresh drain, which since captureFadeSpeed's refill continues from wherever progress has gotten to,
+            // not necessarily full - see DrainRule.Step.Start's own comment).
             Assert.AreEqual(DrainRule.Step.Pause, Decide(new[] { 1 }, false, true, 1, NoTeamMay).Step);
             Assert.AreEqual(DrainRule.Step.Continue, Decide(new[] { 1 }, false, true, 1, AnyTeamMay).Step);
         }

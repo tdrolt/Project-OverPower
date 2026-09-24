@@ -313,6 +313,7 @@ public class BuildingCapture : MonoBehaviourPun
         int eligibleCount = 0;
         bool enemyPresent = false;
         bool mayCaptureNow = false;
+        float fadeRate = FadeRatePerSecond;
         if (!isCaptured && !isOnCooldown && capturingID != -1 && playersInZone.Count != 0)
         {
             // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
@@ -322,11 +323,24 @@ public class BuildingCapture : MonoBehaviourPun
             eligibleCount = playersInZone.Count(p => p.teamID == capturingID);
             enemyPresent = playersInZone.Any(p => p.teamID != capturingID);
             mayCaptureNow = TeamMayCaptureNow(capturingID);
+
+            if (eligibleCount == 0)
+            {
+                // Opus re-review, 2026-09-24: the claim team is absent this frame (empty zone, or only another
+                // team) - CalculateCaptureProgress already ran earlier in this same Update() and is fading/
+                // pushing the claim down; teamsInZone is its own reusable buffer, already fresh for this frame
+                // (populated at the top of that method regardless of which branch it then takes). Calling
+                // CaptureFadeRule.NeutralFadeRate here - the SAME function that step just used, with the SAME
+                // inputs - is what makes the published rate unable to disagree with the master's own step.
+                int pushingTeam = CaptureFadeRule.SinglePushingTeam(capturingID, teamsInZone);
+                bool pushersMayCapture = pushingTeam >= 0 && TeamMayCaptureNow(pushingTeam);
+                fadeRate = CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, pushersMayCapture);
+            }
         }
 
         return CaptureProgressPublishRule.Decide(isCaptured, isDecaying, isDrainPaused, CaptureSeconds, DecaySeconds,
             isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs,
-            FadeRatePerSecond);
+            fadeRate);
     }
 
     /// <summary>Forces this tower to tell the room its current capture progress right now,
@@ -532,14 +546,14 @@ public class BuildingCapture : MonoBehaviourPun
         // whoever is actually listed now - nobody, or the team that pushed it down.
         if (CaptureFadeRule.CapturingTeamAbsent(capturingID, teamsInZone))
         {
-            // Review fix, 2026-09-24: at fade speed 0 this used to hold the claim at the SAME value forever the
-            // instant another team stood here alone - that team could never claim it without the plain fade ever
-            // moving. teamsInZone.Count here is always that other team's own player count (CapturingTeamAbsent
-            // already guarantees nobody of capturingID's own team is listed), so EffectiveFadeRate pushes the
-            // claim down at least as fast as they could capture it themselves - three players three times as
-            // fast as one, like capturing. An empty zone (teamsInZone.Count 0) is untouched: the plain
-            // FadeRatePerSecond, unchanged.
-            float rate = CaptureFadeRule.EffectiveFadeRate(FadeRatePerSecond, teamsInZone.Count, ProgressPerPlayerPerSecond);
+            // Opus re-review, 2026-09-24: replaces this same day's first fix (EffectiveFadeRate, which counted
+            // every non-claim player and ignored TeamMayCaptureNow - see CaptureFadeRule.NeutralFadeRate's own
+            // comment for both bugs). PublishProgressIfNeeded's ComputeCurrentProgress calls the SAME function
+            // with the SAME inputs for the value it publishes, so the rate a client extrapolates from can never
+            // disagree with what this step actually does to captureProgress.
+            int pushingTeam = CaptureFadeRule.SinglePushingTeam(capturingID, teamsInZone);
+            bool pushersMayCapture = pushingTeam >= 0 && TeamMayCaptureNow(pushingTeam);
+            float rate = CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, pushersMayCapture);
             captureProgress = CaptureFadeRule.Step(captureProgress, rate, Time.deltaTime);
             if (captureProgress <= 0f)
                 (capturingID, captureProgress) = CaptureClaimRule.Resolve(-1, 0f, teamsInZone);

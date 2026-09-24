@@ -25,20 +25,62 @@ namespace Overpower.Match
         public static bool CapturingTeamAbsent(int capturingId, IReadOnlyList<int> teamsInZone) =>
             capturingId >= 0 && !Contains(teamsInZone, capturingId);
 
-        /// <summary>Review fix, 2026-09-24: at captureFadeSpeed 0, a neutral zone whose claiming team left stayed
-        /// locked to that team forever once ANOTHER team stood there alone - CalculateCaptureProgress's own fade
-        /// check kept it at the same progress every tick (Step with rate 0), so the other team could never claim
-        /// it without the plain fade ever moving. Decided: when another team stands in the zone ALONE (nobody of
-        /// them the caller only calls this with otherTeamPlayersInZone > 0 to begin with), it pushes the old claim
-        /// down at least as fast as it could capture the zone itself - never slower than
-        /// otherTeamPlayersInZone x progressPerPlayerPerSecond, and never slower than the configured fadeRatePerSecond
-        /// either, so N players still push N times as fast as one, exactly like capturing. The plain fade (nobody
-        /// in the zone at all - otherTeamPlayersInZone 0) is untouched: it keeps fadeRatePerSecond exactly, so
-        /// fade speed 0 still means "holds while nobody's there".</summary>
-        public static float EffectiveFadeRate(float fadeRatePerSecond, int otherTeamPlayersInZone, float progressPerPlayerPerSecond) =>
-            otherTeamPlayersInZone > 0
-                ? System.Math.Max(fadeRatePerSecond, otherTeamPlayersInZone * progressPerPlayerPerSecond)
-                : fadeRatePerSecond;
+        /// <summary>The one enemy team actually pushing a neutral zone's claim down this tick: the single OTHER
+        /// team (not claimTeam) among the zone's listed players, only when every non-claim player belongs to that
+        /// same team. -1 when nobody but the claim team is here (nothing pushing, including an empty zone), or
+        /// when two or more different other teams are here at once (contested among the pushers - nobody's turn
+        /// to push alone).</summary>
+        public static int SinglePushingTeam(int claimTeam, IReadOnlyList<int> teamsInZone)
+        {
+            int pushing = -1;
+            for (int i = 0; i < teamsInZone.Count; i++)
+            {
+                int team = teamsInZone[i];
+                if (team == claimTeam) continue;
+                if (pushing == -1) pushing = team;
+                else if (pushing != team) return -1;
+            }
+            return pushing;
+        }
+
+        /// <summary>Opus re-review, 2026-09-24 (replaces the same day's own first fix, EffectiveFadeRate): that
+        /// version counted EVERY non-claim player as pushing, so two DIFFERENT enemy teams fighting inside a faded
+        /// claim pushed it down at their combined speed, and it ignored TeamMayCaptureNow, so a team whose only
+        /// way in was itself under attack still pushed a claim down it could not actually capture. This is the ONE
+        /// function both the master's per-frame step (BuildingCapture.CalculateCaptureProgress) and the value it
+        /// publishes (BuildingCapture.ComputeCurrentProgress -> CaptureProgressPublishRule.Decide) call for a
+        /// neutral zone's current fade rate, so the two can never disagree on what a client extrapolates from -
+        /// the bug the opus review found: at speed 0 clients saw a frozen Held band for the whole push-down and
+        /// then a snap to 0; at the default speed 1 with two enemies clients slid at 1x while the master dropped
+        /// at 2x, then snapped.
+        ///   - Nobody in the zone → fadeRate.
+        ///   - The claim team is still listed there itself (alone, or contested alongside another team) → fadeRate
+        ///     - not fading at all; the caller's ordinary capture/contest logic runs instead (CapturingTeamAbsent
+        ///     already gates this function out of that case in both production callers).
+        ///   - Exactly ONE other team inside (SinglePushingTeam, above) and pushersMayCapture (the caller's own
+        ///     TeamMayCaptureNow answer for that team - kept out of this pure function on purpose) → pushes the
+        ///     claim down at least as fast as that team could capture the zone itself: max(fadeRate,
+        ///     N x perPlayerSpeed), N = that team's listed players, so N players push N times as fast as one,
+        ///     exactly like capturing.
+        ///   - Two or more different other teams inside, or the single other team present may NOT capture right
+        ///     now → fadeRate; they don't push, the plain fade still applies.</summary>
+        public static float NeutralFadeRate(float fadeRate, int claimTeam, IReadOnlyList<int> teamsInZone,
+                                             float perPlayerSpeed, bool pushersMayCapture)
+        {
+            if (teamsInZone.Count == 0 || Contains(teamsInZone, claimTeam))
+                return fadeRate;
+
+            int pushingTeam = SinglePushingTeam(claimTeam, teamsInZone);
+            if (pushingTeam == -1 || !pushersMayCapture)
+                return fadeRate;
+
+            int n = 0;
+            for (int i = 0; i < teamsInZone.Count; i++)
+                if (teamsInZone[i] == pushingTeam)
+                    n++;
+
+            return System.Math.Max(fadeRate, n * perPlayerSpeed);
+        }
 
         /// <summary>One tick of a neutral zone's claim fading toward 0, never past it.</summary>
         public static float Step(float captureProgress, float fadeRatePerSecond, float deltaTime) =>
