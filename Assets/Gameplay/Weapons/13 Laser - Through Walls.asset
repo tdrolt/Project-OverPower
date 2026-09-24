@@ -24,7 +24,7 @@ MonoBehaviour:
   simultaneous: 0
   sequentialDelay: 0.07
   spreadDegrees: 0
-  windupSeconds: 0.2
+  windupSeconds: 0.15
   projectilePrefab: {fileID: 5083140462017187481, guid: 9a13196bbbc39c445b7dacb0c175931a, type: 3}
   projectileSpeed: 55
   projectileRadius: 0.1
