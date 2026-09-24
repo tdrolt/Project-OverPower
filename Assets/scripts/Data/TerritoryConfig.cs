@@ -67,12 +67,18 @@ namespace Overpower.Data
                  "it's under attack. Stops both from flickering when someone steps on and off the edge.")]
         [SerializeField, Min(0f)] private float underAttackLingerSeconds = 3f;
 
+        [Tooltip("How fast unfinished capture progress slides back when nobody is capturing it, as a fraction of " +
+                 "one player's capture speed. 1 = as fast as one player builds it; 0.5 = half as fast; 0 = it " +
+                 "holds where it was.")]
+        [SerializeField, Min(0f)] private float captureFadeSpeed = 1f;
+
         public int PlayersPerTeam => playersPerTeam;
         public float BountyHoldSeconds => bountyHoldSeconds;
         public int StartingGold => startingGold;
         public float DecaySeconds => decaySeconds;
         public float RecaptureCooldownSeconds => recaptureCooldownSeconds;
         public float UnderAttackLingerSeconds => underAttackLingerSeconds;
+        public float CaptureFadeSpeed => captureFadeSpeed;
         public int TierCount => tiers != null ? tiers.Length : 0;
 
         // Set once an out-of-range tier has already logged, so a mistyped tower spams the console

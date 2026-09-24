@@ -108,6 +108,48 @@ namespace Overpower.Tests
             Assert.AreEqual(0.25f, s.Fill01, 1e-5f);
         }
 
+        // --------------------------------------------------------- captureFadeSpeed (2026-09-24)
+
+        [Test]
+        public void ANeutralFadeShowsTheFadingTeamsColourShrinking()
+        {
+            // Team 1's claim on a still-neutral zone, fading: owner -1, Fading true, negative rate. Must NOT hit
+            // the RatePerSecond01 < 0 && owner < 0 echo-race guard below (that one is for a real drain whose
+            // NEUTRAL owner update arrived first) - Fading is checked before it, on purpose.
+            CaptureRingState s = CaptureRingState.From(new CaptureProgress(1, 0.4f, -0.1f, 1000, fading: true), -1, false, 2000);
+            Assert.AreEqual(CaptureRingPhase.Fading, s.Phase);
+            Assert.AreEqual(0.3f, s.Fill01, 1e-4f);
+            Assert.AreEqual(1, s.ArcTeam, "the fading team's own colour, not the (nonexistent) owner's");
+            Assert.AreEqual(-1, s.OutlineTeam);
+            Assert.IsTrue(s.ShowsArc);
+        }
+
+        [Test]
+        public void AnOwnedRefillShowsTheOwnersColourGrowing()
+        {
+            CaptureRingState s = CaptureRingState.From(new CaptureProgress(2, 0.4f, 0.1f, 1000, fading: true), 0, false, 2000);
+            Assert.AreEqual(CaptureRingPhase.Fading, s.Phase);
+            Assert.AreEqual(0.5f, s.Fill01, 1e-4f);
+            Assert.AreEqual(0, s.ArcTeam, "the owner's colour - team 2 was only the last drainer, now gone");
+            Assert.AreEqual(0, s.OutlineTeam);
+            Assert.AreEqual(-1, s.DrainerTeam, "nobody is actively draining during a refill - must not pulse OwnerPaint");
+        }
+
+        [Test]
+        public void AFadeThatHasReachedZeroIsIdle()
+        {
+            CaptureRingState s = CaptureRingState.From(new CaptureProgress(1, 0f, -0.1f, 1000, fading: true), -1, false, 1000);
+            Assert.AreEqual(CaptureRingPhase.Idle, s.Phase);
+        }
+
+        [Test]
+        public void AFadeNeverBlinksLikeAPause()
+        {
+            // Fading is always moving; Phase must not be Paused (CaptureRingView only dims/blinks on Paused).
+            CaptureRingState s = CaptureRingState.From(new CaptureProgress(1, 0.4f, -0.1f, 1000, fading: true), -1, false, 2000);
+            Assert.AreNotEqual(CaptureRingPhase.Paused, s.Phase);
+        }
+
         [Test]
         public void AnOutOfPlayZoneShowsNoArcWhateverTheRoomSays()
         {

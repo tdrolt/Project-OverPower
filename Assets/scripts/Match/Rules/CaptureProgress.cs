@@ -14,6 +14,13 @@ namespace Overpower.Match
         public const string ProgressKey = "cProg";
         public const string RateKey = "cRate";
         public const string StampKey = "cStamp";
+        // captureFadeSpeed (2026-09-24): a fifth room-properties key. Old code that doesn't know this key simply
+        // never reads it - ReadIntArray/BuildingManager's decode loop default a missing array to 0 (not fading)
+        // per zone, so an old client just falls back to the pre-fix behaviour (the ring reads a fade/refill's
+        // negative-on-neutral or positive-on-owned rate through the SAME echo-race guards a real drain/capture
+        // already had, and shows it as Idle instead of animating) rather than crashing or misreading it as a real
+        // capture/drain. Every build in one match must still match, though - see the capture-fade brief's report.
+        public const string FadingKey = "cFade";
 
         // Ints on the wire: Photon handles int[] natively, and 1/10000 of a capture is finer than a pixel.
         private const float Scale = 10000f;
@@ -24,13 +31,20 @@ namespace Overpower.Match
         public readonly float Progress01;
         public readonly float RatePerSecond01;
         public readonly int StampMs;
+        /// <summary>True when this progress is captureFadeSpeed sliding back (neutral) or refilling (owned) with
+        /// nobody actually capturing/draining right now, rather than a live player-driven capture or drain. Lets
+        /// CaptureRingState.From tell a genuine fade/refill apart from the two-update echo race its Team/rate-sign
+        /// guards exist for, and CaptureTransitionClassifier avoid logging a fade as Started/Resumed/Drain* - see
+        /// both files' own comments.</summary>
+        public readonly bool Fading;
 
-        public CaptureProgress(int team, float progress01, float ratePerSecond01, int stampMs)
+        public CaptureProgress(int team, float progress01, float ratePerSecond01, int stampMs, bool fading = false)
         {
             Team = team;
             Progress01 = progress01;
             RatePerSecond01 = ratePerSecond01;
             StampMs = stampMs;
+            Fading = fading;
         }
 
         public float Evaluate(int nowMs)
@@ -40,17 +54,20 @@ namespace Overpower.Match
             return Math.Max(0f, Math.Min(1f, Progress01 + RatePerSecond01 * seconds));
         }
 
-        /// <summary>True when the other snapshot moves differently (a different team or speed), so
-        /// the master must publish; the same team at the same speed extrapolates identically.</summary>
+        /// <summary>True when the other snapshot moves differently (a different team, speed, or fading-ness), so
+        /// the master must publish; the same team at the same speed and Fading extrapolates identically.</summary>
         public bool NeedsRepublishComparedTo(CaptureProgress other) =>
-            Team != other.Team || Math.Abs(RatePerSecond01 - other.RatePerSecond01) > 1e-4f;
+            Team != other.Team || Fading != other.Fading || Math.Abs(RatePerSecond01 - other.RatePerSecond01) > 1e-4f;
 
         public int EncodeTeam() => Team;
         public int EncodeProgress() => (int)Math.Round(Progress01 * Scale);
         public int EncodeRate() => (int)Math.Round(RatePerSecond01 * Scale);
+        public int EncodeFading() => Fading ? 1 : 0;
 
-        public static CaptureProgress Decode(int team, int progress, int rate, int stampMs) =>
-            new CaptureProgress(team, progress / Scale, rate / Scale, stampMs);
+        /// <param name="fading">0/1 from the cFade wire key; defaults to 0 (not fading) when a room/client has no
+        /// such key yet - see FadingKey's own comment.</param>
+        public static CaptureProgress Decode(int team, int progress, int rate, int stampMs, int fading = 0) =>
+            new CaptureProgress(team, progress / Scale, rate / Scale, stampMs, fading != 0);
 
         /// <summary>A capture or drain on hold (Tudor, 2026-09-16 capture ring): a contested capture, one whose link is
         /// under attack, or a paused drain. It keeps its team and how far it got, at rate 0, so every client can draw

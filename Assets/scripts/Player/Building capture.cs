@@ -48,6 +48,13 @@ public class BuildingCapture : MonoBehaviourPun
     // (the old baseCaptureRate was tuned so that N players finished a capture N times sooner).
     private const float ProgressPerPlayerPerSecond = 1f;
 
+    // captureFadeSpeed (Tudor, 2026-09-24): how fast unfinished progress slides back (neutral) or refills (owned)
+    // once nobody is capturing/draining it, in the same one-player-seconds-per-real-second unit as
+    // ProgressPerPlayerPerSecond - so a fade speed of 1 slides back exactly as fast as one player would have built
+    // it. See CaptureFadeRule (Match/Rules) for the actual per-tick maths.
+    private float FadeRatePerSecond =>
+        (territoryConfig != null ? territoryConfig.CaptureFadeSpeed : 1f) * ProgressPerPlayerPerSecond;
+
     private float DecaySeconds =>
         territoryConfig != null ? territoryConfig.DecaySeconds : FallbackDecaySeconds;
 
@@ -206,10 +213,10 @@ public class BuildingCapture : MonoBehaviourPun
         // below reads p.teamID, so one stale entry throws a MissingReferenceException every frame
         // and the capture system stops working for the rest of the match. Unity's == treats a
         // destroyed object as null, so this catches both the destroyed and the disconnected case.
-        // It is a leave like any other: if the capturing team is now gone, the capture ends, or
-        // another team standing here could never start one without stepping out and back in.
-        if (playersInZone.RemoveAll(p => p == null) > 0)
-            EndCaptureIfCapturersLeft();
+        // It is a leave like any other: CalculateCaptureProgress re-reads playersInZone fresh below
+        // this same frame, so removing it here is all a disconnect needs (captureFadeSpeed, [C],
+        // 2026-09-24 - a neutral claim now fades rather than resetting, see that method's comment).
+        playersInZone.RemoveAll(p => p == null);
 
         // A player who dies in the ring never leaves it either: death switches their collider off,
         // which fires no OnTriggerExit. Measured 2026-09-16, two clients: a killed attacker stayed
@@ -298,8 +305,9 @@ public class BuildingCapture : MonoBehaviourPun
     /// fix, 2026-09-17: the decision used to live here inline, untestable - reverting either Held branch to Idle
     /// still passed every test in the project). eligibleCount/enemyPresent/mayCaptureNow are only worth computing
     /// in the same case the old inline version did: a neutral capture in progress, not on cooldown and not
-    /// already abandoned (EndCaptureIfCapturersLeft resets capturingID to -1 the same frame the zone empties, so
-    /// this exactly mirrors the guard the inline version used to early-return Idle on).</summary>
+    /// already abandoned (capturingID reads -1 once CalculateCaptureProgress's own captureFadeSpeed fade reaches
+    /// 0 and resolves fresh with nobody listed, so this exactly mirrors the guard the inline version used to
+    /// early-return Idle on).</summary>
     private CaptureProgress ComputeCurrentProgress(int nowMs)
     {
         int eligibleCount = 0;
@@ -317,7 +325,8 @@ public class BuildingCapture : MonoBehaviourPun
         }
 
         return CaptureProgressPublishRule.Decide(isCaptured, isDecaying, isDrainPaused, CaptureSeconds, DecaySeconds,
-            isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs);
+            isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs,
+            FadeRatePerSecond);
     }
 
     /// <summary>Forces this tower to tell the room its current capture progress right now,
@@ -385,8 +394,9 @@ public class BuildingCapture : MonoBehaviourPun
 
     void HandleCapturedState()
     {
-        // Nobody standing here and no drain to stop: a quiet tower skips every check below.
-        if (playersInZone.Count == 0 && !isDecaying)
+        // Nothing to do: no drain running, nobody standing here, and already fully refilled (or never drained) -
+        // captureFadeSpeed's refill (below) is the one other reason this must keep running with an empty zone.
+        if (playersInZone.Count == 0 && !isDecaying && captureProgress >= CaptureSeconds)
             return;
 
         teamsInZone.Clear();
@@ -403,7 +413,10 @@ public class BuildingCapture : MonoBehaviourPun
         {
             case DrainRule.Step.Start:
                 isDecaying = true;
-                captureProgress = CaptureSeconds;
+                // captureProgress is NOT reset to CaptureSeconds here any more (captureFadeSpeed, [C],
+                // 2026-09-24): a fresh capture already sits at CaptureSeconds from CompleteCapture, and a drain
+                // that restarts while the zone is still mid-refill now continues from wherever the refill got
+                // to, instead of snapping back to full first.
                 capturingID = drain.Team;
                 photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, capturingID);
                 Debug.Log("[HandleCapturedState] Enemy detected. Starting recapture decay.");
@@ -435,6 +448,14 @@ public class BuildingCapture : MonoBehaviourPun
                 StopCapturingSound(); // Ensure sound stops if neutralized
                 NeutralizeBuilding();
             }
+        }
+        else if (drain.Step != DrainRule.Step.Pause && captureProgress < CaptureSeconds)
+        {
+            // The drain stopped because the drainers left (not a Pause, which holds where it is): refills toward
+            // full at the fade speed instead of snapping to full (captureFadeSpeed, [C], 2026-09-24).
+            // CaptureProgressPublishRule.Decide mirrors this exact step so every client's own
+            // CaptureProgress.Evaluate extrapolates the same climb.
+            captureProgress = CaptureFadeRule.Refill(captureProgress, CaptureSeconds, FadeRatePerSecond, Time.deltaTime);
         }
     }
 
@@ -494,15 +515,6 @@ public class BuildingCapture : MonoBehaviourPun
 
     void CalculateCaptureProgress()
     {
-        // Nobody standing here: nothing advances, so skip the per-frame checks below (the else
-        // branch's sound stop is all that would have happened).
-        if (playersInZone.Count == 0)
-        {
-            if (audioSource.isPlaying)
-                StopCapturingSound();
-            return;
-        }
-
         // Re-decided from the listed players every tick (bug fix, 2026-09-17), not just when unset: a
         // trigger event used to be able to set capturingID to a team with nobody listed at all, which
         // then locked out a lone real capturer until they stepped out and back in - see CaptureClaimRule's
@@ -512,6 +524,22 @@ public class BuildingCapture : MonoBehaviourPun
         teamsInZone.Clear();
         foreach (PlayerTeam p in playersInZone)
             teamsInZone.Add(p.teamID);
+
+        // The capturing team has nobody in the zone right now (empty, or only another team) - fades toward 0
+        // instead of resetting straight away (captureFadeSpeed, [C], 2026-09-24). Contested (both teams inside)
+        // is excluded on purpose: CapturingTeamAbsent reads false there, so it falls through to the ordinary
+        // Resolve/build-or-hold path below, unchanged. Once it reaches 0, resolves fresh (capturingID -1) from
+        // whoever is actually listed now - nobody, or the team that pushed it down.
+        if (CaptureFadeRule.CapturingTeamAbsent(capturingID, teamsInZone))
+        {
+            captureProgress = CaptureFadeRule.Step(captureProgress, FadeRatePerSecond, Time.deltaTime);
+            if (captureProgress <= 0f)
+                (capturingID, captureProgress) = CaptureClaimRule.Resolve(-1, 0f, teamsInZone);
+            if (audioSource.isPlaying)
+                StopCapturingSound();
+            return;
+        }
+
         (capturingID, captureProgress) = CaptureClaimRule.Resolve(capturingID, captureProgress, teamsInZone);
 
         var eligiblePlayers = playersInZone.Where(p => p.teamID == capturingID).ToList();
@@ -827,23 +855,14 @@ public class BuildingCapture : MonoBehaviourPun
         // the zone" is the normal case for them, not a fault.
     }
 
-    /// Master: a listed player has left the zone - walked out (RPC_RemoveFromZone) or died (Update).
+    /// Master: a listed player has left the zone - walked out (RPC_RemoveFromZone) or died (Update). Used to also
+    /// end a neutral capture at once (EndCaptureIfCapturersLeft, DrainRule.LeavingEndsCapture) - removed
+    /// (captureFadeSpeed, [C], 2026-09-24): CalculateCaptureProgress re-reads playersInZone fresh every tick
+    /// (including this same frame, since Update calls it after every RemoveFromZone above), so it already notices
+    /// the capturing team is gone and fades instead, with nothing extra needed here.
     private void RemoveFromZone(PlayerTeam pt)
     {
         playersInZone.Remove(pt);
-        EndCaptureIfCapturersLeft();
-    }
-
-    /// Master, after anyone leaves the zone (walked out, died or disconnected).
-    private void EndCaptureIfCapturersLeft()
-    {
-        // Only a neutral capture ends here. An owned zone's drain is left to HandleCapturedState: resetting it
-        // on a leave wiped a running drain in one frame (see DrainRule.LeavingEndsCapture).
-        if (DrainRule.LeavingEndsCapture(isCaptured, playersInZone.Any(p => p.teamID == capturingID)))
-        {
-            capturingID = -1;
-            captureProgress = 0;
-        }
     }
 
     [PunRPC]

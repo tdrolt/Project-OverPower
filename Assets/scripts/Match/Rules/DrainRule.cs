@@ -93,13 +93,6 @@ namespace Overpower.Match
             return new Decision(draining ? Step.Stop : Step.None, -1);
         }
 
-        /// <summary>Does a player leaving the zone end its capture, resetting the progress? Only for a neutral zone
-        /// whose capturing team has nobody left inside. An owned zone's drain is decided by <see cref="Decide"/> on the
-        /// next tick instead: resetting it on a leave wiped a running drain in one frame whenever the drainer left and
-        /// came back in the same network update, and the zone went neutral at once (measured 2026-09-16).</summary>
-        public static bool LeavingEndsCapture(bool zoneOwned, bool capturingTeamStillInside) =>
-            !zoneOwned && !capturingTeamStillInside;
-
         private static bool Contains(IReadOnlyList<int> teams, int team)
         {
             for (int i = 0; i < teams.Count; i++)

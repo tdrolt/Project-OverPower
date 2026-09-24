@@ -67,7 +67,13 @@ namespace Overpower.Telemetry
         public static string Classify(Overpower.Match.CaptureProgress oldProgress, Overpower.Match.CaptureProgress newProgress,
                                       int nowMs, out int team, out float progress)
         {
-            bool isActive = newProgress.RatePerSecond01 != 0f;
+            // captureFadeSpeed (2026-09-24): a fade/refill has a real nonzero rate too (that is the whole point -
+            // it extrapolates smoothly like a live capture/drain), so without excluding it here it would fall
+            // through to the very same branch below and misreport as Started/Resumed/DrainStarted/DrainResumed.
+            // Nobody is actually capturing or draining during a fade/refill, so it is never "active" for telemetry
+            // purposes - it is treated the same as a Held/Paused state instead (see the wasActive branch below,
+            // which already logs the real stop fill whichever ends a segment: an Idle, a Held, or now a fade).
+            bool isActive = newProgress.RatePerSecond01 != 0f && !newProgress.Fading;
 
             if (isActive)
             {
@@ -86,7 +92,7 @@ namespace Overpower.Telemetry
                 return resuming ? Resumed : Started;
             }
 
-            bool wasActive = oldProgress.RatePerSecond01 != 0f;
+            bool wasActive = oldProgress.RatePerSecond01 != 0f && !oldProgress.Fading;
             if (wasActive)
             {
                 team = oldProgress.Team;

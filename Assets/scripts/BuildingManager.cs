@@ -741,7 +741,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     // ---------------------------------------------------------------- capture progress (Task 2.1d)
 
     /// Master only: publishes zone's new CaptureProgress to the room, in its OWN SetCustomProperties
-    /// call carrying only the four cTeam/cProg/cRate/cStamp keys - a separate call from Write above
+    /// call carrying only the five cTeam/cProg/cRate/cStamp/cFade keys - a separate call from Write above
     /// (territory), never merged into it. Photon only replaces the keys a call actually sends, so
     /// this and a territory write can happen in the same frame without either clobbering the
     /// other's keys, as long as they stay two calls (CODING-STANDARDS one-home rule read literally:
@@ -770,12 +770,14 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         var prog = new int[ZoneCount];
         var rate = new int[ZoneCount];
         var stamp = new int[ZoneCount];
+        var fading = new int[ZoneCount];
         for (int i = 0; i < ZoneCount; i++)
         {
             team[i] = next[i].EncodeTeam();
             prog[i] = next[i].EncodeProgress();
             rate[i] = next[i].EncodeRate();
             stamp[i] = next[i].StampMs;
+            fading[i] = next[i].EncodeFading();
         }
 
         var props = new Hashtable
@@ -784,6 +786,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             [CaptureProgress.ProgressKey] = prog,
             [CaptureProgress.RateKey] = rate,
             [CaptureProgress.StampKey] = stamp,
+            [CaptureProgress.FadingKey] = fading,
         };
 
         if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props))
@@ -808,6 +811,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         int[] prog = ReadIntArray(props, CaptureProgress.ProgressKey);
         int[] rate = ReadIntArray(props, CaptureProgress.RateKey);
         int[] stamp = ReadIntArray(props, CaptureProgress.StampKey);
+        // Missing (an older build's write, before captureFadeSpeed) decodes every zone as not fading - see
+        // CaptureProgress.FadingKey's own comment on what that means for a mixed-build room.
+        int[] fading = ReadIntArray(props, CaptureProgress.FadingKey);
 
         // Task T4: kept so the loop below can compare each zone's fresh value against what this
         // client believed a moment ago - currentProgress itself is overwritten with `next` right
@@ -822,7 +828,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             int p = prog != null && i < prog.Length ? prog[i] : 0;
             int r = rate != null && i < rate.Length ? rate[i] : 0;
             int s = stamp != null && i < stamp.Length ? stamp[i] : 0;
-            next[i] = CaptureProgress.Decode(t, p, r, s);
+            int f = fading != null && i < fading.Length ? fading[i] : 0;
+            next[i] = CaptureProgress.Decode(t, p, r, s, f);
         }
         currentProgress = next;
 

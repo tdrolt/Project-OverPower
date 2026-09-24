@@ -43,6 +43,42 @@ namespace Overpower.Tests
             Assert.AreEqual(0.3337f, back.Progress01, 1e-4f);
             Assert.AreEqual(-0.2f, back.RatePerSecond01, 1e-4f);
             Assert.AreEqual(77, back.StampMs);
+            Assert.IsFalse(back.Fading, "the 4-int Decode overload (old clients' wire shape) must default to not-fading");
+        }
+
+        [Test]
+        public void FadingEncodingRoundTripsThroughInts()
+        {
+            // captureFadeSpeed (2026-09-24): a fifth wire value (cFade) so a fade/refill can be told apart from a
+            // live capture/drain's own two-update echo-race Idle guards (CaptureRingState.From) and from a real
+            // player action (CaptureTransitionClassifier) - see both files' own comments.
+            var p = new CaptureProgress(1, 0.6f, -0.05f, 500, fading: true);
+            Assert.IsTrue(p.Fading);
+            CaptureProgress back = CaptureProgress.Decode(p.EncodeTeam(), p.EncodeProgress(), p.EncodeRate(), p.StampMs, p.EncodeFading());
+            Assert.IsTrue(back.Fading);
+            Assert.AreEqual(1, back.Team);
+            Assert.AreEqual(0.6f, back.Progress01, 1e-4f);
+            Assert.AreEqual(-0.05f, back.RatePerSecond01, 1e-4f);
+        }
+
+        [Test]
+        public void NotFadingIsTheDefault()
+        {
+            Assert.IsFalse(new CaptureProgress(1, 0.5f, 0.1f, 0).Fading);
+            Assert.IsFalse(CaptureProgress.Idle.Fading);
+            Assert.IsFalse(CaptureProgress.Held(1, 0.4f, 500).Fading);
+        }
+
+        [Test]
+        public void FadingFlipAlwaysNeedsRepublish()
+        {
+            // Same team, same rate MAGNITUDE, only Fading differs - still a real change: a remote client's
+            // CaptureRingState.From (and CaptureTransitionClassifier) each read Fading, not just the rate, so a
+            // silent flip would leave every client drawing the wrong picture.
+            var moving = new CaptureProgress(1, 0.2f, -0.1f, 0, fading: false);
+            var fading = new CaptureProgress(1, 0.2f, -0.1f, 0, fading: true);
+            Assert.IsTrue(moving.NeedsRepublishComparedTo(fading));
+            Assert.IsTrue(fading.NeedsRepublishComparedTo(moving));
         }
 
         [Test]

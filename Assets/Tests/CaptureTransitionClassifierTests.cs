@@ -230,5 +230,74 @@ namespace Overpower.Tests
             Assert.AreEqual(CaptureTransitionClassifier.Resumed, state);
             Assert.AreEqual(0, team);
         }
+
+        // --------------------------------------------------------- captureFadeSpeed (2026-09-24)
+        // A fade/refill has a real nonzero rate (unlike Held), so without checking Fading it would fall straight
+        // into the same isActive/draining branch a genuine capture/drain uses and misreport as
+        // Started/Resumed/DrainStarted/DrainResumed - see this file's own comment on isActive below.
+
+        [Test]
+        public void ACaptureInterruptedByAFadeStillLogsPausedNotADrain()
+        {
+            // The capturers left and it started fading (negative rate, same team, Fading true) - this must read
+            // exactly like the capturers leaving into Idle used to (Paused, at the real stop fill), not
+            // DrainResumed/DrainStarted just because the new rate happens to be negative.
+            var wasCapturing = new CaptureProgress(0, 0.1f, 1f / 15f, 1000);
+            var fading = new CaptureProgress(0, 0.1f + 2f / 15f, -0.1f, 3000, fading: true);
+            string state = CaptureTransitionClassifier.Classify(wasCapturing, fading, 3000, out int team, out float progress);
+            Assert.AreEqual(CaptureTransitionClassifier.Paused, state);
+            Assert.AreEqual(0, team);
+            Assert.AreEqual(0.1f + 2f / 15f, progress, 1e-4f);
+        }
+
+        [Test]
+        public void ADrainInterruptedByARefillStillLogsDrainPausedNotACapture()
+        {
+            var wasDraining = new CaptureProgress(1, 0.6f, -0.2f, 1000);
+            var refilling = new CaptureProgress(1, 0.4f, 0.15f, 3000, fading: true);
+            string state = CaptureTransitionClassifier.Classify(wasDraining, refilling, 3000, out int team, out float progress);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainPaused, state);
+            Assert.AreEqual(1, team);
+            Assert.AreEqual(0.6f - 2f * 0.2f, progress, 1e-4f);
+        }
+
+        [Test]
+        public void AFadeReachingZeroLogsNothingMoreAfterItsOwnPausedEvent()
+        {
+            var fading = new CaptureProgress(0, 0.05f, -0.1f, 1000, fading: true);
+            Assert.IsNull(CaptureTransitionClassifier.Classify(fading, CaptureProgress.Idle, 2000, out _, out _));
+        }
+
+        [Test]
+        public void ARefillReachingFullLogsNothingMoreAfterItsOwnDrainPausedEvent()
+        {
+            var refilling = new CaptureProgress(2, 0.9f, 0.1f, 1000, fading: true);
+            Assert.IsNull(CaptureTransitionClassifier.Classify(refilling, CaptureProgress.Idle, 2000, out _, out _));
+        }
+
+        [Test]
+        public void TheClaimingTeamReturningDuringAFadeIsResumedNotStarted()
+        {
+            // Fading team 0, 0.6 banked, steps back in: a real capture resumes (Fading false, positive rate).
+            var fading = new CaptureProgress(0, 0.6f, -0.1f, 1000, fading: true);
+            var resumedCapture = new CaptureProgress(0, 0.6f, 1f / 15f, 3000);
+            string state = CaptureTransitionClassifier.Classify(fading, resumedCapture, 3000, out int team, out float progress);
+            Assert.AreEqual(CaptureTransitionClassifier.Resumed, state);
+            Assert.AreEqual(0, team);
+            Assert.AreEqual(0.6f, progress, 1e-6f);
+        }
+
+        [Test]
+        public void ANewDrainDuringARefillContinuesFromTheCurrentValueAsDrainResumed()
+        {
+            // Refilling (team 2, the last drainer, now gone) at 0.5, a fresh enemy (team 1) starts draining again -
+            // captureFadeSpeed's OTHER half (BuildingCapture no longer resets captureProgress to full on
+            // DrainRule.Step.Start): the new drain continues from 0.5, so this reads DrainResumed, not DrainStarted.
+            var refilling = new CaptureProgress(2, 0.5f, 0.1f, 1000, fading: true);
+            var newDrain = new CaptureProgress(1, 0.5f, -0.2f, 3000);
+            string state = CaptureTransitionClassifier.Classify(refilling, newDrain, 3000, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainResumed, state);
+            Assert.AreEqual(1, team);
+        }
     }
 }

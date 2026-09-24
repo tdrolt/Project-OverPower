@@ -11,6 +11,10 @@ namespace Overpower.Match
         Draining,
         /// <summary>A capture or drain on hold (contested, its link under attack, a paused drain): the band stays and blinks.</summary>
         Paused,
+        /// <summary>captureFadeSpeed (2026-09-24): unfinished progress sliding back (neutral, the fading team's
+        /// colour, shrinking) or refilling (owned, the owner's colour, growing) with nobody actually capturing or
+        /// draining it right now. Always moving, so unlike Paused it never blinks.</summary>
+        Fading,
     }
 
     /// <summary>
@@ -61,6 +65,23 @@ namespace Overpower.Match
 
             int outlineTeam = owner >= 0 ? owner : TerritoryMap.Neutral;
             bool attacked = owner >= 0 && underAttack;
+
+            // captureFadeSpeed (2026-09-24): checked before every guard below, on purpose - a fade/refill's own
+            // Team/rate-sign shape (a negative rate on a still-neutral owner; a positive rate under an owner that
+            // never released ownership) is EXACTLY the shape the echo-race guards further down exist to catch (a
+            // real drain/capture whose separate owner-update write arrived before or after its progress update -
+            // see their own comments), so without this explicit flag a genuine fade/refill would misread as that
+            // race and flash Idle instead of animating.
+            if (progress.Fading)
+            {
+                float fadeFill = nowMs == 0 || progress.StampMs == 0 ? Clamp01(progress.Progress01) : progress.Evaluate(nowMs);
+                if (fadeFill <= 0f)
+                    return Idle(outlineTeam, attacked);
+                // Owned zone refilling: the owner's own colour (progress.Team is only the last drainer, now gone -
+                // see CaptureProgressPublishRule's own comment). Neutral zone fading: the fading team's colour.
+                int arcTeam = owner >= 0 ? owner : progress.Team;
+                return new CaptureRingState(CaptureRingPhase.Fading, fadeFill, arcTeam, outlineTeam, TerritoryMap.Neutral, attacked);
+            }
 
             // A team never captures or drains its own zone. Seeing it means the room's owner update arrived before its
             // progress update (they are separate writes): the capture just completed.

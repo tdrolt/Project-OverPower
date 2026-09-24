@@ -129,26 +129,14 @@ namespace Overpower.Tests
             Assert.AreEqual(1, d.Team);
         }
 
-        [Test]
-        public void LeavingAnOwnedZoneNeverEndsItsDrain()
-        {
-            Assert.IsFalse(DrainRule.LeavingEndsCapture(zoneOwned: true, capturingTeamStillInside: false));
-        }
-
-        [Test]
-        public void TheLastCapturerLeavingANeutralZoneEndsTheCapture()
-        {
-            Assert.IsTrue(DrainRule.LeavingEndsCapture(zoneOwned: false, capturingTeamStillInside: false));
-            Assert.IsFalse(DrainRule.LeavingEndsCapture(zoneOwned: false, capturingTeamStillInside: true));
-        }
-
-        [Test]
-        public void ADrainerLeavingAndComingBackInOneNetworkUpdateKeepsTheDrainGoing()
-        {
-            // The leave doesn't touch the drain (owned zone), and on the next tick the drainer is listed again, so the
-            // drain continues from its progress rather than starting over or ending.
-            Assert.IsFalse(DrainRule.LeavingEndsCapture(zoneOwned: true, capturingTeamStillInside: false));
-            Assert.AreEqual(DrainRule.Step.Continue, Decide(new[] { 1 }, false, true, 1, AnyTeamMay).Step);
-        }
+        // DrainRule.LeavingEndsCapture (and its three tests formerly here: LeavingAnOwnedZoneNeverEndsItsDrain,
+        // TheLastCapturerLeavingANeutralZoneEndsTheCapture, ADrainerLeavingAndComingBackInOneNetworkUpdateKeepsThe
+        // DrainGoing) retired 2026-09-24: it reset a neutral zone's capturingId/captureProgress to (-1, 0) the
+        // instant its last capturer left, which was exactly the "snaps instead of fading" bug captureFadeSpeed
+        // fixes - see Building capture.cs's RemoveFromZone and CaptureFadeRuleTests. Its owned-zone half
+        // (LeavingEndsCapture always false when zoneOwned) was already redundant with Decide: an owned zone's
+        // drain was always decided by Decide above regardless, which ADrainerLeavingAndComingBackInOneNetworkUpdate
+        // KeepsTheDrainGoing's own remaining assertion (still true) already covers via
+        // TheTeamAlreadyDrainingKeepsItWhenASecondAttackerWalksIn and the other Continue/Pause tests above.
     }
 }
