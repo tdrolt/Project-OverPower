@@ -99,7 +99,11 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     private float playerBodyRadius = -1f; // -1 = not read yet
 
-    private static float ReadPlayerBodyRadius()
+    // Public: also called directly by CaptureRadiusSceneTests (EveryZonesTriggerStaysPositive), which needs
+    // the body radius in edit mode - this method has no Play Mode dependency (FindFirstObjectByType works
+    // on the loaded scene either way), unlike the PlayerBodyRadius property's cache, which only exists on
+    // a live BuildingManager.Instance (set in Awake, Play Mode only).
+    public static float ReadPlayerBodyRadius()
     {
         RoomManager roomManager = FindFirstObjectByType<RoomManager>();
         GameObject prefab = roomManager != null ? roomManager.playerPrefab : null;

@@ -16,8 +16,10 @@ namespace Overpower.Tests
     /// field initializer alone would make the in-memory object read a sane default even if the value
     /// were never hand-written into the asset file at all, so only the on-disk check actually proves
     /// the asset carries these lines), and that the numbers are SANE - a rule, not a value: Vent Delay
-    /// &gt; 0, Vent Window &gt;= 0, and the random range is a valid (non-inverted, non-negative) span once
-    /// the "smaller value is always the minimum" tooltip is accounted for.</summary>
+    /// &gt; 0, Vent Window &gt;= 0, Vent Random Delay Min/Max &gt;= 0. No min &lt;= max check: the field's own
+    /// tooltip says a swap is resolved by using the smaller as the minimum (OverheatState.PickVentDelay
+    /// does exactly that), so both orderings of Min/Max are sane - a min-vs-max comparison here can
+    /// never fail (Min(a,b) &lt;= Max(a,b) is a tautology), so it was dropped 2026-09-24.</summary>
     public class GameplayConfigVentTests
     {
         private const string AssetPath = "Assets/Gameplay/Config/GameplayConfig.asset";
@@ -43,14 +45,6 @@ namespace Overpower.Tests
             Assert.GreaterOrEqual(config.VentWindow, 0f, "Vent Window - 0 is the documented 'Vent off' value");
             Assert.GreaterOrEqual(config.VentRandomDelayMin, 0f, "Vent Random Delay Min");
             Assert.GreaterOrEqual(config.VentRandomDelayMax, 0f, "Vent Random Delay Max");
-
-            // "min <= max, or handled": the field's own tooltip says a swap is resolved by using the
-            // smaller as the minimum (OverheatState.PickVentDelay does exactly that), so both possible
-            // orderings are sane - the only actually-unsane case is a negative span with no real width,
-            // already ruled out by the two GreaterOrEqual checks above.
-            float lo = Mathf.Min(config.VentRandomDelayMin, config.VentRandomDelayMax);
-            float hi = Mathf.Max(config.VentRandomDelayMin, config.VentRandomDelayMax);
-            Assert.LessOrEqual(lo, hi);
         }
     }
 }

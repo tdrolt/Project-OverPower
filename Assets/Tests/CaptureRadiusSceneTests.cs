@@ -63,18 +63,14 @@ namespace Overpower.Tests
         public void EveryZonesTriggerStaysPositive()
         {
             // The trigger math (Building capture.cs ~167: collider.radius = max(0, captureRadius - PlayerBodyRadius)
-            // / lossyScale.x) needs BuildingManager.Instance.PlayerBodyRadius, which only exists once a
-            // BuildingManager has run Awake - Play Mode only. This is an edit-mode scene test, so skip rather than
-            // guess at a number nothing here can actually read.
-            if (BuildingManager.Instance == null)
-            {
-                Assert.Ignore("BuildingManager.Instance is only set in Play Mode - the trigger radius isn't reachable from an edit-mode test.");
-                return;
-            }
-
-            float bodyRadius = BuildingManager.Instance.PlayerBodyRadius;
+            // / lossyScale.x) needs the player's body radius. BuildingManager.ReadPlayerBodyRadius() reads it
+            // straight from RoomManager.playerPrefab's CapsuleCollider - no Play Mode dependency (unlike the
+            // PlayerBodyRadius property's cache, which lives on BuildingManager.Instance, set only in Awake) -
+            // so this runs for real in edit mode instead of skipping. RoomManager lives in Game Scene, so read
+            // it inside WithGameScene once the scene is loaded.
             WithGameScene(scene =>
             {
+                float bodyRadius = BuildingManager.ReadPlayerBodyRadius();
                 List<BuildingCapture> towers = Find<BuildingCapture>(scene).ToList();
                 Assert.IsNotEmpty(towers, "expected BuildingCapture zones in Game Scene");
 
