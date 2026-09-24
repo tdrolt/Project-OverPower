@@ -225,13 +225,20 @@ namespace Overpower.Tests
         // --------------------------------------------------------- opus re-review, 2026-09-24 (item 4: "the
         // wiring wasn't tested - reverting line 542 passed every test"). These chain CaptureFadeRule.NeutralFadeRate
         // straight into Decide, the same way BuildingCapture.ComputeCurrentProgress now must (it used to pass the
-        // plain FadeRatePerSecond instead), so a regression at that call site fails a test again.
+        // plain FadeRatePerSecond instead) - proving Decide's own contract for a rate NeutralFadeRate produced,
+        // not BuildingCapture's actual call site (these two tests never touch BuildingCapture at all). Opus
+        // re-review, 2026-09-24 (second pass): that call site drifting or reverting - the exact gap this comment
+        // used to claim was already covered - passed every test in the project; it takes a shared
+        // BuildingCapture.CurrentNeutralFadeRate() both production sites now go through (so there is only one
+        // site left to drift from) plus CaptureFadeRuleTests' recording-delegate test (proving NeutralFadeRate
+        // itself always asks mayCapture about the pushing team, never capturingID) to actually catch it - not
+        // anything here.
 
         [Test]
         public void TwoPushersChainedThroughNeutralFadeRatePublishDoubleTheConfiguredRate()
         {
             float rate = CaptureFadeRule.NeutralFadeRate(fadeRate: 1f, claimTeam: 1,
-                teamsInZone: new List<int> { 2, 2 }, perPlayerSpeed: 1f, pushersMayCapture: true);
+                teamsInZone: new List<int> { 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true);
             Assert.AreEqual(2f, rate, "two pushers beat the configured speed 1: max(1, 2x1)");
 
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
@@ -248,7 +255,7 @@ namespace Overpower.Tests
             // The exact bug this round fixes: at fade speed 0 with a lone pusher, publishing the plain (unboosted)
             // FadeRatePerSecond gave a frozen Held band for the whole push-down instead of a moving Fading one.
             float rate = CaptureFadeRule.NeutralFadeRate(fadeRate: 0f, claimTeam: 1,
-                teamsInZone: new List<int> { 2 }, perPlayerSpeed: 1f, pushersMayCapture: true);
+                teamsInZone: new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true);
             Assert.AreEqual(1f, rate);
 
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,

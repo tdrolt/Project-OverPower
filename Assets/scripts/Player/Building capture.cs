@@ -319,22 +319,30 @@ public class BuildingCapture : MonoBehaviourPun
             // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
             // else, and still allowed to capture" actually moves the bar - otherwise
             // CalculateCaptureProgress itself is not advancing captureProgress this frame either, so the
-            // bar must not claim it is. TeamMayCaptureNow gives both the same answer within a frame.
+            // bar must not claim it is.
             eligibleCount = playersInZone.Count(p => p.teamID == capturingID);
             enemyPresent = playersInZone.Any(p => p.teamID != capturingID);
-            mayCaptureNow = TeamMayCaptureNow(capturingID);
 
-            if (eligibleCount == 0)
+            if (eligibleCount > 0)
+            {
+                // Only asked here when eligibleCount > 0: Decide ignores mayCaptureNow entirely once
+                // eligibleCount is 0 (see its own eligibleCount <= 0 branch), and asking it anyway used to
+                // overwrite TeamMayCaptureNow's once-per-frame cache with capturingID's answer right before
+                // CurrentNeutralFadeRate below asks it again about the pushing team - a different team, so the
+                // cache missed and computed a THIRD answer this same frame (review fix, 2026-09-24, second
+                // pass). Gated like this, whenever it IS asked, it is always capturingID - the same team
+                // CalculateCaptureProgress itself asked this frame - so the cache always hits.
+                mayCaptureNow = TeamMayCaptureNow(capturingID);
+            }
+            else
             {
                 // Opus re-review, 2026-09-24: the claim team is absent this frame (empty zone, or only another
                 // team) - CalculateCaptureProgress already ran earlier in this same Update() and is fading/
                 // pushing the claim down; teamsInZone is its own reusable buffer, already fresh for this frame
-                // (populated at the top of that method regardless of which branch it then takes). Calling
-                // CaptureFadeRule.NeutralFadeRate here - the SAME function that step just used, with the SAME
-                // inputs - is what makes the published rate unable to disagree with the master's own step.
-                int pushingTeam = CaptureFadeRule.SinglePushingTeam(capturingID, teamsInZone);
-                bool pushersMayCapture = pushingTeam >= 0 && TeamMayCaptureNow(pushingTeam);
-                fadeRate = CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, pushersMayCapture);
+                // (populated at the top of that method regardless of which branch it then takes).
+                // CurrentNeutralFadeRate is the one place both this method and CalculateCaptureProgress reach
+                // CaptureFadeRule.NeutralFadeRate, so the published rate cannot drift from the master's own step.
+                fadeRate = CurrentNeutralFadeRate();
             }
         }
 
@@ -405,6 +413,18 @@ public class BuildingCapture : MonoBehaviourPun
         mayCaptureAnswer = answer;
         return answer;
     }
+
+    /// <summary>Master only: this zone's current neutral-claim fade rate (CaptureFadeRule.NeutralFadeRate), from
+    /// teamsInZone (the caller's own reusable buffer, already fresh for this frame) and TeamMayCaptureNow itself
+    /// as the delegate - the pure rule picks the pushing team and asks TeamMayCaptureNow about THAT team, never
+    /// capturingID (see CaptureFadeRuleTests' recording-delegate test). CalculateCaptureProgress (the master's
+    /// per-frame step) and ComputeCurrentProgress (the value it publishes) both call this ONE method instead of
+    /// each computing the pushing team and its answer themselves, so the two cannot drift onto different
+    /// formulas - review fix, 2026-09-24 (second pass, "the wiring still isn't tested"): the two copied call
+    /// sites this replaces were never actually exercised by a test; reverting either one to the plain fadeRate,
+    /// or asking TeamMayCaptureNow(capturingID) instead of the pushing team, passed every test in the project.</summary>
+    private float CurrentNeutralFadeRate() =>
+        CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, TeamMayCaptureNow);
 
     void HandleCapturedState()
     {
@@ -548,12 +568,12 @@ public class BuildingCapture : MonoBehaviourPun
         {
             // Opus re-review, 2026-09-24: replaces this same day's first fix (EffectiveFadeRate, which counted
             // every non-claim player and ignored TeamMayCaptureNow - see CaptureFadeRule.NeutralFadeRate's own
-            // comment for both bugs). PublishProgressIfNeeded's ComputeCurrentProgress calls the SAME function
-            // with the SAME inputs for the value it publishes, so the rate a client extrapolates from can never
-            // disagree with what this step actually does to captureProgress.
-            int pushingTeam = CaptureFadeRule.SinglePushingTeam(capturingID, teamsInZone);
-            bool pushersMayCapture = pushingTeam >= 0 && TeamMayCaptureNow(pushingTeam);
-            float rate = CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, pushersMayCapture);
+            // comment for both bugs). CurrentNeutralFadeRate is the one place this step and
+            // PublishProgressIfNeeded's ComputeCurrentProgress both reach CaptureFadeRule.NeutralFadeRate, so the
+            // rate a client extrapolates from cannot drift from what this step actually does to captureProgress
+            // (review fix, 2026-09-24, second pass: the two used to reach it through their own copied
+            // SinglePushingTeam/TeamMayCaptureNow lines, which no test actually exercised).
+            float rate = CurrentNeutralFadeRate();
             captureProgress = CaptureFadeRule.Step(captureProgress, rate, Time.deltaTime);
             if (captureProgress <= 0f)
                 (capturingID, captureProgress) = CaptureClaimRule.Resolve(-1, 0f, teamsInZone);

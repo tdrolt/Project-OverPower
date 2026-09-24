@@ -53,25 +53,34 @@ namespace Overpower.Match
         /// the bug the opus review found: at speed 0 clients saw a frozen Held band for the whole push-down and
         /// then a snap to 0; at the default speed 1 with two enemies clients slid at 1x while the master dropped
         /// at 2x, then snapped.
+        ///
+        /// Opus re-review, 2026-09-24 (second pass, "the wiring still isn't tested"): picks the pushing team
+        /// itself (SinglePushingTeam, below) and asks the mayCapture delegate about THAT team, rather than taking
+        /// a plain bool the caller worked out beforehand - both production call sites used to compute
+        /// SinglePushingTeam and ask TeamMayCaptureNow(pushingTeam) themselves, copied at both sites, and nothing
+        /// caught a call site asking about claimTeam instead, or a call site reverted to the plain fadeRate; see
+        /// BuildingCapture.CurrentNeutralFadeRate, the one place both call sites now reach this function through,
+        /// and CaptureFadeRuleTests' recording-delegate test for proof mayCapture is always asked about the
+        /// pushing team, never claimTeam.
         ///   - Nobody in the zone → fadeRate.
         ///   - The claim team is still listed there itself (alone, or contested alongside another team) → fadeRate
         ///     - not fading at all; the caller's ordinary capture/contest logic runs instead (CapturingTeamAbsent
         ///     already gates this function out of that case in both production callers).
-        ///   - Exactly ONE other team inside (SinglePushingTeam, above) and pushersMayCapture (the caller's own
-        ///     TeamMayCaptureNow answer for that team - kept out of this pure function on purpose) → pushes the
-        ///     claim down at least as fast as that team could capture the zone itself: max(fadeRate,
+        ///   - Exactly ONE other team inside (SinglePushingTeam, above) and mayCapture(pushingTeam) says yes →
+        ///     pushes the claim down at least as fast as that team could capture the zone itself: max(fadeRate,
         ///     N x perPlayerSpeed), N = that team's listed players, so N players push N times as fast as one,
         ///     exactly like capturing.
         ///   - Two or more different other teams inside, or the single other team present may NOT capture right
-        ///     now → fadeRate; they don't push, the plain fade still applies.</summary>
+        ///     now → fadeRate; they don't push, the plain fade still applies. mayCapture is never even called in
+        ///     either case (nobody to ask about).</summary>
         public static float NeutralFadeRate(float fadeRate, int claimTeam, IReadOnlyList<int> teamsInZone,
-                                             float perPlayerSpeed, bool pushersMayCapture)
+                                             float perPlayerSpeed, System.Func<int, bool> mayCapture)
         {
             if (teamsInZone.Count == 0 || Contains(teamsInZone, claimTeam))
                 return fadeRate;
 
             int pushingTeam = SinglePushingTeam(claimTeam, teamsInZone);
-            if (pushingTeam == -1 || !pushersMayCapture)
+            if (pushingTeam == -1 || !mayCapture(pushingTeam))
                 return fadeRate;
 
             int n = 0;
