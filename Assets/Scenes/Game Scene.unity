@@ -2141,6 +2141,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 790663489725518753, guid: 2a3c9eae3bfd18b40b7a493c5753ca39, type: 3}
+      propertyPath: m_text
+      value: 'Nickname:'
+      objectReference: {fileID: 0}
     - target: {fileID: 3637919369592785613, guid: 2a3c9eae3bfd18b40b7a493c5753ca39, type: 3}
       propertyPath: m_UiScaleMode
       value: 1
