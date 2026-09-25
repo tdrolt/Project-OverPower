@@ -223,6 +223,19 @@ public class BuildingCapture : MonoBehaviourPun
 
         if (!PhotonNetwork.IsMasterClient) return;
 
+        // Map shrink (review of the tower task, 2026-09-25): a zone behind the phase-two wall has its trigger switched
+        // off (SetHiddenAsCut), and a switched-off trigger fires no OnTriggerExit - the same trap as a death or a
+        // disconnect below - so its roster would keep whoever stood in it when the wall went up, for the rest of the
+        // match. Nobody can capture it anyway (MayCapture refuses an out-of-play zone), so the master just empties the
+        // roster and skips the simulation; the knockout's own reset (NeutraliseForPhaseTwo -> ResetCaptureOf) has
+        // already published it idle, and a host start's going-live reset did the same.
+        if (hiddenAsCut)
+        {
+            if (playersInZone.Count > 0)
+                playersInZone.Clear();
+            return;
+        }
+
         // A player who disconnected while standing in the ring leaves a destroyed reference
         // behind: OnTriggerExit cannot fire for an object that no longer exists. Every consumer
         // below reads p.teamID, so one stale entry throws a MissingReferenceException every frame
