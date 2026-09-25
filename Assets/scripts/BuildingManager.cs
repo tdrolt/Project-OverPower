@@ -165,13 +165,22 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// grepping the console log.
     public int CaptureProgressPublishCount { get; private set; }
 
-    /// The registered capture's tier (1..4), or 0 if no tower with that id has registered itself
-    /// yet (RegisterCapture runs in BuildingCapture.Start, so this can briefly read 0 during scene
-    /// startup) or the id is not a zone at all. GoldMath.TeamIncomePerSecond reads 0 as "not a
-    /// tiered zone" and pays it nothing, so a not-yet-registered tower simply earns no income for
-    /// the one frame that can happen in, rather than throwing.
-    public int TierOf(int zone) =>
+    // Map shrink T3, 2026-09-25: the tower's own tier as set in the scene - PhaseTwoCutRules finds the cut
+    // from this, never from the phase-two stand-in (TierOf below), or a cut corner's Tier III towers would
+    // stop reading as Tier III to the very rule that is supposed to find them.
+    public int BaseTierOf(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.tier : 0;
+
+    // Map shrink T3: IsCutActive on its own line so both TierOf and TierByZone's cache-invalidation check
+    // (tierCacheCutActive) ask the exact same question.
+    private static bool IsCutActive => MatchDirector.Instance != null && MatchDirector.Instance.CutTeam >= 0;
+
+    /// The tier a zone plays as right now (1..4): its own (BaseTierOf), except the centre plays as Tier III
+    /// while a corner is cut (PhaseTwoCutRules.EffectiveTier, map shrink T3) - "0 if no tower with that id
+    /// has registered itself yet" is unaffected, EffectiveTier only ever touches tier 4. GoldMath.
+    /// TeamIncomePerSecond reads 0 as "not a tiered zone" and pays it nothing, so a not-yet-registered tower
+    /// simply earns no income for the one frame that can happen in, rather than throwing.
+    public int TierOf(int zone) => PhaseTwoCutRules.EffectiveTier(BaseTierOf(zone), IsCutActive);
 
     // Backing store for TierByZone below. Allocated ONCE (ZoneCount is fixed for the whole match)
     // and filled IN PLACE by RebuildTierByZoneCache on every RegisterCapture (the only thing that
@@ -179,8 +188,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     // tier) - never reassigned to a new array. GoldWallet used to pay for a fresh allocation here on
     // every player's every Update; a future caller that keeps the reference TierByZone() hands back
     // (the shop gate, OverPower - Tasks 2.5/2.6) needs the SAME array to pick up a late tower's real
-    // tier too, which reassigning here would break (code review fix, Task 2.4).
+    // tier too, which reassigning here would break (code review fix, Task 2.4). Map shrink T3: the second
+    // thing that changes a zone's tier is a corner being cut, so the cache also refills when IsCutActive flips.
     private int[] tierByZoneCache;
+    private bool tierCacheCutActive;
 
     /// Tier 1..4 per zone id, index = zone id, length ZoneCount - the array shape GoldMath.
     /// TeamIncomePerSecond's tierByZone parameter wants. Read-only by convention: this is the same
@@ -189,7 +200,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// holds onto the reference sees a late tower's tier the moment it registers.
     public int[] TierByZone()
     {
-        if (tierByZoneCache == null)
+        if (tierByZoneCache == null || tierCacheCutActive != IsCutActive)
             RebuildTierByZoneCache();
         return tierByZoneCache;
     }
@@ -198,6 +209,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     {
         if (tierByZoneCache == null || tierByZoneCache.Length != ZoneCount)
             tierByZoneCache = new int[ZoneCount];
+        tierCacheCutActive = IsCutActive;
         for (int zone = 0; zone < ZoneCount; zone++)
             tierByZoneCache[zone] = TierOf(zone);
     }
@@ -219,6 +231,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         float bestDistance = float.PositiveInfinity;
         foreach (KeyValuePair<int, BuildingCapture> pair in captures)
         {
+            // Map shrink T3: a cut Tier III's capture area pokes through the new wall - standing near the
+            // wall, on the far side, must not count as being in a zone that is out of play.
+            if (MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(pair.Key)) continue;
+
             BuildingCapture capture = pair.Value;
             if (capture == null) continue;
 
@@ -624,6 +640,14 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             return;
 
         Write(basis.WithNeutralReset(zone, ServerNowMs()));
+    }
+
+    /// <summary>Master only: resets one tower's own capture state to owner (-1 = neutral, progress 0) and republishes
+    /// it, so a capture in flight can't complete after a reset (the phase-two knockout reuses the going-live reset).</summary>
+    public void ResetCaptureOf(int zone, int owner)
+    {
+        if (captures.TryGetValue(zone, out BuildingCapture capture) && capture != null)
+            capture.ResetForMatchStart(owner);
     }
 
     private TerritorySnapshot WriteBasis(string caller, int zone)

@@ -77,14 +77,31 @@ namespace Overpower.Match
         /// <summary>Whether team was fixed into the match at the countdown's start.</summary>
         public bool IsInMatch(int team) => System.Array.IndexOf(TeamsInMatch, team) >= 0;
 
-        /// <summary>Decision 8: the cut capital of a host-started match, out of play from LIVE (the countdown is
-        /// still warm-up - Decision 3, MatchStartRules.IsCapitalOutOfPlay).</summary>
+        /// <summary>Map shrink T3 (D1/D13): the team whose corner is closed right now, or PhaseTwoCutRules.NoCut.
+        /// Reads the room directly (like IsLive), so it is right for a late joiner on its very first frame and
+        /// after a master switch.</summary>
+        public int CutTeam => PhotonNetwork.InRoom
+            ? PhaseTwoCutRules.CutTeam(IsLive, TeamsInMatch, ReadCutTeam(PhotonNetwork.CurrentRoom.CustomProperties))
+            : PhaseTwoCutRules.NoCut;
+
+        /// <summary>A zone behind the phase-two wall, or the cut capital of a host start (Decision 8: out of play
+        /// from LIVE - the countdown is still warm-up, Decision 3 - via MatchStartRules.IsCapitalOutOfPlay; map
+        /// shrink T3 adds the PhaseTwoCutRules half, from CutTeam and each zone's own BaseTierOf below).</summary>
         public bool IsOutOfPlay(int zone)
         {
-            int capitalTeam = BuildingManager.Instance != null && BuildingManager.Instance.Map != null
-                ? BuildingManager.Instance.Map.CapitalTeamOf(zone) : TerritoryMap.Neutral;
-            return MatchStartRules.IsCapitalOutOfPlay(IsLive, capitalTeam, TeamsInMatch);
+            BuildingManager buildings = BuildingManager.Instance;
+            TerritoryMap map = buildings != null ? buildings.Map : null;
+            int capitalTeam = map != null ? map.CapitalTeamOf(zone) : TerritoryMap.Neutral;
+            if (MatchStartRules.IsCapitalOutOfPlay(IsLive, capitalTeam, TeamsInMatch))
+                return true;
+            return map != null && PhaseTwoCutRules.IsZoneCut(map, zone, CutTeam, BaseTierOf);
         }
+
+        // Cached once: IsOutOfPlay runs every frame for every tower and minimap bubble, and a fresh method-group delegate
+        // per call would allocate each time.
+        private System.Func<int, int> baseTierOf;
+        private System.Func<int, int> BaseTierOf => baseTierOf ??= zone =>
+            BuildingManager.Instance != null ? BuildingManager.Instance.BaseTierOf(zone) : 0;
 
         /// <summary>Decision 4/17 (R3): before the teams are fixed, any team; from the countdown on, only a team
         /// in the match and not knocked out. RoomManager reads this for both PickSmallestTeam and

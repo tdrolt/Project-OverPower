@@ -19,8 +19,13 @@ public class BuildingCapture : MonoBehaviourPun
 
     [Header("Territory")]
     [Tooltip("1 = Capital, 2 = Transition, 3 = Flanking, 4 = Centre. Decides capture time, income, bounty and " +
-             "regen from the Territory Config.")]
+             "regen from the Territory Config. The centre (4) plays as 3 once a corner is cut.")]
     [Range(1, 4)] public int tier = 2;
+
+    /// <summary>The tier this tower plays as right now (PhaseTwoCutRules.EffectiveTier): its own, except the centre plays
+    /// as Tier III while a corner is cut. Capture time and the bounty read this.</summary>
+    public int EffectiveTier =>
+        PhaseTwoCutRules.EffectiveTier(tier, MatchDirector.Instance != null && MatchDirector.Instance.CutTeam >= 0);
 
     [Tooltip("Shared per-tier numbers. Every tower should point at the same asset.")]
     public TerritoryConfig territoryConfig;
@@ -41,7 +46,7 @@ public class BuildingCapture : MonoBehaviourPun
     // designer reading captureProgress mid-match can tell directly how many seconds of solo
     // capturing it represents.
     private float CaptureSeconds =>
-        territoryConfig != null ? territoryConfig.ForTier(tier).captureSeconds : FallbackCaptureSeconds;
+        territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureSeconds : FallbackCaptureSeconds;
 
     // Progress per player per second of capture time. N players capture N times faster - the GDD
     // doesn't specify multi-player capture speed, so this keeps the game's existing behaviour
@@ -686,7 +691,7 @@ public class BuildingCapture : MonoBehaviourPun
         // back. The bounty PAYOUT (Task 2.4, BountyRule.PayoutOnCapture) is computed inside
         // SetCaptured itself, from the same write basis that write builds on - see its own comment
         // for why. Only this zone's tier numbers need passing in here.
-        int tierBounty = territoryConfig != null ? territoryConfig.ForTier(tier).captureBounty : 0;
+        int tierBounty = territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureBounty : 0;
         int holdMs = territoryConfig != null ? (int)(territoryConfig.BountyHoldSeconds * 1000f) : 0;
         BuildingManager.Instance.SetCaptured(buildingID, capturingTeam, tierBounty, holdMs);
 
