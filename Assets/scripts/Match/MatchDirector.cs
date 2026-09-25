@@ -98,7 +98,8 @@ namespace Overpower.Match
         private bool IsCapitalInPlay(int capitalZone, int capitalTeam) => IsInMatch(capitalTeam) && !IsOutOfPlay(capitalZone);
 
         /// <summary>2.7b step 7 (Decision 10): does this team have a capital right now - its own, an enemy's, or a
-        /// knocked-out team's? Tudor answer 1: adoption counts in both phases, so this is just
+        /// knocked-out team's, as long as it is still in play (IsCapitalInPlay: a capital behind the phase-two wall
+        /// never counts)? Tudor answer 1: adoption counts in both phases, so this is just
         /// MatchPhaseRules.CountsAsHavingACapital fed from the replicated snapshot. A missing map or snapshot reads
         /// as false rather than throwing.</summary>
         public bool TeamHasACapital(int team)
@@ -257,17 +258,28 @@ namespace Overpower.Match
             // Review fix F3, 2026-09-25: if the old master dropped after its phase write reached the server but
             // before all its neutralise writes did, a cut zone can stay owned (and keep paying income from behind
             // the wall) - the room already reads TwoTeams, so nothing else would ever re-run the neutralise.
-            // Idempotent: SetNeutralWithoutBountyHistory skips a zone already neutral with no history, and nobody
-            // can legitimately own a zone behind the wall, so running this on every promotion costs nothing when
-            // there was nothing left to finish. Safe whichever of this component's and BuildingManager's own
-            // OnMasterClientSwitched runs first: BuildingManager clears its lastWritten/writesAwaitingEcho
-            // unconditionally on every switch (not only when it becomes master), so by the time THIS client was
-            // last promoted those fields were already reset - WriteBasis (through SetNeutralWithoutBountyHistory)
-            // reads Current here, never a stale echo from a write this client never made.
+            // Deferred to Update (opus re-check): this component registered with Photon before BuildingManager (it is
+            // added in BuildingManager.Awake), so this callback runs FIRST, and BuildingManager's own
+            // OnMasterClientSwitched would then clear the write bookkeeping of the neutralise writes sent from here.
+            if (PhotonNetwork.IsMasterClient)
+                finishCutNeutralisePending = true;
+        }
+
+        // Set by OnMasterClientSwitched, consumed at the top of Update (MatchDirector.Live.cs).
+        private bool finishCutNeutralisePending;
+
+        /// <summary>Review fix F3: a new master finishes a knockout's neutralise the old master may not have. Idempotent -
+        /// SetNeutralWithoutBountyHistory skips a zone already neutral with no history, and nobody can legitimately own
+        /// a zone behind the wall, so it costs nothing when there was nothing left to finish. Only the cut zones: a
+        /// Tier III or the centre the old master missed is in play and can be fought for as it stands.</summary>
+        private void FinishCutNeutralise()
+        {
             int cut = CutTeam;
-            if (PhotonNetwork.IsMasterClient && cut >= 0 && BuildingManager.Instance != null && BuildingManager.Instance.Map != null)
-                foreach (int zone in PhaseTwoCutRules.CutZones(BuildingManager.Instance.Map, cut, BaseTierOf))
-                    BuildingManager.Instance.SetNeutralWithoutBountyHistory(zone);
+            BuildingManager buildings = BuildingManager.Instance;
+            if (!PhotonNetwork.IsMasterClient || cut < 0 || buildings == null || buildings.Map == null)
+                return;
+            foreach (int zone in PhaseTwoCutRules.CutZones(buildings.Map, cut, BaseTierOf))
+                buildings.SetNeutralWithoutBountyHistory(zone);
         }
 
         public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
@@ -327,6 +339,7 @@ namespace Overpower.Match
             lastAppliedLiveAtMs = 0;
             // Map shrink T3: the next room starts with no corner cut either, whatever this one ended with.
             lastAppliedCutTeam = PhaseTwoCutRules.NoCut;
+            finishCutNeutralisePending = false;
             waitForEchoUntil = -1f;
             liveWritten = false;
         }

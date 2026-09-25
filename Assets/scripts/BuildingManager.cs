@@ -170,8 +170,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// stop reading as Tier III to the very rule that is supposed to find them. Review fix F6: 0 while the tower
     /// with that id hasn't registered itself yet (RegisterCapture runs in BuildingCapture.Start) - the same "not
     /// tiered yet" reading TierOf/GoldMath.TeamIncomePerSecond already rely on, and PhaseTwoCutRules.IsZoneCut
-    /// relies on it too: a zone that hasn't registered can never match a Tier II/III comparison, so it simply
-    /// isn't cut for the one frame that can happen in, rather than matching by accident.</summary>
+    /// relies on it too: an unregistered Tier II or III can never match its tier test, so it simply isn't cut for
+    /// the one frame that can happen in, rather than matching by accident (the cut capital itself is matched by its
+    /// id, not its tier).</summary>
     public int BaseTierOf(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.tier : 0;
 
@@ -186,10 +187,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public int TierOf(int zone) => PhaseTwoCutRules.EffectiveTier(BaseTierOf(zone), IsCutActive);
 
     // Backing store for TierByZone below. Allocated ONCE (ZoneCount is fixed for the whole match)
-    // and filled IN PLACE by RebuildTierByZoneCache, on every RegisterCapture and whenever IsCutActive flips -
-    // review fix F6: one true sentence, not two - those are the only two things that can make a zone's tier
-    // change (a tower going from "not registered yet" (tier 0) to its real tier, or a corner being cut) - never
-    // reassigned to a new array. GoldWallet used to pay for a fresh allocation here on every player's every
+    // and filled IN PLACE by RebuildTierByZoneCache - on every RegisterCapture, and on the first TierByZone() call
+    // after IsCutActive flips; those are the only two things that can make a zone's tier change (a tower going from
+    // "not registered yet" (tier 0) to its real tier, or a corner being cut) - never reassigned to a new array. GoldWallet used to pay for a fresh allocation here on every player's every
     // Update; a future caller that keeps the reference TierByZone() hands back (the shop gate, OverPower -
     // Tasks 2.5/2.6) needs the SAME array to pick up either kind of change too, which reassigning here would
     // break (code review fix, Task 2.4).

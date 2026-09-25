@@ -27,7 +27,8 @@ namespace Overpower.Match
         /// <summary>Owns its own starting capital right now.</summary>
         public bool HoldsOwnCapital;
         /// <summary>Owns at least one capital in play: its own, an enemy's, or a knocked-out team's. The third capital of a
-        /// host-started match is never in play.</summary>
+        /// host-started match is never in play, and neither is a capital behind the phase-two wall (map shrink,
+        /// 2026-09-25 - MatchDirector.IsCapitalInPlay).</summary>
         public bool HoldsAnyCapitalInPlay;
         /// <summary>The server ms this team's latest member went out for the last stand - the latest "lastStandAt"
         /// Player Property among its members who are out. Null when none has a stamp (nobody died; e.g. it emptied).

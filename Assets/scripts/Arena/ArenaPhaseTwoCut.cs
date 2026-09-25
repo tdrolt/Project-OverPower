@@ -68,6 +68,13 @@ namespace Overpower.Arena
         private const float OwnPlayerCheckIntervalSeconds = 0.5f;
         private float nextOwnPlayerCheck;
 
+        // Opus re-check, 2026-09-25: the one way a send-home can land behind the wall again is MoveToSpawnPoint's
+        // own-spawn fallback, for a player whose own corner was the one cut and whose team holds no capital (that match
+        // is about to end anyway). Sending them there every half second would be a loop with two log lines a go, so
+        // after one send-home that didn't get them out this gives up, once, until they are found in front again.
+        private bool sentOwnPlayerHome;
+        private bool gaveUpOnOwnPlayer;
+
         private void OnEnable()
         {
             arena = GetComponent<ArenaSymmetry>();
@@ -122,6 +129,8 @@ namespace Overpower.Arena
             Apply(geometry);
             AppliedCutTeam = cut;
             nextOwnPlayerCheck = Time.unscaledTime; // F5: check the own player this same frame, not 0.5s later
+            sentOwnPlayerHome = false;
+            gaveUpOnOwnPlayer = false;
             Debug.Log($"[Arena] phase two: team {cut}'s corner closed ({geometry.WallRuns.Count} wall boxes, " +
                       $"{hiddenRenderers.Count} renderers hidden).");
         }
@@ -135,9 +144,32 @@ namespace Overpower.Arena
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
             PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
-            if (lifecycle == null || !lifecycle.IsAlive || !Geometry.IsBehindWall(localView.transform.position))
+            if (lifecycle == null || !lifecycle.IsAlive)
                 return;
 
+            // The body's own physics position, like PlayerMotor reads: the transform trails an interpolated Rigidbody
+            // (and TeleportTo sets rb.position), so it can still show a spot the player has already left - e.g. a
+            // corpse behind the wall on the frame its respawn moved the body home (opus re-check, 2026-09-25).
+            Rigidbody body = localView.GetComponent<Rigidbody>();
+            Vector3 position = body != null ? body.position : localView.transform.position;
+            if (!Geometry.IsBehindWall(position))
+            {
+                sentOwnPlayerHome = false;
+                gaveUpOnOwnPlayer = false;
+                return;
+            }
+
+            if (gaveUpOnOwnPlayer)
+                return;
+            if (sentOwnPlayerHome)
+            {
+                gaveUpOnOwnPlayer = true;
+                Debug.LogWarning($"[Arena] phase two: {localView.Owner?.NickName} is still behind the wall after being " +
+                                 "sent home (their home is behind it) - not trying again.");
+                return;
+            }
+
+            sentOwnPlayerHome = true;
             Debug.Log($"[Arena] phase two: {localView.Owner?.NickName} was behind the wall - sent home.");
             lifecycle.ReturnToSpawnForPhaseChange();
         }

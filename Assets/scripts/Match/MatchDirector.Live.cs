@@ -127,6 +127,14 @@ namespace Overpower.Match
 
         private void Update()
         {
+            // Map shrink F3: a promotion's cut-zone catch-up, one frame after OnMasterClientSwitched - before the early
+            // returns below, which skip everything once the match is live.
+            if (finishCutNeutralisePending)
+            {
+                finishCutNeutralisePending = false;
+                FinishCutNeutralise();
+            }
+
             if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient || liveWritten || IsLive
                 || Time.unscaledTime < waitForEchoUntil)
                 return;

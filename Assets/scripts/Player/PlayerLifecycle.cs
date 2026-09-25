@@ -282,7 +282,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         MatchDirector director = MatchDirector.Instance;
 
         // 2.7b step 7 (Decision 10): TeamHasACapital already reads "any capital in play" - this team's own, an
-        // enemy's, or a knocked-out team's (adoption) - in both phases, so IsLastStandDeath's own capital-less
+        // enemy's, or a knocked-out team's (adoption), never one behind the phase-two wall - in both phases, so IsLastStandDeath's own capital-less
         // check below covers adoption for free; nothing here has to special-case it.
         bool live = director != null && director.IsLive;
         bool hasCapital = director != null && director.TeamHasACapital(teamID);
@@ -359,8 +359,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (director == null)
             return;
 
-        // 2.7b step 7 (Decision 9/10): ANY capital in play, not just this team's own - a last-stand team that
-        // adopts an enemy's (or a knocked-out team's) capital comes back the same way a recapture of its own
+        // 2.7b step 7 (Decision 9/10): ANY capital in play (never one behind the phase-two wall), not just this team's
+        // own - a last-stand team that adopts an enemy's (or a knocked-out team's) capital comes back the same way a recapture of its own
         // used to. A knocked-out team never respawns, whatever it captures.
         if (director.RespawnCapitalOf(teamID) != TerritoryMap.Neutral && !director.IsEliminated(teamID) && !respawnStarted)
         {
