@@ -325,11 +325,10 @@ namespace Overpower.EditorTools
                     barrier.transform.localScale = piece.size; // x = length, y = look height, z = thickness
 
                     BoxCollider box = barrier.GetComponent<BoxCollider>();
-                    float blockingCentreYWorld = (layout.BarrierBlockingBottomY + layout.BarrierBlockingTopY) * 0.5f;
-                    float blockingHeightWorld = layout.BarrierBlockingTopY - layout.BarrierBlockingBottomY;
-                    float scaleY = Mathf.Max(0.0001f, piece.size.y);
-                    box.center = new Vector3(0f, (blockingCentreYWorld - position.y) / scaleY, 0f);
-                    box.size = new Vector3(1f, blockingHeightWorld / scaleY, 1f);
+                    ArenaPieceShapes.BarrierBlockingBox(layout.BarrierBlockingBottomY, layout.BarrierBlockingTopY,
+                        position.y, piece.size.y, out Vector3 boxCentre, out Vector3 boxSize);
+                    box.center = boxCentre;
+                    box.size = boxSize;
                     barrierCount++;
                 }
             }
