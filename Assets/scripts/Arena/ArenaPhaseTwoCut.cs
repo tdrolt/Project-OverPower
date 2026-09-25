@@ -306,6 +306,14 @@ namespace Overpower.Arena
             if (arena != null)
                 arena.UsePlayableBounds(null);
             Geometry = null;
+
+            // M6 (final review, 2026-09-25): a refusal's cooldown is per team, but this component is per running
+            // arena - without this, a REAL refusal from a past room (bad layout/geometry, not "towers not registered
+            // yet") would leave failedCutTeam/nextRetryTime standing into a new room, so a genuine refusal there
+            // would silently wait out an old cooldown instead of logging its own (LogRefusalOnce, "once, not every
+            // frame") right away.
+            failedCutTeam = PhaseTwoCutRules.NoCut;
+            nextRetryTime = 0f;
         }
     }
 }

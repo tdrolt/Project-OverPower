@@ -695,9 +695,11 @@ namespace Overpower.UI
         public float debugLogGapBelowMinimapPixels = 6f;
 
         [Header("Match start (2.7b)")]
-        [Tooltip("A capital nobody is playing for - the third capital when the host starts a two-team match. Its ring on the " +
-                 "ground and its minimap bubble take this colour. Keep it darker and more see-through than the neutral grey, " +
-                 "so it reads as closed, not as ground you can take.")]
+        [Tooltip("Only the colour the out-of-play paint path would use on a zone's ring and minimap bubble - and " +
+                 "nothing shows that path in play any more: since 2026-09-25 an out-of-play zone (a host start's " +
+                 "third capital, or any zone the phase-two cut closes) disappears entirely - tower, ring and " +
+                 "minimap bubble - instead of being painted this colour. Kept for whichever paint path might use " +
+                 "it again; not currently seen.")]
         public Color outOfPlayZoneColor = new Color(0.12f, 0.12f, 0.12f, 0.45f);
         [Header("Phase two cut (a team knocked out)")]
         [Tooltip("The minimap's shade over the part of the arena a knockout closed (behind the phase-two wall). Dark and " +

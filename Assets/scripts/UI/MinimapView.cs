@@ -56,11 +56,13 @@ namespace Overpower.UI
     /// OPACITY: the corner map is drawn a little see-through, M makes it solid, and moving with M open dims it
     /// again (UiTheme > Minimap, and the MinimapOpacity rule). One CanvasGroup on the map's root carries all of it.
     ///
-    /// OUT OF PLAY (2.7b Decision 8): the third capital of a host-started match reads its own look straight from
-    /// MatchDirector.IsOutOfPlay, every LateUpdate its ownership is next re-coloured - its bubble fills
-    /// UiTheme.outOfPlayZoneColor and every link to it is hidden, so no route reads as a way in. This is separate
-    /// from SetZoneShown just below, an unused hook that hides a zone (and its links) entirely: out of play is a
-    /// still-visible, unreachable capital, not a hidden one.
+    /// OUT OF PLAY (2.7b Decision 8; hidden entirely since the phase-two cut, 2026-09-25): a zone out of play - the
+    /// third capital of a host-started match, or any zone behind the phase-two wall - reads its own look straight
+    /// from MatchDirector.IsOutOfPlay, every LateUpdate its ownership is next re-coloured. Its bubble and every link
+    /// to it are hidden, not shown grey - RecolourOwnership deactivates the bubble's Upright object, so the
+    /// UiTheme.outOfPlayZoneColor it also sets on the Fill is never actually seen (see that token's own tooltip).
+    /// This is separate from SetZoneShown just below, an unused hook that hides a zone (and its links) entirely for
+    /// its own, unrelated reason.
     /// </summary>
     public sealed class MinimapView : MonoBehaviourPun
     {
@@ -556,6 +558,33 @@ namespace Overpower.UI
             ui.Outline.rectTransform.sizeDelta = Vector2.one * (ui.Diameter + 2f * theme.minimapBubbleOutlineWidth);
             ui.Fill.rectTransform.sizeDelta = Vector2.one * ui.Diameter;
             ui.Label.text = MinimapLayout.TierLabel(tier);
+
+            // M7 (final review, 2026-09-25): BuildLink's two-colour seam is placed once, at build time, from each
+            // end's ZoneRadius - a zone that resizes here (only the centre, IV<->III while a corner is cut) leaves
+            // its touching links' seams off-centre by about half the radius change until re-placed. Width and
+            // colour are left exactly as ApplyLinkStyle last set them; only the geometry (BuildLink's own split)
+            // is redone.
+            foreach (LinkUi link in links)
+                if (link.A == ui.Zone || link.B == ui.Zone)
+                    RePlaceLinkSegments(link);
+        }
+
+        /// <summary>M7: BuildLink's own gap split, redone for a link whose bubble size changed after build time
+        /// (ApplyTier) - same maths, same PlaceHalfSegment helper, but reads each half's current width instead of
+        /// resetting it to minimapNeutralLinkWidth, so this never fights ApplyLinkStyle's own colour/width.</summary>
+        private void RePlaceLinkSegments(LinkUi link)
+        {
+            ZoneUi a = zoneById[link.A];
+            ZoneUi b = zoneById[link.B];
+            Vector2 posA = a.MapPosition;
+            Vector2 posB = b.MapPosition;
+            Vector2 delta = posB - posA;
+            float length = delta.magnitude;
+            Vector2 direction = length > 0.0001f ? delta / length : Vector2.right;
+            float gap = Mathf.Max(0f, length - ZoneRadius(a) - ZoneRadius(b));
+            Vector2 mid = posA + direction * (ZoneRadius(a) + gap / 2f);
+            PlaceHalfSegment(link.LineA, posA, mid, link.LineA.rectTransform.sizeDelta.y);
+            PlaceHalfSegment(link.LineB, mid, posB, link.LineB.rectTransform.sizeDelta.y);
         }
 
         /// <summary>Every link is two half-line Images, split in the middle of the VISIBLE gap between the two
@@ -746,7 +775,10 @@ namespace Overpower.UI
 
             foreach (ZoneUi zone in zones)
             {
-                if (!zone.Shown)
+                // M8b (final review, 2026-09-25): a hidden out-of-play bubble's Upright object is already inactive
+                // (RecolourOwnership) - computing its ring state here every frame was pure waste on a zone nothing
+                // shows.
+                if (!zone.Shown || zone.OutOfPlay)
                     continue;
 
                 int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;

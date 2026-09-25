@@ -227,8 +227,8 @@ public class BuildingCapture : MonoBehaviourPun
         // off (SetHiddenAsCut), and a switched-off trigger fires no OnTriggerExit - the same trap as a death or a
         // disconnect below - so its roster would keep whoever stood in it when the wall went up, for the rest of the
         // match. Nobody can capture it anyway (MayCapture refuses an out-of-play zone), so the master just empties the
-        // roster and skips the simulation; the knockout's own reset (NeutraliseForPhaseTwo -> ResetCaptureOf) has
-        // already published it idle, and a host start's going-live reset did the same.
+        // roster and skips the simulation; SetHiddenAsCut's hide edge (I1/M1) already reset this zone to neutral and
+        // republished it idle, and stopped its sound, the moment it hid - there is no round trip left to wait out here.
         if (hiddenAsCut)
         {
             if (playersInZone.Count > 0)
@@ -285,6 +285,12 @@ public class BuildingCapture : MonoBehaviourPun
         hiddenAsCut = hide;
         if (hide)
         {
+            // I1 (final review, 2026-09-25): the AudioSource is on the tower root, so hiding the children/renderers/
+            // colliders below never touches it, and every tower's source is 2D - a loop left running here would be
+            // heard map-wide for the rest of the match. Every client reaches this (RefreshRingView runs on all of
+            // them), so every client's own source stops, not just the master's.
+            if (audioSource != null)
+                audioSource.Stop();
             foreach (Transform child in transform)
                 if (child.gameObject.activeSelf) { child.gameObject.SetActive(false); hiddenChildren.Add(child.gameObject); }
             foreach (Renderer r in GetComponents<Renderer>())
@@ -292,6 +298,16 @@ public class BuildingCapture : MonoBehaviourPun
             if (flagRenderer != null && flagRenderer.enabled) { flagRenderer.enabled = false; hiddenOwnRenderers.Add(flagRenderer); }
             foreach (Collider c in GetComponents<Collider>())
                 if (c.enabled) { c.enabled = false; hiddenOwnColliders.Add(c); }
+            if (PhotonNetwork.IsMasterClient)
+            {
+                // M1: without this, the master would keep simulating this zone for one more round trip (until its
+                // own mCut echo lands and Update's hiddenAsCut branch takes over) - if a player was still listed it
+                // would republish a non-idle progress and then go silent once hidden, so telemetry logs a capture
+                // that never ends. Resetting right here, on the hide edge, means the very same frame the zone
+                // disappears it also goes idle. ResetToOwner also clears the claim/drain/cooldown state.
+                ResetToOwner(TerritoryMap.Neutral);
+                RepublishProgressNow();
+            }
             return;
         }
         foreach (GameObject go in hiddenChildren) if (go != null) go.SetActive(true);
@@ -446,10 +462,11 @@ public class BuildingCapture : MonoBehaviourPun
     private static readonly System.Func<int, bool> ZoneUnderAttack =
         zone => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(zone);
 
-    // 2.7b Decision 8: the cut capital of a host-started match (its third team was never in the match) is never
-    // capturable, not even by its own team - checked before the own-capital exception, in every MayCapture call
-    // site (TeamMayCaptureNow, so a drain in progress is covered too; OnTriggerEnter) plus the ring itself
-    // (RefreshRingView). Cached for the same allocation reason as ZoneUnderAttack above.
+    // 2.7b Decision 8/9: a zone out of play - not only the host-start left-out capital, but since the phase-two cut
+    // also any zone behind the wall - is never capturable, not even by its own team - checked before the own-capital
+    // exception, in every MayCapture call site (TeamMayCaptureNow, so a drain in progress is covered too;
+    // OnTriggerEnter) plus the ring itself (RefreshRingView), which also uses it to hide the tower entirely
+    // (SetHiddenAsCut) rather than greying it out. Cached for the same allocation reason as ZoneUnderAttack above.
     private static readonly System.Func<int, bool> ZoneOutOfPlay =
         zone => MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(zone);
 
@@ -945,6 +962,12 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_AddToZone(int viewID)
     {
+        // I1: an entry sent before the hide can still arrive after it (the master's own mCut echo, or this RPC
+        // itself, whichever lands second) - without this, a stale entry would relist a player in a zone Update's
+        // hiddenAsCut branch is otherwise emptying every frame, and the "not already playing" check below would let
+        // it restart the capture sound on every client, right after SetHiddenAsCut just stopped it.
+        if (hiddenAsCut)
+            return;
         Debug.Log($"[RPC_AddToZone] Inside Function");
         var pv = PhotonView.Find(viewID);
         if (pv && pv.GetComponent<PlayerTeam>() is PlayerTeam pt)
@@ -997,6 +1020,11 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_PlayCaptureSound()
     {
+        // I1: a send in flight when the zone hides (this call, or the master's own RPC_AddToZone re-triggering it)
+        // must not start a loop nothing will ever stop again on a hidden tower - SetHiddenAsCut already stopped the
+        // source on this same client; starting it back up here would undo that.
+        if (hiddenAsCut)
+            return;
         if (audioSource && capturingSound && !audioSource.isPlaying)
         {
             audioSource.clip = capturingSound;
@@ -1031,6 +1059,10 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_PlayRecaptureSound()
     {
+        // I1: same in-flight-send guard as RPC_PlayCaptureSound - a drain-start sent just before the hide must not
+        // start a loop on a tower that has already fallen silent.
+        if (hiddenAsCut)
+            return;
         if (audioSource && capturingSound)
         {
             audioSource.clip = capturingSound;

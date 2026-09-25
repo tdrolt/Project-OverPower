@@ -84,9 +84,12 @@ namespace Overpower.Match
             ? PhaseTwoCutRules.CutTeam(IsLive, TeamsInMatch, ReadCutTeam(PhotonNetwork.CurrentRoom.CustomProperties))
             : PhaseTwoCutRules.NoCut;
 
-        /// <summary>A zone behind the phase-two wall, or the cut capital of a host start (Decision 8: out of play
-        /// from LIVE - the countdown is still warm-up, Decision 3 - via MatchStartRules.IsCapitalOutOfPlay; map
-        /// shrink T3 adds the PhaseTwoCutRules half, from CutTeam and each zone's own BaseTierOf below).</summary>
+        /// <summary>A zone behind the phase-two wall, or the cut capital of a host start. The MatchStartRules.
+        /// IsCapitalOutOfPlay call stays (Decision 8: out of play from LIVE - the countdown is still warm-up,
+        /// Decision 3) as a belt-and-braces check, but it is no longer the only thing catching a host start's
+        /// left-out capital: once live, CutTeam already derives that same team as the cut (PhaseTwoCutRules.CutTeam
+        /// falls back to the team missing from TeamsInMatch), so PhaseTwoCutRules.IsZoneCut below already covers its
+        /// capital too - final review, 2026-09-25.</summary>
         public bool IsOutOfPlay(int zone)
         {
             BuildingManager buildings = BuildingManager.Instance;

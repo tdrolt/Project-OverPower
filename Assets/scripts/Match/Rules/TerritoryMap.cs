@@ -64,7 +64,9 @@ namespace Overpower.Match
         }
 
         /// <summary>2.7b: the reverse of CapitalOf - whose capital a zone is, or Neutral if it isn't one. Used by the
-        /// out-of-play check (MatchStartRules.IsCapitalOutOfPlay) and the minimap/ring "greyed out" look.</summary>
+        /// out-of-play check (MatchStartRules.IsCapitalOutOfPlay) - since the phase-two cut (2026-09-25), an
+        /// out-of-play zone's tower, ring and minimap bubble hide entirely rather than showing a "greyed out"
+        /// look.</summary>
         public int CapitalTeamOf(int zoneId) => capitalOwnerByZone.TryGetValue(zoneId, out int team) ? team : Neutral;
 
         /// <summary>2.7b: every capital zone and the team it belongs to - the live reset's starting snapshot
