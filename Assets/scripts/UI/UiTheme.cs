@@ -699,6 +699,15 @@ namespace Overpower.UI
                  "ground and its minimap bubble take this colour. Keep it darker and more see-through than the neutral grey, " +
                  "so it reads as closed, not as ground you can take.")]
         public Color outOfPlayZoneColor = new Color(0.12f, 0.12f, 0.12f, 0.45f);
+        [Header("Phase two cut (a team knocked out)")]
+        [Tooltip("The minimap's shade over the part of the arena a knockout closed (behind the phase-two wall). Dark and " +
+                 "mostly opaque, so it reads as gone, not as ground you can take.")]
+        public Color minimapCutAreaColor = new Color(0.05f, 0.05f, 0.06f, 0.75f);
+        [Tooltip("The phase-two wall's line on the minimap.")]
+        public Color minimapCutWallColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+        [Tooltip("How thick the phase-two wall's line is drawn on the minimap, in the same canvas units as the link " +
+                 "widths (the real wall is under a metre - about one unit, too thin to see).")]
+        public float minimapCutWallWidth = 3f;
         [Tooltip("Warm-up line shown to everyone while fewer than two teams have a player yet - nothing counts, the shop is " +
                  "free, and the match starts on its own once all three teams are here.")]
         public string warmupWaitingText = "Warm-up: nothing counts yet and the shop is free. The match starts when all three teams have a player.";

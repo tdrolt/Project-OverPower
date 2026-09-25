@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
@@ -96,15 +97,18 @@ namespace Overpower.UI
         private sealed class ZoneUi
         {
             public int Zone;
+            public int Tier;
             public float Diameter;
             public Vector2 MapPosition;
             public RectTransform Upright;
             public Image Ring;
             public Image Outline;
             public Image Fill;
+            public TextMeshProUGUI Label;
             public bool Shown = true;
-            /// <summary>2.7b Decision 8: MatchDirector.IsOutOfPlay(Zone), refreshed by RecolourOwnership. Read by
-            /// ApplyLinkStyle (no link touches an out-of-play zone) and UpdateZones (CaptureRingState.From).</summary>
+            /// <summary>2.7b Decision 8 / phase two: MatchDirector.IsOutOfPlay(Zone), refreshed by RecolourOwnership.
+            /// Read by ApplyLinkStyle (no link touches an out-of-play zone), UpdateZones (CaptureRingState.From) and
+            /// RecolourOwnership itself (a cut zone's bubble is hidden like its tower - Decision 11).</summary>
             public bool OutOfPlay;
             public float ShownRingFill = -1f;
             public Color ShownRingColor;
@@ -144,6 +148,13 @@ namespace Overpower.UI
         private RectTransform teammatesLayer;
         private RectTransform ownMarker;
         private Material textMaterial;
+
+        // Phase two cut (Decision 11): the closed corner darkened and the wall line drawn, one overlay texture over
+        // the baked arena picture - see PaintCutOverlay.
+        private RawImage cutOverlay;
+        private Texture2D cutTexture;
+        private PhaseTwoCutGeometry paintedCut;
+        private const int CutOverlayPixels = 256; // the overlay's sharpness, not a gameplay value
 
         private bool built;
         private bool largeOpen;
@@ -203,6 +214,8 @@ namespace Overpower.UI
                 Local = null;
             if (textMaterial != null)
                 Destroy(textMaterial);
+            if (cutTexture != null)
+                Destroy(cutTexture);
         }
 
         /// <summary>M: open the large map (closing the loadout screen), or close it.</summary>
@@ -238,6 +251,13 @@ namespace Overpower.UI
         {
             if (!built && !TryBuild())
                 return;
+
+            // Phase two cut (Decision 11): repainted only when the cut itself changes (a knockout, or leaving the
+            // room clears it back to none), not every frame - PhaseTwoCutGeometry reference equality is enough,
+            // since ArenaPhaseTwoCut only ever builds a new one on an actual change (ApplyCutChange).
+            PhaseTwoCutGeometry cut = ArenaPhaseTwoCut.Active != null ? ArenaPhaseTwoCut.Active.Geometry : null;
+            if (cut != paintedCut)
+                PaintCutOverlay(cut);
 
             // The P screen opened (by P or by its button): the large map closes.
             if (largeOpen && LoadoutScreen.IsOpen)
@@ -463,6 +483,15 @@ namespace Overpower.UI
             picture.raycastTarget = false;
             Stretch(picture.rectTransform);
 
+            // Phase two cut (Decision 11): under links and bubbles, on top of the baked picture - PaintCutOverlay
+            // fills it in only once a cut actually stands (LateUpdate).
+            var cutGo = new GameObject("Phase Two Cut", typeof(RectTransform));
+            cutGo.transform.SetParent(map, false);
+            cutOverlay = cutGo.AddComponent<RawImage>();
+            cutOverlay.raycastTarget = false;
+            cutOverlay.enabled = false;
+            Stretch(cutOverlay.rectTransform);
+
             // Sibling order is draw order: lines under bubbles, bubbles under player markers.
             linksLayer = NewLayer("Links", map);
             zonesLayer = NewLayer("Zones", map);
@@ -483,18 +512,16 @@ namespace Overpower.UI
         private void BuildZone(int zone)
         {
             manager.TryGetZoneCentre(zone, out Vector3 centre);
-            int tier = manager.TierOf(zone);
-            var ui = new ZoneUi { Zone = zone, Diameter = theme.MinimapBubbleDiameter(tier) };
+            var ui = new ZoneUi { Zone = zone };
             ui.MapPosition = MinimapLayout.WorldToMap(centre, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
 
             ui.Upright = NewRect($"Zone {zone}", zonesLayer);
             ui.Upright.anchoredPosition = ui.MapPosition;
-            ui.Upright.sizeDelta = Vector2.one * ui.Diameter;
 
             // The progress ring is a Filled disc behind the outline disc, so exactly Progress Ring Width shows around it
-            // at every bubble size. Sprite first: a Filled Image without a sprite ignores its fill amount.
-            float ringDiameter = ui.Diameter + 2f * (theme.minimapBubbleOutlineWidth + theme.minimapProgressRingWidth);
-            ui.Ring = NewImage("Progress Ring", ui.Upright, GeneratedSprites.Disc, Color.white, ringDiameter);
+            // at every bubble size. Sprite first: a Filled Image without a sprite ignores its fill amount. Sized by
+            // ApplyTier below, once this tier's Diameter is known.
+            ui.Ring = NewImage("Progress Ring", ui.Upright, GeneratedSprites.Disc, Color.white, 0f);
             ui.Ring.type = Image.Type.Filled;
             ui.Ring.fillMethod = Image.FillMethod.Radial360;
             ui.Ring.fillOrigin = (int)Image.Origin360.Top; // the top of the screen, like the band on the ground
@@ -502,16 +529,33 @@ namespace Overpower.UI
             ui.Ring.fillAmount = 0f;
             ui.Ring.enabled = false;
 
-            ui.Outline = NewImage("Outline", ui.Upright, GeneratedSprites.Disc, theme.minimapBubbleOutlineColor,
-                                  ui.Diameter + 2f * theme.minimapBubbleOutlineWidth);
+            ui.Outline = NewImage("Outline", ui.Upright, GeneratedSprites.Disc, theme.minimapBubbleOutlineColor, 0f);
             ui.ShownOutlineColor = theme.minimapBubbleOutlineColor;
-            ui.Fill = NewImage("Fill", ui.Upright, GeneratedSprites.Disc, theme.minimapNeutralColor, ui.Diameter);
-            AddLabel(ui.Upright, MinimapLayout.TierLabel(tier), theme.minimapLabelSize);
+            ui.Fill = NewImage("Fill", ui.Upright, GeneratedSprites.Disc, theme.minimapNeutralColor, 0f);
+            ui.Label = AddLabel(ui.Upright, string.Empty, theme.minimapLabelSize);
+
+            ApplyTier(ui, manager.TierOf(zone));
 
             ui.Shown = !hiddenZones.Contains(zone);
             ui.Upright.gameObject.SetActive(ui.Shown);
             zones.Add(ui);
             zoneById[zone] = ui;
+        }
+
+        /// <summary>Sizes a zone's bubble (Upright/Ring/Outline/Fill) and its label for a tier, and remembers it on
+        /// ui.Tier. Called once at build (BuildZone) and again whenever BuildingManager.TierOf(zone) changes
+        /// (RecolourOwnership) - Decision 3: the centre plays as a Tier III while a corner is cut, so its bubble
+        /// shrinks to a III-sized one and relabels "III", then grows back to "IV" the moment the cut clears.</summary>
+        private void ApplyTier(ZoneUi ui, int tier)
+        {
+            ui.Tier = tier;
+            ui.Diameter = theme.MinimapBubbleDiameter(tier);
+            ui.Upright.sizeDelta = Vector2.one * ui.Diameter;
+            ui.Ring.rectTransform.sizeDelta =
+                Vector2.one * (ui.Diameter + 2f * (theme.minimapBubbleOutlineWidth + theme.minimapProgressRingWidth));
+            ui.Outline.rectTransform.sizeDelta = Vector2.one * (ui.Diameter + 2f * theme.minimapBubbleOutlineWidth);
+            ui.Fill.rectTransform.sizeDelta = Vector2.one * ui.Diameter;
+            ui.Label.text = MinimapLayout.TierLabel(tier);
         }
 
         /// <summary>Every link is two half-line Images, split in the middle of the VISIBLE gap between the two
@@ -605,15 +649,50 @@ namespace Overpower.UI
             MatchDirector director = MatchDirector.Instance;
             foreach (ZoneUi zone in zones)
             {
-                // 2.7b Decision 8: out of play wins over ownership - the cut capital is neutral underneath (nobody
-                // can ever capture it), but must not read as ordinary neutral grey.
+                // 2.7b Decision 8 / phase two Decision 11: out of play wins over ownership - a capital nobody is
+                // playing for (host start) or a zone behind the phase-two wall (a knockout) is neutral underneath
+                // (nobody can ever capture it) but must not read as ordinary neutral grey; a cut zone's bubble also
+                // disappears entirely, like its tower (Decision 9) - links touching it are already hidden by
+                // ApplyLinkStyle.
                 zone.OutOfPlay = director != null && director.IsOutOfPlay(zone.Zone);
+
+                // Decision 3: the centre plays as a Tier III while any corner is cut (and back to IV once none is) -
+                // its bubble follows BuildingManager's own effective tier, same source TowerLook reads at runtime.
+                int tier = manager.TierOf(zone.Zone);
+                if (tier > 0 && tier != zone.Tier)
+                    ApplyTier(zone, tier);
+                zone.Upright.gameObject.SetActive(zone.Shown && !zone.OutOfPlay);
+
                 int owner = snapshot.OwnerOf(zone.Zone);
                 zone.Fill.color = zone.OutOfPlay ? theme.outOfPlayZoneColor
                     : owner >= 0 ? theme.ShotColorFor(owner) : theme.minimapNeutralColor;
             }
             foreach (LinkUi link in links)
                 ApplyLinkStyle(link, MinimapLinkStyle.For(snapshot.OwnerOf(link.A), snapshot.OwnerOf(link.B)));
+        }
+
+        /// <summary>Tudor, 2026-09-25: the closed part darkened and the wall drawn, painted once per cut (not per frame)
+        /// into one texture over the baked picture - the same square of the world, so it turns with the map.</summary>
+        private void PaintCutOverlay(PhaseTwoCutGeometry cut)
+        {
+            paintedCut = cut;
+            if (cut == null)
+            {
+                cutOverlay.enabled = false;
+                return;
+            }
+            if (cutTexture == null)
+                cutTexture = new Texture2D(CutOverlayPixels, CutOverlayPixels, TextureFormat.RGBA32, false)
+                {
+                    name = "Minimap Phase Two Cut", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp,
+                };
+            float metresPerCanvasUnit = config.WorldSizeMetres / Mathf.Max(1f, theme.minimapCornerSize);
+            cutTexture.SetPixels32(MinimapCutMask.Paint(CutOverlayPixels, config.WorldCentre, config.WorldSizeMetres, cut,
+                theme.minimapCutWallWidth * 0.5f * metresPerCanvasUnit, theme.minimapCutAreaColor, theme.minimapCutWallColor));
+            cutTexture.Apply();
+            cutOverlay.texture = cutTexture;
+            cutOverlay.color = Color.white;
+            cutOverlay.enabled = true;
         }
 
         /// <summary>One code path for every MinimapLinkKind: Team colours the A half, TeamB colours the B half. For
@@ -818,8 +897,10 @@ namespace Overpower.UI
             return image;
         }
 
-        /// <summary>Same recipe as PlayerHud.AddLabel/ApplyOutline: one shared outline material for every label.</summary>
-        private void AddLabel(Transform parent, string text, float fontSize)
+        /// <summary>Same recipe as PlayerHud.AddLabel/ApplyOutline: one shared outline material for every label.
+        /// Returns the TextMeshProUGUI so a caller (BuildZone) can keep it - ApplyTier re-sets its text whenever a
+        /// zone's effective tier changes.</summary>
+        private TextMeshProUGUI AddLabel(Transform parent, string text, float fontSize)
         {
             GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
             go.name = "Label";
@@ -841,6 +922,7 @@ namespace Overpower.UI
             }
             tmp.fontSharedMaterial = textMaterial;
             Stretch(tmp.rectTransform);
+            return tmp;
         }
     }
 }
