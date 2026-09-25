@@ -426,7 +426,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 7
-  captureRadius: 10
   tier: 1
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -6006,7 +6005,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 2
-  captureRadius: 8
   tier: 2
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -8334,7 +8332,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 4
-  captureRadius: 5.4
   tier: 3
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -9075,7 +9072,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 0
-  captureRadius: 8
   tier: 2
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -10636,7 +10632,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 1
-  captureRadius: 8
   tier: 2
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -10935,7 +10930,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 5
-  captureRadius: 5.4
   tier: 3
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -11105,7 +11099,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 8
-  captureRadius: 10
   tier: 1
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -11548,7 +11541,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 9
-  captureRadius: 8
   tier: 4
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -20641,7 +20633,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 3
-  captureRadius: 5.4
   tier: 3
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
@@ -23682,7 +23673,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildingID: 6
-  captureRadius: 10
   tier: 1
   territoryConfig: {fileID: 11400000, guid: 672b78c1bb85f9a45bd4d2eca4587308, type: 2}
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}

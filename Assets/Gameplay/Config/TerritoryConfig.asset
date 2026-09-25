@@ -17,18 +17,22 @@ MonoBehaviour:
     teamGoldPerSecond: 0
     captureBounty: 0
     healthRegenPerSecond: 10
+    captureRadius: 10
   - captureSeconds: 12.5
     teamGoldPerSecond: 5
     captureBounty: 0
     healthRegenPerSecond: 4
+    captureRadius: 8
   - captureSeconds: 6
     teamGoldPerSecond: 10
     captureBounty: 900
     healthRegenPerSecond: 0
+    captureRadius: 5.4
   - captureSeconds: 10
     teamGoldPerSecond: 8
     captureBounty: 1200
     healthRegenPerSecond: 0
+    captureRadius: 8
   playersPerTeam: 3
   bountyHoldSeconds: 90
   startingGold: 0

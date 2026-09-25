@@ -12,11 +12,6 @@ public class BuildingCapture : MonoBehaviourPun
 {
     public int buildingID;
 
-    [Header("Capture Settings")]
-    [Tooltip("World metres from the zone centre to the player's centre. Capturing, zone presence (under attack), " +
-             "health regen and the shop all use it.")]
-    public float captureRadius = 10f;
-
     [Header("Territory")]
     [Tooltip("1 = Capital, 2 = Transition, 3 = Flanking, 4 = Centre. Decides capture time, income, bounty and " +
              "regen from the Territory Config. The centre (4) plays as 3 once a corner is cut.")]
@@ -30,6 +25,11 @@ public class BuildingCapture : MonoBehaviourPun
     [Tooltip("Shared per-tier numbers. Every tower should point at the same asset.")]
     public TerritoryConfig territoryConfig;
 
+    /// <summary>This tower's capture circle, from the Territory Config row of its OWN tier (the centre keeps its Tier IV
+    /// circle even while it plays as a Tier III after a knockout - its recess in the phase-two wall was sized around it).
+    /// </summary>
+    public float CaptureRadius => territoryConfig != null ? territoryConfig.ForTier(tier).captureRadius : FallbackCaptureRadius;
+
     [Header("UI")]
     [Tooltip("Colours, widths and material of the capture ring on the ground around this tower - every tower should point at the same asset, same as Territory Config.")]
     public UiTheme theme;
@@ -40,6 +40,7 @@ public class BuildingCapture : MonoBehaviourPun
     private const float FallbackCaptureSeconds = 5f;
     private const float FallbackDecaySeconds = 5f;
     private const float FallbackRecaptureCooldownSeconds = 5f;
+    private const float FallbackCaptureRadius = 10f;
 
     // Seconds for ONE player to capture this tower's tier, from the Territory Config. Capture
     // progress below is tracked in those same seconds, not an arbitrary point total, so a
@@ -129,7 +130,7 @@ public class BuildingCapture : MonoBehaviourPun
         if (territoryConfig == null)
         {
             Debug.LogError($"[BuildingCapture] Tower {buildingID} has no Territory Config assigned - " +
-                            "falling back to the old fixed capture numbers (5s/1 per player/5s/5s).", this);
+                            $"falling back to the old fixed capture numbers (5s/1 per player/5s/5s, {FallbackCaptureRadius} m radius).", this);
         }
 
         if (theme == null)
@@ -137,7 +138,7 @@ public class BuildingCapture : MonoBehaviourPun
         else if (theme.captureRingMaterial == null)
             Debug.LogError($"[BuildingCapture] Tower {buildingID}: UiTheme's Capture Ring Material is not assigned - no capture ring will be shown.", this);
         else
-            ringView = CaptureRingView.Create(transform, captureRadius, theme);
+            ringView = CaptureRingView.Create(transform, CaptureRadius, theme);
 
         // Arena rebuild step 2: found once here, painted every frame from the ring's own state
         // (RefreshRingView) - null on a tower without a Tower Look child, which just skips it.
@@ -180,13 +181,14 @@ public class BuildingCapture : MonoBehaviourPun
         var collider = GetComponent<SphereCollider>();
         if (collider)
         {
-            // Capture Radius is in world metres from the zone centre to the player's centre, the distance zone
+            // CaptureRadius (refactor 2026-09-26: this tower's tier's own row in Territory Config, not a field on
+            // the tower any more) is in world metres from the zone centre to the player's centre, the distance zone
             // presence, health regen and the shop measure (BuildingManager.TryGetZoneAt). A trigger fires as soon as
             // it touches the edge of the player's body, so it is one body radius smaller: without that, capturing
             // reached about half a metre further than the rest (measured 2026-09-16: captured at 10.5 m, not 10.7 m).
             // Its radius is also in the tower's own units, which scale with the tower (0.8 on these towers).
             float bodyRadius = BuildingManager.Instance != null ? BuildingManager.Instance.PlayerBodyRadius : 0f;
-            collider.radius = Mathf.Max(0f, captureRadius - bodyRadius) / Mathf.Max(0.0001f, transform.lossyScale.x);
+            collider.radius = Mathf.Max(0f, CaptureRadius - bodyRadius) / Mathf.Max(0.0001f, transform.lossyScale.x);
         }
         else
         {

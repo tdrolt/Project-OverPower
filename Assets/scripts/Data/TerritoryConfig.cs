@@ -35,15 +35,21 @@ namespace Overpower.Data
             [Tooltip("Health per second you regain while standing in a zone of this tier that your team owns, " +
                      "once you have been out of combat long enough. 0 = no regen on this tier.")]
             public float healthRegenPerSecond;
+
+            [Tooltip("How far from the tower, in metres, a player's centre can be and still count as in the zone: " +
+                     "capturing, draining, under attack, health regen and the shop all use this one circle, and the " +
+                     "ring on the ground is drawn at it. Read when the match scene starts, so a change shows on the " +
+                     "next Play.")]
+            public float captureRadius;
         }
 
         [Tooltip("One row per tier. Element 0 = Tier 1 (Capital), 1 = Tier 2, 2 = Tier 3, 3 = Tier 4 (Centre).")]
         [SerializeField] private TierSettings[] tiers =
         {
-            new TierSettings { captureSeconds = 20f, teamGoldPerSecond = 0,  captureBounty = 0,    healthRegenPerSecond = 10f },
-            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 5,  captureBounty = 0,    healthRegenPerSecond = 4f },
-            new TierSettings { captureSeconds = 10f, teamGoldPerSecond = 10, captureBounty = 900,  healthRegenPerSecond = 0f },
-            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 8,  captureBounty = 1200, healthRegenPerSecond = 0f },
+            new TierSettings { captureSeconds = 20f, teamGoldPerSecond = 0,  captureBounty = 0,    healthRegenPerSecond = 10f, captureRadius = 10f },
+            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 5,  captureBounty = 0,    healthRegenPerSecond = 4f,  captureRadius = 8f },
+            new TierSettings { captureSeconds = 10f, teamGoldPerSecond = 10, captureBounty = 900,  healthRegenPerSecond = 0f,  captureRadius = 5.4f },
+            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 8,  captureBounty = 1200, healthRegenPerSecond = 0f,  captureRadius = 8f },
         };
 
         [Tooltip("How many players a team's territory income is shared between. The GDD balances income per team " +

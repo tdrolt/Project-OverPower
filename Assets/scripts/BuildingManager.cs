@@ -227,7 +227,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.PlayersInZoneCount : 0;
 
     /// <summary>Finds which registered zone position stands inside (flat XZ distance to the tower ≤
-    /// its own captureRadius) - the "which zone am I in" question health regen (Task 2.3), the shop
+    /// its own CaptureRadius) - the "which zone am I in" question health regen (Task 2.3), the shop
     /// gate and OverPower's "near a zone" check (Tasks 2.5/2.6) all ask the same way. Capture rings
     /// are not meant to overlap, but if two ever do the nearest centre wins rather than an arbitrary
     /// dictionary order. No allocation: a plain foreach over the existing captures dictionary.</summary>
@@ -241,7 +241,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             if (capture == null) continue;
 
             float distance = FlatDistance(position, capture.transform.position);
-            if (distance > capture.captureRadius) continue;
+            if (distance > capture.CaptureRadius) continue;
 
             // Map shrink T3: a cut Tier III's capture area pokes through the new wall - standing near the
             // wall, on the far side, must not count as being in a zone that is out of play. Review fix F4: this
@@ -292,7 +292,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             BuildingCapture capture = pair.Value;
             if (capture == null || current.OwnerOf(pair.Key) != teamId) continue;
 
-            float distanceToEdge = FlatDistance(position, capture.transform.position) - capture.captureRadius;
+            float distanceToEdge = FlatDistance(position, capture.transform.position) - capture.CaptureRadius;
             if (distanceToEdge < 0f) distanceToEdge = 0f;
             if (distanceToEdge < best) best = distanceToEdge;
         }

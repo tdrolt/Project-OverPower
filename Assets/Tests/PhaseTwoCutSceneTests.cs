@@ -74,7 +74,7 @@ namespace Overpower.Tests
                 for (int i = 0; i < 72; i++)
                 {
                     float radians = i * 5f * Mathf.Deg2Rad;
-                    var edge = centrePosition + new Vector3(Mathf.Cos(radians), 0f, Mathf.Sin(radians)) * centre.captureRadius;
+                    var edge = centrePosition + new Vector3(Mathf.Cos(radians), 0f, Mathf.Sin(radians)) * centre.CaptureRadius;
                     Assert.GreaterOrEqual(geometry.Playable.SignedDistance(edge), 0f,
                         $"team {team}: the centre's own capture ring at {i * 5} degrees is behind the wall.");
                 }
