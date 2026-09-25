@@ -81,8 +81,13 @@ namespace Overpower.Tests
             });
         }
 
+        // Task 4 review, E1 (2026-09-25): ArenaPhaseTwoCut hides pieces from Blocks, Barriers and Scenery alike
+        // (HiddenGroups) - a staying piece from any of the three must not be cut by the wall either, not just Blocks.
+        private static readonly string[] StayingPieceGroupNames =
+            { ArenaSymmetry.BlocksGroupName, ArenaSymmetry.BarriersGroupName, ArenaSymmetry.SceneryGroupName };
+
         [Test]
-        public void NoStayingBlockIsCutByTheNewWallForEveryCorner([Values(0, 1, 2)] int team)
+        public void NoStayingPieceIsCutByTheNewWallForEveryCorner([Values(0, 1, 2)] int team)
         {
             WithGameScene(scene =>
             {
@@ -95,24 +100,29 @@ namespace Overpower.Tests
 
                 foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
                 {
-                    Transform blocks = third != null ? third.Find(ArenaSymmetry.BlocksGroupName) : null;
-                    if (blocks == null)
+                    if (third == null)
                         continue;
-                    foreach (Transform piece in blocks)
+                    foreach (string groupName in StayingPieceGroupNames)
                     {
-                        if (geometry.IsBehindWall(piece.position))
-                            continue; // meant to disappear behind the wall - not this test's concern
-
-                        Vector3 right = piece.right * (piece.lossyScale.x * 0.5f);
-                        Vector3 forward = piece.forward * (piece.lossyScale.z * 0.5f);
-                        Vector3[] corners =
+                        Transform group = third.Find(groupName);
+                        if (group == null)
+                            continue; // skip a group that doesn't exist under this third
+                        foreach (Transform piece in group)
                         {
-                            piece.position + right + forward, piece.position + right - forward,
-                            piece.position - right + forward, piece.position - right - forward,
-                        };
-                        foreach (Vector3 corner in corners)
-                            Assert.Less(geometry.Closed.SignedDistance(corner), 0f,
-                                $"team {team}: '{piece.name}' stays in play but the new wall cuts through it.");
+                            if (geometry.IsBehindWall(piece.position))
+                                continue; // meant to disappear behind the wall - not this test's concern
+
+                            Vector3 right = piece.right * (piece.lossyScale.x * 0.5f);
+                            Vector3 forward = piece.forward * (piece.lossyScale.z * 0.5f);
+                            Vector3[] corners =
+                            {
+                                piece.position + right + forward, piece.position + right - forward,
+                                piece.position - right + forward, piece.position - right - forward,
+                            };
+                            foreach (Vector3 corner in corners)
+                                Assert.Less(geometry.Closed.SignedDistance(corner), 0f,
+                                    $"team {team}: '{third.name}/{groupName}/{piece.name}' stays in play but the new wall cuts through it.");
+                        }
                     }
                 }
             });

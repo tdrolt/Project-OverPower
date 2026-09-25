@@ -50,6 +50,14 @@ namespace Overpower.Arena
         private readonly List<Collider> hiddenColliders = new List<Collider>();
         private int failedCutTeam = PhaseTwoCutRules.NoCut; // logs a refused build once, not every frame
 
+        // Extra step E2 (Task 4 review, 2026-09-25): a REAL refusal (failedCutTeam == the cut team - the capital's
+        // tower IS registered, but the layout/geometry itself doesn't fit) can't fix itself between one frame and the
+        // next, so recomputing every frame just burns CPU on the same answer. The TRANSIENT case (towers not
+        // registered yet, so BuildGeometryFor returns null without ever calling LogRefusalOnce) is unaffected and
+        // keeps retrying every frame - it resolves itself within a frame or two of scene load.
+        private const float RefusedRetryIntervalSeconds = 1f;
+        private float nextRetryTime;
+
         // Review fix F5, 2026-09-25 (the review's plan gap): a player can end up behind the wall in ways the
         // phase-change trip home (PlayerLifecycle.ReturnToSpawnForPhaseChange, fired once off MatchDirector's own
         // ThreeTeams -> TwoTeams edge) never touches - a reconnect or late join whose own D5 alternative spawn
@@ -97,9 +105,18 @@ namespace Overpower.Arena
                 return;
             }
 
+            // E2: a real refusal for this same team waits out its cooldown instead of recomputing every frame - see
+            // the field comments above.
+            if (cut == failedCutTeam && Time.unscaledTime < nextRetryTime)
+                return;
+
             PhaseTwoCutGeometry geometry = BuildGeometryFor(cut);
             if (geometry == null)
-                return; // towers not registered yet, or refused (logged once): try again next frame
+            {
+                if (cut == failedCutTeam)
+                    nextRetryTime = Time.unscaledTime + RefusedRetryIntervalSeconds;
+                return; // towers not registered yet (try again next frame), or refused (wait out the cooldown above)
+            }
 
             Restore();
             Apply(geometry);
