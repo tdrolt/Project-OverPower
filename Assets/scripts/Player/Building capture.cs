@@ -103,6 +103,15 @@ public class BuildingCapture : MonoBehaviourPun
     // (e.g. before arena step 3 stamps one), which simply skips it.
     private TowerLook towerLook;
 
+    // Tudor, 2026-09-25: a zone behind the phase-two wall (or the left-out corner of a host start) disappears - its
+    // tower, ring and capture area - rather than showing grey. Toggled only when IsOutOfPlay changes; exactly what was
+    // hidden is remembered, so showing it again (a new room) puts the tower back as it was.
+    private bool hiddenAsCut;
+    private readonly List<GameObject> hiddenChildren = new List<GameObject>();
+    private readonly List<Renderer> hiddenOwnRenderers = new List<Renderer>();
+    private readonly List<Collider> hiddenOwnColliders = new List<Collider>();
+    private int shownColumnsTier; // set to tier in Start: the prefab was built with tier's columns
+
     // The last CaptureProgress THIS client told BuildingManager to publish for this zone - only
     // meaningful while this client is master (only the master ever calls PublishProgressIfNeeded).
     // Starts Idle, matching a fresh, never-captured zone, so a genuinely idle tower never publishes
@@ -133,6 +142,7 @@ public class BuildingCapture : MonoBehaviourPun
         // Arena rebuild step 2: found once here, painted every frame from the ring's own state
         // (RefreshRingView) - null on a tower without a Tower Look child, which just skips it.
         towerLook = GetComponentInChildren<TowerLook>(true);
+        shownColumnsTier = tier; // the prefab was built with this tier's columns already showing
         if (towerLook != null && theme != null)
             towerLook.Bind(theme);
 
@@ -250,19 +260,63 @@ public class BuildingCapture : MonoBehaviourPun
         PublishProgressIfNeeded();
     }
 
+    /// <summary>2.7b/phase-two: hides (or restores) everything this zone shows once IsOutOfPlay flips - its tower,
+    /// ring and capture area disappear behind the wall rather than showing grey (Decision 9). Only acts on a real
+    /// change, and remembers exactly what it touched (children that were active, renderers/colliders that were
+    /// enabled), so restoring puts the tower back exactly as it was, whether that was after arena build (edit time)
+    /// or however a later change left it.</summary>
+    private void SetHiddenAsCut(bool hide)
+    {
+        if (hide == hiddenAsCut)
+            return;
+        hiddenAsCut = hide;
+        if (hide)
+        {
+            foreach (Transform child in transform)
+                if (child.gameObject.activeSelf) { child.gameObject.SetActive(false); hiddenChildren.Add(child.gameObject); }
+            foreach (Renderer r in GetComponents<Renderer>())
+                if (r.enabled) { r.enabled = false; hiddenOwnRenderers.Add(r); }
+            if (flagRenderer != null && flagRenderer.enabled) { flagRenderer.enabled = false; hiddenOwnRenderers.Add(flagRenderer); }
+            foreach (Collider c in GetComponents<Collider>())
+                if (c.enabled) { c.enabled = false; hiddenOwnColliders.Add(c); }
+            return;
+        }
+        foreach (GameObject go in hiddenChildren) if (go != null) go.SetActive(true);
+        foreach (Renderer r in hiddenOwnRenderers) if (r != null) r.enabled = true;
+        foreach (Collider c in hiddenOwnColliders) if (c != null) c.enabled = true;
+        hiddenChildren.Clear();
+        hiddenOwnRenderers.Clear();
+        hiddenOwnColliders.Clear();
+    }
+
     /// <summary>Every client, every frame: draws this zone's ring and its tower's owner-coloured crown/caps (arena
     /// step 2) from replicated state only (capture progress, the owner, under attack), so a late joiner sees exactly
     /// what everyone else does. Both read the very same CaptureRingState, so they can never disagree.</summary>
     private void RefreshRingView()
     {
         BuildingManager manager = BuildingManager.Instance;
-        if (manager == null || (ringView == null && towerLook == null))
+        if (manager == null)
+            return;
+
+        bool outOfPlay = ZoneOutOfPlay(buildingID);
+        SetHiddenAsCut(outOfPlay);
+        if (outOfPlay)
+            return;
+
+        int effectiveTier = EffectiveTier;
+        if (towerLook != null && effectiveTier != shownColumnsTier)
+        {
+            towerLook.ApplyColumnsAtRuntime(effectiveTier);
+            shownColumnsTier = effectiveTier;
+        }
+
+        if (ringView == null && towerLook == null)
             return;
 
         int owner = manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
         bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
         CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
-                                                       PhotonNetwork.ServerTimestamp, outOfPlay: ZoneOutOfPlay(buildingID));
+                                                       PhotonNetwork.ServerTimestamp, outOfPlay: false);
 
         if (ringView != null)
         {

@@ -115,8 +115,8 @@ namespace Overpower.Arena
 
         /// <summary>Shows this tier's columns (TowerLookRules.ColumnsForTier), each scaled to this tier's radius
         /// (TowerLookRules.ColumnRadius) and placed on the ring that keeps its outer edge tangent to this prefab's
-        /// own collider (TowerLookRules.ColumnRingRadius) - never past it, so columns never add cover. Edit-time
-        /// only, called by ArenaPrimitiveBuilder (arena step 3); nothing here runs at runtime.</summary>
+        /// own collider (TowerLookRules.ColumnRingRadius) - never past it, so columns never add cover. Called at
+        /// edit time by ArenaPrimitiveBuilder (arena step 3); also at runtime through ApplyColumnsAtRuntime.</summary>
         public void ApplyColumns(int tier)
         {
             int count = TowerLookRules.ColumnsForTier(tier);
@@ -149,6 +149,15 @@ namespace Overpower.Arena
                 if (cap != null)
                     cap.localScale = new Vector3(capRadius, cap.localScale.y, capRadius);
             }
+        }
+
+        /// <summary>The same as ApplyColumns, at runtime - the centre drops to three columns while it plays as a Tier III
+        /// (PhaseTwoCutRules.EffectiveTier) and gets its fourth back in a new room. Forces the next Refresh to repaint,
+        /// since a column that was hidden when the colour was cached has none.</summary>
+        public void ApplyColumnsAtRuntime(int tier)
+        {
+            ApplyColumns(tier);
+            shownColorSet = false;
         }
 
         private float ColliderRadius()

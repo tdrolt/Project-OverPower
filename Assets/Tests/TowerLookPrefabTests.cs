@@ -262,6 +262,31 @@ namespace Overpower.Tests
             }
         }
 
+        /// <summary>Task 5 (2026-09-25): the centre drops to three columns while it plays as a Tier III
+        /// (PhaseTwoCutRules.EffectiveTier), through ApplyColumnsAtRuntime - the runtime twin of ApplyColumns.
+        /// Refresh only repaints a piece whose colour actually changed, so a slot that was HIDDEN the last time the
+        /// colour was cached (tier 3's fourth slot) was never painted at all: without ApplyColumnsAtRuntime forcing
+        /// the next Refresh to repaint (clearing shownColorSet, exactly like the very first Refresh after Bind), a
+        /// column shown at runtime would stay colourless.</summary>
+        [Test]
+        public void ShowingAColumnAtRuntimePaintsIt()
+        {
+            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
+
+            look.ApplyColumns(3);
+            look.Bind(theme);
+            const int team = 1;
+            var state = new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, team, TerritoryMap.Neutral, false);
+            look.Refresh(state, 0f);
+
+            look.ApplyColumnsAtRuntime(4);
+            look.Refresh(state, 0f);
+
+            Assert.AreEqual(4, look.ShownColumns);
+            AssertBaseColor(look.columnCaps[3], look.ShownColor, "the newly-shown fourth slot's cap");
+        }
+
         /// <summary>Pins the controller's neutral choice (Rule 6, chosen by capture): the plinth follows the exact
         /// same rule as an owned tower's plinth (the full UiTheme.towerNeutralColor, no shade, since 2026-09-23),
         /// and the drum keeps the shaded formula - so a neutral tower is never left on the stone's own unpainted
