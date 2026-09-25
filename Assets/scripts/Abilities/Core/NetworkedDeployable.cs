@@ -365,6 +365,34 @@ namespace Overpower.Abilities
             }
         }
 
+        /// <summary>A deployable that moves with its caster (the AoE zone; a fence set to follow) is never "left
+        /// behind" anywhere, so a pass by position skips it.</summary>
+        protected virtual bool FollowsCaster => false;
+
+        /// <summary>Tudor, 2026-09-25: when a corner closes, whatever THIS client placed behind the new wall goes, through
+        /// the same single-destroyer path as every other end of life (RequestDestroy - owner only, so every client can run
+        /// the same pass and only the owner's copy acts; no RPC). If any of this client's portals is behind the wall, all
+        /// of them go: a pair with one end in the closed corner would be a way through the wall.</summary>
+        public static void DestroyOwnedWhere(System.Func<Vector3, bool> isGone)
+        {
+            if (isGone == null)
+                return;
+            bool aPortalWentBehind = false;
+            foreach (NetworkedDeployable deployable in FindObjectsByType<NetworkedDeployable>(FindObjectsSortMode.None))
+            {
+                if (!deployable.IsOwnerClient || deployable.FollowsCaster || !isGone(deployable.transform.position))
+                    continue;
+                if (deployable is Portal)
+                    aPortalWentBehind = true;
+                deployable.RequestDestroy();
+            }
+            if (!aPortalWentBehind)
+                return;
+            foreach (NetworkedDeployable deployable in FindObjectsByType<NetworkedDeployable>(FindObjectsSortMode.None))
+                if (deployable.IsOwnerClient && deployable is Portal)
+                    deployable.RequestDestroy();
+        }
+
         private IEnumerator DestroyAfter(float seconds)
         {
             if (seconds > 0f)

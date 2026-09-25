@@ -10159,6 +10159,7 @@ MonoBehaviour:
   - {x: 75.451, y: 121.401}
   - {x: 54.649, y: 121.401}
   - {x: 54.649, y: 95.944}
+  layout: {fileID: 11400000, guid: de6419cc10bef0f4f80cb54cfda7d344, type: 2}
 --- !u!1 &1688573534
 GameObject:
   m_ObjectHideFlags: 8

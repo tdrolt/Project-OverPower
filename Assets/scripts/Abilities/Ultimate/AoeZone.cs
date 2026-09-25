@@ -67,6 +67,8 @@ namespace Overpower.Abilities
                  "it was cast. Tudor's spec: the zone follows, so this defaults ON.")]
         private bool followsCaster = true;
 
+        protected override bool FollowsCaster => followsCaster;
+
         [SerializeField, Tooltip("Which layers this zone can hit. Default is where living players " +
                  "and practice dummies are; nothing on any other layer has an IDamageable to find, so " +
                  "widening this only costs performance.")]

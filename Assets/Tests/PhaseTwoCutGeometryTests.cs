@@ -78,6 +78,30 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AClockwiseOutlineCutsTheSame()
+        {
+            // The reviewer checked the algorithm is winding-agnostic by an independent re-run (2026-09-25): this pins
+            // that same guarantee for the real test suite. Toy is listed one way round; reversing it lists the same
+            // triangle the other way, so this must cut exactly the same shape.
+            var reversed = new List<Vector2>(Toy);
+            reversed.Reverse();
+            PhaseTwoCutGeometry cut = PhaseTwoCutGeometry.Build(reversed, ToyCentre, Vector2.up, 2f, 2f, 1f, wallThickness: 0.2f);
+
+            Assert.NotNull(cut);
+            Assert.Greater(cut.Playable.SignedDistance(ToyCentre), 0f, "the centre is playable");
+            Assert.Greater(cut.Closed.SignedDistance(new Vector2(10f, 26f)), 0f, "(10, 26) is closed");
+            Assert.Greater(cut.Playable.SignedDistance(new Vector2(10f, 22.5f)), 0f, "the recess point is playable");
+            Assert.AreEqual(5, cut.WallRuns.Count);
+            for (int i = 0; i < cut.WallRuns.Count; i++)
+            {
+                ArenaWallPlan.Run run = cut.WallRuns[i];
+                Vector2 a = cut.WallLine[i], b = cut.WallLine[i + 1];
+                Vector2 middle = (a + b) * 0.5f;
+                Assert.Greater(cut.Playable.SignedDistance(middle + run.Inward * 0.05f), 0f, $"run {i} faces the open side");
+            }
+        }
+
+        [Test]
         public void TheBarrierStandsAcrossTheRecessMouth()
         {
             PhaseTwoCutGeometry cut = ToyCut();

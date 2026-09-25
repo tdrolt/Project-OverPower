@@ -27,10 +27,10 @@ namespace Overpower.EditorTools
     {
         public const string TowerLookChildName = "Tower Look";
         public const string OldArtGroupName = "Old Arena (off)";
-        public const string SceneryGroupName = "Scenery";
+        public const string SceneryGroupName = ArenaSymmetry.SceneryGroupName;
         public const string BoundryGroupName = ArenaSymmetry.BoundaryGroupName;
-        public const string BlocksGroupName = "Blocks";
-        public const string BarriersGroupName = "Barriers";
+        public const string BlocksGroupName = ArenaSymmetry.BlocksGroupName;
+        public const string BarriersGroupName = ArenaSymmetry.BarriersGroupName;
         public const string FloorObjectName = "Arena Floor";
 
         private const string PlayModeRefusal = "Can't build the arena in Play Mode: it would change live, networked " +
@@ -435,6 +435,8 @@ namespace Overpower.EditorTools
                 report.Add($"PROBLEM: '{arena.name}' has no parent to hold Old Arena (off), the floor and the scenery.");
                 return report;
             }
+
+            arena.layout = layout;
 
             report.Add("--- 1. BuildTowerLooks ---");
             report.AddRange(BuildTowerLooks(scene, towerLookPrefab));

@@ -101,6 +101,27 @@ namespace Overpower.Data
                  "spawned a little into the floor is always pushed up, never through.")]
         [SerializeField, Min(0.1f)] private float floorThickness = 4f;
 
+        [Header("Phase two cut (a team knocked out)")]
+        [Tooltip("How far past the arena centre, toward the knocked-out team's capital, the phase-two wall's face " +
+                 "stands, in metres. Tudor 2026-09-25: below the two side Tier III, so they and their recesses end up " +
+                 "behind it (they start about 7.6 m and 6.7 m past the centre). Larger keeps more of the arena open. " +
+                 "Seen in Play Mode only: the wall is built when a corner closes.")]
+        [SerializeField, Min(0f)] private float phaseTwoWallDistance = 6.3f;
+
+        [Tooltip("The recess in the phase-two wall behind the centre tower (the centre plays as a Tier III once a " +
+                 "corner is cut): its width along the wall, in metres - the same as the outer walls' Tier III " +
+                 "recesses. 0 = a straight wall, no recess.")]
+        [SerializeField, Min(0f)] private float phaseTwoRecessWidth = 19.54f;
+
+        [Tooltip("How deep that recess goes past the wall's face, in metres - like the other Tier III recesses, so a " +
+                 "portal fits. 0 = no recess.")]
+        [SerializeField, Min(0f)] private float phaseTwoRecessDepth = 3.25f;
+
+        [Tooltip("The jersey barrier across the middle of the recess mouth, level with the wall: x = length, y = how " +
+                 "tall it looks, z = thickness - the same meaning as a Barrier row (the Zone 4 recess's barrier is " +
+                 "10.18 x 1 x 0.6). Length 0 = no barrier.")]
+        [SerializeField] private Vector3 phaseTwoRecessBarrierSize = new Vector3(10.181736f, 1f, 0.6f);
+
         public IReadOnlyList<Piece> Pieces => pieces;
 
         public Material WallMaterial => wallMaterial;
@@ -117,5 +138,10 @@ namespace Overpower.Data
         public Material FloorMaterial => floorMaterial;
         public Vector2 FloorSize => floorSize;
         public float FloorThickness => floorThickness;
+
+        public float PhaseTwoWallDistance => phaseTwoWallDistance;
+        public float PhaseTwoRecessWidth => phaseTwoRecessWidth;
+        public float PhaseTwoRecessDepth => phaseTwoRecessDepth;
+        public Vector3 PhaseTwoRecessBarrierSize => phaseTwoRecessBarrierSize;
     }
 }

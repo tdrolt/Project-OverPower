@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Overpower.Data;
 
 namespace Overpower.Arena
 {
@@ -27,8 +28,10 @@ namespace Overpower.Arena
     /// partners to match. Objects in Centred are moved onto the centre (their height is kept).
     ///
     /// During play this component has exactly one job: it publishes the arena outline as ArenaBounds (Active,
-    /// ActiveBounds, IsInsideArena) for blink, portals and the out-of-arena safety net. Everything else it stores is
-    /// read by the Editor tool (Assets/scripts/Editor/Arena/ArenaSymmetryBuilder.cs).
+    /// ActiveBounds, IsInsideArena) for blink, portals and the out-of-arena safety net - the smaller, playable one
+    /// while a corner is closed (UsePlayableBounds), the full one otherwise - and adds ArenaPhaseTwoCut, which builds
+    /// and removes the phase-two wall. Everything else it stores is read by the Editor tool
+    /// (Assets/scripts/Editor/Arena/ArenaSymmetryBuilder.cs).
     /// </summary>
     public class ArenaSymmetry : MonoBehaviour
     {
@@ -37,6 +40,19 @@ namespace Overpower.Arena
         /// (movement step 3, controller decision R1) needs it from runtime code too - only the arena's own boundary
         /// walls block a portal's path, never a crate or a house.</summary>
         public const string BoundaryGroupName = "Boundry";
+
+        /// <summary>The child of Source (and of each generated third) holding captured blocks (a house, crate, rock
+        /// or bush footprint) - hidden behind the phase-two wall by ArenaPhaseTwoCut.</summary>
+        public const string BlocksGroupName = "Blocks";
+
+        /// <summary>The child of Source (and of each generated third) holding Amendment 1's jersey barriers - hidden
+        /// behind the phase-two wall by ArenaPhaseTwoCut.</summary>
+        public const string BarriersGroupName = "Barriers";
+
+        /// <summary>The child of Source (and of each generated third) holding scenery pieces - hidden behind the
+        /// phase-two wall by ArenaPhaseTwoCut.</summary>
+        public const string SceneryGroupName = "Scenery";
+
         [Serializable]
         public class SnappedTriplet
         {
@@ -83,11 +99,19 @@ namespace Overpower.Arena
                  "them. Validate still reports any built wall more than 15 cm off this outline, as a sanity check.")]
         public List<Vector2> sourceOutline = new List<Vector2>();
 
+        [Tooltip("The arena's build data (Assets/Gameplay/Config/ArenaLayout.asset). In play, the phase-two wall is " +
+                 "built from its wall, barrier and Phase Two Cut values, so it matches what Build primitive arena makes.")]
+        public ArenaLayout layout;
+
         /// <summary>The arena in the running game, or null outside Play Mode and in a scene without one.</summary>
         public static ArenaSymmetry Active { get; private set; }
 
         /// <summary>This arena's outline, built when it starts. Null when Source Outline has fewer than two points.</summary>
         public ArenaBounds Bounds { get; private set; }
+
+        /// <summary>The whole arena's outline, whatever is cut. Set once in OnEnable; Bounds starts equal to it and
+        /// then follows UsePlayableBounds as a corner closes and reopens.</summary>
+        public ArenaBounds FullBounds { get; private set; }
 
         /// <summary>The running arena's outline, or null when there is no arena or no outline (a test scene).</summary>
         public static ArenaBounds ActiveBounds => Active != null ? Active.Bounds : null;
@@ -160,11 +184,15 @@ namespace Overpower.Arena
         {
             // Play Mode only: without ExecuteInEditMode, the Editor never runs this, and the tool reads the fields
             // directly anyway.
-            Bounds = ArenaBounds.FromSourceOutline(sourceOutline, centre);
+            FullBounds = ArenaBounds.FromSourceOutline(sourceOutline, centre);
+            Bounds = FullBounds;
             if (Bounds == null)
                 Debug.LogError($"[Arena] {name}: Source Outline has fewer than two points - blink, portals and the " +
                                 "out-of-arena safety net cannot tell inside from outside.");
             Active = this;
+
+            if (GetComponent<ArenaPhaseTwoCut>() == null)
+                gameObject.AddComponent<ArenaPhaseTwoCut>();
         }
 
         private void OnDisable()
@@ -172,6 +200,11 @@ namespace Overpower.Arena
             if (Active == this)
                 Active = null;
         }
+
+        /// <summary>While a corner is closed (ArenaPhaseTwoCut), the published outline is the smaller one, so blink,
+        /// portals and the out-of-arena safety net all see the wall with no change of their own. Null restores the full
+        /// outline.</summary>
+        public void UsePlayableBounds(ArenaBounds playable) => Bounds = playable ?? FullBounds;
 
         private void OnDrawGizmosSelected()
         {

@@ -66,6 +66,8 @@ namespace Overpower.Abilities
                  "make a fence that tracks its owner instead.")]
         private bool followsCaster = false;
 
+        protected override bool FollowsCaster => followsCaster;
+
         [SerializeField, Tooltip("Which layers this fence can hit. Default is where living players " +
                  "and practice dummies are; nothing on any other layer has an IDamageable to find, so " +
                  "widening this only costs performance.")]

@@ -89,3 +89,7 @@ MonoBehaviour:
   floorMaterial: {fileID: 2100000, guid: e12a545e5e683ca41b2ddc9370eedb4a, type: 2}
   floorSize: {x: 220, y: 220}
   floorThickness: 4
+  phaseTwoWallDistance: 6.3
+  phaseTwoRecessWidth: 19.54
+  phaseTwoRecessDepth: 3.25
+  phaseTwoRecessBarrierSize: {x: 10.181736, y: 1, z: 0.6}
