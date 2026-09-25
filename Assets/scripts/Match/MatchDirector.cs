@@ -14,8 +14,9 @@ namespace Overpower.Match
     /// Task 2.7: who is still in the match and which phase it is in. MatchPhaseRules.cs holds the
     /// actual rule as pure, tested C#; this class is only the Photon wiring around it - reading
     /// PhotonNetwork.PlayerList and BuildingManager.Current into one TeamStatus per team, letting the
-    /// master write the result into Room Properties (and, master-only, neutralising Tier-3 zones on
-    /// the first elimination and closing a finished room), and reacting to whatever the room says on
+    /// master write the result into Room Properties (and, master-only, neutralising every Tier III, the
+    /// centre and the newly cut corner - map shrink T3 - on the first elimination and closing a finished
+    /// room), and reacting to whatever the room says on
     /// every client (the lost panel, the "two teams left" banner and trip home, the match-result
     /// panel). Room Properties, not an RPC, for the same reason BuildingManager's territory is: a
     /// player who joins mid-match reads one value instead of replaying the match, and the state
@@ -88,6 +89,14 @@ namespace Overpower.Match
         public bool IsEliminated(int team) =>
             PhotonNetwork.InRoom && ReadEliminated(PhotonNetwork.CurrentRoom.CustomProperties).Contains(team);
 
+        /// <summary>Review fix F1, 2026-09-25: a capital counts as "in play" while its team was fixed into the match
+        /// (a host start's third capital never is) and it isn't behind the phase-two wall. mCut arrives in the same
+        /// room update as the knockout's mPhase, so this is already right on the frame every client sends its
+        /// players home - before the master's neutralise writes (sent after the phase write) have even arrived.
+        /// Every place below that used to test IsInMatch(capital.Value) alone now asks this instead, so a closed
+        /// capital can never again count as one still in play.</summary>
+        private bool IsCapitalInPlay(int capitalZone, int capitalTeam) => IsInMatch(capitalTeam) && !IsOutOfPlay(capitalZone);
+
         /// <summary>2.7b step 7 (Decision 10): does this team have a capital right now - its own, an enemy's, or a
         /// knocked-out team's? Tudor answer 1: adoption counts in both phases, so this is just
         /// MatchPhaseRules.CountsAsHavingACapital fed from the replicated snapshot. A missing map or snapshot reads
@@ -102,7 +111,7 @@ namespace Overpower.Match
             bool holdsOwn = ownCapital >= 0 && buildings.Current.OwnerOf(ownCapital) == team;
             bool holdsAny = false;
             foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
-                if (buildings.Current.OwnerOf(capital.Key) == team && IsInMatch(capital.Value))
+                if (buildings.Current.OwnerOf(capital.Key) == team && IsCapitalInPlay(capital.Key, capital.Value))
                 { holdsAny = true; break; }
 
             return MatchPhaseRules.CountsAsHavingACapital(Phase, holdsOwn, holdsAny);
@@ -118,7 +127,10 @@ namespace Overpower.Match
         /// <summary>2.7b step 7 (Decision 11): where this team respawns - its own capital while it holds it, else
         /// the in-play capital it has held longest (the one it adopted first, by MatchPhaseRules.RespawnCapital's
         /// wrap-safe HeldSinceMs comparison). TerritoryMap.Neutral if it holds none. Derived from the replicated
-        /// snapshot alone, so a new master and a late joiner compute the same answer with no extra state.</summary>
+        /// snapshot alone, so a new master and a late joiner compute the same answer with no extra state.
+        /// Review fix F1: "in-play" is IsCapitalInPlay now, not just IsInMatch - a knocked-out team's own capital is
+        /// still in mTeams for the rest of the match, but once it is behind the phase-two wall a survivor must
+        /// never be handed it as a respawn point, closing corner and all.</summary>
         public int RespawnCapitalOf(int team)
         {
             BuildingManager buildings = BuildingManager.Instance;
@@ -128,7 +140,7 @@ namespace Overpower.Match
             respawnCapitalScratch.Clear();
             foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
             {
-                if (!IsInMatch(capital.Value))
+                if (!IsCapitalInPlay(capital.Key, capital.Value))
                     continue;
                 int owner = buildings.Current.OwnerOf(capital.Key);
                 if (owner < 0)
@@ -189,7 +201,9 @@ namespace Overpower.Match
 
         /// <summary>MatchPhaseRules.IsAdoption reads whether newOwner held NO other in-play capital already
         /// (this zone excluded, since buildings.Current already reflects the change that just happened) - the
-        /// per-capital-count version of TeamHasACapital's own "any capital in play" loop above.</summary>
+        /// per-capital-count version of TeamHasACapital's own "any capital in play" loop above. Review fix F1:
+        /// "in play" is IsCapitalInPlay, so a capital behind the phase-two wall is never counted as one of
+        /// newOwner's other capitals here either.</summary>
         private void LogAdoptionIfAny(int zone, int newOwner)
         {
             if (MatchTelemetry.Instance == null)
@@ -203,7 +217,7 @@ namespace Overpower.Match
             int otherCapitalsInPlay = 0;
             foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
             {
-                if (capital.Key == zone || !IsInMatch(capital.Value))
+                if (capital.Key == zone || !IsCapitalInPlay(capital.Key, capital.Value))
                     continue;
                 if (buildings.Current.OwnerOf(capital.Key) == newOwner)
                     otherCapitalsInPlay++;
@@ -239,6 +253,21 @@ namespace Overpower.Match
             // be ready to decide the very next elimination on its own.
             if (PhotonNetwork.IsMasterClient)
                 MasterRecompute();
+
+            // Review fix F3, 2026-09-25: if the old master dropped after its phase write reached the server but
+            // before all its neutralise writes did, a cut zone can stay owned (and keep paying income from behind
+            // the wall) - the room already reads TwoTeams, so nothing else would ever re-run the neutralise.
+            // Idempotent: SetNeutralWithoutBountyHistory skips a zone already neutral with no history, and nobody
+            // can legitimately own a zone behind the wall, so running this on every promotion costs nothing when
+            // there was nothing left to finish. Safe whichever of this component's and BuildingManager's own
+            // OnMasterClientSwitched runs first: BuildingManager clears its lastWritten/writesAwaitingEcho
+            // unconditionally on every switch (not only when it becomes master), so by the time THIS client was
+            // last promoted those fields were already reset - WriteBasis (through SetNeutralWithoutBountyHistory)
+            // reads Current here, never a stale echo from a write this client never made.
+            int cut = CutTeam;
+            if (PhotonNetwork.IsMasterClient && cut >= 0 && BuildingManager.Instance != null && BuildingManager.Instance.Map != null)
+                foreach (int zone in PhaseTwoCutRules.CutZones(BuildingManager.Instance.Map, cut, BaseTierOf))
+                    BuildingManager.Instance.SetNeutralWithoutBountyHistory(zone);
         }
 
         public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
@@ -436,9 +465,14 @@ namespace Overpower.Match
         /// taking a zone FROM the team that held it, and this reset takes every Tier-3 zone from
         /// nobody - the next team to capture one must not be paid for a multi-minute hold that was
         /// reset out from under its owner, not fought for. Master-only (WriteBasis's guard) and safe
-        /// to loop every zone even if this runs more than once: a zone already neutral with no hold
-        /// history is skipped (TerritorySnapshot.NeedsNeutralReset), and one that drained to neutral
-        /// naturally but still carries history is wiped - which is the whole point of this method.
+        /// to loop every zone even if this runs more than once, for the TERRITORY half only (SetNeutralWithoutBountyHistory):
+        /// a zone already neutral with no hold history is skipped (TerritorySnapshot.NeedsNeutralReset), and one
+        /// that drained to neutral naturally but still carries history is wiped - which is the whole point of this
+        /// method. Review fix F6, 2026-09-25: ResetCaptureOf below is NOT safe on a second run - it forces a zone's
+        /// in-progress capture back to owner/0 unconditionally, so a second call would wipe a capture that started
+        /// AFTER the first run already reset it. This method itself still only ever runs once per knockout
+        /// (phaseTwoStarts, MasterRecompute's own guard); F3's new-master catch-up calls SetNeutralWithoutBountyHistory
+        /// directly instead of this method, for exactly that reason.
         /// Map shrink T3: now also the centre (a Tier III in all but name once a corner is cut) and every
         /// cut zone (PhaseTwoCutRules.ZonesToNeutralise), plus - for every zone this reaches, cut or not -
         /// the in-progress capture reset (ResetCaptureOf), so nobody keeps an income or a way in from
@@ -454,7 +488,10 @@ namespace Overpower.Match
         }
 
         /// <summary>D5: the knocked-out team's corner, unless that strands a surviving team - see PhaseTwoCutRules.
-        /// ChooseCutTeam. Reads the master's own current snapshot, the same basis Recompute just used.</summary>
+        /// ChooseCutTeam. Review fix F2, 2026-09-25: reads BuildingManager.LatestForMaster, not Current - Current is
+        /// the room's own echo, and a capture still echoing when the knockout's last-stand Player Property arrives
+        /// would read as the OLDER owner here, possibly choosing the wrong corner and stranding the very survivor D5
+        /// exists to protect. LatestForMaster is the same basis every other master-side write already builds on.</summary>
         private static int ChooseCutTeam(BuildingManager buildings, List<int> newlyEliminated, MatchPhaseResult result,
                                          TeamStatus[] statuses)
         {
@@ -465,11 +502,11 @@ namespace Overpower.Match
                 if (status.InMatch && !result.Eliminated.Contains(status.TeamId))
                     survivors.Add(status.TeamId);
             TerritoryMap map = buildings.Map;
-            TerritorySnapshot current = buildings.Current;
+            TerritorySnapshot basis = buildings.LatestForMaster;
             return PhaseTwoCutRules.ChooseCutTeam(newlyEliminated[0], survivors, team =>
             {
                 int capital = map.CapitalOf(team);
-                return capital >= 0 ? current.OwnerOf(capital) : TerritoryMap.Neutral;
+                return capital >= 0 ? basis.OwnerOf(capital) : TerritoryMap.Neutral;
             });
         }
 
@@ -512,7 +549,8 @@ namespace Overpower.Match
         /// stand-in from step 3 is gone. HoldsAnyCapitalInPlay only counts a capital whose OWN team is in mTeams
         /// (Decision 4: the third capital of a host start is never in play, so owning it - which cannot actually
         /// happen once TerritoryMap's out-of-play check is wired in step 6, but this reads correct even before
-        /// that lands) must not count as "having a capital"). LastOutAtMs is the latest lastStandAt Player Property
+        /// that lands) must not count as "having a capital"), and (review fix F1) whose zone isn't itself behind
+        /// the phase-two wall - IsCapitalInPlay, not just IsInMatch. LastOutAtMs is the latest lastStandAt Player Property
         /// (Decision 23) among the team's members currently out for the last stand, compared wrap-safe like every
         /// other server-clock stamp in this codebase - read only by MatchPhaseRules' no-draw rule.</summary>
         private TeamStatus[] BuildTeamStatuses(BuildingManager buildings)
@@ -547,7 +585,7 @@ namespace Overpower.Match
                 bool holdsOwnCapital = capital >= 0 && current.OwnerOf(capital) == team;
                 bool holdsAnyCapitalInPlay = false;
                 foreach (KeyValuePair<int, int> ownCapital in map.Capitals)
-                    if (current.OwnerOf(ownCapital.Key) == team && IsInMatch(ownCapital.Value))
+                    if (current.OwnerOf(ownCapital.Key) == team && IsCapitalInPlay(ownCapital.Key, ownCapital.Value))
                     { holdsAnyCapitalInPlay = true; break; }
 
                 statuses[team] = new TeamStatus

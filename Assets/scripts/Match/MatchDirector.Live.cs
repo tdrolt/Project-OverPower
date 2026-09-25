@@ -121,7 +121,8 @@ namespace Overpower.Match
             PhotonNetwork.IsMasterClient && MatchStartRules.HostMayStart(TeamsFixed, CountMembers(), PlayersWithoutATeam());
 
         /// <summary>Covers the countdown starting, being cancelled, and the match going live - MatchStartPanel
-        /// (step 8) subscribes instead of polling every frame for a change that happens rarely.</summary>
+        /// (step 8) subscribes instead of polling every frame for a change that happens rarely. Map shrink T3: the
+        /// phase-two cut changing (mCut) raises it too - the minimap already listens, to redraw its overlay.</summary>
         public event System.Action LiveStateChanged;
 
         private void Update()

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Photon.Pun;
 using UnityEngine;
 using Overpower.Abilities;
 using Overpower.Data;
@@ -21,6 +22,11 @@ namespace Overpower.Arena
     /// Polls once a frame instead of subscribing: the cut can appear on a join, a knockout or a host start and go away
     /// on leaving the room, and MatchDirector, BuildingManager and the towers start in no fixed order - one integer
     /// compare a frame catches every case.
+    ///
+    /// Review fix F5, 2026-09-25: while a cut stands, also checks THIS client's own player - once the frame it lands,
+    /// then every half second - and sends them home if they are alive and behind the wall (a reconnect, a late join
+    /// spawned into a corner someone else's knockout just closed, or a living player the phase-change trip home
+    /// missed). Own client only; see ReturnOwnPlayerIfBehindWall.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ArenaPhaseTwoCut : MonoBehaviour
@@ -44,6 +50,16 @@ namespace Overpower.Arena
         private readonly List<Collider> hiddenColliders = new List<Collider>();
         private int failedCutTeam = PhaseTwoCutRules.NoCut; // logs a refused build once, not every frame
 
+        // Review fix F5, 2026-09-25 (the review's plan gap): a player can end up behind the wall in ways the
+        // phase-change trip home (PlayerLifecycle.ReturnToSpawnForPhaseChange, fired once off MatchDirector's own
+        // ThreeTeams -> TwoTeams edge) never touches - a reconnect or late join whose own D5 alternative spawn
+        // lands inside a corner someone ELSE's knockout just closed, or a living player that trip home simply
+        // missed. The out-of-arena safety net alone would only catch this once it next remembers a "safe" spot,
+        // which can itself be behind the wall - so this checks THIS client's own player directly: once the frame
+        // a cut lands, then every half second while one still stands.
+        private const float OwnPlayerCheckIntervalSeconds = 0.5f;
+        private float nextOwnPlayerCheck;
+
         private void OnEnable()
         {
             arena = GetComponent<ArenaSymmetry>();
@@ -61,9 +77,19 @@ namespace Overpower.Arena
         private void Update()
         {
             int cut = MatchDirector.Instance != null ? MatchDirector.Instance.CutTeam : PhaseTwoCutRules.NoCut;
-            if (cut == AppliedCutTeam)
-                return;
+            if (cut != AppliedCutTeam)
+                ApplyCutChange(cut);
 
+            // F5: own client only - never move another player, which this component has no authority to do.
+            if (AppliedCutTeam >= 0 && Geometry != null && Time.unscaledTime >= nextOwnPlayerCheck)
+            {
+                nextOwnPlayerCheck = Time.unscaledTime + OwnPlayerCheckIntervalSeconds;
+                ReturnOwnPlayerIfBehindWall();
+            }
+        }
+
+        private void ApplyCutChange(int cut)
+        {
             if (cut < 0)
             {
                 Restore();
@@ -78,8 +104,25 @@ namespace Overpower.Arena
             Restore();
             Apply(geometry);
             AppliedCutTeam = cut;
+            nextOwnPlayerCheck = Time.unscaledTime; // F5: check the own player this same frame, not 0.5s later
             Debug.Log($"[Arena] phase two: team {cut}'s corner closed ({geometry.WallRuns.Count} wall boxes, " +
                       $"{hiddenRenderers.Count} renderers hidden).");
+        }
+
+        /// <summary>F5: this client's own player only, found the way MatchDirector.ReactToRoomState finds it. Moves
+        /// them the same way the phase-change trip home does (SpawnCapitalFor, in-play only since review fix F1) if
+        /// they are alive and standing behind the wall - the safety net alone could loop a player back to a spot it
+        /// remembers as safe that is now behind it.</summary>
+        private void ReturnOwnPlayerIfBehindWall()
+        {
+            PhotonView localView = PhotonNetwork.LocalPlayer != null
+                ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
+            PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
+            if (lifecycle == null || !lifecycle.IsAlive || !Geometry.IsBehindWall(localView.transform.position))
+                return;
+
+            Debug.Log($"[Arena] phase two: {localView.Owner?.NickName} was behind the wall - sent home.");
+            lifecycle.ReturnToSpawnForPhaseChange();
         }
 
         private PhaseTwoCutGeometry BuildGeometryFor(int cutTeam)

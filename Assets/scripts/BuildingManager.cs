@@ -165,9 +165,13 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// grepping the console log.
     public int CaptureProgressPublishCount { get; private set; }
 
-    // Map shrink T3, 2026-09-25: the tower's own tier as set in the scene - PhaseTwoCutRules finds the cut
-    // from this, never from the phase-two stand-in (TierOf below), or a cut corner's Tier III towers would
-    // stop reading as Tier III to the very rule that is supposed to find them.
+    /// <summary>Map shrink T3, 2026-09-25: the tower's own tier as set in the scene - PhaseTwoCutRules finds the cut
+    /// from this, never from the phase-two stand-in (TierOf below), or a cut corner's Tier III towers would
+    /// stop reading as Tier III to the very rule that is supposed to find them. Review fix F6: 0 while the tower
+    /// with that id hasn't registered itself yet (RegisterCapture runs in BuildingCapture.Start) - the same "not
+    /// tiered yet" reading TierOf/GoldMath.TeamIncomePerSecond already rely on, and PhaseTwoCutRules.IsZoneCut
+    /// relies on it too: a zone that hasn't registered can never match a Tier II/III comparison, so it simply
+    /// isn't cut for the one frame that can happen in, rather than matching by accident.</summary>
     public int BaseTierOf(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.tier : 0;
 
@@ -175,21 +179,20 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     // (tierCacheCutActive) ask the exact same question.
     private static bool IsCutActive => MatchDirector.Instance != null && MatchDirector.Instance.CutTeam >= 0;
 
-    /// The tier a zone plays as right now (1..4): its own (BaseTierOf), except the centre plays as Tier III
-    /// while a corner is cut (PhaseTwoCutRules.EffectiveTier, map shrink T3) - "0 if no tower with that id
-    /// has registered itself yet" is unaffected, EffectiveTier only ever touches tier 4. GoldMath.
-    /// TeamIncomePerSecond reads 0 as "not a tiered zone" and pays it nothing, so a not-yet-registered tower
-    /// simply earns no income for the one frame that can happen in, rather than throwing.
+    /// The tier a zone plays as right now (1..4): BaseTierOf's own tier, except the centre plays as Tier III
+    /// while a corner is cut (PhaseTwoCutRules.EffectiveTier, map shrink T3) - EffectiveTier only ever touches
+    /// tier 4, so a not-yet-registered tower's BaseTierOf 0 passes through unchanged and still reads as "not a
+    /// tiered zone" to GoldMath.TeamIncomePerSecond, same as before this class had two tier methods.
     public int TierOf(int zone) => PhaseTwoCutRules.EffectiveTier(BaseTierOf(zone), IsCutActive);
 
     // Backing store for TierByZone below. Allocated ONCE (ZoneCount is fixed for the whole match)
-    // and filled IN PLACE by RebuildTierByZoneCache on every RegisterCapture (the only thing that
-    // can make a zone's tier change: a tower going from "not registered yet" (tier 0) to its real
-    // tier) - never reassigned to a new array. GoldWallet used to pay for a fresh allocation here on
-    // every player's every Update; a future caller that keeps the reference TierByZone() hands back
-    // (the shop gate, OverPower - Tasks 2.5/2.6) needs the SAME array to pick up a late tower's real
-    // tier too, which reassigning here would break (code review fix, Task 2.4). Map shrink T3: the second
-    // thing that changes a zone's tier is a corner being cut, so the cache also refills when IsCutActive flips.
+    // and filled IN PLACE by RebuildTierByZoneCache, on every RegisterCapture and whenever IsCutActive flips -
+    // review fix F6: one true sentence, not two - those are the only two things that can make a zone's tier
+    // change (a tower going from "not registered yet" (tier 0) to its real tier, or a corner being cut) - never
+    // reassigned to a new array. GoldWallet used to pay for a fresh allocation here on every player's every
+    // Update; a future caller that keeps the reference TierByZone() hands back (the shop gate, OverPower -
+    // Tasks 2.5/2.6) needs the SAME array to pick up either kind of change too, which reassigning here would
+    // break (code review fix, Task 2.4).
     private int[] tierByZoneCache;
     private bool tierCacheCutActive;
 
@@ -197,7 +200,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// TeamIncomePerSecond's tierByZone parameter wants. Read-only by convention: this is the same
     /// array every caller gets back, not a copy, so nobody may write into it - and it stays the
     /// SAME array instance for the whole match (see tierByZoneCache's own comment), so a caller that
-    /// holds onto the reference sees a late tower's tier the moment it registers.
+    /// holds onto the reference sees a late tower's tier the moment it registers (RegisterCapture rebuilds the
+    /// cache directly). Review fix F6: a corner being cut is different - this method only checks IsCutActive
+    /// when IT is called, so that flip is picked up on the NEXT TierByZone() call, not the moment the cut itself
+    /// happens.
     public int[] TierByZone()
     {
         if (tierByZoneCache == null || tierCacheCutActive != IsCutActive)
@@ -231,15 +237,19 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         float bestDistance = float.PositiveInfinity;
         foreach (KeyValuePair<int, BuildingCapture> pair in captures)
         {
-            // Map shrink T3: a cut Tier III's capture area pokes through the new wall - standing near the
-            // wall, on the far side, must not count as being in a zone that is out of play.
-            if (MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(pair.Key)) continue;
-
             BuildingCapture capture = pair.Value;
             if (capture == null) continue;
 
             float distance = FlatDistance(position, capture.transform.position);
             if (distance > capture.captureRadius) continue;
+
+            // Map shrink T3: a cut Tier III's capture area pokes through the new wall - standing near the
+            // wall, on the far side, must not count as being in a zone that is out of play. Review fix F4: this
+            // check moved here, AFTER the radius test - it only has to run for a position already inside a
+            // zone's own ring instead of once per registered zone every call (~10x fewer IsOutOfPlay calls);
+            // same result either way, since IsOutOfPlay's answer for a zone doesn't depend on distance.
+            if (MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(pair.Key)) continue;
+
             if (distance < bestDistance)
             {
                 bestDistance = distance;
@@ -624,8 +634,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>Master only: same effect as SetNeutral, but wipes the zone's bounty-eligible history
-    /// instead of recording it (Task 2.7 review) - for MatchDirector's Tier-3 reset at the three-to-
-    /// two team transition, which takes every Tier-3 zone from nobody, not from whoever held it.</summary>
+    /// instead of recording it (Task 2.7 review) - for MatchDirector's reset at the three-to-two team
+    /// transition, which takes every Tier III, the centre and the newly cut corner (map shrink T3) from
+    /// nobody, not from whoever held it - and (review fix F3) for a new master finishing a knockout's
+    /// neutralise an old master may not have.</summary>
     public void SetNeutralWithoutBountyHistory(int zone)
     {
         TerritorySnapshot basis = WriteBasis(nameof(SetNeutralWithoutBountyHistory), zone);
@@ -650,6 +662,14 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             capture.ResetForMatchStart(owner);
     }
 
+    /// <summary>Review fix F2, 2026-09-25: master only - the territory this client last wrote while that write is
+    /// still echoing, else the room's own copy. Exposed so MatchDirector.ChooseCutTeam can read the exact same
+    /// basis every master-side write already builds on (WriteBasis below), instead of Current, which lags one
+    /// echo behind: a capture still echoing when a knockout's last-stand Player Property arrives must count for
+    /// D5's "would this corner strand a survivor" check, or the very team D5 exists to protect can be left with
+    /// no capital and knocked out in the same write.</summary>
+    public TerritorySnapshot LatestForMaster => writesAwaitingEcho > 0 && lastWritten != null ? lastWritten : current;
+
     private TerritorySnapshot WriteBasis(string caller, int zone)
     {
         if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient)
@@ -664,7 +684,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             return null;
         }
 
-        TerritorySnapshot basis = writesAwaitingEcho > 0 && lastWritten != null ? lastWritten : current;
+        TerritorySnapshot basis = LatestForMaster;
         if (basis == null)
             Debug.LogWarning($"[TOWER] {caller}({zone}) ignored: the room's territory snapshot does not exist yet.");
         return basis;
