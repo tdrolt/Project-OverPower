@@ -41,15 +41,20 @@ namespace Overpower.Data
                      "ring on the ground is drawn at it. Read when the match scene starts, so a change shows on the " +
                      "next Play.")]
             public float captureRadius;
+
+            [Tooltip("Seconds an enemy standing alone in a zone of this tier that your team owns takes to drain it back " +
+                     "to neutral (a defender stepping in pauses it). Compare with Capture Seconds above: lower drains " +
+                     "faster than it was captured. Per tier since Tudor, 2026-09-26.")]
+            [Min(0.01f)] public float decaySeconds;
         }
 
         [Tooltip("One row per tier. Element 0 = Tier 1 (Capital), 1 = Tier 2, 2 = Tier 3, 3 = Tier 4 (Centre).")]
         [SerializeField] private TierSettings[] tiers =
         {
-            new TierSettings { captureSeconds = 20f, teamGoldPerSecond = 0,  captureBounty = 0,    healthRegenPerSecond = 10f, captureRadius = 10f },
-            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 5,  captureBounty = 0,    healthRegenPerSecond = 4f,  captureRadius = 8f },
-            new TierSettings { captureSeconds = 10f, teamGoldPerSecond = 10, captureBounty = 900,  healthRegenPerSecond = 0f,  captureRadius = 5.4f },
-            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 8,  captureBounty = 1200, healthRegenPerSecond = 0f,  captureRadius = 8f },
+            new TierSettings { captureSeconds = 20f, teamGoldPerSecond = 0,  captureBounty = 0,    healthRegenPerSecond = 10f, captureRadius = 10f, decaySeconds = 3f },
+            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 5,  captureBounty = 0,    healthRegenPerSecond = 4f,  captureRadius = 8f, decaySeconds = 3f },
+            new TierSettings { captureSeconds = 10f, teamGoldPerSecond = 10, captureBounty = 900,  healthRegenPerSecond = 0f,  captureRadius = 5.4f, decaySeconds = 3f },
+            new TierSettings { captureSeconds = 15f, teamGoldPerSecond = 8,  captureBounty = 1200, healthRegenPerSecond = 0f,  captureRadius = 8f, decaySeconds = 3f },
         };
 
         [Tooltip("How many players a team's territory income is shared between. The GDD balances income per team " +
@@ -61,9 +66,6 @@ namespace Overpower.Data
 
         [Tooltip("Gold every player starts the match with. The starting kit is already free.")]
         [SerializeField, Min(0)] private int startingGold = 0;
-
-        [Tooltip("Seconds an undefended enemy takes to drain a captured zone back to neutral.")]
-        [SerializeField, Min(0.01f)] private float decaySeconds = 5f;
 
         [Tooltip("Seconds a zone that just went neutral cannot be captured by anyone.")]
         [SerializeField, Min(0f)] private float recaptureCooldownSeconds = 5f;
@@ -83,7 +85,6 @@ namespace Overpower.Data
         public int PlayersPerTeam => playersPerTeam;
         public float BountyHoldSeconds => bountyHoldSeconds;
         public int StartingGold => startingGold;
-        public float DecaySeconds => decaySeconds;
         public float RecaptureCooldownSeconds => recaptureCooldownSeconds;
         public float UnderAttackLingerSeconds => underAttackLingerSeconds;
         public float CaptureFadeSpeed => captureFadeSpeed;

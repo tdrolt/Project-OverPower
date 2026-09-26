@@ -80,8 +80,9 @@ public class BuildingCapture : MonoBehaviourPun
     private float FadeRatePerSecond =>
         (territoryConfig != null ? territoryConfig.CaptureFadeSpeed : 1f) * ProgressPerPlayerPerSecond;
 
+    // Per tier since Tudor, 2026-09-26 (was one number for every zone): the row of the tier this tower plays as.
     private float DecaySeconds =>
-        territoryConfig != null ? territoryConfig.DecaySeconds : FallbackDecaySeconds;
+        territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).decaySeconds : FallbackDecaySeconds;
 
     private float RecaptureCooldownSeconds =>
         territoryConfig != null ? territoryConfig.RecaptureCooldownSeconds : FallbackRecaptureCooldownSeconds;

@@ -186,6 +186,11 @@ namespace Overpower.Match
             return best;
         }
 
+        /// <summary>Tudor, 2026-09-26: who a capital counts as held by. A capital drained to NEUTRAL still counts as its
+        /// own team's (they keep respawning there and aren't knocked out); it's lost only once an ENEMY captures it.
+        /// (Was: neutral = held by nobody, so a drained base plus one death could end a small team's match.)</summary>
+        public static int CapitalHolder(int zoneOwner, int capitalTeam) => zoneOwner < 0 ? capitalTeam : zoneOwner;
+
         /// <summary>Where an ended respawn countdown puts a player, as a capital zone; Neutral = don't respawn, wait.</summary>
         public static int SpawnCapitalFor(MatchPhase phase, bool teamEliminated, int ownCapital, int respawnCapital)
         {

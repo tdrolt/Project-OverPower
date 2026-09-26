@@ -109,10 +109,10 @@ namespace Overpower.Match
                 return false;
 
             int ownCapital = buildings.Map.CapitalOf(team);
-            bool holdsOwn = ownCapital >= 0 && buildings.Current.OwnerOf(ownCapital) == team;
+            bool holdsOwn = ownCapital >= 0 && MatchPhaseRules.CapitalHolder(buildings.Current.OwnerOf(ownCapital), team) == team;
             bool holdsAny = false;
             foreach (KeyValuePair<int, int> capital in buildings.Map.Capitals)
-                if (buildings.Current.OwnerOf(capital.Key) == team && IsCapitalInPlay(capital.Key, capital.Value))
+                if (MatchPhaseRules.CapitalHolder(buildings.Current.OwnerOf(capital.Key), capital.Value) == team && IsCapitalInPlay(capital.Key, capital.Value))
                 { holdsAny = true; break; }
 
             return MatchPhaseRules.CountsAsHavingACapital(Phase, holdsOwn, holdsAny);
@@ -143,7 +143,7 @@ namespace Overpower.Match
             {
                 if (!IsCapitalInPlay(capital.Key, capital.Value))
                     continue;
-                int owner = buildings.Current.OwnerOf(capital.Key);
+                int owner = MatchPhaseRules.CapitalHolder(buildings.Current.OwnerOf(capital.Key), capital.Value);
                 if (owner < 0)
                     continue;
                 respawnCapitalScratch.Add(new MatchPhaseRules.CapitalHold
@@ -581,10 +581,10 @@ namespace Overpower.Match
                 }
 
                 int capital = map.CapitalOf(team);
-                bool holdsOwnCapital = capital >= 0 && current.OwnerOf(capital) == team;
+                bool holdsOwnCapital = capital >= 0 && MatchPhaseRules.CapitalHolder(current.OwnerOf(capital), team) == team;
                 bool holdsAnyCapitalInPlay = false;
                 foreach (KeyValuePair<int, int> ownCapital in map.Capitals)
-                    if (current.OwnerOf(ownCapital.Key) == team && IsCapitalInPlay(ownCapital.Key, ownCapital.Value))
+                    if (MatchPhaseRules.CapitalHolder(current.OwnerOf(ownCapital.Key), ownCapital.Value) == team && IsCapitalInPlay(ownCapital.Key, ownCapital.Value))
                     { holdsAnyCapitalInPlay = true; break; }
 
                 statuses[team] = new TeamStatus

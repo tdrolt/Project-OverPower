@@ -335,5 +335,13 @@ namespace Overpower.Tests
             Assert.IsFalse(MatchPhaseRules.IsAdoption(0, 1, 1), "a team that already had a capital just took a second");
             Assert.IsFalse(MatchPhaseRules.IsAdoption(TerritoryMap.Neutral, 1, 0));
         }
+
+        [Test]
+        public void ANeutralCapitalStillCountsAsItsOwnTeams()
+        {
+            Assert.AreEqual(2, MatchPhaseRules.CapitalHolder(TerritoryMap.Neutral, 2), "drained to neutral: still team 2's");
+            Assert.AreEqual(1, MatchPhaseRules.CapitalHolder(1, 2), "captured by team 1: team 1's");
+            Assert.AreEqual(2, MatchPhaseRules.CapitalHolder(2, 2));
+        }
     }
 }
