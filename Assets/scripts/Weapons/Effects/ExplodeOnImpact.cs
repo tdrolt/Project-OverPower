@@ -31,8 +31,8 @@ namespace Overpower.Weapons
     public class ExplodeOnImpact : MonoBehaviour, IProjectileBehaviour
     {
         [SerializeField, Tooltip("Damage dealt to everything caught in the blast, at the very " +
-                 "centre of it. This is ON TOP of the weapon's Damage, which the thing actually " +
-                 "struck has already taken - see the tooltip on Falloff for who gets which.")]
+                 "centre of it - the rocket's main damage. The thing it actually struck takes this " +
+                 "too, ON TOP of the weapon's Damage (a small bonus for a precise hit).")]
         private float splashDamage = 20f;
 
         [SerializeField, Tooltip("How far the blast reaches, in metres. Everything with health " +
@@ -152,17 +152,15 @@ namespace Overpower.Weapons
 
         /// <summary>
         /// One blast at one point. Everything with health inside Splash Radius takes
-        /// Splash Damage scaled by Falloff, except the shooter, the shooter's team, whatever took
-        /// the direct hit, and - Task 1.8b review finding - anything with a wall (Building layer,
+        /// Splash Damage scaled by Falloff, except the shooter, the shooter's team, and - Task 1.8b review finding - anything with a wall (Building layer,
         /// cover included) standing between it and the blast: walls stop blasts, or a wall (cover
         /// especially) would be pointless against a rocket lobbed just past it. FireField's own
         /// ground AoE is deliberately NOT given this check - it has no impact surface to occlude
         /// from, only a radius on the ground.
         /// </summary>
         /// <param name="directVictim">What the projectile physically struck, or null for an
-        /// airburst. It is skipped: it has already taken the weapon's full Damage, and adding the
-        /// splash on top would make a direct hit worth two hits. The designer's time-to-kill
-        /// budget is written against the direct damage alone.</param>
+        /// airburst. Since 2026-09-26 (Tudor) it takes the blast like everyone else, on top of the
+        /// weapon's small impact Damage: the blast is the main damage, the impact rewards precision.</param>
         /// <param name="directHitCollider">The collider actually struck, or null for an airburst -
         /// used only to know whether there IS a struck surface to nudge away from (see
         /// occlusionOrigin below); it is deliberately NOT what gets excluded from the occlusion
@@ -194,7 +192,9 @@ namespace Overpower.Weapons
                     continue;
 
                 IDamageable target = collider.GetComponentInParent<IDamageable>();
-                if (target == null || ReferenceEquals(target, directVictim))
+                // Tudor, 2026-09-26: the blast is the rocket's main damage, so the thing it struck takes it too
+                // (the weapon's own Damage is now a small bonus for a precise hit, on top) - it used to be skipped.
+                if (target == null)
                     continue;
 
                 if (IsFriendly(target) || !caught.Add(target))

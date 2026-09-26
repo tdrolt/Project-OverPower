@@ -20,8 +20,8 @@ namespace Overpower.Tests
     ///   (splashDamage * falloff.Evaluate(distance / splashRadius)) still matches an independent recomputation of
     ///   that same formula from the prefab's OWN current splashDamage/splashRadius/falloff - so a change to the
     ///   FORMULA itself (not the tunable numbers) is still caught, at whatever numbers Tudor has set.
-    /// - ADirectHitPaysMoreThanTheBestSplash: a direct hit must still pay more than the best possible splash (the
-    ///   whole "aiming still matters" argument depends on this), never a fixed number.
+    /// - ADirectHitPaysMoreThanANearMissAndTheBlastIsTheMainDamage: a direct hit (impact + blast) pays more than the best near miss, and the
+    ///   blast is the main damage (Tudor, 2026-09-26), never a fixed number.
     ///
     /// Each prefab's real splashDamage/splashRadius/falloff are read off its asset, then fed into a throwaway
     /// ExplodeOnImpact built fresh in an isolated preview scene (never the prefab's own cached instance) - the same
@@ -126,7 +126,7 @@ namespace Overpower.Tests
         [TestCase("Assets/Gameplay/Weapons/02 Rocket.asset")]
         [TestCase("Assets/Gameplay/Weapons/03 Rocket - Distance.asset")]
         [TestCase("Assets/Gameplay/Weapons/04 Rocket - Cursor Fire.asset")]
-        public void ADirectHitPaysMoreThanTheBestSplash(string weaponPath)
+        public void ADirectHitPaysMoreThanANearMissAndTheBlastIsTheMainDamage(string weaponPath)
         {
             var weapon = AssetDatabase.LoadAssetAtPath<Overpower.Data.WeaponDefinition>(weaponPath);
             Assert.IsNotNull(weapon, weaponPath);
@@ -136,8 +136,12 @@ namespace Overpower.Tests
             ExplodeOnImpact explode = BuildFromPrefab(projectilePrefabPath);
             float bestSplash = SplashDamageAt(explode, 0f); // distance 0 = the strongest a splash hit can ever be
 
-            Assert.Greater(weapon.Damage, bestSplash,
-                $"{weaponPath}.Damage ({weapon.Damage}) should pay more than {projectilePrefabPath}'s best splash ({bestSplash})");
+            // Tudor, 2026-09-26: the blast is the main damage and the struck target takes it too, so a direct hit
+            // (impact + the blast's centre) must still pay more than the best near miss (the blast's centre alone).
+            Assert.Greater(weapon.Damage + bestSplash, bestSplash,
+                $"{weaponPath}: a direct hit ({weapon.Damage} + {bestSplash}) should pay more than the best near miss ({bestSplash})");
+            Assert.Greater(bestSplash, weapon.Damage,
+                $"{weaponPath}: the blast ({bestSplash}) should be the main damage, not the impact ({weapon.Damage})");
         }
     }
 }
