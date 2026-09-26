@@ -31,7 +31,7 @@ MonoBehaviour:
   maxRange: 22
   minConeAngle: 1
   maxConeAngle: 14
-  bloomPerShot: 6
+  bloomPerShot: 10
   recoveryPerSecond: 3.5
   standingStillMultiplier: 1.5
   movingSpreadDegrees: 8

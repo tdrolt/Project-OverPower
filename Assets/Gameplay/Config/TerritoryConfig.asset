@@ -39,4 +39,4 @@ MonoBehaviour:
   decaySeconds: 3
   recaptureCooldownSeconds: 1
   underAttackLingerSeconds: 2.5
-  captureFadeSpeed: 1
+  captureFadeSpeed: 0.5
