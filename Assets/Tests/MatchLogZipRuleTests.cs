@@ -49,8 +49,42 @@ namespace Overpower.Tests
         [Test]
         public void ZipFileNameFollowsTheBriefsPattern()
         {
-            Assert.AreEqual("OverPower-log_2026-09-26_1730_Tudor.zip",
-                MatchLogZipRule.ZipFileName("2026-09-26_1730", "Tudor"));
+            // The first argument is the match FOLDER's own name (MatchTelemetry.ResolveMatchFolder:
+            // "<dateStamp>_<matchId8>"), not a wall-clock read taken at zip time (2026-09-26 fix) - it
+            // never changes for the life of a match, which is exactly what makes every zip of the same
+            // match come out under the same name.
+            Assert.AreEqual("OverPower-log_2026-09-26_0745_1361e7bf_Tudor.zip",
+                MatchLogZipRule.ZipFileName("2026-09-26_0745_1361e7bf", "Tudor"));
+        }
+
+        // Playtest extras P6 follow-up (2026-09-26, the zip-name-fix brief): the two-client check found
+        // a real Player quit could mint a SECOND zip under a different name, because
+        // MatchTelemetry.OnLeftRoom (fired by GameQuit.Quit's own PhotonNetwork.Disconnect) can clear
+        // CurrentFolder before MatchLogZip's own quit-time re-zip attempt runs. ResolveZipFolder is the
+        // pure decision behind the fix: prefer the live folder, and only fall back to the last one this
+        // client actually zipped into (remembered from MatchLogZip.HandleBeforeClose, which runs while
+        // CurrentFolder is still valid - see that method's own comment) when the live one has gone empty.
+
+        [Test]
+        public void ResolveZipFolderPrefersTheLiveFolder()
+        {
+            Assert.AreEqual("C:\\Telemetry\\2026-09-26_0745_1361e7bf",
+                MatchLogZipRule.ResolveZipFolder("C:\\Telemetry\\2026-09-26_0745_1361e7bf", "C:\\Telemetry\\stale"));
+        }
+
+        [Test]
+        public void ResolveZipFolderFallsBackWhenTheLiveFolderWentEmpty()
+        {
+            Assert.AreEqual("C:\\Telemetry\\2026-09-26_0745_1361e7bf",
+                MatchLogZipRule.ResolveZipFolder(null, "C:\\Telemetry\\2026-09-26_0745_1361e7bf"));
+            Assert.AreEqual("C:\\Telemetry\\2026-09-26_0745_1361e7bf",
+                MatchLogZipRule.ResolveZipFolder("", "C:\\Telemetry\\2026-09-26_0745_1361e7bf"));
+        }
+
+        [Test]
+        public void ResolveZipFolderIsEmptyWhenNeitherIsKnown()
+        {
+            Assert.IsTrue(string.IsNullOrEmpty(MatchLogZipRule.ResolveZipFolder(null, null)));
         }
 
         // Playtest extras P6 follow-up (item 3): "handle both orders" - a quit-time zip must still

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -15,11 +14,11 @@ namespace Overpower.Telemetry
     /// <summary>
     /// Playtest extras P5 (2026-09-26): zips THIS client's own match-log files (its own
     /// "{actor}_*.jsonl" and "bug_{actor}_*.png" - see MatchLogZipRule) into
-    /// "&lt;Telemetry folder&gt;/OverPower-log_&lt;dateStamp&gt;_&lt;nick&gt;.zip", so each tester
-    /// sends one file. Called from two places, both fine to call more than once - see ZipNow/
-    /// ZipIfNeeded: MatchUI.ShowMatchResult (this client's own win/lose panel appearing) and
-    /// GameQuit.Quit() (on quit, only if the result-panel path has not already zipped since the
-    /// match started - see hasZippedThisMatch).
+    /// "&lt;Telemetry folder&gt;/OverPower-log_&lt;match folder name&gt;_&lt;nick&gt;.zip", so each
+    /// tester sends one file. Called from two places, both fine to call more than once and both
+    /// through the same ZipNow (2026-09-26 fix - see its own comment on why there is no longer a
+    /// "skip if already zipped" variant): MatchUI.ShowMatchResult (this client's own win/lose panel
+    /// appearing) and GameQuit.Quit() (before it disconnects - see GameQuit's own comment on order).
     ///
     /// Scene-level singleton living next to MatchTelemetry/ConsoleTelemetry (the BuildingManager
     /// object) - not per-player like BugMarkerKey, but every zip step already only ever touches
@@ -37,21 +36,15 @@ namespace Overpower.Telemetry
 
         public static MatchLogZip Instance { get; private set; }
 
-        // Computed once per match (the first time either ZipNow/ZipIfNeeded actually zips) and
-        // reused after - see ZipFileName's own comment on why: the SAME zip name must come out both
-        // times (result shown, then quit moments later) so the second call overwrites the first
-        // rather than minting a second file if the two calls happen to land in different clock
-        // minutes.
-        private string cachedDateStamp;
-
-        // Guards GameQuit's own call (ZipIfNeeded): once the result-panel path has already zipped
-        // for this match, quitting moments later does not need to redo the same IO - see ZipIfNeeded.
-        // Reset in HandleBeforeClose, so the NEXT match (if this client plays another) starts fresh.
-        private bool hasZippedThisMatch;
-
         private GameObject overlayRoot;
         private TextMeshProUGUI savedLabel;
-        private string lastZipFolder;
+
+        // The last match folder this client actually knew about - set here AND in HandleBeforeClose
+        // (which runs while MatchTelemetry.CurrentFolder is still valid, before OnLeftRoom can clear
+        // it - see that method's own comment). MatchLogZipRule.ResolveZipFolder falls back to this
+        // when CurrentFolder has already gone empty, and OnOpenFolderClicked reads it for the overlay's
+        // own button.
+        private string lastKnownFolder;
 
         // One shared TMP material for both overlay button labels (playtest extras P6 follow-up, item 2)
         // - same reasoning as QuitConfirmPanel/MatchStartPanel's own ApplyOutline.
@@ -88,88 +81,76 @@ namespace Overpower.Telemetry
                 Destroy(textMaterial);
         }
 
-        // Set the instant this component's own OnApplicationQuit starts (whichever order it runs in
-        // relative to MatchTelemetry's) - see HandleBeforeClose's own comment on why this exists.
-        private bool isQuitting;
-
+        /// <summary>2026-09-26 fix (the zip-name-fix brief): captures MatchTelemetry.CurrentFolder into
+        /// lastKnownFolder WHILE it is still valid - MatchTelemetry raises BeforeClose (this event)
+        /// BEFORE it does anything that could clear CurrentFolder (OnLeftRoom's own "next match" reset;
+        /// OnApplicationQuit/OnDestroy never clear it at all), so this always sees a real folder when
+        /// there is one. The two-client check found the actual failure this guards against: GameQuit.
+        /// Quit()'s own PhotonNetwork.Disconnect() can raise OnLeftRoom (BeforeClose, then
+        /// CurrentFolder = null) before this component's OWN OnApplicationQuit gets to run its
+        /// re-zip - that second TryZip call used to find CurrentFolder already empty and skip zipping
+        /// a late-arriving line entirely. Now it falls back to whatever this method last captured (see
+        /// MatchLogZipRule.ResolveZipFolder, used by TryZip below).</summary>
         private void HandleBeforeClose()
         {
-            // Item 3 fix, found by actually testing "handle both orders" (not just asserting it): when
-            // MatchTelemetry.OnApplicationQuit happens to run BEFORE this component's own
-            // OnApplicationQuit, ITS OnApplicationQuit fires BeforeClose first - which used to reset
-            // cachedDateStamp/hasZippedThisMatch right before ZipNow() below ran, so the quit-time zip
-            // minted a SECOND, differently-named file instead of overwriting the result panel's own zip
-            // (the brief's explicit "zip AGAIN... overwrite the same file"). Confirmed live: forcing that
-            // exact order produced OverPower-log_..._0724_....zip AND a second _0725_....zip for the same
-            // match. BeforeClose still needs to reset these two for the legitimate case (OnLeftRoom, this
-            // client about to play a genuinely different match) - isQuitting is false there, since the
-            // app is not quitting - so only the quit-time case is skipped.
-            if (isQuitting)
-                return;
-
-            cachedDateStamp = null;
-            hasZippedThisMatch = false;
+            MatchTelemetry mt = MatchTelemetry.Instance;
+            if (mt != null && !string.IsNullOrEmpty(mt.CurrentFolder))
+                lastKnownFolder = mt.CurrentFolder;
         }
 
         /// <summary>Playtest extras P6 follow-up (item 3): most testers close the window (X / Alt+F4) or
         /// quit mid-match, never touching the result panel or the Escape pop-up's Yes - this is the one
-        /// path that catches them. Always re-zips, like ZipNow (not ZipIfNeeded's "skip if the result
-        /// panel already zipped this match") - the brief's own "zip AGAIN even if the result panel
-        /// already zipped": a late bug mark or a leaving error can be logged after that first zip, and
-        /// TryZip always overwrites the same file name (cachedDateStamp), so re-zipping costs nothing -
-        /// isQuitting (set first, below) keeps that name from being wiped out from under it; see
-        /// HandleBeforeClose's own comment.
+        /// path that catches them. Always re-zips, like ZipNow - TryZip names the file after the match
+        /// folder itself (MatchLogZipRule.ZipFileName), not a clock read, so a repeat here simply
+        /// overwrites the same file (the brief's own "zip AGAIN even if the result panel already
+        /// zipped": a late bug mark or a leaving error can be logged after that first zip).
         ///
         /// Order with MatchTelemetry.OnApplicationQuit (same GameObject, no guaranteed order between two
         /// different components' OnApplicationQuit): if that already ran, its writer is closed and
         /// IsRecording now reads false, but Close() flushes before closing (TelemetryWriter.Close), so
-        /// the file on disk is already complete - TryZip's own guard reads CurrentFolder, not
-        /// IsRecording, precisely so it does not bail out in that order. If this runs first instead, the
-        /// writer is still open and FlushNow() below writes the buffer as normal. Either order finds a
-        /// file to zip; TryZip's own try/catch keeps this exception-safe like every other call into it.</summary>
-        private void OnApplicationQuit()
-        {
-            isQuitting = true;
-            ZipNow();
-        }
+        /// the file on disk is already complete - TryZip's own guard reads CurrentFolder (falling back
+        /// to lastKnownFolder), not IsRecording, precisely so it does not bail out in that order. If this
+        /// runs first instead, the writer is still open and FlushNow() below writes the buffer as normal.
+        /// Either order finds a file to zip; TryZip's own try/catch keeps this exception-safe like every
+        /// other call into it.</summary>
+        private void OnApplicationQuit() => ZipNow();
 
-        /// <summary>MatchUI.ShowMatchResult's own call - the result panel appearing always deserves
-        /// an up-to-date zip, so this always tries (idempotent: same file name, safely overwritten -
-        /// see cachedDateStamp).</summary>
+        /// <summary>MatchUI.ShowMatchResult's own call AND GameQuit.Quit()'s own call (2026-09-26 fix -
+        /// there used to be a second, "skip if already zipped" entry point, ZipIfNeeded, but naming the
+        /// file after the match folder instead of a clock read (MatchLogZipRule.ZipFileName) already
+        /// makes every call idempotent - the same file is simply overwritten - so the skip added nothing
+        /// but a chance to miss a line logged between the two calls). Always tries.</summary>
         public void ZipNow() => TryZip();
-
-        /// <summary>GameQuit.Quit()'s own call - skips the IO entirely if ZipNow() already zipped
-        /// this match (the common "result shown, then quit a moment later" path); still zips if the
-        /// match never showed a result at all (a player quitting mid-match).</summary>
-        public void ZipIfNeeded()
-        {
-            if (!hasZippedThisMatch)
-                TryZip();
-        }
 
         private void TryZip()
         {
             try
             {
                 MatchTelemetry mt = MatchTelemetry.Instance;
-                if (mt == null || !MatchLogZipRule.ShouldAttemptZip(mt.CurrentFolder))
+                // ResolveZipFolder: prefer the live folder; fall back to the last one this client knew
+                // about if MatchTelemetry.OnLeftRoom already cleared CurrentFolder - see
+                // HandleBeforeClose's own comment on when and why that race happens.
+                string folder = MatchLogZipRule.ResolveZipFolder(mt != null ? mt.CurrentFolder : null, lastKnownFolder);
+                if (!MatchLogZipRule.ShouldAttemptZip(folder))
                     return; // See ShouldAttemptZip's own comment on why this is CurrentFolder, not IsRecording.
                 if (PhotonNetwork.LocalPlayer == null)
                     return;
 
-                mt.FlushNow(); // The brief's own ordering: flush THIS client's buffer to disk before reading the folder.
+                mt?.FlushNow(); // The brief's own ordering: flush THIS client's buffer to disk before reading the folder.
 
                 int actor = PhotonNetwork.LocalPlayer.ActorNumber;
-                string folder = mt.CurrentFolder;
 
                 string[] allNames = Directory.GetFiles(folder).Select(Path.GetFileName).ToArray();
                 List<string> ownNames = MatchLogZipRule.SelectOwnFiles(allNames, actor);
                 if (ownNames.Count == 0)
                     return; // IsRecording was true but somehow no matching file exists - be safe, do nothing.
 
-                cachedDateStamp ??= DateTime.Now.ToString("yyyy-MM-dd_HHmm", CultureInfo.InvariantCulture);
                 string sanitizedNick = MatchTelemetry.Sanitize(PhotonNetwork.LocalPlayer.NickName);
-                string zipName = MatchLogZipRule.ZipFileName(cachedDateStamp, sanitizedNick);
+                // Named after the match folder itself, not a clock read (2026-09-26 fix - see
+                // MatchLogZipRule.ZipFileName's own comment on the real bug this replaces): stable for
+                // the whole match, so every zip of it - result panel, then maybe again on quit - comes
+                // out under the SAME name no matter what the clock reads when each call happens to run.
+                string zipName = MatchLogZipRule.ZipFileName(Path.GetFileName(folder), sanitizedNick);
                 string zipPath = Path.Combine(folder, zipName);
 
                 // "Overwriting its own earlier zip of the same match" (the brief) - delete first
@@ -185,8 +166,7 @@ namespace Overpower.Telemetry
                         archive.CreateEntryFromFile(Path.Combine(folder, name), name, System.IO.Compression.CompressionLevel.Optimal);
                 }
 
-                hasZippedThisMatch = true;
-                lastZipFolder = folder;
+                lastKnownFolder = folder;
                 ShowSavedOverlay(zipPath, folder);
             }
             catch (Exception e)
@@ -202,7 +182,7 @@ namespace Overpower.Telemetry
             if (overlayRoot == null)
                 BuildOverlay();
 
-            lastZipFolder = folder;
+            lastKnownFolder = folder;
             if (savedLabel != null && theme != null)
             {
                 // Item 2: Path.Combine above uses this platform's separator throughout, but folder
@@ -345,8 +325,8 @@ namespace Overpower.Telemetry
         /// whoever is sitting at this machine's screen; check this wiring by reading it instead.</summary>
         private void OnOpenFolderClicked()
         {
-            if (!string.IsNullOrEmpty(lastZipFolder))
-                Application.OpenURL(lastZipFolder);
+            if (!string.IsNullOrEmpty(lastKnownFolder))
+                Application.OpenURL(lastKnownFolder);
         }
 
         private void OnDismissClicked()
