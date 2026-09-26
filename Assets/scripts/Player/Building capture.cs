@@ -84,6 +84,10 @@ public class BuildingCapture : MonoBehaviourPun
     private float DecaySeconds =>
         territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).decaySeconds : FallbackDecaySeconds;
 
+    // Tudor, 2026-09-26: both capture sounds can be switched off in the Territory Config (off by default now).
+    private bool ProgressSoundOn => territoryConfig == null || territoryConfig.PlayCaptureProgressSound;
+    private bool CapturedSoundOn => territoryConfig == null || territoryConfig.PlayCapturedSound;
+
     private float RecaptureCooldownSeconds =>
         territoryConfig != null ? territoryConfig.RecaptureCooldownSeconds : FallbackRecaptureCooldownSeconds;
 
@@ -915,6 +919,8 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_CompleteCapture(int teamID)
     {
+        if (!CapturedSoundOn)
+            return;
         if (audioSource && capturedSound)
             audioSource.PlayOneShot(capturedSound);
     }
@@ -1065,6 +1071,8 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_PlayCaptureSound()
     {
+        if (!ProgressSoundOn)
+            return;
         // I1: a send in flight when the zone hides (this call, or the master's own RPC_AddToZone re-triggering it)
         // must not start a loop nothing will ever stop again on a hidden tower - SetHiddenAsCut already stopped the
         // source on this same client; starting it back up here would undo that.
@@ -1093,6 +1101,8 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_PlayCapturedSound()
     {
+        if (!CapturedSoundOn)
+            return;
         // Play the captured sound on all clients
         if (audioSource && capturedSound)
         {
@@ -1104,6 +1114,8 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_PlayRecaptureSound()
     {
+        if (!ProgressSoundOn)
+            return;
         // I1: same in-flight-send guard as RPC_PlayCaptureSound - a drain-start sent just before the hide must not
         // start a loop on a tower that has already fallen silent.
         if (hiddenAsCut)
@@ -1119,6 +1131,8 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_PlayNeutralizationSound()
     {
+        if (!CapturedSoundOn)
+            return;
         if (audioSource && capturedSound)
         {
             audioSource.PlayOneShot(capturedSound);

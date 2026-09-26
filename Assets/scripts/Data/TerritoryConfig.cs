@@ -82,12 +82,22 @@ namespace Overpower.Data
                  "fast as it could capture.")]
         [SerializeField, Min(0f)] private float captureFadeSpeed = 1f;
 
+        [Header("Sounds")]
+        [Tooltip("The looping sound a zone plays while it is being captured or drained. Off since Tudor, 2026-09-26.")]
+        [SerializeField] private bool playCaptureProgressSound = false;
+
+        [Tooltip("The sound a zone plays when a team takes control of it (the same clip also marks a zone going " +
+                 "neutral). Off since Tudor, 2026-09-26.")]
+        [SerializeField] private bool playCapturedSound = false;
+
         public int PlayersPerTeam => playersPerTeam;
         public float BountyHoldSeconds => bountyHoldSeconds;
         public int StartingGold => startingGold;
         public float RecaptureCooldownSeconds => recaptureCooldownSeconds;
         public float UnderAttackLingerSeconds => underAttackLingerSeconds;
         public float CaptureFadeSpeed => captureFadeSpeed;
+        public bool PlayCaptureProgressSound => playCaptureProgressSound;
+        public bool PlayCapturedSound => playCapturedSound;
         public int TierCount => tiers != null ? tiers.Length : 0;
 
         // Set once an out-of-range tier has already logged, so a mistyped tower spams the console

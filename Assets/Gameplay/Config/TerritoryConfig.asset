@@ -18,13 +18,13 @@ MonoBehaviour:
     captureBounty: 0
     healthRegenPerSecond: 10
     captureRadius: 10
-    decaySeconds: 8.75
+    decaySeconds: 5
   - captureSeconds: 12.5
     teamGoldPerSecond: 5
     captureBounty: 0
     healthRegenPerSecond: 4
     captureRadius: 8
-    decaySeconds: 6.25
+    decaySeconds: 5
   - captureSeconds: 6
     teamGoldPerSecond: 10
     captureBounty: 900
@@ -43,3 +43,5 @@ MonoBehaviour:
   recaptureCooldownSeconds: 1
   underAttackLingerSeconds: 2.5
   captureFadeSpeed: 0.5
+  playCaptureProgressSound: 0
+  playCapturedSound: 0
