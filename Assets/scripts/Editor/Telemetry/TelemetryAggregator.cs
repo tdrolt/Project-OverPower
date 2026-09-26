@@ -167,6 +167,9 @@ namespace Overpower.EditorTools.Telemetry
             tables.Header.EliminationFallbackUsed = timeline.UsedEliminationFallback; // review fix item 9
             tables.Header.WarmupSeconds = timeline.LiveSeconds; // 2.7b step 9
             tables.Header.NeverWentLive = timeline.HasWarmup && !timeline.WentLive; // 2.7b step 9
+            // Playtest extras Task 2 (P4): unwindowed, like LogCoverage above - the Bug reports and
+            // Console sections only ever render on the whole-match tab (see BugRow's own comment).
+            BuildBugsAndConsole(log, fileActor, sessionByActor, tPhase2, tables.Header.Bugs, tables.Header.ConsoleByPlayer);
             BuildCaptures(log, rawChangesByZone, zoneTier, matchLength, tables.Header, tables.Captures, effectiveWindow, tPhase2);
             BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables, effectiveWindow, tPhase2);
             BuildHits(log, effectiveTeam, tables.Hits, effectiveWindow, tPhase2);
@@ -424,6 +427,129 @@ namespace Overpower.EditorTools.Telemetry
                     JoinedAndLeftBeforeLoggingStarted = joinedAndLeft,
                 });
             }
+        }
+
+        /// <summary>Playtest extras Task 2 (P4): the "Bug reports" and per-player "Console" sections'
+        /// own data, in one pass. A console line carries no actor field of its own - the FILE it came
+        /// from is the player (see TelemetryKeys.Console's own doc comment and ActorOf) - so both a
+        /// bug card's own console window and the per-player grouping below read it through fileActor.
+        ///
+        /// Bug cards: the reporter's OWN chat (never another player's) in [t, t+60], and every
+        /// client's console lines (any level, including plain "log" - the one place they're kept) in
+        /// [t-20, t+5], merged across every file and sorted by time. A "dropped" summary line (State
+        /// "dropped", no Message of its own) is never a real console line and is skipped everywhere
+        /// in this method.
+        ///
+        /// Per-player Console: every non-"log" line (warning/error/exception/assert), grouped by
+        /// (actor, level, message) - the count SUMS each matching line's own fold count (n), since one
+        /// already-folded line can itself represent several real repeats, and First/Last t spans every
+        /// matching line's own first/last-touched time, not just its own single `t`.</summary>
+        private static void BuildBugsAndConsole(TelemetryLog log, Dictionary<string, int> fileActor,
+            Dictionary<int, TelemetrySession> sessionByActor, double? tPhase2, List<BugRow> outBugs,
+            List<ConsolePlayerGroupRow> outConsoleByPlayer)
+        {
+            var chatByActor = new Dictionary<int, List<(double T, string Text)>>();
+            var consoleLines = new List<(double T, int Actor, string Level, string Message, int N, double FirstT, double LastT)>();
+
+            foreach (TelemetryEvent e in log.Events)
+            {
+                if (e.Name == TelemetryKeys.Chat)
+                {
+                    int actor = ReadInt(e.Data, TelemetryKeys.Actor, -1);
+                    if (actor < 0) continue;
+                    if (!chatByActor.TryGetValue(actor, out var list))
+                        chatByActor[actor] = list = new List<(double, string)>();
+                    list.Add((e.T, e.Data[TelemetryKeys.Text]?.ToString() ?? ""));
+                }
+                else if (e.Name == TelemetryKeys.Console)
+                {
+                    string level = e.Data[TelemetryKeys.State]?.ToString() ?? "";
+                    if (level == "dropped") continue; // a summary line, never a real message.
+                    int actor = ActorOf(e, fileActor);
+                    int n = ReadInt(e.Data, TelemetryKeys.RepeatCount, 1);
+                    double firstT = ReadDoubleOrDefault(e.Data, TelemetryKeys.FirstT, e.T);
+                    double lastT = ReadDoubleOrDefault(e.Data, TelemetryKeys.LastT, e.T);
+                    consoleLines.Add((e.T, actor, level, e.Data[TelemetryKeys.Message]?.ToString() ?? "", n, firstT, lastT));
+                }
+            }
+
+            foreach (TelemetryEvent e in log.Events)
+            {
+                if (e.Name != TelemetryKeys.Bug) continue;
+
+                int actor = ReadInt(e.Data, TelemetryKeys.Actor, -1);
+                TelemetrySession session = sessionByActor.GetValueOrDefault(actor);
+
+                var bug = new BugRow
+                {
+                    T = e.T,
+                    Actor = actor,
+                    Nick = session?.Nick ?? "",
+                    Team = ReadInt(e.Data, TelemetryKeys.Team, -1),
+                    Alive = e.Data[TelemetryKeys.Alive]?.ToObject<bool?>() ?? true,
+                    Zone = ReadInt(e.Data, TelemetryKeys.Zone, -1),
+                    X = ReadFloat(e.Data, TelemetryKeys.X),
+                    Z = ReadFloat(e.Data, TelemetryKeys.Z),
+                    Weapon = ReadInt(e.Data, TelemetryKeys.Weapon, -1),
+                    Equipment = ReadInt(e.Data, TelemetryKeys.Equipment, -1),
+                    Mobility = ReadInt(e.Data, TelemetryKeys.Mobility, -1),
+                    Ultimate = ReadInt(e.Data, TelemetryKeys.Ultimate, -1),
+                    ScreenshotFile = e.Data[TelemetryKeys.ScreenshotFile]?.ToString() ?? "",
+                    Phase = PhaseOf(e.T, tPhase2),
+                };
+
+                // The reporter's OWN chat, 0-60s after the mark (P4) - never another player's.
+                if (chatByActor.TryGetValue(actor, out var chats))
+                    foreach (var (t, text) in chats)
+                        if (t >= e.T && t <= e.T + 60.0)
+                            bug.ChatNotes.Add(text);
+
+                // Every client's console lines, 20s before to 5s after (P4) - merged across files,
+                // sorted by time below, labelled by whichever player's file each one came from.
+                foreach (var (t, lineActor, level, message, n, _, _) in consoleLines)
+                {
+                    if (t < e.T - 20.0 || t > e.T + 5.0) continue;
+                    bug.ConsoleWindow.Add(new ConsoleLineRef
+                    {
+                        T = t,
+                        Actor = lineActor,
+                        Nick = sessionByActor.GetValueOrDefault(lineActor)?.Nick ?? "",
+                        Level = level,
+                        Message = message,
+                        Count = n,
+                    });
+                }
+                bug.ConsoleWindow.Sort((a, b) => a.T.CompareTo(b.T));
+
+                outBugs.Add(bug);
+            }
+
+            // Console section, per player - every level except plain "log" (P4's own wording: "plain
+            // log lines only appear inside bug windows" - see BugRow.ConsoleWindow, the one place they
+            // do), grouped by (actor, level, message), with the summed count and the first/last time.
+            var groups = new Dictionary<(int Actor, string Level, string Message), ConsolePlayerGroupRow>();
+            foreach (var (t, actor, level, message, n, firstT, lastT) in consoleLines)
+            {
+                if (level == "log") continue;
+                var key = (actor, level, message);
+                if (!groups.TryGetValue(key, out ConsolePlayerGroupRow row))
+                {
+                    row = new ConsolePlayerGroupRow
+                    {
+                        Actor = actor,
+                        Nick = sessionByActor.GetValueOrDefault(actor)?.Nick ?? "",
+                        Level = level,
+                        Message = message,
+                        FirstT = firstT,
+                        LastT = lastT,
+                    };
+                    groups[key] = row;
+                }
+                row.Count += n;
+                if (firstT < row.FirstT) row.FirstT = firstT;
+                if (lastT > row.LastT) row.LastT = lastT;
+            }
+            outConsoleByPlayer.AddRange(groups.Values.OrderBy(r => r.Actor).ThenBy(r => r.FirstT));
         }
 
         /// <summary>Opus review item 2: a late joiner's `session` line can be written before the room's
@@ -1663,6 +1789,16 @@ namespace Overpower.EditorTools.Telemetry
             foreach (JToken z in zones)
                 if ((z.Type == JTokenType.Null ? 0 : z.ToObject<int>()) != 0) return false;
             return true;
+        }
+
+        /// <summary>Playtest extras Task 2 (P4): a `console` line's own FirstT/LastT are only written
+        /// when its fold count is greater than 1 (TelemetryKeys.RepeatCount's own comment) - absent
+        /// otherwise, in which case the line's own single `t` already IS both its first and last
+        /// touch, hence the fallback being that line's own T rather than a fixed constant.</summary>
+        private static double ReadDoubleOrDefault(JObject data, string key, double fallback)
+        {
+            JToken token = data[key];
+            return (token != null && token.Type != JTokenType.Null) ? token.ToObject<double>() : fallback;
         }
 
         private static float ReadFloat(JObject data, string key, string fallbackKey = null)

@@ -44,6 +44,76 @@ namespace Overpower.EditorTools.Telemetry
         public bool JoinedAndLeftBeforeLoggingStarted;
     }
 
+    /// <summary>Playtest extras Task 2 (P4): one console line inside a bug card's own window (20s
+    /// before to 5s after the mark) - every client's, merged and sorted by time, each one labelled
+    /// with which player it came from (a console line has no actor field of its own; the file it
+    /// came from IS the player - see TelemetryAggregator.BuildBugsAndConsole).</summary>
+    public sealed class ConsoleLineRef
+    {
+        public double T;
+        public int Actor;
+        public string Nick = "";
+        /// <summary>"log"/"warning"/"error"/"exception"/"assert" - never "dropped" (a summary line,
+        /// never a real message, is left out of every bug window).</summary>
+        public string Level = "";
+        public string Message = "";
+        /// <summary>This line's own fold count (TelemetryKeys.RepeatCount) - 1 for a line nothing
+        /// else folded into.</summary>
+        public int Count = 1;
+    }
+
+    /// <summary>Playtest extras Task 2 (P4): one card for the "Bug reports" section - one row per
+    /// `bug` line (Ctrl+B), enriched with the reporter's own chat note(s) and every client's nearby
+    /// console lines. Whole-match only (see ReportHeader.Bugs' own comment) - like LogCoverageRow,
+    /// computed the same way regardless of which scope's own Build call filled it.</summary>
+    public sealed class BugRow
+    {
+        public double T;
+        public int Actor;
+        public string Nick = "";
+        public int Team;
+        public bool Alive;
+        public int Zone;
+        public float X;
+        public float Z;
+        public int Weapon;
+        public int Equipment;
+        public int Mobility;
+        public int Ultimate;
+        /// <summary>The screenshot's own FILE NAME (TelemetryKeys.ScreenshotFile) - never a path.
+        /// The HTML links it relative to the report, which sits in the same match folder the
+        /// screenshot itself was saved into (BugMarkerKey), so a bare file name already resolves
+        /// correctly there, including once the whole folder is zipped and opened elsewhere.</summary>
+        public string ScreenshotFile = "";
+        public int Phase = 1;
+        /// <summary>The reporter's OWN chat text(s), 0-60s after the mark - never another player's
+        /// (P4). Empty when they never said anything in that window.</summary>
+        public List<string> ChatNotes = new List<string>();
+        /// <summary>Every client's console lines from 20s before to 5s after the mark, merged and
+        /// sorted by time (P4) - every level, including plain "log" (P4's own wording: "plain log
+        /// lines only appear inside bug windows" - this is that one place).</summary>
+        public List<ConsoleLineRef> ConsoleWindow = new List<ConsoleLineRef>();
+    }
+
+    /// <summary>Playtest extras Task 2 (P4): one row of the per-player "Console" section - every
+    /// error/exception/warning a player's own file logged, grouped by its exact message, with how
+    /// many times it happened and the first/last time. A plain "log" line is never grouped here (P4:
+    /// "plain log lines only appear inside bug windows" - see BugRow.ConsoleWindow); a "dropped"
+    /// summary line is not a real message either, so it is left out too. Whole-match only.</summary>
+    public sealed class ConsolePlayerGroupRow
+    {
+        public int Actor;
+        public string Nick = "";
+        public string Level = "";
+        public string Message = "";
+        /// <summary>Summed across every separate fold bucket (TelemetryKeys.RepeatCount) that ever
+        /// matched this (actor, level, message) - not just how many `console` JSONL lines matched,
+        /// since one line can itself already represent several real repeats.</summary>
+        public int Count;
+        public double FirstT;
+        public double LastT;
+    }
+
     /// <summary>Everything that isn't one of the 12 tables: match-wide facts and the quality counters
     /// the spec's Error handling section asks for (malformed/unknown lines are never a failure, just a
     /// number in the header).</summary>
@@ -96,6 +166,14 @@ namespace Overpower.EditorTools.Telemetry
         /// <summary>The primary session's own tuning snapshot, re-serialized flat - T6's HTML report
         /// embeds this verbatim; T5 just carries it through.</summary>
         public string TuningJson;
+
+        /// <summary>Playtest extras Task 2 (P4): the "Bug reports" section's own rows - see BugRow's
+        /// own comment on why this is always the whole match's list, like LogCoverage above.</summary>
+        public List<BugRow> Bugs = new List<BugRow>();
+
+        /// <summary>Playtest extras Task 2 (P4): the per-player "Console" section's own rows - see
+        /// ConsolePlayerGroupRow's own comment.</summary>
+        public List<ConsolePlayerGroupRow> ConsoleByPlayer = new List<ConsolePlayerGroupRow>();
     }
 
     public sealed class GoldTimelineRow

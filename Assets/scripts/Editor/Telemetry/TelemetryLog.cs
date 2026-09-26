@@ -109,6 +109,9 @@ namespace Overpower.EditorTools.Telemetry
             TelemetryKeys.Phase, TelemetryKeys.Elimination,
             // 2.7b step 9: the telemetry `adopt` line.
             TelemetryKeys.Adopt,
+            // Playtest extras Task 2 (P4): console/bug/chat lines - TelemetryAggregator.
+            // BuildBugsAndConsole is the only reader.
+            TelemetryKeys.Console, TelemetryKeys.Bug, TelemetryKeys.Chat,
         };
 
         public static TelemetryLog Load(string folder)

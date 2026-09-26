@@ -43,6 +43,10 @@ namespace Overpower.EditorTools.Telemetry
             string wholeMatchFolder = Path.Combine(csvRoot, "whole_match");
             WriteTables(reportSet.WholeMatch, wholeMatchFolder);
             WriteLogCoverage(reportSet.WholeMatch?.Header?.LogCoverage, wholeMatchFolder);
+            // Playtest extras Task 2 (P4): bugs.csv and console.csv, whole_match only - same
+            // "computed once, only ever written from the whole-match table" pattern as log_coverage.csv.
+            WriteBugs(reportSet.WholeMatch?.Header?.Bugs, wholeMatchFolder);
+            WriteConsole(reportSet.WholeMatch?.Header?.ConsoleByPlayer, wholeMatchFolder);
 
             WriteTables(reportSet.Phase1, Path.Combine(csvRoot, "phase1_3teams"));
 
@@ -85,6 +89,41 @@ namespace Overpower.EditorTools.Telemetry
                     N(r.Actor), r.Nick, N(r.FilePresent),
                     r.FirstT.HasValue ? N(r.FirstT.Value) : "-",
                     r.LastT.HasValue ? N(r.LastT.Value) : "-",
+                }));
+        }
+
+        /// <summary>Playtest extras Task 2 (P4), whole_match only. One row per Ctrl+B mark; the chat
+        /// note(s) and console-window line count are summarized, not spelled out in full (the HTML
+        /// report is where the full text lives - see HtmlReportWriter's Bug reports section).</summary>
+        private static void WriteBugs(System.Collections.Generic.List<BugRow> rows, string csvFolder)
+        {
+            rows ??= new System.Collections.Generic.List<BugRow>();
+            Directory.CreateDirectory(csvFolder);
+            WriteCsv(
+                Path.Combine(csvFolder, "bugs.csv"),
+                new[] { "t", "actor", "name", "team", "phase", "x", "z", "zone", "alive",
+                        "weapon", "equipment", "mobility", "ultimate", "screenshot", "chatNotes", "consoleLines" },
+                rows.Select(r => new[]
+                {
+                    N(r.T), N(r.Actor), r.Nick, N(r.Team), N(r.Phase), N(r.X), N(r.Z), N(r.Zone), N(r.Alive),
+                    N(r.Weapon), N(r.Equipment), N(r.Mobility), N(r.Ultimate), r.ScreenshotFile ?? "",
+                    string.Join(" | ", r.ChatNotes), N(r.ConsoleWindow.Count),
+                }));
+        }
+
+        /// <summary>Playtest extras Task 2 (P4), whole_match only. Deliberately narrower than the
+        /// HTML's own per-player Console section (which also shows "exception" rows) - the brief's
+        /// own wording for this file is "console.csv (errors + warnings)".</summary>
+        private static void WriteConsole(System.Collections.Generic.List<ConsolePlayerGroupRow> rows, string csvFolder)
+        {
+            rows ??= new System.Collections.Generic.List<ConsolePlayerGroupRow>();
+            Directory.CreateDirectory(csvFolder);
+            WriteCsv(
+                Path.Combine(csvFolder, "console.csv"),
+                new[] { "actor", "name", "level", "message", "count", "firstT", "lastT" },
+                rows.Where(r => r.Level == "error" || r.Level == "warning").Select(r => new[]
+                {
+                    N(r.Actor), r.Nick, r.Level, r.Message, N(r.Count), N(r.FirstT), N(r.LastT),
                 }));
         }
 

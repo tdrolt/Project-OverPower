@@ -53,7 +53,9 @@ namespace Overpower.Tests
                 Assert.IsFalse(File.Exists(Path.Combine(phase1, "log_coverage.csv")));
                 Assert.IsFalse(File.Exists(Path.Combine(phase2, "log_coverage.csv")));
 
-                Assert.AreEqual(13, Directory.GetFiles(wholeMatch, "*.csv").Length);
+                // 13 (the 12 + log_coverage.csv) + bugs.csv + console.csv - Playtest extras Task 2
+                // (P4), whole_match only, same as log_coverage.csv above.
+                Assert.AreEqual(15, Directory.GetFiles(wholeMatch, "*.csv").Length);
                 Assert.AreEqual(12, Directory.GetFiles(phase1, "*.csv").Length);
                 Assert.AreEqual(12, Directory.GetFiles(phase2, "*.csv").Length);
 

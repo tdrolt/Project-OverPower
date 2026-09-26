@@ -283,6 +283,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 .tab-button.active { color: var(--fg); border-bottom-color: var(--team0); font-weight: 600; }
 .tab-panel { display: block; min-width: 0; }
 .phase-duration { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+.bug-screenshot { max-width: 480px; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 6px; margin: 8px 0; display: block; }
 </style>
 </head>
 <body>
@@ -303,6 +304,18 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 <p class='phase-duration' id='phase-duration-%SCOPE%'></p>
 <div id='phase2-empty-note-%SCOPE%' class='warn' style='display:none'>No team was eliminated in this match: everything is Phase 1.</div>
 <div id='tab-content-%SCOPE%'>
+
+<section id='section-bugs-%SCOPE%'>
+<h2>Bug reports</h2>
+<p class='card-desc'>Whole match only. One card per Ctrl+B mark: who/when/where, their loadout, the screenshot, their own chat note in the 60s after, every client's console lines from 20s before to 5s after, and the surrounding &plusmn;30s of gameplay events.</p>
+<div id='bugs-list-%SCOPE%'></div>
+</section>
+
+<section id='section-console-%SCOPE%'>
+<h2>Console</h2>
+<p class='card-desc'>Whole match only. Every error, exception and warning from each player's own log, grouped by message, with the count and first/last time. Plain log lines only show up inside a Bug report's own console window above.</p>
+<div id='console-by-player-%SCOPE%'></div>
+</section>
 
 <section id='section-header-%SCOPE%'>
 <h2>Header</h2>
@@ -1371,15 +1384,11 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 
   // ---------------------------------------------------------------- markers
 
-  function renderMarkers(scope, suffix) {
-    var bucket = bucketFor(scope);
-    var markers = (bucket && bucket.header && bucket.header.markers) || [];
-    var container = id('markers-list', suffix);
-    if (!markers.length) {
-      container.appendChild(el('div', { class: 'note' }, 'No markers were dropped in this scope.'));
-      return;
-    }
-
+  // Shared by the Markers section and the Bug reports section (P4): the existing 30s
+  // gameplay-event window the Markers section already shows - one build of the event list per
+  // scope, so a marker and a bug mark landing at the same instant can never disagree about what
+  // was happening nearby.
+  function gameplayEventsForScope(scope) {
     var events = [];
     rowsFor('deaths', scope).forEach(function (dr) { events.push({ t: dr.t, kind: 'death', text: dr.victimNick + ' died' }); });
     rowsFor('purchases', scope).forEach(function (pr) { events.push({ t: pr.t, kind: pr.kind, text: pr.nick + ' ' + pr.kind + ' (' + pr.category + ')' }); });
@@ -1389,6 +1398,19 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       events.push({ t: cr.end, kind: 'captureEnd', text: zoneLabel(cr.zone) + ' capture ' + cr.outcome });
     });
     rowsFor('ownership', scope).forEach(function (or_) { events.push({ t: or_.from, kind: 'ownership', text: zoneLabel(or_.zone) + ' to team ' + or_.team }); });
+    return events;
+  }
+
+  function renderMarkers(scope, suffix) {
+    var bucket = bucketFor(scope);
+    var markers = (bucket && bucket.header && bucket.header.markers) || [];
+    var container = id('markers-list', suffix);
+    if (!markers.length) {
+      container.appendChild(el('div', { class: 'note' }, 'No markers were dropped in this scope.'));
+      return;
+    }
+
+    var events = gameplayEventsForScope(scope);
 
     for (var m = 0; m < markers.length; m++) {
       var marker = markers[m];
@@ -1411,6 +1433,109 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     }
   }
 
+  // ---------------------------------------------------------------- Playtest extras (P4): bug reports
+
+  // Whole-match only (P4) - the section still exists in every tab's own template (one shared
+  // TabPanelTemplate - see HtmlReportWriter.TabPanel), so a Phase 1/Phase 2 tab hides it instead of
+  // rendering an empty duplicate of the same whole-match facts.
+  function renderBugReports(scope, suffix) {
+    var section = document.getElementById('section-bugs-' + suffix);
+    if (scope !== 'whole-match') { section.style.display = 'none'; return; }
+
+    var bucket = bucketFor(scope);
+    var bugs = (bucket && bucket.header && bucket.header.bugs) || [];
+    var container = id('bugs-list', suffix);
+    if (!bugs.length) {
+      container.appendChild(el('div', { class: 'note' }, 'No bugs were marked (Ctrl+B) in this match.'));
+      return;
+    }
+
+    var events = gameplayEventsForScope(scope);
+
+    for (var i = 0; i < bugs.length; i++) {
+      var bug = bugs[i];
+      var card = el('div', { class: 'card' });
+      card.appendChild(el('h3', null, 't=' + fmt(bug.t) + 's – ' + (bug.nick || ('actor ' + bug.actor)) + ' (team ' + bug.team + ')'));
+
+      card.appendChild(el('div', null, 'Where: ' + zoneLabel(bug.zone) + ' at (' + fmt(bug.x) + ', ' + fmt(bug.z) + '), ' + (bug.alive ? 'alive' : 'dead')));
+      card.appendChild(el('div', null, 'Loadout: weapon ' + weaponName(bug.weapon) + ', equipment ' + abilityName(bug.equipment) + ', mobility ' + abilityName(bug.mobility) + ', ultimate ' + abilityName(bug.ultimate)));
+
+      if (bug.screenshotFile) {
+        card.appendChild(el('img', { class: 'bug-screenshot', src: bug.screenshotFile, alt: 'Bug screenshot at t=' + fmt(bug.t) + 's' }));
+      }
+
+      var notesHost = el('div', { class: 'note' },
+        (bug.chatNotes && bug.chatNotes.length) ? ('Reporter’s note: ' + bug.chatNotes.join(' / ')) : 'No chat note from the reporter in the 60s after the mark.');
+      card.appendChild(notesHost);
+
+      card.appendChild(el('h4', null, 'Console (20s before to 5s after)'));
+      if (bug.consoleWindow && bug.consoleWindow.length) {
+        buildTable(card, [
+          { label: 't', value: function (r) { return r.t; } },
+          { label: 'player', value: function (r) { return r.nick || ('actor ' + r.actor); } },
+          { label: 'level', value: function (r) { return r.level; } },
+          { label: 'message', value: function (r) { return r.message; } },
+        ], bug.consoleWindow);
+      } else {
+        card.appendChild(el('div', { class: 'note' }, 'No console lines in this window.'));
+      }
+
+      card.appendChild(el('h4', null, 'Nearby gameplay (±30s)'));
+      var windowed = events.filter(function (e) { return e.t >= bug.t - 30 && e.t <= bug.t + 30; }).sort(function (a, b) { return a.t - b.t; });
+      if (windowed.length) {
+        buildTable(card, [
+          { label: 't', value: function (r) { return r.t; } },
+          { label: 'type', value: function (r) { return r.kind; } },
+          { label: 'event', value: function (r) { return r.text; } },
+        ], windowed);
+      } else {
+        card.appendChild(el('div', { class: 'note' }, 'No nearby gameplay events.'));
+      }
+
+      container.appendChild(card);
+    }
+  }
+
+  // ---------------------------------------------------------------- Playtest extras (P4): console per player
+
+  // Whole-match only (P4) - same hide-on-the-other-two-tabs treatment as renderBugReports.
+  function renderConsoleByPlayer(scope, suffix) {
+    var section = document.getElementById('section-console-' + suffix);
+    if (scope !== 'whole-match') { section.style.display = 'none'; return; }
+
+    var bucket = bucketFor(scope);
+    var rows = (bucket && bucket.header && bucket.header.consoleByPlayer) || [];
+    var container = id('console-by-player', suffix);
+    if (!rows.length) {
+      container.appendChild(el('div', { class: 'note' }, 'No warnings, errors or exceptions were logged by any player.'));
+      return;
+    }
+
+    var byActor = {};
+    var order = [];
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (!byActor[r.actor]) { byActor[r.actor] = { nick: r.nick, rows: [] }; order.push(r.actor); }
+      byActor[r.actor].rows.push(r);
+    }
+    order.sort(function (a, b) { return a - b; });
+
+    for (var o = 0; o < order.length; o++) {
+      var actor = order[o];
+      var group = byActor[actor];
+      var sub = el('div', { class: 'card' });
+      sub.appendChild(el('h4', null, group.nick || ('actor ' + actor)));
+      buildTable(sub, [
+        { label: 'level', value: function (r) { return r.level; } },
+        { label: 'message', value: function (r) { return r.message; } },
+        { label: 'count', value: function (r) { return r.count; } },
+        { label: 'first t', value: function (r) { return r.firstT; } },
+        { label: 'last t', value: function (r) { return r.lastT; } },
+      ], group.rows);
+      container.appendChild(sub);
+    }
+  }
+
   // ---------------------------------------------------------------- Task T7: render every tab
 
   ['whole-match', 'phase-1', 'phase-2'].forEach(function (scope) {
@@ -1430,6 +1555,8 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       return;
     }
 
+    safeRun('bug reports (' + scope + ')', function () { renderBugReports(scope, suffix); });
+    safeRun('console by player (' + scope + ')', function () { renderConsoleByPlayer(scope, suffix); });
     safeRun('header (' + scope + ')', function () { renderHeader(scope, suffix); });
     safeRun('economy (' + scope + ')', function () { renderEconomy(scope, suffix); });
     safeRun('territory (' + scope + ')', function () { renderTerritory(scope, suffix); });
