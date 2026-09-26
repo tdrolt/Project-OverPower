@@ -44,10 +44,6 @@ namespace Overpower.Match
         public const string EliminatedKey = "mElim";
         /// Room Property key: the winning team id once Phase is Over, else -1.
         public const string WinnerKey = "mWin";
-        /// Room Property key: int, the team whose corner of the arena is closed (PhaseTwoCutRules). Written by the master
-        /// in the SAME write as the three-to-two phase change, so no client ever sees two teams without the wall. Absent
-        /// before any knockout and in a host-started two-team match (the left-out team is the cut, derived - see CutTeam).
-        public const string CutTeamKey = "mCut";
 
         // Always 0/1/2 - the same fixed team count CathedralBuildingIDs and TerritoryConfig.
         // PlayersPerTeam already assume everywhere else in this codebase.
@@ -90,8 +86,9 @@ namespace Overpower.Match
             PhotonNetwork.InRoom && ReadEliminated(PhotonNetwork.CurrentRoom.CustomProperties).Contains(team);
 
         /// <summary>Review fix F1, 2026-09-25: a capital counts as "in play" while its team was fixed into the match
-        /// (a host start's third capital never is) and it isn't behind the phase-two wall. mCut arrives in the same
-        /// room update as the knockout's mPhase, so this is already right on the frame every client sends its
+        /// (a host start's third capital never is) and it isn't behind the phase-two wall. The cut is derived straight
+        /// from mElim (PhaseTwoCutRules.CutTeam), which arrives in the same room update as the knockout's mPhase - both
+        /// written in the one Hashtable below - so this is already right on the frame every client sends its
         /// players home - before the master's neutralise writes (sent after the phase write) have even arrived.
         /// Every place below that used to test IsInMatch(capital.Value) alone now asks this instead, so a closed
         /// capital can never again count as one still in play.</summary>
@@ -287,11 +284,8 @@ namespace Overpower.Match
             if (propertiesThatChanged == null)
                 return;
 
-            // Map shrink T3: mCut only ever arrives in the SAME write as mPhase (MasterRecompute puts it in the
-            // one Hashtable), so it decrements this same one echo rather than needing a count of its own.
             bool touchesElimination = propertiesThatChanged.ContainsKey(PhaseKey)
-                || propertiesThatChanged.ContainsKey(EliminatedKey) || propertiesThatChanged.ContainsKey(WinnerKey)
-                || propertiesThatChanged.ContainsKey(CutTeamKey);
+                || propertiesThatChanged.ContainsKey(EliminatedKey) || propertiesThatChanged.ContainsKey(WinnerKey);
             // 2.7b step 5: mTeams/mLiveAt (Decision 1) are the countdown's own two keys - a separate write from
             // the elimination triad above, so they get their own check rather than folding into touchesElimination
             // and mis-decrementing writesAwaitingEcho, which only ever counts THIS client's own
@@ -442,10 +436,7 @@ namespace Overpower.Match
             if (!changed)
                 return;
 
-            // Map shrink T3 (D1): the cut is decided BEFORE the write and rides in the SAME Hashtable as the
-            // phase change, so no client ever observes TwoTeams without knowing which corner just closed.
             bool phaseTwoStarts = previousPhase == MatchPhase.ThreeTeams && result.Phase == MatchPhase.TwoTeams;
-            int cutTeam = phaseTwoStarts ? ChooseCutTeam(buildings, newlyEliminated, result, statuses) : PhaseTwoCutRules.NoCut;
 
             var props = new Hashtable
             {
@@ -453,10 +444,6 @@ namespace Overpower.Match
                 { EliminatedKey, result.Eliminated.ToArray() },
                 { WinnerKey, result.Winner },
             };
-            // Only written when there IS a cut - an absent mCut still reads as PhaseTwoCutRules.NoCut
-            // (ReadCutTeam), so this never needs to write NoCut explicitly.
-            if (cutTeam >= 0)
-                props[CutTeamKey] = cutTeam;
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props))
                 return; // Nothing sent - leave lastWritten/writesAwaitingEcho untouched, same as BuildingManager.Write.
 
@@ -465,8 +452,14 @@ namespace Overpower.Match
             lastWrittenWinner = result.Winner;
             writesAwaitingEcho++;
 
-            if (phaseTwoStarts)
-                NeutraliseForPhaseTwo(buildings, cutTeam);
+            // Centre-circle-and-cut-rule, 2026-09-26 (Tudor: "eliminate the spawn of the team that also got
+            // eliminated"): the corner that closes is always the FIRST team knocked out, so there is nothing left to
+            // decide or write here - mElim (just sent above, in the very same Hashtable) already tells every client
+            // which corner that is (PhaseTwoCutRules.CutTeam). newlyEliminated.Count is always > 0 whenever
+            // phaseTwoStarts is true (the ThreeTeams -> TwoTeams edge can only be crossed by a fresh elimination -
+            // MatchPhaseRules.PhaseFor), but this stays defensive rather than assuming that ordering.
+            if (phaseTwoStarts && newlyEliminated.Count > 0)
+                NeutraliseForPhaseTwo(buildings, newlyEliminated[0]);
             if (result.Phase == MatchPhase.Over)
                 CloseFinishedRoom();
 
@@ -498,29 +491,6 @@ namespace Overpower.Match
                 buildings.SetNeutralWithoutBountyHistory(zone);
                 buildings.ResetCaptureOf(zone, TerritoryMap.Neutral);
             }
-        }
-
-        /// <summary>D5: the knocked-out team's corner, unless that strands a surviving team - see PhaseTwoCutRules.
-        /// ChooseCutTeam. Review fix F2, 2026-09-25: reads BuildingManager.LatestForMaster, not Current - Current is
-        /// the room's own echo, and a capture still echoing when the knockout's last-stand Player Property arrives
-        /// would read as the OLDER owner here, possibly choosing the wrong corner and stranding the very survivor D5
-        /// exists to protect. LatestForMaster is the same basis every other master-side write already builds on.</summary>
-        private static int ChooseCutTeam(BuildingManager buildings, List<int> newlyEliminated, MatchPhaseResult result,
-                                         TeamStatus[] statuses)
-        {
-            if (newlyEliminated.Count == 0)
-                return PhaseTwoCutRules.NoCut;
-            var survivors = new List<int>();
-            foreach (TeamStatus status in statuses)
-                if (status.InMatch && !result.Eliminated.Contains(status.TeamId))
-                    survivors.Add(status.TeamId);
-            TerritoryMap map = buildings.Map;
-            TerritorySnapshot basis = buildings.LatestForMaster;
-            return PhaseTwoCutRules.ChooseCutTeam(newlyEliminated[0], survivors, team =>
-            {
-                int capital = map.CapitalOf(team);
-                return capital >= 0 ? basis.OwnerOf(capital) : TerritoryMap.Neutral;
-            });
         }
 
         /// A decided match's room must not keep taking new players - RoomManager.JoinRandomRoom would
@@ -648,8 +618,8 @@ namespace Overpower.Match
         /// against the untouched prev* locals afterward makes that impossible - there is no behaviour change on
         /// the normal (non-throwing) path.
         ///
-        /// Map shrink T3: the cut changing (mCut, in the same write as the knockout's mPhase) also raises
-        /// LiveStateChanged, which the minimap already listens to.
+        /// Map shrink T3: the cut changing (derived from mElim, written in the same Hashtable as the knockout's
+        /// mPhase) also raises LiveStateChanged, which the minimap already listens to.
         private void ReactToRoomState(bool firstRead)
         {
             if (!PhotonNetwork.InRoom)
@@ -729,9 +699,11 @@ namespace Overpower.Match
         private static int ReadWinner(Hashtable props) =>
             props.TryGetValue(WinnerKey, out object raw) && raw is int w ? w : -1;
 
-        // Map shrink T3: beside ReadWinner, the same "absent reads as the rule's own default" shape - NoCut, not -1
-        // by coincidence, so a room with no knockout yet reads exactly like PhaseTwoCutRules' own "nothing cut".
-        private static int ReadCutTeam(Hashtable props) =>
-            props.TryGetValue(CutTeamKey, out object raw) && raw is int t ? t : PhaseTwoCutRules.NoCut;
+        // Centre-circle-and-cut-rule, 2026-09-26: CutTeam (MatchDirector.Live.cs) runs every frame for every tower
+        // and minimap bubble (through IsOutOfPlay), so it reads mElim straight off the Hashtable - the raw int[]
+        // Photon already stores, an IReadOnlyList<int> as it stands - instead of going through ReadEliminated,
+        // which allocates a fresh List on every call for OnRoomPropertiesUpdate's own, much rarer, event-driven reads.
+        private static int[] ReadEliminatedArray(Hashtable props) =>
+            props.TryGetValue(EliminatedKey, out object raw) && raw is int[] arr ? arr : System.Array.Empty<int>();
     }
 }

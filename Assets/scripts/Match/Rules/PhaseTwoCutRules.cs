@@ -15,20 +15,25 @@ namespace Overpower.Match
         public const int NoCut = -1;
         private const int TeamCount = 3;
 
-        /// <summary>The team whose corner is closed: none before live; the one the master stored at the knockout once
-        /// there is one; otherwise, in a two-team match, the team left out of it.</summary>
-        public static int CutTeam(bool live, IReadOnlyList<int> teamsInMatch, int storedCutTeam)
+        /// <summary>The team whose corner is closed - centre-circle-and-cut-rule, 2026-09-26 (Tudor: "for choosing
+        /// which corner to eliminate you can take the original spawn of each team and eliminate the spawn of the
+        /// team that also got eliminated"): the corner is always the FIRST team knocked out, so this is a pure
+        /// function of facts the room already has, no Room Property of its own needed. None before live; in a
+        /// two-team match (a host start), the team left out of it (unchanged - there was never an elimination to
+        /// read there); with three teams in the match, the first team eliminated (eliminated[0]) once there is one,
+        /// else none yet.</summary>
+        public static int CutTeam(bool live, IReadOnlyList<int> teamsInMatch, IReadOnlyList<int> eliminated)
         {
             if (!live)
                 return NoCut;
-            if (storedCutTeam >= 0)
-                return storedCutTeam;
-            if (teamsInMatch == null || teamsInMatch.Count != TeamCount - 1)
+            if (teamsInMatch != null && teamsInMatch.Count == TeamCount - 1)
+            {
+                for (int team = 0; team < TeamCount; team++)
+                    if (!Contains(teamsInMatch, team))
+                        return team;
                 return NoCut;
-            for (int team = 0; team < TeamCount; team++)
-                if (!Contains(teamsInMatch, team))
-                    return team;
-            return NoCut;
+            }
+            return eliminated != null && eliminated.Count > 0 ? eliminated[0] : NoCut;
         }
 
         /// <summary>The zones a cut removes, ascending: the cut team's capital, the Tier II next to it, and every Tier III
@@ -110,42 +115,6 @@ namespace Overpower.Match
                 }
             zones.Sort();
             return zones;
-        }
-
-        /// <summary>
-        /// Which corner closes at the knockout ([C], 2026-09-25). The knocked-out team's - unless a surviving team holds
-        /// that corner's capital and no other (it lost its own and took theirs): closing it would knock that team out
-        /// too. Then the first team (lowest number) whose corner strands nobody and whose capital is not held by its own
-        /// team (nobody lives there). Every corner stranding someone can't happen with two survivors; the knocked-out
-        /// team's corner is the fallback anyway.
-        /// </summary>
-        /// <param name="ownerOfCapitalOf">For a team, who holds that team's own starting capital now (-1 = nobody).</param>
-        public static int ChooseCutTeam(int knockedOut, IReadOnlyList<int> survivors, Func<int, int> ownerOfCapitalOf)
-        {
-            if (knockedOut < 0 || ownerOfCapitalOf == null)
-                return NoCut;
-            if (!StrandsASurvivor(knockedOut, survivors, ownerOfCapitalOf))
-                return knockedOut;
-            for (int team = 0; team < TeamCount; team++)
-            {
-                if (team == knockedOut || ownerOfCapitalOf(team) == team)
-                    continue;
-                if (!StrandsASurvivor(team, survivors, ownerOfCapitalOf))
-                    return team;
-            }
-            return knockedOut;
-        }
-
-        // Closing this corner strands a survivor who holds its capital and no other.
-        private static bool StrandsASurvivor(int corner, IReadOnlyList<int> survivors, Func<int, int> ownerOfCapitalOf)
-        {
-            int holder = ownerOfCapitalOf(corner);
-            if (holder < 0 || !Contains(survivors, holder))
-                return false;
-            for (int team = 0; team < TeamCount; team++)
-                if (team != corner && ownerOfCapitalOf(team) == holder)
-                    return false;
-            return true;
         }
 
         private static bool Contains(IReadOnlyList<int> list, int value)

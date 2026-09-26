@@ -663,11 +663,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>Review fix F2, 2026-09-25: master only - the territory this client last wrote while that write is
-    /// still echoing, else the room's own copy. Exposed so MatchDirector.ChooseCutTeam can read the exact same
-    /// basis every master-side write already builds on (WriteBasis below), instead of Current, which lags one
-    /// echo behind: a capture still echoing when a knockout's last-stand Player Property arrives must count for
-    /// D5's "would this corner strand a survivor" check, or the very team D5 exists to protect can be left with
-    /// no capital and knocked out in the same write.</summary>
+    /// still echoing, else the room's own copy. This is the same basis every master-side write already builds on
+    /// (WriteBasis below), instead of Current, which lags one echo behind - a capture still echoing when a
+    /// knockout's last-stand Player Property arrives must not be read as its OLDER owner by anything else the
+    /// master decides in that same instant.</summary>
     public TerritorySnapshot LatestForMaster => writesAwaitingEcho > 0 && lastWritten != null ? lastWritten : current;
 
     private TerritorySnapshot WriteBasis(string caller, int zone)

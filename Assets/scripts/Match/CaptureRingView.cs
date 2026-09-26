@@ -96,6 +96,33 @@ namespace Overpower.Match
             return view;
         }
 
+        /// <summary>Centre-circle-and-cut-rule, 2026-09-26: re-sizes this ring in place when its tower's CaptureRadius
+        /// changes at runtime - today only the centre, when a cut starts or ends (BuildingCapture.RefreshRingView).
+        /// Recomputes exactly what Create derived from captureRadius (the ground height under the new radius, and the
+        /// edge/band radii); the edge is redrawn immediately (it is always visible), while the band and track are only
+        /// invalidated here - their own Refresh below only rewrites their points on a fill or yaw change, neither of
+        /// which necessarily happened, so the shown-cache is cleared to force that on the very next Refresh call
+        /// instead of adding a second "or the radius changed" check to two hot per-frame comparisons.</summary>
+        public void Resize(float captureRadius)
+        {
+            Vector3 towerPosition = transform.parent != null ? transform.parent.position : transform.position;
+            centre = new Vector3(towerPosition.x, GroundHeight(towerPosition, captureRadius) + theme.captureRingHeightOffset,
+                                 towerPosition.z);
+            trackCentre = new Vector3(centre.x, centre.y - TrackHeightBelowBand, centre.z);
+
+            float edgeRadius = Mathf.Max(0.01f, captureRadius - theme.captureRingOutlineWidth / 2f);
+            bandRadius = Mathf.Max(0.01f, captureRadius - theme.captureRingOutlineWidth - theme.captureRingArcGap
+                                                         - theme.captureRingArcWidth / 2f);
+
+            float step = CaptureRingGeometry.ArcStepDegrees(segments);
+            for (int i = 0; i < segments; i++)
+                edge.SetPosition(i, CaptureRingGeometry.PointOnRing(centre, edgeRadius, 0f, step * i));
+
+            shownBandPointCount = -1;
+            shownBandStartYaw = float.NaN;
+            shownTrackStartYaw = float.NaN;
+        }
+
         /// <summary>Called every frame by BuildingCapture.Update on every client.</summary>
         public void Refresh(CaptureRingState state, float cameraYawDegrees)
         {

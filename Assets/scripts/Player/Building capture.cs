@@ -25,10 +25,13 @@ public class BuildingCapture : MonoBehaviourPun
     [Tooltip("Shared per-tier numbers. Every tower should point at the same asset.")]
     public TerritoryConfig territoryConfig;
 
-    /// <summary>This tower's capture circle, from the Territory Config row of its OWN tier (the centre keeps its Tier IV
-    /// circle even while it plays as a Tier III after a knockout - its recess in the phase-two wall was sized around it).
+    /// <summary>This tower's capture circle, from the Territory Config row of the tier it plays as RIGHT NOW
+    /// (EffectiveTier) - Tudor, 2026-09-26 ("i think the zone should shrink to a normal tier III"): the centre's
+    /// circle now shrinks to the Tier III radius while it plays as one, matching the other Tier IIIs, instead of
+    /// keeping its own Tier IV circle throughout as it used to (the phase-two wall's recess was sized around that
+    /// old, larger radius - see CaptureRingView.Resize for how the ring and trigger now follow this at runtime).
     /// </summary>
-    public float CaptureRadius => territoryConfig != null ? territoryConfig.ForTier(tier).captureRadius : FallbackCaptureRadius;
+    public float CaptureRadius => territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureRadius : FallbackCaptureRadius;
 
     [Header("UI")]
     [Tooltip("Colours, widths and material of the capture ring on the ground around this tower - every tower should point at the same asset, same as Territory Config.")]
@@ -113,6 +116,12 @@ public class BuildingCapture : MonoBehaviourPun
     private readonly List<Collider> hiddenOwnColliders = new List<Collider>();
     private int shownColumnsTier; // set to tier in Start: the prefab was built with tier's columns
 
+    // Centre-circle-and-cut-rule, 2026-09-26: the CaptureRadius the ring and trigger were last (re)sized to - set in
+    // Start, and kept current by RefreshRingView. Only the centre's CaptureRadius ever actually changes after Start
+    // (EffectiveTier only differs from tier there), and then only when a cut starts or ends - every other tower
+    // compares against this every frame for nothing but a float equality check.
+    private float builtCaptureRadius;
+
     // The last CaptureProgress THIS client told BuildingManager to publish for this zone - only
     // meaningful while this client is master (only the master ever calls PublishProgressIfNeeded).
     // Starts Idle, matching a fresh, never-captured zone, so a genuinely idle tower never publishes
@@ -148,6 +157,7 @@ public class BuildingCapture : MonoBehaviourPun
             towerLook.Bind(theme);
 
         ConfigureCollider();
+        builtCaptureRadius = CaptureRadius; // what the ring/trigger above were just built with - see RefreshRingView.
         InitializeAudio();
         if (BuildingManager.Instance.CathedralBuildingIDs.ContainsKey(buildingID))
         {
@@ -303,7 +313,8 @@ public class BuildingCapture : MonoBehaviourPun
             if (PhotonNetwork.IsMasterClient)
             {
                 // M1: without this, the master would keep simulating this zone for one more round trip (until its
-                // own mCut echo lands and Update's hiddenAsCut branch takes over) - if a player was still listed it
+                // own knockout write echoes back - mElim/mPhase, which CutTeam derives the cut from - and Update's
+                // hiddenAsCut branch takes over) - if a player was still listed it
                 // would republish a non-idle progress and then go silent once hidden, so telemetry logs a capture
                 // that never ends. Resetting right here, on the hide edge, means the very same frame the zone
                 // disappears it also goes idle. ResetToOwner also clears the claim/drain/cooldown state.
@@ -333,6 +344,18 @@ public class BuildingCapture : MonoBehaviourPun
         SetHiddenAsCut(outOfPlay);
         if (outOfPlay)
             return;
+
+        // Centre-circle-and-cut-rule, 2026-09-26: follows CaptureRadius at runtime instead of only reading it once
+        // in Start - today that only ever fires for the centre, when a cut starts or ends. Re-sizes the trigger the
+        // same way Start did (ConfigureCollider) and asks the ring to re-size in place (CaptureRingView.Resize)
+        // rather than tearing it down and rebuilding it, so its own state (theme, current fill/colour) survives.
+        float captureRadius = CaptureRadius;
+        if (captureRadius != builtCaptureRadius)
+        {
+            ConfigureCollider();
+            ringView?.Resize(captureRadius);
+            builtCaptureRadius = captureRadius;
+        }
 
         int effectiveTier = EffectiveTier;
         if (towerLook != null && effectiveTier != shownColumnsTier)
@@ -964,8 +987,9 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_AddToZone(int viewID)
     {
-        // I1: an entry sent before the hide can still arrive after it (the master's own mCut echo, or this RPC
-        // itself, whichever lands second) - without this, a stale entry would relist a player in a zone Update's
+        // I1: an entry sent before the hide can still arrive after it (the master's own knockout write echoing -
+        // mElim/mPhase, which CutTeam derives the cut from - or this RPC itself, whichever lands second) - without
+        // this, a stale entry would relist a player in a zone Update's
         // hiddenAsCut branch is otherwise emptying every frame, and the "not already playing" check below would let
         // it restart the capture sound on every client, right after SetHiddenAsCut just stopped it.
         if (hiddenAsCut)

@@ -25,22 +25,30 @@ namespace Overpower.Tests
         [Test]
         public void NothingIsCutBeforeTheMatchIsLive()
         {
-            Assert.AreEqual(PhaseTwoCutRules.NoCut, PhaseTwoCutRules.CutTeam(live: false, new[] { 0, 1 }, storedCutTeam: 2));
-            Assert.AreEqual(PhaseTwoCutRules.NoCut, PhaseTwoCutRules.CutTeam(false, new int[0], PhaseTwoCutRules.NoCut));
+            Assert.AreEqual(PhaseTwoCutRules.NoCut, PhaseTwoCutRules.CutTeam(live: false, new[] { 0, 1 }, new[] { 2 }));
+            Assert.AreEqual(PhaseTwoCutRules.NoCut, PhaseTwoCutRules.CutTeam(false, new int[0], new int[0]));
         }
 
         [Test]
         public void AHostStartCutsTheTeamLeftOutOfTheMatch()
         {
-            Assert.AreEqual(1, PhaseTwoCutRules.CutTeam(true, new[] { 0, 2 }, PhaseTwoCutRules.NoCut));
-            Assert.AreEqual(2, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1 }, PhaseTwoCutRules.NoCut));
+            Assert.AreEqual(1, PhaseTwoCutRules.CutTeam(true, new[] { 0, 2 }, new int[0]));
+            Assert.AreEqual(2, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1 }, new int[0]));
         }
 
         [Test]
-        public void ThreeTeamsAreUncutUntilTheMasterStoresAKnockout()
+        public void ThreeTeamsAreUncutUntilTheFirstKnockout()
         {
-            Assert.AreEqual(PhaseTwoCutRules.NoCut, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1, 2 }, PhaseTwoCutRules.NoCut));
-            Assert.AreEqual(1, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1, 2 }, storedCutTeam: 1));
+            Assert.AreEqual(PhaseTwoCutRules.NoCut, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1, 2 }, new int[0]));
+            Assert.AreEqual(2, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1, 2 }, new[] { 2 }));
+        }
+
+        [Test]
+        public void TheCutIsTheFirstTeamKnockedOutNotTheLatest()
+        {
+            // Centre-circle-and-cut-rule, 2026-09-26 (Tudor): the corner is always the first team out, so a second
+            // knockout must not move it - team 1 stays cut even once team 2 is also eliminated.
+            Assert.AreEqual(1, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1, 2 }, new[] { 1, 2 }));
         }
 
         [Test]
@@ -107,40 +115,6 @@ namespace Overpower.Tests
                 PhaseTwoCutRules.ZonesToNeutralise(RealMap(), 2, RealTier, zoneCount: 10));
             CollectionAssert.AreEqual(new[] { 3, 4, 5, 9 },
                 PhaseTwoCutRules.ZonesToNeutralise(RealMap(), PhaseTwoCutRules.NoCut, RealTier, 10), "no cut: the old Tier III reset plus the centre");
-        }
-
-        // ownerOfCapital[team] = who holds that team's own starting capital (-1 = nobody).
-        private static int Cut(int knockedOut, int[] survivors, params int[] ownerOfCapital) =>
-            PhaseTwoCutRules.ChooseCutTeam(knockedOut, survivors, team => ownerOfCapital[team]);
-
-        [Test]
-        public void TheKnockedOutTeamsCornerClosesWhenThatStrandsNobody()
-        {
-            Assert.AreEqual(2, Cut(2, new[] { 0, 1 }, 0, 1, -1), "its capital is neutral");
-            Assert.AreEqual(2, Cut(2, new[] { 0, 1 }, 0, 1, 0), "team 0 took it but still holds its own");
-        }
-
-        [Test]
-        public void ASurvivorLivingInTheKnockedOutCornerKeepsIt()
-        {
-            // Team 0 lost its own capital to team 1 and lives in team 2's. Team 1 holds its own and team 0's.
-            // Team 0's old corner is the one nobody lives in.
-            Assert.AreEqual(0, Cut(2, new[] { 0, 1 }, 1, 1, 0));
-            // Team 0's old capital is neutral: same answer.
-            Assert.AreEqual(0, Cut(2, new[] { 0, 1 }, -1, 1, 0));
-        }
-
-        [Test]
-        public void ACornerAnotherSurvivorLivesInIsNeverTheAlternative()
-        {
-            // Team 0 lives only in team 2's capital; team 1 lives only in team 0's; team 1's own capital is empty.
-            Assert.AreEqual(1, Cut(2, new[] { 0, 1 }, 1, -1, 0));
-        }
-
-        [Test]
-        public void NoKnockedOutTeamMeansNoCut()
-        {
-            Assert.AreEqual(PhaseTwoCutRules.NoCut, Cut(PhaseTwoCutRules.NoCut, new[] { 0, 1 }, 0, 1, 2));
         }
     }
 }

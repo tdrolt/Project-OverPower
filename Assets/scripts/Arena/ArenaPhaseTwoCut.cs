@@ -60,11 +60,11 @@ namespace Overpower.Arena
 
         // Review fix F5, 2026-09-25 (the review's plan gap): a player can end up behind the wall in ways the
         // phase-change trip home (PlayerLifecycle.ReturnToSpawnForPhaseChange, fired once off MatchDirector's own
-        // ThreeTeams -> TwoTeams edge) never touches - a reconnect or late join whose own D5 alternative spawn
-        // lands inside a corner someone ELSE's knockout just closed, or a living player that trip home simply
-        // missed. The out-of-arena safety net alone would only catch this once it next remembers a "safe" spot,
-        // which can itself be behind the wall - so this checks THIS client's own player directly: once the frame
-        // a cut lands, then every half second while one still stands.
+        // ThreeTeams -> TwoTeams edge) never touches - a reconnect or late join spawned straight into a closed
+        // corner (a host start's own left-out corner, closed from the very first live frame), or a living player
+        // that trip home simply missed. The out-of-arena safety net alone would only catch this once it next
+        // remembers a "safe" spot, which can itself be behind the wall - so this checks THIS client's own player
+        // directly: once the frame a cut lands, then every half second while one still stands.
         private const float OwnPlayerCheckIntervalSeconds = 0.5f;
         private float nextOwnPlayerCheck;
 

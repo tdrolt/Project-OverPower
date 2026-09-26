@@ -79,9 +79,11 @@ namespace Overpower.Match
 
         /// <summary>Map shrink T3 (D1/D13): the team whose corner is closed right now, or PhaseTwoCutRules.NoCut.
         /// Reads the room directly (like IsLive), so it is right for a late joiner on its very first frame and
-        /// after a master switch.</summary>
+        /// after a master switch. Centre-circle-and-cut-rule, 2026-09-26: no longer a stored Room Property of its
+        /// own - PhaseTwoCutRules.CutTeam derives it from mTeams and mElim, the same two facts every client
+        /// already reads, so a corner can never disagree with who was actually knocked out.</summary>
         public int CutTeam => PhotonNetwork.InRoom
-            ? PhaseTwoCutRules.CutTeam(IsLive, TeamsInMatch, ReadCutTeam(PhotonNetwork.CurrentRoom.CustomProperties))
+            ? PhaseTwoCutRules.CutTeam(IsLive, TeamsInMatch, ReadEliminatedArray(PhotonNetwork.CurrentRoom.CustomProperties))
             : PhaseTwoCutRules.NoCut;
 
         /// <summary>A zone behind the phase-two wall, or the cut capital of a host start. The MatchStartRules.
@@ -125,7 +127,8 @@ namespace Overpower.Match
 
         /// <summary>Covers the countdown starting, being cancelled, and the match going live - MatchStartPanel
         /// (step 8) subscribes instead of polling every frame for a change that happens rarely. Map shrink T3: the
-        /// phase-two cut changing (mCut) raises it too - the minimap already listens, to redraw its overlay.</summary>
+        /// phase-two cut changing (derived from mElim) raises it too - the minimap already listens, to redraw its
+        /// overlay.</summary>
         public event System.Action LiveStateChanged;
 
         private void Update()
