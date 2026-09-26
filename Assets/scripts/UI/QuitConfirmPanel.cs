@@ -35,6 +35,11 @@ namespace Overpower.UI
         private TextMeshProUGUI promptLabel;
         private bool visible;
 
+        // One shared TMP material for both button labels (playtest extras P6 follow-up, item 1) - same
+        // reasoning as MatchStartPanel.ApplyOutline/PlayerHud.AddLabel: without it TMP clones a new
+        // material the moment a label's outline is touched, one per button, for no reason.
+        private Material textMaterial;
+
         private bool shopOpenLastFrame;
         private bool chatOpenLastFrame;
 
@@ -50,6 +55,12 @@ namespace Overpower.UI
         {
             claimedRouter?.SetToolFocus(this, false);
             claimedRouter = null;
+        }
+
+        private void OnDestroy()
+        {
+            if (textMaterial != null)
+                Destroy(textMaterial);
         }
 
         private void Update()
@@ -145,7 +156,10 @@ namespace Overpower.UI
             panel.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.95f);
             RectTransform panelRt = panel.GetComponent<RectTransform>();
             panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
-            panelRt.sizeDelta = new Vector2(480f, 0f);
+            // Widened from an original 480 (playtest extras P6 follow-up, item 1): two Start-button-sized
+            // buttons (theme.matchStartButtonSize.x = 260 each) plus the row's own 12 spacing need 532
+            // just for the buttons - 480 used to work only because the old buttons shrank to share it.
+            panelRt.sizeDelta = new Vector2(600f, 0f);
 
             VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(20, 20, 20, 20);
@@ -163,10 +177,29 @@ namespace Overpower.UI
             buttonRow.transform.SetParent(panel.transform, false);
             HorizontalLayoutGroup rowLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
             rowLayout.spacing = 12f;
-            rowLayout.childControlWidth = rowLayout.childForceExpandWidth = true;
+            rowLayout.childAlignment = TextAnchor.MiddleCenter;
+            // All four off (playtest extras P6 follow-up, item 1): a freshly-added HorizontalLayoutGroup
+            // defaults childForceExpandHeight to true, which - even with width left alone - stretched
+            // both buttons to the ROW's own height, and the row's own height comes from its children in
+            // the first place, so it collapsed to 0 (measured live: rect height 0 - the popup's real
+            // symptom was zero-height buttons, not just a bad colour). Each button keeps its own fixed
+            // size (theme.matchStartButtonSize) via a LayoutElement - see AddButton below.
+            rowLayout.childControlWidth = rowLayout.childControlHeight = false;
+            rowLayout.childForceExpandWidth = rowLayout.childForceExpandHeight = false;
 
-            AddButton(buttonRow.transform, res, theme != null ? theme.quitYesText : "Yes", OnYesClicked);
-            AddButton(buttonRow.transform, res, theme != null ? theme.quitNoText : "No", OnNoClicked);
+            // Real buttons, not the bare default sprite these used to render with - tiny dark labels,
+            // no fill at all against the dark panel (the brief's own capture, escape_popup.png). Same
+            // size/font/outline recipe as MatchStartPanel.BuildRowButton's own Start button, duplicated
+            // rather than shared - that method is private to its own canvas/layout, and every other
+            // control on this panel is already built the same "copy the recipe" way (see the class
+            // comment). Yes takes the Start button's own green (an affirmative action, like starting
+            // the match); No takes Bar Track Colour, the same neutral/grey fill Loadout's own buttons
+            // already reuse for exactly this reason (see UiTheme.matchStartButtonColor's tooltip) - no
+            // new UiTheme token needed for either.
+            AddButton(buttonRow.transform, res, theme != null ? theme.quitYesText : "Yes",
+                theme != null ? theme.matchStartButtonColor : new Color(0.16f, 0.45f, 0.25f, 0.95f), OnYesClicked);
+            AddButton(buttonRow.transform, res, theme != null ? theme.quitNoText : "No",
+                theme != null ? theme.barTrackColor : new Color(0.18f, 0.18f, 0.2f, 1f), OnNoClicked);
 
             uiRoot.SetActive(false);
         }
@@ -183,15 +216,53 @@ namespace Overpower.UI
             return tmp;
         }
 
-        private static void AddButton(Transform parent, TMP_DefaultControls.Resources res, string label,
-                                       UnityEngine.Events.UnityAction onClick)
+        /// <summary>Playtest extras P6 follow-up (item 1): a real button - filled background, sized and
+        /// coloured from the Start button's own UiTheme tokens - not just a label sitting on the bare
+        /// default sprite. Instance method now (was static): the fill colour still comes from the
+        /// caller, but the label's font/size/outline come from this panel's own `theme`/`textMaterial`.</summary>
+        private void AddButton(Transform parent, TMP_DefaultControls.Resources res, string label, Color fillColor,
+                                UnityEngine.Events.UnityAction onClick)
         {
             GameObject go = TMP_DefaultControls.CreateButton(res);
             go.transform.SetParent(parent, false);
-            go.GetComponentInChildren<TextMeshProUGUI>().text = label;
+            Vector2 size = theme != null ? theme.matchStartButtonSize : new Vector2(260f, 52f);
+            go.GetComponent<RectTransform>().sizeDelta = size;
+            // The row's own HorizontalLayoutGroup has every control/expand flag off (see BuildUi), so it
+            // never resizes children - but it still needs a LayoutElement to report a size for ITS OWN
+            // preferred-height calculation (the sizeDelta above alone measured as 0 there - Unity reads
+            // preferred size from an ILayoutElement, not the raw RectTransform, once a LayoutGroup is
+            // involved at all).
+            LayoutElement layoutElement = go.AddComponent<LayoutElement>();
+            layoutElement.preferredWidth = size.x;
+            layoutElement.preferredHeight = size.y;
+            go.GetComponent<Image>().color = fillColor;
+
+            TextMeshProUGUI buttonLabel = go.GetComponentInChildren<TextMeshProUGUI>();
+            buttonLabel.text = label;
+            if (theme != null)
+            {
+                if (theme.font != null)
+                    buttonLabel.font = theme.font;
+                buttonLabel.fontSize = theme.bodyTextSize;
+                buttonLabel.color = theme.textColor;
+                ApplyOutline(buttonLabel);
+            }
+
             Button button = go.GetComponent<Button>();
             button.onClick.AddListener(onClick);
             button.navigation = new Navigation { mode = Navigation.Mode.None }; // Same fix as every other code-built control here - see TestRangePanel.AddDropdown's comment.
+        }
+
+        /// <summary>Same reasoning as MatchStartPanel.ApplyOutline: one shared Material instance for
+        /// every button label this panel builds, instead of letting TMP auto-clone one per label.</summary>
+        private void ApplyOutline(TextMeshProUGUI tmp)
+        {
+            if (textMaterial == null)
+            {
+                textMaterial = new Material(tmp.fontSharedMaterial);
+                theme.ApplyHudTextStyle(textMaterial);
+            }
+            tmp.fontSharedMaterial = textMaterial;
         }
     }
 }

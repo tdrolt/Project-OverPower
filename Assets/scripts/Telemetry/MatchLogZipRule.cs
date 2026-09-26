@@ -45,5 +45,19 @@ namespace Overpower.Telemetry
         /// when the result panel shows, maybe again on quit).</summary>
         public static string ZipFileName(string dateStamp, string sanitizedNick) =>
             $"OverPower-log_{dateStamp}_{sanitizedNick}.zip";
+
+        /// <summary>Playtest extras P6 follow-up (item 3): whether MatchLogZip.TryZip should even
+        /// attempt to read the match folder and zip - true whenever this client's file has EVER opened.
+        /// MatchTelemetry.CurrentFolder is exactly that: set once, the first time TryOpenFile succeeds,
+        /// and left alone by every path that can end the match (OnApplicationQuit, OnDestroy) - only
+        /// OnLeftRoom clears it, for the next match.
+        ///
+        /// Deliberately NOT keyed on MatchTelemetry.IsRecording (writer.IsOpen): that reads false the
+        /// moment the writer closes on quit, even though the file it leaves behind is already complete
+        /// (TelemetryWriter.Close flushes before closing) - keying on IsRecording used to make a
+        /// quit-time zip silently do nothing whenever MatchTelemetry.OnApplicationQuit happened to run
+        /// first (the two components' OnApplicationQuit order is not guaranteed - see MatchLogZip's own
+        /// OnApplicationQuit comment on "handle both orders").</summary>
+        public static bool ShouldAttemptZip(string currentFolder) => !string.IsNullOrEmpty(currentFolder);
     }
 }

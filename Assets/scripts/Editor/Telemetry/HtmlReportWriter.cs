@@ -583,6 +583,9 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     return n ? (n + ' (' + wid + ')') : ('Weapon ' + wid);
   }
   function abilityName(aid) {
+    // Playtest extras P6 follow-up (item 4): -1 is an empty loadout slot, not ability id -1 - reads
+    // 'none' rather than the meaningless 'Ability -1' a bug card used to show for an unequipped slot.
+    if (aid === -1) return 'none';
     var n = tuning && nameFromList(tuning.abilities, aid);
     return n ? (n + ' (' + aid + ')') : ('Ability ' + aid);
   }
@@ -1455,7 +1458,11 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     for (var i = 0; i < bugs.length; i++) {
       var bug = bugs[i];
       var card = el('div', { class: 'card' });
-      card.appendChild(el('h3', null, 't=' + fmt(bug.t) + 's – ' + (bug.nick || ('actor ' + bug.actor)) + ' (team ' + bug.team + ')'));
+      // Playtest extras P6 follow-up (item 4): always name the actor number too, even with a nick -
+      // 'Tudor (actor 1, team 0)' - the old (bug.nick || 'actor N') dropped the actor number the
+      // moment a nick was known, which is exactly the case a real playtest log always hits.
+      var bugWho = bug.nick ? (bug.nick + ' (actor ' + bug.actor + ', team ' + bug.team + ')') : ('actor ' + bug.actor + ' (team ' + bug.team + ')');
+      card.appendChild(el('h3', null, 't=' + fmt(bug.t) + 's – ' + bugWho));
 
       card.appendChild(el('div', null, 'Where: ' + zoneLabel(bug.zone) + ' at (' + fmt(bug.x) + ', ' + fmt(bug.z) + '), ' + (bug.alive ? 'alive' : 'dead')));
       card.appendChild(el('div', null, 'Loadout: weapon ' + weaponName(bug.weapon) + ', equipment ' + abilityName(bug.equipment) + ', mobility ' + abilityName(bug.mobility) + ', ultimate ' + abilityName(bug.ultimate)));
@@ -1524,7 +1531,10 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       var actor = order[o];
       var group = byActor[actor];
       var sub = el('div', { class: 'card' });
-      sub.appendChild(el('h4', null, group.nick || ('actor ' + actor)));
+      // Item 4: same always-show-the-actor-number fix as the bug cards, and the same (nick ? ... :
+      // ...) shape the log-coverage warning already uses just above in this file - 'Tudor (actor 1)'
+      // rather than plain 'Tudor' once a nick is known.
+      sub.appendChild(el('h4', null, group.nick ? (group.nick + ' (actor ' + actor + ')') : ('actor ' + actor)));
       buildTable(sub, [
         { label: 'level', value: function (r) { return r.level; } },
         { label: 'message', value: function (r) { return r.message; } },

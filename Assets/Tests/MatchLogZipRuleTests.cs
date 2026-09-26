@@ -52,5 +52,25 @@ namespace Overpower.Tests
             Assert.AreEqual("OverPower-log_2026-09-26_1730_Tudor.zip",
                 MatchLogZipRule.ZipFileName("2026-09-26_1730", "Tudor"));
         }
+
+        // Playtest extras P6 follow-up (item 3): "handle both orders" - a quit-time zip must still
+        // attempt to zip once this client's file has ever opened, whether or not MatchTelemetry's
+        // writer happens to have already closed by the time OnApplicationQuit reaches MatchLogZip.
+
+        [Test]
+        public void AttemptsToZipOnceTheFolderHasEverBeenSet()
+        {
+            // Stands in for MatchTelemetry.CurrentFolder AFTER the writer has closed on quit (Order A,
+            // MatchTelemetry.OnApplicationQuit ran first) - CurrentFolder is never cleared by that path,
+            // only by OnLeftRoom, so this must still say "go ahead and zip".
+            Assert.IsTrue(MatchLogZipRule.ShouldAttemptZip("C:\\Telemetry\\2026-09-26_0643_c25d0fac"));
+        }
+
+        [Test]
+        public void NeverAttemptsToZipBeforeAnyFileEverOpened()
+        {
+            Assert.IsFalse(MatchLogZipRule.ShouldAttemptZip(null));
+            Assert.IsFalse(MatchLogZipRule.ShouldAttemptZip(""));
+        }
     }
 }
