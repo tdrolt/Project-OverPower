@@ -21,7 +21,14 @@ namespace Overpower.Match
         /// function of facts the room already has, no Room Property of its own needed. None before live; in a
         /// two-team match (a host start), the team left out of it (unchanged - there was never an elimination to
         /// read there); with three teams in the match, the first team eliminated (eliminated[0]) once there is one,
-        /// else none yet.</summary>
+        /// else none yet.
+        ///
+        /// One cosmetic edge, cut-rule-followups review, 2026-09-26: the phase rules' fixpoint can in principle knock
+        /// out two teams in the very same write, going straight from three teams to Over. Room state then looks
+        /// identical to the normal three -> two -> over path (teamsInMatch never drops to two; eliminated simply
+        /// arrives with both teams already in it), so this still answers eliminated[0] and the FIRST team's corner
+        /// closes on the result screen, same as if it had been knocked out alone. Harmless - the match is already
+        /// final by then.</summary>
         public static int CutTeam(bool live, IReadOnlyList<int> teamsInMatch, IReadOnlyList<int> eliminated)
         {
             if (!live)

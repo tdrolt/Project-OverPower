@@ -8,9 +8,10 @@ using Overpower.Match;
 namespace Overpower.Arena
 {
     /// <summary>
-    /// Builds and removes the phase-two wall (GDD p.20-21 and p.27; Tudor, 2026-09-25) on every client from one
-    /// replicated number, MatchDirector.CutTeam - so a late joiner and a new master get the same wall with no message
-    /// of their own. Added at play by ArenaSymmetry.OnEnable: no scene object.
+    /// Builds and removes the phase-two wall (GDD p.20-21 and p.27; Tudor, 2026-09-25) on every client from
+    /// MatchDirector.CutTeam - derived from the room's own mTeams and mElim (two replicated numbers, not one Room
+    /// Property of its own - centre-circle-and-cut-rule, 2026-09-26) - so a late joiner and a new master get the
+    /// same wall with no message of their own. Added at play by ArenaSymmetry.OnEnable: no scene object.
     ///
     /// On a cut: builds the wall boxes and the recess barrier (and its two planks, Tudor 2026-09-26: "the zone is too
     /// empty") as primitives with the outer walls' own material, thickness, height and layers (under Source/Boundry,
@@ -28,9 +29,10 @@ namespace Overpower.Arena
     /// compare a frame catches every case.
     ///
     /// Review fix F5, 2026-09-25: while a cut stands, also checks THIS client's own player - once the frame it lands,
-    /// then every half second - and sends them home if they are alive and behind the wall (a reconnect, a late join
-    /// spawned into a corner someone else's knockout just closed, or a living player the phase-change trip home
-    /// missed). Own client only; see ReturnOwnPlayerIfBehindWall.
+    /// then every half second - and sends them home if they are alive and behind the wall (a reconnect, a body
+    /// already standing where a corner closes at going live - not a late join: MayJoin already refuses the team
+    /// missing from mTeams, so nobody spawns there - or a living player the phase-change trip home missed). Own
+    /// client only; see ReturnOwnPlayerIfBehindWall.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ArenaPhaseTwoCut : MonoBehaviour
@@ -64,9 +66,11 @@ namespace Overpower.Arena
 
         // Review fix F5, 2026-09-25 (the review's plan gap): a player can end up behind the wall in ways the
         // phase-change trip home (PlayerLifecycle.ReturnToSpawnForPhaseChange, fired once off MatchDirector's own
-        // ThreeTeams -> TwoTeams edge) never touches - a reconnect or late join spawned straight into a closed
-        // corner (a host start's own left-out corner, closed from the very first live frame), or a living player
-        // that trip home simply missed. The out-of-arena safety net alone would only catch this once it next
+        // ThreeTeams -> TwoTeams edge) never touches - a reconnect, or a body already standing in a host start's
+        // left-out corner when it closes at going live (cut-rule-followups review, 2026-09-26: not a late join - a
+        // joiner can't pick the team missing from mTeams, MayJoin already refuses it; the real case is a player who
+        // was already standing on that ground before the host clicked start), or a living player that trip home
+        // simply missed. The out-of-arena safety net alone would only catch this once it next
         // remembers a "safe" spot, which can itself be behind the wall - so this checks THIS client's own player
         // directly: once the frame a cut lands, then every half second while one still stands.
         private const float OwnPlayerCheckIntervalSeconds = 0.5f;

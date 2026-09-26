@@ -44,6 +44,16 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheTwoTeamBranchWinsEvenWithAnEliminationAlreadyOnRecord()
+        {
+            // Branch-order guard, 2026-09-26 review: CutTeam must resolve a two-team match (teamsInMatch.Count == 2)
+            // from the team MISSING from it before it ever looks at eliminated - team 1 is the eliminated team here,
+            // but the match itself is already down to teams 0 and 1 (a three-team match's second knockout), so the
+            // closed corner is team 2's, not team 1's. Checking eliminated first would wrongly answer 1.
+            Assert.AreEqual(2, PhaseTwoCutRules.CutTeam(true, new[] { 0, 1 }, new[] { 1 }));
+        }
+
+        [Test]
         public void TheCutIsTheFirstTeamKnockedOutNotTheLatest()
         {
             // Centre-circle-and-cut-rule, 2026-09-26 (Tudor): the corner is always the first team out, so a second

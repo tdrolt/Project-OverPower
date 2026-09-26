@@ -47,36 +47,28 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheCentresCaptureCircleReadsItsOwnTierWithNoLiveCutInEditMode()
+        public void TheCentresCaptureCircleReadsTheTierItPlaysAsRightNow()
         {
+            // Cut-rule-followups, 2026-09-26: the old version of this test (once titled "...WithNoLiveCutInEditMode")
+            // asserted PhaseTwoCutRules.EffectiveTier directly and only checked capture.CaptureRadius for the
+            // no-cut case - it passed unchanged on the code before BuildingCapture.CaptureRadiusFor existed, so it
+            // guarded nothing about the wiring. This calls CaptureRadiusFor itself (the exact rule CaptureRadius is
+            // built on) for both cutActive values, with no MonoBehaviour or MatchDirector to fake.
             TerritoryConfig config = ScriptableObject.CreateInstance<TerritoryConfig>();
             SetTierCaptureRadius(config, tier: 4, radius: 23f);
             SetTierCaptureRadius(config, tier: 3, radius: 9f);
 
-            var go = new GameObject("Centre");
             try
             {
-                BuildingCapture capture = go.AddComponent<BuildingCapture>();
-                capture.tier = 4;
-                capture.territoryConfig = config;
-
-                // Edit mode has no MatchDirector.Instance, so BuildingCapture.EffectiveTier's cutActive test
-                // (MatchDirector.Instance != null && ...) always reads false here - the same pure rule confirmed
-                // directly below. The live behaviour (an actual cut shrinking this to the tier 3 row) needs a
-                // MatchDirector, so it is covered in Play Mode instead (see the task's brief) - this only guards
-                // the rule BuildingCapture.CaptureRadius is built on.
-                Assert.AreEqual(4, PhaseTwoCutRules.EffectiveTier(4, cutActive: false),
-                    "the rule BuildingCapture.EffectiveTier reads, with no cut active");
-                Assert.AreEqual(23f, capture.CaptureRadius, 0.001f,
-                    "with no live cut, a tier 4 tower (the centre) reads its own tier's row");
-
-                Assert.AreEqual(3, PhaseTwoCutRules.EffectiveTier(4, cutActive: true),
-                    "while a cut is active, the centre plays as tier 3 - CaptureRadius would feed 9f (tier 3's row) " +
-                    "into ForTier if a live MatchDirector reported one");
+                Assert.AreEqual(9f, BuildingCapture.CaptureRadiusFor(config, baseTier: 4, cutActive: true), 0.001f,
+                    "while a cut is active, the centre (tier 4) plays as tier 3 and reads tier 3's row");
+                Assert.AreEqual(23f, BuildingCapture.CaptureRadiusFor(config, baseTier: 4, cutActive: false), 0.001f,
+                    "with no cut active, the centre reads its own tier 4 row");
+                Assert.AreEqual(9f, BuildingCapture.CaptureRadiusFor(config, baseTier: 3, cutActive: true), 0.001f,
+                    "a real tier 3 tower is unaffected by cutActive - it reads its own row either way");
             }
             finally
             {
-                Object.DestroyImmediate(go);
                 Object.DestroyImmediate(config);
             }
         }

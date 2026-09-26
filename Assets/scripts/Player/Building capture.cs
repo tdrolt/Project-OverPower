@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 using Photon.Pun;
 using System.Linq;
@@ -7,6 +8,10 @@ using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.UI;
+
+// Cut-rule-followups, 2026-09-26: lets BuildingCaptureRadiusTests call CaptureRadiusFor directly (internal, not
+// public - it is the pure rule CaptureRadius is built on, not something outside the capture system should call).
+[assembly: InternalsVisibleTo("Overpower.Tests")]
 
 public class BuildingCapture : MonoBehaviourPun
 {
@@ -29,9 +34,20 @@ public class BuildingCapture : MonoBehaviourPun
     /// (EffectiveTier) - Tudor, 2026-09-26 ("i think the zone should shrink to a normal tier III"): the centre's
     /// circle now shrinks to the Tier III radius while it plays as one, matching the other Tier IIIs, instead of
     /// keeping its own Tier IV circle throughout as it used to (the phase-two wall's recess was sized around that
-    /// old, larger radius - see CaptureRingView.Resize for how the ring and trigger now follow this at runtime).
+    /// old, larger radius - see RefreshRingView, which re-sizes the ring (CaptureRingView.Resize) and the trigger
+    /// (ConfigureCollider) to follow this at runtime). Only Tier IV's radius can ever change with the cut, so a
+    /// non-centre tower skips asking MatchDirector.CutTeam every call - cheap, but it runs every frame per tower.
     /// </summary>
-    public float CaptureRadius => territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureRadius : FallbackCaptureRadius;
+    public float CaptureRadius => territoryConfig != null
+        ? CaptureRadiusFor(territoryConfig, tier, tier == 4 && MatchDirector.Instance != null && MatchDirector.Instance.CutTeam >= 0)
+        : FallbackCaptureRadius;
+
+    /// <summary>Cut-rule-followups, 2026-09-26 (review of the centre-circle-and-cut-rule task: the old edit-mode test
+    /// for this passed on the code before it too - see BuildingCaptureRadiusTests): the actual rule CaptureRadius is
+    /// built on, factored out so a test can guard it directly with no MatchDirector to fake - config's row of
+    /// PhaseTwoCutRules.EffectiveTier(baseTier, cutActive), nothing else.</summary>
+    internal static float CaptureRadiusFor(TerritoryConfig config, int baseTier, bool cutActive) =>
+        config.ForTier(PhaseTwoCutRules.EffectiveTier(baseTier, cutActive)).captureRadius;
 
     [Header("UI")]
     [Tooltip("Colours, widths and material of the capture ring on the ground around this tower - every tower should point at the same asset, same as Territory Config.")]
@@ -117,9 +133,11 @@ public class BuildingCapture : MonoBehaviourPun
     private int shownColumnsTier; // set to tier in Start: the prefab was built with tier's columns
 
     // Centre-circle-and-cut-rule, 2026-09-26: the CaptureRadius the ring and trigger were last (re)sized to - set in
-    // Start, and kept current by RefreshRingView. Only the centre's CaptureRadius ever actually changes after Start
-    // (EffectiveTier only differs from tier there), and then only when a cut starts or ends - every other tower
-    // compares against this every frame for nothing but a float equality check.
+    // Start, and kept current by RefreshRingView. In the normal game this only ever moves for the centre
+    // (EffectiveTier only differs from tier there), when a cut starts or ends - but a Territory Config row edited
+    // live in Play Mode changes ANY tower's CaptureRadius too, and this same comparison just as harmlessly resizes
+    // that tower's ring and trigger to match; every tower not being live-edited compares against this every frame
+    // for nothing but a float equality check.
     private float builtCaptureRadius;
 
     // The last CaptureProgress THIS client told BuildingManager to publish for this zone - only

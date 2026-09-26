@@ -71,10 +71,15 @@ namespace Overpower.Tests
 
                 BuildingCapture centre = towers.Single(t => t.tier == 4);
                 Vector3 centrePosition = centre.transform.position;
+                // Cut-rule-followups, 2026-09-26: measured at cutActive: true, the Tier III radius the wall's recess
+                // was actually sized around - centre.CaptureRadius reads the Tier IV radius here (edit mode has no
+                // MatchDirector, so BuildingCapture.CaptureRadius's own live cut check never finds one active), which
+                // would test the wrong, larger circle against the wall this test builds.
+                float captureRadius = BuildingCapture.CaptureRadiusFor(centre.territoryConfig, centre.tier, cutActive: true);
                 for (int i = 0; i < 72; i++)
                 {
                     float radians = i * 5f * Mathf.Deg2Rad;
-                    var edge = centrePosition + new Vector3(Mathf.Cos(radians), 0f, Mathf.Sin(radians)) * centre.CaptureRadius;
+                    var edge = centrePosition + new Vector3(Mathf.Cos(radians), 0f, Mathf.Sin(radians)) * captureRadius;
                     Assert.GreaterOrEqual(geometry.Playable.SignedDistance(edge), 0f,
                         $"team {team}: the centre's own capture ring at {i * 5} degrees is behind the wall.");
                 }

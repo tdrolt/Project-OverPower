@@ -90,8 +90,8 @@ namespace Overpower.Match
         /// IsCapitalOutOfPlay call stays (Decision 8: out of play from LIVE - the countdown is still warm-up,
         /// Decision 3) as a belt-and-braces check, but it is no longer the only thing catching a host start's
         /// left-out capital: once live, CutTeam already derives that same team as the cut (PhaseTwoCutRules.CutTeam
-        /// falls back to the team missing from TeamsInMatch), so PhaseTwoCutRules.IsZoneCut below already covers its
-        /// capital too - final review, 2026-09-25.</summary>
+        /// checks the team missing from TeamsInMatch FIRST - it is not a fallback), so PhaseTwoCutRules.IsZoneCut
+        /// below already covers its capital too - final review, 2026-09-25.</summary>
         public bool IsOutOfPlay(int zone)
         {
             BuildingManager buildings = BuildingManager.Instance;
