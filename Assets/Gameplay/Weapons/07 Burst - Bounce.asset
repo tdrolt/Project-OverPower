@@ -18,7 +18,7 @@ MonoBehaviour:
   parent: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
   icon: {fileID: 0}
   goldCost: 1280
-  damage: 4.4
+  damage: 10
   fireInterval: 0.38
   projectilesPerShot: 3
   simultaneous: 0
@@ -27,7 +27,7 @@ MonoBehaviour:
   windupSeconds: 0
   projectilePrefab: {fileID: 1623706127264014633, guid: 1ebb1ff824072814f8b555d6460d336f, type: 3}
   projectileSpeed: 60
-  projectileRadius: 0.11
+  projectileRadius: 0.1
   maxRange: 28
   minConeAngle: 1
   maxConeAngle: 9

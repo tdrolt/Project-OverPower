@@ -26,15 +26,15 @@ MonoBehaviour:
   spreadDegrees: 0
   windupSeconds: 0
   projectilePrefab: {fileID: 1623706127264014633, guid: 9a053dd5e9b0eeb448b577cf0d6c424c, type: 3}
-  projectileSpeed: 52
+  projectileSpeed: 60
   projectileRadius: 0.08
   maxRange: 13
   minConeAngle: 5
   maxConeAngle: 20
-  bloomPerShot: 2
+  bloomPerShot: 6
   recoveryPerSecond: 3
   standingStillMultiplier: 1.2
-  movingSpreadDegrees: 6
+  movingSpreadDegrees: 15
   movingBloomPerSecond: 4
   overheatPerShot: 3.5
   overheatRefundOnHit: 0

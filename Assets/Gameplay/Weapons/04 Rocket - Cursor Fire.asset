@@ -26,7 +26,7 @@ MonoBehaviour:
   spreadDegrees: 0
   windupSeconds: 0
   projectilePrefab: {fileID: 3472910922280904258, guid: 63efebc3facaa954eadf1fafd76d7011, type: 3}
-  projectileSpeed: 15
+  projectileSpeed: 20
   projectileRadius: 0.3
   maxRange: 20
   minConeAngle: 1
