@@ -12,11 +12,15 @@ namespace Overpower.Arena
     /// replicated number, MatchDirector.CutTeam - so a late joiner and a new master get the same wall with no message
     /// of their own. Added at play by ArenaSymmetry.OnEnable: no scene object.
     ///
-    /// On a cut: builds the wall boxes and the recess barrier as primitives with the outer walls' own material,
-    /// thickness, height and layers (under Source/Boundry, so a portal's path check sees the wall); publishes the smaller
-    /// outline (ArenaSymmetry.UsePlayableBounds) for blink, portals and the safety net; hides every block, barrier and
-    /// scenery piece whose position is behind the wall; and destroys what this client placed there. Towers behind the
-    /// wall hide themselves (BuildingCapture, from MatchDirector.IsOutOfPlay). On "no cut" (a new room), everything is
+    /// On a cut: builds the wall boxes and the recess barrier (and its two planks, Tudor 2026-09-26: "the zone is too
+    /// empty") as primitives with the outer walls' own material, thickness, height and layers (under Source/Boundry,
+    /// so a portal's path check sees the wall); publishes the smaller outline (ArenaSymmetry.UsePlayableBounds) for
+    /// blink, portals and the safety net; hides every block, barrier and scenery piece with ANY corner of its
+    /// footprint behind the wall (Tudor 2026-09-26: a piece can stand with its centre in front of the wall and still
+    /// reach behind it - the two new centre-to-Tier-III walls facing a closed corner do exactly that; footprint from
+    /// the piece's position, rotation and lossy X/Z scale, ArenaPieceShapes.FootprintCorners, since every piece is a
+    /// unit cube scaled); and destroys what this client placed there. Towers behind the wall hide themselves
+    /// (BuildingCapture, from MatchDirector.IsOutOfPlay). On "no cut" (a new room), everything is
     /// put back exactly as it was.
     ///
     /// Polls once a frame instead of subscribing: the cut can appear on a join, a knockout or a host start and go away
@@ -250,6 +254,20 @@ namespace Overpower.Arena
                 box.size = boxSize;
             }
 
+            Vector3 plankSize = layout.PhaseTwoRecessPlankSize;
+            if (geometry.HasRecess && plankSize.x > 0f && plankSize.y > 0f && plankSize.z > 0f)
+            {
+                (Vector2 first, Vector2 second) = geometry.PlankCentres(layout.PhaseTwoRecessPlankSpacing, layout.PhaseTwoRecessPlankInFront);
+                int plankIndex = 0;
+                foreach (Vector2 centreXZ in new[] { first, second })
+                {
+                    GameObject plank = NewBox($"Phase Two Recess Plank {plankIndex++}", layout.BlockMaterial, buildingLayer);
+                    plank.transform.SetPositionAndRotation(new Vector3(centreXZ.x, plankSize.y * 0.5f, centreXZ.y),
+                        Quaternion.Euler(0f, geometry.BarrierYawDegrees, 0f));
+                    plank.transform.localScale = plankSize;
+                }
+            }
+
             arena.UsePlayableBounds(geometry.Playable);
             HidePiecesBehind(geometry);
             NetworkedDeployable.DestroyOwnedWhere(geometry.IsBehindWall);
@@ -279,7 +297,7 @@ namespace Overpower.Arena
                         continue;
                     foreach (Transform piece in group)
                     {
-                        if (!geometry.IsBehindWall(piece.position))
+                        if (!AnyFootprintCornerBehindWall(geometry, piece))
                             continue;
                         foreach (Renderer r in piece.GetComponentsInChildren<Renderer>())
                             if (r.enabled) { r.enabled = false; hiddenRenderers.Add(r); }
@@ -288,6 +306,19 @@ namespace Overpower.Arena
                     }
                 }
             }
+        }
+
+        /// <summary>Tudor 2026-09-26: a piece hides when ANY corner of its footprint is behind the wall, not just its
+        /// centre - a piece can stand with its centre in front and still reach behind (the two new centre-to-Tier-III
+        /// walls facing a closed corner do exactly that, by about 1.2 m). Height doesn't matter to IsBehindWall (it
+        /// reads X/Z only), so the corners are tested at the piece's own Y.</summary>
+        private static bool AnyFootprintCornerBehindWall(PhaseTwoCutGeometry geometry, Transform piece)
+        {
+            Vector2[] corners = ArenaPieceShapes.FootprintCorners(piece.position, piece.rotation, piece.lossyScale);
+            foreach (Vector2 corner in corners)
+                if (geometry.IsBehindWall(new Vector3(corner.x, piece.position.y, corner.y)))
+                    return true;
+            return false;
         }
 
         private void Restore()

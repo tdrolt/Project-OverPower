@@ -38,8 +38,18 @@ namespace Overpower.Arena
         /// <summary>A Unity yaw whose local +X runs along the wall (a barrier's length axis).</summary>
         public float BarrierYawDegrees { get; }
 
+        /// <summary>Unit vector along the wall line (exit point to entry point) - a plank's width and the recess
+        /// barrier's own length run along this.</summary>
+        public Vector2 AlongWall { get; }
+
+        /// <summary>Unit vector from the arena centre toward the cut capital - the direction Past() measures
+        /// positively, i.e. into the closed side. Subtracting it from a point on the wall line moves onto the open
+        /// side.</summary>
+        public Vector2 TowardClosed { get; }
+
         private PhaseTwoCutGeometry(List<Vector2> wallLine, ArenaBounds playable, ArenaBounds closed,
-                                    List<ArenaWallPlan.Run> runs, bool hasRecess, Vector2 barrierCentre, float barrierYaw)
+                                    List<ArenaWallPlan.Run> runs, bool hasRecess, Vector2 barrierCentre, float barrierYaw,
+                                    Vector2 alongWall, Vector2 towardClosed)
         {
             WallLine = wallLine;
             Playable = playable;
@@ -48,11 +58,24 @@ namespace Overpower.Arena
             HasRecess = hasRecess;
             BarrierCentre = barrierCentre;
             BarrierYawDegrees = barrierYaw;
+            AlongWall = alongWall;
+            TowardClosed = towardClosed;
         }
 
         /// <summary>True for a point behind the wall: inside the old arena, outside the new one. The wall's own body counts
         /// as behind it.</summary>
         public bool IsBehindWall(Vector3 world) => Closed.SignedDistance(world) >= 0f;
+
+        /// <summary>The two "planks" standing out from the recess mouth at each end of its barrier (Tudor 2026-09-26:
+        /// "the zone is too empty"), mirrored across the cut axis: BarrierCentre offset <paramref name="spacing"/>
+        /// metres either way along the wall, and <paramref name="inFront"/> metres off the wall line toward the open
+        /// side. Pure geometry - makes sense with or without HasRecess; the caller decides whether to build them.</summary>
+        public (Vector2 First, Vector2 Second) PlankCentres(float spacing, float inFront)
+        {
+            Vector2 lateral = AlongWall * spacing;
+            Vector2 outward = TowardClosed * inFront;
+            return (BarrierCentre + lateral - outward, BarrierCentre - lateral - outward);
+        }
 
         /// <summary>Null when it can't be built: the wall line doesn't cross the outline exactly twice, or the recess
         /// doesn't fit between the outer walls or inside the old arena (with room for its own back wall).</summary>
@@ -133,7 +156,7 @@ namespace Overpower.Arena
             float barrierYaw = Quaternion.LookRotation(new Vector3(-u.x, 0f, -u.y), Vector3.up).eulerAngles.y;
 
             return new PhaseTwoCutGeometry(wallLine, ArenaBounds.FromPolygon(playable), ArenaBounds.FromPolygon(closed),
-                                           runs, hasRecess, mouthMiddle, barrierYaw);
+                                           runs, hasRecess, mouthMiddle, barrierYaw, along, u);
         }
 
         // Metres past the wall line (positive = the closed side).

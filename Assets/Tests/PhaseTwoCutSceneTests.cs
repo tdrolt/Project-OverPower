@@ -86,8 +86,70 @@ namespace Overpower.Tests
         private static readonly string[] StayingPieceGroupNames =
             { ArenaSymmetry.BlocksGroupName, ArenaSymmetry.BarriersGroupName, ArenaSymmetry.SceneryGroupName };
 
+        // Centre-Tier-III-walls, 2026-09-26: the old test above (a piece that stays never reaches behind the wall)
+        // is true by construction now that ArenaPhaseTwoCut hides a piece with any footprint corner behind the wall
+        // - so it was replaced with this, which pins the actual point of the three new walls: for each cut, exactly
+        // one of the three copies of "Centre - Tier III wall (zone 4)" (one per third, keeping the Source name) has
+        // every corner in front - and it must be the one nearest the Tier III PhaseTwoCutRules.CutZones does NOT cut
+        // - while the other two (facing the closed corner) have a corner behind.
+        private const string CentreWallName = "Centre - Tier III wall (zone 4)";
+
         [Test]
-        public void NoStayingPieceIsCutByTheNewWallForEveryCorner([Values(0, 1, 2)] int team)
+        public void TheCentreWallFacingTheSurvivingTierIIIStaysAndTheOtherTwoGoForEveryCorner([Values(0, 1, 2)] int team)
+        {
+            WithGameScene(scene =>
+            {
+                ArenaSymmetry arena = Find<ArenaSymmetry>(scene).Single();
+                List<BuildingCapture> towers = Find<BuildingCapture>(scene).ToList();
+                TerritoryMap map = MapOf(Find<BuildingManager>(scene).Single());
+                Func<int, int> baseTierOf = zone => towers.FirstOrDefault(t => t.buildingID == zone)?.tier ?? 0;
+                List<int> cutZones = PhaseTwoCutRules.CutZones(map, team, baseTierOf);
+
+                PhaseTwoCutGeometry geometry = BuildGeometry(arena, map, towers, team);
+                Assert.IsNotNull(geometry, $"team {team}'s cut could not be built from the scene's own outline and layout.");
+
+                var wallCopies = new List<Transform>();
+                foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
+                {
+                    Transform group = third != null ? third.Find(ArenaSymmetry.BlocksGroupName) : null;
+                    if (group == null)
+                        continue;
+                    foreach (Transform piece in group)
+                        if (piece.name == CentreWallName)
+                            wallCopies.Add(piece);
+                }
+                Assert.AreEqual(3, wallCopies.Count, "one copy per third - Build primitive arena should have made exactly three.");
+
+                int stayingCount = 0;
+                foreach (Transform wall in wallCopies)
+                {
+                    BuildingCapture nearestTierThree = towers.Where(t => t.tier == 3)
+                        .OrderBy(t => Vector3.Distance(t.transform.position, wall.position)).First();
+                    bool shouldStay = !cutZones.Contains(nearestTierThree.buildingID);
+                    bool everyCornerInFront = !AnyFootprintCornerBehind(geometry, wall);
+                    Assert.AreEqual(shouldStay, everyCornerInFront,
+                        $"team {team}: '{wall.name}' nearest tower {nearestTierThree.buildingID} " +
+                        (shouldStay ? "should have every corner in front but doesn't." : "should have a corner behind but doesn't."));
+                    if (everyCornerInFront)
+                        stayingCount++;
+                }
+                Assert.AreEqual(1, stayingCount, $"team {team}: exactly one of the three wall copies should stay (every corner in front).");
+            });
+        }
+
+        private static bool AnyFootprintCornerBehind(PhaseTwoCutGeometry geometry, Transform piece)
+        {
+            Vector2[] corners = ArenaPieceShapes.FootprintCorners(piece.position, piece.rotation, piece.lossyScale);
+            foreach (Vector2 corner in corners)
+                if (geometry.IsBehindWall(new Vector3(corner.x, piece.position.y, corner.y)))
+                    return true;
+            return false;
+        }
+
+        // Centre-Tier-III-walls Part 2, 2026-09-26 ("the zone is too empty"): the two recess planks' footprints must
+        // not overlap any staying Block/Barrier/Scenery piece or any tower, and must stay wholly inside Playable.
+        [Test]
+        public void ThePlanksOverlapNoStayingPieceOrTowerAndStayInsidePlayableForEveryCorner([Values(0, 1, 2)] int team)
         {
             WithGameScene(scene =>
             {
@@ -98,30 +160,48 @@ namespace Overpower.Tests
                 PhaseTwoCutGeometry geometry = BuildGeometry(arena, map, towers, team);
                 Assert.IsNotNull(geometry, $"team {team}'s cut could not be built from the scene's own outline and layout.");
 
-                foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
-                {
-                    if (third == null)
-                        continue;
-                    foreach (string groupName in StayingPieceGroupNames)
-                    {
-                        Transform group = third.Find(groupName);
-                        if (group == null)
-                            continue; // skip a group that doesn't exist under this third
-                        foreach (Transform piece in group)
-                        {
-                            if (geometry.IsBehindWall(piece.position))
-                                continue; // meant to disappear behind the wall - not this test's concern
+                ArenaLayout layout = arena.layout;
+                Vector3 plankSize = layout.PhaseTwoRecessPlankSize;
+                if (plankSize.x <= 0f)
+                    return; // no planks configured in this layout - nothing to check
 
-                            Vector3 right = piece.right * (piece.lossyScale.x * 0.5f);
-                            Vector3 forward = piece.forward * (piece.lossyScale.z * 0.5f);
-                            Vector3[] corners =
+                (Vector2 plankA, Vector2 plankB) = geometry.PlankCentres(layout.PhaseTwoRecessPlankSpacing, layout.PhaseTwoRecessPlankInFront);
+                foreach (Vector2 plankCentre in new[] { plankA, plankB })
+                {
+                    Vector2[] plankFootprint = ArenaPieceShapes.FootprintCorners(plankCentre, geometry.BarrierYawDegrees,
+                        new Vector2(plankSize.x, plankSize.z));
+
+                    foreach (Vector2 corner in plankFootprint)
+                        Assert.GreaterOrEqual(geometry.Playable.SignedDistance(corner), 0f,
+                            $"team {team}: a recess plank at {plankCentre} has a corner outside Playable.");
+
+                    foreach (BuildingCapture tower in towers)
+                    {
+                        if (geometry.IsBehindWall(tower.transform.position))
+                            continue; // out of play anyway - not this test's concern
+                        Vector2[] towerFootprint = ArenaPieceShapes.FootprintCorners(tower.transform.position,
+                            tower.transform.rotation, tower.transform.lossyScale);
+                        Assert.IsFalse(ArenaPieceShapes.FootprintsOverlap(plankFootprint, towerFootprint),
+                            $"team {team}: a recess plank at {plankCentre} overlaps tower {tower.buildingID}.");
+                    }
+
+                    foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
+                    {
+                        if (third == null)
+                            continue;
+                        foreach (string groupName in StayingPieceGroupNames)
+                        {
+                            Transform group = third.Find(groupName);
+                            if (group == null)
+                                continue;
+                            foreach (Transform piece in group)
                             {
-                                piece.position + right + forward, piece.position + right - forward,
-                                piece.position - right + forward, piece.position - right - forward,
-                            };
-                            foreach (Vector3 corner in corners)
-                                Assert.Less(geometry.Closed.SignedDistance(corner), 0f,
-                                    $"team {team}: '{third.name}/{groupName}/{piece.name}' stays in play but the new wall cuts through it.");
+                                if (geometry.IsBehindWall(piece.position))
+                                    continue; // meant to disappear behind the wall - not this test's concern
+                                Vector2[] pieceFootprint = ArenaPieceShapes.FootprintCorners(piece.position, piece.rotation, piece.lossyScale);
+                                Assert.IsFalse(ArenaPieceShapes.FootprintsOverlap(plankFootprint, pieceFootprint),
+                                    $"team {team}: a recess plank at {plankCentre} overlaps '{third.name}/{groupName}/{piece.name}'.");
+                            }
                         }
                     }
                 }

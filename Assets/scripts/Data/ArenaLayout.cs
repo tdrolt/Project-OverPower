@@ -122,6 +122,18 @@ namespace Overpower.Data
                  "10.18 x 1 x 0.6). Length 0 = no barrier.")]
         [SerializeField] private Vector3 phaseTwoRecessBarrierSize = new Vector3(10.181736f, 1f, 0.6f);
 
+        [Tooltip("The two \"planks\" standing out from the recess mouth at each end of its barrier (Tudor 2026-09-26: " +
+                 "\"you can try to add the planks as i feel the zone is too empty\") - the same boxes as the planks at " +
+                 "the Tier III recesses in the outer walls: x = width along the wall, y = height, z = how far it " +
+                 "stands out. x 0 = no planks.")]
+        [SerializeField] private Vector3 phaseTwoRecessPlankSize = new Vector3(2.609f, 5.729f, 7.181f);
+
+        [Tooltip("Metres from the recess's middle to each plank's centre, along the wall.")]
+        [SerializeField, Min(0f)] private float phaseTwoRecessPlankSpacing = 6.18f;
+
+        [Tooltip("Metres from the recess mouth to each plank's centre, out toward the arena.")]
+        [SerializeField, Min(0f)] private float phaseTwoRecessPlankInFront = 3f;
+
         public IReadOnlyList<Piece> Pieces => pieces;
 
         public Material WallMaterial => wallMaterial;
@@ -143,5 +155,8 @@ namespace Overpower.Data
         public float PhaseTwoRecessWidth => phaseTwoRecessWidth;
         public float PhaseTwoRecessDepth => phaseTwoRecessDepth;
         public Vector3 PhaseTwoRecessBarrierSize => phaseTwoRecessBarrierSize;
+        public Vector3 PhaseTwoRecessPlankSize => phaseTwoRecessPlankSize;
+        public float PhaseTwoRecessPlankSpacing => phaseTwoRecessPlankSpacing;
+        public float PhaseTwoRecessPlankInFront => phaseTwoRecessPlankInFront;
     }
 }

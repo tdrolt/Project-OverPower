@@ -78,6 +78,11 @@ MonoBehaviour:
     centre: {x: 91.20298, y: 0, z: 68.99132}
     yawDegrees: 239.9998
     size: {x: 10.181736, y: 1, z: 0.6}
+  - name: Centre - Tier III wall (zone 4)
+    kind: 0
+    centre: {x: 75.026, y: 2.518, z: 59.1}
+    yawDegrees: 240
+    size: {x: 12, y: 7.036, z: 0.724}
   wallMaterial: {fileID: 2100000, guid: 0ddd8131a35b6b94aa03ab4a047f0576, type: 2}
   wallThickness: 0.724
   wallBottomY: -1
@@ -93,3 +98,6 @@ MonoBehaviour:
   phaseTwoRecessWidth: 19.54
   phaseTwoRecessDepth: 3.25
   phaseTwoRecessBarrierSize: {x: 10.181736, y: 1, z: 0.6}
+  phaseTwoRecessPlankSize: {x: 2.609, y: 5.729, z: 7.181}
+  phaseTwoRecessPlankSpacing: 6.18
+  phaseTwoRecessPlankInFront: 3

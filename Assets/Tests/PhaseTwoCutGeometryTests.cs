@@ -112,6 +112,28 @@ namespace Overpower.Tests
             Assert.AreEqual(0f, length.z, 1e-4f, "its length runs along the wall, across the toy's cut direction (+Z)");
         }
 
+        // Centre-Tier-III-walls Part 2, 2026-09-26 ("the zone is too empty"): the toy's cut runs straight up (+y, u =
+        // Vector2.up), so BarrierCentre (10, 22) and the cut axis is the vertical line x=10 - hand-derived, not read
+        // back off PlankCentres itself.
+        [Test]
+        public void PlankCentresMirrorAcrossTheAxisAndSitOnTheOpenSide()
+        {
+            PhaseTwoCutGeometry cut = ToyCut();
+            (Vector2 first, Vector2 second) = cut.PlankCentres(spacing: 0.5f, inFront: 0.3f);
+
+            Assert.AreEqual(9.5f, first.x, 1e-4f);
+            Assert.AreEqual(21.7f, first.y, 1e-4f);
+            Assert.AreEqual(10.5f, second.x, 1e-4f);
+            Assert.AreEqual(21.7f, second.y, 1e-4f);
+
+            // Mirrored across the cut axis (x = 10): equally either side of it, the same distance off the wall line.
+            Assert.AreEqual(20f, first.x + second.x, 1e-4f, "mirrors across the cut axis");
+            Assert.AreEqual(first.y, second.y, 1e-4f);
+
+            Assert.Greater(cut.Playable.SignedDistance(first), 0f, "on the open side of the wall line");
+            Assert.Greater(cut.Playable.SignedDistance(second), 0f, "on the open side of the wall line");
+        }
+
         [Test]
         public void NoRecessMeansAStraightWall()
         {

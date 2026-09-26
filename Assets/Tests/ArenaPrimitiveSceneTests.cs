@@ -104,6 +104,18 @@ namespace Overpower.Tests
             });
         }
 
+        // Centre-Tier-III-walls, 2026-09-26: one Block row in ArenaLayout makes all three (Source, Generated 120,
+        // Generated 240) - this guards that the build keeps making exactly one copy per third.
+        [Test]
+        public void TheArenaHasExactlyThreeCentreTierThreeWalls()
+        {
+            WithGameScene(scene =>
+            {
+                int count = Find<Transform>(scene).Count(t => t.name == "Centre - Tier III wall (zone 4)");
+                Assert.AreEqual(3, count, "one per third - Build primitive arena should have made exactly three.");
+            });
+        }
+
         // Uses Game Scene if it's already open (the normal case: read-only checks on what's loaded), otherwise opens it
         // additively and closes it again. Never opens it Single, which would prompt to save a dirty scene.
         private static void WithGameScene(Action<Scene> body)

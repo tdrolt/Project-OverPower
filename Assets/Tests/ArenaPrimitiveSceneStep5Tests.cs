@@ -245,7 +245,9 @@ namespace Overpower.Tests
                     Transform blocks = third.Find(ArenaPrimitiveBuilder.BlocksGroupName);
                     Assert.IsNotNull(blocks, $"{third.name} has no Blocks group");
 
-                    int crateCount = 0, houseCount = 0;
+                    // Centre-Tier-III-walls, 2026-09-26: "Centre - Tier III wall (zone 4)" is a real Block too (a
+                    // full-height wall, not cover), so "not a crate" no longer means "a house" - counted on its own.
+                    int crateCount = 0, houseCount = 0, otherCount = 0;
                     foreach (Transform block in blocks)
                     {
                         Assert.IsFalse(block.name.StartsWith("Rock_03"),
@@ -254,10 +256,12 @@ namespace Overpower.Tests
                             $"'{block.name}' under {third.name} should have been removed (Tudor: the bushes add nothing)");
 
                         if (block.name.StartsWith("Cover Crate")) crateCount++;
-                        else houseCount++;
+                        else if (block.name.StartsWith("House")) houseCount++;
+                        else otherCount++;
                     }
                     Assert.AreEqual(6, crateCount, $"{third.name} should still have all six Cover Crate blocks");
                     Assert.AreEqual(6, houseCount, $"{third.name} should still have all six house blocks");
+                    Assert.AreEqual(1, otherCount, $"{third.name} should have exactly one other Block (the centre-to-Tier-III wall)");
                 }
             });
         }
