@@ -186,5 +186,35 @@ namespace Overpower.Tests
             // Mode 3: the old answers.
             Assert.AreEqual(WarmupMessage.HostMayStart, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, true, 3));
         }
+
+        // --- Review fix 3 (2026-09-26): several players on a team the switch just closed must not all re-pick
+        // the same open team from the same counts - each walks the list in the SAME order, filling as it goes. ---
+
+        [Test]
+        public void ReseatingSeveralClosedPlayersSpreadsThemOverTheOpenTeams()
+        {
+            // 0/0/{2 players}: the lower actor gets 0, the higher gets 1 - not both onto 0.
+            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(mode: 2, myActor: 5,
+                closedActorsAscending: new[] { 5, 9 }, openCounts: new[] { 0, 0, 0 }, teamSize: 3));
+            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(2, 9, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
+
+            // 1/0/{1}: the one team with room wins.
+            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(2, 7, new[] { 7 }, new[] { 1, 0, 0 }, 3));
+
+            // 3/3/{1}: both open teams are already at the cap.
+            Assert.AreEqual(-1, MatchStartRules.ReseatTeamFor(2, 4, new[] { 4 }, new[] { 3, 3, 0 }, 3));
+
+            // 1/1/{3 players}, actor order: 0, 1, 0 - not all three onto the same team.
+            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(2, 1, new[] { 1, 2, 3 }, new[] { 1, 1, 0 }, 3));
+            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(2, 2, new[] { 1, 2, 3 }, new[] { 1, 1, 0 }, 3));
+            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(2, 3, new[] { 1, 2, 3 }, new[] { 1, 1, 0 }, 3));
+
+            // myActor never on the closed list: -1.
+            Assert.AreEqual(-1, MatchStartRules.ReseatTeamFor(2, 99, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
+
+            // Mode 3 never has a closed team - a call with it just returns the smallest by the same walk.
+            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(3, 5, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
+            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(3, 9, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
+        }
     }
 }

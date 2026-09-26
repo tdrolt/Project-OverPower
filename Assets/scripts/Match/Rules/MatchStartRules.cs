@@ -154,6 +154,56 @@ namespace Overpower.Match
         public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated, bool teamOpen) =>
             teamsFixed ? MayJoin(teamsFixed, inMatch, eliminated) : teamOpen;
 
+        /// <summary>Review fix 3 (2026-09-26): several players re-seating off the SAME closed team used to all
+        /// read the same frozen counts with the same tie-break (RoomManager.PickSmallestTeam, called once per
+        /// player with no memory of the others) - 0/0/{2 players} landed both on team 0. This walks every closed
+        /// actor in a FIXED order - ascending by actor number, the one order every client can compute identically
+        /// with no room property of its own - simulating each one filling in ahead of myActor: at each actor's
+        /// turn, whichever OPEN team (IsTeamOpen) is smallest right then (ties broken by the lowest team index,
+        /// PickSmallestTeam's own tie-break) gets them, and its count goes up by one before the next actor's turn.
+        /// Returns whichever team myActor was given this way; -1 if myActor is never on the closed list, or if by
+        /// its turn the smallest open team is already at teamSize (RoomManager's own NoFreeTeam - "staying put").
+        ///
+        /// Mode 3 never has a closed team (IsTeamOpen is true everywhere) - a call with it still walks the same
+        /// way and simply returns the smallest by the same tie-break, PickSmallestTeam's own answer for three
+        /// teams.
+        ///
+        /// openCounts is read once, not mutated - a local copy tracks the walk's own running counts, so calling
+        /// this twice for two different actors off the same room snapshot answers exactly as if they were
+        /// re-seated one after the other.</summary>
+        public static int ReseatTeamFor(int mode, int myActor, IReadOnlyList<int> closedActorsAscending,
+            IReadOnlyList<int> openCounts, int teamSize)
+        {
+            var counts = new int[openCounts.Count];
+            for (int i = 0; i < openCounts.Count; i++)
+                counts[i] = openCounts[i];
+
+            int result = -1;
+            for (int i = 0; i < closedActorsAscending.Count; i++)
+            {
+                int smallest = -1;
+                for (int t = 0; t < counts.Length; t++)
+                {
+                    if (!IsTeamOpen(mode, t))
+                        continue;
+                    if (smallest == -1 || counts[t] < counts[smallest])
+                        smallest = t;
+                }
+
+                int given = -1;
+                if (smallest != -1 && counts[smallest] < teamSize)
+                {
+                    given = smallest;
+                    counts[smallest]++;
+                }
+
+                if (closedActorsAscending[i] == myActor)
+                    result = given;
+            }
+
+            return result;
+        }
+
         /// <summary>The warm-up line's wording (Open for Tudor #5: default text, unchanged) - None once live, the
         /// countdown while counting down, else who is here and who is host.</summary>
         public static WarmupMessage WarmupMessageFor(StartState state, int teamsWithPlayers, bool isHost)

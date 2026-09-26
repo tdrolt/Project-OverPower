@@ -278,7 +278,27 @@ public class RoomManager : MonoBehaviourPunCallbacks
         if (director.MayJoinTeam(myTeam))
             return; // Still open - team 0/1, or the mode is already back to three.
 
-        int picked = PickSmallestTeam();
+        int mode = director.LobbyMode;
+        int myActor = PhotonNetwork.LocalPlayer.ActorNumber;
+
+        // Review fix 3 (2026-09-26): openCounts and the closed-team roster, read fresh off PhotonNetwork.
+        // PlayerList (ascending by actor number - PickSmallestTeam's own comment already relies on that same
+        // sort) rather than PickSmallestTeam's per-player snapshot: several players re-seating off the SAME
+        // switch have to walk the SAME list in the SAME order (MatchStartRules.ReseatTeamFor), or they all land
+        // on the same open team again - the bug this fix closes.
+        var openCounts = new int[MatchStartRules.TeamCount];
+        var closedActors = new System.Collections.Generic.List<int>();
+        foreach (var p in PhotonNetwork.PlayerList)
+        {
+            if (!Teams.TryGetTeam(p, out int team))
+                continue;
+            if (MatchStartRules.IsTeamOpen(mode, team))
+                openCounts[team]++;
+            else
+                closedActors.Add(p.ActorNumber);
+        }
+
+        int picked = MatchStartRules.ReseatTeamFor(mode, myActor, closedActors, openCounts, TeamSize);
         if (picked == NoFreeTeam)
         {
             Debug.LogWarning("[TEAM] two-team switch closed my team and no other team has room to re-pick into -- staying put");
@@ -294,5 +314,21 @@ public class RoomManager : MonoBehaviourPunCallbacks
         PhotonView localView = PhotonNetwork.LocalPlayer != null
             ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
         localView?.GetComponent<PlayerLifecycle>()?.TeleportToTeamSpawn(teamSpawnPoints[picked]);
+    }
+
+    /// <summary>Review fix 1 (2026-09-26): closes the LATE ECHO race - a joiner who picked team 2 an instant
+    /// before the mode switch arrives can see the mode edge (MatchDirector.ReactToRoomState, which calls
+    /// ReseatLocalPlayerIfTeamClosed above) before the server's own echo of their teamID = 2 write lands on
+    /// their client. Teams.TryGetTeam finds nothing yet on that ordering, so the call above returns having done
+    /// nothing - and nothing else ever asks again, leaving the room stuck (the host can't start with a player
+    /// stranded on the closed team). Reacting to the echo itself, for the local player's own team key, closes
+    /// it. ReseatLocalPlayerIfTeamClosed's own TeamsFixed early return still runs first, so this can't loop: once
+    /// re-seated onto an open team (or once the teams are fixed), the next echo of this same key is a no-op.</summary>
+    public override void OnPlayerPropertiesUpdate(Player target, Hashtable changed)
+    {
+        if (target != PhotonNetwork.LocalPlayer || !changed.ContainsKey(PlayerTeam.TeamKey))
+            return;
+
+        ReseatLocalPlayerIfTeamClosed();
     }
 }

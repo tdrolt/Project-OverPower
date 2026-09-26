@@ -6,6 +6,7 @@ using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.UI;
 using Overpower.Weapons;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -499,6 +500,16 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             elapsed += Time.deltaTime;
         }
 
+        // Review fix 4 (2026-09-26): re-seated while dead in the warm-up (a two-team switch moved this player
+        // off the closed team - RoomManager.ReseatLocalPlayerIfTeamClosed - while this wait was already running)
+        // used to keep whichever team PlayerDied captured when the wait STARTED, stale by the time it ends -
+        // SpawnCapitalFor below then answered for the closed team's own corner instead of the team this player
+        // actually landed on. Re-read now, at the same moment Decision 12 below already re-decides everything
+        // else - Teams.TryGetTeam, the one place team membership is read and compared. Leaves teamID as PlayerDied
+        // captured it if the property is (impossibly) still missing.
+        if (Teams.TryGetTeam(photonView.Owner, out int currentTeam))
+            teamID = currentTeam;
+
         // 2.7b step 7 (Decision 12): the decision is made now, when the timer ends, not when the player died -
         // already true for the under-attack spawn choice below, now also for whether they respawn at all. Three
         // teams: SpawnCapitalFor returns the own capital regardless (GDD p.20's last stand counts only deaths
@@ -598,6 +609,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     {
         if (!photonView.IsMine || spawn == null)
             return;
+        // Review fix 5 (2026-09-26): a knockback in flight (playerDisplacement's own Forced move) could
+        // otherwise finish AFTER this teleport and carry the body back off the new spawn - the same reason
+        // ResetForMatchStart and HandleLeftArena both cancel before they move the player.
+        playerDisplacement?.Cancel();
         TeleportToSpawnPoint(spawn.position, spawn.rotation);
     }
 

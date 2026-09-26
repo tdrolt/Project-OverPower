@@ -100,6 +100,10 @@ public class CameraTracking : MonoBehaviour
     private float currentZoom = 1f; // Default zoom level (1 = baseOffset)
     private float yaw = 0f;         // degrees rotated around the player
     private bool teamYawResolved = false;
+    // Review fix 6 (2026-09-26): which team teamYawResolved was resolved FOR - so ResolveTeamYaw can tell a
+    // genuine re-seat (a two-team switch moving the local player, RoomManager.ReseatLocalPlayerIfTeamClosed)
+    // apart from "already resolved, nothing to do". PlayerTeam.NoTeam until the first resolve.
+    private int teamYawResolvedForTeam = PlayerTeam.NoTeam;
 
     // Scope ability (Tudor, 2026-09-18): a SEPARATE keyed stack from currentZoom above, on purpose - see
     // CameraZoomStack's class comment for why an extra-zoom multiplier must never be folded into currentZoom
@@ -189,12 +193,24 @@ public class CameraTracking : MonoBehaviour
     /// known on the first frame.
     void ResolveTeamYaw()
     {
-        if (teamYawResolved || target == null)
+        if (target == null)
             return;
 
         PlayerTeam team = target.GetComponent<PlayerTeam>();
         if (team == null || !team.HasTeam)
             return;
+
+        // Review fix 6 (2026-09-26): the two-team lobby's late re-seat (RoomManager.ReseatLocalPlayerIfTeamClosed)
+        // moves the LOCAL player onto a different team after this camera already resolved once - keeping team
+        // 2's angle for the rest of the match otherwise. Re-resolved below the same way as the very first time;
+        // CaptureRingView already self-corrects off Yaw's own value changing (Building capture.cs), not off this
+        // flag, so a moment unresolved here breaks nothing.
+        if (teamYawResolved)
+        {
+            if (team.teamID == teamYawResolvedForTeam)
+                return;
+            teamYawResolved = false;
+        }
 
         RoomManager room = FindObjectOfType<RoomManager>();
         if (room == null || room.teamSpawnPoints == null || team.teamID >= room.teamSpawnPoints.Length)
@@ -219,6 +235,7 @@ public class CameraTracking : MonoBehaviour
 
         yaw = Mathf.Atan2(toSpawn.x, toSpawn.z) * Mathf.Rad2Deg + teamYawOffset;
         teamYawResolved = true;
+        teamYawResolvedForTeam = team.teamID;
 
         Debug.Log($"[TEAM] camera yaw {yaw:0} deg for team {team.teamID}");
     }

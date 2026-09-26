@@ -262,9 +262,17 @@ namespace Overpower.Match
 
             int liveAt = MatchStartRules.CountdownEndsAt(PhotonNetwork.ServerTimestamp, config.MatchStartCountdownSeconds);
             var props = new Hashtable { { TeamsInMatchKey, teams }, { LiveAtKey, liveAt } };
-            // Check-and-set on the ABSENT key (as MatchTelemetry's identity claim): two masters racing across a
-            // switch can't both start a countdown, and the teams can't be fixed twice.
-            var expectedAbsent = new Hashtable { { TeamsInMatchKey, null } };
+            // Review fix 2 (2026-09-26): check-and-set on the ABSENT key AND the mode THIS master saw (as
+            // MatchTelemetry's identity claim) - two masters racing across a switch still can't both start a
+            // countdown, and the teams still can't be fixed twice, but now the mode is pinned too. Without this
+            // an auto-start computed while this master still read mode 3 could land after its own mMode = 2
+            // write (fixing three teams into a room that just went two-team), or a "three teams" read racing a
+            // Start click within one round trip could fix mTeams before the mode-3 echo lands and then have that
+            // echo write MaxPlayers 9 underneath the already-fixed teams. Either way the room's mode has moved
+            // on from what `teams` was computed from, so the write is refused here rather than landing stale - a
+            // three-team room behaves the same as before, since it expects mMode absent either way.
+            PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyModeKey, out object modeSeen);
+            var expectedAbsent = new Hashtable { { TeamsInMatchKey, null }, { LobbyModeKey, modeSeen } };
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent))
                 return;
 
@@ -287,7 +295,12 @@ namespace Overpower.Match
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expected))
                 return;
             waitForEchoUntil = Time.unscaledTime + EchoWaitSeconds;
-            PhotonNetwork.CurrentRoom.MaxPlayers = (byte)(MatchStartRules.TeamCount * RoomManager.TeamSize);
+            // Review fix 7 (2026-09-26): used to hardcode TeamCount * TeamSize (9) here, whatever the room's own
+            // mode - back to the warm-up in a two-team room reopened team 2 but still capped MaxPlayers at 9 for
+            // three, letting a 7th/8th/9th player in on a room that HostMaySwitchToTwoTeamsNow (and the panel)
+            // both still treat as two-team. MaxPlayersFor(LobbyMode, ...) is the one place that maths lives -
+            // same call ApplyLobbyModeMaxPlayers and StartCountdown's own two-team write already make.
+            PhotonNetwork.CurrentRoom.MaxPlayers = (byte)MatchStartRules.MaxPlayersFor(LobbyMode, RoomManager.TeamSize);
             MatchTelemetry.Instance?.DropMarker("countdown cancelled"); // 2.7b step 9 - see StartCountdown's own comment.
             Debug.Log("[MATCH] countdown cancelled: a team in it emptied - back to the warm-up");
         }
