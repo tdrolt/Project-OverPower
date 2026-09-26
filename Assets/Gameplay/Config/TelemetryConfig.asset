@@ -17,3 +17,8 @@ MonoBehaviour:
   recordPositions: 1
   flushIntervalSeconds: 2
   folderName: Telemetry
+  recordConsole: 1
+  consoleMaxLinesPerSecond: 50
+  consoleMessageMaxChars: 500
+  bugMarkKey: 16
+  bugMarkNeedsCtrl: 1

@@ -105,6 +105,11 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     {
         if (!string.IsNullOrEmpty(chatField.text))
         {
+            // Playtest extras P3 (2026-09-26): the SENDER's own text, logged right before it
+            // publishes - never OnGetMessages' receive callback, which is not guaranteed to be this
+            // client's own copy of what was just typed. No-ops if telemetry is off or no match file
+            // is open yet.
+            Overpower.Telemetry.MatchTelemetry.Instance?.LogChat(chatField.text);
             chatClient.PublishMessage("RegionChannel", chatField.text); // Send to public chat
             chatField.text = ""; // Clear input field after sending
         }

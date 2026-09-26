@@ -5684,6 +5684,7 @@ GameObject:
   - component: {fileID: 822750205}
   - component: {fileID: 822750206}
   - component: {fileID: 822750207}
+  - component: {fileID: 822750208}
   m_Layer: 0
   m_Name: BuildingManager
   m_TagString: Untagged
@@ -5853,6 +5854,19 @@ MonoBehaviour:
   armorConfig: {fileID: 11400000, guid: 7c3c352cca1b63c418cb15fb4105cfa5, type: 2}
   weapons: {fileID: 11400000, guid: 16afde6d43329db4bbd7fed72f897638, type: 2}
   abilities: {fileID: 11400000, guid: 70e5ea7660cd12b4bbb497e71ca8b00e, type: 2}
+--- !u!114 &822750208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 822750202}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a6972907609f8a43bb4a6667071b771, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  config: {fileID: 11400000, guid: a62e8092c338d0c4ea30cd6f8f86b29d, type: 2}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0

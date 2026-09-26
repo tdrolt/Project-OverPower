@@ -645,5 +645,82 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.Zone, zone);
             Log(line);
         }
+
+        // ---------------------------------------------------------------- playtest extras (P2/P3, 2026-09-26)
+
+        /// <summary>P1's own `console`/dropped-count lines - ConsoleTelemetry is the only caller.
+        /// level is the string ConsoleLineRule/BugMarkerKey already settled on ("log"/"warning"/
+        /// "error"/"exception"/"assert"), reused verbatim as this line's own State (see that key's
+        /// class comment on reusing a short string label across events). Message/stack are already
+        /// scrubbed and cut; count/firstT/lastT are only written when count is greater than 1 - an
+        /// ordinary, un-folded line stays exactly as lean as any other single-occurrence event.</summary>
+        public void LogConsole(string level, string message, string stack, int count, double firstT, double lastT)
+        {
+            line.Begin(TelemetryKeys.Console, Now);
+            line.String(TelemetryKeys.State, level);
+            line.String(TelemetryKeys.Message, message ?? "");
+            if (stack != null)
+                line.String(TelemetryKeys.Stack, stack);
+            line.Int(TelemetryKeys.RepeatCount, count);
+            if (count > 1)
+            {
+                line.Float(TelemetryKeys.FirstT, (float)firstT);
+                line.Float(TelemetryKeys.LastT, (float)lastT);
+            }
+            Log(line);
+        }
+
+        /// <summary>The "N console lines dropped" summary ConsoleLineRule's per-second cap or its
+        /// pre-open queue produces - its own `console` line (State "dropped"), distinguished from an
+        /// ordinary console line by carrying Dropped instead of Message/RepeatCount.</summary>
+        public void LogConsoleDropped(int count)
+        {
+            line.Begin(TelemetryKeys.Console, Now);
+            line.String(TelemetryKeys.State, "dropped");
+            line.Int(TelemetryKeys.Dropped, count);
+            Log(line);
+        }
+
+        /// <summary>P2: Ctrl+B's own `bug` line - BugMarkerKey is the only caller. screenshotFileName
+        /// is just the file's own NAME (see TelemetryKeys.ScreenshotFile) - the report links it
+        /// relative to the match folder, which is this line's own folder.</summary>
+        public void LogBug(int team, float x, float z, bool alive, int zone, int weaponId, int equipmentId,
+                            int mobilityId, int ultimateId, string screenshotFileName)
+        {
+            line.Begin(TelemetryKeys.Bug, Now);
+            line.Int(TelemetryKeys.Actor, PhotonNetwork.LocalPlayer != null ? PhotonNetwork.LocalPlayer.ActorNumber : -1);
+            line.Int(TelemetryKeys.Team, team);
+            line.Float(TelemetryKeys.X, x);
+            line.Float(TelemetryKeys.Z, z);
+            line.Bool(TelemetryKeys.Alive, alive);
+            line.Int(TelemetryKeys.Zone, zone);
+            line.Int(TelemetryKeys.Weapon, weaponId);
+            line.Int(TelemetryKeys.Equipment, equipmentId);
+            line.Int(TelemetryKeys.Mobility, mobilityId);
+            line.Int(TelemetryKeys.Ultimate, ultimateId);
+            line.String(TelemetryKeys.ScreenshotFile, screenshotFileName ?? "");
+            Log(line);
+        }
+
+        /// <summary>P3: the sender's own public chat text - PhotonChat.SubmitPublicChatOnClick calls
+        /// this right BEFORE it publishes, so this is always the sender's own copy, never the receive
+        /// callback's (see that method's own comment). Cut to 300 characters, matching the brief.</summary>
+        public void LogChat(string text)
+        {
+            const int MaxChars = 300;
+            string cut = text != null && text.Length > MaxChars ? text.Substring(0, MaxChars) : text;
+
+            line.Begin(TelemetryKeys.Chat, Now);
+            line.Int(TelemetryKeys.Actor, PhotonNetwork.LocalPlayer != null ? PhotonNetwork.LocalPlayer.ActorNumber : -1);
+            line.String(TelemetryKeys.Text, cut ?? "");
+            Log(line);
+        }
+
+        /// <summary>Playtest extras P5 (the zip - not this task): flushes whatever is buffered to disk
+        /// right now, regardless of FlushIntervalSeconds' own timer. Harmless and unused until P5
+        /// exists; added now since it is a one-line wrapper around the writer this class already
+        /// owns. Does nothing if the writer never opened or is disabled - same no-op shape as every
+        /// other call on this class.</summary>
+        public void FlushNow() => writer.Flush();
     }
 }

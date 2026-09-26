@@ -249,3 +249,4 @@ MonoBehaviour:
   towerNeutralColor: {r: 0.42, g: 0.42, b: 0.42, a: 1}
   towerBodyShade: 0.8
   towerOwnerGlow: 1.5
+  bugMarkedText: Bug marked - type what happened in chat

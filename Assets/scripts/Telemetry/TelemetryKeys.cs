@@ -81,6 +81,17 @@ namespace Overpower.Telemetry
         /// (MatchPhaseRules.IsAdoption) - logged master-only from MatchDirector.HandleOwnershipChanged,
         /// live only (the warm-up sandbox never adopts anything).</summary>
         public const string Adopt = "adopt";
+        /// <summary>Playtest extras P1 (2026-09-26): one line per console message this client's own
+        /// ConsoleTelemetry admitted (cut, folded, capped and scrubbed by ConsoleLineRule - see its own
+        /// class comment). Also the event name of the "N console lines dropped" summary lines the same
+        /// rule produces, whether the drop happened before the file opened or past the per-second cap.</summary>
+        public const string Console = "console";
+        /// <summary>Playtest extras P2 (2026-09-26): Ctrl+B - "a bug just happened", with a screenshot
+        /// saved alongside this client's own log file. BugMarkerKey is the only writer.</summary>
+        public const string Bug = "bug";
+        /// <summary>Playtest extras P3 (2026-09-26): the sender's own public chat text, logged right
+        /// before PhotonChat.SubmitPublicChatOnClick publishes it - never the receive callback's copy.</summary>
+        public const string Chat = "chat";
 
         // ---------------------------------------------------------------- session (line 1)
         public const string Schema = "schema";
@@ -249,5 +260,30 @@ namespace Overpower.Telemetry
         /// a suppressed line or a new event type: the aggregator's alive-time-tail math needs the real respawn
         /// timestamp either way, and no table anywhere counts `respawn` lines as a stat - only reads their t.</summary>
         public const string Fresh = "fresh";
+
+        // ---------------------------------------------------------------- console / bug / chat (playtest extras, 2026-09-26)
+        /// <summary>`console`'s own message text, already scrubbed and cut to
+        /// TelemetryConfig.consoleMessageMaxChars by ConsoleLineRule.</summary>
+        public const string Message = "msg";
+        /// <summary>`console`'s own stack trace, scrubbed and cut - error/exception only (log/warning
+        /// never carry one). Its own key rather than reusing anything above: nothing else on this list
+        /// means "a call stack".</summary>
+        public const string Stack = "stack";
+        /// <summary>`console`'s own fold count - the brief's own wording ("folded into one line with
+        /// n"): how many times this exact (level, message) repeated within the fold window. 1 for a
+        /// line nothing else folded into. FirstT/LastT above (reused, same meaning as `dot`'s own
+        /// bucket bounds) are only meaningful once this is greater than 1.</summary>
+        public const string RepeatCount = "n";
+        /// <summary>How many console lines ConsoleLineRule counted rather than wrote, on the one
+        /// summary `console` line that reports it - either the per-second cap's own overflow, or
+        /// (before the file opened) anything the pre-open queue refused. Never present on an ordinary
+        /// console line.</summary>
+        public const string Dropped = "dropped";
+        /// <summary>`bug`'s own screenshot FILE NAME (not a path - the report links it relative to the
+        /// match folder, which is this line's own folder) - see BugMarkerKey.</summary>
+        public const string ScreenshotFile = "img";
+        /// <summary>`chat`'s own message text, cut to 300 characters - see PhotonChat.
+        /// SubmitPublicChatOnClick.</summary>
+        public const string Text = "text";
     }
 }

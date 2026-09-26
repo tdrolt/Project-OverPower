@@ -269,8 +269,10 @@ public class PlayerInputRouter : MonoBehaviour
 
     /// <summary>Suppresses input the instant a text field takes focus - e.g. the chat box under
     /// "chat manager" (a TMP_InputField); without this you can fire your weapon while typing a
-    /// message. Also covers the legacy UI InputField in case a future menu uses one.</summary>
-    private static bool IsTypingInChat()
+    /// message. Also covers the legacy UI InputField in case a future menu uses one. Public (playtest
+    /// extras P2, 2026-09-26): BugMarkerKey shares this exact check so Ctrl+B is refused while typing
+    /// too, rather than re-implementing the same EventSystem lookup a second time.</summary>
+    public static bool IsTypingInChat()
     {
         GameObject selected = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
         if (selected == null)

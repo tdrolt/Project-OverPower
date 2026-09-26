@@ -848,6 +848,12 @@ namespace Overpower.UI
                  "lilac. Neutral and out-of-play towers never glow, so a glow means owned. The drum never glows.")]
         [Range(1f, 2.5f)] public float towerOwnerGlow = 1.5f;
 
+        [Header("Playtest extras (2026-09-26)")]
+        [Tooltip("HUD toast shown on Ctrl+B - 'a bug just happened' (BugMarkerKey): a screenshot is " +
+                 "saved next to this client's own telemetry log, and its own `bug` line is written. " +
+                 "Uses the same transient toast label every other HUD toast shares (PlayerHud.ShowToast).")]
+        public string bugMarkedText = "Bug marked - type what happened in chat";
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why
