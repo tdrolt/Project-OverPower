@@ -40,4 +40,4 @@ MonoBehaviour:
   overPowerRadius: 10
   overPowerHealthThreshold: 35
   overPowerStatBonus: 0.1
-  testRangeEnabled: 1
+  testRangeEnabled: 0
