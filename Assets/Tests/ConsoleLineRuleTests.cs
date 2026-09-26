@@ -208,5 +208,31 @@ namespace Overpower.Tests
             Assert.AreEqual(1, rule.TakePreOpenDroppedSummary());
             Assert.AreEqual(0, rule.TakePreOpenDroppedSummary());
         }
+
+        // Step 0 review fix (a), 2026-09-26: the pre-open budget (preOpenAdmitted/preOpenDropped)
+        // used to never reset, and ConsoleTelemetry lives the whole session (no scene reload between
+        // matches) - so from the 2nd/3rd match on, the budget was already spent before that match's
+        // file even opened and every early warning was silently lost. ConsoleTelemetry.
+        // HandleBeforeClose now calls ResetPreOpenBudget() once per match (see that class).
+        [Test]
+        public void AfterResetPreOpenBudgetFiftyMoreAreAdmitted()
+        {
+            var rule = new ConsoleLineRule(500, 1000, 50);
+            for (int i = 0; i < 50; i++)
+                rule.AdmitBeforeOpen(ConsoleLevel.Warning);
+            Assert.AreEqual(0, rule.TakePreOpenDroppedSummary(), "the first 50 all fit under the cap");
+
+            rule.ResetPreOpenBudget();
+
+            int admittedAfterReset = 0;
+            for (int i = 0; i < 50; i++)
+            {
+                if (rule.AdmitBeforeOpen(ConsoleLevel.Warning))
+                    admittedAfterReset++;
+            }
+
+            Assert.AreEqual(50, admittedAfterReset, "a fresh match must get its own full budget, not the previous match's leftovers");
+            Assert.AreEqual(0, rule.TakePreOpenDroppedSummary());
+        }
     }
 }

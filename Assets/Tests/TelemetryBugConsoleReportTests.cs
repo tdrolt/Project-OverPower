@@ -118,5 +118,41 @@ namespace Overpower.Tests
             }
             finally { Directory.Delete(temp, true); }
         }
+
+        // Step 0 review fix (d), 2026-09-26: console.csv used to write only "error"/"warning" rows -
+        // narrower than ConsoleByPlayer (which already excludes "log"/"dropped" - see the test above)
+        // and narrower than the HTML's own per-player Console section, which also shows "exception"
+        // and "assert". Now console.csv writes every ConsoleByPlayer row with no further filtering.
+        [Test]
+        public void ConsoleCsvIncludesExceptionAndAssertRowsNotJustErrorAndWarning()
+        {
+            string temp = NewTempFolder();
+            string outFolder = Path.Combine(Path.GetTempPath(), "TelemetryBugConsoleCsvTests_" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                string file1 = Session(1, "P1", 0, true) +
+                    "{\"e\":\"console\",\"t\":10,\"state\":\"warning\",\"msg\":\"W\",\"n\":1}\n" +
+                    "{\"e\":\"console\",\"t\":11,\"state\":\"error\",\"msg\":\"E\",\"n\":1}\n" +
+                    "{\"e\":\"console\",\"t\":12,\"state\":\"exception\",\"msg\":\"X\",\"n\":1}\n" +
+                    "{\"e\":\"console\",\"t\":13,\"state\":\"assert\",\"msg\":\"A\",\"n\":1}\n" +
+                    "{\"e\":\"console\",\"t\":14,\"state\":\"log\",\"msg\":\"just info\",\"n\":1}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), file1);
+
+                ReportSet set = TelemetryAggregator.BuildSet(TelemetryLog.Load(temp));
+                CsvReportWriter.Write(set, outFolder);
+
+                string csvText = File.ReadAllText(Path.Combine(outFolder, "csv", "whole_match", "console.csv"));
+                StringAssert.Contains(",exception,", csvText);
+                StringAssert.Contains(",assert,", csvText);
+                StringAssert.Contains(",warning,", csvText);
+                StringAssert.Contains(",error,", csvText);
+                Assert.IsFalse(csvText.Contains("just info"), "the plain log line must stay out, same as ConsoleByPlayer");
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+                if (Directory.Exists(outFolder)) Directory.Delete(outFolder, true);
+            }
+        }
     }
 }

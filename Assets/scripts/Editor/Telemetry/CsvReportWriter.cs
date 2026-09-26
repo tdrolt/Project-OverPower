@@ -111,9 +111,12 @@ namespace Overpower.EditorTools.Telemetry
                 }));
         }
 
-        /// <summary>Playtest extras Task 2 (P4), whole_match only. Deliberately narrower than the
-        /// HTML's own per-player Console section (which also shows "exception" rows) - the brief's
-        /// own wording for this file is "console.csv (errors + warnings)".</summary>
+        /// <summary>Playtest extras Task 2 (P4), whole_match only. Step 0 review fix (d), 2026-09-26:
+        /// used to be narrower than the HTML's own per-player Console section (only "error"/
+        /// "warning", dropping "exception"/"assert") - now matches it exactly: every row
+        /// ConsoleByPlayer already carries (TelemetryAggregator has already excluded plain "log" and
+        /// the "dropped" summary line - see its own BuildBugsAndConsole comment), no further
+        /// filtering here.</summary>
         private static void WriteConsole(System.Collections.Generic.List<ConsolePlayerGroupRow> rows, string csvFolder)
         {
             rows ??= new System.Collections.Generic.List<ConsolePlayerGroupRow>();
@@ -121,7 +124,7 @@ namespace Overpower.EditorTools.Telemetry
             WriteCsv(
                 Path.Combine(csvFolder, "console.csv"),
                 new[] { "actor", "name", "level", "message", "count", "firstT", "lastT" },
-                rows.Where(r => r.Level == "error" || r.Level == "warning").Select(r => new[]
+                rows.Select(r => new[]
                 {
                     N(r.Actor), r.Nick, r.Level, r.Message, N(r.Count), N(r.FirstT), N(r.LastT),
                 }));

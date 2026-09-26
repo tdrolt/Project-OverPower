@@ -222,6 +222,18 @@ namespace Overpower.Telemetry
             return n;
         }
 
+        /// <summary>Step 0 review fix (a), 2026-09-26: call once per match (ConsoleTelemetry.
+        /// HandleBeforeClose, alongside its existing Flush()/TakeDroppedSummary() calls) so the NEXT
+        /// match starts with its own full PreOpenQueueCap rather than whatever this match already
+        /// spent - ConsoleTelemetry's rule instance lives for the whole session (no scene reload
+        /// between matches), so without this the budget was gone by the 2nd/3rd match and every
+        /// early warning/error before that match's file opened was silently dropped.</summary>
+        public void ResetPreOpenBudget()
+        {
+            preOpenAdmitted = 0;
+            preOpenDropped = 0;
+        }
+
         /// <summary>Scrub + cut, with no fold/cap bookkeeping at all - every pre-open line (there is
         /// never more than a handful) is written as its own Line with Count 1.</summary>
         public Line FormatSingle(ConsoleLevel level, string rawMessage, string rawStack, double now)
@@ -234,16 +246,10 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- shared
 
-        private string Scrub(string text)
-        {
-            if (string.IsNullOrEmpty(text) || scrubTargets == null)
-                return text ?? "";
-
-            foreach (string target in scrubTargets)
-                if (!string.IsNullOrEmpty(target))
-                    text = text.Replace(target, "<app id>");
-            return text;
-        }
+        // Step 0 review fix (b): the actual replace loop now lives in TelemetryScrub, shared with
+        // MatchTelemetry.LogChat's chat lines - this is just the console-specific "which targets"
+        // plumbing (scrubTargets, read once by ConsoleTelemetry at construction time).
+        private string Scrub(string text) => TelemetryScrub.Apply(text, scrubTargets);
 
         private static string Cut(string text, int maxChars) =>
             text == null || text.Length <= maxChars ? text : text.Substring(0, maxChars);

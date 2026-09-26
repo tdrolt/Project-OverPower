@@ -1,4 +1,3 @@
-using Photon.Pun;
 using UnityEngine;
 using Overpower.Data;
 
@@ -95,17 +94,10 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>Read once, right here - never stored anywhere else, never logged, never printed.
-        /// A build with no PhotonServerSettings assigned (should never happen in this project) scrubs
-        /// nothing rather than throwing.</summary>
-        private static string[] ScrubTargets()
-        {
-            ServerSettings settings = PhotonNetwork.PhotonServerSettings;
-            if (settings == null || settings.AppSettings == null)
-                return null;
-
-            return new[] { settings.AppSettings.AppIdRealtime, settings.AppSettings.AppIdChat };
-        }
+        /// <summary>Step 0 review fix (b): now the shared TelemetryScrub.AppIdTargets() - MatchTelemetry.
+        /// LogChat reads the exact same targets for chat text. Never stored anywhere else, never
+        /// logged, never printed.</summary>
+        private static string[] ScrubTargets() => TelemetryScrub.AppIdTargets();
 
         private void OnLog(string message, string stackTrace, LogType type)
         {
@@ -131,6 +123,21 @@ namespace Overpower.Telemetry
                     MatchTelemetry.Instance.LogConsoleDropped(droppedSummary.Value);
                 if (finished.HasValue)
                     WriteLine(finished.Value);
+            }
+            catch
+            {
+                // Step 0 review fix (c): swallowed on purpose, and nothing here may log anything -
+                // this runs INSIDE Application.logMessageReceived, so a Debug.Log*/LogError call
+                // would immediately re-enter this same event (the inLog guard would only stop it
+                // from doing anything, not stop the recursive dispatch itself). Turns console
+                // recording off for the rest of the session - a listener that throws once has no
+                // reason to believe it won't throw on every following line, and disabling beats
+                // repeating the same silent failure (and cost) on every message from here on.
+                rule = null;
+                Application.logMessageReceived -= OnLog;
+                if (MatchTelemetry.Instance != null)
+                    MatchTelemetry.Instance.BeforeClose -= HandleBeforeClose;
+                subscribed = false;
             }
             finally
             {
@@ -160,6 +167,13 @@ namespace Overpower.Telemetry
             int dropped = rule.TakeDroppedSummary();
             if (dropped > 0)
                 MatchTelemetry.Instance.LogConsoleDropped(dropped);
+
+            // Step 0 review fix (a): this component (and its ConsoleLineRule) lives for the whole
+            // session, not just one match - BeforeClose fires at every match's end (OnLeftRoom) as
+            // well as at real shutdown, so resetting here always leaves the NEXT match (if there is
+            // one) with its own fresh PreOpenQueueCap rather than whatever this match had already
+            // spent by the time its file opened.
+            rule.ResetPreOpenBudget();
         }
 
         private static void WriteLine(ConsoleLineRule.Line line) =>

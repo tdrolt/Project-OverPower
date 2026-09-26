@@ -85,6 +85,12 @@ namespace Overpower.Telemetry
         private Coroutine claimIdentityRoutine;
         private float flushTimer;
 
+        // LogChat's own lazy cache of TelemetryScrub.AppIdTargets() - step 0 review fix (b). Read
+        // once on this client's first chat message, not every message; separate from ConsoleTelemetry's
+        // own cache (two independent readers of the same shared scrub, not one global cache - see
+        // TelemetryScrub's own class comment).
+        private string[] chatScrubTargets;
+
         // Reused for every event this component ever logs (opus review fix) - Begin/.../End is
         // safe to call again immediately once End() has returned the finished string (see
         // TelemetryLine's own class comment), and nothing here is reentrant, so one instance is
@@ -704,15 +710,23 @@ namespace Overpower.Telemetry
 
         /// <summary>P3: the sender's own public chat text - PhotonChat.SubmitPublicChatOnClick calls
         /// this right BEFORE it publishes, so this is always the sender's own copy, never the receive
-        /// callback's (see that method's own comment). Cut to 300 characters, matching the brief.</summary>
+        /// callback's (see that method's own comment). Cut to 300 characters, matching the brief.
+        ///
+        /// Step 0 review fix (b), 2026-09-26: scrubbed of the Photon App IDs (TelemetryScrub - the
+        /// SAME scrub ConsoleLineRule's console lines already use) BEFORE the cut, same reasoning as
+        /// that class's own comment: cutting first could leave a bare, truncated id prefix in the
+        /// log. chatScrubTargets is read once (this component's own lazy cache, separate from
+        /// ConsoleTelemetry's) and reused for every chat line after the first.</summary>
         public void LogChat(string text)
         {
             const int MaxChars = 300;
-            string cut = text != null && text.Length > MaxChars ? text.Substring(0, MaxChars) : text;
+            chatScrubTargets ??= TelemetryScrub.AppIdTargets();
+            string scrubbed = TelemetryScrub.Apply(text, chatScrubTargets);
+            string cut = scrubbed.Length > MaxChars ? scrubbed.Substring(0, MaxChars) : scrubbed;
 
             line.Begin(TelemetryKeys.Chat, Now);
             line.Int(TelemetryKeys.Actor, PhotonNetwork.LocalPlayer != null ? PhotonNetwork.LocalPlayer.ActorNumber : -1);
-            line.String(TelemetryKeys.Text, cut ?? "");
+            line.String(TelemetryKeys.Text, cut);
             Log(line);
         }
 
