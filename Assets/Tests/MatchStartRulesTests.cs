@@ -9,8 +9,9 @@ namespace Overpower.Tests
         public void TheCountdownStartsTheMomentAllThreeTeamsHaveAPlayer()
         {
             Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(teamsFixed: false, new[] { 1, 1, 0 }));
-            Assert.IsTrue(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }));
-            Assert.IsTrue(MatchStartRules.StartsCountdownAutomatically(false, new[] { 3, 2, 1 }));
+            // Tudor, 2026-09-26: never automatic - the host presses Start.
+            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }));
+            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 3, 2, 1 }));
             Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(true, new[] { 1, 1, 1 }), "a countdown or a live match already fixed the teams");
         }
 
@@ -19,7 +20,7 @@ namespace Overpower.Tests
         {
             Assert.IsTrue(MatchStartRules.HostMayStart(teamsFixed: false, new[] { 1, 0, 2 }, playersWithoutATeam: 0));
             Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 2, 0, 0 }, 0), "one team: nobody to play");
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0), "three teams start on their own");
+            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0), "three teams: the host starts it too (Tudor, 2026-09-26)");
             Assert.IsFalse(MatchStartRules.HostMayStart(true, new[] { 1, 1, 0 }, 0), "already counting down or live");
             Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 0 }, 1), "someone still joining may be the third team");
         }
@@ -142,7 +143,7 @@ namespace Overpower.Tests
         public void TwoTeamModeNeverStartsItself()
         {
             Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 2));
-            Assert.IsTrue(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 3));
+            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 3));
         }
 
         [Test]
@@ -155,7 +156,7 @@ namespace Overpower.Tests
             Assert.IsFalse(MatchStartRules.HostMayStart(true, new[] { 1, 1, 0 }, 0, mode: 2), "already counting down or live");
             // Mode 3 keeps the old answers.
             Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 0, 2 }, 0, mode: 3));
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0, mode: 3), "three teams start on their own");
+            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0, mode: 3), "three teams: the host starts it");
         }
 
         [Test]

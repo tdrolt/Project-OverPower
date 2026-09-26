@@ -210,9 +210,9 @@ MonoBehaviour:
   minimapCutAreaColor: {r: 0.05, g: 0.05, b: 0.06, a: 0.75}
   minimapCutWallColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
   minimapCutWallWidth: 3
-  warmupWaitingText: 'Warm-up: nothing counts yet and the shop is free. The match starts when all three teams have a player.'
-  warmupHostText: 'Warm-up: two teams are here. Start now with two teams, or wait for a third.'
-  warmupGuestText: 'Warm-up: waiting for the host to start, or for a third team.'
+  warmupWaitingText: 'Warm-up: nothing counts yet and the shop is free. The host starts once two teams have a player.'
+  warmupHostText: 'Warm-up: press Start when you''re ready (two or three teams).'
+  warmupGuestText: 'Warm-up: waiting for the host to start.'
   matchCountdownText: Match starts in {0}
   matchStartButtonText: Start match (2 teams)
   matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}

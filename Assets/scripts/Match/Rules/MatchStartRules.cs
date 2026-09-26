@@ -66,7 +66,7 @@ namespace Overpower.Match
 
         /// <summary>Tudor, "Going live": the match goes live automatically once three teams have at least one player.</summary>
         public static bool StartsCountdownAutomatically(bool teamsFixed, IReadOnlyList<int> membersPerTeam) =>
-            !teamsFixed && CountTeamsWithPlayers(membersPerTeam) >= TeamCount;
+            false; // Tudor, 2026-09-26: no automatic start in any mode - the host always presses Start.
 
         /// <summary>Decision L3: the two-team lobby never starts itself, whatever fills the room - the host presses
         /// Start (HostMayStart). Mode 3 keeps the answer above.</summary>
@@ -76,7 +76,7 @@ namespace Overpower.Match
         /// <summary>Tudor: with only two teams, the host gets a Start button. Refused while anyone in the room has no
         /// team yet (Decision 17): they might be the third team.</summary>
         public static bool HostMayStart(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int playersWithoutATeam) =>
-            !teamsFixed && playersWithoutATeam == 0 && CountTeamsWithPlayers(membersPerTeam) == 2;
+            !teamsFixed && playersWithoutATeam == 0 && CountTeamsWithPlayers(membersPerTeam) >= 2; // 2 or 3 teams (Tudor, 2026-09-26)
 
         /// <summary>The two-team lobby (Tudor, 2026-09-26; Decision L3): mode 3 keeps the answer above unchanged. In
         /// two-team mode the host may start once teams 0 and 1 both have a player, team 2 (closed - see IsTeamOpen)
@@ -210,7 +210,7 @@ namespace Overpower.Match
         {
             if (state == StartState.Live) return WarmupMessage.None;
             if (state == StartState.CountingDown) return WarmupMessage.Countdown;
-            if (teamsWithPlayers == 2) return isHost ? WarmupMessage.HostMayStart : WarmupMessage.WaitingForHost;
+            if (teamsWithPlayers >= 2) return isHost ? WarmupMessage.HostMayStart : WarmupMessage.WaitingForHost;
             return WarmupMessage.WaitingForTeams;
         }
 
