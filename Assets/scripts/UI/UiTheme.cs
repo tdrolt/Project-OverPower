@@ -853,6 +853,20 @@ namespace Overpower.UI
                  "saved next to this client's own telemetry log, and its own `bug` line is written. " +
                  "Uses the same transient toast label every other HUD toast shares (PlayerHud.ShowToast).")]
         public string bugMarkedText = "Bug marked - type what happened in chat";
+        [Tooltip("Escape's pop-up question (QuitConfirmPanel), shown only when neither the shop nor " +
+                 "chat claimed the key this frame or the frame before.")]
+        public string quitPromptText = "Close the game?";
+        [Tooltip("QuitConfirmPanel's confirm button - runs the shared GameQuit.Quit() (zips this " +
+                 "client's own match log if needed, then disconnects and quits).")]
+        public string quitYesText = "Yes";
+        [Tooltip("QuitConfirmPanel's cancel button - same effect as pressing Escape again.")]
+        public string quitNoText = "No";
+        [Tooltip("MatchLogZip's saved-log overlay, shown once this client's own match log has been " +
+                 "zipped (the win/lose panel, and again on quit if that had not already happened). " +
+                 "{0} is filled in with the zip file's own full path.")]
+        public string matchLogSavedText = "Your match log is saved: {0} - send this file to Tudor.";
+        [Tooltip("MatchLogZip's saved-log overlay button - Application.OpenURL of the match folder.")]
+        public string openLogFolderText = "Open folder";
 
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which

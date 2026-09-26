@@ -250,3 +250,8 @@ MonoBehaviour:
   towerBodyShade: 0.8
   towerOwnerGlow: 1.5
   bugMarkedText: Bug marked - type what happened in chat
+  quitPromptText: Close the game?
+  quitYesText: Yes
+  quitNoText: No
+  matchLogSavedText: 'Your match log is saved: {0} - send this file to Tudor.'
+  openLogFolderText: Open folder

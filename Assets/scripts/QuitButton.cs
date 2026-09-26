@@ -1,4 +1,3 @@
-using Photon.Pun;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,6 +11,11 @@ using UnityEngine.UI;
 ///
 /// These were labelled "Main Menu", but there is no main menu scene to return to. Quitting is the
 /// honest version of what that button can currently do; a real menu is future work.
+///
+/// Playtest extras P6 (2026-09-26): the actual quit sequence now lives in the shared GameQuit.Quit()
+/// (also used by the Escape pop-up's Yes, QuitConfirmPanel), so both zip this client's own match log
+/// first - see GameQuit's own class comment for the order. Kept as a public Quit() method (not
+/// renamed/removed) since the win/lose/waiting panel buttons are already wired to it by name.
 /// </summary>
 [RequireComponent(typeof(Button))]
 public class QuitButton : MonoBehaviour
@@ -21,17 +25,5 @@ public class QuitButton : MonoBehaviour
         GetComponent<Button>().onClick.AddListener(Quit);
     }
 
-    public void Quit()
-    {
-        // Leave the room first so the other players see us go immediately, instead of a ghost
-        // player standing in the arena until Photon's timeout expires.
-        if (PhotonNetwork.IsConnected)
-            PhotonNetwork.Disconnect();
-
-#if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
-#else
-        Application.Quit();
-#endif
-    }
+    public void Quit() => GameQuit.Quit();
 }

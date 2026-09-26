@@ -16,6 +16,12 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     [SerializeField] TMP_InputField chatField;
     [SerializeField] TextMeshProUGUI chatDisplay;
 
+    /// <summary>Playtest extras P6 (2026-09-26): whether the chat panel is open, kept in step with
+    /// chatPanel.activeSelf below (both places that change it also set this) rather than read live
+    /// off the GameObject, so QuitConfirmPanel can check it with no scene reference of its own - same
+    /// static-bool pattern as LoadoutScreen.IsOpen. There is only ever one PhotonChat in the scene.</summary>
+    public static bool IsOpen { get; private set; }
+
     void Start()
     {
         ConnectToChat();
@@ -143,6 +149,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         {
             text.SetActive(false);
             chatPanel.SetActive(true);
+            IsOpen = true;
             chatField.Select();  // Focus on the chat input field
             chatField.ActivateInputField();  // Make sure the input field is active
         }
@@ -159,6 +166,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         if (chatPanel.activeSelf)
         {
             chatPanel.SetActive(false);
+            IsOpen = false;
             text.SetActive(true);  // Show the text when chat is closed
             chatField.DeactivateInputField();  // Deactivate the input field when closing the chat
         }

@@ -557,7 +557,10 @@ namespace Overpower.Telemetry
 
         private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
 
-        private static string Sanitize(string nick)
+        /// <summary>Public (playtest extras P5, 2026-09-26): MatchLogZip reuses this exact function
+        /// so the zip's own file name ends in the SAME sanitized nick as the .jsonl file it is
+        /// zipping up, rather than a second, possibly-different sanitizing of the same raw nick.</summary>
+        public static string Sanitize(string nick)
         {
             if (string.IsNullOrWhiteSpace(nick)) return "player";
 

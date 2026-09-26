@@ -205,6 +205,11 @@ public class MatchUI : MonoBehaviour
             youLostPanel?.SetActive(true);
 
         FreezeForRestOfMatch();
+
+        // Playtest extras P5 (2026-09-26): this client's own match log, zipped and shown alongside
+        // its own result panel - see MatchLogZip's own class comment for why calling this again on
+        // quit (GameQuit.Quit) is still safe.
+        Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
     }
 
     /// Stops the player moving once the match is decided. Adds a zero multiplier rather than
