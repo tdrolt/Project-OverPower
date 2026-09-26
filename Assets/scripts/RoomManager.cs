@@ -258,4 +258,41 @@ public class RoomManager : MonoBehaviourPunCallbacks
         UpdateNetworkProperties(picked);
         return picked;
     }
+
+    /// <summary>Two-team lobby (Tudor, 2026-09-26; Decision L5): MatchDirector.ReactToRoomState calls this on
+    /// EVERY client, for its own player only, on the edge to two-team mode. PickSmallestTeam already skips a
+    /// team MayJoinTeam refuses, so it already honours the mode - reused here rather than a second team-picking
+    /// rule. Idempotent through MayJoinTeam's own check: a local player already on an open team (team 0/1, or a
+    /// mode switched back to three before this ran) is left untouched, and so is a room whose teams are already
+    /// fixed (the switch itself can never land there - HostSetLobbyMode's check-and-set - but this stays
+    /// defensive rather than assuming that ordering). A joiner who picked team 2 with the old mode a moment
+    /// before the switch arrives is covered too: their own client runs this same method on the same edge.
+    ///
+    /// A player with no spawned body yet (e.g. AssignTeamAndSpawnPlayer still mid-flight) just gets its team
+    /// property rewritten - TeleportToTeamSpawn only runs once a local PlayerLifecycle actually exists.</summary>
+    public void ReseatLocalPlayerIfTeamClosed()
+    {
+        MatchDirector director = MatchDirector.Instance;
+        if (director == null || director.TeamsFixed || !Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam))
+            return;
+        if (director.MayJoinTeam(myTeam))
+            return; // Still open - team 0/1, or the mode is already back to three.
+
+        int picked = PickSmallestTeam();
+        if (picked == NoFreeTeam)
+        {
+            Debug.LogWarning("[TEAM] two-team switch closed my team and no other team has room to re-pick into -- staying put");
+            return;
+        }
+
+        Debug.Log($"[TEAM] two-team switch: re-picked {myTeam} -> {picked}");
+        UpdateNetworkProperties(picked);
+
+        if (teamSpawnPoints == null || picked < 0 || picked >= teamSpawnPoints.Length || teamSpawnPoints[picked] == null)
+            return;
+
+        PhotonView localView = PhotonNetwork.LocalPlayer != null
+            ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
+        localView?.GetComponent<PlayerLifecycle>()?.TeleportToTeamSpawn(teamSpawnPoints[picked]);
+    }
 }

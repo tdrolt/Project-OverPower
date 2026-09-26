@@ -28,6 +28,14 @@ namespace Overpower.Match
         /// simply never removed) - the master writes it once, alongside TeamsInMatchKey, and never again.
         public const string LiveAtKey = "mLiveAt";
 
+        /// Room Property key: int, the two-team lobby's own mode (Tudor, 2026-09-26; Decision L1) -
+        /// MatchStartRules.TwoTeams (2) or ThreeTeams (3, the default); absent (or the wrong type, or any other
+        /// number) reads as three - MatchStartRules.LobbyModeOf's own answer, same as a room the host never
+        /// switched. Written only by the master, only while the teams aren't fixed, with check-and-set expecting
+        /// mTeams absent - the same guard StartCountdown's own check-and-set uses, so a switch can never land
+        /// after the countdown has already fixed the teams, even racing a master switch.
+        public const string LobbyModeKey = "mMode";
+
         // Not gameplay values. The master re-checks every 0.5 s in the warm-up (a callback alone can be missed -
         // clock not synced, snapshot not read yet - and would strand a full room there) and every frame while
         // counting down (to go live on the frame its clock reaches mLiveAt). After sending a countdown or cancel
@@ -108,10 +116,80 @@ namespace Overpower.Match
         private System.Func<int, int> BaseTierOf => baseTierOf ??= zone =>
             BuildingManager.Instance != null ? BuildingManager.Instance.BaseTierOf(zone) : 0;
 
-        /// <summary>Decision 4/17 (R3): before the teams are fixed, any team; from the countdown on, only a team
-        /// in the match and not knocked out. RoomManager reads this for both PickSmallestTeam and
-        /// EnsureLocalTeamInMatch.</summary>
-        public bool MayJoinTeam(int team) => MatchStartRules.MayJoin(TeamsFixed, IsInMatch(team), IsEliminated(team));
+        /// <summary>Decision L1: the room's own lobby mode right now, read directly from the room (like IsLive)
+        /// so a late joiner's very first frame and a master switch both read the SAME room value with no extra
+        /// state.</summary>
+        public int LobbyMode => PhotonNetwork.InRoom ? ReadLobbyMode(PhotonNetwork.CurrentRoom.CustomProperties) : MatchStartRules.ThreeTeams;
+
+        private static int ReadLobbyMode(Hashtable props) =>
+            MatchStartRules.LobbyModeOf(props.TryGetValue(LobbyModeKey, out object raw) ? raw : null);
+
+        /// <summary>Decision L4: the host's own two-team toggle reads this every frame the warm-up panel is shown
+        /// (master only - there is no button to grey for anyone else). MaySwitchToTwoTeams' own comment: the
+        /// teams aren't fixed yet, and at most 2 x TeamSize players are already in the room.</summary>
+        public bool HostMaySwitchToTwoTeamsNow =>
+            PhotonNetwork.IsMasterClient && PhotonNetwork.InRoom
+            && MatchStartRules.MaySwitchToTwoTeams(TeamsFixed, PhotonNetwork.CurrentRoom.PlayerCount, RoomManager.TeamSize);
+
+        /// <summary>Decision L4: switching back needs only that the teams aren't fixed yet - nobody moves, team 2
+        /// simply reopens (IsTeamOpen).</summary>
+        public bool HostMaySwitchToThreeTeamsNow =>
+            PhotonNetwork.IsMasterClient && PhotonNetwork.InRoom && MatchStartRules.MaySwitchToThreeTeams(TeamsFixed);
+
+        /// <summary>The host's two-team toggle button calls this directly - master-only, like HostStartMatch, so
+        /// no RPC is needed. Refused (logged) unless this client is master and the matching HostMaySwitchTo...Now
+        /// property allows it right now (the panel is expected to grey the button first; this is the belt-and-
+        /// braces check for a stale click racing a master switch or the room filling up). Idempotent: writing the
+        /// mode the room already has is a no-op, nothing sent.
+        ///
+        /// PUN detail: this call only SENDS the write - SetCustomProperties returning true means sent, not
+        /// applied, and the check-and-set can still be refused by the server. MaxPlayers and the telemetry marker
+        /// are deliberately NOT set here - ApplyLobbyModeMaxPlayers and the marker drop (MatchDirector.
+        /// ReactToRoomState, the mode edge) run only once the master reads the room's own echoed mode back,
+        /// never optimistically off a write that merely sent.</summary>
+        public void HostSetLobbyMode(int mode)
+        {
+            bool allowed = mode == MatchStartRules.TwoTeams ? HostMaySwitchToTwoTeamsNow : HostMaySwitchToThreeTeamsNow;
+            if (!allowed)
+            {
+                Debug.LogWarning($"[MATCH] lobby mode switch to {mode} refused: not the master, or the rule does not allow it now.");
+                return;
+            }
+            if (mode == LobbyMode)
+                return; // Idempotent - already the room's own mode.
+
+            var props = new Hashtable { { LobbyModeKey, mode } };
+            // Check-and-set on the ABSENT mTeams - the same guard StartCountdown's own check-and-set uses, so a
+            // switch can never land after the countdown already fixed the teams.
+            var expectedAbsent = new Hashtable { { TeamsInMatchKey, null } };
+            if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent))
+                return;
+
+            Debug.Log($"[MATCH] lobby mode switch sent: {mode}");
+        }
+
+        /// <summary>Decision L1's MaxPlayers half. A Room Property check-and-set write returning true only means
+        /// "sent" - the SERVER may still refuse it - so MaxPlayers must never be set right after HostSetLobbyMode's
+        /// own call. Instead, the master applies it here whenever it READS the mode while the teams aren't fixed:
+        /// on the mode edge and on its own first read (MatchDirector.ReactToRoomState), and again the instant it
+        /// becomes master (OnMasterClientSwitched) - covering a master that died mid-write or was never the one
+        /// that wrote the mode at all. Idempotent: skips the write when MaxPlayers already reads right. Never
+        /// touches MaxPlayers once the teams are fixed - StartCountdown/CancelCountdown own it from there.</summary>
+        private void ApplyLobbyModeMaxPlayers(int mode)
+        {
+            if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom || TeamsFixed)
+                return;
+            byte want = (byte)MatchStartRules.MaxPlayersFor(mode, RoomManager.TeamSize);
+            if (PhotonNetwork.CurrentRoom.MaxPlayers != want)
+                PhotonNetwork.CurrentRoom.MaxPlayers = want;
+        }
+
+        /// <summary>Decision 4/17 (R3), extended by L2: before the teams are fixed, any OPEN team (IsTeamOpen,
+        /// honouring the two-team lobby mode); from the countdown on, only a team in the match and not knocked
+        /// out, whatever the mode. RoomManager reads this for both PickSmallestTeam and EnsureLocalTeamInMatch
+        /// (and, two-team lobby, ReseatLocalPlayerIfTeamClosed).</summary>
+        public bool MayJoinTeam(int team) =>
+            MatchStartRules.MayJoin(TeamsFixed, IsInMatch(team), IsEliminated(team), MatchStartRules.IsTeamOpen(LobbyMode, team));
 
         /// <summary>How many of the three teams currently have a player - the warm-up line's own question,
         /// polled every frame (MatchStartPanel, step 8), so counted through PhotonNetwork.CurrentRoom.Players
@@ -121,9 +199,10 @@ namespace Overpower.Match
         public int TeamsWithPlayersNow => MatchStartRules.CountTeamsWithPlayers(CountMembers());
 
         /// <summary>Tudor: with only two teams, the host gets a Start button - polled every frame the warm-up
-        /// panel is open (step 8), same allocation reasoning as TeamsWithPlayersNow (nothing per frame).</summary>
+        /// panel is open (step 8), same allocation reasoning as TeamsWithPlayersNow (nothing per frame). Mode 3
+        /// keeps the three-team answer; mode 2 (Decision L3) is the two-team lobby's own rule.</summary>
         public bool HostMayStartNow =>
-            PhotonNetwork.IsMasterClient && MatchStartRules.HostMayStart(TeamsFixed, CountMembers(), PlayersWithoutATeam());
+            PhotonNetwork.IsMasterClient && MatchStartRules.HostMayStart(TeamsFixed, CountMembers(), PlayersWithoutATeam(), LobbyMode);
 
         /// <summary>Covers the countdown starting, being cancelled, and the match going live - MatchStartPanel
         /// (step 8) subscribes instead of polling every frame for a change that happens rarely. Map shrink T3: the
@@ -158,7 +237,7 @@ namespace Overpower.Match
                 return;
             nextStartCheck = Time.unscaledTime + StartCheckIntervalSeconds;
             int[] members = CountMembers();
-            if (MatchStartRules.StartsCountdownAutomatically(TeamsFixed, members))
+            if (MatchStartRules.StartsCountdownAutomatically(TeamsFixed, members, LobbyMode))
                 StartCountdown(MatchStartRules.TeamsWithPlayers(members));
         }
 

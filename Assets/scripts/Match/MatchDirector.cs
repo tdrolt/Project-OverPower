@@ -71,6 +71,9 @@ namespace Overpower.Match
         private int lastAppliedLiveAtMs;
         // Map shrink T3: the cut edge ReactToRoomState reacts to (raises LiveStateChanged - the minimap listens).
         private int lastAppliedCutTeam = PhaseTwoCutRules.NoCut;
+        // Two-team lobby: the mode edge ReactToRoomState reacts to (the MaxPlayers idempotent apply, the
+        // telemetry marker, RoomManager's re-seat, and LiveStateChanged - see that method's own comment).
+        private int lastAppliedLobbyMode = MatchStartRules.ThreeTeams;
 
         /// <summary>The phase this client has last read from the room. Warmup before the first read.</summary>
         public MatchPhase Phase => lastAppliedPhase;
@@ -252,6 +255,12 @@ namespace Overpower.Match
             if (PhotonNetwork.IsMasterClient)
                 MasterRecompute();
 
+            // Two-team lobby: a promoted master must apply the room's own mode to MaxPlayers itself - the old
+            // master may have died mid-write, or simply never had to (ApplyLobbyModeMaxPlayers is idempotent
+            // either way, and a no-op once the teams are fixed).
+            if (PhotonNetwork.IsMasterClient)
+                ApplyLobbyModeMaxPlayers(LobbyMode);
+
             // Review fix F3, 2026-09-25: if the old master dropped after its phase write reached the server but
             // before all its neutralise writes did, a cut zone can stay owned (and keep paying income from behind
             // the wall) - the room already reads TwoTeams, so nothing else would ever re-run the neutralise.
@@ -291,7 +300,11 @@ namespace Overpower.Match
             // and mis-decrementing writesAwaitingEcho, which only ever counts THIS client's own
             // MasterRecompute/GoLive writes of Phase/Eliminated/Winner.
             bool touchesCountdown = propertiesThatChanged.ContainsKey(TeamsInMatchKey) || propertiesThatChanged.ContainsKey(LiveAtKey);
-            if (!touchesElimination && !touchesCountdown)
+            // Two-team lobby: mMode is its own write, not the master's elimination triad above nor the
+            // countdown's two keys - reacted to (ReactToRoomState) but never counted against writesAwaitingEcho,
+            // which only ever tracks THIS client's own MasterRecompute/GoLive writes of Phase/Eliminated/Winner.
+            bool touchesMode = propertiesThatChanged.ContainsKey(LobbyModeKey);
+            if (!touchesElimination && !touchesCountdown && !touchesMode)
                 return;
 
             if (touchesElimination && writesAwaitingEcho > 0)
@@ -333,6 +346,9 @@ namespace Overpower.Match
             lastAppliedLiveAtMs = 0;
             // Map shrink T3: the next room starts with no corner cut either, whatever this one ended with.
             lastAppliedCutTeam = PhaseTwoCutRules.NoCut;
+            // Two-team lobby: the next room starts in three-team mode until its own host switches it, whatever
+            // this one ended with.
+            lastAppliedLobbyMode = MatchStartRules.ThreeTeams;
             finishCutNeutralisePending = false;
             waitForEchoUntil = -1f;
             liveWritten = false;
@@ -620,6 +636,11 @@ namespace Overpower.Match
         ///
         /// Map shrink T3: the cut changing (derived from mElim, written in the same Hashtable as the knockout's
         /// mPhase) also raises LiveStateChanged, which the minimap already listens to.
+        ///
+        /// Two-team lobby (Decision L1/L6): the mode changing also raises LiveStateChanged (the warm-up panel
+        /// redraws), applies MaxPlayers idempotently (ApplyLobbyModeMaxPlayers), and - !firstRead only, same
+        /// reasoning as the two edges above - drops the telemetry marker (master only) and asks RoomManager to
+        /// re-seat this client's own player off a team the switch just closed.
         private void ReactToRoomState(bool firstRead)
         {
             if (!PhotonNetwork.InRoom)
@@ -633,6 +654,7 @@ namespace Overpower.Match
             bool live = IsLive;
             int liveAtMs = LiveAtMs;
             int cutTeam = CutTeam;
+            int mode = LobbyMode;
 
             List<int> prevEliminated = lastAppliedEliminated;
             MatchPhase prevPhase = lastAppliedPhase;
@@ -641,6 +663,7 @@ namespace Overpower.Match
             bool prevLive = lastAppliedLive;
             int prevLiveAtMs = lastAppliedLiveAtMs;
             int prevCutTeam = lastAppliedCutTeam;
+            int prevMode = lastAppliedLobbyMode;
 
             lastAppliedEliminated = eliminated;
             lastAppliedPhase = phase;
@@ -649,6 +672,14 @@ namespace Overpower.Match
             lastAppliedLive = live;
             lastAppliedLiveAtMs = liveAtMs;
             lastAppliedCutTeam = cutTeam;
+            lastAppliedLobbyMode = mode;
+
+            // Two-team lobby (Decision L1): the master applies MaxPlayers whenever it reads the mode while the
+            // teams aren't fixed - on this edge and on its own first read alike (ApplyLobbyModeMaxPlayers is
+            // idempotent and a no-op once TeamsFixed, so calling it unconditionally here costs nothing on every
+            // OTHER read too - simpler than gating it to only the two cases that actually need it).
+            bool modeChanged = mode != prevMode;
+            ApplyLobbyModeMaxPlayers(mode);
 
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
@@ -661,6 +692,20 @@ namespace Overpower.Match
             {
                 if (teamsFixed && !prevTeamsFixed)
                     FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch();
+
+                // Two-team lobby (Decision L5/L8): every client reacts to the mode edge for its own player - the
+                // telemetry marker guarded to the master only (the report merges every client's own file, so only
+                // one of them may log the switch), the re-seat run by every client whose own player just lost its
+                // team (RoomManager.ReseatLocalPlayerIfTeamClosed - MayJoinTeam already honours the new mode). A
+                // joiner who picked team 2 a moment before the switch arrives is covered too: this is the same
+                // edge, reacted to on their own client the instant it sees the write.
+                if (modeChanged)
+                {
+                    if (PhotonNetwork.IsMasterClient)
+                        MatchTelemetry.Instance?.DropMarker(mode == MatchStartRules.TwoTeams ? "two-team lobby on" : "two-team lobby off");
+                    if (mode == MatchStartRules.TwoTeams)
+                        FindFirstObjectByType<RoomManager>()?.ReseatLocalPlayerIfTeamClosed();
+                }
 
                 if (live && !prevLive && lifecycle != null)
                 {
@@ -686,7 +731,7 @@ namespace Overpower.Match
                 localView?.GetComponent<MatchUI>()?.ShowMatchResult(winner);
 
             if (firstRead || teamsFixed != prevTeamsFixed || liveAtMs != prevLiveAtMs || live != prevLive
-                || cutTeam != prevCutTeam)
+                || cutTeam != prevCutTeam || modeChanged)
                 LiveStateChanged?.Invoke();
         }
 

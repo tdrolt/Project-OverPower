@@ -588,6 +588,19 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     public void ReturnToSpawnForPhaseChange() =>
         MoveToSpawnPoint("sent home for the two-team phase change");
 
+    /// <summary>Two-team lobby (Tudor, 2026-09-26; Decision L5): RoomManager.ReseatLocalPlayerIfTeamClosed calls
+    /// this, right after rewriting this player's own team property, to move its already-spawned body to the new
+    /// team's spawn point - the same mover every other path in this class uses (TeleportToSpawnPoint's own
+    /// comment: PlayerDisplacement.TeleportTo, never transform.position). Owner-only, like every other player-
+    /// moving method here. A no-op for a player with no PlayerLifecycle to call this on yet (RoomManager checks
+    /// that itself before calling) - the team property rewrite alone is enough while nothing is spawned.</summary>
+    public void TeleportToTeamSpawn(Transform spawn)
+    {
+        if (!photonView.IsMine || spawn == null)
+            return;
+        TeleportToSpawnPoint(spawn.position, spawn.rotation);
+    }
+
     private void MoveToSpawnPoint(string logReason)
     {
         PlayerTeam pt = GetComponent<PlayerTeam>();
