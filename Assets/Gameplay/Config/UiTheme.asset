@@ -221,6 +221,12 @@ MonoBehaviour:
   warmupLineSize: {x: 900, y: 64}
   matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
   matchLiveTwoTeamsToastText: 'The match is live with two teams: lose your capital and you''re out.'
+  lobbyTwoTeamsButtonText: Two teams (up to 6)
+  lobbyThreeTeamsButtonText: Three teams (up to 9)
+  lobbyTwoTeamsTooManyText: Two teams needs 6 players or fewer
+  warmupTwoTeamsWaitingText: 'Warm-up (two teams): the host starts once both teams have a player.'
+  warmupTwoTeamsHostText: 'Warm-up (two teams): both teams are here. Start when you''re ready.'
+  warmupTwoTeamsGuestText: 'Warm-up (two teams): waiting for the host to start.'
   showDamageNumbers: 1
   damageNumberTextSize: 30
   damageNumberColor: {r: 1, g: 1, b: 1, a: 1}

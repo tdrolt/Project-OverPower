@@ -743,6 +743,23 @@ namespace Overpower.UI
         [Tooltip("Toast shown the instant a host-started match goes live with two teams - losing your capital now means " +
                  "you're out.")]
         public string matchLiveTwoTeamsToastText = "The match is live with two teams: lose your capital and you're out.";
+        [Tooltip("The host's switch button label while the room is in THREE-team mode - press it to open the " +
+                 "two-team lobby (Tudor, 2026-09-26; Decision L7).")]
+        public string lobbyTwoTeamsButtonText = "Two teams (up to 6)";
+        [Tooltip("The host's switch button label while the room is in TWO-team mode - press it to reopen the " +
+                 "third team.")]
+        public string lobbyThreeTeamsButtonText = "Three teams (up to 9)";
+        [Tooltip("Shown to the host instead of the ordinary warm-up line while the switch to two teams is " +
+                 "greyed out - the room already has more than six players.")]
+        public string lobbyTwoTeamsTooManyText = "Two teams needs 6 players or fewer";
+        [Tooltip("Warm-up line shown to everyone in two-team mode while fewer than both teams have a player yet.")]
+        public string warmupTwoTeamsWaitingText = "Warm-up (two teams): the host starts once both teams have a player.";
+        [Tooltip("Warm-up line shown to the HOST in two-team mode once both teams have a player - nothing " +
+                 "auto-starts here (Decision L3): Start when ready.")]
+        public string warmupTwoTeamsHostText = "Warm-up (two teams): both teams are here. Start when you're ready.";
+        [Tooltip("Warm-up line shown to everyone ELSE in two-team mode once both teams have a player - the host " +
+                 "has the Start button, not you.")]
+        public string warmupTwoTeamsGuestText = "Warm-up (two teams): waiting for the host to start.";
 
         [Header("Damage numbers (2026-09-18)")]
         [Tooltip("Pop a number beside an enemy each time your damage lands on them. Off hides them; nothing else about " +
