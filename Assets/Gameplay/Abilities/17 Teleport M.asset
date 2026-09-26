@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Place two portals; stand in one to travel to the other.
   slot: 3
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 6757255287043018991, guid: 00d1b7ee6515a91459bfecc890d76b50, type: 3}

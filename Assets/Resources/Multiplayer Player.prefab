@@ -3338,7 +3338,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ade533858a49ae4989aeccd5ae0bc0c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxCharge: 1000
+  maxCharge: 500
   chargePerDamageDealt: 1
   chargePerDamageTaken: 0.5
   chargePerKill: 150

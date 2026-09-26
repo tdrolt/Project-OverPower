@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Two quick hops toward your cursor.
   slot: 3
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 548643278543839526, guid: dea25e794e582474c97ca818b53293fc, type: 3}

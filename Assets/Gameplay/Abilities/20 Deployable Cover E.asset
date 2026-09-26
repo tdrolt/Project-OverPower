@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Place a wall that blocks shots both ways.
   slot: 1
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 1291822725712270318, guid: 525908f4b5820fd428e6c1b70905c58c, type: 3}

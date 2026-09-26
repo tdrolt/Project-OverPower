@@ -17,7 +17,7 @@ MonoBehaviour:
   description: The beam passes through walls, after a short warning.
   parent: {fileID: 11400000, guid: 8fa3cfc5d5169494cb5251a678cca581, type: 2}
   icon: {fileID: 0}
-  goldCost: 1600
+  goldCost: 1280
   damage: 21
   fireInterval: 1.2
   projectilesPerShot: 1

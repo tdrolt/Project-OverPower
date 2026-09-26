@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Set enemies in front of you on fire.
   slot: 1
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 1811707309625064280, guid: 1b7f649026787c647b1a1a7fe67d8b10, type: 3}

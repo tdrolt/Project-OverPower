@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Hold to pull your camera back and see further than usual.
   slot: 1
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 8889445320927805865, guid: fdfdde32c0190f742968a1097ff5283f, type: 3}

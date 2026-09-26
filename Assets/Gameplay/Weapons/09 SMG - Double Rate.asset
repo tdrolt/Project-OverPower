@@ -17,7 +17,7 @@ MonoBehaviour:
   description: Double fire rate, wide spread. Close range.
   parent: {fileID: 11400000, guid: 27983484f42c6eb409acf1c5d0d8e823, type: 2}
   icon: {fileID: 0}
-  goldCost: 1600
+  goldCost: 1280
   damage: 4
   fireInterval: 0.08
   projectilesPerShot: 1

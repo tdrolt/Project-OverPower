@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Teleport to your cursor.
   slot: 3
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 4109286014405793723, guid: 477593d2dad459640bb6e5ab6ed1e77e, type: 3}

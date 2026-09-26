@@ -13,7 +13,7 @@ namespace Overpower.Tests
     /// pinning a literal here used to go red on every balance pass with nothing actually broken). Guards WIRING and
     /// STRUCTURE only, never a value Tudor can retune freely: prefab references point where they should
     /// (AssetAt), networked prefabs carry the PhotonView count they need, a required component exists
-    /// (AbilityHitRelay), the falloff curve's SHAPE stays full-damage-at-zero to none-at-the-edge (every splash
+    /// (AbilityHitRelay), the falloff curve's SHAPE stays full-damage-at-zero to less-at-the-edge (every splash
     /// weapon's actual rule, not its damage/radius numbers), and that none of the touched prefabs carries a
     /// collider (they are visual/ability objects, not physical ones). Read-only: prefab assets are loaded, never
     /// instantiated or saved.
@@ -108,7 +108,7 @@ namespace Overpower.Tests
             Assert.IsNotNull(Load("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab").GetComponent<AbilityHitRelay>());
         }
 
-        // The falloff curve's SHAPE (full damage at distance 0, none at the outer edge) is every splash weapon's
+        // The falloff curve's SHAPE (full damage at distance 0, less at the outer edge) is every splash weapon's
         // actual rule, not a value Tudor retunes - unlike splashDamage/splashRadius (his to change freely), which
         // this file no longer pins. hitMask/splashMask are dropped too: raw layer bitmasks are level-design/tuning
         // levers here, not enforced anywhere else as a structural invariant the way a PhotonView count is.
@@ -123,7 +123,10 @@ namespace Overpower.Tests
             Assert.AreEqual(0f, keys[0].time, 1e-5f);
             Assert.AreEqual(1f, keys[0].value, 1e-5f);
             Assert.AreEqual(1f, keys[1].time, 1e-5f);
-            Assert.AreEqual(0f, keys[1].value, 1e-5f);
+            // Tudor, 2026-09-26: the blast now keeps 30% at the edge instead of 0 - so the edge value is his to
+            // tune; the rule left is "less at the edge than at the centre, never negative".
+            Assert.GreaterOrEqual(keys[1].value, 0f, "the edge never heals");
+            Assert.Less(keys[1].value, keys[0].value, "the edge pays less than the centre");
         }
 
         [Test]

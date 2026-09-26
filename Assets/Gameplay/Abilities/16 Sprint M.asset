@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Run faster, but it builds overheat.
   slot: 3
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 8688947986194434508, guid: 5fca336d5646eb240b59477ac4ab9027, type: 3}

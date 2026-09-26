@@ -17,7 +17,7 @@ MonoBehaviour:
   description: Rockets burst at your cursor and leave fire on the ground.
   parent: {fileID: 11400000, guid: 73e5ab1af24e5fa44b3323918b8d42ee, type: 2}
   icon: {fileID: 0}
-  goldCost: 1600
+  goldCost: 1280
   damage: 35
   fireInterval: 1.4
   projectilesPerShot: 1

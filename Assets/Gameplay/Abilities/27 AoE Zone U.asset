@@ -17,5 +17,5 @@ MonoBehaviour:
   description: A damaging aura that follows you.
   slot: 2
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 4892140913591457395, guid: 9a7500c9f430b6d4e86dad2805d4a2ec, type: 3}

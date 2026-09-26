@@ -17,5 +17,5 @@ MonoBehaviour:
   description: Drop mines that damage and slow enemies.
   slot: 1
   icon: {fileID: 0}
-  goldCost: 800
+  goldCost: 640
   modulePrefab: {fileID: 8955745586176628307, guid: 029294588b429ef438c4b52d8735316f, type: 3}
