@@ -955,8 +955,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         {
             if (director.IsOutOfPlay(capital.Key))
                 continue;
-            // A neutral capital still counts as its own team's (MatchPhaseRules.CapitalHolder, Tudor 2026-09-26).
-            owners.Add(current != null ? MatchPhaseRules.CapitalHolder(current.OwnerOf(capital.Key), capital.Value) : TerritoryMap.Neutral);
+            owners.Add(current != null ? current.OwnerOf(capital.Key) : TerritoryMap.Neutral);
         }
 
         int winner = MatchPhaseRules.TerritoryWinner(director.IsLive, owners);
