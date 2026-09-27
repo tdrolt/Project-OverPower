@@ -158,20 +158,23 @@ namespace Overpower.EditorTools.Telemetry
                 N(r.GoldGapToRichest), N(r.Phase),
             }));
 
+        // 2026-09-27 designer change: "he can't read team/zone NUMBERS" - a name column added right
+        // next to the id it names (id kept, never removed), from the same pure ArenaNames mapping the
+        // HTML report uses, so a CSV opened on its own reads the same way as the page.
         private static void WriteZoneIncome(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "zone_income.csv"),
-            new[] { "zone", "team", "tier", "secondsHeld", "goldGenerated" },
-            t.ZoneIncome.Select(r => new[] { N(r.Zone), N(r.Team), N(r.Tier), N(r.SecondsHeld), N(r.GoldGenerated) }));
+            new[] { "zone", "zoneName", "team", "teamName", "tier", "secondsHeld", "goldGenerated" },
+            t.ZoneIncome.Select(r => new[] { N(r.Zone), ArenaNames.ZoneName(r.Zone), N(r.Team), ArenaNames.TeamName(r.Team), N(r.Tier), N(r.SecondsHeld), N(r.GoldGenerated) }));
 
         private static void WriteOwnership(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "ownership.csv"),
-            new[] { "zone", "tier", "team", "from", "to", "duration", "howEnded", "phase" },
-            t.Ownership.Select(r => new[] { N(r.Zone), N(r.Tier), N(r.Team), N(r.From), N(r.To), N(r.Duration), r.HowEnded, N(r.Phase) }));
+            new[] { "zone", "zoneName", "tier", "team", "teamName", "from", "to", "duration", "howEnded", "phase" },
+            t.Ownership.Select(r => new[] { N(r.Zone), ArenaNames.ZoneName(r.Zone), N(r.Tier), N(r.Team), ArenaNames.TeamName(r.Team), N(r.From), N(r.To), N(r.Duration), r.HowEnded, N(r.Phase) }));
 
         private static void WriteCaptures(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "captures.csv"),
-            new[] { "zone", "tier", "team", "start", "end", "outcome", "duration", "players", "phase" },
-            t.Captures.Select(r => new[] { N(r.Zone), N(r.Tier), N(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players), N(r.Phase) }));
+            new[] { "zone", "zoneName", "tier", "team", "teamName", "start", "end", "outcome", "duration", "players", "phase" },
+            t.Captures.Select(r => new[] { N(r.Zone), ArenaNames.ZoneName(r.Zone), N(r.Tier), N(r.Team), ArenaNames.TeamName(r.Team), N(r.Start), N(r.End), r.Outcome, N(r.Duration), N(r.Players), N(r.Phase) }));
 
         private static void WritePurchases(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "purchases.csv"),
@@ -223,12 +226,12 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WritePlayers(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "players.csv"),
-            new[] { "actor", "name", "team", "kills", "deaths", "assists", "damageDealt", "damageTaken",
+            new[] { "actor", "name", "team", "teamName", "kills", "deaths", "assists", "damageDealt", "damageTaken",
                     "goldTerritory", "goldBounty", "goldRefund", "goldDebug", "goldOther", "goldSpent",
                     "timeAlive", "timeOwnZone", "timeEnemyZone", "timeNeutralZone", "healing" },
             t.Players.Select(r => new[]
             {
-                N(r.Actor), r.Nick, N(r.Team), N(r.Kills), N(r.Deaths), N(r.Assists), N(r.DamageDealt), N(r.DamageTaken),
+                N(r.Actor), r.Nick, N(r.Team), ArenaNames.TeamName(r.Team), N(r.Kills), N(r.Deaths), N(r.Assists), N(r.DamageDealt), N(r.DamageTaken),
                 N(r.GoldTerritory), N(r.GoldBounty), N(r.GoldRefund), N(r.GoldDebug), N(r.GoldOther), N(r.GoldSpent),
                 N(r.TimeAlive), N(r.TimeOwnZone), N(r.TimeEnemyZone), N(r.TimeNeutralZone), N(r.Healing),
             }));

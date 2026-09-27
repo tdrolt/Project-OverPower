@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -140,6 +141,11 @@ namespace Overpower.EditorTools.Telemetry
                 positionsKeptEveryN,
                 targets,
                 arena,
+                // 2026-09-27 designer change: names Tudor can read, not team/zone numbers - one pure
+                // mapping (ArenaNames), embedded once and read by every render function's own
+                // teamName()/zoneLabel() helper below, so the page never repeats "Team N".
+                teamNames = System.Linq.Enumerable.Range(0, 3).Select(ArenaNames.TeamName).ToArray(),
+                zoneNames = System.Linq.Enumerable.Range(0, 10).Select(ArenaNames.ZoneName).ToArray(),
             };
 
             var settings = new JsonSerializerSettings
@@ -262,9 +268,11 @@ th { cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; 
 th.sorted-asc::after { content: ' \25b2'; font-size: 10px; }
 th.sorted-desc::after { content: ' \25bc'; font-size: 10px; }
 .warn { background: var(--warn-bg); color: var(--warn-fg); padding: 8px 14px; border-radius: 6px; margin: 6px 0; font-size: 13px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 16px; min-width: 0; }
-.chart-wrap { position: relative; height: 260px; min-width: 0; }
-.chart-wrap.tall { height: 320px; }
+/* 2026-09-27 designer change: every chart at full content width (one per row, not squeezed two-up)
+   and clearly taller (roughly 2x) - see .chart-wrap below. */
+.grid { display: grid; grid-template-columns: 1fr; gap: 16px; min-width: 0; }
+.chart-wrap { position: relative; height: 540px; min-width: 0; }
+.chart-wrap.tall { height: 640px; }
 canvas { max-width: 100%; }
 .gantt-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
 .gantt-label { width: 96px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
@@ -278,6 +286,15 @@ canvas[id^='arena-canvas-'] { border: 1px solid var(--border); border-radius: 6p
 .legend-dot:first-of-type { margin-left: 6px; }
 details.card summary { cursor: pointer; font-weight: 600; }
 pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+details.section-details > summary { cursor: pointer; list-style: none; }
+details.section-details > summary::-webkit-details-marker { display: none; }
+details.section-details > summary h2 { display: inline; margin: 0; border-bottom: none; padding-bottom: 0; }
+details.section-details > summary::before { content: '\25b6'; display: inline-block; font-size: 11px; margin-right: 8px; transition: transform 0.1s; }
+details.section-details[open] > summary::before { transform: rotate(90deg); }
+.toc { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+.toc a { color: var(--muted); }
+.card details > summary { cursor: pointer; font-size: 12px; color: var(--muted); margin: 8px 0; }
+.bug-screenshot-thumb { max-width: 220px; cursor: zoom-in; }
 .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
 .tab-button { background: none; border: none; border-bottom: 3px solid transparent; color: var(--muted); font: inherit; font-size: 14px; padding: 8px 14px; cursor: pointer; }
 .tab-button.active { color: var(--fg); border-bottom-color: var(--team0); font-weight: 600; }
@@ -305,29 +322,47 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 <div id='phase2-empty-note-%SCOPE%' class='warn' style='display:none'>No team was eliminated in this match: everything is Phase 1.</div>
 <div id='tab-content-%SCOPE%'>
 
+<nav class='toc' id='toc-%SCOPE%'>
+<a href='#section-bugs-%SCOPE%'>Bug reports</a> ·
+<a href='#section-console-%SCOPE%'>Console</a> ·
+<a href='#section-header-%SCOPE%'>Header</a> ·
+<a href='#section-economy-%SCOPE%'>Economy</a> ·
+<a href='#section-territory-%SCOPE%'>Territory</a> ·
+<a href='#section-combat-%SCOPE%'>Combat</a> ·
+<a href='#section-players-%SCOPE%'>Players</a> ·
+<a href='#section-markers-%SCOPE%'>Markers</a>
+</nav>
+
 <section id='section-bugs-%SCOPE%'>
-<h2>Bug reports</h2>
-<p class='card-desc'>Whole match only. One card per Ctrl+B mark: who/when/where, their loadout, the screenshot, their own chat note in the 60s after, every client's console lines from 20s before to 5s after, and the surrounding &plusmn;30s of gameplay events.</p>
+<details class='section-details' open>
+<summary><h2>Bug reports</h2></summary>
+<p class='card-desc'>Whole match only. One card per Ctrl+B mark: who/when/where, their loadout, the screenshot (a thumbnail - click to open full size), their own chat note in the 60s after, and the errors/warnings from the console window. The full console (plain logs too) and the nearby gameplay events are collapsed below each card.</p>
 <div id='bugs-list-%SCOPE%'></div>
+</details>
 </section>
 
 <section id='section-console-%SCOPE%'>
-<h2>Console</h2>
+<details class='section-details' open>
+<summary><h2>Console</h2></summary>
 <p class='card-desc'>Whole match only. Every error, exception and warning from each player's own log, grouped by message, with the count and first/last time. Plain log lines only show up inside a Bug report's own console window above.</p>
 <div id='console-by-player-%SCOPE%'></div>
+</details>
 </section>
 
 <section id='section-header-%SCOPE%'>
-<h2>Header</h2>
+<details class='section-details' open>
+<summary><h2>Header</h2></summary>
 <div id='header-warnings-%SCOPE%'></div>
 <div class='card' id='header-summary-%SCOPE%'></div>
 <details class='card'><summary>Tuning snapshot</summary><pre id='header-tuning-%SCOPE%'></pre></details>
 <div class='card'><h3>Player coverage</h3><div id='header-coverage-%SCOPE%'></div></div>
 <div class='card'><h3>Log coverage</h3><p class='card-desc'>Every player seen anywhere in the match, and whether their own log file is present in this folder.</p><div id='log-coverage-%SCOPE%'></div></div>
+</details>
 </section>
 
 <section id='section-economy-%SCOPE%'>
-<h2>Economy</h2>
+<details class='section-details' open>
+<summary><h2>Economy</h2></summary>
 <div class='grid'>
 <div class='card'>
 <h3>Gold per player over time</h3>
@@ -359,10 +394,12 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 <div class='card'><h3>Unspent gold (at death / at end)</h3><div id='table-unspent-gold-%SCOPE%'></div></div>
 <div class='card'><h3>Blocked purchases by reason</h3><div id='table-shop-blocked-%SCOPE%'></div></div>
 </div>
+</details>
 </section>
 
 <section id='section-territory-%SCOPE%'>
-<h2>Territory</h2>
+<details class='section-details' open>
+<summary><h2>Territory</h2></summary>
 <div class='card'>
 <h3>Ownership timeline</h3>
 <p class='card-desc'>Each row is one zone; a coloured bar is one team's uninterrupted holding of it. Hover a bar for its exact start/end time and how it ended.</p>
@@ -377,10 +414,12 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 <div class='card'><h3>Bounty total by team</h3><div id='table-bounty-%SCOPE%'></div></div>
 </div>
 <div class='card'><h3>Captures</h3><div id='table-captures-%SCOPE%'></div></div>
+</details>
 </section>
 
 <section id='section-combat-%SCOPE%'>
-<h2>Combat</h2>
+<details class='section-details' open>
+<summary><h2>Combat</h2></summary>
 <div class='card'>
 <h3>Weapons</h3>
 <p class='card-desc'>Damage per minute a weapon was actually equipped, so weapons used for very different lengths of time are still comparable.</p>
@@ -405,16 +444,21 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
 <div id='arena-wrap-%SCOPE%'><canvas id='arena-canvas-%SCOPE%' width='1024' height='1024'></canvas></div>
 <div id='arena-note-%SCOPE%' class='note'></div>
 </div>
+</details>
 </section>
 
 <section id='section-players-%SCOPE%'>
-<h2>Players</h2>
+<details class='section-details' open>
+<summary><h2>Players</h2></summary>
 <div class='card'><div id='table-players-%SCOPE%'></div></div>
+</details>
 </section>
 
 <section id='section-markers-%SCOPE%'>
-<h2>Markers</h2>
+<details class='section-details' open>
+<summary><h2>Markers</h2></summary>
 <div id='markers-list-%SCOPE%'></div>
+</details>
 </section>
 
 </div>
@@ -444,6 +488,20 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
   }
 
   function minutes(t) { return (t || 0) / 60; }
+
+  // 2026-09-27 designer change: 'MM:SS' for the whole-match tab's own 'Stats from live' note, and
+  // for every chart's own time axis (below).
+  function fmtClock(seconds) {
+    var total = Math.max(0, Math.round(seconds || 0));
+    var m = Math.floor(total / 60), s = total % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  // A category 'minute' axis (team income, gold gap, zones held) shows mm:ss labels instead of a
+  // bare minute number - the underlying minutesList (used to look values up) is untouched.
+  function minutesLabelsFor(minutesList) {
+    return minutesList.map(function (m) { return fmtClock(m * 60); });
+  }
 
   // Task T7: which of DATA.phase1/phase2/wholeMatch a scope key reads from.
   function bucketFor(scope) {
@@ -476,6 +534,13 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var xScale = { title: { display: true, text: xLabel } };
     if (config.xType) xScale.type = config.xType;
     if (config.stacked) xScale.stacked = true;
+    // 2026-09-27 designer change: the time axis in mm:ss of match time - a linear 'seconds' axis
+    // (gold-per-player) formats each raw tick value directly; a category 'minute' axis already gets
+    // its LABELS pre-formatted to mm:ss by the caller (see minutesLabelsFor below), so this only
+    // covers the linear case.
+    if (xLabel === 'seconds') {
+      xScale.ticks = { callback: function (value) { return fmtClock(value); } };
+    }
     var yScale = { title: { display: true, text: yLabel } };
     if (config.stacked) yScale.stacked = true;
     var options = { responsive: true, maintainAspectRatio: false, scales: { x: xScale, y: yScale } };
@@ -563,6 +628,13 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     return TEAM_COLORS[i];
   }
 
+  // 2026-09-27 designer change: 'White'/'Purple'/'Cyan' instead of a team number, everywhere the
+  // report names a team - DATA.teamNames is ArenaNames.TeamName(0..2), embedded once by the writer.
+  function teamName(team) {
+    var names = DATA.teamNames;
+    return (names && team >= 0 && team < names.length) ? names[team] : ('Team ' + team);
+  }
+
   // The tuning snapshot is match-wide (identical across every scope) - read once, from whichever
   // scope always exists (wholeMatch).
   var tuning = null;
@@ -604,14 +676,27 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
   // 'Zone 6 · T1 capital' (tier 1 is always a team's capital - TerritoryConfig's own tier-0 row
   // comment) or 'Zone 0 · T2' for any other tier, falling back to a plain 'Zone N' if no ownership
   // or income row ever named this zone's tier (never captured, or a malformed/partial log).
+  // 2026-09-27 designer change: DATA.zoneNames (ArenaNames.ZoneName(0..9)) instead of a bare
+  // 'Zone N . T2' - a name like 'Cyan T2' or 'White-Cyan T3' already says the tier and who it's
+  // near, so the old tier suffix is dropped rather than duplicated.
   function zoneLabel(zoneId) {
     if (zoneId === -1) return 'Unattributed';
+    var names = DATA.zoneNames;
+    if (names && zoneId >= 0 && zoneId < names.length) return names[zoneId];
     var tier = zoneTier(zoneId);
     if (tier === undefined || tier === null) return 'Zone ' + zoneId;
     return 'Zone ' + zoneId + ' · T' + tier + (tier === 1 ? ' capital' : '');
   }
 
   var chartsOk = (typeof Chart !== 'undefined');
+  // 2026-09-27 designer change: readable font sizes on every chart (axis ticks, titles, legend) -
+  // set once, globally, rather than per chart.
+  if (chartsOk) {
+    Chart.defaults.font.size = 14;
+    Chart.defaults.plugins.legend.labels.font = { size: 13 };
+    Chart.defaults.plugins.legend.labels.boxWidth = 18;
+    Chart.defaults.plugins.legend.labels.padding = 12;
+  }
   if (!chartsOk) {
     var fallbackNote = document.getElementById('chart-fallback-note');
     fallbackNote.textContent = 'Chart.js failed to load from the CDN (no internet access?) - charts are skipped, every table below still works.';
@@ -829,6 +914,15 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var text = label + ': ' + fmt(length) + 's';
     if (targetSeconds) text += ' (GDD target ' + fmt(targetSeconds) + 's)';
     host.textContent = text;
+
+    // 2026-09-27 designer change: a prominent note at the top of the whole-match tab when this
+    // match had a real warm-up - Economy/Territory/Combat/Players (and their charts/tables) only
+    // ever count from live onward on this tab (TelemetryAggregator.BuildSet passes
+    // PhaseTimeline.WholeMatch, which already starts at LiveSeconds); Bug reports, Console and
+    // Markers still cover the full log, warm-up included.
+    if (scope === 'whole-match' && bucket.header.warmupSeconds > 0) {
+      host.appendChild(el('div', { class: 'note' }, 'Stats from live (' + fmtClock(bucket.header.warmupSeconds) + ') - the warm-up is left out.'));
+    }
   }
 
   // ---------------------------------------------------------------- header
@@ -911,7 +1005,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       var actorKeys = Object.keys(byActor);
       for (var k = 0; k < actorKeys.length; k++) {
         var a = byActor[actorKeys[k]];
-        goldDatasets.push({ label: a.nick + ' (team ' + a.team + ')', data: a.points, borderColor: teamColor(a.team), backgroundColor: teamColor(a.team), fill: false, pointRadius: 1, tension: 0.1 });
+        goldDatasets.push({ label: a.nick + ' (' + teamName(a.team) + ')', data: a.points, borderColor: teamColor(a.team), backgroundColor: teamColor(a.team), fill: false, pointRadius: 1, tension: 0.1 });
       }
       // Review fix (item 3a): this chart's own x axis is SECONDS (row.t, above), not minutes -
       // the boundary overlay must use the same unit.
@@ -934,7 +1028,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     for (var ti2 = 0; ti2 < teams.length; ti2++) {
       var incomeTeam = teams[ti2];
       var teamCard = el('div', { class: 'card' });
-      teamCard.appendChild(el('h4', null, 'Team ' + incomeTeam));
+      teamCard.appendChild(el('h4', null, teamName(incomeTeam)));
       var wrap = el('div', { class: 'chart-wrap' });
       var canvas = el('canvas');
       wrap.appendChild(canvas);
@@ -976,7 +1070,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
         };
         new Chart(canvas, {
           type: 'bar',
-          data: { labels: minutesList, datasets: teamDatasets },
+          data: { labels: minutesLabelsFor(minutesList), datasets: teamDatasets },
           options: teamOpts,
           plugins: [overlayPlugin],
         });
@@ -990,7 +1084,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       for (var zt = 0; zt < teams.length; zt++) {
         var zoneTeam = teams[zt];
         zoneDatasets.push({
-          label: 'Team ' + zoneTeam, backgroundColor: teamColor(zoneTeam),
+          label: teamName(zoneTeam), backgroundColor: teamColor(zoneTeam),
           data: zones.map(function (z) {
             var found = 0;
             for (var zi2 = 0; zi2 < zi.length; zi2++) { if (zi[zi2].zone === z && zi[zi2].team === zoneTeam) { found = zi[zi2].goldGenerated; break; } }
@@ -1010,7 +1104,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       for (var gi = 0; gi < teams.length; gi++) {
         var gapTeam = teams[gi];
         gapDatasets.push({
-          label: 'Team ' + gapTeam, borderColor: teamColor(gapTeam), fill: false, pointRadius: 1,
+          label: teamName(gapTeam), borderColor: teamColor(gapTeam), fill: false, pointRadius: 1,
           data: minutesList.map(function (m) {
             for (var ei2 = 0; ei2 < eb.length; ei2++) { if (eb[ei2].team === gapTeam && eb[ei2].minute === m) return eb[ei2].goldGapToRichest; }
             return null;
@@ -1024,7 +1118,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       gapOpts.plugins = { overlayLines: { boundary: boundaryOverlaySpec(scope, 'minutes', minutesList) } };
       new Chart(id('chart-gold-gap', suffix), {
         type: 'line',
-        data: { labels: minutesList, datasets: gapDatasets },
+        data: { labels: minutesLabelsFor(minutesList), datasets: gapDatasets },
         options: gapOpts,
         plugins: [overlayPlugin],
       });
@@ -1098,7 +1192,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     });
     buildTable(id('table-unspent-gold', suffix), [
       { label: 'Player', value: function (r) { return r.nick; } },
-      { label: 'Team', value: function (r) { return r.team; } },
+      { label: 'Team', value: function (r) { return teamName(r.team); } },
       { label: 'Gold at end', value: function (r) { return r.endBalance; } },
       { label: 'Mean unspent at death', value: function (r) { return r.meanUnspentAtDeath; } },
       { label: 'Deaths', value: function (r) { return r.deathCount; } },
@@ -1162,7 +1256,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       for (var t = 0; t < teams.length; t++) {
         var team = teams[t];
         zoneHeldDatasets.push({
-          label: 'Team ' + team, borderColor: teamColor(team), fill: false, pointRadius: 1,
+          label: teamName(team), borderColor: teamColor(team), fill: false, pointRadius: 1,
           data: minutesList.map(function (m) {
             var found = null;
             for (var ei = 0; ei < eb.length; ei++) { if (eb[ei].team === team && eb[ei].minute === m) { found = eb[ei]; break; } }
@@ -1178,7 +1272,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       heldOpts.plugins = { overlayLines: { boundary: boundaryOverlaySpec(scope, 'minutes', minutesList) } };
       new Chart(id('chart-zones-held', suffix), {
         type: 'line',
-        data: { labels: minutesList, datasets: zoneHeldDatasets },
+        data: { labels: minutesLabelsFor(minutesList), datasets: zoneHeldDatasets },
         options: heldOpts,
         plugins: [overlayPlugin],
       });
@@ -1190,19 +1284,38 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       bountyByTeam[br.team] = (bountyByTeam[br.team] || 0) + (br.bounty || 0);
     }
     buildTable(id('table-bounty', suffix), [
-      { label: 'Team', value: function (r) { return r.team; } },
+      { label: 'Team', value: function (r) { return teamName(r.team); } },
       { label: 'Total bounty gold', value: function (r) { return r.total; } },
     ], Object.keys(bountyByTeam).map(function (bk) { return { team: bk, total: bountyByTeam[bk] }; }));
 
-    buildTable(id('table-captures', suffix), [
+    // 2026-09-27 designer change: 1,401 capture events made this table alone ~12,000px tall on a
+    // real 10-player match - collapsed by default behind a one-line summary (count, per team),
+    // same treatment as every other long list in this report.
+    var captureRows = rowsFor('captures', scope);
+    var capturesHost = id('table-captures', suffix);
+    var capturesByTeam = {};
+    for (var cbi = 0; cbi < captureRows.length; cbi++) {
+      var ct = captureRows[cbi].team;
+      capturesByTeam[ct] = (capturesByTeam[ct] || 0) + 1;
+    }
+    var captureTeamKeys = Object.keys(capturesByTeam).sort(function (a, b) { return a - b; });
+    var captureSummary = captureTeamKeys.map(function (tk) { return 'team ' + tk + ': ' + capturesByTeam[tk]; }).join(', ');
+    var capturesDetails = el('details');
+    var capturesSummary = el('summary');
+    capturesSummary.textContent = captureRows.length + ' capture event(s)' + (captureSummary ? ' (' + captureSummary + ')' : '') + ' - show';
+    capturesDetails.appendChild(capturesSummary);
+    var capturesBody = el('div');
+    capturesDetails.appendChild(capturesBody);
+    capturesHost.appendChild(capturesDetails);
+    buildTable(capturesBody, [
       { label: 'Zone', value: function (r) { return zoneLabel(r.zone); } },
-      { label: 'Team', value: function (r) { return r.team; } },
+      { label: 'Team', value: function (r) { return teamName(r.team); } },
       { label: 'Start', value: function (r) { return r.start; } },
       { label: 'End', value: function (r) { return r.end; } },
       { label: 'Outcome', value: function (r) { return r.outcome; } },
       { label: 'Duration', value: function (r) { return r.duration; } },
       { label: 'Players', value: function (r) { return r.players; } },
-    ], rowsFor('captures', scope));
+    ], captureRows);
   }
 
   // ---------------------------------------------------------------- combat
@@ -1265,13 +1378,13 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     var matrixHead = el('thead');
     var matrixHeadRow = el('tr');
     matrixHeadRow.appendChild(el('th', null, 'Attacker team / victim team'));
-    for (var c = 0; c < teamsSeen.length; c++) matrixHeadRow.appendChild(el('th', null, 'Team ' + teamsSeen[c]));
+    for (var c = 0; c < teamsSeen.length; c++) matrixHeadRow.appendChild(el('th', null, teamName(teamsSeen[c])));
     matrixHead.appendChild(matrixHeadRow);
     matrixTable.appendChild(matrixHead);
     var matrixBody = el('tbody');
     for (var ri = 0; ri < teamsSeen.length; ri++) {
       var tr = el('tr');
-      tr.appendChild(el('td', null, 'Team ' + teamsSeen[ri]));
+      tr.appendChild(el('td', null, teamName(teamsSeen[ri])));
       for (var ci = 0; ci < teamsSeen.length; ci++) {
         var v = matrix[teamsSeen[ri] + ':' + teamsSeen[ci]] || 0;
         var alpha = maxVal > 0 ? (0.12 + 0.65 * (v / maxVal)) : 0.12;
@@ -1310,7 +1423,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       legendHost.appendChild(el('span', null, 'Deaths (victim team):'));
       deathTeams.forEach(function (t) {
         legendHost.appendChild(el('span', { class: 'legend-dot', style: 'background:' + teamColor(t) + ';' }));
-        legendHost.appendChild(el('span', null, 'Team ' + t));
+        legendHost.appendChild(el('span', null, teamName(t)));
       });
     }
 
@@ -1365,7 +1478,7 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
   function renderPlayers(scope, suffix) {
     buildTable(id('table-players', suffix), [
       { label: 'Player', value: function (r) { return r.nick; } },
-      { label: 'Team', value: function (r) { return r.team; } },
+      { label: 'Team', value: function (r) { return teamName(r.team); } },
       { label: 'Kills', value: function (r) { return r.kills; } },
       { label: 'Deaths', value: function (r) { return r.deaths; } },
       { label: 'Assists', value: function (r) { return r.assists; } },
@@ -1397,10 +1510,10 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
     rowsFor('purchases', scope).forEach(function (pr) { events.push({ t: pr.t, kind: pr.kind, text: pr.nick + ' ' + pr.kind + ' (' + pr.category + ')' }); });
     rowsFor('shopBlocked', scope).forEach(function (sr) { events.push({ t: sr.t, kind: 'shopBlocked', text: sr.nick + ' blocked: ' + sr.reason }); });
     rowsFor('captures', scope).forEach(function (cr) {
-      events.push({ t: cr.start, kind: 'captureStart', text: zoneLabel(cr.zone) + ' capture by team ' + cr.team + ' started' });
+      events.push({ t: cr.start, kind: 'captureStart', text: zoneLabel(cr.zone) + ' capture by ' + teamName(cr.team) + ' started' });
       events.push({ t: cr.end, kind: 'captureEnd', text: zoneLabel(cr.zone) + ' capture ' + cr.outcome });
     });
-    rowsFor('ownership', scope).forEach(function (or_) { events.push({ t: or_.from, kind: 'ownership', text: zoneLabel(or_.zone) + ' to team ' + or_.team }); });
+    rowsFor('ownership', scope).forEach(function (or_) { events.push({ t: or_.from, kind: 'ownership', text: zoneLabel(or_.zone) + ' to ' + teamName(or_.team) }); });
     return events;
   }
 
@@ -1461,43 +1574,83 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       // Playtest extras P6 follow-up (item 4): always name the actor number too, even with a nick -
       // 'Tudor (actor 1, team 0)' - the old (bug.nick || 'actor N') dropped the actor number the
       // moment a nick was known, which is exactly the case a real playtest log always hits.
-      var bugWho = bug.nick ? (bug.nick + ' (actor ' + bug.actor + ', team ' + bug.team + ')') : ('actor ' + bug.actor + ' (team ' + bug.team + ')');
+      var bugWho = bug.nick ? (bug.nick + ' (actor ' + bug.actor + ', ' + teamName(bug.team) + ')') : ('actor ' + bug.actor + ' (' + teamName(bug.team) + ')');
       card.appendChild(el('h3', null, 't=' + fmt(bug.t) + 's – ' + bugWho));
 
       card.appendChild(el('div', null, 'Where: ' + zoneLabel(bug.zone) + ' at (' + fmt(bug.x) + ', ' + fmt(bug.z) + '), ' + (bug.alive ? 'alive' : 'dead')));
       card.appendChild(el('div', null, 'Loadout: weapon ' + weaponName(bug.weapon) + ', equipment ' + abilityName(bug.equipment) + ', mobility ' + abilityName(bug.mobility) + ', ultimate ' + abilityName(bug.ultimate)));
 
+      // 2026-09-27 designer change: a smaller thumbnail up front (click opens the full-size image
+      // in a new tab) - the report's own full-size <img> per bug card, times ~10 players, was a big
+      // share of the page's height.
       if (bug.screenshotFile) {
-        card.appendChild(el('img', { class: 'bug-screenshot', src: bug.screenshotFile, alt: 'Bug screenshot at t=' + fmt(bug.t) + 's' }));
+        var thumbLink = el('a', { href: bug.screenshotFile, target: '_blank', rel: 'noopener' });
+        thumbLink.appendChild(el('img', {
+          class: 'bug-screenshot bug-screenshot-thumb',
+          src: bug.screenshotFile,
+          alt: 'Bug screenshot at t=' + fmt(bug.t) + 's (click for full size)',
+        }));
+        card.appendChild(thumbLink);
       }
 
       var notesHost = el('div', { class: 'note' },
         (bug.chatNotes && bug.chatNotes.length) ? ('Reporter’s note: ' + bug.chatNotes.join(' / ')) : 'No chat note from the reporter in the 60s after the mark.');
       card.appendChild(notesHost);
 
-      card.appendChild(el('h4', null, 'Console (20s before to 5s after)'));
-      if (bug.consoleWindow && bug.consoleWindow.length) {
+      // 2026-09-27 designer change: errors/warnings from the window shown up front (what a reviewer
+      // actually needs first); the FULL console (plain logs too, hundreds of lines per card on a
+      // real playtest) moves into a collapsed <details> below, closed by default.
+      var consoleWindow = bug.consoleWindow || [];
+      var notableLines = consoleWindow.filter(function (cl) { return cl.level && cl.level !== 'log'; });
+      card.appendChild(el('h4', null, 'Errors/warnings in the window (20s before to 5s after)'));
+      if (notableLines.length) {
         buildTable(card, [
           { label: 't', value: function (r) { return r.t; } },
           { label: 'player', value: function (r) { return r.nick || ('actor ' + r.actor); } },
           { label: 'level', value: function (r) { return r.level; } },
           { label: 'message', value: function (r) { return r.message; } },
-        ], bug.consoleWindow);
+        ], notableLines);
       } else {
-        card.appendChild(el('div', { class: 'note' }, 'No console lines in this window.'));
+        card.appendChild(el('div', { class: 'note' }, 'No errors or warnings in this window.'));
       }
 
-      card.appendChild(el('h4', null, 'Nearby gameplay (±30s)'));
+      var errorCount = notableLines.filter(function (cl) { return cl.level === 'error' || cl.level === 'exception' || cl.level === 'assert'; }).length;
+      var warningCount = notableLines.filter(function (cl) { return cl.level === 'warning'; }).length;
+      var consoleDetails = el('details');
+      var consoleSummary = el('summary');
+      consoleSummary.textContent = 'Console around this mark: ' + consoleWindow.length + ' lines (' + errorCount + ' errors, ' + warningCount + ' warnings) - show';
+      consoleDetails.appendChild(consoleSummary);
+      if (consoleWindow.length) {
+        var consoleBody = el('div');
+        consoleDetails.appendChild(consoleBody);
+        buildTable(consoleBody, [
+          { label: 't', value: function (r) { return r.t; } },
+          { label: 'player', value: function (r) { return r.nick || ('actor ' + r.actor); } },
+          { label: 'level', value: function (r) { return r.level; } },
+          { label: 'message', value: function (r) { return r.message; } },
+        ], consoleWindow);
+      } else {
+        consoleDetails.appendChild(el('div', { class: 'note' }, 'No console lines in this window.'));
+      }
+      card.appendChild(consoleDetails);
+
       var windowed = events.filter(function (e) { return e.t >= bug.t - 30 && e.t <= bug.t + 30; }).sort(function (a, b) { return a.t - b.t; });
+      var eventsDetails = el('details');
+      var eventsSummary = el('summary');
+      eventsSummary.textContent = 'Nearby gameplay (±30s): ' + windowed.length + ' event(s) - show';
+      eventsDetails.appendChild(eventsSummary);
       if (windowed.length) {
-        buildTable(card, [
+        var eventsBody = el('div');
+        eventsDetails.appendChild(eventsBody);
+        buildTable(eventsBody, [
           { label: 't', value: function (r) { return r.t; } },
           { label: 'type', value: function (r) { return r.kind; } },
           { label: 'event', value: function (r) { return r.text; } },
         ], windowed);
       } else {
-        card.appendChild(el('div', { class: 'note' }, 'No nearby gameplay events.'));
+        eventsDetails.appendChild(el('div', { class: 'note' }, 'No nearby gameplay events.'));
       }
+      card.appendChild(eventsDetails);
 
       container.appendChild(card);
     }
@@ -1534,14 +1687,23 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
       // Item 4: same always-show-the-actor-number fix as the bug cards, and the same (nick ? ... :
       // ...) shape the log-coverage warning already uses just above in this file - 'Tudor (actor 1)'
       // rather than plain 'Tudor' once a nick is known.
-      sub.appendChild(el('h4', null, group.nick ? (group.nick + ' (actor ' + actor + ')') : ('actor ' + actor)));
-      buildTable(sub, [
+      var errCount = group.rows.filter(function (r) { return r.level === 'error' || r.level === 'exception' || r.level === 'assert'; }).length;
+      var warnCount = group.rows.filter(function (r) { return r.level === 'warning'; }).length;
+      var subDetails = el('details');
+      var subSummary = el('summary');
+      subSummary.textContent = (group.nick ? (group.nick + ' (actor ' + actor + ')') : ('actor ' + actor)) +
+        ': ' + group.rows.length + ' distinct message(s) (' + errCount + ' errors, ' + warnCount + ' warnings) - show';
+      subDetails.appendChild(subSummary);
+      var subBody = el('div');
+      subDetails.appendChild(subBody);
+      buildTable(subBody, [
         { label: 'level', value: function (r) { return r.level; } },
         { label: 'message', value: function (r) { return r.message; } },
         { label: 'count', value: function (r) { return r.count; } },
         { label: 'first t', value: function (r) { return r.firstT; } },
         { label: 'last t', value: function (r) { return r.lastT; } },
       ], group.rows);
+      sub.appendChild(subDetails);
       container.appendChild(sub);
     }
   }

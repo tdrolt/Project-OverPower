@@ -488,5 +488,51 @@ namespace Overpower.Tests
                 Directory.Delete(temp, true);
             }
         }
+
+        /// <summary>2026-09-27 designer change: a warm-up event must never pollute a STAT (Deaths, here,
+        /// same as AWarmupDeathIsNotCountedInTheMatch above) but must stay visible in the sections that
+        /// are meant to cover the full log regardless of live - Console, Bug reports and Markers - on
+        /// the whole-match tab. One fixture exercises all four at once, so a future change to any of
+        /// them is caught by the same test.</summary>
+        [Test]
+        public void AWarmupEventIsExcludedFromAStatButKeptInConsoleBugAndMarkers()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string lines = Session(1, 0, true, "{}") +
+                    "{\"e\":\"phase\",\"t\":-1,\"num\":0,\"remain\":[]}\n" + // the warm-up anchor
+                    "{\"e\":\"console\",\"t\":10,\"state\":\"warning\",\"msg\":\"warmup warning\",\"n\":1}\n" + // warm-up console line - must be kept
+                    "{\"e\":\"bug\",\"t\":15,\"a\":1,\"tm\":0,\"x\":0,\"z\":0,\"alive\":true,\"zone\":-1,\"w\":-1,\"eq\":-1,\"mob\":-1,\"ult\":-1,\"img\":\"\"}\n" + // warm-up bug mark - must be kept
+                    "{\"e\":\"marker\",\"t\":18,\"a\":1,\"note\":\"warmup marker\"}\n" + // warm-up marker - must be kept
+                    "{\"e\":\"death\",\"t\":20,\"a\":-1,\"at\":-1,\"w\":-1,\"ab\":-1,\"assists\":[],\"x\":0,\"z\":0,\"timeAlive\":20,\"gold\":0,\"lw\":-1,\"leq\":-1,\"lmob\":-1,\"lult\":-1,\"abl\":0,\"rcl\":0}\n" + // warm-up death - must be EXCLUDED
+                    "{\"e\":\"phase\",\"t\":60,\"num\":1,\"remain\":[0]}\n" + // live at t=60
+                    "{\"e\":\"death\",\"t\":80,\"a\":-1,\"at\":-1,\"w\":-1,\"ab\":-1,\"assists\":[],\"x\":0,\"z\":0,\"timeAlive\":20,\"gold\":0,\"lw\":-1,\"leq\":-1,\"lmob\":-1,\"lult\":-1,\"abl\":0,\"rcl\":0}\n" + // a real, in-match death
+                    "{\"e\":\"sample\",\"t\":100,\"bal\":0}\n";
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), lines);
+
+                ReportSet set = TelemetryAggregator.BuildSet(TelemetryLog.Load(temp));
+
+                // The stat: only the live death counts.
+                Assert.AreEqual(1, set.WholeMatch.Deaths.Count, "the warm-up death must not count toward the whole-match stat");
+                Assert.AreEqual(80.0, set.WholeMatch.Deaths[0].T, 1e-9);
+
+                // Console/Bug reports: unwindowed, always cover the full log.
+                Assert.IsTrue(set.WholeMatch.Header.ConsoleByPlayer.Any(r => r.Message == "warmup warning"),
+                    "a warm-up console line must still show up in the Console section");
+                Assert.AreEqual(1, set.WholeMatch.Header.Bugs.Count, "a warm-up bug mark must still show up in Bug reports");
+                Assert.AreEqual(15.0, set.WholeMatch.Header.Bugs[0].T, 1e-9);
+
+                // Markers on the WHOLE-MATCH tab: also cover the full log now (2026-09-27), unlike a
+                // stat - a marker dropped during warm-up is exactly the kind of "designer flagged this
+                // live" note that must not silently vanish.
+                Assert.AreEqual(1, set.WholeMatch.Header.Markers.Count, "a warm-up marker must still show up on the whole-match tab");
+                Assert.AreEqual(18.0, set.WholeMatch.Header.Markers[0].T, 1e-9);
+            }
+            finally
+            {
+                Directory.Delete(temp, true);
+            }
+        }
     }
 }

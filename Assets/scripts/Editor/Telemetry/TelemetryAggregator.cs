@@ -108,8 +108,15 @@ namespace Overpower.EditorTools.Telemetry
         /// <summary>Task T7: builds one scope. <paramref name="window"/> null means the whole match
         /// (every event, every integral in full) - the same result <c>Build(log)</c> always produced.
         /// A real window (Phase 1 or Phase 2, from PhaseTimeline) filters every discrete event to it
-        /// and clips every continuous integral to it - see the class comment.</summary>
-        public static ReportTables Build(TelemetryLog log, TimeWindow window)
+        /// and clips every continuous integral to it - see the class comment.
+        ///
+        /// 2026-09-27 designer change: <paramref name="includeWarmupMarkers"/> - Markers, like Bug
+        /// reports and Console, are meant to stay visible over the FULL log (warm-up included), but
+        /// unlike those two they are naturally scoped per phase tab (a marker dropped in Phase 2 has
+        /// no business on the Phase 1 tab) - so this only widens the marker window's own START back to
+        /// 0 for the whole-match build (BuildSet is the only caller that passes true), not for a
+        /// Phase-1/Phase-2-scoped one.</summary>
+        public static ReportTables Build(TelemetryLog log, TimeWindow window, bool includeWarmupMarkers = false)
         {
             var tables = new ReportTables();
             if (log == null) return tables;
@@ -163,7 +170,8 @@ namespace Overpower.EditorTools.Telemetry
             var rawChangesByZone = new Dictionary<int, List<(double T, int New)>>();
             BuildOwnership(log, tables.Ownership, zoneTier, rawChangesByZone, matchLength, effectiveWindow, tPhase2);
 
-            BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow, sampleInterval);
+            TimeWindow markerWindow = includeWarmupMarkers ? new TimeWindow(0, effectiveWindow.End, effectiveWindow.EndInclusive) : effectiveWindow;
+            BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow, sampleInterval, markerWindow);
             tables.Header.EliminationFallbackUsed = timeline.UsedEliminationFallback; // review fix item 9
             tables.Header.WarmupSeconds = timeline.LiveSeconds; // 2.7b step 9
             tables.Header.NeverWentLive = timeline.HasWarmup && !timeline.WentLive; // 2.7b step 9
@@ -191,7 +199,7 @@ namespace Overpower.EditorTools.Telemetry
             PhaseTimeline timeline = PhaseTimeline.From(log);
             return new ReportSet
             {
-                WholeMatch = Build(log, timeline.WholeMatch),
+                WholeMatch = Build(log, timeline.WholeMatch, includeWarmupMarkers: true),
                 Phase1 = Build(log, timeline.Phase1),
                 Phase2 = timeline.HasPhase2 ? Build(log, timeline.Phase2) : null,
                 LiveSeconds = timeline.LiveSeconds, // 2.7b step 9
@@ -240,8 +248,9 @@ namespace Overpower.EditorTools.Telemetry
         // ==================================================================== header
 
         private static void BuildHeader(ReportHeader header, TelemetryLog log, Dictionary<int, TelemetrySession> sessionByActor,
-            Dictionary<int, (double First, double Last)> coverageByActor, TimeWindow window, double sampleInterval)
+            Dictionary<int, (double First, double Last)> coverageByActor, TimeWindow window, double sampleInterval, TimeWindow markerWindow = null)
         {
+            markerWindow ??= window;
             header.MatchId = log.MatchId;
             // Task T7: THIS window's own duration - the whole match's length when window is the
             // whole-match window (unchanged from before T7), or a phase's own duration on a
@@ -273,20 +282,26 @@ namespace Overpower.EditorTools.Telemetry
 
             foreach (TelemetryEvent e in log.Events)
             {
-                // Task T7: markers and the free-loadout/debug-gold warnings are scoped to THIS
-                // window - a marker dropped in Phase 2 has no business on the Phase 1 tab.
-                if (!window.Contains(e.T)) continue;
-
+                // Task T7: the free-loadout/debug-gold warnings are scoped to THIS window. 2026-09-27
+                // designer change: a Marker uses markerWindow instead - on the whole-match build that
+                // is [0, End] (the full log, warm-up included - Markers stay visible over the full log
+                // like Bug reports/Console), but still scoped per phase tab on a Phase 1/Phase 2 build
+                // (a marker dropped in Phase 2 has no business on the Phase 1 tab).
                 if (e.Name == TelemetryKeys.Marker)
                 {
+                    if (!markerWindow.Contains(e.T)) continue;
                     header.Markers.Add(new MarkerRow
                     {
                         T = e.T,
                         Actor = ReadInt(e.Data, TelemetryKeys.Actor, -1),
                         Note = e.Data[TelemetryKeys.Note]?.ToString() ?? "",
                     });
+                    continue;
                 }
-                else if (e.Name == TelemetryKeys.GoldEarned && !IsJunkGoldEarned(e.Data))
+
+                if (!window.Contains(e.T)) continue;
+
+                if (e.Name == TelemetryKeys.GoldEarned && !IsJunkGoldEarned(e.Data))
                 {
                     if (ReadInt(e.Data, TelemetryKeys.Debug, 0) > 0)
                         header.DebugGoldUsed = true;
