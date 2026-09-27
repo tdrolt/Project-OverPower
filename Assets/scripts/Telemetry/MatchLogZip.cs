@@ -14,8 +14,9 @@ namespace Overpower.Telemetry
     /// <summary>
     /// Playtest extras P5 (2026-09-26): zips THIS client's own match-log files (its own
     /// "{actor}_*.jsonl" and "bug_{actor}_*.png" - see MatchLogZipRule) into
-    /// "&lt;Telemetry folder&gt;/OverPower-log_&lt;match folder name&gt;_&lt;nick&gt;.zip", so each
-    /// tester sends one file. Called from two places, both fine to call more than once and both
+    /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;nick&gt;.zip" (2026-09-27:
+    /// directly in the root, not the dated per-match subfolder - see TryZip), so each tester finds and
+    /// sends one file right away. Called from two places, both fine to call more than once and both
     /// through the same ZipNow (2026-09-26 fix - see its own comment on why there is no longer a
     /// "skip if already zipped" variant): MatchUI.ShowMatchResult (this client's own win/lose panel
     /// appearing) and GameQuit.Quit() (before it disconnects - see GameQuit's own comment on order).
@@ -151,7 +152,12 @@ namespace Overpower.Telemetry
                 // the whole match, so every zip of it - result panel, then maybe again on quit - comes
                 // out under the SAME name no matter what the clock reads when each call happens to run.
                 string zipName = MatchLogZipRule.ZipFileName(Path.GetFileName(folder), sanitizedNick);
-                string zipPath = Path.Combine(folder, zipName);
+                // 2026-09-27 designer change: the zip goes directly in the "Match logs" ROOT (folder's own
+                // parent), not inside the dated per-match subfolder, so testers find it at once instead of
+                // having to open one more folder. Falls back to folder itself if, somehow, it has no parent
+                // (should never happen - ResolveMatchFolder always creates it one level under a root).
+                string zipFolder = Directory.GetParent(folder)?.FullName ?? folder;
+                string zipPath = Path.Combine(zipFolder, zipName);
 
                 // "Overwriting its own earlier zip of the same match" (the brief) - delete first
                 // rather than open in Update mode, so a shrunk file list (should never happen, but
@@ -186,9 +192,9 @@ namespace Overpower.Telemetry
             if (savedLabel != null && theme != null)
             {
                 // Item 2: Path.Combine above uses this platform's separator throughout, but folder
-                // itself (MatchTelemetry.ResolveMatchFolder, built from Application.persistentDataPath)
+                // itself (MatchTelemetry.ResolveMatchFolder, via TelemetryPaths.ResolveMatchLogsRoot)
                 // always comes back with forward slashes on Windows too - Unity's own doing, not ours -
-                // so the raw zipPath read "C:/Users/...\Telemetry\..." (the brief's own capture). Display
+                // so the raw zipPath read "C:/Users/...\Match logs\..." (the brief's own capture). Display
                 // only: GetFullPath normalises every separator to this platform's own without touching
                 // the actual path used to write the file above.
                 savedLabel.text = string.Format(theme.matchLogSavedText, Path.GetFullPath(zipPath));

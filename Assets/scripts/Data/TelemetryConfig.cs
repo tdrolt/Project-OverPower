@@ -42,8 +42,11 @@ namespace Overpower.Data
         [SerializeField, Min(0.5f)] private float flushIntervalSeconds = 2f;
         public float FlushIntervalSeconds => flushIntervalSeconds;
 
-        [Tooltip("Folder name under the platform's persistent data path that every match's own " +
-                 "dated subfolder is created inside - e.g. .../Telemetry/2026-09-16_1730_ab12cd34/.")]
+        [Tooltip("Only used as the LAST-RESORT fallback name, under the platform's persistent data " +
+                 "path (AppData on Windows), if neither the game/project folder's own \"Match logs\" " +
+                 "nor Documents\\OverPower\\Match logs could be created or written to - see " +
+                 "TelemetryPaths.ResolveMatchLogsRoot. Every match's own dated subfolder is created " +
+                 "inside whichever root wins - e.g. .../Match logs/2026-09-16_1730_ab12cd34/.")]
         [SerializeField] private string folderName = "Telemetry";
         public string FolderName => folderName;
 

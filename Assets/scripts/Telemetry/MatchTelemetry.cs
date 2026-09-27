@@ -503,6 +503,12 @@ namespace Overpower.Telemetry
         /// one already exists (a late-starting second client on the same machine), otherwise creates a
         /// freshly dated one.
         ///
+        /// 2026-09-27 designer change: testers complained the old location (persistentDataPath - AppData
+        /// on Windows) was too hard to find, so the root now comes from TelemetryPaths.ResolveMatchLogsRoot
+        /// - the game/project folder's own "Match logs" subfolder first, Documents\OverPower next, the
+        /// old AppData location only as a last resort. TelemetryMenu (the Editor's "Open Telemetry
+        /// Folder"/"Build Report…") shares that same helper so both agree on where logs live.
+        ///
         /// Small same-instant race, accepted rather than fixed: two local clients opening their file for
         /// the first time in the very same frame can both fail to see the other's not-yet-created
         /// directory and each create their own `_{mId8}` folder. Not silently harmless - T5's
@@ -512,7 +518,7 @@ namespace Overpower.Telemetry
         /// a multi-PC playtest already requires (design doc, "Files").</summary>
         private string ResolveMatchFolder()
         {
-            string root = Path.Combine(Application.persistentDataPath, string.IsNullOrEmpty(config.FolderName) ? "Telemetry" : config.FolderName);
+            string root = TelemetryPaths.ResolveMatchLogsRoot(config.FolderName);
             Directory.CreateDirectory(root);
 
             string suffix = "_" + matchId.Substring(0, 8);

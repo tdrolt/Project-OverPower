@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using Overpower.Data;
+using Overpower.Telemetry;
 
 namespace Overpower.EditorTools.Telemetry
 {
@@ -170,14 +171,18 @@ namespace Overpower.EditorTools.Telemetry
             return asset != null ? asset.ToData() : new BalanceTargetsData();
         }
 
+        // 2026-09-27 designer change: shares MatchTelemetry's own helper, so "Open Telemetry Folder"
+        // and "Build Report…"'s default folder point at the SAME place the game just wrote to (the
+        // project folder's own "Match logs" - Documents\OverPower\Match logs, or the old AppData
+        // location, only as fallbacks - see TelemetryPaths.ResolveMatchLogsRoot).
         private static string TelemetryRoot()
         {
-            return Path.Combine(Application.persistentDataPath, TelemetryFolderName());
+            return TelemetryPaths.ResolveMatchLogsRoot(TelemetryFolderName());
         }
 
-        // Any TelemetryConfig asset in the project carries the same folder name every client writes
-        // into (MatchTelemetry reads its own wired config's FolderName) - falls back to the shipped
-        // default so the menu still works if none is found.
+        // Any TelemetryConfig asset in the project carries the legacy fallback folder name (only used
+        // if TelemetryPaths.ResolveMatchLogsRoot has to fall all the way back to persistentDataPath) -
+        // falls back to the shipped default so the menu still works if none is found.
         private static string TelemetryFolderName()
         {
             string[] guids = AssetDatabase.FindAssets("t:TelemetryConfig");
