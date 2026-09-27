@@ -434,11 +434,12 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
 </div>
 <div class='card' id='heatmaps-%SCOPE%'>
 <h3>Death and position heatmaps</h3>
-<p class='card-desc'>Dots plotted on a top-down render of the arena. Deaths are solid, outlined, coloured by the victim's team; positions are small translucent samples showing where players spent time. <span id='position-sample-note-%SCOPE%'></span></p>
+<p class='card-desc'>Dots plotted on a top-down render of the arena. Deaths are solid, outlined, coloured by the victim's team; positions are small translucent samples showing where players spent time, in their team's colour (tick a team to show only its players). <span id='position-sample-note-%SCOPE%'></span></p>
 <div>
 <label><input type='checkbox' id='toggle-deaths-%SCOPE%' checked> Deaths</label>
 &nbsp;&nbsp;
-<label><input type='checkbox' id='toggle-positions-%SCOPE%'> Positions</label>
+<label><input type='checkbox' id='toggle-positions-%SCOPE%' checked> Positions</label>
+&nbsp;&nbsp;<span id='position-teams-%SCOPE%'></span>
 </div>
 <div id='heatmap-legend-%SCOPE%'></div>
 <div id='arena-wrap-%SCOPE%'><canvas id='arena-canvas-%SCOPE%' width='1024' height='1024'></canvas></div>
@@ -1432,6 +1433,26 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
       });
     }
 
+    // Tudor, 2026-09-27: positions coloured by team, with a per-team filter, to see which team went where.
+    function teamRgba(team, alpha) {
+      var hex = teamColor(team).replace('#', '');
+      return 'rgba(' + parseInt(hex.substr(0, 2), 16) + ',' + parseInt(hex.substr(2, 2), 16) + ',' + parseInt(hex.substr(4, 2), 16) + ',' + alpha + ')';
+    }
+    var positionTeams = uniqueSorted(rowsFor('positions', scope).map(function (p) { return p.team; }));
+    var teamHost = id('position-teams', suffix);
+    var teamBoxes = {};
+    positionTeams.forEach(function (t) {
+      var box = el('input', { type: 'checkbox' });
+      box.checked = true;
+      teamBoxes[t] = box;
+      var label = el('label', null);
+      label.appendChild(box);
+      label.appendChild(el('span', { class: 'legend-dot', style: 'background:' + teamColor(t) + ';' }));
+      label.appendChild(document.createTextNode(teamName(t) + '  '));
+      teamHost.appendChild(label);
+      box.addEventListener('change', function () { draw(); });
+    });
+
     var ctx = canvas.getContext('2d');
     var img = new Image();
 
@@ -1444,9 +1465,11 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
     function draw() {
       ctx.drawImage(img, 0, 0, arena.pixelSize, arena.pixelSize);
       if (id('toggle-positions', suffix).checked) {
-        ctx.fillStyle = 'rgba(58,109,240,0.35)';
         var positions = rowsFor('positions', scope);
         for (var i = 0; i < positions.length; i++) {
+          var box = teamBoxes[positions[i].team];
+          if (box && !box.checked) continue;
+          ctx.fillStyle = teamRgba(positions[i].team, 0.45);
           var pp = toPixel(positions[i].x, positions[i].z);
           ctx.beginPath();
           ctx.arc(pp[0], pp[1], 3, 0, 2 * Math.PI);
