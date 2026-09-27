@@ -622,7 +622,8 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
     return out;
   }
 
-  var TEAM_COLORS = ['#3a6df0', '#e0473f', '#2fa84f', '#9a6df0'];
+  // The game's own team colours (UiTheme.teamShotColors): White, Purple, Cyan (Tudor, 2026-09-27: lines must match the names).
+  var TEAM_COLORS = ['#edf7ff', '#ad52ff', '#26f2ff', '#8c8c94'];
   function teamColor(team) {
     var i = ((team % TEAM_COLORS.length) + TEAM_COLORS.length) % TEAM_COLORS.length;
     return TEAM_COLORS[i];
@@ -1003,9 +1004,13 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
     if (chartsOk) {
       var goldDatasets = [];
       var actorKeys = Object.keys(byActor);
+      // Several players share a team colour, so each teammate gets its own dash pattern (solid, dashed, dotted, ...).
+      var DASHES = [[], [10, 5], [2, 4], [14, 4, 2, 4]];
+      var seenPerTeam = {};
       for (var k = 0; k < actorKeys.length; k++) {
         var a = byActor[actorKeys[k]];
-        goldDatasets.push({ label: a.nick + ' (' + teamName(a.team) + ')', data: a.points, borderColor: teamColor(a.team), backgroundColor: teamColor(a.team), fill: false, pointRadius: 1, tension: 0.1 });
+        var nth = seenPerTeam[a.team] = (seenPerTeam[a.team] === undefined ? 0 : seenPerTeam[a.team] + 1);
+        goldDatasets.push({ label: a.nick + ' (' + teamName(a.team) + ')', data: a.points, borderColor: teamColor(a.team), backgroundColor: teamColor(a.team), borderDash: DASHES[nth % DASHES.length], borderWidth: 2, fill: false, pointRadius: 1, tension: 0.1 });
       }
       // Review fix (item 3a): this chart's own x axis is SECONDS (row.t, above), not minutes -
       // the boundary overlay must use the same unit.
