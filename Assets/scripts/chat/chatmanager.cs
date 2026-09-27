@@ -12,6 +12,14 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     string privateReceiver = "";
 
     [SerializeField] GameObject chatPanel;
+    // 2026-09-27 bug fix: this used to be wired (in "chat manager.prefab") to the SAME GameObject as
+    // chatField's own TMP_InputField text component ("chat input/Text Area/Text") - a scene wiring
+    // mistake, not a deliberate double-use. Update() below calls text.SetActive(false) the instant
+    // chat opens, which disabled the exact object TMP_InputField renders typed characters into: you
+    // could open chat, type, and never see a single character, because the one thing on screen that
+    // would have shown it had just been turned off. There is no other "closed-chat hint" object in
+    // the prefab to point this at, so the reference is now null in the prefab and every use below is
+    // null-guarded - safe today, and safe again if a real hint object is wired in later.
     [SerializeField] GameObject text;
     [SerializeField] TMP_InputField chatField;
     [SerializeField] TextMeshProUGUI chatDisplay;
@@ -147,7 +155,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         // If the chat is closed, open it and focus on the input field
         if (!chatPanel.activeSelf)
         {
-            text.SetActive(false);
+            if (text != null) text.SetActive(false);
             chatPanel.SetActive(true);
             IsOpen = true;
             chatField.Select();  // Focus on the chat input field
@@ -167,7 +175,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         {
             chatPanel.SetActive(false);
             IsOpen = false;
-            text.SetActive(true);  // Show the text when chat is closed
+            if (text != null) text.SetActive(true);  // Show the text when chat is closed
             chatField.DeactivateInputField();  // Deactivate the input field when closing the chat
         }
     }

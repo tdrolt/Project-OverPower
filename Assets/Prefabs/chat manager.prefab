@@ -669,7 +669,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   chatPanel: {fileID: 5214122138414532893}
-  text: {fileID: 1305033116005624167}
+  text: {fileID: 0}
   chatField: {fileID: 4583322330311546549}
   chatDisplay: {fileID: 5955021184521103324}
 --- !u!1 &5165643279370163622
