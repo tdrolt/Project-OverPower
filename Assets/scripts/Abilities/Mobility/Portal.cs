@@ -5,18 +5,17 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A teleport gate placed on the ground - Tudor's Mobility spec: a 2.5m circle, up to two per
+    /// A teleport gate placed on the ground - Tudor's Mobility spec: a 2.0m circle, up to two per
     /// player, personal to whoever placed them. This class is only the networked object and the
     /// registry that lets an owner find their own pair; TeleportAbility owns the actual channel that
     /// uses them.
     ///
-    /// VISIBLE TO EVERYONE, USABLE BY ONE. Tudor's clarification: an enemy should be able to SEE a
-    /// portal - it is a readable tell, "that lane has a gate somewhere" - but never step through it.
-    /// That is why this object has no Collider and no trigger at all: TeleportAbility.OwnerTick
-    /// checks entry with a plain XZ distance against Portal.ForOwner(Owner.ActorNumber), and
-    /// OwnerTick only ever RUNS on the owner's own client (see AbilityModule's class comment on the
-    /// owner/every-client split) - "personal" falls out of who is doing the asking, not anything
-    /// this class has to enforce with a physics check of its own.
+    /// VISIBLE TO EVERYONE, USABLE BY THE OWNER'S TEAM. Tudor's clarification: an enemy should be able to SEE a
+    /// portal - it is a readable tell, "that lane has a gate somewhere" - but never step through it (Tudor, D15:
+    /// a teammate may). That is why this object has no Collider and no trigger at all: entry is a plain XZ
+    /// distance check (PortalUseRules.IsOnPortal) made by whoever wants to use it, on their own client - the owner
+    /// in TeleportAbility.OwnerTick against Portal.ForOwner(Owner.ActorNumber), a teammate in AllyPortalTraveller
+    /// against their teammates' entries. Enemies simply never run either check on it.
     ///
     /// PAIRING is a static PER-CLIENT registry keyed by owner actor number, ordered by placement
     /// (Seq) - not a paired view id carried in instantiationData, because the FIRST portal placed
@@ -29,12 +28,12 @@ namespace Overpower.Abilities
     /// </summary>
     public sealed class Portal : NetworkedDeployable
     {
-        [SerializeField, Tooltip("Diameter of the portal circle, in metres - Tudor's spec: 2.5m. The " +
+        [SerializeField, Tooltip("Diameter of the portal circle, in metres - Tudor's spec (D16): 2.0m. The " +
                  "visual ring is scaled to match. This prefab's own value only previews the size in " +
                  "the Editor; the real value travels with the placement (see TeleportAbility) so " +
                  "every client agrees on the same size even if this prefab is retuned without every " +
                  "machine rebuilding first.")]
-        private float portalDiameter = 2.5f;
+        private float portalDiameter = 2.0f;
 
         [SerializeField, Tooltip("The ring/disc visual, scaled sideways to Portal Diameter when this " +
                  "portal is placed - one prefab draws every size. Left empty draws nothing, which is " +
@@ -53,6 +52,11 @@ namespace Overpower.Abilities
         /// instantiationData; never decided here.</summary>
         public int Seq { get; private set; }
 
+        /// <summary>Seconds of standing on this portal that complete a trip - the owner's Teleport ability's Channel
+        /// Seconds, sent along with the placement (its one home) so a teammate's client uses the same number without
+        /// needing the ability equipped. 0 when the placement carried none: nobody can channel through it.</summary>
+        public float ChannelSeconds { get; private set; }
+
         private static readonly List<Portal> EmptyList = new List<Portal>();
         private static readonly Dictionary<int, List<Portal>> byOwner = new Dictionary<int, List<Portal>>();
 
@@ -63,10 +67,11 @@ namespace Overpower.Abilities
 
         protected override void OnPlaced(object[] data, PhotonMessageInfo info)
         {
-            if (data != null && data.Length >= 2)
+            if (data != null && data.Length >= 3)
             {
                 portalDiameter = (float)data[0];
                 Seq = (int)data[1];
+                ChannelSeconds = (float)data[2];
             }
             else
             {

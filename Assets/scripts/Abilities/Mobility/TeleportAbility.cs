@@ -8,7 +8,7 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// Places a personal gate on the ground; standing in it channels you to its pair. Tudor's spec:
-    /// a 2.5m circle within 5m of the player, at most two down at once, a 3-second channel, a 10-
+    /// a 2.0m circle within 5m of the player, at most two down at once, a 3-second channel, a 10-
     /// second cooldown before the gate can be used again.
     ///
     /// FIT WITH THE FRAMEWORK. Pressing Shift PLACES a portal - it does not travel. The base pool
@@ -116,6 +116,9 @@ namespace Overpower.Abilities
         // Owner only: the pure channel timer this module drives every OwnerTick.
         private PortalChannelState channelState;
 
+        // Owner only: the last "has a portal charge" answer sent to teammates, null until the first publish.
+        private bool? lastPublishedReady;
+
         // Owner only: which of the owner's own portals is currently mid-channel, or null - kept only
         // so IsActive (the HUD glow) can answer without asking PortalChannelState for its private state.
         private Portal channelingPortal;
@@ -204,6 +207,8 @@ namespace Overpower.Abilities
 
         public override void OwnerTick(float deltaTime, bool held, bool canAct)
         {
+            PublishReadyIfChanged(HasCharge);
+
             IReadOnlyList<Portal> mine = Portal.ForOwner(Owner.ActorNumber);
             Portal current = FindStandingPortal(mine);
             Portal other = current != null ? FindOther(mine, current) : null;
@@ -238,7 +243,10 @@ namespace Overpower.Abilities
             // flight - so only Unequipped removes them. A death or a stun must not touch them at all;
             // Tudor's decision.
             if (reason == InterruptReason.Unequipped)
+            {
                 DestroyOwnPortals();
+                PublishReadyIfChanged(false);
+            }
 
             // The channel marker is purely cosmetic and per-client, so it must stop on every client
             // regardless of why this was called - mirrors DebugPingAbility.Interrupt.
@@ -254,6 +262,31 @@ namespace Overpower.Abilities
                 // to follow it, but also nobody left to show a cancel to: the module (and its portals,
                 // just destroyed above) is about to be gone.
             }
+        }
+
+        /// <summary>Owner only. Publishes "I have a portal charge" as a Player Property (AllyPortalTraveller.ReadyKey)
+        /// on this player, only when the answer changes, so teammates' clients know whether my portals can be used.
+        /// Photon sends Player Properties to late joiners by itself.</summary>
+        private void PublishReadyIfChanged(bool ready)
+        {
+            if (lastPublishedReady.HasValue && lastPublishedReady.Value == ready)
+                return;
+            if (!PhotonNetwork.InRoom || !Owner.IsMine)
+                return;
+
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable { { AllyPortalTraveller.ReadyKey, ready } });
+            lastPublishedReady = ready;
+        }
+
+        /// <summary>Owner only. A teammate finished a trip through one of my portals: spends one charge, exactly as my
+        /// own trip does (so the cooldown starts and the HUD shows it). Floors at 0 - if my own trip and theirs land
+        /// in the same instant with one charge left, both trips happen and nobody is refunded (accepted race).</summary>
+        public void SpendChargeForAllyTrip()
+        {
+            if (!Owner.IsMine)
+                return;
+            SpendCharge();
+            PublishReadyIfChanged(HasCharge);
         }
 
         private void CompleteTravel(Portal from, Portal to)
@@ -306,6 +339,7 @@ namespace Overpower.Abilities
         private Portal FindStandingPortal(IReadOnlyList<Portal> mine)
         {
             Vector3 position = Owner.Root.transform.position;
+            float bodyRadius = capsule != null ? capsule.radius : 0f;
             Portal best = null;
             float bestDistanceSqr = float.MaxValue;
 
@@ -317,9 +351,9 @@ namespace Overpower.Abilities
                 Vector3 delta = p.transform.position - position;
                 delta.y = 0f;
                 float distanceSqr = delta.sqrMagnitude;
-                float radiusSqr = p.Radius * p.Radius;
 
-                if (distanceSqr <= radiusSqr && distanceSqr < bestDistanceSqr)
+                // The body touching the circle counts (Tudor D15), not only the body's middle.
+                if (PortalUseRules.IsOnPortal(p.transform.position, position, p.Radius, bodyRadius) && distanceSqr < bestDistanceSqr)
                 {
                     best = p;
                     bestDistanceSqr = distanceSqr;
@@ -333,7 +367,7 @@ namespace Overpower.Abilities
         /// portals. With the normal cap of two this is simply "the other one"; picking the newest
         /// among more than one (only possible for the one frame before a same-frame prune finishes)
         /// keeps the answer deterministic without waiting on that prune.</summary>
-        private static Portal FindOther(IReadOnlyList<Portal> mine, Portal current)
+        public static Portal FindOther(IReadOnlyList<Portal> mine, Portal current)
         {
             Portal best = null;
             foreach (Portal p in mine)
@@ -397,7 +431,7 @@ namespace Overpower.Abilities
         /// networked portal and prunes the oldest if that puts this owner over Max Portals.</summary>
         private void PlacePortal(CastPayload payload)
         {
-            object[] data = { portalTemplate.PortalDiameter, payload.IntArg };
+            object[] data = { portalTemplate.PortalDiameter, payload.IntArg, channelSeconds };
             GameObject spawned = NetworkedDeployable.Spawn(portalPrefab.name, payload.Point, data);
             if (spawned == null)
                 return; // Spawn already logged why.
@@ -422,20 +456,29 @@ namespace Overpower.Abilities
         /// <summary>Where a traveller's root lands on a portal: standing on its floor point, the same height Blink
         /// uses. Travelling to the raw ground point sank the capsule half a metre into the floor, and physics popped
         /// it out in whatever direction it could.</summary>
-        private Vector3 ArrivalRoot(Portal to) => PlayerSpaceProbe.RootOnGround(capsule, to.transform.position);
+        private Vector3 ArrivalRoot(Portal to) => ArrivalRoot(capsule, to);
+
+        /// <summary>Same as the instance ArrivalRoot, for a traveller that is not this ability's owner (a teammate
+        /// using the owner's portal - AllyPortalTraveller) and brings its own capsule.</summary>
+        public static Vector3 ArrivalRoot(CapsuleCollider travellerCapsule, Portal to) =>
+            PlayerSpaceProbe.RootOnGround(travellerCapsule, to.transform.position);
 
         /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare,
         /// and not inside a wall, house, crate, cover or (Amendment 1) a barrier - crossing by portal is allowed, so
         /// arriving fused into one is refused the same way arriving inside a wall already was. Other players don't
         /// count (Building | Barrier, not a body layer).</summary>
-        private bool IsExitClear(Portal to)
+        private bool IsExitClear(Portal to) => IsExitClear(capsule, to, Owner.Root.transform);
+
+        /// <summary>The exit check for any traveller - the owner here, or a teammate through AllyPortalTraveller
+        /// with their own capsule and root (so their own body is not what blocks the exit).</summary>
+        public static bool IsExitClear(CapsuleCollider travellerCapsule, Portal to, Transform travellerRoot)
         {
-            if (capsule == null)
+            if (travellerCapsule == null)
                 return false;
 
-            Vector3 root = ArrivalRoot(to);
-            return Overpower.Arena.ArenaSymmetry.IsInsideArena(root, capsule.radius)
-                   && !PlayerSpaceProbe.IsCapsuleBlocked(capsule, root, ArenaLayers.WallsAndBarriers, Owner.Root.transform);
+            Vector3 root = ArrivalRoot(travellerCapsule, to);
+            return Overpower.Arena.ArenaSymmetry.IsInsideArena(root, travellerCapsule.radius)
+                   && !PlayerSpaceProbe.IsCapsuleBlocked(travellerCapsule, root, ArenaLayers.WallsAndBarriers, travellerRoot);
         }
 
         // The check volume's vertical band above the grounded point - not a design tunable, the
@@ -452,7 +495,7 @@ namespace Overpower.Abilities
         ///
         /// A BOX, not a capsule like Blink's own check: Physics.OverlapCapsule's two hemispherical
         /// end caps extend a FURTHER radius beyond the two points passed to it. That is invisible for
-        /// Blink's player capsule, whose radius is well under half its height, but not for a 1.25m
+        /// Blink's player capsule, whose radius is well under half its height, but not for a 1.0m
         /// portal radius against a band only 1.7m tall - built the same way, the bottom cap would dip
         /// (radius - halfBandHeight) below the intended floor, back down into the ground itself. Once
         /// Default (the floor's own layer) is in the mask, as it now is, every placement on ordinary
@@ -467,9 +510,9 @@ namespace Overpower.Abilities
             Vector3 halfExtents = new Vector3(radius, (BlockCheckTop - BlockCheckBottom) * 0.5f, radius);
 
             // Default|Building only, as before Amendment 1 - NOT BodiesWallsAndBarriers here (arena step 5 review
-            // fix, R-3): this box is wide (a 2.5 m portal diameter), and a Tier III recess is only ~3 m deep, so
+            // fix, R-3): this box is wide (a 2.0 m portal diameter), and a Tier III recess is only ~3 m deep, so
             // checking the whole box against a barrier too refused almost every spot in the recess - a barrier
-            // anywhere near its mouth falls within 2.5 m of nearly the whole pocket behind it. That silently undid
+            // anywhere near its mouth falls within 2.0 m of nearly the whole pocket behind it. That silently undid
             // "a portal crosses a barrier" (GDD p.29) at the one place a barrier actually stands. A barrier is
             // instead refused below, at the tighter, player-sized capsule a traveller will really arrive in.
             Collider[] overlaps = Physics.OverlapBox(center, halfExtents, Quaternion.identity, blockMask, QueryTriggerInteraction.Ignore);
