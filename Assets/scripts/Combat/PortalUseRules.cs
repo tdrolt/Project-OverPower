@@ -32,6 +32,9 @@ namespace Overpower.Combat
         /// one charge. Spends only for a message about the owner's own portals, from a teammate, whose counter is
         /// newer than the last one seen from that teammate - so an echo, a repeat or an out-of-date value spends
         /// nothing.</summary>
+        /// <summary>The counter to remember for that teammate after a message: never goes backwards.</summary>
+        public static int NewLastSeen(int lastSeenCounter, int newCounter) => newCounter > lastSeenCounter ? newCounter : lastSeenCounter;
+
         public static bool ShouldSpendForAllyTrip(int lastSeenCounter, int newCounter, int targetOwnerActor, int myActor, bool writerIsTeammate)
         {
             return writerIsTeammate && targetOwnerActor == myActor && newCounter > lastSeenCounter;

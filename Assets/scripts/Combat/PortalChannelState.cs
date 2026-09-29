@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// Pure timer logic for a teleport portal's channel: standing inside your own portal for
+    /// Pure timer logic for a teleport portal's channel: standing inside a portal for
     /// channelSeconds triggers a travel. Time is injected (Tick, not Time.deltaTime) so "leaving
     /// cancels", "a stun cancels" and "the arrival portal needs you to step out before it channels
     /// again" are all provable without a scene, a Rigidbody or a frame budget - the same reason
@@ -47,7 +47,7 @@ namespace Overpower.Combat
 
         /// <summary>
         /// One tick. standingIn: the portal (by identity) the player currently physically occupies,
-        /// or null if they are in neither of their own portals. canChannel: every OTHER gate at once
+        /// or null if they are on no portal. canChannel: every OTHER gate at once
         /// - a charge is available, there is a paired portal to travel to, the player can act (not
         /// dead, stunned or silenced) - collapsed into one bool because none of them behave any
         /// differently from this class's point of view: any one of them being false cancels or
@@ -77,6 +77,8 @@ namespace Overpower.Combat
 
             bool justStarted = !Equals(channelingPortal, standingIn);
             channelingPortal = standingIn;
+            if (justStarted)
+                elapsed = 0f; // stepping straight from one portal onto another must not carry channel time over
             elapsed += deltaTime;
 
             if (elapsed >= channelSeconds)

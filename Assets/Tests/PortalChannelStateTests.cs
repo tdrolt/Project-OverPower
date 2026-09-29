@@ -168,5 +168,18 @@ namespace Overpower.Tests
 
             Assert.AreEqual(PortalChannelState.Result.Completed, result);
         }
+    
+        [Test]
+        public void SteppingStraightOntoAnotherPortalDoesNotCarryChannelTimeOver()
+        {
+            var state = NewState();
+
+            state.Tick(2.5f, A, canChannel: true);
+            var onB = state.Tick(0.6f, B, canChannel: true);
+            var stillNotDone = state.Tick(2.0f, B, canChannel: true);
+
+            Assert.AreEqual(PortalChannelState.Result.Started, onB);
+            Assert.AreEqual(PortalChannelState.Result.Progressing, stillNotDone);
+        }
     }
 }

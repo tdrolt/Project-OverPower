@@ -89,7 +89,7 @@ namespace Overpower.Abilities
             bool silenced = overheat != null && overheat.IsSilenced;
             bool canAct = CastGate.ForActor(alive, stunned, silenced) == CastBlock.None;
 
-            Portal current = FindStandingTeammatePortal(out Player portalOwner);
+            Portal current = FindStandingPortal(out Player portalOwner, out bool sameTeam);
             Portal other = null;
             bool canChannel = false;
 
@@ -100,7 +100,7 @@ namespace Overpower.Abilities
 
                 channelState.SetChannelSeconds(current.ChannelSeconds);
                 canChannel = canAct && other != null && current.ChannelSeconds > 0f
-                             && PortalUseRules.MayUse(isOwner: false, sameTeam: true, userAlive: alive, ownerHasCharge: ownerReady)
+                             && PortalUseRules.MayUse(isOwner: false, sameTeam: sameTeam, userAlive: alive, ownerHasCharge: ownerReady)
                              && TeleportAbility.IsExitClear(capsule, other, transform);
             }
 
@@ -109,9 +109,10 @@ namespace Overpower.Abilities
                 CompleteTrip(other, portalOwner);
         }
 
-        private Portal FindStandingTeammatePortal(out Player portalOwner)
+        private Portal FindStandingPortal(out Player portalOwner, out bool sameTeam)
         {
             portalOwner = null;
+            sameTeam = false;
             Portal best = null;
             float bestDistanceSqr = float.MaxValue;
             // The Rigidbody's own position, not the Transform's: TeleportTo writes the Rigidbody, and the Transform only
@@ -121,10 +122,10 @@ namespace Overpower.Abilities
 
             foreach (Player other in PhotonNetwork.PlayerListOthers)
             {
-                // Unknown teams count as not teammates: a portal is never opened to a maybe-enemy.
-                if (!Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) || !Teams.TryGetTeam(other, out _)
-                    || !Teams.AreSameTeam(PhotonNetwork.LocalPlayer, other))
-                    continue;
+                // Unknown teams count as not teammates: a portal is never opened to a maybe-enemy. Enemy portals are
+                // still found (so PortalUseRules.MayUse is the one place that refuses them).
+                bool otherIsTeammate = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && Teams.TryGetTeam(other, out _)
+                                       && Teams.AreSameTeam(PhotonNetwork.LocalPlayer, other);
 
                 foreach (Portal p in Portal.ForOwner(other.ActorNumber))
                 {
@@ -138,6 +139,7 @@ namespace Overpower.Abilities
                         best = p;
                         bestDistanceSqr = delta.sqrMagnitude;
                         portalOwner = other;
+                        sameTeam = otherIsTeammate;
                     }
                 }
             }
@@ -172,8 +174,7 @@ namespace Overpower.Abilities
             if (PortalUseRules.ShouldSpendForAllyTrip(lastSeen, use[1], use[0], photonView.OwnerActorNr, teammate))
                 (runner != null ? runner.StatusFor(AbilitySlot.Mobility) as TeleportAbility : null)?.SpendChargeForAllyTrip();
 
-            if (use[1] > lastSeen)
-                lastSeenCounter[targetPlayer.ActorNumber] = use[1];
+            lastSeenCounter[targetPlayer.ActorNumber] = PortalUseRules.NewLastSeen(lastSeen, use[1]);
         }
 
         // Unused IInRoomCallbacks members.

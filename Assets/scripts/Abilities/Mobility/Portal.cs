@@ -6,7 +6,7 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// A teleport gate placed on the ground - Tudor's Mobility spec: a 2.0m circle, up to two per
-    /// player, personal to whoever placed them. This class is only the networked object and the
+    /// player, usable by whoever placed them and their teammates. This class is only the networked object and the
     /// registry that lets an owner find their own pair; TeleportAbility owns the actual channel that
     /// uses them.
     ///

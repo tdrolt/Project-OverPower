@@ -96,6 +96,14 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheRememberedCounterNeverGoesBackwards()
+        {
+            Assert.AreEqual(7, PortalUseRules.NewLastSeen(lastSeenCounter: 5, newCounter: 7));
+            Assert.AreEqual(5, PortalUseRules.NewLastSeen(lastSeenCounter: 5, newCounter: 4));
+            Assert.AreEqual(5, PortalUseRules.NewLastSeen(lastSeenCounter: 5, newCounter: 5));
+        }
+
+        [Test]
         public void AnOlderCounterSpendsNothing()
         {
             Assert.IsFalse(PortalUseRules.ShouldSpendForAllyTrip(lastSeenCounter: 5, newCounter: 4, targetOwnerActor: 3, myActor: 3, writerIsTeammate: true));

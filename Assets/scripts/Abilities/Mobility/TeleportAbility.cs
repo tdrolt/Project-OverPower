@@ -7,7 +7,7 @@ using Overpower.Combat;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Places a personal gate on the ground; standing in it channels you to its pair. Tudor's spec:
+    /// Places a teleport gate on the ground, usable by you and your teammates; standing in it channels you to its pair. Tudor's spec:
     /// a 2.0m circle within 5m of the player, at most two down at once, a 3-second channel, a 10-
     /// second cooldown before the gate can be used again.
     ///
@@ -73,9 +73,10 @@ namespace Overpower.Abilities
         private float maxStepUp = 0.6f;
 
         [Header("Channel")]
-        [SerializeField, Tooltip("Seconds you must stand inside your own portal, without leaving, " +
+        [SerializeField, Tooltip("Seconds you (or a teammate) must stand on one of these portals, without leaving, " +
                  "before it teleports you to its pair. Interrupted by leaving the circle or by dying, " +
-                 "being stunned or silenced - see PortalChannelState.")]
+                 "being stunned or silenced - see PortalChannelState. Teammates use the same number on your portals. " +
+                 "A change only reaches portals placed after it (the value is sent when a portal is placed).")]
         private float channelSeconds = 3f;
 
         [Header("Remote visuals (cosmetic only)")]
@@ -100,6 +101,9 @@ namespace Overpower.Abilities
         // The caster's own capsule, read in OnEquip like Blink's: a portal is placed for a player to arrive on, so it
         // is checked against the real player shape.
         private CapsuleCollider capsule;
+
+        // The owner's Rigidbody, read in OnEquip: FindStandingPortal reads its position, which is up to date right after TeleportTo.
+        private Rigidbody body;
 
         // Owner only: the portal template's own numbers (diameter), read once so TryBuildCast's
         // validity check and ExecuteCast's spawn agree on the same radius without a second
@@ -147,6 +151,7 @@ namespace Overpower.Abilities
                 Debug.LogError($"[TeleportAbility] {name}: Portal Prefab '{portalPrefab.name}' has no Portal component.");
 
             capsule = Owner.Root.GetComponent<CapsuleCollider>();
+            body = Owner.Root.GetComponent<Rigidbody>();
             if (capsule == null)
                 Debug.LogError($"[TeleportAbility] {name}: the player has no CapsuleCollider - a portal cannot be " +
                                 "checked for the player who would arrive on it, so placing will always refuse.");
@@ -338,7 +343,9 @@ namespace Overpower.Abilities
 
         private Portal FindStandingPortal(IReadOnlyList<Portal> mine)
         {
-            Vector3 position = Owner.Root.transform.position;
+            // The Rigidbody's position, not the Transform's: TeleportTo writes the Rigidbody and the Transform lags a
+            // physics step, which would lift the arrival latch (same fix as AllyPortalTraveller).
+            Vector3 position = body != null ? body.position : Owner.Root.transform.position;
             float bodyRadius = capsule != null ? capsule.radius : 0f;
             Portal best = null;
             float bestDistanceSqr = float.MaxValue;
