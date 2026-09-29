@@ -80,5 +80,20 @@ namespace Overpower.Tests
             Assert.IsTrue(ShieldWindowRule.CanSee(false, 0, 1, true), "an enemy, switch on");
             Assert.IsTrue(ShieldWindowRule.CanSee(false, -1, -1, true), "anyone, switch on");
         }
+
+        [Test]
+        public void ARemoteWindowIsNotFinishedDuringItsGraceSoWastedCanStart()
+        {
+            Assert.IsFalse(ShieldWindowRule.IsFinished(Window + 0.1f, Window, false, WastedFor, Grace), "in the grace");
+            Assert.IsFalse(ShieldWindowRule.IsFinished(Window + Grace + 0.5f, Window, false, WastedFor, Grace), "Wasted showing");
+            Assert.IsFalse(ShieldWindowRule.IsFinished(1f, Window, false, WastedFor, Grace), "still armed");
+        }
+
+        [Test]
+        public void TheWindowIsFinishedOnceWastedHasRunItsSecondsOrAtOnceOnATrigger()
+        {
+            Assert.IsTrue(ShieldWindowRule.IsFinished(Window + Grace + WastedFor + 0.001f, Window, false, WastedFor, Grace), "after Wasted");
+            Assert.IsTrue(ShieldWindowRule.IsFinished(0.5f, Window, true, WastedFor, Grace), "triggered");
+        }
     }
 }

@@ -43,6 +43,16 @@ namespace Overpower.Abilities
             return new ShieldWindowView(ring, wasted);
         }
 
+        /// <summary>True once nothing more will ever show for this window: a hit set the shield off, or the ring
+        /// and then "Wasted" (after the grace) have both run their course. Not finished during the grace, so a
+        /// remote copy's "Wasted" can still start.</summary>
+        public static bool IsFinished(float elapsed, float window, bool triggered, float wastedSeconds, float grace)
+        {
+            if (triggered)
+                return true;
+            return elapsed >= window + grace + wastedSeconds;
+        }
+
         /// <summary>The armed ring is for the caster and their team always, and for everyone else only while the
         /// "Enemies see the armed ring" switch is on. An unknown team counts as not on the team.</summary>
         public static bool CanSee(bool viewerIsCaster, int viewerTeam, int casterTeam, bool enemiesSeeIt)

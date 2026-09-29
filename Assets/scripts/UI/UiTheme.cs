@@ -275,8 +275,8 @@ namespace Overpower.UI
         public float shieldWastedSeconds = 1.2f;
         [Tooltip("Size of the \"Wasted\" text (same units as the name above the health bar).")]
         public float shieldWastedTextSize = 15f;
-        [Tooltip("How high above the health bar's centre the \"Wasted\" text sits, in overhead-canvas units (the STUNNED label sits at 15.5).")]
-        public float shieldWastedY = 15.5f;
+        [Tooltip("How high above the health bar's centre the \"Wasted\" text sits, in overhead-canvas units (the STUNNED label sits at 15.5, so this is clearly above it).")]
+        public float shieldWastedY = 27f;
         [Tooltip("Colour of the weapon-icon placeholder in the silenced banner - a plain rectangle, since the " +
                  "project has no weapon-silhouette sprite yet.")]
         public Color silencedIconColor = new Color(0.85f, 0.85f, 0.85f, 0.9f);
