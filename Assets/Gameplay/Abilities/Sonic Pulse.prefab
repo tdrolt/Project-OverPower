@@ -48,6 +48,7 @@ MonoBehaviour:
   charges: 1
   knockbackDistance: 8
   knockbackSpeed: 14
+  selfPushDistance: 4
   collisionStunSeconds: 4
   coneRange: 5
   coneAngle: 60

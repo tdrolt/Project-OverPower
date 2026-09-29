@@ -35,6 +35,21 @@ namespace Overpower.Combat
         }
 
         /// <summary>
+        /// Which way a caster throws THEMSELVES when their own ability pushes them back (the sonic
+        /// pulse's self push): straight away from where they aim, flattened onto the ground plane
+        /// and normalised. An aim with no ground-plane part (zero, or straight up or down) has no
+        /// "backwards" to mean anything, so it returns Vector3.zero and the caller pushes nobody.
+        /// </summary>
+        public static Vector3 ComputeSelfPushDirection(Vector3 aimDirection)
+        {
+            aimDirection.y = 0f;
+            if (aimDirection.sqrMagnitude <= 0.0001f)
+                return Vector3.zero;
+
+            return -aimDirection.normalized;
+        }
+
+        /// <summary>
         /// True when a blocker a victim collided with should ALSO be stunned - the player-into-
         /// player half of the collision rule (Task 1.10 addendum's "Holes" section: the brief's
         /// version, which wins over the plan's "wall or enemy" wording). Three gates, all of which

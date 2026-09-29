@@ -179,5 +179,46 @@ namespace Overpower.Tests
             bool result = KnockbackResolver.ShouldStunBlocker(enemy, hasStatusReceiver: true, CasterActor, -1);
             Assert.IsTrue(result);
         }
+
+        // ---- ComputeSelfPushDirection --------------------------------------------------------------
+
+        [Test]
+        public void SelfPushGoesOppositeTheAim()
+        {
+            Vector3 result = KnockbackResolver.ComputeSelfPushDirection(Vector3.right);
+
+            Assert.AreEqual(Vector3.left, result);
+        }
+
+        [Test]
+        public void SelfPushFlattensAnAimWithAHeightComponent()
+        {
+            Vector3 result = KnockbackResolver.ComputeSelfPushDirection(new Vector3(0f, 0.7f, 2f));
+
+            Assert.AreEqual(Vector3.back, result);
+        }
+
+        [Test]
+        public void SelfPushIsNormalisedWhateverTheAimLength()
+        {
+            Vector3 result = KnockbackResolver.ComputeSelfPushDirection(new Vector3(3f, 0f, 4f));
+
+            Assert.AreEqual(1f, result.magnitude, 1e-5f);
+            Assert.AreEqual(-0.6f, result.x, 1e-5f);
+            Assert.AreEqual(-0.8f, result.z, 1e-5f);
+        }
+
+        [Test]
+        public void ZeroAimGivesNoSelfPush()
+        {
+            Assert.AreEqual(Vector3.zero, KnockbackResolver.ComputeSelfPushDirection(Vector3.zero));
+        }
+
+        [Test]
+        public void StraightUpOrDownAimGivesNoSelfPush()
+        {
+            Assert.AreEqual(Vector3.zero, KnockbackResolver.ComputeSelfPushDirection(Vector3.up));
+            Assert.AreEqual(Vector3.zero, KnockbackResolver.ComputeSelfPushDirection(Vector3.down));
+        }
     }
 }

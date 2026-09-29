@@ -53,6 +53,11 @@ namespace Overpower.Abilities
                  "impact, not a slow drift.")]
         private float knockbackSpeed = 14f;
 
+        [SerializeField, Tooltip("How far the pulse throws YOU backwards, away from where you aim, in " +
+                 "metres, at the same speed as the enemy push. Hitting a wall on the way never stuns " +
+                 "you. 0 = no self push. Tudor's call: 4, so the pulse is an escape as well as a defence.")]
+        private float selfPushDistance = 4f;
+
         [SerializeField, Tooltip("How many seconds a collision stuns for - the victim always, and " +
                  "whatever it collided with too if that is an enemy of the caster. Tudor's spec: 2.")]
         private float collisionStunSeconds = 2f;
@@ -100,6 +105,7 @@ namespace Overpower.Abilities
             base.OnValidate();
             knockbackDistance = Mathf.Max(0f, knockbackDistance);
             knockbackSpeed = Mathf.Max(0.01f, knockbackSpeed);
+            selfPushDistance = Mathf.Max(0f, selfPushDistance);
             collisionStunSeconds = Mathf.Max(0f, collisionStunSeconds);
             coneRange = Mathf.Max(0f, coneRange);
             coneAngle = Mathf.Clamp(coneAngle, 0f, 360f);
@@ -126,6 +132,8 @@ namespace Overpower.Abilities
             Vector3 forward = cast.Payload.Direction;
             int casterActor = cast.CasterActor;
             int casterTeam = cast.CasterTeam;
+
+            PushCasterBack(forward);
 
             int count = Physics.OverlapSphereNonAlloc(origin, coneRange, overlapBuffer, detectionMask,
                                                        QueryTriggerInteraction.Ignore);
@@ -169,6 +177,27 @@ namespace Overpower.Abilities
                 displaceable.Displace(pushDirection, knockbackDistance, knockbackSpeed,
                     end => HandlePushEnd(end, victim, casterActor, casterTeam));
             }
+        }
+
+        /// <summary>
+        /// The pulse throws its own caster backwards too, so it doubles as an escape. Only on the
+        /// caster's own machine (Owner.IsMine): PlayerDisplacement is owner-authoritative and the
+        /// move then replicates as the owner's ordinary movement, so no client but this one starts
+        /// it and no network traffic is added. Forced priority, because the push must happen even
+        /// mid-dash (a Voluntary request would be refused, or would lose to a running Forced move).
+        /// The end callback is deliberately empty - unlike an enemy, the caster is never stunned
+        /// for hitting a wall on the way (HandlePushEnd is not used).
+        /// </summary>
+        private void PushCasterBack(Vector3 aimDirection)
+        {
+            if (selfPushDistance <= 0f || Owner == null || !Owner.IsMine || Owner.Displacement == null)
+                return;
+
+            Vector3 direction = KnockbackResolver.ComputeSelfPushDirection(aimDirection);
+            if (direction == Vector3.zero)
+                return;
+
+            Owner.Displacement.Displace(direction, selfPushDistance, knockbackSpeed, _ => { });
         }
 
         /// <summary>True when a Building-layer collider (a wall, or cover) stands between origin and
