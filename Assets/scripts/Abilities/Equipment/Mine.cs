@@ -75,6 +75,12 @@ namespace Overpower.Abilities
                  "so it can never detonate at the caster's own feet the instant it is dropped.")]
         private float armDelaySeconds = 0.5f;
 
+        [SerializeField, Tooltip("While the mine is still arming (Arm Delay Seconds above) its model blinks: " +
+                 "this many seconds shown, then this many hidden, over and over, so anyone who can see it " +
+                 "knows it cannot go off yet. Once it is armed it stops blinking and stays shown. " +
+                 "Smaller is a faster flicker.")]
+        private float blinkPeriodSeconds = 0.15f;
+
         [SerializeField, Tooltip("Which layers this mine's trigger and explosion can catch. Default " +
                  "is everything with health - a player or a practice dummy; nothing on any other " +
                  "layer has an IDamageable to find, so widening this only costs performance.")]
@@ -190,6 +196,19 @@ namespace Overpower.Abilities
         }
 
         private void OnDestroy() => Unregister(this);
+
+        private void Update()
+        {
+            // Local only, from this mine's own placed time - no RPC. Never fights the hiding: once detonated
+            // or expired the model stays hidden, and enemies' own MineView renderer hiding is independent of
+            // the model's active state, so a mine hidden from you stays hidden whatever the blink says.
+            if (visual == null || detonation == null || detonation.Detonated || IsExpired)
+                return;
+
+            bool shown = MineArmingBlinkRule.IsShown(SecondsSincePlaced, armDelaySeconds, blinkPeriodSeconds);
+            if (visual.gameObject.activeSelf != shown)
+                visual.gameObject.SetActive(shown);
+        }
 
         private void FixedUpdate()
         {

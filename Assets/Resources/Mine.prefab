@@ -222,6 +222,7 @@ MonoBehaviour:
   triggerRadius: 1.8
   explosionRadius: 2.2
   armDelaySeconds: 1.5
+  blinkPeriodSeconds: 0.15
   detectionMask:
     serializedVersion: 2
     m_Bits: 4294967295
