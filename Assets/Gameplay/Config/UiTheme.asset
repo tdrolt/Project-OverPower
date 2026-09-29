@@ -171,6 +171,8 @@ MonoBehaviour:
   minimapNeutralLinkWidth: 2
   minimapArrowheadSize: 12
   minimapOwnMarkerSize: 18
+  minimapPackBadgeSize: 12
+  minimapPackBadgeBarFraction: 0.34
   minimapOwnMarkerColor: {r: 1, g: 0.85, b: 0.25, a: 1}
   minimapTeammateDotSize: 10
   minimapTeammateDotColor: {r: 0.45, g: 1, b: 0.45, a: 1}

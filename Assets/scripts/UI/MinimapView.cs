@@ -115,6 +115,12 @@ namespace Overpower.UI
             public float ShownRingFill = -1f;
             public Color ShownRingColor;
             public Color ShownOutlineColor;
+            /// <summary>Health pack badge (Task 4b): built the first time this zone has a pack in play, then only
+            /// recoloured (ShownPackReady: -1 not decided yet, 0 grey, 1 green) and shown or hidden.</summary>
+            public RectTransform PackBadge;
+            public Image PackBadgeBarA;
+            public Image PackBadgeBarB;
+            public int ShownPackReady = -1;
         }
 
         private sealed class LinkUi
@@ -558,6 +564,8 @@ namespace Overpower.UI
             ui.Outline.rectTransform.sizeDelta = Vector2.one * (ui.Diameter + 2f * theme.minimapBubbleOutlineWidth);
             ui.Fill.rectTransform.sizeDelta = Vector2.one * ui.Diameter;
             ui.Label.text = MinimapLayout.TierLabel(tier);
+            if (ui.PackBadge != null)
+                ui.PackBadge.anchoredPosition = MinimapLayout.PackBadgeOffset(ui.Diameter);
 
             // M7 (final review, 2026-09-25): BuildLink's two-colour seam is placed once, at build time, from each
             // end's ZoneRadius - a zone that resizes here (only the centre, IV<->III while a corner is cut) leaves
@@ -781,6 +789,8 @@ namespace Overpower.UI
                 if (!zone.Shown || zone.OutOfPlay)
                     continue;
 
+                UpdatePackBadge(zone);
+
                 int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;
                 bool attacked = presence != null && presence.IsUnderAttack(zone.Zone);
                 CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(zone.Zone), owner, attacked, nowMs,
@@ -815,6 +825,54 @@ namespace Overpower.UI
                     zone.ShownRingColor = ring;
                 }
             }
+        }
+
+        /// <summary>Task 4b: a small cross on the upper right of a bubble whose zone has a health pack in play - green
+        /// while ready, grey while taken, the same two colours as the pack in the world (HealthPackConfig is their one
+        /// home). It is a child of the bubble, so it hides with it when the zone is out of play. Built once, the first
+        /// time the pack exists; after that the colour is only written when the ready state changes.</summary>
+        private void UpdatePackBadge(ZoneUi zone)
+        {
+            HealthPackManager packs = HealthPackManager.Instance;
+            bool inPlay = packs != null && packs.Config != null && packs.TryGetPack(zone.Zone, out _, out _);
+            if (!inPlay)
+            {
+                if (zone.PackBadge != null && zone.PackBadge.gameObject.activeSelf)
+                    zone.PackBadge.gameObject.SetActive(false);
+                zone.ShownPackReady = -1;
+                return;
+            }
+            packs.TryGetPack(zone.Zone, out _, out bool ready);
+            if (zone.PackBadge == null)
+                BuildPackBadge(zone);
+            if (!zone.PackBadge.gameObject.activeSelf)
+                zone.PackBadge.gameObject.SetActive(true);
+            int state = ready ? 1 : 0;
+            if (state == zone.ShownPackReady)
+                return;
+            zone.ShownPackReady = state;
+            Color colour = ready ? packs.Config.ReadyColour : packs.Config.TakenColour;
+            zone.PackBadgeBarA.color = colour;
+            zone.PackBadgeBarB.color = colour;
+        }
+
+        /// <summary>A plus made of two bars, each with a dark copy behind it so it reads on any bubble colour.</summary>
+        private void BuildPackBadge(ZoneUi zone)
+        {
+            float size = theme.minimapPackBadgeSize;
+            float bar = size * theme.minimapPackBadgeBarFraction;
+            float outline = theme.minimapBubbleOutlineWidth * 0.5f;
+            RectTransform badge = NewRect("Health Pack", zone.Upright);
+            badge.sizeDelta = Vector2.one * size;
+            badge.anchoredPosition = MinimapLayout.PackBadgeOffset(zone.Diameter);
+            Color dark = theme.minimapBubbleOutlineColor;
+            NewImage("Outline Horizontal", badge, null, dark, 0f).rectTransform.sizeDelta = new Vector2(size + 2f * outline, bar + 2f * outline);
+            NewImage("Outline Vertical", badge, null, dark, 0f).rectTransform.sizeDelta = new Vector2(bar + 2f * outline, size + 2f * outline);
+            zone.PackBadgeBarA = NewImage("Bar Horizontal", badge, null, Color.white, 0f);
+            zone.PackBadgeBarA.rectTransform.sizeDelta = new Vector2(size, bar);
+            zone.PackBadgeBarB = NewImage("Bar Vertical", badge, null, Color.white, 0f);
+            zone.PackBadgeBarB.rectTransform.sizeDelta = new Vector2(bar, size);
+            zone.PackBadge = badge;
         }
 
         private void UpdatePlayers()

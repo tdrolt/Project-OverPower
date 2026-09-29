@@ -72,6 +72,9 @@ namespace Overpower.Match
         public int RequestsSent { get; private set; }
         public int GrantsWritten { get; private set; }
 
+        /// <summary>The pack numbers and colours (the minimap reads the ready and taken colours from here).</summary>
+        public HealthPackConfig Config => config;
+
         public IEnumerable<int> PackZones => packs.Keys;
         public bool HasPack(int zone) => packs.ContainsKey(zone);
         public Vector3 PackCentre(int zone) => packs.TryGetValue(zone, out Pack p) ? p.centre : Vector3.zero;

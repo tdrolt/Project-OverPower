@@ -191,5 +191,24 @@ namespace Overpower.Tests
             Assert.AreEqual("IV", MinimapLayout.TierLabel(4));
             Assert.AreEqual("5", MinimapLayout.TierLabel(5));
         }
+
+        [Test]
+        public void PackBadgeSitsOnTheUpperRightEdgeOfTheBubble()
+        {
+            Vector2 offset = MinimapLayout.PackBadgeOffset(24f);
+
+            Assert.Greater(offset.x, 0f);
+            Assert.Greater(offset.y, 0f);
+            Assert.AreEqual(offset.x, offset.y, 0.0001f);
+            Assert.AreEqual(12f, offset.magnitude, 0.001f, "exactly on the bubble's edge, so the label in the middle stays clear");
+        }
+
+        [Test]
+        public void PackBadgeFollowsABubbleThatChangesSize()
+        {
+            Assert.AreEqual(15f, MinimapLayout.PackBadgeOffset(30f).magnitude, 0.001f);
+            Assert.AreEqual(Vector2.zero, MinimapLayout.PackBadgeOffset(0f));
+            Assert.AreEqual(Vector2.zero, MinimapLayout.PackBadgeOffset(-5f));
+        }
     }
 }

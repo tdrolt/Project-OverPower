@@ -575,6 +575,10 @@ namespace Overpower.UI
         public float minimapArrowheadSize = 12f;
         [Tooltip("Size of your own arrow on the minimap, in canvas units. It points where you face.")]
         public float minimapOwnMarkerSize = 18f;
+        [Tooltip("Size of the little health pack cross on a bubble's upper right edge, in canvas units. Its colours (green ready, grey taken) come from the Health Pack Config.")]
+        public float minimapPackBadgeSize = 12f;
+        [Tooltip("How thick the arms of that cross are, as a fraction of its size (0.3 = a third).")]
+        [Range(0.1f, 0.6f)] public float minimapPackBadgeBarFraction = 0.34f;
         [Tooltip("Colour of your own arrow on the minimap.")]
         public Color minimapOwnMarkerColor = new Color(1f, 0.85f, 0.25f, 1f);
         [Tooltip("Diameter of a teammate's dot on the minimap, in canvas units. Enemies aren't shown.")]
