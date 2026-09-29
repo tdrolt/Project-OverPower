@@ -152,6 +152,7 @@ namespace Overpower.UI
         private RectTransform map;
         private RectTransform linksLayer;
         private RectTransform zonesLayer;
+        private RectTransform packsLayer;
         private RectTransform markersLayer;
         private RectTransform teammatesLayer;
         private RectTransform ownMarker;
@@ -503,6 +504,7 @@ namespace Overpower.UI
             // Sibling order is draw order: lines under bubbles, bubbles under player markers.
             linksLayer = NewLayer("Links", map);
             zonesLayer = NewLayer("Zones", map);
+            packsLayer = NewLayer("Health Packs", map);
             markersLayer = NewLayer("Markers", map);
             // A nested Canvas (review fix, 2026-09-17): player markers move every frame, and without this UGUI had
             // to rebuild the WHOLE minimap's batched mesh (links, zone bubbles, labels) each frame just to redraw
@@ -564,8 +566,6 @@ namespace Overpower.UI
             ui.Outline.rectTransform.sizeDelta = Vector2.one * (ui.Diameter + 2f * theme.minimapBubbleOutlineWidth);
             ui.Fill.rectTransform.sizeDelta = Vector2.one * ui.Diameter;
             ui.Label.text = MinimapLayout.TierLabel(tier);
-            if (ui.PackBadge != null)
-                ui.PackBadge.anchoredPosition = MinimapLayout.PackBadgeOffset(ui.Diameter);
 
             // M7 (final review, 2026-09-25): BuildLink's two-colour seam is placed once, at build time, from each
             // end's ZoneRadius - a zone that resizes here (only the centre, IV<->III while a corner is cut) leaves
@@ -677,7 +677,11 @@ namespace Overpower.UI
             edgeShape.localEulerAngles = new Vector3(0f, 0f, triangleRotation);
             var upright = Quaternion.Euler(0f, 0f, MinimapLayout.UprightRotationDegrees(yaw));
             foreach (ZoneUi zone in zones)
+            {
                 zone.Upright.localRotation = upright;
+                if (zone.PackBadge != null)
+                    zone.PackBadge.localRotation = upright;
+            }
         }
 
         private void RecolourOwnership()
@@ -786,10 +790,9 @@ namespace Overpower.UI
                 // M8b (final review, 2026-09-25): a hidden out-of-play bubble's Upright object is already inactive
                 // (RecolourOwnership) - computing its ring state here every frame was pure waste on a zone nothing
                 // shows.
+                UpdatePackBadge(zone);
                 if (!zone.Shown || zone.OutOfPlay)
                     continue;
-
-                UpdatePackBadge(zone);
 
                 int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;
                 bool attacked = presence != null && presence.IsUnderAttack(zone.Zone);
@@ -827,14 +830,17 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>Task 4b: a small cross on the upper right of a bubble whose zone has a health pack in play - green
-        /// while ready, grey while taken, the same two colours as the pack in the world (HealthPackConfig is their one
-        /// home). It is a child of the bubble, so it hides with it when the zone is out of play. Built once, the first
-        /// time the pack exists; after that the colour is only written when the ready state changes.</summary>
+        /// <summary>Task 4d: a small cross at the health pack's real spot on the map (the same world-to-map transform the
+        /// bubbles use), so it sits in the recess toward the map edge, not on the bubble. Green while ready, grey while
+        /// taken, the same two colours as the pack in the world (HealthPackConfig is their one home). It lives in its own
+        /// layer turned upright like the bubbles, and is hidden when the pack is out of play or its zone is hidden or
+        /// out of play. Built once, the first time the pack exists; after that the colour is only written when the
+        /// ready state changes.</summary>
         private void UpdatePackBadge(ZoneUi zone)
         {
             HealthPackManager packs = HealthPackManager.Instance;
-            bool inPlay = packs != null && packs.Config != null && packs.TryGetPack(zone.Zone, out _, out _);
+            bool inPlay = zone.Shown && !zone.OutOfPlay && packs != null && packs.Config != null
+                && packs.TryGetPack(zone.Zone, out _, out _);
             if (!inPlay)
             {
                 if (zone.PackBadge != null && zone.PackBadge.gameObject.activeSelf)
@@ -842,9 +848,9 @@ namespace Overpower.UI
                 zone.ShownPackReady = -1;
                 return;
             }
-            packs.TryGetPack(zone.Zone, out _, out bool ready);
+            packs.TryGetPack(zone.Zone, out Vector3 packWorld, out bool ready);
             if (zone.PackBadge == null)
-                BuildPackBadge(zone);
+                BuildPackBadge(zone, packWorld);
             if (!zone.PackBadge.gameObject.activeSelf)
                 zone.PackBadge.gameObject.SetActive(true);
             int state = ready ? 1 : 0;
@@ -857,14 +863,15 @@ namespace Overpower.UI
         }
 
         /// <summary>A plus made of two bars, each with a dark copy behind it so it reads on any bubble colour.</summary>
-        private void BuildPackBadge(ZoneUi zone)
+        private void BuildPackBadge(ZoneUi zone, Vector3 packWorld)
         {
             float size = theme.minimapPackBadgeSize;
             float bar = size * theme.minimapPackBadgeBarFraction;
             float outline = theme.minimapBubbleOutlineWidth * 0.5f;
-            RectTransform badge = NewRect("Health Pack", zone.Upright);
+            RectTransform badge = NewRect($"Health Pack {zone.Zone}", packsLayer);
             badge.sizeDelta = Vector2.one * size;
-            badge.anchoredPosition = MinimapLayout.PackBadgeOffset(zone.Diameter);
+            badge.anchoredPosition = MinimapLayout.WorldToMap(packWorld, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+            badge.localRotation = zone.Upright.localRotation;
             Color dark = theme.minimapBubbleOutlineColor;
             NewImage("Outline Horizontal", badge, null, dark, 0f).rectTransform.sizeDelta = new Vector2(size + 2f * outline, bar + 2f * outline);
             NewImage("Outline Vertical", badge, null, dark, 0f).rectTransform.sizeDelta = new Vector2(bar + 2f * outline, size + 2f * outline);

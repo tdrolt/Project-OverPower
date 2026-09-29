@@ -603,8 +603,8 @@ namespace Overpower.UI
         public float minimapBubbleDiameterTier1 = 36f;
         [Tooltip("Bubble diameter of a Tier 2 zone on the corner minimap, in canvas units (small in the GDD).")]
         public float minimapBubbleDiameterTier2 = 24f;
-        [Tooltip("Bubble diameter of a Tier 3 zone on the corner minimap, in canvas units (small in the GDD).")]
-        public float minimapBubbleDiameterTier3 = 24f;
+        [Tooltip("Bubble diameter of a Tier 3 zone on the corner minimap, in canvas units (small in the GDD). Kept small so the health pack cross in its recess does not touch the bubble.")]
+        public float minimapBubbleDiameterTier3 = 18f;
         [Tooltip("Bubble diameter of the Tier 4 centre zone on the corner minimap, in canvas units (medium in the GDD).")]
         public float minimapBubbleDiameterTier4 = 30f;
         [Tooltip("Width of the dark outline around each zone bubble, in canvas units. It pulses to Capture Ring Warning " +

@@ -193,22 +193,19 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void PackBadgeSitsOnTheUpperRightEdgeOfTheBubble()
+        public void ThePackDrawsTowardTheMapEdgeAndClearOfItsTierThreeBubble()
         {
-            Vector2 offset = MinimapLayout.PackBadgeOffset(24f);
+            // Measured in the arena (metres, map 340 units for 340 m): the bottom Tier III zone's centre and its
+            // health pack in the recess below it. Bubble 18 across with a 3 outline; the cross is 12 across.
+            Vector2 centre = Vector2.zero;
+            Vector2 zone = MinimapLayout.WorldToMap(new Vector3(0f, 0f, -31.84f), centre, 340f, 340f);
+            Vector2 pack = MinimapLayout.WorldToMap(new Vector3(0.75f, 0f, -50.11f), centre, 340f, 340f);
 
-            Assert.Greater(offset.x, 0f);
-            Assert.Greater(offset.y, 0f);
-            Assert.AreEqual(offset.x, offset.y, 0.0001f);
-            Assert.AreEqual(12f, offset.magnitude, 0.001f, "exactly on the bubble's edge, so the label in the middle stays clear");
-        }
-
-        [Test]
-        public void PackBadgeFollowsABubbleThatChangesSize()
-        {
-            Assert.AreEqual(15f, MinimapLayout.PackBadgeOffset(30f).magnitude, 0.001f);
-            Assert.AreEqual(Vector2.zero, MinimapLayout.PackBadgeOffset(0f));
-            Assert.AreEqual(Vector2.zero, MinimapLayout.PackBadgeOffset(-5f));
+            Assert.Greater(pack.magnitude, zone.magnitude, "the pack is farther out toward the map edge than the bubble");
+            float bubbleOuter = 18f / 2f + 3f;
+            float crossHalf = 12f / 2f;
+            Assert.Greater(Vector2.Distance(pack, zone), bubbleOuter + crossHalf, "the cross does not touch the bubble's outline");
+            Assert.Less(Mathf.Abs(pack.y), 340f / 2f, "and it is still inside the map");
         }
     }
 }

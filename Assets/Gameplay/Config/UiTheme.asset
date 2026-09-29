@@ -185,7 +185,7 @@ MonoBehaviour:
   minimapBackgroundTint: {r: 1, g: 1, b: 1, a: 0.9}
   minimapBubbleDiameterTier1: 36
   minimapBubbleDiameterTier2: 24
-  minimapBubbleDiameterTier3: 24
+  minimapBubbleDiameterTier3: 18
   minimapBubbleDiameterTier4: 30
   minimapBubbleOutlineWidth: 3
   minimapBubbleOutlineColor: {r: 0, g: 0, b: 0, a: 0.85}

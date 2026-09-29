@@ -60,14 +60,6 @@ namespace Overpower.UI
             return ((from + to) / 2f, delta.magnitude, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
         }
 
-        /// <summary>Where a bubble's health pack badge sits, relative to the bubble's centre: on the bubble's edge at
-        /// its upper right (45 degrees), so it never covers the tier label in the middle.</summary>
-        public static Vector2 PackBadgeOffset(float bubbleDiameter)
-        {
-            float onEdge = Mathf.Max(0f, bubbleDiameter) / 2f * 0.70710678f;
-            return new Vector2(onEdge, onEdge);
-        }
-
         /// <summary>The point <paramref name="distanceFromEnd"/> back from <paramref name="to"/> toward
         /// <paramref name="from"/>: where an arrowhead sits so it touches the edge of the zone it points at.</summary>
         public static Vector2 PointBeforeEnd(Vector2 from, Vector2 to, float distanceFromEnd)
