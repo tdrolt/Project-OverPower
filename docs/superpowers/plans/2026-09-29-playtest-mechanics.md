@@ -41,6 +41,10 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 | D21 | **Connection lost:** a "Connection lost - Rejoin" panel. Rejoining puts you back in the same match as the same player (same team, gold, loadout) - also after a crash and restart, within 2 minutes. Identity: a random id saved on the PC the first time the game runs (not the name, not the IP: names repeat and IPs change). Two players with the same name are fine; they're told apart by the id. | D (the id, the 2 minutes: A) |
 | D22 | When a match ends, the result screen's button takes you back to the name screen (a fresh start) instead of quitting; Escape still offers "Close the game?". | D |
 | D23 | Teleport portals show their cooldown: after any trip (owner or teammate) the pair can't be used for 10 s (the owner's 1 charge / 10 s, already the rule); while it can't, its glow turns grey for everyone, back to its colour when usable. | D (09-29, the look: grey) |
+| D24 | Health pack position: in the Tier III recess behind the capture zone, between the arena wall and the short yellow wall (drives players into the recess). A full-health player can't take it; 99/100 can (and uses it up). | D (09-29) |
+| D25 | The ultimate: an empty ultimate slot shows "No ultimate"; the go-live wipe stays; shield hits give no charge; **burning an enemy gives charge**. | D (09-29) |
+| D26 | Retaking a base during a last stand respawns the waiting teammates (as today). | D (09-29) |
+| D27 | You're out of combat when you die and when you respawn (shop, armour recharge, regen). | D (09-29) |
 | D14 | Every new number lives in an editable asset with a plain tooltip (the QA rule: "everything in ScriptableObjects"). | D |
 
 ## Rules that bind every task (from the handover, `Resources\loops\Limit Test\HANDOFF.md`)
@@ -123,6 +127,10 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 - **Check:** Play Mode: a ready pack and a taken pack on the minimap (capture).
 - **Review:** standard.
 
+### Task 4c: Health packs into the recess (D24)
+- Move each pack into its Tier III recess, between the arena wall and the short yellow wall; minimum missing health 0.
+- **Check:** capture per recess; a two-client re-take isn't needed (position only). **Review:** standard.
+
 ### Task 5a: Upgrade-tree mockups (D6) - Tudor chooses
 - Make 2-3 mockups of the weapon upgrade tree with arrows (e.g. top-down tree, left-to-right branches, radial) as one
   page (an Artifact) using the real weapon names and prices from the weapon assets. Stop and let Tudor pick.
@@ -166,6 +174,14 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
   field, reflected/indirect damage; charge lost at death or at respawn; the meter's display vs its value.
 - Report the cause with evidence before changing anything; a fix gets a test that fails without it.
 - **Review:** standard (the strongest model if the cause is networking).
+
+### Task 9a: "No ultimate" on the empty slot (D25)
+- The Ultimate slot shows "No ultimate" (text in `UiTheme`) instead of the meter's READY while nothing is equipped.
+- **Check:** Play Mode capture after go-live with no ultimate. **Review:** standard.
+
+### Task 9a2: Burning enemies charges the ultimate (D25) - networking
+- Burn damage (flamethrower, fire field) gives the dealer extra ultimate charge (a number in the ultimate's config).
+- **Review:** the strongest model (the credit crosses clients).
 
 ### Task 9b: Last stand (D17) - rules, networking
 - **Files:** `Assets/scripts/Match/Rules/MatchPhaseRules.cs` (`IsOutNow`, `SpawnCapitalFor`, `IsLastStandDeath`),
