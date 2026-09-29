@@ -28,11 +28,8 @@ namespace Overpower.Match
         public const string RequestKey = "hpReq";
         public static string PackKey(int zone) => "hp" + zone;
 
-        /// <summary>The master forgets a write of its own that never echoed after this long.</summary>
-        private const float PendingWriteSeconds = 1.5f;
-
-        /// <summary>A client stops re-asking for one pack after this many tries until it steps off it.</summary>
-        private const int MaxAttemptsPerVisit = 6;
+        /// <summary>How often a client without its player yet looks for it.</summary>
+        private const float LocalPlayerSearchSeconds = 1f;
 
         [SerializeField, Tooltip("The health pack numbers: heal amount, respawn time, pickup radius, and the look.")]
         private HealthPackConfig config;
@@ -40,6 +37,7 @@ namespace Overpower.Match
         private sealed class Pack
         {
             public int zone;
+            public string key;             // "hp" + zone, built once
             public Vector3 centre;         // the ground point in the middle of the zone
             public GameObject root;
             public Transform cross;        // spins and bobs
@@ -63,6 +61,7 @@ namespace Overpower.Match
         private Material crossMaterial;
         private Material glowMaterial;
 
+        private float nextLocalSearchAt;
         private int nextRequestId;
         private int lastHealedRequestId;
         private PlayerHealth localHealth;
@@ -81,7 +80,7 @@ namespace Overpower.Match
         /// <summary>The cross is drawn green with its glow: ready to take.</summary>
         public bool IsReadyShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.root.activeSelf && p.shownReady;
         public bool IsGlowShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.glow.activeSelf;
-        public int[] RoomValue(int zone) => ReadRoomValue(zone);
+        public int[] RoomValue(int zone) => packs.TryGetValue(zone, out Pack p) ? ReadRoomValue(p.key) : null;
 
         /// <summary>For the minimap: where a pack is and whether it is ready to take right now. False for a zone
         /// with no pack, or one that is out of play (its pack is hidden).</summary>
@@ -106,6 +105,8 @@ namespace Overpower.Match
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
+            if (crossMaterial != null) Destroy(crossMaterial);
+            if (glowMaterial != null) Destroy(glowMaterial);
         }
 
         private void Update()
@@ -123,7 +124,7 @@ namespace Overpower.Match
             foreach (Pack pack in packs.Values)
             {
                 bool inPlay = match == null || !match.IsOutOfPlay(pack.zone);
-                bool available = HealthPackRules.IsAvailable(ReadRoomValue(pack.zone), now);
+                bool available = IsPackAvailable(pack, now, match);
                 Show(pack, inPlay, available);
                 if (inPlay)
                     AnimateCross(pack);
@@ -174,7 +175,7 @@ namespace Overpower.Match
             towardMiddle = towardMiddle.sqrMagnitude > 0.0001f ? towardMiddle.normalized : Vector3.forward;
             Vector3 spot = tower + towardMiddle * config.DistanceFromTowerMetres;
             float ground = CaptureRingView.GroundHeight(spot, 0.5f);
-            var pack = new Pack { zone = zone, centre = new Vector3(spot.x, ground, spot.z) };
+            var pack = new Pack { zone = zone, key = PackKey(zone), centre = new Vector3(spot.x, ground, spot.z) };
 
             pack.root = new GameObject("Health Pack (zone " + zone + ")");
             pack.root.transform.SetParent(transform, false);
@@ -205,7 +206,7 @@ namespace Overpower.Match
             glow.name = "Glow";
             DestroyImmediate(glow.GetComponent<Collider>());
             glow.transform.SetParent(pack.root.transform, false);
-            glow.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+            glow.transform.localPosition = new Vector3(0f, config.GlowHeightMetres, 0f);
             glow.transform.localScale = new Vector3(config.GlowDiameterMetres, 0.005f, config.GlowDiameterMetres);
             var glowRenderer = glow.GetComponent<MeshRenderer>();
             glowRenderer.sharedMaterial = glowMaterial;
@@ -278,6 +279,8 @@ namespace Overpower.Match
         {
             if (localHealth == null)
             {
+                if (Time.unscaledTime < nextLocalSearchAt) return;
+                nextLocalSearchAt = Time.unscaledTime + LocalPlayerSearchSeconds;
                 foreach (PlayerHealth candidate in FindObjectsByType<PlayerHealth>(FindObjectsSortMode.None))
                     if (candidate.HasLocalAuthority) { localHealth = candidate; break; }
                 if (localHealth == null) return;
@@ -294,10 +297,11 @@ namespace Overpower.Match
                 }
 
                 bool inPlay = match == null || !match.IsOutOfPlay(pack.zone);
-                bool available = HealthPackRules.IsAvailable(ReadRoomValue(pack.zone), now);
-                if (!HealthPackRules.MayTake(localHealth.IsAlive, localHealth.Health, localHealth.MaxHealth, available, inPlay))
+                bool available = IsPackAvailable(pack, now, match);
+                if (!HealthPackRules.MayTake(localHealth.IsAlive, localHealth.Health, localHealth.MaxHealth,
+                                             config.MinimumMissingHealth, available, inPlay))
                     continue;
-                if (pack.attempts >= MaxAttemptsPerVisit)
+                if (pack.attempts >= config.MaxAttemptsPerVisit)
                     continue;
                 if (!HealthPackRules.MayRequestNow(pack.hasOutstanding, Time.unscaledTime - pack.requestSentAt, config.RetrySeconds))
                     continue;
@@ -343,22 +347,22 @@ namespace Overpower.Match
             bool inPlay = match == null || !match.IsOutOfPlay(zone);
             bool inRange = RequesterInRange(targetPlayer.ActorNumber, pack);
 
-            int[] roomValue = ReadRoomValue(zone);
+            int[] roomValue = ReadRoomValue(pack.key);
             int[] basis = pack.pending != null && Time.unscaledTime < pack.pendingUntil ? pack.pending : roomValue;
             HealthPackRules.Decision decision = HealthPackRules.Decide(basis, now, alive, inPlay, inRange,
-                                                                       targetPlayer.ActorNumber, requestId, config.RespawnMs);
+                                                                       targetPlayer.ActorNumber, requestId, config.RespawnMs, LiveAtMs(match));
             if (!decision.Granted)
                 return;
 
-            var props = new Hashtable { { PackKey(zone), decision.NewValue } };
+            var props = new Hashtable { { pack.key, decision.NewValue } };
             // Check-and-set on what the master decided from (absent = never taken): a stale basis is refused by
             // the server instead of overwriting.
-            var expected = new Hashtable { { PackKey(zone), roomValue } };
+            var expected = new Hashtable { { pack.key, roomValue } };
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expected))
                 return;
 
             pack.pending = decision.NewValue;
-            pack.pendingUntil = Time.unscaledTime + PendingWriteSeconds;
+            pack.pendingUntil = Time.unscaledTime + config.PendingWriteSeconds;
             GrantsWritten++;
         }
 
@@ -388,7 +392,7 @@ namespace Overpower.Match
 
             foreach (Pack pack in packs.Values)
             {
-                if (!propertiesThatChanged.TryGetValue(PackKey(pack.zone), out object raw) || !(raw is int[] value))
+                if (!propertiesThatChanged.TryGetValue(pack.key, out object raw) || !(raw is int[] value))
                     continue;
 
                 pack.hasOutstanding = false;
@@ -408,12 +412,18 @@ namespace Overpower.Match
 
         // ---- helpers -------------------------------------------------------------------------------
 
-        private static int[] ReadRoomValue(int zone)
+        private static int[] ReadRoomValue(string key)
         {
             Room room = PhotonNetwork.CurrentRoom;
             if (room == null) return null;
-            return room.CustomProperties.TryGetValue(PackKey(zone), out object raw) ? raw as int[] : null;
+            return room.CustomProperties.TryGetValue(key, out object raw) ? raw as int[] : null;
         }
+
+        /// <summary>0 until the match is live, then the server ms it went live: a take from before that no longer counts.</summary>
+        private static int LiveAtMs(MatchDirector match) => match != null && match.IsLive ? match.LiveAtMs : 0;
+
+        private bool IsPackAvailable(Pack pack, int now, MatchDirector match) =>
+            HealthPackRules.IsAvailable(ReadRoomValue(pack.key), now, LiveAtMs(match), config.RespawnMs);
 
         private static float FlatDistance(Vector3 a, Vector3 b)
         {

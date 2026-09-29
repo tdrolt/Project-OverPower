@@ -17,7 +17,11 @@ MonoBehaviour:
   distanceFromTowerMetres: 3.9
   pickupRadius: 1.2
   hostSlackMetres: 1.5
-  retrySeconds: 0.5
+  retrySeconds: 0.2
+  minimumMissingHealth: 10
+  maxAttemptsPerVisit: 6
+  pendingWriteSeconds: 1.5
+  glowHeightMetres: 0.05
   readyColour: {r: 0.2, g: 0.9, b: 0.3, a: 1}
   glowColour: {r: 0.2, g: 0.9, b: 0.3, a: 0.35}
   takenColour: {r: 0.5, g: 0.5, b: 0.5, a: 1}

@@ -31,7 +31,21 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float hostSlackMetres = 1.5f;
 
         [Tooltip("If the host has not answered your request after this many seconds, you ask again.")]
-        [SerializeField, Min(0.1f)] private float retrySeconds = 0.5f;
+        [SerializeField, Min(0.1f)] private float retrySeconds = 0.2f;
+
+        [Tooltip("A player must be missing at least this much health to take a pack, so a sliver of damage does not use it up. " +
+                 "0 = any damage at all. Full health never takes it.")]
+        [SerializeField, Min(0f)] private float minimumMissingHealth = 10f;
+
+        [Tooltip("How many times you ask again for a pack you are standing on before giving up until you step off it and back on.")]
+        [SerializeField, Min(1)] private int maxAttemptsPerVisit = 6;
+
+        [Tooltip("How long, in seconds, the host waits for the room to confirm the pack it just gave out before it trusts its " +
+                 "own record again. Only matters if the confirmation never arrives.")]
+        [SerializeField, Min(0.1f)] private float pendingWriteSeconds = 1.5f;
+
+        [Tooltip("How high, in metres, the glow disc sits above the ground, just enough to not flicker against it.")]
+        [SerializeField, Min(0f)] private float glowHeightMetres = 0.05f;
 
         [Tooltip("Colour of the floating cross while the pack is ready to take.")]
         [SerializeField] private Color readyColour = new Color(0.2f, 0.9f, 0.3f, 1f);
@@ -65,6 +79,10 @@ namespace Overpower.Data
         [Tooltip("How fast the cross turns, in degrees per second.")]
         [SerializeField] private float spinDegreesPerSecond = 60f;
 
+        public float MinimumMissingHealth => minimumMissingHealth;
+        public int MaxAttemptsPerVisit => maxAttemptsPerVisit;
+        public float PendingWriteSeconds => pendingWriteSeconds;
+        public float GlowHeightMetres => glowHeightMetres;
         public float HealAmount => healAmount;
         public float RespawnSeconds => respawnSeconds;
         public int RespawnMs => Mathf.RoundToInt(respawnSeconds * 1000f);

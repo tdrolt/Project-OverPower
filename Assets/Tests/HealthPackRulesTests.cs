@@ -10,31 +10,31 @@ namespace Overpower.Tests
         [Test]
         public void AliveHurtAvailableInPlayMayTake()
         {
-            Assert.IsTrue(HealthPackRules.MayTake(alive: true, health: 60f, maxHealth: 100f, available: true, zoneInPlay: true));
+            Assert.IsTrue(HealthPackRules.MayTake(alive: true, health: 60f, maxHealth: 100f, minMissing: 10f, available: true, zoneInPlay: true));
         }
 
         [Test]
         public void DeadMayNotTake()
         {
-            Assert.IsFalse(HealthPackRules.MayTake(false, 60f, 100f, true, true));
+            Assert.IsFalse(HealthPackRules.MayTake(false, 60f, 100f, 10f, true, true));
         }
 
         [Test]
         public void FullHealthMayNotTake()
         {
-            Assert.IsFalse(HealthPackRules.MayTake(true, 100f, 100f, true, true));
+            Assert.IsFalse(HealthPackRules.MayTake(true, 100f, 100f, 10f, true, true));
         }
 
         [Test]
         public void TakenPackMayNotBeTaken()
         {
-            Assert.IsFalse(HealthPackRules.MayTake(true, 60f, 100f, false, true));
+            Assert.IsFalse(HealthPackRules.MayTake(true, 60f, 100f, 10f, false, true));
         }
 
         [Test]
         public void PackInAZoneOutOfPlayMayNotBeTaken()
         {
-            Assert.IsFalse(HealthPackRules.MayTake(true, 60f, 100f, true, false));
+            Assert.IsFalse(HealthPackRules.MayTake(true, 60f, 100f, 10f, true, false));
         }
 
         // ---- how much it heals ---------------------------------------------------------------------
@@ -146,12 +146,64 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void EchoForSomeoneElseOrAnOlderRequestOrAnOldTakeDoesNotHeal()
+        public void EchoForSomeoneElseOrAnOldTakeDoesNotHeal()
         {
             Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(new[] { 40000, 4, 7 }, 3, 7, 0, 10000, 30000), "another taker");
-            Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(new[] { 40000, 3, 6 }, 3, 7, 0, 10000, 30000), "not my latest request");
             Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(new[] { 40000, 3, 7 }, 3, 7, 0, 41000, 30000), "the take is long over");
             Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(null, 3, 7, 0, 10000, 30000), "no entry");
+        }
+
+        [Test]
+        public void GrantedOnAnEarlierIdAfterARetryHealsOnce()
+        {
+            // Request 7 was granted, my retry 8 was already sent, and the echo names 7.
+            int[] granted = { 40000, 3, 7 };
+            Assert.IsTrue(HealthPackRules.EchoIsMyFreshTake(granted, 3, 8, 6, 10000, 30000));
+            Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(granted, 3, 8, 7, 10000, 30000), "already healed for 7");
+        }
+
+        [Test]
+        public void AnIdIHaveNotSentYetNeverHeals()
+        {
+            Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(new[] { 40000, 3, 9 }, 3, 8, 0, 10000, 30000));
+        }
+
+        [Test]
+        public void AStaleValueFarInTheFutureOrWrappedDoesNotHeal()
+        {
+            Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(new[] { 10000 + 30001, 3, 7 }, 3, 7, 0, 10000, 30000), "further ahead than a take can be");
+            Assert.IsTrue(HealthPackRules.EchoIsMyFreshTake(new[] { unchecked(int.MaxValue - 1000 + 30000), 3, 7 }, 3, 7, 0, int.MaxValue - 1000, 30000), "a fresh take across the wrap heals");
+            Assert.IsFalse(HealthPackRules.EchoIsMyFreshTake(new[] { unchecked(int.MaxValue - 1000 + 60000), 3, 7 }, 3, 7, 0, int.MaxValue - 1000, 30000), "wrapped but 60 s ahead");
+        }
+
+        // ---- a sliver of missing health -------------------------------------------------------------
+
+        [Test]
+        public void MissingLessThanTheMinimumMayNotTakeButAtTheMinimumMay()
+        {
+            Assert.IsFalse(HealthPackRules.MayTake(true, 99.9f, 100f, 10f, true, true), "a sliver");
+            Assert.IsFalse(HealthPackRules.MayTake(true, 90.5f, 100f, 10f, true, true), "9.5 missing");
+            Assert.IsTrue(HealthPackRules.MayTake(true, 90f, 100f, 10f, true, true), "exactly 10 missing");
+        }
+
+        [Test]
+        public void MinimumZeroMeansAnyDamageButNotFull()
+        {
+            Assert.IsTrue(HealthPackRules.MayTake(true, 99.9f, 100f, 0f, true, true));
+            Assert.IsFalse(HealthPackRules.MayTake(true, 100f, 100f, 0f, true, true));
+        }
+
+        // ---- packs reset when the match goes live ---------------------------------------------------
+
+        [Test]
+        public void ATakeFromBeforeGoLiveReadsAsAvailableButOneAfterDoesNot()
+        {
+            const int respawn = 30000;
+            int[] warmupTake = { 50000 + respawn, 3, 1 };   // taken at 50000
+            int[] liveTake = { 70000 + respawn, 3, 1 };     // taken at 70000
+            Assert.IsTrue(HealthPackRules.IsAvailable(warmupTake, 60000, 60000, respawn), "taken before go-live: fresh start");
+            Assert.IsFalse(HealthPackRules.IsAvailable(liveTake, 80000, 60000, respawn), "taken after go-live still counts");
+            Assert.IsFalse(HealthPackRules.IsAvailable(warmupTake, 55000, 0, respawn), "no go-live yet: the take counts");
         }
 
         // ---- asking ---------------------------------------------------------------------------------
@@ -159,9 +211,9 @@ namespace Overpower.Tests
         [Test]
         public void OneOutstandingRequestPerPackRetriesOnlyAfterTheDelay()
         {
-            Assert.IsTrue(HealthPackRules.MayRequestNow(false, 0f, 0.5f), "nothing outstanding");
-            Assert.IsFalse(HealthPackRules.MayRequestNow(true, 0.3f, 0.5f), "still waiting for the echo");
-            Assert.IsTrue(HealthPackRules.MayRequestNow(true, 0.5f, 0.5f), "no echo for long enough: try again");
+            Assert.IsTrue(HealthPackRules.MayRequestNow(false, 0f, 0.2f), "nothing outstanding");
+            Assert.IsFalse(HealthPackRules.MayRequestNow(true, 0.1f, 0.2f), "still waiting for the echo");
+            Assert.IsTrue(HealthPackRules.MayRequestNow(true, 0.2f, 0.2f), "no echo for long enough: try again");
         }
     }
 }

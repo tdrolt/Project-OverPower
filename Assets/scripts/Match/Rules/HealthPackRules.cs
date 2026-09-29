@@ -24,9 +24,22 @@ namespace Overpower.Match
         public static bool IsAvailable(int[] value, int nowMs) =>
             value == null || value.Length < ValueLength || unchecked(nowMs - value[TakenUntilIndex]) >= 0;
 
-        /// <summary>The player's own side: alive, hurt, and a pack that is there in a zone that is in play.</summary>
-        public static bool MayTake(bool alive, float health, float maxHealth, bool available, bool zoneInPlay) =>
-            alive && health < maxHealth && available && zoneInPlay;
+        /// <summary>Same, but a take made before the match went live no longer counts: going live is a fresh start.
+        /// liveAtMs 0 = not live yet (nothing is reset). A take's own time is takenUntil - respawn.</summary>
+        public static bool IsAvailable(int[] value, int nowMs, int liveAtMs, int respawnMs)
+        {
+            if (value == null || value.Length < ValueLength) return true;
+            if (liveAtMs != 0 && unchecked(value[TakenUntilIndex] - respawnMs - liveAtMs) < 0) return true;
+            return IsAvailable(value, nowMs);
+        }
+
+        /// <summary>The player's own side: alive, missing at least minMissing health (and always at least a little), and a
+        /// pack that is there in a zone that is in play.</summary>
+        public static bool MayTake(bool alive, float health, float maxHealth, float minMissing, bool available, bool zoneInPlay)
+        {
+            float missing = maxHealth - health;
+            return alive && missing > 0f && missing >= minMissing && available && zoneInPlay;
+        }
 
         /// <summary>How much of the pack's heal actually lands: never past the max.</summary>
         public static float HealAmount(float packAmount, float current, float max)
@@ -37,25 +50,29 @@ namespace Overpower.Match
         }
 
         /// <summary>The master: grant a request only if everything it can know holds and the pack is free
-        /// at server-now. The caller passes the pack's latest value (including any write of its own still on
-        /// its way), so a second request for the same pack sees it taken.</summary>
+        /// at server-now (available = the caller's answer, which may include the go-live reset). The caller passes
+        /// the pack's latest value (including any write of its own still on its way), so a second request for the
+        /// same pack sees it taken.</summary>
         public static Decision Decide(int[] currentValue, int nowMs, bool requesterAlive, bool zoneInPlay,
-                                      bool requesterInRange, int requesterActor, int requestId, int respawnMs)
+                                      bool requesterInRange, int requesterActor, int requestId, int respawnMs,
+                                      int liveAtMs = 0)
         {
-            if (!requesterAlive || !zoneInPlay || !requesterInRange || !IsAvailable(currentValue, nowMs))
+            if (!requesterAlive || !zoneInPlay || !requesterInRange || !IsAvailable(currentValue, nowMs, liveAtMs, respawnMs))
                 return new Decision(false, null);
             return new Decision(true, new[] { unchecked(nowMs + respawnMs), requesterActor, requestId });
         }
 
-        /// <summary>The taker's client heals when it READS the echo: the value names me, names my latest request,
-        /// this request has not healed me already, and the take is recent (a stale value from an earlier
-        /// life of the room heals nobody).</summary>
+        /// <summary>The taker's client heals when it READS the echo: the value names me, names a request I have sent
+        /// (a retry may already be out, so the granted id can be older than my latest) that has not healed me yet,
+        /// and the take is recent (a stale value from an earlier life of the room, or one further ahead than a take
+        /// can be, heals nobody).</summary>
         public static bool EchoIsMyFreshTake(int[] value, int myActor, int myLatestRequestId, int lastHealedRequestId,
                                              int nowMs, int respawnMs)
         {
             if (value == null || value.Length < ValueLength) return false;
-            if (value[TakerActorIndex] != myActor || value[RequestIdIndex] != myLatestRequestId) return false;
-            if (myLatestRequestId <= lastHealedRequestId) return false;
+            int id = value[RequestIdIndex];
+            if (value[TakerActorIndex] != myActor) return false;
+            if (id <= lastHealedRequestId || id > myLatestRequestId) return false;
             int untilNow = unchecked(value[TakenUntilIndex] - nowMs); // ms of the take still to run
             return untilNow > 0 && untilNow <= respawnMs;
         }
