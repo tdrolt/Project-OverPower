@@ -606,7 +606,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         {
             isDead = true;   // Latched before raising Died so a re-entrant hit cannot double-kill.
             armor.Clear();   // A corpse has no armor; ResetForRespawn decides what comes back.
-            MarkOutOfCombat(); // Tudor 2026-09-29: dying takes you out of combat (the shop, and everything else on this clock).
+            secondsSinceCombat = CombatClockRule.AfterDeath(RegenGate, ShopGate, LongestArmourDelay); // Tudor 2026-09-29: dying takes you out of combat.
             sourcePlayer?.AddScore(1);
             // Death clears the victim's marks (Decision 8) BEFORE Died fires, so the death credit
             // flush (PlayerCombatCredit.HandleDied, which reads MarkSecondsLeftFor per attacker while
@@ -686,7 +686,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
         statusEffects?.ClearAll();
-        MarkOutOfCombat(); // Tudor 2026-09-29: you respawn out of combat - the shop, armour recharge and regen all work at once.
+        secondsSinceCombat = CombatClockRule.AfterRespawn(RegenGate, ShopGate, LongestArmourDelay); // Tudor 2026-09-29: you respawn out of combat.
         isDead = false;
 
         // Controller decision [C]: respawn with full armor by default. RespawnWithFullArmor off
@@ -711,21 +711,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     /// Call when this player deals damage, so dealing it keeps you "in combat" the same way
     /// taking it does.
-    public void NoteDealtDamage()
-    {
-        if (!isDead) // A late credit for a hit dealt just before dying must not put a corpse back in combat.
-            secondsSinceCombat = 0f;
-    }
+    public void NoteDealtDamage() => secondsSinceCombat = CombatClockRule.AfterDealtDamage(isDead, secondsSinceCombat);
 
-    /// <summary>Sets the combat clock to "out of combat" for every reader at once (CombatClockRule): the shop's
-    /// gate, the armour's recharge delay at the current recharge level, and health regen.</summary>
-    private void MarkOutOfCombat()
-    {
-        float regenGate = gameplayConfig != null ? gameplayConfig.OutOfCombatSeconds : 0f;
-        float shopGate = gameplayConfig != null ? gameplayConfig.ShopOutOfCombatSeconds : 0f;
-        float armourDelay = armorConfig != null ? armorConfig.RechargeSecondsFor(rechargeLevel) : 0f;
-        secondsSinceCombat = CombatClockRule.OutOfCombatValue(regenGate, shopGate, armourDelay);
-    }
+    // The three thresholds every reader of the combat clock waits for (CombatClockRule decides what the clock becomes).
+    // The armour delay is the longest over ALL recharge levels, so selling armour after respawn cannot lengthen it past the clock.
+    private float RegenGate => gameplayConfig != null ? gameplayConfig.OutOfCombatSeconds : 0f;
+    private float ShopGate => gameplayConfig != null ? gameplayConfig.ShopOutOfCombatSeconds : 0f;
+    private float LongestArmourDelay => armorConfig != null ? armorConfig.MaxRechargeSeconds : 0f;
 
     /// Called by PlayerNetSync's receive side on a non-owner. Health is written directly since
     /// only the owner ever simulates it; armor goes through ArmorState.SetFromNetwork rather than

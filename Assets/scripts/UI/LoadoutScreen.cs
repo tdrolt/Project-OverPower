@@ -449,7 +449,7 @@ namespace Overpower.UI
                 return;
             // Task 5b-1 (D4): a dead player may open the shop while waiting to respawn (and an open shop stays
             // open through a death) - only the match ending closes it. The gates count as passed while dead
-            // (ShopRules.EffectiveInOwnTerritory / EffectiveSecondsSinceCombat, applied in ShopPricing.Build).
+            // (ShopRules.EffectiveInOwnTerritory, applied in ShopPricing.Build; the combat gate needs none - PlayerHealth puts the clock out of combat on death).
             if (matchUI != null && matchUI.MatchOver)
                 return; // The match is already decided - see Update()'s own MatchOver check (Task 9a review).
 
@@ -947,13 +947,14 @@ namespace Overpower.UI
 
             // Task 5b-2 (D5): the limit is ONE budget shared by both rows (ArmorUpgradePath.TotalUpgrades against
             // ArmorConfig.MaxArmorUpgrades), so both rows say where the next click sits in it, or that it is spent.
-            string limit = ArmorLimitLabel.Text(path.TotalUpgrades, armorConfig.MaxArmorUpgrades);
+            string limit = ArmorLimitLabel.Text(path.TotalUpgrades, armorConfig.MaxArmorUpgrades,
+                theme.loadoutArmorUpgradeFormat, theme.loadoutArmorMaxFormat);
             absorbText.text = path.CanUpgradeAbsorb
-                ? $"Absorb lv {playerHealth.AbsorbLevel}: {limit} ({priceLine})"
-                : $"Absorb lv {playerHealth.AbsorbLevel}: {ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit)}";
+                ? ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel, $"{limit} ({priceLine})")
+                : ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel, ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit));
             rechargeText.text = path.CanUpgradeRecharge
-                ? $"Recharge lv {playerHealth.RechargeLevel}: {limit} ({priceLine})"
-                : $"Recharge lv {playerHealth.RechargeLevel}: {ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit)}";
+                ? ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel, $"{limit} ({priceLine})")
+                : ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel, ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit));
             absorbText.color = path.CanUpgradeAbsorb && gateBlocked ? theme.mutedTextColor : theme.textColor;
             rechargeText.color = path.CanUpgradeRecharge && gateBlocked ? theme.mutedTextColor : theme.textColor;
 
@@ -963,8 +964,12 @@ namespace Overpower.UI
 
         /// <summary>What a row says when it cannot be bought: the shared limit's "N of N (max)" if the budget is
         /// spent, otherwise that this row is at its own top level.</summary>
-        private static string ArmorRowFull(int bought, int max, string limit) =>
-            bought >= max ? limit : "top level";
+        /// <summary>One armour row's text from its UiTheme format: {0} = this row's level, {1} = the status.</summary>
+        private static string ArmorRow(string format, int level, string status) =>
+            string.Format(System.Globalization.CultureInfo.InvariantCulture, format, level, status);
+
+        private string ArmorRowFull(int bought, int max, string limit) =>
+            bought >= max ? limit : theme.loadoutArmorTopLevelText;
 
         // ============================================================================================
         // Abilities (right column) - Mobility, Equipment, Ultimate, each a heading and a wrapping

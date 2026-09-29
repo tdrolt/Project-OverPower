@@ -85,10 +85,12 @@ namespace Overpower.UI
             Vector2 size = tooltipRect.sizeDelta;
             Vector2 half = canvasRect.rect.size * 0.5f;
             // Top-left corner just below-right of the cursor; flip above / left when it would leave the screen.
-            float x = local.x + 16f;
-            float y = local.y - 18f;
-            if (x + size.x > half.x) x = local.x - 8f - size.x;
-            if (y - size.y < -half.y) y = local.y + 8f + size.y;
+            Vector2 offset = theme.loadoutTooltipOffset;
+            float flipGap = theme.loadoutTooltipFlipGap;
+            float x = local.x + offset.x;
+            float y = local.y + offset.y;
+            if (x + size.x > half.x) x = local.x - flipGap - size.x;
+            if (y - size.y < -half.y) y = local.y + flipGap + size.y;
             x = Mathf.Clamp(x, -half.x, Mathf.Max(-half.x, half.x - size.x));
             y = Mathf.Clamp(y, Mathf.Min(half.y, -half.y + size.y), half.y);
             tooltipRect.anchoredPosition = new Vector2(x, y);

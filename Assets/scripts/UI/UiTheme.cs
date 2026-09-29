@@ -310,6 +310,22 @@ namespace Overpower.UI
         public float loadoutTooltipMaxWidth = 320f;
         [Tooltip("Background of the shop tooltip.")]
         public Color loadoutTooltipBackgroundColor = new Color(0.12f, 0.12f, 0.145f, 1f);
+        [Tooltip("Where the tooltip's top-left corner sits relative to the cursor, in canvas units (x right, y up: a negative y is below the cursor).")]
+        public Vector2 loadoutTooltipOffset = new Vector2(16f, -18f);
+        [Tooltip("Gap between the cursor and the tooltip when it flips to the other side of the cursor near a screen edge, in canvas units.")]
+        public float loadoutTooltipFlipGap = 8f;
+        [Tooltip("How far beside its column the arrow to a weapon's lower upgrade bows out, as a fraction of Loadout Tree Column Gap.")]
+        [Range(0.1f, 1f)] public float loadoutArrowSideLaneFactor = 0.8f;
+        [Tooltip("Armour row wording while upgrades remain. {0} = the number of the next upgrade, {1} = the limit (ArmorConfig Max Armor Upgrades).")]
+        public string loadoutArmorUpgradeFormat = "Upgrade {0} of {1}";
+        [Tooltip("Armour row wording once the limit is reached. {0} = the limit.")]
+        public string loadoutArmorMaxFormat = "{0} of {0} (max)";
+        [Tooltip("Armour row wording for a row that is at its own top level with upgrades still left in the shared limit.")]
+        public string loadoutArmorTopLevelText = "top level";
+        [Tooltip("The Absorb armour row. {0} = its level, {1} = the status text (which upgrade is next, or max).")]
+        public string loadoutArmorAbsorbRowFormat = "Absorb lv {0}: {1}";
+        [Tooltip("The Recharge armour row. {0} = its level, {1} = the status text (which upgrade is next, or max).")]
+        public string loadoutArmorRechargeRowFormat = "Recharge lv {0}: {1}";
         [Tooltip("Colour of the arrows from each weapon to the upgrades it opens in the shop's weapon tree (neutral grey, Task 5b-2).")]
         public Color loadoutArrowColor = new Color(0.42f, 0.42f, 0.47f, 1f);
         [Tooltip("Thickness of those arrows, in canvas units.")]

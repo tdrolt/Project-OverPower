@@ -114,6 +114,14 @@ MonoBehaviour:
   loadoutTooltipDelaySeconds: 1
   loadoutTooltipMaxWidth: 320
   loadoutTooltipBackgroundColor: {r: 0.12, g: 0.12, b: 0.145, a: 1}
+  loadoutTooltipOffset: {x: 16, y: -18}
+  loadoutTooltipFlipGap: 8
+  loadoutArrowSideLaneFactor: 0.8
+  loadoutArmorUpgradeFormat: Upgrade {0} of {1}
+  loadoutArmorMaxFormat: '{0} of {0} (max)'
+  loadoutArmorTopLevelText: top level
+  loadoutArmorAbsorbRowFormat: 'Absorb lv {0}: {1}'
+  loadoutArmorRechargeRowFormat: 'Recharge lv {0}: {1}'
   loadoutArrowColor: {r: 0.42, g: 0.42, b: 0.47, a: 1}
   loadoutArrowWidth: 3
   loadoutArrowHeadSize: 12

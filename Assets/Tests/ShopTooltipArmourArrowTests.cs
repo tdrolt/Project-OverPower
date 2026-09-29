@@ -87,24 +87,34 @@ namespace Overpower.Tests
 
         // ---- armour label ----
 
+        private static string L(int bought, int max) =>
+            ArmorLimitLabel.Text(bought, max, ArmorLimitLabel.DefaultUpgradeFormat, ArmorLimitLabel.DefaultMaxFormat);
+
+        [Test]
+        public void ArmourLabelUsesTheGivenFormats()
+        {
+            Assert.AreEqual("#1/2", ArmorLimitLabel.Text(0, 2, "#{0}/{1}", "full {0}"));
+            Assert.AreEqual("full 2", ArmorLimitLabel.Text(2, 2, "#{0}/{1}", "full {0}"));
+        }
+
         [Test]
         public void ArmourLabelNamesTheNextUpgradeOutOfTheLimit()
         {
-            Assert.AreEqual("Upgrade 1 of 2", ArmorLimitLabel.Text(0, 2));
-            Assert.AreEqual("Upgrade 2 of 2", ArmorLimitLabel.Text(1, 2));
+            Assert.AreEqual("Upgrade 1 of 2", L(0, 2));
+            Assert.AreEqual("Upgrade 2 of 2", L(1, 2));
         }
 
         [Test]
         public void ArmourLabelSaysMaxAtTheLimit()
         {
-            Assert.AreEqual("2 of 2 (max)", ArmorLimitLabel.Text(2, 2));
+            Assert.AreEqual("2 of 2 (max)", L(2, 2));
         }
 
         [Test]
         public void ArmourLabelFollowsTheConfiguredLimit()
         {
-            Assert.AreEqual("Upgrade 1 of 3", ArmorLimitLabel.Text(0, 3));
-            Assert.AreEqual("3 of 3 (max)", ArmorLimitLabel.Text(3, 3));
+            Assert.AreEqual("Upgrade 1 of 3", L(0, 3));
+            Assert.AreEqual("3 of 3 (max)", L(3, 3));
         }
 
         // ---- tree arrows ----
@@ -156,6 +166,77 @@ namespace Overpower.Tests
         {
             Assert.AreEqual(8f, CombatClockRule.OutOfCombatValue(6f, 8f, 5f));
             Assert.AreEqual(0f, CombatClockRule.OutOfCombatValue());
+        }
+
+        [Test]
+        public void DeathAndRespawnPutTheClockAtTheLargestGate()
+        {
+            Assert.AreEqual(6f, CombatClockRule.AfterDeath(6f, 5f, 4f));
+            Assert.AreEqual(6f, CombatClockRule.AfterRespawn(6f, 5f, 4f));
+            Assert.AreEqual(7.5f, CombatClockRule.AfterDeath(6f, 5f, 7.5f), "a long armour delay must be cleared too");
+            Assert.AreEqual(7.5f, CombatClockRule.AfterRespawn(6f, 5f, 7.5f));
+        }
+
+        [Test]
+        public void DealingDamageWhileAliveRestartsTheClock()
+        {
+            Assert.AreEqual(0f, CombatClockRule.AfterDealtDamage(false, 12f));
+        }
+
+        [Test]
+        public void DealingDamageWhileDeadLeavesTheClockAlone()
+        {
+            Assert.AreEqual(6f, CombatClockRule.AfterDealtDamage(true, 6f));
+        }
+
+        [Test]
+        public void TheLongestRechargeDelayOverAllLevelsIsUsed()
+        {
+            var config = UnityEngine.ScriptableObject.CreateInstance<Overpower.Data.ArmorConfig>();
+            try
+            {
+                typeof(Overpower.Data.ArmorConfig).GetField("rechargeSeconds", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                    .SetValue(config, new[] { 6f, 4f, 9f, 3f });
+                Assert.AreEqual(9f, config.MaxRechargeSeconds);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(config); }
+        }
+
+        // ---- arrow shape by geometry ----
+
+        private static TreeNodeBox Box(float cx, float top) => new TreeNodeBox(cx - 65f, cx + 65f, top - 64f, top);
+
+        [Test]
+        public void AnotherColumnIsAnSCurve()
+        {
+            Assert.AreEqual(TreeArrowShape.SCurve, TreeArrowShapeRule.Choose(Box(0, 0), Box(200, -100), new TreeNodeBox[0]));
+        }
+
+        [Test]
+        public void DirectlyBelowWithNothingBetweenIsStraight()
+        {
+            Assert.AreEqual(TreeArrowShape.Straight, TreeArrowShapeRule.Choose(Box(0, 0), Box(0, -100), new TreeNodeBox[0]));
+        }
+
+        [Test]
+        public void ANodeBetweenSendsTheArrowDownTheSide()
+        {
+            Assert.AreEqual(TreeArrowShape.SideLane, TreeArrowShapeRule.Choose(Box(0, 0), Box(0, -200), new[] { Box(0, -100) }));
+        }
+
+        [Test]
+        public void ANodeInAnotherColumnDoesNotForceTheSide()
+        {
+            Assert.AreEqual(TreeArrowShape.Straight, TreeArrowShapeRule.Choose(Box(0, 0), Box(0, -200), new[] { Box(160, -100) }));
+        }
+
+        [Test]
+        public void TheMiddleOfThreeChildrenSideBySideGetsAStraightArrowNotACurve()
+        {
+            var left = Box(-160, -100); var mid = Box(0, -100); var right = Box(160, -100);
+            var parent = Box(0, 0);
+            Assert.AreEqual(TreeArrowShape.SCurve, TreeArrowShapeRule.Choose(parent, left, new[] { mid, right }));
+            Assert.AreEqual(TreeArrowShape.Straight, TreeArrowShapeRule.Choose(parent, mid, new[] { left, right }));
         }
     }
 }

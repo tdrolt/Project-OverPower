@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using Overpower.Match;
 
 namespace Overpower.UI
 {
@@ -19,11 +20,13 @@ namespace Overpower.UI
         {
             public RectTransform from;
             public RectTransform to;
-            public int indexAmongSiblings;
         }
 
         private readonly List<Arrow> arrows = new List<Arrow>();
         private readonly List<Vector2> path = new List<Vector2>(32);
+        private readonly List<RectTransform> nodeRects = new List<RectTransform>();
+        private readonly List<TreeNodeBox> boxes = new List<TreeNodeBox>();
+        private readonly List<TreeNodeBox> others = new List<TreeNodeBox>();
         private readonly Vector3[] corners = new Vector3[4];
         private Vector2 headTip;
         private Vector2 headDir;
@@ -35,9 +38,9 @@ namespace Overpower.UI
 
         public int ArrowCount => arrows.Count;
 
-        public void Add(RectTransform from, RectTransform to, int indexAmongSiblings)
+        public void Add(RectTransform from, RectTransform to)
         {
-            arrows.Add(new Arrow { from = from, to = to, indexAmongSiblings = indexAmongSiblings });
+            arrows.Add(new Arrow { from = from, to = to });
             SetVerticesDirty();
         }
 
@@ -47,13 +50,33 @@ namespace Overpower.UI
         protected override void OnPopulateMesh(VertexHelper vh)
         {
             vh.Clear();
+            // Every node's box, so each arrow's shape can be chosen by where the nodes really are.
+            nodeRects.Clear();
             foreach (Arrow arrow in arrows)
             {
                 if (arrow.from == null || arrow.to == null) continue;
+                if (!nodeRects.Contains(arrow.from)) nodeRects.Add(arrow.from);
+                if (!nodeRects.Contains(arrow.to)) nodeRects.Add(arrow.to);
+            }
+            boxes.Clear();
+            foreach (RectTransform node in nodeRects)
+            {
+                Rect r = LocalRect(node);
+                boxes.Add(new TreeNodeBox(r.xMin, r.xMax, r.yMin, r.yMax));
+            }
+
+            foreach (Arrow arrow in arrows)
+            {
+                if (arrow.from == null || arrow.to == null) continue;
+                int fromIndex = nodeRects.IndexOf(arrow.from);
+                int toIndex = nodeRects.IndexOf(arrow.to);
                 Rect from = LocalRect(arrow.from);
                 Rect to = LocalRect(arrow.to);
                 if (from.width <= 0f || to.width <= 0f) continue; // Layout has not run yet.
-                BuildPath(from, to, arrow.indexAmongSiblings);
+                others.Clear();
+                for (int i = 0; i < boxes.Count; i++)
+                    if (i != fromIndex && i != toIndex) others.Add(boxes[i]);
+                BuildPath(from, to, TreeArrowShapeRule.Choose(boxes[fromIndex], boxes[toIndex], others));
                 AddStroke(vh);
             }
         }
@@ -66,12 +89,11 @@ namespace Overpower.UI
             return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
         }
 
-        private void BuildPath(Rect from, Rect to, int indexAmongSiblings)
+        private void BuildPath(Rect from, Rect to, TreeArrowShape shape)
         {
             path.Clear();
-            bool sameColumn = Mathf.Abs(to.center.x - from.center.x) < from.width * 0.25f;
             Vector2 p0, p1, p2, p3;
-            if (!sameColumn)
+            if (shape == TreeArrowShape.SCurve)
             {
                 // S-curve: leaves the weapon's bottom edge straight down, arrives at the upgrade's top edge straight down.
                 p0 = new Vector2(from.center.x, from.yMin);
@@ -80,7 +102,7 @@ namespace Overpower.UI
                 p1 = new Vector2(p0.x, midY);
                 p2 = new Vector2(p3.x, midY);
             }
-            else if (indexAmongSiblings == 0)
+            else if (shape == TreeArrowShape.Straight)
             {
                 p0 = new Vector2(from.center.x, from.yMin);
                 p3 = new Vector2(to.center.x, to.yMax);

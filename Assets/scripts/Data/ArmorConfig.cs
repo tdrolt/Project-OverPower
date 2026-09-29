@@ -84,6 +84,19 @@ namespace Overpower.Data
             return absorbLevels[Mathf.Clamp(level, 0, absorbLevels.Length - 1)];
         }
 
+        /// <summary>The longest recharge wait over ALL levels - what "out of combat" must clear so that selling
+        /// armour back to a slower level later cannot leave the clock short of the delay.</summary>
+        public float MaxRechargeSeconds
+        {
+            get
+            {
+                float max = 0f;
+                if (rechargeSeconds != null)
+                    foreach (float sec in rechargeSeconds) if (sec > max) max = sec;
+                return max;
+            }
+        }
+
         /// <summary>
         /// How long the given recharge level waits out of combat before refilling. Clamped rather
         /// than throwing, for the same reason as AbsorbFor.

@@ -108,16 +108,13 @@ namespace Overpower.UI
             graphic.color = theme.loadoutArrowColor;
             graphic.LineWidth = theme.loadoutArrowWidth;
             graphic.HeadSize = theme.loadoutArrowHeadSize;
-            graphic.SideLaneWidth = theme.loadoutTreeColumnGap * 0.8f;
+            graphic.SideLaneWidth = theme.loadoutTreeColumnGap * theme.loadoutArrowSideLaneFactor;
 
-            var childIndex = new Dictionary<int, int>();
             foreach (var (parentId, childId) in tree.Edges())
             {
                 if (!weaponNodes.TryGetValue(parentId, out WeaponNodeUi parentNode) || !weaponNodes.TryGetValue(childId, out WeaponNodeUi childNode))
                     continue;
-                childIndex.TryGetValue(parentId, out int index);
-                childIndex[parentId] = index + 1;
-                graphic.Add(parentNode.outer.rectTransform, childNode.outer.rectTransform, index);
+                graphic.Add(parentNode.outer.rectTransform, childNode.outer.rectTransform);
             }
         }
 
@@ -198,7 +195,8 @@ namespace Overpower.UI
             HoverRelay hover = go.AddComponent<HoverRelay>();
             hover.OnEnter = () => ShowWeaponHover(def);
             string tooltipKey = "w:" + def.Id;
-            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, () => def.Description, pos);
+            System.Func<string> tooltipText = () => def.Description; // Built once, not per pointer move.
+            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, tooltipText, pos);
             hover.OnExit = () => { ClearHover(); TooltipPointerLeft(tooltipKey); };
 
             return new WeaponNodeUi { button = button, outer = outer, inner = inner, label = label };
@@ -356,7 +354,8 @@ namespace Overpower.UI
             HoverRelay hover = go.AddComponent<HoverRelay>();
             hover.OnEnter = () => ShowAbilityHover(def);
             string tooltipKey = "a:" + def.Slot + ":" + def.Id;
-            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, () => def.Description, pos);
+            System.Func<string> tooltipText = () => def.Description; // Built once, not per pointer move.
+            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, tooltipText, pos);
             hover.OnExit = () => { ClearHover(); TooltipPointerLeft(tooltipKey); };
 
             return new AbilityCardUi { button = button, outer = outer, inner = inner, label = label };
