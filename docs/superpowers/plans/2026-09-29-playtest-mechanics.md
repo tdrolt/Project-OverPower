@@ -40,6 +40,7 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 | D20 | The shield ultimate shows its armed window: a visible ring/glow for its 2 s, and a "wasted" cue if nothing hit you in time. | D (the look: A) |
 | D21 | **Connection lost:** a "Connection lost - Rejoin" panel. Rejoining puts you back in the same match as the same player (same team, gold, loadout) - also after a crash and restart, within 2 minutes. Identity: a random id saved on the PC the first time the game runs (not the name, not the IP: names repeat and IPs change). Two players with the same name are fine; they're told apart by the id. | D (the id, the 2 minutes: A) |
 | D22 | When a match ends, the result screen's button takes you back to the name screen (a fresh start) instead of quitting; Escape still offers "Close the game?". | D |
+| D23 | Teleport portals show their cooldown: after any trip (owner or teammate) the pair can't be used for 10 s (the owner's 1 charge / 10 s, already the rule); while it can't, its glow turns grey for everyone, back to its colour when usable. | D (09-29, the look: grey) |
 | D14 | Every new number lives in an editable asset with a plain tooltip (the QA rule: "everything in ScriptableObjects"). | D |
 
 ## Rules that bind every task (from the handover, `Resources\loops\Limit Test\HANDOFF.md`)
@@ -94,6 +95,12 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 - **Check:** two clients on the same team: B uses A's portal pair; the charge is spent on both screens; an enemy (a
   third client, or a forced team) can't; entering at the rim works. Captures.
 - **Review:** the strongest model (networking).
+
+### Task 3c: Portals greyed while cooling down (D23)
+- **Files:** the portal's view (`Portal.cs` / its prefab visual), `UiTheme` or the portal prefab for the grey. Driven by the owner's `tpRdy` Player Property (Task 3b), so every client agrees; no RPC.
+- **Test first:** pure rule: shown usable ↔ owner has a charge.
+- **Check:** two clients: after a trip both see the pair grey for ~10 s, then coloured. Captures.
+- **Review:** standard (reads an existing property; no new shared state).
 
 ### Task 4: Health packs in the Tier III recesses (D1-D3) - networking
 - **Design:** positions come from the arena layout (the Tier III recess piece, rotated into the three thirds by the
