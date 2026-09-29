@@ -114,7 +114,9 @@ namespace Overpower.Abilities
             portalOwner = null;
             sameTeam = false;
             Portal best = null;
+            bool bestUsable = false;
             float bestDistanceSqr = float.MaxValue;
+            bool alive = lifecycle == null || lifecycle.IsAlive;
             // The Rigidbody's own position, not the Transform's: TeleportTo writes the Rigidbody, and the Transform only
             // catches up on the next physics step. Reading the stale Transform for a few frames after a trip showed the
             // traveller still standing on the DEPARTURE portal, which lifted the arrival latch and let the trip repeat.
@@ -134,9 +136,16 @@ namespace Overpower.Abilities
 
                     Vector3 delta = p.transform.position - position;
                     delta.y = 0f;
-                    if (delta.sqrMagnitude < bestDistanceSqr)
+                    bool ready = other.CustomProperties.TryGetValue(ReadyKey, out object raw) && raw is bool r && r;
+                    bool usable = PortalUseRules.MayUse(isOwner: false, sameTeam: otherIsTeammate, userAlive: alive, ownerHasCharge: ready);
+
+                    // A portal this player may use beats one it may not, so a nearer enemy portal cannot block a teammate's.
+                    // With nothing usable the nearest is still returned, so the arrival latch keeps seeing the portal the
+                    // player stands on; Update's MayUse check is what stops the channel.
+                    if (PortalUseRules.IsBetterCandidate(usable, delta.sqrMagnitude, best != null, bestUsable, bestDistanceSqr))
                     {
                         best = p;
+                        bestUsable = usable;
                         bestDistanceSqr = delta.sqrMagnitude;
                         portalOwner = other;
                         sameTeam = otherIsTeammate;

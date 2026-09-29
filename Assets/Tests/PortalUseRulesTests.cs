@@ -104,6 +104,21 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AUsablePortalBeatsANearerUnusableOne()
+        {
+            Assert.IsTrue(PortalUseRules.IsBetterCandidate(usable: true, distanceSqr: 4f, haveBest: true, bestUsable: false, bestDistanceSqr: 1f));
+            Assert.IsFalse(PortalUseRules.IsBetterCandidate(usable: false, distanceSqr: 1f, haveBest: true, bestUsable: true, bestDistanceSqr: 4f));
+        }
+
+        [Test]
+        public void BetweenTheSameKindTheNearerWinsAndTheFirstAlwaysStands()
+        {
+            Assert.IsTrue(PortalUseRules.IsBetterCandidate(true, 1f, haveBest: true, bestUsable: true, bestDistanceSqr: 4f));
+            Assert.IsFalse(PortalUseRules.IsBetterCandidate(true, 4f, haveBest: true, bestUsable: true, bestDistanceSqr: 1f));
+            Assert.IsTrue(PortalUseRules.IsBetterCandidate(false, 9f, haveBest: false, bestUsable: false, bestDistanceSqr: float.MaxValue));
+        }
+
+        [Test]
         public void AnOlderCounterSpendsNothing()
         {
             Assert.IsFalse(PortalUseRules.ShouldSpendForAllyTrip(lastSeenCounter: 5, newCounter: 4, targetOwnerActor: 3, myActor: 3, writerIsTeammate: true));
