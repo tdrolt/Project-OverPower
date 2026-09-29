@@ -1467,6 +1467,8 @@ namespace Overpower.EditorTools.Telemetry
                 if (!window.Contains(e.T)) continue;
                 if (e.Name == TelemetryKeys.Cast)
                 {
+                    // A follow-up (the AoE Zone's throw) is not a fresh cast of the ability.
+                    if (ReadInt(e.Data, TelemetryKeys.FollowUp, 0) == 1) continue;
                     int ab = ReadInt(e.Data, TelemetryKeys.AbilityId, -1);
                     if (ab >= 0) castsByAbility[ab] = castsByAbility.GetValueOrDefault(ab) + 1;
                 }

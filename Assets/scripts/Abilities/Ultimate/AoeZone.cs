@@ -66,7 +66,8 @@ namespace Overpower.Abilities
 
         [Header("Anchor")]
         [SerializeField, Tooltip("If checked, the zone follows the caster instead of staying where " +
-                 "it was cast. Tudor's spec: the zone follows, so this defaults ON.")]
+                 "it was cast. Tudor's spec: the zone follows, so this defaults ON. The throw (pressing the " +
+                 "ultimate again to throw the zone to the cursor) only works while the zone follows its caster.")]
         private bool followsCaster = true;
 
         // A thrown zone stays where it landed, so it counts as a placed deployable for the corner-close clean-up.

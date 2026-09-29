@@ -150,7 +150,7 @@ namespace Overpower.Tests
 
             var ability = tables.Abilities[0];
             Assert.AreEqual(27, ability.AbilityId);
-            Assert.AreEqual(1, ability.Casts);
+            Assert.AreEqual(1, ability.Casts); // the fixture also has a followUp cast line (a throw) at t=58.5, which is not counted
             Assert.AreEqual(15f, ability.DamageRaw, 1e-6); // the dot's raw sum - no `hit` line uses ab 27
             Assert.AreEqual(0, ability.Kills);              // the death's own ab is -1, not 27
             Assert.AreEqual(1, ability.StatusCount);

@@ -221,8 +221,10 @@ namespace Overpower.Telemetry
             if (weaponFiring != null)
                 weaponFiring.Fired += HandleFired;
             if (abilityRunner != null)
+            {
                 abilityRunner.Cast += HandleCast;
                 abilityRunner.FollowUpCast += HandleFollowUpCast;
+            }
             if (overPowerBuff != null)
             {
                 overPowerBuff.Triggered += HandleOverpowerTriggered;
@@ -272,8 +274,10 @@ namespace Overpower.Telemetry
             if (weaponFiring != null)
                 weaponFiring.Fired -= HandleFired;
             if (abilityRunner != null)
+            {
                 abilityRunner.Cast -= HandleCast;
                 abilityRunner.FollowUpCast -= HandleFollowUpCast;
+            }
             if (overPowerBuff != null)
             {
                 overPowerBuff.Triggered -= HandleOverpowerTriggered;
