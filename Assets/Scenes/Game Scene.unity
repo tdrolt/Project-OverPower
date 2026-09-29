@@ -823,6 +823,8 @@ MonoBehaviour:
   - {fileID: 291751996}
   - {fileID: 1003819558}
   - {fileID: 1363344738}
+  gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!114 &101938907
 MonoBehaviour:
   m_ObjectHideFlags: 0

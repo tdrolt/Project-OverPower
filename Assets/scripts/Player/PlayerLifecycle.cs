@@ -206,9 +206,22 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         ApplyAliveStateFromProperties();
 
-        joinCheckPending = photonView.IsMine;
+        // Task 9e (Tudor D21): a REJOINED actor (its connection dropped, or the game was closed, and it came back inside the
+        // room's rejoin window) is not a new joiner. The room kept its Player Properties (team, gold, loadout) and this is its
+        // new body (RoomManager.SpawnFreshBodyIfNoneReturns; or the old one, if the room still had it). It respawns as after a
+        // death (TryRespawnAfterRejoin below); the join-into-a-last-stand check would only judge the same thing a second time.
+        bool rejoined = photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined;
+        joinCheckPending = photonView.IsMine && !rejoined;
         if (joinCheckPending)
             TryEnterTheWaitIfJoiningALastStand();
+        if (rejoined)
+        {
+            rejoinPending = true;
+            death = true; // a body that is already "dead" must not die again on the next lethal tick
+            ApplyAliveState(false); // stands still and hidden until the respawn path below answers
+            Debug.LogWarning($"[REJOIN] actor {photonView.OwnerActorNr} has a body again - respawning as after a death");
+            TryRespawnAfterRejoin();
+        }
 
         if (photonView.IsMine)
         {
@@ -264,11 +277,27 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     }
 
     private bool joinCheckPending;
+    private bool rejoinPending;
+
+    /// <summary>Task 9e: a rejoined player comes back exactly as after a death - PlayerDied decides between the respawn
+    /// countdown (a base to respawn at, or the warm-up) and the last-stand wait (the team has no base in a live match:
+    /// the rejoiner waits like everyone else on that team, consistent with the join-into-a-last-stand rule). Asked once,
+    /// as soon as the team and the territory are known (a fresh process has neither at Start).</summary>
+    void TryRespawnAfterRejoin()
+    {
+        MatchDirector director = MatchDirector.Instance;
+        if (director == null || !director.JoinCheckReady || !Teams.TryGetTeam(photonView.Owner, out _))
+            return;
+        rejoinPending = false;
+        PlayerDied();
+    }
 
     void FixedUpdate()
     {
         if (joinCheckPending)
             TryEnterTheWaitIfJoiningALastStand();
+        if (rejoinPending)
+            TryRespawnAfterRejoin();
 
         // Continuously check for cathedral capture status
         CheckForCathedralCapture();
@@ -957,7 +986,23 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
     // Unused IInRoomCallbacks members.
     public void OnPlayerEnteredRoom(Player newPlayer) { }
-    public void OnPlayerLeftRoom(Player otherPlayer) { }
+
+    /// <summary>Task 9e: an actor whose connection dropped stays in the room as "inactive" for the rejoin window, and
+    /// PUN keeps its body. Nobody is left to write its "alive" flag, so every other client hides it and counts it as
+    /// not alive right here (PresenceRules). It comes back through the rejoiner's own respawn, which publishes the flag
+    /// again. A real leave (not inactive) still destroys the body.</summary>
+    public void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        // AmOwner, not IsMine: PUN hands a dropped player's objects to the master, so IsMine turns TRUE there for a body whose
+        // owner is gone - exactly the body this must hide.
+        if (photonView == null || photonView.AmOwner || otherPlayer == null || photonView.Owner != otherPlayer)
+            return;
+        if (PresenceRules.IsPresent(otherPlayer.IsInactive))
+            return;
+        Debug.Log($"[REJOIN] actor {otherPlayer.ActorNumber} dropped - its body is hidden and counts as not alive until it rejoins");
+        ApplyAliveState(false);
+    }
+
     public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) { }
     public void OnMasterClientSwitched(Player newMasterClient) { }
 

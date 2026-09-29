@@ -1052,6 +1052,43 @@ namespace Overpower.UI
         [Tooltip("Distance from the bottom of the Join button to the top of the tips, in reference pixels.")]
         public float nameTipsGapBelowJoin = 30f;
 
+        [Header("Connection lost and rejoin (Task 9e, Tudor D21)")]
+        [Tooltip("Title of the panel that appears when your connection to the match drops (ConnectionLostPanel).")]
+        public string connectionLostTitle = "Connection lost";
+        [Tooltip("The line under the title: what Rejoin does for you.")]
+        public string connectionLostBody = "Rejoin to come back to the same match as the same player - same team, gold and loadout. You respawn as after a death.";
+        [Tooltip("The button that reconnects and puts you back in the same match.")]
+        public string connectionLostRejoinButton = "Rejoin";
+        [Tooltip("The button that gives up your place and goes back to the name screen to join a new match.")]
+        public string connectionLostLeaveButton = "Leave";
+        [Tooltip("Shown on the panel while the reconnect is running.")]
+        public string rejoinWorkingText = "Reconnecting...";
+        [Tooltip("Shown when the rejoin cannot happen: the match is over, or the two minutes ran out and your place was given up.")]
+        public string rejoinFailedText = "The match has ended, or your place in it was given up. You can join a new match.";
+        [Tooltip("The button on the failure message that goes back to the name screen.")]
+        public string rejoinFailedOkButton = "OK";
+        [Tooltip("The name screen's button, shown while a match you dropped out of is still holding your place.")]
+        public string rejoinMatchButton = "Rejoin your match";
+        [Tooltip("Width of the connection lost panel, in reference pixels.")]
+        public float connectionLostPanelWidth = 640f;
+        [Tooltip("Fill colour of the connection lost panel.")]
+        public Color connectionLostPanelColor = new Color(0.08f, 0.08f, 0.08f, 0.95f);
+        [Tooltip("Colour of the connection lost title.")]
+        public Color connectionLostTitleColor = new Color(1f, 0.55f, 0.35f, 1f);
+        [Tooltip("Text size of the connection lost title, in reference pixels.")]
+        [Min(8f)] public float connectionLostTitleSize = 34f;
+        [Tooltip("Text size of the line under the title, in reference pixels.")]
+        [Min(8f)] public float connectionLostBodySize = 22f;
+        [Tooltip("Size of the connection lost panel's Rejoin / Leave / OK buttons, in reference pixels.")]
+        public Vector2 rejoinButtonSize = new Vector2(260f, 52f);
+        [Tooltip("Size of the name screen's Rejoin your match button, in reference pixels. Wider than the panel's buttons: the " +
+                 "name screen's font is wide and would wrap the label.")]
+        public Vector2 rejoinMatchButtonSize = new Vector2(420f, 52f);
+        [Tooltip("Fill colour of the Rejoin buttons - the same affirmative green the match Start button uses.")]
+        public Color rejoinButtonColor = new Color(0.16f, 0.45f, 0.25f, 0.95f);
+        [Tooltip("Distance from the top of the name box to the bottom of the Rejoin your match button, in reference pixels.")]
+        public float rejoinButtonGapAboveNameBox = 16f;
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why

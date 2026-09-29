@@ -4,6 +4,7 @@ using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Match;
 using Overpower.Net;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
@@ -72,6 +73,14 @@ namespace Overpower.Abilities
             capsule = GetComponent<CapsuleCollider>();
             body = GetComponent<Rigidbody>();
             runner = GetComponent<AbilityRunner>();
+
+            // Task 9e: the static counter above survives a rebuilt body but not a restarted game, while the portal owners
+            // still remember the last counter this actor wrote ("tpUse" is a Player Property the room kept). Count on
+            // from there, or the first trips after a restart would be ignored as old.
+            if (photonView.IsMine && PhotonNetwork.LocalPlayer != null
+                && PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(UseKey, out object useRaw)
+                && useRaw is int[] use && use.Length >= 2)
+                tripCounter = RejoinRules.SeedCounter(tripCounter, use[1]);
         }
 
         private void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
@@ -124,6 +133,11 @@ namespace Overpower.Abilities
 
             foreach (Player other in PhotonNetwork.PlayerListOthers)
             {
+                // Task 9e: a player whose connection dropped keeps their portals standing, but nobody is there to pay the
+                // charge (their "ready" flag would read whatever it last was) - a portal of an absent player is not usable.
+                if (!PresenceRules.IsPresent(other.IsInactive))
+                    continue;
+
                 // Unknown teams count as not teammates: a portal is never opened to a maybe-enemy. Enemy portals are
                 // still found (so PortalUseRules.MayUse is the one place that refuses them).
                 bool otherIsTeammate = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && Teams.TryGetTeam(other, out _)

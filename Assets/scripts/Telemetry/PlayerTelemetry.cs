@@ -1053,7 +1053,9 @@ namespace Overpower.Telemetry
             if (!alive)
                 return; // Death itself is logged from HandleDied above, off PlayerHealth.Died.
 
-            float timeDead = Time.time - deathTime;
+            // Task 9e: a rejoined player's fresh body never saw the death (no Died event on this instance), so deathTime is
+            // still 0 and the subtraction would read "dead since the process started". No known death = no time dead.
+            float timeDead = deathTime > 0f ? Time.time - deathTime : 0f;
             aliveSinceTime = Time.time;
 
             if (MatchTelemetry.Instance == null)

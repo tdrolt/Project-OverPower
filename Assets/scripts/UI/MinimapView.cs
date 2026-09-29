@@ -904,7 +904,9 @@ namespace Overpower.UI
                     Player player = pair.Value;
                     if (player.IsLocal || !Teams.TryGetTeam(player, out int team) || team != myTeam)
                         continue;
-                    if (player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool isAlive && !isAlive)
+                    // Task 9e: a teammate whose connection dropped is not on the map (PresenceRules), whatever "alive" they last wrote.
+                    bool? aliveFlag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool isAlive ? isAlive : (bool?)null;
+                    if (!PresenceRules.CountsAsAlive(player.IsInactive, aliveFlag))
                         continue;
                     PhotonView view = PlayerLookup.GetPhotonViewFor(player.ActorNumber);
                     if (view == null)

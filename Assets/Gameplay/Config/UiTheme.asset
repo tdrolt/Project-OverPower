@@ -343,3 +343,20 @@ MonoBehaviour:
   quitNoText: No
   matchLogSavedText: 'Your match log is saved: {0} - send this file to Tudor.'
   openLogFolderText: Open folder
+  connectionLostTitle: Connection lost
+  connectionLostBody: Rejoin to come back to the same match as the same player - same team, gold and loadout. You respawn as after a death.
+  connectionLostRejoinButton: Rejoin
+  connectionLostLeaveButton: Leave
+  rejoinWorkingText: Reconnecting...
+  rejoinFailedText: The match has ended, or your place in it was given up. You can join a new match.
+  rejoinFailedOkButton: OK
+  rejoinMatchButton: Rejoin your match
+  connectionLostPanelWidth: 640
+  connectionLostPanelColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.95}
+  connectionLostTitleColor: {r: 1, g: 0.55, b: 0.35, a: 1}
+  connectionLostTitleSize: 34
+  connectionLostBodySize: 22
+  rejoinButtonSize: {x: 260, y: 52}
+  rejoinMatchButtonSize: {x: 420, y: 52}
+  rejoinButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
+  rejoinButtonGapAboveNameBox: 16

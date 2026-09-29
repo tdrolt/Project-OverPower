@@ -2,8 +2,10 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
+using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
+using Overpower.UI;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 public class RoomManager : MonoBehaviourPunCallbacks
@@ -24,8 +26,40 @@ public class RoomManager : MonoBehaviourPunCallbacks
     public const int TeamSize = 3;         // hard cap per team; 3 teams x 3 = the room's 9
     private const int NoFreeTeam = -1;
 
+    [Header("Rejoin (Task 9e)")]
+    [Tooltip("Read for the rejoin window (Connection > Rejoin Window Seconds): how long the room keeps a dropped player's place.")]
+    [SerializeField] private GameplayConfig gameplayConfig;
+
+    [Tooltip("Read for the Connection lost panel and the name screen's Rejoin your match button.")]
+    [SerializeField] private UiTheme theme;
+
+    /// <summary>The client side of coming back after a drop (Task 9e). The name screen asks it whether to offer a rejoin.</summary>
+    public RejoinController Rejoin { get; private set; }
+
+    /// <summary>Seconds the room keeps a dropped player's place: RoomOptions.PlayerTtl, and how long the name screen offers
+    /// "Rejoin your match". One home: GameplayConfig.</summary>
+    public float RejoinWindowSeconds => gameplayConfig != null ? gameplayConfig.RejoinWindowSeconds : 0f;
+
+    /// <summary>How long a rejoined player waits for PUN to hand their old body back before spawning a fresh one.</summary>
+    private const float BodyReturnWaitSeconds = 1.5f;
+
+    void Awake()
+    {
+        // Created in Awake, not Start: the name screen (JoinGameUI.Start) subscribes to it and Start order is not fixed.
+        Rejoin = gameObject.AddComponent<RejoinController>();
+        Rejoin.Init(theme, RejoinWindowSeconds);
+    }
+
     void Start()
     {
+        if (gameplayConfig == null)
+            Debug.LogError("[REJOIN] RoomManager has no GameplayConfig - rooms are created with no rejoin window (a dropped player is removed at once).");
+
+        // The random id kept on this install is the Photon user id: it is what lets the server give a dropped player their own
+        // place back. Set before connecting. Only its first 8 characters are ever logged.
+        PhotonNetwork.AuthValues = new Photon.Realtime.AuthenticationValues(PlayerIdentity.UserId);
+        Debug.Log($"[REJOIN] user id {PlayerIdRule.ForLog(PlayerIdentity.UserId)}..., rejoin window {RejoinWindowSeconds:0} s");
+
         // Default is 10 Hz, which makes the remote position a staircase updating once per
         // 100 ms. 20 Hz halves that interval and is the single cheapest smoothness win.
         // Must stay <= SendRate (default 30).
@@ -54,17 +88,61 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinRandomFailed(short returnCode, string message)
     {
-        Debug.Log("No room found, creating one.");
+        Debug.Log($"No room found ({returnCode}), creating one.");
         string roomName = "Room_" + Random.Range(1000, 9999);
         RoomOptions options = new RoomOptions();
         options.MaxPlayers = (byte)(TeamSize * 3);   // 3 teams at the hard cap
+        // Task 9e (Tudor D21): a player whose connection drops stays in the room as an inactive actor for this long, keeping
+        // their team, gold and loadout (Player Properties) and their body, and can come back as the same player. Part of the
+        // room's options, so every build in a room must match this one.
+        options.PlayerTtl = RejoinRules.PlayerTtlMs(RejoinWindowSeconds);
         PhotonNetwork.CreateRoom(roomName, options, TypedLobby.Default);
     }
 
     public override void OnJoinedRoom()
     {
         Debug.Log($"Joined Room: {PhotonNetwork.CurrentRoom.Name}");
+
+        // Task 9e: the same actor coming back (ReconnectAndRejoin / RejoinRoom) is not a new player. Its team, gold and loadout
+        // are still Player Properties in the room, so no team is picked. Its old body was removed by the master when the drop
+        // was noticed (RejoinController), so a new one is spawned on its own team a moment from now
+        // (SpawnFreshBodyIfNoneReturns); if the room still holds the buffered spawn, PUN hands that body back instead and
+        // nothing is spawned. Either way PlayerLifecycle respawns it as after a death.
+        if (PhotonNetwork.LocalPlayer.HasRejoined)
+        {
+            Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back - no new team pick, getting a body");
+            ReseatLocalPlayerIfTeamClosed(); // a lobby whose mode was switched to two teams while this player was away
+            StartCoroutine(SpawnFreshBodyIfNoneReturns());
+            return;
+        }
+
         AssignTeamAndSpawnPlayer();
+    }
+
+    /// <summary>Task 9e: the returning player's body. The master removes a dropped player's body (and with it the room's buffered
+    /// spawn), so normally nothing comes back and this spawns a fresh one on the team the room still holds for them - exactly
+    /// as a new joiner would, but without picking a team again. If the buffered spawn is still there (the master had not
+    /// noticed the drop), PUN hands the old body back within a moment and this does nothing.</summary>
+    private System.Collections.IEnumerator SpawnFreshBodyIfNoneReturns()
+    {
+        int actor = PhotonNetwork.LocalPlayer.ActorNumber;
+        float waited = 0f;
+        while (PhotonNetwork.InRoom)
+        {
+            bool hasBody = PlayerLookup.GetPhotonViewFor(actor) != null;
+            if (hasBody)
+                yield break;
+            if (RejoinRules.NeedsFallbackBody(hasBody, waited, BodyReturnWaitSeconds))
+                break;
+            waited += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        if (!PhotonNetwork.InRoom || !Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int team))
+            yield break;
+
+        Debug.Log($"[REJOIN] no old body came back - spawning a new one on team {team}");
+        SpawnPlayerOnTeam(team);
     }
 
     /// <summary>Review round 2: Photon carries the local player's own Custom Properties into the
@@ -93,6 +171,15 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// changes it themselves, not a fact about the match just played.</summary>
     public override void OnLeftRoom()
     {
+        // Task 9e: this also fires when the connection drops (or the game closes). That is not a new match: the room keeps this
+        // player's Player Properties for the rejoin window and gives them back on a rejoin, so resetting them here (and
+        // reading them back later) would only risk the very state a rejoin exists to keep. Only a deliberate leave resets.
+        if (RejoinRules.LeaveIsADisconnect(PhotonNetwork.NetworkClientState))
+        {
+            Debug.Log("[REJOIN] connection dropped - match properties kept for a rejoin");
+            return;
+        }
+
         var props = new Hashtable
         {
             { PlayerLifecycle.AliveKey, true },
@@ -115,12 +202,17 @@ public class RoomManager : MonoBehaviourPunCallbacks
         if (teamID == NoFreeTeam)
         {
             Debug.LogWarning("[TEAM] no free slot in any team, leaving the room");
-            PhotonNetwork.LeaveRoom();
+            PhotonNetwork.LeaveRoom(becomeInactive: false); // turned away: never hold a place for someone who was never in
             return;
         }
 
         Debug.Log($"[TEAM] assigned team {teamID} on join");
 
+        SpawnPlayerOnTeam(teamID);
+    }
+
+    void SpawnPlayerOnTeam(int teamID)
+    {
         if (!ValidateTeamResources(teamID)) return;
 
         GameObject player = PhotonNetwork.Instantiate(

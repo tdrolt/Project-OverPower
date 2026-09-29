@@ -322,6 +322,21 @@ namespace Overpower.Match
             return body != null ? body.position : player.transform.position;
         }
 
+        /// <summary>Task 9e: this player's own request counter lives on this machine and starts at 0 in a fresh process, but
+        /// the master remembers the last id it decided for this ACTOR (lastHandledByActor) and drops anything not above it.
+        /// A rejoined player's "hpReq" Player Property still holds the last id it sent, so continue counting from there -
+        /// otherwise its first few pack requests after a restart would look old and be ignored.</summary>
+        public override void OnJoinedRoom()
+        {
+            if (PhotonNetwork.LocalPlayer == null
+                || !PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(RequestKey, out object raw)
+                || !(raw is int[] last) || last.Length < 2)
+                return;
+
+            nextRequestId = Overpower.Match.RejoinRules.SeedCounter(nextRequestId, last[1]);
+            lastHealedRequestId = Overpower.Match.RejoinRules.SeedCounter(lastHealedRequestId, last[1]);
+        }
+
         // ---- deciding (master only) ----------------------------------------------------------------
 
         public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)

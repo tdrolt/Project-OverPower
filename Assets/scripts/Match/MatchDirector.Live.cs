@@ -373,7 +373,8 @@ namespace Overpower.Match
             if (room == null)
                 return countMembersScratch;
             foreach (System.Collections.Generic.KeyValuePair<int, Player> pair in room.Players)
-                if (Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < countMembersScratch.Length)
+                // Task 9e: a player whose connection dropped is not "here" for the lobby (PresenceRules.CountsInTheLobby).
+                if (PresenceRules.CountsInTheLobby(pair.Value.IsInactive) && Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < countMembersScratch.Length)
                     countMembersScratch[t]++;
             return countMembersScratch;
         }

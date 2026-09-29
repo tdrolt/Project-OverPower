@@ -263,6 +263,10 @@ namespace Overpower.Match
 
         public override void OnPlayerLeftRoom(Player otherPlayer) => MasterRecompute();
 
+        /// <summary>Task 9e: a dropped member coming back is a change in who counts as dead, with no Player Property
+        /// change of its own to trigger the recompute.</summary>
+        public override void OnPlayerEnteredRoom(Player newPlayer) => MasterRecompute();
+
         public override void OnMasterClientSwitched(Player newMasterClient)
         {
             // Pending-write bookkeeping belonged to the old master's writes, not ours - same
@@ -610,8 +614,10 @@ namespace Overpower.Match
                     // (with no base that countdown is no way back). A missing alive key means alive; a missing lastStand
                     // key means not waiting.
                     bool waiting = p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool b && b;
-                    bool notAlive = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object aliveRaw) && aliveRaw is bool a && !a;
-                    if (!waiting && !notAlive)
+                    bool? aliveFlag = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object aliveRaw) && aliveRaw is bool a ? a : (bool?)null;
+                    // Task 9e: a member whose connection dropped (inactive, kept for the rejoin window) is dead here whatever
+                    // "alive" they last wrote - PresenceRules.CountsAsDead. With no base the team is out once all its members are.
+                    if (!PresenceRules.CountsAsDead(p.IsInactive, waiting, aliveFlag))
                         continue;
                     dead++;
                     if (waiting)

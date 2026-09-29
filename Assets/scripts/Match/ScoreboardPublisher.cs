@@ -65,6 +65,11 @@ namespace Overpower.Match
             body = GetComponent<Rigidbody>();
             tally = new ScoreTally();
             throttle = new ScorePublishThrottle(FallbackPublishesPerSecond);
+
+            // Task 9e: a rejoined player continues their own numbers - the room kept their "sb" Player Property.
+            if (photonView != null && photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined
+                && PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScoreboardRules.Key, out object kept))
+                tally.Restore(kept as int[]);
         }
 
         private void OnEnable()

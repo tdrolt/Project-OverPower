@@ -78,7 +78,14 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         if (weaponFiring != null && weaponFiring.Weapon != null)
             startingWeaponId = weaponFiring.Weapon.Id;
 
-        if (photonView.IsMine)
+        if (photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined)
+        {
+            // Task 9e (Tudor D21): a REJOINED player keeps their loadout - the room kept their Player Properties, so this is
+            // the same read a late joiner does (falling back to the prefab's default only for a key that was never set),
+            // never the starting-kit publish below, which would overwrite what they had bought.
+            ApplyFromProperties(PhotonNetwork.LocalPlayer.CustomProperties, onlyKeysPresent: false);
+        }
+        else if (photonView.IsMine)
         {
             // Publish what the prefab starts with, so every other client - and anyone who joins
             // later - reads the same loadout rather than guessing from their own prefab copy.

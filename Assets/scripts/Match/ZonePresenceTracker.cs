@@ -210,7 +210,9 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     private bool IsCountable(Player player)
     {
         int actor = player.ActorNumber;
-        if (player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool alive && !alive)
+        bool? aliveFlag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool alive ? alive : (bool?)null;
+        // Task 9e: a dropped (inactive) actor's body stands where it was; it is neither present nor alive (PresenceRules).
+        if (!PresenceRules.CountsAsAlive(player.IsInactive, aliveFlag))
         {
             // A dead player isn't attacking or defending anything.
             measuredDead.Add(actor);
