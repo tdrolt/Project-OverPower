@@ -19,7 +19,7 @@ MonoBehaviour:
   icon: {fileID: 0}
   goldCost: 1280
   damage: 7
-  fireInterval: 0.9
+  fireInterval: 1.5
   projectilesPerShot: 8
   simultaneous: 1
   sequentialDelay: 0.07

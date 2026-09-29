@@ -253,7 +253,7 @@ MonoBehaviour:
   hitMask:
     serializedVersion: 2
     m_Bits: 9
-  maxLifetimeSeconds: 5
+  maxLifetimeSeconds: 3.6
   fallbackImpactVfx: {fileID: 1000010321467122, guid: c108d1bfc37c0494daea3e4e53c3c16e, type: 3}
   impactSfx: {fileID: 8300000, guid: d6bb1df959326064a8f5fcc97b8e436f, type: 3}
 --- !u!114 &6410789498585402660
@@ -268,8 +268,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f12284e8281df3041866accfe21ba5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxBounces: 3
-  damagePerBounce: 0.2
+  maxBounces: 2
+  damagePerBounce: 0.35
 --- !u!114 &694183307610266887
 MonoBehaviour:
   m_ObjectHideFlags: 0

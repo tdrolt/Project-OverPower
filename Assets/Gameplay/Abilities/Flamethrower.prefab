@@ -46,11 +46,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cooldownSeconds: 13
   charges: 1
-  burnDamagePerSecond: 5
+  burnDamagePerSecond: 8
   burnSeconds: 5
-  coneAngle: 45
-  coneRange: 7
-  spraySeconds: 1
+  coneAngle: 60
+  coneRange: 6
+  spraySeconds: 2
   detectionMask:
     serializedVersion: 2
     m_Bits: 4294967295

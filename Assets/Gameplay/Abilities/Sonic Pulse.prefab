@@ -46,11 +46,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cooldownSeconds: 8
   charges: 1
-  knockbackDistance: 5
+  knockbackDistance: 8
   knockbackSpeed: 14
-  collisionStunSeconds: 2
-  coneRange: 4
-  coneAngle: 90
+  collisionStunSeconds: 4
+  coneRange: 5
+  coneAngle: 60
   detectionMask:
     serializedVersion: 2
     m_Bits: 4294967295

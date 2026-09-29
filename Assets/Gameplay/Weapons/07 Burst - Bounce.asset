@@ -18,7 +18,7 @@ MonoBehaviour:
   parent: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
   icon: {fileID: 0}
   goldCost: 1280
-  damage: 10
+  damage: 7
   fireInterval: 0.38
   projectilesPerShot: 3
   simultaneous: 0

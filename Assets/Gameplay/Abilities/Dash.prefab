@@ -46,7 +46,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cooldownSeconds: 5
-  charges: 2
+  charges: 3
   distance: 3
   travelSpeed: 18
   damageReduction: 0

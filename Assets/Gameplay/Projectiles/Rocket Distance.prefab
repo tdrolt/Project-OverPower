@@ -271,7 +271,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   splashDamage: 28
-  splashRadius: 3
+  splashRadius: 4
   falloff:
     serializedVersion: 2
     m_Curve:

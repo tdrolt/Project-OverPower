@@ -47,5 +47,5 @@ MonoBehaviour:
   cooldownSeconds: 0
   charges: 0
   speedMultiplier: 1.5
-  overheatPerSecond: 18
+  overheatPerSecond: 10
   toggleMode: 0
