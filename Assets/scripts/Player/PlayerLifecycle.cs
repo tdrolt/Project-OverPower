@@ -36,10 +36,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     public const string AliveKey = "alive";
 
     /// <summary>The Custom Property key marking this player "out for the last stand" (Task 2.7
-    /// review) - dead with the capital already lost, waiting for a teammate to take it back
-    /// (MatchPhaseRules.IsLastStandDeath). Distinct from AliveKey: a player on an ordinary respawn
-    /// countdown is not alive either, but their capital was never lost, so they must not count
-    /// toward their team's last stand.</summary>
+    /// review) - dead and waiting, no respawn countdown running, for a teammate to retake or adopt a base
+    /// (a last-stand death, an ended countdown, or a join into a last stand). Distinct from AliveKey: a
+    /// player on a respawn countdown is dead too but not yet waiting. Since Task 9b-2 MatchDirector also counts a
+    /// dead member on a countdown toward the last stand once the team has no base (it reads AliveKey for that);
+    /// this key stays the "waiting" fact.</summary>
     public const string LastStandKey = "lastStand";
 
     /// <summary>2.7b Decision 23: the server ms of this player's last last-stand death, written by the owner in the
@@ -48,6 +49,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// MatchDirector.BuildTeamStatuses into TeamStatus.LastOutAtMs, for the no-draw rule: in a same-instant wipe the
     /// team whose last player died LATEST stays in and wins.</summary>
     public const string LastStandAtKey = "lastStandAt";
+    // Task 9b-2: LastStandAtKey holds the server ms of this player's latest DEATH while they are dead, written at the
+    // moment of death - also for a death that starts a respawn countdown (alive false, lastStand false) - and kept
+    // through the countdown's end into the wait. Cleared when they are back in the match.
 
     [Header("Respawn")]
     [SerializeField, Tooltip("Match tuning asset. The base respawn wait, the per-death increase " +
@@ -103,6 +107,14 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     private bool death = false;
     private bool respawnStarted = false;
     private int deathCount = 0;
+    /// <summary>True from the moment a respawn countdown starts (NextRespawnDelay charged that death) until the player is
+    /// back: a countdown that ended in the wait already paid, so the retake respawn must not charge a second death
+    /// (RespawnDelayRules.DeathCountForRetake). A last-stand death or a join into a last stand never counted, so the
+    /// retake charges it once.</summary>
+    private bool deathCounted = false;
+    /// <summary>The server ms this player last died - what the countdown's end re-publishes as lastStandAt, so the
+    /// no-draw rule reads the moment of death, not when a countdown ended.</summary>
+    private int deathStampMs;
 
     /// <summary>2.7b step 4: the running RespawnPlayer coroutine, or null when nothing is waiting - both
     /// StartCoroutine sites below assign it, and RespawnPlayer itself nulls it at the end. Without a handle
@@ -195,6 +207,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         ApplyAliveStateFromProperties();
 
         if (photonView.IsMine)
+            EnterTheWaitIfJoiningALastStand();
+
+        if (photonView.IsMine)
         {
             // Transitional home: pointing the camera at the local player is spawn-time wiring
             // rather than lifecycle, but of the three components this file was split into it is
@@ -214,6 +229,23 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         {
             rigidbody.isKinematic = false;
         }
+    }
+
+    /// <summary>Task 9b-2 (Tudor's default): joining or rejoining a team already in its last stand spawns you dead into the
+    /// wait - the same wait an ended countdown starts - and you come back only if the team retakes or adopts a base
+    /// (CheckForCathedralCapture). The death was never counted, so that respawn charges it once. Owner only.</summary>
+    void EnterTheWaitIfJoiningALastStand()
+    {
+        MatchDirector director = MatchDirector.Instance;
+        if (director == null || !Teams.TryGetTeam(photonView.Owner, out int team) || !director.SpawnsIntoLastStand(team))
+            return;
+
+        Debug.LogWarning($"[VIS] JOINED INTO A LAST STAND  team={team} - spawning dead into the wait");
+        death = true; // a body that is already dead must not "die" again on the next lethal tick
+        deathStampMs = PhotonNetwork.ServerTimestamp;
+        SetAlive(false);
+        SetLastStandOut(true, deathStampMs);
+        matchUI?.ShowWaitingPanel();
     }
 
     void FixedUpdate()
@@ -304,8 +336,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             int respawnCapital = director != null ? director.RespawnCapitalOf(teamID) : TerritoryMap.Neutral;
             Debug.LogWarning($"[VIS] LAST-STAND DEATH  team={teamID} respawnCapital={respawnCapital}");
 
+            deathStampMs = PhotonNetwork.ServerTimestamp;
             SetAlive(false);
-            SetLastStandOut(true);
+            SetLastStandOut(true, deathStampMs);
             matchUI?.ShowWaitingPanel();
             photonView.RPC("RPC_HandleDeathMaster", RpcTarget.MasterClient, teamID, actorNumber);
             return;
@@ -318,10 +351,14 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         {
             respawnStarted = true;
 
-            SetAlive(false);
+            // The moment of death goes out WITH the alive flag (one write): with no base a countdown still running counts
+            // as out (Task 9b-2), and the no-draw rule must read this instant.
+            deathStampMs = PhotonNetwork.ServerTimestamp;
+            SetAlive(false, deathStampMs);
             Debug.Log("[PlayerDied] Player Respawn Entered");
             matchUI?.SetRespawnPanelVisible(true);
 
+            deathCounted = true;
             float delay = NextRespawnDelay();
             Debug.Log($"[VIS] death {deathCount}, respawning in {delay}s");
 
@@ -372,8 +409,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
             // Used to hardcode 5f here and never touch deathCount, so a capital-recapture respawn
             // never scaled with repeated deaths the way a normal death does (Task 0.11a defect 3).
-            // NextRespawnDelay is the one place both paths compute this now.
-            float delay = NextRespawnDelay();
+            // NextRespawnDelay is the one place both paths compute this now. Task 9b-2: a player whose
+            // countdown already ended in the wait was charged that death when it started - not twice.
+            float delay = NextRespawnDelay(chargeDeath: !deathCounted);
+            deathCounted = true;
             Debug.Log($"[VIS] cathedral-recapture death {deathCount}, respawning in {delay}s");
             respawnRoutine = StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         }
@@ -425,6 +464,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         }
         death = false;
         respawnStarted = false;
+        deathCounted = false;
         deathCount = 0;
         matchUI?.SetRespawnPanelVisible(false);
         matchUI?.HideWaitingPanel();
@@ -478,15 +518,15 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// hardcode 5f and skip deathCount entirely. Each death costs a bit more than the last, up to
     /// a cap, so repeated deaths carry a growing price without benching anyone for an unreasonable
     /// stretch - all three numbers live on GameplayConfig, not here.
-    private float NextRespawnDelay()
+    private float NextRespawnDelay(bool chargeDeath = true)
     {
-        deathCount++;
+        deathCount = RespawnDelayRules.DeathCountForRetake(deathCount, countdownAlreadyCounted: !chargeDeath);
 
         float baseSeconds = gameplayConfig != null ? gameplayConfig.RespawnBaseSeconds : 5f;
         float perDeathSeconds = gameplayConfig != null ? gameplayConfig.RespawnPerDeathSeconds : 1f;
         float maxSeconds = gameplayConfig != null ? gameplayConfig.RespawnMaxSeconds : 10f;
 
-        return Mathf.Min(baseSeconds + perDeathSeconds * (deathCount - 1), maxSeconds);
+        return RespawnDelayRules.Delay(deathCount, baseSeconds, perDeathSeconds, maxSeconds);
     }
 
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)
@@ -522,7 +562,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         {
             matchUI?.SetRespawnPanelVisible(false);
             matchUI?.ShowWaitingPanel();
-            SetLastStandOut(true);
+            SetLastStandOut(true, deathStampMs); // the moment of death, not the countdown's end
             respawnStarted = false;
             respawnRoutine = null;
             yield break; // death stays true - this player is still dead, now waiting instead of counting down.
@@ -562,6 +602,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // place - this is then a harmless repeat write - or a last-stand recapture), they are back in
         // the fight and no longer count toward their team's last stand.
         SetLastStandOut(false);
+        deathCounted = false;
 
         // No fallback string: theme's own null already logged an error in Start, and playerHud's a
         // second one - showing wrong or missing-theme text here would just be a second symptom.
@@ -776,13 +817,16 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
     /// Owner-only. Applies the change locally straight away so dying feels instant, then
     /// publishes it so every other client -- including anyone who joins later -- agrees.
-    void SetAlive(bool alive)
+    void SetAlive(bool alive, int? deathStamp = null)
     {
         if (!photonView.IsMine)
             return;
 
         ApplyAliveState(alive);
-        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { AliveKey, alive } });
+        var props = new Hashtable { { AliveKey, alive } };
+        if (deathStamp.HasValue)
+            props[LastStandAtKey] = deathStamp.Value; // Task 9b-2: one write, so no reader sees dead without its moment
+        PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
     /// Owner-only, published the same way SetAlive is just above (Task 2.7 review) - the "out for the
@@ -790,9 +834,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// death and cleared the moment this player is on their way back into the match (RespawnPlayer),
     /// whichever path got them there.
     ///
-    /// 2.7b Decision 23: writes LastStandAtKey in the SAME call - PhotonNetwork.ServerTimestamp on a last-stand
-    /// death, cleared (null) alongside LastStandKey going false - so a reader can never see one without the other.
-    void SetLastStandOut(bool outForLastStand)
+    /// 2.7b Decision 23: writes LastStandAtKey in the SAME call - the moment of death (diedAtMs; the server clock now
+    /// when none is given), cleared (null) alongside LastStandKey going false - so a reader can never see one without the other.
+    void SetLastStandOut(bool outForLastStand, int? diedAtMs = null)
     {
         if (!photonView.IsMine)
             return;
@@ -800,7 +844,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
         {
             { LastStandKey, outForLastStand },
-            { LastStandAtKey, outForLastStand ? (object)PhotonNetwork.ServerTimestamp : null },
+            { LastStandAtKey, outForLastStand ? (object)(diedAtMs ?? PhotonNetwork.ServerTimestamp) : null },
         });
     }
 

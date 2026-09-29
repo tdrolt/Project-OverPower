@@ -958,7 +958,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             owners.Add(current != null ? current.OwnerOf(capital.Key) : TerritoryMap.Neutral);
         }
 
-        int winner = MatchPhaseRules.TerritoryWinner(director.IsLive, owners);
+        // Task 9b-2: holding every base in play no longer pre-empts the last stand - the win counts only once every other
+        // team in the match has nobody alive (a base-less team with a living member still gets its last stand).
+        int winner = MatchPhaseRules.TerritoryWinner(director.IsLive, owners, director.CurrentTeamStatuses());
         if (winner < 0)
             return;
 

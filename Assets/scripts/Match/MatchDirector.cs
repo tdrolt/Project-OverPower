@@ -166,6 +166,17 @@ namespace Overpower.Match
             return MatchPhaseRules.SpawnCapitalFor(Phase, IsEliminated(team), ownCapital, RespawnCapitalOf(team));
         }
 
+        /// <summary>Task 9b-2: a player joining or rejoining this team right now spawns dead into the wait - the team is
+        /// in its last stand (live, no base in play) - and comes back only when it retakes or adopts a base. False until
+        /// the territory is known, so a joiner never waits on a half-loaded map.</summary>
+        public bool SpawnsIntoLastStand(int team)
+        {
+            BuildingManager buildings = BuildingManager.Instance;
+            if (buildings == null || buildings.Map == null || buildings.Current == null)
+                return false;
+            return MatchPhaseRules.JoinsIntoLastStand(Phase, IsEliminated(team), buildings.Map.CapitalOf(team), RespawnCapitalOf(team));
+        }
+
         private void Awake()
         {
             if (Instance == null)
@@ -230,7 +241,10 @@ namespace Overpower.Match
 
         public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
         {
-            if (changedProps.ContainsKey(PlayerLifecycle.LastStandKey) || changedProps.ContainsKey(Teams.TeamKey))
+            // Task 9b-2: a death whose countdown is still running (alive false) counts once the team has no base, so the
+            // alive flag and the death moment recompute too, not only the waiting flag.
+            if (changedProps.ContainsKey(PlayerLifecycle.LastStandKey) || changedProps.ContainsKey(PlayerLifecycle.AliveKey)
+                || changedProps.ContainsKey(PlayerLifecycle.LastStandAtKey) || changedProps.ContainsKey(Teams.TeamKey))
                 MasterRecompute();
         }
 
@@ -444,9 +458,10 @@ namespace Overpower.Match
 
             // Recompute always starts from previousEliminated's own items (Recompute's first line is
             // AddRange(alreadyEliminated)), so anything after that prefix is newly found this call -
-            // possibly more than one team at once (GDD p.21: the instant an elimination narrows the
-            // match to two teams, a further capital-less team is swept in by that same call, not next
-            // tick - MatchPhaseRules.Recompute's own fixpoint, restored in the review round-2 fix).
+            // possibly more than one team at once (a knockout can leave another base-less team with nobody alive,
+            // and it goes out in that same call, not next tick - MatchPhaseRules.Recompute's own fixpoint, restored
+            // in the review round-2 fix). Tudor D17: a team is knocked out only when it holds no base AND every
+            // member is dead; the two-team "out at once" rule no longer exists.
             List<int> newlyEliminated = result.Eliminated.Skip(previousEliminated.Count).ToList();
             bool changed = newlyEliminated.Count > 0 || result.Phase != previousPhase || result.Winner != previousWinner;
             if (!changed)
@@ -552,6 +567,16 @@ namespace Overpower.Match
         /// the phase-two wall - IsCapitalInPlay, not just IsInMatch. LastOutAtMs is the latest lastStandAt Player Property
         /// (Decision 23) among the team's members currently out for the last stand, compared wrap-safe like every
         /// other server-clock stamp in this codebase - read only by MatchPhaseRules' no-draw rule.</summary>
+        /// <summary>The same per-team facts MasterRecompute reads, for BuildingManager's territory win (Task 9b-2). Null
+        /// while the territory is not known.</summary>
+        public TeamStatus[] CurrentTeamStatuses()
+        {
+            BuildingManager buildings = BuildingManager.Instance;
+            if (buildings == null || buildings.Current == null || buildings.Map == null)
+                return null;
+            return BuildTeamStatuses(buildings);
+        }
+
         private TeamStatus[] BuildTeamStatuses(BuildingManager buildings)
         {
             var statuses = new TeamStatus[TeamCount];
@@ -560,7 +585,7 @@ namespace Overpower.Match
 
             for (int team = 0; team < TeamCount; team++)
             {
-                int members = 0, outForLastStand = 0;
+                int members = 0, outForLastStand = 0, dead = 0;
                 int? lastOutAtMs = null;
                 foreach (Player p in PhotonNetwork.PlayerList)
                 {
@@ -568,12 +593,16 @@ namespace Overpower.Match
                         continue;
                     members++;
 
-                    // Missing property means this player has never died with their capital lost -
-                    // PlayerLifecycle only ever publishes it true on a last-stand death, false again
-                    // the moment that player is back on their way into the match.
-                    if (!(p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool b && b))
+                    // Task 9b-2: "dead" is alive == false OR waiting (lastStand) - a member on a respawn countdown counts
+                    // (with no base that countdown is no way back). A missing alive key means alive; a missing lastStand
+                    // key means not waiting.
+                    bool waiting = p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool b && b;
+                    bool notAlive = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object aliveRaw) && aliveRaw is bool a && !a;
+                    if (!waiting && !notAlive)
                         continue;
-                    outForLastStand++;
+                    dead++;
+                    if (waiting)
+                        outForLastStand++;
 
                     if (p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandAtKey, out object stampRaw) && stampRaw is int stamp)
                         if (lastOutAtMs == null || unchecked(stamp - lastOutAtMs.Value) > 0)
@@ -593,6 +622,7 @@ namespace Overpower.Match
                     InMatch = IsInMatch(team),
                     Members = members,
                     MembersOutForLastStand = outForLastStand,
+                    MembersDead = dead,
                     HoldsOwnCapital = holdsOwnCapital,
                     HoldsAnyCapitalInPlay = holdsAnyCapitalInPlay,
                     LastOutAtMs = lastOutAtMs,

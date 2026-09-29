@@ -84,6 +84,14 @@ public class MatchUI : MonoBehaviour
         // to plain white/no backing) is silent at runtime - every call below is null-guarded so one
         // broken Inspector reference cannot throw mid-match - so say so once at spawn instead. Three UI
         // buttons sat broken for the life of this project because nothing ever complained.
+        // Task 9b-2: the waiting text lives on the UiTheme (one home for texts), set here rather than baked into the prefab.
+        if (waitingPanel != null && theme != null)
+        {
+            TMP_Text waitingText = waitingPanel.GetComponentInChildren<TMP_Text>(true);
+            if (waitingText != null)
+                waitingText.text = theme.waitingPanelText;
+        }
+
         if (waitingPanel == null || youWonPanel == null || respawnPanel == null || youLostPanel == null || theme == null)
             Debug.LogError($"[MatchUI] {name}: one or more match panels, or the UiTheme, are not " +
                             "assigned - this player will not be told when they win, lose or respawn, " +
@@ -283,9 +291,9 @@ public class MatchUI : MonoBehaviour
     {
         Debug.Log("[MatchUI] Show Waiting Panel Entered");
 
-        // Never over the top of "you lost": being eliminated outranks waiting for a respawn that
-        // is no longer coming.
-        if (waitingPanel != null && !waitingPanel.activeSelf && (youLostPanel == null || !youLostPanel.activeSelf))
+        // Never over the top of "you lost" (being eliminated outranks waiting for a respawn that is no longer coming),
+        // nor of "you won" (Task 9b-2): MatchOver covers both.
+        if (waitingPanel != null && !waitingPanel.activeSelf && !MatchOver)
         {
             waitingPanel.SetActive(true);
             Debug.Log("[MatchUI] (local) Showing Waiting panel.");

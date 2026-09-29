@@ -360,5 +360,107 @@ namespace Overpower.Tests
             Assert.IsFalse(MatchPhaseRules.IsAdoption(0, 1, 1), "a team that already had a capital just took a second");
             Assert.IsFalse(MatchPhaseRules.IsAdoption(TerritoryMap.Neutral, 1, 0));
         }
+
+        // ---- Task 9b-2: follow-ups to the last stand
+
+        /// <summary>Holds no capital; deadNow members are dead (last-stand wait or a respawn countdown still running).</summary>
+        private static TeamStatus LostWithDead(int id, int members, int deadNow, int? lastOutAt = null) =>
+            new TeamStatus { TeamId = id, InMatch = true, Members = members, MembersDead = deadNow,
+                             HoldsOwnCapital = false, HoldsAnyCapitalInPlay = false, LastOutAtMs = lastOutAt };
+
+        [Test]
+        public void ARespawnCountdownStillRunningCountsAsOutOnceTheTeamHasNoBase()
+        {
+            // Two members: one waiting (lastStand), one still on a countdown (dead, not yet waiting).
+            var team = new TeamStatus { TeamId = 0, InMatch = true, Members = 2, MembersOutForLastStand = 1, MembersDead = 2 };
+            var r = Run(team, Holds(1, 2), Holds(2, 2));
+            CollectionAssert.AreEqual(new[] { 0 }, r.Eliminated);
+        }
+
+        [Test]
+        public void ALivingMemberKeepsTheBaselessTeamIn()
+        {
+            var r = Run(LostWithDead(0, 2, 1), Holds(1, 2), Holds(2, 2));
+            Assert.IsEmpty(r.Eliminated);
+        }
+
+        [Test]
+        public void DeadMembersOfATeamThatStillHoldsABaseAreNotOut()
+        {
+            var team = new TeamStatus { TeamId = 0, InMatch = true, Members = 2, MembersDead = 2, HoldsOwnCapital = true, HoldsAnyCapitalInPlay = true };
+            Assert.IsEmpty(Run(team, Holds(1, 2), Holds(2, 2)).Eliminated);
+        }
+
+        [Test]
+        public void NoDrawUsesTheMomentOfDeathNotTheEndOfTheCountdown()
+        {
+            // Team 0's last member died at 1000 (its countdown ended later, in the wait); team 1's last died at 2000.
+            var r = Run(LostWithDead(0, 1, 1, lastOutAt: 1000), LostWithDead(1, 1, 1, lastOutAt: 2000));
+            Assert.AreEqual(1, r.Winner);
+        }
+
+        [Test]
+        public void TwoTeamsTheEnemyTakingYourBaseDoesNotEndTheMatchWhileYouLive()
+        {
+            var teams = new[] { LostWithDead(0, 2, 0), Holds(1, 2) };
+            Assert.AreEqual(TerritoryMap.Neutral, MatchPhaseRules.TerritoryWinner(true, new[] { 1, 1 }, teams),
+                "team 0 has no base but is alive: its last stand comes first");
+            Assert.IsEmpty(Run(teams).Eliminated);
+            Assert.AreEqual(-1, Run(teams).Winner);
+        }
+
+        [Test]
+        public void TwoTeamsTheTerritoryWinCountsOnceTheOtherTeamHasNobodyAlive()
+        {
+            var teams = new[] { LostWithDead(0, 2, 2), Holds(1, 2) };
+            Assert.AreEqual(1, MatchPhaseRules.TerritoryWinner(true, new[] { 1, 1 }, teams));
+            Assert.AreEqual(1, Run(teams).Winner, "and the last stand ends the same way");
+        }
+
+        [Test]
+        public void ThreeTeamsAKnockedOutTeamsCutBaseDoesNotHandTheHolderAWinOverALivingBaselessTeam()
+        {
+            // Team 0 knocked out earlier (everyone dead), team 2 has no base but a living member, team 1 holds every base in play.
+            var teams = new[] { LostWithDead(0, 2, 2), Holds(1, 2), LostWithDead(2, 2, 1) };
+            Assert.AreEqual(TerritoryMap.Neutral, MatchPhaseRules.TerritoryWinner(true, new[] { 1, 1 }, teams));
+            var again = Run(new[] { 0 }, teams);
+            Assert.AreEqual(-1, again.Winner);
+            Assert.IsEmpty(again.Eliminated.FindAll(t => t != 0));
+        }
+
+        [Test]
+        public void TheTerritoryWinIgnoresATeamNotInTheMatchAndAnEmptiedTeam()
+        {
+            var teams = new[] { Holds(0, 2), NotInMatch(1), new TeamStatus { TeamId = 2, InMatch = true, Members = 0 } };
+            Assert.AreEqual(0, MatchPhaseRules.TerritoryWinner(true, new[] { 0, 0 }, teams));
+            Assert.AreEqual(TerritoryMap.Neutral, MatchPhaseRules.TerritoryWinner(false, new[] { 0, 0 }, teams));
+        }
+
+        [Test]
+        public void ANewMemberOfATeamInItsLastStandSpawnsIntoTheWait()
+        {
+            const int own = 6, none = TerritoryMap.Neutral;
+            Assert.IsTrue(MatchPhaseRules.JoinsIntoLastStand(MatchPhase.TwoTeams, false, own, none));
+            Assert.IsTrue(MatchPhaseRules.JoinsIntoLastStand(MatchPhase.ThreeTeams, false, own, none));
+            Assert.IsFalse(MatchPhaseRules.JoinsIntoLastStand(MatchPhase.ThreeTeams, false, own, own), "the team holds a base: spawn normally");
+            Assert.IsFalse(MatchPhaseRules.JoinsIntoLastStand(MatchPhase.TwoTeams, false, own, 7), "holding another team's base counts");
+            Assert.IsFalse(MatchPhaseRules.JoinsIntoLastStand(MatchPhase.Warmup, false, own, none), "nothing counts before live");
+            Assert.IsFalse(MatchPhaseRules.JoinsIntoLastStand(MatchPhase.Over, false, own, none), "an ended match has no last stand");
+        }
+
+        [Test]
+        public void ARetakeRespawnAfterAnEndedCountdownIsNotChargedASecondDeath()
+        {
+            Assert.AreEqual(3, RespawnDelayRules.DeathCountForRetake(3, countdownAlreadyCounted: true));
+            Assert.AreEqual(4, RespawnDelayRules.DeathCountForRetake(3, countdownAlreadyCounted: false), "a last-stand death is charged once, on the retake");
+        }
+
+        [Test]
+        public void TheRespawnDelayGrowsPerDeathUpToTheCap()
+        {
+            Assert.AreEqual(5f, RespawnDelayRules.Delay(1, 5f, 1f, 10f));
+            Assert.AreEqual(7f, RespawnDelayRules.Delay(3, 5f, 1f, 10f));
+            Assert.AreEqual(10f, RespawnDelayRules.Delay(20, 5f, 1f, 10f));
+        }
     }
 }

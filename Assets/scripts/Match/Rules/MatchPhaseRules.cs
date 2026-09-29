@@ -22,17 +22,21 @@ namespace Overpower.Match
         public bool InMatch;
         public int Members;
         /// <summary>Members who are out for the last stand ("lastStand" Player Property): dead with the team holding no
-        /// capital, either dying after the fall or a respawn countdown that ended after it (D17). A countdown still
-        /// running never counts.</summary>
+        /// capital, either dying after the fall or a respawn countdown that ended after it (D17).</summary>
         public int MembersOutForLastStand;
+        /// <summary>Members who are dead right now ("alive" Player Property false): a last-stand wait AND a respawn
+        /// countdown still running (Task 9b-2: with no base that countdown is no way back, so the member counts as out).
+        /// Includes every member counted in MembersOutForLastStand.</summary>
+        public int MembersDead;
         /// <summary>Owns its own starting capital right now.</summary>
         public bool HoldsOwnCapital;
         /// <summary>Owns at least one capital in play: its own, an enemy's, or a knocked-out team's. The third capital of a
         /// host-started match is never in play, and neither is a capital behind the phase-two wall (map shrink,
         /// 2026-09-25 - MatchDirector.IsCapitalInPlay).</summary>
         public bool HoldsAnyCapitalInPlay;
-        /// <summary>The server ms this team's latest member went out for the last stand - the latest "lastStandAt"
-        /// Player Property among its members who are out. Null when none has a stamp (nobody died; e.g. it emptied).
+        /// <summary>The server ms this team's latest member DIED while out (a last-stand death, or a death whose countdown is
+        /// still running - the moment of death either way, never when a countdown ended) - the latest "lastStandAt"
+        /// Player Property among its dead members. Null when none has a stamp (nobody died; e.g. it emptied).
         /// Read only by the no-draw rule (Tudor: the last team to die wins a same-instant wipe).</summary>
         public int? LastOutAtMs;
     }
@@ -104,7 +108,7 @@ namespace Overpower.Match
         {
             if (HasACapital(team, phase))
                 return false;
-            return team.MembersOutForLastStand >= team.Members;
+            return System.Math.Max(team.MembersOutForLastStand, team.MembersDead) >= team.Members;
         }
 
         /// <summary>Capital adoption (Tudor, 2026-09-18): holding ANY capital in play counts - a team that lost its own
@@ -202,6 +206,27 @@ namespace Overpower.Match
                 if (o != owner) return TerritoryMap.Neutral;
             return owner;
         }
+
+        /// <summary>Task 9b-2: the territory win no longer pre-empts the last stand. The team holding every base in play
+        /// wins this way only once every other team in the match has nobody alive - a base-less team with a living member
+        /// still gets its last stand (its knockout, and so the win, then follows from Recompute).</summary>
+        public static int TerritoryWinner(bool live, IReadOnlyList<int> ownersOfCapitalsInPlay, IReadOnlyList<TeamStatus> teams)
+        {
+            int winner = TerritoryWinner(live, ownersOfCapitalsInPlay);
+            if (winner < 0 || teams == null)
+                return winner;
+            foreach (TeamStatus team in teams)
+                if (team.InMatch && team.TeamId != winner && team.Members - System.Math.Max(team.MembersDead, team.MembersOutForLastStand) > 0)
+                    return TerritoryMap.Neutral;
+            return winner;
+        }
+
+        /// <summary>Task 9b-2: a player joining (or rejoining) a team already in its last stand spawns dead into the wait -
+        /// the same answer an ended countdown gets (SpawnCapitalFor is Neutral) - and comes back only when the team
+        /// retakes a base. Only in a live match: nothing counts in the warm-up and an ended match has no last stand.</summary>
+        public static bool JoinsIntoLastStand(MatchPhase phase, bool teamEliminated, int ownCapital, int respawnCapital) =>
+            (phase == MatchPhase.ThreeTeams || phase == MatchPhase.TwoTeams)
+            && SpawnCapitalFor(phase, teamEliminated, ownCapital, respawnCapital) == TerritoryMap.Neutral;
 
         /// <summary>The telemetry `adopt` line: a team holding no other capital in play just took one that isn't its own.</summary>
         public static bool IsAdoption(int newOwner, int capitalTeamOfZone, int otherCapitalsInPlayHeldByNewOwner) =>

@@ -555,10 +555,15 @@ namespace Overpower.UI
 
         [Header("Phase transition (Task 2.7)")]
         [Tooltip("HUD toast shown to every surviving player the instant the match narrows from three " +
-                 "teams to two (GDD p.20-21: losing your capital now eliminates your team at once, " +
-                 "instead of starting a last stand). Uses the same toast label and duration as the " +
-                 "bounty payout (Bounty Toast Duration Seconds above).")]
-        public string twoTeamsLeftBannerText = "Two teams left - losing your capital now eliminates you";
+                 "teams to two (Tudor D17: the last stand is the same with two teams - a team with no base can't " +
+                 "respawn and is out once every member is dead, unless it retakes or takes a base). Uses the same " +
+                 "toast label and duration as the bounty payout (Bounty Toast Duration Seconds above). Keep it to two " +
+                 "lines (about 52 characters): the toast label grows upward and clips at the top of the screen.")]
+        public string twoTeamsLeftBannerText = "Two teams left: lose your base and you can't respawn";
+
+        [Tooltip("The panel a dead player sees while their team holds no base and nobody on it can respawn - shown by " +
+                 "MatchUI in place of the text baked into the waiting panel (Task 9b-2: one home for texts).")]
+        public string waitingPanelText = "Waiting for team to \n\ncapture Base territory ";
 
         [Header("Capture ring (2026-09-16)")]
         [Tooltip("Material every capture ring line draws with. Keep it unlit, transparent, vertex-coloured and its own " +
@@ -824,9 +829,9 @@ namespace Overpower.UI
         public Vector2 warmupLineSize = new Vector2(900f, 64f);
         [Tooltip("Toast shown the instant the match goes live with all three teams - the ordinary case.")]
         public string matchLiveToastText = "The match is live! Zones, gold, loadouts and respawn timers are reset.";
-        [Tooltip("Toast shown the instant a host-started match goes live with two teams - losing your capital now means " +
-                 "you're out.")]
-        public string matchLiveTwoTeamsToastText = "The match is live with two teams: lose your capital and you're out.";
+        [Tooltip("Toast shown the instant a host-started match goes live with two teams - lose your base and your team " +
+                 "can't respawn until it retakes one (Tudor D17). Two lines at most (about 52 characters), as the bounty toast.")]
+        public string matchLiveTwoTeamsToastText = "Two teams: lose your base and you can't respawn";
         [Tooltip("The host's switch button label while the room is in THREE-team mode - press it to open the " +
                  "two-team lobby (Tudor, 2026-09-26; Decision L7).")]
         public string lobbyTwoTeamsButtonText = "Two teams (up to 6)";

@@ -173,7 +173,8 @@ MonoBehaviour:
   capitalUnderAttackNoteFontSize: 30
   capitalUnderAttackNoteColor: {r: 1, g: 1, b: 1, a: 1}
   capitalUnderAttackNoteBackingColor: {r: 0, g: 0, b: 0, a: 0.6}
-  twoTeamsLeftBannerText: Two teams left - losing your capital now eliminates you
+  twoTeamsLeftBannerText: 'Two teams left: lose your base and you can''t respawn'
+  waitingPanelText: "Waiting for team to \n\ncapture Base territory "
   captureRingMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
   captureRingOutlineWidth: 0.15
   captureRingArcWidth: 0.45
@@ -259,7 +260,7 @@ MonoBehaviour:
   warmupTopOffset: 130
   warmupLineSize: {x: 900, y: 64}
   matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
-  matchLiveTwoTeamsToastText: 'The match is live with two teams: lose your capital and you''re out.'
+  matchLiveTwoTeamsToastText: 'Two teams: lose your base and you can''t respawn'
   lobbyTwoTeamsButtonText: Two teams (up to 6)
   lobbyThreeTeamsButtonText: Three teams (up to 9)
   lobbyTwoTeamsTooManyText: Two teams needs 6 players or fewer
