@@ -15,6 +15,9 @@ public static class PlayerLookup
         _lookup.Remove(actorNumber);
     }
 
+    /// <summary>Task 9f: nothing left over when the scene is rebuilt for a new match.</summary>
+    public static void Clear() => _lookup.Clear();
+
     public static PhotonView GetPhotonViewFor(int actorNumber)
     {
         _lookup.TryGetValue(actorNumber, out var view);

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using Overpower.Match;
 
 /// <summary>
 /// Quits the game when its Button is clicked.
@@ -25,5 +26,16 @@ public class QuitButton : MonoBehaviour
         GetComponent<Button>().onClick.AddListener(Quit);
     }
 
-    public void Quit() => GameQuit.Quit();
+    /// <summary>Task 9f (Tudor D22): once the match is over this leads back to the name screen for a fresh start; on the mid-match
+    /// waiting panel it still closes the game.</summary>
+    public void Quit()
+    {
+        MatchUI ui = GetComponentInParent<MatchUI>();
+        bool matchOver = ui != null && ui.MatchOver;
+        RoomManager manager = matchOver ? FindFirstObjectByType<RoomManager>() : null;
+        if (BackToNameScreenRules.ButtonAction(matchOver) == ResultButtonAction.BackToNameScreen && manager != null)
+            manager.ReturnToNameScreen();
+        else
+            GameQuit.Quit();
+    }
 }

@@ -6,6 +6,7 @@ using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
 using Overpower.UI;
+using UnityEngine.SceneManagement;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 public class RoomManager : MonoBehaviourPunCallbacks
@@ -65,7 +66,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // Must stay <= SendRate (default 30).
         PhotonNetwork.SerializationRate = 20;
 
-        PhotonNetwork.ConnectUsingSettings();
+        // Task 9f: after "back to name screen" the scene is rebuilt while the connection stays up on the master server: a second
+        // ConnectUsingSettings then would be refused and only log noise.
+        if (!PhotonNetwork.IsConnected)
+            PhotonNetwork.ConnectUsingSettings();
     }
 
     public override void OnConnectedToMaster()
@@ -152,9 +156,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
             if (view != null)
             {
                 withoutBody = 0f;
+                view = DestroyExtraOwnBodies(actor, view);
                 PlayerLifecycle lifecycle = view.GetComponent<PlayerLifecycle>();
-                DestroyExtraOwnBodies(actor, view);
-                bool waiting = PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool w && w;
+                // Task 9f: "waiting" is read from THIS body (its own wait panel), not from the player's "lastStand" property - that one
+                // survives the drop and would end the watch before the new body had even started its respawn.
+                MatchUI bodyUi = view.GetComponent<MatchUI>();
+                bool waiting = bodyUi != null && bodyUi.IsWaitingForRespawn;
                 if (RejoinRules.BodyWatchIsDone(true, lifecycle != null && lifecycle.IsAlive, waiting, total))
                     yield break; // respawned, or in the last-stand wait: nothing more to watch for
             }
@@ -176,19 +183,92 @@ public class RoomManager : MonoBehaviourPunCallbacks
         }
     }
 
-    /// <summary>Task 9e-3: an old cached body can arrive AFTER the watchdog already spawned a fallback one - two own bodies. Keep the one
-    /// PlayerLookup points at and network-destroy the others.</summary>
-    private static void DestroyExtraOwnBodies(int actor, PhotonView keep)
+    /// <summary>Task 9e-3 / 9f: an old cached body can arrive AFTER the watchdog already spawned a fallback one - two own bodies. Keeps
+    /// the one THIS client spawned itself (the same answer whatever order the bodies arrived in; BackToNameScreenRules.BodyToKeep),
+    /// network-destroys the others and points PlayerLookup at the kept one. Returns the kept body's view.</summary>
+    private PhotonView DestroyExtraOwnBodies(int actor, PhotonView lookupView)
     {
+        var own = new System.Collections.Generic.List<PhotonView>();
+        var ids = new System.Collections.Generic.List<int>();
         foreach (PlayerLifecycle other in FindObjectsByType<PlayerLifecycle>(FindObjectsSortMode.None))
         {
             PhotonView v = other.GetComponent<PhotonView>();
-            if (v != null && v != keep && v.OwnerActorNr == actor && v.IsMine)
+            if (v != null && v.OwnerActorNr == actor && v.IsMine)
             {
-                Debug.LogWarning($"[REJOIN] a second own body arrived (view {v.ViewID}) - removing it");
-                PhotonNetwork.Destroy(v.gameObject);
+                own.Add(v);
+                ids.Add(v.ViewID);
             }
         }
+        if (own.Count < 2)
+            return lookupView;
+
+        int keepId = BackToNameScreenRules.BodyToKeep(ids, spawnedBodyViewId, lookupView != null ? lookupView.ViewID : -1);
+        PhotonView kept = lookupView;
+        foreach (PhotonView v in own)
+        {
+            if (v.ViewID == keepId)
+            {
+                kept = v;
+                continue;
+            }
+            Debug.LogWarning($"[REJOIN] a second own body (view {v.ViewID}) - removing it, keeping view {keepId}");
+            PhotonNetwork.Destroy(v.gameObject);
+        }
+        PlayerLookup.Register(actor, kept);
+        return kept;
+    }
+
+    /// <summary>The view id of the body THIS client last spawned itself (SpawnPlayerOnTeam); -1 = none.</summary>
+    private int spawnedBodyViewId = -1;
+
+    // ---- back to the name screen (Task 9f, Tudor D22) ----
+
+    private bool returningToNameScreen;
+
+    /// <summary>The result screen's button: leave the room for good, then REBUILD the scene and land on the name screen. The scene is
+    /// reloaded (rather than only hiding panels) because everything a match leaves in it - territory, capitals, zones, packs, portals,
+    /// minimap, chat, panels, scoreboard - is then a fresh copy by construction instead of a list of things to remember to clear.
+    /// The connection stays up on the master server, so Join works at once. LeaveRoom(false) frees the seat, OnLeftRoom resets
+    /// the match properties, and the saved match is forgotten so the name screen offers no Rejoin.</summary>
+    public void ReturnToNameScreen()
+    {
+        if (returningToNameScreen)
+            return;
+        returningToNameScreen = true;
+
+        Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
+        PlayerIdentity.ClearLastMatch();
+        if (PhotonNetwork.InRoom)
+        {
+            PhotonNetwork.LeaveRoom(becomeInactive: false);
+            PhotonNetwork.SendAllOutgoingCommands();
+        }
+        StartCoroutine(ReloadWhenBackOnMaster());
+    }
+
+    private const float ReturnTimeoutSeconds = 20f;
+
+    private System.Collections.IEnumerator ReloadWhenBackOnMaster()
+    {
+        float waited = 0f;
+        bool reconnecting = false;
+        while (waited < ReturnTimeoutSeconds)
+        {
+            ReturnStep step = BackToNameScreenRules.NextStep(PhotonNetwork.NetworkClientState);
+            if (step == ReturnStep.ReloadScene)
+                break;
+            if (step == ReturnStep.Reconnect && !reconnecting)
+            {
+                reconnecting = true;
+                PhotonNetwork.ConnectUsingSettings();
+            }
+            waited += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        PlayerLookup.Clear();
+        Debug.Log($"[NAME SCREEN] rebuilding the scene ({PhotonNetwork.NetworkClientState})");
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     /// <summary>Review round 2: Photon carries the local player's own Custom Properties into the
@@ -274,6 +354,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
             // last-stand check reads this instead (PlayerLifecycle.InstantiatedTeam).
             new object[] { teamID }
         );
+
+        PhotonView spawnedView = player.GetComponent<PhotonView>();
+        spawnedBodyViewId = spawnedView != null ? spawnedView.ViewID : -1;
 
         SetupPlayerTeamComponent(player, teamID);
     }

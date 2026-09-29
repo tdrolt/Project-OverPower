@@ -35,6 +35,14 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         ConnectToChat();
     }
 
+    /// <summary>Task 9f: the scene is rebuilt when a player goes back to the name screen. The old chat connection and the open flag must
+    /// not outlive it (the next join connects again under the new name).</summary>
+    void OnDestroy()
+    {
+        IsOpen = false;
+        chatClient?.Disconnect();
+    }
+
    private void ConnectToChat()
 {
     isConnected = true;
