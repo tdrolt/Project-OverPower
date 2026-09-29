@@ -354,6 +354,8 @@ MonoBehaviour:
   rejoinMatchButton: Rejoin your match
   resultButtonMainMenu: Main menu
   resultButtonQuit: Quit
+  spectateButton: Spectate
+  spectateNextButton: Next
   connectionLostPanelWidth: 640
   connectionLostPanelColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.95}
   connectionLostTitleColor: {r: 1, g: 0.55, b: 0.35, a: 1}

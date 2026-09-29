@@ -104,9 +104,17 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // same way matchUI is - a sibling component on this same player root.
     private PlayerHud playerHud;
 
+    /// <summary>Task 9g: the team behind this player's last lethal hit (DamageInfo.SourceTeamId), -1 before any death and for a rejoined
+    /// process. Owner side only - the victim's client is the one that decides damage. SpectateView reads it.</summary>
+    public int LastKillerTeam { get; private set; } = -1;
+
     private bool death = false;
     private bool respawnStarted = false;
     private int deathCount = 0;
+    /// <summary>Task 9g (Tudor D28): set when this body is a rejoiner's. Its first respawn wait (either path) is the flat
+    /// GameplayConfig.RejoinRespawnSeconds and charges no death: deathCount was restored from the room's "sb" deaths at Start, and
+    /// that already includes the death the drop counted as. Cleared once that wait has been computed, and at go-live.</summary>
+    private bool rejoinRespawnPending = false;
     /// <summary>True from the moment a respawn countdown starts (NextRespawnDelay charged that death) until the player is
     /// back: a countdown that ended in the wait already paid, so the retake respawn must not charge a second death
     /// (RespawnDelayRules.DeathCountForRetake). A last-stand death or a join into a last stand never counted, so the
@@ -217,6 +225,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (rejoined)
         {
             rejoinPending = true;
+            // Task 9g: keep the death penalty - the next death counts on from where it was (the "sb" deaths the room kept; see
+            // RespawnDelayRules.DeathCountOnRejoin) - and wait the flat rejoin time instead of the scaled one.
+            PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScoreboardRules.Key, out object keptScore);
+            deathCount = RespawnDelayRules.DeathCountOnRejoin(keptScore as int[]);
+            rejoinRespawnPending = true;
             death = true; // a body that is already "dead" must not die again on the next lethal tick
             // Published at once (not just applied here): no flash of a hittable, standing body on everyone else's screen while the
             // respawn path below waits for the team and the territory.
@@ -291,6 +304,17 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (director == null || !director.JoinCheckReady || !Teams.TryGetTeam(photonView.Owner, out _))
             return;
         rejoinPending = false;
+        // Task 9g (Tudor): a rejoiner onto a KNOCKED-OUT team is a spectator of it - the "You lost" panel with the Spectate button,
+        // not the last-stand wait (which would read as if a teammate could still win the base back).
+        if (Teams.TryGetTeam(photonView.Owner, out int rejoinTeam) && RejoinRules.LandsOnLosePanel(director.IsEliminated(rejoinTeam), director.Phase))
+        {
+            Debug.LogWarning($"[REJOIN] team {rejoinTeam} was knocked out - back as its spectator");
+            rejoinRespawnPending = false;
+            deathStampMs = PhotonNetwork.ServerTimestamp;
+            SetLastStandOut(true, deathStampMs);
+            matchUI?.ShowYouLost();
+            return;
+        }
         // KNOWN LIMIT (Tudor, 9e-3: accepted for now): this takes the ordinary death path, so the last living member of a team with no base
         // who returns inside the grace (GameplayConfig.DroppedGraceSeconds) still lands in the last-stand wait, counts dead, and the team
         // is out - the grace only protects the team WHILE the player is away. A rejoiner on a knocked-out team stays dead (spectator).
@@ -327,6 +351,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// flag (read by the respawn coroutine and CheckForCathedralCapture) in step with it.
     private void HandlePlayerHealthDied(DamageInfo info)
     {
+        LastKillerTeam = info.SourceTeamId; // Task 9g: who a knocked-out player may spectate first (SpectateRules.KnockerTeam)
         if (!death)
             PlayerDied();
 
@@ -520,6 +545,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         respawnStarted = false;
         deathCounted = false;
         deathCount = 0;
+        rejoinRespawnPending = false;
         matchUI?.SetRespawnPanelVisible(false);
         matchUI?.HideWaitingPanel();
         matchUI?.SetRespawnNote("");
@@ -574,7 +600,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// stretch - all three numbers live on GameplayConfig, not here.
     private float NextRespawnDelay(bool chargeDeath = true)
     {
-        deathCount = RespawnDelayRules.DeathCountForRetake(deathCount, countdownAlreadyCounted: !chargeDeath);
+        bool rejoinRespawn = rejoinRespawnPending;
+        deathCount = RespawnDelayRules.DeathCountForRetake(deathCount, countdownAlreadyCounted: !chargeDeath, rejoinRespawn: rejoinRespawn);
+        if (rejoinRespawn)
+        {
+            rejoinRespawnPending = false;
+            return RespawnDelayRules.RejoinDelay(gameplayConfig != null ? gameplayConfig.RejoinRespawnSeconds : 5f);
+        }
 
         float baseSeconds = gameplayConfig != null ? gameplayConfig.RespawnBaseSeconds : 5f;
         float perDeathSeconds = gameplayConfig != null ? gameplayConfig.RespawnPerDeathSeconds : 1f;

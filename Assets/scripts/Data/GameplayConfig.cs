@@ -51,6 +51,12 @@ namespace Overpower.Data
         [SerializeField] private float respawnMaxSeconds = 10f;
         public float RespawnMaxSeconds => respawnMaxSeconds;
 
+        [Tooltip("How long a player who comes back after a dropped connection waits before they respawn. The same for " +
+                 "everyone, whatever their number of deaths. Their death count is kept, so the next death still counts " +
+                 "on from where it was.")]
+        [SerializeField, Min(0f)] private float rejoinRespawnSeconds = 5f;
+        public float RejoinRespawnSeconds => rejoinRespawnSeconds;
+
         [Tooltip("Fall below this Y height and you are returned to spawn, counted as a death. " +
                  "Set it a few metres under the lowest floor a player can legitimately stand " +
                  "on, so falling off the map ends quickly instead of falling forever.")]

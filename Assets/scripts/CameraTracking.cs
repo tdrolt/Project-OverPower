@@ -76,6 +76,10 @@ void FixedUpdate()
 public class CameraTracking : MonoBehaviour
 {
     public Transform target;
+    /// <summary>Task 9g: whose team decides the view angle. Null means the followed target (the normal case). A knocked-out
+    /// player watching someone else (SpectateView) sets their own body here, so the arena does not turn round to that player's
+    /// team angle and the minimap's "up" stays where it was.</summary>
+    [System.NonSerialized] public Transform yawSource;
     public Vector3 baseOffset = new Vector3(0f, 10f, -5f); // Base offset
     public float zoomSpeed = 2f; // How fast zoom adjusts
     [Tooltip("Closest the camera can zoom in with the scroll wheel, as a multiple of Base Offset. " +
@@ -193,10 +197,11 @@ public class CameraTracking : MonoBehaviour
     /// known on the first frame.
     void ResolveTeamYaw()
     {
-        if (target == null)
+        Transform yawFrom = yawSource != null ? yawSource : target;
+        if (yawFrom == null)
             return;
 
-        PlayerTeam team = target.GetComponent<PlayerTeam>();
+        PlayerTeam team = yawFrom.GetComponent<PlayerTeam>();
         if (team == null || !team.HasTeam)
             return;
 

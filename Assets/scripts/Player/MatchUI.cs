@@ -350,6 +350,15 @@ public class MatchUI : MonoBehaviour
         // StartCoroutine(DelayedShowLose());
 
         FreezeForRestOfMatch();
+        EnsureSpectateView();
+    }
+
+    /// <summary>Task 9g (Tudor D28): the Spectate button on this player's own lose panel, built the first time it is shown.</summary>
+    private void EnsureSpectateView()
+    {
+        if (youLostPanel == null || photonView == null || !photonView.IsMine || GetComponent<SpectateView>() != null)
+            return;
+        gameObject.AddComponent<SpectateView>().Init(this, youLostPanel);
     }
 
     /// Kept only for the committed RpcList (Task 2.7 retired its caller, PlayerLifecycle.

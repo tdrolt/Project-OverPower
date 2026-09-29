@@ -1120,5 +1120,11 @@ namespace Overpower.UI
             else
                 material.DisableKeyword(ShaderUtilities.Keyword_Underlay);
         }
+
+        [Header("Spectate (Task 9g, Tudor D28)")]
+        [Tooltip("The button on a knocked-out player's lose screen that starts watching a living player.")]
+        public string spectateButton = "Spectate";
+        [Tooltip("The same button once you are watching: it moves to the next living player.")]
+        public string spectateNextButton = "Next";
     }
 }

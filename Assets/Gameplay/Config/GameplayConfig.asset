@@ -17,6 +17,7 @@ MonoBehaviour:
   respawnBaseSeconds: 5
   respawnPerDeathSeconds: 2
   respawnMaxSeconds: 35
+  rejoinRespawnSeconds: 5
   killHeight: -10
   matchStartCountdownSeconds: 5
   outOfCombatSeconds: 6

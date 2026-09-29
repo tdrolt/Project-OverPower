@@ -135,6 +135,11 @@ namespace Overpower.Match
         public static RejoinTeamAction TeamOnRejoin(bool teamsFixed, bool teamEliminated, bool teamInMatch) =>
             teamsFixed && !teamEliminated && !teamInMatch ? RejoinTeamAction.Repick : RejoinTeamAction.Keep;
 
+        /// <summary>Task 9g (Tudor): the rejoiner onto a knocked-out team lands on the "You lost" panel (with Spectate) while the match
+        /// still runs. Once the match is over the result screen decides win or lose instead (MatchDirector's winner reaction).</summary>
+        public static bool LandsOnLosePanel(bool teamEliminated, MatchPhase phase) =>
+            teamEliminated && phase != MatchPhase.Over;
+
         /// <summary>The body watchdog after a rejoin is finished once there IS a body and it is either alive (the first respawn is done) or
         /// in the last-stand wait (it will not respawn until the team retakes a base - no reason to keep polling for the whole match).
         /// Never before a second has passed, so a body that has not run its first frame yet is not mistaken for a finished one.</summary>
