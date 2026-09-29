@@ -24,7 +24,7 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 | D3 | A pack can only be taken by a living player who isn't at full health; it heals up to max health, never above. While it's gone, a faint marker shows where it will return. | A |
 | D4 | The shop opens while dead; what you buy is yours when you respawn (same prices, same rules). | A |
 | D5 | Ability and item descriptions show as a tooltip after hovering 1 s; the shield (armour) shows "upgrade 1 of 2" style limits. | D (the limit wording: A) |
-| D6 | Weapon upgrade tree: arrows from each weapon to its upgrades, forming branches. 2-3 mockups first; Tudor picks one. | D |
+| D6 | Weapon upgrade tree: arrows from each weapon to its upgrades, forming branches. 2-3 mockups first; Tudor picks one. **09-29: Layout A (top-down tree: Baseline on top, the four families below, two upgrades under each) - https://claude.ai/artifact/QPVHbRi8Gojf8CaZ7hAvEA.** Prices stay at the playtest's -20%. | D |
 | D7 | Mines arm 1.5 s after being placed (done by Tudor, `84391e5`) and blink while arming. | D (the blink: A) |
 | D8 | Dash: 3 charges. When all 3 are used, the Dash locks until 2 have refilled; the charge marks turn red while locked. Using it with charges left works as today. | D |
 | D9 | Sonic Pulse also pushes the user 4 m backwards (away from where they aim), at the same speed as the enemy push; the user is never stunned by hitting a wall. | D |
