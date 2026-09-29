@@ -148,3 +148,7 @@ InitTestScene*.unity*
 # (TelemetryPaths.ResolveMatchLogsRoot) so testers find them without digging into AppData - local
 # playtest output, never committed.
 /Match logs/
+
+# Task 9e: this install's own player id and last match (written next to the game / the project by PlayerIdentity)
+/overpower-player-id.txt
+/overpower-last-match.json

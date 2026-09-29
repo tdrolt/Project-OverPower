@@ -217,6 +217,15 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float scoreboardPublishesPerSecond = 4f;
         public float ScoreboardPublishesPerSecond => scoreboardPublishesPerSecond;
 
+        [Header("Connection")]
+        [Tooltip("How long, in seconds, a player whose connection dropped keeps their place in the match. Inside this " +
+                 "time they can press Rejoin (or, after closing the game, \"Rejoin your match\" on the name screen) and come " +
+                 "back as the same player: same team, gold and loadout. After it their place is given up. 0 = a dropped " +
+                 "player is removed at once and cannot come back. Read when a room is created, so every player in a " +
+                 "room must run the same build.")]
+        [SerializeField, Min(0f)] private float rejoinWindowSeconds = 120f;
+        public float RejoinWindowSeconds => rejoinWindowSeconds;
+
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
                  "click. Handy while tuning weapons; switch it off for a real match.")]

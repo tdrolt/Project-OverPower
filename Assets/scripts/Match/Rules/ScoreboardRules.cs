@@ -58,6 +58,20 @@ namespace Overpower.Match
             damage = 0f;
         }
 
+        /// <summary>Task 9e: a rejoined player's fresh body starts from the numbers the room still holds for them (their
+        /// "sb" Player Property), not from zero - kills, deaths, assists, damage, captures, in ToArray's order. A missing,
+        /// short or negative value leaves that number at 0.</summary>
+        public void Restore(int[] values)
+        {
+            if (values == null)
+                return;
+            Kills = values.Length > 0 && values[0] > 0 ? values[0] : 0;
+            Deaths = values.Length > 1 && values[1] > 0 ? values[1] : 0;
+            Assists = values.Length > 2 && values[2] > 0 ? values[2] : 0;
+            damage = values.Length > 3 && values[3] > 0 ? values[3] : 0f;
+            Captures = values.Length > 4 && values[4] > 0 ? values[4] : 0;
+        }
+
         /// <summary>The Player Property value. Allocates, so only called when actually publishing.</summary>
         public int[] ToArray() => new[] { Kills, Deaths, Assists, DamageRounded, Captures };
     }
