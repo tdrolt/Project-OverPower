@@ -69,6 +69,8 @@ MonoBehaviour:
   slotActiveGlowColor: {r: 1, g: 0.85, b: 0.25, a: 1}
   pipAvailableColor: {r: 1, g: 1, b: 1, a: 1}
   pipSpentColor: {r: 1, g: 1, b: 1, a: 0.15}
+  pipLockedColor: {r: 0.9, g: 0.15, b: 0.15, a: 1}
+  pipLockedSpentColor: {r: 0.9, g: 0.15, b: 0.15, a: 0.35}
   pipSize: 14
   pipSpacing: 4
   pipRowHeight: 20

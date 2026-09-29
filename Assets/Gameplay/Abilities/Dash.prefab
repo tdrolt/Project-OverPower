@@ -50,6 +50,7 @@ MonoBehaviour:
   distance: 3
   travelSpeed: 18
   damageReduction: 0
+  chargesNeededAfterRunningDry: 2
   remoteTrail: {fileID: 4637875335801047385}
 --- !u!96 &4637875335801047385
 TrailRenderer:

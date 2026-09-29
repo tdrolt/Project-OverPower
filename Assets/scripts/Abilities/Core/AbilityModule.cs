@@ -126,6 +126,9 @@ namespace Overpower.Abilities
 
         public int ChargesAvailable => pool != null ? pool.Available : 0;
         public int MaxCharges => pool != null ? pool.MaxCharges : 0;
+
+        /// <summary>True while the pool is locked after running dry (see ChargePool.IsLocked), for the HUD.</summary>
+        public bool ChargesLocked => pool != null && pool.IsLocked;
         public float RechargeProgress => pool != null ? pool.RechargeProgress : 0f;
         public virtual bool IsActive => false;
 
@@ -145,7 +148,7 @@ namespace Overpower.Abilities
         public int ConfiguredCharges => charges;
 
         internal bool HasChargeGate => pool != null;
-        internal bool HasCharge => pool == null || pool.Available > 0;
+        internal bool HasCharge => pool == null || pool.CanConsume;
         internal bool SpendsChargeWhenCast => SpendsChargeOnCast;
         internal bool TrySpendChargeForCast() => SpendCharge();
 
@@ -159,6 +162,10 @@ namespace Overpower.Abilities
         /// the player pressing the key again.
         /// </summary>
         internal virtual bool RetriesRefusalWithinBuffer => false;
+
+        /// <summary>Charges that must be back after the pool runs dry before it can be used again.
+        /// 0 (the default) means no lock-out; only Dash overrides it.</summary>
+        protected virtual int ChargesNeededAfterRunningDry => 0;
 
         internal void Bind(AbilityRunner owningRunner, AbilityOwner owner, AbilityDefinition definition)
         {
@@ -188,11 +195,12 @@ namespace Overpower.Abilities
             }
 
             if (pool == null)
-                pool = new ChargePool(charges, cooldownSeconds);
+                pool = new ChargePool(charges, cooldownSeconds, ChargesNeededAfterRunningDry);
             else
             {
                 pool.SetMaxCharges(charges);
                 pool.SetRechargeSeconds(cooldownSeconds);
+                pool.SetChargesNeededAfterRunningDry(ChargesNeededAfterRunningDry);
             }
         }
 

@@ -200,5 +200,114 @@ namespace Overpower.Tests
             Assert.AreEqual(0f, p.RechargeProgress, 0.001f);
             Assert.IsFalse(float.IsNaN(p.RechargeProgress));
         }
+
+        // ---- lock-out after running dry (numbers passed in, not Tudor's asset values) ----
+
+        private static ChargePool NewLockoutPool(int needed) =>
+            new ChargePool(maxCharges: 3, rechargeSeconds: 5f, chargesNeededAfterRunningDry: needed);
+
+        [Test]
+        public void RunningDryLocksUntilEnoughChargesHaveRefilled()
+        {
+            var p = NewLockoutPool(2);
+            Assert.IsTrue(p.TryConsume());
+            Assert.IsTrue(p.TryConsume());
+            Assert.IsTrue(p.TryConsume());
+            Assert.IsTrue(p.IsLocked);
+            Assert.IsFalse(p.TryConsume());
+
+            p.Tick(5f); // one charge back - still locked
+            Assert.AreEqual(1, p.Available);
+            Assert.IsTrue(p.IsLocked);
+            Assert.IsFalse(p.TryConsume());
+            Assert.AreEqual(1, p.Available);
+
+            p.Tick(5f); // two back - unlocked
+            Assert.AreEqual(2, p.Available);
+            Assert.IsFalse(p.IsLocked);
+            Assert.IsTrue(p.TryConsume());
+        }
+
+        [Test]
+        public void UsingTwoOfThreeNeverLocks()
+        {
+            var p = NewLockoutPool(2);
+            p.TryConsume();
+            p.TryConsume();
+            Assert.IsFalse(p.IsLocked);
+
+            p.Tick(5f);
+            Assert.AreEqual(2, p.Available);
+            Assert.IsTrue(p.TryConsume());
+            Assert.IsFalse(p.IsLocked);
+        }
+
+        [Test]
+        public void NeededZeroIsTodaysBehaviour()
+        {
+            var p = NewLockoutPool(0);
+            p.TryConsume();
+            p.TryConsume();
+            p.TryConsume();
+            Assert.IsFalse(p.IsLocked);
+
+            p.Tick(5f);
+            Assert.AreEqual(1, p.Available);
+            Assert.IsTrue(p.TryConsume());
+        }
+
+        [Test]
+        public void NeededOneIsTodaysBehaviour()
+        {
+            var p = NewLockoutPool(1);
+            p.TryConsume();
+            p.TryConsume();
+            p.TryConsume();
+            Assert.IsFalse(p.IsLocked);
+            p.Tick(5f);
+            Assert.IsTrue(p.TryConsume());
+        }
+
+        [Test]
+        public void RefillAllClearsTheLock()
+        {
+            var p = NewLockoutPool(2);
+            p.TryConsume();
+            p.TryConsume();
+            p.TryConsume();
+            Assert.IsTrue(p.IsLocked);
+
+            p.RefillAll();
+            Assert.IsFalse(p.IsLocked);
+            Assert.IsTrue(p.TryConsume());
+        }
+
+        [Test]
+        public void NeededAboveMaxChargesUnlocksAtFull()
+        {
+            var p = new ChargePool(maxCharges: 2, rechargeSeconds: 5f, chargesNeededAfterRunningDry: 5);
+            p.TryConsume();
+            p.TryConsume();
+            Assert.IsTrue(p.IsLocked);
+            p.Tick(5f);
+            Assert.IsTrue(p.IsLocked);
+            p.Tick(5f);
+            Assert.IsFalse(p.IsLocked);
+        }
+
+        [Test]
+        public void LoweringMaxChargesBelowNeededUnlocksAtTheClampedNumber()
+        {
+            var p = NewLockoutPool(3);
+            p.TryConsume();
+            p.TryConsume();
+            p.TryConsume();
+            p.Tick(5f);
+            p.Tick(5f); // 2 available, needed 3: still locked
+            Assert.IsTrue(p.IsLocked);
+
+            p.SetMaxCharges(2); // needed clamps to 2, which we already have
+            Assert.IsFalse(p.IsLocked);
+        }
     }
 }

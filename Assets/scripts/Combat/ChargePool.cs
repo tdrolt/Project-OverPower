@@ -33,8 +33,23 @@ namespace Overpower.Combat
         /// meaningful "partway there" to report, since the very next Tick fills it outright.</summary>
         public float RechargeProgress => Available >= MaxCharges || rechargeSeconds <= 0f ? 0f : timer / rechargeSeconds;
 
-        public ChargePool(int maxCharges, float rechargeSeconds)
+        // Charges that must be back after the pool runs dry before it can be used again. 0 or 1 means
+        // no lock-out (today's behaviour). Tudor's Dash rule (D8): use all 3, locked until 2 refill.
+        private int chargesNeededAfterRunningDry;
+
+        /// <summary>True from the moment a use empties the pool until enough charges have refilled.
+        /// While locked nothing can be consumed, even if one charge is already back.</summary>
+        public bool IsLocked { get; private set; }
+
+        /// <summary>The cast gate's question: can a charge be spent right now.</summary>
+        public bool CanConsume => Available > 0 && !IsLocked;
+
+        // The needed number can never ask for more than the pool can hold.
+        private int EffectiveNeeded => Mathf.Min(chargesNeededAfterRunningDry, MaxCharges);
+
+        public ChargePool(int maxCharges, float rechargeSeconds, int chargesNeededAfterRunningDry = 0)
         {
+            this.chargesNeededAfterRunningDry = chargesNeededAfterRunningDry;
             MaxCharges = maxCharges;
             this.rechargeSeconds = rechargeSeconds;
             Available = maxCharges;
@@ -42,11 +57,27 @@ namespace Overpower.Combat
 
         public bool TryConsume()
         {
-            if (Available <= 0)
+            if (!CanConsume)
                 return false;
 
             Available--;
+            if (Available == 0 && EffectiveNeeded > 1)
+                IsLocked = true;
             return true;
+        }
+
+        /// <summary>Retunes the lock-out (0 or 1 = off). Turning it off, or asking for fewer than
+        /// are already back, unlocks straight away.</summary>
+        public void SetChargesNeededAfterRunningDry(int needed)
+        {
+            chargesNeededAfterRunningDry = Mathf.Max(0, needed);
+            UpdateLock();
+        }
+
+        private void UpdateLock()
+        {
+            if (IsLocked && (EffectiveNeeded <= 1 || Available >= EffectiveNeeded))
+                IsLocked = false;
         }
 
         public void Tick(float deltaTime)
@@ -66,6 +97,8 @@ namespace Overpower.Combat
                 Available++;
             }
 
+            UpdateLock();
+
             if (Available >= MaxCharges)
                 timer = 0f; // fully charged - no partial progress left to report
         }
@@ -75,6 +108,7 @@ namespace Overpower.Combat
         {
             Available = MaxCharges;
             timer = 0f;
+            IsLocked = false;
         }
 
         /// <summary>
@@ -102,6 +136,8 @@ namespace Overpower.Combat
             Available = delta > 0
                 ? Mathf.Min(MaxCharges, Available + delta)
                 : Mathf.Min(Available, MaxCharges);
+
+            UpdateLock();
 
             if (Available >= MaxCharges)
                 timer = 0f;

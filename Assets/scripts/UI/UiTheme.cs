@@ -201,6 +201,12 @@ namespace Overpower.UI
         public Color pipAvailableColor = Color.white;
         [Tooltip("Charge pip colour when that charge is spent.")]
         public Color pipSpentColor = new Color(1f, 1f, 1f, 0.15f);
+        [Tooltip("Charge pip colour for a charge that is available while the ability is locked after running out " +
+                 "of charges (Dash: locked until enough have refilled). Red, so the player sees it cannot be used yet.")]
+        public Color pipLockedColor = new Color(0.9f, 0.15f, 0.15f, 1f);
+        [Tooltip("Charge pip colour for a spent charge while the ability is locked - the same red, dimmer, so the " +
+                 "count still reads.")]
+        public Color pipLockedSpentColor = new Color(0.9f, 0.15f, 0.15f, 0.35f);
         [Tooltip("Width and height of one charge pip, in canvas units (HUD step 3 - this used to be a number " +
                  "typed into PlayerHud where no designer could reach it). Tudor asked for bigger indicators: at " +
                  "14 a pip is a tenth of a 140-unit slot, where the old 8 was a seventeenth. The pips sit in a " +

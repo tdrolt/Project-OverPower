@@ -232,6 +232,7 @@ namespace Overpower.UI
         private bool lastWeaponBlocked;
         private WeaponDefinition lastWeaponDef;
         private readonly int[] lastCharges = { -1, -1, -1 };
+        private readonly bool[] lastLocked = new bool[3];
         private readonly int[] lastMaxCharges = { -1, -1, -1 };
         private readonly float[] lastRecharge = { -1f, -1f, -1f };
         private readonly bool[] lastActive = { false, false, false };
@@ -661,11 +662,12 @@ namespace Overpower.UI
             ApplyIconOrFallback(ui, def != null ? def.Icon : null, def != null ? def.DisplayName : "");
 
             int maxCharges = status != null ? status.MaxCharges : 0;
-            SetPips(ui, status != null ? status.ChargesAvailable : 0, maxCharges);
+            SetPips(ui, status != null ? status.ChargesAvailable : 0, maxCharges, status != null && status.ChargesLocked);
 
             // Force every cached value stale so the very next LateUpdate redraws this slot's sweep,
             // tint and reason text even if the new ability's numbers happen to match the old one's.
             lastCharges[index] = -1;
+            lastLocked[index] = status != null && status.ChargesLocked;
             lastMaxCharges[index] = maxCharges;
             lastRecharge[index] = -1f;
             lastActive[index] = !status?.IsActive ?? true;
@@ -692,12 +694,16 @@ namespace Overpower.UI
                 // Captured before either cache is overwritten below: the cover's own gate (next
                 // block) needs to know whether CHARGES moved this frame, not just recharge - see its
                 // comment for why the two can move independently.
+                bool locked = status != null && status.ChargesLocked;
                 bool chargesChanged = charges != lastCharges[i] || maxCharges != lastMaxCharges[i];
-                if (chargesChanged)
+                // The lock can flip without the count moving (running dry locks at 0 charges, which the
+                // count may already show), so the marks redraw on a lock change too.
+                if (chargesChanged || locked != lastLocked[i])
                 {
-                    SetPips(ui, charges, maxCharges);
+                    SetPips(ui, charges, maxCharges, locked);
                     lastCharges[i] = charges;
                     lastMaxCharges[i] = maxCharges;
+                    lastLocked[i] = locked;
                 }
 
                 if (chargesChanged || !Mathf.Approximately(recharge, lastRecharge[i]))
@@ -792,7 +798,7 @@ namespace Overpower.UI
             }
         }
 
-        private void SetPips(SlotUi ui, int charges, int maxCharges)
+        private void SetPips(SlotUi ui, int charges, int maxCharges, bool locked)
         {
             if (ui.pipRow == null)
                 return; // The weapon slot has no pip row.
@@ -837,7 +843,9 @@ namespace Overpower.UI
             }
 
             for (int i = 0; i < ui.pips.Count; i++)
-                ui.pips[i].color = i < charges ? theme.pipAvailableColor : theme.pipSpentColor;
+                ui.pips[i].color = locked
+                    ? (i < charges ? theme.pipLockedColor : theme.pipLockedSpentColor)
+                    : (i < charges ? theme.pipAvailableColor : theme.pipSpentColor);
         }
 
         // ============================================================================================

@@ -46,6 +46,12 @@ namespace Overpower.Abilities
         [Range(0f, 1f)]
         private float damageReduction = 0f;
 
+        [SerializeField, Tooltip("After you use up every Dash charge, Dash stays locked until this many " +
+                 "charges have come back. Using fewer than all of them never locks it. 0 or 1 means no " +
+                 "lock-out at all.")]
+        [Min(0)]
+        private int chargesNeededAfterRunningDry = 2;
+
         [Header("Remote trail (cosmetic only)")]
         [SerializeField, Tooltip("TrailRenderer shown on every OTHER client's screen while this " +
                  "dash travels, so a fast dash still reads clearly at a distance. The caster's own " +
@@ -74,6 +80,8 @@ namespace Overpower.Abilities
         // Every client: counts down the remote trail so it turns off on its own without a second
         // network message - see PlayResolveTrail below.
         private float remoteTrailSecondsLeft;
+
+        protected override int ChargesNeededAfterRunningDry => chargesNeededAfterRunningDry;
 
         public override bool IsActive => travelling;
 

@@ -123,6 +123,10 @@ namespace Overpower.Abilities
         AbilityDefinition Definition { get; }
         int ChargesAvailable { get; }
 
+        /// <summary>True while the ability is locked after running out of charges, until enough have
+        /// refilled. The HUD draws the charge marks red for it.</summary>
+        bool ChargesLocked { get; }
+
         /// <summary>0 means this ability has no charges at all (a sprint that spends heat instead)
         /// - the HUD should draw no cooldown for it, not a permanently empty one.</summary>
         int MaxCharges { get; }
