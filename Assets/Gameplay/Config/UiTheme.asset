@@ -82,6 +82,7 @@ MonoBehaviour:
   ultimateReadyTextColor: {r: 1, g: 0.95, b: 0.6, a: 1}
   ultimateRecastText: THROW
   ultimateReadyText: READY
+  ultimateNoneText: No ultimate
   silencedIconColor: {r: 0.85, g: 0.85, b: 0.85, a: 0.9}
   silencedWashAlpha: 0.35
   silencedIconSize: 28

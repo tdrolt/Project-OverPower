@@ -240,6 +240,7 @@ namespace Overpower.UI
         private float lastUltimateCharge = -1f;
         private bool lastUltimateReady;
         private bool lastUltimateRecast;
+        private bool lastUltimateNone;
         private int lastGoldBalance = int.MinValue;
         private double lastGoldIncome = double.MinValue;
         private bool lastOverPowerShown;
@@ -739,7 +740,7 @@ namespace Overpower.UI
                 }
 
                 if (slot == AbilitySlot.Ultimate)
-                    UpdateUltimateMeter(ui, block);
+                    UpdateUltimateMeter(ui, block, status != null);
             }
         }
 
@@ -748,7 +749,7 @@ namespace Overpower.UI
         /// same moment Space actually casts something. Independent of the slot's ordinary cooldown
         /// cover above, which for an ultimate module reflects only the trivial always-instant
         /// base-class pool, never the real gate.</summary>
-        private void UpdateUltimateMeter(SlotUi ui, CastBlock block)
+        private void UpdateUltimateMeter(SlotUi ui, CastBlock block, bool equipped)
         {
             if (ui.ultimateChargeFill == null)
                 return; // Built only for the Ultimate slot - see BuildSlot's isUltimate parameter.
@@ -756,21 +757,27 @@ namespace Overpower.UI
             float normalised = ultimateCharge != null ? ultimateCharge.Normalised : 0f;
             bool ready = ultimateCharge != null && ultimateCharge.IsFull;
 
-            if (!Mathf.Approximately(normalised, lastUltimateCharge))
+            // "No ultimate" wins over the meter and READY/THROW; the meter keeps filling underneath.
+            UltimateSlotState state = UltimateSlotRule.StateFor(equipped, ready, block == CastBlock.None);
+            bool noUltimate = state == UltimateSlotState.NoUltimate;
+            float shown = noUltimate ? 0f : normalised;
+
+            if (!Mathf.Approximately(shown, lastUltimateCharge))
             {
-                ui.ultimateChargeFill.fillAmount = normalised;
-                lastUltimateCharge = normalised;
+                ui.ultimateChargeFill.fillAmount = shown;
+                lastUltimateCharge = shown;
             }
 
-            // Meter empty but the slot is still usable: the AoE Zone's throw (D11) - say so, in its own text.
-            bool recast = !ready && block == CastBlock.None;
+            bool showReady = state == UltimateSlotState.Ready;
+            bool recast = state == UltimateSlotState.Throw;
 
-            if (ready != lastUltimateReady || recast != lastUltimateRecast)
+            if (showReady != lastUltimateReady || recast != lastUltimateRecast || noUltimate != lastUltimateNone)
             {
-                ui.readyLabel.gameObject.SetActive(ready || recast);
-                ui.readyLabel.text = recast ? theme.ultimateRecastText : theme.ultimateReadyText;
-                lastUltimateReady = ready;
+                ui.readyLabel.gameObject.SetActive(showReady || recast || noUltimate);
+                ui.readyLabel.text = noUltimate ? theme.ultimateNoneText : recast ? theme.ultimateRecastText : theme.ultimateReadyText;
+                lastUltimateReady = showReady;
                 lastUltimateRecast = recast;
+                lastUltimateNone = noUltimate;
             }
         }
 
