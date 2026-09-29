@@ -91,6 +91,19 @@ namespace Overpower.Combat
         public IReadOnlyList<int> ChildrenOf(int id) =>
             childrenOf.TryGetValue(id, out var list) ? list : None;
 
+        /// <summary>Task 5b-2 (D6): one (parent, child) pair per upgrade step - what the shop draws an arrow for.
+        /// The starting weapon has no parent, so it is never a child here.</summary>
+        public IReadOnlyList<(int parent, int child)> Edges()
+        {
+            var edges = new List<(int parent, int child)>();
+            var parents = new List<int>(childrenOf.Keys);
+            parents.Sort();
+            foreach (int parent in parents)
+                foreach (int child in childrenOf[parent])
+                    if (!inCycle.Contains(child)) edges.Add((parent, child));
+            return edges;
+        }
+
         public bool IsLeaf(int id) => parentOf.ContainsKey(id) && ChildrenOf(id).Count == 0;
 
         /// <summary>True only for a direct child of the given weapon - upgrades go one step at a time.</summary>

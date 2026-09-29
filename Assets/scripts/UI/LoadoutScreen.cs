@@ -180,12 +180,16 @@ namespace Overpower.UI
         /// and ability card so hovering either one can drive the description panel below, without
         /// every node/card wiring its own EventTrigger by hand. A MonoBehaviour because
         /// IPointerEnterHandler/IPointerExitHandler only work on one.</summary>
-        private sealed class HoverRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+        private sealed class HoverRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
         {
             public System.Action OnEnter;
             public System.Action OnExit;
-            public void OnPointerEnter(PointerEventData eventData) => OnEnter?.Invoke();
+            /// <summary>Where the pointer is (screen pixels) - fired on enter and on every move, so the tooltip
+            /// (Task 5b-2) knows where to appear.</summary>
+            public System.Action<Vector2> OnPointerAt;
+            public void OnPointerEnter(PointerEventData eventData) { OnEnter?.Invoke(); OnPointerAt?.Invoke(eventData.position); }
             public void OnPointerExit(PointerEventData eventData) => OnExit?.Invoke();
+            public void OnPointerMove(PointerEventData eventData) => OnPointerAt?.Invoke(eventData.position);
         }
 
         private const string HoverHintText = "Hover an item to see what it does.";
@@ -406,6 +410,8 @@ namespace Overpower.UI
             // something on THIS screen was clicked. Abilities do not need this: AbilityRunner's
             // SlotChanged already fires for every equip from every source, and Refresh is already
             // subscribed to it.
+            TickTooltip(Time.unscaledDeltaTime);
+
             int weaponId = CurrentWeaponId();
             int absorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
             int rechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
@@ -454,6 +460,7 @@ namespace Overpower.UI
             // No Cursor.lockState/Cursor.visible call exists anywhere in this project (checked
             // before writing this) - the cursor is always free, so there is nothing to unlock here.
             ClearHover(); // Reopening must not show whatever was last hovered before it closed.
+            HideTooltip();
             Refresh();
         }
 
@@ -464,6 +471,7 @@ namespace Overpower.UI
 
             isOpenLocal = false;
             IsOpen = false;
+            HideTooltip();
             screenRoot.SetActive(false);
             inputRouter?.SetToolFocus(this, false);
 
@@ -931,27 +939,32 @@ namespace Overpower.UI
             if (playerHealth == null || armorConfig == null)
                 return;
 
-            int absorbMax = Mathf.Max(0, armorConfig.AbsorbLevelCount - 1);
-            int rechargeMax = Mathf.Max(0, armorConfig.RechargeLevelCount - 1);
-
             var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel);
             int nextPrice = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
             PurchaseBlock block = ctx.Check(nextPrice);
             bool gateBlocked = block != PurchaseBlock.None;
             string priceLine = ShopPricing.PriceLine(nextPrice, block, ctx.Balance);
 
+            // Task 5b-2 (D5): the limit is ONE budget shared by both rows (ArmorUpgradePath.TotalUpgrades against
+            // ArmorConfig.MaxArmorUpgrades), so both rows say where the next click sits in it, or that it is spent.
+            string limit = ArmorLimitLabel.Text(path.TotalUpgrades, armorConfig.MaxArmorUpgrades);
             absorbText.text = path.CanUpgradeAbsorb
-                ? $"Absorb {playerHealth.AbsorbLevel}/{absorbMax} ({priceLine})"
-                : $"Absorb {playerHealth.AbsorbLevel}/{absorbMax}";
+                ? $"Absorb lv {playerHealth.AbsorbLevel}: {limit} ({priceLine})"
+                : $"Absorb lv {playerHealth.AbsorbLevel}: {ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit)}";
             rechargeText.text = path.CanUpgradeRecharge
-                ? $"Recharge {playerHealth.RechargeLevel}/{rechargeMax} ({priceLine})"
-                : $"Recharge {playerHealth.RechargeLevel}/{rechargeMax}";
+                ? $"Recharge lv {playerHealth.RechargeLevel}: {limit} ({priceLine})"
+                : $"Recharge lv {playerHealth.RechargeLevel}: {ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit)}";
             absorbText.color = path.CanUpgradeAbsorb && gateBlocked ? theme.mutedTextColor : theme.textColor;
             rechargeText.color = path.CanUpgradeRecharge && gateBlocked ? theme.mutedTextColor : theme.textColor;
 
             absorbButton.interactable = path.CanUpgradeAbsorb;
             rechargeButton.interactable = path.CanUpgradeRecharge;
         }
+
+        /// <summary>What a row says when it cannot be bought: the shared limit's "N of N (max)" if the budget is
+        /// spent, otherwise that this row is at its own top level.</summary>
+        private static string ArmorRowFull(int bought, int max, string limit) =>
+            bought >= max ? limit : "top level";
 
         // ============================================================================================
         // Abilities (right column) - Mobility, Equipment, Ultimate, each a heading and a wrapping

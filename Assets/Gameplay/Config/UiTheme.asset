@@ -111,6 +111,14 @@ MonoBehaviour:
   loadoutSoldArmorFormat: 'Sold armour upgrades: +{0} gold'
   loadoutSoldMessageDurationSeconds: 3
   loadoutDescriptionPanelHeight: 190
+  loadoutTooltipDelaySeconds: 1
+  loadoutTooltipMaxWidth: 320
+  loadoutTooltipBackgroundColor: {r: 0.12, g: 0.12, b: 0.145, a: 1}
+  loadoutArrowColor: {r: 0.42, g: 0.42, b: 0.47, a: 1}
+  loadoutArrowWidth: 3
+  loadoutArrowHeadSize: 12
+  loadoutTreeRowGap: 26
+  loadoutTreeColumnGap: 30
   loadoutToggleButtonWidth: 190
   loadoutToggleButtonHeight: 48
   loadoutToggleButtonMargin: 24

@@ -37,21 +37,17 @@ namespace Overpower.Match
         /// territory" gate counts as passed while dead. Living players are asked about where they really are.</summary>
         public static bool EffectiveInOwnTerritory(bool isAlive, bool inOwnTerritory) => !isAlive || inOwnTerritory;
 
-        /// <summary>Task 5b-1 (D4): a respawned player starts out of combat, so the "out of combat" gate counts
-        /// as passed while dead (exactly the required time has passed). Living players keep their real timer.</summary>
-        public static float EffectiveSecondsSinceCombat(bool isAlive, float secondsSinceCombat, float requiredOutOfCombatSeconds) =>
-            isAlive ? secondsSinceCombat : Math.Max(secondsSinceCombat, requiredOutOfCombatSeconds);
-
         /// <summary>Task 5b-1 (D19): the text on a weapon node that can only be reached by selling the current
         /// weapon path first: the new weapon's price and what selling back gives. Empty when there is nothing to
         /// sell back (the node then keeps its normal price line). format: {0} = price, {1} = refund.</summary>
         public static string SwapLine(int price, int refund, string format) =>
             refund > 0 ? string.Format(System.Globalization.CultureInfo.InvariantCulture, format, price, refund) : "";
 
-        /// <summary>Task 5b-1 (D19): the message after a sale. format has {0} = what was sold, {1} = the refund.</summary>
+        /// <summary>Task 5b-1 (D19): the message after selling armour upgrades. format has {0} = the refund.</summary>
         public static string SoldArmorMessage(string format, int refund) =>
             string.Format(System.Globalization.CultureInfo.InvariantCulture, format, refund);
 
+        /// <summary>Task 5b-1 (D19): the message after selling a weapon. format has {0} = what was sold, {1} = the refund.</summary>
         public static string SoldMessage(string format, string what, int refund) =>
             string.Format(System.Globalization.CultureInfo.InvariantCulture, format, what, refund);
 

@@ -98,11 +98,10 @@ namespace Overpower.UI
             bool freeLoadout = config == null || config.FreeLoadout;
             bool isFree = IsFreeNow(config);
             bool isWarmupSandbox = isFree && !freeLoadout;
-            // Task 5b-1 (D4): while dead the territory and combat gates count as passed (respawn is at home, out of combat).
+            // Task 5b-1 (D4): while dead the territory gate counts as passed (respawn is at home). The combat gate needs no override: PlayerHealth puts the clock at "out of combat" on death.
             bool inOwnTerritory = ShopRules.EffectiveInOwnTerritory(isAlive, InOwnTerritory(owner, position));
             float secondsSinceCombat = health != null ? health.SecondsSinceCombat : 0f;
             float required = config != null ? config.ShopOutOfCombatSeconds : 0f;
-            secondsSinceCombat = ShopRules.EffectiveSecondsSinceCombat(isAlive, secondsSinceCombat, required);
             int balance = wallet != null ? wallet.Balance : 0;
             return new ShopContext(isFree, isWarmupSandbox, inOwnTerritory, secondsSinceCombat, required, balance);
         }

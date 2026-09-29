@@ -304,6 +304,22 @@ namespace Overpower.UI
         public float loadoutSoldMessageDurationSeconds = 3f;
         [Tooltip("Fixed height of the hover-description strip under the weapon/ability columns, in canvas units - fixed so switching between a short weapon hover and a long ability description never resizes the panel around it. G1 review follow-up, 2026-09-21: 150 measured 14.5 units too short for 12 Laser - Mark's own 168-character description (needs 164.5 once its own pinned width forces it to wrap); raised to 190, a line's headroom (~23 units at Small Text Size) above that measured worst case, since the strip has no mask and content past its own box would silently draw over whatever sits below it.")]
         public float loadoutDescriptionPanelHeight = 190f;
+        [Tooltip("Seconds the pointer must rest on a weapon node or ability card before its description appears in a tooltip next to the cursor (Task 5b-2). Moving off hides it at once; moving to another item restarts the wait.")]
+        public float loadoutTooltipDelaySeconds = 1f;
+        [Tooltip("Widest a shop tooltip gets, in canvas units; longer descriptions wrap onto more lines.")]
+        public float loadoutTooltipMaxWidth = 320f;
+        [Tooltip("Background of the shop tooltip.")]
+        public Color loadoutTooltipBackgroundColor = new Color(0.12f, 0.12f, 0.145f, 1f);
+        [Tooltip("Colour of the arrows from each weapon to the upgrades it opens in the shop's weapon tree (neutral grey, Task 5b-2).")]
+        public Color loadoutArrowColor = new Color(0.42f, 0.42f, 0.47f, 1f);
+        [Tooltip("Thickness of those arrows, in canvas units.")]
+        public float loadoutArrowWidth = 3f;
+        [Tooltip("Length of the arrowhead at the upgrade end of each tree arrow, in canvas units.")]
+        public float loadoutArrowHeadSize = 12f;
+        [Tooltip("Vertical space between one weapon-tree row and the next, in canvas units - room for the arrows to read (Task 5b-2).")]
+        public float loadoutTreeRowGap = 26f;
+        [Tooltip("Horizontal space between the weapon-tree columns, in canvas units. The four columns must still fit Loadout Left Column Width; the arrow to a branch's second upgrade runs down this gap.")]
+        public float loadoutTreeColumnGap = 30f;
         [Tooltip("Width of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
         public float loadoutToggleButtonWidth = 190f;
         [Tooltip("Height of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]

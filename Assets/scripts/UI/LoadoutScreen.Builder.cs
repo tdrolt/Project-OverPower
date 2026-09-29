@@ -69,16 +69,56 @@ namespace Overpower.UI
             rootLayout.childForceExpandWidth = rootLayout.childForceExpandHeight = false;
             weaponNodes[rootDef.Id] = BuildNodeButton(rootRow.transform, rootDef);
 
+            // Room between the root and the four weapons for the arrows to read (Task 5b-2, loadoutTreeRowGap).
+            GameObject rootGap = new GameObject("Weapon Tree Root Gap", typeof(RectTransform));
+            rootGap.transform.SetParent(leftColumn, false);
+            LayoutElement rootGapLe = rootGap.AddComponent<LayoutElement>();
+            rootGapLe.preferredHeight = rootGapLe.minHeight = Mathf.Max(0f, theme.loadoutTreeRowGap - theme.loadoutPanelPadding * 0.5f);
+
             GameObject branchesRow = new GameObject("Weapon Tree Branches", typeof(RectTransform));
             branchesRow.transform.SetParent(leftColumn, false);
             HorizontalLayoutGroup branchesLayout = branchesRow.AddComponent<HorizontalLayoutGroup>();
-            branchesLayout.spacing = theme.loadoutNodeSpacing;
+            branchesLayout.spacing = theme.loadoutTreeColumnGap;
             branchesLayout.childAlignment = TextAnchor.UpperCenter;
             branchesLayout.childControlWidth = branchesLayout.childControlHeight = true;
             branchesLayout.childForceExpandWidth = branchesLayout.childForceExpandHeight = false;
 
             foreach (int childId in tree.ChildrenOf(rootDef.Id))
                 BuildDescendantColumn(branchesRow.transform, childId);
+
+            BuildTreeArrows(leftColumn);
+        }
+
+        /// <summary>Task 5b-2 (D6): one arrow per parent -> child pair of the tree data (WeaponUpgradeTree.Edges),
+        /// drawn behind the nodes by a single graphic that reads the built nodes' positions - so a new weapon asset
+        /// with a Parent gets its arrow with no hand placement. Never a raycast target: it must not block a node.</summary>
+        private void BuildTreeArrows(Transform leftColumn)
+        {
+            GameObject go = new GameObject("Weapon Tree Arrows", typeof(RectTransform), typeof(CanvasRenderer));
+            go.transform.SetParent(leftColumn, false);
+            go.transform.SetAsFirstSibling(); // Behind every node and label.
+            go.AddComponent<LayoutElement>().ignoreLayout = true;
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+            TreeArrowGraphic graphic = go.AddComponent<TreeArrowGraphic>();
+            graphic.raycastTarget = false;
+            graphic.color = theme.loadoutArrowColor;
+            graphic.LineWidth = theme.loadoutArrowWidth;
+            graphic.HeadSize = theme.loadoutArrowHeadSize;
+            graphic.SideLaneWidth = theme.loadoutTreeColumnGap * 0.8f;
+
+            var childIndex = new Dictionary<int, int>();
+            foreach (var (parentId, childId) in tree.Edges())
+            {
+                if (!weaponNodes.TryGetValue(parentId, out WeaponNodeUi parentNode) || !weaponNodes.TryGetValue(childId, out WeaponNodeUi childNode))
+                    continue;
+                childIndex.TryGetValue(parentId, out int index);
+                childIndex[parentId] = index + 1;
+                graphic.Add(parentNode.outer.rectTransform, childNode.outer.rectTransform, index);
+            }
         }
 
         /// <summary>One branch's own vertical column: its node, then a nested column per child,
@@ -93,7 +133,7 @@ namespace Overpower.UI
             GameObject column = new GameObject($"Weapon Branch {weaponId}", typeof(RectTransform));
             column.transform.SetParent(parent, false);
             VerticalLayoutGroup layout = column.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = theme.loadoutNodeSpacing;
+            layout.spacing = theme.loadoutTreeRowGap;
             layout.childAlignment = TextAnchor.UpperCenter;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
@@ -157,7 +197,9 @@ namespace Overpower.UI
 
             HoverRelay hover = go.AddComponent<HoverRelay>();
             hover.OnEnter = () => ShowWeaponHover(def);
-            hover.OnExit = ClearHover;
+            string tooltipKey = "w:" + def.Id;
+            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, () => def.Description, pos);
+            hover.OnExit = () => { ClearHover(); TooltipPointerLeft(tooltipKey); };
 
             return new WeaponNodeUi { button = button, outer = outer, inner = inner, label = label };
         }
@@ -313,7 +355,9 @@ namespace Overpower.UI
 
             HoverRelay hover = go.AddComponent<HoverRelay>();
             hover.OnEnter = () => ShowAbilityHover(def);
-            hover.OnExit = ClearHover;
+            string tooltipKey = "a:" + def.Slot + ":" + def.Id;
+            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, () => def.Description, pos);
+            hover.OnExit = () => { ClearHover(); TooltipPointerLeft(tooltipKey); };
 
             return new AbilityCardUi { button = button, outer = outer, inner = inner, label = label };
         }

@@ -31,27 +31,20 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ADeadPlayerCountsAsOutOfCombat()
+        public void ALivingPlayerCombatTimerStillBlocksTheShop()
         {
-            Assert.AreEqual(PurchaseBlock.None,
-                ShopRules.Check(ShopRules.EffectiveInOwnTerritory(false, false),
-                    ShopRules.EffectiveSecondsSinceCombat(false, 0.5f, 5f), 5f, 5000, 1200));
-        }
-
-        [Test]
-        public void ALivingPlayerCombatTimerIsUnchanged()
-        {
-            Assert.AreEqual(0.5f, ShopRules.EffectiveSecondsSinceCombat(true, 0.5f, 5f));
-            Assert.AreEqual(PurchaseBlock.InCombat,
-                ShopRules.Check(true, ShopRules.EffectiveSecondsSinceCombat(true, 0.5f, 5f), 5f, 5000, 1200));
+            Assert.AreEqual(PurchaseBlock.InCombat, ShopRules.Check(true, 0.5f, 5f, 5000, 1200));
         }
 
         [Test]
         public void ADeadPlayerStillCannotBuyWhatTheyCannotPayFor()
         {
+            // PlayerHealth puts the combat clock at "out of combat" on death (CombatClockRule), so it reads as passed here.
+            float clockAfterDeath = CombatClockRule.OutOfCombatValue(6f, 5f, 4f);
             Assert.AreEqual(PurchaseBlock.CannotAfford,
-                ShopRules.Check(ShopRules.EffectiveInOwnTerritory(false, false),
-                    ShopRules.EffectiveSecondsSinceCombat(false, 0f, 5f), 5f, 100, 1200));
+                ShopRules.Check(ShopRules.EffectiveInOwnTerritory(false, false), clockAfterDeath, 5f, 100, 1200));
+            Assert.AreEqual(PurchaseBlock.None,
+                ShopRules.Check(ShopRules.EffectiveInOwnTerritory(false, false), clockAfterDeath, 5f, 5000, 1200));
         }
 
         [Test]
