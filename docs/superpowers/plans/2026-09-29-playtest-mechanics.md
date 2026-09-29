@@ -12,10 +12,15 @@ basics on the name screen; everyone can see the score with Tab; the ultimate met
 **D** = Tudor decided, **A** = default until Tudor says otherwise. The session confirms the A rows with Tudor at its
 start (play terms, one question each, default stated), then proceeds with whatever he answers.
 
+**2026-09-29 session start: Tudor confirmed every A row as stated** (the look/wording specifics as offered: the shield
+limit "Upgrade 1 of 2" / "2 of 2 (max)"; tips = keys, overheat + Vent, charges, the mode; a capture counts for everyone
+standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold X: +N gold"; the shield ring for its 2 s
++ a "Wasted" pop). Changes: D2 = the middle of each recess; D18 adds a SLOWED label (STUNNED takes priority).
+
 | # | Decision | Who |
 |---|---|---|
 | D1 | Health pack: +50 health, reappears 30 s after it's taken. | D |
-| D2 | Health packs sit in the three Tier III recesses (one each). Not in the capital pockets; not in the recess that appears when the map shrinks. | A |
+| D2 | Health packs sit in the three Tier III recesses (one each), **in the middle of the recess zone**. Not in the capital pockets; not in the recess that appears when the map shrinks. | D (09-29) |
 | D3 | A pack can only be taken by a living player who isn't at full health; it heals up to max health, never above. While it's gone, a faint marker shows where it will return. | A |
 | D4 | The shop opens while dead; what you buy is yours when you respawn (same prices, same rules). | A |
 | D5 | Ability and item descriptions show as a tooltip after hovering 1 s; the shield (armour) shows "upgrade 1 of 2" style limits. | D (the limit wording: A) |
@@ -30,7 +35,7 @@ start (play terms, one question each, default stated), then proceeds with whatev
 | D15 | Teleport portals: teammates can use them too, not only the player who placed them; standing anywhere on the portal counts (not just its middle); the portal is 20% smaller (2.5 m → 2.0 m across). | D |
 | D16 | A teammate's trip works like the owner's (the same 3 s channel, interrupted the same way) and uses the same portal charge and cooldown as the owner's own trips; enemies still can't use them. | A |
 | D17 | **Last stand, changed:** a base that is neutral or held by an enemy is lost only when every member of its team is dead. While any member is alive, the team is in its last stand: nobody on it can respawn - neither players who were already dead when the base fell nor players who die after. The two-team "out at once if the other team holds a base" rule goes. Holding another team's base still counts as having a base. | D |
-| D18 | A **"STUNNED"** label with a short countdown bar over a stunned player (everyone sees it) and on your own HUD. | D (the look: A) |
+| D18 | A **"STUNNED"** label with a short countdown bar over a stunned player (everyone sees it) and on your own HUD. Yellow text, a thin bar shrinking over the stun's time. **The same for slowed ("SLOWED")**; when both apply, STUNNED always shows (the stronger effect). | D (09-29: the look confirmed, SLOWED added by Tudor) |
 | D19 | The shop shows what a swap costs: selling back and the refund amount on the button, and a short message after a sale. | D (the wording: A) |
 | D20 | The shield ultimate shows its armed window: a visible ring/glow for its 2 s, and a "wasted" cue if nothing hit you in time. | D (the look: A) |
 | D21 | **Connection lost:** a "Connection lost - Rejoin" panel. Rejoining puts you back in the same match as the same player (same team, gold, loadout) - also after a crash and restart, within 2 minutes. Identity: a random id saved on the PC the first time the game runs (not the name, not the IP: names repeat and IPs change). Two players with the same name are fine; they're told apart by the id. | D (the id, the 2 minutes: A) |
@@ -161,8 +166,9 @@ start (play terms, one question each, default stated), then proceeds with whatev
   the team out; the match ends correctly. Captures + recorder lines.
 - **Review:** the strongest model (rules every client must agree on).
 
-### Task 9c: The STUNNED label (D18)
-- **Files:** the status-effect view (find where stun is applied and shown), `UiTheme` (text, colours, sizes).
+### Task 9c: The STUNNED and SLOWED labels (D18)
+- **Files:** the status-effect view (find where stun and slow are applied and shown), `UiTheme` (text, colours, sizes).
+- **Test first:** pure rule: which label shows (stun beats slow; none when neither).
 - **Check:** Play Mode: stun a test dummy and yourself; capture both. Two clients: the other player sees it.
 
 ### Task 9d: The shield's window (D20)
