@@ -208,6 +208,15 @@ namespace Overpower.Data
         [SerializeField, Range(0f, 1f)] private float overPowerStatBonus = 0.10f;
         public float OverPowerStatBonus => overPowerStatBonus;
 
+        [Header("Scoreboard")]
+        [Tooltip("How many times a second, at most, your own client publishes your scoreboard numbers " +
+                 "(kills, deaths, assists, damage, zones) for everyone else's Tab board. Damage adds up fast, so " +
+                 "it is sent in batches at this rate; a kill, a death or a zone capture is sent at once. " +
+                 "0 = send every change. Lower = less network traffic, but other players' damage number " +
+                 "lags a little more behind.")]
+        [SerializeField, Min(0f)] private float scoreboardPublishesPerSecond = 4f;
+        public float ScoreboardPublishesPerSecond => scoreboardPublishesPerSecond;
+
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
                  "click. Handy while tuning weapons; switch it off for a real match.")]

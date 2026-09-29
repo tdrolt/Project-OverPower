@@ -267,6 +267,26 @@ MonoBehaviour:
   damageNumberRise: 60
   damageNumberFadeStart: 0.55
   damageNumberAnchorHeight: 2
+  scoreboardWidth: 1100
+  scoreboardRowHeight: 42
+  scoreboardTextSize: 26
+  scoreboardHeadingTextSize: 28
+  scoreboardPanelColor: {r: 0.04, g: 0.04, b: 0.06, a: 0.88}
+  scoreboardSelfRowColor: {r: 1, g: 1, b: 1, a: 0.16}
+  scoreboardRefreshesPerSecond: 5
+  scoreboardTitleText: Scoreboard
+  scoreboardColumnTexts:
+  - Player
+  - Kills
+  - Deaths
+  - Assists
+  - Damage
+  - Zones
+  scoreboardTeamNames:
+  - White
+  - Purple
+  - Cyan
+  scoreboardUnknownTeamText: Joining
   damageNumberScreenOffset: {x: 50, y: 0}
   blockedText: Blocked
   blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}

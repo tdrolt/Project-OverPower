@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using Overpower.Match;
 using TMPro;
 
 /// <summary>
@@ -76,8 +77,8 @@ public class PlayerInputRouter : MonoBehaviour
     /// is the only subscriber (owner only), and forwards it to OverheatState.TryVent().</summary>
     public event System.Action VentPressed;
 
-    // Scoreboard still has nothing subscribed. Shop (LoadoutScreen) and Map (MinimapView) each have their own,
-    // narrower emit gate - see ShopSuppressed and MapSuppressed.
+    // Scoreboard (ScoreboardPanel), Shop (LoadoutScreen) and Map (MinimapView) each have their own, narrower
+    // emit gate - see EmitScoreboardPressed, ShopSuppressed and MapSuppressed.
     public event System.Action MapToggled;
     public event System.Action ShopToggled;
     public event System.Action ScoreboardPressed;
@@ -179,7 +180,7 @@ public class PlayerInputRouter : MonoBehaviour
         equipmentAction.started += _ => EmitPointerGated(EquipmentPressed); ultimateAction.started += _ => Emit(UltimatePressed);
         mobilityAction.started += _ => Emit(MobilityPressed); mobilityAction.canceled += _ => Emit(MobilityReleased);
         mapAction.started += _ => EmitMap(); shopAction.started += _ => EmitShop();
-        scoreboardAction.started += _ => Emit(ScoreboardPressed); scoreboardAction.canceled += _ => Emit(ScoreboardReleased);
+        scoreboardAction.started += _ => EmitScoreboardPressed(); scoreboardAction.canceled += _ => ScoreboardReleased?.Invoke();
         ventAction.started += _ => Emit(VentPressed);
     }
 
@@ -259,6 +260,15 @@ public class PlayerInputRouter : MonoBehaviour
     {
         if (!ShopSuppressed)
             ShopToggled?.Invoke();
+    }
+
+    /// <summary>ScoreboardPressed's own emit path (Tudor's D12): only typing in chat blocks it - a dead player still
+    /// sees the board (ScoreboardRules.MayOpen). The release (see Awake's wiring) is never gated, so a board
+    /// opened just before you started typing, or before you died, can always close again.</summary>
+    private void EmitScoreboardPressed()
+    {
+        if (ScoreboardRules.MayOpen(IsTypingInChat()))
+            ScoreboardPressed?.Invoke();
     }
 
     /// <summary>MapToggled's own emit path - see MapSuppressed.</summary>

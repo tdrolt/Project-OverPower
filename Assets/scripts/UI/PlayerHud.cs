@@ -1018,6 +1018,11 @@ namespace Overpower.UI
             TextMeshProUGUI warmupLabel = BuildWarmupLine(canvasGo.transform);
             MatchStartPanel.Create(transform, theme, warmupLabel);
 
+            // Tudor D12: hold Tab for the scoreboard. The publisher counts this player's own numbers and writes them
+            // to their Player Properties; the panel reads everyone's. Both are owner-only, like the rest of this HUD.
+            ScoreboardPublisher.Create(gameObject, gameplayConfig);
+            ScoreboardPanel.Create(transform, theme, GetComponent<PlayerInputRouter>());
+
             BuildHitFeedbackCanvas();
         }
 

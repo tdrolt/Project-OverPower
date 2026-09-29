@@ -929,6 +929,32 @@ namespace Overpower.UI
         [Tooltip("MatchLogZip's saved-log overlay button - Application.OpenURL of the match folder.")]
         public string openLogFolderText = "Open folder";
 
+        [Header("Scoreboard (hold Tab)")]
+        [Tooltip("Width of the Tab scoreboard, in reference pixels (the HUD's 1920x1080 grid).")]
+        public float scoreboardWidth = 1100f;
+        [Tooltip("Height of every scoreboard line: a team's title, the column headings and each player.")]
+        public float scoreboardRowHeight = 42f;
+        [Tooltip("Text size of a player's line on the scoreboard.")]
+        public float scoreboardTextSize = 26f;
+        [Tooltip("Text size of the scoreboard's title, its column headings and each team's name.")]
+        public float scoreboardHeadingTextSize = 28f;
+        [Tooltip("Colour of the dark slab behind the scoreboard. Keep it fairly see-through so the arena still shows.")]
+        public Color scoreboardPanelColor = new Color(0.04f, 0.04f, 0.06f, 0.88f);
+        [Tooltip("Colour of the strip behind YOUR OWN line, so you find yourself at a glance.")]
+        public Color scoreboardSelfRowColor = new Color(1f, 1f, 1f, 0.16f);
+        [Tooltip("How many times a second the scoreboard re-reads everyone's numbers while Tab is held. It does " +
+                 "not read anything while closed.")]
+        [Min(1f)] public float scoreboardRefreshesPerSecond = 5f;
+        [Tooltip("The scoreboard's title.")]
+        public string scoreboardTitleText = "Scoreboard";
+        [Tooltip("The column headings, in order: player name, kills, deaths, assists, damage dealt, zones captured.")]
+        public string[] scoreboardColumnTexts = { "Player", "Kills", "Deaths", "Assists", "Damage", "Zones" };
+        [Tooltip("Each team's name on the scoreboard, in team order (White, Purple, Cyan). Each one is drawn in that " +
+                 "team's Team Shot Colour.")]
+        public string[] scoreboardTeamNames = { "White", "Purple", "Cyan" };
+        [Tooltip("Shown for a team the scoreboard cannot name (a player whose team has not arrived yet).")]
+        public string scoreboardUnknownTeamText = "Joining";
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why

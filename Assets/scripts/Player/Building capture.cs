@@ -914,11 +914,19 @@ public class BuildingCapture : MonoBehaviourPun
         StopCooldown();
     }
 
-    // Sound only. The flag is no longer set here: it follows replicated ownership via
-    // BuildingManager, so a late joiner gets the right colour without needing this call.
+    /// <summary>Raised on EVERY client when a zone flips to a team (zone id, team). ScoreboardPublisher is the
+    /// subscriber; the RPC itself is unchanged.</summary>
+    public static event System.Action<int, int> ZoneFlipped;
+
+    // Sound only (plus the ZoneFlipped notice below). The flag is no longer set here: it follows replicated
+    // ownership via BuildingManager, so a late joiner gets the right colour without needing this call.
     [PunRPC]
     void RPC_CompleteCapture(int teamID)
     {
+        // Runs on every client: each one's own scoreboard tally decides whether ITS player was standing here
+        // (Tudor D12). Raised before the sound gate below, which only decides whether a sound plays.
+        ZoneFlipped?.Invoke(buildingID, teamID);
+
         if (!CapturedSoundOn)
             return;
         if (audioSource && capturedSound)
