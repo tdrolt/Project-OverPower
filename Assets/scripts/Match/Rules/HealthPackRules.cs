@@ -55,7 +55,7 @@ namespace Overpower.Match
         /// same pack sees it taken.</summary>
         public static Decision Decide(int[] currentValue, int nowMs, bool requesterAlive, bool zoneInPlay,
                                       bool requesterInRange, int requesterActor, int requestId, int respawnMs,
-                                      int liveAtMs = 0)
+                                      int liveAtMs)
         {
             if (!requesterAlive || !zoneInPlay || !requesterInRange || !IsAvailable(currentValue, nowMs, liveAtMs, respawnMs))
                 return new Decision(false, null);

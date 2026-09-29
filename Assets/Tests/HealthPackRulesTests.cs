@@ -102,7 +102,7 @@ namespace Overpower.Tests
         [Test]
         public void FirstRequestOnAnAvailablePackIsGrantedAndStampsTheReturnTime()
         {
-            HealthPackRules.Decision d = HealthPackRules.Decide(null, 10000, true, true, true, 3, 7, 30000);
+            HealthPackRules.Decision d = HealthPackRules.Decide(null, 10000, true, true, true, 3, 7, 30000, 0);
             Assert.IsTrue(d.Granted);
             CollectionAssert.AreEqual(new[] { 40000, 3, 7 }, d.NewValue);
         }
@@ -110,8 +110,8 @@ namespace Overpower.Tests
         [Test]
         public void TwoRequestsForTheSamePackInOrderOnlyTheFirstIsGranted()
         {
-            HealthPackRules.Decision first = HealthPackRules.Decide(null, 10000, true, true, true, 3, 1, 30000);
-            HealthPackRules.Decision second = HealthPackRules.Decide(first.NewValue, 10000, true, true, true, 4, 1, 30000);
+            HealthPackRules.Decision first = HealthPackRules.Decide(null, 10000, true, true, true, 3, 1, 30000, 0);
+            HealthPackRules.Decision second = HealthPackRules.Decide(first.NewValue, 10000, true, true, true, 4, 1, 30000, 0);
             Assert.IsTrue(first.Granted);
             Assert.IsFalse(second.Granted);
             Assert.IsNull(second.NewValue);
@@ -120,19 +120,34 @@ namespace Overpower.Tests
         [Test]
         public void RequestIsRefusedForDeadOutOfPlayOrOutOfRange()
         {
-            Assert.IsFalse(HealthPackRules.Decide(null, 0, false, true, true, 3, 1, 30000).Granted, "dead");
-            Assert.IsFalse(HealthPackRules.Decide(null, 0, true, false, true, 3, 1, 30000).Granted, "out of play");
-            Assert.IsFalse(HealthPackRules.Decide(null, 0, true, true, false, 3, 1, 30000).Granted, "too far away");
+            Assert.IsFalse(HealthPackRules.Decide(null, 0, false, true, true, 3, 1, 30000, 0).Granted, "dead");
+            Assert.IsFalse(HealthPackRules.Decide(null, 0, true, false, true, 3, 1, 30000, 0).Granted, "out of play");
+            Assert.IsFalse(HealthPackRules.Decide(null, 0, true, true, false, 3, 1, 30000, 0).Granted, "too far away");
         }
 
         [Test]
         public void PackThatHasComeBackCanBeTakenAgain()
         {
             int[] old = { 40000, 3, 7 };
-            Assert.IsFalse(HealthPackRules.Decide(old, 39999, true, true, true, 4, 1, 30000).Granted);
-            HealthPackRules.Decision again = HealthPackRules.Decide(old, 40000, true, true, true, 4, 1, 30000);
+            Assert.IsFalse(HealthPackRules.Decide(old, 39999, true, true, true, 4, 1, 30000, 0).Granted);
+            HealthPackRules.Decision again = HealthPackRules.Decide(old, 40000, true, true, true, 4, 1, 30000, 0);
             Assert.IsTrue(again.Granted);
             CollectionAssert.AreEqual(new[] { 70000, 4, 1 }, again.NewValue);
+        }
+
+        [Test]
+        public void DecideGrantsAPackTakenInWarmUpOnceTheMatchIsLive()
+        {
+            int[] warmup = { 50000 + 30000, 3, 1 }; // taken at 50000, still "taken" by the clock at 60000
+            Assert.IsTrue(HealthPackRules.Decide(warmup, 60000, true, true, true, 4, 1, 30000, 55000).Granted);
+            Assert.IsFalse(HealthPackRules.Decide(warmup, 60000, true, true, true, 4, 1, 30000, 0).Granted, "not live: the take counts");
+        }
+
+        [Test]
+        public void ATakeStampedExactlyAtGoLiveCounts()
+        {
+            int[] atLive = { 60000 + 30000, 3, 1 }; // taken at exactly liveAt
+            Assert.IsFalse(HealthPackRules.IsAvailable(atLive, 70000, 60000, 30000));
         }
 
         // ---- reading the echo ----------------------------------------------------------------------
