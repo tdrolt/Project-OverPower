@@ -16,7 +16,7 @@ MonoBehaviour:
   maxHealth: 100
   respawnBaseSeconds: 5
   respawnPerDeathSeconds: 2
-  respawnMaxSeconds: 20
+  respawnMaxSeconds: 35
   killHeight: -10
   matchStartCountdownSeconds: 5
   outOfCombatSeconds: 6
