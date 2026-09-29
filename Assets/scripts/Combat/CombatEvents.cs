@@ -71,6 +71,13 @@ namespace Overpower.Combat
         /// be shielded) - see PlayerHealth.ApplyDamage's own guard.</summary>
         public static event Action<Transform> LocalBlockedSeen;
 
+        /// <summary>Raised ONLY by PlayerCombatCredit.RPC_DamageCredit - credit for hitting a real player, never a
+        /// test-range dummy (DummyTarget raises the two events above directly). The scoreboard listens to this one.
+        /// takedown: 0 = damage only, 1 = kill, 2 = assist.</summary>
+        public static event Action<float, int> LocalPlayerCredit;
+
+        public static void RaisePlayerCredit(float amount, int takedown) => LocalPlayerCredit?.Invoke(amount, takedown);
+
         public static void RaiseDamageDealt(float amount) => LocalDamageDealt?.Invoke(amount);
 
         public static void RaiseTakedown(bool isKill) => LocalTakedown?.Invoke(isKill);

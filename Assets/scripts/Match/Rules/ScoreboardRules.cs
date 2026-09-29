@@ -32,7 +32,18 @@ namespace Overpower.Match
                 damage += amount;
         }
 
-        /// <summary>A zone just flipped to zoneTeam. Counts only for a living player who was standing in that zone
+        /// <summary>One credit message from a real player's hit: its damage, plus a kill (takedown 1) or an assist
+        /// (takedown 2) when it carries one.</summary>
+        public void AddCredit(float amount, int takedown)
+        {
+            AddDamage(amount);
+            if (takedown == 1)
+                AddKill();
+            else if (takedown == 2)
+                AddAssist();
+        }
+
+        /// <summary>A zone just flipped        /// <summary>A zone just flipped to zoneTeam. Counts only for a living player who was standing in that zone
         /// and is on the team it flipped to (Tudor: every capture you were standing in counts).</summary>
         public void NoteCapture(bool standingInZone, bool alive, int zoneTeam, int myTeam)
         {

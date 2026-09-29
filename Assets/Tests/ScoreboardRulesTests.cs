@@ -29,6 +29,18 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ARealPlayersCreditCountsDamageAndItsKillOrAssist()
+        {
+            var t = new ScoreTally();
+            t.AddCredit(30f, 0);
+            t.AddCredit(20f, 1);
+            t.AddCredit(10f, 2);
+            Assert.AreEqual(60, t.DamageRounded);
+            Assert.AreEqual(1, t.Kills);
+            Assert.AreEqual(1, t.Assists);
+        }
+
+        [Test]
         public void ADeathAddsOneDeath()
         {
             var t = new ScoreTally();

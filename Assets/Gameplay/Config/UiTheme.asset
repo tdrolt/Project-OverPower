@@ -274,6 +274,19 @@ MonoBehaviour:
   scoreboardPanelColor: {r: 0.04, g: 0.04, b: 0.06, a: 0.88}
   scoreboardSelfRowColor: {r: 1, g: 1, b: 1, a: 0.16}
   scoreboardRefreshesPerSecond: 5
+  scoreboardColumnEdges:
+  - 0.02
+  - 0.42
+  - 0.53
+  - 0.64
+  - 0.75
+  - 0.88
+  - 0.99
+  scoreboardSortingOrder: 30
+  scoreboardPaddingHorizontal: 12
+  scoreboardPaddingVertical: 11
+  scoreboardLineSpacing: 2
+  scoreboardTitleExtraSize: 6
   scoreboardTitleText: Scoreboard
   scoreboardColumnTexts:
   - Player

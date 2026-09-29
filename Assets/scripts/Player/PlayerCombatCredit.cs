@@ -116,7 +116,15 @@ public class PlayerCombatCredit : MonoBehaviourPun
             SendCredit(drained[i].actor, drained[i].amount, takedown: 0, cashedMark: drained[i].cashedMark);
     }
 
-    /// <summary>Records one hit. Self-damage and an unresolved source are skipped here rather than
+    /// <summary>Go-live's fresh start (PlayerLifecycle.ResetForMatchStart): forgets every warm-up hit so none of
+    /// them can turn into a live assist or damage credit. Owner only.</summary>
+    public void ResetForMatchStart()
+    {
+        if (photonView.IsMine)
+            ledger.Clear();
+    }
+
+    /// <summary>Records one hit.    /// <summary>Records one hit. Self-damage and an unresolved source are skipped here rather than
     /// in the ledger - DamageCreditLedger has no notion of whose ledger it is, only PlayerHealth's
     /// owner (this player) knows that a source actor matching its own is a self-hit.</summary>
     private void HandleDamaged(DamageResult result, DamageInfo info)
@@ -251,6 +259,8 @@ public class PlayerCombatCredit : MonoBehaviourPun
         // hide a live diamond) - after the sender check above, never before it, so a spoofed sender
         // can never clear or draw a diamond on a machine it does not own the RPC's own victim on.
         CombatEvents.RaiseMarkReported(transform, markSecondsLeft);
+
+        CombatEvents.RaisePlayerCredit(amount, takedown);
 
         if (takedown == 1)
             CombatEvents.RaiseTakedown(true);

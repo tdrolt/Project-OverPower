@@ -14,12 +14,14 @@ namespace Overpower.Match
     /// gets everyone's numbers with the room's Player Properties.
     ///
     /// Where each number comes from (all on this player's own client):
-    ///  - kills / assists / damage: CombatEvents.LocalTakedown and LocalDamageDealt, raised when the victim's
-    ///    client sends this player its credit (PlayerCombatCredit.RPC_DamageCredit) - same subscription as
-    ///    UltimateCharge, gated on IsMine for the same reason (those static events belong to whoever is local).
+    ///  - kills / assists / damage: CombatEvents.LocalPlayerCredit, raised ONLY when a real player's client sends
+    ///    this player its credit (PlayerCombatCredit.RPC_DamageCredit). Not LocalDamageDealt/LocalTakedown: the
+    ///    test-range dummies raise those too, and dummy hits must not count. Gated on IsMine like UltimateCharge
+    ///    (those static events belong to whoever is local).
     ///  - deaths: PlayerHealth.Died, which every kind of death goes through.
     ///  - zones captured: BuildingCapture.ZoneFlipped, raised on every client when a zone flips; this client asks
-    ///    BuildingManager.TryGetZoneAt whether its own body is in that zone (ScoreTally.NoteCapture).
+    ///    BuildingManager.TryGetZoneAt whether its own body is in that zone (ScoreTally.NoteCapture). The capture
+    ///    is judged by where the body is when the flip message arrives (about one round trip after the host decided).
     ///
     /// Stats count from go-live: PlayerLifecycle.ResetForMatchStart calls ResetForMatchStart here, which zeroes the
     /// tally and publishes at once (the warm-up does not count, matching the match report).
@@ -29,6 +31,9 @@ namespace Overpower.Match
     /// </summary>
     public sealed class ScoreboardPublisher : MonoBehaviour
     {
+        // Only used when no GameplayConfig is assigned; the real number is GameplayConfig.ScoreboardPublishesPerSecond.
+        private const float FallbackPublishesPerSecond = 4f;
+
         private PhotonView photonView;
         private PlayerHealth playerHealth;
         private PlayerTeam playerTeam;
@@ -45,7 +50,7 @@ namespace Overpower.Match
                 return null;
 
             ScoreboardPublisher publisher = player.AddComponent<ScoreboardPublisher>();
-            float rate = config != null ? config.ScoreboardPublishesPerSecond : 4f;
+            float rate = config != null ? config.ScoreboardPublishesPerSecond : FallbackPublishesPerSecond;
             if (config == null)
                 Debug.LogWarning($"[Scoreboard] {player.name}: no GameplayConfig - publishing at the default 4 times a second.");
             publisher.throttle = new ScorePublishThrottle(rate);
@@ -59,7 +64,7 @@ namespace Overpower.Match
             playerTeam = GetComponent<PlayerTeam>();
             body = GetComponent<Rigidbody>();
             tally = new ScoreTally();
-            throttle = new ScorePublishThrottle(4f);
+            throttle = new ScorePublishThrottle(FallbackPublishesPerSecond);
         }
 
         private void OnEnable()
@@ -70,8 +75,7 @@ namespace Overpower.Match
 
             if (playerHealth != null)
                 playerHealth.Died += HandleDied;
-            CombatEvents.LocalDamageDealt += HandleDamageDealt;
-            CombatEvents.LocalTakedown += HandleTakedown;
+            CombatEvents.LocalPlayerCredit += HandlePlayerCredit;
             BuildingCapture.ZoneFlipped += HandleZoneFlipped;
             subscribed = true;
         }
@@ -83,8 +87,7 @@ namespace Overpower.Match
 
             if (playerHealth != null)
                 playerHealth.Died -= HandleDied;
-            CombatEvents.LocalDamageDealt -= HandleDamageDealt;
-            CombatEvents.LocalTakedown -= HandleTakedown;
+            CombatEvents.LocalPlayerCredit -= HandlePlayerCredit;
             BuildingCapture.ZoneFlipped -= HandleZoneFlipped;
             subscribed = false;
         }
@@ -108,19 +111,10 @@ namespace Overpower.Match
             Publish();
         }
 
-        private void HandleDamageDealt(float amount)
+        private void HandlePlayerCredit(float amount, int takedown)
         {
-            tally.AddDamage(amount);
-            throttle.NoteChange(urgent: false);
-        }
-
-        private void HandleTakedown(bool kill)
-        {
-            if (kill)
-                tally.AddKill();
-            else
-                tally.AddAssist();
-            throttle.NoteChange(urgent: true);
+            tally.AddCredit(amount, takedown);
+            throttle.NoteChange(urgent: takedown != 0);
         }
 
         private void HandleDied(DamageInfo info)

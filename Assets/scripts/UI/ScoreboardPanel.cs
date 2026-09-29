@@ -23,11 +23,7 @@ namespace Overpower.UI
     /// </summary>
     public sealed class ScoreboardPanel : MonoBehaviour
     {
-        // Left edge and width of each column as a fraction of the panel: name, kills, deaths, assists, damage, zones.
-        private static readonly float[] ColumnStart = { 0.02f, 0.42f, 0.53f, 0.64f, 0.75f, 0.88f };
-        private static readonly float[] ColumnEnd = { 0.42f, 0.53f, 0.64f, 0.75f, 0.88f, 0.99f };
         private const int ColumnCount = 6;
-        private const int SortingOrder = 30;
 
         private sealed class Line
         {
@@ -131,16 +127,20 @@ namespace Overpower.UI
         public void Refresh()
         {
             rows.Clear();
-            Player[] players = PhotonNetwork.PlayerList;
-            for (int i = 0; i < players.Length; i++)
+            // The room's own dictionary: its value enumerator is a struct, unlike PhotonNetwork.PlayerList, which
+            // builds a sorted array on every call. Sort below already breaks every tie by actor number.
+            Room room = PhotonNetwork.CurrentRoom;
+            if (room != null)
             {
-                Player p = players[i];
+                foreach (Player p in room.Players.Values)
+                {
                 int team = PlayerTeam.NoTeam;
                 if (p.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out object rawTeam) && rawTeam is int t)
                     team = t;
 
                 int[] values = p.CustomProperties.TryGetValue(ScoreboardRules.Key, out object rawStats) ? rawStats as int[] : null;
                 rows.Add(ScoreboardRules.RowFrom(p.ActorNumber, team, p.NickName, values));
+                }
             }
             ScoreboardRules.Sort(rows);
 
@@ -258,7 +258,7 @@ namespace Overpower.UI
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = SortingOrder;
+            canvas.sortingOrder = theme.scoreboardSortingOrder;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;
@@ -277,8 +277,9 @@ namespace Overpower.UI
             background.raycastTarget = false;
 
             VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(12, 12, 10, 12);
-            layout.spacing = 2f;
+            layout.padding = new RectOffset(theme.scoreboardPaddingHorizontal, theme.scoreboardPaddingHorizontal,
+                theme.scoreboardPaddingVertical, theme.scoreboardPaddingVertical);
+            layout.spacing = theme.scoreboardLineSpacing;
             layout.childAlignment = TextAnchor.UpperCenter;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
@@ -292,7 +293,7 @@ namespace Overpower.UI
             // Title, then the column headings. Both are plain lines built once and never touched again.
             Line title = BuildLine(panelRect);
             title.cells[0].text = theme.scoreboardTitleText;
-            title.cells[0].fontSize = theme.scoreboardHeadingTextSize + 6f;
+            title.cells[0].fontSize = theme.scoreboardHeadingTextSize + theme.scoreboardTitleExtraSize;
             title.cells[0].fontStyle = FontStyles.Bold;
 
             Line headings = BuildLine(panelRect);
@@ -332,12 +333,22 @@ namespace Overpower.UI
             {
                 TextMeshProUGUI cell = AddCell(line.root.transform, c == 0 ? TextAlignmentOptions.Left : TextAlignmentOptions.Center);
                 RectTransform rt = cell.rectTransform;
-                rt.anchorMin = new Vector2(ColumnStart[c], 0f);
-                rt.anchorMax = new Vector2(ColumnEnd[c], 1f);
+                rt.anchorMin = new Vector2(ColumnEdge(c), 0f);
+                rt.anchorMax = new Vector2(ColumnEdge(c + 1), 1f);
                 rt.offsetMin = rt.offsetMax = Vector2.zero;
                 line.cells[c] = cell;
             }
             return line;
+        }
+
+        /// <summary>Column c starts at edge c and ends at edge c+1 (UiTheme.scoreboardColumnEdges); a theme with
+        /// too few edges falls back to an even split so the board still draws.</summary>
+        private float ColumnEdge(int index)
+        {
+            float[] edges = theme.scoreboardColumnEdges;
+            if (edges != null && edges.Length > ColumnCount)
+                return edges[index];
+            return index / (float)ColumnCount;
         }
 
         /// <summary>Same recipe as PlayerHud.AddLabel: one shared outlined material for every text on this board.</summary>

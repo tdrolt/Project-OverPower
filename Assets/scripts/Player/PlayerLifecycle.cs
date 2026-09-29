@@ -442,6 +442,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         GoldWallet goldWallet = GetComponent<GoldWallet>();
         goldWallet?.ResetForMatchStart();
         GetComponent<UltimateCharge>()?.ResetForMatchStart();
+        GetComponent<PlayerCombatCredit>()?.ResetForMatchStart(); // Warm-up hits must not become live assists.
         GetComponent<ScoreboardPublisher>()?.ResetForMatchStart(); // Tudor D12: the scoreboard starts from zero at go-live.
         GetComponentInChildren<PlayerOverheat>(true)?.Clear();
         GetComponent<LoadoutScreen>()?.ResetForMatchStart();

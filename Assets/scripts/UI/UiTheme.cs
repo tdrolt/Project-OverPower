@@ -945,6 +945,20 @@ namespace Overpower.UI
         [Tooltip("How many times a second the scoreboard re-reads everyone's numbers while Tab is held. It does " +
                  "not read anything while closed.")]
         [Min(1f)] public float scoreboardRefreshesPerSecond = 5f;
+        [Tooltip("Where the scoreboard's six columns (name, kills, deaths, assists, damage, zones) start and end, as " +
+                 "fractions of its width from the left: 7 numbers, column 1 runs from the first to the second, " +
+                 "column 2 from the second to the third, and so on. Keep them rising.")]
+        public float[] scoreboardColumnEdges = { 0.02f, 0.42f, 0.53f, 0.64f, 0.75f, 0.88f, 0.99f };
+        [Tooltip("Draw order of the scoreboard against other screen panels: higher is on top. The HUD is at -10.")]
+        public int scoreboardSortingOrder = 30;
+        [Tooltip("Empty space, in reference pixels, between the scoreboard's left and right edges and its text.")]
+        public int scoreboardPaddingHorizontal = 12;
+        [Tooltip("Empty space, in reference pixels, above and below the scoreboard's lines.")]
+        public int scoreboardPaddingVertical = 11;
+        [Tooltip("Gap, in reference pixels, between two scoreboard lines.")]
+        public float scoreboardLineSpacing = 2f;
+        [Tooltip("How much bigger the scoreboard's title is than its headings, in text size points.")]
+        public float scoreboardTitleExtraSize = 6f;
         [Tooltip("The scoreboard's title.")]
         public string scoreboardTitleText = "Scoreboard";
         [Tooltip("The column headings, in order: player name, kills, deaths, assists, damage dealt, zones captured.")]
