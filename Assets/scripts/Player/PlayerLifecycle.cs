@@ -291,6 +291,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (director == null || !director.JoinCheckReady || !Teams.TryGetTeam(photonView.Owner, out _))
             return;
         rejoinPending = false;
+        // KNOWN LIMIT (Tudor, 9e-3: accepted for now): this takes the ordinary death path, so the last living member of a team with no base
+        // who returns inside the grace (GameplayConfig.DroppedGraceSeconds) still lands in the last-stand wait, counts dead, and the team
+        // is out - the grace only protects the team WHILE the player is away. A rejoiner on a knocked-out team stays dead (spectator).
         PlayerDied();
     }
 

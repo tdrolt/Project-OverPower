@@ -449,6 +449,60 @@ namespace Overpower.Tests
             Assert.IsNotEmpty(PlayerIdRule.ResolveTagged(null, "tag", () => "", out _));
         }
 
+        // ---- 9e-3
+
+        [Test]
+        public void ARejoinerOnAKnockedOutTeamStaysThereAsASpectator()
+        {
+            Assert.AreEqual(RejoinTeamAction.Keep, RejoinRules.TeamOnRejoin(teamsFixed: true, teamEliminated: true, teamInMatch: true));
+        }
+
+        [Test]
+        public void ARejoinerOnATeamLeftOutAtGoLiveIsRepicked()
+        {
+            Assert.AreEqual(RejoinTeamAction.Repick, RejoinRules.TeamOnRejoin(true, false, false));
+        }
+
+        [Test]
+        public void ARejoinerOnATeamStillInOrInTheLobbyKeepsIt()
+        {
+            Assert.AreEqual(RejoinTeamAction.Keep, RejoinRules.TeamOnRejoin(true, false, true));
+            Assert.AreEqual(RejoinTeamAction.Keep, RejoinRules.TeamOnRejoin(false, false, false));
+        }
+
+        [Test]
+        public void AKnockedOutTeamThatWasAlsoLeftOutIsStillNotRepicked()
+        {
+            Assert.AreEqual(RejoinTeamAction.Keep, RejoinRules.TeamOnRejoin(true, true, false));
+        }
+
+        [Test]
+        public void TwoSpellingsOfOneFolderGiveOneTag()
+        {
+            Assert.AreEqual(PlayerIdRule.Tag("PC", @"C:\Games\A"), PlayerIdRule.Tag("PC", @"c:/games/a/"));
+            Assert.AreEqual(PlayerIdRule.Tag("PC", @"C:\Games\A"), PlayerIdRule.Tag("PC", @"C:\Games\A\"));
+            Assert.AreNotEqual(PlayerIdRule.Tag("PC", @"C:\Games\A"), PlayerIdRule.Tag("PC", @"C:\Games\B"));
+        }
+
+        [TestCase(32760, true)]
+        [TestCase(32749, true)]
+        [TestCase(32758, false)]
+        [TestCase(32765, false)]
+        public void OnlyTheTwoHeldPlaceAnswersAreTreatedAsAHeldPlace(int code, bool expected)
+        {
+            Assert.AreEqual(expected, RejoinRules.IsHeldPlaceRefusal(code));
+        }
+
+        [Test]
+        public void TheBodyWatchEndsWhenAliveOrWaitingButNotBeforeABodyExists()
+        {
+            Assert.IsFalse(RejoinRules.BodyWatchIsDone(false, true, false, 5f));
+            Assert.IsFalse(RejoinRules.BodyWatchIsDone(true, false, false, 5f));
+            Assert.IsTrue(RejoinRules.BodyWatchIsDone(true, true, false, 5f));
+            Assert.IsTrue(RejoinRules.BodyWatchIsDone(true, false, true, 5f));
+            Assert.IsFalse(RejoinRules.BodyWatchIsDone(true, true, false, 0.5f));
+        }
+
         private static RejoinRecord Record(string room, string userId, long savedAtMs) =>
             new RejoinRecord { RoomName = room, UserId = userId, Nick = "Nick", SavedAtMs = savedAtMs };
     }

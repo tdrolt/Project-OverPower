@@ -69,10 +69,20 @@ namespace Overpower.Match
             unchecked
             {
                 uint hash = 2166136261u;
-                foreach (char c in (machine ?? "") + "|" + (folder ?? ""))
+                foreach (char c in (machine ?? "") + "|" + NormaliseFolder(folder))
                     hash = (hash ^ c) * 16777619u;
                 return hash.ToString("x8");
             }
+        }
+
+        /// <summary>One spelling per folder: full path, no trailing separator, upper case (so "C:\Games\A", "c:/games/a/" agree).</summary>
+        private static string NormaliseFolder(string folder)
+        {
+            if (string.IsNullOrEmpty(folder))
+                return "";
+            try { folder = System.IO.Path.GetFullPath(folder); }
+            catch (Exception) { /* keep the raw text */ }
+            return folder.TrimEnd('\\', '/').ToUpperInvariant();
         }
 
         public static string Compose(string id, string tag) => id + "@" + tag;
@@ -107,9 +117,29 @@ namespace Overpower.Match
 
     public enum JoinRefusalAction { None, RejoinSavedRoom, ShowMessage }
 
+    public enum RejoinTeamAction { Keep, Repick }
+
     public static class RejoinRules
     {
         public const int InactiveJoinerErrorCode = 32749;
+        public const int NoRandomMatchFoundCode = 32760;
+
+        /// <summary>The two answers Photon gives a NORMAL join that ran into this user's own held place: "found inactive joiner" for a
+        /// named room, "no random match found" for a random join (which skips the room that holds the place). Any other failure is
+        /// not about a held place.</summary>
+        public static bool IsHeldPlaceRefusal(int code) => code == InactiveJoinerErrorCode || code == NoRandomMatchFoundCode;
+
+        /// <summary>Tudor (9e-3): a player rejoining a team that was KNOCKED OUT comes back as a spectator of it - dead, no respawn, the
+        /// waiting state the rest of the team has (the ordinary death path already answers that for an eliminated team) - and is not
+        /// moved. Only a team that was never in the match (left out at go-live) is re-picked, as for a new joiner.</summary>
+        public static RejoinTeamAction TeamOnRejoin(bool teamsFixed, bool teamEliminated, bool teamInMatch) =>
+            teamsFixed && !teamEliminated && !teamInMatch ? RejoinTeamAction.Repick : RejoinTeamAction.Keep;
+
+        /// <summary>The body watchdog after a rejoin is finished once there IS a body and it is either alive (the first respawn is done) or
+        /// in the last-stand wait (it will not respawn until the team retakes a base - no reason to keep polling for the whole match).
+        /// Never before a second has passed, so a body that has not run its first frame yet is not mistaken for a finished one.</summary>
+        public static bool BodyWatchIsDone(bool hasBody, bool alive, bool inLastStandWait, float secondsWatched) =>
+            hasBody && secondsWatched > 1f && (alive || inLastStandWait);
 
         /// <summary>Photon refuses a normal join while this same user id still holds a place in that room
         /// (ErrorCode.JoinFailedFoundInactiveJoiner). That is not "no room": the player's own dropped place is there. With a saved

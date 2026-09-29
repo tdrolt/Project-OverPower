@@ -202,7 +202,7 @@ namespace Overpower.Net
         }
 
         /// <summary>The name screen's "Rejoin your match": the saved room, under the saved name.</summary>
-        public void RejoinFromNameScreen()
+        public void RejoinFromNameScreen(bool keepTypedName = false)
         {
             RejoinRecord record = PlayerIdentity.LoadLastMatch();
             if (record == null || !RejoinRules.IsOffered(record, PlayerIdentity.UserId, PlayerIdentity.NowMs(), Mathf.RoundToInt(windowSeconds)))
@@ -210,8 +210,8 @@ namespace Overpower.Net
                 Debug.LogWarning("[REJOIN] no rejoin on offer any more");
                 return;
             }
-            if (!string.IsNullOrEmpty(record.Nick))
-                PhotonNetwork.NickName = record.Nick;
+            if (!keepTypedName && !string.IsNullOrEmpty(record.Nick))
+                PhotonNetwork.NickName = record.Nick; // the name-screen button has no typed name; a refused Join has - keep that one
             lastRoomName = record.RoomName;
             BeginRejoin(record.RoomName);
         }
@@ -277,14 +277,14 @@ namespace Overpower.Net
         /// but there is no saved room to go to, say so and go back to the name screen. Otherwise false: nothing to do with a rejoin.</summary>
         public bool TryRejoinHeldPlace(int returnCode)
         {
-            if (stage != Stage.Idle)
+            if (stage != Stage.Idle || !RejoinRules.IsHeldPlaceRefusal(returnCode))
                 return false;
             RejoinRecord record = PlayerIdentity.LoadLastMatch();
             bool offered = RejoinRules.IsOffered(record, PlayerIdentity.UserId, PlayerIdentity.NowMs(), Mathf.RoundToInt(windowSeconds));
             if (offered)
             {
                 Debug.Log($"[REJOIN] a new join was refused ({returnCode}) while our place in {record.RoomName} is held - rejoining it");
-                RejoinFromNameScreen();
+                RejoinFromNameScreen(keepTypedName: true);
                 return true;
             }
             if (RejoinRules.OnJoinRefused(returnCode, false) == JoinRefusalAction.ShowMessage)

@@ -116,9 +116,18 @@ public class RoomManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.LocalPlayer.HasRejoined)
         {
             Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back - no new team pick, getting a body");
-            // Task 9e-2: the team this player held may have been left out of the match while they were away (a host start with two
-            // teams, or a knockout): pick again exactly as a joiner would (EnsureLocalTeamInMatch is a no-op for a team still in).
-            EnsureLocalTeamInMatch();
+            // Task 9e-2 / 9e-3: the team this player held may have been left out of the match at go-live: pick again as a joiner would.
+            // A team that was KNOCKED OUT while they were away is kept: they come back as its spectator (dead, no respawn - the
+            // ordinary death path already waits for an eliminated team), not moved to a team that is still in.
+            MatchDirector rejoinDirector = MatchDirector.Instance;
+            if (rejoinDirector != null && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int heldTeam))
+            {
+                bool eliminated = rejoinDirector.IsEliminated(heldTeam);
+                if (RejoinRules.TeamOnRejoin(rejoinDirector.TeamsFixed, eliminated, rejoinDirector.IsInMatch(heldTeam)) == RejoinTeamAction.Repick)
+                    EnsureLocalTeamInMatch();
+                else if (rejoinDirector.TeamsFixed && eliminated)
+                    Debug.Log($"[REJOIN] team {heldTeam} was knocked out while this player was away - back as its spectator");
+            }
             ReseatLocalPlayerIfTeamClosed(); // a lobby whose mode was switched to two teams while this player was away
             StartCoroutine(WatchOwnBodyAfterRejoin());
             return;
@@ -144,8 +153,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
             {
                 withoutBody = 0f;
                 PlayerLifecycle lifecycle = view.GetComponent<PlayerLifecycle>();
-                if (total > 1f && lifecycle != null && lifecycle.IsAlive)
-                    yield break; // the first respawn is complete: nothing can take this body away now
+                DestroyExtraOwnBodies(actor, view);
+                bool waiting = PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool w && w;
+                if (RejoinRules.BodyWatchIsDone(true, lifecycle != null && lifecycle.IsAlive, waiting, total))
+                    yield break; // respawned, or in the last-stand wait: nothing more to watch for
             }
             else
             {
@@ -162,6 +173,21 @@ public class RoomManager : MonoBehaviourPunCallbacks
             }
             total += Time.unscaledDeltaTime;
             yield return null;
+        }
+    }
+
+    /// <summary>Task 9e-3: an old cached body can arrive AFTER the watchdog already spawned a fallback one - two own bodies. Keep the one
+    /// PlayerLookup points at and network-destroy the others.</summary>
+    private static void DestroyExtraOwnBodies(int actor, PhotonView keep)
+    {
+        foreach (PlayerLifecycle other in FindObjectsByType<PlayerLifecycle>(FindObjectsSortMode.None))
+        {
+            PhotonView v = other.GetComponent<PhotonView>();
+            if (v != null && v != keep && v.OwnerActorNr == actor && v.IsMine)
+            {
+                Debug.LogWarning($"[REJOIN] a second own body arrived (view {v.ViewID}) - removing it");
+                PhotonNetwork.Destroy(v.gameObject);
+            }
         }
     }
 

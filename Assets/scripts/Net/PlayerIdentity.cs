@@ -35,10 +35,17 @@ namespace Overpower.Net
 
                 // The file holds "id@tag" (machine + folder): a build folder copied elsewhere makes its own id.
                 string tag = PlayerIdRule.Tag(SystemInfo.deviceName, Folder());
-                string saved = TryRead(IdPath());
+                string saved = TryRead(IdPath(), out bool readFailed);
+                if (readFailed)
+                {
+                    // Never overwrite a file that exists but could not be read (it may hold the real id): a temporary id for this session.
+                    cachedId = PlayerIdRule.NewId();
+                    Debug.LogWarning("[REJOIN] the id file could not be read - using a temporary id for this session, the file is left alone");
+                    return cachedId;
+                }
                 string id = PlayerIdRule.ResolveTagged(saved, tag, PlayerIdRule.NewId, out bool created);
                 if (created)
-                    TryWrite(IdPath(), PlayerIdRule.Compose(id, tag));
+                    TryWrite(IdPath(), PlayerIdRule.Compose(id, tag)); // file missing, made elsewhere (another folder or PC), or an untagged legacy id
                 cachedId = id;
                 return id;
             }
@@ -125,11 +132,15 @@ namespace Overpower.Net
             }
         }
 
-        private static string TryRead(string path)
+        private static string TryRead(string path) => TryRead(path, out _);
+
+        private static string TryRead(string path, out bool failed)
         {
+            failed = false;
             try { return File.Exists(path) ? File.ReadAllText(path) : null; }
             catch (Exception e)
             {
+                failed = true;
                 Debug.LogWarning($"[REJOIN] could not read {Path.GetFileName(path)}: {e.Message}");
                 return null;
             }
