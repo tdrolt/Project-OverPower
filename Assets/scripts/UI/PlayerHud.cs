@@ -674,6 +674,13 @@ namespace Overpower.UI
             lastRecharge[index] = -1f;
             lastActive[index] = !status?.IsActive ?? true;
             lastBlock[index] = (CastBlock)(-1);
+
+            if (AbilitySlotOrder[index].slot == AbilitySlot.Ultimate)
+            {
+                // Force the label logic to run again for the new ultimate (or the emptied slot).
+                lastUltimateCharge = -1f;
+                lastUltimateReady = lastUltimateRecast = lastUltimateNone = true; // an impossible combination, so the next update always redraws
+            }
         }
 
         private void UpdateAbilitySlots()
@@ -779,6 +786,11 @@ namespace Overpower.UI
                 lastUltimateRecast = recast;
                 lastUltimateNone = noUltimate;
             }
+
+            // The ability's fallback name sits in the same spot as the label, so it hides while a label shows
+            // (the two overprinted, "Shield" under READY). Set every frame, not on change: a loadout swap
+            // re-enables the name through ApplyIconOrFallback and this puts it back the next frame.
+            ui.fallbackNameText.enabled = !ui.readyLabel.gameObject.activeSelf && !ui.icon.enabled;
         }
 
         private static string BlockReasonLabel(CastBlock block)
