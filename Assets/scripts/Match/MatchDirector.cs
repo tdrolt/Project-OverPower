@@ -169,6 +169,19 @@ namespace Overpower.Match
         /// <summary>Task 9b-2: a player joining or rejoining this team right now spawns dead into the wait - the team is
         /// in its last stand (live, no base in play) - and comes back only when it retakes or adopts a base. False until
         /// the territory is known, so a joiner never waits on a half-loaded map.</summary>
+        /// <summary>True when the join-into-a-last-stand question can be answered now: the match is not live (the answer
+        /// is no) or the territory is loaded. PlayerLifecycle keeps asking each physics step until this is true, once.</summary>
+        public bool JoinCheckReady
+        {
+            get
+            {
+                if (!IsLive)
+                    return true;
+                BuildingManager buildings = BuildingManager.Instance;
+                return buildings != null && buildings.Map != null && buildings.Current != null;
+            }
+        }
+
         public bool SpawnsIntoLastStand(int team)
         {
             BuildingManager buildings = BuildingManager.Instance;

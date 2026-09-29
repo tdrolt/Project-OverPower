@@ -206,8 +206,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         ApplyAliveStateFromProperties();
 
-        if (photonView.IsMine)
-            EnterTheWaitIfJoiningALastStand();
+        joinCheckPending = photonView.IsMine;
+        if (joinCheckPending)
+            TryEnterTheWaitIfJoiningALastStand();
 
         if (photonView.IsMine)
         {
@@ -234,10 +235,24 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// <summary>Task 9b-2 (Tudor's default): joining or rejoining a team already in its last stand spawns you dead into the
     /// wait - the same wait an ended countdown starts - and you come back only if the team retakes or adopts a base
     /// (CheckForCathedralCapture). The death was never counted, so that respawn charges it once. Owner only.</summary>
-    void EnterTheWaitIfJoiningALastStand()
+    /// <summary>The team RoomManager picked, carried in the Instantiate data (Task 9b-3), or null for a player spawned without it.</summary>
+    int? InstantiatedTeam =>
+        photonView.InstantiationData != null && photonView.InstantiationData.Length > 0 && photonView.InstantiationData[0] is int t ? t : (int?)null;
+
+    /// <summary>Asks once, as soon as it can be answered (Start, else each physics step until the team and the territory
+    /// are known - a fresh process joining a live match has neither at Start), and never again.</summary>
+    void TryEnterTheWaitIfJoiningALastStand()
     {
         MatchDirector director = MatchDirector.Instance;
-        if (director == null || !Teams.TryGetTeam(photonView.Owner, out int team) || !director.SpawnsIntoLastStand(team))
+        if (director == null || !director.JoinCheckReady)
+            return;
+        int? propertyTeam = Teams.TryGetTeam(photonView.Owner, out int p) ? p : (int?)null;
+        int? judged = MatchPhaseRules.TeamForJoinCheck(InstantiatedTeam, propertyTeam);
+        if (!judged.HasValue)
+            return;
+        joinCheckPending = false;
+        int team = judged.Value;
+        if (!director.SpawnsIntoLastStand(team))
             return;
 
         Debug.LogWarning($"[VIS] JOINED INTO A LAST STAND  team={team} - spawning dead into the wait");
@@ -248,8 +263,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         matchUI?.ShowWaitingPanel();
     }
 
+    private bool joinCheckPending;
+
     void FixedUpdate()
     {
+        if (joinCheckPending)
+            TryEnterTheWaitIfJoiningALastStand();
+
         // Continuously check for cathedral capture status
         CheckForCathedralCapture();
     }

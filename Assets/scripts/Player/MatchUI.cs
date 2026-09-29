@@ -73,6 +73,8 @@ public class MatchUI : MonoBehaviour
     /// property, explicitly when that happens - it will not do so on its own.</summary>
     public bool MatchOver => (youWonPanel != null && youWonPanel.activeSelf) || (youLostPanel != null && youLostPanel.activeSelf);
 
+    private const string WaitingTitleObjectName = "Waiting";
+
     private void Awake()
     {
         photonView = GetComponent<PhotonView>();
@@ -87,9 +89,15 @@ public class MatchUI : MonoBehaviour
         // Task 9b-2: the waiting text lives on the UiTheme (one home for texts), set here rather than baked into the prefab.
         if (waitingPanel != null && theme != null)
         {
-            TMP_Text waitingText = waitingPanel.GetComponentInChildren<TMP_Text>(true);
+            // The title is the panel's child GameObject named "Waiting" - the QUIT button's own TMP text is a child too,
+            // so a bare GetComponentInChildren would be order-dependent.
+            TMP_Text waitingText = null;
+            foreach (TMP_Text candidate in waitingPanel.GetComponentsInChildren<TMP_Text>(true))
+                if (candidate.gameObject.name == WaitingTitleObjectName) { waitingText = candidate; break; }
             if (waitingText != null)
                 waitingText.text = theme.waitingPanelText;
+            else
+                Debug.LogError($"[MatchUI] {name}: the waiting panel has no text object named \"{WaitingTitleObjectName}\" - its title stays as the prefab has it.");
         }
 
         if (waitingPanel == null || youWonPanel == null || respawnPanel == null || youLostPanel == null || theme == null)

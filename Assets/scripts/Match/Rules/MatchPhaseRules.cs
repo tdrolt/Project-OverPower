@@ -221,6 +221,12 @@ namespace Overpower.Match
             return winner;
         }
 
+        /// <summary>Task 9b-3: which team a joining player is judged on. The team picked at spawn (instantiation data) wins:
+        /// a fresh process has no team property yet at Start, and an in-process rejoiner's property is its OLD team.
+        /// The property is only the fallback for a player spawned without the data. Null = not known yet.</summary>
+        public static int? TeamForJoinCheck(int? instantiatedTeam, int? propertyTeam) =>
+            instantiatedTeam.HasValue && instantiatedTeam.Value >= 0 ? instantiatedTeam : propertyTeam;
+
         /// <summary>Task 9b-2: a player joining (or rejoining) a team already in its last stand spawns dead into the wait -
         /// the same answer an ended countdown gets (SpawnCapitalFor is Neutral) - and comes back only when the team
         /// retakes a base. Only in a live match: nothing counts in the warm-up and an ended match has no last stand.</summary>

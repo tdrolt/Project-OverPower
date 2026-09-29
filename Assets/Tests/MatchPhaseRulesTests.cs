@@ -449,6 +449,16 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AJoinerIsJudgedOnTheTeamItWasSpawnedOnNotAStaleOrMissingProperty()
+        {
+            Assert.AreEqual(1, MatchPhaseRules.TeamForJoinCheck(instantiatedTeam: 1, propertyTeam: 0), "an in-process rejoiner's property is its OLD team");
+            Assert.AreEqual(1, MatchPhaseRules.TeamForJoinCheck(1, null), "a fresh process has no property yet at Start");
+            Assert.AreEqual(0, MatchPhaseRules.TeamForJoinCheck(null, 0), "no instantiation data: fall back to the property");
+            Assert.AreEqual(0, MatchPhaseRules.TeamForJoinCheck(-1, 0));
+            Assert.IsNull(MatchPhaseRules.TeamForJoinCheck(null, null), "not known yet: keep asking");
+        }
+
+        [Test]
         public void ARetakeRespawnAfterAnEndedCountdownIsNotChargedASecondDeath()
         {
             Assert.AreEqual(3, RespawnDelayRules.DeathCountForRetake(3, countdownAlreadyCounted: true));

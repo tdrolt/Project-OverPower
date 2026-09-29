@@ -126,7 +126,13 @@ public class RoomManager : MonoBehaviourPunCallbacks
         GameObject player = PhotonNetwork.Instantiate(
             playerPrefab.name,
             teamSpawnPoints[teamID].position,
-            Quaternion.identity
+            Quaternion.identity,
+            0,
+            // The picked team travels with the spawn (Task 9b-3): a fresh process has no team property of its own yet
+            // when the player's Start runs (PUN applies the local player's own properties on the server echo, after
+            // this Instantiate), and an in-process rejoiner still carries its OLD team. PlayerLifecycle's join-into-a-
+            // last-stand check reads this instead (PlayerLifecycle.InstantiatedTeam).
+            new object[] { teamID }
         );
 
         SetupPlayerTeamComponent(player, teamID);
