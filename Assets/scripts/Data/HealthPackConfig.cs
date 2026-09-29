@@ -4,7 +4,7 @@ namespace Overpower.Data
 {
     /// <summary>
     /// The three Tier III health packs: how much they heal, how long they stay gone, how close you have to
-    /// stand, and what they look like. One asset, shared by every pack.
+    /// stand (where each pack stands is in ArenaLayout), and what they look like. One asset, shared by every pack.
     ///
     /// Fields are [SerializeField] private with read-only properties, like the rest of the Data folder
     /// (see GameplayConfig).
@@ -17,11 +17,6 @@ namespace Overpower.Data
 
         [Tooltip("Seconds a pack stays gone after someone takes it, before it comes back for everyone.")]
         [SerializeField, Min(1f)] private float respawnSeconds = 30f;
-
-        [Tooltip("How far from the middle of the zone's tower, in metres, the pack sits, on the side facing the middle of " +
-                 "the map. The tower is a solid pillar about 2.6 m wide from its middle, so this has to be more than that " +
-                 "plus your own body, or nobody could reach the pack.")]
-        [SerializeField, Min(0f)] private float distanceFromTowerMetres = 3.9f;
 
         [Tooltip("How close, in metres, your centre must be to the middle of the pack to take it.")]
         [SerializeField, Min(0.1f)] private float pickupRadius = 1.2f;
@@ -86,7 +81,6 @@ namespace Overpower.Data
         public float HealAmount => healAmount;
         public float RespawnSeconds => respawnSeconds;
         public int RespawnMs => Mathf.RoundToInt(respawnSeconds * 1000f);
-        public float DistanceFromTowerMetres => distanceFromTowerMetres;
         public float PickupRadius => pickupRadius;
         public float HostSlackMetres => hostSlackMetres;
         public float RetrySeconds => retrySeconds;

@@ -14,11 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   healAmount: 50
   respawnSeconds: 30
-  distanceFromTowerMetres: 3.9
   pickupRadius: 1.2
   hostSlackMetres: 1.5
   retrySeconds: 0.2
-  minimumMissingHealth: 10
+  minimumMissingHealth: 0
   maxAttemptsPerVisit: 6
   pendingWriteSeconds: 1.5
   glowHeightMetres: 0.05

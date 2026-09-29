@@ -64,5 +64,25 @@ namespace Overpower.Tests
             Assert.AreEqual(2, RadialSymmetry.ThirdIndex(At(265f), Centre, 25f));
             Assert.AreEqual(2, RadialSymmetry.ThirdIndex(At(24.9f), Centre, 25f));
         }
+
+        [Test]
+        public void TheCopyOfAPointNearestATargetIsTheOneInThatTargetsThird()
+        {
+            // The three copies of a point sit in three thirds; the one nearest a tower is the one in the tower's own third.
+            Vector3 authored = new Vector3(92.67f, 0f, 69.84f);
+            for (int thirds = 0; thirds < 3; thirds++)
+            {
+                Vector3 copy = RadialSymmetry.RotatePoint(authored, Centre, thirds);
+                Vector3 nearTower = copy + new Vector3(-4f, 0f, -3f); // a tower a few metres from that copy
+                AssertClose(copy, RadialSymmetry.NearestCopy(authored, Centre, nearTower));
+            }
+        }
+
+        [Test]
+        public void TheNearestCopyKeepsTheAuthoredHeight()
+        {
+            Vector3 authored = new Vector3(92.67f, 3f, 69.84f);
+            Assert.AreEqual(3f, RadialSymmetry.NearestCopy(authored, Centre, new Vector3(20f, 0f, 30f)).y, 1e-4f);
+        }
     }
 }

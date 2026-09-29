@@ -23,6 +23,23 @@ namespace Overpower.Arena
         public static Vector3 RotatePoint(Vector3 point, Vector3 centre, int thirds) =>
             centre + ThirdTurn(thirds) * (point - centre);
 
+        /// <summary>Of the point and its two turned copies (0, 1 and 2 thirds), the one nearest <paramref name="target"/>
+        /// on the ground plane. Height is the point's own. How a point authored once, in the Source third, finds the copy
+        /// that belongs to a given tower.</summary>
+        public static Vector3 NearestCopy(Vector3 point, Vector3 centre, Vector3 target)
+        {
+            Vector3 best = point;
+            float bestSqr = float.MaxValue;
+            for (int thirds = 0; thirds < 3; thirds++)
+            {
+                Vector3 copy = RotatePoint(point, centre, thirds);
+                float dx = copy.x - target.x, dz = copy.z - target.z;
+                float sqr = dx * dx + dz * dz;
+                if (sqr < bestSqr) { bestSqr = sqr; best = copy; }
+            }
+            return best;
+        }
+
         /// <summary>Turns an object's facing by the same amount RotatePoint turns its position.</summary>
         public static Quaternion RotateRotation(Quaternion rotation, int thirds) => ThirdTurn(thirds) * rotation;
 

@@ -134,7 +134,16 @@ namespace Overpower.Data
         [Tooltip("Metres from the recess mouth to each plank's centre, out toward the arena.")]
         [SerializeField, Min(0f)] private float phaseTwoRecessPlankInFront = 3f;
 
+        [Header("Health packs")]
+        [Tooltip("Where the health pack stands in the Source (Team 2) third's Tier III recess, world metres: on the floor " +
+                 "midway between the recess's back wall and the yellow barrier across its mouth, level with the middle of " +
+                 "both. The other two recesses' packs are this point turned 120 and 240 degrees about the arena centre. " +
+                 "Only X and Z are used; the pack rests on whatever floor is there.")]
+        [SerializeField] private Vector3 healthPackPoint = new Vector3(92.67f, 0f, 69.84f);
+
         public IReadOnlyList<Piece> Pieces => pieces;
+
+        public Vector3 HealthPackPoint => healthPackPoint;
 
         public Material WallMaterial => wallMaterial;
         public float WallThickness => wallThickness;

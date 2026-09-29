@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Overpower.Arena;
 using Overpower.Data;
 using Photon.Pun;
 using Photon.Realtime;
@@ -8,15 +9,15 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Match
 {
     /// <summary>
-    /// The Tier III health packs: one floating cross in the middle of each Tier III zone. Walk over it hurt and
-    /// alive and it heals you 50 (never past max), then it is gone for everyone for 30 s.
+    /// The Tier III health packs: one floating cross in each Tier III zone's recess, between the arena wall and the
+    /// yellow barrier. Walk over it hurt and alive and it heals you 50 (never past max), then it is gone for everyone for 30 s.
     ///
     /// State: ONE Room Property per pack, "hp" + zone, int[] { takenUntilMs, takerActor, requestId } (see
     /// HealthPackRules), written ONLY by the master with a check-and-set. A player asks by writing a Player
     /// Property on itself, "hpReq" = int[] { zone, requestId }; the master decides in OnPlayerPropertiesUpdate.
     /// A write returning true only means "sent": the taker heals when it READS the echo naming it. No RPC.
     ///
-    /// Every client builds the packs itself (they are not networked objects) at each Tier III tower once it has
+    /// Every client builds the packs itself (they are not networked objects) once each Tier III tower has
     /// registered, and draws them from the Room Property and the server clock alone, so all clients agree. A
     /// taken pack stays in place greyed out with no glow until it returns. A Tier III zone that is out of play
     /// after the map shrinks hides its pack and cannot be taken.
@@ -38,7 +39,7 @@ namespace Overpower.Match
         {
             public int zone;
             public string key;             // "hp" + zone, built once
-            public Vector3 centre;         // the ground point in the middle of the zone
+            public Vector3 centre;         // the ground point of the pack, in the zone's recess
             public GameObject root;
             public Transform cross;        // spins and bobs
             public Transform lean;         // holds the two bars, leaned back from upright
@@ -141,11 +142,6 @@ namespace Overpower.Match
         private void EnsurePacks()
         {
             BuildingManager buildings = BuildingManager.Instance;
-            // Wait until every tower has registered: the packs are placed relative to the middle of the map.
-            for (int zone = 0; zone < buildings.ZoneCount; zone++)
-                if (!buildings.TryGetZoneCentre(zone, out _))
-                    return;
-
             for (int zone = 0; zone < buildings.ZoneCount; zone++)
             {
                 // The tower's own tier, not TierOf: TierOf plays the centre as Tier III while a corner is cut.
@@ -157,26 +153,23 @@ namespace Overpower.Match
             }
         }
 
-        /// <summary>The middle of the map: the average of every tower that has registered (the nine are laid out
-        /// symmetrically around it).</summary>
-        private static Vector3 MapMiddle()
+        /// <summary>The pack's spot for the zone whose tower is at <paramref name="tower"/>: the authored recess point
+        /// (turned into that zone's third), or the tower itself when there is no arena or layout to read it from (a
+        /// test scene).</summary>
+        private static Vector3 SpotFor(Vector3 tower)
         {
-            BuildingManager buildings = BuildingManager.Instance;
-            Vector3 sum = Vector3.zero;
-            int count = 0;
-            for (int zone = 0; zone < buildings.ZoneCount; zone++)
-                if (buildings.TryGetZoneCentre(zone, out Vector3 tower)) { sum += tower; count++; }
-            return count > 0 ? sum / count : Vector3.zero;
+            ArenaSymmetry arena = ArenaSymmetry.Active;
+            if (arena == null || arena.layout == null)
+                return tower;
+            return RadialSymmetry.NearestCopy(arena.layout.HealthPackPoint, arena.centre, tower);
         }
 
         private Pack Build(int zone, Vector3 tower)
         {
-            // Not on the tower itself: it is a solid pillar. On the side facing the middle of the map, so the
-            // three packs are placed by the same rule.
-            Vector3 towardMiddle = MapMiddle() - tower;
-            towardMiddle.y = 0f;
-            towardMiddle = towardMiddle.sqrMagnitude > 0.0001f ? towardMiddle.normalized : Vector3.forward;
-            Vector3 spot = tower + towardMiddle * config.DistanceFromTowerMetres;
+            // In the zone's Tier III recess, midway between the arena wall behind it and the yellow barrier across its
+            // mouth. The spot is authored once (ArenaLayout.HealthPackPoint, Source third); the copy nearest this
+            // zone's tower is the one in its recess, so the three packs are placed by the same rule.
+            Vector3 spot = SpotFor(tower);
             float ground = CaptureRingView.GroundHeight(spot, 0.5f);
             var pack = new Pack { zone = zone, key = PackKey(zone), centre = new Vector3(spot.x, ground, spot.z) };
 

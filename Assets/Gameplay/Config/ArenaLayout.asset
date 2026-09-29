@@ -101,3 +101,4 @@ MonoBehaviour:
   phaseTwoRecessPlankSize: {x: 2.609, y: 5.729, z: 7.181}
   phaseTwoRecessPlankSpacing: 6.18
   phaseTwoRecessPlankInFront: 3
+  healthPackPoint: {x: 92.67, y: 0, z: 69.84}
