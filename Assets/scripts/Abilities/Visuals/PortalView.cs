@@ -1,5 +1,7 @@
+using Overpower.Combat;
 using Overpower.UI;
 using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 
 namespace Overpower.Abilities
@@ -11,6 +13,10 @@ namespace Overpower.Abilities
     /// dominant colour, the centre stays see-through and darker). Only the player who placed it also sees a floating
     /// diamond on a stem - "this one is yours to use" - because nobody else, teammates included, can use it (Portal's
     /// class comment). Enemies still see the disc and rim, as they always saw the portal.
+    ///
+    /// COOLING DOWN (Tudor D23): while the owner has no portal charge - after anyone's trip, until it recharges - the
+    /// whole glow turns grey, on every player's screen. The rule is the owner's published "has a charge" Player Property
+    /// (AllyPortalTraveller.ReadyKey), the same one for the owner's own client as for everyone else.
     ///
     /// Visual only: the rim is drawn from Portal.Radius, the same number TeleportAbility's channel check uses.
     /// </summary>
@@ -49,22 +55,54 @@ namespace Overpower.Abilities
         [SerializeField, Range(0f, 1f), Tooltip("Opacity of the stem.")]
         private float stemOpacity = 0.6f;
 
+        private Portal portal;
+        private Color team;
+        private bool? shownUsable;
+
         public void OnDeployablePlaced(NetworkedDeployable deployable)
         {
-            var portal = deployable as Portal;
+            portal = deployable as Portal;
             if (portal == null)
                 return;
 
-            Color team = theme != null ? theme.ShotColorFor(deployable.OwnerTeam) : Color.white;
-            var block = new MaterialPropertyBlock();
-            VisualTint.SetMeshColor(footprint, block, VisualTint.WithAlpha(team, footprintOpacity));
-            VisualTint.SetMeshColor(beacon, block, VisualTint.WithAlpha(team, 1f));
-            VisualTint.SetMeshColor(stem, block, VisualTint.WithAlpha(team, stemOpacity));
+            team = theme != null ? theme.ShotColorFor(deployable.OwnerTeam) : Color.white;
             VisualTint.FillFlatCircle(rim, portal.Radius, rimSegments);
-            VisualTint.SetLineColor(rim, VisualTint.WithAlpha(team, rimOpacity));
+            Paint(true);
 
             if (ownerBeacon != null)
                 ownerBeacon.SetActive(PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.ActorNumber == deployable.OwnerActor);
+        }
+
+        private void Update()
+        {
+            if (portal == null)
+                return;
+            bool usable = PortalUseRules.ShowsUsable(TryReadOwnerCharge(out bool ownerHasCharge), ownerHasCharge);
+            if (shownUsable != usable)
+                Paint(usable);
+        }
+
+        private bool TryReadOwnerCharge(out bool ownerHasCharge)
+        {
+            ownerHasCharge = false;
+            Room room = PhotonNetwork.CurrentRoom;
+            Player owner = room != null ? room.GetPlayer(portal.OwnerActor) : null;
+            if (owner == null || !owner.CustomProperties.TryGetValue(AllyPortalTraveller.ReadyKey, out object raw) || !(raw is bool ready))
+                return false;
+            ownerHasCharge = ready;
+            return true;
+        }
+
+        /// <summary>Draws every part in the team colour, or in the theme's cooling-down grey; opacities stay as tuned.</summary>
+        private void Paint(bool usable)
+        {
+            shownUsable = usable;
+            Color colour = usable || theme == null ? team : theme.portalCooldownColor;
+            var block = new MaterialPropertyBlock();
+            VisualTint.SetMeshColor(footprint, block, VisualTint.WithAlpha(colour, footprintOpacity));
+            VisualTint.SetMeshColor(beacon, block, VisualTint.WithAlpha(colour, 1f));
+            VisualTint.SetMeshColor(stem, block, VisualTint.WithAlpha(colour, stemOpacity));
+            VisualTint.SetLineColor(rim, VisualTint.WithAlpha(colour, rimOpacity));
         }
     }
 }

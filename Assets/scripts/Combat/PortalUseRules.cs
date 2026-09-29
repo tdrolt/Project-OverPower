@@ -51,5 +51,10 @@ namespace Overpower.Combat
         {
             return writerIsTeammate && targetOwnerActor == myActor && newCounter > lastSeenCounter;
         }
+
+        /// <summary>Whether a portal should show its normal colour (true) or its cooling-down grey (false): usable exactly
+        /// while its owner has a charge. A flag that has not been published yet counts as usable, so nothing greys by
+        /// mistake before the owner's first publish.</summary>
+        public static bool ShowsUsable(bool flagKnown, bool ownerHasCharge) => !flagKnown || ownerHasCharge;
     }
 }

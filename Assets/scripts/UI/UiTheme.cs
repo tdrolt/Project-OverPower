@@ -194,6 +194,10 @@ namespace Overpower.UI
                  "empty/not-ready slot. Brighter than it was as a full-square fill (HUD step 2): three canvas " +
                  "units of mid-grey has to work harder than a hundred and forty did.")]
         public Color slotBlockedColor = new Color(0.45f, 0.45f, 0.45f, 0.95f);
+
+        [Tooltip("Colour of a teleport portal's disc, rim, diamond and stem while its pair cannot be used (the owner's " +
+                 "charge is recharging). Only the colour is used; each part keeps its own opacity.")]
+        public Color portalCooldownColor = new Color(0.5f, 0.5f, 0.5f, 1f);
         [Tooltip("Slot BORDER colour while the ability is active - a channel, a dash mid-flight, sprint held. " +
                  "Unchanged by HUD step 2: at full alpha it already reads as a lit frame.")]
         public Color slotActiveGlowColor = new Color(1f, 0.85f, 0.25f, 1f);

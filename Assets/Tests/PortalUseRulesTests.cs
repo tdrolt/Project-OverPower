@@ -123,5 +123,25 @@ namespace Overpower.Tests
         {
             Assert.IsFalse(PortalUseRules.ShouldSpendForAllyTrip(lastSeenCounter: 5, newCounter: 4, targetOwnerActor: 3, myActor: 3, writerIsTeammate: true));
         }
+
+        // ---- the portal's glow: grey while its owner has no charge (Tudor D23) ----------------------
+
+        [Test]
+        public void AnOwnerWithAChargeShowsThePortalUsable()
+        {
+            Assert.IsTrue(PortalUseRules.ShowsUsable(flagKnown: true, ownerHasCharge: true));
+        }
+
+        [Test]
+        public void AnOwnerWithoutAChargeShowsThePortalGrey()
+        {
+            Assert.IsFalse(PortalUseRules.ShowsUsable(flagKnown: true, ownerHasCharge: false));
+        }
+
+        [Test]
+        public void AnAbsentFlagShowsThePortalUsableSoNothingGreysBeforeTheFirstPublish()
+        {
+            Assert.IsTrue(PortalUseRules.ShowsUsable(flagKnown: false, ownerHasCharge: false));
+        }
     }
 }
