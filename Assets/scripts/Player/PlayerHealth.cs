@@ -114,6 +114,14 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// owner's own screen-space bars (the overhead bar above needs no such read: it drives itself).</summary>
     public bool ShowsImmuneLook => immuneLookApplied;
 
+    /// <summary>The shared theme, so the STUNNED / SLOWED label built over this player's head (Tudor D18) reads its
+    /// colours and sizes from the same asset as the bar under it.</summary>
+    public UiTheme Theme => theme;
+
+    /// <summary>The world-space canvas the overhead bar and the name sit on - null when the prefab has no health
+    /// fill assigned. The status label is built onto it.</summary>
+    public Canvas OverheadCanvas => healthFillImage != null ? healthFillImage.canvas : null;
+
     private PhotonView photonView;
 
     private float health;

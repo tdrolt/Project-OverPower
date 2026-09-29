@@ -3,6 +3,8 @@ using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
+using Overpower.UI;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 /// <summary>
 /// Owns the StatusEffectState for one player - burns, slows, stuns, vulnerability and
@@ -79,6 +81,18 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     /// duration for Burn/Slow/Vulnerability; T5 wants to sum seconds across every kind uniformly).</summary>
     public event System.Action<StatusKind, int, int, float, float> StatusApplied;
 
+    // Tudor D18: STUNNED / SLOWED label. Statuses live only on the victim's client, so it publishes the label it
+    // wears as a Player Property (StatusLabelProperty) and every other client reads that; the label over the head
+    // is built on every copy, the real state feeding the owner's and the property feeding the rest.
+    private const int LabelEndToleranceMs = 120;
+    private StatusLabelOverhead overheadLabel;
+    private float stunTotal;
+    private float slowTotal;
+    private StatusLabel publishedLabel;
+    private int publishedEndMs;
+    private int publishedTotalMs;
+    private bool publishedOnce;
+
     public bool IsStunned => state.IsActive(StatusKind.Stun);
     public bool IsInvulnerable => state.IsActive(StatusKind.Invulnerability);
 
@@ -104,10 +118,82 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         reductionStack = new DamageReductionStack();
     }
 
+    private void Start()
+    {
+        overheadLabel = StatusLabelOverhead.TryCreate(this,
+            playerHealth != null ? playerHealth.Theme : null,
+            playerHealth != null ? playerHealth.OverheadCanvas : null);
+    }
+
+    /// <summary>The label this player wears right now, how long it has left and how long it started with (for the
+    /// bar). The owner's own copy reads its real status; every other copy reads what the owner published.
+    /// Stun beats slow; None when neither runs.</summary>
+    public void TryGetStatusLabel(out StatusLabel label, out float remaining, out float total)
+    {
+        if (photonView.IsMine)
+        {
+            float stunLeft = state.Remaining(StatusKind.Stun);
+            float slowLeft = state.Remaining(StatusKind.Slow);
+            label = StatusLabelRule.Choose(stunLeft, slowLeft);
+            remaining = label == StatusLabel.Stunned ? stunLeft : label == StatusLabel.Slowed ? slowLeft : 0f;
+            total = label == StatusLabel.Stunned ? stunTotal : label == StatusLabel.Slowed ? slowTotal : 0f;
+            return;
+        }
+
+        label = StatusLabel.None;
+        remaining = 0f;
+        total = 0f;
+        Photon.Realtime.Player owner = photonView.Owner;
+        if (owner == null || owner.CustomProperties == null
+            || !owner.CustomProperties.TryGetValue(StatusLabelProperty.Key, out object raw)
+            || !StatusLabelProperty.TryDecode(raw, out int publishedKind, out int endMs, out int durationMs))
+            return;
+
+        remaining = StatusLabelRule.SecondsLeft(endMs, PhotonNetwork.ServerTimestamp);
+        if (remaining <= 0f)
+            return;
+
+        label = (StatusLabel)publishedKind;
+        total = durationMs / 1000f;
+    }
+
+    /// <summary>Owner only: keeps the tracked windows current and publishes the label when it changes - the
+    /// label itself, or its end moving (a refresh) - never every frame.</summary>
+    private void PublishStatusLabel()
+    {
+        stunTotal = StatusLabelRule.TrackedTotal(stunTotal, state.Remaining(StatusKind.Stun));
+        slowTotal = StatusLabelRule.TrackedTotal(slowTotal, state.Remaining(StatusKind.Slow));
+
+        if (!PhotonNetwork.InRoom || photonView.Owner == null)
+            return;
+
+        TryGetStatusLabel(out StatusLabel label, out float remaining, out float total);
+        int endMs = label == StatusLabel.None ? 0 : unchecked(PhotonNetwork.ServerTimestamp + Mathf.RoundToInt(remaining * 1000f));
+        int totalMs = Mathf.RoundToInt(total * 1000f);
+
+        bool changed = !publishedOnce || label != publishedLabel;
+        if (!changed && label != StatusLabel.None)
+            changed = Mathf.Abs(unchecked(endMs - publishedEndMs)) > LabelEndToleranceMs || totalMs != publishedTotalMs;
+        if (!changed)
+            return;
+
+        publishedOnce = true;
+        publishedLabel = label;
+        publishedEndMs = endMs;
+        publishedTotalMs = totalMs;
+        photonView.Owner.SetCustomProperties(new Hashtable
+        {
+            { StatusLabelProperty.Key, label == StatusLabel.None ? StatusLabelProperty.None() : StatusLabelProperty.Encode((int)label, endMs, totalMs) },
+        });
+    }
+
     private void Update()
     {
         if (!photonView.IsMine)
+        {
+            overheadLabel?.Tick(); // A remote copy only shows the label the owner published; it never ticks a status.
             return; // No other client should simulate your statuses, same reasoning as PlayerHealth.
+        }
 
         // Order matters: ConsumeBurnDamage reports damage for the burn as it stood before this
         // step, then Tick ages every status - including that same burn - by the same deltaTime.
@@ -124,6 +210,8 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
 
         ApplySlowToMotor();
         ApplyStunToMotor(); // Ticked every frame so a stun that just expired unfreezes the same frame.
+        PublishStatusLabel();
+        overheadLabel?.Tick();
     }
 
     /// <summary>
@@ -324,6 +412,8 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         DisarmReactiveInvulnerability(); // Death and respawn must never carry an armed shield or a stale trigger forward - one home for that, see its own comment.
         ApplySlowToMotor(); // Slow is now 0 - make sure the motor's multiplier is dropped with it.
         ApplyStunToMotor(); // Same for stun - a death or respawn must not leave the freeze behind.
+        if (photonView != null && photonView.IsMine)
+            PublishStatusLabel(); // A death or respawn wipes the label off every client at once, not a frame later.
     }
 
     public float Remaining(StatusKind kind) => state.Remaining(kind);

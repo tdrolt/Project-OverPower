@@ -245,6 +245,27 @@ namespace Overpower.UI
         public string ultimateReadyText = "READY";
         [Tooltip("Text shown over the Ultimate slot while no ultimate is equipped (the meter keeps filling underneath).")]
         public string ultimateNoneText = "No ultimate";
+        [Header("Status labels (STUNNED / SLOWED)")]
+        [Tooltip("Text shown over a stunned player's head, and on your own HUD when it is you. Stun is the stronger effect: it always wins over slowed.")]
+        public string statusStunnedText = "STUNNED";
+        [Tooltip("Text shown over a slowed player's head, and on your own HUD when it is you (only while not stunned).")]
+        public string statusSlowedText = "SLOWED";
+        [Tooltip("Colour of the STUNNED label and the thin bar shrinking under it.")]
+        public Color statusStunnedColor = new Color(1f, 0.86f, 0.1f, 1f);
+        [Tooltip("Colour of the SLOWED label and the thin bar shrinking under it - a cool blue so it never reads as the stun.")]
+        public Color statusSlowedColor = new Color(0.4f, 0.7f, 1f, 1f);
+        [Tooltip("Your own HUD label: how far below the middle of the screen it sits, in canvas units.")]
+        public float statusHudOffsetY = 170f;
+        [Tooltip("Your own HUD bar: width and height, in canvas units. Sits directly under the label.")]
+        public Vector2 statusHudBarSize = new Vector2(220f, 8f);
+        [Tooltip("Size of the label over a player's head (same units as the name above the health bar).")]
+        public float statusOverheadTextSize = 15f;
+        [Tooltip("How high above the health bar's centre the label sits, in overhead-canvas units (the name text sits at 5).")]
+        public float statusOverheadLabelY = 15.5f;
+        [Tooltip("How high above the health bar's centre the thin countdown bar sits, in overhead-canvas units - between the name and the label.")]
+        public float statusOverheadBarY = 11f;
+        [Tooltip("Overhead countdown bar: width and height, in overhead-canvas units (the health bar is 15 by 3).")]
+        public Vector2 statusOverheadBarSize = new Vector2(15f, 1f);
         [Tooltip("Colour of the weapon-icon placeholder in the silenced banner - a plain rectangle, since the " +
                  "project has no weapon-silhouette sprite yet.")]
         public Color silencedIconColor = new Color(0.85f, 0.85f, 0.85f, 0.9f);

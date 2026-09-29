@@ -245,6 +245,11 @@ namespace Overpower.UI
         private double lastGoldIncome = double.MinValue;
         private bool lastOverPowerShown;
         private bool lastOverPowerActive;
+        private GameObject statusRoot;
+        private TextMeshProUGUI statusText;
+        private Image statusFill;
+        private StatusLabel lastStatusLabel = (StatusLabel)(-1);
+        private float lastStatusFill = -1f;
 
         private void Awake()
         {
@@ -331,6 +336,7 @@ namespace Overpower.UI
             UpdateGold();
             UpdateToast();
             UpdateOverPower();
+            UpdateStatusLabel();
             UpdateHealthAndArmor();
             UpdateOverheat();
             UpdateWeaponSlot();
@@ -1030,6 +1036,7 @@ namespace Overpower.UI
 
             BuildGoldCorner(canvasGo.transform);
             BuildToast(canvasGo.transform);
+            BuildStatusLabel(canvasGo.transform);
 
             // 2.7b step 8: the warm-up/countdown/host line, built here (so it shares the HUD's own font/shadow/
             // outline material like every other HUD text) and handed to MatchStartPanel, which decides what it
@@ -1209,6 +1216,94 @@ namespace Overpower.UI
             go.SetActive(false); // ShowToast turns this on; UpdateToast turns it off again.
             toastGo = go;
             toastText = text;
+        }
+
+        private const float StatusHudGap = 8f; // Clear air between the label's letters and the bar under them.
+
+        /// <summary>Tudor D18: your own STUNNED / SLOWED label with its thin shrinking bar, a little below the middle
+        /// of the screen - parented to the canvas (not Hud Panel's layout group) like the toast, so showing and hiding
+        /// it never moves anything. Starts hidden; UpdateStatusLabel is the only thing that shows it.</summary>
+        private void BuildStatusLabel(Transform canvasParent)
+        {
+            GameObject go = new GameObject("Status Label", typeof(RectTransform));
+            go.transform.SetParent(canvasParent, false);
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(0f, -theme.statusHudOffsetY);
+            rt.sizeDelta = new Vector2(theme.statusHudBarSize.x, theme.bodyTextSize + 10f + StatusHudGap + theme.statusHudBarSize.y);
+
+            TextMeshProUGUI text = AddLabel(go.transform, "", theme.bodyTextSize, FontStyles.Bold);
+            RectTransform textRt = text.rectTransform;
+            textRt.anchorMin = new Vector2(0f, 1f);
+            textRt.anchorMax = new Vector2(1f, 1f);
+            textRt.pivot = new Vector2(0.5f, 1f);
+            textRt.anchoredPosition = Vector2.zero;
+            textRt.sizeDelta = new Vector2(0f, theme.bodyTextSize + 10f);
+            text.alignment = TextAlignmentOptions.Center;
+
+            GameObject trackGo = new GameObject("Bar", typeof(RectTransform));
+            trackGo.transform.SetParent(go.transform, false);
+            RectTransform trackRt = trackGo.GetComponent<RectTransform>();
+            trackRt.anchorMin = trackRt.anchorMax = new Vector2(0.5f, 0f);
+            trackRt.pivot = new Vector2(0.5f, 0f);
+            trackRt.anchoredPosition = Vector2.zero;
+            trackRt.sizeDelta = theme.statusHudBarSize;
+            Image track = trackGo.AddComponent<Image>();
+            track.color = theme.barTrackColor;
+            track.raycastTarget = false;
+
+            GameObject fillGo = new GameObject("Fill", typeof(RectTransform));
+            fillGo.transform.SetParent(trackGo.transform, false);
+            RectTransform fillRt = fillGo.GetComponent<RectTransform>();
+            fillRt.anchorMin = Vector2.zero;
+            fillRt.anchorMax = Vector2.one;
+            fillRt.offsetMin = fillRt.offsetMax = Vector2.zero;
+            Image fill = fillGo.AddComponent<Image>();
+            fill.sprite = theme.barSprite; // Sprite before Type - see BuildBar.
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            fill.raycastTarget = false;
+
+            go.SetActive(false);
+            statusRoot = go;
+            statusText = text;
+            statusFill = fill;
+        }
+
+        /// <summary>Shows STUNNED or SLOWED (stun wins) with the bar shrinking over the time left, and hides both
+        /// when neither runs. Text and colour are written only when the label changes, the fill only when it moves.</summary>
+        private void UpdateStatusLabel()
+        {
+            if (statusEffects == null || statusRoot == null)
+                return;
+
+            statusEffects.TryGetStatusLabel(out StatusLabel label, out float remaining, out float total);
+
+            if (label != lastStatusLabel)
+            {
+                lastStatusLabel = label;
+                lastStatusFill = -1f;
+                statusRoot.SetActive(label != StatusLabel.None);
+                if (label != StatusLabel.None)
+                {
+                    bool stunned = label == StatusLabel.Stunned;
+                    Color colour = stunned ? theme.statusStunnedColor : theme.statusSlowedColor;
+                    statusText.text = stunned ? theme.statusStunnedText : theme.statusSlowedText;
+                    statusText.color = colour;
+                    statusFill.color = colour;
+                }
+            }
+
+            if (label == StatusLabel.None)
+                return;
+
+            float amount = StatusLabelRule.Fill(remaining, total);
+            if (Mathf.Abs(amount - lastStatusFill) > 0.002f)
+            {
+                lastStatusFill = amount;
+                statusFill.fillAmount = amount;
+            }
         }
 
         /// <summary>trackImage is handed back so a caller can add something on top of the track

@@ -83,6 +83,16 @@ MonoBehaviour:
   ultimateRecastText: THROW
   ultimateReadyText: READY
   ultimateNoneText: No ultimate
+  statusStunnedText: STUNNED
+  statusSlowedText: SLOWED
+  statusStunnedColor: {r: 1, g: 0.86, b: 0.1, a: 1}
+  statusSlowedColor: {r: 0.4, g: 0.7, b: 1, a: 1}
+  statusHudOffsetY: 170
+  statusHudBarSize: {x: 220, y: 8}
+  statusOverheadTextSize: 15
+  statusOverheadLabelY: 15.5
+  statusOverheadBarY: 11
+  statusOverheadBarSize: {x: 15, y: 1}
   silencedIconColor: {r: 0.85, g: 0.85, b: 0.85, a: 0.9}
   silencedWashAlpha: 0.35
   silencedIconSize: 28
