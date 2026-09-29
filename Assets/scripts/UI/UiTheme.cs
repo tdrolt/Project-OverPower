@@ -985,21 +985,21 @@ namespace Overpower.UI
             "M  Map\n" +
             "Hold Tab  Scoreboard\n" +
             "Enter  Chat\n" +
-            "Escape  Quit";
+            "Escape  Close the game";
         [Tooltip("The overheat block on the name screen: what overheat is and what the Vent does.")]
         [TextArea(3, 8)] public string nameTipsOverheatText =
             "<b>Overheat and the Vent</b>\n" +
-            "Shooting and abilities build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\n" +
+            "Shooting and Sprint build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\n" +
             "While locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout.";
         [Tooltip("The ability charges block on the name screen.")]
         [TextArea(3, 8)] public string nameTipsChargesText =
             "<b>Ability charges</b>\n" +
-            "Some abilities hold several charges. Spent charges come back one at a time, so using them all means a longer wait.";
+            "Some abilities hold several charges. Spent charges come back one at a time. Dash locks until 2 charges are back once you use all 3.";
         [Tooltip("The game mode block on the name screen: capture zones, respawning, winning. Worded so it stays true " +
                  "whatever the last stand's exact rule is.")]
         [TextArea(3, 8)] public string nameTipsModeText =
             "<b>The match</b>\n" +
-            "Capture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake one. The last team standing wins.";
+            "Capture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake it or take another team's base. The last team standing wins.";
         [Tooltip("Text size of the name screen tips, in reference pixels.")]
         [Min(8f)] public float nameTipsFontSize = 20f;
         [Tooltip("Colour of the name screen tips text.")]

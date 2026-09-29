@@ -300,6 +300,16 @@ MonoBehaviour:
   - Purple
   - Cyan
   scoreboardUnknownTeamText: Joining
+  nameTipsKeysText: "<b>Keys</b>\nWASD  move\nMouse  aim, left click shoots\nRight click  Equipment ability\nLeft Shift  Mobility ability\nSpace  Ultimate ability (meter full)\nR  Vent (see Overheat)\nP  Shop\nM  Map\nHold Tab  Scoreboard\nEnter  Chat\nEscape  Close the game"
+  nameTipsOverheatText: "<b>Overheat and the Vent</b>\nShooting and Sprint build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\nWhile locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout."
+  nameTipsChargesText: "<b>Ability charges</b>\nSome abilities hold several charges. Spent charges come back one at a time. Dash locks until 2 charges are back once you use all 3."
+  nameTipsModeText: "<b>The match</b>\nCapture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake it or take another team's base. The last team standing wins."
+  nameTipsFontSize: 20
+  nameTipsColor: {r: 1, g: 1, b: 1, a: 0.9}
+  nameTipsKeysWidth: 560
+  nameTipsRulesWidth: 800
+  nameTipsColumnGap: 60
+  nameTipsGapBelowJoin: 30
   damageNumberScreenOffset: {x: 50, y: 0}
   blockedText: Blocked
   blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
