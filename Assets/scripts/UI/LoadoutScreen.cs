@@ -223,6 +223,7 @@ namespace Overpower.UI
         // cannot freeze this reason on screen forever.
         private string blockedReasonText = "";
         private float blockedReasonExpiryTime = -1f;
+        private bool blockedReasonIsNotice; // Task 5b-1: a "Sold ..." message rides the same status line, in the normal text colour.
 
         /// <summary>Shown under the Ultimate heading only while that slot is empty ("Buy an
         /// ultimate") - the one ability slot with no card that can ever read Equipped at spawn, so
@@ -325,8 +326,6 @@ namespace Overpower.UI
             BuildUi();
             screenRoot.SetActive(false);
 
-            if (lifecycle != null)
-                lifecycle.AliveChanged += HandleAliveChanged;
             if (inputRouter != null)
                 inputRouter.ShopToggled += Toggle;
             if (abilityRunner != null)
@@ -344,8 +343,6 @@ namespace Overpower.UI
 
         private void OnDestroy()
         {
-            if (lifecycle != null)
-                lifecycle.AliveChanged -= HandleAliveChanged;
             if (inputRouter != null)
                 inputRouter.ShopToggled -= Toggle;
             if (abilityRunner != null)
@@ -430,12 +427,6 @@ namespace Overpower.UI
                 RefreshHeader(ctx); // Still cheap even when nothing else changed - see RefreshHeader's own comment.
         }
 
-        private void HandleAliveChanged(bool alive)
-        {
-            if (!alive && isOpenLocal)
-                Close();
-        }
-
         /// <summary>AbilityRunner.SlotChanged fires for every equip, from any source - this
         /// screen's own click, the F1 panel, or a remote property echo - so subscribing it straight
         /// to Refresh (rather than polling like Update() does for the weapon and armor, Task 9a
@@ -450,8 +441,9 @@ namespace Overpower.UI
         {
             if (isOpenLocal)
                 return;
-            if (lifecycle != null && !lifecycle.IsAlive)
-                return; // Never open on a corpse - Verification 5 also requires staying closed through death.
+            // Task 5b-1 (D4): a dead player may open the shop while waiting to respawn (and an open shop stays
+            // open through a death) - only the match ending closes it. The gates count as passed while dead
+            // (ShopRules.EffectiveInOwnTerritory / EffectiveSecondsSinceCombat, applied in ShopPricing.Build).
             if (matchUI != null && matchUI.MatchOver)
                 return; // The match is already decided - see Update()'s own MatchOver check (Task 9a review).
 
@@ -550,7 +542,8 @@ namespace Overpower.UI
         /// BuildingManager/Teams/GoldWallet reads every purchase check needs - see ShopPricing's own
         /// class comment for why this was pulled out of LoadoutScreen itself.</summary>
         private ShopContext CurrentShopContext() =>
-            ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position);
+            ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position,
+                lifecycle == null || lifecycle.IsAlive);
 
         /// <summary>Header row: "Gold 1234" and the status line - a refused click's own reason
         /// (Task 2.5b review fix 2, see ShowBlockedReason) while its timer runs, else the shop
@@ -575,7 +568,7 @@ namespace Overpower.UI
                 if (blockedReasonText != lastStatusText)
                 {
                     statusLabel.text = blockedReasonText;
-                    statusLabel.color = theme.overheatWarningColor; // Always a block reason - never muted.
+                    statusLabel.color = blockedReasonIsNotice ? theme.textColor : theme.overheatWarningColor;
                     lastStatusText = blockedReasonText;
                 }
                 headerInitialized = true;
@@ -629,6 +622,7 @@ namespace Overpower.UI
         private void ShowBlockedReason(ShopContext ctx, PurchaseBlock block, int price, int itemId = -1)
         {
             blockedReasonText = ctx.ReasonText(block, price);
+            blockedReasonIsNotice = false;
             // Unscaled (re-review fix, project convention - see PlayerHud.bountyToastHideAtTime's own
             // comment): a debug Time.timeScale change must not freeze this reason on screen forever.
             blockedReasonExpiryTime = Time.unscaledTime + theme.loadoutBlockedReasonDurationSeconds;
@@ -640,6 +634,15 @@ namespace Overpower.UI
             PurchaseRefused?.Invoke(itemId, price, block, shortfall);
         }
 
+        /// <summary>Task 5b-1 (D19): "Sold Laser - Through Walls: +600 gold" on the header status line for a few
+        /// seconds after a sale, so a refund is never a silent change in the gold number.</summary>
+        private void ShowSoldMessage(string text)
+        {
+            blockedReasonText = text;
+            blockedReasonIsNotice = true;
+            blockedReasonExpiryTime = Time.unscaledTime + theme.loadoutSoldMessageDurationSeconds;
+        }
+
         /// <summary>Rewrites the Reset Weapon/Reset Armor buttons' own labels with a refund preview
         /// ("Reset Weapon (+600)") - read straight off the ledger, never spent, so hovering (or just
         /// looking at) the button tells a player what undoing costs them before they click it.</summary>
@@ -648,7 +651,7 @@ namespace Overpower.UI
             double rate = gameplayConfig != null ? gameplayConfig.SellRefundRate : 0.5;
             if (resetWeaponLabel != null)
             {
-                int refund = GoldMath.Refund(ledger.WeaponSpent, rate);
+                int refund = ledger.WeaponRefundPreview(rate);
                 resetWeaponLabel.text = refund > 0 ? $"Reset Weapon (+{refund})" : "Reset Weapon";
             }
             if (resetArmorLabel != null)
@@ -736,10 +739,14 @@ namespace Overpower.UI
                 }
                 if (goldWallet != null && gameplayConfig != null)
                 {
+                    WeaponDefinition sold = weapons != null ? weapons.Resolve(CurrentWeaponId()) : null;
                     int refund = ledger.SellWeapon(gameplayConfig.SellRefundRate);
                     goldWallet.Add(refund, GoldSource.Refund);
                     if (refund > 0)
+                    {
                         Refunded?.Invoke(PurchaseCategory.Weapon, refund, goldWallet.Balance);
+                        ShowSoldMessage(ShopRules.SoldMessage(theme.loadoutSoldWeaponFormat, sold != null ? sold.DisplayName : "weapon", refund));
+                    }
                 }
             }
 
@@ -756,8 +763,11 @@ namespace Overpower.UI
                 return;
 
             int equipped = CurrentWeaponId();
+            double rate = gameplayConfig != null ? gameplayConfig.SellRefundRate : 0.5;
+            int refundNow = ledger.WeaponRefundPreview(rate);
             foreach (var pair in weaponNodes)
-                StyleNode(pair.Value, tree.StateOf(pair.Key, equipped), weapons.Resolve(pair.Key), ctx);
+                StyleNode(pair.Value, tree.StateOf(pair.Key, equipped), weapons.Resolve(pair.Key), ctx,
+                    tree.NeedsSwap(pair.Key, equipped) ? refundNow : -1);
         }
 
         /// <summary>Task 2.5b: the label's second line now reads "Equipped"/"Owned" for a weapon
@@ -770,7 +780,7 @@ namespace Overpower.UI
         /// on a refusal, shows the specific reason in the header (ShowBlockedReason, fix 2) - a
         /// disabled button would also stop this node being hoverable for the price/description
         /// panel below.</summary>
-        private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state, WeaponDefinition def, ShopContext ctx)
+        private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state, WeaponDefinition def, ShopContext ctx, int swapRefund)
         {
             PurchaseBlock block = state == UpgradeNodeState.Selectable && def != null ? ctx.Check(def.GoldCost) : PurchaseBlock.None;
             bool shopBlocked = block != PurchaseBlock.None;
@@ -780,6 +790,9 @@ namespace Overpower.UI
                           : def != null ? ShopPricing.PriceLine(def.GoldCost, block, ctx.Balance) : "";
             // Loadout Price Line Size Percent (UiTheme) on the price/status line only - the node is
             // small (Loadout Node Width x Height) and two full-size lines would not both fit.
+            // Task 5b-1 (D19): a weapon on another branch says what the swap costs (what selling back gives now).
+            if (state == UpgradeNodeState.Locked && swapRefund >= 0)
+                suffix = ShopRules.SwapLine(true, swapRefund, theme.loadoutSwapFormat);
             ui.label.text = def != null ? $"{def.DisplayName}\n<size={theme.loadoutPriceLineSizePercent}%>{suffix}</size>" : suffix;
 
             switch (state)
@@ -885,7 +898,10 @@ namespace Overpower.UI
                     int refund = ledger.SellArmor(gameplayConfig.SellRefundRate);
                     goldWallet.Add(refund, GoldSource.Refund);
                     if (refund > 0)
+                    {
                         Refunded?.Invoke(PurchaseCategory.Armor, refund, goldWallet.Balance);
+                        ShowSoldMessage(string.Format(System.Globalization.CultureInfo.InvariantCulture, theme.loadoutSoldArmorFormat, refund));
+                    }
                 }
             }
 

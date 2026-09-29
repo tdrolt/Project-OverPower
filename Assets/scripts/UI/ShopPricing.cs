@@ -93,14 +93,16 @@ namespace Overpower.UI
             ShopRules.IsFree(config == null || config.FreeLoadout,
                 MatchDirector.Instance != null && MatchDirector.Instance.IsLive);
 
-        public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position)
+        public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position, bool isAlive = true)
         {
             bool freeLoadout = config == null || config.FreeLoadout;
             bool isFree = IsFreeNow(config);
             bool isWarmupSandbox = isFree && !freeLoadout;
-            bool inOwnTerritory = InOwnTerritory(owner, position);
+            // Task 5b-1 (D4): while dead the territory and combat gates count as passed (respawn is at home, out of combat).
+            bool inOwnTerritory = ShopRules.EffectiveInOwnTerritory(isAlive, InOwnTerritory(owner, position));
             float secondsSinceCombat = health != null ? health.SecondsSinceCombat : 0f;
             float required = config != null ? config.ShopOutOfCombatSeconds : 0f;
+            secondsSinceCombat = ShopRules.EffectiveSecondsSinceCombat(isAlive, secondsSinceCombat, required);
             int balance = wallet != null ? wallet.Balance : 0;
             return new ShopContext(isFree, isWarmupSandbox, inOwnTerritory, secondsSinceCombat, required, balance);
         }

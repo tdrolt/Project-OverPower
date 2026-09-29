@@ -105,6 +105,10 @@ MonoBehaviour:
   loadoutShopBlockedColor: {r: 0.22, g: 0.14, b: 0.05, a: 0.92}
   loadoutPriceLineSizePercent: 70
   loadoutBlockedReasonDurationSeconds: 2
+  loadoutSwapFormat: Swap (sell back +{0})
+  loadoutSoldWeaponFormat: 'Sold {0}: +{1} gold'
+  loadoutSoldArmorFormat: 'Sold armour upgrades: +{0} gold'
+  loadoutSoldMessageDurationSeconds: 3
   loadoutDescriptionPanelHeight: 190
   loadoutToggleButtonWidth: 190
   loadoutToggleButtonHeight: 48

@@ -95,12 +95,13 @@ public class PlayerInputRouter : MonoBehaviour
     /// one, and the design wants an overheated player to still be able to walk away.</summary>
     public bool InputSuppressed => !isAlive || IsTypingInChat() || toolFocusOwners.Count > 0;
 
-    /// <summary>Dead or typing in chat block Shop too, but a tool holding general focus must not -
+    /// <summary>Typing in chat blocks Shop (Task 5b-1, D4: being dead no longer does - a player waiting to
+    /// respawn can shop), but a tool holding general focus must not -
     /// P is how the loadout screen (itself a tool focus owner) closes again, and F1 being open must
     /// not swallow a P press either (Verification 1: F1 open AND loadout open, closing the loadout
     /// must leave InputSuppressed true, which only works if opening/closing the loadout while F1
     /// holds focus works at all).</summary>
-    private bool ShopSuppressed => !isAlive || IsTypingInChat();
+    private bool ShopSuppressed => IsTypingInChat();
 
     /// <summary>MapToggled's own, narrowest gate (controller amendment 5, capture ring + minimap spec,
     /// 2026-09-16/17): M must work while dead, and while the loadout screen holds tool focus, because opening the

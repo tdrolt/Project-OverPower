@@ -107,6 +107,14 @@ namespace Overpower.Combat
             return UpgradeNodeState.Locked;
         }
 
+        /// <summary>True for a weapon that can only be reached by first selling the current weapon path: another
+        /// branch, at any depth. False for what you hold, what you passed, and anything further down your own
+        /// path (those are plain upgrades).</summary>
+        public bool NeedsSwap(int nodeId, int equippedId) =>
+            StateOf(nodeId, equippedId) == UpgradeNodeState.Locked
+            && parentOf.ContainsKey(nodeId) && parentOf.ContainsKey(equippedId)
+            && !IsAncestorOf(equippedId, nodeId);
+
         private bool IsAncestorOf(int ancestorId, int id)
         {
             int current = id, steps = 0;

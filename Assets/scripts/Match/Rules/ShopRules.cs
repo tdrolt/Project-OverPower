@@ -33,6 +33,24 @@ namespace Overpower.Match
             return PurchaseBlock.None;
         }
 
+        /// <summary>Task 5b-1 (D4): a player waiting to respawn will respawn at home, so the "in your own
+        /// territory" gate counts as passed while dead. Living players are asked about where they really are.</summary>
+        public static bool EffectiveInOwnTerritory(bool isAlive, bool inOwnTerritory) => !isAlive || inOwnTerritory;
+
+        /// <summary>Task 5b-1 (D4): a respawned player starts out of combat, so the "out of combat" gate counts
+        /// as passed while dead (exactly the required time has passed). Living players keep their real timer.</summary>
+        public static float EffectiveSecondsSinceCombat(bool isAlive, float secondsSinceCombat, float requiredOutOfCombatSeconds) =>
+            isAlive ? secondsSinceCombat : Math.Max(secondsSinceCombat, requiredOutOfCombatSeconds);
+
+        /// <summary>Task 5b-1 (D19): the text on a weapon node that can only be reached by selling the current
+        /// weapon path first; empty when no swap is needed. format has one {0}, the refund.</summary>
+        public static string SwapLine(bool needsSwap, int refund, string format) =>
+            needsSwap ? string.Format(System.Globalization.CultureInfo.InvariantCulture, format, refund) : "";
+
+        /// <summary>Task 5b-1 (D19): the message after a sale. format has {0} = what was sold, {1} = the refund.</summary>
+        public static string SoldMessage(string format, string what, int refund) =>
+            string.Format(System.Globalization.CultureInfo.InvariantCulture, format, what, refund);
+
         public static float SecondsUntilOutOfCombat(float secondsSinceCombat, float requiredOutOfCombatSeconds) =>
             Math.Max(0f, requiredOutOfCombatSeconds - secondsSinceCombat);
 
@@ -61,6 +79,10 @@ namespace Overpower.Match
     {
         public int WeaponSpent { get; private set; }
         public int ArmorSpent { get; private set; }
+
+        /// <summary>What SellWeapon would give right now, without selling - the one number the Reset button's
+        /// preview and every swap node show (Task 5b-1).</summary>
+        public int WeaponRefundPreview(double refundRate) => GoldMath.Refund(WeaponSpent, refundRate);
 
         public void RecordWeapon(int price) { if (price > 0) WeaponSpent += price; }
         public void RecordArmor(int price) { if (price > 0) ArmorSpent += price; }
