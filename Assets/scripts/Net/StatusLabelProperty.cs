@@ -31,7 +31,7 @@ namespace Overpower.Net
             label = values[0];
             endServerMs = values[1];
             durationMs = values[2];
-            return label != 0;
+            return label == 1 || label == 2; // Slowed or Stunned only: a mismatched build cannot show a label by accident.
         }
     }
 }

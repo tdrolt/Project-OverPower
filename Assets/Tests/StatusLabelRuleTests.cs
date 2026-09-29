@@ -33,6 +33,46 @@ namespace Overpower.Tests
         {
             Assert.AreEqual(0f, StatusLabelRule.Fill(-0.3f, 2f), 1e-5f);
             Assert.AreEqual(StatusLabel.None, StatusLabelRule.Choose(-0.3f, -0.1f));
+
+            // A remote copy hides the same way: its seconds left (server time) are at or below zero.
+            float remoteLeft = StatusLabelRule.SecondsLeft(10000, 10400);
+            Assert.LessOrEqual(remoteLeft, 0f);
+            Assert.AreEqual(StatusLabel.None, StatusLabelRule.Choose(remoteLeft, remoteLeft));
+        }
+
+        [Test]
+        public void PublishesTheFirstTimeAndOnEveryLabelChangeIncludingToNone()
+        {
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(false, StatusLabel.None, 0, 0, StatusLabel.None, 0, 0, 120), "first ever");
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(true, StatusLabel.None, 0, 0, StatusLabel.Stunned, 5000, 2000, 120), "none to stunned");
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, 5000, 2000, StatusLabel.Slowed, 7000, 4000, 120), "stunned to slowed");
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, 5000, 2000, StatusLabel.None, 0, 0, 120), "expiry or death to none");
+        }
+
+        [Test]
+        public void DoesNotRepublishForJitterOrWhileNothingShows()
+        {
+            Assert.IsFalse(StatusLabelRule.ShouldPublish(true, StatusLabel.None, 0, 0, StatusLabel.None, 0, 0, 120), "still none");
+            Assert.IsFalse(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, 5000, 2000, StatusLabel.Stunned, 5120, 2000, 120), "exactly at tolerance");
+            Assert.IsFalse(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, 5000, 2000, StatusLabel.Stunned, 4900, 2000, 120), "jitter earlier");
+        }
+
+        [Test]
+        public void RepublishesWhenARefreshMovesTheEndOrTheWindowChanges()
+        {
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, 5000, 2000, StatusLabel.Stunned, 5121, 2000, 120), "end later");
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, 5000, 2000, StatusLabel.Stunned, 4879, 2000, 120), "end earlier");
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, 5000, 2000, StatusLabel.Stunned, 5000, 3000, 120), "window changed");
+            Assert.IsTrue(StatusLabelRule.ShouldPublish(true, StatusLabel.Stunned, int.MaxValue - 50, 2000, StatusLabel.Stunned, int.MinValue + 200, 2000, 120), "wrap-safe");
+        }
+
+        [Test]
+        public void OnlySlowedAndStunnedDecodeAsALabel()
+        {
+            Assert.IsTrue(StatusLabelProperty.TryDecode(new int[] { 1, 5000, 1500 }, out _, out _, out _));
+            Assert.IsTrue(StatusLabelProperty.TryDecode(new int[] { 2, 5000, 1500 }, out _, out _, out _));
+            Assert.IsFalse(StatusLabelProperty.TryDecode(new int[] { 3, 5000, 1500 }, out _, out _, out _));
+            Assert.IsFalse(StatusLabelProperty.TryDecode(new int[] { -1, 5000, 1500 }, out _, out _, out _));
         }
 
         [Test]

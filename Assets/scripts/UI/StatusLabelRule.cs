@@ -45,6 +45,19 @@ namespace Overpower.UI
             return remaining > previousTotal ? remaining : previousTotal;
         }
 
+        /// <summary>Whether the owner should write a new value to its Player Property: the first time ever, when
+        /// the label changes (including to None), or, while a label shows, when its end moved by more than the
+        /// tolerance (a refresh) or its window changed. Jitter under the tolerance never republishes.</summary>
+        public static bool ShouldPublish(bool publishedOnce, StatusLabel publishedLabel, int publishedEndMs, int publishedTotalMs,
+                                         StatusLabel label, int endMs, int totalMs, int toleranceMs)
+        {
+            if (!publishedOnce || label != publishedLabel)
+                return true;
+            if (label == StatusLabel.None)
+                return false;
+            return Mathf.Abs(unchecked(endMs - publishedEndMs)) > toleranceMs || totalMs != publishedTotalMs;
+        }
+
         /// <summary>Seconds left until endServerMs, read against the current server time. The 32-bit
         /// subtraction wraps on purpose: Photon's server clock rolls over about every 49.7 days and a
         /// plain subtraction would then read a huge wrong number.</summary>

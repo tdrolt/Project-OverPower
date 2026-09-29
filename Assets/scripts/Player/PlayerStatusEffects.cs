@@ -24,6 +24,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
 
     private PhotonView photonView;
     private PlayerHealth playerHealth;
+    private PlayerLifecycle lifecycle;
     private PlayerMotor motor;
     private StatusEffectState state;
     private DamageReductionStack reductionStack;
@@ -110,6 +111,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     {
         photonView = GetComponent<PhotonView>();
         playerHealth = GetComponent<PlayerHealth>();
+        lifecycle = GetComponent<PlayerLifecycle>();
         motor = GetComponent<PlayerMotor>();
 
         state = new StatusEffectState(
@@ -127,9 +129,19 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
 
     /// <summary>The label this player wears right now, how long it has left and how long it started with (for the
     /// bar). The owner's own copy reads its real status; every other copy reads what the owner published.
-    /// Stun beats slow; None when neither runs.</summary>
+    /// Stun beats slow; None when neither runs, and None while the player is dead (PlayerLifecycle.IsAlive is
+    /// replicated, so every client hides the label at once and the owner stops publishing it - death does not
+    /// clear the statuses, only the respawn does).</summary>
     public void TryGetStatusLabel(out StatusLabel label, out float remaining, out float total)
     {
+        if (lifecycle != null && !lifecycle.IsAlive)
+        {
+            label = StatusLabel.None;
+            remaining = 0f;
+            total = 0f;
+            return;
+        }
+
         if (photonView.IsMine)
         {
             float stunLeft = state.Remaining(StatusKind.Stun);
@@ -171,10 +183,8 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         int endMs = label == StatusLabel.None ? 0 : unchecked(PhotonNetwork.ServerTimestamp + Mathf.RoundToInt(remaining * 1000f));
         int totalMs = Mathf.RoundToInt(total * 1000f);
 
-        bool changed = !publishedOnce || label != publishedLabel;
-        if (!changed && label != StatusLabel.None)
-            changed = Mathf.Abs(unchecked(endMs - publishedEndMs)) > LabelEndToleranceMs || totalMs != publishedTotalMs;
-        if (!changed)
+        if (!StatusLabelRule.ShouldPublish(publishedOnce, publishedLabel, publishedEndMs, publishedTotalMs,
+                                           label, endMs, totalMs, LabelEndToleranceMs))
             return;
 
         publishedOnce = true;
@@ -413,7 +423,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         ApplySlowToMotor(); // Slow is now 0 - make sure the motor's multiplier is dropped with it.
         ApplyStunToMotor(); // Same for stun - a death or respawn must not leave the freeze behind.
         if (photonView != null && photonView.IsMine)
-            PublishStatusLabel(); // A death or respawn wipes the label off every client at once, not a frame later.
+            PublishStatusLabel(); // A respawn wipes the label off every client at once, not a frame later (death is covered by TryGetStatusLabel's alive check).
     }
 
     public float Remaining(StatusKind kind) => state.Remaining(kind);
