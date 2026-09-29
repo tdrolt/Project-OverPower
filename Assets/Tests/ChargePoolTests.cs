@@ -309,5 +309,34 @@ namespace Overpower.Tests
             p.SetMaxCharges(2); // needed clamps to 2, which we already have
             Assert.IsFalse(p.IsLocked);
         }
+
+        [Test]
+        public void TurningTheLockOutOffUnlocksAtOnce()
+        {
+            var p = NewLockoutPool(2);
+            p.TryConsume();
+            p.TryConsume();
+            p.TryConsume();
+            Assert.IsTrue(p.IsLocked);
+
+            p.SetChargesNeededAfterRunningDry(0);
+            Assert.IsFalse(p.IsLocked);
+            p.Tick(5f);
+            Assert.IsTrue(p.TryConsume());
+        }
+
+        [Test]
+        public void OneBigTickThatRefillsTwoChargesUnlocks()
+        {
+            var p = NewLockoutPool(2);
+            p.TryConsume();
+            p.TryConsume();
+            p.TryConsume();
+
+            p.Tick(10.5f); // a lag spike: two recharge periods in one frame
+            Assert.AreEqual(2, p.Available);
+            Assert.IsFalse(p.IsLocked);
+            Assert.IsTrue(p.TryConsume());
+        }
     }
 }
