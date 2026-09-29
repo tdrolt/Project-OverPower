@@ -54,6 +54,7 @@ namespace Overpower.Abilities
         private PlayerOverheat overheat;
         private PlayerDisplacement displacement;
         private CapsuleCollider capsule;
+        private Rigidbody body;
         private AbilityRunner runner;
 
         // The channel timer is retuned to the portal's own seconds every tick; this first value is never used.
@@ -69,6 +70,7 @@ namespace Overpower.Abilities
             overheat = GetComponent<PlayerOverheat>();
             displacement = GetComponent<PlayerDisplacement>();
             capsule = GetComponent<CapsuleCollider>();
+            body = GetComponent<Rigidbody>();
             runner = GetComponent<AbilityRunner>();
         }
 
@@ -79,7 +81,7 @@ namespace Overpower.Abilities
 
         private void Update()
         {
-            if (!photonView.IsMine || !PhotonNetwork.InRoom || capsule == null || displacement == null)
+            if (!photonView.IsMine || !PhotonNetwork.InRoom || capsule == null || body == null || displacement == null)
                 return;
 
             bool alive = lifecycle == null || lifecycle.IsAlive;
@@ -112,7 +114,10 @@ namespace Overpower.Abilities
             portalOwner = null;
             Portal best = null;
             float bestDistanceSqr = float.MaxValue;
-            Vector3 position = transform.position;
+            // The Rigidbody's own position, not the Transform's: TeleportTo writes the Rigidbody, and the Transform only
+            // catches up on the next physics step. Reading the stale Transform for a few frames after a trip showed the
+            // traveller still standing on the DEPARTURE portal, which lifted the arrival latch and let the trip repeat.
+            Vector3 position = body.position;
 
             foreach (Player other in PhotonNetwork.PlayerListOthers)
             {
