@@ -20,7 +20,7 @@ start (play terms, one question each, default stated), then proceeds with whatev
 | D4 | The shop opens while dead; what you buy is yours when you respawn (same prices, same rules). | A |
 | D5 | Ability and item descriptions show as a tooltip after hovering 1 s; the shield (armour) shows "upgrade 1 of 2" style limits. | D (the limit wording: A) |
 | D6 | Weapon upgrade tree: arrows from each weapon to its upgrades, forming branches. 2-3 mockups first; Tudor picks one. | D |
-| D7 | Mines arm 1.5 s after being placed (a number: `Assets/Resources/Mine.prefab` › Arm Delay Seconds, now 0.5), and blink while arming. | D (the blink: A) |
+| D7 | Mines arm 1.5 s after being placed (done by Tudor, `84391e5`) and blink while arming. | D (the blink: A) |
 | D8 | Dash: 3 charges. When all 3 are used, the Dash locks until 2 have refilled; the charge marks turn red while locked. Using it with charges left works as today. | D |
 | D9 | Sonic Pulse also pushes the user 4 m backwards (away from where they aim), at the same speed as the enemy push; the user is never stunned by hitting a wall. | D |
 | D10 | Name screen: a short panel of tips: the keys, overheat and the Vent, how ability charges work, the game mode in two lines. Texts in `UiTheme`. | D (content: A) |
@@ -29,6 +29,12 @@ start (play terms, one question each, default stated), then proceeds with whatev
 | D13 | The ultimate meter complaint is investigated before anything is changed (see Task 9). | A |
 | D15 | Teleport portals: teammates can use them too, not only the player who placed them; standing anywhere on the portal counts (not just its middle); the portal is 20% smaller (2.5 m → 2.0 m across). | D |
 | D16 | A teammate's trip works like the owner's (the same 3 s channel, interrupted the same way) and uses the same portal charge and cooldown as the owner's own trips; enemies still can't use them. | A |
+| D17 | **Last stand, changed:** a base that is neutral or held by an enemy is lost only when every member of its team is dead. While any member is alive, the team is in its last stand: nobody on it can respawn - neither players who were already dead when the base fell nor players who die after. The two-team "out at once if the other team holds a base" rule goes. Holding another team's base still counts as having a base. | D |
+| D18 | A **"STUNNED"** label with a short countdown bar over a stunned player (everyone sees it) and on your own HUD. | D (the look: A) |
+| D19 | The shop shows what a swap costs: selling back and the refund amount on the button, and a short message after a sale. | D (the wording: A) |
+| D20 | The shield ultimate shows its armed window: a visible ring/glow for its 2 s, and a "wasted" cue if nothing hit you in time. | D (the look: A) |
+| D21 | **Connection lost:** a "Connection lost - Rejoin" panel. Rejoining puts you back in the same match as the same player (same team, gold, loadout) - also after a crash and restart, within 2 minutes. Identity: a random id saved on the PC the first time the game runs (not the name, not the IP: names repeat and IPs change). Two players with the same name are fine; they're told apart by the id. | D (the id, the 2 minutes: A) |
+| D22 | When a match ends, the result screen's button takes you back to the name screen (a fresh start) instead of quitting; Escape still offers "Close the game?". | D |
 | D14 | Every new number lives in an editable asset with a plain tooltip (the QA rule: "everything in ScriptableObjects"). | D |
 
 ## Rules that bind every task (from the handover, `Resources\loops\Limit Test\HANDOFF.md`)
@@ -42,11 +48,11 @@ start (play terms, one question each, default stated), then proceeds with whatev
 
 ## Tasks (in order; 30-90 min each)
 
-### Task 1: Mines arm later, and show it (D7)
-- **Files:** `Assets/Resources/Mine.prefab` (arm delay 0.5 → 1.5, a YAML/serialized change - grep it after saving),
-  the mine's view script (a blink while arming, visible to everyone who can see the mine; the owner sees it too).
-- **Test first:** the arming rule (a mine placed at t=0 does not trigger at t=1.4 and does at t=1.6 with an enemy on it),
-  as a pure rule if the logic isn't one already.
+### Task 1: Mines show they're arming (D7)
+- The 1.5 s delay is done (`84391e5`). **Files:** the mine's view script: a blink while arming, visible to everyone who
+  can see the mine.
+- **Test first:** the arming rule (placed at t=0: no trigger at t=1.4, triggers at t=1.6 with an enemy on it), as a pure
+  rule if the logic isn't one already - it guards the delay whatever the number is.
 - **Check:** Play Mode: place a mine on a test dummy; it explodes only after 1.5 s; capture the blink.
 - **Review:** standard.
 
@@ -104,11 +110,11 @@ start (play terms, one question each, default stated), then proceeds with whatev
 - Make 2-3 mockups of the weapon upgrade tree with arrows (e.g. top-down tree, left-to-right branches, radial) as one
   page (an Artifact) using the real weapon names and prices from the weapon assets. Stop and let Tudor pick.
 
-### Task 5b: Shop clarity and shop while dead (D4, D5, D6)
+### Task 5b: Shop clarity and shop while dead (D4, D5, D6, D19)
 - **Files:** `PlayerInputRouter` (`ShopSuppressed` currently blocks the dead), `LoadoutScreen` (open while dead; the
   purchase path must work while dead and apply at respawn - check the out-of-combat gate and any "alive" assumption),
-  the tooltip (1 s hover; the existing description text), the armour upgrade limit shown, the chosen upgrade-tree layout.
-  Texts in `UiTheme`.
+  the tooltip (1 s hover; the existing description text), the armour upgrade limit shown, the chosen upgrade-tree layout, the swap/sell-back
+  price on the button (D19). Texts in `UiTheme`.
 - **Test first:** the pure rules that change (may open the shop while dead; tooltip delay rule if extracted).
 - **Check:** Play Mode: die, open the shop, buy, respawn with it; hover 1 s → tooltip; captures of each.
 - **Review:** standard.
@@ -144,6 +150,43 @@ start (play terms, one question each, default stated), then proceeds with whatev
 - Report the cause with evidence before changing anything; a fix gets a test that fails without it.
 - **Review:** standard (the strongest model if the cause is networking).
 
+### Task 9b: Last stand (D17) - rules, networking
+- **Files:** `Assets/scripts/Match/Rules/MatchPhaseRules.cs` (`IsOutNow`, `SpawnCapitalFor`, `IsLastStandDeath`),
+  `MatchDirector` (the team statuses), `PlayerLifecycle` (a respawn countdown running when the base falls must end in the
+  last stand, not at home). Update the tests that pin the old two-team "instant" rule and the "countdown that began before
+  the fall ends at home" rule - they describe rules Tudor has now changed; say which tests changed and why.
+- **Test first:** pure rules: base neutral/enemy-held + a member alive → not out, nobody respawns (dead before or after);
+  every member dead → out; holding another team's base → respawns there; two-team phase no longer instant.
+- **Check:** two or three clients: drain a team's base, kill its members one by one; nobody respawns; the last death knocks
+  the team out; the match ends correctly. Captures + recorder lines.
+- **Review:** the strongest model (rules every client must agree on).
+
+### Task 9c: The STUNNED label (D18)
+- **Files:** the status-effect view (find where stun is applied and shown), `UiTheme` (text, colours, sizes).
+- **Check:** Play Mode: stun a test dummy and yourself; capture both. Two clients: the other player sees it.
+
+### Task 9d: The shield's window (D20)
+- **Files:** `InvulnerabilityAbility` / its view; `UiTheme`. The cue shows for the armed window and a "wasted" cue when it
+  ends untriggered; everyone sees the ring.
+- **Check:** Play Mode captures of both outcomes (hit in time / not).
+
+### Task 9e: Connection lost, rejoin, and coming back after a crash (D21) - networking
+- **Today:** rooms have no player time-to-live, so a dropped player is gone at once; nothing identifies a returning player.
+- **Change:** a random id saved on the PC on first run, used as the Photon user id (`AuthValues`); rooms keep a dropped
+  player for 120 s (`PlayerTtl`, an editable value); on a disconnect, a "Connection lost - Rejoin" panel
+  (`ReconnectAndRejoin`); on start-up, if this PC's id was in a match that's still running, offer "Rejoin your match"
+  (`RejoinRoom`). A rejoin keeps the same actor, so team, gold and loadout (Player Properties) come back; the player
+  respawns as after a death. Texts in `UiTheme`.
+- **Test first:** pure rules around it (when to offer a rejoin; the id is created once and reused).
+- **Check:** two clients: cut B's connection (disconnect by script) → panel → Rejoin → same team, gold, loadout; stop B's
+  process (by its PID) and restart within 120 s → "Rejoin your match" works; after 120 s it doesn't. Captures.
+- **Review:** the strongest model (networking).
+
+### Task 9f: Back to the name screen after a match (D22)
+- **Files:** the result panel (`MatchUI`), the room flow (leave the room, return to the name screen with a clean state:
+  nothing left over from the last match). Escape → "Close the game?" stays.
+- **Check:** end a match (or force the result panel) → the name screen → join a new match normally. Capture.
+
 ### Task 10: One multi-client check of everything
 - A fresh development Client2; two clients (three if possible). Everything above, plus the checks still owed from before
   the playtest (friction F6 in `Resources\workflow-log.md`): play over UDP including a mid-match join, the host starting
@@ -158,7 +201,7 @@ start (play terms, one question each, default stated), then proceeds with whatev
   he approves a design.
 
 ## Risks and out of scope
-- Tasks 3b, 4, 6 and 7 add shared state: every build in a room must match; test a late joiner each time.
+- Tasks 3b, 4, 6, 7, 9b and 9e add or change shared state: every build in a room must match; test a late joiner each time.
 - Out of scope: the ScriptableObject top ten (`so-top-ten-plan-2026-09-26.md`), compacting code comments, the vision
   feature itself (Task 11 only starts its design).
 
