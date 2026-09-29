@@ -22,12 +22,12 @@ MonoBehaviour:
   outOfCombatSeconds: 6
   shopOutOfCombatSeconds: 5
   overheatMax: 100
-  overheatDecayDelay: 1
+  overheatDecayDelay: 0.5
   overheatDecayPerSecond: 25
   overheatWarningThreshold: 80
   ventDelay: 2
   ventWindow: 0.3
-  ventRandomTiming: 1
+  ventRandomTiming: 0
   ventRandomDelayMin: 0.6
   ventRandomDelayMax: 1.6
   slowCap: 0.9
