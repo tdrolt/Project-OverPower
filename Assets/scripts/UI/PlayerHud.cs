@@ -239,6 +239,7 @@ namespace Overpower.UI
         private readonly CastBlock[] lastBlock = { (CastBlock)(-1), (CastBlock)(-1), (CastBlock)(-1) };
         private float lastUltimateCharge = -1f;
         private bool lastUltimateReady;
+        private bool lastUltimateRecast;
         private int lastGoldBalance = int.MinValue;
         private double lastGoldIncome = double.MinValue;
         private bool lastOverPowerShown;
@@ -738,7 +739,7 @@ namespace Overpower.UI
                 }
 
                 if (slot == AbilitySlot.Ultimate)
-                    UpdateUltimateMeter(ui);
+                    UpdateUltimateMeter(ui, block);
             }
         }
 
@@ -747,7 +748,7 @@ namespace Overpower.UI
         /// same moment Space actually casts something. Independent of the slot's ordinary cooldown
         /// cover above, which for an ultimate module reflects only the trivial always-instant
         /// base-class pool, never the real gate.</summary>
-        private void UpdateUltimateMeter(SlotUi ui)
+        private void UpdateUltimateMeter(SlotUi ui, CastBlock block)
         {
             if (ui.ultimateChargeFill == null)
                 return; // Built only for the Ultimate slot - see BuildSlot's isUltimate parameter.
@@ -761,10 +762,15 @@ namespace Overpower.UI
                 lastUltimateCharge = normalised;
             }
 
-            if (ready != lastUltimateReady)
+            // Meter empty but the slot is still usable: the AoE Zone's throw (D11) - say so, in its own text.
+            bool recast = !ready && block == CastBlock.None;
+
+            if (ready != lastUltimateReady || recast != lastUltimateRecast)
             {
-                ui.readyLabel.gameObject.SetActive(ready);
+                ui.readyLabel.gameObject.SetActive(ready || recast);
+                ui.readyLabel.text = recast ? theme.ultimateRecastText : "READY";
                 lastUltimateReady = ready;
+                lastUltimateRecast = recast;
             }
         }
 

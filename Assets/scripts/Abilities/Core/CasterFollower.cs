@@ -50,6 +50,9 @@ namespace Overpower.Abilities
             active = true;
         }
 
+        /// <summary>Stops following for good - the AoE Zone's throw (Tudor's D11) leaves it where it landed.</summary>
+        public void Stop() => active = false;
+
         /// <summary>Call every frame this object is alive. Snaps target to the caster's current
         /// position while the caster still exists and is alive; the first frame that stops being true
         /// switches this off for good, leaving target exactly where it last was.

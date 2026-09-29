@@ -1,4 +1,6 @@
+using Photon.Pun;
 using UnityEngine;
+using Overpower.Combat;
 
 namespace Overpower.Abilities
 {
@@ -13,6 +15,10 @@ namespace Overpower.Abilities
     /// (set on this prefab) - readiness comes entirely from UltimateCharge. IsReady reads
     /// Owner.UltimateCharge.IsFull; TryBuildCast only agrees to cast if Spend() actually returns
     /// true, and Point is ctx.Origin - the caster's own current position.
+    ///
+    /// THE THROW (Tudor's D11): while the zone is up and not yet thrown, pressing again is also
+    /// "ready" and throws the zone to the cursor (at most Recast Range from the caster), where it
+    /// stays. No meter is spent. See AoeZoneRecast and AoeZone.Throw.
     /// </summary>
     public sealed class AoeZoneAbility : AbilityModule
     {
@@ -22,6 +28,28 @@ namespace Overpower.Abilities
                  "caster - lives on that prefab; this ability only reads its name to spawn it.")]
         private GameObject zonePrefab;
 
+        [SerializeField, Tooltip("How far from you, in metres, the zone can be thrown. While your zone " +
+                 "is up, pressing the ultimate once more throws it to your cursor - a cursor further away " +
+                 "than this is cut to this distance in the same direction. The zone then stays where it " +
+                 "landed and stops following you. One throw per zone, and it costs no meter.")]
+        private float recastRange = 5f;
+
+        // Owner only: the zone this player last placed. A destroyed zone reads as null, which is how
+        // "the zone has ended" is known.
+        private AoeZone ownZone;
+
+        private bool RecastAllowed => AoeZoneRecast.MayRecast(ownZone != null, ownZone != null && ownZone.Thrown);
+
+        // The meter is the ultimate's only gate; the base class's one-charge pool (0 s cooldown) is
+        // never spent, so a throw cannot touch the meter or that pool a second time.
+        protected override bool SpendsChargeOnCast => false;
+
+        protected override void OnValidate()
+        {
+            base.OnValidate();
+            recastRange = Mathf.Max(0f, recastRange);
+        }
+
         public override void OnEquip()
         {
             if (zonePrefab == null)
@@ -30,13 +58,27 @@ namespace Overpower.Abilities
 
         // ---- owner only ---------------------------------------------------------------------------
 
-        public override bool IsReady => Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull;
+        public override bool IsReady =>
+            Owner.UltimateCharge != null && (Owner.UltimateCharge.IsFull || RecastAllowed);
 
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
+            if (RecastAllowed)
+            {
+                // The throw: no meter spent. IntArg 1 tells ExecuteCast this is the throw, not a new zone.
+                payload = new CastPayload
+                {
+                    Point = AoeZoneRecast.LandingPoint(ctx.Origin, ctx.TargetPoint, recastRange),
+                    IntArg = RecastIntArg,
+                };
+                return true;
+            }
+
             payload = new CastPayload { Point = ctx.Origin };
             return Owner.UltimateCharge != null && Owner.UltimateCharge.Spend();
         }
+
+        private const int RecastIntArg = 1;
 
         // ---- every client -------------------------------------------------------------------------
 
@@ -45,9 +87,40 @@ namespace Overpower.Abilities
             if (cast.Phase != 0 || !cast.IsCasterClient || zonePrefab == null)
                 return; // Only the caster's own machine ever places the real networked object.
 
+            if (cast.Payload.IntArg == RecastIntArg)
+            {
+                ThrowOwnZone(cast.Payload.Point);
+                return;
+            }
+
+            ClearOldThrow();
+
             // Task T3 (telemetry): this ability's own id, so AoeZone can attribute its own damage
             // ticks to it (DamageInfo.AbilityId) - see AoeZone.OnPlaced.
-            NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
+            GameObject placed = NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
+            ownZone = placed != null ? placed.GetComponent<AoeZone>() : null;
+        }
+
+        // The throw reaches everyone through one Player Property on the caster (no RPC): every copy of
+        // the zone - including one placed later on a client that joins after the throw - reads it.
+        private void ThrowOwnZone(Vector3 point)
+        {
+            if (ownZone == null)
+                return;
+
+            ownZone.Throw(point);
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable
+            {
+                { AoeZoneRecast.PropertyKey, AoeZoneRecast.Encode(ownZone.photonView.ViewID, point) }
+            });
+        }
+
+        // A new zone supersedes the last throw's value (keyed to the old zone's id, so it could never
+        // grab this one anyway; removing it keeps a reused view id from ever matching).
+        private static void ClearOldThrow()
+        {
+            if (PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey(AoeZoneRecast.PropertyKey))
+                PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable { { AoeZoneRecast.PropertyKey, null } });
         }
     }
 }

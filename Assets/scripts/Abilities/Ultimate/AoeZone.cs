@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using ExitGames.Client.Photon;
 using Photon.Pun;
+using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
 
@@ -42,7 +44,7 @@ namespace Overpower.Abilities
     /// see CasterFollower.Tick's own comment.
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
-    public sealed class AoeZone : NetworkedDeployable
+    public sealed class AoeZone : NetworkedDeployable, IInRoomCallbacks
     {
         [Header("Zone")]
         [SerializeField, Tooltip("How far the zone reaches from its centre, in metres. Claude's " +
@@ -103,6 +105,42 @@ namespace Overpower.Abilities
         // Mine.cs documents on its own localPlacedRealTime field.
         private float localPlacedRealTime;
 
+        /// <summary>True once the zone has been thrown to a spot (Tudor's D11): from then on it stays
+        /// there and no longer follows the caster. Set on every client - by the thrower's own call, or
+        /// by the thrower's Player Property (AoeZoneRecast.PropertyKey) arriving, which is also how a
+        /// client that joins after the throw finds the zone at the thrown spot.</summary>
+        public bool Thrown { get; private set; }
+
+        /// <summary>Moves the zone to point and stops it following. Only the first throw counts.</summary>
+        public void Throw(Vector3 point)
+        {
+            if (Thrown)
+                return;
+
+            Thrown = true;
+            transform.position = point;
+            follower?.Stop(); // a zone not yet placed picks the stop up in OnPlaced.
+        }
+
+        private void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
+        private void OnDisable() => PhotonNetwork.RemoveCallbackTarget(this);
+
+        public void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+        {
+            if (targetPlayer == null || targetPlayer.ActorNumber != OwnerActor || photonView == null ||
+                !changedProps.TryGetValue(AoeZoneRecast.PropertyKey, out object raw))
+                return;
+
+            if (AoeZoneRecast.TryDecode(raw, photonView.ViewID, out Vector3 point))
+                Throw(point);
+        }
+
+        // Unused IInRoomCallbacks members.
+        public void OnPlayerEnteredRoom(Player newPlayer) { }
+        public void OnPlayerLeftRoom(Player otherPlayer) { }
+        public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) { }
+        public void OnMasterClientSwitched(Player newMasterClient) { }
+
         private void OnValidate()
         {
             radius = Mathf.Max(0.1f, radius);
@@ -130,6 +168,18 @@ namespace Overpower.Abilities
             schedule = new ZoneTickSchedule(tickSeconds, totalTicks, (float)Age);
             follower = new CasterFollower(followsCaster, OwnerActor);
             localPlacedRealTime = Time.time;
+
+            // Thrown before this client placed the zone (a late joiner, or the property beating the
+            // instantiate): the owner's property already names this zone, so land where it says.
+            if (Thrown)
+                follower.Stop();
+            else if (PhotonNetwork.CurrentRoom != null)
+            {
+                Player owner = PhotonNetwork.CurrentRoom.GetPlayer(OwnerActor);
+                if (owner != null && owner.CustomProperties.TryGetValue(AoeZoneRecast.PropertyKey, out object raw) &&
+                    AoeZoneRecast.TryDecode(raw, photonView.ViewID, out Vector3 thrownTo))
+                    Throw(thrownTo);
+            }
 
             if (visual != null)
                 visual.localScale = new Vector3(radius * 2f, visual.localScale.y, radius * 2f);

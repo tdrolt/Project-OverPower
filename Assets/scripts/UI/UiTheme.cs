@@ -238,6 +238,9 @@ namespace Overpower.UI
         public Color ultimateChargeColor = new Color(1f, 0.85f, 0.25f, 0.45f);
         [Tooltip("Colour of the READY text shown over the Ultimate slot once its charge is full.")]
         public Color ultimateReadyTextColor = new Color(1f, 0.95f, 0.6f);
+        [Tooltip("Text shown over the Ultimate slot while the meter is empty but the key still does something - " +
+                 "the AoE Zone can be thrown to the cursor once. Same colour as the READY text.")]
+        public string ultimateRecastText = "THROW";
         [Tooltip("Colour of the weapon-icon placeholder in the silenced banner - a plain rectangle, since the " +
                  "project has no weapon-silhouette sprite yet.")]
         public Color silencedIconColor = new Color(0.85f, 0.85f, 0.85f, 0.9f);
