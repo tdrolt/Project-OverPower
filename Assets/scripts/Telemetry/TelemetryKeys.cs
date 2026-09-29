@@ -229,6 +229,8 @@ namespace Overpower.Telemetry
         /// are each hook's own choice (T3/T4), not fixed here.</summary>
         public const string State = "state";
         public const string SecondsSinceReady = "sinceReady";
+        /// <summary>1 on a `cast` line that is a follow-up to an earlier cast (the AoE Zone's throw), not a fresh use.</summary>
+        public const string FollowUp = "followUp";
 
         // ---------------------------------------------------------------- territory
         public const string Tier = "tier";

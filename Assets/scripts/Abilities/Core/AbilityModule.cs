@@ -163,6 +163,10 @@ namespace Overpower.Abilities
         /// </summary>
         internal virtual bool RetriesRefusalWithinBuffer => false;
 
+        /// <summary>True when this cast is a follow-up to an earlier one (the AoE Zone's throw), not a
+        /// fresh use of the ability. The runner reports it through FollowUpCast instead of Cast.</summary>
+        internal virtual bool IsFollowUpCast(in CastPayload payload) => false;
+
         /// <summary>Charges that must be back after the pool runs dry before it can be used again.
         /// 0 (the default) means no lock-out; only Dash overrides it.</summary>
         protected virtual int ChargesNeededAfterRunningDry => 0;

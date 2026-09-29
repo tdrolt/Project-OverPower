@@ -38,7 +38,19 @@ namespace Overpower.Abilities
         // "the zone has ended" is known.
         private AoeZone ownZone;
 
-        private bool RecastAllowed => AoeZoneRecast.MayRecast(ownZone != null, ownZone != null && ownZone.Thrown);
+        private AoeZoneRecast.Choice CurrentChoice =>
+            AoeZoneRecast.Choose(Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull, ownZone != null,
+                                 ownZone != null && ownZone.IsFollowing, ownZone != null && ownZone.Thrown);
+
+        // A caster who dies leaves the zone frozen where they fell; it can no longer be thrown.
+        public override void Interrupt(InterruptReason reason)
+        {
+            if (reason == InterruptReason.Died)
+                ownZone = null;
+        }
+
+        // A throw is a follow-up to the cast, not a second ultimate use (telemetry).
+        internal override bool IsFollowUpCast(in CastPayload payload) => payload.IntArg == RecastIntArg;
 
         // The meter is the ultimate's only gate; the base class's one-charge pool (0 s cooldown) is
         // never spent, so a throw cannot touch the meter or that pool a second time.
@@ -58,12 +70,18 @@ namespace Overpower.Abilities
 
         // ---- owner only ---------------------------------------------------------------------------
 
-        public override bool IsReady =>
-            Owner.UltimateCharge != null && (Owner.UltimateCharge.IsFull || RecastAllowed);
+        public override bool IsReady => Owner.UltimateCharge != null && CurrentChoice != AoeZoneRecast.Choice.Refuse;
 
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
-            if (RecastAllowed)
+            AoeZoneRecast.Choice choice = CurrentChoice;
+            if (choice == AoeZoneRecast.Choice.Refuse)
+            {
+                payload = default;
+                return false;
+            }
+
+            if (choice == AoeZoneRecast.Choice.Throw)
             {
                 // The throw: no meter spent. IntArg 1 tells ExecuteCast this is the throw, not a new zone.
                 payload = new CastPayload

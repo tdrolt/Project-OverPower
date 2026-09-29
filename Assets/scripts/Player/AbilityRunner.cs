@@ -93,6 +93,10 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     /// which one happened.</summary>
     public event System.Action<AbilitySlot, int> Cast;
 
+    /// <summary>Raised instead of Cast for a follow-up to an earlier cast (the AoE Zone's throw): the
+    /// same slot and ability id, but not a fresh use of the ability.</summary>
+    public event System.Action<AbilitySlot, int> FollowUpCast;
+
     private void Awake()
     {
         owner = new AbilityOwner(gameObject);
@@ -245,7 +249,10 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             return false;
 
         SendCast(module, 0, payload);
-        Cast?.Invoke(module.Definition.Slot, module.Definition.Id);
+        if (module.IsFollowUpCast(payload))
+            FollowUpCast?.Invoke(module.Definition.Slot, module.Definition.Id);
+        else
+            Cast?.Invoke(module.Definition.Slot, module.Definition.Id);
         return true;
     }
 

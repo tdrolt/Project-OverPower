@@ -69,7 +69,8 @@ namespace Overpower.Abilities
                  "it was cast. Tudor's spec: the zone follows, so this defaults ON.")]
         private bool followsCaster = true;
 
-        protected override bool FollowsCaster => followsCaster;
+        // A thrown zone stays where it landed, so it counts as a placed deployable for the corner-close clean-up.
+        protected override bool FollowsCaster => followsCaster && !Thrown;
 
         [SerializeField, Tooltip("Which layers this zone can hit. Default is where living players " +
                  "and practice dummies are; nothing on any other layer has an IDamageable to find, so " +
@@ -110,6 +111,10 @@ namespace Overpower.Abilities
         /// by the thrower's Player Property (AoeZoneRecast.PropertyKey) arriving, which is also how a
         /// client that joins after the throw finds the zone at the thrown spot.</summary>
         public bool Thrown { get; private set; }
+
+        /// <summary>True while the zone still follows its caster: not thrown, and the caster has not
+        /// died or left (the follower switches itself off then).</summary>
+        public bool IsFollowing => !Thrown && (follower == null ? followsCaster : follower.IsActive);
 
         /// <summary>Moves the zone to point and stops it following. Only the first throw counts.</summary>
         public void Throw(Vector3 point)

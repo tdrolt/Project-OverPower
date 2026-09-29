@@ -768,7 +768,7 @@ namespace Overpower.UI
             if (ready != lastUltimateReady || recast != lastUltimateRecast)
             {
                 ui.readyLabel.gameObject.SetActive(ready || recast);
-                ui.readyLabel.text = recast ? theme.ultimateRecastText : "READY";
+                ui.readyLabel.text = recast ? theme.ultimateRecastText : theme.ultimateReadyText;
                 lastUltimateReady = ready;
                 lastUltimateRecast = recast;
             }
@@ -1671,7 +1671,7 @@ namespace Overpower.UI
                     ui.ultimateChargeFill.fillAmount = 0f;
                     ui.ultimateChargeFill.raycastTarget = false;
 
-                    ui.readyLabel = AddLabel(iconBox.transform, "READY", theme.smallTextSize, FontStyles.Bold);
+                    ui.readyLabel = AddLabel(iconBox.transform, theme.ultimateReadyText, theme.smallTextSize, FontStyles.Bold);
                     RectTransform readyRt = ui.readyLabel.rectTransform;
                     readyRt.anchorMin = Vector2.zero;
                     readyRt.anchorMax = Vector2.one;

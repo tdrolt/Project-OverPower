@@ -222,6 +222,7 @@ namespace Overpower.Telemetry
                 weaponFiring.Fired += HandleFired;
             if (abilityRunner != null)
                 abilityRunner.Cast += HandleCast;
+                abilityRunner.FollowUpCast += HandleFollowUpCast;
             if (overPowerBuff != null)
             {
                 overPowerBuff.Triggered += HandleOverpowerTriggered;
@@ -272,6 +273,7 @@ namespace Overpower.Telemetry
                 weaponFiring.Fired -= HandleFired;
             if (abilityRunner != null)
                 abilityRunner.Cast -= HandleCast;
+                abilityRunner.FollowUpCast -= HandleFollowUpCast;
             if (overPowerBuff != null)
             {
                 overPowerBuff.Triggered -= HandleOverpowerTriggered;
@@ -716,6 +718,22 @@ namespace Overpower.Telemetry
         }
 
         // ---------------------------------------------------------------- cast / ultimate used
+
+        // A follow-up to an earlier cast (the AoE Zone's throw): a `cast` line tagged followUp, and NO
+        // `ultimateUsed` - the ultimate was used once, when the zone went down.
+        private void HandleFollowUpCast(AbilitySlot slot, int abilityId)
+        {
+            if (MatchTelemetry.Instance == null)
+                return;
+
+            line.Begin(TelemetryKeys.Cast, MatchTelemetry.Instance.Now);
+            line.Int(TelemetryKeys.Slot, (int)slot);
+            line.Int(TelemetryKeys.AbilityId, abilityId);
+            line.Float(TelemetryKeys.X, MyPosition.x);
+            line.Float(TelemetryKeys.Z, MyPosition.z);
+            line.Int(TelemetryKeys.FollowUp, 1);
+            MatchTelemetry.Instance.Log(line);
+        }
 
         private void HandleCast(AbilitySlot slot, int abilityId)
         {

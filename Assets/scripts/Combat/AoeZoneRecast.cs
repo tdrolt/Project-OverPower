@@ -13,8 +13,23 @@ namespace Overpower.Combat
         /// <summary>The Player Property the thrower writes on themselves.</summary>
         public const string PropertyKey = "aozT";
 
-        /// <summary>A throw needs your own zone still up, and only one throw per zone.</summary>
-        public static bool MayRecast(bool ownZoneAlive, bool alreadyThrown) => ownZoneAlive && !alreadyThrown;
+        /// <summary>What pressing the ultimate does right now.</summary>
+        public enum Choice { Refuse, Throw, NewCast }
+
+        /// <summary>The one decision behind IsReady and TryBuildCast. A throw wins whenever it is allowed
+        /// - including with a full meter while the zone is up (the meter is kept for the next zone); a
+        /// new cast needs a full meter; otherwise nothing happens.</summary>
+        public static Choice Choose(bool meterFull, bool ownZoneAlive, bool zoneFollowing, bool alreadyThrown)
+        {
+            if (MayRecast(ownZoneAlive, zoneFollowing, alreadyThrown))
+                return Choice.Throw;
+            return meterFull ? Choice.NewCast : Choice.Refuse;
+        }
+
+        /// <summary>A throw needs your own zone still up and still following you (a zone frozen where you
+        /// died cannot be thrown after you respawn), and only one throw per zone.</summary>
+        public static bool MayRecast(bool ownZoneAlive, bool zoneFollowing, bool alreadyThrown)
+            => ownZoneAlive && zoneFollowing && !alreadyThrown;
 
         /// <summary>The cursor point cut to at most range metres from the caster (sideways, same
         /// direction), at the caster's own height.</summary>

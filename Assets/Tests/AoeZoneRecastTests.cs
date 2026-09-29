@@ -48,18 +48,53 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void RecastIsAllowedWithALiveZoneThatWasNotThrownYet()
-            => Assert.IsTrue(AoeZoneRecast.MayRecast(ownZoneAlive: true, alreadyThrown: false));
+        public void RecastIsAllowedWithALiveFollowingZoneThatWasNotThrownYet()
+            => Assert.IsTrue(AoeZoneRecast.MayRecast(ownZoneAlive: true, zoneFollowing: true, alreadyThrown: false));
 
         [Test]
         public void RecastIsNotAllowedAfterTheThrow()
-            => Assert.IsFalse(AoeZoneRecast.MayRecast(ownZoneAlive: true, alreadyThrown: true));
+            => Assert.IsFalse(AoeZoneRecast.MayRecast(ownZoneAlive: true, zoneFollowing: false, alreadyThrown: true));
 
         [Test]
         public void RecastIsNotAllowedWithNoZoneOrAfterItEnded()
         {
-            Assert.IsFalse(AoeZoneRecast.MayRecast(ownZoneAlive: false, alreadyThrown: false));
-            Assert.IsFalse(AoeZoneRecast.MayRecast(ownZoneAlive: false, alreadyThrown: true));
+            Assert.IsFalse(AoeZoneRecast.MayRecast(ownZoneAlive: false, zoneFollowing: true, alreadyThrown: false));
+            Assert.IsFalse(AoeZoneRecast.MayRecast(ownZoneAlive: false, zoneFollowing: false, alreadyThrown: true));
+        }
+
+        [Test]
+        public void ARecastIsNotAllowedOnAZoneFrozenWhereItsCasterDied()
+            => Assert.IsFalse(AoeZoneRecast.MayRecast(ownZoneAlive: true, zoneFollowing: false, alreadyThrown: false));
+
+        [Test]
+        public void EmptyMeterWithNoZoneRefuses()
+            => Assert.AreEqual(AoeZoneRecast.Choice.Refuse, AoeZoneRecast.Choose(false, false, false, false));
+
+        [Test]
+        public void FullMeterWithNoZoneIsANewCast()
+            => Assert.AreEqual(AoeZoneRecast.Choice.NewCast, AoeZoneRecast.Choose(true, false, false, false));
+
+        [Test]
+        public void EmptyMeterWithAFollowingZoneIsAThrow()
+            => Assert.AreEqual(AoeZoneRecast.Choice.Throw, AoeZoneRecast.Choose(false, true, true, false));
+
+        [Test]
+        public void FullMeterWhileTheZoneIsUpStillThrowsAndKeepsTheMeter()
+            => Assert.AreEqual(AoeZoneRecast.Choice.Throw, AoeZoneRecast.Choose(true, true, true, false),
+                "the throw wins over a new cast; it spends no meter, so the next zone still has a full one");
+
+        [Test]
+        public void AfterTheThrowOnlyAFullMeterDoesAnything()
+        {
+            Assert.AreEqual(AoeZoneRecast.Choice.Refuse, AoeZoneRecast.Choose(false, true, false, true));
+            Assert.AreEqual(AoeZoneRecast.Choice.NewCast, AoeZoneRecast.Choose(true, true, false, true));
+        }
+
+        [Test]
+        public void AFrozenZoneCannotBeThrownButAFullMeterCastsANewOne()
+        {
+            Assert.AreEqual(AoeZoneRecast.Choice.Refuse, AoeZoneRecast.Choose(false, true, false, false));
+            Assert.AreEqual(AoeZoneRecast.Choice.NewCast, AoeZoneRecast.Choose(true, true, false, false));
         }
 
         [Test]
