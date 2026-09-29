@@ -93,6 +93,11 @@ MonoBehaviour:
   statusOverheadLabelY: 15.5
   statusOverheadBarY: 11
   statusOverheadBarSize: {x: 15, y: 1}
+  shieldWastedText: Wasted
+  shieldWastedColor: {r: 0.75, g: 0.78, b: 0.85, a: 1}
+  shieldWastedSeconds: 1.2
+  shieldWastedTextSize: 15
+  shieldWastedY: 15.5
   silencedIconColor: {r: 0.85, g: 0.85, b: 0.85, a: 0.9}
   silencedWashAlpha: 0.35
   silencedIconSize: 28

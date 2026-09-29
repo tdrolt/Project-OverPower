@@ -266,6 +266,17 @@ namespace Overpower.UI
         public float statusOverheadBarY = 11f;
         [Tooltip("Overhead countdown bar: width and height, in overhead-canvas units (the health bar is 15 by 3).")]
         public Vector2 statusOverheadBarSize = new Vector2(15f, 1f);
+        [Header("Shield wasted text (Invulnerability ultimate)")]
+        [Tooltip("Text that pops over a player's head when their armed shield window ran out and nobody hit them.")]
+        public string shieldWastedText = "Wasted";
+        [Tooltip("Colour of the shield's \"Wasted\" text.")]
+        public Color shieldWastedColor = new Color(0.75f, 0.78f, 0.85f, 1f);
+        [Tooltip("How long the shield's \"Wasted\" text stays over the player's head, in seconds.")]
+        public float shieldWastedSeconds = 1.2f;
+        [Tooltip("Size of the \"Wasted\" text (same units as the name above the health bar).")]
+        public float shieldWastedTextSize = 15f;
+        [Tooltip("How high above the health bar's centre the \"Wasted\" text sits, in overhead-canvas units (the STUNNED label sits at 15.5).")]
+        public float shieldWastedY = 15.5f;
         [Tooltip("Colour of the weapon-icon placeholder in the silenced banner - a plain rectangle, since the " +
                  "project has no weapon-silhouette sprite yet.")]
         public Color silencedIconColor = new Color(0.85f, 0.85f, 0.85f, 0.9f);
