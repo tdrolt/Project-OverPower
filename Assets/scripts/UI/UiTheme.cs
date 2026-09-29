@@ -292,8 +292,10 @@ namespace Overpower.UI
         [Range(10f, 100f)] public float loadoutPriceLineSizePercent = 70f;
         [Tooltip("Seconds a refused click's reason (\"Need 700 more gold\", \"Out of combat in 2.4s\"...) stays shown in the header status line before it reverts to the ordinary gate status - Task 2.5b review fix 2. A click on a shop-blocked item used to do nothing visible at all.")]
         public float loadoutBlockedReasonDurationSeconds = 2f;
-        [Tooltip("Second line on a weapon node that can only be reached by selling your current weapon path first. {0} = the gold selling back gives right now (the same number the Reset Weapon button shows).")]
-        public string loadoutSwapFormat = "Swap (sell back +{0})";
+        [Tooltip("Second line on a weapon node that can only be reached by selling your current weapon path first. {0} = the new weapon's price, {1} = the gold selling back gives right now (the same number the Reset Weapon button shows). Not shown when there is nothing to sell back.")]
+        public string loadoutSwapFormat = "Swap {0} (sell back +{1})";
+        [Tooltip("Font size percentage for that swap line (smaller than Loadout Price Line Size Percent so it fits the node).")]
+        [Range(10f, 100f)] public float loadoutSwapLineSizePercent = 55f;
         [Tooltip("Message after selling weapons with Reset Weapon. {0} = weapon name, {1} = gold refunded.")]
         public string loadoutSoldWeaponFormat = "Sold {0}: +{1} gold";
         [Tooltip("Message after selling armour upgrades with Reset Armor. {0} = gold refunded.")]

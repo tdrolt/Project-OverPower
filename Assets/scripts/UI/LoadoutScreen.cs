@@ -790,10 +790,19 @@ namespace Overpower.UI
                           : def != null ? ShopPricing.PriceLine(def.GoldCost, block, ctx.Balance) : "";
             // Loadout Price Line Size Percent (UiTheme) on the price/status line only - the node is
             // small (Loadout Node Width x Height) and two full-size lines would not both fit.
-            // Task 5b-1 (D19): a weapon on another branch says what the swap costs (what selling back gives now).
-            if (state == UpgradeNodeState.Locked && swapRefund >= 0)
-                suffix = ShopRules.SwapLine(true, swapRefund, theme.loadoutSwapFormat);
-            ui.label.text = def != null ? $"{def.DisplayName}\n<size={theme.loadoutPriceLineSizePercent}%>{suffix}</size>" : suffix;
+            // Task 5b-1 (D19): a weapon on another branch says its price AND what selling back gives now; with
+            // nothing to sell back the node keeps its normal price line.
+            float sizePercent = theme.loadoutPriceLineSizePercent;
+            if (state == UpgradeNodeState.Locked && swapRefund > 0 && def != null)
+            {
+                string swap = ShopRules.SwapLine(def.GoldCost, swapRefund, theme.loadoutSwapFormat);
+                if (swap.Length > 0)
+                {
+                    suffix = swap;
+                    sizePercent = theme.loadoutSwapLineSizePercent;
+                }
+            }
+            ui.label.text = def != null ? $"{def.DisplayName}\n<size={sizePercent}%>{suffix}</size>" : suffix;
 
             switch (state)
             {
@@ -900,7 +909,7 @@ namespace Overpower.UI
                     if (refund > 0)
                     {
                         Refunded?.Invoke(PurchaseCategory.Armor, refund, goldWallet.Balance);
-                        ShowSoldMessage(string.Format(System.Globalization.CultureInfo.InvariantCulture, theme.loadoutSoldArmorFormat, refund));
+                        ShowSoldMessage(ShopRules.SoldArmorMessage(theme.loadoutSoldArmorFormat, refund));
                     }
                 }
             }

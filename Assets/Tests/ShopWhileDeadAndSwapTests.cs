@@ -81,8 +81,19 @@ namespace Overpower.Tests
         [Test]
         public void TheSwapTextShowsTheRefundOnlyWhereASwapIsNeeded()
         {
-            Assert.AreEqual("Swap (sell back +600)", ShopRules.SwapLine(true, 600, "Swap (sell back +{0})"));
-            Assert.AreEqual("", ShopRules.SwapLine(false, 600, "Swap (sell back +{0})"));
+            Assert.AreEqual("Swap 960 (sell back +480)", ShopRules.SwapLine(960, 480, "Swap {0} (sell back +{1})"));
+        }
+
+        [Test]
+        public void NothingToSellBackMeansNoSwapText()
+        {
+            Assert.AreEqual("", ShopRules.SwapLine(960, 0, "Swap {0} (sell back +{1})"));
+        }
+
+        [Test]
+        public void TheArmourSaleMessageGoesThroughTheSamePureHelper()
+        {
+            Assert.AreEqual("Sold armour upgrades: +300 gold", ShopRules.SoldArmorMessage("Sold armour upgrades: +{0} gold", 300));
         }
 
         [Test]

@@ -86,9 +86,9 @@ public class PlayerInputRouter : MonoBehaviour
     /// <summary>True while dead, while the player is typing into a text field (e.g. chat), or while
     /// any tool has claimed focus (see SetToolFocus). Every property and event above except
     /// ShopToggled and MapToggled is gated on this being false - those two have their own, narrower
-    /// gates (ShopSuppressed, MapSuppressed) so the P key can still close the loadout screen while
-    /// that screen's own focus claim would otherwise block it, and so M still works while dead or
-    /// while the loadout screen holds focus.
+    /// gates (ShopSuppressed: typing in chat only, so P works while dead and can still close the loadout
+    /// screen while that screen's own focus claim would otherwise block it; MapSuppressed) and so M
+    /// still works while dead or while the loadout screen holds focus.
     ///
     /// Deliberately NOT gated on PlayerOverheat.CanAct - full overheat silencing the weapon and
     /// abilities is an ability-level rule the ability system enforces itself, not an input-level

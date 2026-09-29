@@ -93,7 +93,7 @@ namespace Overpower.UI
             ShopRules.IsFree(config == null || config.FreeLoadout,
                 MatchDirector.Instance != null && MatchDirector.Instance.IsLive);
 
-        public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position, bool isAlive = true)
+        public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position, bool isAlive)
         {
             bool freeLoadout = config == null || config.FreeLoadout;
             bool isFree = IsFreeNow(config);

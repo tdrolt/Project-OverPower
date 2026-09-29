@@ -43,11 +43,15 @@ namespace Overpower.Match
             isAlive ? secondsSinceCombat : Math.Max(secondsSinceCombat, requiredOutOfCombatSeconds);
 
         /// <summary>Task 5b-1 (D19): the text on a weapon node that can only be reached by selling the current
-        /// weapon path first; empty when no swap is needed. format has one {0}, the refund.</summary>
-        public static string SwapLine(bool needsSwap, int refund, string format) =>
-            needsSwap ? string.Format(System.Globalization.CultureInfo.InvariantCulture, format, refund) : "";
+        /// weapon path first: the new weapon's price and what selling back gives. Empty when there is nothing to
+        /// sell back (the node then keeps its normal price line). format: {0} = price, {1} = refund.</summary>
+        public static string SwapLine(int price, int refund, string format) =>
+            refund > 0 ? string.Format(System.Globalization.CultureInfo.InvariantCulture, format, price, refund) : "";
 
         /// <summary>Task 5b-1 (D19): the message after a sale. format has {0} = what was sold, {1} = the refund.</summary>
+        public static string SoldArmorMessage(string format, int refund) =>
+            string.Format(System.Globalization.CultureInfo.InvariantCulture, format, refund);
+
         public static string SoldMessage(string format, string what, int refund) =>
             string.Format(System.Globalization.CultureInfo.InvariantCulture, format, what, refund);
 
