@@ -19,7 +19,7 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 
 | # | Decision | Who |
 |---|---|---|
-| D1 | Health pack: +50 health, reappears 30 s after it's taken. | D |
+| D1 | Health pack: +50 health, reappears 30 s after it's taken. **Look (09-29): glows green when ready, with a floating cross (the classic health-pack plus) above it; while taken, the same cross stays, greyed out (replaces D3's "faint marker"). The cross stands upright (a plus sign in a vertical plane), bobs, and slowly spins around the vertical axis. On the minimap: a small cross per pack, green when ready, grey when taken (Task 4b).** | D |
 | D2 | Health packs sit in the three Tier III recesses (one each), **in the middle of the recess zone**. Not in the capital pockets; not in the recess that appears when the map shrinks. | D (09-29) |
 | D3 | A pack can only be taken by a living player who isn't at full health; it heals up to max health, never above. While it's gone, a faint marker shows where it will return. | A |
 | D4 | The shop opens while dead; what you buy is yours when you respawn (same prices, same rules). | A |
@@ -117,6 +117,11 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 - **Check:** two clients: both see the pack; B takes it (health goes up by 50, capped); A sees it vanish and return 30 s
   later; two players touching it in the same instant → only one heals. Capture.
 - **Review:** the strongest model (networking).
+
+### Task 4b: Health packs on the minimap (D1 look)
+- **Files:** the minimap (find its zone-bubble code), reading the pack state Task 4 exposes. A small cross icon per pack: green when ready, grey when taken; colours/size in `UiTheme`. No network change.
+- **Check:** Play Mode: a ready pack and a taken pack on the minimap (capture).
+- **Review:** standard.
 
 ### Task 5a: Upgrade-tree mockups (D6) - Tudor chooses
 - Make 2-3 mockups of the weapon upgrade tree with arrows (e.g. top-down tree, left-to-right branches, radial) as one
