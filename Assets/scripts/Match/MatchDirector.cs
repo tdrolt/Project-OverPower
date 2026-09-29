@@ -3,6 +3,7 @@ using System.Linq;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using Overpower.Data;
 using Overpower.Net;
 using Overpower.Telemetry;
 using Overpower.UI;
@@ -261,11 +262,82 @@ namespace Overpower.Match
                 MasterRecompute();
         }
 
-        public override void OnPlayerLeftRoom(Player otherPlayer) => MasterRecompute();
+        // Task 9e-2 (Tudor D-a): when this client learned each dropped player went inactive, so the team status can hold off
+        // counting them as dead for the grace (GameplayConfig.DroppedGraceSeconds). Every client keeps it (any can become master).
+        private readonly Dictionary<int, float> inactiveSince = new Dictionary<int, float>();
+        private readonly HashSet<int> graceEndedHandled = new HashSet<int>();
+        private float nextGraceCheckAt;
+        private const float FallbackGraceSeconds = 10f;
+
+        public override void OnPlayerLeftRoom(Player otherPlayer)
+        {
+            if (otherPlayer != null && !PresenceRules.IsPresent(otherPlayer.IsInactive))
+                inactiveSince[otherPlayer.ActorNumber] = Time.unscaledTime;
+            else if (otherPlayer != null)
+                ForgetDropped(otherPlayer.ActorNumber);
+            MasterRecompute();
+        }
 
         /// <summary>Task 9e: a dropped member coming back is a change in who counts as dead, with no Player Property
         /// change of its own to trigger the recompute.</summary>
-        public override void OnPlayerEnteredRoom(Player newPlayer) => MasterRecompute();
+        public override void OnPlayerEnteredRoom(Player newPlayer)
+        {
+            if (newPlayer != null)
+                ForgetDropped(newPlayer.ActorNumber);
+            MasterRecompute();
+        }
+
+        private void ForgetDropped(int actor)
+        {
+            inactiveSince.Remove(actor);
+            graceEndedHandled.Remove(actor);
+        }
+
+        private float DroppedGraceSeconds
+        {
+            get
+            {
+                GameplayConfig config = LocalPlayerConfig();
+                return config != null ? config.DroppedGraceSeconds : FallbackGraceSeconds;
+            }
+        }
+
+        /// <summary>Seconds this player has been inactive as far as this client knows. A player first seen already inactive (a new
+        /// master, a late joiner) starts counting from now.</summary>
+        private float SecondsInactive(Player p)
+        {
+            if (!inactiveSince.TryGetValue(p.ActorNumber, out float since))
+            {
+                since = Time.unscaledTime;
+                inactiveSince[p.ActorNumber] = since;
+            }
+            return Time.unscaledTime - since;
+        }
+
+        /// <summary>Master, polled from Update: the grace of a dropped player has just run out with nothing else changing, so the
+        /// team status has to be recomputed once for them.</summary>
+        private void RecomputeWhenAGraceEnds()
+        {
+            if (inactiveSince.Count == 0 || !PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom || Time.unscaledTime < nextGraceCheckAt)
+                return;
+            nextGraceCheckAt = Time.unscaledTime + 0.5f;
+
+            float grace = DroppedGraceSeconds;
+            bool recompute = false;
+            foreach (KeyValuePair<int, float> entry in inactiveSince)
+            {
+                Player p = PhotonNetwork.CurrentRoom.GetPlayer(entry.Key);
+                if (p == null || !p.IsInactive || graceEndedHandled.Contains(entry.Key))
+                    continue;
+                if (Time.unscaledTime - entry.Value >= grace)
+                {
+                    graceEndedHandled.Add(entry.Key);
+                    recompute = true;
+                }
+            }
+            if (recompute)
+                MasterRecompute();
+        }
 
         public override void OnMasterClientSwitched(Player newMasterClient)
         {
@@ -617,7 +689,7 @@ namespace Overpower.Match
                     bool? aliveFlag = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object aliveRaw) && aliveRaw is bool a ? a : (bool?)null;
                     // Task 9e: a member whose connection dropped (inactive, kept for the rejoin window) is dead here whatever
                     // "alive" they last wrote - PresenceRules.CountsAsDead. With no base the team is out once all its members are.
-                    if (!PresenceRules.CountsAsDead(p.IsInactive, waiting, aliveFlag))
+                    if (!PresenceRules.CountsAsDead(p.IsInactive, waiting, aliveFlag, p.IsInactive ? SecondsInactive(p) : 0f, DroppedGraceSeconds))
                         continue;
                     dead++;
                     if (waiting)

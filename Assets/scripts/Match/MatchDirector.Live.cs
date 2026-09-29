@@ -129,7 +129,20 @@ namespace Overpower.Match
         /// teams aren't fixed yet, and at most 2 x TeamSize players are already in the room.</summary>
         public bool HostMaySwitchToTwoTeamsNow =>
             PhotonNetwork.IsMasterClient && PhotonNetwork.InRoom
-            && MatchStartRules.MaySwitchToTwoTeams(TeamsFixed, PhotonNetwork.CurrentRoom.PlayerCount, RoomManager.TeamSize);
+            && MatchStartRules.MaySwitchToTwoTeams(TeamsFixed, ActivePlayerCount(), RoomManager.TeamSize);
+
+        /// <summary>Players who are here: the room's count without those whose connection dropped (PresenceRules.CountsInTheLobby),
+        /// the same reading CountMembers uses.</summary>
+        private static int ActivePlayerCount()
+        {
+            int count = 0;
+            Room room = PhotonNetwork.CurrentRoom;
+            if (room != null)
+                foreach (System.Collections.Generic.KeyValuePair<int, Player> pair in room.Players)
+                    if (PresenceRules.CountsInTheLobby(pair.Value.IsInactive))
+                        count++;
+            return count;
+        }
 
         /// <summary>Decision L4: switching back needs only that the teams aren't fixed yet - nobody moves, team 2
         /// simply reopens (IsTeamOpen).</summary>
@@ -212,6 +225,8 @@ namespace Overpower.Match
 
         private void Update()
         {
+            RecomputeWhenAGraceEnds();
+
             // Map shrink F3: a promotion's cut-zone catch-up, one frame after OnMasterClientSwitched - before the early
             // returns below, which skip everything once the match is live.
             if (finishCutNeutralisePending)
@@ -387,7 +402,7 @@ namespace Overpower.Match
             Room room = PhotonNetwork.CurrentRoom;
             if (room != null)
                 foreach (System.Collections.Generic.KeyValuePair<int, Player> pair in room.Players)
-                    if (!Teams.TryGetTeam(pair.Value, out _))
+                    if (PresenceRules.CountsInTheLobby(pair.Value.IsInactive) && !Teams.TryGetTeam(pair.Value, out _))
                         count++;
             return count;
         }

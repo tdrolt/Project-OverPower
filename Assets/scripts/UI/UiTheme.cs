@@ -1065,6 +1065,8 @@ namespace Overpower.UI
         public string rejoinWorkingText = "Reconnecting...";
         [Tooltip("Shown when the rejoin cannot happen: the match is over, or the two minutes ran out and your place was given up.")]
         public string rejoinFailedText = "The match has ended, or your place in it was given up. You can join a new match.";
+        [Tooltip("Shown when a new join is refused because your own dropped place is still held in a match that cannot be rejoined from here.")]
+        public string rejoinPlaceHeldText = "You still hold a place in a match you dropped out of, but it could not be reached. Try again in a minute, or join a new match once it is given up.";
         [Tooltip("The button on the failure message that goes back to the name screen.")]
         public string rejoinFailedOkButton = "OK";
         [Tooltip("The name screen's button, shown while a match you dropped out of is still holding your place.")]

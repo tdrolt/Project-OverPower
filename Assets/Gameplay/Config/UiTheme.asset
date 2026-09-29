@@ -350,6 +350,7 @@ MonoBehaviour:
   rejoinWorkingText: Reconnecting...
   rejoinFailedText: The match has ended, or your place in it was given up. You can join a new match.
   rejoinFailedOkButton: OK
+  rejoinPlaceHeldText: You still hold a place in a match you dropped out of, but it could not be reached. Try again in a minute, or join a new match once it is given up.
   rejoinMatchButton: Rejoin your match
   connectionLostPanelWidth: 640
   connectionLostPanelColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.95}

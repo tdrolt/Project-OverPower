@@ -60,9 +60,10 @@ namespace Overpower.UI
         }
 
         /// <summary>The rejoin cannot happen: the message and one OK button back to the name screen.</summary>
-        public void ShowFailed()
+        public void ShowFailed(string message = null)
         {
-            Show(Text(t => t.connectionLostTitle, "Connection lost"), Text(t => t.rejoinFailedText, "The match is gone."), lost: false, ok: true);
+            Show(Text(t => t.connectionLostTitle, "Connection lost"),
+                 string.IsNullOrEmpty(message) ? Text(t => t.rejoinFailedText, "The match is gone.") : message, lost: false, ok: true);
         }
 
         public void Hide()

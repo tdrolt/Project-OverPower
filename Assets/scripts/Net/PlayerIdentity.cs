@@ -33,10 +33,12 @@ namespace Overpower.Net
                 if (!string.IsNullOrEmpty(cachedId))
                     return cachedId;
 
+                // The file holds "id@tag" (machine + folder): a build folder copied elsewhere makes its own id.
+                string tag = PlayerIdRule.Tag(SystemInfo.deviceName, Folder());
                 string saved = TryRead(IdPath());
-                string id = PlayerIdRule.Resolve(saved, PlayerIdRule.NewId, out bool created);
+                string id = PlayerIdRule.ResolveTagged(saved, tag, PlayerIdRule.NewId, out bool created);
                 if (created)
-                    TryWrite(IdPath(), id);
+                    TryWrite(IdPath(), PlayerIdRule.Compose(id, tag));
                 cachedId = id;
                 return id;
             }

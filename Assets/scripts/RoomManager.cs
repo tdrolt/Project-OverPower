@@ -88,6 +88,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinRandomFailed(short returnCode, string message)
     {
+        // Task 9e-2: Photon refuses a normal join while this same user id still holds a dropped place in that room (CheckUserOnJoin).
+        // That is our own place being held, not an absence of rooms - go back to it (or say so) instead of starting a new room.
+        if (Rejoin != null && Rejoin.TryRejoinHeldPlace(returnCode))
+            return;
+
         Debug.Log($"No room found ({returnCode}), creating one.");
         string roomName = "Room_" + Random.Range(1000, 9999);
         RoomOptions options = new RoomOptions();
@@ -106,43 +111,58 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // Task 9e: the same actor coming back (ReconnectAndRejoin / RejoinRoom) is not a new player. Its team, gold and loadout
         // are still Player Properties in the room, so no team is picked. Its old body was removed by the master when the drop
         // was noticed (RejoinController), so a new one is spawned on its own team a moment from now
-        // (SpawnFreshBodyIfNoneReturns); if the room still holds the buffered spawn, PUN hands that body back instead and
+        // (WatchOwnBodyAfterRejoin); if the room still holds the buffered spawn, PUN hands that body back instead and
         // nothing is spawned. Either way PlayerLifecycle respawns it as after a death.
         if (PhotonNetwork.LocalPlayer.HasRejoined)
         {
             Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back - no new team pick, getting a body");
+            // Task 9e-2: the team this player held may have been left out of the match while they were away (a host start with two
+            // teams, or a knockout): pick again exactly as a joiner would (EnsureLocalTeamInMatch is a no-op for a team still in).
+            EnsureLocalTeamInMatch();
             ReseatLocalPlayerIfTeamClosed(); // a lobby whose mode was switched to two teams while this player was away
-            StartCoroutine(SpawnFreshBodyIfNoneReturns());
+            StartCoroutine(WatchOwnBodyAfterRejoin());
             return;
         }
 
         AssignTeamAndSpawnPlayer();
     }
 
-    /// <summary>Task 9e: the returning player's body. The master removes a dropped player's body (and with it the room's buffered
-    /// spawn), so normally nothing comes back and this spawns a fresh one on the team the room still holds for them - exactly
-    /// as a new joiner would, but without picking a team again. If the buffered spawn is still there (the master had not
-    /// noticed the drop), PUN hands the old body back within a moment and this does nothing.</summary>
-    private System.Collections.IEnumerator SpawnFreshBodyIfNoneReturns()
+    /// <summary>Task 9e / 9e-2: the returning player's body, as a WATCHDOG. The master removes a dropped player's body (and with it the
+    /// room's buffered spawn), so normally nothing comes back and this spawns a new one on the team the room holds for them, exactly as
+    /// a new joiner would but without picking a team again. If the buffered spawn is still there, PUN hands the old body back - and
+    /// the master may still destroy it a moment later, so a sighting is not the end: while in the room with no own body for
+    /// BodyReturnWaitSeconds a body is spawned, until the first respawn has completed (the body is alive again).</summary>
+    private System.Collections.IEnumerator WatchOwnBodyAfterRejoin()
     {
         int actor = PhotonNetwork.LocalPlayer.ActorNumber;
-        float waited = 0f;
-        while (PhotonNetwork.InRoom)
+        float withoutBody = 0f;
+        float total = 0f;
+        while (PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer.ActorNumber == actor)
         {
-            bool hasBody = PlayerLookup.GetPhotonViewFor(actor) != null;
-            if (hasBody)
-                yield break;
-            if (RejoinRules.NeedsFallbackBody(hasBody, waited, BodyReturnWaitSeconds))
-                break;
-            waited += Time.unscaledDeltaTime;
+            PhotonView view = PlayerLookup.GetPhotonViewFor(actor);
+            if (view != null)
+            {
+                withoutBody = 0f;
+                PlayerLifecycle lifecycle = view.GetComponent<PlayerLifecycle>();
+                if (total > 1f && lifecycle != null && lifecycle.IsAlive)
+                    yield break; // the first respawn is complete: nothing can take this body away now
+            }
+            else
+            {
+                withoutBody += Time.unscaledDeltaTime;
+                if (RejoinRules.NeedsFallbackBody(false, withoutBody, BodyReturnWaitSeconds))
+                {
+                    if (Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int team))
+                    {
+                        Debug.Log($"[REJOIN] no own body for {BodyReturnWaitSeconds:0.0} s - spawning one on team {team}");
+                        SpawnPlayerOnTeam(team);
+                    }
+                    withoutBody = -BodyReturnWaitSeconds; // the new body registers itself on its first frame; give it time
+                }
+            }
+            total += Time.unscaledDeltaTime;
             yield return null;
         }
-
-        if (!PhotonNetwork.InRoom || !Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int team))
-            yield break;
-
-        Debug.Log($"[REJOIN] no old body came back - spawning a new one on team {team}");
-        SpawnPlayerOnTeam(team);
     }
 
     /// <summary>Review round 2: Photon carries the local player's own Custom Properties into the
@@ -180,15 +200,17 @@ public class RoomManager : MonoBehaviourPunCallbacks
             return;
         }
 
-        var props = new Hashtable
-        {
-            { PlayerLifecycle.AliveKey, true },
-            { PlayerLifecycle.LastStandKey, false },
-            { PlayerLifecycle.LastStandAtKey, null },
-            { GoldWallet.GoldKey, null },
-            { LoadoutProperties.ArmorAbsorbLevelKey, 0 },
-            { LoadoutProperties.ArmorRechargeLevelKey, 0 },
-        };
+        ResetMatchProperties();
+    }
+
+    /// <summary>Task 9e-2: puts the local player's match properties back to a fresh player's (MatchPropertyReset is the list). Called by a
+    /// deliberate leave (OnLeftRoom) and when a rejoin is given up (Leave / OK on the rejoin panel): without it the NEXT match would
+    /// inherit the old one's gold, loadout, dead flag and stats. A lost connection that may still be rejoined does not call it.</summary>
+    public void ResetMatchProperties()
+    {
+        var props = new Hashtable();
+        foreach (var pair in MatchPropertyReset.Build())
+            props[pair.Key] = pair.Value;
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 

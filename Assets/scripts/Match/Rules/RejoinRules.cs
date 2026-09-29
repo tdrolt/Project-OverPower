@@ -61,13 +61,66 @@ namespace Overpower.Match
 
         public static string NewId() => Guid.NewGuid().ToString("N");
 
+        /// <summary>A short stable fingerprint of where an id was made: the machine and the game folder. A build folder copied to
+        /// another folder or PC gets a different tag, so it does not share the original's id (Photon refuses two connections
+        /// with one id in a room).</summary>
+        public static string Tag(string machine, string folder)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                foreach (char c in (machine ?? "") + "|" + (folder ?? ""))
+                    hash = (hash ^ c) * 16777619u;
+                return hash.ToString("x8");
+            }
+        }
+
+        public static string Compose(string id, string tag) => id + "@" + tag;
+
+        /// <summary>The id file holds "id@tag". The id is reused only when the tag matches this machine and folder; otherwise a new
+        /// one is made. A legacy file with no tag is adopted (its id kept) and reported as created, so the caller rewrites it
+        /// with a tag. Never empty.</summary>
+        public static string ResolveTagged(string savedFile, string tag, Func<string> create, out bool created)
+        {
+            string text = savedFile == null ? "" : savedFile.Trim();
+            if (text.Length > 0)
+            {
+                int at = text.LastIndexOf('@');
+                if (at < 0)
+                {
+                    created = true;
+                    return text;
+                }
+                if (at > 0 && text.Substring(at + 1) == tag)
+                {
+                    created = false;
+                    return text.Substring(0, at);
+                }
+            }
+            return Resolve(null, create, out created);
+        }
+
         /// <summary>At most the first 8 characters - the only form of an id that may reach a log or the screen.</summary>
         public static string ForLog(string id) =>
             string.IsNullOrEmpty(id) ? "" : (id.Length <= 8 ? id : id.Substring(0, 8));
     }
 
+    public enum JoinRefusalAction { None, RejoinSavedRoom, ShowMessage }
+
     public static class RejoinRules
     {
+        public const int InactiveJoinerErrorCode = 32749;
+
+        /// <summary>Photon refuses a normal join while this same user id still holds a place in that room
+        /// (ErrorCode.JoinFailedFoundInactiveJoiner). That is not "no room": the player's own dropped place is there. With a saved
+        /// match still on offer the answer is to rejoin it; without one, a clear message and back to the name screen.</summary>
+        public static JoinRefusalAction OnJoinRefused(int code, bool savedMatchOffered)
+        {
+            if (code != InactiveJoinerErrorCode)
+                return JoinRefusalAction.None;
+            return savedMatchOffered ? JoinRefusalAction.RejoinSavedRoom : JoinRefusalAction.ShowMessage;
+        }
+
         /// <summary>The name screen offers "Rejoin your match": there is a saved room, saved under this same id, and it was
         /// last seen younger than the window the room keeps a dropped player's slot (RoomOptions.PlayerTtl). After that the
         /// server has given the slot up and only a normal join is left. A record from the future (the clock moved) is not
@@ -129,6 +182,12 @@ namespace Overpower.Match
     public static class PresenceRules
     {
         public static bool IsPresent(bool inactive) => !inactive;
+
+        /// <summary>Tudor D-a: as <see cref="CountsAsDead(bool,bool,bool?)"/>, but a dropped player only counts as dead once they have
+        /// been gone <paramref name="graceSeconds"/> - a quick reconnect inside the grace changes nothing for the team. A real
+        /// death (alive false, or waiting in the last stand) is never hidden by the grace.</summary>
+        public static bool CountsAsDead(bool inactive, bool waiting, bool? aliveProperty, float inactiveSeconds, float graceSeconds) =>
+            waiting || !(aliveProperty ?? true) || (inactive && inactiveSeconds >= graceSeconds);
 
         /// <summary>Alive needs an active player: an inactive one still carries whatever "alive" flag they last wrote, which
         /// would read true. A missing flag means alive (a player who never died).</summary>

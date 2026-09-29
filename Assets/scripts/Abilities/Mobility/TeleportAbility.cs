@@ -205,6 +205,13 @@ namespace Overpower.Abilities
             if (Overpower.Arena.ArenaSymmetry.PathCrossesBoundary(feetKnee, groundKnee, PlayerSpaceProbe.PathProbeRadiusMetres))
                 return false;
 
+            // Task 9e-2: after a rejoin the portals PUN kept have higher Seqs than this fresh module's counter - continue above them.
+            IReadOnlyList<Portal> standing = Portal.ForOwner(Owner.ActorNumber);
+            var standingSeqs = new List<int>(standing.Count);
+            foreach (Portal p in standing)
+                standingSeqs.Add(p.Seq);
+            nextSeq = DeployablePruning.NextSeq(nextSeq, standingSeqs);
+
             payload = new CastPayload { Origin = ctx.Origin, Point = ground, IntArg = nextSeq };
             nextSeq++;
             return true;

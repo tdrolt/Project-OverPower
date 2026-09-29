@@ -208,7 +208,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         // Task 9e (Tudor D21): a REJOINED actor (its connection dropped, or the game was closed, and it came back inside the
         // room's rejoin window) is not a new joiner. The room kept its Player Properties (team, gold, loadout) and this is its
-        // new body (RoomManager.SpawnFreshBodyIfNoneReturns; or the old one, if the room still had it). It respawns as after a
+        // new body (RoomManager.WatchOwnBodyAfterRejoin; or the old one, if the room still had it). It respawns as after a
         // death (TryRespawnAfterRejoin below); the join-into-a-last-stand check would only judge the same thing a second time.
         bool rejoined = photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined;
         joinCheckPending = photonView.IsMine && !rejoined;
@@ -218,7 +218,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         {
             rejoinPending = true;
             death = true; // a body that is already "dead" must not die again on the next lethal tick
-            ApplyAliveState(false); // stands still and hidden until the respawn path below answers
+            // Published at once (not just applied here): no flash of a hittable, standing body on everyone else's screen while the
+            // respawn path below waits for the team and the territory.
+            SetAlive(false, PhotonNetwork.ServerTimestamp);
             Debug.LogWarning($"[REJOIN] actor {photonView.OwnerActorNr} has a body again - respawning as after a death");
             TryRespawnAfterRejoin();
         }

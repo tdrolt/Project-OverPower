@@ -116,8 +116,8 @@ public class JoinGameUI : MonoBehaviourPunCallbacks
 
     void OnJoinClicked()
     {
-        // Choosing a new match gives up the place a rejoin would return to.
-        PlayerIdentity.ClearLastMatch();
+        // Task 9e-2: the saved match is kept here - if the server refuses this join because the old place is still held, the answer
+        // is to rejoin it (RejoinController.TryRejoinHeldPlace); a successful new join saves its own match over it.
         PhotonNetwork.NickName = nameInput.text;
         joinButton.interactable = false;   // one join per click; re-enabled only if we never connect
 

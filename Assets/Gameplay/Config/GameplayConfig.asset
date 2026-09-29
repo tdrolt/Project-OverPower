@@ -42,4 +42,5 @@ MonoBehaviour:
   overPowerStatBonus: 0.1
   scoreboardPublishesPerSecond: 4
   rejoinWindowSeconds: 120
+  droppedGraceSeconds: 10
   testRangeEnabled: 1

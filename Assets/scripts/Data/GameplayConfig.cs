@@ -226,6 +226,12 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float rejoinWindowSeconds = 120f;
         public float RejoinWindowSeconds => rejoinWindowSeconds;
 
+        [Tooltip("How long, in seconds, a player whose connection dropped is still counted as alive for their team. A quick " +
+                 "reconnect inside this time changes nothing; after it the team counts them as dead (so a team with no base whose " +
+                 "last living member is gone is knocked out). 0 = counted as dead the moment the drop is noticed.")]
+        [SerializeField, Min(0f)] private float droppedGraceSeconds = 10f;
+        public float DroppedGraceSeconds => droppedGraceSeconds;
+
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
                  "click. Handy while tuning weapons; switch it off for a real match.")]

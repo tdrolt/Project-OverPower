@@ -133,6 +133,13 @@ namespace Overpower.Abilities
             Vector3 requested = MinePlacementRule.ClampToRange(ctx.Origin, ctx.TargetPoint, placementRange);
             Vector3 point = FindSafePlacement(ctx.Origin, requested);
 
+            // Task 9e-2: after a rejoin the mines PUN kept have higher Seqs than this fresh module's counter - continue above them.
+            IReadOnlyList<Mine> standing = Mine.ForOwner(Owner.ActorNumber);
+            var standingSeqs = new List<int>(standing.Count);
+            foreach (Mine m in standing)
+                standingSeqs.Add(m.Seq);
+            nextSeq = DeployablePruning.NextSeq(nextSeq, standingSeqs);
+
             payload = new CastPayload { Point = point, IntArg = nextSeq };
             nextSeq++;
             return true;

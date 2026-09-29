@@ -78,7 +78,7 @@ namespace Overpower.Net
         // portals, packs) would run for a standing statue as if it were the master's own player. Nobody should be standing
         // there anyway. So the master removes the body the moment the drop is known: every client loses it, and the server
         // drops its buffered spawn, so a rejoin gets NO old body back - the returning player spawns a new one
-        // (RoomManager.SpawnFreshBodyIfNoneReturns) and respawns as after a death.
+        // (RoomManager.WatchOwnBodyAfterRejoin) and respawns as after a death.
 
         private readonly System.Collections.Generic.List<int> bodiesToRemove = new System.Collections.Generic.List<int>();
 
@@ -272,10 +272,38 @@ namespace Overpower.Net
                 Fail("RejoinRoom refused");
         }
 
+        /// <summary>Task 9e-2: a normal join was refused (a random join that found nothing, or Photon's "your old place here is held").
+        /// If a saved match is still on offer it is OUR place that is being held - go back to it. If Photon says a place is held
+        /// but there is no saved room to go to, say so and go back to the name screen. Otherwise false: nothing to do with a rejoin.</summary>
+        public bool TryRejoinHeldPlace(int returnCode)
+        {
+            if (stage != Stage.Idle)
+                return false;
+            RejoinRecord record = PlayerIdentity.LoadLastMatch();
+            bool offered = RejoinRules.IsOffered(record, PlayerIdentity.UserId, PlayerIdentity.NowMs(), Mathf.RoundToInt(windowSeconds));
+            if (offered)
+            {
+                Debug.Log($"[REJOIN] a new join was refused ({returnCode}) while our place in {record.RoomName} is held - rejoining it");
+                RejoinFromNameScreen();
+                return true;
+            }
+            if (RejoinRules.OnJoinRefused(returnCode, false) == JoinRefusalAction.ShowMessage)
+            {
+                Debug.LogWarning($"[REJOIN] a new join was refused ({returnCode}): a place is held but no saved room to return to");
+                stage = Stage.Failed;
+                panel.ShowFailed(theme != null ? theme.rejoinPlaceHeldText : null);
+                return true;
+            }
+            return false;
+        }
+
         public override void OnJoinRoomFailed(short returnCode, string message)
         {
             if (stage != Stage.Working)
+            {
+                TryRejoinHeldPlace(returnCode);
                 return;
+            }
             Debug.LogWarning($"[REJOIN] rejoin refused ({returnCode}): {message}");
 
             // Restarting within seconds of a crash: the server has not noticed the old connection is dead yet and still calls this
@@ -304,8 +332,15 @@ namespace Overpower.Net
             pendingRetryRoom = null;
             if (stage != Stage.Working)
                 return;
+            if (!PhotonNetwork.IsConnectedAndReady)
+            {
+                // Not on the master yet (the connection is still coming up): keep waiting, still Working - not a failure.
+                pendingRetryRoom = room;
+                retryAt = Time.unscaledTime + 0.5f;
+                return;
+            }
             Debug.Log($"[REJOIN] retrying {room} ({retries}/{MaxRetries})");
-            if (!PhotonNetwork.IsConnectedAndReady || !PhotonNetwork.RejoinRoom(room))
+            if (!PhotonNetwork.RejoinRoom(room))
                 Fail("retry could not be sent");
         }
 
@@ -315,8 +350,18 @@ namespace Overpower.Net
             pendingRoomAtMaster = null;
             pendingRetryRoom = null;
             PlayerIdentity.ClearLastMatch();
+            GiveUpMatchState();
             stage = Stage.Failed;
             panel.ShowFailed();
+        }
+
+        /// <summary>The place is given up: the next match must not inherit this one's gold, loadout, dead flag or stats (RoomManager.
+        /// ResetMatchProperties - a lost connection kept them on purpose, for the rejoin that is now not happening).</summary>
+        private void GiveUpMatchState()
+        {
+            RoomManager manager = GetComponent<RoomManager>();
+            if (manager != null && PhotonNetwork.LocalPlayer != null)
+                manager.ResetMatchProperties();
         }
 
         /// <summary>Leave, or OK on the failure message: give up the place and go back to the name screen for a normal join.</summary>
@@ -325,6 +370,7 @@ namespace Overpower.Net
             pendingRoomAtMaster = null;
             wasInRoom = false;
             PlayerIdentity.ClearLastMatch();
+            GiveUpMatchState();
             stage = Stage.Idle;
             panel.Hide();
 

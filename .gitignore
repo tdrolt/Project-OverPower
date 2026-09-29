@@ -152,3 +152,4 @@ InitTestScene*.unity*
 # Task 9e: this install's own player id and last match (written next to the game / the project by PlayerIdentity)
 /overpower-player-id.txt
 /overpower-last-match.json
+.overpower-write-test

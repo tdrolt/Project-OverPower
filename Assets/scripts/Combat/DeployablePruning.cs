@@ -21,6 +21,18 @@ namespace Overpower.Combat
         /// treated as 0 (destroy everything) rather than "no limit" - a designer setting it to 0 by
         /// mistake should see the effect immediately, not silently keep unlimited portals.
         /// </summary>
+        /// <summary>The next placement number for an owner: never below what the owner's surviving deployables already hold.
+        /// A module rebuilt after a rejoin restarts its own counter at 0 while the room kept the old mines/portals (with their
+        /// higher Seqs), and the "oldest" pruning would otherwise destroy the NEW one at once.</summary>
+        public static int NextSeq(int current, IReadOnlyList<int> existingSeqs)
+        {
+            int next = current;
+            for (int i = 0; i < existingSeqs.Count; i++)
+                if (existingSeqs[i] + 1 > next)
+                    next = existingSeqs[i] + 1;
+            return next;
+        }
+
         public static List<int> OverflowBySeq(IReadOnlyList<int> existingSeqs, int maxCount)
         {
             var sorted = new List<int>(existingSeqs);

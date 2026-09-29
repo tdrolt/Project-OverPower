@@ -29,8 +29,15 @@ public static class GameQuit
     {
         Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
 
-        // Leave the room first so the other players see us go immediately, instead of a ghost
-        // player standing in the arena until Photon's timeout expires.
+        // Tudor D-b (Task 9e-2): quitting through the menu gives the seat up at once - LeaveRoom(false) is a real leave, not the
+        // "inactive, may come back" a bare Disconnect leaves for the rejoin window (that is for crashes and lost connections) - and
+        // forgets the saved match so the next start offers no rejoin. Leave first and flush it, then disconnect.
+        Overpower.Net.PlayerIdentity.ClearLastMatch();
+        if (PhotonNetwork.InRoom)
+        {
+            PhotonNetwork.LeaveRoom(becomeInactive: false);
+            PhotonNetwork.SendAllOutgoingCommands();
+        }
         if (PhotonNetwork.IsConnected)
             PhotonNetwork.Disconnect();
 
