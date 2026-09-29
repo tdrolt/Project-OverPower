@@ -205,7 +205,7 @@ namespace Overpower.Abilities
             if (visual == null || detonation == null || detonation.Detonated || IsExpired)
                 return;
 
-            bool shown = MineArmingBlinkRule.IsShown(SecondsSincePlaced, armDelaySeconds, blinkPeriodSeconds);
+            bool shown = MineArmingBlinkRule.IsShown(SecondsSincePlaced, detonation.IsArmed(SecondsSincePlaced), blinkPeriodSeconds);
             if (visual.gameObject.activeSelf != shown)
                 visual.gameObject.SetActive(shown);
         }
