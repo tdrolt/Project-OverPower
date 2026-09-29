@@ -161,7 +161,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
                 // Task 9f: "waiting" is read from THIS body (its own wait panel), not from the player's "lastStand" property - that one
                 // survives the drop and would end the watch before the new body had even started its respawn.
                 MatchUI bodyUi = view.GetComponent<MatchUI>();
-                bool waiting = bodyUi != null && bodyUi.IsWaitingForRespawn;
+                bool waiting = bodyUi != null && (bodyUi.IsWaitingForRespawn || bodyUi.MatchOver); // a result panel ends the watch too
                 if (RejoinRules.BodyWatchIsDone(true, lifecycle != null && lifecycle.IsAlive, waiting, total))
                     yield break; // respawned, or in the last-stand wait: nothing more to watch for
             }
@@ -265,6 +265,23 @@ public class RoomManager : MonoBehaviourPunCallbacks
             waited += Time.unscaledDeltaTime;
             yield return null;
         }
+
+        // The wait ran out (still in a room, or halfway through connecting): drop the connection so the rebuilt scene connects afresh.
+        if (BackToNameScreenRules.MustDisconnectBeforeReload(PhotonNetwork.NetworkClientState))
+        {
+            Debug.LogWarning($"[NAME SCREEN] not on the master server after {ReturnTimeoutSeconds:0} s ({PhotonNetwork.NetworkClientState}) - disconnecting before the rebuild");
+            PhotonNetwork.Disconnect();
+            float disconnectWait = 0f;
+            while (disconnectWait < 5f && PhotonNetwork.IsConnected)
+            {
+                disconnectWait += Time.unscaledDeltaTime;
+                yield return null;
+            }
+        }
+
+        // The log's last lines are written while the leave is processed (MatchTelemetry closes its file on leaving), i.e. AFTER the zip made
+        // at the button press: zip once more now that the leave is complete.
+        Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
 
         PlayerLookup.Clear();
         Debug.Log($"[NAME SCREEN] rebuilding the scene ({PhotonNetwork.NetworkClientState})");

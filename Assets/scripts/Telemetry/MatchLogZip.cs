@@ -47,6 +47,11 @@ namespace Overpower.Telemetry
         // own button.
         private string lastKnownFolder;
 
+        // Task 9f: the actor number and nick while still in the room. After a deliberate leave (back to the name screen) Photon
+        // reports the actor as -1, and the last zip must still find this client's own files.
+        private int lastKnownActor = -1;
+        private string lastKnownNick = "";
+
         // One shared TMP material for both overlay button labels (playtest extras P6 follow-up, item 2)
         // - same reasoning as QuitConfirmPanel/MatchStartPanel's own ApplyOutline.
         private Material textMaterial;
@@ -97,6 +102,11 @@ namespace Overpower.Telemetry
             MatchTelemetry mt = MatchTelemetry.Instance;
             if (mt != null && !string.IsNullOrEmpty(mt.CurrentFolder))
                 lastKnownFolder = mt.CurrentFolder;
+            if (PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.ActorNumber > 0)
+            {
+                lastKnownActor = PhotonNetwork.LocalPlayer.ActorNumber;
+                lastKnownNick = PhotonNetwork.LocalPlayer.NickName;
+            }
         }
 
         /// <summary>Playtest extras P6 follow-up (item 3): most testers close the window (X / Alt+F4) or
@@ -139,14 +149,14 @@ namespace Overpower.Telemetry
 
                 mt?.FlushNow(); // The brief's own ordering: flush THIS client's buffer to disk before reading the folder.
 
-                int actor = PhotonNetwork.LocalPlayer.ActorNumber;
+                int actor = MatchLogZipRule.ResolveActor(PhotonNetwork.LocalPlayer.ActorNumber, lastKnownActor);
 
                 string[] allNames = Directory.GetFiles(folder).Select(Path.GetFileName).ToArray();
                 List<string> ownNames = MatchLogZipRule.SelectOwnFiles(allNames, actor);
                 if (ownNames.Count == 0)
                     return; // IsRecording was true but somehow no matching file exists - be safe, do nothing.
 
-                string sanitizedNick = MatchTelemetry.Sanitize(PhotonNetwork.LocalPlayer.NickName);
+                string sanitizedNick = MatchTelemetry.Sanitize(MatchLogZipRule.ResolveNick(PhotonNetwork.LocalPlayer.NickName, lastKnownNick));
                 // Named after the match folder itself, not a clock read (2026-09-26 fix - see
                 // MatchLogZipRule.ZipFileName's own comment on the real bug this replaces): stable for
                 // the whole match, so every zip of it - result panel, then maybe again on quit - comes

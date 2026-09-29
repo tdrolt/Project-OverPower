@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using Overpower.Match;
+using TMPro;
 
 /// <summary>
 /// Quits the game when its Button is clicked.
@@ -26,16 +27,45 @@ public class QuitButton : MonoBehaviour
         GetComponent<Button>().onClick.AddListener(Quit);
     }
 
-    /// <summary>Task 9f (Tudor D22): once the match is over this leads back to the name screen for a fresh start; on the mid-match
-    /// waiting panel it still closes the game.</summary>
+    private TMP_Text label;
+    private RoomManager manager;
+
+    /// <summary>Task 9f (Tudor D22): once the MATCH is over (the room's phase) this leads back to the name screen for a fresh start; on the
+    /// waiting panel, or on a knocked-out player's lose panel while the match still runs, it closes the game.</summary>
     public void Quit()
     {
+        if (CurrentAction() == ResultButtonAction.BackToNameScreen)
+        {
+            if (manager == null)
+                manager = FindFirstObjectByType<RoomManager>();
+            if (manager != null)
+            {
+                manager.ReturnToNameScreen();
+                return;
+            }
+        }
+        GameQuit.Quit();
+    }
+
+    private static ResultButtonAction CurrentAction()
+    {
+        MatchDirector director = MatchDirector.Instance;
+        return BackToNameScreenRules.ButtonAction(director != null ? director.Phase : MatchPhase.Warmup);
+    }
+
+    /// <summary>The label follows what the button will do (UiTheme texts): "Main menu" once the match is over, else "Quit".</summary>
+    void Update()
+    {
         MatchUI ui = GetComponentInParent<MatchUI>();
-        bool matchOver = ui != null && ui.MatchOver;
-        RoomManager manager = matchOver ? FindFirstObjectByType<RoomManager>() : null;
-        if (BackToNameScreenRules.ButtonAction(matchOver) == ResultButtonAction.BackToNameScreen && manager != null)
-            manager.ReturnToNameScreen();
-        else
-            GameQuit.Quit();
+        if (ui == null || ui.Theme == null)
+            return;
+        if (label == null)
+            label = GetComponentInChildren<TMP_Text>(true);
+        if (label == null)
+            return;
+        string wanted = ui.MatchOver && CurrentAction() == ResultButtonAction.BackToNameScreen
+            ? ui.Theme.resultButtonMainMenu : ui.Theme.resultButtonQuit;
+        if (label.text != wanted)
+            label.text = wanted;
     }
 }

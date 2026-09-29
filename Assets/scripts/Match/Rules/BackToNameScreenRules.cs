@@ -14,10 +14,15 @@ namespace Overpower.Match
     /// rebuild the scene, and which of two own bodies a rejoining player keeps.</summary>
     public static class BackToNameScreenRules
     {
-        /// <summary>The result panel's button (match over) starts a fresh game on the name screen. The waiting panel's button, shown
-        /// mid-match, still closes the game.</summary>
-        public static ResultButtonAction ButtonAction(bool matchOver) =>
-            matchOver ? ResultButtonAction.BackToNameScreen : ResultButtonAction.CloseGame;
+        /// <summary>The result panel's button leads back to the name screen only when the MATCH is really over (the room's phase). A
+        /// knocked-out player sees their lose panel mid-match: their button stays a plain Quit, so they cannot re-join the running
+        /// room as a fresh player on another team. The waiting panel's button is a Quit too.</summary>
+        public static ResultButtonAction ButtonAction(MatchPhase phase) =>
+            phase == MatchPhase.Over ? ResultButtonAction.BackToNameScreen : ResultButtonAction.CloseGame;
+
+        /// <summary>The wait for the leave timed out: unless the client is on the master server, disconnect before the scene is rebuilt so
+        /// the new scene's Start connects from a clean state (it only connects when not connected).</summary>
+        public static bool MustDisconnectBeforeReload(ClientState state) => state != ClientState.ConnectedToMasterServer;
 
         /// <summary>After LeaveRoom(false) the client walks back to the master server. Only there is it safe to rebuild the scene
         /// (a scene loaded mid-leave would run its Start against a half-left connection). A client that lost its connection

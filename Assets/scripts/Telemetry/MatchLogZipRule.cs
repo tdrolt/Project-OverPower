@@ -15,6 +15,13 @@ namespace Overpower.Telemetry
         /// though several local clients on one PC can share this same folder (survey, "Screenshot,
         /// zip") - the trailing underscore in each prefix matters: actor 1 must never also match
         /// actor 10's "10_...jsonl" or "bug_10_...png".</summary>
+        /// <summary>After a deliberate leave Photon reports the local actor number as -1 (or 0): the zip that runs after it uses the number
+        /// remembered while still in the room, or it would look for "-1_..." files and miss the whole log.</summary>
+        public static int ResolveActor(int live, int remembered) => live > 0 ? live : remembered;
+
+        /// <summary>The nick counterpart of <see cref="ResolveActor"/>: the live one if there is one, else the remembered one.</summary>
+        public static string ResolveNick(string live, string remembered) => string.IsNullOrEmpty(live) ? remembered : live;
+
         public static List<string> SelectOwnFiles(IEnumerable<string> fileNames, int actor)
         {
             var result = new List<string>();

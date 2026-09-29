@@ -32,6 +32,9 @@ public class JoinGameUI : MonoBehaviourPunCallbacks
         nameInput.onValueChanged.AddListener(OnNameChanged);
         NameScreenTips.Build((RectTransform)joinButton.transform, theme, nameInput.textComponent.font);
         BuildRejoinButton();
+        // Task 9f: back on the name screen after a match the name is already there (PhotonNetwork.NickName survives the scene rebuild).
+        if (!string.IsNullOrEmpty(PhotonNetwork.NickName))
+            nameInput.text = PhotonNetwork.NickName;
         if (roomManager != null && roomManager.Rejoin != null)
             roomManager.Rejoin.ReturnToNameScreen += ShowNameScreenAgain;
     }

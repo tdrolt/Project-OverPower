@@ -352,6 +352,8 @@ MonoBehaviour:
   rejoinFailedOkButton: OK
   rejoinPlaceHeldText: You still hold a place in a match you dropped out of, but it could not be reached. Try again in a minute, or join a new match once it is given up.
   rejoinMatchButton: Rejoin your match
+  resultButtonMainMenu: Main menu
+  resultButtonQuit: Quit
   connectionLostPanelWidth: 640
   connectionLostPanelColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.95}
   connectionLostTitleColor: {r: 1, g: 0.55, b: 0.35, a: 1}

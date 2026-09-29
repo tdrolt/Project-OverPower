@@ -73,6 +73,9 @@ public class MatchUI : MonoBehaviour
     /// property, explicitly when that happens - it will not do so on its own.</summary>
     public bool MatchOver => (youWonPanel != null && youWonPanel.activeSelf) || (youLostPanel != null && youLostPanel.activeSelf);
 
+    /// <summary>The theme this panel set reads (Task 9f: the result button's label comes from it).</summary>
+    public UiTheme Theme => theme;
+
     private const string WaitingTitleObjectName = "Waiting";
 
     private void Awake()

@@ -7,15 +7,50 @@ namespace Overpower.Tests
     /// <summary>Task 9f (Tudor D22): the result screen leads back to the name screen; and the rejoin body choice (9e-3 review).</summary>
     public class BackToNameScreenRulesTests
     {
-        // ---- the panel button
+        // ---- the panel button (decided by the match PHASE: a knocked-out player's lose panel shows mid-match)
 
         [Test]
-        public void AfterTheMatchTheButtonGoesBackToTheNameScreen() =>
-            Assert.AreEqual(ResultButtonAction.BackToNameScreen, BackToNameScreenRules.ButtonAction(matchOver: true));
+        public void WhenTheMatchIsReallyOverTheButtonGoesBackToTheNameScreen() =>
+            Assert.AreEqual(ResultButtonAction.BackToNameScreen, BackToNameScreenRules.ButtonAction(MatchPhase.Over));
+
+        [TestCase(MatchPhase.Warmup)]
+        [TestCase(MatchPhase.ThreeTeams)]
+        [TestCase(MatchPhase.TwoTeams)]
+        public void WhileTheMatchStillRunsTheButtonStillClosesTheGame(MatchPhase phase) =>
+            Assert.AreEqual(ResultButtonAction.CloseGame, BackToNameScreenRules.ButtonAction(phase));
+
+        // ---- giving up on the wait
 
         [Test]
-        public void DuringTheMatchTheButtonStillClosesTheGame() =>
-            Assert.AreEqual(ResultButtonAction.CloseGame, BackToNameScreenRules.ButtonAction(matchOver: false));
+        public void StillInARoomAfterTheTimeoutMeansDisconnectBeforeTheReload() =>
+            Assert.IsTrue(BackToNameScreenRules.MustDisconnectBeforeReload(ClientState.Joined));
+
+        [Test]
+        public void ConnectingHalfwayAfterTheTimeoutMeansDisconnectBeforeTheReload() =>
+            Assert.IsTrue(BackToNameScreenRules.MustDisconnectBeforeReload(ClientState.ConnectingToMasterServer));
+
+        [Test]
+        public void OnTheMasterServerNoDisconnectIsNeeded() =>
+            Assert.IsFalse(BackToNameScreenRules.MustDisconnectBeforeReload(ClientState.ConnectedToMasterServer));
+
+        // ---- the zip after the leave
+
+        [Test]
+        public void TheLiveActorNumberIsUsedWhileInARoom() =>
+            Assert.AreEqual(3, Overpower.Telemetry.MatchLogZipRule.ResolveActor(3, 5));
+
+        [TestCase(-1)]
+        [TestCase(0)]
+        public void AfterTheLeaveTheRememberedActorNumberIsUsed(int live) =>
+            Assert.AreEqual(5, Overpower.Telemetry.MatchLogZipRule.ResolveActor(live, 5));
+
+        [Test]
+        public void AnEmptyNickFallsBackToTheRememberedOne() =>
+            Assert.AreEqual("Radu", Overpower.Telemetry.MatchLogZipRule.ResolveNick("", "Radu"));
+
+        [Test]
+        public void ALiveNickIsKept() =>
+            Assert.AreEqual("Live", Overpower.Telemetry.MatchLogZipRule.ResolveNick("Live", "Radu"));
 
         // ---- waiting for the leave
 
