@@ -841,6 +841,7 @@ MonoBehaviour:
   chatmanager: {fileID: 941603635}
   chattext: {fileID: 1105604635}
   roomManager: {fileID: 101938906}
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!1 &134475970
 GameObject:
   m_ObjectHideFlags: 8

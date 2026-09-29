@@ -43,7 +43,7 @@ namespace Overpower.Match
                 AddAssist();
         }
 
-        /// <summary>A zone just flipped        /// <summary>A zone just flipped to zoneTeam. Counts only for a living player who was standing in that zone
+        /// <summary>A zone just flipped to zoneTeam. Counts only for a living player who was standing in that zone
         /// and is on the team it flipped to (Tudor: every capture you were standing in counts).</summary>
         public void NoteCapture(bool standingInZone, bool alive, int zoneTeam, int myTeam)
         {

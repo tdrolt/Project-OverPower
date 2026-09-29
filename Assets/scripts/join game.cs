@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using System.Text.RegularExpressions;
 using Photon.Pun;
 using TMPro;
+using Overpower.UI;
 
 
 public class JoinGameUI : MonoBehaviourPunCallbacks
@@ -14,11 +15,15 @@ public class JoinGameUI : MonoBehaviourPunCallbacks
     public GameObject chattext;
     public RoomManager roomManager;
 
+    [Tooltip("Read for the tips shown under the name box (Name screen tips section). Empty = no tips.")]
+    [SerializeField] private UiTheme theme;
+
     void Start()
     {
         joinButton.interactable = false;
         joinButton.onClick.AddListener(OnJoinClicked);
         nameInput.onValueChanged.AddListener(OnNameChanged);
+        NameScreenTips.Build((RectTransform)joinButton.transform, theme, nameInput.textComponent.font);
     }
 
     /// At least four alphanumeric characters. Named so the disconnect path can re-check it

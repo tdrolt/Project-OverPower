@@ -969,6 +969,50 @@ namespace Overpower.UI
         [Tooltip("Shown for a team the scoreboard cannot name (a player whose team has not arrived yet).")]
         public string scoreboardUnknownTeamText = "Joining";
 
+        [Header("Name screen tips")]
+        [Tooltip("The keys block on the name screen. Written from the Gameplay actions in OverpowerControls (WASD, " +
+                 "left / right mouse, Left Shift, Space, R, P, M, Tab) plus Enter for chat and Escape: if you " +
+                 "rebind a key there, change it here too. <b> makes the heading bold.")]
+        [TextArea(4, 14)] public string nameTipsKeysText =
+            "<b>Keys</b>\n" +
+            "WASD  move\n" +
+            "Mouse  aim, left click shoots\n" +
+            "Right click  Equipment ability\n" +
+            "Left Shift  Mobility ability\n" +
+            "Space  Ultimate ability (meter full)\n" +
+            "R  Vent (see Overheat)\n" +
+            "P  Shop\n" +
+            "M  Map\n" +
+            "Hold Tab  Scoreboard\n" +
+            "Enter  Chat\n" +
+            "Escape  Quit";
+        [Tooltip("The overheat block on the name screen: what overheat is and what the Vent does.")]
+        [TextArea(3, 8)] public string nameTipsOverheatText =
+            "<b>Overheat and the Vent</b>\n" +
+            "Shooting and abilities build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\n" +
+            "While locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout.";
+        [Tooltip("The ability charges block on the name screen.")]
+        [TextArea(3, 8)] public string nameTipsChargesText =
+            "<b>Ability charges</b>\n" +
+            "Some abilities hold several charges. Spent charges come back one at a time, so using them all means a longer wait.";
+        [Tooltip("The game mode block on the name screen: capture zones, respawning, winning. Worded so it stays true " +
+                 "whatever the last stand's exact rule is.")]
+        [TextArea(3, 8)] public string nameTipsModeText =
+            "<b>The match</b>\n" +
+            "Capture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake one. The last team standing wins.";
+        [Tooltip("Text size of the name screen tips, in reference pixels.")]
+        [Min(8f)] public float nameTipsFontSize = 20f;
+        [Tooltip("Colour of the name screen tips text.")]
+        public Color nameTipsColor = new Color(1f, 1f, 1f, 0.9f);
+        [Tooltip("Width of the keys column on the name screen, in reference pixels.")]
+        public float nameTipsKeysWidth = 560f;
+        [Tooltip("Width of the column holding the overheat, charges and match blocks, in reference pixels.")]
+        public float nameTipsRulesWidth = 800f;
+        [Tooltip("Empty space between the two tip columns, in reference pixels.")]
+        public float nameTipsColumnGap = 60f;
+        [Tooltip("Distance from the bottom of the Join button to the top of the tips, in reference pixels.")]
+        public float nameTipsGapBelowJoin = 30f;
+
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
         /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why

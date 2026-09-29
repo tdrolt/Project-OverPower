@@ -124,7 +124,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
             ledger.Clear();
     }
 
-    /// <summary>Records one hit.    /// <summary>Records one hit. Self-damage and an unresolved source are skipped here rather than
+    /// <summary>Records one hit. Self-damage and an unresolved source are skipped here rather than
     /// in the ledger - DamageCreditLedger has no notion of whose ledger it is, only PlayerHealth's
     /// owner (this player) knows that a source actor matching its own is a self-hit.</summary>
     private void HandleDamaged(DamageResult result, DamageInfo info)
