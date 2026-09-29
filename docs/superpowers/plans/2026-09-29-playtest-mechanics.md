@@ -5,7 +5,7 @@ Follows workflow v1.1 (`C:\UniStuff\Y3\MinorSkilled\Resources\core\`). Tudor did
 `C:\UniStuff\Y3\MinorSkilled\Resources\playtests\2026-09-26-playtest-feedback.md` (rows T8-T18).
 
 **Goal (play terms):** the recesses become places worth fighting over; the shop and upgrades are understandable and
-usable while dead; Dash, Sonic Pulse, Mines and the AoE ultimate play as Tudor redesigned them; new players get the
+usable while dead; Dash, Sonic Pulse, Mines, the teleport portals and the AoE ultimate play as Tudor redesigned them; new players get the
 basics on the name screen; everyone can see the score with Tab; the ultimate meter complaint is explained or fixed.
 
 ## Designer's answers and defaults (Ask step)
@@ -27,6 +27,8 @@ start (play terms, one question each, default stated), then proceeds with whatev
 | D11 | AoE Zone ultimate: while it is up, pressing the ultimate key once more throws it to the cursor, at most 5 m from the player; from then on it stays there (stops following the player) for its remaining time. | D (the "stays there" and "once": A) |
 | D12 | Hold Tab: a scoreboard grouped by team, one row per player: name, kills, deaths, assists, damage dealt, zones captured (captures the player took part in). Release to close. | D (hold vs toggle, what counts as a capture: A) |
 | D13 | The ultimate meter complaint is investigated before anything is changed (see Task 9). | A |
+| D15 | Teleport portals: teammates can use them too, not only the player who placed them; standing anywhere on the portal counts (not just its middle); the portal is 20% smaller (2.5 m → 2.0 m across). | D |
+| D16 | A teammate's trip works like the owner's (the same 3 s channel, interrupted the same way) and uses the same portal charge and cooldown as the owner's own trips; enemies still can't use them. | A |
 | D14 | Every new number lives in an editable asset with a plain tooltip (the QA rule: "everything in ScriptableObjects"). | D |
 
 ## Rules that bind every task (from the handover, `Resources\loops\Limit Test\HANDOFF.md`)
@@ -65,6 +67,22 @@ start (play terms, one question each, default stated), then proceeds with whatev
 - **Check:** Play Mode: cast against a wall behind you and in the open; the user ends 4 m back, not stunned. Two clients:
   the other client sees the user move (it's the owner's own movement, replicated as usual).
 - **Review:** standard.
+
+### Task 3b: Portals for teammates, easier to enter, smaller (D15, D16) - networking
+- **Today:** a portal is personal (`Assets/scripts/Abilities/Mobility/Portal.cs`, `TeleportAbility.cs`); the channel
+  (`PortalChannelState`) runs only in the placing player's own ability, on their own client. Every client already
+  knows every portal (`Portal`'s per-owner registry), so a teammate's client can find an ally's portal pair.
+- **Change:** a teammate standing on an ally's portal channels for themselves on their own client (their own player
+  moves, through `PlayerDisplacement`), with the same rules as the owner (3 s, cancelled by moving out, stun, silence).
+  "Standing on it" = the player's body overlaps the circle (portal radius + the player's radius), for owner and allies
+  alike. The trip spends the portal's charge/cooldown the way D16 says; find how the owner's charge is spent and share
+  it without a new RPC (a Player or Room Property written by the portal's owner, or an appended parameter on an existing
+  message - say which in the report). Diameter 2.5 → 2.0 on `Assets/Resources/Portal.prefab` (grep the saved value).
+- **Test first:** pure rules: who may use a portal (owner or teammate, alive, not an enemy); "on the portal" with the
+  body radius at the edge; the shared charge.
+- **Check:** two clients on the same team: B uses A's portal pair; the charge is spent on both screens; an enemy (a
+  third client, or a forced team) can't; entering at the rim works. Captures.
+- **Review:** the strongest model (networking).
 
 ### Task 4: Health packs in the Tier III recesses (D1-D3) - networking
 - **Design:** positions come from the arena layout (the Tier III recess piece, rotated into the three thirds by the
@@ -140,7 +158,7 @@ start (play terms, one question each, default stated), then proceeds with whatev
   he approves a design.
 
 ## Risks and out of scope
-- Tasks 4, 6 and 7 add shared state: every build in a room must match; test a late joiner each time.
+- Tasks 3b, 4, 6 and 7 add shared state: every build in a room must match; test a late joiner each time.
 - Out of scope: the ScriptableObject top ten (`so-top-ten-plan-2026-09-26.md`), compacting code comments, the vision
   feature itself (Task 11 only starts its design).
 
