@@ -238,6 +238,7 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 
 ## Risks and out of scope
 - Tasks 3b, 4, 6, 7, 9b and 9e add or change shared state: every build in a room must match; test a late joiner each time.
+- Out of scope, noted for later (Tudor 2026-09-30): **a lobby system** - two matches at once, players choose team and game mode, "Play again" remakes the lobby. Starts at Ask after the vision feature is designed (or before, if Tudor prefers).
 - Out of scope: the ScriptableObject top ten (`so-top-ten-plan-2026-09-26.md`), compacting code comments, the vision
   feature itself (Task 11 only starts its design).
 
