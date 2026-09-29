@@ -45,6 +45,7 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 | D25 | The ultimate: an empty ultimate slot shows "No ultimate"; the go-live wipe stays; shield hits give no charge; burning counts like any other damage (Tudor, later on 09-29: no extra). | D (09-29) |
 | D26 | Retaking a base during a last stand respawns the waiting teammates (as today). | D (09-29) |
 | D27 | You're out of combat when you die and when you respawn (shop, armour recharge, regen). | D (09-29) |
+| D28 | Tudor 09-30 (ten answers): the last-stand and rejoin defaults stand (see the decisions list); a returning player respawns after a flat 5 s but keeps the death penalty; a knocked-out player gets a **Spectate** button that follows a living player of the team that knocked them out (next / any team still in), also for a rejoiner onto a knocked-out team. | D |
 | D14 | Every new number lives in an editable asset with a plain tooltip (the QA rule: "everything in ScriptableObjects"). | D |
 
 ## Rules that bind every task (from the handover, `Resources\loops\Limit Test\HANDOFF.md`)
@@ -218,6 +219,9 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 - **Files:** the result panel (`MatchUI`), the room flow (leave the room, return to the name screen with a clean state:
   nothing left over from the last match). Escape → "Close the game?" stays.
 - **Check:** end a match (or force the result panel) → the name screen → join a new match normally. Capture.
+
+### Task 9g: Spectate after a knockout + the rejoin respawn (D28)
+- Brief: `Resources/loops/Limit Test/briefs/2026-09-30-task9g-spectate-and-rejoin-penalty.md`. **Review:** strongest model (camera + rejoin state).
 
 ### Task 10: One multi-client check of everything
 - A fresh development Client2; two clients (three if possible). Everything above, plus the checks still owed from before
