@@ -140,6 +140,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private bool loggedFriendlyFireBlocked;
 
     public float Health => health;
+    /// <summary>The most health this player can have, from GameplayConfig (100 if that is missing, as elsewhere here).</summary>
+    public float MaxHealth => gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
     // A single ArmorState per client now, owner and remote alike - a remote client's copy is
     // written by SetHealthFromNetwork below through ArmorState.SetFromNetwork instead of a
     // separately mirrored field, so Armor means the same thing regardless of whose client reads it.
@@ -471,6 +473,23 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return;
 
         health = Mathf.Min(maxHealth, health + rate * deltaTime);
+    }
+
+    /// <summary>A health pack heals here. Owner only (health is this client's own), alive only, never above max health;
+    /// returns how much actually landed. Reaches the other clients the same way regen does, through PlayerNetSync's
+    /// serialize tick reading Health live, and updates the overhead bar at once.</summary>
+    public float Heal(float amount)
+    {
+        if (!photonView.IsMine || isDead || gameplayConfig == null)
+            return 0f;
+
+        float applied = HealthPackRules.HealAmount(amount, health, gameplayConfig.MaxHealth);
+        if (applied <= 0f)
+            return 0f;
+
+        health += applied;
+        UpdateOverheadBar();
+        return applied;
     }
 
     /// The one funnel every damage source goes through - see the class comment.

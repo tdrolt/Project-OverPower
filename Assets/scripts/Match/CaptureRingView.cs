@@ -230,7 +230,7 @@ namespace Overpower.Match
         /// never dips into the ground. The tower's own height where no terrain covers the zone. Called once per
         /// tower by Create, and again by Resize whenever the radius it was built with changes (centre-circle-and-
         /// cut-rule, 2026-09-26) - not just once.</summary>
-        private static float GroundHeight(Vector3 towerPosition, float radius)
+        public static float GroundHeight(Vector3 towerPosition, float radius)
         {
             Terrain[] terrains = Terrain.activeTerrains;
             float best = float.NegativeInfinity;

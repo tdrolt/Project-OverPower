@@ -1,0 +1,424 @@
+using System.Collections.Generic;
+using Overpower.Data;
+using Photon.Pun;
+using Photon.Realtime;
+using UnityEngine;
+using Hashtable = ExitGames.Client.Photon.Hashtable;
+
+namespace Overpower.Match
+{
+    /// <summary>
+    /// The Tier III health packs: one floating cross in the middle of each Tier III zone. Walk over it hurt and
+    /// alive and it heals you 50 (never past max), then it is gone for everyone for 30 s.
+    ///
+    /// State: ONE Room Property per pack, "hp" + zone, int[] { takenUntilMs, takerActor, requestId } (see
+    /// HealthPackRules), written ONLY by the master with a check-and-set. A player asks by writing a Player
+    /// Property on itself, "hpReq" = int[] { zone, requestId }; the master decides in OnPlayerPropertiesUpdate.
+    /// A write returning true only means "sent": the taker heals when it READS the echo naming it. No RPC.
+    ///
+    /// Every client builds the packs itself (they are not networked objects) at each Tier III tower once it has
+    /// registered, and draws them from the Room Property and the server clock alone, so all clients agree. A
+    /// taken pack stays in place greyed out with no glow until it returns. A Tier III zone that is out of play
+    /// after the map shrinks hides its pack and cannot be taken.
+    /// </summary>
+    public sealed class HealthPackManager : MonoBehaviourPunCallbacks
+    {
+        public static HealthPackManager Instance { get; private set; }
+
+        public const string RequestKey = "hpReq";
+        public static string PackKey(int zone) => "hp" + zone;
+
+        /// <summary>The master forgets a write of its own that never echoed after this long.</summary>
+        private const float PendingWriteSeconds = 1.5f;
+
+        /// <summary>A client stops re-asking for one pack after this many tries until it steps off it.</summary>
+        private const int MaxAttemptsPerVisit = 6;
+
+        [SerializeField, Tooltip("The health pack numbers: heal amount, respawn time, pickup radius, and the look.")]
+        private HealthPackConfig config;
+
+        private sealed class Pack
+        {
+            public int zone;
+            public Vector3 centre;         // the ground point in the middle of the zone
+            public GameObject root;
+            public Transform cross;        // spins and bobs
+            public Transform lean;         // holds the two bars, leaned back from upright
+            public Renderer[] crossRenderers;
+            public GameObject glow;
+            public bool colourKnown;
+            public bool shownReady;
+            // Asking side (every client)
+            public bool hasOutstanding;
+            public float requestSentAt;
+            public int attempts;
+            // Master side
+            public int[] pending;
+            public float pendingUntil;
+        }
+
+        private readonly Dictionary<int, Pack> packs = new Dictionary<int, Pack>();
+        private static readonly int ColorId = Shader.PropertyToID("_BaseColor");
+        private MaterialPropertyBlock block;
+        private Material crossMaterial;
+        private Material glowMaterial;
+
+        private int nextRequestId;
+        private int lastHealedRequestId;
+        private PlayerHealth localHealth;
+        private readonly Dictionary<int, int> lastHandledByActor = new Dictionary<int, int>();
+
+        /// <summary>Diagnostics for tests and recordings.</summary>
+        public int HealsApplied { get; private set; }
+        public int RequestsSent { get; private set; }
+        public int GrantsWritten { get; private set; }
+
+        public IEnumerable<int> PackZones => packs.Keys;
+        public bool HasPack(int zone) => packs.ContainsKey(zone);
+        public Vector3 PackCentre(int zone) => packs.TryGetValue(zone, out Pack p) ? p.centre : Vector3.zero;
+        /// <summary>The cross is drawn (zone in play), ready or greyed.</summary>
+        public bool IsCrossShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.root.activeSelf;
+        /// <summary>The cross is drawn green with its glow: ready to take.</summary>
+        public bool IsReadyShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.root.activeSelf && p.shownReady;
+        public bool IsGlowShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.glow.activeSelf;
+        public int[] RoomValue(int zone) => ReadRoomValue(zone);
+
+        /// <summary>For the minimap: where a pack is and whether it is ready to take right now. False for a zone
+        /// with no pack, or one that is out of play (its pack is hidden).</summary>
+        public bool TryGetPack(int zone, out Vector3 worldPosition, out bool ready)
+        {
+            worldPosition = Vector3.zero;
+            ready = false;
+            if (!packs.TryGetValue(zone, out Pack pack) || !pack.root.activeSelf)
+                return false;
+            worldPosition = pack.centre;
+            ready = pack.shownReady;
+            return true;
+        }
+
+        private void Awake()
+        {
+            Instance = this;
+            if (config == null)
+                Debug.LogError($"[HealthPackManager] {name}: Health Pack Config is not assigned - there will be no health packs.");
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+        }
+
+        private void Update()
+        {
+            if (config == null || !PhotonNetwork.InRoom || BuildingManager.Instance == null)
+                return;
+
+            EnsurePacks();
+
+            int now = PhotonNetwork.ServerTimestamp;
+            if (now == 0)
+                return; // Server clock not synced yet: showing anything would be a guess.
+
+            MatchDirector match = MatchDirector.Instance;
+            foreach (Pack pack in packs.Values)
+            {
+                bool inPlay = match == null || !match.IsOutOfPlay(pack.zone);
+                bool available = HealthPackRules.IsAvailable(ReadRoomValue(pack.zone), now);
+                Show(pack, inPlay, available);
+                if (inPlay)
+                    AnimateCross(pack);
+            }
+
+            TryRequestLocal(now, match);
+        }
+
+        // ---- building and drawing ------------------------------------------------------------------
+
+        private void EnsurePacks()
+        {
+            BuildingManager buildings = BuildingManager.Instance;
+            // Wait until every tower has registered: the packs are placed relative to the middle of the map.
+            for (int zone = 0; zone < buildings.ZoneCount; zone++)
+                if (!buildings.TryGetZoneCentre(zone, out _))
+                    return;
+
+            for (int zone = 0; zone < buildings.ZoneCount; zone++)
+            {
+                // The tower's own tier, not TierOf: TierOf plays the centre as Tier III while a corner is cut.
+                if (packs.ContainsKey(zone) || buildings.BaseTierOf(zone) != 3)
+                    continue;
+                if (!buildings.TryGetZoneCentre(zone, out Vector3 tower))
+                    continue;
+                packs[zone] = Build(zone, tower);
+            }
+        }
+
+        /// <summary>The middle of the map: the average of every tower that has registered (the nine are laid out
+        /// symmetrically around it).</summary>
+        private static Vector3 MapMiddle()
+        {
+            BuildingManager buildings = BuildingManager.Instance;
+            Vector3 sum = Vector3.zero;
+            int count = 0;
+            for (int zone = 0; zone < buildings.ZoneCount; zone++)
+                if (buildings.TryGetZoneCentre(zone, out Vector3 tower)) { sum += tower; count++; }
+            return count > 0 ? sum / count : Vector3.zero;
+        }
+
+        private Pack Build(int zone, Vector3 tower)
+        {
+            // Not on the tower itself: it is a solid pillar. On the side facing the middle of the map, so the
+            // three packs are placed by the same rule.
+            Vector3 towardMiddle = MapMiddle() - tower;
+            towardMiddle.y = 0f;
+            towardMiddle = towardMiddle.sqrMagnitude > 0.0001f ? towardMiddle.normalized : Vector3.forward;
+            Vector3 spot = tower + towardMiddle * config.DistanceFromTowerMetres;
+            float ground = CaptureRingView.GroundHeight(spot, 0.5f);
+            var pack = new Pack { zone = zone, centre = new Vector3(spot.x, ground, spot.z) };
+
+            pack.root = new GameObject("Health Pack (zone " + zone + ")");
+            pack.root.transform.SetParent(transform, false);
+            pack.root.transform.position = pack.centre;
+
+            crossMaterial = crossMaterial != null ? crossMaterial : new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            glowMaterial = glowMaterial != null ? glowMaterial : MakeTransparentUnlit();
+            block = block ?? new MaterialPropertyBlock();
+
+            // The cross: two boxes in an UPRIGHT plus (in a vertical plane, like the classic health sign), floating
+            // above the spot, bobbing, and turning slowly about the vertical axis so it reads from the top-down
+            // camera as it turns.
+            var cross = new GameObject("Cross");
+            cross.transform.SetParent(pack.root.transform, false);
+            pack.cross = cross.transform;
+            var lean = new GameObject("Lean");
+            lean.transform.SetParent(cross.transform, false);
+            pack.lean = lean.transform;
+            float length = config.CrossSizeMetres, arm = length / 3f;
+            pack.crossRenderers = new[]
+            {
+                MakeBox(lean.transform, "Horizontal bar", new Vector3(length, arm, arm), crossMaterial),
+                MakeBox(lean.transform, "Vertical bar", new Vector3(arm, length, arm), crossMaterial),
+            };
+
+            // The glow: a flat disc on the ground.
+            GameObject glow = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            glow.name = "Glow";
+            DestroyImmediate(glow.GetComponent<Collider>());
+            glow.transform.SetParent(pack.root.transform, false);
+            glow.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+            glow.transform.localScale = new Vector3(config.GlowDiameterMetres, 0.005f, config.GlowDiameterMetres);
+            var glowRenderer = glow.GetComponent<MeshRenderer>();
+            glowRenderer.sharedMaterial = glowMaterial;
+            glowRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            glowRenderer.receiveShadows = false;
+            block.SetColor(ColorId, config.GlowColour);
+            glowRenderer.SetPropertyBlock(block);
+            pack.glow = glow;
+            return pack;
+        }
+
+        private static Renderer MakeBox(Transform parent, string boxName, Vector3 size, Material material)
+        {
+            GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            box.name = boxName;
+            DestroyImmediate(box.GetComponent<Collider>()); // never a solid, physics-blocking object
+            box.transform.SetParent(parent, false);
+            box.transform.localScale = size;
+            var renderer = box.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            return renderer;
+        }
+
+        private static Material MakeTransparentUnlit()
+        {
+            var material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            material.SetFloat("_Surface", 1f); // transparent
+            material.SetFloat("_Blend", 0f);
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat("_ZWrite", 0f);
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            material.SetOverrideTag("RenderType", "Transparent");
+            return material;
+        }
+
+        private void Show(Pack pack, bool inPlay, bool available)
+        {
+            if (pack.root.activeSelf != inPlay)
+                pack.root.SetActive(inPlay);
+            if (!inPlay)
+                return;
+
+            if (pack.glow.activeSelf != available)
+                pack.glow.SetActive(available);
+
+            if (pack.colourKnown && pack.shownReady == available)
+                return;
+            pack.colourKnown = true;
+            pack.shownReady = available;
+            block.SetColor(ColorId, available ? config.ReadyColour : config.TakenColour);
+            foreach (Renderer r in pack.crossRenderers)
+                r.SetPropertyBlock(block);
+        }
+
+        private void AnimateCross(Pack pack)
+        {
+            float t = Time.time;
+            float bob = Mathf.Sin(t * config.BobCyclesPerSecond * Mathf.PI * 2f) * config.BobHeightMetres;
+            pack.cross.localPosition = new Vector3(0f, config.FloatHeightMetres + bob, 0f);
+            pack.cross.localRotation = Quaternion.Euler(0f, t * config.SpinDegreesPerSecond, 0f);
+            pack.lean.localRotation = Quaternion.Euler(config.CrossLeanDegrees, 0f, 0f);
+        }
+
+        // ---- asking (every client, for its own player) ---------------------------------------------
+
+        private void TryRequestLocal(int now, MatchDirector match)
+        {
+            if (localHealth == null)
+            {
+                foreach (PlayerHealth candidate in FindObjectsByType<PlayerHealth>(FindObjectsSortMode.None))
+                    if (candidate.HasLocalAuthority) { localHealth = candidate; break; }
+                if (localHealth == null) return;
+            }
+
+            Vector3 position = BodyPosition(localHealth);
+            foreach (Pack pack in packs.Values)
+            {
+                if (FlatDistance(position, pack.centre) > config.PickupRadius)
+                {
+                    pack.attempts = 0;
+                    pack.hasOutstanding = false;
+                    continue;
+                }
+
+                bool inPlay = match == null || !match.IsOutOfPlay(pack.zone);
+                bool available = HealthPackRules.IsAvailable(ReadRoomValue(pack.zone), now);
+                if (!HealthPackRules.MayTake(localHealth.IsAlive, localHealth.Health, localHealth.MaxHealth, available, inPlay))
+                    continue;
+                if (pack.attempts >= MaxAttemptsPerVisit)
+                    continue;
+                if (!HealthPackRules.MayRequestNow(pack.hasOutstanding, Time.unscaledTime - pack.requestSentAt, config.RetrySeconds))
+                    continue;
+
+                nextRequestId++;
+                pack.hasOutstanding = true;
+                pack.requestSentAt = Time.unscaledTime;
+                pack.attempts++;
+                RequestsSent++;
+                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RequestKey, new[] { pack.zone, nextRequestId } } });
+            }
+        }
+
+        /// <summary>The Rigidbody's own position: the Transform lags a physics step behind a teleport.</summary>
+        private static Vector3 BodyPosition(PlayerHealth player)
+        {
+            Rigidbody body = player.GetComponent<Rigidbody>();
+            return body != null ? body.position : player.transform.position;
+        }
+
+        // ---- deciding (master only) ----------------------------------------------------------------
+
+        public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+        {
+            if (!PhotonNetwork.IsMasterClient || config == null || changedProps == null)
+                return;
+            if (!changedProps.TryGetValue(RequestKey, out object raw) || !(raw is int[] request) || request.Length < 2)
+                return;
+
+            int zone = request[0], requestId = request[1];
+            if (lastHandledByActor.TryGetValue(targetPlayer.ActorNumber, out int last) && requestId <= last)
+                return; // a request is decided once
+            lastHandledByActor[targetPlayer.ActorNumber] = requestId;
+
+            if (!packs.TryGetValue(zone, out Pack pack))
+                return;
+            int now = PhotonNetwork.ServerTimestamp;
+            if (now == 0)
+                return;
+
+            bool alive = !(targetPlayer.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object a) && a is bool isAlive && !isAlive);
+            MatchDirector match = MatchDirector.Instance;
+            bool inPlay = match == null || !match.IsOutOfPlay(zone);
+            bool inRange = RequesterInRange(targetPlayer.ActorNumber, pack);
+
+            int[] roomValue = ReadRoomValue(zone);
+            int[] basis = pack.pending != null && Time.unscaledTime < pack.pendingUntil ? pack.pending : roomValue;
+            HealthPackRules.Decision decision = HealthPackRules.Decide(basis, now, alive, inPlay, inRange,
+                                                                       targetPlayer.ActorNumber, requestId, config.RespawnMs);
+            if (!decision.Granted)
+                return;
+
+            var props = new Hashtable { { PackKey(zone), decision.NewValue } };
+            // Check-and-set on what the master decided from (absent = never taken): a stale basis is refused by
+            // the server instead of overwriting.
+            var expected = new Hashtable { { PackKey(zone), roomValue } };
+            if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expected))
+                return;
+
+            pack.pending = decision.NewValue;
+            pack.pendingUntil = Time.unscaledTime + PendingWriteSeconds;
+            GrantsWritten++;
+        }
+
+        private bool RequesterInRange(int actor, Pack pack)
+        {
+            foreach (PlayerHealth candidate in FindObjectsByType<PlayerHealth>(FindObjectsSortMode.None))
+            {
+                if (candidate.ActorNumber != actor) continue;
+                return FlatDistance(BodyPosition(candidate), pack.centre) <= config.PickupRadius + config.HostSlackMetres;
+            }
+            return false;
+        }
+
+        public override void OnMasterClientSwitched(Player newMasterClient)
+        {
+            // Pending writes and handled ids were the old master's. The Room Properties carry the rest.
+            foreach (Pack pack in packs.Values) pack.pending = null;
+            lastHandledByActor.Clear();
+        }
+
+        // ---- reading the echo (every client) -------------------------------------------------------
+
+        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+        {
+            if (config == null || propertiesThatChanged == null || PhotonNetwork.LocalPlayer == null)
+                return;
+
+            foreach (Pack pack in packs.Values)
+            {
+                if (!propertiesThatChanged.TryGetValue(PackKey(pack.zone), out object raw) || !(raw is int[] value))
+                    continue;
+
+                pack.hasOutstanding = false;
+                pack.pending = null;
+
+                if (localHealth == null)
+                    continue;
+                if (!HealthPackRules.EchoIsMyFreshTake(value, PhotonNetwork.LocalPlayer.ActorNumber, nextRequestId,
+                                                       lastHealedRequestId, PhotonNetwork.ServerTimestamp, config.RespawnMs))
+                    continue;
+
+                lastHealedRequestId = nextRequestId;
+                if (localHealth.Heal(config.HealAmount) > 0f)
+                    HealsApplied++;
+            }
+        }
+
+        // ---- helpers -------------------------------------------------------------------------------
+
+        private static int[] ReadRoomValue(int zone)
+        {
+            Room room = PhotonNetwork.CurrentRoom;
+            if (room == null) return null;
+            return room.CustomProperties.TryGetValue(PackKey(zone), out object raw) ? raw as int[] : null;
+        }
+
+        private static float FlatDistance(Vector3 a, Vector3 b)
+        {
+            float dx = a.x - b.x, dz = a.z - b.z;
+            return Mathf.Sqrt(dx * dx + dz * dz);
+        }
+    }
+}
