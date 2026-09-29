@@ -157,8 +157,8 @@ namespace Overpower.Match
         }
 
         /// <summary>2.7b step 7: where an ended respawn countdown puts this team's player, as a capital zone -
-        /// TerritoryMap.Neutral means don't respawn, wait (Decision 12: two teams left with no capital, the dead
-        /// can't respawn; a knocked-out team never respawns).</summary>
+        /// TerritoryMap.Neutral means don't respawn, wait (Decision 12 + Tudor D17: a live team with no capital in
+        /// play is in its last stand in both phases, the dead can't respawn; a knocked-out team never respawns).</summary>
         public int SpawnCapitalFor(int team)
         {
             BuildingManager buildings = BuildingManager.Instance;

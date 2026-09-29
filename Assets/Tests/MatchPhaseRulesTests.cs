@@ -100,12 +100,27 @@ namespace Overpower.Tests
         // ---- two teams
 
         [Test]
-        public void WithTwoTeamsLosingYourCapitalWhileTheOtherHoldsOneIsInstant()
+        public void WithTwoTeamsLosingYourCapitalWhileTheOtherHoldsOneIsNoLongerInstant()
         {
-            var r = Run(new[] { 2 }, Lost(0, 3, 0), Holds(1, 3), Lost(2, 3, 3));
-            CollectionAssert.AreEqual(new[] { 2, 0 }, r.Eliminated);
+            // Tudor D17 (2026-09-29): the two-team instant knockout is gone - both phases play the same last stand.
+            var r = Run(Lost(0, 3, 0), Holds(1, 3), NotInMatch(2));
+            Assert.IsEmpty(r.Eliminated);
+            Assert.AreEqual(MatchPhase.TwoTeams, r.Phase);
+        }
+
+        [Test]
+        public void WithTwoTeamsNoCapitalAndEveryMemberOutIsOutEvenWhenTheOtherHoldsOne()
+        {
+            var r = Run(Lost(0, 3, 3), Holds(1, 3), NotInMatch(2));
+            CollectionAssert.AreEqual(new[] { 0 }, r.Eliminated);
             Assert.AreEqual(MatchPhase.Over, r.Phase);
             Assert.AreEqual(1, r.Winner);
+        }
+
+        [Test]
+        public void WithTwoTeamsHoldingAnotherTeamsCapitalIsNotALastStand()
+        {
+            Assert.IsEmpty(Run(Adopted(0, 3, 3), Holds(1, 3), NotInMatch(2)).Eliminated);
         }
 
         [Test]
@@ -150,11 +165,12 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TakingAnyCapitalInLastManStandingKnocksOutTheOtherTeam()
+        public void TakingACapitalInTheLastStandDoesNotKnockOutTheOtherTeamWhileItHasSurvivors()
         {
-            var r = Run(Adopted(0, 2, 1), Lost(1, 2, 0), NotInMatch(2));
-            CollectionAssert.AreEqual(new[] { 1 }, r.Eliminated);
-            Assert.AreEqual(0, r.Winner);
+            // Was "knocks out the other team at once" - Tudor D17: it is out only when every member is out.
+            var r = Run(Adopted(0, 2, 1), Lost(1, 2, 1), NotInMatch(2));
+            Assert.IsEmpty(r.Eliminated);
+            Assert.AreEqual(MatchPhase.TwoTeams, r.Phase);
         }
 
         // ---- no draw: the last team to die wins (Tudor, 2026-09-18 afternoon)
@@ -207,14 +223,21 @@ namespace Overpower.Tests
         [Test]
         public void TheKnockoutCascadeEndsTheMatchInOneRecompute()
         {
-            // 2.7 review leftover, re-checked against last man standing. A is wiped with no capital; B has lost its
-            // capital but has players left; C holds its own. A goes out (last stand); now two teams remain and C HOLDS a
-            // capital, so B is out at once - not last man standing, which needs BOTH sides capital-less. One call must
-            // see both, or the match would sit one tick in a phase that is already decided.
-            var r = Run(Lost(0, 3, 3), Lost(1, 3, 0), Holds(2, 3));
+            // A is wiped with no capital and goes out; B has lost its capital and is wiped too (all three out). Two
+            // teams remain after A, and B, wiped, goes out in the same call - one call must see both. (Was: B out at
+            // once because C holds a capital; that instant rule is gone, D17.)
+            var r = Run(Lost(0, 3, 3), Lost(1, 3, 3), Holds(2, 3));
             CollectionAssert.AreEqual(new[] { 0, 1 }, r.Eliminated);
             Assert.AreEqual(MatchPhase.Over, r.Phase);
             Assert.AreEqual(2, r.Winner);
+        }
+
+        [Test]
+        public void ACapitallessTeamWithSurvivorsSurvivesTheKnockoutOfAnotherTeam()
+        {
+            var r = Run(Lost(0, 3, 3), Lost(1, 3, 0), Holds(2, 3));
+            CollectionAssert.AreEqual(new[] { 0 }, r.Eliminated);
+            Assert.AreEqual(MatchPhase.TwoTeams, r.Phase);
         }
 
         [Test]
@@ -310,8 +333,10 @@ namespace Overpower.Tests
             const int own = 6, adopted = 7, none = TerritoryMap.Neutral;
             Assert.AreEqual(own, MatchPhaseRules.SpawnCapitalFor(MatchPhase.Warmup, false, own, none), "warm-up: always home");
             Assert.AreEqual(adopted, MatchPhaseRules.SpawnCapitalFor(MatchPhase.TwoTeams, false, own, adopted));
-            Assert.AreEqual(own, MatchPhaseRules.SpawnCapitalFor(MatchPhase.ThreeTeams, false, own, none), "a countdown that began before the fall still ends at home");
-            Assert.AreEqual(none, MatchPhaseRules.SpawnCapitalFor(MatchPhase.TwoTeams, false, own, none), "last man standing: the dead wait");
+            Assert.AreEqual(none, MatchPhaseRules.SpawnCapitalFor(MatchPhase.ThreeTeams, false, own, none), "D17: a countdown that ends with no base becomes the wait, in both phases");
+            Assert.AreEqual(adopted, MatchPhaseRules.SpawnCapitalFor(MatchPhase.ThreeTeams, false, own, adopted), "holding another team's base: respawn there");
+            Assert.AreEqual(own, MatchPhaseRules.SpawnCapitalFor(MatchPhase.ThreeTeams, false, own, own), "retaken: the waiting respawn at home again");
+            Assert.AreEqual(none, MatchPhaseRules.SpawnCapitalFor(MatchPhase.TwoTeams, false, own, none), "no base: the dead wait");
             Assert.AreEqual(none, MatchPhaseRules.SpawnCapitalFor(MatchPhase.ThreeTeams, true, own, own), "a knocked-out team never respawns");
         }
 

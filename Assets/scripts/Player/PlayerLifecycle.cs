@@ -512,13 +512,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (Teams.TryGetTeam(photonView.Owner, out int currentTeam))
             teamID = currentTeam;
 
-        // 2.7b step 7 (Decision 12): the decision is made now, when the timer ends, not when the player died -
-        // already true for the under-attack spawn choice below, now also for whether they respawn at all. Three
-        // teams: SpawnCapitalFor returns the own capital regardless (GDD p.20's last stand counts only deaths
-        // AFTER the fall, so a countdown begun before it still ends at home). Two teams left with no capital in
-        // play: last man standing, the dead can't respawn (Tudor) - this converts the countdown into the same
-        // wait a last-stand death starts. A knocked-out team never respawns either (SpawnCapitalFor's own
-        // Eliminated check).
+        // 2.7b step 7 (Decision 12) + Tudor D17: the decision is made now, when the timer ends, not when the player
+        // died. Warm-up: home. Live with a base in play (own or adopted): respawn there. Live with no base, in either
+        // phase: the countdown becomes the same wait a last-stand death starts (SetLastStandOut below counts this
+        // player as out, so the team is knocked out once every member is). A knocked-out team never respawns either
+        // (SpawnCapitalFor's own Eliminated check).
         int capital = MatchDirector.Instance != null ? MatchDirector.Instance.SpawnCapitalFor(teamID) : TerritoryMap.Neutral;
         if (capital == TerritoryMap.Neutral)
         {

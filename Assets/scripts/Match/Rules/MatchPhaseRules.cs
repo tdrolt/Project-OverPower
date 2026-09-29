@@ -7,7 +7,7 @@ namespace Overpower.Match
         /// <summary>Before the match goes live (2.7b, Tudor 2026-09-18): fights and captures happen, nothing counts. Never
         /// stored - MatchDirector reads it from mTeams being absent.</summary>
         Warmup = 0,
-        /// <summary>Three teams still in: a team with no capital is out only once all its members are out (last stand).</summary>
+        /// <summary>Three teams still in.</summary>
         ThreeTeams = 1,
         /// <summary>Two teams still in - after the first knockout, or from the start of a host-started match.</summary>
         TwoTeams = 2,
@@ -21,8 +21,9 @@ namespace Overpower.Match
         /// (Tudor, rule 2); the third team of a host start was never in and is ignored here entirely.</summary>
         public bool InMatch;
         public int Members;
-        /// <summary>Members who died while the team had no capital ("lastStand" Player Property). An ordinary respawn
-        /// countdown never counts.</summary>
+        /// <summary>Members who are out for the last stand ("lastStand" Player Property): dead with the team holding no
+        /// capital, either dying after the fall or a respawn countdown that ended after it (D17). A countdown still
+        /// running never counts.</summary>
         public int MembersOutForLastStand;
         /// <summary>Owns its own starting capital right now.</summary>
         public bool HoldsOwnCapital;
@@ -51,14 +52,13 @@ namespace Overpower.Match
     ///
     /// The phase moves ONLY on a knockout (telemetry spec Part 3): it is the number of teams still in, and "in" is fixed
     /// at going live - nobody joining or leaving can move it. What each phase MEANS (Tudor, 2026-09-18, and GDD p.20-21):
-    /// - three teams: a team with no capital is out once every member is out (its last stand); an emptied team is "all
-    ///   out", so its capital falling is its knockout;
-    /// - two teams: with no capital while the other team holds one, you are out at once; with none on either side it is
-    ///   last man standing - only a wiped team goes out, and the other wins even holding nothing;
+    /// - both phases (Tudor D17, 2026-09-29): a team with no capital is in its last stand - nobody on it respawns - and
+    ///   is out once every member is out; while any member is alive it stays in, whatever the others hold. An emptied
+    ///   team is "all out", so its capital falling is its knockout. There is no "out at once" rule any more;
     /// - "having a capital" is CountsAsHavingACapital (adoption);
     /// - there is never a draw: if every team still in would go out at the same instant, the team whose last player
     ///   went out latest stays in and wins (NoDrawSurvivorIndex).
-    /// A fixpoint: a knockout can narrow the match to two teams, and the two-team rule then applies at once, not next tick.
+    /// A fixpoint: a knockout can narrow the match to two teams, and the rule then applies again at once, not next tick.
     /// </summary>
     public static class MatchPhaseRules
     {
@@ -76,7 +76,7 @@ namespace Overpower.Match
 
                 outNow.Clear();
                 foreach (TeamStatus team in teams)
-                    if (IsStillIn(team, result.Eliminated) && IsOutNow(team, phase, teams, result.Eliminated))
+                    if (IsStillIn(team, result.Eliminated) && IsOutNow(team, phase))
                         outNow.Add(team);
                 if (outNow.Count == 0)
                     break;
@@ -97,19 +97,14 @@ namespace Overpower.Match
             return result;
         }
 
-        private static bool IsOutNow(TeamStatus team, MatchPhase phase, IReadOnlyList<TeamStatus> teams, List<int> eliminated)
+        /// <summary>Tudor D17 (2026-09-29): the last stand, the same in both phases. A team with no base in play (adoption
+        /// counts as a base) is out once every member is out - dead and waiting, none respawning. While any member is alive
+        /// it is still in, whatever the other teams hold. An emptied team is "all out" (0 >= 0).</summary>
+        private static bool IsOutNow(TeamStatus team, MatchPhase phase)
         {
             if (HasACapital(team, phase))
                 return false;
-
-            bool everyoneOut = team.MembersOutForLastStand >= team.Members; // an emptied team: 0 >= 0
-            if (phase == MatchPhase.ThreeTeams)
-                return everyoneOut;
-
-            foreach (TeamStatus other in teams)
-                if (other.TeamId != team.TeamId && IsStillIn(other, eliminated) && HasACapital(other, phase))
-                    return true;   // GDD p.21: the other team holds a capital - instant
-            return everyoneOut;    // last man standing
+            return team.MembersOutForLastStand >= team.Members;
         }
 
         /// <summary>Capital adoption (Tudor, 2026-09-18): holding ANY capital in play counts - a team that lost its own
@@ -192,9 +187,9 @@ namespace Overpower.Match
             if (teamEliminated || phase == MatchPhase.Over) return TerritoryMap.Neutral;
             if (phase == MatchPhase.Warmup) return ownCapital;
             if (respawnCapital != TerritoryMap.Neutral) return respawnCapital;
-            // No capital. Three teams: a countdown that began before the fall still ends at home (GDD p.20's last stand
-            // counts only deaths AFTER the fall - unchanged from 2.7). Two teams: last man standing, the dead can't respawn.
-            return phase == MatchPhase.ThreeTeams ? ownCapital : TerritoryMap.Neutral;
+            // No capital in play (Tudor D17): the last stand, in both phases. A countdown that began before the fall
+            // ends in the wait too - nobody respawns until the team retakes a base or takes another's.
+            return TerritoryMap.Neutral;
         }
 
         /// <summary>BuildingManager's second win condition: one team holds every capital in play - only once live.</summary>
