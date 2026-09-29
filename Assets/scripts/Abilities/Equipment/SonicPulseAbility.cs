@@ -55,11 +55,11 @@ namespace Overpower.Abilities
 
         [SerializeField, Tooltip("How far the pulse throws YOU backwards, away from where you aim, in " +
                  "metres, at the same speed as the enemy push. Hitting a wall on the way never stuns " +
-                 "you. 0 = no self push. Tudor's call: 4, so the pulse is an escape as well as a defence.")]
+                 "you. 0 = off.")]
         private float selfPushDistance = 4f;
 
         [SerializeField, Tooltip("How many seconds a collision stuns for - the victim always, and " +
-                 "whatever it collided with too if that is an enemy of the caster. Tudor's spec: 2.")]
+                 "whatever it collided with too if that is an enemy of the caster.")]
         private float collisionStunSeconds = 2f;
 
         [Header("Cone")]
@@ -133,7 +133,7 @@ namespace Overpower.Abilities
             int casterActor = cast.CasterActor;
             int casterTeam = cast.CasterTeam;
 
-            PushCasterBack(forward);
+            PushCasterBack(forward, cast.IsCasterClient);
 
             int count = Physics.OverlapSphereNonAlloc(origin, coneRange, overlapBuffer, detectionMask,
                                                        QueryTriggerInteraction.Ignore);
@@ -181,24 +181,25 @@ namespace Overpower.Abilities
 
         /// <summary>
         /// The pulse throws its own caster backwards too, so it doubles as an escape. Only on the
-        /// caster's own machine (Owner.IsMine): PlayerDisplacement is owner-authoritative and the
+        /// caster's own machine (cast.IsCasterClient): PlayerDisplacement is owner-authoritative and the
         /// move then replicates as the owner's ordinary movement, so no client but this one starts
         /// it and no network traffic is added. Forced priority, because the push must happen even
         /// mid-dash (a Voluntary request would be refused, or would lose to a running Forced move).
         /// The end callback is deliberately empty - unlike an enemy, the caster is never stunned
         /// for hitting a wall on the way (HandlePushEnd is not used).
         /// </summary>
-        private void PushCasterBack(Vector3 aimDirection)
+        private void PushCasterBack(Vector3 aimDirection, bool isCasterClient)
         {
-            if (selfPushDistance <= 0f || Owner == null || !Owner.IsMine || Owner.Displacement == null)
+            if (!KnockbackResolver.ShouldSelfPush(isCasterClient, aimDirection, selfPushDistance) ||
+                Owner == null || Owner.Displacement == null)
                 return;
 
             Vector3 direction = KnockbackResolver.ComputeSelfPushDirection(aimDirection);
-            if (direction == Vector3.zero)
-                return;
-
-            Owner.Displacement.Displace(direction, selfPushDistance, knockbackSpeed, _ => { });
+            Owner.Displacement.Displace(direction, selfPushDistance, knockbackSpeed, SelfPushEnded);
         }
+
+        // The user is never stunned by their own push (Tudor's rule D9), so unlike HandlePushEnd this does nothing.
+        private static void SelfPushEnded(DisplaceEnd end) { }
 
         /// <summary>True when a Building-layer collider (a wall, or cover) stands between origin and
         /// the target - same idea as FlamethrowerAbility.IsOccludedByWall, but from the caster's body

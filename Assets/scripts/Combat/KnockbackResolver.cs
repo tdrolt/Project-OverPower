@@ -50,6 +50,15 @@ namespace Overpower.Combat
         }
 
         /// <summary>
+        /// Whether a cast should throw its caster back: only on the caster's own client, only with a
+        /// distance above zero, and only when the aim has a ground-plane direction to go opposite to.
+        /// </summary>
+        public static bool ShouldSelfPush(bool isCasterClient, Vector3 aimDirection, float distance)
+        {
+            return isCasterClient && distance > 0f && ComputeSelfPushDirection(aimDirection) != Vector3.zero;
+        }
+
+        /// <summary>
         /// True when a blocker a victim collided with should ALSO be stunned - the player-into-
         /// player half of the collision rule (Task 1.10 addendum's "Holes" section: the brief's
         /// version, which wins over the plan's "wall or enemy" wording). Three gates, all of which

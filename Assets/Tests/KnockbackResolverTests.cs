@@ -220,5 +220,31 @@ namespace Overpower.Tests
             Assert.AreEqual(Vector3.zero, KnockbackResolver.ComputeSelfPushDirection(Vector3.up));
             Assert.AreEqual(Vector3.zero, KnockbackResolver.ComputeSelfPushDirection(Vector3.down));
         }
+
+        // ---- ShouldSelfPush ------------------------------------------------------------------------
+
+        [Test]
+        public void OnlyTheCastersOwnClientSelfPushes()
+        {
+            Assert.IsFalse(KnockbackResolver.ShouldSelfPush(false, Vector3.right, 4f));
+        }
+
+        [Test]
+        public void ZeroSelfPushDistanceMeansNoSelfPush()
+        {
+            Assert.IsFalse(KnockbackResolver.ShouldSelfPush(true, Vector3.right, 0f));
+        }
+
+        [Test]
+        public void VerticalAimMeansNoSelfPush()
+        {
+            Assert.IsFalse(KnockbackResolver.ShouldSelfPush(true, Vector3.up, 4f));
+        }
+
+        [Test]
+        public void CasterWithARealAimSelfPushes()
+        {
+            Assert.IsTrue(KnockbackResolver.ShouldSelfPush(true, Vector3.right, 4f));
+        }
     }
 }
