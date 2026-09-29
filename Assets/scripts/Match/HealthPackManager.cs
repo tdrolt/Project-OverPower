@@ -160,7 +160,11 @@ namespace Overpower.Match
         {
             ArenaSymmetry arena = ArenaSymmetry.Active;
             if (arena == null || arena.layout == null)
+            {
+                Debug.LogError("[HealthPackManager] No ArenaSymmetry or no Arena Layout assigned to it: the health packs cannot " +
+                               "find their recess spot and are placed on the towers themselves, where nobody can take them.");
                 return tower;
+            }
             return RadialSymmetry.NearestCopy(arena.layout.HealthPackPoint, arena.centre, tower);
         }
 
