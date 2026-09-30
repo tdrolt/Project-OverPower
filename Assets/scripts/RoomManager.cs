@@ -279,6 +279,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
             }
         }
 
+        // A timeout Disconnect reads as a lost connection (OnLeftRoom keeps the match properties for a rejoin), so the reset is made here
+        // whatever happened above: the next match must start clean.
+        ResetMatchProperties();
+
         // The log's last lines are written while the leave is processed (MatchTelemetry closes its file on leaving), i.e. AFTER the zip made
         // at the button press: zip once more now that the leave is complete.
         Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();

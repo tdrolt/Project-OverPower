@@ -149,14 +149,19 @@ namespace Overpower.Telemetry
 
                 mt?.FlushNow(); // The brief's own ordering: flush THIS client's buffer to disk before reading the folder.
 
+                // Remember them HERE too, while in the room: Photon sets the actor to -1 before OnLeftRoom on a deliberate leave, so
+                // HandleBeforeClose never sees a valid one there (Task 9f review) - the zip made at the button press does.
                 int actor = MatchLogZipRule.ResolveActor(PhotonNetwork.LocalPlayer.ActorNumber, lastKnownActor);
+                lastKnownActor = actor;
+                string nick = MatchLogZipRule.ResolveNick(PhotonNetwork.LocalPlayer.NickName, lastKnownNick);
+                lastKnownNick = nick;
 
                 string[] allNames = Directory.GetFiles(folder).Select(Path.GetFileName).ToArray();
                 List<string> ownNames = MatchLogZipRule.SelectOwnFiles(allNames, actor);
                 if (ownNames.Count == 0)
                     return; // IsRecording was true but somehow no matching file exists - be safe, do nothing.
 
-                string sanitizedNick = MatchTelemetry.Sanitize(MatchLogZipRule.ResolveNick(PhotonNetwork.LocalPlayer.NickName, lastKnownNick));
+                string sanitizedNick = MatchTelemetry.Sanitize(nick);
                 // Named after the match folder itself, not a clock read (2026-09-26 fix - see
                 // MatchLogZipRule.ZipFileName's own comment on the real bug this replaces): stable for
                 // the whole match, so every zip of it - result panel, then maybe again on quit - comes

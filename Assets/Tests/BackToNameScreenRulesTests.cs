@@ -49,6 +49,14 @@ namespace Overpower.Tests
             Assert.AreEqual("Radu", Overpower.Telemetry.MatchLogZipRule.ResolveNick("", "Radu"));
 
         [Test]
+        public void AnActorSeenInTheRoomIsStillThereAfterTheLeave()
+        {
+            int remembered = Overpower.Telemetry.MatchLogZipRule.ResolveActor(4, -1); // the zip at the button press stores this
+            Assert.AreEqual(4, remembered);
+            Assert.AreEqual(4, Overpower.Telemetry.MatchLogZipRule.ResolveActor(-1, remembered));
+        }
+
+        [Test]
         public void ALiveNickIsKept() =>
             Assert.AreEqual("Live", Overpower.Telemetry.MatchLogZipRule.ResolveNick("Live", "Radu"));
 
