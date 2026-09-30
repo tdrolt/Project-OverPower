@@ -33,6 +33,9 @@ namespace Overpower.Weapons
         [SerializeField, Tooltip("How many seconds the status lasts. The stun gun's spec: 2.5s.")]
         private float duration = 2.5f;
 
+        /// <summary>Duration in seconds, read-only - the shop's pop-up shows it (Task 13).</summary>
+        public float Duration => duration;
+
         [SerializeField, Tooltip("The status's strength: ignored for Stun, 0..1 speed loss for Slow, " +
                  "0..1 extra damage for Vulnerability, damage per second for Burn. The stun gun " +
                  "leaves this at 0 - Stun does not read it.")]

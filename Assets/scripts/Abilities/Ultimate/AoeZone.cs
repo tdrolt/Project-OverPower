@@ -102,6 +102,12 @@ namespace Overpower.Abilities
         /// its own. -1 if the data is missing.</summary>
         public int AbilityId { get; private set; } = -1;
 
+        /// <summary>Radius, Damage Per Tick, Duration Seconds and Tick Seconds, read-only - the shop's pop-up shows them (Task 13).</summary>
+        public float Radius => radius;
+        public float DamagePerTick => damagePerTick;
+        public float DurationSeconds => durationSeconds;
+        public float TickSeconds => tickSeconds;
+
         // The real Time.time this zone's OnPlaced ran on THIS client, turning Age (a one-time
         // snapshot) into a number that keeps growing - the identical secondsSincePlaced pattern
         // Mine.cs documents on its own localPlacedRealTime field.

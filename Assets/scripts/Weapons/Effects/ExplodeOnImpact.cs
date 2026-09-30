@@ -97,6 +97,9 @@ namespace Overpower.Weapons
         /// this one number.</summary>
         public float SplashRadius => splashRadius;
 
+        /// <summary>Splash Damage, read-only - the shop's pop-up shows it (Task 13).</summary>
+        public float SplashDamage => splashDamage;
+
         /// <summary>Raised once per rocket, on every client, right after the splash has been applied, with the blast
         /// centre and the rocket's own Splash Radius - ALWAYS the full radius, whatever the blast actually caught.
         /// 2026-09-17 (A6): first raised, so the blast could be drawn at the real burst point instead of a floor

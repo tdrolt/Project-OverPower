@@ -145,6 +145,11 @@ namespace Overpower.Abilities
         /// <summary>Explosion Radius, read-only - MineView flashes the blast ring at this size.</summary>
         public float ExplosionRadius => explosionRadius;
 
+        /// <summary>Damage, Slow Magnitude and Slow Seconds, read-only - the shop's pop-up shows them (Task 13).</summary>
+        public float Damage => damage;
+        public float SlowMagnitude => slowMagnitude;
+        public float SlowSeconds => slowSeconds;
+
         /// <summary>Invisible After Seconds, read-only - MineView (A5) switches every viewer's MineVisibility at
         /// this age.</summary>
         public float InvisibleAfterSeconds => invisibleAfterSeconds;

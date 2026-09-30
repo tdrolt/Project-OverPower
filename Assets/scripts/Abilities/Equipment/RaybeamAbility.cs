@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Weapons;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -350,5 +351,9 @@ namespace Overpower.Abilities
 
             Destroy(beam, beamVisualSeconds);
         }
+
+        public override string ShopStatsText() =>
+            ShopNumberFormat.Lines($"+{ShopNumberFormat.Compact(vulnerabilityPerBeam * 100f)}% damage taken per beam, for {ShopNumberFormat.Compact(vulnerabilitySeconds)}s",
+                                   $"Range {ShopNumberFormat.Compact(beamRange)}m");
     }
 }

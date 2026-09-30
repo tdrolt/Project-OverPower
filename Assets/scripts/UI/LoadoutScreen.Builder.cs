@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using Overpower.Data;
+using Overpower.Match;
 
 namespace Overpower.UI
 {
@@ -14,7 +15,7 @@ namespace Overpower.UI
     /// LoadoutScreen.cs once that file passed 1400 lines, so a designer looking for "how is this
     /// screen laid out" and one looking for "what does clicking this actually do" each have a
     /// shorter file to read. A plain code move: nothing here changed behaviour, and every field/
-    /// method it touches (theme, weaponNodes, abilityCards, OnWeaponNodeClicked, ShowWeaponHover,
+    /// method it touches (theme, weaponNodes, abilityCards, OnWeaponNodeClicked,
     /// RefreshHeader's own labels, etc.) still lives on the other partial, LoadoutScreen.cs - partial
     /// classes share one field list, so there is nothing to pass between the two files.
     ///
@@ -22,18 +23,15 @@ namespace Overpower.UI
     /// BuildDescendantColumn, BuildNodeButton), the armor section's builders (BuildArmorSection,
     /// BuildArmorRow), the ability column's builders (BuildAbilitiesUi, SlotHeading,
     /// BuildAbilityCard), and the screen's own top-level construction (BuildUi, BuildScreenCanvas -
-    /// including the hover-description panel's labels, BuildColumn, BuildTitleRow, BuildHeaderRow,
-    /// BuildToggleButtonCanvas) plus their shared low-level helpers (AddSectionHeader, AddButton,
-    /// AddStretchedLabel, AddLabel, ApplyOutline, EnsureEventSystem).
+    /// including the two pages and their tabs (Task 13), BuildColumn, BuildTitleRow, BuildHeaderRow,
+    /// BuildTabRow, BuildToggleButtonCanvas) plus their shared low-level helpers (AddSectionHeader, AddButton,
+    /// AddLabel, ApplyOutline, EnsureEventSystem).
     ///
     /// What stays on LoadoutScreen.cs: Awake/Update/Open/Close/Refresh and every click handler
     /// (OnWeaponNodeClicked, TryBuyArmorUpgrade, OnAbilityCardClicked, ...), every Refresh* method
-    /// that repaints already-built UI from live state, and the hover-CONTENT methods (ShowWeaponHover,
-    /// WeaponNumbersText, ShowAbilityHover, AbilityNumbersText, Compact) - those read live
-    /// asset/module data into the hover strip's text, which is a world away from building the strip's
-    /// GameObjects in the first place (that part - BuildScreenCanvas's "Hover description" region -
-    /// is the one piece of construction that stayed textually inside BuildScreenCanvas rather than
-    /// becoming its own method, so it moved along with it).
+    /// that repaints already-built UI from live state, and the pop-up's content and timing (LoadoutScreen.Tooltip.cs,
+    /// ShopItemNumbers) - those read live asset/module data into the hover pop-up's text, a world away from building
+    /// the screen's GameObjects in the first place.
     /// </summary>
     public partial class LoadoutScreen
     {
@@ -43,15 +41,14 @@ namespace Overpower.UI
         // partial.
         // ============================================================================================
 
-        /// <summary>Root centred on its own row; its direct children in a row beneath it (id order);
-        /// each of THOSE children's own children stacked vertically beneath it, recursively - see
-        /// BuildDescendantColumn. Today's data is exactly three tiers with two children per branch
-        /// (Baseline -> {Rocket, Burst, SMG, Laser} -> two leaves each), but nothing here assumes
-        /// that shape: a branch with one child gets a column one row tall, a branch with three gets
-        /// one three rows tall, and a fourth tier (a leaf gaining its own child) simply stacks one
-        /// row further down the same column - a designer adding weapon assets never needs a layout
-        /// change here, only a new asset with the right Parent.</summary>
-        private void BuildWeaponTreeUi(Transform leftColumn)
+        /// <summary>Root centred on its own row; its direct children in a row beneath it (id order); each of THOSE
+        /// children's own children in a row beneath it, side by side (Tudor, Task 13: the two upgrades of a family sit next
+        /// to each other, not stacked), recursively - see BuildDescendantColumn. Today's data is exactly three tiers with two
+        /// children per branch (Baseline -> {Rocket, Burst, SMG, Laser} -> two upgrades each), but nothing here assumes
+        /// that shape: a branch with one child gets a row one node wide, a branch with three gets one three wide, and a
+        /// fourth tier (an upgrade gaining its own child) simply adds one row further down - a designer adding weapon
+        /// assets never needs a layout change here, only a new asset with the right Parent.</summary>
+        private void BuildWeaponTreeUi(Transform page)
         {
             weaponNodes.Clear();
             if (weapons == null || tree.RootId < 0)
@@ -62,7 +59,7 @@ namespace Overpower.UI
                 return;
 
             GameObject rootRow = new GameObject("Weapon Tree Root", typeof(RectTransform));
-            rootRow.transform.SetParent(leftColumn, false);
+            rootRow.transform.SetParent(page, false);
             HorizontalLayoutGroup rootLayout = rootRow.AddComponent<HorizontalLayoutGroup>();
             rootLayout.childAlignment = TextAnchor.MiddleCenter;
             rootLayout.childControlWidth = rootLayout.childControlHeight = true;
@@ -71,12 +68,12 @@ namespace Overpower.UI
 
             // Room between the root and the four weapons for the arrows to read (Task 5b-2, loadoutTreeRowGap).
             GameObject rootGap = new GameObject("Weapon Tree Root Gap", typeof(RectTransform));
-            rootGap.transform.SetParent(leftColumn, false);
+            rootGap.transform.SetParent(page, false);
             LayoutElement rootGapLe = rootGap.AddComponent<LayoutElement>();
             rootGapLe.preferredHeight = rootGapLe.minHeight = Mathf.Max(0f, theme.loadoutTreeRowGap - theme.loadoutPanelPadding * 0.5f);
 
             GameObject branchesRow = new GameObject("Weapon Tree Branches", typeof(RectTransform));
-            branchesRow.transform.SetParent(leftColumn, false);
+            branchesRow.transform.SetParent(page, false);
             HorizontalLayoutGroup branchesLayout = branchesRow.AddComponent<HorizontalLayoutGroup>();
             branchesLayout.spacing = theme.loadoutTreeColumnGap;
             branchesLayout.childAlignment = TextAnchor.UpperCenter;
@@ -86,16 +83,16 @@ namespace Overpower.UI
             foreach (int childId in tree.ChildrenOf(rootDef.Id))
                 BuildDescendantColumn(branchesRow.transform, childId);
 
-            BuildTreeArrows(leftColumn);
+            BuildTreeArrows(page);
         }
 
         /// <summary>Task 5b-2 (D6): one arrow per parent -> child pair of the tree data (WeaponUpgradeTree.Edges),
         /// drawn behind the nodes by a single graphic that reads the built nodes' positions - so a new weapon asset
         /// with a Parent gets its arrow with no hand placement. Never a raycast target: it must not block a node.</summary>
-        private void BuildTreeArrows(Transform leftColumn)
+        private void BuildTreeArrows(Transform page)
         {
             GameObject go = new GameObject("Weapon Tree Arrows", typeof(RectTransform), typeof(CanvasRenderer));
-            go.transform.SetParent(leftColumn, false);
+            go.transform.SetParent(page, false);
             go.transform.SetAsFirstSibling(); // Behind every node and label.
             go.AddComponent<LayoutElement>().ignoreLayout = true;
             RectTransform rt = go.GetComponent<RectTransform>();
@@ -118,9 +115,9 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>One branch's own vertical column: its node, then a nested column per child,
-        /// recursively - see BuildWeaponTreeUi's comment for why this copes with any child count at
-        /// any depth with no code change.</summary>
+        /// <summary>One branch: a vertical column holding its node and, beneath it, ONE row with a nested column per child
+        /// side by side, recursively - see BuildWeaponTreeUi's comment for why this copes with any child count at any
+        /// depth with no code change. The node sits centred above its row of children.</summary>
         private void BuildDescendantColumn(Transform parent, int weaponId)
         {
             WeaponDefinition def = weapons.Resolve(weaponId);
@@ -137,8 +134,22 @@ namespace Overpower.UI
 
             weaponNodes[weaponId] = BuildNodeButton(column.transform, def);
 
+            Transform childrenRow = null;
             foreach (int childId in tree.ChildrenOf(weaponId))
-                BuildDescendantColumn(column.transform, childId);
+            {
+                if (childrenRow == null)
+                {
+                    GameObject row = new GameObject($"Weapon Branch {weaponId} Upgrades", typeof(RectTransform));
+                    row.transform.SetParent(column.transform, false);
+                    HorizontalLayoutGroup rowLayout = row.AddComponent<HorizontalLayoutGroup>();
+                    rowLayout.spacing = theme.loadoutNodeSpacing;
+                    rowLayout.childAlignment = TextAnchor.UpperCenter;
+                    rowLayout.childControlWidth = rowLayout.childControlHeight = true;
+                    rowLayout.childForceExpandWidth = rowLayout.childForceExpandHeight = false;
+                    childrenRow = row.transform;
+                }
+                BuildDescendantColumn(childrenRow, childId);
+            }
         }
 
         /// <summary>One weapon node: an outer Image (transparent except when Equipped, where it
@@ -192,12 +203,7 @@ namespace Overpower.UI
             int weaponId = def.Id; // Captured per node - the field itself would be the last weapon iterated by click time.
             button.onClick.AddListener(() => OnWeaponNodeClicked(weaponId));
 
-            HoverRelay hover = go.AddComponent<HoverRelay>();
-            hover.OnEnter = () => ShowWeaponHover(def);
-            string tooltipKey = "w:" + def.Id;
-            System.Func<string> tooltipText = () => def.Description; // Built once, not per pointer move.
-            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, tooltipText, pos);
-            hover.OnExit = () => { ClearHover(); TooltipPointerLeft(tooltipKey); };
+            AddPopUp(go, "w:" + def.Id, () => WeaponPopUpText(def));
 
             return new WeaponNodeUi { button = button, outer = outer, inner = inner, label = label };
         }
@@ -207,28 +213,36 @@ namespace Overpower.UI
         // on the other partial (see its own "Armor" section banner).
         // ============================================================================================
 
-        private void BuildArmorSection(Transform leftColumn)
+        /// <summary>The armor rows (Absorb, Recharge) and Reset Armor side by side, under an "Armor" heading, at the top
+        /// of the Abilities &amp; Armor page.</summary>
+        private void BuildArmorSection(Transform page)
         {
-            // Extra breathing room above "Armor" (Task 9a review, 616x576 capture): the ordinary
-            // item spacing between this and the Reset Weapon button above it read as the heading
-            // crowding the button. An invisible spacer rather than padding on the header itself, so
-            // only the gap ABOVE the heading grows, not the gap below it too.
-            GameObject armorGap = new GameObject("Armor Section Gap", typeof(RectTransform));
-            armorGap.transform.SetParent(leftColumn, false);
-            LayoutElement armorGapLe = armorGap.AddComponent<LayoutElement>();
-            armorGapLe.preferredHeight = theme.loadoutSectionGap;
-            armorGapLe.minHeight = theme.loadoutSectionGap;
+            AddSectionHeader(page, "Armor");
 
-            AddSectionHeader(leftColumn, "Armor");
+            GameObject group = new GameObject("Armor Rows", typeof(RectTransform));
+            group.transform.SetParent(page, false);
+            HorizontalLayoutGroup layout = group.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = theme.loadoutNodeSpacing * 2f;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
-            absorbText = BuildArmorRow(leftColumn, out absorbButton, OnAbsorbClicked);
-            rechargeText = BuildArmorRow(leftColumn, out rechargeButton, OnRechargeClicked);
+            absorbText = BuildArmorRow(group.transform, out absorbButton, OnAbsorbClicked, "armor:absorb", () => ArmorPopUpText(true));
+            rechargeText = BuildArmorRow(group.transform, out rechargeButton, OnRechargeClicked, "armor:recharge", () => ArmorPopUpText(false));
 
-            Button resetArmorButton = AddButton(leftColumn, "Reset Armor", OnResetArmorClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
+            Button resetArmorButton = AddButton(group.transform, "Reset Armor", OnResetArmorClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
             resetArmorLabel = resetArmorButton.GetComponentInChildren<TextMeshProUGUI>();
+
+            // Room between the armor rows and the ability columns below them.
+            GameObject gap = new GameObject("Armor Section Gap", typeof(RectTransform));
+            gap.transform.SetParent(page, false);
+            LayoutElement gapLe = gap.AddComponent<LayoutElement>();
+            gapLe.preferredHeight = theme.loadoutSectionGap;
+            gapLe.minHeight = theme.loadoutSectionGap;
         }
 
-        private TextMeshProUGUI BuildArmorRow(Transform parent, out Button plusButton, UnityEngine.Events.UnityAction onClick)
+        private TextMeshProUGUI BuildArmorRow(Transform parent, out Button plusButton, UnityEngine.Events.UnityAction onClick,
+            string popUpKey, System.Func<string> popUpText)
         {
             GameObject row = new GameObject("Armor Row", typeof(RectTransform));
             row.transform.SetParent(parent, false);
@@ -237,6 +251,14 @@ namespace Overpower.UI
             layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+            LayoutElement rowLe = row.AddComponent<LayoutElement>();
+            rowLe.flexibleWidth = 1f; // The two rows share the width Reset Armor leaves.
+
+            // Invisible, but it is what the pointer lands on between the text and the + button - so the pop-up opens
+            // on the whole row, not only on the button (Task 13).
+            Image hit = row.AddComponent<Image>();
+            hit.color = Color.clear;
+            hit.raycastTarget = true;
 
             TextMeshProUGUI label = AddLabel(row.transform, "", theme.bodyTextSize, FontStyles.Normal);
             label.alignment = TextAlignmentOptions.MidlineLeft;
@@ -245,6 +267,7 @@ namespace Overpower.UI
 
             plusButton = AddButton(row.transform, "+", onClick, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
 
+            AddPopUp(row, popUpKey, popUpText);
             return label;
         }
 
@@ -253,24 +276,37 @@ namespace Overpower.UI
         // click/repaint side) stay on the other partial (see its own "Abilities" section banner).
         // ============================================================================================
 
-        private void BuildAbilitiesUi(Transform rightColumn)
+        private void BuildAbilitiesUi(Transform page)
         {
             abilityCards.Clear();
             if (abilities == null)
                 return; // Awake already logged why.
 
+            GameObject columns = new GameObject("Ability Columns", typeof(RectTransform));
+            columns.transform.SetParent(page, false);
+            HorizontalLayoutGroup columnsLayout = columns.AddComponent<HorizontalLayoutGroup>();
+            columnsLayout.spacing = theme.loadoutAbilityColumnGap;
+            columnsLayout.childAlignment = TextAnchor.UpperCenter;
+            columnsLayout.childControlWidth = columnsLayout.childControlHeight = true;
+            columnsLayout.childForceExpandWidth = columnsLayout.childForceExpandHeight = false;
+
+            // Two cards across in every column.
+            float columnWidth = 2f * theme.loadoutAbilityCardWidth + theme.loadoutNodeSpacing;
+
             foreach (AbilitySlot slot in LoadoutAbilitySlotOrder)
             {
-                AddSectionHeader(rightColumn, SlotHeading(slot));
+                Transform column = BuildColumn(columns.transform, columnWidth).transform;
+                AddSectionHeader(column, SlotHeading(slot));
 
                 // Task 2.5b: the Ultimate slot is the one slot that can read Equipped on NO card at
                 // all (starts empty when the economy is on - Task 2.5a) - without this, an empty
                 // ultimate column would say nothing at all about why nothing is highlighted.
                 if (slot == AbilitySlot.Ultimate)
                 {
-                    ultimateEmptyLabel = AddLabel(rightColumn, "", theme.smallTextSize, FontStyles.Normal);
+                    ultimateEmptyLabel = AddLabel(column, "", theme.smallTextSize, FontStyles.Normal);
                     ultimateEmptyLabel.alignment = TextAlignmentOptions.MidlineLeft;
                     ultimateEmptyLabel.color = theme.overheatWarningColor;
+                    ultimateEmptyLabel.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
                 }
 
                 List<AbilityDefinition> slotAbilities = abilities.ForSlot(slot);
@@ -278,18 +314,17 @@ namespace Overpower.UI
                 slotAbilities.Sort((a, b) => a.Id.CompareTo(b.Id));
 
                 GameObject grid = new GameObject($"{slot} Ability Grid", typeof(RectTransform));
-                grid.transform.SetParent(rightColumn, false);
-                // Same "pin only the width, let the group compute its own height" trick BuildColumn
-                // uses - a GridLayoutGroup needs its own rect width already resolved before it can
-                // work out how many cards fit per row, so this cannot be left for the outer
-                // VerticalLayoutGroup to guess from the (not yet laid out) cards inside it.
+                grid.transform.SetParent(column, false);
+                // Pin the width and let the group compute its own height - a GridLayoutGroup needs its own
+                // rect width resolved before it can place its cards (see BuildColumn).
                 LayoutElement gridLe = grid.AddComponent<LayoutElement>();
-                gridLe.preferredWidth = theme.loadoutRightColumnWidth;
+                gridLe.preferredWidth = columnWidth;
                 GridLayoutGroup gridLayout = grid.AddComponent<GridLayoutGroup>();
-                gridLayout.cellSize = new Vector2(theme.loadoutNodeWidth, theme.loadoutNodeHeight);
+                gridLayout.cellSize = new Vector2(theme.loadoutAbilityCardWidth, theme.loadoutAbilityCardHeight);
                 gridLayout.spacing = new Vector2(theme.loadoutNodeSpacing, theme.loadoutNodeSpacing);
                 gridLayout.childAlignment = TextAnchor.UpperLeft;
-                gridLayout.constraint = GridLayoutGroup.Constraint.Flexible; // Wraps to a new row once Loadout Right Column Width runs out.
+                gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                gridLayout.constraintCount = 2;
 
                 foreach (AbilityDefinition def in slotAbilities)
                     abilityCards[(slot, def.Id)] = BuildAbilityCard(grid.transform, def);
@@ -304,7 +339,7 @@ namespace Overpower.UI
             switch (slot)
             {
                 case AbilitySlot.Mobility: return "Mobility — Shift";
-                case AbilitySlot.Equipment: return "Equipment — RMB";
+                case AbilitySlot.Equipment: return "Attachment — RMB";
                 case AbilitySlot.Ultimate: return "Ultimate — Space";
                 default: return slot.ToString(); // Primary never reaches here - ForSlot(Primary) is never called.
             }
@@ -340,7 +375,7 @@ namespace Overpower.UI
             Image inner = innerGo.AddComponent<Image>();
             inner.raycastTarget = false;
 
-            TextMeshProUGUI label = AddLabel(innerGo.transform, def.DisplayName, theme.smallTextSize, FontStyles.Normal);
+            TextMeshProUGUI label = AddLabel(innerGo.transform, def.DisplayName, theme.bodyTextSize, FontStyles.Normal);
             RectTransform labelRt = label.rectTransform;
             labelRt.anchorMin = Vector2.zero;
             labelRt.anchorMax = Vector2.one;
@@ -351,12 +386,7 @@ namespace Overpower.UI
             int abilityId = def.Id;
             button.onClick.AddListener(() => OnAbilityCardClicked(slot, abilityId));
 
-            HoverRelay hover = go.AddComponent<HoverRelay>();
-            hover.OnEnter = () => ShowAbilityHover(def);
-            string tooltipKey = "a:" + def.Slot + ":" + def.Id;
-            System.Func<string> tooltipText = () => def.Description; // Built once, not per pointer move.
-            hover.OnPointerAt = pos => TooltipPointerAt(tooltipKey, tooltipText, pos);
-            hover.OnExit = () => { ClearHover(); TooltipPointerLeft(tooltipKey); };
+            AddPopUp(go, "a:" + def.Slot + ":" + def.Id, () => AbilityPopUpText(def));
 
             return new AbilityCardUi { button = button, outer = outer, inner = inner, label = label };
         }
@@ -433,70 +463,61 @@ namespace Overpower.UI
             panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             BuildTitleRow(panel.transform);
-            BuildHeaderRow(panel.transform);
+            BuildHeaderRow(panel.transform); // Gold and the status line: above the tabs, so both pages show them.
+            BuildTabRow(panel.transform);
 
-            GameObject contentRow = new GameObject("Content", typeof(RectTransform));
-            contentRow.transform.SetParent(panel.transform, false);
-            HorizontalLayoutGroup contentLayout = contentRow.AddComponent<HorizontalLayoutGroup>();
-            contentLayout.spacing = theme.loadoutPanelPadding;
-            contentLayout.childAlignment = TextAnchor.UpperLeft;
-            contentLayout.childControlWidth = contentLayout.childControlHeight = true;
-            contentLayout.childForceExpandWidth = contentLayout.childForceExpandHeight = false;
+            // One fixed-size area for both pages, so the panel never changes size when a tab is pressed.
+            GameObject pages = new GameObject("Pages", typeof(RectTransform));
+            pages.transform.SetParent(panel.transform, false);
+            LayoutElement pagesLe = pages.AddComponent<LayoutElement>();
+            pagesLe.preferredWidth = pagesLe.minWidth = theme.loadoutPageWidth;
+            pagesLe.preferredHeight = pagesLe.minHeight = theme.loadoutPageHeight;
 
-            GameObject leftColumn = BuildColumn(contentRow.transform, theme.loadoutLeftColumnWidth);
-            GameObject rightColumn = BuildColumn(contentRow.transform, theme.loadoutRightColumnWidth);
-            BuildAbilitiesUi(rightColumn.transform);
-
-            AddSectionHeader(leftColumn.transform, "Weapons");
-            BuildWeaponTreeUi(leftColumn.transform);
-            Button resetWeaponButton = AddButton(leftColumn.transform, "Reset Weapon", OnResetWeaponClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
+            weaponsPageRoot = BuildPage(pages.transform, "Weapons Page");
+            BuildWeaponTreeUi(weaponsPageRoot.transform);
+            Button resetWeaponButton = AddButton(weaponsPageRoot.transform, "Reset Weapon", OnResetWeaponClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
             resetWeaponLabel = resetWeaponButton.GetComponentInChildren<TextMeshProUGUI>();
 
-            BuildArmorSection(leftColumn.transform);
+            abilitiesPageRoot = BuildPage(pages.transform, "Abilities and Armor Page");
+            BuildArmorSection(abilitiesPageRoot.transform);
+            BuildAbilitiesUi(abilitiesPageRoot.transform);
 
-            // Hover-description strip. Fixed height (Loadout Description Panel Height) via
-            // LayoutElement's min AND preferred, both pinned, so switching between a short weapon
-            // hover and a long ability description never resizes the panel around it - see the
-            // "Hover description" region for what fills it in.
-            GameObject descriptionPanel = new GameObject("Description Panel", typeof(RectTransform));
-            descriptionPanel.transform.SetParent(panel.transform, false);
-            LayoutElement descriptionLe = descriptionPanel.AddComponent<LayoutElement>();
-            descriptionLe.preferredHeight = theme.loadoutDescriptionPanelHeight;
-            descriptionLe.minHeight = theme.loadoutDescriptionPanelHeight;
-            // Tudor, 2026-09-21: "when you hover over the mark upgrade from the laser tree it expands
-            // the shop menu for no reason". A TextMeshProUGUI's own preferred width is its UNWRAPPED
-            // single-line width, and with no width pinned here, this panel's own VerticalLayoutGroup
-            // (below) reported the longest hovered description's full length up to the outer Panel's
-            // ContentSizeFitter (PreferredSize, both axes), which then grew sideways to fit it - worst
-            // with 12 Laser - Mark, the shop's longest description at 168 characters (measured: panel
-            // grew from 1340 to 1575.95 canvas units while it was hovered; every other weapon and
-            // ability stayed at exactly 1340). Pinning preferredWidth here is the same recipe
-            // BuildColumn already uses for the two content columns above (a LayoutElement and a
-            // LayoutGroup on the same GameObject, the LayoutElement's explicit value winning).
-            // Derived from the columns' own widths rather than a new UiTheme field - Content's
-            // HorizontalLayoutGroup above is exactly leftColumn + spacing + rightColumn wide, so this
-            // strip lines up flush under them and never depends on what text happens to be showing.
-            // The text children already wrap (AddLabel sets enableWordWrapping = true), so once the
-            // panel stops growing to fit them, they wrap inside it instead.
-            descriptionLe.preferredWidth = theme.loadoutLeftColumnWidth + theme.loadoutPanelPadding + theme.loadoutRightColumnWidth;
-            Image descriptionBackground = descriptionPanel.AddComponent<Image>();
-            descriptionBackground.color = theme.barTrackColor;
-            descriptionBackground.raycastTarget = false;
+            ShowPage(pageMemory.Last);
+        }
 
-            VerticalLayoutGroup descriptionLayout = descriptionPanel.AddComponent<VerticalLayoutGroup>();
-            int descPad = Mathf.RoundToInt(theme.loadoutPanelPadding * 0.5f);
-            descriptionLayout.padding = new RectOffset(descPad, descPad, descPad, descPad);
-            descriptionLayout.spacing = 2f;
-            descriptionLayout.childAlignment = TextAnchor.UpperLeft;
-            descriptionLayout.childControlWidth = descriptionLayout.childControlHeight = true;
-            descriptionLayout.childForceExpandWidth = descriptionLayout.childForceExpandHeight = false;
+        /// <summary>One page: fills the Pages area and stacks its content top-down, centred across.</summary>
+        private GameObject BuildPage(Transform parent, string pageName)
+        {
+            GameObject page = new GameObject(pageName, typeof(RectTransform));
+            page.transform.SetParent(parent, false);
+            RectTransform rt = page.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            VerticalLayoutGroup layout = page.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = theme.loadoutPanelPadding * 0.5f;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+            return page;
+        }
 
-            hoverNameLabel = AddStretchedLabel(descriptionPanel.transform, "", theme.bodyTextSize, FontStyles.Bold);
-            hoverDescriptionLabel = AddStretchedLabel(descriptionPanel.transform, "", theme.smallTextSize, FontStyles.Normal);
-            hoverDescriptionLabel.color = theme.mutedTextColor;
-            hoverNumbersLabel = AddStretchedLabel(descriptionPanel.transform, "", theme.smallTextSize, FontStyles.Normal);
-            hoverNumbersLabel.color = theme.mutedTextColor;
-            ClearHover();
+        /// <summary>The two tabs under the gold line: "Weapons" and "Abilities &amp; Armor". The lit one is the page
+        /// on screen (ShowPage colours them).</summary>
+        private void BuildTabRow(Transform parent)
+        {
+            GameObject row = new GameObject("Tab Row", typeof(RectTransform));
+            row.transform.SetParent(parent, false);
+            HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = theme.loadoutNodeSpacing;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childControlWidth = layout.childControlHeight = true;
+            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+
+            Button weaponsTab = AddButton(row.transform, theme.loadoutTabWeaponsText, () => ShowPage(ShopPage.Weapons), theme.loadoutTabWidth, theme.loadoutTabHeight);
+            weaponsTabImage = weaponsTab.GetComponent<Image>();
+            Button abilitiesTab = AddButton(row.transform, theme.loadoutTabAbilitiesArmorText, () => ShowPage(ShopPage.AbilitiesAndArmor), theme.loadoutTabWidth, theme.loadoutTabHeight);
+            abilitiesTabImage = abilitiesTab.GetComponent<Image>();
         }
 
         private GameObject BuildColumn(Transform parent, float width)
@@ -505,6 +526,7 @@ namespace Overpower.UI
             column.transform.SetParent(parent, false);
             LayoutElement le = column.AddComponent<LayoutElement>();
             le.preferredWidth = width;
+            le.flexibleWidth = 0f; // A stretched heading inside must not make the column grab spare width (its cards would sit off-centre).
             VerticalLayoutGroup layout = column.AddComponent<VerticalLayoutGroup>();
             layout.spacing = theme.loadoutPanelPadding * 0.5f;
             layout.childAlignment = TextAnchor.UpperCenter;
@@ -612,6 +634,9 @@ namespace Overpower.UI
             TextMeshProUGUI header = AddLabel(parent, text, theme.smallTextSize, FontStyles.Bold);
             header.alignment = TextAlignmentOptions.MidlineLeft;
             header.color = theme.mutedTextColor;
+            // Stretch to the width of what it heads, so the left-aligned text starts at that section's own left edge
+            // (unstretched, a layout group centres a label narrower than its column - Task 13 capture).
+            header.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
         }
 
         /// <summary>width/height of 0 (the default) leaves that axis to the layout group instead of
@@ -645,19 +670,6 @@ namespace Overpower.UI
             }
 
             return button;
-        }
-
-        /// <summary>A label that stretches to fill whatever width it sits in - the same flexibleWidth
-        /// trick BuildTitleRow's own title text and BuildArmorRow's own label already use, here
-        /// pulled into a helper for the hover-description panel's three stacked lines, each of which
-        /// needs the same "wrap to the panel's own width, not to my own text's width" behaviour.</summary>
-        private TextMeshProUGUI AddStretchedLabel(Transform parent, string text, float fontSize, FontStyles style)
-        {
-            TextMeshProUGUI label = AddLabel(parent, text, fontSize, style);
-            label.alignment = TextAlignmentOptions.TopLeft;
-            LayoutElement le = label.gameObject.AddComponent<LayoutElement>();
-            le.flexibleWidth = 1f;
-            return label;
         }
 
         /// <summary>Same recipe as PlayerHud.AddLabel - kept private to this file rather than shared

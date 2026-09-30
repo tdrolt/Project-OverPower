@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Globalization;
-using System.Text;
 using Photon.Pun;
 using TMPro;
 using UnityEngine;
@@ -47,12 +45,13 @@ namespace Overpower.UI
     /// general tool focus the same way the F1 panel does (PlayerInputRouter.SetToolFocus), now keyed
     /// by owner so the two tools can be open at once without one closing stealing the other's claim.
     ///
-    /// ABILITIES AND HOVER (Task 9b): the right column now holds a heading and a wrapping card grid
-    /// per ability slot (see BuildAbilitiesUi), in place of the placeholder label Task 9a left there.
-    /// Under both columns sits a fixed-height hover-description strip (see BuildScreenCanvas and the
-    /// "Hover description" region) that every weapon node and ability card feeds through a HoverRelay
-    /// pointer-enter/exit component - name, description and live numbers read straight off the
-    /// asset/module at hover time.
+    /// TWO PAGES AND THE POP-UP (Task 13, Tudor): the shop is two pages behind two tabs at the top - "Weapons" (the
+    /// weapon tree and Reset Weapon) and "Abilities & Armor" (the armor rows with Reset Armor, and the Mobility,
+    /// Equipment and Ultimate card columns) - and reopens on the page last used (ShopPageMemory, kept for the session).
+    /// The gold and the status line sit above the tabs, so both pages show them. The bottom description strip is gone:
+    /// resting the pointer on a weapon node, an ability card or an armor row for Loadout Tooltip Delay Seconds opens
+    /// a pop-up beside the cursor (name, one line on what it does, the numbers) - see LoadoutScreen.Tooltip.cs. The
+    /// numbers are read live off the asset/module when the pop-up opens (ShopItemNumbers).
     /// </summary>
     public partial class LoadoutScreen : MonoBehaviourPun
     {
@@ -174,29 +173,37 @@ namespace Overpower.UI
             AbilitySlot.Mobility, AbilitySlot.Equipment, AbilitySlot.Ultimate
         };
 
-        // ---- hover description ------------------------------------------------------------------
+        // ---- hover pop-up (Task 13) ---------------------------------------------------------------
 
-        /// <summary>Turns UI pointer enter/exit into a plain callback - added to every weapon node
-        /// and ability card so hovering either one can drive the description panel below, without
-        /// every node/card wiring its own EventTrigger by hand. A MonoBehaviour because
-        /// IPointerEnterHandler/IPointerExitHandler only work on one.</summary>
+        /// <summary>Turns UI pointer enter/exit/move into plain callbacks - added to every weapon node, ability card
+        /// and armor row so hovering one can drive the pop-up (LoadoutScreen.Tooltip.cs), without every item wiring
+        /// its own EventTrigger by hand. A MonoBehaviour because IPointerEnterHandler/IPointerExitHandler only work
+        /// on one.</summary>
         private sealed class HoverRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
         {
-            public System.Action OnEnter;
             public System.Action OnExit;
-            /// <summary>Where the pointer is (screen pixels) - fired on enter and on every move, so the tooltip
-            /// (Task 5b-2) knows where to appear.</summary>
+            /// <summary>Where the pointer is (screen pixels) - fired on enter and on every move, so the pop-up
+            /// knows where to appear.</summary>
             public System.Action<Vector2> OnPointerAt;
-            public void OnPointerEnter(PointerEventData eventData) { OnEnter?.Invoke(); OnPointerAt?.Invoke(eventData.position); }
+            public void OnPointerEnter(PointerEventData eventData) => OnPointerAt?.Invoke(eventData.position);
             public void OnPointerExit(PointerEventData eventData) => OnExit?.Invoke();
             public void OnPointerMove(PointerEventData eventData) => OnPointerAt?.Invoke(eventData.position);
         }
 
-        private const string HoverHintText = "Hover an item to see what it does.";
+        // ---- pages (Task 13) ----------------------------------------------------------------------
 
-        private TextMeshProUGUI hoverNameLabel;
-        private TextMeshProUGUI hoverDescriptionLabel;
-        private TextMeshProUGUI hoverNumbersLabel;
+        /// <summary>The page the shop reopens on: one for the whole session, shared by every LoadoutScreen (a new
+        /// player object after a respawn or a match rebuild lands on the page the player last used).</summary>
+        private static readonly ShopPageMemory pageMemory = new ShopPageMemory();
+
+        private GameObject weaponsPageRoot;
+        private GameObject abilitiesPageRoot;
+        private Image weaponsTabImage;
+        private Image abilitiesTabImage;
+        private ShopPage shownPage = ShopPage.Weapons;
+
+        /// <summary>The page on screen right now (the one whose tab is lit).</summary>
+        public ShopPage CurrentPage => shownPage;
 
         // ---- shop header (Task 2.5b) --------------------------------------------------------------
 
@@ -459,8 +466,8 @@ namespace Overpower.UI
             inputRouter?.SetToolFocus(this, true);
             // No Cursor.lockState/Cursor.visible call exists anywhere in this project (checked
             // before writing this) - the cursor is always free, so there is nothing to unlock here.
-            ClearHover(); // Reopening must not show whatever was last hovered before it closed.
-            HideTooltip();
+            HideTooltip(); // Reopening must not show whatever was last hovered before it closed.
+            ShowPage(pageMemory.Last);
             Refresh();
         }
 
@@ -533,6 +540,7 @@ namespace Overpower.UI
             RefreshArmor(ctx);
             RefreshAbilities(ctx);
             RefreshResetLabels();
+            tooltipTextDirty = true; // A price, a level or the equipped item may have changed under an open pop-up.
 
             // Snapshot what was just drawn, so Update()'s poll (Task 9a review) only calls back in
             // here once something ACTUALLY changes since this Refresh, from any path - Open, a
@@ -786,8 +794,7 @@ namespace Overpower.UI
         /// fix 1 - this used to be painted with Locked Colour, indistinguishable from a genuinely
         /// Locked node) but STAYS interactable: OnWeaponNodeClicked re-checks the same rule and,
         /// on a refusal, shows the specific reason in the header (ShowBlockedReason, fix 2) - a
-        /// disabled button would also stop this node being hoverable for the price/description
-        /// panel below.</summary>
+        /// disabled button would also stop this node being hoverable for its pop-up.</summary>
         private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state, WeaponDefinition def, ShopContext ctx, int swapRefund)
         {
             PurchaseBlock block = state == UpgradeNodeState.Selectable && def != null ? ctx.Check(def.GoldCost) : PurchaseBlock.None;
@@ -1067,99 +1074,24 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Hover description - one panel at the bottom of the screen, fed by whichever weapon node
-        // or ability card the pointer is currently over (HoverRelay above). Numbers are always read
-        // live off the asset/module at hover time, never typed text, so a designer retuning a
-        // weapon or ability never has to remember to also update a description here.
+        // Pages (Task 13) - the two tabs at the top switch between the weapon tree and the abilities/armor.
         // ============================================================================================
 
-        private void ClearHover()
+        /// <summary>Shows one page: its content on, the other off, its tab lit, and the choice remembered for the
+        /// next time the shop opens. Any pop-up is dropped (the item under the pointer just went away). Nothing about
+        /// what is bought or priced depends on the page - both pages are refreshed together.</summary>
+        public void ShowPage(ShopPage page)
         {
-            hoverNameLabel.text = "";
-            hoverDescriptionLabel.text = HoverHintText;
-            hoverNumbersLabel.text = "";
-        }
-
-        private void ShowWeaponHover(WeaponDefinition def)
-        {
-            if (def == null)
-            {
-                ClearHover();
+            if (weaponsPageRoot == null || abilitiesPageRoot == null)
                 return;
-            }
 
-            hoverNameLabel.text = def.DisplayName;
-            hoverDescriptionLabel.text = def.Description ?? "";
-            hoverNumbersLabel.text = WeaponNumbersText(def);
+            pageMemory.Remember(page);
+            shownPage = pageMemory.Last;
+            weaponsPageRoot.SetActive(shownPage == ShopPage.Weapons);
+            abilitiesPageRoot.SetActive(shownPage == ShopPage.AbilitiesAndArmor);
+            weaponsTabImage.color = shownPage == ShopPage.Weapons ? theme.loadoutTabActiveColor : theme.loadoutTabInactiveColor;
+            abilitiesTabImage.color = shownPage == ShopPage.AbilitiesAndArmor ? theme.loadoutTabActiveColor : theme.loadoutTabInactiveColor;
+            HideTooltip();
         }
-
-        private static string WeaponNumbersText(WeaponDefinition def)
-        {
-            var sb = new StringBuilder();
-            sb.Append(def.ProjectilesPerShot > 1
-                ? $"Damage {Compact(def.Damage)} x{def.ProjectilesPerShot} ({Compact(def.Damage * def.ProjectilesPerShot)} total)"
-                : $"Damage {Compact(def.Damage)}");
-
-            float shotsPerSecond = def.FireInterval > 0f ? 1f / def.FireInterval : 0f;
-            sb.Append($"\nFire interval {Compact(def.FireInterval)}s ({Compact(shotsPerSecond)}/s) · Range {Compact(def.MaxRange)}m");
-            sb.Append($"\nOverheat {Compact(def.OverheatPerShot)}/shot");
-            if (def.CanCharge)
-                sb.Append(" · hold to charge");
-            // Task 11b: the three lasers now wind up before they fire - worth a player reading this
-            // before they equip one, the same way "hold to charge" already is above.
-            if (def.WindupSeconds > 0f)
-                sb.Append($" · {Compact(def.WindupSeconds)}s wind-up");
-            // Mark plan step 4: "hold to charge" disappears from weapon 12 by itself (CanCharge is
-            // now off), and this takes its place on any weapon whose mark actually does something.
-            if (def.MarkWindowSeconds > 0f)
-                sb.Append($" · mark: next hit within {Compact(def.MarkWindowSeconds)}s +{Compact((def.MarkedDamageMultiplier - 1f) * 100f)}%");
-
-            return sb.ToString();
-        }
-
-        private void ShowAbilityHover(AbilityDefinition def)
-        {
-            if (def == null)
-            {
-                ClearHover();
-                return;
-            }
-
-            hoverNameLabel.text = def.DisplayName;
-            hoverDescriptionLabel.text = def.Description ?? "";
-            hoverNumbersLabel.text = AbilityNumbersText(def);
-        }
-
-        /// <summary>The module prefab carries an ability's only numbers (AbilityDefinition itself is
-        /// deliberately thin - see its own class comment), read through
-        /// AbilityModule.ConfiguredCooldownSeconds/ConfiguredCharges rather than
-        /// ChargesAvailable/RechargeProgress: those read a live runtime ChargePool, which is null on
-        /// a prefab asset that was never Bind-ed to a player.</summary>
-        private static string AbilityNumbersText(AbilityDefinition def)
-        {
-            AbilityModule prefabModule = def.ModulePrefab != null ? def.ModulePrefab.GetComponent<AbilityModule>() : null;
-            if (prefabModule == null)
-                return "";
-
-            // Ultimates have 0s cooldown / 1 charge by design (AbilityModule's own defaults) -
-            // readiness instead comes from the shared UltimateCharge meter (kills, assists, damage
-            // dealt/taken), so "cooldown 0s" here would flatly misdescribe how they work.
-            if (def.Slot == AbilitySlot.Ultimate)
-                return "Charges from kills, assists, and damage dealt or taken.";
-
-            if (prefabModule.ConfiguredCharges <= 0)
-                return "No cooldown.";
-            if (prefabModule.ConfiguredCharges == 1)
-                return $"{Compact(prefabModule.ConfiguredCooldownSeconds)}s cooldown";
-
-            return $"{prefabModule.ConfiguredCharges} charges, {Compact(prefabModule.ConfiguredCooldownSeconds)}s each";
-        }
-
-        /// <summary>Trims a float to at most two decimals and drops a trailing ".00" - so this panel
-        /// shows "5" or "3.13", never "5.000000". CultureInfo.InvariantCulture on purpose (Task 9b
-        /// quality review): the default "current culture" format uses a comma decimal separator on
-        /// nl/ro Windows and others, which would render "3,13" here and, worse, inside a string
-        /// already built with " · " and ", " separators of its own.</summary>
-        private static string Compact(float value) => value.ToString("0.##", CultureInfo.InvariantCulture);
     }
 }

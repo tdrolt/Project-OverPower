@@ -147,6 +147,12 @@ namespace Overpower.Abilities
         /// the same Configured naming to keep it distinct from the live MaxCharges/ChargesAvailable.</summary>
         public int ConfiguredCharges => charges;
 
+        /// <summary>Task 13: the ability's own numbers for the shop's hover pop-up (range, damage, duration, radius...),
+        /// one line each, beyond the cooldown and charges every module has. Read off this module's serialized fields
+        /// (and, for a deployed thing, off its prefab), so it works on a module PREFAB that was never bound to a player.
+        /// Empty by default; each module that has numbers to show overrides it.</summary>
+        public virtual string ShopStatsText() => "";
+
         internal bool HasChargeGate => pool != null;
         internal bool HasCharge => pool == null || pool.CanConsume;
         internal bool SpendsChargeWhenCast => SpendsChargeOnCast;

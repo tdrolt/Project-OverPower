@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -110,5 +111,7 @@ namespace Overpower.Abilities
             else
                 camera.RemoveZoomMultiplier(this);
         }
+
+        public override string ShopStatsText() => $"Camera pulls back {ShopNumberFormat.Compact(extraZoomOutPercent)}% further";
     }
 }

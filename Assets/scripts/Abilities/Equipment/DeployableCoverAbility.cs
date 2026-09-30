@@ -1,5 +1,6 @@
 using UnityEngine;
 using Overpower.Arena;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -108,6 +109,16 @@ namespace Overpower.Abilities
             Quaternion rotation = Quaternion.LookRotation(direction, Vector3.up);
 
             return Physics.CheckBox(center, halfExtents, rotation, ArenaLayers.BodiesWallsAndBarriers, QueryTriggerInteraction.Ignore);
+        }
+
+        public override string ShopStatsText()
+        {
+            CoverWall wall = coverPrefab != null ? coverPrefab.GetComponent<CoverWall>() : null;
+            if (wall == null)
+                return "";
+            return ShopNumberFormat.Lines(
+                $"Wall {ShopNumberFormat.Compact(wall.Width)}m wide, {ShopNumberFormat.Compact(wall.Height)}m tall",
+                $"Absorbs {ShopNumberFormat.Compact(wall.HitPoints)} damage" + (wall.LifetimeSeconds > 0f ? $" · lasts {ShopNumberFormat.Compact(wall.LifetimeSeconds)}s" : ""));
         }
     }
 }

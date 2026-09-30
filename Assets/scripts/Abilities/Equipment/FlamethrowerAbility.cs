@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -325,5 +326,9 @@ namespace Overpower.Abilities
             if (vfx != null)
                 vfx.gameObject.SetActive(false);
         }
+
+        public override string ShopStatsText() =>
+            ShopNumberFormat.Lines($"Burn {ShopNumberFormat.Compact(burnDamagePerSecond)} damage/s for {ShopNumberFormat.Compact(burnSeconds)}s",
+                                   $"Range {ShopNumberFormat.Compact(coneRange)}m · {ShopNumberFormat.Compact(coneAngle)}° cone · sprays {ShopNumberFormat.Compact(spraySeconds)}s");
     }
 }

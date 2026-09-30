@@ -1,5 +1,6 @@
 using UnityEngine;
 using Overpower.Weapons;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -98,6 +99,13 @@ namespace Overpower.Abilities
             }
 
             motor.Initialize(shot);
+        }
+
+        public override string ShopStatsText()
+        {
+            ApplyStatusOnHit status = projectilePrefab != null ? projectilePrefab.GetComponent<ApplyStatusOnHit>() : null;
+            return ShopNumberFormat.Lines($"Range {ShopNumberFormat.Compact(range)}m",
+                status != null ? $"Stuns for {ShopNumberFormat.Compact(status.Duration)}s" : "");
         }
     }
 }

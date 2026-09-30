@@ -76,6 +76,9 @@ namespace Overpower.Abilities
                  "must destroy it (a portal is destroyed only when its owner unequips Mobility).")]
         private float lifetimeSeconds = 0f;
 
+        /// <summary>Lifetime Seconds (0 = never expires), read-only - the shop's pop-up shows it (Task 13).</summary>
+        public float LifetimeSeconds => lifetimeSeconds;
+
         /// <summary>The actor number of whoever placed this - from the instantiate's own sender, set
         /// once in OnPhotonInstantiate and never changed after.</summary>
         public int OwnerActor { get; private set; } = -1;

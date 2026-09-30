@@ -1,6 +1,7 @@
 using UnityEngine;
 using Overpower.Arena;
 using Overpower.Combat;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -195,5 +196,7 @@ namespace Overpower.Abilities
         {
             Debug.Log($"[BLINK] dist={dist:F2} requested={requested:F2} adjusted={adjusted}");
         }
+
+        public override string ShopStatsText() => $"Range {ShopNumberFormat.Compact(range)}m";
     }
 }

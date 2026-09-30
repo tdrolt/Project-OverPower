@@ -87,6 +87,9 @@ namespace Overpower.Abilities
         public float Height => height;
         public float Thickness => thickness;
 
+        /// <summary>Hit Points, read-only - the shop's pop-up shows it (Task 13).</summary>
+        public float HitPoints => hitPoints;
+
         // ---- IDamageable ----------------------------------------------------------------------
 
         /// <summary>Fails open, on purpose - see the class comment. Never a real actor or a real

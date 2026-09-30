@@ -34,6 +34,9 @@ namespace Overpower.Weapons
                  "direct hit.")]
         private float maxBonus = 0.5f;
 
+        /// <summary>Max Bonus (a fraction of normal damage at the end of the range), read-only - the shop's pop-up shows it (Task 13).</summary>
+        public float MaxBonus => maxBonus;
+
         private ProjectileMotor motor;
         private ProjectileContext context;
 

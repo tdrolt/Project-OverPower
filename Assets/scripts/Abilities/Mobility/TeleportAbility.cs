@@ -3,6 +3,7 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Arena;
 using Overpower.Combat;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -575,5 +576,9 @@ namespace Overpower.Abilities
             marker.transform.localScale = Vector3.one * radius * 2f;
             return marker;
         }
+
+        public override string ShopStatsText() =>
+            ShopNumberFormat.Lines($"Place up to {ShopNumberFormat.Compact(placementRange)}m away · {maxPortals} portals",
+                                   $"{ShopNumberFormat.Compact(channelSeconds)}s standing in one to travel");
     }
 }

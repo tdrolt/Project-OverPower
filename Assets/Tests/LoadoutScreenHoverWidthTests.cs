@@ -11,15 +11,11 @@ namespace Overpower.Tests
 {
     /// <summary>
     /// Tudor, 2026-09-21: "when you hover over the mark upgrade from the laser tree it expands the
-    /// shop menu for no reason". LoadoutScreen.Builder.BuildScreenCanvas gives the hover-description
-    /// strip a pinned HEIGHT (Loadout Description Panel Height) but never a pinned WIDTH - a
-    /// TextMeshProUGUI's own preferred width is its unwrapped single-line width, so the strip's
-    /// VerticalLayoutGroup reports the longest hovered description's full length upward, and the
-    /// panel's own ContentSizeFitter (PreferredSize, both axes) grows sideways to fit it. 12 Laser -
-    /// Mark's description is the shop's longest at 168 characters (Assets/Gameplay/Weapons/12 Laser -
-    /// Mark.asset; the bug report says ~170) and is the one this bug report names, but this test
-    /// checks every weapon and ability in the real catalogues, since any long-enough text does the
-    /// same thing.
+    /// shop menu for no reason". That was the hover-description strip; Task 13 replaced the strip with a pop-up
+    /// beside the cursor and put the shop on two fixed-size pages, and this class now pins the same promise for the
+    /// new design: hovering never resizes the panel (the pop-up is not part of the panel), both pages give the panel
+    /// the SAME size (switching a tab never jumps the panel), and each page's content fits inside its fixed
+    /// area (the pages have no mask, so overflow would silently draw over what sits below).
     ///
     /// LoadoutScreen.Awake() bails for every non-owner copy behind photonView.IsMine (see the class
     /// comment), which PUN only ever sets true through a live room's controller-cache rebuild - it
@@ -50,7 +46,8 @@ namespace Overpower.Tests
         private WeaponCatalogue weapons;
         private AbilityCatalogue abilities;
         private UiTheme theme;
-        private VerticalLayoutGroup descriptionPanelLayout;
+        private GameObject weaponsPage;
+        private GameObject abilitiesPage;
 
         // G2 (review follow-up, 2026-09-21): BuildUi -> EnsureEventSystem creates an EventSystem root
         // in the active scene when none exists there yet - true for an edit-mode test run with no
@@ -87,10 +84,11 @@ namespace Overpower.Tests
             Assert.NotNull(panel, "BuildScreenCanvas should have created a child named 'Panel'");
             panelRect = (RectTransform)panel;
 
-            Transform descriptionPanel = panel.Find("Description Panel");
-            Assert.NotNull(descriptionPanel, "BuildScreenCanvas should have created a child named 'Description Panel'");
-            descriptionPanelLayout = descriptionPanel.GetComponent<VerticalLayoutGroup>();
-            Assert.NotNull(descriptionPanelLayout, "Description Panel's VerticalLayoutGroup");
+            Assert.IsNull(panel.Find("Description Panel"), "the description strip was removed in Task 13");
+            weaponsPage = (GameObject)GetField("weaponsPageRoot");
+            abilitiesPage = (GameObject)GetField("abilitiesPageRoot");
+            Assert.NotNull(weaponsPage, "weapons page");
+            Assert.NotNull(abilitiesPage, "abilities page");
         }
 
         [TearDown]
@@ -131,14 +129,17 @@ namespace Overpower.Tests
             return panelRect.rect.width;
         }
 
-        private void ShowWeaponHover(WeaponDefinition def) => InvokePrivate("ShowWeaponHover", def);
-        private void ShowAbilityHover(AbilityDefinition def) => InvokePrivate("ShowAbilityHover", def);
-        private void ClearHover() => InvokePrivate("ClearHover");
+        private void OpenPopUp(string key, string text)
+        {
+            InvokePrivate("HideTooltip");
+            var source = (System.Func<string>)(() => text);
+            InvokePrivate("TooltipPointerAt", key, source, new Vector2(400f, 300f));
+            InvokePrivate("TickTooltip", 10f);
+        }
 
         [Test]
-        public void ThePanelWidthNeverChangesAcrossAnyWeaponOrAbilityHover()
+        public void ThePanelWidthNeverChangesWhileAPopUpIsOpenOnAnyWeaponOrAbility()
         {
-            ClearHover();
             float baseline = MeasuredPanelWidth();
             Assert.Greater(baseline, 0f, "sanity: the panel should have a real width before any hover starts");
 
@@ -146,114 +147,131 @@ namespace Overpower.Tests
             {
                 if (weapon == null)
                     continue;
-
-                ShowWeaponHover(weapon);
-                float hovered = MeasuredPanelWidth();
-                Assert.AreEqual(baseline, hovered, WidthTolerance,
-                    $"panel width changed while hovering weapon '{weapon.name}' " +
-                    $"(description {weapon.Description?.Length ?? 0} chars)");
-
-                ClearHover();
-                float cleared = MeasuredPanelWidth();
-                Assert.AreEqual(baseline, cleared, WidthTolerance,
-                    $"panel width did not return to baseline after clearing weapon '{weapon.name}'");
+                OpenPopUp("w:" + weapon.Id, weapon.DisplayName + "\n" + weapon.Description + "\n" + ShopItemNumbers.Weapon(weapon));
+                Assert.IsTrue(screen.TooltipVisible, $"pop-up for weapon '{weapon.name}'");
+                Assert.AreEqual(baseline, MeasuredPanelWidth(), WidthTolerance, $"panel width changed while the pop-up for weapon '{weapon.name}' is open");
             }
 
             foreach (AbilityDefinition ability in abilities.Abilities)
             {
                 if (ability == null)
                     continue;
-
-                ShowAbilityHover(ability);
-                float hovered = MeasuredPanelWidth();
-                Assert.AreEqual(baseline, hovered, WidthTolerance,
-                    $"panel width changed while hovering ability '{ability.name}' " +
-                    $"(description {ability.Description?.Length ?? 0} chars)");
-
-                ClearHover();
-                float cleared = MeasuredPanelWidth();
-                Assert.AreEqual(baseline, cleared, WidthTolerance,
-                    $"panel width did not return to baseline after clearing ability '{ability.name}'");
+                OpenPopUp("a:" + ability.Id, ability.DisplayName + "\n" + ability.Description + "\n" + ShopItemNumbers.Ability(ability));
+                Assert.IsTrue(screen.TooltipVisible, $"pop-up for ability '{ability.name}'");
+                Assert.AreEqual(baseline, MeasuredPanelWidth(), WidthTolerance, $"panel width changed while the pop-up for ability '{ability.name}' is open");
             }
         }
 
-        /// <summary>
-        /// G1 (review follow-up, 2026-09-21): pinning the strip's WIDTH (the test above) does not by
-        /// itself guarantee its fixed HEIGHT (Loadout Description Panel Height, 150 units) is still
-        /// enough now that a long description wraps to several lines instead of reporting one long
-        /// unwrapped line - the panel has no mask, so content that no longer fits would silently draw
-        /// past its own box instead of resizing or clipping. descriptionPanelLayout.preferredHeight
-        /// is the VerticalLayoutGroup's own intrinsic "how tall do my children actually need me to
-        /// be" figure (name + description + numbers labels, their own spacing and padding) -
-        /// independent of the LayoutElement's fixed clamp on the same GameObject, so it reports the
-        /// real overflow instead of silently reading back the clamp itself.
-        /// </summary>
         [Test]
-        public void TheDescriptionStripsContentAlwaysFitsInsideItsFixedHeight()
+        public void ThePanelHasTheSameSizeOnBothPages()
         {
-            AssertContentFitsHeight("(cleared)", () => ClearHover());
+            screen.ShowPage(Overpower.Match.ShopPage.Weapons);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(panelRect);
+            Vector2 onWeapons = panelRect.rect.size;
 
-            foreach (WeaponDefinition weapon in weapons.Weapons)
-            {
-                if (weapon == null)
-                    continue;
+            screen.ShowPage(Overpower.Match.ShopPage.AbilitiesAndArmor);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(panelRect);
+            Vector2 onAbilities = panelRect.rect.size;
 
-                AssertContentFitsHeight($"weapon '{weapon.name}' ({weapon.Description?.Length ?? 0} chars)",
-                    () => ShowWeaponHover(weapon));
-            }
-
-            foreach (AbilityDefinition ability in abilities.Abilities)
-            {
-                if (ability == null)
-                    continue;
-
-                AssertContentFitsHeight($"ability '{ability.name}' ({ability.Description?.Length ?? 0} chars)",
-                    () => ShowAbilityHover(ability));
-            }
+            Assert.AreEqual(onWeapons.x, onAbilities.x, WidthTolerance, "panel width differs between the pages");
+            Assert.AreEqual(onWeapons.y, onAbilities.y, WidthTolerance, "panel height differs between the pages");
         }
 
-        private void AssertContentFitsHeight(string label, System.Action setHover)
+        [Test]
+        public void EachPagesContentFitsInsideTheFixedPageArea()
         {
-            setHover();
+            screen.ShowPage(Overpower.Match.ShopPage.Weapons);
+            AssertPageFits("weapons page", weaponsPage);
+            screen.ShowPage(Overpower.Match.ShopPage.AbilitiesAndArmor);
+            AssertPageFits("abilities & armor page", abilitiesPage);
+        }
+
+        /// <summary>Tudor, Task 13: on the Weapons page Baseline is centred on top, the four families sit in one row
+        /// under it, and under each family its two upgrades sit side by side in one row (not stacked).</summary>
+        [Test]
+        public void TheWeaponTreeHasTheFamiliesInOneRowAndEachFamilysUpgradesSideBySide()
+        {
+            screen.ShowPage(Overpower.Match.ShopPage.Weapons);
             LayoutRebuilder.ForceRebuildLayoutImmediate(panelRect);
 
-            float contentPreferredHeight = descriptionPanelLayout.preferredHeight;
-            Assert.LessOrEqual(contentPreferredHeight, theme.loadoutDescriptionPanelHeight,
-                $"hovering {label}: the description strip's content needs {contentPreferredHeight:F1} units, " +
-                $"more than Loadout Description Panel Height ({theme.loadoutDescriptionPanelHeight:F1}) - it " +
-                "would draw past the strip's own box, since it has no mask");
-        }
-
-        /// <summary>The bug report's own example, called out on its own: 170 characters, the shop's
-        /// longest description (checked directly here, not just implied by the loop above) and the
-        /// one that made the panel visibly stretch sideways in Tudor's game.</summary>
-        [Test]
-        public void HoveringTheLaserMarkSpecificallyDoesNotStretchThePanel()
-        {
-            WeaponDefinition mark = null;
-            foreach (WeaponDefinition weapon in weapons.Weapons)
+            var nodes = (System.Collections.IDictionary)GetField("weaponNodes");
+            System.Func<int, Vector2> centre = id =>
             {
-                if (weapon != null && weapon.name == "12 Laser - Mark")
-                {
-                    mark = weapon;
-                    break;
-                }
+                object ui = nodes[id];
+                var outer = (Image)ui.GetType().GetField("outer").GetValue(ui);
+                var corners = new Vector3[4];
+                outer.rectTransform.GetWorldCorners(corners);
+                return (corners[0] + corners[2]) * 0.5f;
+            };
+
+            WeaponDefinition root = null;
+            foreach (WeaponDefinition w in weapons.Weapons)
+                if (w != null && w.Parent == null) root = w;
+            Assert.NotNull(root);
+
+            var families = new System.Collections.Generic.List<WeaponDefinition>();
+            foreach (WeaponDefinition w in weapons.Weapons)
+                if (w != null && w.Parent == root) families.Add(w);
+            Assert.AreEqual(4, families.Count, "four weapon families under the baseline");
+
+            Vector2 rootAt = centre(root.Id);
+            float familyRowY = centre(families[0].Id).y;
+            foreach (WeaponDefinition family in families)
+            {
+                Vector2 familyAt = centre(family.Id);
+                Assert.AreEqual(familyRowY, familyAt.y, 0.5f, $"{family.DisplayName} is in the families' row");
+                Assert.Less(familyAt.y, rootAt.y, $"{family.DisplayName} is below the baseline");
+
+                var upgrades = new System.Collections.Generic.List<Vector2>();
+                foreach (WeaponDefinition w in weapons.Weapons)
+                    if (w != null && w.Parent == family) upgrades.Add(centre(w.Id));
+                Assert.AreEqual(2, upgrades.Count, $"{family.DisplayName} has two upgrades");
+                Assert.AreEqual(upgrades[0].y, upgrades[1].y, 0.5f, $"{family.DisplayName}: the two upgrades share one row");
+                Assert.Less(upgrades[0].y, familyAt.y, $"{family.DisplayName}: the upgrades are below it");
+                Assert.Greater(Mathf.Abs(upgrades[0].x - upgrades[1].x), 1f, $"{family.DisplayName}: the upgrades are side by side");
+                Assert.AreEqual(familyAt.x, (upgrades[0].x + upgrades[1].x) * 0.5f, 0.5f, $"{family.DisplayName} sits centred above its two upgrades");
             }
 
-            Assert.NotNull(mark, "expected to find the '12 Laser - Mark' weapon asset in the catalogue");
-            // The bug report says 170 characters; the asset measures 168 - close enough that either
-            // is clearly "the shop's longest description", which is the only thing this test needs.
-            Assert.Greater(mark.Description?.Length ?? 0, 100,
-                "sanity: this is supposed to be the shop's longest description");
+            float rootX = rootAt.x, sum = 0f;
+            foreach (WeaponDefinition family in families) sum += centre(family.Id).x;
+            Assert.AreEqual(rootX, sum / families.Count, 0.5f, "the baseline is centred above the four families");
+        }
 
-            ClearHover();
-            float baseline = MeasuredPanelWidth();
+        /// <summary>The capture found each ability column's heading starting left of its cards (the column grew wider than
+        /// its two cards): the heading and the first card must share one left edge.</summary>
+        [Test]
+        public void EachAbilityColumnsHeadingAndCardsShareOneLeftEdge()
+        {
+            screen.ShowPage(Overpower.Match.ShopPage.AbilitiesAndArmor);
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(panelRect);
+            LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)abilitiesPage.transform);
 
-            ShowWeaponHover(mark);
-            float hovered = MeasuredPanelWidth();
+            int columns = 0;
+            foreach (Transform t in abilitiesPage.GetComponentsInChildren<Transform>(true))
+            {
+                if (!t.name.EndsWith(" Ability Grid")) continue;
+                columns++;
+                var corners = new Vector3[4];
+                ((RectTransform)t.GetChild(0)).GetWorldCorners(corners);
+                float cardLeft = corners[0].x;
+                ((RectTransform)t.parent.GetChild(0)).GetWorldCorners(corners);
+                float headingLeft = corners[0].x;
+                Assert.AreEqual(headingLeft, cardLeft, 0.5f, $"{t.name}: heading and first card start at the same x");
+            }
+            Assert.AreEqual(3, columns, "Mobility, Attachment and Ultimate columns");
+        }
 
-            Assert.AreEqual(baseline, hovered, WidthTolerance,
-                "hovering '12 Laser - Mark' must not change the shop panel's width");
+        private void AssertPageFits(string label, GameObject page)
+        {
+            LayoutRebuilder.ForceRebuildLayoutImmediate(panelRect);
+            var rt = (RectTransform)page.transform;
+            var group = page.GetComponent<VerticalLayoutGroup>();
+            Assert.LessOrEqual(group.preferredHeight, theme.loadoutPageHeight,
+                $"{label}: its content needs {group.preferredHeight:F1} units of height, more than Loadout Page Height ({theme.loadoutPageHeight:F1}) - it would draw past the page's own box");
+            Assert.LessOrEqual(group.preferredWidth, theme.loadoutPageWidth,
+                $"{label}: its content needs {group.preferredWidth:F1} units of width, more than Loadout Page Width ({theme.loadoutPageWidth:F1})");
+            Assert.AreEqual(theme.loadoutPageWidth, rt.rect.width, WidthTolerance, $"{label}: page width");
         }
     }
 }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -219,5 +220,7 @@ namespace Overpower.Abilities
         {
             Debug.Log($"[DASH] refused dir={direction:F2} (a wall at the start, or a knockback is running)");
         }
+
+        public override string ShopStatsText() => $"Distance {ShopNumberFormat.Compact(distance)}m";
     }
 }

@@ -1,6 +1,7 @@
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Weapons;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -354,5 +355,8 @@ namespace Overpower.Abilities
         {
             Debug.Log($"[ZIP] hit={hitPoint} pullDistance={travelDistance:F2}");
         }
+
+        public override string ShopStatsText() =>
+            $"Range {ShopNumberFormat.Compact(range)}m · pulls you at {ShopNumberFormat.Compact(pullSpeed)} m/s";
     }
 }

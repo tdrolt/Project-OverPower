@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -130,5 +131,9 @@ namespace Overpower.Abilities
         {
             Debug.Log("[SPRINT] silenced - stopping.");
         }
+
+        public override string ShopStatsText() =>
+            ShopNumberFormat.Lines($"+{ShopNumberFormat.Compact((speedMultiplier - 1f) * 100f)}% speed",
+                                   $"Builds {ShopNumberFormat.Compact(overheatPerSecond)} overheat/s");
     }
 }

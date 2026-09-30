@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Arena;
 using Overpower.Combat;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -243,6 +244,17 @@ namespace Overpower.Abilities
                     }
                 }
             }
+        }
+
+        public override string ShopStatsText()
+        {
+            Mine mine = minePrefab != null ? minePrefab.GetComponent<Mine>() : null;
+            if (mine == null)
+                return $"Up to {maxActiveMines} mines";
+            return ShopNumberFormat.Lines(
+                $"Damage {ShopNumberFormat.Compact(mine.Damage)} · blast radius {ShopNumberFormat.Compact(mine.ExplosionRadius)}m",
+                $"Slows {ShopNumberFormat.Compact(mine.SlowMagnitude * 100f)}% for {ShopNumberFormat.Compact(mine.SlowSeconds)}s",
+                $"Up to {maxActiveMines} mines" + (mine.LifetimeSeconds > 0f ? $" · each lasts {ShopNumberFormat.Compact(mine.LifetimeSeconds)}s" : ""));
         }
     }
 }

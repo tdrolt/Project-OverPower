@@ -50,6 +50,12 @@ namespace Overpower.Weapons
                  "that has bounced three times deals 1 + 0.2*3 = 1.6x, not 1.2 cubed.")]
         private float damagePerBounce = 0.20f;
 
+        /// <summary>Max Bounces, read-only - the shop's pop-up shows it (Task 13).</summary>
+        public int MaxBounces => maxBounces;
+
+        /// <summary>Damage Per Bounce (a fraction of base damage), read-only - the shop's pop-up shows it (Task 13).</summary>
+        public float DamagePerBounce => damagePerBounce;
+
         private int bounces;
 
         /// A pooled or otherwise reused GameObject must never carry a previous flight's bounce

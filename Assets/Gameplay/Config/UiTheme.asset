@@ -107,12 +107,15 @@ MonoBehaviour:
   loadoutPanelColor: {r: 0.05, g: 0.05, b: 0.07, a: 0.96}
   loadoutPanelPadding: 20
   loadoutSectionGap: 16
-  loadoutPanelTopMargin: 40
-  loadoutLeftColumnWidth: 640
-  loadoutRightColumnWidth: 640
-  loadoutNodeWidth: 130
-  loadoutNodeHeight: 64
-  loadoutNodeSpacing: 14
+  loadoutPanelTopMargin: 24
+  loadoutPageWidth: 1700
+  loadoutPageHeight: 600
+  loadoutNodeWidth: 180
+  loadoutNodeHeight: 96
+  loadoutAbilityCardWidth: 240
+  loadoutAbilityCardHeight: 88
+  loadoutAbilityColumnGap: 60
+  loadoutNodeSpacing: 20
   loadoutEquippedBorderWidth: 4
   loadoutStepperButtonSize: 56
   loadoutStepperFontSize: 32
@@ -128,9 +131,9 @@ MonoBehaviour:
   loadoutSoldWeaponFormat: 'Sold {0}: +{1} gold'
   loadoutSoldArmorFormat: 'Sold armour upgrades: +{0} gold'
   loadoutSoldMessageDurationSeconds: 3
-  loadoutDescriptionPanelHeight: 190
-  loadoutTooltipDelaySeconds: 1
-  loadoutTooltipMaxWidth: 320
+  loadoutTooltipDelaySeconds: 0.5
+  loadoutTooltipMaxWidth: 400
+  loadoutTooltipNumbersColor: {r: 0.72, g: 0.74, b: 0.8, a: 1}
   loadoutTooltipBackgroundColor: {r: 0.12, g: 0.12, b: 0.145, a: 1}
   loadoutTooltipOffset: {x: 16, y: -18}
   loadoutTooltipFlipGap: 8
@@ -143,8 +146,23 @@ MonoBehaviour:
   loadoutArrowColor: {r: 0.42, g: 0.42, b: 0.47, a: 1}
   loadoutArrowWidth: 3
   loadoutArrowHeadSize: 12
-  loadoutTreeRowGap: 26
-  loadoutTreeColumnGap: 30
+  loadoutTreeRowGap: 90
+  loadoutTreeColumnGap: 50
+  loadoutTabWeaponsText: Weapons
+  loadoutTabAbilitiesArmorText: Abilities & Armor
+  loadoutTabWidth: 300
+  loadoutTabHeight: 46
+  loadoutTabActiveColor: {r: 0.3, g: 0.3, b: 0.36, a: 1}
+  loadoutTabInactiveColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
+  loadoutArmorAbsorbTipName: Absorb armor
+  loadoutArmorAbsorbTipText: Armor that soaks damage before your health takes any.
+  loadoutArmorAbsorbNowFormat: 'Now: level {0}, soaks {1} damage'
+  loadoutArmorAbsorbNextFormat: 'Next: level {0}, soaks {1} damage ({2})'
+  loadoutArmorRechargeTipName: Recharge armor
+  loadoutArmorRechargeTipText: Your armor starts refilling sooner after a fight.
+  loadoutArmorRechargeNowFormat: 'Now: level {0}, refills after {1}s out of combat'
+  loadoutArmorRechargeNextFormat: 'Next: level {0}, refills after {1}s out of combat ({2})'
+  loadoutArmorNoNextText: 'Next: no upgrade left'
   loadoutToggleButtonWidth: 190
   loadoutToggleButtonHeight: 48
   loadoutToggleButtonMargin: 24
@@ -317,7 +335,7 @@ MonoBehaviour:
   - Purple
   - Cyan
   scoreboardUnknownTeamText: Joining
-  nameTipsKeysText: "<b>Keys</b>\nWASD  move\nMouse  aim, left click shoots\nRight click  Equipment ability\nLeft Shift  Mobility ability\nSpace  Ultimate ability (meter full)\nR  Vent (see Overheat)\nP  Shop\nM  Map\nHold Tab  Scoreboard\nEnter  Chat\nEscape  Close the game"
+  nameTipsKeysText: "<b>Keys</b>\nWASD  move\nMouse  aim, left click shoots\nRight click  Attachment ability\nLeft Shift  Mobility ability\nSpace  Ultimate ability (meter full)\nR  Vent (see Overheat)\nP  Shop\nM  Map\nHold Tab  Scoreboard\nEnter  Chat\nEscape  Close the game"
   nameTipsOverheatText: "<b>Overheat and the Vent</b>\nShooting and Sprint build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\nWhile locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout."
   nameTipsChargesText: "<b>Ability charges</b>\nSome abilities hold several charges. Spent charges come back one at a time. Dash locks until 2 charges are back once you use all 3."
   nameTipsModeText: "<b>The match</b>\nCapture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake it or take another team's base. The last team standing wins."

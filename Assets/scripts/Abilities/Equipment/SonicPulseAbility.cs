@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -245,5 +246,10 @@ namespace Overpower.Abilities
                 blockerReceiver.ApplyStatus(stun, casterActor); // Should not happen: every non-local
                                                                   // IStatusReceiver today is a player.
         }
+
+        public override string ShopStatsText() =>
+            ShopNumberFormat.Lines($"Knockback {ShopNumberFormat.Compact(knockbackDistance)}m",
+                                   $"Range {ShopNumberFormat.Compact(coneRange)}m · {ShopNumberFormat.Compact(coneAngle)}° cone",
+                                   $"Wall or ally hit stuns {ShopNumberFormat.Compact(collisionStunSeconds)}s");
     }
 }

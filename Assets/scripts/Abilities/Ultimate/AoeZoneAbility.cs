@@ -1,6 +1,7 @@
 using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -139,6 +140,16 @@ namespace Overpower.Abilities
         {
             if (PhotonNetwork.InRoom && PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey(AoeZoneRecast.PropertyKey))
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable { { AoeZoneRecast.PropertyKey, null } });
+        }
+
+        public override string ShopStatsText()
+        {
+            AoeZone zone = zonePrefab != null ? zonePrefab.GetComponent<AoeZone>() : null;
+            if (zone == null)
+                return "";
+            return ShopNumberFormat.Lines(
+                $"Radius {ShopNumberFormat.Compact(zone.Radius)}m · {ShopNumberFormat.Compact(zone.DamagePerTick)} damage every {ShopNumberFormat.Compact(zone.TickSeconds)}s",
+                $"Lasts {ShopNumberFormat.Compact(zone.DurationSeconds)}s");
         }
     }
 }

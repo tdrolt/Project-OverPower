@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Match;
 
 namespace Overpower.Abilities
 {
@@ -57,6 +58,17 @@ namespace Overpower.Abilities
             // Task T3 (telemetry): this ability's own id, so ElectricFence can attribute its own
             // damage passes to it (DamageInfo.AbilityId) - see ElectricFence.OnPlaced.
             NetworkedDeployable.Spawn(fencePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
+        }
+
+        public override string ShopStatsText()
+        {
+            ElectricFence fence = fencePrefab != null ? fencePrefab.GetComponent<ElectricFence>() : null;
+            if (fence == null)
+                return "";
+            return ShopNumberFormat.Lines(
+                $"Radius {ShopNumberFormat.Compact(fence.Radius)}m · {ShopNumberFormat.Compact(fence.DamagePerPass)} damage per pass",
+                $"Slows {ShopNumberFormat.Compact(fence.SlowMagnitude * 100f)}% for {ShopNumberFormat.Compact(fence.SlowSeconds)}s" +
+                (fence.LifetimeSeconds > 0f ? $" · lasts {ShopNumberFormat.Compact(fence.LifetimeSeconds)}s" : ""));
         }
     }
 }

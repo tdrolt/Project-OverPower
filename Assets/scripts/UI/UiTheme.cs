@@ -300,17 +300,23 @@ namespace Overpower.UI
         [Tooltip("Extra vertical gap inserted above the 'Armor' heading, on top of the normal item spacing between it and the Reset Weapon button above it - at the normal spacing alone the heading read as crowding the button above it (Task 9a review, 616x576 capture).")]
         public float loadoutSectionGap = 16f;
         [Tooltip("Gap from the top of the screen to the top of the loadout panel, in canvas units. The panel is anchored to the TOP of the screen rather than dead-centre so a tall tree/armor column never grows down into the HUD, which sits at the bottom.")]
-        public float loadoutPanelTopMargin = 40f;
-        [Tooltip("Width of the weapon-tree/armor column on the left, in canvas units - fixed so the ability column on the right (Task 9b) lines up beside it instead of both fighting over leftover space.")]
-        public float loadoutLeftColumnWidth = 640f;
-        [Tooltip("Width of the ability-picks column on the right, in canvas units - holds the Mobility/Equipment/Ultimate card grids (see LoadoutScreen.BuildAbilitiesUi). Kept equal to Loadout Left Column Width so neither column reads as the odd one out.")]
-        public float loadoutRightColumnWidth = 640f;
-        [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units - also the width of one ability card in the right-hand column's grids, so both columns read as the same kind of pickable button.")]
-        public float loadoutNodeWidth = 130f;
-        [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units - also the height of one ability card in the right-hand column's grids.")]
-        public float loadoutNodeHeight = 64f;
-        [Tooltip("Gap between sibling weapon nodes - side to side in the branches row, and top to bottom in a branch's own stack of children - in canvas units. Also the gap between ability cards in the right-hand column's grids, both directions.")]
-        public float loadoutNodeSpacing = 14f;
+        public float loadoutPanelTopMargin = 24f;
+        [Tooltip("Width of the shop's content area under the tabs, in canvas units - the same on both pages, so the panel never changes size when you switch tabs. Wide enough for the four weapon-tree columns (Loadout Node Width and Loadout Tree Column Gap) and for the three ability columns (Loadout Ability Card Width, two cards across).")]
+        public float loadoutPageWidth = 1700f;
+        [Tooltip("Height of the shop's content area under the tabs, in canvas units - the same on both pages. Must fit the weapon tree with its Reset Weapon button and the Abilities & Armor page's tallest column.")]
+        public float loadoutPageHeight = 600f;
+        [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units. The weapons page has the whole content area to itself, so the nodes are big enough to read at a glance; eight upgrades sit side by side (two under each of the four families), so eight of these plus the gaps must fit Loadout Page Width.")]
+        public float loadoutNodeWidth = 180f;
+        [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units.")]
+        public float loadoutNodeHeight = 96f;
+        [Tooltip("Width of one ability card on the Abilities & Armor page, in canvas units. Two cards fit across each of the three columns.")]
+        public float loadoutAbilityCardWidth = 240f;
+        [Tooltip("Height of one ability card on the Abilities & Armor page, in canvas units.")]
+        public float loadoutAbilityCardHeight = 88f;
+        [Tooltip("Horizontal space between the Mobility, Attachment and Ultimate columns on the Abilities & Armor page, in canvas units.")]
+        public float loadoutAbilityColumnGap = 60f;
+        [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the Absorb row, the Recharge row and Reset Armor, in canvas units.")]
+        public float loadoutNodeSpacing = 20f;
         [Tooltip("Thickness of the highlight border drawn around the equipped weapon node or ability card, in canvas units.")]
         public float loadoutEquippedBorderWidth = 4f;
         [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units. Raised from an original 44 (Task 9a review, 616x576 capture): a bigger button gives the bigger glyph below more room to stay legible.")]
@@ -341,12 +347,12 @@ namespace Overpower.UI
         public string loadoutSoldArmorFormat = "Sold armour upgrades: +{0} gold";
         [Tooltip("Seconds a 'Sold ...' message stays on the shop's status line.")]
         public float loadoutSoldMessageDurationSeconds = 3f;
-        [Tooltip("Fixed height of the hover-description strip under the weapon/ability columns, in canvas units - fixed so switching between a short weapon hover and a long ability description never resizes the panel around it. G1 review follow-up, 2026-09-21: 150 measured 14.5 units too short for 12 Laser - Mark's own 168-character description (needs 164.5 once its own pinned width forces it to wrap); raised to 190, a line's headroom (~23 units at Small Text Size) above that measured worst case, since the strip has no mask and content past its own box would silently draw over whatever sits below it.")]
-        public float loadoutDescriptionPanelHeight = 190f;
-        [Tooltip("Seconds the pointer must rest on a weapon node or ability card before its description appears in a tooltip next to the cursor (Task 5b-2). Moving off hides it at once; moving to another item restarts the wait.")]
-        public float loadoutTooltipDelaySeconds = 1f;
-        [Tooltip("Widest a shop tooltip gets, in canvas units; longer descriptions wrap onto more lines.")]
-        public float loadoutTooltipMaxWidth = 320f;
+        [Tooltip("Seconds the pointer must rest on a weapon node, ability card or armour row before its pop-up (name, what it does, numbers) appears next to the cursor (Task 13: 0.5 s). Moving off hides it at once; moving to another item restarts the wait.")]
+        public float loadoutTooltipDelaySeconds = 0.5f;
+        [Tooltip("Widest a shop pop-up gets, in canvas units; longer text wraps onto more lines.")]
+        public float loadoutTooltipMaxWidth = 400f;
+        [Tooltip("Colour of the numbers block (damage, cooldown, ...) in a shop pop-up, under the name and the one-line description.")]
+        public Color loadoutTooltipNumbersColor = new Color(0.72f, 0.74f, 0.80f, 1f);
         [Tooltip("Background of the shop tooltip.")]
         public Color loadoutTooltipBackgroundColor = new Color(0.12f, 0.12f, 0.145f, 1f);
         [Tooltip("Where the tooltip's top-left corner sits relative to the cursor, in canvas units (x right, y up: a negative y is below the cursor).")]
@@ -371,10 +377,40 @@ namespace Overpower.UI
         public float loadoutArrowWidth = 3f;
         [Tooltip("Length of the arrowhead at the upgrade end of each tree arrow, in canvas units.")]
         public float loadoutArrowHeadSize = 12f;
-        [Tooltip("Vertical space between one weapon-tree row and the next, in canvas units - room for the arrows to read (Task 5b-2).")]
-        public float loadoutTreeRowGap = 26f;
-        [Tooltip("Horizontal space between the weapon-tree columns, in canvas units. The four columns must still fit Loadout Left Column Width; the arrow to a branch's second upgrade runs down this gap.")]
-        public float loadoutTreeColumnGap = 30f;
+        [Tooltip("Vertical space between one weapon-tree row and the next, in canvas units - room for the arrows to read (Task 5b-2, widened in Task 13 now the tree has its own page).")]
+        public float loadoutTreeRowGap = 90f;
+        [Tooltip("Horizontal space between the four weapon families (each family is its node with its two upgrades side by side beneath it), in canvas units. The whole tree must fit Loadout Page Width.")]
+        public float loadoutTreeColumnGap = 50f;
+        [Tooltip("Text on the shop's first tab (the weapon tree page).")]
+        public string loadoutTabWeaponsText = "Weapons";
+        [Tooltip("Text on the shop's second tab (the armour rows and the Mobility, Attachment and Ultimate cards).")]
+        public string loadoutTabAbilitiesArmorText = "Abilities & Armor";
+        [Tooltip("Width of one shop tab, in canvas units.")]
+        public float loadoutTabWidth = 300f;
+        [Tooltip("Height of one shop tab, in canvas units.")]
+        public float loadoutTabHeight = 46f;
+        [Tooltip("Fill of the tab of the page you are on.")]
+        public Color loadoutTabActiveColor = new Color(0.30f, 0.30f, 0.36f, 1f);
+        [Tooltip("Fill of the tab of the page you are not on.")]
+        public Color loadoutTabInactiveColor = new Color(0.13f, 0.13f, 0.16f, 1f);
+        [Tooltip("Pop-up name of the Absorb armour row.")]
+        public string loadoutArmorAbsorbTipName = "Absorb armor";
+        [Tooltip("Pop-up line saying what the Absorb armour path does.")]
+        public string loadoutArmorAbsorbTipText = "Armor that soaks damage before your health takes any.";
+        [Tooltip("Pop-up numbers: the Absorb level you have. {0} = level, {1} = how much damage it soaks.")]
+        public string loadoutArmorAbsorbNowFormat = "Now: level {0}, soaks {1} damage";
+        [Tooltip("Pop-up numbers: what the next Absorb upgrade gives. {0} = level, {1} = how much damage it soaks, {2} = the price.")]
+        public string loadoutArmorAbsorbNextFormat = "Next: level {0}, soaks {1} damage ({2})";
+        [Tooltip("Pop-up name of the Recharge armour row.")]
+        public string loadoutArmorRechargeTipName = "Recharge armor";
+        [Tooltip("Pop-up line saying what the Recharge armour path does.")]
+        public string loadoutArmorRechargeTipText = "Your armor starts refilling sooner after a fight.";
+        [Tooltip("Pop-up numbers: the Recharge level you have. {0} = level, {1} = seconds out of combat before it refills.")]
+        public string loadoutArmorRechargeNowFormat = "Now: level {0}, refills after {1}s out of combat";
+        [Tooltip("Pop-up numbers: what the next Recharge upgrade gives. {0} = level, {1} = seconds out of combat before it refills, {2} = the price.")]
+        public string loadoutArmorRechargeNextFormat = "Next: level {0}, refills after {1}s out of combat ({2})";
+        [Tooltip("Pop-up numbers line for an armour row that has no upgrade left (limit reached or top level).")]
+        public string loadoutArmorNoNextText = "Next: no upgrade left";
         [Tooltip("Width of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
         public float loadoutToggleButtonWidth = 190f;
         [Tooltip("Height of the always-visible 'Loadout (P)' button bottom-right of the HUD, in canvas units.")]
@@ -1016,7 +1052,7 @@ namespace Overpower.UI
             "<b>Keys</b>\n" +
             "WASD  move\n" +
             "Mouse  aim, left click shoots\n" +
-            "Right click  Equipment ability\n" +
+            "Right click  Attachment ability\n" +
             "Left Shift  Mobility ability\n" +
             "Space  Ultimate ability (meter full)\n" +
             "R  Vent (see Overheat)\n" +

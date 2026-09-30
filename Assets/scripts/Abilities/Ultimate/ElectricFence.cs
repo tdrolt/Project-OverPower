@@ -107,6 +107,11 @@ namespace Overpower.Abilities
         /// <summary>Radius, read-only - FenceCageView (ability visuals step 4) builds the cage on this one number.</summary>
         public float Radius => radius;
 
+        /// <summary>Damage Per Pass, Slow Magnitude and Slow Seconds, read-only - the shop's pop-up shows them (Task 13).</summary>
+        public float DamagePerPass => damagePerPass;
+        public float SlowMagnitude => slowMagnitude;
+        public float SlowSeconds => slowSeconds;
+
         /// <summary>Ring Thickness, read-only - FenceCageView draws the floor band exactly this wide.</summary>
         public float RingThickness => ringThickness;
 
