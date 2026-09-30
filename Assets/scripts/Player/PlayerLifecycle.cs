@@ -112,8 +112,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     private bool respawnStarted = false;
     private int deathCount = 0;
     /// <summary>Task 9g (Tudor D28): set when this body is a rejoiner's. Its first respawn wait (either path) is the flat
-    /// GameplayConfig.RejoinRespawnSeconds and charges no death: deathCount was restored from the room's "sb" deaths at Start, and
-    /// that already includes the death the drop counted as. Cleared once that wait has been computed, and at go-live.</summary>
+    /// GameplayConfig.RejoinRespawnSeconds and charges no death (a drop is not a death): deathCount was restored at Start to exactly what the room's
+    /// "sb" deaths held, and the rejoin respawn adds nothing to it. Cleared once that wait has been computed, and at go-live.</summary>
     private bool rejoinRespawnPending = false;
     /// <summary>True from the moment a respawn countdown starts (NextRespawnDelay charged that death) until the player is
     /// back: a countdown that ended in the wait already paid, so the retake respawn must not charge a second death
@@ -227,6 +227,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             rejoinPending = true;
             // Task 9g: keep the death penalty - the next death counts on from where it was (the "sb" deaths the room kept; see
             // RespawnDelayRules.DeathCountOnRejoin) - and wait the flat rejoin time instead of the scaled one.
+            // KNOWN LIMIT (accepted, rare): a drop that spans go-live restores the WARM-UP's sb deaths - the go-live reset of sb and of
+            // deathCount happened on a client that was away, and the new process has only what the room still holds.
             PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScoreboardRules.Key, out object keptScore);
             deathCount = RespawnDelayRules.DeathCountOnRejoin(keptScore as int[]);
             rejoinRespawnPending = true;

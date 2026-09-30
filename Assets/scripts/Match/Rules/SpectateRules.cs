@@ -51,6 +51,10 @@ namespace Overpower.Match
             return pool[0].Actor;
         }
 
+        /// <summary>When nobody is watchable at this moment the current target (and the camera on it) is kept - never a snap back to the
+        /// own frozen body; the refresh picks someone as soon as a player is alive. Only the end of the match returns the camera.</summary>
+        public static int PickOrKeep(int picked, int currentActor) => picked != None ? picked : currentActor;
+
         /// <summary>The Spectate / Next button shows on the lose panel while the match still runs; once it is over the normal result
         /// screen (whose button leads back to the name screen) takes over.</summary>
         public static bool ButtonVisible(bool losePanelShown, MatchPhase phase) =>

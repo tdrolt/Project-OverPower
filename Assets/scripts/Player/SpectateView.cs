@@ -31,6 +31,12 @@ public sealed class SpectateView : MonoBehaviour
     private CameraTracking cam;
     private int currentActor = SpectateRules.None;
     private float nextRefresh;
+    private RectTransform panelRect, quitRect, spectateRect;
+    private Image panelImage;
+    private GameObject titleObject;
+    private bool compact;
+    // The full panel's own layout, kept so it comes back exactly.
+    private Vector2 savedAnchorMin, savedAnchorMax, savedPivot, savedPos, savedSize, savedQuitPos, savedSpectatePos;
     private readonly List<SpectateCandidate> living = new List<SpectateCandidate>();
 
     /// <summary>The actor number being watched, or SpectateRules.None.</summary>
@@ -55,13 +61,50 @@ public sealed class SpectateView : MonoBehaviour
         copy.name = "Spectate Button";
         DestroyImmediate(copy.GetComponent<QuitButton>()); // the copy must not quit the game
         RectTransform rect = copy.GetComponent<RectTransform>();
-        RectTransform quitRect = quit.GetComponent<RectTransform>();
+        quitRect = quit.GetComponent<RectTransform>();
         rect.anchoredPosition = quitRect.anchoredPosition + new Vector2(0f, quitRect.sizeDelta.y + 10f);
         button = copy.GetComponent<Button>();
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(Advance);
         label = copy.GetComponentInChildren<TMP_Text>(true);
         copy.SetActive(false);
+
+        panelRect = panel.GetComponent<RectTransform>();
+        panelImage = panel.GetComponent<Image>();
+        spectateRect = rect;
+        Transform title = panel.transform.Find("You lose");
+        titleObject = title != null ? title.gameObject : null;
+    }
+
+    /// <summary>While watching, the full-screen lose panel hides the game: it shrinks to a strip at the bottom holding Next and Quit
+    /// (big title and grey backdrop hidden), and comes back exactly as it was when watching stops or the match ends.</summary>
+    private void SetCompact(bool on)
+    {
+        if (on == compact || panelRect == null || ui == null || ui.Theme == null)
+            return;
+        compact = on;
+        if (on)
+        {
+            savedAnchorMin = panelRect.anchorMin; savedAnchorMax = panelRect.anchorMax; savedPivot = panelRect.pivot;
+            savedPos = panelRect.anchoredPosition; savedSize = panelRect.sizeDelta;
+            savedQuitPos = quitRect.anchoredPosition; savedSpectatePos = spectateRect.anchoredPosition;
+            panelRect.anchorMin = panelRect.anchorMax = new Vector2(0.5f, 0f);
+            panelRect.pivot = new Vector2(0.5f, 0f);
+            panelRect.anchoredPosition = new Vector2(0f, ui.Theme.spectateStripBottom);
+            panelRect.sizeDelta = ui.Theme.spectateStripSize;
+            quitRect.anchoredPosition = new Vector2(ui.Theme.spectateButtonOffset, 0f);
+            spectateRect.anchoredPosition = new Vector2(-ui.Theme.spectateButtonOffset, 0f);
+        }
+        else
+        {
+            panelRect.anchorMin = savedAnchorMin; panelRect.anchorMax = savedAnchorMax; panelRect.pivot = savedPivot;
+            panelRect.anchoredPosition = savedPos; panelRect.sizeDelta = savedSize;
+            quitRect.anchoredPosition = savedQuitPos; spectateRect.anchoredPosition = savedSpectatePos;
+        }
+        if (panelImage != null)
+            panelImage.enabled = !on;
+        if (titleObject != null)
+            titleObject.SetActive(!on);
     }
 
     private void Update()
@@ -82,12 +125,13 @@ public sealed class SpectateView : MonoBehaviour
         }
 
         UiThemeLabels();
+        SetCompact(IsSpectating);
 
         if (IsSpectating && Time.unscaledTime >= nextRefresh)
         {
             nextRefresh = Time.unscaledTime + RefreshSeconds;
             if (!StillWatchable(currentActor))
-                Advance(); // the followed player died or left: on to the next one (or back to the own body when nobody is left)
+                Advance(); // the followed player died or left: on to the next one (or stays put when nobody is left, until someone is alive again)
         }
     }
 
@@ -114,12 +158,9 @@ public sealed class SpectateView : MonoBehaviour
         int actor = SpectateRules.NextTarget(living, PreferredTeam(), currentActor);
         PhotonView view = actor != SpectateRules.None ? PlayerLookup.GetPhotonViewFor(actor) : null;
         if (view == null)
-        {
-            StopSpectating();
-            return;
-        }
+            return; // nobody watchable now: keep the target and the camera; the refresh tries again (SpectateRules.PickOrKeep)
 
-        currentActor = actor;
+        currentActor = SpectateRules.PickOrKeep(actor, currentActor);
         cam.yawSource = transform; // the arena keeps this player's own angle whichever team is watched
         cam.target = view.transform;
         Debug.Log($"[SPECTATE] watching actor {actor}");
@@ -135,6 +176,7 @@ public sealed class SpectateView : MonoBehaviour
             cam.yawSource = null;
         }
         currentActor = SpectateRules.None;
+        SetCompact(false);
     }
 
     private bool StillWatchable(int actor)

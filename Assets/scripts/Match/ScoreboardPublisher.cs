@@ -142,6 +142,8 @@ namespace Overpower.Match
                 throttle.NoteChange(urgent: true);
         }
 
+        // KNOWN LIMIT (accepted, rare): a death in the very frame the connection drops may not reach the room's "sb", so a rejoiner's
+        // restored death count (and their next respawn wait) can be one short. Nothing retries a publish the server never saw.
         private void Publish()
         {
             if (!PhotonNetwork.InRoom || PhotonNetwork.LocalPlayer == null)

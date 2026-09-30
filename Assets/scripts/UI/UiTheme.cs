@@ -1126,5 +1126,11 @@ namespace Overpower.UI
         public string spectateButton = "Spectate";
         [Tooltip("The same button once you are watching: it moves to the next living player.")]
         public string spectateNextButton = "Next";
+        [Tooltip("While watching, the lose panel shrinks to a strip holding Next and Quit. Its size, in reference pixels.")]
+        public Vector2 spectateStripSize = new Vector2(460f, 70f);
+        [Tooltip("Height of the strip's bottom edge above the bottom of the screen, in reference pixels.")]
+        public float spectateStripBottom = 120f;
+        [Tooltip("Distance of the Next and Quit buttons from the strip's centre, sideways, in reference pixels.")]
+        public float spectateButtonOffset = 115f;
     }
 }

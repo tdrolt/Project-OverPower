@@ -93,6 +93,20 @@ namespace Overpower.Tests
             Assert.AreEqual(SpectateRules.None, SpectateRules.NextTarget(null, 2, SpectateRules.None));
         }
 
+        // ---- nobody watchable right now
+
+        [Test]
+        public void WithNobodyToPickTheCurrentTargetIsKept() =>
+            Assert.AreEqual(4, SpectateRules.PickOrKeep(SpectateRules.None, currentActor: 4));
+
+        [Test]
+        public void WithNobodyToPickAndNoTargetThereStaysNoTarget() =>
+            Assert.AreEqual(SpectateRules.None, SpectateRules.PickOrKeep(SpectateRules.None, SpectateRules.None));
+
+        [Test]
+        public void APickedPlayerReplacesTheCurrentTarget() =>
+            Assert.AreEqual(7, SpectateRules.PickOrKeep(7, currentActor: 4));
+
         // ---- when the button shows
 
         [TestCase(MatchPhase.Warmup)]

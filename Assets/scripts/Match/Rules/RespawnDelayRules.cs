@@ -26,7 +26,7 @@ namespace Overpower.Match
         /// <summary>The wait after a rejoin: a flat number of seconds (GameplayConfig.RejoinRespawnSeconds), not scaled by deaths.</summary>
         public static float RejoinDelay(float flatSeconds) => Mathf.Max(0f, flatSeconds);
 
-        /// <summary>As the two-argument form, but a rejoin respawn never charges a death: the drop's death is already in the restored count.</summary>
+        /// <summary>As the two-argument form, but a rejoin respawn never charges a death (a drop is not a death): the count is what the room's sb held.</summary>
         public static int DeathCountForRetake(int deathCount, bool countdownAlreadyCounted, bool rejoinRespawn) =>
             rejoinRespawn ? deathCount : DeathCountForRetake(deathCount, countdownAlreadyCounted);
     }
