@@ -242,6 +242,9 @@ standing in the circle when it flips; swap button "Swap (sell back +N)" + "Sold 
 - Out of scope: the ScriptableObject top ten (`so-top-ten-plan-2026-09-26.md`), compacting code comments, the vision
   feature itself (Task 11 only starts its design).
 
+## Status (2026-09-30)
+Tasks 1-9g built, reviewed and checked; Task 10: 25/25 multi-client checks PASS (Resources/loops/Limit Test/captures/2026-09-30-task10/). HEAD `68183cb`, 1754 tests. Waiting on Tudor for Task 11 ("merge").
+
 ## Done when
 - Every task reviewed (approve), checked in Play Mode or on two clients with captures, logged (progress, workflow log,
   feedback file rows T8-T18 updated), and the Task 10 check passes; then Tudor decides the merge.
