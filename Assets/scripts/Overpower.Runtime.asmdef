@@ -1,0 +1,23 @@
+{
+  "name": "Overpower.Runtime",
+  "rootNamespace": "Overpower",
+  "references": [
+    "PhotonUnityNetworking",
+    "PhotonUnityNetworking.Utilities",
+    "PhotonRealtime",
+    "PhotonChat",
+    "Unity.InputSystem",
+    "Unity.TextMeshPro",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Project.Tools"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

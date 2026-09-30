@@ -1,0 +1,104 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02938c5e14f758149b13429fe6ed1806, type: 3}
+  m_Name: ArenaLayout
+  m_EditorClassIdentifier: 
+  pieces:
+  - name: House_06L (4)
+    kind: 0
+    centre: {x: 85.35736, y: 2.773521, z: 72.77114}
+    yawDegrees: 58.41552
+    size: {x: 2.6092231, y: 5.7285337, z: 7.1808767}
+  - name: House_06L (6)
+    kind: 0
+    centre: {x: 44.246147, y: 2.694683, z: 71.919174}
+    yawDegrees: 298.9656
+    size: {x: 2.6092224, y: 5.7285357, z: 7.1808753}
+  - name: House_03 (2)
+    kind: 0
+    centre: {x: 74.401245, y: 1.3000016, z: 77.89627}
+    yawDegrees: 61.2292
+    size: {x: 8.450748, y: 2.8000083, z: 5.3268147}
+  - name: House_03 (4)
+    kind: 0
+    centre: {x: 55.301132, y: 1.3000064, z: 77.70094}
+    yawDegrees: 299.60715
+    size: {x: 8.4507475, y: 2.8000083, z: 5.326815}
+  - name: House_04R (3)
+    kind: 0
+    centre: {x: 66.66976, y: 3.5000048, z: 67.927025}
+    yawDegrees: 312.79303
+    size: {x: 10.200001, y: 7.0000095, z: 5.5507407}
+  - name: House_05 (2)
+    kind: 0
+    centre: {x: 61.118443, y: 3.5803294, z: 69.64506}
+    yawDegrees: 312.79303
+    size: {x: 5.723678, y: 7.160659, z: 5.74206}
+  - name: Cover Crate Defender Front
+    kind: 0
+    centre: {x: 65.018265, y: 1.3096044, z: 100.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Defender Left
+    kind: 0
+    centre: {x: 58.818256, y: 1.3096044, z: 110.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Defender Right
+    kind: 0
+    centre: {x: 71.21826, y: 1.3096044, z: 110.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Attacker Front
+    kind: 0
+    centre: {x: 65.018265, y: 1.3096044, z: 94.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Attacker Left
+    kind: 0
+    centre: {x: 58.818256, y: 1.3096044, z: 90.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Cover Crate Attacker Right
+    kind: 0
+    centre: {x: 71.21826, y: 1.3096044, z: 90.98971}
+    yawDegrees: 0
+    size: {x: 2.063483, y: 2.6195798, z: 2.0569067}
+  - name: Jersey Barrier (Zone 4 recess)
+    kind: 1
+    centre: {x: 91.20298, y: 0, z: 68.99132}
+    yawDegrees: 239.9998
+    size: {x: 10.181736, y: 1, z: 0.6}
+  - name: Centre - Tier III wall (zone 4)
+    kind: 0
+    centre: {x: 75.026, y: 2.518, z: 59.1}
+    yawDegrees: 240
+    size: {x: 12, y: 7.036, z: 0.724}
+  wallMaterial: {fileID: 2100000, guid: 0ddd8131a35b6b94aa03ab4a047f0576, type: 2}
+  wallThickness: 0.724
+  wallBottomY: -1
+  wallTopY: 6.036
+  blockMaterial: {fileID: 2100000, guid: 59b7b28c52fde124385cba4a07f9a7fd, type: 2}
+  barrierMaterial: {fileID: 2100000, guid: 3e7d20497c1677746a42854803b8ec1c, type: 2}
+  barrierBlockingBottomY: -1
+  barrierBlockingTopY: 3
+  floorMaterial: {fileID: 2100000, guid: e12a545e5e683ca41b2ddc9370eedb4a, type: 2}
+  floorSize: {x: 220, y: 220}
+  floorThickness: 4
+  phaseTwoWallDistance: 6.3
+  phaseTwoRecessWidth: 19.54
+  phaseTwoRecessDepth: 3.25
+  phaseTwoRecessBarrierSize: {x: 10.181736, y: 1, z: 0.6}
+  phaseTwoRecessPlankSize: {x: 2.609, y: 5.729, z: 7.181}
+  phaseTwoRecessPlankSpacing: 6.18
+  phaseTwoRecessPlankInFront: 3
+  healthPackPoint: {x: 92.67, y: 0, z: 69.84}

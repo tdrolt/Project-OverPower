@@ -2,17 +2,22 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
+using Overpower.Weapons;
 
 public class animScript : MonoBehaviourPun
 {
     private Animator anim;
-    public PlayerShooting playerShooting; // Reference to the PlayerShooting component
+    public WeaponFiring weaponFiring; // Reference to the weapon component (was PlayerShooting).
     private PhotonView photonView;
 
     void Awake()
     {
         anim = GetComponent<Animator>();
-        playerShooting = GetComponent<PlayerShooting>();
+        // In the parent, not on this object: this script lives on the character mesh child, while
+        // WeaponFiring sits on the player root with PlayerAim, PlayerOverheat and the input router
+        // it needs. The component this replaced was a sibling here, which is why the old lookup was
+        // a plain GetComponent.
+        weaponFiring = GetComponentInParent<WeaponFiring>();
         photonView = GetComponent<PhotonView>();
     }
 
@@ -34,8 +39,8 @@ public class animScript : MonoBehaviourPun
         anim.SetBool("run", isRunning);
         anim.SetBool("idle", !isRunning);
 
-        // Only process shoot input if the PlayerShooting script is active/enabled.
-        if (playerShooting != null && playerShooting.enabled)
+        // Only process shoot input if the weapon component is active/enabled.
+        if (weaponFiring != null && weaponFiring.enabled)
         {
             if (Input.GetMouseButtonDown(0))
             {

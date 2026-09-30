@@ -12,13 +12,35 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     string privateReceiver = "";
 
     [SerializeField] GameObject chatPanel;
+    // 2026-09-27 bug fix: this used to be wired (in "chat manager.prefab") to the SAME GameObject as
+    // chatField's own TMP_InputField text component ("chat input/Text Area/Text") - a scene wiring
+    // mistake, not a deliberate double-use. Update() below calls text.SetActive(false) the instant
+    // chat opens, which disabled the exact object TMP_InputField renders typed characters into: you
+    // could open chat, type, and never see a single character, because the one thing on screen that
+    // would have shown it had just been turned off. There is no other "closed-chat hint" object in
+    // the prefab to point this at, so the reference is now null in the prefab and every use below is
+    // null-guarded - safe today, and safe again if a real hint object is wired in later.
     [SerializeField] GameObject text;
     [SerializeField] TMP_InputField chatField;
     [SerializeField] TextMeshProUGUI chatDisplay;
 
+    /// <summary>Playtest extras P6 (2026-09-26): whether the chat panel is open, kept in step with
+    /// chatPanel.activeSelf below (both places that change it also set this) rather than read live
+    /// off the GameObject, so QuitConfirmPanel can check it with no scene reference of its own - same
+    /// static-bool pattern as LoadoutScreen.IsOpen. There is only ever one PhotonChat in the scene.</summary>
+    public static bool IsOpen { get; private set; }
+
     void Start()
     {
         ConnectToChat();
+    }
+
+    /// <summary>Task 9f: the scene is rebuilt when a player goes back to the name screen. The old chat connection and the open flag must
+    /// not outlive it (the next join connects again under the new name).</summary>
+    void OnDestroy()
+    {
+        IsOpen = false;
+        chatClient?.Disconnect();
     }
 
    private void ConnectToChat()
@@ -105,6 +127,11 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     {
         if (!string.IsNullOrEmpty(chatField.text))
         {
+            // Playtest extras P3 (2026-09-26): the SENDER's own text, logged right before it
+            // publishes - never OnGetMessages' receive callback, which is not guaranteed to be this
+            // client's own copy of what was just typed. No-ops if telemetry is off or no match file
+            // is open yet.
+            Overpower.Telemetry.MatchTelemetry.Instance?.LogChat(chatField.text);
             chatClient.PublishMessage("RegionChannel", chatField.text); // Send to public chat
             chatField.text = ""; // Clear input field after sending
         }
@@ -136,8 +163,9 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         // If the chat is closed, open it and focus on the input field
         if (!chatPanel.activeSelf)
         {
-            text.SetActive(false);
+            if (text != null) text.SetActive(false);
             chatPanel.SetActive(true);
+            IsOpen = true;
             chatField.Select();  // Focus on the chat input field
             chatField.ActivateInputField();  // Make sure the input field is active
         }
@@ -154,7 +182,8 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         if (chatPanel.activeSelf)
         {
             chatPanel.SetActive(false);
-            text.SetActive(true);  // Show the text when chat is closed
+            IsOpen = false;
+            if (text != null) text.SetActive(true);  // Show the text when chat is closed
             chatField.DeactivateInputField();  // Deactivate the input field when closing the chat
         }
     }

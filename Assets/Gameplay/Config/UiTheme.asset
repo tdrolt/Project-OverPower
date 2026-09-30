@@ -1,0 +1,388 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3474bf16eda717b49839d4c51e29158b, type: 3}
+  m_Name: UiTheme
+  m_EditorClassIdentifier: 
+  referenceResolution: {x: 1920, y: 1080}
+  matchWidthOrHeight: 0.5
+  hudScale: 0.8
+  font: {fileID: 0}
+  smallTextSize: 20
+  bodyTextSize: 24
+  titleTextSize: 34
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  mutedTextColor: {r: 0.75, g: 0.75, b: 0.75, a: 1}
+  textOutlineColor: {r: 0, g: 0, b: 0, a: 0.9}
+  textOutlineWidth: 0.26
+  hudTextFaceDilate: 0.08
+  hudTextShadowColor: {r: 0, g: 0, b: 0, a: 0.75}
+  hudTextShadowOffset: {x: 0.5, y: -0.5}
+  hudTextShadowSoftness: 0.25
+  hudTextShadowDilate: 0.1
+  highlightColor: {r: 1, g: 0.78, b: 0.25, a: 1}
+  lockedColor: {r: 0.09, g: 0.09, b: 0.1, a: 0.92}
+  hudPanelPadding: 16
+  hudBottomOffset: 28
+  barSprite: {fileID: 21300000, guid: 1615351f74fe97140aa068aafd0324e6, type: 3}
+  barWidth: 590
+  healthColor: {r: 0.39, g: 0.8, b: 0.25, a: 1}
+  shieldColor: {r: 0.25, g: 0.6, b: 1, a: 1}
+  immuneBarColor: {r: 1, g: 0.86, b: 0.1, a: 1}
+  immuneBarFrameThickness: 4
+  immuneOverheadFrameThickness: 0.6
+  immuneBarWashAlpha: 0.15
+  overheatColor: {r: 0.95, g: 0.62, b: 0.15, a: 1}
+  overheatWarningColor: {r: 1, g: 0.35, b: 0.1, a: 1}
+  overheatSilencedColor: {r: 0.9, g: 0.1, b: 0.1, a: 1}
+  barTrackColor: {r: 0.18, g: 0.18, b: 0.2, a: 1}
+  healthBarHeight: 28
+  armorBarHeight: 22
+  overheatBarHeight: 32
+  overheatTickColor: {r: 1, g: 1, b: 1, a: 0.85}
+  overheatTickWidth: 2
+  pulseAtWarning: 1
+  pulseSpeed: 1.2
+  ventBandDimColor: {r: 1, g: 1, b: 1, a: 0.28}
+  ventBandOpenColor: {r: 1, g: 0.95, b: 0.35, a: 0.95}
+  ventBandHitColor: {r: 0.4, g: 1, b: 0.55, a: 1}
+  ventHitFlashSeconds: 0.25
+  ventBandMissColor: {r: 0.3, g: 0.3, b: 0.3, a: 1}
+  slotWidth: 140
+  hudSlotSpacing: 10
+  slotIconBoxHeight: 104
+  slotCooldownAreaHeight: 58
+  slotKeyRowHeight: 30
+  slotReasonTextHeight: 26
+  slotBorderWidth: 3
+  slotFillColor: {r: 0, g: 0, b: 0, a: 0.22}
+  slotReadyColor: {r: 0.05, g: 0.05, b: 0.07, a: 0.9}
+  slotBlockedColor: {r: 0.45, g: 0.45, b: 0.45, a: 0.95}
+  portalCooldownColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  slotActiveGlowColor: {r: 1, g: 0.85, b: 0.25, a: 1}
+  pipAvailableColor: {r: 1, g: 1, b: 1, a: 1}
+  pipSpentColor: {r: 1, g: 1, b: 1, a: 0.15}
+  pipLockedColor: {r: 0.9, g: 0.15, b: 0.15, a: 1}
+  pipLockedSpentColor: {r: 0.9, g: 0.15, b: 0.15, a: 0.35}
+  pipSize: 14
+  pipSpacing: 4
+  pipRowHeight: 20
+  pipOutlineWidth: 2
+  pipOutlineColor: {r: 0, g: 0, b: 0, a: 0.85}
+  cooldownCoverColor: {r: 0, g: 0, b: 0, a: 0.65}
+  ultimateChargeColor: {r: 1, g: 0.85, b: 0.25, a: 0.45}
+  ultimateReadyTextColor: {r: 1, g: 0.95, b: 0.6, a: 1}
+  ultimateRecastText: THROW
+  ultimateReadyText: READY
+  ultimateNoneText: No ultimate
+  statusStunnedText: STUNNED
+  statusSlowedText: SLOWED
+  statusStunnedColor: {r: 1, g: 0.86, b: 0.1, a: 1}
+  statusSlowedColor: {r: 0.4, g: 0.7, b: 1, a: 1}
+  statusHudOffsetY: 170
+  statusHudBarSize: {x: 220, y: 8}
+  statusOverheadTextSize: 15
+  statusOverheadLabelY: 15.5
+  statusOverheadBarY: 11
+  statusOverheadBarSize: {x: 15, y: 1}
+  shieldWastedText: Wasted
+  shieldWastedColor: {r: 0.75, g: 0.78, b: 0.85, a: 1}
+  shieldWastedSeconds: 1.2
+  shieldWastedTextSize: 15
+  shieldWastedY: 27
+  silencedIconColor: {r: 0.85, g: 0.85, b: 0.85, a: 0.9}
+  silencedWashAlpha: 0.35
+  silencedIconSize: 28
+  silencedStrikeWidth: 38
+  silencedStrikeHeight: 4
+  loadoutDimColor: {r: 0, g: 0, b: 0, a: 0.75}
+  loadoutPanelColor: {r: 0.05, g: 0.05, b: 0.07, a: 0.96}
+  loadoutPanelPadding: 20
+  loadoutSectionGap: 16
+  loadoutPanelTopMargin: 24
+  loadoutPageWidth: 1700
+  loadoutPageHeight: 540
+  loadoutNodeWidth: 180
+  loadoutNodeHeight: 96
+  loadoutAbilityCardWidth: 240
+  loadoutAbilityCardHeight: 88
+  loadoutAbilityColumnGap: 60
+  loadoutNodeSpacing: 20
+  loadoutEquippedBorderWidth: 4
+  loadoutStepperButtonSize: 56
+  loadoutStepperFontSize: 32
+  loadoutSmallButtonWidth: 170
+  loadoutSmallButtonHeight: 42
+  loadoutSelectableColor: {r: 0.16, g: 0.16, b: 0.19, a: 0.95}
+  loadoutOwnedColor: {r: 0.3, g: 0.3, b: 0.33, a: 0.85}
+  loadoutShopBlockedColor: {r: 0.22, g: 0.14, b: 0.05, a: 0.92}
+  loadoutPriceLineSizePercent: 70
+  loadoutBlockedReasonDurationSeconds: 2
+  loadoutSwapFormat: Swap {0} (sell back +{1})
+  loadoutSwapLineSizePercent: 55
+  loadoutSoldWeaponFormat: 'Sold {0}: +{1} gold'
+  loadoutSoldArmorFormat: 'Sold armour upgrades: +{0} gold'
+  loadoutSoldMessageDurationSeconds: 3
+  loadoutTooltipDelaySeconds: 0.5
+  loadoutTooltipMaxWidth: 400
+  loadoutTooltipNumbersColor: {r: 0.72, g: 0.74, b: 0.8, a: 1}
+  loadoutTooltipBackgroundColor: {r: 0.12, g: 0.12, b: 0.145, a: 1}
+  loadoutTooltipOffset: {x: 16, y: -18}
+  loadoutTooltipFlipGap: 8
+  loadoutArrowSideLaneFactor: 0.8
+  loadoutArmorUpgradeFormat: Upgrade {0} of {1}
+  loadoutArmorMaxFormat: '{0} of {0} (max)'
+  loadoutArmorTopLevelText: top level
+  loadoutArmorAbsorbRowFormat: 'Absorb lv {0}: {1}'
+  loadoutArmorRechargeRowFormat: 'Recharge lv {0}: {1}'
+  loadoutArrowColor: {r: 0.42, g: 0.42, b: 0.47, a: 1}
+  loadoutArrowWidth: 3
+  loadoutArrowHeadSize: 12
+  loadoutTreeRowGap: 90
+  loadoutTreeColumnGap: 50
+  loadoutTabWeaponsText: Weapons
+  loadoutTabAbilitiesArmorText: Abilities & Armor
+  loadoutTabWidth: 300
+  loadoutTabHeight: 46
+  loadoutTabActiveColor: {r: 0.3, g: 0.3, b: 0.36, a: 1}
+  loadoutTabInactiveColor: {r: 0.13, g: 0.13, b: 0.16, a: 1}
+  loadoutArmorAbsorbTipName: Absorb armor
+  loadoutArmorAbsorbTipText: Armor that soaks damage before your health takes any.
+  loadoutArmorAbsorbNowFormat: 'Now: level {0}, soaks {1} damage'
+  loadoutArmorAbsorbNextFormat: 'Next: level {0}, soaks {1} damage ({2})'
+  loadoutArmorRechargeTipName: Recharge armor
+  loadoutArmorRechargeTipText: Your armor starts refilling sooner after a fight.
+  loadoutArmorRechargeNowFormat: 'Now: level {0}, refills after {1}s out of combat'
+  loadoutArmorRechargeNextFormat: 'Next: level {0}, refills after {1}s out of combat ({2})'
+  loadoutArmorNoNextText: 'Next: no upgrade left'
+  loadoutToggleButtonWidth: 190
+  loadoutToggleButtonHeight: 48
+  loadoutToggleButtonMargin: 24
+  teamShotColors:
+  - {r: 0.93, g: 0.97, b: 1, a: 1}
+  - {r: 0.68, g: 0.32, b: 1, a: 1}
+  - {r: 0.15, g: 0.95, b: 1, a: 1}
+  unknownTeamShotColor: {r: 0.55, g: 0.55, b: 0.58, a: 0.5}
+  trailTime: 0.35
+  trailStartWidth: 0.15
+  trailEndWidth: 0.02
+  trailMaterial: {fileID: 2100000, guid: 26c3ed38fb3f03746848d4f3ce14fb2c, type: 2}
+  bulletTintStrength: 0.9
+  bulletEmission: 5
+  laserWarningStartWidth: 0.03
+  laserWarningEndWidth: 0.14
+  laserWarningStartAlpha: 0.15
+  laserWarningEndAlpha: 0.9
+  laserWarningMaterial: {fileID: 2100000, guid: 26c3ed38fb3f03746848d4f3ce14fb2c, type: 2}
+  laserBeamWidth: 0.14
+  laserBeamEmission: 1.6
+  laserBeamLingerSeconds: 0.18
+  goldTextColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+  goldShopGap: 8
+  goldIncomeSizePercent: 75
+  bountyToastColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+  bountyToastDurationSeconds: 3
+  capitalUnderAttackRespawnNote: Your capital is under attack - you will respawn
+    at your Tier 2 zone
+  capitalUnderAttackRespawnToast: 'Respawned at Tier 2: capital under attack'
+  capitalUnderAttackNoteFontSize: 30
+  capitalUnderAttackNoteColor: {r: 1, g: 1, b: 1, a: 1}
+  capitalUnderAttackNoteBackingColor: {r: 0, g: 0, b: 0, a: 0.6}
+  twoTeamsLeftBannerText: 'Two teams left: lose your base and you can''t respawn'
+  waitingPanelText: "Waiting for team to \n\ncapture Base territory "
+  captureRingMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
+  captureRingOutlineWidth: 0.15
+  captureRingArcWidth: 0.45
+  captureRingArcGap: 0.1
+  captureRingHeightOffset: 0.06
+  captureRingNeutralColor: {r: 1, g: 1, b: 1, a: 0.35}
+  captureRingPausedBlinkSpeed: 0.7
+  captureRingPausedOpacity: 0.6
+  captureRingWarningColor: {r: 1, g: 0.2, b: 0.15, a: 1}
+  captureRingPulseSpeed: 1.6
+  captureRingSegments: 96
+  captureRingTrackColor: {r: 0, g: 0, b: 0, a: 0.4}
+  minimapCornerSize: 340
+  minimapCornerMargin: 24
+  minimapLargeSize: 860
+  minimapLargeBottomClearance: 300
+  minimapFrameWidth: 5
+  minimapFrameColor: {r: 0.06, g: 0.06, b: 0.08, a: 0.9}
+  minimapBackgroundTint: {r: 1, g: 1, b: 1, a: 0.9}
+  minimapBubbleDiameterTier1: 36
+  minimapBubbleDiameterTier2: 24
+  minimapBubbleDiameterTier3: 18
+  minimapBubbleDiameterTier4: 30
+  minimapBubbleOutlineWidth: 3
+  minimapBubbleOutlineColor: {r: 0, g: 0, b: 0, a: 0.85}
+  minimapNeutralColor: {r: 0.55, g: 0.55, b: 0.55, a: 1}
+  minimapLabelSize: 16
+  minimapProgressRingWidth: 4
+  minimapOwnedLinkWidth: 4
+  minimapNeutralLinkWidth: 2
+  minimapArrowheadSize: 12
+  minimapOwnMarkerSize: 18
+  minimapPackBadgeSize: 12
+  minimapPackBadgeBarFraction: 0.34
+  minimapOwnMarkerColor: {r: 1, g: 0.85, b: 0.25, a: 1}
+  minimapTeammateDotSize: 10
+  minimapTeammateDotColor: {r: 0.45, g: 1, b: 0.45, a: 1}
+  minimapCornerOpacity: 0.8
+  minimapLargeOpacity: 1
+  minimapLargeMovingOpacityDrop: 0.3
+  minimapOpacityFadeSeconds: 0.25
+  minimapMovingEnterSpeed: 1
+  minimapMovingExitSpeed: 0.35
+  minimapSpeedSmoothingSeconds: 0.15
+  overPowerActiveText: OVERPOWER
+  overPowerArmedText: OverPower ready
+  overPowerActiveColor: {r: 1, g: 0.25, b: 0.55, a: 1}
+  overPowerArmedColor: {r: 1, g: 0.25, b: 0.55, a: 0.45}
+  coneLineColor: {r: 1, g: 1, b: 1, a: 0.55}
+  coneFanLineColor: {r: 1, g: 1, b: 1, a: 0.25}
+  coneLineWidth: 0.04
+  showRangeArc: 1
+  coneArcColor: {r: 1, g: 1, b: 1, a: 0.35}
+  coneArcSegments: 24
+  coneLineMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
+  showChargeRing: 1
+  chargeRingMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
+  chargeRingRadius: 1.15
+  chargeRingWidth: 0.22
+  chargeRingHeightOffset: 0.06
+  chargeRingSegments: 64
+  chargeRingTrackColor: {r: 0, g: 0, b: 0, a: 0.45}
+  chargeRingFillColor: {r: 1, g: 0.82, b: 0.2, a: 0.85}
+  chargeRingFullColor: {r: 1, g: 0.95, b: 0.6, a: 1}
+  chargeRingStepTickColor: {r: 1, g: 1, b: 1, a: 0.85}
+  chargeRingStepTickLength: 0.3
+  chargeRingStepTickWidth: 0.05
+  debugLogWidthPixels: 420
+  debugLogMaxHeightFraction: 0.45
+  debugLogScreenMarginPixels: 8
+  debugLogGapBelowMinimapPixels: 6
+  outOfPlayZoneColor: {r: 0.12, g: 0.12, b: 0.12, a: 0.45}
+  minimapCutAreaColor: {r: 0.05, g: 0.05, b: 0.06, a: 0.75}
+  minimapCutWallColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
+  minimapCutWallWidth: 3
+  warmupWaitingText: 'Warm-up: nothing counts yet and the shop is free. The host starts once two teams have a player.'
+  warmupHostText: 'Warm-up: press Start when you''re ready (two or three teams).'
+  warmupGuestText: 'Warm-up: waiting for the host to start.'
+  matchCountdownText: Match starts in {0}
+  matchStartButtonText: Start match ({0} teams)
+  matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
+  matchStartButtonSize: {x: 260, y: 52}
+  warmupTopOffset: 130
+  warmupLineSize: {x: 900, y: 64}
+  matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
+  matchLiveTwoTeamsToastText: 'Two teams: lose your base and you can''t respawn'
+  lobbyTwoTeamsButtonText: Two teams (up to 6)
+  lobbyThreeTeamsButtonText: Three teams (up to 9)
+  lobbyTwoTeamsTooManyText: Two teams needs 6 players or fewer
+  warmupTwoTeamsWaitingText: 'Warm-up (two teams): the host starts once both teams have a player.'
+  warmupTwoTeamsHostText: 'Warm-up (two teams): both teams are here. Start when you''re ready.'
+  warmupTwoTeamsGuestText: 'Warm-up (two teams): waiting for the host to start.'
+  showDamageNumbers: 1
+  damageNumberTextSize: 30
+  damageNumberColor: {r: 1, g: 1, b: 1, a: 1}
+  markColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  damageNumberMarkedScale: 1.4
+  damageNumberLifetimeSeconds: 0.8
+  damageNumberPopSeconds: 0.12
+  damageNumberPopScale: 1.5
+  damageNumberHoldSeconds: 0.6
+  damageNumberRise: 60
+  damageNumberFadeStart: 0.55
+  damageNumberAnchorHeight: 2
+  scoreboardWidth: 1100
+  scoreboardRowHeight: 42
+  scoreboardTextSize: 26
+  scoreboardHeadingTextSize: 28
+  scoreboardPanelColor: {r: 0.04, g: 0.04, b: 0.06, a: 0.88}
+  scoreboardSelfRowColor: {r: 1, g: 1, b: 1, a: 0.16}
+  scoreboardRefreshesPerSecond: 5
+  scoreboardColumnEdges:
+  - 0.02
+  - 0.42
+  - 0.53
+  - 0.64
+  - 0.75
+  - 0.88
+  - 0.99
+  scoreboardSortingOrder: 30
+  scoreboardPaddingHorizontal: 12
+  scoreboardPaddingVertical: 11
+  scoreboardLineSpacing: 2
+  scoreboardTitleExtraSize: 6
+  scoreboardTitleText: Scoreboard
+  scoreboardColumnTexts:
+  - Player
+  - Kills
+  - Deaths
+  - Assists
+  - Damage
+  - Zones
+  scoreboardTeamNames:
+  - White
+  - Purple
+  - Cyan
+  scoreboardUnknownTeamText: Joining
+  nameTipsKeysText: "<b>Keys</b>\nWASD  move\nMouse  aim, left click shoots\nRight click  Attachment ability\nLeft Shift  Mobility ability\nSpace  Ultimate ability (meter full)\nR  Vent (see Overheat)\nP  Shop\nM  Map\nHold Tab  Scoreboard\nEnter  Chat\nEscape  Close the game"
+  nameTipsOverheatText: "<b>Overheat and the Vent</b>\nShooting and Sprint build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\nWhile locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout."
+  nameTipsChargesText: "<b>Ability charges</b>\nSome abilities hold several charges. Spent charges come back one at a time. Dash locks until 2 charges are back once you use all 3."
+  nameTipsModeText: "<b>The match</b>\nCapture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake it or take another team's base. The last team standing wins."
+  nameTipsFontSize: 20
+  nameTipsColor: {r: 1, g: 1, b: 1, a: 0.9}
+  nameTipsKeysWidth: 560
+  nameTipsRulesWidth: 800
+  nameTipsColumnGap: 60
+  nameTipsGapBelowJoin: 30
+  damageNumberScreenOffset: {x: 50, y: 0}
+  blockedText: Blocked
+  blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
+  markIndicatorSize: 22
+  markIndicatorAnchorHeight: 3.6
+  markIndicatorPulseSpeed: 2.5
+  markIndicatorMinAlpha: 0.35
+  towerNeutralColor: {r: 0.42, g: 0.42, b: 0.42, a: 1}
+  towerBodyShade: 0.8
+  towerOwnerGlow: 1.5
+  bugMarkedText: Bug marked - type what happened in chat
+  quitPromptText: Close the game?
+  quitYesText: Yes
+  quitNoText: No
+  matchLogSavedText: 'Your match log is saved: {0} - send this file to Tudor.'
+  openLogFolderText: Open folder
+  connectionLostTitle: Connection lost
+  connectionLostBody: Rejoin to come back to the same match as the same player - same team, gold and loadout. You respawn as after a death.
+  connectionLostRejoinButton: Rejoin
+  connectionLostLeaveButton: Leave
+  rejoinWorkingText: Reconnecting...
+  rejoinFailedText: The match has ended, or your place in it was given up. You can join a new match.
+  rejoinFailedOkButton: OK
+  rejoinPlaceHeldText: You still hold a place in a match you dropped out of, but it could not be reached. Try again in a minute, or join a new match once it is given up.
+  rejoinMatchButton: Rejoin your match
+  resultButtonMainMenu: Main menu
+  resultButtonQuit: Quit
+  spectateButton: Spectate
+  spectateNextButton: Next
+  spectateStripSize: {x: 460, y: 70}
+  spectateStripBottom: 120
+  spectateButtonOffset: 115
+  connectionLostPanelWidth: 640
+  connectionLostPanelColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.95}
+  connectionLostTitleColor: {r: 1, g: 0.55, b: 0.35, a: 1}
+  connectionLostTitleSize: 34
+  connectionLostBodySize: 22
+  rejoinButtonSize: {x: 260, y: 52}
+  rejoinMatchButtonSize: {x: 420, y: 52}
+  rejoinButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
+  rejoinButtonGapAboveNameBox: 16

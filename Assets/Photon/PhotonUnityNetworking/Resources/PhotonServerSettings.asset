@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: PhotonServerSettings
   m_EditorClassIdentifier: 
   AppSettings:
-    AppIdRealtime: c631f6e2-20f6-4481-9984-6025e8f3596b
+    AppIdRealtime: b3850b65-9061-4726-86e0-f338fd10cd3b
     AppIdFusion: 
-    AppIdChat: 3902c4a1-066d-4946-8577-185f2d9a0a90
+    AppIdChat: 1ca3ca4b-95ef-4e1e-96bd-284c2e34e00d
     AppIdVoice: 
     AppVersion: 
     UseNameServer: 1
@@ -23,7 +23,7 @@ MonoBehaviour:
     Server: 
     Port: 0
     ProxyServer: 
-    Protocol: 1
+    Protocol: 0
     EnableProtocolFallback: 1
     AuthMode: 0
     EnableLobbyStatistics: 0
@@ -74,6 +74,11 @@ MonoBehaviour:
   - RPC_HandleRespawnMaster
   - RPC_ShowYouWonPanel
   - RPC_TerritoryWin
+  - RPC_FireWeapon
+  - RPC_CastAbility
+  - RPC_ApplyStatusFromPeer
+  - RPC_DamageCredit
+  - RPC_Detonate
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

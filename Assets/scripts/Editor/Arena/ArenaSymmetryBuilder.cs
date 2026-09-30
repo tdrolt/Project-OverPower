@@ -1,0 +1,286 @@
+using System.Collections.Generic;
+using Overpower.Arena;
+using Photon.Pun;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+namespace Overpower.EditorTools
+{
+    /// <summary>
+    /// The arena tool behind ArenaSymmetry's "Rebuild thirds" and "Validate" buttons. See ArenaSymmetry's class
+    /// comment for the designer workflow; this class is the how.
+    /// </summary>
+    public static class ArenaSymmetryBuilder
+    {
+        /// <summary>How far a copy or snapped partner may sit from where its source puts it before Validate reports
+        /// it. Tight on purpose: the tool places copies exactly, so anything bigger means a hand edit or a forgotten
+        /// rebuild.</summary>
+        public const float PositionToleranceMetres = 0.05f;
+        public const float AngleToleranceDegrees = 0.5f;
+
+        /// <summary>How far a boundary wall's inner face may sit from Source Outline before Validate reports it. Loose
+        /// enough for a corner where two pieces meet, tight enough that a wall moved by hand is caught.</summary>
+        public const float OutlineToleranceMetres = 0.15f;
+
+        /// <summary>The child of Source (and of each generated third) holding the boundary walls. Kept on ArenaSymmetry
+        /// itself (a runtime class) rather than defined here, because the portal path check (movement step 3) needs
+        /// the same name from gameplay code, which cannot reference this Editor-only class.</summary>
+        public const string BoundaryGroupName = ArenaSymmetry.BoundaryGroupName;
+
+        private const string UndoName = "Rebuild arena thirds";
+
+        /// <summary>Deletes both generated thirds, copies Source into them turned 120° and 240°, moves snapped
+        /// partners and centred objects, and returns Validate's findings. If the setup is wrong it changes nothing
+        /// and returns what is wrong. It never saves the scene: the designer looks first, then saves.</summary>
+        public static List<string> Rebuild(ArenaSymmetry arena, bool recordUndo)
+        {
+            // A rebuild moves live snapped towers and spawns. In Play Mode that would move them on this one client
+            // only - every other client's arena stays where it was, desyncing the match - so refuse outright.
+            if (EditorApplication.isPlaying)
+                return new List<string> { "Can't rebuild the arena thirds in Play Mode: it would move live towers and spawns on this client only and desync the match. Stop Play Mode first." };
+
+            List<string> problems = CheckSetup(arena);
+            if (problems.Count > 0)
+                return problems;
+
+            // A fresh group per rebuild, so a script that calls Rebuild in a loop still collapses each call into its
+            // own single undo step instead of merging every call into whichever group was open before the first one.
+            if (recordUndo)
+                Undo.IncrementCurrentGroup();
+            int undoGroup = Undo.GetCurrentGroup();
+            if (recordUndo)
+                Undo.SetCurrentGroupName(UndoName);
+
+            Transform[] targets = { arena.generated120, arena.generated240 };
+            for (int t = 0; t < targets.Length; t++)
+            {
+                Transform target = targets[t];
+                for (int i = target.childCount - 1; i >= 0; i--)
+                {
+                    GameObject old = target.GetChild(i).gameObject;
+                    if (recordUndo) Undo.DestroyObjectImmediate(old);
+                    else UnityEngine.Object.DestroyImmediate(old);
+                }
+
+                int thirds = t + 1;
+                for (int i = 0; i < arena.source.childCount; i++)
+                {
+                    Transform original = arena.source.GetChild(i);
+                    GameObject copy = UnityEngine.Object.Instantiate(original.gameObject, target);
+                    copy.name = original.name;
+                    copy.transform.SetPositionAndRotation(
+                        RadialSymmetry.RotatePoint(original.position, arena.centre, thirds),
+                        RadialSymmetry.RotateRotation(original.rotation, thirds));
+                    copy.transform.localScale = original.localScale;
+                    // A copy must be a plain object: one still linked to a prefab asset would offer "Apply to
+                    // Prefab" in its context menu, and using that on a generated, throwaway copy would silently
+                    // overwrite the shared asset with this copy's (turned) transform.
+                    if (PrefabUtility.IsPartOfPrefabInstance(copy))
+                        PrefabUtility.UnpackPrefabInstance(copy, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+                    foreach (Transform part in copy.GetComponentsInChildren<Transform>(true))
+                        part.gameObject.hideFlags |= HideFlags.NotEditable;
+                    if (recordUndo)
+                        Undo.RegisterCreatedObjectUndo(copy, UndoName);
+                }
+            }
+
+            foreach (ArenaSymmetry.SnappedTriplet triplet in arena.snappedTriplets)
+            {
+                Place(triplet.at120, RadialSymmetry.RotatePoint(triplet.source.position, arena.centre, 1),
+                      RadialSymmetry.RotateRotation(triplet.source.rotation, 1), recordUndo);
+                Place(triplet.at240, RadialSymmetry.RotatePoint(triplet.source.position, arena.centre, 2),
+                      RadialSymmetry.RotateRotation(triplet.source.rotation, 2), recordUndo);
+            }
+
+            foreach (Transform middle in arena.centred)
+                Place(middle, new Vector3(arena.centre.x, middle.position.y, arena.centre.z), middle.rotation, recordUndo);
+
+            if (recordUndo)
+                Undo.CollapseUndoOperations(undoGroup);
+            if (!EditorSceneManager.IsPreviewScene(arena.gameObject.scene))
+                EditorSceneManager.MarkSceneDirty(arena.gameObject.scene);
+
+            return Validate(arena);
+        }
+
+        /// <summary>Everything that doesn't match its source, one line each. Empty means symmetric.</summary>
+        public static List<string> Validate(ArenaSymmetry arena)
+        {
+            List<string> problems = CheckSetup(arena);
+            if (problems.Count > 0)
+                return problems;
+
+            Transform[] targets = { arena.generated120, arena.generated240 };
+            for (int t = 0; t < targets.Length; t++)
+            {
+                Transform target = targets[t];
+                if (target.childCount != arena.source.childCount)
+                {
+                    problems.Add($"{target.name} has {target.childCount} objects but Source has {arena.source.childCount}: press Rebuild thirds.");
+                    continue;
+                }
+                for (int i = 0; i < arena.source.childCount; i++)
+                {
+                    Transform original = arena.source.GetChild(i);
+                    Transform copy = target.GetChild(i);
+                    if (copy.name != original.name)
+                    {
+                        // Once Source's order no longer lines up with a generated third, comparing further indices
+                        // just restates the same cause once per object; one line for the whole third says it plainly.
+                        problems.Add($"{target.name}: Source order or contents changed since the last rebuild: press Rebuild thirds.");
+                        break;
+                    }
+                    Compare(original, copy, arena.centre, t + 1, problems);
+                    if ((copy.localScale - original.localScale).sqrMagnitude > 1e-6f)
+                        problems.Add($"{copy.name} ({(t + 1) * 120}°) has a different scale from its Source.");
+                }
+            }
+
+            foreach (ArenaSymmetry.SnappedTriplet triplet in arena.snappedTriplets)
+            {
+                Compare(triplet.source, triplet.at120, arena.centre, 1, problems);
+                Compare(triplet.source, triplet.at240, arena.centre, 2, problems);
+            }
+
+            foreach (Transform middle in arena.centred)
+            {
+                float off = new Vector2(middle.position.x - arena.centre.x, middle.position.z - arena.centre.z).magnitude;
+                if (off > PositionToleranceMetres)
+                    problems.Add($"{middle.name} is {off:0.00} m from the centre.");
+            }
+
+            CheckOutline(arena, problems);
+
+            return problems;
+        }
+
+        /// <summary>Every boundary wall must sit on Source Outline (movement step 3). A designer who moves a wall and
+        /// forgets the outline would otherwise leave blink, portals and the safety net working off the old edge.</summary>
+        private static void CheckOutline(ArenaSymmetry arena, List<string> problems)
+        {
+            // A tiny arena with no boundary walls (the builder's own tests) has nothing to check.
+            if (arena.source.Find(BoundaryGroupName) == null)
+                return;
+
+            ArenaBounds outline = ArenaBounds.FromSourceOutline(arena.sourceOutline, arena.centre);
+            if (outline == null)
+            {
+                problems.Add("Source has boundary walls but Source Outline has fewer than two points: set it to the " +
+                             "inner faces of the walls under Source/" + BoundaryGroupName + ".");
+                return;
+            }
+
+            foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
+            {
+                Transform walls = third.Find(BoundaryGroupName);
+                if (walls == null)
+                    continue; // The copy check above already says a rebuild is needed.
+
+                foreach (BoxCollider box in walls.GetComponentsInChildren<BoxCollider>(true))
+                {
+                    // A boundary piece's pivot is its outer face and its local +Z faces the arena, so the inner face
+                    // is the box's +Z side.
+                    Vector3 face = box.transform.TransformPoint(box.center + new Vector3(0f, 0f, box.size.z * 0.5f));
+                    float off = Mathf.Abs(outline.SignedDistance(face));
+                    if (off > OutlineToleranceMetres)
+                        problems.Add($"{box.name} ({third.name}) has its inner face {off:0.00} m off Source Outline: " +
+                                      "move the outline points onto the boundary walls' inner faces.");
+                }
+            }
+        }
+
+        private static List<string> CheckSetup(ArenaSymmetry arena)
+        {
+            var problems = new List<string>();
+            if (arena == null) { problems.Add("No ArenaSymmetry given."); return problems; }
+            if (arena.source == null || arena.generated120 == null || arena.generated240 == null)
+            {
+                problems.Add("Source, Generated 120 and Generated 240 must all be assigned.");
+                return problems;
+            }
+            if (arena.source == arena.generated120 || arena.source == arena.generated240 || arena.generated120 == arena.generated240
+                || arena.generated120.IsChildOf(arena.source) || arena.generated240.IsChildOf(arena.source)
+                || arena.source.IsChildOf(arena.generated120) || arena.source.IsChildOf(arena.generated240))
+                problems.Add("Source and the two generated thirds must be three separate objects, none inside another.");
+
+            foreach (Transform parent in new[] { arena.source, arena.generated120, arena.generated240 })
+            {
+                // Copies are placed in world space but keep Source's local scale, which is only the same thing when
+                // these parents have no position, rotation or scale of their own.
+                if (parent.position != Vector3.zero || parent.rotation != Quaternion.identity || parent.lossyScale != Vector3.one)
+                    problems.Add($"{parent.name} must sit at position 0, rotation 0, scale 1 (it doesn't).");
+            }
+
+            foreach (PhotonView view in arena.source.GetComponentsInChildren<PhotonView>(true))
+                problems.Add($"'{view.name}' under Source has a PhotonView. Networked objects can't be copied (their view ids must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+
+            // Towers get their own message below; anything else that is networked - a MonoBehaviourPun script, or
+            // any component that streams state over the network via IPunObservable - gets a generic one. A
+            // component already covered by the tower message isn't repeated with the generic wording too.
+            var alreadyReportedNetworked = new HashSet<Component>();
+            foreach (BuildingCapture tower in arena.source.GetComponentsInChildren<BuildingCapture>(true))
+            {
+                problems.Add($"'{tower.name}' under Source is a capture tower. Towers can't be copied (their ids must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+                alreadyReportedNetworked.Add(tower);
+            }
+            foreach (MonoBehaviourPun pun in arena.source.GetComponentsInChildren<MonoBehaviourPun>(true))
+            {
+                if (pun == null || alreadyReportedNetworked.Contains(pun))
+                    continue; // null means a missing script, which has nothing to move to Snapped Triplets anyway
+                problems.Add($"'{pun.name}' under Source has a {pun.GetType().Name}, a networked script. Networked objects can't be copied (their view state must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+                alreadyReportedNetworked.Add(pun);
+            }
+            foreach (IPunObservable observable in arena.source.GetComponentsInChildren<IPunObservable>(true))
+            {
+                var component = observable as Component;
+                if (component == null || alreadyReportedNetworked.Contains(component))
+                    continue;
+                problems.Add($"'{component.name}' under Source has a {component.GetType().Name}, which streams state over the network (IPunObservable). Networked objects can't be copied (their view state must stay unique): move it out of Source and add it to Snapped Triplets instead.");
+                alreadyReportedNetworked.Add(component);
+            }
+
+            for (int i = 0; i < arena.snappedTriplets.Count; i++)
+            {
+                ArenaSymmetry.SnappedTriplet triplet = arena.snappedTriplets[i];
+                if (triplet == null || triplet.source == null || triplet.at120 == null || triplet.at240 == null)
+                {
+                    problems.Add($"Snapped Triplet {i} has an empty slot.");
+                    continue;
+                }
+                foreach (Transform member in new[] { triplet.source, triplet.at120, triplet.at240 })
+                    if (IsUnderArenaThirds(arena, member))
+                        problems.Add($"'{member.name}' (Snapped Triplet {i}) is inside Source or a generated third, so a rebuild would copy or delete it.");
+            }
+            foreach (Transform middle in arena.centred)
+            {
+                if (middle == null) problems.Add("Centred has an empty slot.");
+                else if (IsUnderArenaThirds(arena, middle)) problems.Add($"'{middle.name}' (Centred) is inside Source or a generated third.");
+            }
+            return problems;
+        }
+
+        private static bool IsUnderArenaThirds(ArenaSymmetry arena, Transform t) =>
+            t.IsChildOf(arena.source) || t.IsChildOf(arena.generated120) || t.IsChildOf(arena.generated240);
+
+        private static void Compare(Transform original, Transform copy, Vector3 centre, int thirds, List<string> problems)
+        {
+            float drift = Vector3.Distance(RadialSymmetry.RotatePoint(original.position, centre, thirds), copy.position);
+            if (drift > PositionToleranceMetres)
+                problems.Add($"{copy.name} ({thirds * 120}°) is {drift:0.00} m from where {original.name} puts it.");
+            float turn = Quaternion.Angle(RadialSymmetry.RotateRotation(original.rotation, thirds), copy.rotation);
+            if (turn > AngleToleranceDegrees)
+                problems.Add($"{copy.name} ({thirds * 120}°) is turned {turn:0.0}° away from where {original.name} puts it.");
+        }
+
+        private static void Place(Transform target, Vector3 position, Quaternion rotation, bool recordUndo)
+        {
+            if (recordUndo)
+                Undo.RecordObject(target, UndoName);
+            target.SetPositionAndRotation(position, rotation);
+            // Towers 1/2/4/5/7/8 are prefab instances: without this a scripted move can be lost on save.
+            if (PrefabUtility.IsPartOfPrefabInstance(target))
+                PrefabUtility.RecordPrefabInstancePropertyModifications(target);
+        }
+    }
+}

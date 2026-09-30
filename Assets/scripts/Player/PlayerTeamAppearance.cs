@@ -51,7 +51,7 @@ public class PlayerTeamAppearance : MonoBehaviour
     /// Must be called again when the team arrives. teamID lives in a Photon Custom Property, which
     /// is asynchronous -- on a remote player it is routinely still NoTeam at Start(). This is the
     /// same trap the name tag colour hit, fixed in 5cd73a9 ("name tag colours recompute when teams
-    /// arrive"); Multiplayer.OnPlayerPropertiesUpdate drives both from one place.
+    /// arrive"); PlayerNameTag.OnPlayerPropertiesUpdate drives both from one place.
     /// </summary>
     public void Apply()
     {

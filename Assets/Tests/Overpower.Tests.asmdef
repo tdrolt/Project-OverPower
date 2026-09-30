@@ -1,0 +1,24 @@
+{
+  "name": "Overpower.Tests",
+  "rootNamespace": "Overpower.Tests",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Overpower.Runtime",
+    "Overpower.Editor",
+    "PhotonUnityNetworking",
+    "PhotonRealtime",
+    "Project.Tools",
+    "Unity.TextMeshPro",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [ "Editor" ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [ "nunit.framework.dll", "Newtonsoft.Json.dll" ],
+  "autoReferenced": false,
+  "defineConstraints": [ "UNITY_INCLUDE_TESTS" ],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

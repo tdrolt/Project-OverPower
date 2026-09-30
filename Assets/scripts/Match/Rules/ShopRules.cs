@@ -1,0 +1,112 @@
+using System;
+using Overpower.Data;
+
+namespace Overpower.Match
+{
+    public enum PurchaseBlock
+    {
+        None,
+        /// <summary>GDD p.18-19: shopping happens in territory your team holds.</summary>
+        NotInOwnTerritory,
+        /// <summary>GDD: out of combat for the shop's required seconds.</summary>
+        InCombat,
+        CannotAfford,
+    }
+
+    /// <summary>Task T4: which shop section a purchase/refund/refusal belongs to - LoadoutScreen's
+    /// own Purchased/Refunded/PurchaseRefused events carry this so PlayerTelemetry's
+    /// `purchase`/`refund`/`shopBlocked` lines can write it as the spec's plain "weapon" / "armor" /
+    /// "equipment" / "mobility" / "ultimate" category string without LoadoutScreen and
+    /// PlayerTelemetry each inventing their own naming.</summary>
+    public enum PurchaseCategory { Weapon, Armor, Equipment, Mobility, Ultimate }
+
+    /// <summary>The shop's purchase rules, apart from any UI, so the screen and any future shop ask the
+    /// same questions in the same order (the first failing reason is the one a player needs to fix).</summary>
+    public static class ShopRules
+    {
+        public static PurchaseBlock Check(bool inOwnTerritory, float secondsSinceCombat,
+                                          float requiredOutOfCombatSeconds, int balance, int price)
+        {
+            if (!inOwnTerritory) return PurchaseBlock.NotInOwnTerritory;
+            if (secondsSinceCombat < requiredOutOfCombatSeconds) return PurchaseBlock.InCombat;
+            if (price > 0 && balance < price) return PurchaseBlock.CannotAfford;
+            return PurchaseBlock.None;
+        }
+
+        /// <summary>Task 5b-1 (D4): a player waiting to respawn will respawn at home, so the "in your own
+        /// territory" gate counts as passed while dead. Living players are asked about where they really are.</summary>
+        public static bool EffectiveInOwnTerritory(bool isAlive, bool inOwnTerritory) => !isAlive || inOwnTerritory;
+
+        /// <summary>Task 5b-1 (D19): the text on a weapon node that can only be reached by selling the current
+        /// weapon path first: the new weapon's price and what selling back gives. Empty when there is nothing to
+        /// sell back (the node then keeps its normal price line). format: {0} = price, {1} = refund.</summary>
+        public static string SwapLine(int price, int refund, string format) =>
+            refund > 0 ? string.Format(System.Globalization.CultureInfo.InvariantCulture, format, price, refund) : "";
+
+        /// <summary>Task 5b-1 (D19): the message after selling armour upgrades. format has {0} = the refund.</summary>
+        public static string SoldArmorMessage(string format, int refund) =>
+            string.Format(System.Globalization.CultureInfo.InvariantCulture, format, refund);
+
+        /// <summary>Task 5b-1 (D19): the message after selling a weapon. format has {0} = what was sold, {1} = the refund.</summary>
+        public static string SoldMessage(string format, string what, int refund) =>
+            string.Format(System.Globalization.CultureInfo.InvariantCulture, format, what, refund);
+
+        public static float SecondsUntilOutOfCombat(float secondsSinceCombat, float requiredOutOfCombatSeconds) =>
+            Math.Max(0f, requiredOutOfCombatSeconds - secondsSinceCombat);
+
+        /// <summary>2.7b step 5b (Tudor answer 2): the ONE place "is the shop free right now?" is decided. The
+        /// warm-up (countdown included) is a sandbox so testers can experiment - buy anything, reset for free,
+        /// with no gate - and going live empties every loadout (PlayerLifecycle.ResetForMatchStart), so nothing
+        /// bought free in the warm-up survives into the real match. Free Loadout keeps the whole match free, as
+        /// before, whether or not the match is live.</summary>
+        public static bool IsFree(bool freeLoadout, bool matchLive) => freeLoadout || !matchLive;
+
+        /// <summary>What one ability pick actually costs. The prefab ships with the Mobility and
+        /// Equipment slots EMPTY (Task 2.5a) rather than pre-loaded with a free starting pick, so
+        /// the GDD's "starting kit is free" [G p.17-18] has to be read here instead: the FIRST pick
+        /// into an empty Mobility or Equipment slot is free, and only a later CHANGE away from it
+        /// costs the ability's own price [C, assumptions-for-tudor.md]. Named explicitly rather
+        /// than "free unless Ultimate" (Task 2.5b review fix 5) - AbilitySlot has a fourth value,
+        /// Primary, which the old check also silently freed; Primary is never actually offered
+        /// through this screen, but the rule itself should not depend on that being true forever.</summary>
+        public static int AbilityPrice(bool slotIsEmpty, AbilitySlot slot, int goldCost) =>
+            slotIsEmpty && (slot == AbilitySlot.Mobility || slot == AbilitySlot.Equipment) ? 0 : goldCost;
+    }
+
+    /// <summary>What a player has paid per category, so "undo" can refund part of it. Local to the
+    /// owner: only the resulting gold is replicated.</summary>
+    public sealed class PurchaseLedger
+    {
+        public int WeaponSpent { get; private set; }
+        public int ArmorSpent { get; private set; }
+
+        /// <summary>What SellWeapon would give right now, without selling - the one number the Reset button's
+        /// preview and every swap node show (Task 5b-1).</summary>
+        public int WeaponRefundPreview(double refundRate) => GoldMath.Refund(WeaponSpent, refundRate);
+
+        public void RecordWeapon(int price) { if (price > 0) WeaponSpent += price; }
+        public void RecordArmor(int price) { if (price > 0) ArmorSpent += price; }
+
+        public int SellWeapon(double refundRate)
+        {
+            int refund = GoldMath.Refund(WeaponSpent, refundRate);
+            WeaponSpent = 0;
+            return refund;
+        }
+
+        public int SellArmor(double refundRate)
+        {
+            int refund = GoldMath.Refund(ArmorSpent, refundRate);
+            ArmorSpent = 0;
+            return refund;
+        }
+
+        /// <summary>2.7b fresh start (Decision 6): forgets everything spent this match, so neither reset
+        /// button can refund warm-up spending once the real economy starts.</summary>
+        public void Clear()
+        {
+            WeaponSpent = 0;
+            ArmorSpent = 0;
+        }
+    }
+}
