@@ -349,6 +349,17 @@ namespace Overpower.Abilities
             }
         }
 
+        /// <summary>The owner's portal standing at a point (the departure point a trip's message carries), or null.</summary>
+        private static Portal FindPortalAt(int ownerActor, Vector3 point)
+        {
+            foreach (Portal p in Portal.ForOwner(ownerActor))
+            {
+                if (p != null && (p.transform.position - point).sqrMagnitude < 0.01f)
+                    return p;
+            }
+            return null;
+        }
+
         private Portal FindStandingPortal(IReadOnlyList<Portal> mine)
         {
             // The Rigidbody's position, not the Transform's: TeleportTo writes the Rigidbody and the Transform lags a
@@ -433,6 +444,11 @@ namespace Overpower.Abilities
                         // derives the floor back out of it so it still matches Origin's own floor-level point.
                         PlayArrivalVfx(cast.Payload.Origin);
                         PlayArrivalVfx(capsule != null ? PlayerSpaceProbe.FeetOf(capsule, cast.Payload.Point) : cast.Payload.Point);
+
+                        // Task 15: a trip just completed here - teammates standing on the departure portal travel with it.
+                        // Each client moves only its own player (AllyPortalTraveller.Local), no new message is needed.
+                        if (PortalUseRules.IsFreshGroupSignal(cast.SecondsLate))
+                            AllyPortalTraveller.Local?.JoinGroupTrip(Owner.ActorNumber, FindPortalAt(Owner.ActorNumber, cast.Payload.Origin), cast.CasterActor);
                     }
                     return;
 
@@ -491,9 +507,32 @@ namespace Overpower.Abilities
             if (travellerCapsule == null)
                 return false;
 
-            Vector3 root = ArrivalRoot(travellerCapsule, to);
+            return IsRootClear(travellerCapsule, ArrivalRoot(travellerCapsule, to), travellerRoot);
+        }
+
+        /// <summary>The same exit check for an arbitrary arrival root - a group member landing beside the centre rather
+        /// than on it (Task 15).</summary>
+        public static bool IsRootClear(CapsuleCollider travellerCapsule, Vector3 root, Transform travellerRoot)
+        {
+            if (travellerCapsule == null)
+                return false;
+
             return Overpower.Arena.ArenaSymmetry.IsInsideArena(root, travellerCapsule.radius)
                    && !PlayerSpaceProbe.IsCapsuleBlocked(travellerCapsule, root, ArenaLayers.WallsAndBarriers, travellerRoot);
+        }
+
+        /// <summary>The owner as a group member (a teammate's trip through my portal pulled me along): I was moved by
+        /// AllyPortalTraveller, so my own channel stops and the arrival portal is latched exactly as after my own trip.
+        /// No charge - the trip's one charge was spent by whoever triggered it.</summary>
+        public void NoteArrivedWithGroup(Portal arrival)
+        {
+            if (channelingPortal != null)
+            {
+                channelingPortal = null;
+                SendPhase(PhaseChannelCancel, default);
+            }
+            channelState.Reset();
+            channelState.LatchArrival(arrival);
         }
 
         // The check volume's vertical band above the grounded point - not a design tunable, the

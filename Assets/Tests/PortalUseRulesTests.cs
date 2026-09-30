@@ -143,5 +143,91 @@ namespace Overpower.Tests
         {
             Assert.IsTrue(PortalUseRules.ShowsUsable(flagKnown: false, ownerHasCharge: false));
         }
+        // ---- group travel: teammates standing on the portal when a trip completes ------------------
+
+        [Test]
+        public void ALivingTeammateOnTheDeparturePortalJoinsTheTrip()
+        {
+            Assert.IsTrue(PortalUseRules.JoinsGroupTrip(userAlive: true, sameTeamAsOwner: true, onDeparturePortal: true, isTheTraveller: false));
+        }
+
+        [Test]
+        public void ADeadPlayerDoesNotJoinTheTrip()
+        {
+            Assert.IsFalse(PortalUseRules.JoinsGroupTrip(userAlive: false, sameTeamAsOwner: true, onDeparturePortal: true, isTheTraveller: false));
+        }
+
+        [Test]
+        public void AnEnemyOnThePortalDoesNotJoinTheTrip()
+        {
+            Assert.IsFalse(PortalUseRules.JoinsGroupTrip(userAlive: true, sameTeamAsOwner: false, onDeparturePortal: true, isTheTraveller: false));
+        }
+
+        [Test]
+        public void ATeammateOnTheOtherPortalOfThePairDoesNotJoinTheTrip()
+        {
+            Assert.IsFalse(PortalUseRules.JoinsGroupTrip(userAlive: true, sameTeamAsOwner: true, onDeparturePortal: false, isTheTraveller: false));
+        }
+
+        [Test]
+        public void TheTravellerItselfIsNotPulledAlongASecondTime()
+        {
+            Assert.IsFalse(PortalUseRules.JoinsGroupTrip(userAlive: true, sameTeamAsOwner: true, onDeparturePortal: true, isTheTraveller: true));
+        }
+
+        [Test]
+        public void AGroupSignalOlderThanTheFreshWindowIsIgnored()
+        {
+            Assert.IsTrue(PortalUseRules.IsFreshGroupSignal(0.3f));
+            Assert.IsFalse(PortalUseRules.IsFreshGroupSignal(PortalUseRules.GroupSignalFreshSeconds + 0.1f));
+        }
+
+        [Test]
+        public void AGroupMemberArrivesAtTheSameOffsetFromTheOtherPortalsCentre()
+        {
+            Vector3 arrival = PortalUseRules.GroupArrivalPoint(new Vector3(10f, 0f, 0f), new Vector3(10.6f, 0f, -0.4f),
+                                                              new Vector3(-20f, 0f, 5f), PortalRadius, 0.5f);
+            Assert.AreEqual(-19.4f, arrival.x, 0.001f);
+            Assert.AreEqual(4.6f, arrival.z, 0.001f);
+        }
+
+        [Test]
+        public void AnOffsetBeyondThePortalRadiusIsClampedToTheRim()
+        {
+            Vector3 arrival = PortalUseRules.GroupArrivalPoint(Vector3.zero, new Vector3(1.4f, 0f, 0f), new Vector3(10f, 0f, 0f), PortalRadius, 0.5f);
+            Assert.AreEqual(11f, arrival.x, 0.001f);
+            Assert.AreEqual(0f, arrival.z, 0.001f);
+        }
+
+        [Test]
+        public void AMemberStandingNearTheCentreIsPushedOutSoItDoesNotLandInsideTheTraveller()
+        {
+            Vector3 arrival = PortalUseRules.GroupArrivalPoint(Vector3.zero, new Vector3(0.1f, 0f, 0f), new Vector3(10f, 0f, 0f), PortalRadius, 0.5f);
+            Assert.AreEqual(10.5f, arrival.x, 0.001f);
+        }
+
+        [Test]
+        public void AMemberExactlyOnTheCentreStillGetsAFixedSeparationFromIt()
+        {
+            Vector3 arrival = PortalUseRules.GroupArrivalPoint(Vector3.zero, Vector3.zero, new Vector3(10f, 0f, 0f), PortalRadius, 0.5f);
+            Vector3 flat = arrival - new Vector3(10f, 0f, 0f);
+            flat.y = 0f;
+            Assert.AreEqual(0.5f, flat.magnitude, 0.001f);
+        }
+
+        [Test]
+        public void TheArrivalPointKeepsTheOtherPortalsHeight()
+        {
+            Vector3 arrival = PortalUseRules.GroupArrivalPoint(new Vector3(0f, 3f, 0f), new Vector3(0.5f, 3.5f, 0f), new Vector3(10f, 1f, 0f), PortalRadius, 0.25f);
+            Assert.AreEqual(1f, arrival.y, 0.001f);
+        }
+        [Test]
+        public void ASeparationWiderThanThePortalRadiusIsStillKept()
+        {
+            // A player is wider than half the portal: landing 0.8 m from the traveller would overlap the body, so the
+            // member is placed a full body width (1.4 m) out, just past the rim, still touching the portal.
+            Vector3 arrival = PortalUseRules.GroupArrivalPoint(Vector3.zero, new Vector3(0.8f, 0f, 0f), new Vector3(10f, 0f, 0f), PortalRadius, 1.4f);
+            Assert.AreEqual(11.4f, arrival.x, 0.001f);
+        }
     }
 }
