@@ -304,7 +304,7 @@ namespace Overpower.UI
         [Tooltip("Width of the shop's content area under the tabs, in canvas units - the same on both pages, so the panel never changes size when you switch tabs. Wide enough for the four weapon-tree columns (Loadout Node Width and Loadout Tree Column Gap) and for the three ability columns (Loadout Ability Card Width, two cards across).")]
         public float loadoutPageWidth = 1700f;
         [Tooltip("Height of the shop's content area under the tabs, in canvas units - the same on both pages. Must fit the weapon tree with its Reset Weapon button and the Abilities & Armor page's tallest column.")]
-        public float loadoutPageHeight = 600f;
+        public float loadoutPageHeight = 540f;
         [Tooltip("Width of one weapon node button in the upgrade tree, in canvas units. The weapons page has the whole content area to itself, so the nodes are big enough to read at a glance; eight upgrades sit side by side (two under each of the four families), so eight of these plus the gaps must fit Loadout Page Width.")]
         public float loadoutNodeWidth = 180f;
         [Tooltip("Height of one weapon node button in the upgrade tree, in canvas units.")]
@@ -359,7 +359,7 @@ namespace Overpower.UI
         public Vector2 loadoutTooltipOffset = new Vector2(16f, -18f);
         [Tooltip("Gap between the cursor and the tooltip when it flips to the other side of the cursor near a screen edge, in canvas units.")]
         public float loadoutTooltipFlipGap = 8f;
-        [Tooltip("How far beside its column the arrow to a weapon's lower upgrade bows out, as a fraction of Loadout Tree Column Gap.")]
+        [Tooltip("How far beside its column an arrow bows out when it must run down past another node in the same column, as a fraction of Loadout Tree Column Gap. The shop's tree draws its upgrades side by side, so no arrow uses this today; it is kept for a deeper tree.")]
         [Range(0.1f, 1f)] public float loadoutArrowSideLaneFactor = 0.8f;
         [Tooltip("Armour row wording while upgrades remain. {0} = the number of the next upgrade, {1} = the limit (ArmorConfig Max Armor Upgrades).")]
         public string loadoutArmorUpgradeFormat = "Upgrade {0} of {1}";

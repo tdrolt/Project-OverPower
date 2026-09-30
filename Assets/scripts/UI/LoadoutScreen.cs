@@ -196,6 +196,7 @@ namespace Overpower.UI
         /// player object after a respawn or a match rebuild lands on the page the player last used).</summary>
         private static readonly ShopPageMemory pageMemory = new ShopPageMemory();
 
+        private RectTransform panelRect;
         private GameObject weaponsPageRoot;
         private GameObject abilitiesPageRoot;
         private Image weaponsTabImage;
@@ -417,6 +418,7 @@ namespace Overpower.UI
             // something on THIS screen was clicked. Abilities do not need this: AbilityRunner's
             // SlotChanged already fires for every equip from every source, and Refresh is already
             // subscribed to it.
+            FitPanelToCanvas();
             TickTooltip(Time.unscaledDeltaTime);
 
             int weaponId = CurrentWeaponId();
@@ -468,7 +470,21 @@ namespace Overpower.UI
             // before writing this) - the cursor is always free, so there is nothing to unlock here.
             HideTooltip(); // Reopening must not show whatever was last hovered before it closed.
             ShowPage(pageMemory.Last);
+            FitPanelToCanvas();
             Refresh();
+        }
+
+        /// <summary>Scales the panel down evenly when the canvas is narrower than the panel (4:3, 5:4 windows), so
+        /// nothing clips; ShopPanelScale is the rule. Cheap enough for Update, which calls it while open so a resized
+        /// window follows.</summary>
+        private void FitPanelToCanvas()
+        {
+            if (panelRect == null || screenRoot == null)
+                return;
+            float panelWidth = theme.loadoutPageWidth + 2f * Mathf.RoundToInt(theme.loadoutPanelPadding);
+            float scale = ShopPanelScale.For(((RectTransform)screenRoot.transform).rect.width, panelWidth);
+            if (!Mathf.Approximately(panelRect.localScale.x, scale))
+                panelRect.localScale = new Vector3(scale, scale, 1f);
         }
 
         public void Close()

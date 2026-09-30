@@ -157,6 +157,30 @@ namespace Overpower.Tests
             Assert.GreaterOrEqual(topLeft.y - h, -Half.y - 0.001f, "bottom edge");
         }
 
+        // ---- panel scale on narrow canvases ----
+
+        [Test]
+        public void APanelThatFitsTheCanvasIsNotScaled()
+        {
+            Assert.AreEqual(1f, ShopPanelScale.For(1920f, 1740f), 0.0001f);
+            Assert.AreEqual(1f, ShopPanelScale.For(1740f, 1740f), 0.0001f);
+        }
+
+        [Test]
+        public void APanelWiderThanTheCanvasIsScaledDownToFitEvenly()
+        {
+            Assert.AreEqual(1440f / 1740f, ShopPanelScale.For(1440f, 1740f), 0.0001f);
+            Assert.AreEqual(0.5f, ShopPanelScale.For(870f, 1740f), 0.0001f);
+        }
+
+        [Test]
+        public void ADegenerateCanvasOrPanelWidthLeavesTheScaleAtOne()
+        {
+            Assert.AreEqual(1f, ShopPanelScale.For(0f, 1740f), 0.0001f);
+            Assert.AreEqual(1f, ShopPanelScale.For(-5f, 1740f), 0.0001f);
+            Assert.AreEqual(1f, ShopPanelScale.For(1920f, 0f), 0.0001f);
+        }
+
         // ---- text ----
 
         [Test]
@@ -215,22 +239,25 @@ namespace Overpower.Tests
         public void TheAbsorbRowShowsTheCurrentLevelAndTheNextUpgradeWithItsPrice()
         {
             string text = ArmorPopupText.Numbers(true, config, 0, 0, "1400", AbsorbNow, AbsorbNext, NoNext);
-            Assert.AreEqual("Now: level 0, soaks 25 damage\nNext: level 1, soaks 50 damage (1400)", text);
+            string N(float v) => ShopNumberFormat.Compact(v);
+            Assert.AreEqual($"Now: level 0, soaks {N(config.AbsorbFor(0))} damage\nNext: level 1, soaks {N(config.AbsorbFor(1))} damage (1400)", text);
         }
 
         [Test]
         public void TheRechargeRowShowsTheCurrentLevelAndTheNextUpgradeWithItsPrice()
         {
             string text = ArmorPopupText.Numbers(false, config, 0, 1, "1800", RechargeNow, RechargeNext, NoNext);
-            Assert.AreEqual("Now: level 1, refills after 4s out of combat\nNext: level 2, refills after 2s out of combat (1800)", text);
+            string N(float v) => ShopNumberFormat.Compact(v);
+            Assert.AreEqual($"Now: level 1, refills after {N(config.RechargeSecondsFor(1))}s out of combat\nNext: level 2, refills after {N(config.RechargeSecondsFor(2))}s out of combat (1800)", text);
         }
 
         [Test]
         public void ARowWithNoUpgradeLeftSaysSo()
         {
-            // Two upgrades is the shared limit (ArmorConfig default): both rows are done.
-            string text = ArmorPopupText.Numbers(true, config, 2, 0, "-", AbsorbNow, AbsorbNext, NoNext);
-            Assert.AreEqual("Now: level 2, soaks 100 damage\nNext: no upgrade left", text);
+            // The shared limit (ArmorConfig.MaxArmorUpgrades) is spent: the row has no upgrade left (or its own top level, whichever is first).
+            int level = Mathf.Min(config.MaxArmorUpgrades, config.AbsorbLevelCount - 1);
+            string text = ArmorPopupText.Numbers(true, config, level, 0, "-", AbsorbNow, AbsorbNext, NoNext);
+            Assert.AreEqual($"Now: level {level}, soaks {ShopNumberFormat.Compact(config.AbsorbFor(level))} damage\nNext: no upgrade left", text);
         }
 
         // ---- what each item shows (read off the real assets) ----

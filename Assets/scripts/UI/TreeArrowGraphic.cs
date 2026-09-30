@@ -10,9 +10,10 @@ namespace Overpower.UI
     /// end per (weapon -> upgrade) pair. It only reads where the node rectangles currently are, so it follows the
     /// layout groups and any new weapon. Not a raycast target: the nodes under it keep their clicks and hovers.
     ///
-    /// Shapes: to an upgrade in another column, an S-curve from the weapon's bottom edge to the upgrade's top edge.
-    /// To the first upgrade stacked straight below, a short straight drop. To a later upgrade further down the same
-    /// column (a node sits between), a C-curve down the gap beside the column, entering the upgrade from the side.
+    /// Shapes: to a node off to the side (the two upgrades of a family sit side by side under it, Task 13), an S-curve
+    /// from the weapon's bottom edge to the upgrade's top edge. To a node directly below, a short straight drop. To a
+    /// node further down the same column with another node in between, a C-curve down the gap beside the column,
+    /// entering it from the side. The shop's tree today only needs the S-curve; the other two keep any layout working.
     /// </summary>
     public sealed class TreeArrowGraphic : MaskableGraphic
     {

@@ -1,5 +1,6 @@
 using System.Reflection;
 using NUnit.Framework;
+using Photon.Pun;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -55,9 +56,15 @@ namespace Overpower.Tests
         // never an EventSystem some other test (or the real scene) already had.
         private bool createdEventSystem;
 
+        /// <summary>The page memory is static (one per session), so a test that switches pages must not leak into the next.</summary>
+        private static void ResetPageMemory() =>
+            ((Overpower.Match.ShopPageMemory)typeof(LoadoutScreen).GetField("pageMemory", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null))
+                .Remember(Overpower.Match.ShopPage.Weapons);
+
         [SetUp]
         public void BuildScreen()
         {
+            ResetPageMemory();
             createdEventSystem = EventSystem.current == null;
 
             theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
@@ -95,6 +102,7 @@ namespace Overpower.Tests
         public void DestroyScreen()
         {
             Object.DestroyImmediate(screenGo);
+            ResetPageMemory();
 
             // G2: only destroy the EventSystem this test's own BuildUi call created - never one that
             // was already there (the real scene, or another test's own rig) before this test ran.
@@ -129,37 +137,102 @@ namespace Overpower.Tests
             return panelRect.rect.width;
         }
 
-        private void OpenPopUp(string key, string text)
+        /// <summary>Rests the (simulated) pointer on a built item through its real HoverRelay, the way the EventSystem
+        /// would, and lets the delay pass.</summary>
+        private void HoverItem(string itemObjectName)
         {
             InvokePrivate("HideTooltip");
-            var source = (System.Func<string>)(() => text);
-            InvokePrivate("TooltipPointerAt", key, source, new Vector2(400f, 300f));
+            Transform item = null;
+            foreach (Transform t in ((GameObject)GetField("screenRoot")).GetComponentsInChildren<Transform>(true))
+                if (t.name == itemObjectName) { item = t; break; }
+            Assert.NotNull(item, itemObjectName);
+            Component relay = null;
+            foreach (Component comp in item.GetComponents<Component>())
+                if (comp != null && comp.GetType().Name == "HoverRelay") relay = comp;
+            Assert.NotNull(relay, "HoverRelay on " + itemObjectName);
+            var ev = new PointerEventData(EventSystem.current) { position = new Vector2(400f, 300f) };
+            relay.GetType().GetMethod("OnPointerEnter").Invoke(relay, new object[] { ev });
             InvokePrivate("TickTooltip", 10f);
         }
 
+        private string PopUpBuilt(string builder, object def) =>
+            (string)typeof(LoadoutScreen).GetMethod(builder, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(screen, new[] { def });
+
+        /// <summary>The pop-up is a child of the canvas, not of the panel (so it can never resize the panel), and what
+        /// it shows is what the real pop-up builders make for that item.</summary>
         [Test]
-        public void ThePanelWidthNeverChangesWhileAPopUpIsOpenOnAnyWeaponOrAbility()
+        public void ThePopUpSitsOutsideThePanelAndShowsTheRealBuildersText()
         {
             float baseline = MeasuredPanelWidth();
-            Assert.Greater(baseline, 0f, "sanity: the panel should have a real width before any hover starts");
+            int shown = 0;
 
             foreach (WeaponDefinition weapon in weapons.Weapons)
             {
-                if (weapon == null)
-                    continue;
-                OpenPopUp("w:" + weapon.Id, weapon.DisplayName + "\n" + weapon.Description + "\n" + ShopItemNumbers.Weapon(weapon));
+                if (weapon == null) continue;
+                screen.ShowPage(Overpower.Match.ShopPage.Weapons);
+                HoverItem($"Weapon Node {weapon.Id}");
                 Assert.IsTrue(screen.TooltipVisible, $"pop-up for weapon '{weapon.name}'");
-                Assert.AreEqual(baseline, MeasuredPanelWidth(), WidthTolerance, $"panel width changed while the pop-up for weapon '{weapon.name}' is open");
+                Assert.AreEqual(PopUpBuilt("WeaponPopUpText", weapon), screen.TooltipShownText, weapon.name);
+                AssertPopUpOutsidePanel(baseline, weapon.name);
+                shown++;
             }
 
             foreach (AbilityDefinition ability in abilities.Abilities)
             {
-                if (ability == null)
-                    continue;
-                OpenPopUp("a:" + ability.Id, ability.DisplayName + "\n" + ability.Description + "\n" + ShopItemNumbers.Ability(ability));
+                if (ability == null || ability.Id >= 900) continue;
+                screen.ShowPage(Overpower.Match.ShopPage.AbilitiesAndArmor);
+                HoverItem($"Ability Card {ability.Id}");
                 Assert.IsTrue(screen.TooltipVisible, $"pop-up for ability '{ability.name}'");
-                Assert.AreEqual(baseline, MeasuredPanelWidth(), WidthTolerance, $"panel width changed while the pop-up for ability '{ability.name}' is open");
+                Assert.AreEqual(PopUpBuilt("AbilityPopUpText", ability), screen.TooltipShownText, ability.name);
+                AssertPopUpOutsidePanel(baseline, ability.name);
+                shown++;
             }
+            Assert.Greater(shown, 20);
+        }
+
+        private void AssertPopUpOutsidePanel(float baselineWidth, string what)
+        {
+            Transform popUp = ((GameObject)GetField("screenRoot")).transform.Find("Shop Tooltip");
+            Assert.NotNull(popUp, "Shop Tooltip object");
+            Assert.IsFalse(popUp.IsChildOf(panelRect), $"{what}: the pop-up must not be inside the panel");
+            Assert.AreEqual(baselineWidth, MeasuredPanelWidth(), WidthTolerance, $"{what}: panel width changed with the pop-up open");
+            Assert.LessOrEqual(screen.TooltipBox.width, theme.loadoutTooltipMaxWidth + 0.5f, $"{what}: pop-up wider than Loadout Tooltip Max Width");
+        }
+
+        [Test]
+        public void MovingOffAnItemHidesThePopUpAtOnce()
+        {
+            HoverItem("Weapon Node " + weapons.Weapons[0].Id);
+            Assert.IsTrue(screen.TooltipVisible);
+            InvokePrivate("TooltipPointerLeft", "w:" + weapons.Weapons[0].Id);
+            Assert.IsFalse(screen.TooltipVisible, "hidden in the same call, not on the next frame");
+        }
+
+        /// <summary>Open() lands on the page last used. Needs a PhotonView on the rig for the shop-gate read Open does.</summary>
+        [Test]
+        public void OpenLandsOnTheRememberedPage()
+        {
+            screenGo.AddComponent<PhotonView>();
+            screen.ShowPage(Overpower.Match.ShopPage.AbilitiesAndArmor);
+            screen.Open();
+            try { Assert.AreEqual(Overpower.Match.ShopPage.AbilitiesAndArmor, screen.CurrentPage); }
+            finally { screen.Close(); }
+
+            screen.ShowPage(Overpower.Match.ShopPage.Weapons);
+            screen.Open();
+            try { Assert.AreEqual(Overpower.Match.ShopPage.Weapons, screen.CurrentPage); }
+            finally { screen.Close(); }
+        }
+
+        /// <summary>A canvas narrower than the panel (4:3, 5:4) scales the panel down by the rule; a wide one leaves it at 1.</summary>
+        [Test]
+        public void ThePanelIsScaledByTheRuleForTheCanvasItSitsOn()
+        {
+            InvokePrivate("FitPanelToCanvas");
+            float canvasWidth = ((RectTransform)((GameObject)GetField("screenRoot")).transform).rect.width;
+            float panelWidth = theme.loadoutPageWidth + 2f * Mathf.RoundToInt(theme.loadoutPanelPadding);
+            Assert.AreEqual(Overpower.Match.ShopPanelScale.For(canvasWidth, panelWidth), panelRect.localScale.x, 0.0001f);
+            Assert.AreEqual(panelRect.localScale.x, panelRect.localScale.y, 0.0001f, "scaled evenly");
         }
 
         [Test]

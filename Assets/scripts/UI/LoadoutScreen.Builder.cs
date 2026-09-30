@@ -14,7 +14,8 @@ namespace Overpower.UI
     /// other half, with no purchase/refresh/hover-content logic of its own. Pulled out of
     /// LoadoutScreen.cs once that file passed 1400 lines, so a designer looking for "how is this
     /// screen laid out" and one looking for "what does clicking this actually do" each have a
-    /// shorter file to read. A plain code move: nothing here changed behaviour, and every field/
+    /// shorter file to read. Since Task 13 it also builds the two pages and their tabs (the weapon tree's family-and-two-upgrades rows, the
+    /// armor rows and the ability columns); every field/
     /// method it touches (theme, weaponNodes, abilityCards, OnWeaponNodeClicked,
     /// RefreshHeader's own labels, etc.) still lives on the other partial, LoadoutScreen.cs - partial
     /// classes share one field list, so there is nothing to pass between the two files.
@@ -441,6 +442,7 @@ namespace Overpower.UI
             panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 1f);
             panelRt.pivot = new Vector2(0.5f, 1f);
             panelRt.anchoredPosition = new Vector2(0f, -theme.loadoutPanelTopMargin);
+            panelRect = panelRt;
             Image panelBackground = panel.AddComponent<Image>();
             // Its OWN colour - see Loadout Panel Colour's tooltip. The HUD has no panel behind it at all any more
             // (HUD step 2); this modal still does, because it deliberately hides the world behind it.
@@ -483,6 +485,7 @@ namespace Overpower.UI
             BuildAbilitiesUi(abilitiesPageRoot.transform);
 
             ShowPage(pageMemory.Last);
+            FitPanelToCanvas();
         }
 
         /// <summary>One page: fills the Pages area and stacks its content top-down, centred across.</summary>

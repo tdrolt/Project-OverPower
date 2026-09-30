@@ -109,7 +109,7 @@ MonoBehaviour:
   loadoutSectionGap: 16
   loadoutPanelTopMargin: 24
   loadoutPageWidth: 1700
-  loadoutPageHeight: 600
+  loadoutPageHeight: 540
   loadoutNodeWidth: 180
   loadoutNodeHeight: 96
   loadoutAbilityCardWidth: 240

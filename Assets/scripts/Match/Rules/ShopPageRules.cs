@@ -39,6 +39,19 @@ namespace Overpower.Match
         }
     }
 
+    /// <summary>Task 13 review: the shop panel is wider than a 4:3 or 5:4 canvas (the canvas is 1920 units wide at 16:9
+    /// and narrower on squarer screens), so its X button and outer nodes would clip. The panel is scaled down evenly
+    /// until it fits, and never scaled up.</summary>
+    public static class ShopPanelScale
+    {
+        public static float For(float canvasWidth, float panelWidth)
+        {
+            if (canvasWidth <= 0f || panelWidth <= 0f)
+                return 1f;
+            return Mathf.Min(1f, canvasWidth / panelWidth);
+        }
+    }
+
     /// <summary>Task 13: the pop-up's text, from the three parts every shop item has: its name, one line on what it
     /// does, and its numbers. Empty parts are left out; nothing at all gives an empty string (no pop-up).</summary>
     public static class ShopPopupText
