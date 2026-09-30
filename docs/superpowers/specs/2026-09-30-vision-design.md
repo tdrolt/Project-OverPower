@@ -84,8 +84,10 @@ through walls.
 
 **Each client works out its own team's sight** (Tudor's choice A). Every client already knows every player's position,
 facing (the body turns toward the cursor, `PlayerNetSync` sends the rotation), team (`teamID`) and alive state
-(`alive`). Nothing new is sent: **no RPC is added, renamed or removed; no new Room or Player Property.** A hacked client
-could see through the fog; accepted for a prototype.
+(`alive`). **No RPC is added, renamed or removed; no new Room Property.** One new Player Property, `vScp` (bool, the
+owner writes it when the Scope starts and ends), lets teammates' games use a scoped teammate's narrow cone; the Scope
+today only moves the holder's own camera, so nothing else carries it. A hacked client could see through the fog;
+accepted for a prototype. Towers stop bullets (they are on the `Building` layer), so they block sight too.
 
 **The centre scan's clock is shared already:** zone 9's `tSince` (the server-clock moment its owner took it, in
 `TerritorySnapshot`). Scan k happens at `tSince + k × interval` for every client alike; the wave's radius at any moment
