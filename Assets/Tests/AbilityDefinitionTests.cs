@@ -60,7 +60,7 @@ namespace Overpower.Tests
         [Test]
         public void ACorrectAbilityReportsNothing()
         {
-            Assert.IsEmpty(NewAbility(AbilitySlot.Equipment, NewModulePrefab()).Validate());
+            Assert.IsEmpty(NewAbility(AbilitySlot.Attachment, NewModulePrefab()).Validate());
         }
 
         [Test]
@@ -96,7 +96,7 @@ namespace Overpower.Tests
             child.transform.SetParent(prefab.transform);
             child.AddComponent<SphereCollider>();
 
-            List<string> problems = NewAbility(AbilitySlot.Equipment, prefab).Validate();
+            List<string> problems = NewAbility(AbilitySlot.Attachment, prefab).Validate();
             Assert.AreEqual(1, problems.Count);
             StringAssert.Contains("Collider", problems[0]);
         }
@@ -107,7 +107,7 @@ namespace Overpower.Tests
             GameObject prefab = NewModulePrefab();
             prefab.AddComponent<PhotonView>();
 
-            List<string> problems = NewAbility(AbilitySlot.Equipment, prefab).Validate();
+            List<string> problems = NewAbility(AbilitySlot.Attachment, prefab).Validate();
             Assert.IsTrue(problems.Exists(p => p.Contains("PhotonView")));
         }
     }

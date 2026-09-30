@@ -13,7 +13,7 @@ namespace Overpower.Tests
     /// speed-multiplier version of exactly this bug (2.10's respawn speed bug).
     ///
     /// Drives OwnerTick directly rather than through AbilityRunner/PlayerInputRouter - the same "held" the runner
-    /// would compute (Equipment key down AND canAct), just supplied straight to the module the way the Play Mode
+    /// would compute (Attachment key down AND canAct), just supplied straight to the module the way the Play Mode
     /// measurement script also will (see progress.md's Scope step 2 entry for which path it used there).
     /// </summary>
     public class ScopeAbilityTests

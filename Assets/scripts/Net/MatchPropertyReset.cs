@@ -23,7 +23,7 @@ namespace Overpower.Net
             { LoadoutProperties.ArmorAbsorbLevelKey, 0 },
             { LoadoutProperties.ArmorRechargeLevelKey, 0 },
             { LoadoutProperties.WeaponKey, null },
-            { LoadoutProperties.EquipmentKey, null },
+            { LoadoutProperties.AttachmentKey, null },
             { LoadoutProperties.UltimateKey, null },
             { LoadoutProperties.MobilityKey, null },
             { ScoreboardRules.Key, null },

@@ -73,7 +73,7 @@ namespace Overpower.Tests
                 Assert.AreEqual("P1", bug.Nick);
                 Assert.AreEqual(3, bug.Zone);
                 Assert.AreEqual(1, bug.Weapon);
-                Assert.AreEqual(2, bug.Equipment);
+                Assert.AreEqual(2, bug.Attachment);
                 Assert.AreEqual(3, bug.Mobility);
                 Assert.AreEqual(4, bug.Ultimate);
                 Assert.AreEqual("bug_1_100.png", bug.ScreenshotFile);

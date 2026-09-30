@@ -52,7 +52,7 @@ namespace Overpower.TestRange
     /// in code puts each listener on the same line as the control it belongs to.
     ///
     /// Toggled with the raw keyboard (Keyboard.current), not an InputAction: this is a tool, not a
-    /// game control, and must never appear in a future rebinding UI next to Primary/Equipment/
+    /// game control, and must never appear in a future rebinding UI next to Primary/Attachment/
     /// Ultimate/Mobility.
     ///
     /// Gated entirely on GameplayConfig.TestRangeEnabled - false disables this component in Awake
@@ -83,7 +83,7 @@ namespace Overpower.TestRange
         // three near-duplicate blocks.
         private static readonly (string label, AbilitySlot slot)[] AbilitySlots =
         {
-            ("Equipment", AbilitySlot.Equipment),
+            ("Attachment", AbilitySlot.Attachment),
             ("Ultimate", AbilitySlot.Ultimate),
             ("Mobility", AbilitySlot.Mobility),
         };

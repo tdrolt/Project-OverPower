@@ -506,7 +506,7 @@ namespace Overpower.EditorTools.Telemetry
                     X = ReadFloat(e.Data, TelemetryKeys.X),
                     Z = ReadFloat(e.Data, TelemetryKeys.Z),
                     Weapon = ReadInt(e.Data, TelemetryKeys.Weapon, -1),
-                    Equipment = ReadInt(e.Data, TelemetryKeys.Equipment, -1),
+                    Attachment = ReadInt(e.Data, TelemetryKeys.Attachment, -1),
                     Mobility = ReadInt(e.Data, TelemetryKeys.Mobility, -1),
                     Ultimate = ReadInt(e.Data, TelemetryKeys.Ultimate, -1),
                     ScreenshotFile = e.Data[TelemetryKeys.ScreenshotFile]?.ToString() ?? "",
@@ -879,7 +879,7 @@ namespace Overpower.EditorTools.Telemetry
                     tables.Purchases.Add(new PurchaseRow
                     {
                         T = e.T, Actor = actor, Nick = nick, Team = team, Kind = "purchase",
-                        Category = e.Data[TelemetryKeys.Category]?.ToString() ?? "",
+                        Category = CategoryName(e.Data[TelemetryKeys.Category]?.ToString()),
                         // Opus review item 5 (armor encoding): item stays a plain opaque int here -
                         // 100+level (absorb) / 200+level (recharge) as of the T4 fix, a real weapon/
                         // ability id otherwise. Never decoded - see TelemetryKeys.ItemId's own comment.
@@ -896,7 +896,7 @@ namespace Overpower.EditorTools.Telemetry
                     tables.Purchases.Add(new PurchaseRow
                     {
                         T = e.T, Actor = actor, Nick = nick, Team = team, Kind = "refund",
-                        Category = e.Data[TelemetryKeys.Category]?.ToString() ?? "",
+                        Category = CategoryName(e.Data[TelemetryKeys.Category]?.ToString()),
                         ItemId = -1,
                         Amount = ReadInt(e.Data, TelemetryKeys.Amount, 0),
                         BalanceAfter = ReadInt(e.Data, TelemetryKeys.BalanceAfter, 0),
@@ -1614,7 +1614,7 @@ namespace Overpower.EditorTools.Telemetry
                     Z = ReadFloat(e.Data, TelemetryKeys.Z),
                     UnspentGold = ReadInt(e.Data, TelemetryKeys.UnspentGold, 0),
                     LoadoutWeapon = ReadInt(e.Data, TelemetryKeys.LoadoutWeapon, -1),
-                    LoadoutEquipment = ReadInt(e.Data, TelemetryKeys.LoadoutEquipment, -1),
+                    LoadoutAttachment = ReadInt(e.Data, TelemetryKeys.LoadoutAttachment, -1),
                     LoadoutMobility = ReadInt(e.Data, TelemetryKeys.LoadoutMobility, -1),
                     LoadoutUltimate = ReadInt(e.Data, TelemetryKeys.LoadoutUltimate, -1),
                     AbsorbLevel = ReadInt(e.Data, TelemetryKeys.AbsorbLevel, 0),
@@ -1781,6 +1781,14 @@ namespace Overpower.EditorTools.Telemetry
             fileActor.TryGetValue(e.File, out int a) ? a : -1;
 
         /// <summary>The repeated `data[key]?.ToObject&lt;int?&gt;() ?? fallback` read, in one place.</summary>
+        /// <summary>Purchase/refund category as the report shows it. Logs written before the right-click
+        /// slot was renamed say "equipment"; they read as "attachment" so old and new matches line up.</summary>
+        public static string CategoryName(string logged)
+        {
+            if (string.IsNullOrEmpty(logged)) return "";
+            return logged == "equipment" ? "attachment" : logged;
+        }
+
         private static int ReadInt(JObject data, string key, int fallback)
         {
             JToken token = data[key];

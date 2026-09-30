@@ -10,11 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4c660593cf9bb4d44b3954e56e33cfd8, type: 3}
-  m_Name: 901 Debug Ping E
+  m_Name: 19 Mines A
   m_EditorClassIdentifier: 
-  id: 901
-  displayName: Debug Ping
+  id: 19
+  displayName: Mines
+  description: Drop mines that damage and slow enemies.
   slot: 1
   icon: {fileID: 0}
-  goldCost: 0
-  modulePrefab: {fileID: 3945797618507070747, guid: f24bbd3e4c85e7b40a1514f6f76564d9, type: 3}
+  goldCost: 640
+  modulePrefab: {fileID: 8955745586176628307, guid: 029294588b429ef438c4b52d8735316f, type: 3}

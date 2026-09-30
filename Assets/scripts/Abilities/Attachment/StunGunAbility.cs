@@ -6,7 +6,7 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// Fires a large, slow, 8m bolt that stuns the first enemy it touches for 2.5s - Tudor's
-    /// Equipment spec. Pure utility, exactly like the zip gun (Task 1.7b): zero damage, and this
+    /// Attachment spec. Pure utility, exactly like the zip gun (Task 1.7b): zero damage, and this
     /// module owns none of the flight or the status itself. ProjectileMotor already "flies through
     /// teammates, stops at the first enemy or a wall" for free (FriendlyFire.IsSelfOrTeammate, the
     /// same rule every weapon's bullet uses), so "stuns the FIRST enemy hit" needs no code here at

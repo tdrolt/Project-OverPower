@@ -214,7 +214,7 @@ namespace Overpower.UI
         // three ability values - Primary (the weapon) is handled separately, has no runner slot.
         private static readonly (AbilitySlot slot, string keyLabel)[] AbilitySlotOrder =
         {
-            (AbilitySlot.Equipment, "RMB"),
+            (AbilitySlot.Attachment, "RMB"),
             (AbilitySlot.Ultimate, "SPACE"),
             (AbilitySlot.Mobility, "SHIFT"),
         };

@@ -7,7 +7,7 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// Knocks every enemy standing in a short forward cone straight away from the caster - Tudor's
-    /// Equipment spec: 5m of knockback in a 4m cone, 8s cooldown. An enemy whose flight ends against
+    /// Attachment spec: 5m of knockback in a 4m cone, 8s cooldown. An enemy whose flight ends against
     /// a wall or another player is stunned for 2s, and so is whichever player it landed on - but
     /// only if that second player is ALSO an enemy of the caster (Task 1.10 addendum's own "Holes"
     /// section: the brief wins over the plan's "wall or enemy" wording, and there is no "both" for a

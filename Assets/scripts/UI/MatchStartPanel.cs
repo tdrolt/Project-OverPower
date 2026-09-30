@@ -270,7 +270,7 @@ namespace Overpower.UI
 
         /// <summary>Copies LoadoutScreen.Builder.BuildToggleButtonCanvas's recipe (overlay canvas, overrideSorting at
         /// order -10, a GraphicRaycaster) so PlayerInputRouter.pointerOverUi - true only for a raycast-target Graphic
-        /// on a canvas that HAS a GraphicRaycaster - picks up a hover/click here and gates PrimaryHeld/EquipmentHeld
+        /// on a canvas that HAS a GraphicRaycaster - picks up a hover/click here and gates PrimaryHeld/AttachmentHeld
         /// off, exactly like the loadout toggle button already does. The HUD's own canvas (PlayerHud.BuildUi)
         /// deliberately carries none, because nothing on it is clickable; this one is, so it must.
         ///

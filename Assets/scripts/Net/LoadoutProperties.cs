@@ -18,7 +18,7 @@ namespace Overpower.Net
     public static class LoadoutProperties
     {
         public const string WeaponKey = "weaponId";
-        public const string EquipmentKey = "equipmentId";
+        public const string AttachmentKey = "attachmentId";
         public const string UltimateKey = "ultimateId";
         public const string MobilityKey = "mobilityId";
 
@@ -58,7 +58,7 @@ namespace Overpower.Net
         {
             switch (slot)
             {
-                case AbilitySlot.Equipment: return EquipmentKey;
+                case AbilitySlot.Attachment: return AttachmentKey;
                 case AbilitySlot.Ultimate: return UltimateKey;
                 case AbilitySlot.Mobility: return MobilityKey;
                 default: return null;

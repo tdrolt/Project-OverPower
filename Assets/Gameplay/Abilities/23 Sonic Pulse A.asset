@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4c660593cf9bb4d44b3954e56e33cfd8, type: 3}
-  m_Name: 20 Deployable Cover E
+  m_Name: 23 Sonic Pulse A
   m_EditorClassIdentifier: 
-  id: 20
-  displayName: Cover
-  description: Place a wall that blocks shots both ways.
+  id: 23
+  displayName: Pulse
+  description: Knock enemies back; walls and allies stun them.
   slot: 1
   icon: {fileID: 0}
   goldCost: 640
-  modulePrefab: {fileID: 1291822725712270318, guid: 525908f4b5820fd428e6c1b70905c58c, type: 3}
+  modulePrefab: {fileID: 4275577269441808119, guid: ed58e88a087148e4b907129279cc9ae5, type: 3}

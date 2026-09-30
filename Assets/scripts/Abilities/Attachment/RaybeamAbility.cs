@@ -18,7 +18,7 @@ namespace Overpower.Abilities
     /// targets spread along one beam's path all take that beam's debuff, not just whichever one sits
     /// at the convergence point. Zero damage - this is a debuff, not a weapon (addendum, [C, plan]).
     ///
-    /// REWORK STEP 5 (Tudor, 2026-09-18): moved from Equipment to the Ultimate slot. Readiness comes
+    /// REWORK STEP 5 (Tudor, 2026-09-18): moved from Attachment to the Ultimate slot. Readiness comes
     /// entirely from Owner.UltimateCharge - see IsReady/TryBuildCast below, the identical pattern
     /// InvulnerabilityAbility, ElectricFenceAbility and AoeZoneAbility already use - NOT the base
     /// class's own charge/cooldown pool (1 charge, 0s cooldown on this prefab; that recovers the

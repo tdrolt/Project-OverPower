@@ -102,11 +102,11 @@ namespace Overpower.EditorTools.Telemetry
             WriteCsv(
                 Path.Combine(csvFolder, "bugs.csv"),
                 new[] { "t", "actor", "name", "team", "phase", "x", "z", "zone", "alive",
-                        "weapon", "equipment", "mobility", "ultimate", "screenshot", "chatNotes", "consoleLines" },
+                        "weapon", "attachment", "mobility", "ultimate", "screenshot", "chatNotes", "consoleLines" },
                 rows.Select(r => new[]
                 {
                     N(r.T), N(r.Actor), r.Nick, N(r.Team), N(r.Phase), N(r.X), N(r.Z), N(r.Zone), N(r.Alive),
-                    N(r.Weapon), N(r.Equipment), N(r.Mobility), N(r.Ultimate), r.ScreenshotFile ?? "",
+                    N(r.Weapon), N(r.Attachment), N(r.Mobility), N(r.Ultimate), r.ScreenshotFile ?? "",
                     string.Join(" | ", r.ChatNotes), N(r.ConsoleWindow.Count),
                 }));
         }
@@ -239,13 +239,13 @@ namespace Overpower.EditorTools.Telemetry
         private static void WriteDeaths(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "deaths.csv"),
             new[] { "t", "victim", "victimName", "victimTeam", "killer", "killerTeam", "assists", "weapon", "ability",
-                    "x", "z", "unspentGold", "loadoutWeapon", "loadoutEquipment", "loadoutMobility", "loadoutUltimate",
+                    "x", "z", "unspentGold", "loadoutWeapon", "loadoutAttachment", "loadoutMobility", "loadoutUltimate",
                     "absorbLevel", "rechargeLevel", "phase" },
             t.Deaths.Select(r => new[]
             {
                 N(r.T), N(r.Victim), r.VictimNick, N(r.VictimTeam), N(r.Killer), N(r.KillerTeam),
                 string.Join(";", r.Assists), N(r.Weapon), N(r.Ability), N(r.X), N(r.Z), N(r.UnspentGold),
-                N(r.LoadoutWeapon), N(r.LoadoutEquipment), N(r.LoadoutMobility), N(r.LoadoutUltimate),
+                N(r.LoadoutWeapon), N(r.LoadoutAttachment), N(r.LoadoutMobility), N(r.LoadoutUltimate),
                 N(r.AbsorbLevel), N(r.RechargeLevel), N(r.Phase),
             }));
 

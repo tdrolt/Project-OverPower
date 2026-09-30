@@ -3271,7 +3271,7 @@ MonoBehaviour:
   catalogue: {fileID: 11400000, guid: 70e5ea7660cd12b4bbb497e71ca8b00e, type: 2}
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
   moduleParent: {fileID: 2690151092285713717}
-  startingEquipment: {fileID: 0}
+  startingAttachment: {fileID: 0}
   startingUltimate: {fileID: 0}
   startingMobility: {fileID: 0}
 --- !u!114 &7382941698319182268

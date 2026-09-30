@@ -2,7 +2,7 @@ namespace Overpower.Combat
 {
     /// <summary>
     /// The status-effect equivalent of IDamageable: found the same way, with the same
-    /// "GetComponentInParent, then let the callee decide" shape, so an equipment ability that
+    /// "GetComponentInParent, then let the callee decide" shape, so an attachment ability that
     /// applies a slow or a stun to whatever it hit does not need to know that thing is a
     /// PlayerStatusEffects specifically. DummyTarget has nothing to apply a status to and does not
     /// implement this - a dummy can be damaged, but it has no motor to slow or stun.

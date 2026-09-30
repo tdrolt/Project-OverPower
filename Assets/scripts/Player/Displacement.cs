@@ -48,7 +48,7 @@ public readonly struct DisplaceEnd
 /// instead of each dash/knockback/blink re-deriving its own movement and its own way of reporting
 /// what stopped it.
 ///
-/// Deliberately excludes anything about WHO is moving or WHY - an equipment ability calls this on
+/// Deliberately excludes anything about WHO is moving or WHY - an attachment ability calls this on
 /// whatever IDamageable it just hit, the same "found generically, acts on itself" shape as
 /// IStatusReceiver.
 /// </summary>

@@ -311,7 +311,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// finds no key at all and falls through to StartingGold, exactly like a first-time joiner.
     ///
     /// Kept: "teamID" - PickSmallestTeam overwrites it on the very next join anyway, nothing to reset.
-    /// Kept: weapon/equipment/ultimate/mobility (LoadoutProperties) - PlayerLoadout.Start republishes
+    /// Kept: weapon/attachment/ultimate/mobility (LoadoutProperties) - PlayerLoadout.Start republishes
     /// the whole starting kit for every newly spawned player regardless of what is still on the local
     /// Custom Properties, so there is nothing here for a stale pick to leak into a new match. Treated
     /// the same as the nickname: a player-level preference that carries forward until the player

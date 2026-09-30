@@ -1606,7 +1606,7 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
       card.appendChild(el('h3', null, 't=' + fmt(bug.t) + 's – ' + bugWho));
 
       card.appendChild(el('div', null, 'Where: ' + zoneLabel(bug.zone) + ' at (' + fmt(bug.x) + ', ' + fmt(bug.z) + '), ' + (bug.alive ? 'alive' : 'dead')));
-      card.appendChild(el('div', null, 'Loadout: weapon ' + weaponName(bug.weapon) + ', equipment ' + abilityName(bug.equipment) + ', mobility ' + abilityName(bug.mobility) + ', ultimate ' + abilityName(bug.ultimate)));
+      card.appendChild(el('div', null, 'Loadout: weapon ' + weaponName(bug.weapon) + ', attachment ' + abilityName(bug.attachment) + ', mobility ' + abilityName(bug.mobility) + ', ultimate ' + abilityName(bug.ultimate)));
 
       // 2026-09-27 designer change: a smaller thumbnail up front (click opens the full-size image
       // in a new tab) - the report's own full-size <img> per bug card, times ~10 players, was a big

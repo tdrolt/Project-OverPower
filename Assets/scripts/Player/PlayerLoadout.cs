@@ -34,7 +34,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
 {
     private static readonly AbilitySlot[] AbilitySlots =
     {
-        AbilitySlot.Equipment, AbilitySlot.Ultimate, AbilitySlot.Mobility
+        AbilitySlot.Attachment, AbilitySlot.Ultimate, AbilitySlot.Mobility
     };
 
     [SerializeField, Tooltip("Match tuning asset. Free Loadout decides whether the ultimate slot " +
@@ -141,9 +141,9 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
     }
 
     /// <summary>2.7b Decision 6 (Tudor answer 2, amended): the fresh start at match-live puts EVERY slot back
-    /// to the starter kit - the weapon, AND all three ability slots (Mobility, Equipment, Ultimate) to
+    /// to the starter kit - the weapon, AND all three ability slots (Mobility, Attachment, Ultimate) to
     /// StartingAbilityId, not weapon+armour only as the pre-amendment plan text said. The prefab ships every
-    /// ability slot empty, so this is "back to empty" for Mobility and Equipment too: the first pick into
+    /// ability slot empty, so this is "back to empty" for Mobility and Attachment too: the first pick into
     /// either is free again, exactly like a brand new player (ShopRules.AbilityPrice). Armour drops to level
     /// 0/0 here too - PlayerLifecycle.ResetForMatchStart calls this BEFORE PlayerHealth.ResetForRespawn, so the
     /// capacity is already at 0 when that refill decides what "full" means. One Hashtable publish, the same
@@ -308,7 +308,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
     {
         int weaponId = weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : LoadoutProperties.Empty;
         Debug.Log($"[LOADOUT] actor={photonView.OwnerActorNr} W={weaponId} " +
-                  $"E={EquippedAbilityId(AbilitySlot.Equipment)} U={EquippedAbilityId(AbilitySlot.Ultimate)} " +
+                  $"E={EquippedAbilityId(AbilitySlot.Attachment)} U={EquippedAbilityId(AbilitySlot.Ultimate)} " +
                   $"M={EquippedAbilityId(AbilitySlot.Mobility)} " +
                   $"A={(playerHealth != null ? playerHealth.AbsorbLevel : 0)}/{(playerHealth != null ? playerHealth.RechargeLevel : 0)} " +
                   $"isMine={photonView.IsMine}");

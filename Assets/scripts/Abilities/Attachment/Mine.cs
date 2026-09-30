@@ -7,7 +7,7 @@ using Overpower.Combat;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A proximity mine dropped at the caster's feet - Tudor's Equipment spec: 20 damage plus a
+    /// A proximity mine dropped at the caster's feet - Tudor's Attachment spec: 20 damage plus a
     /// slow, 2 charges, 10s per charge (the charges live on MineAbility, the module that places
     /// these). This class is only the networked object and its own trigger/blast; MineAbility
     /// decides when one gets placed and prunes the oldest once Max Active Mines is exceeded.

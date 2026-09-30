@@ -513,7 +513,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     ///
     /// RESET here, in this order: any respawn wait or countdown (stopped before anything moves the player);
     /// every ability's interrupt/cooldown/respawn cleanup and this player's own deployables (destroyed); the
-    /// loadout - weapon, and all three ability slots (Mobility, Equipment, Ultimate) back to the starter kit,
+    /// loadout - weapon, and all three ability slots (Mobility, Attachment, Ultimate) back to the starter kit,
     /// "back to empty" per Tudor's amended answer 2 - and armour to level 0/0; gold to TerritoryConfig.
     /// StartingGold; the ultimate meter; overheat; the purchase ledger and the loadout screen (closed); full
     /// health and armour, every status effect cleared (an armed shield included), the combat clock; deathCount;

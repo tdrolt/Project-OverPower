@@ -5,7 +5,7 @@ using Overpower.Combat;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A wall of cover, dropped by the Equipment slot's Deployable Cover ability - Tudor's decision
+    /// A wall of cover, dropped by the Attachment slot's Deployable Cover ability - Tudor's decision
     /// of 2026-09-12: it blocks projectiles in BOTH directions, including the caster's own, because
     /// the hit points are the point - the enemy decides whether to spend damage on the wall or on
     /// the player standing behind it. Destroyed at 100 damage absorbed or 10 seconds old, whichever

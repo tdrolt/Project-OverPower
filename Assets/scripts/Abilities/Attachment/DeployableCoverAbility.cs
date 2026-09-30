@@ -5,7 +5,7 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Places a wall of cover in front of the caster - Tudor's Equipment spec: 10s or 100 damage
+    /// Places a wall of cover in front of the caster - Tudor's Attachment spec: 10s or 100 damage
     /// absorbed (whichever comes first), 20s cooldown, blocking projectiles - and movement - in BOTH
     /// directions, including the caster's own. This module only decides WHEN and WHERE; everything
     /// about what the wall itself does once it exists lives on CoverWall.cs - see its own class

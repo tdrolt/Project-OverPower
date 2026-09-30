@@ -437,7 +437,7 @@ namespace Overpower.Telemetry
             {
                 case PurchaseCategory.Weapon: return "weapon";
                 case PurchaseCategory.Armor: return "armor";
-                case PurchaseCategory.Equipment: return "equipment";
+                case PurchaseCategory.Attachment: return "attachment";
                 case PurchaseCategory.Mobility: return "mobility";
                 case PurchaseCategory.Ultimate: return "ultimate";
                 default: return "other";
@@ -1110,21 +1110,21 @@ namespace Overpower.Telemetry
             MatchTelemetry.Instance.Log(line);
         }
 
-        /// <summary>Weapon/equipment/mobility/ultimate ids and both armor levels - this player's own
+        /// <summary>Weapon/attachment/mobility/ultimate ids and both armor levels - this player's own
         /// loadout, written into whichever event is currently being built (callers Begin first).
-        /// `sample` has no other use for Weapon/Equipment/Mobility/Ultimate, so it writes them
+        /// `sample` has no other use for Weapon/Attachment/Mobility/Ultimate, so it writes them
         /// directly; `death` already uses those same keys for the KILLING weapon/ability (matching
         /// `hit`'s convention), so it needs the separate Loadout* keys instead - see their own
         /// comment on TelemetryKeys.</summary>
         private void WriteLoadout(bool useDeathKeys)
         {
             int weaponId = weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : LoadoutProperties.Empty;
-            int equipmentId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Equipment) : LoadoutProperties.Empty;
+            int attachmentId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Attachment) : LoadoutProperties.Empty;
             int mobilityId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Mobility) : LoadoutProperties.Empty;
             int ultimateId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Ultimate) : LoadoutProperties.Empty;
 
             line.Int(useDeathKeys ? TelemetryKeys.LoadoutWeapon : TelemetryKeys.Weapon, weaponId);
-            line.Int(useDeathKeys ? TelemetryKeys.LoadoutEquipment : TelemetryKeys.Equipment, equipmentId);
+            line.Int(useDeathKeys ? TelemetryKeys.LoadoutAttachment : TelemetryKeys.Attachment, attachmentId);
             line.Int(useDeathKeys ? TelemetryKeys.LoadoutMobility : TelemetryKeys.Mobility, mobilityId);
             line.Int(useDeathKeys ? TelemetryKeys.LoadoutUltimate : TelemetryKeys.Ultimate, ultimateId);
             line.Int(TelemetryKeys.AbsorbLevel, playerHealth != null ? playerHealth.AbsorbLevel : 0);

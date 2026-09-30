@@ -73,14 +73,14 @@ namespace Overpower.Tests
             Assert.AreEqual("Abilities & Armor", asset.loadoutTabAbilitiesArmorText);
         }
 
-        // ---- Tudor: the Equipment slot is called Attachment wherever the player reads it ----
+        // ---- Tudor: the right-click slot is called Attachment (and no longer Equipment) wherever the player reads it ----
 
         [Test]
         public void TheRightClickSlotIsCalledAttachmentOnTheShopColumnAndTheKeysTip()
         {
             var heading = typeof(LoadoutScreen).GetMethod("SlotHeading", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
             Assert.NotNull(heading);
-            string column = (string)heading.Invoke(null, new object[] { AbilitySlot.Equipment });
+            string column = (string)heading.Invoke(null, new object[] { AbilitySlot.Attachment });
             StringAssert.Contains("Attachment", column);
             StringAssert.DoesNotContain("Equipment", column);
 
@@ -326,8 +326,8 @@ namespace Overpower.Tests
             // Tudor tunes the values, so these pin the wording (which number the pop-up shows), not the number itself.
             StringAssert.IsMatch(@"Range \d+(\.\d+)?m", ShopItemNumbers.Ability(AbilityNamed("15 Blink M.asset")));
             StringAssert.IsMatch(@"Distance \d+(\.\d+)?m", ShopItemNumbers.Ability(AbilityNamed("14 Dash M.asset")));
-            StringAssert.IsMatch(@"Burn \d+(\.\d+)? damage/s for \d+(\.\d+)?s", ShopItemNumbers.Ability(AbilityNamed("21 Flamethrower E.asset")));
-            StringAssert.IsMatch(@"Damage \d+(\.\d+)? · blast radius \d+(\.\d+)?m", ShopItemNumbers.Ability(AbilityNamed("19 Mines E.asset")));
+            StringAssert.IsMatch(@"Burn \d+(\.\d+)? damage/s for \d+(\.\d+)?s", ShopItemNumbers.Ability(AbilityNamed("21 Flamethrower A.asset")));
+            StringAssert.IsMatch(@"Damage \d+(\.\d+)? · blast radius \d+(\.\d+)?m", ShopItemNumbers.Ability(AbilityNamed("19 Mines A.asset")));
             StringAssert.IsMatch(@"Radius \d+(\.\d+)?m · \d+(\.\d+)? damage per pass", ShopItemNumbers.Ability(AbilityNamed("26 Electric Fence U.asset")));
             StringAssert.IsMatch(@"Lasts \d+(\.\d+)?s", ShopItemNumbers.Ability(AbilityNamed("27 AoE Zone U.asset")));
             StringAssert.IsMatch(@"Armed \d+(\.\d+)?s · Invulnerable \d+(\.\d+)?s", ShopItemNumbers.Ability(AbilityNamed("25 Invulnerability U.asset")));

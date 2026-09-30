@@ -7,7 +7,7 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Sprays a short forward cone that ignites every enemy it touches - Tudor's Equipment spec: 5
+    /// Sprays a short forward cone that ignites every enemy it touches - Tudor's Attachment spec: 5
     /// damage per second for 5 seconds, 13s cooldown. Contact starts the burn; the burn then ticks on
     /// its own through StatusEffectState/PlayerStatusEffects (the Refresh stack rule) and does NOT
     /// need the target to stay inside the cone - Tudor's own clarification, and the difference between
@@ -60,7 +60,7 @@ namespace Overpower.Abilities
     /// nothing but death (or, for those two, nothing at all) calls it back" precedent.
     ///
     /// THE CASTER CAN STILL FIRE THEIR WEAPON WHILE SPRAYING - Tudor's spec. This occupies only the
-    /// Equipment slot and its own cooldown, exactly like every other equipment item; nothing here
+    /// Attachment slot and its own cooldown, exactly like every other attachment item; nothing here
     /// touches WeaponFiring or the other ability slots.
     /// </summary>
     public sealed class FlamethrowerAbility : AbilityModule

@@ -4,12 +4,12 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Hold right click (the Equipment slot) to pull the camera back further than the scroll zoom allows, so a
+    /// Hold right click (the Attachment slot) to pull the camera back further than the scroll zoom allows, so a
     /// sniper-style loadout can actually see what it is shooting at - Tudor, 2026-09-18: "Laser, Charge Laser,
     /// Baseline and Rockets can already hit targets the shooter can't see on screen." Let go and it eases back.
     /// No toggle, no cooldown, no heat cost (charges 0 on this module, Sprint's own convention for "self-limiting
     /// through something other than a cooldown" - here there is no limiter at all, by design), no movement slow,
-    /// and nothing shown to other players: carrying Scope in the Equipment slot means giving up mines, cover,
+    /// and nothing shown to other players: carrying Scope in the Attachment slot means giving up mines, cover,
     /// raybeam and so on, and that trade-off alone is the cost.
     ///
     /// OWNER ONLY, NO NETWORK MESSAGE AT ALL. The camera this ability moves exists only on the owner's own

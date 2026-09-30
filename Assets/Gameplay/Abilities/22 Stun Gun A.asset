@@ -10,12 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4c660593cf9bb4d44b3954e56e33cfd8, type: 3}
-  m_Name: 28 Scope E
+  m_Name: 22 Stun Gun A
   m_EditorClassIdentifier: 
-  id: 28
-  displayName: Scope
-  description: Hold to pull your camera back and see further than usual.
+  id: 22
+  displayName: Stun
+  description: A slow orb that stuns the first enemy hit.
   slot: 1
   icon: {fileID: 0}
   goldCost: 640
-  modulePrefab: {fileID: 8889445320927805865, guid: fdfdde32c0190f742968a1097ff5283f, type: 3}
+  modulePrefab: {fileID: 5621843770665407029, guid: 43403e6cd4749984d8bf5902d6388744, type: 3}

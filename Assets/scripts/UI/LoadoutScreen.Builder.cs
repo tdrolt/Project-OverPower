@@ -340,7 +340,7 @@ namespace Overpower.UI
             switch (slot)
             {
                 case AbilitySlot.Mobility: return "Mobility — Shift";
-                case AbilitySlot.Equipment: return "Attachment — RMB";
+                case AbilitySlot.Attachment: return "Attachment — RMB";
                 case AbilitySlot.Ultimate: return "Ultimate — Space";
                 default: return slot.ToString(); // Primary never reaches here - ForSlot(Primary) is never called.
             }

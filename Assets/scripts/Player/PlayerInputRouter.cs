@@ -26,7 +26,7 @@ public class PlayerInputRouter : MonoBehaviour
     private PhotonView photonView;
     private PlayerLifecycle playerLifecycle;
     private InputActionMap gameplayMap;
-    private InputAction moveAction, primaryAction, equipmentAction, ultimateAction;
+    private InputAction moveAction, primaryAction, attachmentAction, ultimateAction;
     private InputAction mobilityAction, mapAction, shopAction, scoreboardAction, ventAction;
 
     // Mirrors PlayerLifecycle.IsAlive rather than polling it on every property read - updated once
@@ -57,17 +57,17 @@ public class PlayerInputRouter : MonoBehaviour
     // purpose: a charge weapon reads Held every frame it is still holding the trigger, while a
     // dash only cares about the instant the button went down. One cannot substitute for the other.
     //
-    // Primary and Equipment additionally gate on !pointerOverUi (fix 1) - both are mouse buttons
+    // Primary and Attachment additionally gate on !pointerOverUi (fix 1) - both are mouse buttons
     // (see OverpowerControls.inputactions), and the other two Held properties are keyboard keys
     // that can never land on a UI click in the first place, so they do not need the same gate.
     public bool PrimaryHeld => gameplayMap != null && !InputSuppressed && !pointerOverUi && primaryAction.IsPressed();
-    public bool EquipmentHeld => gameplayMap != null && !InputSuppressed && !pointerOverUi && equipmentAction.IsPressed();
+    public bool AttachmentHeld => gameplayMap != null && !InputSuppressed && !pointerOverUi && attachmentAction.IsPressed();
     public bool UltimateHeld => gameplayMap != null && !InputSuppressed && ultimateAction.IsPressed();
     public bool MobilityHeld => gameplayMap != null && !InputSuppressed && mobilityAction.IsPressed();
 
     public event System.Action PrimaryPressed;
     public event System.Action PrimaryReleased;
-    public event System.Action EquipmentPressed;
+    public event System.Action AttachmentPressed;
     public event System.Action UltimatePressed;
     public event System.Action MobilityPressed;
     public event System.Action MobilityReleased;
@@ -153,12 +153,12 @@ public class PlayerInputRouter : MonoBehaviour
         }
 
         moveAction = gameplayMap.FindAction("Move"); primaryAction = gameplayMap.FindAction("Primary");
-        equipmentAction = gameplayMap.FindAction("Equipment"); ultimateAction = gameplayMap.FindAction("Ultimate");
+        attachmentAction = gameplayMap.FindAction("Attachment"); ultimateAction = gameplayMap.FindAction("Ultimate");
         mobilityAction = gameplayMap.FindAction("Mobility"); mapAction = gameplayMap.FindAction("ExpandMap");
         shopAction = gameplayMap.FindAction("Shop"); scoreboardAction = gameplayMap.FindAction("Scoreboard");
         ventAction = gameplayMap.FindAction("Vent");
 
-        if (moveAction == null || primaryAction == null || equipmentAction == null || ultimateAction == null ||
+        if (moveAction == null || primaryAction == null || attachmentAction == null || ultimateAction == null ||
             mobilityAction == null || mapAction == null || shopAction == null || scoreboardAction == null ||
             ventAction == null)
         {
@@ -171,13 +171,13 @@ public class PlayerInputRouter : MonoBehaviour
         // Button actions with no interaction assigned go Waiting -> Started -> Performed on press
         // (same frame) and Performed -> Canceled on release, so started/canceled are the clean
         // press/release edges below.
-        // Primary/Equipment PRESSED go through EmitPointerGated, not Emit - see fix 1's comment on
+        // Primary/Attachment PRESSED go through EmitPointerGated, not Emit - see fix 1's comment on
         // that method. Release is deliberately left on plain Emit: a click that opened a tool
         // fires no press (blocked above), so there is nothing still "held" for a release to
         // wrongly end, and gating release too would risk a stuck-held weapon if the pointer were
         // over UI at the exact frame the button came up.
         primaryAction.started += _ => EmitPointerGated(PrimaryPressed); primaryAction.canceled += _ => Emit(PrimaryReleased);
-        equipmentAction.started += _ => EmitPointerGated(EquipmentPressed); ultimateAction.started += _ => Emit(UltimatePressed);
+        attachmentAction.started += _ => EmitPointerGated(AttachmentPressed); ultimateAction.started += _ => Emit(UltimatePressed);
         mobilityAction.started += _ => Emit(MobilityPressed); mobilityAction.canceled += _ => Emit(MobilityReleased);
         mapAction.started += _ => EmitMap(); shopAction.started += _ => EmitShop();
         scoreboardAction.started += _ => EmitScoreboardPressed(); scoreboardAction.canceled += _ => ScoreboardReleased?.Invoke();
@@ -215,10 +215,10 @@ public class PlayerInputRouter : MonoBehaviour
 
     /// <summary>Fix 1 (Playtest polish review): a UI click and a mouse-button gameplay action are
     /// the SAME physical click, so a "Loadout (P)" HUD button press reached PlayerInputRouter as a
-    /// Primary press too, fired the equipped weapon (or Equipment, for a right-click control),
+    /// Primary press too, fired the equipped weapon (or Attachment, for a right-click control),
     /// then only afterwards did the button's own onClick claim tool focus and shut input off - by
     /// then the shot had already gone. Read here, once a frame, rather than inside the Input
-    /// System callback that raises PrimaryPressed/EquipmentPressed: EventSystem.
+    /// System callback that raises PrimaryPressed/AttachmentPressed: EventSystem.
     /// IsPointerOverGameObject() logs an Input System warning if it is called from outside a
     /// MonoBehaviour message. Only ever meaningful for the local player - gameplayMap is null (or
     /// disabled) for every other copy, so nothing reads this field for them.</summary>
@@ -242,7 +242,7 @@ public class PlayerInputRouter : MonoBehaviour
             evt?.Invoke();
     }
 
-    /// <summary>Primary/Equipment's own emit path (fix 1) - both are mouse buttons (see
+    /// <summary>Primary/Attachment's own emit path (fix 1) - both are mouse buttons (see
     /// OverpowerControls.inputactions), so both can land on a UI click before that click's own
     /// onClick has claimed tool focus (see Update's comment above for the concrete "Loadout (P)"
     /// case). IsPointerOverGameObject() only ever returns true for a raycast-target Graphic on a

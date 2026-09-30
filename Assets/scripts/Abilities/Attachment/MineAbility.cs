@@ -7,7 +7,7 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Drops a proximity mine - Tudor's Equipment spec: 2 charges, 10 seconds each. WHERE changed
+    /// Drops a proximity mine - Tudor's Attachment spec: 2 charges, 10 seconds each. WHERE changed
     /// (A9, Tudor 2026-09-17 evening): a mine used to always land at the caster's own feet, with no
     /// aiming at all; it now lands at the player's aim point on the floor, clamped to Placement Range
     /// metres from the player - see TryBuildCast and MinePlacementRule (Assets/scripts/Combat).
@@ -24,7 +24,7 @@ namespace Overpower.Abilities
     /// INTERRUPT IS NOT OVERRIDDEN. Tudor's decision: mines survive the placer's own death, exactly
     /// like a portal survives - so Died must do nothing here, and the base no-op already gives that
     /// for free. Nothing in this task specifies what should happen to a player's mines if the
-    /// Equipment slot is later swapped to something else (there is no shop yet to do that with) - so
+    /// Attachment slot is later swapped to something else (there is no shop yet to do that with) - so
     /// unlike Portal, which explicitly destroys its own gates on Unequipped, this module leaves that
     /// decision unmade rather than guessing: an untriggered mine still expires on its own Persist
     /// Seconds (NetworkedDeployable's Lifetime Seconds field) regardless.
