@@ -65,9 +65,9 @@ namespace Overpower.Combat
         /// <summary>Whether a player standing around when someone else's trip through a portal completes travels too:
         /// alive, on the owner's team, touching the portal that was used (not the other one of the pair), and not the
         /// traveller who already went.</summary>
-        public static bool JoinsGroupTrip(bool userAlive, bool sameTeamAsOwner, bool onDeparturePortal, bool isTheTraveller)
+        public static bool JoinsGroupTrip(bool userAlive, bool sameTeamAsOwner, bool onDeparturePortal, bool isTheTraveller, bool latchedOnDeparture = false)
         {
-            return userAlive && sameTeamAsOwner && onDeparturePortal && !isTheTraveller;
+            return userAlive && sameTeamAsOwner && onDeparturePortal && !isTheTraveller && !latchedOnDeparture;
         }
 
         /// <summary>True while a group-trip signal is recent enough to act on.</summary>

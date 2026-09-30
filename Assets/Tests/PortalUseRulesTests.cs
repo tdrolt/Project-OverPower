@@ -229,5 +229,10 @@ namespace Overpower.Tests
             Vector3 arrival = PortalUseRules.GroupArrivalPoint(Vector3.zero, new Vector3(0.8f, 0f, 0f), new Vector3(10f, 0f, 0f), PortalRadius, 1.4f);
             Assert.AreEqual(11.4f, arrival.x, 0.001f);
         }
+        [Test]
+        public void APlayerLatchedOnTheDeparturePortalIsNotPulledBackThroughIt()
+        {
+            Assert.IsFalse(PortalUseRules.JoinsGroupTrip(userAlive: true, sameTeamAsOwner: true, onDeparturePortal: true, isTheTraveller: false, latchedOnDeparture: true));
+        }
     }
 }

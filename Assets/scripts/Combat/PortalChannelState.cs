@@ -96,6 +96,9 @@ namespace Overpower.Combat
         /// start channelling you straight back.</summary>
         public void LatchArrival(object arrivalPortal) => arrivalLatch = arrivalPortal;
 
+        /// <summary>True while this portal is the arrival portal the body has not yet stepped out of.</summary>
+        public bool IsLatchedOn(object portal) => portal != null && Equals(arrivalLatch, portal);
+
         /// <summary>Retunes how long a channel takes, keeping any channel already in progress
         /// running rather than resetting it - a designer changing this mid-match should not punish
         /// whoever happens to be mid-channel, the same courtesy ChargePool.SetRechargeSeconds gives

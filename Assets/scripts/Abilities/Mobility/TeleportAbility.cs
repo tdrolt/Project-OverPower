@@ -524,6 +524,8 @@ namespace Overpower.Abilities
         /// <summary>The owner as a group member (a teammate's trip through my portal pulled me along): I was moved by
         /// AllyPortalTraveller, so my own channel stops and the arrival portal is latched exactly as after my own trip.
         /// No charge - the trip's one charge was spent by whoever triggered it.</summary>
+        public bool IsLatchedOn(Portal portal) => channelState.IsLatchedOn(portal);
+
         public void NoteArrivedWithGroup(Portal arrival)
         {
             if (channelingPortal != null)

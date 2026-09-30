@@ -119,6 +119,8 @@ namespace Overpower.Abilities
             bool silenced = overheat != null && overheat.IsSilenced;
             bool canAct = CastGate.ForActor(alive, stunned, silenced) == CastBlock.None;
 
+            TryJoinPendingGroupTrip();
+
             Portal current = FindStandingPortal(out Player portalOwner, out bool sameTeam);
             Portal other = null;
             bool canChannel = false;
@@ -210,6 +212,33 @@ namespace Overpower.Abilities
         /// arrival is checked like any exit; a blocked offset falls back to the centre. Only the local player moves.</summary>
         public void JoinGroupTrip(int ownerActor, Portal from, int travellerActor)
         {
+            // Only stores the request: this is called from Photon's message handling (PhotonHandler.FixedUpdate), where
+            // PlayerMotor.Move's MovePosition in the same physics step can undo a teleport. The checks and the jump run
+            // in the next Update, like every other portal teleport (TryJoinPendingGroupTrip).
+            if (from == null || !photonView.IsMine)
+                return;
+            pendingGroupFrom = from;
+            pendingGroupOwner = ownerActor;
+            pendingGroupTraveller = travellerActor;
+        }
+
+        private Portal pendingGroupFrom;
+        private int pendingGroupOwner;
+        private int pendingGroupTraveller;
+
+        private void TryJoinPendingGroupTrip()
+        {
+            Portal from = pendingGroupFrom;
+            int ownerActor = pendingGroupOwner;
+            int travellerActor = pendingGroupTraveller;
+            pendingGroupFrom = null;
+            if (from == null)
+                return;
+            ExecuteGroupTrip(ownerActor, from, travellerActor);
+        }
+
+        private void ExecuteGroupTrip(int ownerActor, Portal from, int travellerActor)
+        {
             if (from == null || !photonView.IsMine || !PhotonNetwork.InRoom || capsule == null || body == null || displacement == null)
                 return;
 
@@ -220,10 +249,14 @@ namespace Overpower.Abilities
             bool iAmOwner = ownerActor == PhotonNetwork.LocalPlayer.ActorNumber;
             bool sameTeam = iAmOwner || (Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && Teams.TryGetTeam(portalOwner, out _)
                                         && Teams.AreSameTeam(PhotonNetwork.LocalPlayer, portalOwner));
+            // "Alive" only, by design (Tudor has not objected): a stunned or silenced teammate standing on the portal travels along too.
             bool alive = lifecycle == null || lifecycle.IsAlive;
             bool onDeparture = PortalUseRules.IsOnPortal(from.transform.position, body.position, from.Radius, capsule.radius);
+            // Just arrived on this portal (latched): a trip from it finishing now must not pull the player straight back.
+            TeleportAbility ownAbility = iAmOwner && runner != null ? runner.StatusFor(AbilitySlot.Mobility) as TeleportAbility : null;
+            bool latched = iAmOwner && ownAbility != null ? ownAbility.IsLatchedOn(from) : channelState.IsLatchedOn(from);
 
-            if (!PortalUseRules.JoinsGroupTrip(alive, sameTeam, onDeparture, isTheTraveller: travellerActor == PhotonNetwork.LocalPlayer.ActorNumber))
+            if (!PortalUseRules.JoinsGroupTrip(alive, sameTeam, onDeparture, isTheTraveller: travellerActor == PhotonNetwork.LocalPlayer.ActorNumber, latchedOnDeparture: latched))
                 return;
 
             Portal to = TeleportAbility.FindOther(Portal.ForOwner(ownerActor), from);
@@ -231,8 +264,14 @@ namespace Overpower.Abilities
                 return;
 
             Vector3 landing = PortalUseRules.GroupArrivalPoint(from.transform.position, body.position, to.transform.position, from.Radius, capsule.radius * 2f);
-            Vector3 root = PlayerSpaceProbe.RootOnGround(capsule, landing);
-            if (!TeleportAbility.IsRootClear(capsule, root, transform))
+            // Ground under the landing spot, probed like Blink does; a failed probe falls back to the centre below.
+            Vector3 root;
+            PlayerMotor motor = GetComponent<PlayerMotor>();
+            bool grounded = GroundProbe.TryFindGround(to.transform.position.y, landing, 0.6f, 2f,
+                                motor != null ? motor.KillHeight : float.NegativeInfinity,
+                                LayerMask.GetMask("Default", "Building"), transform, out Vector3 ground);
+            root = PlayerSpaceProbe.RootOnGround(capsule, grounded ? ground : landing);
+            if (!grounded || !TeleportAbility.IsRootClear(capsule, root, transform))
             {
                 root = TeleportAbility.ArrivalRoot(capsule, to);
                 if (!TeleportAbility.IsExitClear(capsule, to, transform))
@@ -245,7 +284,7 @@ namespace Overpower.Abilities
             channelState.Reset();
             channelState.LatchArrival(to);
             if (iAmOwner)
-                (runner != null ? runner.StatusFor(AbilitySlot.Mobility) as TeleportAbility : null)?.NoteArrivedWithGroup(to);
+                ownAbility?.NoteArrivedWithGroup(to);
         }
 
         // ---- owner half -----------------------------------------------------------------------------
