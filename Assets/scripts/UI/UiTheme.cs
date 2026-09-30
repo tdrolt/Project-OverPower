@@ -823,9 +823,9 @@ namespace Overpower.UI
                  "client's own synced server clock - it MUST stay in the text, or the number never shows. The countdown's " +
                  "own length is GameplayConfig > Match Start Countdown Seconds.")]
         public string matchCountdownText = "Match starts in {0}";
-        [Tooltip("The host's Start button label - shown only while exactly two teams have a player and nobody is still " +
-                 "team-less.")]
-        public string matchStartButtonText = "Start match (2 teams)";
+        [Tooltip("The host's Start button label - shown while two or three teams have a player and nobody is still " +
+                 "team-less. {0} is the number of teams the match will start with (2 or 3) - it MUST stay in the text.")]
+        public string matchStartButtonText = "Start match ({0} teams)";
         [Tooltip("Fill colour of the host's Start button. Deliberately its own colour, not Bar Track Colour (the ordinary " +
                  "grey button fill, e.g. Loadout) - Start is the one button that begins the match, so it must stand out.")]
         public Color matchStartButtonColor = new Color(0.16f, 0.45f, 0.25f, 0.95f);

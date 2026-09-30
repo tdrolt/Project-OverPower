@@ -45,6 +45,7 @@ namespace Overpower.UI
         private UiTheme theme;
         private TextMeshProUGUI label; // Built (and owned) by PlayerHud.BuildWarmupLine - this class only writes to it.
         private GameObject buttonGo;
+        private TextMeshProUGUI startButtonLabel;
         private GameObject switchButtonGo;
         private Button switchButton;
         private TextMeshProUGUI switchButtonLabel;
@@ -53,6 +54,7 @@ namespace Overpower.UI
         private MatchDirector subscribedDirector;
         private WarmupMessage lastMessage = (WarmupMessage)(-1); // Never a real value - forces the first Update to write.
         private int lastSecondsShown = -1;
+        private int lastStartTeams = -1; // Never a real team count - forces the first Update to write Start's label.
         private bool lastTooManyForHost;
         private bool lastShowButton;
         private bool lastShowSwitchButton;
@@ -125,6 +127,17 @@ namespace Overpower.UI
                 buttonGo.SetActive(showButton);
                 lastShowButton = showButton;
             }
+            if (showButton)
+            {
+                // Start's label names the teams the match will start with - it changes when a third team's first
+                // player arrives or the last one leaves, so it is rewritten only on that change (string.Format allocates).
+                int startTeams = StartButtonTeams(d.TeamsWithPlayersNow);
+                if (startTeams != lastStartTeams)
+                {
+                    startButtonLabel.text = StartButtonText(theme.matchStartButtonText, startTeams);
+                    lastStartTeams = startTeams;
+                }
+            }
 
             // The switch button: host only, warm-up only (Decision L4/L7) - never while counting down or live,
             // whether or not Start itself is showing (Start also needs both open teams filled; the switch does not).
@@ -168,6 +181,27 @@ namespace Overpower.UI
         /// mode (there is nothing to refuse switching back). Pure - see MatchStartPanelTests.</summary>
         internal static bool ShowTooManyForHost(bool isHost, StartState state, int mode, bool maySwitchToTwoTeams) =>
             isHost && state == StartState.Warmup && mode == MatchStartRules.ThreeTeams && !maySwitchToTwoTeams;
+
+        /// <summary>How many teams the Start button names: the teams with a player right now, which is exactly what
+        /// HostStartMatch fixes into the match (MatchStartRules.TeamsWithPlayers) - 2 in the two-team lobby (team 2
+        /// stays empty there, HostMayStart), 2 or 3 in the three-team lobby. The button only shows from two teams
+        /// up, so the clamp just keeps the text sane on a frame it is about to hide. Pure - see MatchStartPanelTests.</summary>
+        internal static int StartButtonTeams(int teamsWithPlayers) =>
+            System.Math.Max(MatchStartRules.TwoTeams, System.Math.Min(MatchStartRules.ThreeTeams, teamsWithPlayers));
+
+        /// <summary>UiTheme.matchStartButtonText with its {0} filled by the team count; a theme edit that breaks the
+        /// format shows the raw text instead of throwing (same safety net as FormatCountdown). Pure.</summary>
+        internal static string StartButtonText(string format, int teams)
+        {
+            try
+            {
+                return string.Format(format, teams);
+            }
+            catch (System.FormatException)
+            {
+                return format;
+            }
+        }
 
         /// <summary>Which warm-up line the panel shows, as a key rather than the UiTheme string itself, so the
         /// decision (which message wins, and that the too-many reason overrides all of them) is testable with no
@@ -266,7 +300,8 @@ namespace Overpower.UI
             float rowY = -(theme.warmupTopOffset + theme.warmupLineSize.y + ButtonGapBelowLine);
             float rowOffset = (theme.matchStartButtonSize.x + ButtonHorizontalGap) / 2f;
 
-            buttonGo = BuildRowButton(canvasGo.transform, "Start Match Button", rowOffset, rowY, theme.matchStartButtonText);
+            buttonGo = BuildRowButton(canvasGo.transform, "Start Match Button", rowOffset, rowY, StartButtonText(theme.matchStartButtonText, MatchStartRules.TwoTeams));
+            startButtonLabel = buttonGo.GetComponentInChildren<TextMeshProUGUI>();
             buttonGo.GetComponent<Button>().onClick.AddListener(() => MatchDirector.Instance?.HostStartMatch());
             buttonGo.SetActive(false); // Refresh turns this on only while HostMayStartNow.
 

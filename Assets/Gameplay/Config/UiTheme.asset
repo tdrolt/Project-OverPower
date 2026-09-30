@@ -259,7 +259,7 @@ MonoBehaviour:
   warmupHostText: 'Warm-up: press Start when you''re ready (two or three teams).'
   warmupGuestText: 'Warm-up: waiting for the host to start.'
   matchCountdownText: Match starts in {0}
-  matchStartButtonText: Start match (2 teams)
+  matchStartButtonText: Start match ({0} teams)
   matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   matchStartButtonSize: {x: 260, y: 52}
   warmupTopOffset: 130
