@@ -108,6 +108,9 @@ namespace Overpower.Vision
         private int lastStart;
         private int prevNow;
 
+        /// <summary>Forget the scan seen so far (the room was left, or the scan is switched off): the next frame is a first frame.</summary>
+        public void Reset() => has = false;
+
         /// <summary>Call once per frame, every frame, with the same inputs. Returns Holding = false (and forgets the scan) while
         /// no team holds the centre or the map is cut. A frame with the server clock at 0, or one that does not move the clock
         /// forward (Photon's clock can step back a few ms), gets an empty band and is not remembered, so no slice of the wave

@@ -161,6 +161,12 @@ namespace Overpower.UI
         private RectTransform packsLayer;
         private RectTransform markersLayer;
         private RectTransform teammatesLayer;
+        private RectTransform scanLayer;
+        private RectTransform scanRing;
+        private RectTransform scanDotsLayer;
+        private readonly List<Image> scanRingSegments = new List<Image>();
+        private readonly List<RectTransform> scanDotMarkers = new List<RectTransform>();
+        private readonly List<CanvasGroup> scanDotGroups = new List<CanvasGroup>();
         private RectTransform ownMarker;
         private Material textMaterial;
 
@@ -304,6 +310,7 @@ namespace Overpower.UI
             UpdateZones();
             UpdateFog();
             UpdatePlayers();
+            UpdateScan();
             UpdateOpacity();
         }
 
@@ -542,6 +549,10 @@ namespace Overpower.UI
             // to rebuild the WHOLE minimap's batched mesh (links, zone bubbles, labels) each frame just to redraw
             // two tiny dots. A separate Canvas here gives markers their own batch, so an idle map never rebuilds.
             markersLayer.gameObject.AddComponent<Canvas>();
+            // The centre scan (Vision Task 11): under the player markers, so a dot never hides a teammate.
+            scanLayer = NewLayer("Centre Scan", markersLayer);
+            scanRing = NewRect("Wave", scanLayer);
+            scanDotsLayer = NewLayer("Scan Dots", scanLayer);
             teammatesLayer = NewLayer("Teammates", markersLayer);
 
             // Drawn LAST, so on top of and outside the mask (a sibling of Viewport, not a child): a thin,
@@ -997,6 +1008,67 @@ namespace Overpower.UI
             }
             HideDotsFrom(teammateDots, used);
             HideDotsFrom(enemyDots, enemiesUsed);
+        }
+
+        // The centre scan (Vision Task 11, only for the team holding the centre; Tudor picked wave + enemy dots, no text): the
+        // wave as a ring round the centre's bubble, and a frozen red dot per enemy the front passed, fading as it ages. Both maps
+        // are this one map (the large one is the same objects scaled), so one pass draws both.
+        private const int ScanRingSegments = 64;
+        private const float ScanRingWidth = 2.5f; // map units; a look, like the link widths
+
+        private void UpdateScan()
+        {
+            CentreScan scan = CentreScan.Instance;
+            TeamSight sight = TeamSight.Local;
+            bool show = scan != null && sight != null && sight.Config != null && scan.SeenByMyTeam;
+            if (scanLayer.gameObject.activeSelf != show)
+                scanLayer.gameObject.SetActive(show);
+            if (!show)
+                return;
+
+            VisionConfig vision = sight.Config;
+            float now = Time.time;
+
+            bool ring = scan.WaveVisible;
+            if (scanRing.gameObject.activeSelf != ring)
+                scanRing.gameObject.SetActive(ring);
+            if (ring)
+            {
+                Vector2 centre = MinimapLayout.WorldToMap(scan.CentrePosition, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                float radius = CentreScanDisplayRules.MinimapRadius(scan.Frame.Radius, config.WorldSizeMetres, theme.minimapCornerSize);
+                while (scanRingSegments.Count < ScanRingSegments)
+                    scanRingSegments.Add(NewImage("Segment", scanRing, null, vision.ScanWaveColour, 0f));
+                for (int i = 0; i < ScanRingSegments; i++)
+                {
+                    float a0 = i * 2f * Mathf.PI / ScanRingSegments;
+                    float a1 = (i + 1) * 2f * Mathf.PI / ScanRingSegments;
+                    Vector2 from = centre + new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * radius;
+                    Vector2 to = centre + new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * radius;
+                    scanRingSegments[i].color = vision.ScanWaveColour;
+                    PlaceHalfSegment(scanRingSegments[i], from, to, ScanRingWidth);
+                }
+            }
+
+            var dots = scan.Dots.Dots;
+            for (int i = 0; i < dots.Count; i++)
+            {
+                while (scanDotMarkers.Count <= i)
+                {
+                    RectTransform marker = BuildMarker("Scan Dot", scanDotsLayer, GeneratedSprites.Disc, vision.MinimapEnemyColour, theme.minimapTeammateDotSize);
+                    dotFills[marker] = marker.Find("Fill").GetComponent<Image>();
+                    scanDotGroups.Add(marker.gameObject.AddComponent<CanvasGroup>());
+                    scanDotMarkers.Add(marker);
+                }
+                RectTransform dot = scanDotMarkers[i];
+                if (!dot.gameObject.activeSelf)
+                    dot.gameObject.SetActive(true);
+                dot.anchoredPosition = MinimapLayout.WorldToMap(dots[i].Position, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                Image fill = dotFills[dot];
+                if (fill.color != vision.MinimapEnemyColour)
+                    fill.color = vision.MinimapEnemyColour;
+                scanDotGroups[i].alpha = CentreScanDisplayRules.DotAlpha(now - dots[i].BornTime, vision.ScanDotSeconds);
+            }
+            HideDotsFrom(scanDotMarkers, dots.Count);
         }
 
         private static void HideDotsFrom(List<RectTransform> dots, int first)

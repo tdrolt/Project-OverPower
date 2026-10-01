@@ -315,6 +315,19 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AfterAReset_TheTrackerForgetsTheScan_AndTheNextFrameIsAFirstFrame()
+        {
+            // The client left the room (or the scan was switched off): the next frame starts clean, and a frame long after
+            // the scan began is a joiner's, who is not handed every enemy behind the front.
+            ScanBandTracker tracker = new ScanBandTracker();
+            tracker.Step(Team, 1000, 1000, Interval, false, Speed, ScanMax);
+            tracker.Step(Team, 1000, 1020, Interval, false, Speed, ScanMax);
+            tracker.Reset();
+            ScanFrame f = tracker.Step(Team, 1000, 4000, Interval, false, Speed, ScanMax);
+            Assert.AreEqual(f.Radius, f.PrevRadius, 0.0001f);
+        }
+
+        [Test]
         public void TheWaveStopsTravellingPastTheFarthestPoint_ButTheLastBandIsStillSwept()
         {
             ScanBandTracker tracker = new ScanBandTracker();

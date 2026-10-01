@@ -376,6 +376,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // MatchDirector above: no scene footprint, so it is added here on the same GameObject.
         if (GetComponent<Overpower.Vision.ZoneKnowledge>() == null)
             gameObject.AddComponent<Overpower.Vision.ZoneKnowledge>();
+
+        // Vision Task 11: the centre scan (wave on the ground, dots and zone refresh for the holding team). Same reasoning.
+        if (GetComponent<Overpower.Vision.CentreScan>() == null)
+            gameObject.AddComponent<Overpower.Vision.CentreScan>();
     }
 
     void Start()

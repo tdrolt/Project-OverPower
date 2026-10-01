@@ -69,6 +69,9 @@ namespace Overpower.Data
         [Tooltip("The colour of the scan wave as it crosses the arena.")]
         [SerializeField] private Color scanWaveColour = new Color(0.898f, 0.282f, 0.302f, 1f);
 
+        [Tooltip("How thick the red ring on the ground is, in metres. Thicker is easier to see from the top-down camera.")]
+        [SerializeField, Min(0.1f)] private float scanWaveWidth = 1.5f;
+
         [Tooltip("How many seconds the dots the scan reveals stay on the minimap. Longer keeps enemy positions visible for longer.")]
         [SerializeField, Min(0f)] private float scanDotSeconds = 4f;
 
@@ -102,6 +105,7 @@ namespace Overpower.Data
         public float ScanIntervalSeconds => scanIntervalSeconds;
         public float ScanWaveSpeed => scanWaveSpeed;
         public Color ScanWaveColour => scanWaveColour;
+        public float ScanWaveWidth => scanWaveWidth;
         public float ScanDotSeconds => scanDotSeconds;
         public bool ScanTier1 => scanTier1;
         public bool ScanTier2 => scanTier2;
