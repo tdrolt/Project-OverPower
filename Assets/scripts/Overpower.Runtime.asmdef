@@ -9,6 +9,7 @@
     "Unity.InputSystem",
     "Unity.TextMeshPro",
     "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
     "Project.Tools"
   ],
   "includePlatforms": [],

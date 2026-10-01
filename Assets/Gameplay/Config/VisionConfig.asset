@@ -22,7 +22,7 @@ MonoBehaviour:
   wallRevealDepth: 0.75
   lineSampleSpacing: 1
   sightRayCount: 180
-  sightTextureSize: 512
+  sightTextureSize: 1024
   zoneOwnersVisibleWithoutSight: 1
   minimapEnemyColour: {r: 0.898, g: 0.282, b: 0.302, a: 1}
   scanIntervalSeconds: 30

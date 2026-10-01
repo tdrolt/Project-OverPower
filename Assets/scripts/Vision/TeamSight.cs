@@ -151,7 +151,8 @@ namespace Overpower.Vision
             DrawSight();
             Shader.SetGlobalTexture("_VisionSightTex", sightTexture);
             Shader.SetGlobalVector("_VisionSightRect", sightRect);
-            Shader.SetGlobalColor("_VisionFogColour", config.FogColour);
+            Color fog = config.FogColour;
+            Shader.SetGlobalVector("_VisionFogColour", QualitySettings.activeColorSpace == ColorSpace.Linear ? fog.linear : fog);
             Shader.SetGlobalFloat("_VisionFogDarkness", config.FogDarkness);
         }
 
