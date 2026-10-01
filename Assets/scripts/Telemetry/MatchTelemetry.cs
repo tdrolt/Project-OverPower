@@ -699,7 +699,7 @@ namespace Overpower.Telemetry
         /// <summary>P2: Ctrl+B's own `bug` line - BugMarkerKey is the only caller. screenshotFileName
         /// is just the file's own NAME (see TelemetryKeys.ScreenshotFile) - the report links it
         /// relative to the match folder, which is this line's own folder.</summary>
-        public void LogBug(int team, float x, float z, bool alive, int zone, int weaponId, int equipmentId,
+        public void LogBug(int team, float x, float z, bool alive, int zone, int weaponId, int attachmentId,
                             int mobilityId, int ultimateId, string screenshotFileName)
         {
             line.Begin(TelemetryKeys.Bug, Now);
@@ -710,7 +710,7 @@ namespace Overpower.Telemetry
             line.Bool(TelemetryKeys.Alive, alive);
             line.Int(TelemetryKeys.Zone, zone);
             line.Int(TelemetryKeys.Weapon, weaponId);
-            line.Int(TelemetryKeys.Equipment, equipmentId);
+            line.Int(TelemetryKeys.Attachment, attachmentId);
             line.Int(TelemetryKeys.Mobility, mobilityId);
             line.Int(TelemetryKeys.Ultimate, ultimateId);
             line.String(TelemetryKeys.ScreenshotFile, screenshotFileName ?? "");

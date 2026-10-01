@@ -315,8 +315,12 @@ namespace Overpower.UI
         public float loadoutAbilityCardHeight = 88f;
         [Tooltip("Horizontal space between the Mobility, Attachment and Ultimate columns on the Abilities & Armor page, in canvas units.")]
         public float loadoutAbilityColumnGap = 60f;
-        [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the Absorb row, the Recharge row and Reset Armor, in canvas units.")]
+        [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the armor rows and Reset Armor, in canvas units.")]
         public float loadoutNodeSpacing = 20f;
+        [Tooltip("Gap between an armor upgrade's text (Absorb, Recharge) and its own + button, in canvas units. Keep it much smaller than Armor Row Gap, so each + reads as part of the text before it.")]
+        public float loadoutArmorPlusGap = 12f;
+        [Tooltip("Gap between the Absorb group (text + button) and the Recharge group on the Abilities & Armor page, in canvas units. Keep it much larger than Armor Plus Gap, so a + button is never mistaken for the other upgrade's.")]
+        public float loadoutArmorRowGap = 90f;
         [Tooltip("Thickness of the highlight border drawn around the equipped weapon node or ability card, in canvas units.")]
         public float loadoutEquippedBorderWidth = 4f;
         [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units. Raised from an original 44 (Task 9a review, 616x576 capture): a bigger button gives the bigger glyph below more room to stay legible.")]
@@ -697,6 +701,20 @@ namespace Overpower.UI
         public float minimapOwnedLinkWidth = 4f;
         [Tooltip("Width of a link nobody owns (a thin grey line), in canvas units.")]
         public float minimapNeutralLinkWidth = 2f;
+        [Tooltip("Thickness of the centre scan's red ring on the minimap, in canvas units.")]
+        public float minimapScanRingWidth = 2.5f;
+        [Tooltip("The text of the countdown above the centre tower. {0} is the whole seconds left until the next centre scan, " +
+                 "e.g. \"Scan {0}\" reads \"Scan 12\". Its height and on/off are on the Vision Config; its size is below.")]
+        public string scanCountdownFormat = "Scan {0}";
+        [Tooltip("Text size of the countdown above the centre tower, in reference pixels (1080p). It is a HUD label, so it keeps " +
+                 "the same size on screen however far the camera is zoomed out. Bigger reads better but covers more of the view.")]
+        [Min(1f)] public float scanCountdownFontSize = 28f;
+        [Tooltip("Text size of the second countdown, the one fixed under the corner minimap, in reference pixels (1080p). Same words " +
+                 "and colour as the one above the tower; it is always on screen while there is a scan, so it can stay smaller.")]
+        [Min(1f)] public float scanMinimapCountdownFontSize = 22f;
+        [Tooltip("Where that countdown sits relative to the spot straight under the middle of the corner minimap, in canvas units: " +
+                 "x moves it right, y moves it up (a negative y moves it further down, away from the map).")]
+        public Vector2 scanMinimapCountdownOffset = new Vector2(0f, -4f);
         [Tooltip("Size of a way-in arrowhead, in canvas units. It points from a team's zone toward the neutral zone next to it.")]
         public float minimapArrowheadSize = 12f;
         [Tooltip("Size of your own arrow on the minimap, in canvas units. It points where you face.")]

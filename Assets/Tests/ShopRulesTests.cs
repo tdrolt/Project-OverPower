@@ -79,17 +79,17 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void FirstPickIntoAnEmptyMobilityOrEquipmentSlotIsFree()
+        public void FirstPickIntoAnEmptyMobilityOrAttachmentSlotIsFree()
         {
             Assert.AreEqual(0, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Mobility, goldCost: 800));
-            Assert.AreEqual(0, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Equipment, goldCost: 800));
+            Assert.AreEqual(0, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Attachment, goldCost: 800));
         }
 
         [Test]
-        public void ChangingAnAlreadyFilledMobilityOrEquipmentSlotCostsItsPrice()
+        public void ChangingAnAlreadyFilledMobilityOrAttachmentSlotCostsItsPrice()
         {
             Assert.AreEqual(800, ShopRules.AbilityPrice(slotIsEmpty: false, AbilitySlot.Mobility, goldCost: 800));
-            Assert.AreEqual(800, ShopRules.AbilityPrice(slotIsEmpty: false, AbilitySlot.Equipment, goldCost: 800));
+            Assert.AreEqual(800, ShopRules.AbilityPrice(slotIsEmpty: false, AbilitySlot.Attachment, goldCost: 800));
         }
 
         [Test]
@@ -112,11 +112,11 @@ namespace Overpower.Tests
         [Test]
         public void EmptyPrimarySlotIsNotFree()
         {
-            // Task 2.5b review fix 5: AbilitySlot has FOUR values (Primary, Equipment, Ultimate,
+            // Task 2.5b review fix 5: AbilitySlot has FOUR values (Primary, Attachment, Ultimate,
             // Mobility) - the old rule read "free unless Ultimate", which silently also freed an
             // empty Primary slot. Nothing equips Primary through this screen today
             // (LoadoutScreen.SlotHeading's own comment: "Primary never reaches here"), but the RULE
-            // itself must say "free only for Mobility/Equipment" explicitly rather than relying on
+            // itself must say "free only for Mobility/Attachment" explicitly rather than relying on
             // that coincidence.
             Assert.AreEqual(800, ShopRules.AbilityPrice(slotIsEmpty: true, AbilitySlot.Primary, goldCost: 800));
         }

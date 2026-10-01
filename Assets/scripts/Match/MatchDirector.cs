@@ -828,6 +828,10 @@ namespace Overpower.Match
                         FindFirstObjectByType<RoomManager>()?.ReseatLocalPlayerIfTeamClosed();
                 }
 
+                // Vision Task 9b: the live reset threw the warm-up captures away; what the team knows starts again from it.
+                if (live && !prevLive)
+                    Overpower.Vision.ZoneKnowledge.ResetKnowledge();
+
                 if (live && !prevLive && lifecycle != null)
                 {
                     int team = FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch() ?? myTeam;

@@ -387,13 +387,27 @@ public class BuildingCapture : MonoBehaviourPun
             shownColumnsTier = effectiveTier;
         }
 
+        // Vision Task 9b, the one place this tower chooses: with Zone Owners Visible Without Sight off, the ring, the
+        // crown/caps and the carpet all show what the team knows of this zone, not the live state.
+        bool filtered = Overpower.Vision.ZoneKnowledge.TryGetDisplayed(buildingID, out Overpower.Vision.ZoneView known);
+        int owner = filtered ? known.OwnerTeam
+            : manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
+        PaintKnownCarpet(owner, filtered);
+
         if (ringView == null && towerLook == null)
             return;
 
-        int owner = manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
-        bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
-        CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
-                                                       PhotonNetwork.ServerTimestamp, outOfPlay: false);
+        CaptureRingState state;
+        if (filtered)
+        {
+            state = known.Ring;
+        }
+        else
+        {
+            bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
+            state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
+                                          PhotonNetwork.ServerTimestamp, outOfPlay: false);
+        }
 
         if (ringView != null)
         {
@@ -1156,10 +1170,33 @@ public class BuildingCapture : MonoBehaviourPun
     /// after a neutralise.
     public void ApplyOwnerVisual(bool captured, int teamID)
     {
-        if (!flagRenderer)
+        // Vision Task 9b: while the team's knowledge is filtering, RefreshRingView paints the carpet from it instead.
+        if (!flagRenderer || Overpower.Vision.ZoneKnowledge.IsFiltering)
             return;
 
         flagRenderer.material = GetTeamMaterial(captured ? teamID : -1);
+        shownCarpetTeam = int.MinValue;
+    }
+
+    // The carpet's owner as last painted by the knowledge-driven path; MinValue = the live paint is in charge.
+    private int shownCarpetTeam = int.MinValue;
+
+    /// <summary>While the team's knowledge is filtering, the carpet shows the known owner (repainted only on change).
+    /// Otherwise the live paint (ApplyOwnerVisual, on every snapshot) is in charge, as before.</summary>
+    private void PaintKnownCarpet(int knownOwner, bool filtered)
+    {
+        if (!filtered)
+        {
+            // Filtering just ended: the live owner (knownOwner is the live one on this path) takes the carpet back.
+            if (shownCarpetTeam != int.MinValue && flagRenderer)
+                flagRenderer.material = GetTeamMaterial(knownOwner);
+            shownCarpetTeam = int.MinValue;
+            return;
+        }
+        if (!flagRenderer || knownOwner == shownCarpetTeam)
+            return;
+        flagRenderer.material = GetTeamMaterial(knownOwner);
+        shownCarpetTeam = knownOwner;
     }
 
     Material GetTeamMaterial(int teamID)

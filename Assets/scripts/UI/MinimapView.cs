@@ -3,6 +3,7 @@ using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
+using Overpower.Vision;
 using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
@@ -22,8 +23,12 @@ namespace Overpower.UI
     ///   colour at the owned-line width, no arrowhead;
     /// - each zone's capture progress as a ring around its bubble, matching the ground ring's arc (same states);
     /// - a pulsing outline on zones under attack;
-    /// - your own arrow and your teammates' dots. Enemies aren't shown: there are no vision rules to decide who
-    ///   may see whom.
+    /// - your own arrow and your teammates' dots. Enemies are shown only as red dots (VisionConfig > Minimap Enemy
+    ///   Colour), one for each enemy my team sees right now (TeamSight.CanSeePlayer): not in their team colour, so an
+    ///   ally's sighting tells you someone is there, not who. No last-seen marks (D10): the dot goes the moment nobody
+    ///   sees that enemy. While spectating, the watched team counts as the teammates and everyone else is red. A fog
+    ///   layer darkens the parts of the arena my team cannot see (the sight picture over the arena picture). With the
+    ///   fog switched off there is neither the layer nor the enemy dots.
     ///
     /// OWNER ONLY, built in code like PlayerHud (see its class comment for why code-built). Everything comes from state
     /// every client already has: BuildingManager (owners, capture progress, links), ZonePresenceTracker (under attack)
@@ -138,6 +143,7 @@ namespace Overpower.UI
         private readonly Dictionary<int, ZoneUi> zoneById = new Dictionary<int, ZoneUi>();
         private readonly List<LinkUi> links = new List<LinkUi>();
         private readonly List<RectTransform> teammateDots = new List<RectTransform>();
+        private readonly List<RectTransform> enemyDots = new List<RectTransform>();
         private readonly HashSet<int> hiddenZones = new HashSet<int>();
 
         private PlayerInputRouter inputRouter;
@@ -155,6 +161,12 @@ namespace Overpower.UI
         private RectTransform packsLayer;
         private RectTransform markersLayer;
         private RectTransform teammatesLayer;
+        private RectTransform scanLayer;
+        private RectTransform scanRing;
+        private RectTransform scanDotsLayer;
+        private readonly List<Image> scanRingSegments = new List<Image>();
+        private readonly List<RectTransform> scanDotMarkers = new List<RectTransform>();
+        private readonly List<CanvasGroup> scanDotGroups = new List<CanvasGroup>();
         private RectTransform ownMarker;
         private Material textMaterial;
 
@@ -164,6 +176,11 @@ namespace Overpower.UI
         private Texture2D cutTexture;
         private PhaseTwoCutGeometry paintedCut;
         private const int CutOverlayPixels = 256; // the overlay's sharpness, not a gameplay value
+
+        // The fog layer (vision D10): the sight picture drawn as darkness over the baked arena picture, same rect.
+        private RawImage fogLayer;
+        private Material fogMaterial;
+        private readonly Dictionary<RectTransform, Image> dotFills = new Dictionary<RectTransform, Image>(); // each dot's fill, to recolour live
 
         private bool built;
         private bool largeOpen;
@@ -225,6 +242,8 @@ namespace Overpower.UI
                 Destroy(textMaterial);
             if (cutTexture != null)
                 Destroy(cutTexture);
+            if (fogMaterial != null)
+                Destroy(fogMaterial);
         }
 
         /// <summary>M: open the large map (closing the loadout screen), or close it.</summary>
@@ -274,6 +293,14 @@ namespace Overpower.UI
 
             ApplyYawIfChanged();
 
+            // Vision Task 9b: with the zone switch off the bubbles show what the team knows, so a change in it repaints them.
+            ZoneKnowledge knowledge = ZoneKnowledge.Instance;
+            if (knowledge != null && knowledge.Version != shownKnowledgeVersion)
+            {
+                shownKnowledgeVersion = knowledge.Version;
+                ownershipDirty = true;
+            }
+
             if (ownershipDirty && manager.Current != null)
             {
                 RecolourOwnership();
@@ -281,7 +308,9 @@ namespace Overpower.UI
             }
 
             UpdateZones();
+            UpdateFog();
             UpdatePlayers();
+            UpdateScan();
             UpdateOpacity();
         }
 
@@ -492,6 +521,16 @@ namespace Overpower.UI
             picture.raycastTarget = false;
             Stretch(picture.rectTransform);
 
+            // Vision fog (D10): the sight picture covers the same world square as the baked picture, so it lies over it
+            // with the same rect; UpdateFog shows it and sets its colour. Under the cut overlay, links, bubbles and markers, so the
+            // knocked-out corner's wall line (which everyone knows) is not dimmed.
+            var fogGo = new GameObject("Vision Fog", typeof(RectTransform));
+            fogGo.transform.SetParent(map, false);
+            fogLayer = fogGo.AddComponent<RawImage>();
+            fogLayer.raycastTarget = false;
+            fogLayer.enabled = false;
+            Stretch(fogLayer.rectTransform);
+
             // Phase two cut (Decision 11): under links and bubbles, on top of the baked picture - PaintCutOverlay
             // fills it in only once a cut actually stands (LateUpdate).
             var cutGo = new GameObject("Phase Two Cut", typeof(RectTransform));
@@ -510,6 +549,10 @@ namespace Overpower.UI
             // to rebuild the WHOLE minimap's batched mesh (links, zone bubbles, labels) each frame just to redraw
             // two tiny dots. A separate Canvas here gives markers their own batch, so an idle map never rebuilds.
             markersLayer.gameObject.AddComponent<Canvas>();
+            // The centre scan (Vision Task 11): under the player markers, so a dot never hides a teammate.
+            scanLayer = NewLayer("Centre Scan", markersLayer);
+            scanRing = NewRect("Wave", scanLayer);
+            scanDotsLayer = NewLayer("Scan Dots", scanLayer);
             teammatesLayer = NewLayer("Teammates", markersLayer);
 
             // Drawn LAST, so on top of and outside the mask (a sibling of Viewport, not a child): a thin,
@@ -684,6 +727,13 @@ namespace Overpower.UI
             }
         }
 
+        private int shownKnowledgeVersion = -1;
+
+        /// <summary>The owner this player's team believes a zone has: the known one while the zone switch is off
+        /// (ZoneKnowledge), else the live snapshot's.</summary>
+        private static int OwnerShown(TerritorySnapshot snapshot, int zone) =>
+            ZoneKnowledge.TryGetDisplayed(zone, out ZoneView known) ? known.OwnerTeam : snapshot.OwnerOf(zone);
+
         private void RecolourOwnership()
         {
             TerritorySnapshot snapshot = manager.Current;
@@ -704,12 +754,12 @@ namespace Overpower.UI
                     ApplyTier(zone, tier);
                 zone.Upright.gameObject.SetActive(zone.Shown && !zone.OutOfPlay);
 
-                int owner = snapshot.OwnerOf(zone.Zone);
+                int owner = OwnerShown(snapshot, zone.Zone);
                 zone.Fill.color = zone.OutOfPlay ? theme.outOfPlayZoneColor
                     : owner >= 0 ? theme.ShotColorFor(owner) : theme.minimapNeutralColor;
             }
             foreach (LinkUi link in links)
-                ApplyLinkStyle(link, MinimapLinkStyle.For(snapshot.OwnerOf(link.A), snapshot.OwnerOf(link.B)));
+                ApplyLinkStyle(link, MinimapLinkStyle.For(OwnerShown(snapshot, link.A), OwnerShown(snapshot, link.B)));
         }
 
         /// <summary>Tudor, 2026-09-25: the closed part darkened and the wall drawn, painted once per cut (not per frame)
@@ -794,10 +844,17 @@ namespace Overpower.UI
                 if (!zone.Shown || zone.OutOfPlay)
                     continue;
 
-                int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;
-                bool attacked = presence != null && presence.IsUnderAttack(zone.Zone);
-                CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(zone.Zone), owner, attacked, nowMs,
-                                                                outOfPlay: zone.OutOfPlay);
+                // Vision Task 9b: the known state while the zone switch is off, else the live one as before.
+                CaptureRingState state;
+                if (ZoneKnowledge.TryGetDisplayed(zone.Zone, out ZoneView known))
+                    state = known.Ring;
+                else
+                {
+                    int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;
+                    bool attacked = presence != null && presence.IsUnderAttack(zone.Zone);
+                    state = CaptureRingState.From(manager.CaptureProgressOf(zone.Zone), owner, attacked, nowMs,
+                                                  outOfPlay: zone.OutOfPlay);
+                }
 
                 Color outline = state.UnderAttack
                     ? Color.Lerp(theme.minimapBubbleOutlineColor, theme.captureRingWarningColor, pulse)
@@ -882,6 +939,29 @@ namespace Overpower.UI
             zone.PackBadge = badge;
         }
 
+        // The fog layer: on while TeamSight draws the fog, with its colour and darkness; off (today's map) otherwise.
+        private void UpdateFog()
+        {
+            TeamSight sight = TeamSight.Local;
+            bool on = sight != null && sight.FogActive && sight.MinimapFogShader != null;
+            if (on && fogMaterial == null)
+            {
+                fogMaterial = new Material(sight.MinimapFogShader) { hideFlags = HideFlags.HideAndDontSave };
+                fogLayer.material = fogMaterial;
+            }
+            on &= fogMaterial != null;
+            if (fogLayer.enabled != on)
+                fogLayer.enabled = on;
+            if (!on)
+                return;
+            if (fogLayer.texture != sight.SightTexture)
+                fogLayer.texture = sight.SightTexture;
+            Color fog = sight.Config.FogColour;
+            fog.a = 1f; // the shader takes darkness and lift from globals; alpha here carries only the canvas group opacity
+            if (fogLayer.color != fog)
+                fogLayer.color = fog;
+        }
+
         private void UpdatePlayers()
         {
             bool alive = lifecycle == null || lifecycle.IsAlive;
@@ -894,40 +974,124 @@ namespace Overpower.UI
             }
 
             int used = 0;
+            int enemiesUsed = 0;
+            TeamSight sight = TeamSight.Local;
+            bool fogOn = sight != null && sight.FogActive;
             Room room = PhotonNetwork.CurrentRoom;
             if (room != null && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam))
             {
+                // Spectating: the watched team are the teammates (TeamSight knows it); otherwise my own team.
+                int friendlyTeam = fogOn && sight.FriendlyTeamId >= 0 ? sight.FriendlyTeamId : myTeam;
                 // Room.Players is a Dictionary: its enumerator is a struct, so this allocates nothing (PhotonNetwork.PlayerList
                 // would build a new sorted array every frame).
                 foreach (KeyValuePair<int, Player> pair in room.Players)
                 {
                     Player player = pair.Value;
-                    if (player.IsLocal || !Teams.TryGetTeam(player, out int team) || team != myTeam)
+                    if (player.IsLocal || !Teams.TryGetTeam(player, out int team))
                         continue;
+                    bool friendly = team == friendlyTeam;
                     // Task 9e: a teammate whose connection dropped is not on the map (PresenceRules), whatever "alive" they last wrote.
                     bool? aliveFlag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool isAlive ? isAlive : (bool?)null;
-                    if (!PresenceRules.CountsAsAlive(player.IsInactive, aliveFlag))
+                    bool playerAlive = PresenceRules.CountsAsAlive(player.IsInactive, aliveFlag);
+                    if (!playerAlive || (!friendly && !fogOn))
                         continue;
                     PhotonView view = PlayerLookup.GetPhotonViewFor(player.ActorNumber);
                     if (view == null)
                         continue;
 
-                    RectTransform dot = DotAt(used++);
-                    dot.anchoredPosition = MinimapLayout.WorldToMap(view.transform.position, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                    Vector2 mapPosition = MinimapLayout.WorldToMap(view.transform.position, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                    if (friendly)
+                        DotAt(teammateDots, used++, "Teammate", theme.minimapTeammateDotColor).anchoredPosition = mapPosition;
+                    else if (MinimapEnemyRule.ShowDot(false, playerAlive, sight.CanSeePlayer(view), fogOn))
+                        DotAt(enemyDots, enemiesUsed++, "Enemy", sight.Config.MinimapEnemyColour).anchoredPosition = mapPosition;
                 }
             }
-            for (int i = used; i < teammateDots.Count; i++)
-                if (teammateDots[i].gameObject.activeSelf)
-                    teammateDots[i].gameObject.SetActive(false);
+            HideDotsFrom(teammateDots, used);
+            HideDotsFrom(enemyDots, enemiesUsed);
         }
 
-        private RectTransform DotAt(int index)
+        // The centre scan (Vision Task 11, only for the team the wave belongs to, the one holding the centre when it started; Tudor picked wave + enemy dots, no text): the
+        // wave as a ring round the centre's bubble, and a frozen red dot per enemy the front passed, fading as it ages. Both maps
+        // are this one map (the large one is the same objects scaled), so one pass draws both.
+        private const int ScanRingSegments = 64;
+
+        private void UpdateScan()
         {
-            while (teammateDots.Count <= index)
-                teammateDots.Add(BuildMarker("Teammate", teammatesLayer, GeneratedSprites.Disc, theme.minimapTeammateDotColor, theme.minimapTeammateDotSize));
-            RectTransform dot = teammateDots[index];
+            CentreScan scan = CentreScan.Instance;
+            TeamSight sight = TeamSight.Local;
+            // The layer stays while dots are left, so they finish their time after the centre is lost (the ring stops at once).
+            bool show = scan != null && sight != null && sight.Config != null && (scan.SeenByMyTeam || scan.Dots.Dots.Count > 0);
+            if (scanLayer.gameObject.activeSelf != show)
+                scanLayer.gameObject.SetActive(show);
+            if (!show)
+                return;
+
+            VisionConfig vision = sight.Config;
+            float now = Time.time;
+
+            bool ring = scan.SeenByMyTeam && scan.WaveVisible;
+            if (scanRing.gameObject.activeSelf != ring)
+                scanRing.gameObject.SetActive(ring);
+            if (ring)
+            {
+                Vector2 centre = MinimapLayout.WorldToMap(scan.CentrePosition, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                float radius = CentreScanDisplayRules.MinimapRadius(scan.Frame.Radius, config.WorldSizeMetres, theme.minimapCornerSize);
+                while (scanRingSegments.Count < ScanRingSegments)
+                    scanRingSegments.Add(NewImage("Segment", scanRing, null, vision.ScanWaveColour, 0f));
+                for (int i = 0; i < ScanRingSegments; i++)
+                {
+                    float a0 = i * 2f * Mathf.PI / ScanRingSegments;
+                    float a1 = (i + 1) * 2f * Mathf.PI / ScanRingSegments;
+                    Vector2 from = centre + new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * radius;
+                    Vector2 to = centre + new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * radius;
+                    scanRingSegments[i].color = vision.ScanWaveColour;
+                    PlaceHalfSegment(scanRingSegments[i], from, to, theme.minimapScanRingWidth);
+                }
+            }
+
+            var dots = scan.Dots.Dots;
+            for (int i = 0; i < dots.Count; i++)
+            {
+                while (scanDotMarkers.Count <= i)
+                {
+                    RectTransform marker = BuildMarker("Scan Dot", scanDotsLayer, GeneratedSprites.Disc, vision.MinimapEnemyColour, theme.minimapTeammateDotSize);
+                    dotFills[marker] = marker.Find("Fill").GetComponent<Image>();
+                    scanDotGroups.Add(marker.gameObject.AddComponent<CanvasGroup>());
+                    scanDotMarkers.Add(marker);
+                }
+                RectTransform dot = scanDotMarkers[i];
+                if (!dot.gameObject.activeSelf)
+                    dot.gameObject.SetActive(true);
+                dot.anchoredPosition = MinimapLayout.WorldToMap(dots[i].Position, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                Image fill = dotFills[dot];
+                if (fill.color != vision.MinimapEnemyColour)
+                    fill.color = vision.MinimapEnemyColour;
+                scanDotGroups[i].alpha = CentreScanDisplayRules.DotAlpha(now - dots[i].BornTime, vision.ScanDotSeconds, vision.ScanDotFadeSeconds);
+            }
+            HideDotsFrom(scanDotMarkers, dots.Count);
+        }
+
+        private static void HideDotsFrom(List<RectTransform> dots, int first)
+        {
+            for (int i = first; i < dots.Count; i++)
+                if (dots[i].gameObject.activeSelf)
+                    dots[i].gameObject.SetActive(false);
+        }
+
+        private RectTransform DotAt(List<RectTransform> pool, int index, string dotName, Color colour)
+        {
+            while (pool.Count <= index)
+            {
+                RectTransform marker = BuildMarker(dotName, teammatesLayer, GeneratedSprites.Disc, colour, theme.minimapTeammateDotSize);
+                dotFills[marker] = marker.Find("Fill").GetComponent<Image>();
+                pool.Add(marker);
+            }
+            RectTransform dot = pool[index];
             if (!dot.gameObject.activeSelf)
                 dot.gameObject.SetActive(true);
+            Image fill = dotFills[dot];
+            if (fill.color != colour)
+                fill.color = colour; // a changed Minimap Enemy Colour shows live
             return dot;
         }
 

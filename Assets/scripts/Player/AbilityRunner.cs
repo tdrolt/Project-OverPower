@@ -1,3 +1,4 @@
+using UnityEngine.Serialization;
 using Photon.Pun;
 using UnityEngine;
 using Overpower.Abilities;
@@ -7,7 +8,7 @@ using Overpower.Net;
 using Overpower.TestRange;
 
 /// <summary>
-/// One player's three ability slots - Equipment (right mouse), Ultimate (Space), Mobility (Left
+/// One player's three ability slots - Attachment (right mouse), Ultimate (Space), Mobility (Left
 /// Shift). Primary (left mouse) stays WeaponFiring's. This class owns the parts every ability
 /// shares, so no ability has to write them again: reading the keys, the "can you act" gate, the
 /// press buffer, the one network message, and what happens on death and respawn. Everything that
@@ -49,9 +50,9 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     private Transform moduleParent;
 
     [Header("Starting abilities (leave empty for none)")]
-    [SerializeField, Tooltip("The right-mouse ability a player starts the match with. The shop and " +
+    [SerializeField, FormerlySerializedAs("startingEquipment"), Tooltip("The right-mouse ability a player starts the match with. The shop and " +
              "the test range replace it at runtime through PlayerLoadout.")]
-    private AbilityDefinition startingEquipment;
+    private AbilityDefinition startingAttachment;
 
     [SerializeField, Tooltip("The Space ability a player starts the match with.")]
     private AbilityDefinition startingUltimate;
@@ -59,7 +60,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     [SerializeField, Tooltip("The Left Shift ability a player starts the match with.")]
     private AbilityDefinition startingMobility;
 
-    // Indexed by SlotIndex: 0 Equipment, 1 Ultimate, 2 Mobility. Primary has no entry - it is a weapon.
+    // Indexed by SlotIndex: 0 Attachment, 1 Ultimate, 2 Mobility. Primary has no entry - it is a weapon.
     private const int SlotCount = 3;
     private readonly AbilityModule[] modules = new AbilityModule[SlotCount];
     private readonly CastGate.PressBuffer[] pressBuffers =
@@ -133,7 +134,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         if (input == null)
             return;
 
-        input.EquipmentPressed += HandleEquipmentPressed;
+        input.AttachmentPressed += HandleAttachmentPressed;
         input.UltimatePressed += HandleUltimatePressed;
         input.MobilityPressed += HandleMobilityPressed;
     }
@@ -145,12 +146,12 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         if (input == null)
             return;
 
-        input.EquipmentPressed -= HandleEquipmentPressed;
+        input.AttachmentPressed -= HandleAttachmentPressed;
         input.UltimatePressed -= HandleUltimatePressed;
         input.MobilityPressed -= HandleMobilityPressed;
     }
 
-    private void HandleEquipmentPressed() => PressSlot(AbilitySlot.Equipment);
+    private void HandleAttachmentPressed() => PressSlot(AbilitySlot.Attachment);
     private void HandleUltimatePressed() => PressSlot(AbilitySlot.Ultimate);
     private void HandleMobilityPressed() => PressSlot(AbilitySlot.Mobility);
 
@@ -444,7 +445,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     /// spawn when nothing else has been chosen.</summary>
     public int StartingId(AbilitySlot slot)
     {
-        AbilityDefinition definition = slot == AbilitySlot.Equipment ? startingEquipment
+        AbilityDefinition definition = slot == AbilitySlot.Attachment ? startingAttachment
                                      : slot == AbilitySlot.Ultimate ? startingUltimate
                                      : slot == AbilitySlot.Mobility ? startingMobility
                                      : null;
@@ -554,7 +555,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
 
         switch (slot)
         {
-            case AbilitySlot.Equipment: return input.EquipmentHeld;
+            case AbilitySlot.Attachment: return input.AttachmentHeld;
             case AbilitySlot.Ultimate: return input.UltimateHeld;
             case AbilitySlot.Mobility: return input.MobilityHeld;
             default: return false;
@@ -567,7 +568,7 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     {
         switch (slot)
         {
-            case AbilitySlot.Equipment: return 0;
+            case AbilitySlot.Attachment: return 0;
             case AbilitySlot.Ultimate: return 1;
             case AbilitySlot.Mobility: return 2;
             default: return -1;
@@ -575,5 +576,5 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     }
 
     private static AbilitySlot SlotFromIndex(int index) =>
-        index == 0 ? AbilitySlot.Equipment : index == 1 ? AbilitySlot.Ultimate : AbilitySlot.Mobility;
+        index == 0 ? AbilitySlot.Attachment : index == 1 ? AbilitySlot.Ultimate : AbilitySlot.Mobility;
 }

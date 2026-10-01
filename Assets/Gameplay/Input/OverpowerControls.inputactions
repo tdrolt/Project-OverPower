@@ -24,7 +24,7 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Equipment",
+                    "name": "Attachment",
                     "type": "Button",
                     "id": "4bc422c9-db13-45a8-b721-e3a50e175b55",
                     "expectedControlType": "Button",
@@ -161,7 +161,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Equipment",
+                    "action": "Attachment",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },

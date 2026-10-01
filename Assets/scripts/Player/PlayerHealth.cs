@@ -120,9 +120,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     /// <summary>The world-space canvas the overhead bar and the name sit on - null when the prefab has no health
     /// fill assigned. The status label is built onto it.</summary>
-    public Canvas OverheadCanvas => healthFillImage != null ? healthFillImage.canvas : null;
+    public Canvas OverheadCanvas => healthFillImage != null ? healthFillImage.GetComponentInParent<Canvas>(true) : null; // includes a canvas EnemyVisibility switched off (Image.canvas reads null then)
 
     private PhotonView photonView;
+    private PlayerLifecycle lifecycle; // the replicated alive state, read by IsAlive
 
     private float health;
     private ArmorState armor;
@@ -159,7 +160,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public int RechargeLevel => rechargeLevel;
     public float SecondsSinceCombat => secondsSinceCombat;
     public bool IsOutOfCombat => gameplayConfig != null && secondsSinceCombat >= gameplayConfig.OutOfCombatSeconds;
-    public bool IsAlive => !isDead;
+    /// <summary>Alive on EVERY client (Task 16): the owner's own death latch and the replicated alive state, see PlayerAliveRule.</summary>
+    public bool IsAlive => PlayerAliveRule.IsAlive(isDead, lifecycle != null, lifecycle != null && lifecycle.IsAlive);
     public int TeamId => Teams.TryGetTeam(photonView.Owner, out int teamId) ? teamId : -1;
     public int ActorNumber => photonView.OwnerActorNr;
 
@@ -172,6 +174,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private void Awake()
     {
         photonView = GetComponent<PhotonView>();
+        lifecycle = GetComponent<PlayerLifecycle>();
         statusEffects = GetComponent<PlayerStatusEffects>();
 
         // A silent null here would make this player un-damageable - the worst failure mode.
@@ -210,9 +213,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// which runs on every client for every player, not just the owner (see that method's own class
     /// comment). Deliberately keyed off the caller's own alive value rather than this class's IsAlive:
     /// PlayerHealth.isDead is only ever written on the owner's machine (ApplyDamage's IsMine guard),
-    /// so a remote copy's IsAlive silently reads true for the whole time that player is actually
-    /// dead - the exact trap this method exists to route around. Callers must pass
-    /// PlayerLifecycle.IsAlive (replicated), never PlayerHealth.IsAlive.</summary>
+    /// so a remote copy's latch used to read alive for the whole time that player was actually
+    /// dead (Task 16: IsAlive now also follows PlayerLifecycle.IsAlive, but this caller IS that change, so it keeps
+    /// passing PlayerLifecycle's own value).</summary>
     public void SetOverheadBarVisible(bool visible)
     {
         if (overheadBarRoot != null)

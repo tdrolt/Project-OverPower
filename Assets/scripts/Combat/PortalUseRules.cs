@@ -56,5 +56,36 @@ namespace Overpower.Combat
         /// while its owner has a charge. A flag that has not been published yet counts as usable, so nothing greys by
         /// mistake before the owner's first publish.</summary>
         public static bool ShowsUsable(bool flagKnown, bool ownerHasCharge) => !flagKnown || ownerHasCharge;
+        // ---- group travel (Task 15) ----------------------------------------------------------------
+
+        /// <summary>How old, in seconds, a "a trip just finished" signal may be and still pull bystanders along. A late
+        /// joiner replaying buffered messages must not teleport anyone for a trip that ended long ago.</summary>
+        public const float GroupSignalFreshSeconds = 2f;
+
+        /// <summary>Whether a player standing around when someone else's trip through a portal completes travels too:
+        /// alive, on the owner's team, touching the portal that was used (not the other one of the pair), and not the
+        /// traveller who already went.</summary>
+        public static bool JoinsGroupTrip(bool userAlive, bool sameTeamAsOwner, bool onDeparturePortal, bool isTheTraveller, bool latchedOnDeparture = false)
+        {
+            return userAlive && sameTeamAsOwner && onDeparturePortal && !isTheTraveller && !latchedOnDeparture;
+        }
+
+        /// <summary>True while a group-trip signal is recent enough to act on.</summary>
+        public static bool IsFreshGroupSignal(float secondsLate) => secondsLate <= GroupSignalFreshSeconds;
+
+        /// <summary>Where a group member lands: the same flat offset from the arrival portal's centre that they had from the
+        /// departure portal's centre, clamped to the portal's radius, at the arrival portal's height. The traveller who
+        /// triggered the trip lands on the centre, so an offset shorter than minSeparation is pushed out to it (in the same
+        /// direction, or along +x when the member stood exactly on the centre) so nobody lands inside anybody.</summary>
+        public static Vector3 GroupArrivalPoint(Vector3 departureCentre, Vector3 memberPosition, Vector3 arrivalCentre, float portalRadius, float minSeparation)
+        {
+            Vector3 offset = memberPosition - departureCentre;
+            offset.y = 0f;
+            float length = offset.magnitude;
+            Vector3 direction = length > 0.0001f ? offset / length : Vector3.right;
+            float clamped = Mathf.Min(length, portalRadius);
+            clamped = Mathf.Max(clamped, minSeparation); // may exceed the radius: the rim is a ring the body only has to touch
+            return arrivalCentre + direction * clamped;
+        }
     }
 }

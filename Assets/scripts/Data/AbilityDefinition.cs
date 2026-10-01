@@ -16,7 +16,7 @@ namespace Overpower.Data
         Primary,
 
         /// <summary>Right mouse button.</summary>
-        Equipment,
+        Attachment,
 
         /// <summary>Space.</summary>
         Ultimate,
@@ -58,7 +58,7 @@ namespace Overpower.Data
         public string Description => description;
 
         [Tooltip("Which of the four slots this ability occupies, and therefore which key fires it: " +
-                 "Primary is left mouse, Equipment is right mouse, Ultimate is Space, Mobility is " +
+                 "Primary is left mouse, Attachment is right mouse, Ultimate is Space, Mobility is " +
                  "Left Shift. A player can carry one ability per slot.")]
         [SerializeField] private AbilitySlot slot = AbilitySlot.Primary;
         public AbilitySlot Slot => slot;
@@ -98,7 +98,7 @@ namespace Overpower.Data
 
             if (slot == AbilitySlot.Primary)
                 problems.Add($"Ability '{name}': Slot is Primary (left mouse), which belongs to the weapon. " +
-                             "Choose Equipment, Ultimate or Mobility.");
+                             "Choose Attachment, Ultimate or Mobility.");
 
             if (modulePrefab == null)
             {

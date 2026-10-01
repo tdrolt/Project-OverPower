@@ -188,7 +188,7 @@ namespace Overpower.Tests
         public void AbilityResolveReturnsTheMatchingDefinition()
         {
             var dash = NewAbility(4, "Dash", AbilitySlot.Mobility);
-            var mine = NewAbility(9, "Mine", AbilitySlot.Equipment);
+            var mine = NewAbility(9, "Mine", AbilitySlot.Attachment);
             var catalogue = NewAbilityCatalogue(dash, mine);
 
             Assert.AreSame(dash, catalogue.Resolve(4));
@@ -211,7 +211,7 @@ namespace Overpower.Tests
             var catalogue = NewAbilityCatalogue(
                 NewAbility(4, "Dash", AbilitySlot.Mobility),
                 NewAbility(7, "Turret", AbilitySlot.Ultimate),
-                NewAbility(9, "Mine", AbilitySlot.Equipment));
+                NewAbility(9, "Mine", AbilitySlot.Attachment));
 
             var before = catalogue.Resolve(7);
 
@@ -229,8 +229,8 @@ namespace Overpower.Tests
         public void AbilityValidateReportsDuplicateIds()
         {
             var catalogue = NewAbilityCatalogue(
-                NewAbility(5, "Shield", AbilitySlot.Equipment),
-                NewAbility(5, "ShieldUpgrade", AbilitySlot.Equipment));
+                NewAbility(5, "Shield", AbilitySlot.Attachment),
+                NewAbility(5, "ShieldUpgrade", AbilitySlot.Attachment));
 
             var problems = catalogue.Validate();
 
@@ -245,7 +245,7 @@ namespace Overpower.Tests
         {
             var dash = NewAbility(1, "Dash", AbilitySlot.Mobility);
             var blink = NewAbility(2, "Blink", AbilitySlot.Mobility);
-            var mine = NewAbility(3, "Mine", AbilitySlot.Equipment);
+            var mine = NewAbility(3, "Mine", AbilitySlot.Attachment);
             var nuke = NewAbility(4, "Nuke", AbilitySlot.Ultimate);
             var catalogue = NewAbilityCatalogue(dash, blink, mine, nuke);
 

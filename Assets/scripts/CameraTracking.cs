@@ -150,9 +150,13 @@ public class CameraTracking : MonoBehaviour
     /// reason) without first checking whether it had actually added anything.</summary>
     public void RemoveZoomMultiplier(object key) => zoomMultipliers.Remove(key);
 
+    // Vision Task 7: where gun sounds are heard from - the followed player, not this camera (see ListenerRig).
+    private Transform listener;
+
     void Awake()
     {
         Instance = this;
+        listener = ListenerRig.MoveListenerToChild(gameObject);
     }
 
     void OnDestroy()
@@ -173,7 +177,12 @@ public class CameraTracking : MonoBehaviour
 
     void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+        {
+            // No one to follow: the listener goes back onto the camera (ListenerRig.Follow's no-target branch).
+            ListenerRig.Follow(listener, null);
+            return;
+        }
 
         // Zoom in/out with Mouse Scroll
         float scroll = Input.GetAxis("Mouse ScrollWheel");
@@ -189,6 +198,7 @@ public class CameraTracking : MonoBehaviour
         // Update camera position
         transform.position = target.position + currentOffset;
         transform.LookAt(target);
+        ListenerRig.Follow(listener, target);
     }
 
     /// Works out this player's camera rotation from where their team actually spawns, so all three

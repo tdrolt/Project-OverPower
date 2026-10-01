@@ -6,6 +6,7 @@ using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Net;
 using Overpower.UI;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -219,6 +220,11 @@ namespace Overpower.Weapons
                 VisualTint.FillFlatCircle(rim, radius, rimSegments);
                 VisualTint.SetLineColor(rim, VisualTint.WithAlpha(teamColor, rimOpacity));
             }
+
+            // Vision: shown when any part of the disc is in sight, or it reaches my team.
+            VisibleWhenSeen gate = GetComponent<VisibleWhenSeen>();
+            if (gate != null)
+                gate.SetSeenRadius(radius);
 
             Debug.Log($"[FireField] lit at {transform.position} - {radius:0.##}m, " +
                        $"{damagePerSecond:0.#} dmg/s for {duration:0.##}s");

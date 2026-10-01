@@ -3,6 +3,7 @@ using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.UI;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -131,10 +132,10 @@ namespace Overpower.Weapons
         /// <summary>
         /// Issue 1 fix (2026-09-15): catches a target whose collider already CONTAINS the origin -
         /// the point-blank case the raycast above structurally cannot see. Unity never reports a
-        /// collider a ray starts inside of, and the muzzle (SafeMuzzlePosition, ~1.36m in front of
-        /// the shooter's root) sits inside a target's capsule (radius ~0.7) at any centre distance
-        /// under about 2.06m - measured and confirmed live: at 1.5m the muzzle sat exactly on the
-        /// dummy capsule's ClosestPoint (i.e. inside it), and the raycast above reported only the
+        /// collider a ray starts inside of, and the muzzle (SafeMuzzlePosition, just inside the
+        /// shooter's own body capsule) can sit inside a target's capsule when the two players are close -
+        /// measured and confirmed live: at 1.5m the muzzle (then farther out in front) sat exactly on
+        /// the dummy capsule's ClosestPoint (i.e. inside it), and the raycast above reported only the
         /// far wall, skipping the dummy entirely.
         ///
         /// Deliberately an OverlapSphere AT THE ORIGIN, not a second ray cast from farther back:
@@ -150,8 +151,8 @@ namespace Overpower.Weapons
         /// Distance is recorded as 0 - nothing can be closer to the muzzle than something the muzzle
         /// is already inside of, and BeamResolver only uses Distance to ORDER and CAP contacts (see
         /// BeamResolverTests.AContactAtZeroDistanceIsStruckFirstAndEndsTheBeamThere), so 0 sorting
-        /// first is exactly correct. A target also found by the raycast above (relevant past ~2.06m,
-        /// where the origin has cleared it but the beam still reaches it) is naturally deduplicated
+        /// first is exactly correct. A target also found by the raycast above (relevant once the
+        /// origin has cleared it but the beam still reaches it) is naturally deduplicated
         /// by BeamResolver's own alreadyStruck set, which keeps whichever contact it meets first in
         /// distance order - here, always this 0-distance one. Point is the origin itself
         /// (Collider.ClosestPoint returns the query point unchanged when it is already inside),
@@ -193,12 +194,14 @@ namespace Overpower.Weapons
                                                           shot.ShooterTeamId, shot.Weapon.Id,
                                                           DamageSource.Projectile, false, contact.Point, -1,
                                                           shot.Weapon.MarkWindowSeconds, shot.Weapon.MarkedDamageMultiplier));
-                PlayImpact(shot.Weapon, contact.Point);
+                // Every client runs this, so each can show my team the enemy it just hit (X-Ray blind hit); damage is untouched.
+                TeamSight.RevealOnHit(shot.Weapon, contact.Target, shot.ShooterTeamId);
+                PlayImpact(shot.Weapon, contact.Point, shot.ShooterTeamId);
             }
 
             Vector3 end = origin + shot.Direction.normalized * beam.Length;
             if (beam.StoppedOnGeometry)
-                PlayImpact(shot.Weapon, end);
+                PlayImpact(shot.Weapon, end, shot.ShooterTeamId);
 
             DrawBeam(origin, end, shot.ShooterTeamId);
         }
@@ -269,6 +272,10 @@ namespace Overpower.Weapons
         private void DrawBeam(Vector3 from, Vector3 to, int shooterTeamId)
         {
             if (beamVfx == null)
+                return;
+
+            // D2: a beam from the fog is drawn only while the line crosses my team's sight (own team's always).
+            if (!TeamSight.ShotShownAlong(shooterTeamId, from, to))
                 return;
 
             GameObject beam = Instantiate(beamVfx, from, Quaternion.identity);
@@ -357,9 +364,10 @@ namespace Overpower.Weapons
             line.SetPropertyBlock(beamPropertyBlock);
         }
 
-        private static void PlayImpact(WeaponDefinition weapon, Vector3 at)
+        private static void PlayImpact(WeaponDefinition weapon, Vector3 at, int shooterTeamId)
         {
-            if (weapon.ImpactVfx != null && VFXManager.Instance != null)
+            // D2: an enemy beam's impact flash in the fog is not shown (own team's always).
+            if (weapon.ImpactVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeamId, at))
                 VFXManager.Instance.PlayVFX(weapon.ImpactVfx, at);
         }
 

@@ -1,6 +1,7 @@
 using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.UI;
+using Overpower.Vision;
 using UnityEngine;
 
 namespace Overpower.Weapons
@@ -68,6 +69,9 @@ namespace Overpower.Weapons
             // 2026-09-21: radius is always the rocket's own full Splash Radius now (ExplodeOnImpact.Detonated's own
             // comment has the full history) - nothing left to gate here beyond SplashShell.Spawn's own defensive
             // radius <= 0 check.
+            // D2: a blast from the fog is shown only if its centre is seen or it reaches me (own team's always).
+            if (!TeamSight.BlastShownAt(shooterTeam, centre, radius))
+                return;
             Color color = theme != null ? theme.ShotColorFor(shooterTeam) : Color.white;
             SplashShell.Spawn(splashShellPrefab, centre, radius, color);
         }

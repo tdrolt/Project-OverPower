@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Rework step 5 (Tudor, 2026-09-18): the Raybeam moves from Equipment to Ultimate, gated by the
+    /// Rework step 5 (Tudor, 2026-09-18): the Raybeam moves from Attachment to Ultimate, gated by the
     /// ultimate meter alone like every other ultimate, and costs the same gold as the rest. Pins the
     /// slot move and the two cross-ultimate relationships as a live read of the real catalogue asset -
     /// AssetDatabase + SerializedObject, read-only, the same recipe as AbilityVisualPrefabGuardTests
@@ -26,7 +26,7 @@ namespace Overpower.Tests
     /// </summary>
     public class RaybeamUltimateGuardTests
     {
-        private const string RaybeamPath = "Assets/Gameplay/Abilities/24 Raybeam E.asset";
+        private const string RaybeamPath = "Assets/Gameplay/Abilities/24 Raybeam U.asset";
         private const string CataloguePath = "Assets/Gameplay/Config/AbilityCatalogue.asset";
 
         // The shop's own cutoff (LoadoutScreen.Builder.cs:237, LoadoutScreen.cs:65) - see this

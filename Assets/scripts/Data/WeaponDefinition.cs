@@ -236,6 +236,11 @@ namespace Overpower.Data
         [SerializeField] private float markedDamageMultiplier = 1f;
         public float MarkedDamageMultiplier => markedDamageMultiplier;
 
+        [Header("Reveal")]
+        [Min(0f), Tooltip("When this weapon hits an enemy your team can't see, that enemy is shown to your team for this long. 0 = never.")]
+        [SerializeField] private float revealOnHitSeconds = 0f;
+        public float RevealOnHitSeconds => revealOnHitSeconds;
+
         [Header("Feedback")]
         [Tooltip("Effect spawned at the barrel each time the weapon fires. Leave it empty for no " +
                  "muzzle effect.")]

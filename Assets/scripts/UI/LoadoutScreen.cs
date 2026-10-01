@@ -47,7 +47,7 @@ namespace Overpower.UI
     ///
     /// TWO PAGES AND THE POP-UP (Task 13, Tudor): the shop is two pages behind two tabs at the top - "Weapons" (the
     /// weapon tree and Reset Weapon) and "Abilities & Armor" (the armor rows with Reset Armor, and the Mobility,
-    /// Equipment and Ultimate card columns) - and reopens on the page last used (ShopPageMemory, kept for the session).
+    /// Attachment and Ultimate card columns) - and reopens on the page last used (ShopPageMemory, kept for the session).
     /// The gold and the status line sit above the tabs, so both pages show them. The bottom description strip is gone:
     /// resting the pointer on a weapon node, an ability card or an armor row for Loadout Tooltip Delay Seconds opens
     /// a pop-up beside the cursor (name, one line on what it does, the numbers) - see LoadoutScreen.Tooltip.cs. The
@@ -165,12 +165,12 @@ namespace Overpower.UI
         private readonly Dictionary<(AbilitySlot slot, int id), AbilityCardUi> abilityCards =
             new Dictionary<(AbilitySlot slot, int id), AbilityCardUi>();
 
-        // Mobility (Shift), Equipment (RMB), Ultimate (Space) - the brief's own order, left to right
+        // Mobility (Shift), Attachment (RMB), Ultimate (Space) - the brief's own order, left to right
         // across the movement/utility/panic-button spectrum rather than AbilitySlot's declaration
         // order (which puts Primary - the weapon, not drawn here at all - first).
         private static readonly AbilitySlot[] LoadoutAbilitySlotOrder =
         {
-            AbilitySlot.Mobility, AbilitySlot.Equipment, AbilitySlot.Ultimate
+            AbilitySlot.Mobility, AbilitySlot.Attachment, AbilitySlot.Ultimate
         };
 
         // ---- hover pop-up (Task 13) ---------------------------------------------------------------
@@ -995,7 +995,7 @@ namespace Overpower.UI
             bought >= max ? limit : theme.loadoutArmorTopLevelText;
 
         // ============================================================================================
-        // Abilities (right column) - Mobility, Equipment, Ultimate, each a heading and a wrapping
+        // Abilities (right column) - Mobility, Attachment, Ultimate, each a heading and a wrapping
         // grid of cards straight from the catalogue. No upgrade tree here: any non-debug ability in
         // the right slot is pickable any time, so unlike weapons there is no Owned/Locked state.
         // ============================================================================================
@@ -1009,7 +1009,7 @@ namespace Overpower.UI
                 return; // Already equipped - same no-op-on-self-click guard as OnWeaponNodeClicked.
 
             // Task 2.5b: ShopRules.AbilityPrice reads 0 for a first pick into an empty Mobility/
-            // Equipment slot (the free starting kit - Task 2.5a leaves those slots empty on the
+            // Attachment slot (the free starting kit - Task 2.5a leaves those slots empty on the
             // prefab) and the card's real GoldCost otherwise; the Ultimate slot is never free.
             AbilityDefinition def = abilities != null ? abilities.Resolve(abilityId) : null;
             int goldCost = def != null ? def.GoldCost : 0;
@@ -1041,7 +1041,7 @@ namespace Overpower.UI
 
         /// <summary>Task T4: this screen's own three ability slots, as the shared PurchaseCategory
         /// telemetry uses. Primary never reaches here (this screen never builds a card for it - see
-        /// LoadoutAbilitySlotOrder), so it has no real mapping; Equipment is an arbitrary but
+        /// LoadoutAbilitySlotOrder), so it has no real mapping; Attachment is an arbitrary but
         /// harmless fallback rather than throwing.</summary>
         private static PurchaseCategory CategoryFor(AbilitySlot slot)
         {
@@ -1049,13 +1049,13 @@ namespace Overpower.UI
             {
                 case AbilitySlot.Mobility: return PurchaseCategory.Mobility;
                 case AbilitySlot.Ultimate: return PurchaseCategory.Ultimate;
-                default: return PurchaseCategory.Equipment;
+                default: return PurchaseCategory.Attachment;
             }
         }
 
         /// <summary>Equipped gets the weapon tree's own Equipped look (highlight border) and its
         /// label reads "Equipped"; every other card shows its price (ShopPricing.PriceLine of
-        /// ShopRules.AbilityPrice - "Free" for a first pick into an empty Mobility/Equipment slot,
+        /// ShopRules.AbilityPrice - "Free" for a first pick into an empty Mobility/Attachment slot,
         /// or a CannotAfford shortfall) and, while shop-blocked, its OWN look (Loadout Shop Blocked
         /// Colour, Task 2.5b review fix 1) rather than Locked Colour - see StyleNode's own comment
         /// for why this stays interactable rather than disabled.</summary>

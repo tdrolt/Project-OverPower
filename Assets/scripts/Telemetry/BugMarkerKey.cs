@@ -109,7 +109,7 @@ namespace Overpower.Telemetry
             int zone = -1;
             BuildingManager.Instance?.TryGetZoneAt(pos, out zone);
             int weaponId = weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : LoadoutProperties.Empty;
-            int equipmentId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Equipment) : LoadoutProperties.Empty;
+            int attachmentId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Attachment) : LoadoutProperties.Empty;
             int mobilityId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Mobility) : LoadoutProperties.Empty;
             int ultimateId = abilityRunner != null ? abilityRunner.EquippedId(AbilitySlot.Ultimate) : LoadoutProperties.Empty;
 
@@ -126,7 +126,7 @@ namespace Overpower.Telemetry
                 Debug.LogWarning($"[BugMarkerKey] could not save the screenshot at '{path}': {e.Message}");
             }
 
-            MatchTelemetry.Instance.LogBug(team, pos.x, pos.z, alive, zone, weaponId, equipmentId, mobilityId, ultimateId, fileName);
+            MatchTelemetry.Instance.LogBug(team, pos.x, pos.z, alive, zone, weaponId, attachmentId, mobilityId, ultimateId, fileName);
 
             if (hud != null && theme != null)
                 hud.ShowToast(theme.bugMarkedText);

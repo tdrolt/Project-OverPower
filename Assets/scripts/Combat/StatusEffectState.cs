@@ -30,7 +30,7 @@ namespace Overpower.Combat
     /// Plain C# on purpose, same reason as DamageResolver: it is unit tested without touching
     /// the Unity engine. A MonoBehaviour wrapper calls Tick from Update in a later task.
     ///
-    /// Six equipment abilities do nothing but apply one of these kinds for a duration. Without
+    /// Six attachment abilities do nothing but apply one of these kinds for a duration. Without
     /// this shared machinery they would each become their own copy of a timer, the same
     /// divergence problem the damage funnel was built to avoid.
     ///

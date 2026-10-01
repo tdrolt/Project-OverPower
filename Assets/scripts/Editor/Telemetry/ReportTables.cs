@@ -77,7 +77,7 @@ namespace Overpower.EditorTools.Telemetry
         public float X;
         public float Z;
         public int Weapon;
-        public int Equipment;
+        public int Attachment;
         public int Mobility;
         public int Ultimate;
         /// <summary>The screenshot's own FILE NAME (TelemetryKeys.ScreenshotFile) - never a path.
@@ -413,7 +413,7 @@ namespace Overpower.EditorTools.Telemetry
         public float Z;
         public int UnspentGold;
         public int LoadoutWeapon;
-        public int LoadoutEquipment;
+        public int LoadoutAttachment;
         public int LoadoutMobility;
         public int LoadoutUltimate;
         public int AbsorbLevel;

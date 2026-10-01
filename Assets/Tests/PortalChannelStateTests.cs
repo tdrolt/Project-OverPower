@@ -181,5 +181,16 @@ namespace Overpower.Tests
             Assert.AreEqual(PortalChannelState.Result.Started, onB);
             Assert.AreEqual(PortalChannelState.Result.Progressing, stillNotDone);
         }
+        [Test]
+        public void ALatchedArrivalPortalReportsLatchedUntilTheBodyStepsOut()
+        {
+            var state = NewState();
+            Assert.IsFalse(state.IsLatchedOn(B));
+            state.LatchArrival(B);
+            Assert.IsTrue(state.IsLatchedOn(B));
+            Assert.IsFalse(state.IsLatchedOn(A));
+            state.Tick(0.1f, standingIn: null, canChannel: true);
+            Assert.IsFalse(state.IsLatchedOn(B));
+        }
     }
 }

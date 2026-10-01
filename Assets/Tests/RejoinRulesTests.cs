@@ -352,7 +352,7 @@ namespace Overpower.Tests
             var resets = Overpower.Net.MatchPropertyReset.Build();
             foreach (string key in new[] { "alive", "lastStand", "lastStandAt", "gold", "armorAbsorbLvl", "armorRechargeLvl",
                                            "sb", "hpReq", "tpUse", "tpRdy", "st", "aozT",
-                                           "weaponId", "equipmentId", "ultimateId", "mobilityId" })
+                                           "weaponId", "attachmentId", "ultimateId", "mobilityId" })
                 Assert.IsTrue(resets.ContainsKey(key), "missing key " + key);
         }
 

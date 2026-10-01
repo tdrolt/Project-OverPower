@@ -277,13 +277,22 @@ namespace Overpower.Tests
         // ---------------------------------------------------------------- straight-row tables
 
         [Test]
+        public void OldLogsThatSayEquipmentReadAsAttachment()
+        {
+            Assert.AreEqual("attachment", TelemetryAggregator.CategoryName("equipment"));
+            Assert.AreEqual("attachment", TelemetryAggregator.CategoryName("attachment"));
+            Assert.AreEqual("weapon", TelemetryAggregator.CategoryName("weapon"));
+            Assert.AreEqual("", TelemetryAggregator.CategoryName(null));
+        }
+
+        [Test]
         public void PurchasesShopBlockedHitsAndDeathsRowCounts()
         {
             var tables = BuildFixtureTables();
 
             Assert.AreEqual(2, tables.Purchases.Count); // 1 purchase + 1 refund
             Assert.IsTrue(tables.Purchases.Any(p => p.Kind == "purchase" && p.Category == "weapon" && p.Amount == 1200));
-            Assert.IsTrue(tables.Purchases.Any(p => p.Kind == "refund" && p.Category == "equipment" && p.Amount == 400));
+            Assert.IsTrue(tables.Purchases.Any(p => p.Kind == "refund" && p.Category == "attachment" && p.Amount == 400));
 
             Assert.AreEqual(1, tables.ShopBlocked.Count);
             Assert.AreEqual("gold", tables.ShopBlocked[0].Reason);

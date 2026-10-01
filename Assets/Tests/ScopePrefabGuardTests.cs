@@ -14,14 +14,14 @@ namespace Overpower.Tests
     /// "so I can retune it in the Inspector without touching code"). Same recipe as
     /// InvulnerabilityPrefabGuardTests: the asset/prefab are loaded, never instantiated or saved.
     ///
-    /// 2026-09-24 (Tudor: "remove tests that are outdated"): ScopeCostsTheSameAsEveryOtherEquipmentAbility used to
+    /// 2026-09-24 (Tudor: "remove tests that are outdated"): ScopeCostsTheSameAsEveryOtherAttachmentAbility used to
     /// pin the literal 800; rewritten to the same catalogue-relationship pattern
-    /// RaybeamUltimateGuardTests.EveryUltimateCostsTheSameGold uses, since every real Equipment ability shares one
+    /// RaybeamUltimateGuardTests.EveryUltimateCostsTheSameGold uses, since every real Attachment ability shares one
     /// price today (Mines/Deployable Cover/Flamethrower/Stun Gun/Sonic Pulse/Scope all 800, measured 2026-09-24).
     /// </summary>
     public class ScopePrefabGuardTests
     {
-        private const string DefinitionPath = "Assets/Gameplay/Abilities/28 Scope E.asset";
+        private const string DefinitionPath = "Assets/Gameplay/Abilities/28 Scope A.asset";
         private const string PrefabPath = "Assets/Gameplay/Abilities/Scope.prefab";
         private const string CataloguePath = "Assets/Gameplay/Config/AbilityCatalogue.asset";
 
@@ -44,11 +44,11 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ScopeIsAnEquipmentAbility()
+        public void ScopeIsAnAttachmentAbility()
         {
-            // The relationship the spec is built on: right mouse is the Equipment slot. Carrying Scope means
+            // The relationship the spec is built on: right mouse is the Attachment slot. Carrying Scope means
             // giving up mines, cover, raybeam and so on - that trade-off is intended, not this test's concern.
-            Assert.AreEqual(AbilitySlot.Equipment, LoadDefinition().Slot);
+            Assert.AreEqual(AbilitySlot.Attachment, LoadDefinition().Slot);
         }
 
         [Test]
@@ -62,24 +62,24 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ScopeCostsTheSameAsEveryOtherEquipmentAbility()
+        public void ScopeCostsTheSameAsEveryOtherAttachmentAbility()
         {
             // A relationship, not a pinned number (RaybeamUltimateGuardTests.EveryUltimateCostsTheSameGold's own
-            // pattern): every real (non-debug) Equipment-slot ability costs the same gold, whatever that shared
+            // pattern): every real (non-debug) Attachment-slot ability costs the same gold, whatever that shared
             // price is - Tudor can retune it freely without this test going red.
             var catalogue = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>(CataloguePath);
             Assert.IsNotNull(catalogue, CataloguePath);
 
-            var equipment = new List<AbilityDefinition>();
-            foreach (AbilityDefinition ability in catalogue.ForSlot(AbilitySlot.Equipment))
+            var attachment = new List<AbilityDefinition>();
+            foreach (AbilityDefinition ability in catalogue.ForSlot(AbilitySlot.Attachment))
                 if (ability.Id < FirstDebugAbilityId)
-                    equipment.Add(ability);
+                    attachment.Add(ability);
 
-            Assert.IsNotEmpty(equipment, "No real (non-debug) Equipment-slot ability found in the catalogue.");
-            Assert.Contains(LoadDefinition(), equipment, "Scope itself should be one of them.");
+            Assert.IsNotEmpty(attachment, "No real (non-debug) Attachment-slot ability found in the catalogue.");
+            Assert.Contains(LoadDefinition(), attachment, "Scope itself should be one of them.");
 
-            int expected = equipment[0].GoldCost;
-            foreach (AbilityDefinition ability in equipment)
+            int expected = attachment[0].GoldCost;
+            foreach (AbilityDefinition ability in attachment)
                 Assert.AreEqual(expected, ability.GoldCost, $"{ability.name}.goldCost");
         }
 

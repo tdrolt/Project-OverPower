@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -408,6 +409,9 @@ namespace Overpower.Weapons
                 victim.ApplyDamage(new DamageInfo(context.Damage, context.ShooterActorNumber,
                                                    context.ShooterTeamId, weaponId,
                                                    DamageSource.Projectile, false, hit.point, abilityId));
+                // A weapon with Reveal On Hit Seconds shows the enemy it hit to the shooter's team (every client runs this shot).
+                if (context.Weapon != null)
+                    TeamSight.RevealOnHit(context.Weapon, victim, context.ShooterTeamId);
             }
 
             // No behaviours attached is the normal case and means "stop here". Any single
@@ -433,7 +437,14 @@ namespace Overpower.Weapons
                 // had none of its own set.
                 GameObject vfx = context.Weapon != null && context.Weapon.ImpactVfx != null
                     ? context.Weapon.ImpactVfx : fallbackImpactVfx;
-                if (vfx != null && VFXManager.Instance != null)
+                // D2: an enemy shot's impact flash in the fog is not shown (it would give away where it landed); the
+                // sound below is untouched (Task 7). An exploding projectile's flash follows the blast rule, like its
+                // Splash Shell (so it also shows when the blast reaches my team).
+                ExplodeOnImpact blast = GetComponent<ExplodeOnImpact>();
+                bool flashShown = blast != null
+                    ? TeamSight.BlastShownAt(context.ShooterTeamId, at, blast.SplashRadius)
+                    : TeamSight.ShotShownAt(context.ShooterTeamId, at);
+                if (vfx != null && VFXManager.Instance != null && flashShown)
                     VFXManager.Instance.PlayVFX(vfx, at);
 
                 if (impactSfx != null && AudioManager.Instance != null)

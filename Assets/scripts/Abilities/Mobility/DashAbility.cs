@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Vision;
 using Overpower.Match;
 
 namespace Overpower.Abilities
@@ -204,6 +205,8 @@ namespace Overpower.Abilities
             if (remoteTrail == null)
                 return;
 
+            // Vision: the trail betrays the dasher, so it is shown only while the dasher is (my team's always).
+            VisibleWhenSeen.AttachToCaster(remoteTrail.gameObject, Owner.PhotonView);
             remoteTrail.Clear();
             remoteTrail.emitting = true;
             remoteTrailSecondsLeft = travelSpeed > 0f ? distance / travelSpeed : 0f;

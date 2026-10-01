@@ -22,7 +22,7 @@ namespace Overpower.Combat
 
     /// <summary>
     /// Selects targets standing inside a forward cone on the ground plane - the flamethrower's spray
-    /// (Task 1.9) today, and any later equipment that channels a status effect into a cone in front of
+    /// (Task 1.9) today, and any later attachment that channels a status effect into a cone in front of
     /// the caster. Two rules, both pure and both testable without a scene:
     ///
     ///   - IsWithinCone: range and half-angle are measured on the flat (XZ) plane, exactly like

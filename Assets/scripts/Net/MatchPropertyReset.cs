@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Match;
+using Overpower.Vision;
 
 namespace Overpower.Net
 {
@@ -23,7 +24,7 @@ namespace Overpower.Net
             { LoadoutProperties.ArmorAbsorbLevelKey, 0 },
             { LoadoutProperties.ArmorRechargeLevelKey, 0 },
             { LoadoutProperties.WeaponKey, null },
-            { LoadoutProperties.EquipmentKey, null },
+            { LoadoutProperties.AttachmentKey, null },
             { LoadoutProperties.UltimateKey, null },
             { LoadoutProperties.MobilityKey, null },
             { ScoreboardRules.Key, null },
@@ -32,6 +33,7 @@ namespace Overpower.Net
             { AllyPortalTraveller.ReadyKey, null },
             { StatusLabelProperty.Key, null },
             { AoeZoneRecast.PropertyKey, null },
+            { ScopeSightProperty.Key, null },
         };
     }
 }

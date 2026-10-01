@@ -4,6 +4,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Vision;
 
 namespace Overpower.Abilities
 {
@@ -195,6 +196,11 @@ namespace Overpower.Abilities
 
             if (visual != null)
                 visual.localScale = new Vector3(radius * 2f, visual.localScale.y, radius * 2f);
+
+            // Vision: shown when any part of the disc is in sight, or it reaches my team.
+            VisibleWhenSeen gate = GetComponent<VisibleWhenSeen>();
+            if (gate != null)
+                gate.SetSeenRadius(Radius);
         }
 
         private void FixedUpdate()

@@ -2908,6 +2908,8 @@ GameObject:
   - component: {fileID: 8063144748288658312}
   - component: {fileID: 4008941535436042049}
   - component: {fileID: 7539827692431618632}
+  - component: {fileID: 6984854517677362291}
+  - component: {fileID: 8987111587285106385}
   m_Layer: 0
   m_Name: Multiplayer Player
   m_TagString: Player
@@ -3271,7 +3273,7 @@ MonoBehaviour:
   catalogue: {fileID: 11400000, guid: 70e5ea7660cd12b4bbb497e71ca8b00e, type: 2}
   gameplayConfig: {fileID: 11400000, guid: e9fa857f850dfe749b598fd4e08f7370, type: 2}
   moduleParent: {fileID: 2690151092285713717}
-  startingEquipment: {fileID: 0}
+  startingAttachment: {fileID: 0}
   startingUltimate: {fileID: 0}
   startingMobility: {fileID: 0}
 --- !u!114 &7382941698319182268
@@ -3467,6 +3469,35 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54c7583a919e24944873548d05f9fcf3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &6984854517677362291
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6aeb81a397165bc44982f9c4b6a336f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  config: {fileID: 11400000, guid: 8f976973125e6cc408a4086d6ba10c5d, type: 2}
+  minimap: {fileID: 11400000, guid: 44a96b43500e0ba4c8792be3c65830c2, type: 2}
+  sightFillShader: {fileID: 4800000, guid: 02158f4d0faa9674288c0b1cf3e4c622, type: 3}
+  minimapFogShader: {fileID: 4800000, guid: a76420d756a8fc340b0519d6aba6d405, type: 3}
+  scopeSight: {fileID: 10285600641185623, guid: fdfdde32c0190f742968a1097ff5283f, type: 3}
+--- !u!114 &8987111587285106385
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2536872752076754183}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43bb3d686ccae8d4cbb5d62f2758a931, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2741422025056904628
 GameObject:
   m_ObjectHideFlags: 0
@@ -3492,7 +3523,7 @@ Transform:
   m_GameObject: {fileID: 2741422025056904628}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.144, y: 1.486, z: 1.357}
+  m_LocalPosition: {x: 0.072, y: 1.486, z: 0.6785}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

@@ -38,17 +38,17 @@ namespace Overpower.Tests
         [Test]
         public void MinusOneReadsBackAsEmpty()
         {
-            var props = new Dictionary<object, object> { { LoadoutProperties.EquipmentKey, -1 } };
+            var props = new Dictionary<object, object> { { LoadoutProperties.AttachmentKey, -1 } };
 
-            int result = LoadoutProperties.ReadInt(props, LoadoutProperties.EquipmentKey, fallback: 0);
+            int result = LoadoutProperties.ReadInt(props, LoadoutProperties.AttachmentKey, fallback: 0);
 
             Assert.AreEqual(LoadoutProperties.Empty, result);
         }
 
         [Test]
-        public void KeyForMapsEquipmentUltimateAndMobility()
+        public void KeyForMapsAttachmentUltimateAndMobility()
         {
-            Assert.AreEqual(LoadoutProperties.EquipmentKey, LoadoutProperties.KeyFor(AbilitySlot.Equipment));
+            Assert.AreEqual(LoadoutProperties.AttachmentKey, LoadoutProperties.KeyFor(AbilitySlot.Attachment));
             Assert.AreEqual(LoadoutProperties.UltimateKey, LoadoutProperties.KeyFor(AbilitySlot.Ultimate));
             Assert.AreEqual(LoadoutProperties.MobilityKey, LoadoutProperties.KeyFor(AbilitySlot.Mobility));
         }

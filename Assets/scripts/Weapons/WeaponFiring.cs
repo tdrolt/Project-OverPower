@@ -5,6 +5,7 @@ using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
 using Overpower.UI;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -38,6 +39,9 @@ namespace Overpower.Weapons
                  "the test range replace it at runtime through PlayerLoadout.")]
         private WeaponDefinition startingWeapon;
 
+        // The muzzle's one home is its Transform on Assets/Resources/Multiplayer Player.prefab - tune
+        // it by moving that child. It sits just inside the player's body capsule; the shot logic
+        // ignores the shooter, so that is safe.
         [SerializeField, Tooltip("Where projectiles leave the gun. Falls back to the player's own " +
                  "position if it is empty, which looks wrong but still fires.")]
         private Transform muzzle;
@@ -52,8 +56,8 @@ namespace Overpower.Weapons
         [Header("Wall-hugging clearance (review finding, Task 1.9 follow-up)")]
         [SerializeField, Tooltip("Radius, in metres, of the clearance check between the player's " +
                  "body and the muzzle tip - approximately a projectile's own radius. The muzzle sits " +
-                 "roughly 1.36m in front of the root (about 0.66m past a 0.7m capsule); a player " +
-                 "standing flush against a wall or thin cover pushes that point INSIDE or THROUGH it, " +
+                 "just inside the body capsule, but the check still reaches past the capsule's surface; " +
+                 "a player standing flush against a wall or thin cover pushes that point INSIDE or THROUGH it, " +
                  "and Physics.Raycast/SphereCast never report a collider their own origin already " +
                  "starts inside - so a shot, beam or the flamethrower's occlusion check fired from " +
                  "the raw muzzle sailed straight through the wall it was touching (measured: the " +
@@ -593,7 +597,8 @@ namespace Overpower.Weapons
             else
                 DispatchShots(fired, origin, shots);
 
-            if (fired.MuzzleVfx != null && VFXManager.Instance != null)
+            // D2: a hidden shooter's muzzle flash is not shown (own team's always). The fire sound below is untouched (Task 7).
+            if (fired.MuzzleVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeam, origin))
                 VFXManager.Instance.PlayVFX(fired.MuzzleVfx, origin);
             if (fired.FireSfx != null && AudioManager.Instance != null)
                 AudioManager.Instance.Play3D(fired.FireSfx, origin);
@@ -679,6 +684,9 @@ namespace Overpower.Weapons
                 float length = beam.PredictBeamLength(origin, shots[i]);
                 warnings[i] = LaserWarningLine.Create(origin, shots[i].Direction, length, color,
                                                       weapon.WindupSeconds, theme);
+                // D2: the warning line of a shot from the fog is drawn only while it crosses my team's sight.
+                if (!TeamSight.ShotShownAlong(shooterTeam, origin, origin + shots[i].Direction.normalized * length))
+                    warnings[i].GetComponent<LineRenderer>().enabled = false;
 
                 // Quality review finding: parented to the SHOOTER, not left as a loose root object.
                 // FireAfterWindup only destroys this line after its own WaitForSeconds finishes, and
@@ -859,6 +867,9 @@ namespace Overpower.Weapons
             }
 
             motor.Initialize(shot);
+            // D2: an enemy's shot is drawn only while it is inside my team's sight, so one from the fog appears as it
+            // crosses the fog's edge (own team's always). Visuals only: the shot flies and hits as before.
+            VisibleWhenSeen.Attach(projectile, shot.ShooterTeamId);
         }
     }
 }
