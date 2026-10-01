@@ -39,6 +39,9 @@ namespace Overpower.Weapons
                  "the test range replace it at runtime through PlayerLoadout.")]
         private WeaponDefinition startingWeapon;
 
+        // The muzzle's one home is its Transform on Assets/Resources/Multiplayer Player.prefab - tune
+        // it by moving that child. Local position there is (0.072, 1.486, 0.6785): half the earlier
+        // horizontal distance from the body centre (was 0.144, 1.486, 1.357), same height.
         [SerializeField, Tooltip("Where projectiles leave the gun. Falls back to the player's own " +
                  "position if it is empty, which looks wrong but still fires.")]
         private Transform muzzle;
