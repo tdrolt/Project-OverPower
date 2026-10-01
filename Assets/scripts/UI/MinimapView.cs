@@ -174,6 +174,7 @@ namespace Overpower.UI
         // The fog layer (vision D10): the sight picture drawn as darkness over the baked arena picture, same rect.
         private RawImage fogLayer;
         private Material fogMaterial;
+        private readonly Dictionary<RectTransform, Image> dotFills = new Dictionary<RectTransform, Image>(); // each dot's fill, to recolour live
 
         private bool built;
         private bool largeOpen;
@@ -505,6 +506,16 @@ namespace Overpower.UI
             picture.raycastTarget = false;
             Stretch(picture.rectTransform);
 
+            // Vision fog (D10): the sight picture covers the same world square as the baked picture, so it lies over it
+            // with the same rect; UpdateFog shows it and sets its colour. Under the cut overlay, links, bubbles and markers, so the
+            // knocked-out corner's wall line (which everyone knows) is not dimmed.
+            var fogGo = new GameObject("Vision Fog", typeof(RectTransform));
+            fogGo.transform.SetParent(map, false);
+            fogLayer = fogGo.AddComponent<RawImage>();
+            fogLayer.raycastTarget = false;
+            fogLayer.enabled = false;
+            Stretch(fogLayer.rectTransform);
+
             // Phase two cut (Decision 11): under links and bubbles, on top of the baked picture - PaintCutOverlay
             // fills it in only once a cut actually stands (LateUpdate).
             var cutGo = new GameObject("Phase Two Cut", typeof(RectTransform));
@@ -513,15 +524,6 @@ namespace Overpower.UI
             cutOverlay.raycastTarget = false;
             cutOverlay.enabled = false;
             Stretch(cutOverlay.rectTransform);
-
-            // Vision fog (D10): the sight picture covers the same world square as the baked picture, so it lies over it
-            // with the same rect; UpdateFog shows it and sets its colour. Under links, bubbles and markers.
-            var fogGo = new GameObject("Vision Fog", typeof(RectTransform));
-            fogGo.transform.SetParent(map, false);
-            fogLayer = fogGo.AddComponent<RawImage>();
-            fogLayer.raycastTarget = false;
-            fogLayer.enabled = false;
-            Stretch(fogLayer.rectTransform);
 
             // Sibling order is draw order: lines under bubbles, bubbles under player markers.
             linksLayer = NewLayer("Links", map);
@@ -922,7 +924,7 @@ namespace Overpower.UI
             if (fogLayer.texture != sight.SightTexture)
                 fogLayer.texture = sight.SightTexture;
             Color fog = sight.Config.FogColour;
-            fog.a = sight.Config.FogDarkness;
+            fog.a = 1f; // the shader takes darkness and lift from globals; alpha here carries only the canvas group opacity
             if (fogLayer.color != fog)
                 fogLayer.color = fog;
         }
@@ -985,10 +987,17 @@ namespace Overpower.UI
         private RectTransform DotAt(List<RectTransform> pool, int index, string dotName, Color colour)
         {
             while (pool.Count <= index)
-                pool.Add(BuildMarker(dotName, teammatesLayer, GeneratedSprites.Disc, colour, theme.minimapTeammateDotSize));
+            {
+                RectTransform marker = BuildMarker(dotName, teammatesLayer, GeneratedSprites.Disc, colour, theme.minimapTeammateDotSize);
+                dotFills[marker] = marker.Find("Fill").GetComponent<Image>();
+                pool.Add(marker);
+            }
             RectTransform dot = pool[index];
             if (!dot.gameObject.activeSelf)
                 dot.gameObject.SetActive(true);
+            Image fill = dotFills[dot];
+            if (fill.color != colour)
+                fill.color = colour; // a changed Minimap Enemy Colour shows live
             return dot;
         }
 

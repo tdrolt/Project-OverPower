@@ -102,7 +102,11 @@ namespace Overpower.Vision
             else if (config == null)
                 Debug.LogError($"[TeamSight] {name}: Vision Config is not assigned - nothing will be hidden.");
             else
+            {
+                if (minimapFogShader == null)
+                    Debug.LogError($"[TeamSight] {name}: Minimap Fog Shader is not assigned - the minimap shows no fog.");
                 CreateSightTexture();
+            }
         }
 
         private void OnDestroy()
@@ -175,6 +179,8 @@ namespace Overpower.Vision
             Color fog = config.FogColour;
             Shader.SetGlobalVector("_VisionFogColour", QualitySettings.activeColorSpace == ColorSpace.Linear ? fog.linear : fog);
             Shader.SetGlobalFloat("_VisionFogDarkness", config.FogDarkness);
+            Shader.SetGlobalFloat("_VisionMinimapDarkness", config.MinimapFogDarkness);
+            Shader.SetGlobalFloat("_VisionMinimapSeenLift", config.MinimapSeenLift);
         }
 
         // Every eye's fan, from the same eye list CanSee uses, as one mesh drawn white on black.

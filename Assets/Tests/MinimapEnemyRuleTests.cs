@@ -1,4 +1,6 @@
 using NUnit.Framework;
+using UnityEngine;
+using Overpower.Data;
 using Overpower.Vision;
 
 namespace Overpower.Tests
@@ -36,11 +38,18 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheFogLayerIsClearWhereSeen_AndFullDarknessWhereNot()
+        public void TheMinimapFogDefaults_DarkenTheUnseenMap_AndLiftTheSeenPart()
         {
-            Assert.AreEqual(0f, FogMaths.UnseenAlpha(1f, 0.6f), 1e-5f);
-            Assert.AreEqual(0.6f, FogMaths.UnseenAlpha(0f, 0.6f), 1e-5f);
-            Assert.AreEqual(0.3f, FogMaths.UnseenAlpha(0.5f, 0.6f), 1e-5f);
+            var config = ScriptableObject.CreateInstance<VisionConfig>();
+            try
+            {
+                Assert.AreEqual(0.6f, config.MinimapFogDarkness, 1e-5f);
+                Assert.AreEqual(0.2f, config.MinimapSeenLift, 1e-5f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
         }
     }
 }

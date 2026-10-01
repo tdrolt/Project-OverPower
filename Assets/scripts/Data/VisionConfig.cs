@@ -53,6 +53,12 @@ namespace Overpower.Data
         [Tooltip("The colour of enemy dots on the minimap. A different colour changes how enemies look on the map.")]
         [SerializeField] private Color minimapEnemyColour = new Color(0.898f, 0.282f, 0.302f, 1f);
 
+        [Tooltip("How dark the minimap is drawn where your team cannot see. Higher hides the unseen map more.")]
+        [SerializeField, Range(0f, 1f)] private float minimapFogDarkness = 0.6f;
+
+        [Tooltip("How much lighter the parts of the minimap your team can see are drawn, so the lit holes read against the dark map")]
+        [SerializeField, Range(0f, 1f)] private float minimapSeenLift = 0.2f;
+
         [Header("Centre scan")]
         [Tooltip("Seconds between centre scans. A shorter gap means zone states refresh more often.")]
         [SerializeField, Min(1f)] private float scanIntervalSeconds = 30f;
@@ -91,6 +97,8 @@ namespace Overpower.Data
         public int SightTextureSize => sightTextureSize;
         public bool ZoneOwnersVisibleWithoutSight => zoneOwnersVisibleWithoutSight;
         public Color MinimapEnemyColour => minimapEnemyColour;
+        public float MinimapFogDarkness => minimapFogDarkness;
+        public float MinimapSeenLift => minimapSeenLift;
         public float ScanIntervalSeconds => scanIntervalSeconds;
         public float ScanWaveSpeed => scanWaveSpeed;
         public Color ScanWaveColour => scanWaveColour;

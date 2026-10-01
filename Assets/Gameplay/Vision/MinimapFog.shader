@@ -1,7 +1,8 @@
-// The minimap's fog layer: a UI shader that paints the fog colour with alpha (1 - sight) * darkness over the baked arena
-// picture. The sight picture (white = my team sees it) is the RawImage's texture, so the layer sits on the same rect as
-// the arena picture. The colour and darkness come in as the Graphic's vertex colour (rgb = fog colour, a = darkness),
-// which carries the canvas group opacity and respects masks like any other UI graphic.
+// The minimap's fog layer: a UI shader over the baked arena picture. Unseen parts get the fog colour at the darkness;
+// seen parts are drawn white at the (small) lift, so the lit holes read against the near-black map. The sight picture
+// (white = my team sees it) is the RawImage's texture, so the layer sits on the same rect as the arena picture. The
+// vertex colour is (fog colour, alpha 1 * canvas group opacity). Darkness and lift are globals set by TeamSight (the
+// Mask makes a stencil copy of the material, which later SetFloat calls on the original do not reach).
 Shader "Overpower/Minimap Fog"
 {
     Properties
@@ -39,6 +40,8 @@ Shader "Overpower/Minimap Fog"
             #include "UnityCG.cginc"
 
             sampler2D _MainTex;
+            float _VisionMinimapDarkness;
+            float _VisionMinimapSeenLift;
 
             struct appdata { float4 vertex : POSITION; float4 color : COLOR; float2 uv : TEXCOORD0; };
             struct v2f { float4 pos : SV_POSITION; fixed4 color : COLOR; float2 uv : TEXCOORD0; };
@@ -55,7 +58,9 @@ Shader "Overpower/Minimap Fog"
             fixed4 frag(v2f i) : SV_Target
             {
                 float seen = tex2D(_MainTex, i.uv).r;
-                return fixed4(i.color.rgb, i.color.a * (1.0 - seen));
+                float a = lerp(_VisionMinimapDarkness, _VisionMinimapSeenLift, seen);
+                float3 rgb = lerp(i.color.rgb, float3(1, 1, 1), seen);
+                return fixed4(rgb, i.color.a * a);
             }
             ENDCG
         }
