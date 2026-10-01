@@ -22,7 +22,7 @@ namespace Overpower.Vision
     /// the player prefab: the wave and the dots must survive a respawn and exist for a spectator, and the centre's owner is
     /// read from the territory this object already hosts. Nothing is sent: the wave is a function of the server clock and
     /// the room's go-live time mLiveAt (CentreScanRules), so every client agrees on where it is. Each client remembers the
-    /// owner it saw when the wave started (ScanBandTracker); a client that joins mid-wave takes the owner it reads then.
+    /// owner it held at the wave's start, read from the zone's held-since stamp so every client agrees (ScanBandTracker); a client that joins after a mid-wave capture gives that wave to nobody.
     ///
     /// CATCHES ARE JUDGED ON THE HOLDER'S GAME against the enemy's remote copy (the interpolated position this client draws):
     /// a Blink of 3 m or more snaps there, so the enemy cannot be caught part-way; a shorter Blink glides for about 0.2 s and
@@ -127,10 +127,11 @@ namespace Overpower.Vision
             int owner = territory.OwnerOf(centreZone);
             MatchDirector director = MatchDirector.Instance;
             bool cut = director != null && director.CutTeam >= 0;
-            // Live and with a go-live time: waves an interval apart from go-live. Otherwise (warm-up) on server-clock multiples.
-            int? liveAtMs = director != null && director.IsLive && director.LiveAtMs != 0 ? director.LiveAtMs : (int?)null;
+            // With a go-live time (from the countdown start on): waves an interval apart from go-live. Otherwise (warm-up) on
+            // server-clock multiples. Decided by mLiveAt alone, so the schedule does not jump when the match goes live.
+            int? liveAtMs = director != null ? CentreScanRules.LiveSchedule(director.LiveAtMs) : null;
             int intervalMs = Mathf.RoundToInt(config.ScanIntervalSeconds * 1000f);
-            Frame = tracker.Step(liveAtMs, owner, nowMs, intervalMs, cut, config.ScanWaveSpeed, maxRadius);
+            Frame = tracker.Step(liveAtMs, owner, nowMs, intervalMs, cut, config.ScanWaveSpeed, maxRadius, territory.HeldSinceMs(centreZone));
             HolderTeam = Frame.Active ? Frame.HolderTeam : -1;
             CountdownSeconds = cut || intervalMs <= 0
                 ? -1

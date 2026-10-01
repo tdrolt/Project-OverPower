@@ -38,6 +38,11 @@ namespace Overpower.Vision
         /// <summary>The start of the next wave after nowMs (what the countdown above the tower counts to). Live: one interval
         /// after the latest wave, or after go-live while none has gone out yet. Warm-up: the next multiple of the interval.
         /// With an interval of 0 or less it is nowMs.</summary>
+        /// <summary>The go-live time the schedule runs on, from the room's mLiveAt alone (0 = not announced yet): from the moment
+        /// it is announced, the countdown included, waves are at liveAt + k x interval, so there is no wave during the countdown
+        /// and the label counts straight to the first live wave. Null (the warm-up clock) while it is 0.</summary>
+        public static int? LiveSchedule(int liveAtMs) => liveAtMs != 0 ? liveAtMs : (int?)null;
+
         public static int NextScanStart(int? liveAtMs, int nowMs, int intervalMs)
         {
             if (intervalMs <= 0)
@@ -155,22 +160,34 @@ namespace Overpower.Vision
         private int lastStart;
         private int lastHolder = -1;
         private int prevNow;
+        private bool hasPrevOwner; // an owner was read on an earlier frame of this room
+        private int prevOwner;     // ... and this is it (the owner before whatever this frame shows)
 
         /// <summary>Forget the wave seen so far (the room was left, or the scan is switched off): the next frame is a first frame.</summary>
-        public void Reset() { has = false; sawNoScan = false; lastHolder = -1; }
+        public void Reset() { has = false; sawNoScan = false; lastHolder = -1; hasPrevOwner = false; }
 
         /// <summary>Call once per frame, every frame, with the same inputs. liveAtMs is the server ms the match went live, or
-        /// null in the warm-up (see CentreScanRules.ScanStart). ownerNow is who owns the centre right now (-1 neutral): it is
-        /// read only on the first frame a wave is seen, and that owner IS the wave's holder for its whole life, so a capture
-        /// mid-wave changes nothing until the next wave. A client that joins mid-wave takes the owner it reads then (it never
-        /// saw the start). Returns Active = false (and forgets the wave) while there is no wave or the map is cut. A frame with
-        /// the server clock at 0, or one that does not move the clock forward (Photon's clock can step back a few ms), gets an
-        /// empty band and is not remembered, so no slice of the wave is ever covered twice. A new wave, or the first frame
-        /// ever seen, starts the band from 0.</summary>
-        public ScanFrame Step(int? liveAtMs, int ownerNow, int nowMs, int intervalMs, bool cutActive, float speed, float maxRadius)
+        /// null in the warm-up (see CentreScanRules.ScanStart). ownerNow is who owns the centre right now (-1 neutral) and
+        /// heldSinceMs the server ms that owner took it (the snapshot stamps every owner change, going neutral included).
+        /// The wave belongs to whoever held the centre at its start, and every client must agree on that however its capture
+        /// news arrives: on every frame of a wave, an owner who held it at the start (heldSince at or before the start)
+        /// is the holder, so a capture stamped just before the start but read just after it is corrected (the band then
+        /// restarts from 0 for that client, so the first metres of the wave are not lost); a capture stamped after the start
+        /// changes nothing until the next wave (the remembered holder stays). A client whose first frame of a wave already
+        /// shows a later capture, with no earlier owner read to fall back on (a joiner), gives the wave to nobody (-1) rather
+        /// than the wrong team. Leave heldSinceMs null for no stamp: the owner read on a wave's first frame then stands for the whole wave (no correction). Returns Active = false (and
+        /// forgets the wave) while there is no wave or the map is cut. A frame with the server clock at 0, or one that does
+        /// not move the clock forward (Photon's clock can step back a few ms), gets an empty band and is not remembered, so no
+        /// slice of the wave is ever covered twice. A new wave, or the first frame ever seen, starts the band from 0.</summary>
+        public ScanFrame Step(int? liveAtMs, int ownerNow, int nowMs, int intervalMs, bool cutActive, float speed, float maxRadius, int? heldSinceMs = null)
         {
             if (nowMs == 0)
                 return new ScanFrame(false, false, 0, -1, 0f, 0f);
+
+            int previousOwner = prevOwner;
+            bool hadPreviousOwner = hasPrevOwner;
+            prevOwner = ownerNow;
+            hasPrevOwner = true;
 
             if (!CentreScanRules.ActiveScan(liveAtMs, nowMs, intervalMs, cutActive, out int start))
             {
@@ -182,6 +199,8 @@ namespace Overpower.Vision
 
             float radius = CentreScanRules.WaveRadius(start, nowMs, speed);
             bool travelling = CentreScanRules.IsTravelling(radius, maxRadius);
+            bool heldAtStart = !heldSinceMs.HasValue || unchecked(heldSinceMs.Value - start) <= 0;
+            bool canCorrect = heldSinceMs.HasValue; // without a stamp the owner read on a wave's first frame stands for the whole wave
 
             float prevRadius;
             if (has && start == lastStart)
@@ -189,10 +208,18 @@ namespace Overpower.Vision
                 if (unchecked(nowMs - prevNow) <= 0)
                     return new ScanFrame(true, travelling, start, lastHolder, radius, radius);
                 prevRadius = CentreScanRules.WaveRadius(start, prevNow, speed);
+                if (canCorrect && heldAtStart && ownerNow != lastHolder)
+                {
+                    // A capture made before the start reached this client after it: the wave was theirs all along.
+                    lastHolder = ownerNow;
+                    prevRadius = 0f;
+                }
             }
             else
             {
-                lastHolder = ownerNow; // the first frame of this wave: whoever owns the centre now owns the wave
+                // The first frame of this wave: whoever held the centre at the start owns it. A later capture already showing
+                // means the owner of the frame before was the holder (nobody known, for a joiner: nobody gets the wave).
+                lastHolder = heldAtStart ? ownerNow : hadPreviousOwner ? previousOwner : -1;
                 if (has || sawNoScan || unchecked(nowMs - start) <= LateStampGraceMs)
                     prevRadius = 0f;
                 else

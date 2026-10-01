@@ -96,9 +96,6 @@ namespace Overpower.Data
         [Tooltip("How high above the top of the centre tower the countdown label floats, in metres. Higher keeps it clear of the tower from the top-down camera.")]
         [SerializeField, Min(0f)] private float scanCountdownHeight = 2f;
 
-        [Tooltip("How big the countdown label's text is. Bigger reads from further away.")]
-        [SerializeField, Min(0.1f)] private float scanCountdownFontSize = 8f;
-
         public bool FogEnabled => fogEnabled;
         public Color FogColour => fogColour;
         public float FogDarkness => fogDarkness;
@@ -122,7 +119,6 @@ namespace Overpower.Data
         public float ScanDotFadeSeconds => scanDotFadeSeconds;
         public bool ScanCountdownVisible => scanCountdownVisible;
         public float ScanCountdownHeight => scanCountdownHeight;
-        public float ScanCountdownFontSize => scanCountdownFontSize;
         public bool ScanTier1 => scanTier1;
         public bool ScanTier2 => scanTier2;
         public bool ScanTier3 => scanTier3;
