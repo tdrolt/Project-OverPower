@@ -311,20 +311,53 @@ namespace Overpower.Vision
             if (sight == null)
                 return true;
             bool friendly = sight.IsFriendlyTeam(shooterTeam);
-            bool seen = friendly || sight.CanSee(centre); // a friendly blast needs no wall test
+            bool seen = friendly || sight.CanSeeShot(centre); // a friendly blast needs no wall test; a burst is in the air, so eye height
             return ShotVisibilityRules.BlastShown(friendly, seen, !seen && sight.BlastReachesMyTeam(centre, radius));
         }
 
         private readonly List<Vector3> eyeSpots = new List<Vector3>(16);
+        private System.Func<Vector3, bool> canSeeShotPoint;
 
+        // Reaches the body (the line from each player's feet up to their eye), not just the feet.
         private bool BlastReachesMyTeam(Vector3 centre, float radius)
         {
             Refresh();
             float eyeHeight = config != null ? config.EyeHeight : 1f;
+            FillFeet();
+            return ShotVisibilityRules.ReachesAnyBody(centre, radius, eyeSpots, eyeHeight);
+        }
+
+        private void FillFeet()
+        {
+            float eyeHeight = config != null ? config.EyeHeight : 1f;
             eyeSpots.Clear();
             for (int i = 0; i < eyes.Count; i++)
                 eyeSpots.Add(new Vector3(eyes[i].Position.x, eyes[i].EyeY - eyeHeight, eyes[i].Position.y)); // each player's feet
-            return ShotVisibilityRules.ReachesAny(centre, radius, eyeSpots);
+        }
+
+        /// <summary>Whether a placed disc (an AoE Zone, a Fire Field) of this owner team is drawn: always for my team;
+        /// otherwise when its centre or any of 8 rim points is seen, or when the disc reaches any of my team.</summary>
+        public static bool DiscShownAt(int ownerTeam, Vector3 centre, float radius)
+        {
+            TeamSight sight = Local;
+            if (sight == null || sight.IsFriendlyTeam(ownerTeam) || !sight.FogOn)
+                return true;
+            sight.canSeeShotPoint ??= sight.CanSeeShot;
+            return ShotVisibilityRules.DiscSeen(centre, radius, 8, sight.canSeeShotPoint) || sight.BlastReachesMyTeam(centre, radius);
+        }
+
+        /// <summary>True when the flat cone (apex, forward, range, full angle) reaches any of my team's players.</summary>
+        public static bool ConeReachesMyTeam(Vector3 apex, Vector3 forward, float range, float fullAngleDegrees)
+        {
+            TeamSight sight = Local;
+            if (sight == null)
+                return false;
+            sight.Refresh();
+            sight.FillFeet();
+            for (int i = 0; i < sight.eyeSpots.Count; i++)
+                if (ShotVisibilityRules.ConeReaches(apex, forward, range, fullAngleDegrees, sight.eyeSpots[i]))
+                    return true;
+            return false;
         }
 
         // The eye is at its own player's eye point (their feet + Eye Height); the asked-about point is lifted the same

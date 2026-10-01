@@ -55,6 +55,18 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ARendererSwitchedBackOnWhileHidden_IsSwitchedOffByTheNextApply()
+        {
+            gate.SetVisible(false);
+            on.enabled = true; // outside code (FlameConeVisual.Configure re-enabling its edge line) while the gate is hidden
+            gate.SetVisible(false);
+            Assert.IsFalse(on.enabled, "hidden means every renderer off, even after someone re-enabled one");
+            gate.SetVisible(true);
+            Assert.IsTrue(on.enabled);
+            Assert.IsFalse(off.enabled);
+        }
+
+        [Test]
         public void ForceVisible_WinsOverHidden()
         {
             gate.SetVisible(false);

@@ -60,5 +60,53 @@ namespace Overpower.Vision
         /// not lifted again over a Cover Wall.</summary>
         public static float TargetHeight(bool atEyeHeight, float eyeY, float pointY, float eyeHeight) =>
             atEyeHeight ? eyeY : pointY + eyeHeight;
+
+        /// <summary>True when the disc (a zone, a fire field) is seen: its centre, or any of <paramref name="rimPoints"/>
+        /// points spaced evenly round the rim at the centre's height. Stops at the first seen sample. A radius that is
+        /// not positive is just the centre.</summary>
+        public static bool DiscSeen(Vector3 centre, float radius, int rimPoints, Func<Vector3, bool> seen)
+        {
+            if (seen(centre))
+                return true;
+            if (radius <= 0f || rimPoints <= 0)
+                return false;
+            for (int i = 0; i < rimPoints; i++)
+            {
+                float angle = i * (2f * Mathf.PI / rimPoints);
+                if (seen(centre + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>Like ReachesAny, but each player is a vertical line from their feet up <paramref name="bodyHeight"/>:
+        /// the blast counts when it reaches the nearest point of that line, so a burst in the air reaches a chest.</summary>
+        public static bool ReachesAnyBody(Vector3 centre, float radius, IReadOnlyList<Vector3> feet, float bodyHeight)
+        {
+            for (int i = 0; i < feet.Count; i++)
+            {
+                float y = Mathf.Clamp(centre.y, feet[i].y, feet[i].y + Mathf.Max(0f, bodyHeight));
+                if (Vector3.Distance(centre, new Vector3(feet[i].x, y, feet[i].z)) <= radius)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>True when the point lies inside a flat cone: within <paramref name="range"/> of the apex on the ground
+        /// and within half of <paramref name="fullAngleDegrees"/> of the forward direction (height ignored, the way the
+        /// Flamethrower itself measures). The apex itself counts.</summary>
+        public static bool ConeReaches(Vector3 apex, Vector3 forward, float range, float fullAngleDegrees, Vector3 point)
+        {
+            Vector2 toPoint = new Vector2(point.x - apex.x, point.z - apex.z);
+            float distance = toPoint.magnitude;
+            if (distance > range)
+                return false;
+            if (distance < 0.0001f)
+                return true;
+            Vector2 flatForward = new Vector2(forward.x, forward.z);
+            if (flatForward.sqrMagnitude < 0.0001f)
+                return false;
+            return Vector2.Angle(flatForward, toPoint) <= fullAngleDegrees * 0.5f;
+        }
     }
 }

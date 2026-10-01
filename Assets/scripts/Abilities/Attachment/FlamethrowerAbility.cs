@@ -315,7 +315,10 @@ namespace Overpower.Abilities
             vfx.Configure(coneRange, coneAngle, vfxColor, Owner.IsMine);
             vfx.gameObject.SetActive(true);
             // Vision: the cone is hidden with the enemy who sprays it, checked every frame (friendly: always).
-            VisibleWhenSeen.AttachToCaster(vfx.gameObject, Owner.PhotonView);
+            // It is also shown while the cone reaches any of my team (the fire hurts them, so they must see it).
+            VisibleWhenSeen gate = VisibleWhenSeen.AttachToCaster(vfx.gameObject, Owner.PhotonView);
+            if (gate != null)
+                gate.SetCone(coneRange, coneAngle);
         }
 
         private void PositionVfx(Vector3 apex, Vector3 forward)

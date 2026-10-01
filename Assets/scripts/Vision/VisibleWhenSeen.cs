@@ -17,9 +17,12 @@ namespace Overpower.Vision
         private readonly List<Renderer> renderers = new List<Renderer>(8);
         private readonly List<bool> authoredEnabled = new List<bool>(8); // what each renderer was set to before we touched it
         private bool shown = true;
-        [SerializeField, Tooltip("For a placed thing with a PhotonView (AoE Zone, Fire Field): shown always when its owner is on my team, " +
-            "otherwise only while its position is seen. Leave off for shots, which are told their team when spawned.")]
+        // For a placed thing with a PhotonView (AoE Zone, Fire Field): shown always when its owner is on my team. Set on the
+        // prefabs; not a designer field (unticking it would hide your own team's zones).
+        [SerializeField, HideInInspector]
         private bool ownersTeamAlwaysSees;
+        private float seenRadius; // > 0: a placed disc, shown when any part of it is seen or it reaches my team
+        private float coneRange, coneAngle; // > 0 range: a flame cone, shown while its caster is shown or it reaches my team
 
         private PhotonView ownView;
         private PhotonView followCaster; // set: shown exactly while that player is shown (their abilities' visuals)
@@ -54,8 +57,20 @@ namespace Overpower.Vision
             if (gate == null)
                 gate = visual.AddComponent<VisibleWhenSeen>();
             gate.followCaster = casterView;
+            gate.RefreshRenderers(); // the visual may have switched renderers back on (FlameConeVisual.Configure) while we hid it
             gate.Apply();
             return gate;
+        }
+
+        /// <summary>For a placed disc (AoE Zone, Fire Field): with a radius above zero it is shown when its centre or any
+        /// part of its rim is seen, or when it reaches my team (not only its centre).</summary>
+        public void SetSeenRadius(float radius) => seenRadius = Mathf.Max(0f, radius);
+
+        /// <summary>For the Flamethrower cone: also shown while the cone reaches any of my team (its length and full angle).</summary>
+        public void SetCone(float range, float fullAngleDegrees)
+        {
+            coneRange = Mathf.Max(0f, range);
+            coneAngle = fullAngleDegrees;
         }
 
         /// <summary>The whole choice, plain values: forced or no sight = shown; an object bound to a caster follows the
@@ -96,9 +111,11 @@ namespace Overpower.Vision
             bool bound = followCaster != null; // a caster who left (destroyed view) no longer binds: the spot rules
             bool force = ForceVisible || (ownersTeamAlwaysSees && sight != null && ownView != null
                 && Teams.TryGetTeam(ownView.Owner, out int ownerTeam) && sight.IsFriendlyTeam(ownerTeam));
-            SetVisible(Decide(force, sight != null, bound,
-                bound && sight != null && sight.CanSeePlayer(followCaster),
-                sight != null && !bound && sight.CanSeeShot(transform.position)));
+            bool casterShown = bound && sight != null && (sight.CanSeePlayer(followCaster)
+                || (coneRange > 0f && TeamSight.ConeReachesMyTeam(transform.position, transform.forward, coneRange, coneAngle)));
+            bool spotSeen = sight != null && !bound && !force
+                && (seenRadius > 0f ? TeamSight.DiscShownAt(-1, transform.position, seenRadius) : sight.CanSeeShot(transform.position));
+            SetVisible(Decide(force, sight != null, bound, casterShown, spotSeen));
         }
 
         /// <summary>Switches the renderers on (to their authored state) or off. A trail is cleared when it comes back, so
@@ -106,7 +123,12 @@ namespace Overpower.Vision
         public void SetVisible(bool visible)
         {
             if (visible == shown)
+            {
+                // Hidden means every renderer off: outside code may have switched one back on since (a repeat spray).
+                if (!visible)
+                    SetRenderers(false);
                 return;
+            }
             shown = visible;
             SetRenderers(visible);
             if (visible)

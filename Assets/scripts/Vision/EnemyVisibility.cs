@@ -39,8 +39,8 @@ namespace Overpower.Vision
             if (lifecycle != null && lifecycle.PlayerMesh != null)
                 lifecycle.PlayerMesh.GetComponentsInChildren(true, bodyRenderers);
             // The world-space canvas under the player root is the overhead one (the other canvas is the owner's own
-            // screen-space win/lose panel). PlayerHealth.OverheadCanvas is not used: it reads null while the canvas or
-            // the bar is off, which would leave a hidden or dead player's name showing.
+            // screen-space win/lose panel). PlayerHealth.OverheadCanvas now finds it too (it includes a switched-off
+            // canvas); this search stays so the canvas is found without needing the health bar's image.
             foreach (Canvas canvas in GetComponentsInChildren<Canvas>(true))
             {
                 if (canvas.renderMode == RenderMode.WorldSpace)
