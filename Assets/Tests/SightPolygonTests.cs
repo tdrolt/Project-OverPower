@@ -95,6 +95,15 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheCircleRays_ForTheStandardEye_AreTheHandWorkedCount()
+        {
+            // Hand-worked: spacing = 22 * (pi/2) / 180 = 0.19199 m; the circle's 270 degrees at radius 7 is 32.987 m;
+            // 32.987 / 0.19199 = 171.8, rounded up to 172 (under the 180 cap).
+            var fan = Fan(FacingUp(Vector2.zero), 180, NoWalls);
+            Assert.AreEqual(172, CountAt(fan, Vector2.zero, Radius));
+        }
+
+        [Test]
         public void ANarrowScopedCone_DoesNotMultiplyTheCirclesRays()
         {
             const int rays = 20;

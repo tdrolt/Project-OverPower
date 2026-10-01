@@ -37,6 +37,8 @@ namespace Overpower.Vision
             CameraType type = renderingData.cameraData.cameraType;
             if (type != CameraType.Game || renderingData.cameraData.renderType == CameraRenderType.Overlay)
                 return;
+            if (renderingData.cameraData.camera.targetTexture != null)
+                return; // a bake into a texture (the top-down renders) is never fogged
             if (TeamSight.Local == null || Shader.GetGlobalFloat(FogEnabledId) < 0.5f)
                 return;
             renderer.EnqueuePass(pass);
