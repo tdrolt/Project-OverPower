@@ -1,31 +1,54 @@
 using System;
 using System.Collections.Generic;
+using Overpower.Match;
 
 namespace Overpower.Vision
 {
-    /// <summary>What a team knows about one zone, as plain values: who owns it, who is capturing it, how far the
-    /// capture has got, whether it is under attack, and when it was captured.
-    /// Progress01 is a plain number evaluated by the caller at the moment it builds the live list, not the stamped
-    /// rate the room properties carry. A stamped rate keeps advancing on its own clock, so a copy of it kept for an
-    /// unseen zone would keep filling; a plain number stays exactly what the team last saw.</summary>
+    /// <summary>What a team knows about one zone, as plain values: who owns it, the capture ring as it was drawn (phase, fill,
+    /// the capturing or draining team, under attack) and when it was captured. The ring is already evaluated at the moment
+    /// the caller built the live list, not the stamped rate the room properties carry: a stamped rate keeps advancing on
+    /// its own clock, so a copy kept for an unseen zone would keep filling, while an evaluated ring stays exactly what the
+    /// team last saw. Both the ring on the ground and the minimap are drawn from this one CaptureRingState.</summary>
     public readonly struct ZoneView
     {
         public readonly int OwnerTeam;
-        public readonly int CapturingTeam;
-        public readonly float Progress01;
-        public readonly bool UnderAttack;
+        public readonly CaptureRingState Ring;
         public readonly int HeldSinceMs;
 
-        public ZoneView(int ownerTeam, int capturingTeam, float progress01, bool underAttack, int heldSinceMs)
+        public ZoneView(int ownerTeam, CaptureRingState ring, int heldSinceMs)
         {
             OwnerTeam = ownerTeam;
-            CapturingTeam = capturingTeam;
-            Progress01 = progress01;
-            UnderAttack = underAttack;
+            Ring = ring;
             HeldSinceMs = heldSinceMs;
         }
 
-        public static readonly ZoneView Neutral = new ZoneView(-1, -1, 0f, false, 0);
+        public bool UnderAttack => Ring.UnderAttack;
+
+        public static readonly ZoneView Neutral = new ZoneView(-1,
+            new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, TerritoryMap.Neutral, TerritoryMap.Neutral, false), 0);
+    }
+
+    /// <summary>The plain pieces the component feeds ZoneKnowledgeStore with.</summary>
+    public static class ZoneViews
+    {
+        /// <summary>Rebuilds <paramref name="into"/> (cleared first) with the true state of every zone in the snapshot, by zone
+        /// id, the ring evaluated at <paramref name="nowMs"/>. Out-of-play zones are not special here: the displays hide those
+        /// before they ever read a view.</summary>
+        public static void BuildLive(TerritorySnapshot snapshot, Func<int, CaptureProgress> progressOf, Func<int, bool> underAttack,
+                                     int nowMs, List<ZoneView> into)
+        {
+            into.Clear();
+            for (int zone = 0; zone < snapshot.ZoneCount; zone++)
+            {
+                int owner = snapshot.OwnerOf(zone);
+                CaptureRingState ring = CaptureRingState.From(progressOf(zone), owner, underAttack(zone), nowMs);
+                into.Add(new ZoneView(owner, ring, snapshot.HeldSinceMs(zone)));
+            }
+        }
+
+        /// <summary>A tower is seen when it is in my team's sight. With no sight object at all there is no fog, so everything
+        /// is seen.</summary>
+        public static bool IsSeen(bool hasSight, bool towerInSight) => !hasSight || towerInSight;
     }
 
     /// <summary>
@@ -40,11 +63,17 @@ namespace Overpower.Vision
     ///
     /// Index in the lists is the zone id.
     /// </summary>
-    public sealed class ZoneKnowledge
+    public sealed class ZoneKnowledgeStore
     {
         private ZoneView[] known = new ZoneView[0];
         private bool started;
 
+        /// <summary>The next Update copies the live state again. Called when the match goes live (the live reset throws the
+        /// warm-up captures away and fixes which capitals are in play) and when leaving a room.</summary>
+        public void Reset() => started = false;
+
+        /// <remarks>Do not call this until the room's territory snapshot has been read and the server clock has synced: the first
+        /// call copies whatever it is given as the team's starting knowledge.</remarks>
         /// <param name="live">The true state of every zone this frame, by zone id, with progress already evaluated at now.</param>
         /// <param name="scannedNow">Zones the centre scan wave is passing over right now. Each frame in it the zone takes the
         /// live state, so it ends on the state at the moment the wave leaves, and then freezes again.</param>
@@ -65,7 +94,9 @@ namespace Overpower.Vision
                 // A zone my team owns is live (Tudor: "I can see if it gets attacked"). A zone my team knew as its own and
                 // has now lost is live for that frame too: the team's income stops, so it knows. The frame after, the loss
                 // is what it last knew and the zone freezes on that like any other unseen zone.
-                bool mine = live[i].OwnerTeam == myTeam || known[i].OwnerTeam == myTeam;
+                // A zone my team is capturing or draining is live too: a teammate far from the tower still sees their own progress.
+                bool mine = myTeam >= 0 && (live[i].OwnerTeam == myTeam || known[i].OwnerTeam == myTeam
+                    || live[i].Ring.ArcTeam == myTeam || live[i].Ring.DrainerTeam == myTeam);
                 if (switchOn || mine || zoneSeen(i) || Contains(scannedNow, i))
                     known[i] = live[i];
             }
