@@ -389,25 +389,25 @@ public class BuildingCapture : MonoBehaviourPun
 
         // Vision Task 9b, the one place this tower chooses: with Zone Owners Visible Without Sight off, the ring, the
         // crown/caps and the carpet all show what the team knows of this zone, not the live state.
-        int owner;
-        CaptureRingState state;
         bool filtered = Overpower.Vision.ZoneKnowledge.TryGetDisplayed(buildingID, out Overpower.Vision.ZoneView known);
-        if (filtered)
-        {
-            owner = known.OwnerTeam;
-            state = known.Ring;
-        }
-        else
-        {
-            owner = manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
-            bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
-            state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
-                                          PhotonNetwork.ServerTimestamp, outOfPlay: false);
-        }
+        int owner = filtered ? known.OwnerTeam
+            : manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
         PaintKnownCarpet(owner, filtered);
 
         if (ringView == null && towerLook == null)
             return;
+
+        CaptureRingState state;
+        if (filtered)
+        {
+            state = known.Ring;
+        }
+        else
+        {
+            bool underAttack = ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(buildingID);
+            state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
+                                          PhotonNetwork.ServerTimestamp, outOfPlay: false);
+        }
 
         if (ringView != null)
         {

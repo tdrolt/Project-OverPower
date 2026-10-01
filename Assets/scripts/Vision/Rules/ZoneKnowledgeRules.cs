@@ -47,16 +47,20 @@ namespace Overpower.Vision
             }
         }
 
-        /// <summary>Sight lines to a tower's centre always stop at the tower's own solid capsule (Building layer, 2.6 m radius), so a
-        /// tower counts as in sight when a spot on the ground just outside that capsule is. These are those spots.</summary>
-        public const float TowerSightRadius = 3f;
+        /// <summary>Sight lines to a tower's centre always stop at the tower's own solid capsule, so a tower counts as in sight
+        /// when a spot on the ground just outside that capsule is. These are those spots: TowerSightMargin beyond the capsule's
+        /// world radius (its radius times the larger of the horizontal scales).</summary>
+        public const float TowerSightMargin = 0.5f;
         public const int TowerSightPointCount = 8;
 
-        public static Vector3 TowerSightPoint(Vector3 towerCentre, int index)
+        public static float TowerSightRadiusFor(float capsuleRadius, Vector3 lossyScale) =>
+            capsuleRadius * Mathf.Max(Mathf.Abs(lossyScale.x), Mathf.Abs(lossyScale.z)) + TowerSightMargin;
+
+        public static Vector3 TowerSightPoint(Vector3 towerCentre, int index, float radius)
         {
             float angle = index * (2f * Mathf.PI / TowerSightPointCount);
-            return new Vector3(towerCentre.x + Mathf.Cos(angle) * TowerSightRadius, towerCentre.y,
-                               towerCentre.z + Mathf.Sin(angle) * TowerSightRadius);
+            return new Vector3(towerCentre.x + Mathf.Cos(angle) * radius, towerCentre.y,
+                               towerCentre.z + Mathf.Sin(angle) * radius);
         }
 
         /// <summary>A tower is seen when it is in my team's sight. With no sight object at all there is no fog, so everything

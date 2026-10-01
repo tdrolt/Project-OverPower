@@ -198,6 +198,136 @@ namespace Overpower.Tests
             Assert.AreEqual(2, c.Caught);
         }
 
+        // ---- how a client calls the rules frame after frame (Task 10 review) ----
+
+        private const float ScanMax = 120f;
+
+        // Calls the tracker every step and counts the frames a player standing at 'distance' is inside the swept band.
+        private sealed class TrackedCatcher
+        {
+            private readonly ScanBandTracker tracker = new ScanBandTracker();
+            public int Caught;
+            public ScanFrame Last;
+            public int Holder = Team;
+            public int HeldSince = 1000;
+
+            public void Step(int now, float distance)
+            {
+                Last = tracker.Step(Holder, HeldSince, now, Interval, false, Speed, ScanMax);
+                if (Last.Holding && CentreScanRules.FrontSwept(Last.PrevRadius, Last.Radius, distance)) Caught++;
+            }
+        }
+
+        [Test]
+        public void AStillPlayerIsCaughtOncePerScan_AcrossSeveralScans()
+        {
+            TrackedCatcher c = new TrackedCatcher();
+            for (int t = 1000; t < 1000 + 3 * Interval; t += Frame) c.Step(t, 30f);
+            Assert.AreEqual(3, c.Caught);
+        }
+
+        [Test]
+        public void NobodyIsCaughtOnANewScansFirstFrame_JustBecauseTheOldWaveWasFar()
+        {
+            TrackedCatcher c = new TrackedCatcher();
+            int t = 1000;
+            for (; t < 1000 + Interval; t += Frame) c.Step(t, 30f);
+            int before = c.Caught;
+            c.Step(1000 + Interval, 30f); // the frame the next scan starts: radius 0
+            Assert.AreEqual(before, c.Caught);
+            Assert.AreEqual(0f, c.Last.PrevRadius, 0.0001f);
+            Assert.AreEqual(0f, c.Last.Radius, 0.0001f);
+        }
+
+        [Test]
+        public void ANewHolder_StartsAFreshBandFromZero()
+        {
+            TrackedCatcher c = new TrackedCatcher();
+            for (int t = 1000; t < 4000; t += Frame) c.Step(t, 30f);
+            c.Holder = 5;
+            c.HeldSince = 4000;
+            c.Step(4100, 2f); // 100 ms into the new holder's scan: front at 5 m, the player at 2 m is inside the new band
+            Assert.AreEqual(0f, c.Last.PrevRadius, 0.0001f);
+            Assert.AreEqual(5f, c.Last.Radius, 0.001f);
+            Assert.AreEqual(2, c.Caught, "once for the first holder's wave over 30 m, once for the new holder's wave over 2 m");
+        }
+
+        [Test]
+        public void AHalfSecondFrame_StillCatchesAPlayerOnce()
+        {
+            TrackedCatcher c = new TrackedCatcher();
+            for (int t = 1000; t <= 1000 + Interval; t += 500) c.Step(t, 30f);
+            Assert.AreEqual(1, c.Caught);
+        }
+
+        [Test]
+        public void ALateCaptureStamp_StillCatchesAPlayerStandingInTheCentre()
+        {
+            // The stamp arrives 100 ms after the capture moment: the first frame this client sees is 5 m into the wave.
+            TrackedCatcher c = new TrackedCatcher();
+            c.Step(1100, 3f);
+            Assert.AreEqual(1, c.Caught);
+            for (int t = 1120; t < 1000 + Interval - Frame; t += Frame) c.Step(t, 3f);
+            Assert.AreEqual(1, c.Caught);
+        }
+
+        [Test]
+        public void SomeoneJoiningMidWave_DoesNotCatchEveryoneBehindTheFront()
+        {
+            TrackedCatcher c = new TrackedCatcher();
+            c.Step(1000 + 3000, 30f); // first frame ever, 3 s into the scan
+            Assert.AreEqual(0, c.Caught);
+            Assert.AreEqual(150f, c.Last.Radius, 0.01f);
+        }
+
+        [Test]
+        public void TheClockSteppingBackAFewMs_DoesNotCatchAPlayerTwice()
+        {
+            TrackedCatcher c = new TrackedCatcher();
+            int[] clock = { 1000, 1020, 1040, 1025, 1045, 1060, 1100, 1140, 1200 };
+            foreach (int t in clock) c.Step(t, 3.5f);
+            Assert.AreEqual(1, c.Caught);
+        }
+
+        [Test]
+        public void AZeroServerClock_IsSkippedAndNotRemembered()
+        {
+            TrackedCatcher c = new TrackedCatcher();
+            c.Step(1020, 0.5f);
+            Assert.AreEqual(1, c.Caught);
+            c.Step(0, 0.5f);
+            Assert.IsFalse(c.Last.Holding);
+            c.Step(1040, 0.5f);
+            Assert.AreEqual(1, c.Caught, "the frame after the zero continues from 1020, not from 0");
+            Assert.AreEqual(1f, c.Last.PrevRadius, 0.001f);
+        }
+
+        [Test]
+        public void AfterTheMapShrinks_NoFrameHoldsAScan_AndANewCaptureStartsClean()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            tracker.Step(Team, 1000, 2000, Interval, false, Speed, ScanMax);
+            Assert.IsFalse(tracker.Step(Team, 1000, 2020, Interval, true, Speed, ScanMax).Holding);
+            Assert.IsFalse(tracker.Step(-1, 1000, 2040, Interval, false, Speed, ScanMax).Holding);
+            ScanFrame fresh = tracker.Step(Team, 3000, 3040, Interval, false, Speed, ScanMax);
+            Assert.AreEqual(0f, fresh.PrevRadius, 0.0001f);
+            Assert.AreEqual(2f, fresh.Radius, 0.001f);
+        }
+
+        [Test]
+        public void TheWaveStopsTravellingPastTheFarthestPoint_ButTheLastBandIsStillSwept()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            tracker.Step(Team, 1000, 1000, Interval, false, Speed, ScanMax);
+            tracker.Step(Team, 1000, 3300, Interval, false, Speed, ScanMax); // front at 115 m
+            ScanFrame f = tracker.Step(Team, 1000, 3400, Interval, false, Speed, ScanMax); // front at 120 m, still inside
+            Assert.IsTrue(f.Travelling);
+            f = tracker.Step(Team, 1000, 3500, Interval, false, Speed, ScanMax); // front at 125 m
+            Assert.IsFalse(f.Travelling);
+            Assert.IsFalse(CentreScanRules.FrontSwept(f.PrevRadius, f.Radius, 120f), "120 m was caught the frame before");
+            Assert.IsTrue(CentreScanRules.FrontSwept(f.PrevRadius, f.Radius, 122f));
+        }
+
         // ---- which zones refresh ----
 
         private static readonly Vector2 Centre = new Vector2(100f, 100f);

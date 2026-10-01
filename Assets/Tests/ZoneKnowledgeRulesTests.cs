@@ -266,27 +266,53 @@ namespace Overpower.Tests
 
         // ---- "seen"
 
-        // The tower is a solid (Building layer) capsule 2.6 m wide, so a sight line to its centre always stops at its own
-        // surface; the tower is seen when a spot just outside that capsule is.
+        // The tower is a solid (Building layer) capsule, so a sight line to its centre always stops at its own surface; the
+        // tower is seen when a spot just outside that capsule is. The distance comes from the capsule's size and scale.
         [Test]
-        public void EveryTowerSightPoint_IsTheSameDistanceFromTheCentre_OnTheGround()
+        public void TheTowerSightRadius_IsTheCapsuleRadiusPlusHalfAMetre()
         {
-            var centre = new Vector3(40f, 0.3f, -12f);
+            Assert.AreEqual(3.1f, ZoneViews.TowerSightRadiusFor(2.6f, Vector3.one), 1e-4f);
+        }
+
+        [Test]
+        public void AScaledUpTower_StillGetsSightPointsOutsideItsBody()
+        {
+            Vector3 scale = new Vector3(2f, 3f, 1.5f);
+            float bodyRadius = 2.6f * 2f; // the larger horizontal scale; the height scale does not widen the body
+            float radius = ZoneViews.TowerSightRadiusFor(2.6f, scale);
+            Assert.AreEqual(bodyRadius + 0.5f, radius, 1e-4f);
             for (int i = 0; i < ZoneViews.TowerSightPointCount; i++)
             {
-                Vector3 p = ZoneViews.TowerSightPoint(centre, i);
-                Assert.AreEqual(centre.y, p.y, 1e-5f);
-                Assert.AreEqual(ZoneViews.TowerSightRadius, Vector2.Distance(new Vector2(p.x, p.z), new Vector2(centre.x, centre.z)), 1e-4f);
+                Vector3 p = ZoneViews.TowerSightPoint(Vector3.zero, i, radius);
+                Assert.Greater(new Vector2(p.x, p.z).magnitude, bodyRadius);
             }
         }
 
         [Test]
-        public void TheTowerSightPoints_AreAllDifferent_AndSitOutsideTheTowerCapsule()
+        public void ANegativeScale_DoesNotShrinkTheSightRadius()
         {
-            Assert.Greater(ZoneViews.TowerSightRadius, 2.6f, "the Tower Look capsule is 2.6 m in radius");
+            Assert.AreEqual(3.1f, ZoneViews.TowerSightRadiusFor(2.6f, new Vector3(-1f, 1f, -1f)), 1e-4f);
+        }
+
+        [Test]
+        public void EveryTowerSightPoint_IsTheSameDistanceFromTheCentre_OnTheGround()
+        {
+            var centre = new Vector3(40f, 0.3f, -12f);
+            const float radius = 3.1f;
+            for (int i = 0; i < ZoneViews.TowerSightPointCount; i++)
+            {
+                Vector3 p = ZoneViews.TowerSightPoint(centre, i, radius);
+                Assert.AreEqual(centre.y, p.y, 1e-5f);
+                Assert.AreEqual(radius, Vector2.Distance(new Vector2(p.x, p.z), new Vector2(centre.x, centre.z)), 1e-4f);
+            }
+        }
+
+        [Test]
+        public void TheTowerSightPoints_AreAllDifferent()
+        {
             var seen = new System.Collections.Generic.HashSet<Vector3>();
             for (int i = 0; i < ZoneViews.TowerSightPointCount; i++)
-                seen.Add(ZoneViews.TowerSightPoint(Vector3.zero, i));
+                seen.Add(ZoneViews.TowerSightPoint(Vector3.zero, i, 3.1f));
             Assert.AreEqual(ZoneViews.TowerSightPointCount, seen.Count);
         }
 

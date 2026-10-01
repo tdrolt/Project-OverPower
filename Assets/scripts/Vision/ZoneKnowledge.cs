@@ -30,6 +30,8 @@ namespace Overpower.Vision
         private int[] lastShownOwner = new int[0];
         private bool filtering;
         private int version;
+        private int knownForTeam = int.MinValue;
+        private readonly Dictionary<int, float> sightRadius = new Dictionary<int, float>();
 
         // The centre scan (Task 11) will hand in the zones its wave is passing over; empty until then.
         private IReadOnlyCollection<int> scannedNow = Array.Empty<int>();
@@ -80,14 +82,21 @@ namespace Overpower.Vision
             progressOf = id => buildings.CaptureProgressOf(id);
             underAttack = id => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(id);
             towerSeen = id => buildings.TryGetZoneCentre(id, out Vector3 centre)
-                && ZoneViews.IsSeen(sight != null, sight != null && TowerInSight(centre));
+                && ZoneViews.IsSeen(sight != null, sight != null && TowerInSight(id, centre));
         }
 
         // The tower is solid, so a line to its centre stops on its own surface: it is in sight when a spot just outside it is.
-        private bool TowerInSight(Vector3 centre)
+        // How far outside comes from the tower's own capsule and scale, read once per zone.
+        private bool TowerInSight(int zone, Vector3 centre)
         {
+            if (!sightRadius.TryGetValue(zone, out float radius))
+            {
+                buildings.TryGetZoneTowerCapsule(zone, out float capsuleRadius, out Vector3 scale);
+                radius = ZoneViews.TowerSightRadiusFor(capsuleRadius, scale);
+                sightRadius[zone] = radius;
+            }
             for (int i = 0; i < ZoneViews.TowerSightPointCount; i++)
-                if (sight.CanSee(ZoneViews.TowerSightPoint(centre, i)))
+                if (sight.CanSee(ZoneViews.TowerSightPoint(centre, i, radius)))
                     return true;
             return false;
         }
@@ -112,6 +121,23 @@ namespace Overpower.Vision
             VisionConfig config = sight != null ? sight.Config : null;
             bool switchOn = config == null || config.ZoneOwnersVisibleWithoutSight;
             int myTeam = sight != null ? sight.FriendlyTeamId : -1;
+
+            // The switch on: every display draws the live state, so there is no knowledge to keep and no per-frame work. Turning
+            // it off later starts from the live state again.
+            if (switchOn)
+            {
+                store.Reset();
+                SetFiltering(false);
+                return;
+            }
+
+            // Spectating: FriendlyTeamId is the watched team, so a change of team starts the view of the new team from live
+            // (not the knocked-out team's old knowledge).
+            if (myTeam != knownForTeam)
+            {
+                store.Reset();
+                knownForTeam = myTeam;
+            }
 
             ZoneViews.BuildLive(buildings.Current, progressOf, underAttack, PhotonNetwork.ServerTimestamp, live);
             store.Update(switchOn, myTeam, live, towerSeen, scannedNow);

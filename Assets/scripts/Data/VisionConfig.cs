@@ -60,8 +60,8 @@ namespace Overpower.Data
         [SerializeField, Range(0f, 1f)] private float minimapSeenLift = 0.2f;
 
         [Header("Centre scan")]
-        [Tooltip("Seconds between centre scans. A shorter gap means zone states refresh more often.")]
-        [SerializeField, Min(1f)] private float scanIntervalSeconds = 30f;
+        [Tooltip("Seconds between centre scans. A shorter gap means zone states refresh more often. A new scan cuts off the previous wave, so a gap shorter than the wave's travel time (about 3 seconds at 40 m/s) means the outer arena is never scanned.")]
+        [SerializeField, Min(5f)] private float scanIntervalSeconds = 30f;
 
         [Tooltip("How fast the scan wave spreads out from the centre, in metres per second. Faster means zones refresh sooner after a scan starts.")]
         [SerializeField, Min(1f)] private float scanWaveSpeed = 40f;

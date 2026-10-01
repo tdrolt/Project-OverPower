@@ -272,6 +272,24 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return false;
     }
 
+    /// <summary>The solid capsule of the zone's tower (its radius and the tower's world scale), for the "tower in sight" spots
+    /// round it. Falls back to the authored 2.6 m at scale 1 when the tower has no capsule.</summary>
+    public bool TryGetZoneTowerCapsule(int zone, out float radius, out Vector3 lossyScale)
+    {
+        radius = 2.6f;
+        lossyScale = Vector3.one;
+        if (!captures.TryGetValue(zone, out BuildingCapture capture) || capture == null)
+            return false;
+        var look = capture.GetComponentInChildren<Overpower.Arena.TowerLook>(true);
+        var capsule = look != null ? look.GetComponent<CapsuleCollider>() : null;
+        if (capsule != null)
+        {
+            radius = capsule.radius;
+            lossyScale = capsule.transform.lossyScale;
+        }
+        return true;
+    }
+
     /// <summary>How far position is from the edge of the nearest zone teamId owns - 0 while standing
     /// inside one, PositiveInfinity if the team owns nothing (or the room's territory state has not
     /// been read yet). Same building block as TryGetZoneAt, reused by the shop's "in your own
