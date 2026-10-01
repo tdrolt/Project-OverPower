@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
@@ -20,6 +21,12 @@ namespace Overpower.Vision
         [SerializeField, Tooltip("The sight numbers (cone, circle, eye height) and the fog on/off switch.")]
         private VisionConfig config;
 
+        [SerializeField, Tooltip("The minimap's world square. The sight picture covers the same square, so the minimap and the fog can share it.")]
+        private MinimapConfig minimap;
+
+        [SerializeField, Tooltip("The shader that paints each eye's sight shape white into the sight picture. Leave as set.")]
+        private Shader sightFillShader;
+
         /// <summary>The owner's copy on this client, or null before it exists (then nothing is hidden).</summary>
         public static TeamSight Local { get; private set; }
 
@@ -35,6 +42,18 @@ namespace Overpower.Vision
         private float feetOffset; // the capsule's bottom below the pivot, read once from the prefab
         private bool feetOffsetRead;
         private PlayerLifecycle lifecycle;
+
+        // The sight texture: white where my team sees, black elsewhere (read by the fog shader, the minimap).
+        private RenderTexture sightTexture;
+        private Material fillMaterial;
+        private Mesh fanMesh;
+        private CommandBuffer drawBuffer;
+        private readonly List<Vector2> fan = new List<Vector2>(1024);
+        private readonly List<Vector3> meshVertices = new List<Vector3>(4096);
+        private readonly List<int> meshTriangles = new List<int>(16384);
+        private System.Func<Vector2, Vector2, float, float?> sightRaycast;
+        private float currentEyeY;
+        private Vector4 sightRect;
         private SpectateView spectate;
 
         /// <summary>The eyes built this frame (read-only, for later tasks that draw them).</summary>
@@ -42,6 +61,12 @@ namespace Overpower.Vision
         {
             get { Refresh(); return eyes; }
         }
+
+        /// <summary>The sight picture (white = my team sees it), or null when it is not set up.</summary>
+        public RenderTexture SightTexture => sightTexture;
+
+        /// <summary>The world square the sight picture covers: (minX, minZ, sizeX, sizeZ).</summary>
+        public Vector4 SightRect => sightRect;
 
         private bool FogOn => config != null && config.FogEnabled;
 
@@ -53,6 +78,106 @@ namespace Overpower.Vision
                 enabled = false;
             else if (config == null)
                 Debug.LogError($"[TeamSight] {name}: Vision Config is not assigned - nothing will be hidden.");
+            else
+                CreateSightTexture();
+        }
+
+        private void OnDestroy()
+        {
+            if (sightTexture != null)
+                sightTexture.Release();
+            if (fillMaterial != null)
+                Destroy(fillMaterial);
+            if (fanMesh != null)
+                Destroy(fanMesh);
+            drawBuffer?.Release();
+        }
+
+        private void CreateSightTexture()
+        {
+            if (minimap == null || sightFillShader == null)
+            {
+                Debug.LogError($"[TeamSight] {name}: Minimap Config or the Sight Fill Shader is not assigned - no sight picture is drawn.");
+                return;
+            }
+            int size = config.SightTextureSize;
+            sightTexture = new RenderTexture(size, size, 0, RenderTextureFormat.R8, RenderTextureReadWrite.Linear)
+            {
+                name = "Vision Sight Texture",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+            };
+            sightTexture.Create();
+
+            Vector2 centre = minimap.WorldCentre;
+            float side = minimap.WorldSizeMetres;
+            sightRect = new Vector4(centre.x - side * 0.5f, centre.y - side * 0.5f, side, side);
+
+            fillMaterial = new Material(sightFillShader) { hideFlags = HideFlags.HideAndDontSave };
+            fillMaterial.SetVector("_SightRect", sightRect);
+            fillMaterial.SetFloat("_SightFlipY", SystemInfo.graphicsUVStartsAtTop ? -1f : 1f);
+            fanMesh = new Mesh { name = "Sight Fans", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+            fanMesh.MarkDynamic();
+            drawBuffer = new CommandBuffer { name = "Draw sight" };
+            sightRaycast = SightRaycast;
+        }
+
+        // Sight stops where bullets stop: the Building layer, at this eye's own height.
+        private float? SightRaycast(Vector2 origin, Vector2 direction, float maxDistance)
+        {
+            if (buildingMask < 0)
+                buildingMask = LayerMask.GetMask("Building");
+            return Physics.Raycast(new Vector3(origin.x, currentEyeY, origin.y), new Vector3(direction.x, 0f, direction.y),
+                out RaycastHit hit, maxDistance, buildingMask, QueryTriggerInteraction.Ignore)
+                ? hit.distance : (float?)null;
+        }
+
+        private void LateUpdate()
+        {
+            Shader.SetGlobalFloat("_VisionFogEnabled", FogOn ? 1f : 0f);
+            if (sightTexture == null || !FogOn)
+                return;
+            Refresh();
+            DrawSight();
+            Shader.SetGlobalTexture("_VisionSightTex", sightTexture);
+            Shader.SetGlobalVector("_VisionSightRect", sightRect);
+        }
+
+        // Every eye's fan, from the same eye list CanSee uses, as one mesh drawn white on black.
+        private void DrawSight()
+        {
+            meshVertices.Clear();
+            meshTriangles.Clear();
+            for (int e = 0; e < eyes.Count; e++)
+            {
+                currentEyeY = eyes[e].EyeY;
+                SightPolygon.Build(eyes[e], config.SightRayCount, config.WallRevealDepth, sightRaycast, fan);
+                int first = meshVertices.Count;
+                for (int i = 0; i < fan.Count; i++)
+                    meshVertices.Add(new Vector3(fan[i].x, fan[i].y, 0f));
+                int outline = fan.Count - 1;
+                for (int i = 1; i <= outline; i++)
+                {
+                    meshTriangles.Add(first);
+                    meshTriangles.Add(first + i);
+                    meshTriangles.Add(first + (i % outline) + 1); // the last outline point closes back to the first
+                }
+            }
+
+            fanMesh.Clear();
+            if (meshVertices.Count > 0)
+            {
+                fanMesh.SetVertices(meshVertices);
+                fanMesh.SetTriangles(meshTriangles, 0, false);
+                fanMesh.bounds = new Bounds(Vector3.zero, Vector3.one * 100000f);
+            }
+
+            drawBuffer.Clear();
+            drawBuffer.SetRenderTarget(sightTexture);
+            drawBuffer.ClearRenderTarget(false, true, Color.black);
+            if (meshVertices.Count > 0)
+                drawBuffer.DrawMesh(fanMesh, Matrix4x4.identity, fillMaterial, 0, 0);
+            Graphics.ExecuteCommandBuffer(drawBuffer);
         }
 
         private void OnEnable()

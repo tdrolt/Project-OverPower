@@ -3482,6 +3482,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   config: {fileID: 11400000, guid: 8f976973125e6cc408a4086d6ba10c5d, type: 2}
+  minimap: {fileID: 11400000, guid: 44a96b43500e0ba4c8792be3c65830c2, type: 2}
+  sightFillShader: {fileID: 4800000, guid: 02158f4d0faa9674288c0b1cf3e4c622, type: 3}
 --- !u!114 &8987111587285106385
 MonoBehaviour:
   m_ObjectHideFlags: 0
