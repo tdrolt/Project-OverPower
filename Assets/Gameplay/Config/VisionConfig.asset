@@ -26,7 +26,7 @@ MonoBehaviour:
   zoneOwnersVisibleWithoutSight: 1
   minimapEnemyColour: {r: 0.898, g: 0.282, b: 0.302, a: 1}
   minimapFogDarkness: 0.6
-  minimapSeenLift: 0.2
+  minimapSeenLift: 0.4
   scanIntervalSeconds: 30
   scanWaveSpeed: 40
   scanWaveColour: {r: 0.898, g: 0.282, b: 0.302, a: 1}
