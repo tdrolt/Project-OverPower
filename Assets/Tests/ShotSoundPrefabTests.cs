@@ -24,14 +24,16 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheShotSoundSource_IsFullyThreeDBeyondAFewMetres_AndCentredAtTheShootersOwnSpot()
+        public void TheShotSoundSource_IsCentredWithinACoupleOfMetres_AndFullyThreeDFromAFewMetresOut()
         {
-            // Your own muzzle sits about 1.4 m to your side; fully 3D there would put it almost wholly in one ear. The
+            // Your own muzzle sits well under a metre to your side; fully 3D there would put it almost wholly in one
+            // ear, so the sound stays centred within a couple of metres and only then swings out to its side. The
             // curve's time axis is the fraction of the source's max distance.
             AudioSource source = Source();
             AnimationCurve blend = source.GetCustomCurve(AudioSourceCurveType.SpatialBlend);
             Assert.AreEqual(0f, blend.Evaluate(0f), 1e-3f, "at the shooter's own spot the sound should be centred");
-            Assert.AreEqual(1f, blend.Evaluate(4f / source.maxDistance), 1e-3f, "fully 3D by a few metres");
+            Assert.AreEqual(0f, blend.Evaluate(2f / source.maxDistance), 1e-3f, "still centred a couple of metres out");
+            Assert.AreEqual(1f, blend.Evaluate(4f / source.maxDistance), 1e-3f, "fully 3D from a few metres out");
             Assert.AreEqual(1f, blend.Evaluate(1f), 1e-3f, "fully 3D far out");
         }
 
