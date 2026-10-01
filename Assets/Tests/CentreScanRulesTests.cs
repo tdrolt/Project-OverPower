@@ -594,6 +594,68 @@ namespace Overpower.Tests
             Assert.AreEqual(3, Held(tracker, 3, -50000, 3000).HolderTeam);
         }
 
+        [Test]
+        public void ACorrectionOneSecondIntoTheWave_CatchesNobodyTheFrontAlreadyPassed()
+        {
+            // Late capture news after a lag spike: the front is already 50 m out, so an enemy 10 m from the centre was passed
+            // long ago and must not be caught by the corrected holder.
+            ScanBandTracker tracker = new ScanBandTracker();
+            Held(tracker, 2, 0, 1000);
+            Held(tracker, 2, 0, 1040);
+            ScanFrame late = Held(tracker, 4, 950, 2000);
+            Assert.AreEqual(4, late.HolderTeam);
+            Assert.AreEqual(late.Radius, late.PrevRadius, 0.0001f, "an empty band: nobody behind the front is handed over");
+            Assert.IsFalse(CentreScanRules.FrontSwept(late.PrevRadius, late.Radius, 10f), "10 m out was passed long ago");
+            Assert.IsFalse(CentreScanRules.FrontSwept(late.PrevRadius, late.Radius, 30f), "so was 30 m");
+            ScanFrame next = Held(tracker, 4, 950, 2020);
+            Assert.IsTrue(CentreScanRules.FrontSwept(next.PrevRadius, next.Radius, 51f), "the band carries on from the front the next frame");
+        }
+
+        [Test]
+        public void ACorrectionWithinTheLateGrace_StillRestartsTheBandFromTheCentre()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            Held(tracker, 2, 0, 1000);
+            Held(tracker, 2, 0, 1040);
+            ScanFrame late = Held(tracker, 4, 950, 1000 + ScanBandTracker.LateStampGraceMs);
+            Assert.AreEqual(4, late.HolderTeam);
+            Assert.AreEqual(0f, late.PrevRadius);
+        }
+
+        [Test]
+        public void AfterAReset_ThePreviousRoomsOwnerIsForgotten_SoAJoinerAfterAMidWaveCaptureHasNoHolder()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            Assert.IsFalse(Held(tracker, 2, 0, 990).Active, "team 2 held it in the old room");
+            tracker.Reset();
+            Assert.AreEqual(-1, Held(tracker, 4, 1050, 3000).HolderTeam);
+        }
+
+        [Test]
+        public void ANeutralStampedBeforeTheStart_ButReadAfterIt_CorrectsTheHolderToNobody()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            Assert.AreEqual(2, Held(tracker, 2, 0, 1000).HolderTeam);
+            Held(tracker, 2, 0, 1040);
+            Assert.AreEqual(-1, Held(tracker, -1, 950, 1100).HolderTeam);
+        }
+
+        [Test]
+        public void TheStampComparisonIsWrapSafe_WhenTheServerClockReadsNegative()
+        {
+            int live = int.MaxValue - 4000;
+            int start = unchecked(live + Interval);
+            Assert.Less(start, 0);
+            int stampBefore = unchecked(start - 10000); // wraps to a large positive number, but is 10 s earlier
+            ScanBandTracker joiner = new ScanBandTracker();
+            Assert.AreEqual(5, joiner.Step(live, 5, unchecked(start + 1000), Interval, false, Speed, ScanMax, stampBefore).HolderTeam,
+                            "held since before the start, so the wave is theirs");
+            ScanBandTracker running = new ScanBandTracker();
+            running.Step(live, 5, start, Interval, false, Speed, ScanMax, stampBefore);
+            Assert.AreEqual(5, running.Step(live, 8, unchecked(start + 1000), Interval, false, Speed, ScanMax, unchecked(start + 500)).HolderTeam,
+                            "a capture stamped after the start leaves the wave with the old holder");
+        }
+
         // ---- the schedule follows mLiveAt alone (Task 16 review) ----
 
         [Test]

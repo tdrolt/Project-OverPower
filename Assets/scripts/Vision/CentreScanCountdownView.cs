@@ -11,8 +11,14 @@ namespace Overpower.Vision
     /// the next scan above the tower"). A HUD label, not a world-space one: it is projected from a point above the tower
     /// onto its own screen-overlay canvas (the same pattern as DamageNumberView and MarkIndicatorView), so it keeps one
     /// size on screen however far the camera is zoomed out. The canvas has no GraphicRaycaster, so it can never swallow a
-    /// click (HANDOFF trap 20), sits behind the main HUD (order -20) and is not fogged. The font is UiTheme.font, the size
+    /// click (HANDOFF trap 20), sits behind the main HUD (order -21) and is not fogged. The font is UiTheme.font, the size
     /// UiTheme > Scan Countdown Font Size, the colour the scan wave's red.
+    ///
+    /// SECOND LABEL (Tudor 2026-10-01, pick C): the same text in the same colour sits under the corner minimap, fixed on the
+    /// screen, so the countdown is always readable even when the tower is off screen. It is shown under the same conditions
+    /// as the one above the tower, minus the camera test, and it stays under the CORNER map when M opens the large one: the
+    /// large map is centred and leaves the corner free, so the label never moves or hides behind the map. Its size and
+    /// offset are UiTheme > Scan Minimap Countdown Font Size / Offset.
     ///
     /// LOOK CHOICE: it reads "Scan 12", whole seconds counting down, and keeps counting while a wave is travelling (so it
     /// is simply the time to the next wave: the full interval right as a wave starts). Hidden when CentreScan has no
@@ -27,12 +33,17 @@ namespace Overpower.Vision
         private GameObject canvasGo;
         private RectTransform canvasRect;
         private TextMeshProUGUI label;
+        private TextMeshProUGUI minimapLabel;
         private Material labelMaterial;
+        private Material minimapLabelMaterial;
         private int shownSeconds = -1;
         private string format;
 
         /// <summary>What the label shows now, or empty while it is hidden (recorders read it).</summary>
         public string ShownText => label != null && label.gameObject.activeSelf ? label.text : string.Empty;
+
+        /// <summary>What the label under the corner minimap shows now, or empty while it is hidden (recorders read it).</summary>
+        public string MinimapShownText => minimapLabel != null && minimapLabel.gameObject.activeSelf ? minimapLabel.text : string.Empty;
 
         private void OnDestroy()
         {
@@ -40,6 +51,8 @@ namespace Overpower.Vision
                 Destroy(canvasGo);
             if (labelMaterial != null)
                 Destroy(labelMaterial);
+            if (minimapLabelMaterial != null)
+                Destroy(minimapLabelMaterial);
         }
 
         private void LateUpdate()
@@ -60,20 +73,28 @@ namespace Overpower.Vision
                 return;
             }
 
-            Vector3 screenPoint = cam.WorldToScreenPoint(scan.CountdownPosition);
-            if (screenPoint.z < 0f)
-            {
-                Hide();
-                return;
-            }
-
             if (format == null)
                 format = !string.IsNullOrEmpty(theme.scanCountdownFormat) ? theme.scanCountdownFormat : FallbackFormat;
             if (scan.CountdownSeconds != shownSeconds)
             {
                 shownSeconds = scan.CountdownSeconds;
-                label.text = string.Format(format, shownSeconds); // once a second, so the allocation does not matter
+                string text = string.Format(format, shownSeconds); // once a second, so the allocation does not matter
+                label.text = text;
+                minimapLabel.text = text;
             }
+            minimapLabel.fontSize = theme.scanMinimapCountdownFontSize;
+            minimapLabel.color = config.ScanWaveColour;
+            PlaceUnderCornerMinimap(theme);
+            if (!minimapLabel.gameObject.activeSelf)
+                minimapLabel.gameObject.SetActive(true);
+
+            Vector3 screenPoint = cam.WorldToScreenPoint(scan.CountdownPosition);
+            if (screenPoint.z < 0f)
+            {
+                HideTowerLabel();
+                return;
+            }
+
             label.fontSize = theme.scanCountdownFontSize;
             label.color = config.ScanWaveColour;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPoint, null, out Vector2 local);
@@ -82,9 +103,25 @@ namespace Overpower.Vision
                 label.gameObject.SetActive(true);
         }
 
+        // Straight under the corner minimap's box (top right: margin + frame band in, then the map's size down), centred on it.
+        private void PlaceUnderCornerMinimap(UiTheme theme)
+        {
+            float inset = theme.minimapCornerMargin + theme.minimapFrameWidth;
+            RectTransform rect = minimapLabel.rectTransform;
+            rect.anchoredPosition = new Vector2(-(inset + theme.minimapCornerSize / 2f) + theme.scanMinimapCountdownOffset.x,
+                                                -(inset + theme.minimapCornerSize) + theme.scanMinimapCountdownOffset.y);
+        }
+
         private void Hide()
         {
             shownSeconds = -1;
+            HideTowerLabel();
+            if (minimapLabel != null && minimapLabel.gameObject.activeSelf)
+                minimapLabel.gameObject.SetActive(false);
+        }
+
+        private void HideTowerLabel()
+        {
             if (label != null && label.gameObject.activeSelf)
                 label.gameObject.SetActive(false);
         }
@@ -106,7 +143,7 @@ namespace Overpower.Vision
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = -20;
+            canvas.sortingOrder = -21; // under PlayerHud's hit feedback canvas (-20): a flash of damage draws over the countdown, never under it
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;
@@ -114,25 +151,33 @@ namespace Overpower.Vision
             // No GraphicRaycaster: nothing here is clickable.
             canvasRect = canvasGo.GetComponent<RectTransform>();
 
-            GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
-            go.name = "Countdown Label";
-            go.transform.SetParent(canvasGo.transform, false);
-            label = go.GetComponent<TextMeshProUGUI>();
-            if (theme.font != null)
-                label.font = theme.font; // before the material is touched (assigning a font swaps the material)
-            label.fontStyle = FontStyles.Bold;
-            label.alignment = TextAlignmentOptions.Center;
-            label.enableWordWrapping = false;
-            label.raycastTarget = false;
-            labelMaterial = new Material(label.fontSharedMaterial);
-            theme.ApplyHudTextStyle(labelMaterial);
-            label.fontSharedMaterial = labelMaterial;
-            RectTransform rect = label.rectTransform;
-            rect.sizeDelta = new Vector2(400f, 80f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            label.gameObject.SetActive(false);
+            label = NewLabel("Countdown Label", theme, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), out labelMaterial);
+            // Under the corner minimap: anchored to the top right with its top edge at the point PlaceUnderCornerMinimap sets.
+            minimapLabel = NewLabel("Minimap Countdown Label", theme, Vector2.one, new Vector2(0.5f, 1f), out minimapLabelMaterial);
             return true;
+        }
+
+        private TextMeshProUGUI NewLabel(string name, UiTheme theme, Vector2 anchor, Vector2 pivot, out Material material)
+        {
+            GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
+            go.name = name;
+            go.transform.SetParent(canvasGo.transform, false);
+            TextMeshProUGUI text = go.GetComponent<TextMeshProUGUI>();
+            if (theme.font != null)
+                text.font = theme.font; // before the material is touched (assigning a font swaps the material)
+            text.fontStyle = FontStyles.Bold;
+            text.alignment = TextAlignmentOptions.Center;
+            text.enableWordWrapping = false;
+            text.raycastTarget = false;
+            material = new Material(text.fontSharedMaterial);
+            theme.ApplyHudTextStyle(material);
+            text.fontSharedMaterial = material;
+            RectTransform rect = text.rectTransform;
+            rect.sizeDelta = new Vector2(400f, 80f);
+            rect.pivot = pivot;
+            rect.anchorMin = rect.anchorMax = anchor;
+            go.SetActive(false);
+            return text;
         }
     }
 }

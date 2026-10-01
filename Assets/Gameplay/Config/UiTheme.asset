@@ -231,6 +231,10 @@ MonoBehaviour:
   minimapOwnedLinkWidth: 4
   minimapNeutralLinkWidth: 2
   minimapScanRingWidth: 2.5
+  scanCountdownFormat: Scan {0}
+  scanCountdownFontSize: 28
+  scanMinimapCountdownFontSize: 22
+  scanMinimapCountdownOffset: {x: 0, y: -4}
   minimapArrowheadSize: 12
   minimapOwnMarkerSize: 18
   minimapPackBadgeSize: 12

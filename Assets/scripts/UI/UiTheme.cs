@@ -709,6 +709,12 @@ namespace Overpower.UI
         [Tooltip("Text size of the countdown above the centre tower, in reference pixels (1080p). It is a HUD label, so it keeps " +
                  "the same size on screen however far the camera is zoomed out. Bigger reads better but covers more of the view.")]
         [Min(1f)] public float scanCountdownFontSize = 28f;
+        [Tooltip("Text size of the second countdown, the one fixed under the corner minimap, in reference pixels (1080p). Same words " +
+                 "and colour as the one above the tower; it is always on screen while there is a scan, so it can stay smaller.")]
+        [Min(1f)] public float scanMinimapCountdownFontSize = 22f;
+        [Tooltip("Where that countdown sits relative to the spot straight under the middle of the corner minimap, in canvas units: " +
+                 "x moves it right, y moves it up (a negative y moves it further down, away from the map).")]
+        public Vector2 scanMinimapCountdownOffset = new Vector2(0f, -4f);
         [Tooltip("Size of a way-in arrowhead, in canvas units. It points from a team's zone toward the neutral zone next to it.")]
         public float minimapArrowheadSize = 12f;
         [Tooltip("Size of your own arrow on the minimap, in canvas units. It points where you face.")]

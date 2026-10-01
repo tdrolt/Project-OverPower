@@ -35,14 +35,14 @@ namespace Overpower.Vision
             return unchecked((int)(now - now % (uint)intervalMs));
         }
 
-        /// <summary>The start of the next wave after nowMs (what the countdown above the tower counts to). Live: one interval
-        /// after the latest wave, or after go-live while none has gone out yet. Warm-up: the next multiple of the interval.
-        /// With an interval of 0 or less it is nowMs.</summary>
         /// <summary>The go-live time the schedule runs on, from the room's mLiveAt alone (0 = not announced yet): from the moment
         /// it is announced, the countdown included, waves are at liveAt + k x interval, so there is no wave during the countdown
         /// and the label counts straight to the first live wave. Null (the warm-up clock) while it is 0.</summary>
         public static int? LiveSchedule(int liveAtMs) => liveAtMs != 0 ? liveAtMs : (int?)null;
 
+        /// <summary>The start of the next wave after nowMs (what the countdown above the tower counts to). Live: one interval
+        /// after the latest wave, or after go-live while none has gone out yet. Warm-up: the next multiple of the interval.
+        /// With an interval of 0 or less it is nowMs.</summary>
         public static int NextScanStart(int? liveAtMs, int nowMs, int intervalMs)
         {
             if (intervalMs <= 0)
@@ -211,8 +211,10 @@ namespace Overpower.Vision
                 if (canCorrect && heldAtStart && ownerNow != lastHolder)
                 {
                     // A capture made before the start reached this client after it: the wave was theirs all along.
+                    // The band restarts from 0 only within the late grace; later, the front has long passed whoever is behind
+                    // it, so the corrected holder gets an empty band for this frame (as a joiner does) and carries on from the front.
                     lastHolder = ownerNow;
-                    prevRadius = 0f;
+                    prevRadius = unchecked(nowMs - start) <= LateStampGraceMs ? 0f : radius;
                 }
             }
             else
