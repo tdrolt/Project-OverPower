@@ -224,13 +224,22 @@ namespace Overpower.UI
             GameObject group = new GameObject("Armor Rows", typeof(RectTransform));
             group.transform.SetParent(page, false);
             HorizontalLayoutGroup layout = group.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = theme.loadoutArmorRowGap;
+            layout.spacing = theme.loadoutNodeSpacing; // Between the rows group, the spacer and Reset Armor.
             layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
-            absorbText = BuildArmorRow(group.transform, out absorbButton, OnAbsorbClicked, "armor:absorb", () => ArmorPopUpText(true));
-            rechargeText = BuildArmorRow(group.transform, out rechargeButton, OnRechargeClicked, "armor:recharge", () => ArmorPopUpText(false));
+            // The two rows sit in their own group, so the wide Armor Row Gap is only between them, not around the spacer.
+            GameObject rows = new GameObject("Armor Rows Inner", typeof(RectTransform));
+            rows.transform.SetParent(group.transform, false);
+            HorizontalLayoutGroup rowsLayout = rows.AddComponent<HorizontalLayoutGroup>();
+            rowsLayout.spacing = theme.loadoutArmorRowGap;
+            rowsLayout.childAlignment = TextAnchor.MiddleLeft;
+            rowsLayout.childControlWidth = rowsLayout.childControlHeight = true;
+            rowsLayout.childForceExpandWidth = rowsLayout.childForceExpandHeight = false;
+
+            absorbText = BuildArmorRow(rows.transform, out absorbButton, OnAbsorbClicked, "armor:absorb", () => ArmorPopUpText(true));
+            rechargeText = BuildArmorRow(rows.transform, out rechargeButton, OnRechargeClicked, "armor:recharge", () => ArmorPopUpText(false));
 
             // Pushes Reset Armor to the right edge, so the free width is not spread between the two rows.
             GameObject spacer = new GameObject("Armor Rows Spacer", typeof(RectTransform));
@@ -671,7 +680,7 @@ namespace Overpower.UI
             if (width > 0f || height > 0f)
             {
                 LayoutElement le = go.AddComponent<LayoutElement>();
-                if (width > 0f) le.preferredWidth = width;
+                if (width > 0f) { le.preferredWidth = width; le.minWidth = width; } // Keeps its width when space runs short.
                 if (height > 0f) le.preferredHeight = height;
             }
 

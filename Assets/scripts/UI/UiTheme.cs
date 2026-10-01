@@ -315,7 +315,7 @@ namespace Overpower.UI
         public float loadoutAbilityCardHeight = 88f;
         [Tooltip("Horizontal space between the Mobility, Attachment and Ultimate columns on the Abilities & Armor page, in canvas units.")]
         public float loadoutAbilityColumnGap = 60f;
-        [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the Absorb row, the Recharge row and Reset Armor, in canvas units.")]
+        [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the armor rows and Reset Armor, in canvas units.")]
         public float loadoutNodeSpacing = 20f;
         [Tooltip("Gap between an armor upgrade's text (Absorb, Recharge) and its own + button, in canvas units. Keep it much smaller than Armor Row Gap, so each + reads as part of the text before it.")]
         public float loadoutArmorPlusGap = 12f;
