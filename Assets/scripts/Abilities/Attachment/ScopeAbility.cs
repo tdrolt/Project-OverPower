@@ -71,6 +71,7 @@ namespace Overpower.Abilities
         // Owner only: whether the sight is the scoped one right now, and the last value written to the Player Property.
         private bool holdingSight;
         private bool publishedScoped;
+        private bool seededFromRoom;
 
         /// <summary>True while the Scope is held and the player can act. The owner mirrors it to every client as the Player
         /// Property vScp (ScopeSightProperty); a remote copy of this module never changes it.</summary>
@@ -133,6 +134,13 @@ namespace Overpower.Abilities
         private void SetHoldingSight(bool value)
         {
             holdingSight = value;
+            if (!seededFromRoom && Owner != null && Owner.PhotonView != null && Owner.IsMine && PhotonNetwork.InRoom)
+            {
+                // First tick in a room: a stale vScp=true left by a drop while scoped counts as published, so it is overwritten.
+                seededFromRoom = true;
+                PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScopeSightProperty.Key, out object roomValue);
+                publishedScoped = ScopeSightProperty.SeedPublished(roomValue);
+            }
             if (!ScopeSightProperty.ShouldPublish(publishedScoped, value))
                 return;
             if (Owner == null || Owner.PhotonView == null || !Owner.IsMine || !PhotonNetwork.InRoom)

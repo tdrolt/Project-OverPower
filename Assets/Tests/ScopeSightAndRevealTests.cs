@@ -87,6 +87,22 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void AStaleScopedValueInTheRoomIsCorrectedWhenNotHoldingAfterARejoin()
+        {
+            // A drop while scoped keeps vScp=true in the Player Properties; the new module starts by assuming what the room says.
+            bool seeded = ScopeSightProperty.SeedPublished(true);
+            Assert.IsTrue(seeded);
+            Assert.IsTrue(ScopeSightProperty.ShouldPublish(seeded, false), "not holding, so the stale true is overwritten with false");
+        }
+
+        [Test]
+        public void ARoomWithNoValueSeedsAsNotScopedAndWritesNothingWhileNotHolding()
+        {
+            bool seeded = ScopeSightProperty.SeedPublished(null);
+            Assert.IsFalse(ScopeSightProperty.ShouldPublish(seeded, false));
+        }
+
+        [Test]
         public void GivingUpAMatchRemovesTheScopeFlag()
         {
             var resets = MatchPropertyReset.Build();
