@@ -65,8 +65,9 @@ namespace Overpower.Vision
             return ageSeconds <= fadeStart ? 1f : Mathf.Clamp01((lifeSeconds - ageSeconds) / fade);
         }
 
-        /// <summary>Who gets the scan on their maps and the dots: the team that holds the centre (while spectating, the watched
-        /// team, which is what the friendly team is then). Nobody before a team is known, nobody while the centre has no holder.</summary>
+        /// <summary>Who gets the scan on their maps and the dots: the team the wave belongs to, i.e. the one that held the centre when
+        /// the wave started (while spectating, the watched team, which is what the friendly team is then). Nobody before a team is known,
+        /// nobody when the centre was neutral at the start of the wave.</summary>
         public static bool SeesScan(int friendlyTeam, int holderTeam)
         {
             return friendlyTeam >= 0 && friendlyTeam == holderTeam;

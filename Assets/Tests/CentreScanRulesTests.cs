@@ -6,9 +6,10 @@ using Overpower.Vision;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Vision Task 10 (Tudor 2026-09-30): while a team holds the centre a sonar wave goes out at capture and every
-    /// interval after, fast, through walls. An enemy is caught each time the front passes over where they are now.
-    /// Every number here is the test's own; none is the tuned value.
+    /// Vision Task 10 (Tudor 2026-09-30): a sonar wave goes out fast, through walls; an enemy is caught each time the front
+    /// passes over where they are now. Vision Task 16 (Tudor 2026-10-01): the waves are on a fixed clock (every interval from
+    /// go-live, or on server-clock multiples in the warm-up), whoever holds the centre; the team holding it when a wave
+    /// starts owns that wave, nobody if it is neutral then. Every number here is the test's own; none is the tuned value.
     /// </summary>
     public class CentreScanRulesTests
     {
@@ -37,64 +38,131 @@ namespace Overpower.Tests
             }
         }
 
-        // ---- when a scan happens ----
+        // ---- when a scan happens (the fixed clock) ----
+
+        private const int LiveAt = 1000;
 
         [Test]
-        public void TheFirstScanStartsTheMomentTheCentreIsCaptured()
+        public void LiveWaves_TheFirstIsOneIntervalAfterGoLive()
         {
-            Assert.IsTrue(CentreScanRules.ActiveScan(Team, 5000, 5000, Interval, false, out int start));
-            Assert.AreEqual(5000, start);
+            Assert.IsNull(CentreScanRules.ScanStart(LiveAt, LiveAt, Interval));
+            Assert.IsNull(CentreScanRules.ScanStart(LiveAt, LiveAt + Interval - 1, Interval));
+            Assert.AreEqual(LiveAt + Interval, CentreScanRules.ScanStart(LiveAt, LiveAt + Interval, Interval));
         }
 
         [Test]
-        public void TheScanKeepsItsStartTimeUntilAFullIntervalHasPassed()
+        public void LiveWaves_AWaveKeepsItsStartUntilAFullIntervalHasPassed()
         {
-            Assert.IsTrue(CentreScanRules.ActiveScan(Team, 5000, 5000 + Interval - 1, Interval, false, out int start));
-            Assert.AreEqual(5000, start);
+            Assert.AreEqual(LiveAt + Interval, CentreScanRules.ScanStart(LiveAt, LiveAt + 2 * Interval - 1, Interval));
+            Assert.AreEqual(LiveAt + 2 * Interval, CentreScanRules.ScanStart(LiveAt, LiveAt + 2 * Interval, Interval));
         }
 
         [Test]
-        public void TheNextScanStartsOneIntervalAfterCapture()
+        public void LiveWaves_TheLatestIsReturnedManyIntervalsLater()
         {
-            Assert.IsTrue(CentreScanRules.ActiveScan(Team, 5000, 5000 + Interval, Interval, false, out int start));
-            Assert.AreEqual(5000 + Interval, start);
+            Assert.AreEqual(LiveAt + 3 * Interval, CentreScanRules.ScanStart(LiveAt, LiveAt + 3 * Interval + 7, Interval));
         }
 
         [Test]
-        public void TheLatestScanIsTheOneReturnedManyIntervalsLater()
+        public void LiveWaves_AClockReadingBeforeGoLiveHasNoWave()
         {
-            Assert.IsTrue(CentreScanRules.ActiveScan(Team, 5000, 5000 + 3 * Interval + 7, Interval, false, out int start));
-            Assert.AreEqual(5000 + 3 * Interval, start);
+            Assert.IsNull(CentreScanRules.ScanStart(LiveAt, LiveAt - 10, Interval));
         }
 
         [Test]
-        public void NoScanWhileTheCentreIsNeutral()
+        public void WarmUpWaves_AreOnWholeMultiplesOfTheIntervalOnTheServerClock()
         {
-            Assert.IsFalse(CentreScanRules.ActiveScan(-1, 5000, 9000, Interval, false, out _));
+            Assert.AreEqual(3 * Interval, CentreScanRules.ScanStart(null, 3 * Interval + 7, Interval));
+            Assert.AreEqual(3 * Interval, CentreScanRules.ScanStart(null, 3 * Interval, Interval));
+            Assert.AreEqual(2 * Interval, CentreScanRules.ScanStart(null, 3 * Interval - 1, Interval));
+        }
+
+        [Test]
+        public void WarmUpWaves_StillLineUpWhenTheServerClockReadsNegative()
+        {
+            // Photon's 32-bit clock reads as a negative int after 2^31 ms; every client must still agree on the same multiple.
+            int now = unchecked((int)(uint.MaxValue - 5));
+            Assert.Less(now, 0);
+            uint u = unchecked((uint)now);
+            int expected = unchecked((int)(u - u % (uint)Interval));
+            Assert.AreEqual(expected, CentreScanRules.ScanStart(null, now, Interval));
+        }
+
+        [Test]
+        public void LiveWaves_TheServerClockWrappingAroundDoesNotBreakTheSchedule()
+        {
+            int live = int.MaxValue - 4000; // the match went live just before the 32-bit server clock wraps
+            int now = unchecked(live + Interval + 500);
+            Assert.Less(now, 0, "the test needs a clock that has wrapped");
+            Assert.AreEqual(unchecked(live + Interval), CentreScanRules.ScanStart(live, now, Interval));
+            Assert.AreEqual(unchecked(live + 2 * Interval), CentreScanRules.NextScanStart(live, now, Interval));
+        }
+
+        [Test]
+        public void NoWaveWithAnIntervalOfZeroOrLess()
+        {
+            Assert.IsNull(CentreScanRules.ScanStart(null, 5000, 0));
+            Assert.IsNull(CentreScanRules.ScanStart(LiveAt, 99999, -5));
+        }
+
+        [Test]
+        public void TheNextWave_LiveBeforeTheFirstIsOneIntervalAfterGoLive()
+        {
+            Assert.AreEqual(LiveAt + Interval, CentreScanRules.NextScanStart(LiveAt, LiveAt + 5, Interval));
+            Assert.AreEqual(LiveAt + Interval, CentreScanRules.NextScanStart(LiveAt, LiveAt - 10, Interval));
+        }
+
+        [Test]
+        public void TheNextWave_LiveAfterAWaveIsOneIntervalLater()
+        {
+            Assert.AreEqual(LiveAt + 2 * Interval, CentreScanRules.NextScanStart(LiveAt, LiveAt + Interval + 1, Interval));
+            Assert.AreEqual(LiveAt + 2 * Interval, CentreScanRules.NextScanStart(LiveAt, LiveAt + 2 * Interval - 1, Interval));
+            Assert.AreEqual(LiveAt + 3 * Interval, CentreScanRules.NextScanStart(LiveAt, LiveAt + 2 * Interval, Interval));
+        }
+
+        [Test]
+        public void TheNextWave_WarmUpIsTheNextMultiple()
+        {
+            Assert.AreEqual(4 * Interval, CentreScanRules.NextScanStart(null, 3 * Interval + 7, Interval));
+            Assert.AreEqual(4 * Interval, CentreScanRules.NextScanStart(null, 3 * Interval, Interval));
+            Assert.AreEqual(3 * Interval, CentreScanRules.NextScanStart(null, 3 * Interval - 1, Interval));
+        }
+
+        [Test]
+        public void TheCountdownShowsWholeSecondsRoundedUp()
+        {
+            Assert.AreEqual(10, CentreScanRules.CountdownSecondsShown(10000));
+            Assert.AreEqual(10, CentreScanRules.CountdownSecondsShown(9001));
+            Assert.AreEqual(9, CentreScanRules.CountdownSecondsShown(9000));
+            Assert.AreEqual(1, CentreScanRules.CountdownSecondsShown(1));
+            Assert.AreEqual(0, CentreScanRules.CountdownSecondsShown(0));
+            Assert.AreEqual(0, CentreScanRules.CountdownSecondsShown(-40));
+        }
+
+        [Test]
+        public void TheCountdownResetsAtEachWave()
+        {
+            int justBefore = 3 * Interval - 1;
+            int atWave = 3 * Interval;
+            Assert.AreEqual(1, CentreScanRules.CountdownSecondsShown(unchecked(CentreScanRules.NextScanStart(null, justBefore, Interval) - justBefore)));
+            Assert.AreEqual(10, CentreScanRules.CountdownSecondsShown(unchecked(CentreScanRules.NextScanStart(null, atWave, Interval) - atWave)));
+        }
+
+        [Test]
+        public void ActiveScan_IsTheClocksWave_NeverDependingOnAHolder()
+        {
+            Assert.IsTrue(CentreScanRules.ActiveScan(LiveAt, LiveAt + Interval + 5, Interval, false, out int start));
+            Assert.AreEqual(LiveAt + Interval, start);
+            Assert.IsTrue(CentreScanRules.ActiveScan(null, 3 * Interval + 5, Interval, false, out start));
+            Assert.AreEqual(3 * Interval, start);
+            Assert.IsFalse(CentreScanRules.ActiveScan(LiveAt, LiveAt + 5, Interval, false, out _), "live, before the first wave");
         }
 
         [Test]
         public void NoScanOnceTheMapHasShrunk()
         {
-            Assert.IsFalse(CentreScanRules.ActiveScan(Team, 5000, 9000, Interval, true, out _));
-        }
-
-        [Test]
-        public void ARuleReadBeforeTheCaptureMomentStillStartsAtTheCapture()
-        {
-            // A client whose clock reads a few ms behind the stamp must not see a scan from the past.
-            Assert.IsTrue(CentreScanRules.ActiveScan(Team, 5000, 4990, Interval, false, out int start));
-            Assert.AreEqual(5000, start);
-        }
-
-        [Test]
-        public void TheServerClockWrappingAroundDoesNotBreakTheSchedule()
-        {
-            int held = int.MaxValue - 4000; // captured just before the 32-bit server clock wraps
-            int now = unchecked(held + Interval + 500);
-            Assert.Less(now, 0, "the test needs a clock that has wrapped");
-            Assert.IsTrue(CentreScanRules.ActiveScan(Team, held, now, Interval, false, out int start));
-            Assert.AreEqual(unchecked(held + Interval), start);
+            Assert.IsFalse(CentreScanRules.ActiveScan(LiveAt, LiveAt + 3 * Interval, Interval, true, out _));
+            Assert.IsFalse(CentreScanRules.ActiveScan(null, 3 * Interval, Interval, true, out _));
         }
 
         [Test]
@@ -208,13 +276,14 @@ namespace Overpower.Tests
             private readonly ScanBandTracker tracker = new ScanBandTracker();
             public int Caught;
             public ScanFrame Last;
-            public int Holder = Team;
-            public int HeldSince = 1000;
+            public int Owner = Team;          // who owns the centre right now
+            public int? LiveAtMs = 1000 - Interval; // waves at 1000, 1000 + Interval, ...
+            public bool Cut;
 
             public void Step(int now, float distance)
             {
-                Last = tracker.Step(Holder, HeldSince, now, Interval, false, Speed, ScanMax);
-                if (Last.Holding && CentreScanRules.FrontSwept(Last.PrevRadius, Last.Radius, distance)) Caught++;
+                Last = tracker.Step(LiveAtMs, Owner, now, Interval, Cut, Speed, ScanMax);
+                if (Last.Active && CentreScanRules.FrontSwept(Last.PrevRadius, Last.Radius, distance)) Caught++;
             }
         }
 
@@ -240,16 +309,16 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ANewHolder_StartsAFreshBandFromZero()
+        public void ACaptureMidWave_DoesNotRestartTheBand_AndTheWaveKeepsItsHolder()
         {
-            TrackedCatcher c = new TrackedCatcher();
+            TrackedCatcher c = new TrackedCatcher { Owner = 5 };
             for (int t = 1000; t < 4000; t += Frame) c.Step(t, 30f);
-            c.Holder = 5;
-            c.HeldSince = 4000;
-            c.Step(4100, 2f); // 100 ms into the new holder's scan: front at 5 m, the player at 2 m is inside the new band
-            Assert.AreEqual(0f, c.Last.PrevRadius, 0.0001f);
-            Assert.AreEqual(5f, c.Last.Radius, 0.001f);
-            Assert.AreEqual(2, c.Caught, "once for the first holder's wave over 30 m, once for the new holder's wave over 2 m");
+            Assert.AreEqual(1, c.Caught);
+            c.Owner = 7; // captured 3 s into the wave
+            c.Step(4000, 30f);
+            Assert.AreEqual(5, c.Last.HolderTeam, "that wave still belongs to the team that held the centre when it began");
+            Assert.AreEqual(Speed * 2.98f, c.Last.PrevRadius, 0.01f, "the band carries on, it does not start again from 0");
+            Assert.AreEqual(1, c.Caught);
         }
 
         [Test]
@@ -257,17 +326,6 @@ namespace Overpower.Tests
         {
             TrackedCatcher c = new TrackedCatcher();
             for (int t = 1000; t <= 1000 + Interval; t += 500) c.Step(t, 30f);
-            Assert.AreEqual(1, c.Caught);
-        }
-
-        [Test]
-        public void ALateCaptureStamp_StillCatchesAPlayerStandingInTheCentre()
-        {
-            // The stamp arrives 100 ms after the capture moment: the first frame this client sees is 5 m into the wave.
-            TrackedCatcher c = new TrackedCatcher();
-            c.Step(1100, 3f);
-            Assert.AreEqual(1, c.Caught);
-            for (int t = 1120; t < 1000 + Interval - Frame; t += Frame) c.Step(t, 3f);
             Assert.AreEqual(1, c.Caught);
         }
 
@@ -296,20 +354,21 @@ namespace Overpower.Tests
             c.Step(1020, 0.5f);
             Assert.AreEqual(1, c.Caught);
             c.Step(0, 0.5f);
-            Assert.IsFalse(c.Last.Holding);
+            Assert.IsFalse(c.Last.Active);
             c.Step(1040, 0.5f);
             Assert.AreEqual(1, c.Caught, "the frame after the zero continues from 1020, not from 0");
             Assert.AreEqual(1f, c.Last.PrevRadius, 0.001f);
         }
 
         [Test]
-        public void AfterTheMapShrinks_NoFrameHoldsAScan_AndANewCaptureStartsClean()
+        public void AfterTheMapShrinks_NoFrameIsActive_AndTheNextWaveStartsClean()
         {
             ScanBandTracker tracker = new ScanBandTracker();
-            tracker.Step(Team, 1000, 2000, Interval, false, Speed, ScanMax);
-            Assert.IsFalse(tracker.Step(Team, 1000, 2020, Interval, true, Speed, ScanMax).Holding);
-            Assert.IsFalse(tracker.Step(-1, 1000, 2040, Interval, false, Speed, ScanMax).Holding);
-            ScanFrame fresh = tracker.Step(Team, 3000, 3040, Interval, false, Speed, ScanMax);
+            tracker.Step(1000 - Interval, Team, 2000, Interval, false, Speed, ScanMax);
+            Assert.IsFalse(tracker.Step(1000 - Interval, Team, 2020, Interval, true, Speed, ScanMax).Active);
+            Assert.IsFalse(tracker.Step(1000 - Interval, -1, 2040, Interval, true, Speed, ScanMax).Active);
+            ScanFrame fresh = tracker.Step(1000 - Interval, Team, 1000 + Interval + 40, Interval, false, Speed, ScanMax);
+            Assert.IsTrue(fresh.Active);
             Assert.AreEqual(0f, fresh.PrevRadius, 0.0001f);
             Assert.AreEqual(2f, fresh.Radius, 0.001f);
         }
@@ -320,10 +379,11 @@ namespace Overpower.Tests
             // The client left the room (or the scan was switched off): the next frame starts clean, and a frame long after
             // the scan began is a joiner's, who is not handed every enemy behind the front.
             ScanBandTracker tracker = new ScanBandTracker();
-            tracker.Step(Team, 1000, 1000, Interval, false, Speed, ScanMax);
-            tracker.Step(Team, 1000, 1020, Interval, false, Speed, ScanMax);
+            int live = 1000 - Interval;
+            tracker.Step(live, Team, 1000, Interval, false, Speed, ScanMax);
+            tracker.Step(live, Team, 1020, Interval, false, Speed, ScanMax);
             tracker.Reset();
-            ScanFrame f = tracker.Step(Team, 1000, 4000, Interval, false, Speed, ScanMax);
+            ScanFrame f = tracker.Step(live, Team, 4000, Interval, false, Speed, ScanMax);
             Assert.AreEqual(f.Radius, f.PrevRadius, 0.0001f);
         }
 
@@ -338,8 +398,8 @@ namespace Overpower.Tests
             while (now < 1000 + 3 * Interval)
             {
                 now += 7 + (step++ * 13) % 40; // 7..46 ms, uneven like real frames
-                ScanFrame f = tracker.Step(Team, 1000, now, Interval, false, Speed, ScanMax);
-                if (!f.Holding) continue;
+                ScanFrame f = tracker.Step(1000 - Interval, Team, now, Interval, false, Speed, ScanMax);
+                if (!f.Active) continue;
                 List<int> zones = new List<int>();
                 CentreScanRules.ZonesToRefresh(f.PrevRadius, f.Radius, Centre, Positions, Tiers, true, true, true, true, zones);
                 int scan = Mathf.Min(2, (now - 1000) / Interval);
@@ -349,27 +409,28 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ALateStampAfterANeutralFrame_StillCatchesTheEnemiesAlreadyInTheCentre()
+        public void AWaveSeenLateAfterAFrameWithNoWave_StillStartsFromZero()
         {
-            // The centre was neutral, a team captures it, and the stamp reaches this client 800 ms late (a wifi spike): the
+            // Live, before the first wave: no scan. A hitch then delays the first frame past the wave's start by 800 ms. The
             // client saw no scan the frame before, so this is not a mid-wave join and the band starts from 0.
             ScanBandTracker tracker = new ScanBandTracker();
-            tracker.Step(-1, 0, 1900, Interval, false, Speed, ScanMax);
-            ScanFrame f = tracker.Step(Team, 1000, 1800 + 100, Interval, false, Speed, ScanMax);
-            ScanFrame late = tracker.Step(Team, 1000, 2000, Interval, false, Speed, ScanMax);
-            Assert.AreEqual(0f, f.PrevRadius, 0.0001f, "the first frame with the stamp starts from 0, however late");
-            Assert.IsTrue(CentreScanRules.FrontSwept(f.PrevRadius, f.Radius, 20f), "an enemy 20 m out at capture is caught");
-            Assert.Greater(late.PrevRadius, 0f);
+            Assert.IsFalse(tracker.Step(0, -1, Interval - 20, Interval, false, Speed, ScanMax).Active);
+            ScanFrame f = tracker.Step(0, -1, Interval + 800, Interval, false, Speed, ScanMax);
+            ScanFrame next = tracker.Step(0, -1, Interval + 820, Interval, false, Speed, ScanMax);
+            Assert.IsTrue(f.Active);
+            Assert.AreEqual(0f, f.PrevRadius, 0.0001f, "the first frame of the wave starts from 0, however late");
+            Assert.IsTrue(CentreScanRules.FrontSwept(f.PrevRadius, f.Radius, 20f), "an enemy 20 m out is caught");
+            Assert.Greater(next.PrevRadius, 0f);
         }
 
         [Test]
         public void AFirstFrameAfterAResetWithin300ms_IsCaught_AndOneMsLaterIsNot()
         {
             ScanBandTracker tracker = new ScanBandTracker();
-            ScanFrame inside = tracker.Step(Team, 1000, 1300, Interval, false, Speed, ScanMax);
+            ScanFrame inside = tracker.Step(1000 - Interval, Team, 1300, Interval, false, Speed, ScanMax);
             Assert.AreEqual(0f, inside.PrevRadius, 0.0001f);
             tracker.Reset();
-            ScanFrame outside = tracker.Step(Team, 1000, 1301, Interval, false, Speed, ScanMax);
+            ScanFrame outside = tracker.Step(1000 - Interval, Team, 1301, Interval, false, Speed, ScanMax);
             Assert.AreEqual(outside.Radius, outside.PrevRadius, 0.0001f);
         }
 
@@ -377,14 +438,104 @@ namespace Overpower.Tests
         public void TheWaveStopsTravellingPastTheFarthestPoint_ButTheLastBandIsStillSwept()
         {
             ScanBandTracker tracker = new ScanBandTracker();
-            tracker.Step(Team, 1000, 1000, Interval, false, Speed, ScanMax);
-            tracker.Step(Team, 1000, 3300, Interval, false, Speed, ScanMax); // front at 115 m
-            ScanFrame f = tracker.Step(Team, 1000, 3400, Interval, false, Speed, ScanMax); // front at 120 m, still inside
+            int live = 1000 - Interval;
+            tracker.Step(live, Team, 1000, Interval, false, Speed, ScanMax);
+            tracker.Step(live, Team, 3300, Interval, false, Speed, ScanMax); // front at 115 m
+            ScanFrame f = tracker.Step(live, Team, 3400, Interval, false, Speed, ScanMax); // front at 120 m, still inside
             Assert.IsTrue(f.Travelling);
-            f = tracker.Step(Team, 1000, 3500, Interval, false, Speed, ScanMax); // front at 125 m
+            f = tracker.Step(live, Team, 3500, Interval, false, Speed, ScanMax); // front at 125 m
             Assert.IsFalse(f.Travelling);
             Assert.IsFalse(CentreScanRules.FrontSwept(f.PrevRadius, f.Radius, 120f), "120 m was caught the frame before");
             Assert.IsTrue(CentreScanRules.FrontSwept(f.PrevRadius, f.Radius, 122f));
+        }
+
+        // ---- who the wave belongs to (Task 16) ----
+
+        private static ScanFrame At(ScanBandTracker tracker, int owner, int now) =>
+            tracker.Step(1000 - Interval, owner, now, Interval, false, Speed, ScanMax);
+
+        [Test]
+        public void ANeutralCentreAtTheStart_MeansNobodyOwnsThatWave_ButItStillRollsOut()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            ScanFrame f = At(tracker, -1, 1000);
+            Assert.IsTrue(f.Active);
+            Assert.AreEqual(-1, f.HolderTeam);
+            f = At(tracker, -1, 1500);
+            Assert.IsTrue(f.Travelling);
+            Assert.AreEqual(-1, f.HolderTeam);
+        }
+
+        [Test]
+        public void ACaptureMidWave_DoesNotGiveThatWaveToTheCapturer_ButTheNextWaveIsTheirs()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            Assert.AreEqual(-1, At(tracker, -1, 1000).HolderTeam);
+            Assert.AreEqual(-1, At(tracker, 4, 2000).HolderTeam, "captured one second into a neutral wave");
+            Assert.AreEqual(-1, At(tracker, 4, 1000 + Interval - 20).HolderTeam);
+            Assert.AreEqual(4, At(tracker, 4, 1000 + Interval).HolderTeam, "the next wave starts with team 4 holding");
+        }
+
+        [Test]
+        public void ALossMidWave_KeepsThatWaveWithTheTeamThatHeldItAtTheStart()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            Assert.AreEqual(2, At(tracker, 2, 1000).HolderTeam);
+            Assert.AreEqual(2, At(tracker, 6, 2500).HolderTeam, "team 6 took it mid-wave");
+            Assert.AreEqual(2, At(tracker, -1, 3000).HolderTeam, "even if it went neutral");
+            Assert.AreEqual(6, At(tracker, 6, 1000 + Interval).HolderTeam);
+        }
+
+        [Test]
+        public void ANeutralStartAfterAHeldWave_HasNoHolder()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            Assert.AreEqual(2, At(tracker, 2, 1000).HolderTeam);
+            Assert.AreEqual(-1, At(tracker, -1, 1000 + Interval).HolderTeam);
+        }
+
+        [Test]
+        public void SomeoneJoiningMidWave_UsesTheOwnerTheyReadThen()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            ScanFrame f = At(tracker, 3, 1000 + 4000);
+            Assert.IsTrue(f.Active);
+            Assert.AreEqual(3, f.HolderTeam);
+            Assert.AreEqual(3, At(tracker, 9, 1000 + 4020).HolderTeam, "and then keeps it for the rest of that wave");
+        }
+
+        [Test]
+        public void AfterACut_ThereIsNoWaveAndNoHolder()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            Assert.AreEqual(2, At(tracker, 2, 1000).HolderTeam);
+            ScanFrame cut = tracker.Step(1000 - Interval, 2, 1000 + Interval, Interval, true, Speed, ScanMax);
+            Assert.IsFalse(cut.Active);
+            Assert.AreEqual(-1, cut.HolderTeam);
+        }
+
+        [Test]
+        public void TheHolderIsDecidedAcrossAClockWrap()
+        {
+            int live = int.MaxValue - 4000;
+            ScanBandTracker tracker = new ScanBandTracker();
+            int start = unchecked(live + Interval);
+            Assert.Less(start, 0);
+            Assert.IsFalse(tracker.Step(live, 5, unchecked(start - 20), Interval, false, Speed, ScanMax).Active);
+            Assert.AreEqual(5, tracker.Step(live, 5, start, Interval, false, Speed, ScanMax).HolderTeam);
+            Assert.AreEqual(5, tracker.Step(live, 8, unchecked(start + 1000), Interval, false, Speed, ScanMax).HolderTeam);
+            Assert.AreEqual(8, tracker.Step(live, 8, unchecked(start + Interval), Interval, false, Speed, ScanMax).HolderTeam);
+        }
+
+        [Test]
+        public void WarmUpWaves_AlsoHaveTheirHolderDecidedAtTheStart()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            ScanFrame f = tracker.Step(null, 2, 3 * Interval + 20, Interval, false, Speed, ScanMax);
+            Assert.AreEqual(3 * Interval, f.ScanStartMs);
+            Assert.AreEqual(2, f.HolderTeam);
+            Assert.AreEqual(2, tracker.Step(null, 4, 3 * Interval + 2000, Interval, false, Speed, ScanMax).HolderTeam);
+            Assert.AreEqual(4, tracker.Step(null, 4, 4 * Interval, Interval, false, Speed, ScanMax).HolderTeam);
         }
 
         // ---- which zones refresh ----

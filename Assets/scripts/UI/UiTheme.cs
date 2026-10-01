@@ -703,6 +703,9 @@ namespace Overpower.UI
         public float minimapNeutralLinkWidth = 2f;
         [Tooltip("Thickness of the centre scan's red ring on the minimap, in canvas units.")]
         public float minimapScanRingWidth = 2.5f;
+        [Tooltip("The text of the countdown above the centre tower. {0} is the whole seconds left until the next centre scan, " +
+                 "e.g. \"Scan {0}\" reads \"Scan 12\". Its size, height and on/off are on the Vision Config.")]
+        public string scanCountdownFormat = "Scan {0}";
         [Tooltip("Size of a way-in arrowhead, in canvas units. It points from a team's zone toward the neutral zone next to it.")]
         public float minimapArrowheadSize = 12f;
         [Tooltip("Size of your own arrow on the minimap, in canvas units. It points where you face.")]

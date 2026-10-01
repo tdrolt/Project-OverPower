@@ -60,7 +60,7 @@ namespace Overpower.Data
         [SerializeField, Range(0f, 1f)] private float minimapSeenLift = 0.2f;
 
         [Header("Centre scan")]
-        [Tooltip("Seconds between centre scans. A shorter gap means zone states refresh more often. A new scan cuts off the previous wave, so a gap shorter than the wave's travel time (about 3 seconds at 40 m/s) means the outer arena is never scanned.")]
+        [Tooltip("Seconds between centre scans. The centre sends a wave every this many seconds, whether or not anyone holds it (the first one this long after the match goes live); the team holding the centre when a wave starts gets its dots and zone refresh, nobody does if the centre is neutral then. A shorter gap means zone states refresh more often. A new scan cuts off the previous wave, so a gap shorter than the wave's travel time (about 3 seconds at 40 m/s) means the outer arena is never scanned.")]
         [SerializeField, Min(5f)] private float scanIntervalSeconds = 30f;
 
         [Tooltip("How fast the scan wave spreads out from the centre, in metres per second. Faster means zones refresh sooner after a scan starts.")]
@@ -90,6 +90,15 @@ namespace Overpower.Data
         [Tooltip("Zones of this tier get their state refreshed by the centre scan.")]
         [SerializeField] private bool scanTier4 = true;
 
+        [Tooltip("Show the countdown to the next centre scan above the centre tower, for everyone. Off hides the label; the scan itself is unchanged.")]
+        [SerializeField] private bool scanCountdownVisible = true;
+
+        [Tooltip("How high above the top of the centre tower the countdown label floats, in metres. Higher keeps it clear of the tower from the top-down camera.")]
+        [SerializeField, Min(0f)] private float scanCountdownHeight = 2f;
+
+        [Tooltip("How big the countdown label's text is. Bigger reads from further away.")]
+        [SerializeField, Min(0.1f)] private float scanCountdownFontSize = 8f;
+
         public bool FogEnabled => fogEnabled;
         public Color FogColour => fogColour;
         public float FogDarkness => fogDarkness;
@@ -111,6 +120,9 @@ namespace Overpower.Data
         public float ScanWaveWidth => scanWaveWidth;
         public float ScanDotSeconds => scanDotSeconds;
         public float ScanDotFadeSeconds => scanDotFadeSeconds;
+        public bool ScanCountdownVisible => scanCountdownVisible;
+        public float ScanCountdownHeight => scanCountdownHeight;
+        public float ScanCountdownFontSize => scanCountdownFontSize;
         public bool ScanTier1 => scanTier1;
         public bool ScanTier2 => scanTier2;
         public bool ScanTier3 => scanTier3;

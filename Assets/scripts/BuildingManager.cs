@@ -272,6 +272,26 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return false;
     }
 
+    /// <summary>The world height of the top of the zone's tower (the highest point of its look: columns, crown, plinth), so
+    /// something can float just above it. False while the tower has not registered or has no look.</summary>
+    public bool TryGetZoneTowerTopY(int zone, out float topY)
+    {
+        topY = 0f;
+        if (!captures.TryGetValue(zone, out BuildingCapture capture) || capture == null)
+            return false;
+        var look = capture.GetComponentInChildren<Overpower.Arena.TowerLook>(true);
+        if (look == null)
+            return false;
+        bool any = false;
+        foreach (Renderer renderer in look.GetComponentsInChildren<Renderer>(true))
+        {
+            float top = renderer.bounds.max.y;
+            topY = any ? Mathf.Max(topY, top) : top;
+            any = true;
+        }
+        return any;
+    }
+
     /// <summary>The solid capsule of the zone's tower (its radius and the tower's world scale), for the "tower in sight" spots
     /// round it. Falls back to the authored 2.6 m at scale 1 when the tower has no capsule.</summary>
     public bool TryGetZoneTowerCapsule(int zone, out float radius, out Vector3 lossyScale)
@@ -377,7 +397,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         if (GetComponent<Overpower.Vision.ZoneKnowledge>() == null)
             gameObject.AddComponent<Overpower.Vision.ZoneKnowledge>();
 
-        // Vision Task 11: the centre scan (wave on the ground, dots and zone refresh for the holding team). Same reasoning.
+        // Vision Task 11: the centre scan (wave on the ground, dots and zone refresh for the team that held the centre when the wave started; the countdown above the tower is for everyone). Same reasoning.
         if (GetComponent<Overpower.Vision.CentreScan>() == null)
             gameObject.AddComponent<Overpower.Vision.CentreScan>();
     }

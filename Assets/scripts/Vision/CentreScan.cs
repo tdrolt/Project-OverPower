@@ -10,14 +10,19 @@ using UnityEngine;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// The centre scan in the game (Tudor 2026-10-01, Vision Task 11). While a team holds the centre a red wave rolls out
-    /// from it at capture and once per interval after; everyone sees it on the ground, and the holding team also gets a red
-    /// dot where each enemy was when the front passed over them, and a refresh of the zones the front passes.
+    /// The centre scan in the game (Tudor 2026-10-01, Vision Tasks 11 and 16). A red wave rolls out from the centre on a
+    /// fixed clock, every Scan Interval Seconds, whoever holds the centre (the first one an interval after the match goes
+    /// live; in the warm-up on whole multiples of the interval on the server clock); everyone sees it on the ground and
+    /// everyone sees the countdown to the next one above the tower. The team that holds the centre at the moment a wave
+    /// STARTS gets a red dot where each enemy was when the front passed over them, and a refresh of the zones the front
+    /// passes, for that whole wave (a capture mid-wave changes nothing until the next wave). A neutral centre at the start
+    /// means nobody learns anything from that wave. Once the map has shrunk there is no wave and no countdown.
     ///
     /// WHERE IT LIVES: on the BuildingManager's GameObject (added at runtime, next to ZoneKnowledge and MatchDirector), not on
-    /// the player prefab: the wave and the dots must survive a respawn and exist for a spectator, and the centre's owner and
-    /// capture time are read from the territory this object already hosts. Nothing is sent: the wave is a function of the
-    /// server clock and zone 9's tSince (CentreScanRules), so every client agrees on where it is.
+    /// the player prefab: the wave and the dots must survive a respawn and exist for a spectator, and the centre's owner is
+    /// read from the territory this object already hosts. Nothing is sent: the wave is a function of the server clock and
+    /// the room's go-live time mLiveAt (CentreScanRules), so every client agrees on where it is. Each client remembers the
+    /// owner it saw when the wave started (ScanBandTracker); a client that joins mid-wave takes the owner it reads then.
     ///
     /// CATCHES ARE JUDGED ON THE HOLDER'S GAME against the enemy's remote copy (the interpolated position this client draws):
     /// a Blink of 3 m or more snaps there, so the enemy cannot be caught part-way; a shorter Blink glides for about 0.2 s and
@@ -42,15 +47,23 @@ namespace Overpower.Vision
         private int dotsTeam = -1; // the team the dots in the pool belong to (a spectator can switch the watched team)
         private int centreZone = -1;
         private Vector3 centrePosition;
+        private float centreTopY;
         private float maxRadius;
         private VisionConfig config;
 
-        /// <summary>This frame's scan: Holding (a team holds the centre and the map is not cut), Travelling (the front is still
-        /// inside the arena), and the band it swept.</summary>
+        /// <summary>This frame's scan: Active (a wave is on the clock and the map is not cut), Travelling (the front is still
+        /// inside the arena), the team the wave belongs to, and the band it swept.</summary>
         public ScanFrame Frame { get; private set; }
 
-        /// <summary>The team holding the centre, or -1.</summary>
+        /// <summary>The team this wave belongs to (the owner of the centre when it started), or -1 (no wave, or neutral then).</summary>
         public int HolderTeam { get; private set; } = -1;
+
+        /// <summary>Whole seconds until the next wave, for the label above the tower; -1 when there is no countdown (no
+        /// centre read yet, not in a room, fog off, or the map has shrunk). It keeps counting while a wave travels.</summary>
+        public int CountdownSeconds { get; private set; } = -1;
+
+        /// <summary>Where the countdown label floats: the centre tower's top plus the configured height.</summary>
+        public Vector3 CountdownPosition => new Vector3(centrePosition.x, centreTopY + (config != null ? config.ScanCountdownHeight : 0f), centrePosition.z);
 
         /// <summary>The centre tower's position (the wave's centre).</summary>
         public Vector3 CentrePosition => centrePosition;
@@ -61,10 +74,10 @@ namespace Overpower.Vision
         /// <summary>The vision numbers the scan reads (null before the owner's player exists).</summary>
         public VisionConfig Config => config;
 
-        /// <summary>The wave is on the ground now: a scan is running and its front is inside the arena. Everyone sees it.</summary>
-        public bool WaveVisible => Frame.Holding && Frame.Travelling;
+        /// <summary>The wave is on the ground now: a wave is running and its front is inside the arena. Everyone sees it.</summary>
+        public bool WaveVisible => Frame.Active && Frame.Travelling;
 
-        /// <summary>My team (the watched team while spectating) holds the centre: the maps show the ring and the dots.</summary>
+        /// <summary>The current wave belongs to my team (the watched team while spectating): the maps show the ring and the dots.</summary>
         public bool SeenByMyTeam { get; private set; }
 
         /// <summary>The red dots of the enemies the front passed over, newest last.</summary>
@@ -76,6 +89,8 @@ namespace Overpower.Vision
                 Instance = this;
             if (GetComponent<CentreScanWaveView>() == null)
                 gameObject.AddComponent<CentreScanWaveView>();
+            if (GetComponent<CentreScanCountdownView>() == null)
+                gameObject.AddComponent<CentreScanCountdownView>();
         }
 
         private void OnDestroy()
@@ -109,19 +124,25 @@ namespace Overpower.Vision
             }
 
             TerritorySnapshot territory = buildings.Current;
-            int holder = territory.OwnerOf(centreZone);
-            bool cut = MatchDirector.Instance != null && MatchDirector.Instance.CutTeam >= 0;
+            int owner = territory.OwnerOf(centreZone);
+            MatchDirector director = MatchDirector.Instance;
+            bool cut = director != null && director.CutTeam >= 0;
+            // Live and with a go-live time: waves an interval apart from go-live. Otherwise (warm-up) on server-clock multiples.
+            int? liveAtMs = director != null && director.IsLive && director.LiveAtMs != 0 ? director.LiveAtMs : (int?)null;
             int intervalMs = Mathf.RoundToInt(config.ScanIntervalSeconds * 1000f);
-            Frame = tracker.Step(holder, territory.HeldSinceMs(centreZone), nowMs, intervalMs, cut, config.ScanWaveSpeed, maxRadius);
-            HolderTeam = Frame.Holding ? holder : -1;
+            Frame = tracker.Step(liveAtMs, owner, nowMs, intervalMs, cut, config.ScanWaveSpeed, maxRadius);
+            HolderTeam = Frame.Active ? Frame.HolderTeam : -1;
+            CountdownSeconds = cut || intervalMs <= 0
+                ? -1
+                : CentreScanRules.CountdownSecondsShown(unchecked(CentreScanRules.NextScanStart(liveAtMs, nowMs, intervalMs) - nowMs));
 
             int friendly = sight.FriendlyTeamId;
-            SeenByMyTeam = Frame.Holding && CentreScanDisplayRules.SeesScan(friendly, holder);
+            SeenByMyTeam = Frame.Active && CentreScanDisplayRules.SeesScan(friendly, Frame.HolderTeam);
             if (dotPool.Dots.Count > 0 && dotsTeam != friendly)
                 dotPool.Clear();
             if (SeenByMyTeam)
                 dotsTeam = friendly;
-            // The dots of a lost centre finish their time and fade as normal; only the wave, the ring and the zone work stop.
+            // The dots of an earlier wave finish their time and fade as normal; only the wave, the ring and the zone work stop.
             dotPool.Prune(Time.time, config.ScanDotSeconds);
             if (!SeenByMyTeam)
             {
@@ -208,6 +229,7 @@ namespace Overpower.Vision
             }
             if (centreZone < 0)
                 return false;
+            centreTopY = buildings.TryGetZoneTowerTopY(centreZone, out float topY) ? topY : centrePosition.y;
 
             ArenaBounds bounds = ArenaSymmetry.Active != null ? ArenaSymmetry.Active.FullBounds : null;
             maxRadius = bounds != null
@@ -216,13 +238,14 @@ namespace Overpower.Vision
             return maxRadius > 0f;
         }
 
-        // Not in a room, or the scan is off: the wave, dots and zone refresh all stop, and the next scan starts clean.
+        // Not in a room, or the scan is off: the wave, countdown, dots and zone refresh all stop, and the next wave starts clean.
         private void Stop()
         {
             tracker.Reset();
             Frame = default;
             HolderTeam = -1;
             SeenByMyTeam = false;
+            CountdownSeconds = -1;
             dotPool.Clear();
             SetScanned(refreshed, false);
         }

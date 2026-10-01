@@ -1010,7 +1010,7 @@ namespace Overpower.UI
             HideDotsFrom(enemyDots, enemiesUsed);
         }
 
-        // The centre scan (Vision Task 11, only for the team holding the centre; Tudor picked wave + enemy dots, no text): the
+        // The centre scan (Vision Task 11, only for the team the wave belongs to, the one holding the centre when it started; Tudor picked wave + enemy dots, no text): the
         // wave as a ring round the centre's bubble, and a frozen red dot per enemy the front passed, fading as it ages. Both maps
         // are this one map (the large one is the same objects scaled), so one pass draws both.
         private const int ScanRingSegments = 64;
