@@ -9,13 +9,16 @@ namespace Overpower.Vision
     {
         public readonly int Team;
         public readonly bool Alive, IsLocal;
+        /// <summary>True while this player holds the Scope: their eye uses the scoped shape.</summary>
+        public readonly bool Scoped;
         public readonly Vector2 Position, Facing;
         /// <summary>World height of this player's eyes: their own feet plus the Eye Height.</summary>
         public readonly float EyeY;
 
-        public SightCandidate(int team, bool alive, bool isLocal, Vector2 position, Vector2 facing, float eyeY = 0f) // eyeY: the game always passes it; the default is for tests that never test walls
+        public SightCandidate(int team, bool alive, bool isLocal, Vector2 position, Vector2 facing, float eyeY = 0f, bool scoped = false) // eyeY: the game always passes it; the default is for tests that never test walls
         {
             EyeY = eyeY;
+            Scoped = scoped;
             Team = team;
             Alive = alive;
             IsLocal = isLocal;
@@ -40,16 +43,20 @@ namespace Overpower.Vision
             mode == ViewerMode.Spectating ? watchedTeam : localTeam;
 
         /// <summary>Clears <paramref name="into"/> and fills it with one eye per candidate that is an eye right now, all
-        /// with the same (unscoped for now) shape.</summary>
+        /// with the same shape.</summary>
         public static void Build(IReadOnlyList<SightCandidate> candidates, int localTeam, ViewerMode mode, int watchedTeam,
-            SightShape shape, List<Eye> into)
+            SightShape shape, List<Eye> into) => Build(candidates, localTeam, mode, watchedTeam, shape, shape, into);
+
+        /// <summary>Same, but an eye whose player holds the Scope uses <paramref name="scopedShape"/>.</summary>
+        public static void Build(IReadOnlyList<SightCandidate> candidates, int localTeam, ViewerMode mode, int watchedTeam,
+            SightShape shape, SightShape scopedShape, List<Eye> into)
         {
             into.Clear();
             for (int i = 0; i < candidates.Count; i++)
             {
                 SightCandidate c = candidates[i];
                 if (VisionRules.IsEye(localTeam, mode, watchedTeam, c.Team, c.Alive, c.IsLocal))
-                    into.Add(new Eye(c.Position, c.Facing, shape, c.EyeY));
+                    into.Add(new Eye(c.Position, c.Facing, c.Scoped ? scopedShape : shape, c.EyeY));
             }
         }
     }

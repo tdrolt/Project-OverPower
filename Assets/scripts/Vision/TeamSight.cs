@@ -3,6 +3,8 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Overpower.Abilities;
+using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
@@ -30,6 +32,10 @@ namespace Overpower.Vision
         [SerializeField, Tooltip("The shader the minimap uses to darken the parts of the arena my team cannot see. Leave as set.")]
         private Shader minimapFogShader;
 
+        [SerializeField, Tooltip("The Scope's module on Scope.prefab. Its three sight numbers (cone angle, cone length, circle change) " +
+                 "are the shape of anyone who is holding the Scope, so every client reads the same values for any teammate.")]
+        private ScopeAbility scopeSight;
+
         /// <summary>The owner's copy on this client, or null before it exists (then nothing is hidden).</summary>
         public static TeamSight Local { get; private set; }
 
@@ -49,6 +55,8 @@ namespace Overpower.Vision
         private bool feetOffsetRead;
         private PlayerLifecycle lifecycle;
         private System.Func<Vector3, bool> canSeePoint;
+        private AbilityRunner abilities;
+        private readonly RevealTimers reveals = new RevealTimers();
 
         // The sight texture: white where my team sees, black elsewhere (read by the fog shader, the minimap).
         private RenderTexture sightTexture;
@@ -96,6 +104,7 @@ namespace Overpower.Vision
         private void Awake()
         {
             lifecycle = GetComponent<PlayerLifecycle>();
+            abilities = GetComponent<AbilityRunner>();
             clearLine = ClearLine;
             if (!photonView.IsMine)
                 enabled = false;
@@ -269,9 +278,34 @@ namespace Overpower.Vision
             int friendly = SightEyes.FriendlyTeam(mode, localTeam, watchedTeam);
             if (friendly >= 0 && Teams.TryGetTeam(view.Owner, out int team) && team == friendly)
                 return true;
+            if (view.Owner != null && reveals.IsRevealed(view.OwnerActorNr, Time.time))
+                return true; // a blind hit with a revealing weapon (X-Ray) shows them for a moment
             // The enemy's feet: CanSee lifts the point by Eye Height, so the line runs feet+Eye Height to feet+Eye Height,
             // level with the texture's rays (one height for sight).
             return CanSee(view.transform.position + Vector3.up * FeetOffset());
+        }
+
+        /// <summary>Shows this player to my team for the given seconds (an X-Ray blind hit). A later reveal extends the time,
+        /// never shortens it. Zero or less does nothing.</summary>
+        public void Reveal(PhotonView view, float seconds)
+        {
+            if (view != null && view.Owner != null)
+                reveals.Reveal(view.OwnerActorNr, Time.time, seconds);
+        }
+
+        /// <summary>Called for every hit of a shot on a player, on every client: if the weapon reveals on hit, the shooter is on
+        /// my team (or the team I watch) and the one hit is an enemy, shows that enemy to my team. Damage is not touched.</summary>
+        public static void RevealOnHit(WeaponDefinition weapon, IDamageable victim, int shooterTeam)
+        {
+            TeamSight sight = Local;
+            if (sight == null || weapon == null || victim == null || weapon.RevealOnHitSeconds <= 0f || !sight.FogOn)
+                return;
+            PhotonView view = (victim as Component) != null ? ((Component)victim).GetComponentInParent<PhotonView>() : null;
+            if (view == null || view.Owner == null)
+                return; // not a player (a practice dummy, a wall)
+            bool enemy = victim.TeamId >= 0 && !sight.IsFriendlyTeam(victim.TeamId);
+            if (RevealOnHitRule.ShouldReveal(sight.IsFriendlyTeam(shooterTeam), enemy, weapon.RevealOnHitSeconds))
+                sight.Reveal(view, weapon.RevealOnHitSeconds);
         }
 
         /// <summary>True when my team sees any point along a to b, sampled every Line Sample Spacing metres (both ends
@@ -431,15 +465,28 @@ namespace Overpower.Vision
                     Vector3 forward = view.transform.forward;
                     // Each eye stands at its own player's feet (this prefab's capsule bottom), not at the local player's height.
                     float eyeY = position.y + FeetOffset() + eyeHeight;
+                    // Local = my own live Scope state (no round trip); everyone else = their published vScp property.
+                    bool scoped = view.IsMine ? LocalHoldingScope() : player.CustomProperties.TryGetValue(ScopeSightProperty.Key, out object scp) && ScopeSightProperty.Read(scp);
                     candidates.Add(new SightCandidate(team, alive, view.IsMine,
-                        new Vector2(position.x, position.z), new Vector2(forward.x, forward.z), eyeY));
+                        new Vector2(position.x, position.z), new Vector2(forward.x, forward.z), eyeY, scoped));
                 }
             }
 
             SightShape shape = config != null
                 ? VisionRules.ShapeFor(config.ConeAngleDegrees, config.ConeLength, config.CircleRadius, false, 0f, 0f, 0f)
                 : new SightShape(0f, 0f, 0f);
-            SightEyes.Build(candidates, localTeam, mode, watchedTeam, shape, eyes);
+            SightShape scopedShape = config != null && scopeSight != null
+                ? VisionRules.ShapeFor(config.ConeAngleDegrees, config.ConeLength, config.CircleRadius, true,
+                    scopeSight.SightConeAngleDegrees, scopeSight.SightConeLength, scopeSight.SightCircleChange)
+                : shape; // no Scope reference: a scoped player sees as normal
+            SightEyes.Build(candidates, localTeam, mode, watchedTeam, shape, scopedShape, eyes);
+        }
+
+        private bool LocalHoldingScope()
+        {
+            if (abilities == null)
+                return false;
+            return abilities.StatusFor(AbilitySlot.Attachment) is ScopeAbility scope && scope.IsHoldingSight;
         }
     }
 }

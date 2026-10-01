@@ -48,3 +48,6 @@ MonoBehaviour:
   charges: 0
   extraZoomOutPercent: 20
   easeSeconds: 0.2
+  sightConeAngleDegrees: 30
+  sightConeLength: 26
+  sightCircleChange: -3

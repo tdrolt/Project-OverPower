@@ -194,6 +194,8 @@ namespace Overpower.Weapons
                                                           shot.ShooterTeamId, shot.Weapon.Id,
                                                           DamageSource.Projectile, false, contact.Point, -1,
                                                           shot.Weapon.MarkWindowSeconds, shot.Weapon.MarkedDamageMultiplier));
+                // Every client runs this, so each can show my team the enemy it just hit (X-Ray blind hit); damage is untouched.
+                TeamSight.RevealOnHit(shot.Weapon, contact.Target, shot.ShooterTeamId);
                 PlayImpact(shot.Weapon, contact.Point, shot.ShooterTeamId);
             }
 

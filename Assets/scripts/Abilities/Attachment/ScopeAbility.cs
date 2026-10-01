@@ -1,5 +1,7 @@
+using Photon.Pun;
 using UnityEngine;
 using Overpower.Match;
+using Overpower.Vision;
 
 namespace Overpower.Abilities
 {
@@ -45,6 +47,35 @@ namespace Overpower.Abilities
                  "comment.")]
         private float easeSeconds = 0.2f;
 
+        [Header("Sight while held")]
+        [SerializeField, Tooltip("While you hold the Scope, your sight cone is this wide (full angle in degrees). " +
+                 "Your teammates' screens use it too. Letting go, dying or respawning brings the normal cone back.")]
+        private float sightConeAngleDegrees = 30f;
+
+        [SerializeField, Tooltip("While you hold the Scope, your sight cone reaches this far (metres).")]
+        private float sightConeLength = 26f;
+
+        [SerializeField, Tooltip("While you hold the Scope, the circle around you grows by this many metres. " +
+                 "Negative shrinks it (-3 turns a 7 m circle into 4 m); it never goes below 0.")]
+        private float sightCircleChange = -3f;
+
+        /// <summary>The cone angle (degrees) of the sight while the Scope is held.</summary>
+        public float SightConeAngleDegrees => sightConeAngleDegrees;
+
+        /// <summary>The cone length (metres) of the sight while the Scope is held.</summary>
+        public float SightConeLength => sightConeLength;
+
+        /// <summary>Metres added to the sight circle while the Scope is held (negative shrinks it).</summary>
+        public float SightCircleChange => sightCircleChange;
+
+        // Owner only: whether the sight is the scoped one right now, and the last value written to the Player Property.
+        private bool holdingSight;
+        private bool publishedScoped;
+
+        /// <summary>True while the Scope is held and the player can act. The owner mirrors it to every client as the Player
+        /// Property vScp (ScopeSightProperty); a remote copy of this module never changes it.</summary>
+        public bool IsHoldingSight => holdingSight;
+
         // Owner only: this frame's applied multiplier, eased toward 1 (not scoped) or 1 + extraZoomOutPercent/100
         // (fully scoped). Exactly 1 means "nothing active" - see ApplyOrRemove.
         private float appliedFactor = 1f;
@@ -69,6 +100,7 @@ namespace Overpower.Abilities
         {
             float target = held && canAct ? 1f + extraZoomOutPercent / 100f : 1f;
             appliedFactor = ScopeEase.Advance(appliedFactor, target, extraZoomOutPercent, easeSeconds, deltaTime);
+            SetHoldingSight(held && canAct);
 
             ApplyOrRemove();
         }
@@ -94,6 +126,19 @@ namespace Overpower.Abilities
         {
             appliedFactor = 1f;
             CameraTracking.Instance?.RemoveZoomMultiplier(this);
+            SetHoldingSight(false);
+        }
+
+        // Written only by the owner, only on change, no RPC: every client reads the player's vScp property.
+        private void SetHoldingSight(bool value)
+        {
+            holdingSight = value;
+            if (!ScopeSightProperty.ShouldPublish(publishedScoped, value))
+                return;
+            if (Owner == null || Owner.PhotonView == null || !Owner.IsMine || !PhotonNetwork.InRoom)
+                return;
+            publishedScoped = value;
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new ExitGames.Client.Photon.Hashtable { { ScopeSightProperty.Key, value } });
         }
 
         /// <summary>Written every frame appliedFactor sits above 1 (still easing in, or fully scoped); removed

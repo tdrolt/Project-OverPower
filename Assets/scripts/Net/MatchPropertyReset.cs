@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Match;
+using Overpower.Vision;
 
 namespace Overpower.Net
 {
@@ -32,6 +33,7 @@ namespace Overpower.Net
             { AllyPortalTraveller.ReadyKey, null },
             { StatusLabelProperty.Key, null },
             { AoeZoneRecast.PropertyKey, null },
+            { ScopeSightProperty.Key, null },
         };
     }
 }

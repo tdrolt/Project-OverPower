@@ -409,6 +409,9 @@ namespace Overpower.Weapons
                 victim.ApplyDamage(new DamageInfo(context.Damage, context.ShooterActorNumber,
                                                    context.ShooterTeamId, weaponId,
                                                    DamageSource.Projectile, false, hit.point, abilityId));
+                // A weapon with Reveal On Hit Seconds shows the enemy it hit to the shooter's team (every client runs this shot).
+                if (context.Weapon != null)
+                    TeamSight.RevealOnHit(context.Weapon, victim, context.ShooterTeamId);
             }
 
             // No behaviours attached is the normal case and means "stop here". Any single
