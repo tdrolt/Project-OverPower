@@ -70,6 +70,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
              "disabling the root would switch this whole component off with it.")]
     private GameObject playerMesh;
 
+    /// <summary>The character model root (vision Task 2: EnemyVisibility collects the body renderers under it).</summary>
+    public GameObject PlayerMesh => playerMesh;
+
     [SerializeField, Tooltip("Colours and text for the capital-under-attack respawn note/toast (Tudor, " +
              "2026-09-16). The same theme asset PlayerHud reads for the HUD.")]
     private UiTheme theme;
