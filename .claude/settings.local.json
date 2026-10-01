@@ -23,5 +23,20 @@
       "PowerShell(python \"C:\\\\Users\\\\bascu\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\2b95ba27-2f75-45b7-84af-a64ba9e3fc0e\\\\1a695a31-45bd-480a-b683-b91fb58cad70\\\\skills\\\\xlsx\\\\scripts\\\\recalc.py\" \"C:\\\\Uni stuff\\\\Y3\\\\Minor Skilled\\\\Resources\\\\Global Planning Sheet - Tudor Oltean.xlsx\" 60)",
       "PowerShell(python \"C:\\\\Users\\\\bascu\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\xlsx\\\\skill_scripts\\\\recalc.py\" \"C:\\\\Uni stuff\\\\Y3\\\\Minor Skilled\\\\Resources\\\\Global Planning Sheet - Tudor Oltean.xlsx\" 60)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"C:/UniStuff/Y3/MinorSkilled/GitAccess/Project-OverPower/.claude/hooks/editor-playmode-guard.py\"",
+            "timeout": 20,
+            "statusMessage": "Checking the Unity Editor isn't in Play Mode"
+          }
+        ]
+      }
+    ]
   }
 }
