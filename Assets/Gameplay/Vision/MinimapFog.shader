@@ -1,5 +1,5 @@
 // The minimap's fog layer: a UI shader over the baked arena picture. Unseen parts get the fog colour at the darkness;
-// seen parts are drawn white at the (small) lift, so the lit holes read against the near-black map. The sight picture
+// seen parts are drawn white at the (small) lift, so the lit holes (a hard edge at 0.5) read against the near-black map. The sight picture
 // (white = my team sees it) is the RawImage's texture, so the layer sits on the same rect as the arena picture. The
 // vertex colour is (fog colour, alpha 1 * canvas group opacity). Darkness and lift are globals set by TeamSight (the
 // Mask makes a stencil copy of the material, which later SetFloat calls on the original do not reach).
@@ -56,7 +56,9 @@ Shader "Overpower/Minimap Fog"
 
             fixed4 frag(v2f i) : SV_Target
             {
-                float seen = tex2D(_MainTex, i.uv).r;
+                // Hard edge, one screen pixel wide (the picture is MSAA-drawn and bilinear): clean lit holes, no blur.
+                float s = tex2D(_MainTex, i.uv).r;
+                float seen = saturate((s - 0.5) / max(fwidth(s), 1e-4) + 0.5);
                 float a = lerp(_VisionMinimapDarkness, _VisionMinimapSeenLift, seen);
                 float3 rgb = lerp(i.color.rgb, float3(1, 1, 1), seen);
                 return fixed4(rgb, i.color.a * a);

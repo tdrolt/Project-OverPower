@@ -1,7 +1,7 @@
 // The fog: a full-screen pass that darkens everything the local team cannot see. Each pixel's world position is rebuilt
 // from the camera depth texture; its x/z is looked up in the sight picture (_VisionSightTex, white = seen) through
 // _VisionSightRect (min x, min z, size x, size z). Unseen (or off the picture) pixels are blended toward the fog colour by
-// the darkness; the edge is hard (a step at 0.5). Sky pixels (no depth) are left alone. The colour and the darkness are
+// the darkness; the edge is hard but anti-aliased (a threshold at 0.5, one screen pixel wide). Sky pixels (no depth) are left alone. The colour and the darkness are
 // globals that TeamSight sets from VisionConfig every frame, so there are no numbers in the material.
 Shader "Overpower/Fog"
 {
@@ -47,7 +47,15 @@ Shader "Overpower/Fog"
                 float3 world = ComputeWorldSpacePosition(screenUV, depth, UNITY_MATRIX_I_VP);
                 float2 sightUV = (world.xz - _VisionSightRect.xy) / _VisionSightRect.zw;
                 bool inside = all(sightUV >= 0.0) && all(sightUV <= 1.0);
-                float seen = inside ? step(0.5, SAMPLE_TEXTURE2D_LOD(_VisionSightTex, sampler_LinearClamp, sightUV, 0).r) : 0.0;
+                float seen = 0.0;
+                if (inside)
+                {
+                    // The picture is magnified on screen, so a plain step shows each texel's corner as a tooth. Threshold the
+                    // smooth (bilinear, MSAA-fed) value at 0.5 over one screen pixel: a hard, straight line with no blur.
+                    float s = SAMPLE_TEXTURE2D_LOD(_VisionSightTex, sampler_LinearClamp, sightUV, 0).r;
+                    float w = max(fwidth(s), 1e-4);
+                    seen = saturate((s - 0.5) / w + 0.5);
+                }
                 return half4(_VisionFogColour.rgb, _VisionFogDarkness * (1.0 - seen));
             }
             ENDHLSL

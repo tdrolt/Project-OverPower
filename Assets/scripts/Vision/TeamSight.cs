@@ -150,6 +150,9 @@ namespace Overpower.Vision
                 name = "Vision Sight Texture",
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
+                // MSAA: the fan edges get fractional coverage instead of all-or-nothing texels; Unity resolves it before the
+                // fog and the minimap sample the picture, so the shaders' pixel-wide threshold draws a straight line.
+                antiAliasing = 8,
             };
             sightTexture.Create();
 

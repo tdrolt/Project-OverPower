@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fogEnabled: 1
   fogColour: {r: 0.102, g: 0.11, b: 0.133, a: 1}
-  fogDarkness: 0.5
+  fogDarkness: 0.65
   coneAngleDegrees: 90
   coneLength: 22
   circleRadius: 7
@@ -30,6 +30,7 @@ MonoBehaviour:
   scanIntervalSeconds: 30
   scanWaveSpeed: 40
   scanWaveColour: {r: 0.898, g: 0.282, b: 0.302, a: 1}
+  scanWaveWidth: 1.5
   scanDotSeconds: 4
   scanDotFadeSeconds: 1
   scanTier1: 1
