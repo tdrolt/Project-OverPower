@@ -27,6 +27,9 @@ namespace Overpower.Vision
         [SerializeField, Tooltip("The shader that paints each eye's sight shape white into the sight picture. Leave as set.")]
         private Shader sightFillShader;
 
+        [SerializeField, Tooltip("The shader the minimap uses to darken the parts of the arena my team cannot see. Leave as set.")]
+        private Shader minimapFogShader;
+
         /// <summary>The owner's copy on this client, or null before it exists (then nothing is hidden).</summary>
         public static TeamSight Local { get; private set; }
 
@@ -71,6 +74,22 @@ namespace Overpower.Vision
 
         /// <summary>The world square the sight picture covers: (minX, minZ, sizeX, sizeZ).</summary>
         public Vector4 SightRect => sightRect;
+
+        /// <summary>The sight numbers and fog settings (the minimap reads the fog colour, darkness and enemy dot colour).</summary>
+        public VisionConfig Config => config;
+
+        /// <summary>The shader for the minimap's fog layer.</summary>
+        public Shader MinimapFogShader => minimapFogShader;
+
+        /// <summary>True while the fog is drawn: switched on and the sight picture exists. The minimap shows its fog layer
+        /// and the red enemy dots only then.</summary>
+        public bool FogActive => FogOn && sightTexture != null;
+
+        /// <summary>The team whose members are always shown to me (the watched team while spectating, else my own), or -1.</summary>
+        public int FriendlyTeamId
+        {
+            get { Refresh(); return SightEyes.FriendlyTeam(mode, localTeam, watchedTeam); }
+        }
 
         private bool FogOn => config != null && config.FogEnabled;
 

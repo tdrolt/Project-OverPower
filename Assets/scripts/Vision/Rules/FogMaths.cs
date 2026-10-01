@@ -21,5 +21,12 @@ namespace Overpower.Vision
             Vector2 uv = WorldToSightUv(world, rect);
             return uv.x >= 0f && uv.x <= 1f && uv.y >= 0f && uv.y <= 1f;
         }
+
+        /// <summary>The fog layer's opacity at a spot: clear where the sight picture is white (1), the full darkness where it
+        /// is black (0). The minimap fog shader does the same sum.</summary>
+        public static float UnseenAlpha(float sight, float darkness)
+        {
+            return (1f - Mathf.Clamp01(sight)) * darkness;
+        }
     }
 }
