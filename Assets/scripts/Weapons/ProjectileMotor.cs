@@ -435,8 +435,13 @@ namespace Overpower.Weapons
                 GameObject vfx = context.Weapon != null && context.Weapon.ImpactVfx != null
                     ? context.Weapon.ImpactVfx : fallbackImpactVfx;
                 // D2: an enemy shot's impact flash in the fog is not shown (it would give away where it landed); the
-                // sound below is untouched (Task 7).
-                if (vfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(context.ShooterTeamId, at))
+                // sound below is untouched (Task 7). An exploding projectile's flash follows the blast rule, like its
+                // Splash Shell (so it also shows when the blast reaches my team).
+                ExplodeOnImpact blast = GetComponent<ExplodeOnImpact>();
+                bool flashShown = blast != null
+                    ? TeamSight.BlastShownAt(context.ShooterTeamId, at, blast.SplashRadius)
+                    : TeamSight.ShotShownAt(context.ShooterTeamId, at);
+                if (vfx != null && VFXManager.Instance != null && flashShown)
                     VFXManager.Instance.PlayVFX(vfx, at);
 
                 if (impactSfx != null && AudioManager.Instance != null)

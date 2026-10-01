@@ -41,6 +41,7 @@ namespace Overpower.Vision
         private ViewerMode mode = ViewerMode.Alive;
         private int buildingMask = -1;
         private float pointY; // the height of the point being asked about
+        private bool atEyeHeight; // true while answering CanSeeShot
         private float feetOffset; // the capsule's bottom below the pivot, read once from the prefab
         private bool feetOffsetRead;
         private PlayerLifecycle lifecycle;
@@ -87,7 +88,8 @@ namespace Overpower.Vision
 
         private void OnDestroy()
         {
-            Shader.SetGlobalFloat(FogEnabledId, 0f);
+            if (photonView != null && photonView.IsMine)
+                Shader.SetGlobalFloat(FogEnabledId, 0f); // a remote copy leaving must not drop the owner's fog
             if (sightTexture != null)
             {
                 sightTexture.Release();
@@ -203,7 +205,8 @@ namespace Overpower.Vision
         {
             if (Local == this)
                 Local = null;
-            Shader.SetGlobalFloat(FogEnabledId, 0f);
+            if (photonView != null && photonView.IsMine)
+                Shader.SetGlobalFloat(FogEnabledId, 0f);
         }
 
         /// <summary>True when my team sees this point, taken as a spot on the ground: the test is made Eye Height above it
@@ -216,6 +219,19 @@ namespace Overpower.Vision
             Refresh();
             pointY = worldPoint.y;
             return VisionRules.TeamSeesWithEye(eyes, new Vector2(worldPoint.x, worldPoint.z), clearLine);
+        }
+
+        /// <summary>Like CanSee, for a point already in the air (a bullet, muzzle or impact flash): the wall test aims at the
+        /// eye's own height, level with the sight picture, so a Cover Wall hides a shot behind it.</summary>
+        public bool CanSeeShot(Vector3 worldPoint)
+        {
+            if (!FogOn)
+                return true;
+            Refresh();
+            pointY = worldPoint.y;
+            atEyeHeight = true;
+            try { return VisionRules.TeamSeesWithEye(eyes, new Vector2(worldPoint.x, worldPoint.z), clearLine); }
+            finally { atEyeHeight = false; }
         }
 
         /// <summary>My own body and my team (the watched team while spectating) are always shown; anyone else only while
@@ -239,16 +255,12 @@ namespace Overpower.Vision
         {
             if (!FogOn)
                 return true;
-            canSeePoint ??= CanSee;
+            canSeePoint ??= CanSeeShot;
             return ShotVisibilityRules.LineSeen(a, b, config.LineSampleSpacing, canSeePoint);
         }
 
-        /// <summary>Whether a shooter counts as friendly to me: my own team, or the watched team while I am spectating.
-        /// A shooter whose team is not known yet counts as an enemy.</summary>
-        public bool IsFriendly(Photon.Realtime.Player shooter) =>
-            Teams.TryGetTeam(shooter, out int team) && IsFriendlyTeam(team);
-
-        /// <summary>The same by team number (a negative team is unknown, so an enemy).</summary>
+        /// <summary>Whether a shooter on this team counts as friendly to me: my own team, or the watched team while I am
+        /// spectating. A negative team is unknown, so an enemy.</summary>
         public bool IsFriendlyTeam(int shooterTeam)
         {
             Refresh();
@@ -262,7 +274,7 @@ namespace Overpower.Vision
         public static bool ShotShownAt(int shooterTeam, Vector3 point)
         {
             TeamSight sight = Local;
-            return sight == null || ShotVisibilityRules.ShowOwnTeamOrSeen(sight.IsFriendlyTeam(shooterTeam), sight.CanSee(point));
+            return sight == null || ShotVisibilityRules.ShowOwnTeamOrSeen(sight.IsFriendlyTeam(shooterTeam), sight.CanSeeShot(point));
         }
 
         /// <summary>D2: is a beam / line of this team drawn? Own team always; an enemy's only while the line crosses sight.</summary>
@@ -272,14 +284,28 @@ namespace Overpower.Vision
             return sight == null || ShotVisibilityRules.ShowOwnTeamOrSeen(sight.IsFriendlyTeam(shooterTeam), sight.CanSeeLine(a, b));
         }
 
-        /// <summary>D2: is a blast of this team drawn? Own team always; an enemy's if its centre is seen or it reaches me.</summary>
+        /// <summary>D2: is a blast of this team drawn? Own team always; an enemy's if its centre is seen or it hurts someone
+        /// on my team (reaches one of my team's eyes: mine while I live, my living teammates', the watched team's).</summary>
         public static bool BlastShownAt(int shooterTeam, Vector3 centre, float radius)
         {
             TeamSight sight = Local;
             if (sight == null)
                 return true;
-            return ShotVisibilityRules.BlastShown(sight.IsFriendlyTeam(shooterTeam), sight.CanSee(centre),
-                Vector3.Distance(centre, sight.transform.position), radius);
+            bool friendly = sight.IsFriendlyTeam(shooterTeam);
+            bool seen = friendly || sight.CanSee(centre); // a friendly blast needs no wall test
+            return ShotVisibilityRules.BlastShown(friendly, seen, !seen && sight.BlastReachesMyTeam(centre, radius));
+        }
+
+        private readonly List<Vector3> eyeSpots = new List<Vector3>(16);
+
+        private bool BlastReachesMyTeam(Vector3 centre, float radius)
+        {
+            Refresh();
+            float eyeHeight = config != null ? config.EyeHeight : 1f;
+            eyeSpots.Clear();
+            for (int i = 0; i < eyes.Count; i++)
+                eyeSpots.Add(new Vector3(eyes[i].Position.x, eyes[i].EyeY - eyeHeight, eyes[i].Position.y)); // each player's feet
+            return ShotVisibilityRules.ReachesAny(centre, radius, eyeSpots);
         }
 
         // The eye is at its own player's eye point (their feet + Eye Height); the asked-about point is lifted the same
@@ -290,7 +316,7 @@ namespace Overpower.Vision
                 buildingMask = LayerMask.GetMask("Building");
             float height = config != null ? config.EyeHeight : 1f;
             Vector3 a = new Vector3(eye.Position.x, eye.EyeY, eye.Position.y);
-            Vector3 b = new Vector3(to.x, pointY + height, to.y);
+            Vector3 b = new Vector3(to.x, ShotVisibilityRules.TargetHeight(atEyeHeight, eye.EyeY, pointY, height), to.y);
             return !Physics.Linecast(a, b, buildingMask, QueryTriggerInteraction.Ignore);
         }
 

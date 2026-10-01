@@ -73,10 +73,32 @@ namespace Overpower.Tests
             Assert.IsTrue(ShotVisibilityRules.LineSeen(Vector3.zero, new Vector3(10, 0, 0), 0f, Window(9.9f, 11f)));
         }
 
-        [Test] public void Blast_Friendly_IsShown() => Assert.IsTrue(ShotVisibilityRules.BlastShown(true, false, 99f, 3f));
-        [Test] public void Blast_EnemyCentreSeen_IsShown() => Assert.IsTrue(ShotVisibilityRules.BlastShown(false, true, 99f, 3f));
-        [Test] public void Blast_EnemyUnseenAndFar_IsHidden() => Assert.IsFalse(ShotVisibilityRules.BlastShown(false, false, 10f, 3f));
-        [Test] public void Blast_EnemyUnseenButReachesMe_IsShown() => Assert.IsTrue(ShotVisibilityRules.BlastShown(false, false, 2.5f, 3f));
-        [Test] public void Blast_ExactlyAtTheRim_ReachesMe() => Assert.IsTrue(ShotVisibilityRules.BlastShown(false, false, 3f, 3f));
+        [Test] public void Blast_Friendly_IsShown() => Assert.IsTrue(ShotVisibilityRules.BlastShown(true, false, false));
+        [Test] public void Blast_EnemyCentreSeen_IsShown() => Assert.IsTrue(ShotVisibilityRules.BlastShown(false, true, false));
+        [Test] public void Blast_EnemyUnseenAndNobodyReached_IsHidden() => Assert.IsFalse(ShotVisibilityRules.BlastShown(false, false, false));
+        [Test] public void Blast_EnemyUnseenButReachesMyTeam_IsShown() => Assert.IsTrue(ShotVisibilityRules.BlastShown(false, false, true));
+
+        [Test]
+        public void ReachesAny_OneTeammateInside_IsTrue()
+        {
+            var team = new System.Collections.Generic.List<Vector3> { new Vector3(50, 0, 0), new Vector3(2, 0, 0) };
+            Assert.IsTrue(ShotVisibilityRules.ReachesAny(Vector3.zero, 3f, team));
+        }
+
+        [Test]
+        public void ReachesAny_AllOutside_IsFalse()
+        {
+            var team = new System.Collections.Generic.List<Vector3> { new Vector3(50, 0, 0), new Vector3(10, 0, 0) };
+            Assert.IsFalse(ShotVisibilityRules.ReachesAny(Vector3.zero, 3f, team));
+        }
+
+        [Test] public void ReachesAny_ExactlyAtTheRim_IsTrue() =>
+            Assert.IsTrue(ShotVisibilityRules.ReachesAny(Vector3.zero, 3f, new[] { new Vector3(3, 0, 0) }));
+        [Test] public void ReachesAny_NoOne_IsFalse() =>
+            Assert.IsFalse(ShotVisibilityRules.ReachesAny(Vector3.zero, 3f, new Vector3[0]));
+
+        // A shot is already in the air, so its wall test aims at the eye's own height, not lifted again.
+        [Test] public void ShotTarget_IsTheEyesOwnHeight() => Assert.AreEqual(1.5f, ShotVisibilityRules.TargetHeight(true, 1.5f, 2f, 1f), 1e-5f);
+        [Test] public void GroundTarget_IsLiftedByEyeHeight() => Assert.AreEqual(3f, ShotVisibilityRules.TargetHeight(false, 1.5f, 2f, 1f), 1e-5f);
     }
 }

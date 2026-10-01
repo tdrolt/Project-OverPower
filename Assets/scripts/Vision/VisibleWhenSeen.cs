@@ -37,9 +37,12 @@ namespace Overpower.Vision
 
         private void Awake() => RefreshRenderers();
 
-        /// <summary>Collects the renderers again; call after adding children later (a trail, a muzzle effect).</summary>
+        /// <summary>Collects the renderers again; call after adding children later (a trail, a muzzle effect). Renderers
+        /// we switched off are put back to their authored state first, so "off" is never recorded as authored.</summary>
         public void RefreshRenderers()
         {
+            if (!shown)
+                SetRenderers(true);
             renderers.Clear();
             authoredEnabled.Clear();
             GetComponentsInChildren(true, renderers);
@@ -50,13 +53,29 @@ namespace Overpower.Vision
 
         private void LateUpdate() => Apply();
 
-        private void Apply()
+        /// <summary>Works out whether the object is shown right now (my team's: always; else its position seen) and applies it.</summary>
+        public void Apply()
         {
             TeamSight sight = TeamSight.Local;
-            bool visible = ForceVisible || sight == null || sight.CanSee(transform.position);
+            SetVisible(ForceVisible || sight == null || sight.CanSeeShot(transform.position));
+        }
+
+        /// <summary>Switches the renderers on (to their authored state) or off. A trail is cleared when it comes back, so
+        /// a bullet that left the fog and returned draws no line through it.</summary>
+        public void SetVisible(bool visible)
+        {
             if (visible == shown)
                 return;
             shown = visible;
+            SetRenderers(visible);
+            if (visible)
+                for (int i = 0; i < renderers.Count; i++)
+                    if (renderers[i] is TrailRenderer trail)
+                        trail.Clear();
+        }
+
+        private void SetRenderers(bool visible)
+        {
             for (int i = 0; i < renderers.Count; i++)
                 if (renderers[i] != null)
                     renderers[i].enabled = visible && authoredEnabled[i];

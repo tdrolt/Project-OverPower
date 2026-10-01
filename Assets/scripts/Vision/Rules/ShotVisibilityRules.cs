@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Overpower.Vision
@@ -40,9 +41,24 @@ namespace Overpower.Vision
             return seen(b);
         }
 
-        /// <summary>A blast is drawn when it is my team's, when its centre is seen, or when it reaches me (so a blast
-        /// from the fog that hits me is never invisible).</summary>
-        public static bool BlastShown(bool shooterIsFriendly, bool centreSeen, float distanceToLocal, float radius) =>
-            shooterIsFriendly || centreSeen || distanceToLocal <= radius;
+        /// <summary>A blast is drawn when it is my team's, when its centre is seen, or when it hurts someone on my team
+        /// (the blast reaches one of my team's eyes), so a blast from the fog that hits us is never invisible.</summary>
+        public static bool BlastShown(bool shooterIsFriendly, bool centreSeen, bool reachesMyTeam) =>
+            shooterIsFriendly || centreSeen || reachesMyTeam;
+
+        /// <summary>True when any of the positions is within <paramref name="radius"/> of the blast centre (the rim counts).</summary>
+        public static bool ReachesAny(Vector3 centre, float radius, IReadOnlyList<Vector3> positions)
+        {
+            for (int i = 0; i < positions.Count; i++)
+                if (Vector3.Distance(centre, positions[i]) <= radius)
+                    return true;
+            return false;
+        }
+
+        /// <summary>The height the wall test aims at. A point on the ground is lifted by the Eye Height (as high as the eyes
+        /// looking); a shot is already in the air, so it is judged on the eye's own plane (the one the sight picture uses),
+        /// not lifted again over a Cover Wall.</summary>
+        public static float TargetHeight(bool atEyeHeight, float eyeY, float pointY, float eyeHeight) =>
+            atEyeHeight ? eyeY : pointY + eyeHeight;
     }
 }
