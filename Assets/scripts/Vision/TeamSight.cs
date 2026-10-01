@@ -42,6 +42,7 @@ namespace Overpower.Vision
         private float feetOffset; // the capsule's bottom below the pivot, read once from the prefab
         private bool feetOffsetRead;
         private PlayerLifecycle lifecycle;
+        private System.Func<Vector3, bool> canSeePoint;
 
         // The sight texture: white where my team sees, black elsewhere (read by the fog shader, the minimap).
         private RenderTexture sightTexture;
@@ -214,6 +215,55 @@ namespace Overpower.Vision
             if (friendly >= 0 && Teams.TryGetTeam(view.Owner, out int team) && team == friendly)
                 return true;
             return CanSee(view.transform.position);
+        }
+
+        /// <summary>True when my team sees any point along a to b, sampled every Line Sample Spacing metres (both ends
+        /// included). True for everything when the fog is switched off. Used by beams and warning lines.</summary>
+        public bool CanSeeLine(Vector3 a, Vector3 b)
+        {
+            if (!FogOn)
+                return true;
+            canSeePoint ??= CanSee;
+            return ShotVisibilityRules.LineSeen(a, b, config.LineSampleSpacing, canSeePoint);
+        }
+
+        /// <summary>Whether a shooter counts as friendly to me: my own team, or the watched team while I am spectating.
+        /// A shooter whose team is not known yet counts as an enemy.</summary>
+        public bool IsFriendly(Photon.Realtime.Player shooter) =>
+            Teams.TryGetTeam(shooter, out int team) && IsFriendlyTeam(team);
+
+        /// <summary>The same by team number (a negative team is unknown, so an enemy).</summary>
+        public bool IsFriendlyTeam(int shooterTeam)
+        {
+            Refresh();
+            return ShotVisibilityRules.IsFriendlyTeam(shooterTeam, SightEyes.FriendlyTeam(mode, localTeam, watchedTeam));
+        }
+
+        // The three questions the shot visuals ask. Each is true when there is no TeamSight yet or the fog is off, so a
+        // client without fog draws everything exactly as before.
+
+        /// <summary>D2: is a shot of this team drawn at this point? Own team always; an enemy's only while the point is seen.</summary>
+        public static bool ShotShownAt(int shooterTeam, Vector3 point)
+        {
+            TeamSight sight = Local;
+            return sight == null || ShotVisibilityRules.ShowOwnTeamOrSeen(sight.IsFriendlyTeam(shooterTeam), sight.CanSee(point));
+        }
+
+        /// <summary>D2: is a beam / line of this team drawn? Own team always; an enemy's only while the line crosses sight.</summary>
+        public static bool ShotShownAlong(int shooterTeam, Vector3 a, Vector3 b)
+        {
+            TeamSight sight = Local;
+            return sight == null || ShotVisibilityRules.ShowOwnTeamOrSeen(sight.IsFriendlyTeam(shooterTeam), sight.CanSeeLine(a, b));
+        }
+
+        /// <summary>D2: is a blast of this team drawn? Own team always; an enemy's if its centre is seen or it reaches me.</summary>
+        public static bool BlastShownAt(int shooterTeam, Vector3 centre, float radius)
+        {
+            TeamSight sight = Local;
+            if (sight == null)
+                return true;
+            return ShotVisibilityRules.BlastShown(sight.IsFriendlyTeam(shooterTeam), sight.CanSee(centre),
+                Vector3.Distance(centre, sight.transform.position), radius);
         }
 
         // The eye is at its own player's eye point (their feet + Eye Height); the asked-about point is lifted the same

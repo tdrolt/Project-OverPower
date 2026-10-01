@@ -5,6 +5,7 @@ using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
 using Overpower.UI;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -593,7 +594,8 @@ namespace Overpower.Weapons
             else
                 DispatchShots(fired, origin, shots);
 
-            if (fired.MuzzleVfx != null && VFXManager.Instance != null)
+            // D2: a hidden shooter's muzzle flash is not shown (own team's always). The fire sound below is untouched (Task 7).
+            if (fired.MuzzleVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeam, origin))
                 VFXManager.Instance.PlayVFX(fired.MuzzleVfx, origin);
             if (fired.FireSfx != null && AudioManager.Instance != null)
                 AudioManager.Instance.Play3D(fired.FireSfx, origin);
@@ -679,6 +681,9 @@ namespace Overpower.Weapons
                 float length = beam.PredictBeamLength(origin, shots[i]);
                 warnings[i] = LaserWarningLine.Create(origin, shots[i].Direction, length, color,
                                                       weapon.WindupSeconds, theme);
+                // D2: the warning line of a shot from the fog is drawn only while it crosses my team's sight.
+                if (!TeamSight.ShotShownAlong(shooterTeam, origin, origin + shots[i].Direction.normalized * length))
+                    warnings[i].GetComponent<LineRenderer>().enabled = false;
 
                 // Quality review finding: parented to the SHOOTER, not left as a loose root object.
                 // FireAfterWindup only destroys this line after its own WaitForSeconds finishes, and
@@ -859,6 +864,9 @@ namespace Overpower.Weapons
             }
 
             motor.Initialize(shot);
+            // D2: an enemy's shot is drawn only while it is inside my team's sight, so one from the fog appears as it
+            // crosses the fog's edge (own team's always). Visuals only: the shot flies and hits as before.
+            VisibleWhenSeen.Attach(projectile, shot.ShooterTeamId);
         }
     }
 }

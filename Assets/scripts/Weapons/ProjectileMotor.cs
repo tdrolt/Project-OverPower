@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -433,7 +434,9 @@ namespace Overpower.Weapons
                 // had none of its own set.
                 GameObject vfx = context.Weapon != null && context.Weapon.ImpactVfx != null
                     ? context.Weapon.ImpactVfx : fallbackImpactVfx;
-                if (vfx != null && VFXManager.Instance != null)
+                // D2: an enemy shot's impact flash in the fog is not shown (it would give away where it landed); the
+                // sound below is untouched (Task 7).
+                if (vfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(context.ShooterTeamId, at))
                     VFXManager.Instance.PlayVFX(vfx, at);
 
                 if (impactSfx != null && AudioManager.Instance != null)

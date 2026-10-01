@@ -1,0 +1,65 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace Overpower.Vision
+{
+    /// <summary>
+    /// On an enemy's shot (a bullet, rocket, Stun Gun or Zip Gun bolt, a rope anchor): every Renderer under this object
+    /// (mesh, trail, line, particles) is switched on only while my team sees the object's position, so a shot from the
+    /// fog appears as it crosses the fog's edge (vision D2). Only Renderer.enabled is touched - never the object's active
+    /// state, colliders or scripts - so the shot still flies, hits and damages exactly as before. ForceVisible keeps my
+    /// own team's shots always shown. No TeamSight yet, or the fog off, means shown.
+    /// </summary>
+    public sealed class VisibleWhenSeen : MonoBehaviour
+    {
+        private readonly List<Renderer> renderers = new List<Renderer>(8);
+        private readonly List<bool> authoredEnabled = new List<bool>(8); // what each renderer was set to before we touched it
+        private bool shown = true;
+
+        /// <summary>True for my team's shots: always drawn.</summary>
+        public bool ForceVisible { get; set; }
+
+        /// <summary>Whether the renderers are currently on (recorders and tests read it).</summary>
+        public bool Shown => shown;
+
+        /// <summary>Adds the component to a freshly spawned shot of <paramref name="shooterTeam"/>: friendly shots are
+        /// force-visible, an enemy's follow the sight. Does nothing without a TeamSight (nothing is hidden then).</summary>
+        public static VisibleWhenSeen Attach(GameObject shot, int shooterTeam)
+        {
+            TeamSight sight = TeamSight.Local;
+            if (shot == null || sight == null)
+                return null;
+            VisibleWhenSeen gate = shot.AddComponent<VisibleWhenSeen>();
+            gate.ForceVisible = sight.IsFriendlyTeam(shooterTeam);
+            gate.Apply();
+            return gate;
+        }
+
+        private void Awake() => RefreshRenderers();
+
+        /// <summary>Collects the renderers again; call after adding children later (a trail, a muzzle effect).</summary>
+        public void RefreshRenderers()
+        {
+            renderers.Clear();
+            authoredEnabled.Clear();
+            GetComponentsInChildren(true, renderers);
+            for (int i = 0; i < renderers.Count; i++)
+                authoredEnabled.Add(renderers[i] != null && renderers[i].enabled);
+            shown = true;
+        }
+
+        private void LateUpdate() => Apply();
+
+        private void Apply()
+        {
+            TeamSight sight = TeamSight.Local;
+            bool visible = ForceVisible || sight == null || sight.CanSee(transform.position);
+            if (visible == shown)
+                return;
+            shown = visible;
+            for (int i = 0; i < renderers.Count; i++)
+                if (renderers[i] != null)
+                    renderers[i].enabled = visible && authoredEnabled[i];
+        }
+    }
+}

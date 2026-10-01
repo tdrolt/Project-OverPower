@@ -3,6 +3,7 @@ using UnityEngine;
 using Overpower.Combat;
 using Overpower.Weapons;
 using Overpower.Match;
+using Overpower.Vision;
 
 namespace Overpower.Abilities
 {
@@ -315,7 +316,7 @@ namespace Overpower.Abilities
             }
 
             Vector3 end = beamOrigin + aimDirection * beam.Length;
-            DrawBeam(beamOrigin, end);
+            DrawBeam(beamOrigin, end, casterTeam);
         }
 
         /// <summary>Hitscan.BuildMask's identical reasoning: the designer's layers minus the three
@@ -325,9 +326,13 @@ namespace Overpower.Abilities
 
         /// <summary>A local, throwaway effect on each client, matching Hitscan.DrawBeam - never a
         /// networked object, since every client draws its own copy from the same cast event.</summary>
-        private void DrawBeam(Vector3 from, Vector3 to)
+        private void DrawBeam(Vector3 from, Vector3 to, int casterTeam)
         {
             if (beamVfx == null)
+                return;
+
+            // D2: an enemy's Raybeam is drawn only while this beam's line crosses my team's sight (own team's always).
+            if (!TeamSight.ShotShownAlong(casterTeam, from, to))
                 return;
 
             GameObject beam = Instantiate(beamVfx, from, Quaternion.identity);

@@ -1,6 +1,7 @@
 using UnityEngine;
 using Overpower.Weapons;
 using Overpower.Match;
+using Overpower.Vision;
 
 namespace Overpower.Abilities
 {
@@ -99,6 +100,8 @@ namespace Overpower.Abilities
             }
 
             motor.Initialize(shot);
+            // D2: an enemy's Stun Gun bolt is drawn only while inside my team's sight (own team's always).
+            VisibleWhenSeen.Attach(projectile, cast.CasterTeam);
         }
 
         public override string ShopStatsText()

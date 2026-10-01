@@ -2,6 +2,7 @@ using UnityEngine;
 using Overpower.Combat;
 using Overpower.Weapons;
 using Overpower.Match;
+using Overpower.Vision;
 
 namespace Overpower.Abilities
 {
@@ -101,6 +102,7 @@ namespace Overpower.Abilities
         private LineRenderer pullRope;
         private Vector3 tetherPoint;
         private float ropeUntil;
+        private int ropeTeam = -1;
         private MaterialPropertyBlock anchorBlock;
 
         public override bool IsActive => pulling;
@@ -192,7 +194,7 @@ namespace Overpower.Abilities
                     // Ability visuals step 7: every client, the caster's own included, draws the square
                     // anchor and a rope for as long as the pull takes. The caster used to see the pull
                     // with nothing connecting them to where the hook bit.
-                    PlayTether(cast.Payload.Point);
+                    PlayTether(cast.Payload.Point, cast.CasterTeam);
                     return;
             }
         }
@@ -221,6 +223,8 @@ namespace Overpower.Abilities
             }
 
             motor.Initialize(shot);
+            // D2: an enemy's Zip Gun bolt (and the rope that rides on it) is drawn only while inside my team's sight.
+            VisibleWhenSeen.Attach(projectile, cast.CasterTeam);
         }
 
         /// <summary>Caster only, called by AbilityHitRelay through the context it was built with -
@@ -270,7 +274,7 @@ namespace Overpower.Abilities
             pulling = false;
         }
 
-        private void PlayTether(Vector3 point)
+        private void PlayTether(Vector3 point, int casterTeam)
         {
             Vector3 toPoint = point - Owner.Root.transform.position;
             toPoint.y = 0f;
@@ -294,6 +298,8 @@ namespace Overpower.Abilities
                 if (anchorBlock == null)
                     anchorBlock = new MaterialPropertyBlock();
                 VisualTint.SetMeshColor(renderer, anchorBlock, color);
+                // D2: an enemy's anchor is drawn only while its spot is inside my team's sight (own team's always).
+                VisibleWhenSeen.Attach(anchor, casterTeam);
                 Destroy(anchor, seconds);
             }
 
@@ -303,6 +309,7 @@ namespace Overpower.Abilities
                 pullRope = BuildRope();
             VisualTint.SetLineColor(pullRope, color);
             tetherPoint = point;
+            ropeTeam = casterTeam;
             ropeUntil = Time.time + seconds;
             pullRope.enabled = true;
             UpdateRope();
@@ -333,7 +340,7 @@ namespace Overpower.Abilities
 
         private void LateUpdate()
         {
-            if (pullRope == null || !pullRope.enabled)
+            if (pullRope == null)
                 return;
             if (Time.time >= ropeUntil)
             {
@@ -348,6 +355,9 @@ namespace Overpower.Abilities
             Vector3 start = Owner.Weapon != null ? Owner.Weapon.MuzzlePosition : Owner.Root.transform.position;
             pullRope.SetPosition(0, start);
             pullRope.SetPosition(1, tetherPoint);
+            // D2: an enemy's pull rope is drawn only while the line crosses my team's sight, checked every frame it is
+            // drawn (own team's always).
+            pullRope.enabled = TeamSight.ShotShownAlong(ropeTeam, start, tetherPoint);
         }
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]

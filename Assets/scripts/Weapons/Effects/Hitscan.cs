@@ -3,6 +3,7 @@ using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.UI;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -193,12 +194,12 @@ namespace Overpower.Weapons
                                                           shot.ShooterTeamId, shot.Weapon.Id,
                                                           DamageSource.Projectile, false, contact.Point, -1,
                                                           shot.Weapon.MarkWindowSeconds, shot.Weapon.MarkedDamageMultiplier));
-                PlayImpact(shot.Weapon, contact.Point);
+                PlayImpact(shot.Weapon, contact.Point, shot.ShooterTeamId);
             }
 
             Vector3 end = origin + shot.Direction.normalized * beam.Length;
             if (beam.StoppedOnGeometry)
-                PlayImpact(shot.Weapon, end);
+                PlayImpact(shot.Weapon, end, shot.ShooterTeamId);
 
             DrawBeam(origin, end, shot.ShooterTeamId);
         }
@@ -269,6 +270,10 @@ namespace Overpower.Weapons
         private void DrawBeam(Vector3 from, Vector3 to, int shooterTeamId)
         {
             if (beamVfx == null)
+                return;
+
+            // D2: a beam from the fog is drawn only while the line crosses my team's sight (own team's always).
+            if (!TeamSight.ShotShownAlong(shooterTeamId, from, to))
                 return;
 
             GameObject beam = Instantiate(beamVfx, from, Quaternion.identity);
@@ -357,9 +362,10 @@ namespace Overpower.Weapons
             line.SetPropertyBlock(beamPropertyBlock);
         }
 
-        private static void PlayImpact(WeaponDefinition weapon, Vector3 at)
+        private static void PlayImpact(WeaponDefinition weapon, Vector3 at, int shooterTeamId)
         {
-            if (weapon.ImpactVfx != null && VFXManager.Instance != null)
+            // D2: an enemy beam's impact flash in the fog is not shown (own team's always).
+            if (weapon.ImpactVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeamId, at))
                 VFXManager.Instance.PlayVFX(weapon.ImpactVfx, at);
         }
 
