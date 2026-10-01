@@ -317,6 +317,10 @@ namespace Overpower.UI
         public float loadoutAbilityColumnGap = 60f;
         [Tooltip("Gap between the two upgrades of a weapon family (side by side), between ability cards in a column's grid (both directions), and between the Absorb row, the Recharge row and Reset Armor, in canvas units.")]
         public float loadoutNodeSpacing = 20f;
+        [Tooltip("Gap between an armor upgrade's text (Absorb, Recharge) and its own + button, in canvas units. Keep it much smaller than Armor Row Gap, so each + reads as part of the text before it.")]
+        public float loadoutArmorPlusGap = 12f;
+        [Tooltip("Gap between the Absorb group (text + button) and the Recharge group on the Abilities & Armor page, in canvas units. Keep it much larger than Armor Plus Gap, so a + button is never mistaken for the other upgrade's.")]
+        public float loadoutArmorRowGap = 90f;
         [Tooltip("Thickness of the highlight border drawn around the equipped weapon node or ability card, in canvas units.")]
         public float loadoutEquippedBorderWidth = 4f;
         [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units. Raised from an original 44 (Task 9a review, 616x576 capture): a bigger button gives the bigger glyph below more room to stay legible.")]

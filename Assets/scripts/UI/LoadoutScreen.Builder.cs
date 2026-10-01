@@ -215,7 +215,8 @@ namespace Overpower.UI
         // ============================================================================================
 
         /// <summary>The armor rows (Absorb, Recharge) and Reset Armor side by side, under an "Armor" heading, at the top
-        /// of the Abilities &amp; Armor page.</summary>
+        /// of the Abilities &amp; Armor page. Each row is its label with its own "+" right after it; a wide gap separates
+        /// the two rows so a "+" never reads as belonging to the other upgrade (Task 14b). Reset Armor sits at the right edge.</summary>
         private void BuildArmorSection(Transform page)
         {
             AddSectionHeader(page, "Armor");
@@ -223,13 +224,18 @@ namespace Overpower.UI
             GameObject group = new GameObject("Armor Rows", typeof(RectTransform));
             group.transform.SetParent(page, false);
             HorizontalLayoutGroup layout = group.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = theme.loadoutNodeSpacing * 2f;
-            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.spacing = theme.loadoutArmorRowGap;
+            layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
             absorbText = BuildArmorRow(group.transform, out absorbButton, OnAbsorbClicked, "armor:absorb", () => ArmorPopUpText(true));
             rechargeText = BuildArmorRow(group.transform, out rechargeButton, OnRechargeClicked, "armor:recharge", () => ArmorPopUpText(false));
+
+            // Pushes Reset Armor to the right edge, so the free width is not spread between the two rows.
+            GameObject spacer = new GameObject("Armor Rows Spacer", typeof(RectTransform));
+            spacer.transform.SetParent(group.transform, false);
+            spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
             Button resetArmorButton = AddButton(group.transform, "Reset Armor", OnResetArmorClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
             resetArmorLabel = resetArmorButton.GetComponentInChildren<TextMeshProUGUI>();
@@ -248,12 +254,10 @@ namespace Overpower.UI
             GameObject row = new GameObject("Armor Row", typeof(RectTransform));
             row.transform.SetParent(parent, false);
             HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = theme.loadoutNodeSpacing;
+            layout.spacing = theme.loadoutArmorPlusGap; // The "+" sits this close after its own label.
             layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
-            LayoutElement rowLe = row.AddComponent<LayoutElement>();
-            rowLe.flexibleWidth = 1f; // The two rows share the width Reset Armor leaves.
 
             // Invisible, but it is what the pointer lands on between the text and the + button - so the pop-up opens
             // on the whole row, not only on the button (Task 13).
@@ -263,8 +267,7 @@ namespace Overpower.UI
 
             TextMeshProUGUI label = AddLabel(row.transform, "", theme.bodyTextSize, FontStyles.Normal);
             label.alignment = TextAlignmentOptions.MidlineLeft;
-            LayoutElement labelLe = label.gameObject.AddComponent<LayoutElement>();
-            labelLe.flexibleWidth = 1f; // Takes whatever width the fixed-size + button below does not.
+            // No flexible width on the label or the row: the label is as wide as its text, so the + follows it directly.
 
             plusButton = AddButton(row.transform, "+", onClick, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
 
