@@ -76,5 +76,19 @@ namespace Overpower.Tests
             gate.SetVisible(true);
             Assert.AreEqual(0, trail.positionCount);
         }
+
+        // The pure choice: force wins, no sight = shown, a caster-bound object follows its caster, else its spot.
+        [Test] public void Decide_Forced_IsShown() => Assert.IsTrue(VisibleWhenSeen.Decide(true, true, false, false, false));
+        [Test] public void Decide_NoSight_IsShown() => Assert.IsTrue(VisibleWhenSeen.Decide(false, false, false, false, false));
+        [Test] public void Decide_ByPosition_FollowsTheSpot()
+        {
+            Assert.IsTrue(VisibleWhenSeen.Decide(false, true, false, false, true));
+            Assert.IsFalse(VisibleWhenSeen.Decide(false, true, false, true, false));
+        }
+        [Test] public void Decide_ByCaster_FollowsTheCasterNotTheSpot()
+        {
+            Assert.IsTrue(VisibleWhenSeen.Decide(false, true, true, true, false), "caster shown, own spot in fog");
+            Assert.IsFalse(VisibleWhenSeen.Decide(false, true, true, false, true), "caster hidden, own spot seen");
+        }
     }
 }

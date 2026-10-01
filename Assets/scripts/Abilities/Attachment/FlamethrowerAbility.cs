@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.Vision;
 using Overpower.Match;
 
 namespace Overpower.Abilities
@@ -313,6 +314,8 @@ namespace Overpower.Abilities
             // everyone else sees just the soft fan, never a hard edge.
             vfx.Configure(coneRange, coneAngle, vfxColor, Owner.IsMine);
             vfx.gameObject.SetActive(true);
+            // Vision: the cone is hidden with the enemy who sprays it, checked every frame (friendly: always).
+            VisibleWhenSeen.AttachToCaster(vfx.gameObject, Owner.PhotonView);
         }
 
         private void PositionVfx(Vector3 apex, Vector3 forward)

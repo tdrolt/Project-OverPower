@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using Photon.Pun;
 using UnityEngine;
+using Overpower.Net;
 
 namespace Overpower.Vision
 {
@@ -15,6 +17,12 @@ namespace Overpower.Vision
         private readonly List<Renderer> renderers = new List<Renderer>(8);
         private readonly List<bool> authoredEnabled = new List<bool>(8); // what each renderer was set to before we touched it
         private bool shown = true;
+        [SerializeField, Tooltip("For a placed thing with a PhotonView (AoE Zone, Fire Field): shown always when its owner is on my team, " +
+            "otherwise only while its position is seen. Leave off for shots, which are told their team when spawned.")]
+        private bool ownersTeamAlwaysSees;
+
+        private PhotonView ownView;
+        private PhotonView followCaster; // set: shown exactly while that player is shown (their abilities' visuals)
 
         /// <summary>True for my team's shots: always drawn.</summary>
         public bool ForceVisible { get; set; }
@@ -35,7 +43,35 @@ namespace Overpower.Vision
             return gate;
         }
 
-        private void Awake() => RefreshRenderers();
+        /// <summary>Adds (or reuses) the component on an ability visual that belongs to a player and follows them: it is
+        /// shown exactly while that player is shown (my team's always, an enemy's while seen), checked every frame. Does
+        /// nothing without a TeamSight.</summary>
+        public static VisibleWhenSeen AttachToCaster(GameObject visual, PhotonView casterView)
+        {
+            if (visual == null || TeamSight.Local == null)
+                return null;
+            VisibleWhenSeen gate = visual.GetComponent<VisibleWhenSeen>();
+            if (gate == null)
+                gate = visual.AddComponent<VisibleWhenSeen>();
+            gate.followCaster = casterView;
+            gate.Apply();
+            return gate;
+        }
+
+        /// <summary>The whole choice, plain values: forced or no sight = shown; an object bound to a caster follows the
+        /// caster; any other follows its own position.</summary>
+        public static bool Decide(bool forceVisible, bool hasSight, bool followsCaster, bool casterShown, bool positionSeen)
+        {
+            if (forceVisible || !hasSight)
+                return true;
+            return followsCaster ? casterShown : positionSeen;
+        }
+
+        private void Awake()
+        {
+            ownView = GetComponent<PhotonView>();
+            RefreshRenderers();
+        }
 
         /// <summary>Collects the renderers again; call after adding children later (a trail, a muzzle effect). Renderers
         /// we switched off are put back to their authored state first, so "off" is never recorded as authored.</summary>
@@ -57,7 +93,12 @@ namespace Overpower.Vision
         public void Apply()
         {
             TeamSight sight = TeamSight.Local;
-            SetVisible(ForceVisible || sight == null || sight.CanSeeShot(transform.position));
+            bool bound = followCaster != null; // a caster who left (destroyed view) no longer binds: the spot rules
+            bool force = ForceVisible || (ownersTeamAlwaysSees && sight != null && ownView != null
+                && Teams.TryGetTeam(ownView.Owner, out int ownerTeam) && sight.IsFriendlyTeam(ownerTeam));
+            SetVisible(Decide(force, sight != null, bound,
+                bound && sight != null && sight.CanSeePlayer(followCaster),
+                sight != null && !bound && sight.CanSeeShot(transform.position)));
         }
 
         /// <summary>Switches the renderers on (to their authored state) or off. A trail is cleared when it comes back, so

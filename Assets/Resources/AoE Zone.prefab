@@ -98,6 +98,7 @@ GameObject:
   - component: {fileID: 3151929924070772902}
   - component: {fileID: 958633899319211336}
   - component: {fileID: 744301671496898337}
+  - component: {fileID: 8275226448855262276}
   m_Layer: 0
   m_Name: AoE Zone
   m_TagString: Untagged
@@ -187,3 +188,16 @@ MonoBehaviour:
   sceneViewId: 0
   InstantiationId: 0
   isRuntimeInstantiated: 0
+--- !u!114 &8275226448855262276
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7589836499342953701}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fec34cf377bb65f42aa924b1fcdd3e1e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ownersTeamAlwaysSees: 1

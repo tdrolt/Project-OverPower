@@ -120,7 +120,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     /// <summary>The world-space canvas the overhead bar and the name sit on - null when the prefab has no health
     /// fill assigned. The status label is built onto it.</summary>
-    public Canvas OverheadCanvas => healthFillImage != null ? healthFillImage.canvas : null;
+    public Canvas OverheadCanvas => healthFillImage != null ? healthFillImage.GetComponentInParent<Canvas>(true) : null; // includes a canvas EnemyVisibility switched off (Image.canvas reads null then)
 
     private PhotonView photonView;
     private PlayerLifecycle lifecycle; // the replicated alive state, read by IsAlive

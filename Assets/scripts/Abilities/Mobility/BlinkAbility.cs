@@ -1,6 +1,7 @@
 using UnityEngine;
 using Overpower.Arena;
 using Overpower.Combat;
+using Overpower.Vision;
 using Overpower.Match;
 
 namespace Overpower.Abilities
@@ -164,13 +165,15 @@ namespace Overpower.Abilities
                 return;
             }
 
-            PlayRemoteVfx(cast.Payload.Origin);
-            PlayRemoteVfx(cast.Payload.Point);
+            // Vision: an enemy's Blink is seen leaving only if the start is in my team's sight, and arriving only if
+            // the landing is (they can Blink into the fog and be gone). My own team's always show.
+            PlayRemoteVfx(cast.Payload.Origin, cast.CasterTeam);
+            PlayRemoteVfx(cast.Payload.Point, cast.CasterTeam);
         }
 
-        private void PlayRemoteVfx(Vector3 point)
+        private void PlayRemoteVfx(Vector3 point, int casterTeam)
         {
-            if (remoteVfxRadius <= 0f)
+            if (remoteVfxRadius <= 0f || !TeamSight.ShotShownAt(casterTeam, point))
                 return;
 
             GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);

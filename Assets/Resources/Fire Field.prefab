@@ -157,6 +157,7 @@ GameObject:
   - component: {fileID: 336821031624262639}
   - component: {fileID: 5566425329573350323}
   - component: {fileID: 3800548617608865943}
+  - component: {fileID: 3651292873186776730}
   m_Layer: 0
   m_Name: Fire Field
   m_TagString: Untagged
@@ -228,6 +229,19 @@ MonoBehaviour:
   fillOpacity: 0.5
   rimOpacity: 0.95
   rimSegments: 48
+--- !u!114 &3651292873186776730
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5027107811277816759}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fec34cf377bb65f42aa924b1fcdd3e1e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ownersTeamAlwaysSees: 1
 --- !u!1 &5977107801584436062
 GameObject:
   m_ObjectHideFlags: 0

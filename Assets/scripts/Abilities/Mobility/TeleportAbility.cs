@@ -3,6 +3,7 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Arena;
 using Overpower.Combat;
+using Overpower.Vision;
 using Overpower.Match;
 
 namespace Overpower.Abilities
@@ -420,6 +421,8 @@ namespace Overpower.Abilities
                 case PhaseChannelStart:
                     ClearChannelVfx();
                     channelVfx = SpawnMarker(cast.Payload.Point, channelVfxRadius);
+                    // Vision: it lasts seconds, so it follows my team's sight instead of being judged once (friendly: always).
+                    VisibleWhenSeen.Attach(channelVfx, cast.CasterTeam);
                     return;
 
                 case PhaseTravelled:
@@ -442,8 +445,8 @@ namespace Overpower.Abilities
                         // height (0.5 m above the floor, so the caster's own TeleportTo above lands standing), but
                         // these two markers are cosmetic ground rings, not standing heights - PlayerSpaceProbe.FeetOf
                         // derives the floor back out of it so it still matches Origin's own floor-level point.
-                        PlayArrivalVfx(cast.Payload.Origin);
-                        PlayArrivalVfx(capsule != null ? PlayerSpaceProbe.FeetOf(capsule, cast.Payload.Point) : cast.Payload.Point);
+                        PlayArrivalVfx(cast.Payload.Origin, cast.CasterTeam); // departure: only if its spot is seen
+                        PlayArrivalVfx(capsule != null ? PlayerSpaceProbe.FeetOf(capsule, cast.Payload.Point) : cast.Payload.Point, cast.CasterTeam); // arrival: only if its spot is seen
 
                         // Task 15: a trip just completed here - teammates standing on the departure portal travel with it.
                         // Each client moves only its own player (AllyPortalTraveller.Local), no new message is needed.
@@ -595,9 +598,9 @@ namespace Overpower.Abilities
             channelVfx = null;
         }
 
-        private void PlayArrivalVfx(Vector3 point)
+        private void PlayArrivalVfx(Vector3 point, int casterTeam)
         {
-            if (arrivalVfxRadius <= 0f)
+            if (arrivalVfxRadius <= 0f || !TeamSight.ShotShownAt(casterTeam, point))
                 return;
             Destroy(SpawnMarker(point, arrivalVfxRadius), arrivalVfxSeconds);
         }
