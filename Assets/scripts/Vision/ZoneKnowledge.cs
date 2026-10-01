@@ -80,7 +80,16 @@ namespace Overpower.Vision
             progressOf = id => buildings.CaptureProgressOf(id);
             underAttack = id => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(id);
             towerSeen = id => buildings.TryGetZoneCentre(id, out Vector3 centre)
-                && ZoneViews.IsSeen(sight != null, sight != null && sight.CanSee(centre));
+                && ZoneViews.IsSeen(sight != null, sight != null && TowerInSight(centre));
+        }
+
+        // The tower is solid, so a line to its centre stops on its own surface: it is in sight when a spot just outside it is.
+        private bool TowerInSight(Vector3 centre)
+        {
+            for (int i = 0; i < ZoneViews.TowerSightPointCount; i++)
+                if (sight.CanSee(ZoneViews.TowerSightPoint(centre, i)))
+                    return true;
+            return false;
         }
 
         private void OnDestroy()

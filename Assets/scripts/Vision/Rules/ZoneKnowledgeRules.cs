@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Overpower.Match;
+using UnityEngine;
 
 namespace Overpower.Vision
 {
@@ -44,6 +45,18 @@ namespace Overpower.Vision
                 CaptureRingState ring = CaptureRingState.From(progressOf(zone), owner, underAttack(zone), nowMs);
                 into.Add(new ZoneView(owner, ring, snapshot.HeldSinceMs(zone)));
             }
+        }
+
+        /// <summary>Sight lines to a tower's centre always stop at the tower's own solid capsule (Building layer, 2.6 m radius), so a
+        /// tower counts as in sight when a spot on the ground just outside that capsule is. These are those spots.</summary>
+        public const float TowerSightRadius = 3f;
+        public const int TowerSightPointCount = 8;
+
+        public static Vector3 TowerSightPoint(Vector3 towerCentre, int index)
+        {
+            float angle = index * (2f * Mathf.PI / TowerSightPointCount);
+            return new Vector3(towerCentre.x + Mathf.Cos(angle) * TowerSightRadius, towerCentre.y,
+                               towerCentre.z + Mathf.Sin(angle) * TowerSightRadius);
         }
 
         /// <summary>A tower is seen when it is in my team's sight. With no sight object at all there is no fog, so everything

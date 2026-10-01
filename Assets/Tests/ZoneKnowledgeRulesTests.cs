@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using UnityEngine;
 using Overpower.Match;
 using Overpower.Vision;
 
@@ -264,6 +265,30 @@ namespace Overpower.Tests
         }
 
         // ---- "seen"
+
+        // The tower is a solid (Building layer) capsule 2.6 m wide, so a sight line to its centre always stops at its own
+        // surface; the tower is seen when a spot just outside that capsule is.
+        [Test]
+        public void EveryTowerSightPoint_IsTheSameDistanceFromTheCentre_OnTheGround()
+        {
+            var centre = new Vector3(40f, 0.3f, -12f);
+            for (int i = 0; i < ZoneViews.TowerSightPointCount; i++)
+            {
+                Vector3 p = ZoneViews.TowerSightPoint(centre, i);
+                Assert.AreEqual(centre.y, p.y, 1e-5f);
+                Assert.AreEqual(ZoneViews.TowerSightRadius, Vector2.Distance(new Vector2(p.x, p.z), new Vector2(centre.x, centre.z)), 1e-4f);
+            }
+        }
+
+        [Test]
+        public void TheTowerSightPoints_AreAllDifferent_AndSitOutsideTheTowerCapsule()
+        {
+            Assert.Greater(ZoneViews.TowerSightRadius, 2.6f, "the Tower Look capsule is 2.6 m in radius");
+            var seen = new System.Collections.Generic.HashSet<Vector3>();
+            for (int i = 0; i < ZoneViews.TowerSightPointCount; i++)
+                seen.Add(ZoneViews.TowerSightPoint(Vector3.zero, i));
+            Assert.AreEqual(ZoneViews.TowerSightPointCount, seen.Count);
+        }
 
         [Test] public void WithNoSightObject_ATowerCountsAsSeen() => Assert.IsTrue(ZoneViews.IsSeen(false, false));
         [Test] public void ATowerOutOfSight_IsNotSeen() => Assert.IsFalse(ZoneViews.IsSeen(true, false));
