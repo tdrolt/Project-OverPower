@@ -40,8 +40,8 @@ namespace Overpower.Weapons
         private WeaponDefinition startingWeapon;
 
         // The muzzle's one home is its Transform on Assets/Resources/Multiplayer Player.prefab - tune
-        // it by moving that child. Local position there is (0.072, 1.486, 0.6785): half the earlier
-        // horizontal distance from the body centre (was 0.144, 1.486, 1.357), same height.
+        // it by moving that child. It sits just inside the player's body capsule; the shot logic
+        // ignores the shooter, so that is safe.
         [SerializeField, Tooltip("Where projectiles leave the gun. Falls back to the player's own " +
                  "position if it is empty, which looks wrong but still fires.")]
         private Transform muzzle;
@@ -56,8 +56,8 @@ namespace Overpower.Weapons
         [Header("Wall-hugging clearance (review finding, Task 1.9 follow-up)")]
         [SerializeField, Tooltip("Radius, in metres, of the clearance check between the player's " +
                  "body and the muzzle tip - approximately a projectile's own radius. The muzzle sits " +
-                 "roughly 1.36m in front of the root (about 0.66m past a 0.7m capsule); a player " +
-                 "standing flush against a wall or thin cover pushes that point INSIDE or THROUGH it, " +
+                 "just inside the body capsule, but the check still reaches past the capsule's surface; " +
+                 "a player standing flush against a wall or thin cover pushes that point INSIDE or THROUGH it, " +
                  "and Physics.Raycast/SphereCast never report a collider their own origin already " +
                  "starts inside - so a shot, beam or the flamethrower's occlusion check fired from " +
                  "the raw muzzle sailed straight through the wall it was touching (measured: the " +

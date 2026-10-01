@@ -132,10 +132,10 @@ namespace Overpower.Weapons
         /// <summary>
         /// Issue 1 fix (2026-09-15): catches a target whose collider already CONTAINS the origin -
         /// the point-blank case the raycast above structurally cannot see. Unity never reports a
-        /// collider a ray starts inside of, and the muzzle (SafeMuzzlePosition, ~1.36m in front of
-        /// the shooter's root) sits inside a target's capsule (radius ~0.7) at any centre distance
-        /// under about 2.06m - measured and confirmed live: at 1.5m the muzzle sat exactly on the
-        /// dummy capsule's ClosestPoint (i.e. inside it), and the raycast above reported only the
+        /// collider a ray starts inside of, and the muzzle (SafeMuzzlePosition, just inside the
+        /// shooter's own body capsule) can sit inside a target's capsule when the two players are close -
+        /// measured and confirmed live: at 1.5m the muzzle (then farther out in front) sat exactly on
+        /// the dummy capsule's ClosestPoint (i.e. inside it), and the raycast above reported only the
         /// far wall, skipping the dummy entirely.
         ///
         /// Deliberately an OverlapSphere AT THE ORIGIN, not a second ray cast from farther back:
@@ -151,8 +151,8 @@ namespace Overpower.Weapons
         /// Distance is recorded as 0 - nothing can be closer to the muzzle than something the muzzle
         /// is already inside of, and BeamResolver only uses Distance to ORDER and CAP contacts (see
         /// BeamResolverTests.AContactAtZeroDistanceIsStruckFirstAndEndsTheBeamThere), so 0 sorting
-        /// first is exactly correct. A target also found by the raycast above (relevant past ~2.06m,
-        /// where the origin has cleared it but the beam still reaches it) is naturally deduplicated
+        /// first is exactly correct. A target also found by the raycast above (relevant once the
+        /// origin has cleared it but the beam still reaches it) is naturally deduplicated
         /// by BeamResolver's own alreadyStruck set, which keeps whichever contact it meets first in
         /// distance order - here, always this 0-distance one. Point is the origin itself
         /// (Collider.ClosestPoint returns the query point unchanged when it is already inside),
