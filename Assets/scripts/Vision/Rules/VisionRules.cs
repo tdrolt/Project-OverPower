@@ -24,12 +24,15 @@ namespace Overpower.Vision
     {
         public readonly Vector2 Position, Facing;
         public readonly SightShape Shape;
+        /// <summary>World height of this eye (its own feet plus the eye height), used for the wall tests.</summary>
+        public readonly float EyeY;
 
-        public Eye(Vector2 position, Vector2 facing, SightShape shape)
+        public Eye(Vector2 position, Vector2 facing, SightShape shape, float eyeY = 0f)
         {
             Position = position;
             Facing = facing;
             Shape = shape;
+            EyeY = eyeY;
         }
     }
 
@@ -95,9 +98,15 @@ namespace Overpower.Vision
         /// clearLine is passed in so tests can fake walls; the game passes a Linecast on the Building layer.</summary>
         public static bool TeamSees(IReadOnlyList<Eye> eyes, Vector2 point, Func<Vector2, Vector2, bool> clearLine)
         {
+            return TeamSeesWithEye(eyes, point, (Eye eye, Vector2 target) => clearLine(eye.Position, target));
+        }
+
+        /// <summary>Same, but the wall test receives the whole eye, so it can use that eye's own height.</summary>
+        public static bool TeamSeesWithEye(IReadOnlyList<Eye> eyes, Vector2 point, Func<Eye, Vector2, bool> clearLine)
+        {
             for (int i = 0; i < eyes.Count; i++)
             {
-                if (InShape(eyes[i], point) && clearLine(eyes[i].Position, point))
+                if (InShape(eyes[i], point) && clearLine(eyes[i], point))
                     return true;
             }
             return false;

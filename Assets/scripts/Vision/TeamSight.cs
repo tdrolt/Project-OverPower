@@ -25,14 +25,15 @@ namespace Overpower.Vision
 
         private readonly List<SightCandidate> candidates = new List<SightCandidate>(16);
         private readonly List<Eye> eyes = new List<Eye>(16);
-        private System.Func<Vector2, Vector2, bool> clearLine;
+        private System.Func<Eye, Vector2, bool> clearLine;
         private int builtFrame = -1;
         private int localTeam = -1;
         private int watchedTeam = -1;
         private ViewerMode mode = ViewerMode.Alive;
         private int buildingMask = -1;
-        private float groundY; // the height the eyes stand at (this player's own), and the height of the point being asked about
-        private float pointY;
+        private float pointY; // the height of the point being asked about
+        private float feetOffset; // the capsule's bottom below the pivot, read once from the prefab
+        private bool feetOffsetRead;
         private PlayerLifecycle lifecycle;
         private SpectateView spectate;
 
@@ -74,7 +75,7 @@ namespace Overpower.Vision
                 return true;
             Refresh();
             pointY = worldPoint.y;
-            return VisionRules.TeamSees(eyes, new Vector2(worldPoint.x, worldPoint.z), clearLine);
+            return VisionRules.TeamSeesWithEye(eyes, new Vector2(worldPoint.x, worldPoint.z), clearLine);
         }
 
         /// <summary>My own body and my team (the watched team while spectating) are always shown; anyone else only while
@@ -84,21 +85,34 @@ namespace Overpower.Vision
             if (view == null || view.IsMine || !FogOn)
                 return true;
             Refresh();
-            int friendly = mode == ViewerMode.Spectating ? watchedTeam : localTeam;
+            int friendly = SightEyes.FriendlyTeam(mode, localTeam, watchedTeam);
             if (friendly >= 0 && Teams.TryGetTeam(view.Owner, out int team) && team == friendly)
                 return true;
             return CanSee(view.transform.position);
         }
 
-        // The eye and the point are both lifted to the eye height above their ground, so a low rock does not hide a player.
-        private bool ClearLine(Vector2 from, Vector2 to)
+        // The eye is at its own player's eye point (their feet + Eye Height); the asked-about point is lifted the same
+        // height above its own ground, so a low rock does not hide a player.
+        private bool ClearLine(Eye eye, Vector2 to)
         {
             if (buildingMask < 0)
                 buildingMask = LayerMask.GetMask("Building");
             float height = config != null ? config.EyeHeight : 1f;
-            Vector3 a = new Vector3(from.x, groundY + height, from.y);
+            Vector3 a = new Vector3(eye.Position.x, eye.EyeY, eye.Position.y);
             Vector3 b = new Vector3(to.x, pointY + height, to.y);
             return !Physics.Linecast(a, b, buildingMask, QueryTriggerInteraction.Ignore);
+        }
+
+        // Height of the capsule's bottom relative to the pivot (the feet; about -0.5 on the player prefab).
+        private float FeetOffset()
+        {
+            if (!feetOffsetRead)
+            {
+                feetOffsetRead = true;
+                CapsuleCollider capsule = GetComponent<CapsuleCollider>();
+                feetOffset = capsule != null ? (capsule.center.y - capsule.height * 0.5f) * transform.lossyScale.y : 0f;
+            }
+            return feetOffset;
         }
 
         private void Refresh()
@@ -106,7 +120,6 @@ namespace Overpower.Vision
             if (builtFrame == Time.frameCount)
                 return;
             builtFrame = Time.frameCount;
-            groundY = transform.position.y;
 
             candidates.Clear();
             localTeam = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int mine) ? mine : -1;
@@ -123,6 +136,7 @@ namespace Overpower.Vision
             }
             bool localAlive = lifecycle == null || lifecycle.IsAlive;
             mode = SightEyes.ModeFor(spectating, localAlive);
+            float eyeHeight = config != null ? config.EyeHeight : 1f;
 
             Room room = PhotonNetwork.CurrentRoom;
             if (room != null)
@@ -137,11 +151,13 @@ namespace Overpower.Vision
                         team = -1;
                     // Same reading as MinimapView: a missing flag means alive, a dropped player is not.
                     bool? flag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool b ? b : (bool?)null;
-                    bool alive = PresenceRules.CountsAsAlive(player.IsInactive, flag);
+                    bool alive = view.IsMine ? localAlive : PresenceRules.CountsAsAlive(player.IsInactive, flag); // my own state from the same source as the mode
                     Vector3 position = view.transform.position;
                     Vector3 forward = view.transform.forward;
+                    // Each eye stands at its own player's feet (this prefab's capsule bottom), not at the local player's height.
+                    float eyeY = position.y + FeetOffset() + eyeHeight;
                     candidates.Add(new SightCandidate(team, alive, view.IsMine,
-                        new Vector2(position.x, position.z), new Vector2(forward.x, forward.z)));
+                        new Vector2(position.x, position.z), new Vector2(forward.x, forward.z), eyeY));
                 }
             }
 
