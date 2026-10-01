@@ -75,6 +75,9 @@ namespace Overpower.Data
         [Tooltip("How many seconds the dots the scan reveals stay on the minimap. Longer keeps enemy positions visible for longer.")]
         [SerializeField, Min(0f)] private float scanDotSeconds = 4f;
 
+        [Tooltip("How long the scan's red dots take to fade out at the end of Scan Dot Seconds.")]
+        [SerializeField, Min(0f)] private float scanDotFadeSeconds = 1f;
+
         [Tooltip("Zones of this tier get their state refreshed by the centre scan.")]
         [SerializeField] private bool scanTier1 = true;
 
@@ -107,6 +110,7 @@ namespace Overpower.Data
         public Color ScanWaveColour => scanWaveColour;
         public float ScanWaveWidth => scanWaveWidth;
         public float ScanDotSeconds => scanDotSeconds;
+        public float ScanDotFadeSeconds => scanDotFadeSeconds;
         public bool ScanTier1 => scanTier1;
         public bool ScanTier2 => scanTier2;
         public bool ScanTier3 => scanTier3;

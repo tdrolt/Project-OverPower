@@ -52,15 +52,15 @@ namespace Overpower.Vision
     /// <summary>The plain pieces behind what the centre scan draws.</summary>
     public static class CentreScanDisplayRules
     {
-        /// <summary>A dot is fully there, then fades away over its last second (or its whole life if that is shorter).</summary>
-        public const float DotFadeSeconds = 1f;
-
-        /// <summary>1 for a fresh dot, falling to 0 as its age reaches the life; 0 beyond it.</summary>
-        public static float DotAlpha(float ageSeconds, float lifeSeconds)
+        /// <summary>1 for a fresh dot, falling to 0 over its last fadeSeconds (VisionConfig Scan Dot Fade Seconds; the whole
+        /// life if that is shorter) as its age reaches the life; 0 beyond it.</summary>
+        public static float DotAlpha(float ageSeconds, float lifeSeconds, float fadeSeconds)
         {
             if (lifeSeconds <= 0f || ageSeconds >= lifeSeconds)
                 return 0f;
-            float fade = Mathf.Min(DotFadeSeconds, lifeSeconds);
+            float fade = Mathf.Min(fadeSeconds, lifeSeconds);
+            if (fade <= 0f)
+                return 1f;
             float fadeStart = lifeSeconds - fade;
             return ageSeconds <= fadeStart ? 1f : Mathf.Clamp01((lifeSeconds - ageSeconds) / fade);
         }

@@ -16,38 +16,45 @@ namespace Overpower.Tests
         [Test]
         public void AFreshDotIsFullyThere()
         {
-            Assert.AreEqual(1f, CentreScanDisplayRules.DotAlpha(0f, 4f), 1e-4f);
+            Assert.AreEqual(1f, CentreScanDisplayRules.DotAlpha(0f, 4f, 1f), 1e-4f);
         }
 
         [Test]
         public void ADotIsStillFullBeforeItsLastSecond()
         {
-            Assert.AreEqual(1f, CentreScanDisplayRules.DotAlpha(2.9f, 4f), 1e-4f);
+            Assert.AreEqual(1f, CentreScanDisplayRules.DotAlpha(2.9f, 4f, 1f), 1e-4f);
+        }
+
+        [Test]
+        public void TheFadeTimeIsTheCallers_ALongerFadeStartsEarlier()
+        {
+            Assert.AreEqual(1f, CentreScanDisplayRules.DotAlpha(1.9f, 4f, 2f), 1e-4f);
+            Assert.AreEqual(0.5f, CentreScanDisplayRules.DotAlpha(3f, 4f, 2f), 1e-4f);
         }
 
         [Test]
         public void ADotFadesOutOverItsLastSecond()
         {
-            Assert.AreEqual(0.5f, CentreScanDisplayRules.DotAlpha(3.5f, 4f), 1e-4f);
+            Assert.AreEqual(0.5f, CentreScanDisplayRules.DotAlpha(3.5f, 4f, 1f), 1e-4f);
         }
 
         [Test]
         public void ADotIsGoneAtItsLife_AndAfter()
         {
-            Assert.AreEqual(0f, CentreScanDisplayRules.DotAlpha(4f, 4f), 1e-4f);
-            Assert.AreEqual(0f, CentreScanDisplayRules.DotAlpha(9f, 4f), 1e-4f);
+            Assert.AreEqual(0f, CentreScanDisplayRules.DotAlpha(4f, 4f, 1f), 1e-4f);
+            Assert.AreEqual(0f, CentreScanDisplayRules.DotAlpha(9f, 4f, 1f), 1e-4f);
         }
 
         [Test]
         public void ADotThatLivesLessThanTheFadeFadesOverItsWholeLife()
         {
-            Assert.AreEqual(0.5f, CentreScanDisplayRules.DotAlpha(0.25f, 0.5f), 1e-4f);
+            Assert.AreEqual(0.5f, CentreScanDisplayRules.DotAlpha(0.25f, 0.5f, 1f), 1e-4f);
         }
 
         [Test]
         public void AZeroLifeMeansNoDot()
         {
-            Assert.AreEqual(0f, CentreScanDisplayRules.DotAlpha(0f, 0f), 1e-4f);
+            Assert.AreEqual(0f, CentreScanDisplayRules.DotAlpha(0f, 0f, 1f), 1e-4f);
         }
 
         [Test]

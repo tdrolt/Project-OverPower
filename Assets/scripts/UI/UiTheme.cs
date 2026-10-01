@@ -697,6 +697,8 @@ namespace Overpower.UI
         public float minimapOwnedLinkWidth = 4f;
         [Tooltip("Width of a link nobody owns (a thin grey line), in canvas units.")]
         public float minimapNeutralLinkWidth = 2f;
+        [Tooltip("Thickness of the centre scan's red ring on the minimap, in canvas units.")]
+        public float minimapScanRingWidth = 2.5f;
         [Tooltip("Size of a way-in arrowhead, in canvas units. It points from a team's zone toward the neutral zone next to it.")]
         public float minimapArrowheadSize = 12f;
         [Tooltip("Size of your own arrow on the minimap, in canvas units. It points where you face.")]

@@ -31,6 +31,7 @@ MonoBehaviour:
   scanWaveSpeed: 40
   scanWaveColour: {r: 0.898, g: 0.282, b: 0.302, a: 1}
   scanDotSeconds: 4
+  scanDotFadeSeconds: 1
   scanTier1: 1
   scanTier2: 1
   scanTier3: 1

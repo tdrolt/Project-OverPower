@@ -328,6 +328,52 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ATierThreeZoneIsRefreshedOnceInEveryScan_WithUnevenFrames_WhenTierThreeIsTicked()
+        {
+            // Playtest log question (Task 11 review, item 6): a tier-3 zone 60 m out must be refreshed in scan 1, 2 and 3 alike.
+            ScanBandTracker tracker = new ScanBandTracker();
+            int[] refreshedInScan = new int[3];
+            int now = 1000;
+            int step = 0;
+            while (now < 1000 + 3 * Interval)
+            {
+                now += 7 + (step++ * 13) % 40; // 7..46 ms, uneven like real frames
+                ScanFrame f = tracker.Step(Team, 1000, now, Interval, false, Speed, ScanMax);
+                if (!f.Holding) continue;
+                List<int> zones = new List<int>();
+                CentreScanRules.ZonesToRefresh(f.PrevRadius, f.Radius, Centre, Positions, Tiers, true, true, true, true, zones);
+                int scan = Mathf.Min(2, (now - 1000) / Interval);
+                if (zones.Contains(2)) refreshedInScan[scan]++;
+            }
+            CollectionAssert.AreEqual(new[] { 1, 1, 1 }, refreshedInScan);
+        }
+
+        [Test]
+        public void ALateStampAfterANeutralFrame_StillCatchesTheEnemiesAlreadyInTheCentre()
+        {
+            // The centre was neutral, a team captures it, and the stamp reaches this client 800 ms late (a wifi spike): the
+            // client saw no scan the frame before, so this is not a mid-wave join and the band starts from 0.
+            ScanBandTracker tracker = new ScanBandTracker();
+            tracker.Step(-1, 0, 1900, Interval, false, Speed, ScanMax);
+            ScanFrame f = tracker.Step(Team, 1000, 1800 + 100, Interval, false, Speed, ScanMax);
+            ScanFrame late = tracker.Step(Team, 1000, 2000, Interval, false, Speed, ScanMax);
+            Assert.AreEqual(0f, f.PrevRadius, 0.0001f, "the first frame with the stamp starts from 0, however late");
+            Assert.IsTrue(CentreScanRules.FrontSwept(f.PrevRadius, f.Radius, 20f), "an enemy 20 m out at capture is caught");
+            Assert.Greater(late.PrevRadius, 0f);
+        }
+
+        [Test]
+        public void AFirstFrameAfterAResetWithin300ms_IsCaught_AndOneMsLaterIsNot()
+        {
+            ScanBandTracker tracker = new ScanBandTracker();
+            ScanFrame inside = tracker.Step(Team, 1000, 1300, Interval, false, Speed, ScanMax);
+            Assert.AreEqual(0f, inside.PrevRadius, 0.0001f);
+            tracker.Reset();
+            ScanFrame outside = tracker.Step(Team, 1000, 1301, Interval, false, Speed, ScanMax);
+            Assert.AreEqual(outside.Radius, outside.PrevRadius, 0.0001f);
+        }
+
+        [Test]
         public void TheWaveStopsTravellingPastTheFarthestPoint_ButTheLastBandIsStillSwept()
         {
             ScanBandTracker tracker = new ScanBandTracker();

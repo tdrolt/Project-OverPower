@@ -18,6 +18,9 @@ namespace Overpower.Vision
     /// facts from Photon and the scene and does the wall test (a Linecast on the Building layer at eye height).
     /// Nothing here touches hits, collisions or networking: it is only read by what draws things.
     /// </summary>
+    // Order -50: its LateUpdate (fresh eyes for the fog, cone and EnemyVisibility's body hiding) runs before the other
+    // LateUpdates at order 0 (EnemyVisibility, MinimapView), which then read this frame's positions.
+    [DefaultExecutionOrder(-50)]
     public sealed class TeamSight : MonoBehaviourPun
     {
         [SerializeField, Tooltip("The sight numbers (cone, circle, eye height) and the fog on/off switch.")]
@@ -181,6 +184,9 @@ namespace Overpower.Vision
             Shader.SetGlobalFloat(FogEnabledId, fogOn ? 1f : 0f);
             if (!fogOn)
                 return;
+            // CentreScan and ZoneKnowledge (orders -110 / -100) already built the eyes this frame from last frame's positions,
+            // before movement, aim and the network moved anyone; draw and hide bodies from fresh ones.
+            builtFrame = -1;
             Refresh();
             DrawSight();
             Shader.SetGlobalTexture("_VisionSightTex", sightTexture);

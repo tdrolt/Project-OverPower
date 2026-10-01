@@ -99,17 +99,19 @@ namespace Overpower.Vision
     /// <summary>Keeps what a client must remember between frames to call CentreScanRules correctly (Task 10 review).</summary>
     public sealed class ScanBandTracker
     {
-        /// <summary>A client that first sees a scan up to this long after it began (the capture stamp reaches clients 50-150 ms
-        /// late) still catches the enemies already inside the wave. Later than that it is someone joining mid-wave, who must
-        /// not get a dot for everyone behind the front.</summary>
+        /// <summary>The time grace applies only to the truly first frame after Reset() (a join or rejoin): a client that first
+        /// sees a scan up to this long after it began still catches the enemies already inside the wave; later than that it is
+        /// someone joining mid-wave, who must not get a dot for everyone behind the front. A client that saw no scan the frame
+        /// before (neutral, cut, no holder) is not joining: a new scan starts from 0 however late its stamp arrives.</summary>
         public const int LateStampGraceMs = 300;
 
         private bool has;
+        private bool sawNoScan; // the last frame stepped in this room had no scan, so the next scan is new, not joined
         private int lastStart;
         private int prevNow;
 
         /// <summary>Forget the scan seen so far (the room was left, or the scan is switched off): the next frame is a first frame.</summary>
-        public void Reset() => has = false;
+        public void Reset() { has = false; sawNoScan = false; }
 
         /// <summary>Call once per frame, every frame, with the same inputs. Returns Holding = false (and forgets the scan) while
         /// no team holds the centre or the map is cut. A frame with the server clock at 0, or one that does not move the clock
@@ -123,6 +125,7 @@ namespace Overpower.Vision
             if (!CentreScanRules.ActiveScan(holderTeam, heldSinceMs, nowMs, intervalMs, cutActive, out int start))
             {
                 has = false;
+                sawNoScan = true;
                 return new ScanFrame(false, false, 0, 0f, 0f);
             }
 
@@ -136,7 +139,7 @@ namespace Overpower.Vision
                     return new ScanFrame(true, travelling, start, radius, radius);
                 prevRadius = CentreScanRules.WaveRadius(start, prevNow, speed);
             }
-            else if (has || unchecked(nowMs - start) <= LateStampGraceMs)
+            else if (has || sawNoScan || unchecked(nowMs - start) <= LateStampGraceMs)
             {
                 prevRadius = 0f;
             }
@@ -146,6 +149,7 @@ namespace Overpower.Vision
             }
 
             has = true;
+            sawNoScan = false;
             lastStart = start;
             prevNow = nowMs;
             return new ScanFrame(true, travelling, start, prevRadius, radius);

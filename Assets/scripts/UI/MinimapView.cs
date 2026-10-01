@@ -1014,13 +1014,13 @@ namespace Overpower.UI
         // wave as a ring round the centre's bubble, and a frozen red dot per enemy the front passed, fading as it ages. Both maps
         // are this one map (the large one is the same objects scaled), so one pass draws both.
         private const int ScanRingSegments = 64;
-        private const float ScanRingWidth = 2.5f; // map units; a look, like the link widths
 
         private void UpdateScan()
         {
             CentreScan scan = CentreScan.Instance;
             TeamSight sight = TeamSight.Local;
-            bool show = scan != null && sight != null && sight.Config != null && scan.SeenByMyTeam;
+            // The layer stays while dots are left, so they finish their time after the centre is lost (the ring stops at once).
+            bool show = scan != null && sight != null && sight.Config != null && (scan.SeenByMyTeam || scan.Dots.Dots.Count > 0);
             if (scanLayer.gameObject.activeSelf != show)
                 scanLayer.gameObject.SetActive(show);
             if (!show)
@@ -1029,7 +1029,7 @@ namespace Overpower.UI
             VisionConfig vision = sight.Config;
             float now = Time.time;
 
-            bool ring = scan.WaveVisible;
+            bool ring = scan.SeenByMyTeam && scan.WaveVisible;
             if (scanRing.gameObject.activeSelf != ring)
                 scanRing.gameObject.SetActive(ring);
             if (ring)
@@ -1045,7 +1045,7 @@ namespace Overpower.UI
                     Vector2 from = centre + new Vector2(Mathf.Cos(a0), Mathf.Sin(a0)) * radius;
                     Vector2 to = centre + new Vector2(Mathf.Cos(a1), Mathf.Sin(a1)) * radius;
                     scanRingSegments[i].color = vision.ScanWaveColour;
-                    PlaceHalfSegment(scanRingSegments[i], from, to, ScanRingWidth);
+                    PlaceHalfSegment(scanRingSegments[i], from, to, theme.minimapScanRingWidth);
                 }
             }
 
@@ -1066,7 +1066,7 @@ namespace Overpower.UI
                 Image fill = dotFills[dot];
                 if (fill.color != vision.MinimapEnemyColour)
                     fill.color = vision.MinimapEnemyColour;
-                scanDotGroups[i].alpha = CentreScanDisplayRules.DotAlpha(now - dots[i].BornTime, vision.ScanDotSeconds);
+                scanDotGroups[i].alpha = CentreScanDisplayRules.DotAlpha(now - dots[i].BornTime, vision.ScanDotSeconds, vision.ScanDotFadeSeconds);
             }
             HideDotsFrom(scanDotMarkers, dots.Count);
         }

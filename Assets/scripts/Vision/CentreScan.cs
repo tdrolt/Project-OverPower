@@ -39,6 +39,7 @@ namespace Overpower.Vision
         private readonly List<Vector2> zonePositions = new List<Vector2>();
         private readonly List<int> zoneTiers = new List<int>();
 
+        private int dotsTeam = -1; // the team the dots in the pool belong to (a spectator can switch the watched team)
         private int centreZone = -1;
         private Vector3 centrePosition;
         private float maxRadius;
@@ -116,15 +117,20 @@ namespace Overpower.Vision
 
             int friendly = sight.FriendlyTeamId;
             SeenByMyTeam = Frame.Holding && CentreScanDisplayRules.SeesScan(friendly, holder);
+            if (dotPool.Dots.Count > 0 && dotsTeam != friendly)
+                dotPool.Clear();
+            if (SeenByMyTeam)
+                dotsTeam = friendly;
+            // The dots of a lost centre finish their time and fade as normal; only the wave, the ring and the zone work stop.
+            dotPool.Prune(Time.time, config.ScanDotSeconds);
             if (!SeenByMyTeam)
             {
-                dotPool.Clear();
                 SetScanned(refreshed, false);
                 return;
             }
 
-            dotPool.Prune(Time.time, config.ScanDotSeconds);
-            if (Frame.Radius > Frame.PrevRadius)
+            // Once the front is past the arena's farthest point there is nobody left to catch and no zone left to refresh.
+            if (Frame.Radius > Frame.PrevRadius && Frame.PrevRadius <= maxRadius)
             {
                 CatchEnemies(friendly, nowMs);
                 RefreshZones(buildings, territory);
