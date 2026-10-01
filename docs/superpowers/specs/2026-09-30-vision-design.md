@@ -96,7 +96,7 @@ follows from the server clock, so every screen shows the same wave. The shrink i
 **Pure rules** (plain C#, edit-mode tested, no engine types beyond maths):
 - `VisionRules`: is a point inside one viewer's cone or circle (angle, length, radius, the Scope trade); which
   viewers are "my team's eyes" (living teammates; while dead, the living teammates; spectating, the watched team; your team
-  not known yet = only yourself, and only while alive); a team sees a point if any eye sees it and no wall is in between (the wall test is passed in, so
+  not known yet = only yourself, and only while alive; spectating always uses the watched team); a team sees a point if any eye sees it and no wall is in between (the wall test is passed in, so
   it can be faked in tests).
 - `ZoneKnowledgeRules`: with the switch off, which zone state a team knows (own, in sight, scanned, else last known).
 - `CentreScanRules`: when scans happen (from `tSince`, the interval, the holder, the cut), the wave radius at a
