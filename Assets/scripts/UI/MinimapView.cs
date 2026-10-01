@@ -287,6 +287,14 @@ namespace Overpower.UI
 
             ApplyYawIfChanged();
 
+            // Vision Task 9b: with the zone switch off the bubbles show what the team knows, so a change in it repaints them.
+            ZoneKnowledge knowledge = ZoneKnowledge.Instance;
+            if (knowledge != null && knowledge.Version != shownKnowledgeVersion)
+            {
+                shownKnowledgeVersion = knowledge.Version;
+                ownershipDirty = true;
+            }
+
             if (ownershipDirty && manager.Current != null)
             {
                 RecolourOwnership();
@@ -708,6 +716,13 @@ namespace Overpower.UI
             }
         }
 
+        private int shownKnowledgeVersion = -1;
+
+        /// <summary>The owner this player's team believes a zone has: the known one while the zone switch is off
+        /// (ZoneKnowledge), else the live snapshot's.</summary>
+        private static int OwnerShown(TerritorySnapshot snapshot, int zone) =>
+            ZoneKnowledge.TryGetDisplayed(zone, out ZoneView known) ? known.OwnerTeam : snapshot.OwnerOf(zone);
+
         private void RecolourOwnership()
         {
             TerritorySnapshot snapshot = manager.Current;
@@ -728,12 +743,12 @@ namespace Overpower.UI
                     ApplyTier(zone, tier);
                 zone.Upright.gameObject.SetActive(zone.Shown && !zone.OutOfPlay);
 
-                int owner = snapshot.OwnerOf(zone.Zone);
+                int owner = OwnerShown(snapshot, zone.Zone);
                 zone.Fill.color = zone.OutOfPlay ? theme.outOfPlayZoneColor
                     : owner >= 0 ? theme.ShotColorFor(owner) : theme.minimapNeutralColor;
             }
             foreach (LinkUi link in links)
-                ApplyLinkStyle(link, MinimapLinkStyle.For(snapshot.OwnerOf(link.A), snapshot.OwnerOf(link.B)));
+                ApplyLinkStyle(link, MinimapLinkStyle.For(OwnerShown(snapshot, link.A), OwnerShown(snapshot, link.B)));
         }
 
         /// <summary>Tudor, 2026-09-25: the closed part darkened and the wall drawn, painted once per cut (not per frame)
@@ -818,10 +833,17 @@ namespace Overpower.UI
                 if (!zone.Shown || zone.OutOfPlay)
                     continue;
 
-                int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;
-                bool attacked = presence != null && presence.IsUnderAttack(zone.Zone);
-                CaptureRingState state = CaptureRingState.From(manager.CaptureProgressOf(zone.Zone), owner, attacked, nowMs,
-                                                                outOfPlay: zone.OutOfPlay);
+                // Vision Task 9b: the known state while the zone switch is off, else the live one as before.
+                CaptureRingState state;
+                if (ZoneKnowledge.TryGetDisplayed(zone.Zone, out ZoneView known))
+                    state = known.Ring;
+                else
+                {
+                    int owner = snapshot != null ? snapshot.OwnerOf(zone.Zone) : TerritoryMap.Neutral;
+                    bool attacked = presence != null && presence.IsUnderAttack(zone.Zone);
+                    state = CaptureRingState.From(manager.CaptureProgressOf(zone.Zone), owner, attacked, nowMs,
+                                                  outOfPlay: zone.OutOfPlay);
+                }
 
                 Color outline = state.UnderAttack
                     ? Color.Lerp(theme.minimapBubbleOutlineColor, theme.captureRingWarningColor, pulse)

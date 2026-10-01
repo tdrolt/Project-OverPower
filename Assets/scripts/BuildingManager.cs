@@ -353,6 +353,11 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // [C, controller decision, 2026-09-18; arena step 5, 2026-09-19].
         if (GetComponent<MatchDirector>() == null)
             gameObject.AddComponent<MatchDirector>();
+
+        // Vision Task 9b: what this client's team knows about each zone, for the displays only. Same reasoning as
+        // MatchDirector above: no scene footprint, so it is added here on the same GameObject.
+        if (GetComponent<Overpower.Vision.ZoneKnowledge>() == null)
+            gameObject.AddComponent<Overpower.Vision.ZoneKnowledge>();
     }
 
     void Start()
@@ -396,6 +401,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // The next room is a different match; nothing from this one may leak into it.
         current = null;
         CurrentOwners = null;
+        Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the next room's team starts out knowing that room's live state
         lastWritten = null;
         writesAwaitingEcho = 0;
         currentProgress = null;

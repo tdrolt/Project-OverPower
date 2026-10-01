@@ -46,7 +46,7 @@ namespace Overpower.Data
         [SerializeField, Range(64, 2048)] private int sightTextureSize = 512;
 
         [Header("Zones")]
-        [Tooltip("When on, you always see everything about every zone (owner, capture, under attack). When off, you only learn about a zone while you see it, own it, or the centre scan passes over it; otherwise it stays as you last knew it.")]
+        [Tooltip("When on, you always see everything about every zone (owner, capture, under attack). When off, you only learn about a zone while your team sees it, owns it, or your centre scan passes over it (a zone your team loses shows the loss); otherwise it stays as you last knew it.")]
         [SerializeField] private bool zoneOwnersVisibleWithoutSight = true;
 
         [Header("Minimap")]
