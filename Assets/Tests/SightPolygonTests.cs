@@ -78,14 +78,46 @@ namespace Overpower.Tests
             Assert.IsTrue(fan.Exists(p => p.x > Radius * 0.99f - 0.5f)); // and to the side
         }
 
-        [Test]
-        public void TheCircleDensityFollowsTheAngleItCovers()
+        // The rule: one ray spacing, in metres along the cone's far edge, for the cone and the circle both.
+        static int ExpectedCircleRays(float coneDegrees, float coneLength, float radius, int rayCount)
         {
-            // 90 degree cone with 20 rays => the 270 degree circle part gets about 3 times as many points.
-            var fan = Fan(FacingUp(Vector2.zero), 20, NoWalls);
-            int circle = CountAt(fan, Vector2.zero, Radius);
-            Assert.GreaterOrEqual(circle, 58);
-            Assert.LessOrEqual(circle, 64);
+            float spacing = coneLength * coneDegrees * Mathf.Deg2Rad / rayCount;
+            float rest = (360f - coneDegrees) * Mathf.Deg2Rad;
+            return Mathf.Min(rayCount, Mathf.CeilToInt(radius * rest / spacing));
+        }
+
+        [Test]
+        public void TheCircleRaysFollowTheConeSpacing_UpToTheRayCount()
+        {
+            const int rays = 180;
+            var fan = Fan(FacingUp(Vector2.zero), rays, NoWalls);
+            Assert.AreEqual(ExpectedCircleRays(90f, Cone, Radius, rays), CountAt(fan, Vector2.zero, Radius));
+        }
+
+        [Test]
+        public void ANarrowScopedCone_DoesNotMultiplyTheCirclesRays()
+        {
+            const int rays = 20;
+            var eye = new Eye(Vector2.zero, Vector2.up, new SightShape(10f, Cone, Radius));
+            var fan = Fan(eye, rays, NoWalls);
+            Assert.LessOrEqual(CountAt(fan, Vector2.zero, Radius), rays);
+        }
+
+        [Test]
+        public void TheOutlineGoesRoundTheEyeInAngularOrder()
+        {
+            var fan = Fan(FacingUp(new Vector2(2, 3)), 40, NoWalls);
+            Vector2 eye = fan[0];
+            float total = 0f;
+            for (int i = 1; i < fan.Count; i++)
+            {
+                Vector2 a = fan[i] - eye;
+                Vector2 b = fan[i == fan.Count - 1 ? 1 : i + 1] - eye;
+                float step = Mathf.DeltaAngle(Mathf.Atan2(a.y, a.x) * Mathf.Rad2Deg, Mathf.Atan2(b.y, b.x) * Mathf.Rad2Deg);
+                Assert.GreaterOrEqual(step, -1e-3f, $"outline point {i} goes backwards"); // a shared end point may repeat (0)
+                total += step;
+            }
+            Assert.AreEqual(360f, total, 0.01f);
         }
 
         [Test]

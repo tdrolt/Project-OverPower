@@ -30,6 +30,8 @@ namespace Overpower.Vision
         /// <summary>The owner's copy on this client, or null before it exists (then nothing is hidden).</summary>
         public static TeamSight Local { get; private set; }
 
+        private static readonly int FogEnabledId = Shader.PropertyToID("_VisionFogEnabled");
+
         private readonly List<SightCandidate> candidates = new List<SightCandidate>(16);
         private readonly List<Eye> eyes = new List<Eye>(16);
         private System.Func<Eye, Vector2, bool> clearLine;
@@ -85,8 +87,12 @@ namespace Overpower.Vision
 
         private void OnDestroy()
         {
+            Shader.SetGlobalFloat(FogEnabledId, 0f);
             if (sightTexture != null)
+            {
                 sightTexture.Release();
+                Destroy(sightTexture);
+            }
             if (fillMaterial != null)
                 Destroy(fillMaterial);
             if (fanMesh != null)
@@ -110,6 +116,7 @@ namespace Overpower.Vision
             };
             sightTexture.Create();
 
+            // The minimap's world square and Sight Texture Size are read once, here; changing them needs a restart.
             Vector2 centre = minimap.WorldCentre;
             float side = minimap.WorldSizeMetres;
             sightRect = new Vector4(centre.x - side * 0.5f, centre.y - side * 0.5f, side, side);
@@ -135,13 +142,17 @@ namespace Overpower.Vision
 
         private void LateUpdate()
         {
-            Shader.SetGlobalFloat("_VisionFogEnabled", FogOn ? 1f : 0f);
-            if (sightTexture == null || !FogOn)
+            // No fog without a sight picture (the pass reads it), and none when the owner is gone (OnDisable / OnDestroy).
+            bool fogOn = FogOn && sightTexture != null;
+            Shader.SetGlobalFloat(FogEnabledId, fogOn ? 1f : 0f);
+            if (!fogOn)
                 return;
             Refresh();
             DrawSight();
             Shader.SetGlobalTexture("_VisionSightTex", sightTexture);
             Shader.SetGlobalVector("_VisionSightRect", sightRect);
+            Shader.SetGlobalColor("_VisionFogColour", config.FogColour);
+            Shader.SetGlobalFloat("_VisionFogDarkness", config.FogDarkness);
         }
 
         // Every eye's fan, from the same eye list CanSee uses, as one mesh drawn white on black.
@@ -191,9 +202,11 @@ namespace Overpower.Vision
         {
             if (Local == this)
                 Local = null;
+            Shader.SetGlobalFloat(FogEnabledId, 0f);
         }
 
-        /// <summary>True when my team sees this point: inside an eye's cone or circle with no wall between. True for
+        /// <summary>True when my team sees this point, taken as a spot on the ground: the test is made Eye Height above it
+        /// (as high as the eyes looking). Inside an eye's cone or circle with no wall between. True for
         /// everything when the fog is switched off.</summary>
         public bool CanSee(Vector3 worldPoint)
         {
@@ -214,7 +227,9 @@ namespace Overpower.Vision
             int friendly = SightEyes.FriendlyTeam(mode, localTeam, watchedTeam);
             if (friendly >= 0 && Teams.TryGetTeam(view.Owner, out int team) && team == friendly)
                 return true;
-            return CanSee(view.transform.position);
+            // The enemy's feet: CanSee lifts the point by Eye Height, so the line runs feet+Eye Height to feet+Eye Height,
+            // level with the texture's rays (one height for sight).
+            return CanSee(view.transform.position + Vector3.up * FeetOffset());
         }
 
         /// <summary>True when my team sees any point along a to b, sampled every Line Sample Spacing metres (both ends
@@ -267,7 +282,7 @@ namespace Overpower.Vision
         }
 
         // The eye is at its own player's eye point (their feet + Eye Height); the asked-about point is lifted the same
-        // height above its own ground, so a low rock does not hide a player.
+        // height above the ground point it was given, so a low rock does not hide a player.
         private bool ClearLine(Eye eye, Vector2 to)
         {
             if (buildingMask < 0)

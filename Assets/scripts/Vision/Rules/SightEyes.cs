@@ -13,7 +13,7 @@ namespace Overpower.Vision
         /// <summary>World height of this player's eyes: their own feet plus the Eye Height.</summary>
         public readonly float EyeY;
 
-        public SightCandidate(int team, bool alive, bool isLocal, Vector2 position, Vector2 facing, float eyeY = 0f)
+        public SightCandidate(int team, bool alive, bool isLocal, Vector2 position, Vector2 facing, float eyeY = 0f) // eyeY: the game always passes it; the default is for tests that never test walls
         {
             EyeY = eyeY;
             Team = team;

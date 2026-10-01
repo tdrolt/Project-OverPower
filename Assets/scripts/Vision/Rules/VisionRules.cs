@@ -27,6 +27,7 @@ namespace Overpower.Vision
         /// <summary>World height of this eye (its own feet plus the eye height), used for the wall tests.</summary>
         public readonly float EyeY;
 
+        // eyeY defaults to 0 only for the pure rule tests, which never test walls; the game always passes the real height (SightEyes).
         public Eye(Vector2 position, Vector2 facing, SightShape shape, float eyeY = 0f)
         {
             Position = position;

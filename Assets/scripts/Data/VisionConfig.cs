@@ -39,10 +39,10 @@ namespace Overpower.Data
         [Tooltip("Metres between the spots checked along a line of sight. Smaller is more precise but costs more.")]
         [SerializeField, Min(0.1f)] private float lineSampleSpacing = 1f;
 
-        [Tooltip("How many rays are cast around a player to find the edge of their sight. More rays give smoother edges.")]
+        [Tooltip("How many rays fan across the cone of sight (the circle around you uses the same spacing). More rays give smoother edges.")]
         [SerializeField, Min(8)] private int sightRayCount = 180;
 
-        [Tooltip("Pixels along each side of the sight picture. Larger gives crisper fog edges and costs more memory.")]
+        [Tooltip("Pixels along each side of the sight picture. Larger gives crisper fog edges and costs more memory. Read once when the match starts.")]
         [SerializeField, Range(64, 2048)] private int sightTextureSize = 512;
 
         [Header("Zones")]
