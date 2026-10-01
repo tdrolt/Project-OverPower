@@ -69,23 +69,21 @@ namespace Overpower.Vision
         }
 
         /// <summary>Is this candidate one of my team's eyes right now? Alive: me (if alive) and living teammates.
-        /// Dead: living teammates (I see through them). Spectating: living players of the team I watch. Team not
-        /// arrived yet (localTeam below 0): only me, if alive. Enemies and the dead are never eyes.</summary>
+        /// Dead: living teammates (I see through them). Spectating: living players of the team I watch, whatever my
+        /// own team is. My own team not arrived yet (localTeam below 0): Alive sees only me, Dead sees nobody.
+        /// Enemies and the dead are never eyes.</summary>
         public static bool IsEye(int localTeam, ViewerMode mode, int watchedTeam,
             int candidateTeam, bool candidateAlive, bool candidateIsLocal)
         {
             if (!candidateAlive)
                 return false;
 
-            if (localTeam < 0)
-                return candidateIsLocal && mode == ViewerMode.Alive;
-
             switch (mode)
             {
                 case ViewerMode.Alive:
-                    return candidateTeam == localTeam;
+                    return localTeam < 0 ? candidateIsLocal : candidateTeam == localTeam;
                 case ViewerMode.Dead:
-                    return candidateTeam == localTeam && !candidateIsLocal;
+                    return localTeam >= 0 && candidateTeam == localTeam && !candidateIsLocal;
                 case ViewerMode.Spectating:
                     return watchedTeam >= 0 && candidateTeam == watchedTeam;
                 default:

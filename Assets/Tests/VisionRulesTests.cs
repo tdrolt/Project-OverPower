@@ -51,6 +51,9 @@ namespace Overpower.Tests
             Assert.Less(s.ConeAngleDegrees, n.ConeAngleDegrees);
             Assert.Greater(s.ConeLength, n.ConeLength);
             Assert.Less(s.CircleRadius, n.CircleRadius);
+            Assert.AreEqual(30f, s.ConeAngleDegrees);
+            Assert.AreEqual(40f, s.ConeLength);
+            Assert.AreEqual(3f, s.CircleRadius);
         }
 
         [Test] public void ShapeFor_CircleNeverGoesNegative() =>
@@ -61,6 +64,9 @@ namespace Overpower.Tests
 
         [Test] public void TeamSees_ClearLineInCone_Sees() =>
             Assert.IsTrue(VisionRules.TeamSees(new[] { EyeFacingForward() }, new Vector2(0, 10), Clear));
+
+        [Test] public void TeamSees_ClearLineButPointOutsideEveryShape_DoesNotSee() =>
+            Assert.IsFalse(VisionRules.TeamSees(new[] { EyeFacingForward() }, new Vector2(0, -30), Clear));
 
         [Test] public void TeamSees_AnyOneEyeIsEnough()
         {
@@ -82,6 +88,7 @@ namespace Overpower.Tests
         {
             Assert.IsTrue(VisionRules.IsEye(0, ViewerMode.Dead, -1, 0, true, false));
             Assert.IsFalse(VisionRules.IsEye(0, ViewerMode.Dead, -1, 0, false, true));
+            Assert.IsFalse(VisionRules.IsEye(0, ViewerMode.Dead, -1, 0, true, true));
         }
         [Test] public void IsEye_Spectating_WatchedTeamLivingOnly()
         {
@@ -94,6 +101,19 @@ namespace Overpower.Tests
             Assert.IsTrue(VisionRules.IsEye(-1, ViewerMode.Alive, -1, -1, true, true));
             Assert.IsFalse(VisionRules.IsEye(-1, ViewerMode.Alive, -1, 0, true, false));
             Assert.IsFalse(VisionRules.IsEye(-1, ViewerMode.Alive, -1, -1, false, true));
+            Assert.IsFalse(VisionRules.IsEye(-1, ViewerMode.Alive, -1, -1, true, false));
+        }
+        [Test] public void IsEye_Spectating_UnknownOwnTeam_StillSeesThroughWatchedTeam() =>
+            Assert.IsTrue(VisionRules.IsEye(-1, ViewerMode.Spectating, 1, 1, true, false));
+        [Test] public void IsEye_Spectating_NoWatchedTeam_Nobody()
+        {
+            Assert.IsFalse(VisionRules.IsEye(0, ViewerMode.Spectating, -1, 0, true, false));
+            Assert.IsFalse(VisionRules.IsEye(-1, ViewerMode.Spectating, -1, -1, true, false));
+        }
+        [Test] public void IsEye_Dead_UnknownOwnTeam_Nobody()
+        {
+            Assert.IsFalse(VisionRules.IsEye(-1, ViewerMode.Dead, -1, -1, true, false));
+            Assert.IsFalse(VisionRules.IsEye(-1, ViewerMode.Dead, -1, -1, true, true));
         }
     }
 }
