@@ -595,20 +595,22 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ACorrectionOneSecondIntoTheWave_CatchesNobodyTheFrontAlreadyPassed()
+        public void ACorrectionOneSecondIntoTheWave_CatchesNobodyTheFrontAlreadyPassed_ButSweepsWhatNobodySwept()
         {
-            // Late capture news after a lag spike: the front is already 50 m out, so an enemy 10 m from the centre was passed
-            // long ago and must not be caught by the corrected holder.
+            // Late capture news after a lag spike: the front is already 49 m out, so an enemy 10 m from the centre was passed
+            // long ago and must not be caught by the corrected holder; the metres between the last frame and now are still swept.
             ScanBandTracker tracker = new ScanBandTracker();
             Held(tracker, 2, 0, 1000);
             Held(tracker, 2, 0, 1040);
+            Held(tracker, 2, 0, 1980);
             ScanFrame late = Held(tracker, 4, 950, 2000);
             Assert.AreEqual(4, late.HolderTeam);
-            Assert.AreEqual(late.Radius, late.PrevRadius, 0.0001f, "an empty band: nobody behind the front is handed over");
+            Assert.Greater(late.PrevRadius, 0f, "the band does not restart from the centre");
             Assert.IsFalse(CentreScanRules.FrontSwept(late.PrevRadius, late.Radius, 10f), "10 m out was passed long ago");
             Assert.IsFalse(CentreScanRules.FrontSwept(late.PrevRadius, late.Radius, 30f), "so was 30 m");
+            Assert.IsTrue(CentreScanRules.FrontSwept(late.PrevRadius, late.Radius, 49.5f), "the metres nobody swept yet are the corrected holder's");
             ScanFrame next = Held(tracker, 4, 950, 2020);
-            Assert.IsTrue(CentreScanRules.FrontSwept(next.PrevRadius, next.Radius, 51f), "the band carries on from the front the next frame");
+            Assert.IsTrue(CentreScanRules.FrontSwept(next.PrevRadius, next.Radius, 50.5f), "the band carries on from the front the next frame");
         }
 
         [Test]

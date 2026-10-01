@@ -172,7 +172,7 @@ namespace Overpower.Vision
         /// The wave belongs to whoever held the centre at its start, and every client must agree on that however its capture
         /// news arrives: on every frame of a wave, an owner who held it at the start (heldSince at or before the start)
         /// is the holder, so a capture stamped just before the start but read just after it is corrected (the band then
-        /// restarts from 0 for that client, so the first metres of the wave are not lost); a capture stamped after the start
+        /// restarts from 0 for that client within LateStampGraceMs, so the first metres of the wave are not lost, and otherwise sweeps on from the previous frame's radius); a capture stamped after the start
         /// changes nothing until the next wave (the remembered holder stays). A client whose first frame of a wave already
         /// shows a later capture, with no earlier owner read to fall back on (a joiner), gives the wave to nobody (-1) rather
         /// than the wrong team. Leave heldSinceMs null for no stamp: the owner read on a wave's first frame then stands for the whole wave (no correction). Returns Active = false (and
@@ -212,9 +212,10 @@ namespace Overpower.Vision
                 {
                     // A capture made before the start reached this client after it: the wave was theirs all along.
                     // The band restarts from 0 only within the late grace; later, the front has long passed whoever is behind
-                    // it, so the corrected holder gets an empty band for this frame (as a joiner does) and carries on from the front.
+                    // it, so the corrected holder sweeps on from the previous frame's radius (the metres nobody swept yet, nothing twice).
                     lastHolder = ownerNow;
-                    prevRadius = unchecked(nowMs - start) <= LateStampGraceMs ? 0f : radius;
+                    if (unchecked(nowMs - start) <= LateStampGraceMs)
+                        prevRadius = 0f;
                 }
             }
             else

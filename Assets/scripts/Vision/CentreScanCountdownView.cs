@@ -154,6 +154,7 @@ namespace Overpower.Vision
             label = NewLabel("Countdown Label", theme, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), out labelMaterial);
             // Under the corner minimap: anchored to the top right with its top edge at the point PlaceUnderCornerMinimap sets.
             minimapLabel = NewLabel("Minimap Countdown Label", theme, Vector2.one, new Vector2(0.5f, 1f), out minimapLabelMaterial);
+            minimapLabel.alignment = TextAlignmentOptions.Top; // the text hugs the top of its box, right under the minimap
             return true;
         }
 
