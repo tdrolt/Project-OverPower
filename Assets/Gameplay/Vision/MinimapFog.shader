@@ -8,7 +8,6 @@ Shader "Overpower/Minimap Fog"
     Properties
     {
         [PerRendererData] _MainTex ("Sight picture", 2D) = "black" {}
-        _Color ("Fog colour and darkness", Color) = (0,0,0,0.6)
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
         _StencilOp ("Stencil Operation", Float) = 0

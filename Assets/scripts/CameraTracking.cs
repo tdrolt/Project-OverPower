@@ -177,7 +177,12 @@ public class CameraTracking : MonoBehaviour
 
     void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+        {
+            // No one to follow: the listener goes back onto the camera (ListenerRig.Follow's no-target branch).
+            ListenerRig.Follow(listener, null);
+            return;
+        }
 
         // Zoom in/out with Mouse Scroll
         float scroll = Input.GetAxis("Mouse ScrollWheel");

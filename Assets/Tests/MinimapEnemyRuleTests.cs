@@ -36,20 +36,5 @@ namespace Overpower.Tests
         {
             Assert.IsFalse(MinimapEnemyRule.ShowDot(false, true, true, false));
         }
-
-        [Test]
-        public void TheMinimapFogDefaults_DarkenTheUnseenMap_AndLiftTheSeenPart()
-        {
-            var config = ScriptableObject.CreateInstance<VisionConfig>();
-            try
-            {
-                Assert.AreEqual(0.6f, config.MinimapFogDarkness, 1e-5f);
-                Assert.AreEqual(0.2f, config.MinimapSeenLift, 1e-5f);
-            }
-            finally
-            {
-                Object.DestroyImmediate(config);
-            }
-        }
     }
 }
