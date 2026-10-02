@@ -422,3 +422,135 @@ MonoBehaviour:
   spectatorBarLeaveText: Leave
   spectatorWholeMapFill: 0.88
   spectatorViewAngle: 0
+  lobbyDisplayFont: {fileID: 11400000, guid: 14d1d34ba8f7d8449a13152de47b27ae, type: 2}
+  lobbyBodyFont: {fileID: 11400000, guid: 564195cefb6722440bfd615ee4597ba9, type: 2}
+  lobbyBoldFont: {fileID: 11400000, guid: 81634db9a9ca57842b8bd3061d1d3649, type: 2}
+  lobbyDarkColor: {r: 0.102, g: 0.1098, b: 0.1333, a: 1}
+  lobbyBackdropColor: {r: 0.0588, g: 0.0627, b: 0.0784, a: 1}
+  lobbyPanelColor: {r: 0.149, g: 0.1608, b: 0.1961, a: 1}
+  lobbyRowFullColor: {r: 0.1255, g: 0.1333, b: 0.1647, a: 1}
+  lobbyBorderColor: {r: 0.2902, g: 0.302, b: 0.3412, a: 1}
+  lobbyCardBorderColor: {r: 0.2275, g: 0.2392, b: 0.2784, a: 1}
+  lobbyPurpleColor: {r: 0.4196, g: 0.2471, b: 0.749, a: 1}
+  lobbyCyanColor: {r: 0.1686, g: 0.7216, b: 0.7686, a: 1}
+  lobbyOffWhiteColor: {r: 0.9569, g: 0.949, b: 0.9294, a: 1}
+  lobbyMutedColor: {r: 0.7255, g: 0.7137, b: 0.6824, a: 1}
+  lobbyDimColor: {r: 0.5569, g: 0.5451, b: 0.5216, a: 1}
+  lobbyYellowColor: {r: 0.9098, g: 0.7255, b: 0.1922, a: 1}
+  lobbyDisabledButtonColor: {r: 0.2, g: 0.2118, b: 0.2471, a: 1}
+  lobbyDarkTextColor: {r: 0.102, g: 0.1098, b: 0.1333, a: 1}
+  lobbyErrorColor: {r: 0.9098, g: 0.7255, b: 0.1922, a: 1}
+  lobbyTitleOutlineColor: {r: 0.949, g: 0.549, b: 0.1569, a: 1}
+  lobbyTitleOutlineWidth: 0.09
+  lobbyTitleMaterial: {fileID: 2100000, guid: 91f299c386dd23948a457ce323197502, type: 2}
+  lobbyCreateSelectedFill: {r: 0.4196, g: 0.2471, b: 0.749, a: 0.251}
+  lobbyCornerRadius: 9
+  lobbyCardRadius: 15
+  lobbyBorderWidth: 1.5
+  lobbyChosenBorderWidth: 3
+  lobbyLabelSpacing: 1.5
+  lobbyKickerSpacing: 6
+  lobbyButtonSpacing: 1.5
+  nameScreenWidth: 720
+  nameScreenGap: 42
+  nameScreenInnerGap: 12
+  nameScreenKickerSize: 21
+  nameScreenTitleSize: 144
+  nameScreenLabelSize: 19.5
+  nameScreenFieldHeight: 84
+  nameScreenFieldTextSize: 33
+  nameScreenHintSize: 19.5
+  nameScreenFindHeight: 90
+  nameScreenFindTextSize: 36
+  nameScreenRejoinHeight: 72
+  nameScreenRejoinTextSize: 24
+  lobbyListPadding: {x: 96, y: 72}
+  lobbyListGap: 36
+  lobbyListKickerSize: 19.5
+  lobbyListKickerSpacing: 4.5
+  lobbyListTitleSize: 72
+  lobbyListPlayingAsSize: 22.5
+  lobbyListCreateHeight: 72
+  lobbyListCreatePadding: 42
+  lobbyListCreateTextSize: 30
+  lobbyListHeadSize: 19.5
+  lobbyListColumnWeights:
+  - 3
+  - 2
+  - 1.4
+  - 1.6
+  - 1.4
+  lobbyListActionWidth: 180
+  lobbyListColumnGap: 24
+  lobbyListRowPadding: 30
+  lobbyListRowHeight: 96
+  lobbyListRowGap: 12
+  lobbyListRowTextSize: 25.5
+  lobbyListRowSpecSize: 21
+  lobbyListRowButtonHeight: 60
+  lobbyListRowButtonTextSize: 22.5
+  lobbyListHowToHeight: 72
+  lobbyListHowToPadding: 33
+  lobbyListHowToTextSize: 24
+  lobbyListHintSize: 21
+  createCardWidth: 1140
+  createCardPadding: 60
+  createCardGap: 39
+  createTitleSize: 54
+  createLabelSize: 19.5
+  createFieldHeight: 72
+  createFieldPadding: 24
+  createFieldTextSize: 27
+  createModeHeight: 84
+  createModeTextSize: 33
+  createNoteSize: 21
+  createComingSoonSize: 18
+  createSizeButton: {x: 210, y: 78}
+  createSizeTextSize: 30
+  createSizeGap: 18
+  createActionHeight: 72
+  createCancelPadding: 36
+  createCancelTextSize: 24
+  createCreatePadding: 48
+  createCreateTextSize: 30
+  createActionGap: 18
+  lobbyMessageSeconds: 6
+  nameScreenKickerText: PROJECT
+  nameScreenTitleText: OVERPOWER
+  nameScreenLabelText: YOUR NAME
+  nameScreenHintFormat: '{0} to {1} letters or numbers'
+  nameScreenFindText: FIND A LOBBY
+  lobbyListKickerText: PROJECT OVERPOWER
+  lobbyListTitleText: Lobbies
+  lobbyListPlayingAsText: Playing as
+  lobbyListCreateText: CREATE LOBBY
+  lobbyListColumnTexts:
+  - LOBBY
+  - MODE
+  - PLAYERS
+  - STATUS
+  - HOST
+  lobbyListJoinText: Join
+  lobbyListSpectateText: Spectate
+  lobbyListFullText: Full
+  lobbyListHowToText: How to play
+  lobbyListHintText: The list updates by itself. A lobby closes when everyone has left.
+  lobbyListEmptyText: No lobbies yet. Create one to get started.
+  lobbyListConnectingText: Connecting to the lobby list...
+  lobbyListUnknownModeText: Unknown mode
+  createTitleText: Create a lobby
+  createNameLabelText: LOBBY NAME
+  createNamePrefillFormat: '{0}''s lobby'
+  createNameFallbackText: My lobby
+  createModeLabelText: MODE
+  createTeamsLabelText: TEAMS
+  createComingSoonText: coming soon
+  createFamilyNotes:
+  - Capture territory for gold, take capitals, be the last team standing.
+  - A new mode, coming soon.
+  createOtherFamilyFormat: '{0} offers {1} here instead.'
+  createSizeJoiner: ' and '
+  createCancelText: Cancel
+  createCreateText: CREATE
+  createFailedText: Could not create the lobby. Try again.
+  lobbyConnectionLostText: Disconnected. Check your connection.

@@ -35,7 +35,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [SerializeField] private UiTheme theme;
 
     [Header("Lobbies (lobby Task 2)")]
-    [Tooltip("Every game mode a lobby can be created with. The interim Join button creates its room with the first available one.")]
+    [Tooltip("Every game mode a lobby can be created with. The create screen lists them in this order.")]
     [SerializeField] private GameModeCatalogue modeCatalogue;
 
     [Tooltip("Read for how long a lobby name may be.")]
@@ -43,6 +43,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     [Tooltip("Read by a spectator seat's view for the centre scan's numbers (its wave and the countdown), which otherwise come from a player's own body.")]
     [SerializeField] private VisionConfig visionConfig;
+
+    /// <summary>Every game mode a lobby can be created with (the create screen lists them).</summary>
+    public GameModeCatalogue ModeCatalogue => modeCatalogue;
+
+    /// <summary>The lobby and player name lengths and the list's redraw time.</summary>
+    public LobbyConfig LobbyCfg => lobbyConfig;
 
     /// <summary>The vision numbers (the centre scan's wave and countdown) for a client with no body: a spectator seat's view (lobby Task 7).</summary>
     public VisionConfig Vision => visionConfig;
@@ -62,9 +68,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// <summary>The scene's UI theme (the spectator bar and the rejoin panel read their colours, sizes and texts from it).</summary>
     public UiTheme Theme => theme;
 
-    /// <summary>True from pressing the interim Join button (when not yet in the lobby) until OnJoinedLobby consumes it: only then does joining the lobby go on to join a random room.</summary>
-    private bool joiningRandom;
-
     /// <summary>The client side of coming back after a drop (Task 9e). The name screen asks it whether to offer a rejoin.</summary>
     public RejoinController Rejoin { get; private set; }
 
@@ -80,7 +83,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     void Awake()
     {
-        // Created in Awake, not Start: the name screen (JoinGameUI.Start) subscribes to it and Start order is not fixed.
+        // Created in Awake, not Start: the name screen (NameScreen.Start) subscribes to it and Start order is not fixed.
         Rejoin = gameObject.AddComponent<RejoinController>();
         Rejoin.Init(theme, RejoinWindowSeconds);
         Lobbies = gameObject.AddComponent<LobbyDirectory>();
@@ -120,59 +123,17 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // Do not join lobby here anymore
     }
 
-    // ✅ Called from UI when "Join Game" is pressed
-    public void JoinGame()
-    {
-        if (PhotonNetwork.InLobby)
-        {
-            PhotonNetwork.JoinRandomRoom();
-        }
-        else
-        {
-            // Only this branch waits for OnJoinedLobby; the flag is consumed there, so a join that fails some other way can
-            // never later turn LobbyDirectory.EnterList() into a random join.
-            joiningRandom = true;
-            PhotonNetwork.JoinLobby();
-        }
-    }
+    // Rooms are joined from the lobby list (NameScreen > LobbyListPanel > LobbyDirectory.Join) and created from the create screen
+    // (LobbyDirectory.Create); the random-room path this class once had is gone (lobby Task 9). A join refused because this same user id
+    // still holds a dropped place is answered by RejoinController, which watches the join failure callback itself.
 
     public override void OnJoinedLobby()
     {
         Debug.Log("Joined Lobby");
-        // Entering the lobby for the list (LobbyDirectory.EnterList) must not also join a room.
-        if (joiningRandom)
-        {
-            joiningRandom = false;
-            PhotonNetwork.JoinRandomRoom();
-        }
-    }
-
-    public override void OnJoinRandomFailed(short returnCode, string message)
-    {
-        // Task 9e-2: Photon refuses a normal join while this same user id still holds a dropped place in that room (CheckUserOnJoin).
-        // That is our own place being held, not an absence of rooms - go back to it (or say so) instead of starting a new room.
-        if (Rejoin != null && Rejoin.TryRejoinHeldPlace(returnCode))
-            return;
-
-        Debug.Log($"No room found ({returnCode}), creating one.");
-        // Every room is a lobby now (lobby Task 2): created through the directory so it carries the lobby properties.
-        // The interim path uses the catalogue's first available mode; Task 9 replaces it with the create screen.
-        GameModeDefinition mode = null;
-        if (modeCatalogue != null)
-            foreach (GameModeDefinition m in modeCatalogue.Modes)
-                if (m != null && m.Available) { mode = m; break; }
-        if (mode == null)
-        {
-            Debug.LogError("[LOBBY] RoomManager has no available game mode in its catalogue - cannot create a room.");
-            joiningRandom = false;
-            return;
-        }
-        Lobbies.Create(PhotonNetwork.NickName + "'s lobby", mode);
     }
 
     public override void OnJoinedRoom()
     {
-        joiningRandom = false;
         Debug.Log($"Joined Room: {PhotonNetwork.CurrentRoom.Name}");
 
         // Task 9e: the same actor coming back (ReconnectAndRejoin / RejoinRoom) is not a new player. Its team, gold and loadout

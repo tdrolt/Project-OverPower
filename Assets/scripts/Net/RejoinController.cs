@@ -382,7 +382,7 @@ namespace Overpower.Net
             panel.Hide();
 
             if (PhotonNetwork.NetworkClientState == ClientState.Disconnected || PhotonNetwork.NetworkClientState == ClientState.PeerCreated)
-                PhotonNetwork.ConnectUsingSettings(); // the name screen's Join waits for the master (JoinGameUI.joinRequestedEarly)
+                PhotonNetwork.ConnectUsingSettings(); // the name screen's Find a lobby waits for the master (NameScreen.enterListWhenConnected)
             ReturnToNameScreen?.Invoke();
         }
     }
