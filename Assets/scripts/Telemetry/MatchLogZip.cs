@@ -237,16 +237,12 @@ namespace Overpower.Telemetry
             panel.transform.SetParent(canvasGo.transform, false);
             panel.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.95f); // Opaque (item 2) - 0.8 let the HUD's "not ready" labels show through it.
             RectTransform panelRt = panel.GetComponent<RectTransform>();
-            // Item 2: top-centre, under the warm-up line's own spot (theme.warmupTopOffset) - the exact
-            // anchor PlayerHud.BuildWarmupLine uses for that line - rather than bottom-centre, which sat
-            // directly over the ability bar's slots (the brief's own capture,
-            // zip_overlay_matchlog_saved.png). By the time this overlay can show (a result panel, or a
-            // quit), the warm-up line and the Start/switch buttons that shared this spot are always
-            // hidden - the match is over - so nothing there is free to overlap. Canvas units, so this
-            // holds at 1920x1080 and 1280x720 alike, same as everything else built against this theme.
-            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 1f);
-            panelRt.anchoredPosition = new Vector2(0f, -(theme != null ? theme.warmupTopOffset : 130f));
-            panelRt.sizeDelta = new Vector2(760f, 0f);
+            // Lobby Task 10: bottom left (theme.matchLogSavedOffset), not top centre. The result screen's YOU WIN / YOU LOSE title sits
+            // at the top, and this overlay used to cover it (captures/2026-10-02-lobby-task8/over_B.png); the bottom left is clear of the
+            // title, the result button and the ability slots. Canvas units, so this holds at 1920x1080 and 1280x720 alike.
+            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0f, 0f);
+            panelRt.anchoredPosition = theme != null ? theme.matchLogSavedOffset : new Vector2(24f, 70f);
+            panelRt.sizeDelta = new Vector2(theme != null ? theme.matchLogSavedWidth : 640f, 0f);
 
             VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(16, 16, 12, 12);

@@ -864,15 +864,12 @@ namespace Overpower.UI
         [Tooltip("How thick the phase-two wall's line is drawn on the minimap, in the same canvas units as the link " +
                  "widths (the real wall is under a metre - about one unit, too thin to see).")]
         public float minimapCutWallWidth = 3f;
-        [Tooltip("Warm-up line shown to everyone while fewer than two teams have a player yet - nothing counts, the shop is " +
-                 "free, and the match starts on its own once all three teams are here.")]
-        public string warmupWaitingText = "Warm-up: nothing counts yet and the shop is free. The match starts when all three teams have a player.";
-        [Tooltip("Warm-up line shown to the HOST once exactly two teams have a player - Start now with two, or wait for a " +
-                 "third team to arrive.")]
-        public string warmupHostText = "Warm-up: two teams are here. Start now with two teams, or wait for a third.";
-        [Tooltip("Warm-up line shown to everyone ELSE once exactly two teams have a player - the host has the Start button, " +
-                 "not you.")]
-        public string warmupGuestText = "Warm-up: waiting for the host to start, or for a third team.";
+        [Tooltip("Warm-up line shown to the HOST while ending the warm-up is not allowed yet: a team of the mode has no player.")]
+        public string warmupBlockedText = "Warm-up: nothing counts yet and the shop is free. It can end once every team has a player.";
+        [Tooltip("Warm-up line shown to the HOST while ending the warm-up is allowed (every team of the mode has a player).")]
+        public string warmupHostText = "Warm-up: every team has a player. End the warm-up when you're ready.";
+        [Tooltip("Warm-up line shown to everyone ELSE - the host ends the warm-up, not you.")]
+        public string warmupGuestText = "Warm-up: waiting for the host to end it.";
         [Tooltip("Shown to everyone while the countdown counts down to going live. {0} is the whole seconds left, on this " +
                  "client's own synced server clock - it MUST stay in the text, or the number never shows. The countdown's " +
                  "own length is GameplayConfig > Match Start Countdown Seconds.")]
@@ -897,23 +894,6 @@ namespace Overpower.UI
         [Tooltip("Toast shown the instant a host-started match goes live with two teams - lose your base and your team " +
                  "can't respawn until it retakes one (Tudor D17). Two lines at most (about 52 characters), as the bounty toast.")]
         public string matchLiveTwoTeamsToastText = "Two teams: lose your base and you can't respawn";
-        [Tooltip("The host's switch button label while the room is in THREE-team mode - press it to open the " +
-                 "two-team lobby (Tudor, 2026-09-26; Decision L7).")]
-        public string lobbyTwoTeamsButtonText = "Two teams (up to 6)";
-        [Tooltip("The host's switch button label while the room is in TWO-team mode - press it to reopen the " +
-                 "third team.")]
-        public string lobbyThreeTeamsButtonText = "Three teams (up to 9)";
-        [Tooltip("Shown to the host instead of the ordinary warm-up line while the switch to two teams is " +
-                 "greyed out - the room already has more than six players.")]
-        public string lobbyTwoTeamsTooManyText = "Two teams needs 6 players or fewer";
-        [Tooltip("Warm-up line shown to everyone in two-team mode while fewer than both teams have a player yet.")]
-        public string warmupTwoTeamsWaitingText = "Warm-up (two teams): the host starts once both teams have a player.";
-        [Tooltip("Warm-up line shown to the HOST in two-team mode once both teams have a player - nothing " +
-                 "auto-starts here (Decision L3): Start when ready.")]
-        public string warmupTwoTeamsHostText = "Warm-up (two teams): both teams are here. Start when you're ready.";
-        [Tooltip("Warm-up line shown to everyone ELSE in two-team mode once both teams have a player - the host " +
-                 "has the Start button, not you.")]
-        public string warmupTwoTeamsGuestText = "Warm-up (two teams): waiting for the host to start.";
 
         [Header("Damage numbers (2026-09-18)")]
         [Tooltip("Pop a number beside an enemy each time your damage lands on them. Off hides them; nothing else about " +
@@ -1021,6 +1001,11 @@ namespace Overpower.UI
         public string matchLogSavedText = "Your match log is saved: {0} - send this file to Tudor.";
         [Tooltip("MatchLogZip's saved-log overlay button - Application.OpenURL of the match folder.")]
         public string openLogFolderText = "Open folder";
+        [Tooltip("Where the saved-log overlay sits: how far from the left edge and from the bottom edge of the screen, in reference pixels. " +
+                 "The bottom left keeps it clear of the YOU WIN / YOU LOSE title and the result button.")]
+        public Vector2 matchLogSavedOffset = new Vector2(24f, 70f);
+        [Tooltip("Width of the saved-log overlay, in reference pixels. Narrow enough to stay clear of the ability slots.")]
+        public float matchLogSavedWidth = 640f;
 
         [Header("Scoreboard (hold Tab)")]
         [Tooltip("Width of the Tab scoreboard, in reference pixels (the HUD's 1920x1080 grid).")]

@@ -7,18 +7,13 @@ namespace Overpower.Match
     /// <summary>Where the warm-up/countdown/live state stands for the UI, per StartStateFor.</summary>
     public enum StartState { Warmup, CountingDown, Live }
 
-    /// <summary>What the warm-up line should say, per WarmupMessageFor. The three "TwoTeams..." values are the
-    /// two-team lobby's own wording (Tudor, 2026-09-26; Decision L7) - a room in two-team mode never returns one of
-    /// the older values while in the warm-up.</summary>
-    public enum WarmupMessage
-    {
-        None, Countdown, WaitingForTeams, HostMayStart, WaitingForHost,
-        TwoTeamsWaitingForPlayers, TwoTeamsHostMayStart, TwoTeamsWaitingForHost
-    }
+    /// <summary>What the warm-up bar should say, per WarmupMessageFor. The host's two wordings differ so that the offer to
+    /// end the warm-up is only ever made while ending it is allowed.</summary>
+    public enum WarmupMessage { None, Countdown, HostMayEnd, HostBlocked, WaitingForHost }
 
     /// <summary>
     /// Pure C# rules for 2.7b's match start (Tudor, 2026-09-18, "Going live" and answer 3): a 5-second countdown
-    /// starts automatically once all three teams have a player, or the host starts it with exactly two teams; "Match
+    /// that the host starts (lobby Task 5: End warm-up, once every team of the mode has a player); "Match
     /// starts in N" shows on every screen, then the match goes live. No UnityEngine here - MatchDirector.Live.cs (step
     /// 5) is the only Photon wiring around it, reading PhotonNetwork.PlayerList/ServerTimestamp into the plain values
     /// these methods take, so a new master and every client reach the same answer with no extra state.
@@ -65,15 +60,6 @@ namespace Overpower.Match
         /// counting down, mPhase present means live - MatchPhase.Warmup is never stored.</summary>
         public static StartState StartStateFor(bool teamsFixed, bool phaseWritten) =>
             phaseWritten ? StartState.Live : teamsFixed ? StartState.CountingDown : StartState.Warmup;
-
-        /// <summary>Tudor, "Going live": the match goes live automatically once three teams have at least one player.</summary>
-        public static bool StartsCountdownAutomatically(bool teamsFixed, IReadOnlyList<int> membersPerTeam) =>
-            false; // Tudor, 2026-09-26: no automatic start in any mode - the host always presses Start.
-
-        /// <summary>Decision L3: the two-team lobby never starts itself, whatever fills the room - the host presses
-        /// Start (HostMayEndWarmup). Mode 3 keeps the answer above.</summary>
-        public static bool StartsCountdownAutomatically(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int mode) =>
-            mode != TwoTeams && StartsCountdownAutomatically(teamsFixed, membersPerTeam);
 
         /// <summary>The host may end the warm-up (lobby Task 5): the teams are not fixed yet, the lobby is in the
         /// warm-up (lS = 1) and every team of the lobby's mode has at least one player present - three teams for a
@@ -144,26 +130,15 @@ namespace Overpower.Match
         public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated, bool teamOpen) =>
             teamsFixed ? MayJoin(teamsFixed, inMatch, eliminated) : teamOpen;
 
-        /// <summary>The warm-up line's wording (Open for Tudor #5: default text, unchanged) - None once live, the
-        /// countdown while counting down, else who is here and who is host.</summary>
-        public static WarmupMessage WarmupMessageFor(StartState state, int teamsWithPlayers, bool isHost)
+        /// <summary>The warm-up bar's wording: nothing once live, the countdown while counting down, else the host's line
+        /// (the offer to end the warm-up only while HostMayEndWarmup holds, otherwise the blocked wording) or everyone
+        /// else's line naming the host.</summary>
+        public static WarmupMessage WarmupMessageFor(StartState state, bool isHost, bool hostMayEnd)
         {
             if (state == StartState.Live) return WarmupMessage.None;
             if (state == StartState.CountingDown) return WarmupMessage.Countdown;
-            if (teamsWithPlayers >= 2) return isHost ? WarmupMessage.HostMayStart : WarmupMessage.WaitingForHost;
-            return WarmupMessage.WaitingForTeams;
-        }
-
-        /// <summary>Decision L7: the two-team lobby's own wording (Tudor, 2026-09-26). Mode 3 keeps the answer
-        /// above; live and counting down read the same regardless of mode - only the warm-up wording differs.</summary>
-        public static WarmupMessage WarmupMessageFor(StartState state, int teamsWithPlayers, bool isHost, int mode)
-        {
-            if (mode != TwoTeams) return WarmupMessageFor(state, teamsWithPlayers, isHost);
-            if (state == StartState.Live) return WarmupMessage.None;
-            if (state == StartState.CountingDown) return WarmupMessage.Countdown;
-            if (teamsWithPlayers == TwoTeams)
-                return isHost ? WarmupMessage.TwoTeamsHostMayStart : WarmupMessage.TwoTeamsWaitingForHost;
-            return WarmupMessage.TwoTeamsWaitingForPlayers;
+            if (!isHost) return WarmupMessage.WaitingForHost;
+            return hostMayEnd ? WarmupMessage.HostMayEnd : WarmupMessage.HostBlocked;
         }
 
         private static bool Contains(IReadOnlyList<int> list, int value)

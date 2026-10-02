@@ -178,17 +178,21 @@ namespace Overpower.Lobby
         }
 
         /// <summary>
-        /// The host may start the game when, after No role players are filled into seats (they count, so everyone
-        /// fits at Start), every team of the layout has at least one player. A two-team layout never asks about a
-        /// third team.
+        /// Why the host may not start the game yet: the first team of the layout (in layout order) that would still have no
+        /// player once No role players are filled into seats (they count, so everyone fits at Start), or null when the game
+        /// may start. A two-team layout never names a third team, since only the layout's own teams are looked at.
         /// </summary>
-        public static bool MayStartGame(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> noRoleActors)
+        public static int? StartBlockReason(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> noRoleActors)
         {
             var placed = AutoFill(layout, seats, noRoleActors);
             foreach (int team in layout.Teams)
-                if (FilledOnTeam(layout, team, seats, placed) < 1) return false;
-            return true;
+                if (FilledOnTeam(layout, team, seats, placed) < 1) return team;
+            return null;
         }
+
+        /// <summary>The host may start the game when no team of the layout would stay empty (StartBlockReason is null).</summary>
+        public static bool MayStartGame(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> noRoleActors) =>
+            StartBlockReason(layout, seats, noRoleActors) == null;
 
         /// <summary>
         /// The host pressing Start: every No role player is placed (AutoFill) and the stage moves from the lobby to the

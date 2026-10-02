@@ -88,8 +88,7 @@ namespace Overpower.UI
                 return;
 
             bool isHost = PhotonNetwork.IsMasterClient;
-            int mode = d.LobbyMode;
-            WarmupMessage message = MatchStartRules.WarmupMessageFor(d.State, d.TeamsWithPlayersNow, isHost, mode);
+            WarmupMessage message = MatchStartRules.WarmupMessageFor(d.State, isHost, d.HostMayStartNow);
             int secondsShown = message == WarmupMessage.Countdown ? d.CountdownSecondsShown : 0;
 
             // The label's text and active state change ONLY when the message or the countdown's own number
@@ -121,10 +120,9 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>How many teams the Start button names: the teams with a player right now, which is exactly what
-        /// HostStartMatch fixes into the match (MatchStartRules.TeamsWithPlayers) - 2 in the two-team lobby (team 2
-        /// stays empty there, HostMayStart), 2 or 3 in the three-team lobby. The button only shows from two teams
-        /// up, so the clamp just keeps the text sane on a frame it is about to hide. Pure - see MatchStartPanelTests.</summary>
+        /// <summary>How many teams the Start button names: the teams of the lobby's mode, which is exactly what HostStartMatch
+        /// fixes into the match (MatchStartRules.TeamsOfLayout) - 2 in a 3v3 lobby, 3 in a 3v3v3 one. The clamp just keeps the
+        /// text sane on a frame the button is about to hide. Pure - see MatchStartPanelTests.</summary>
         internal static int StartButtonTeams(int teamsWithPlayers) =>
             System.Math.Max(MatchStartRules.TwoTeams, System.Math.Min(MatchStartRules.ThreeTeams, teamsWithPlayers));
 
@@ -146,19 +144,16 @@ namespace Overpower.UI
         /// decision (which message wins, and that the too-many reason overrides all of them) is testable with no
         /// UiTheme asset or MonoBehaviour involved - see MatchStartPanelTests. ApplyMessage below is the only
         /// place that turns a key into the actual theme.* text (and, for Countdown, the formatted string).</summary>
-        internal enum WarmupLineKey { Waiting, Host, Guest, TwoTeamsWaiting, TwoTeamsHost, TwoTeamsGuest, Countdown }
+        internal enum WarmupLineKey { Host, Blocked, Guest, Countdown }
 
         internal static WarmupLineKey WarmupLineFor(WarmupMessage message)
         {
             return message switch
             {
                 WarmupMessage.Countdown => WarmupLineKey.Countdown,
-                WarmupMessage.HostMayStart => WarmupLineKey.Host,
+                WarmupMessage.HostMayEnd => WarmupLineKey.Host,
                 WarmupMessage.WaitingForHost => WarmupLineKey.Guest,
-                WarmupMessage.TwoTeamsHostMayStart => WarmupLineKey.TwoTeamsHost,
-                WarmupMessage.TwoTeamsWaitingForHost => WarmupLineKey.TwoTeamsGuest,
-                WarmupMessage.TwoTeamsWaitingForPlayers => WarmupLineKey.TwoTeamsWaiting,
-                _ => WarmupLineKey.Waiting, // WaitingForTeams
+                _ => WarmupLineKey.Blocked, // HostBlocked
             };
         }
 
@@ -175,10 +170,7 @@ namespace Overpower.UI
                 WarmupLineKey.Countdown => FormatCountdown(secondsShown),
                 WarmupLineKey.Host => theme.warmupHostText,
                 WarmupLineKey.Guest => theme.warmupGuestText,
-                WarmupLineKey.TwoTeamsHost => theme.warmupTwoTeamsHostText,
-                WarmupLineKey.TwoTeamsGuest => theme.warmupTwoTeamsGuestText,
-                WarmupLineKey.TwoTeamsWaiting => theme.warmupTwoTeamsWaitingText,
-                _ => theme.warmupWaitingText, // Waiting
+                _ => theme.warmupBlockedText, // Blocked
             };
         }
 

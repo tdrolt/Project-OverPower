@@ -13,13 +13,10 @@ namespace Overpower.Tests
         [Test]
         public void EachWarmupMessageMapsToItsOwnLine()
         {
-            Assert.AreEqual(MatchStartPanel.WarmupLineKey.Waiting, MatchStartPanel.WarmupLineFor(WarmupMessage.WaitingForTeams));
-            Assert.AreEqual(MatchStartPanel.WarmupLineKey.Host, MatchStartPanel.WarmupLineFor(WarmupMessage.HostMayStart));
+            Assert.AreEqual(MatchStartPanel.WarmupLineKey.Blocked, MatchStartPanel.WarmupLineFor(WarmupMessage.HostBlocked));
+            Assert.AreEqual(MatchStartPanel.WarmupLineKey.Host, MatchStartPanel.WarmupLineFor(WarmupMessage.HostMayEnd));
             Assert.AreEqual(MatchStartPanel.WarmupLineKey.Guest, MatchStartPanel.WarmupLineFor(WarmupMessage.WaitingForHost));
             Assert.AreEqual(MatchStartPanel.WarmupLineKey.Countdown, MatchStartPanel.WarmupLineFor(WarmupMessage.Countdown));
-            Assert.AreEqual(MatchStartPanel.WarmupLineKey.TwoTeamsWaiting, MatchStartPanel.WarmupLineFor(WarmupMessage.TwoTeamsWaitingForPlayers));
-            Assert.AreEqual(MatchStartPanel.WarmupLineKey.TwoTeamsHost, MatchStartPanel.WarmupLineFor(WarmupMessage.TwoTeamsHostMayStart));
-            Assert.AreEqual(MatchStartPanel.WarmupLineKey.TwoTeamsGuest, MatchStartPanel.WarmupLineFor(WarmupMessage.TwoTeamsWaitingForHost));
         }
 
         [Test]

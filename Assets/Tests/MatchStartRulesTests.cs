@@ -8,16 +8,6 @@ namespace Overpower.Tests
     public class MatchStartRulesTests
     {
         [Test]
-        public void TheCountdownStartsTheMomentAllThreeTeamsHaveAPlayer()
-        {
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(teamsFixed: false, new[] { 1, 1, 0 }));
-            // Tudor, 2026-09-26: never automatic - the host presses Start.
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }));
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 3, 2, 1 }));
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(true, new[] { 1, 1, 1 }), "a countdown or a live match already fixed the teams");
-        }
-
-        [Test]
         public void TheCountdownEndsItsLengthAfterItStartsEvenAcrossTheClockWrap()
         {
             Assert.AreEqual(15000, MatchStartRules.CountdownEndsAt(nowMs: 10000, countdownSeconds: 5f));
@@ -99,13 +89,27 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheWarmupLineMatchesTheStateWhoIsHereAndWhoIsHost()
+        public void TheHostsLineOnlyOffersEndingTheWarmupWhileItIsAllowed()
         {
-            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, teamsWithPlayers: 2, isHost: true));
-            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, 2, true));
-            Assert.AreEqual(WarmupMessage.WaitingForTeams, MatchStartRules.WarmupMessageFor(StartState.Warmup, 1, true));
-            Assert.AreEqual(WarmupMessage.HostMayStart, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, true));
-            Assert.AreEqual(WarmupMessage.WaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, false));
+            Assert.AreEqual(WarmupMessage.HostMayEnd, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: true, hostMayEnd: true));
+            Assert.AreEqual(WarmupMessage.HostBlocked, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: true, hostMayEnd: false),
+                "no 'end it when ready' line while a team has nobody");
+        }
+
+        [Test]
+        public void TheWarmupLineOfEveryoneElseNamesTheHostWhateverTheRule()
+        {
+            Assert.AreEqual(WarmupMessage.WaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: false, hostMayEnd: false));
+            Assert.AreEqual(WarmupMessage.WaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: false, hostMayEnd: true));
+        }
+
+        [Test]
+        public void TheCountdownAndGoingLiveReadTheSameForEveryone()
+        {
+            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, isHost: true, hostMayEnd: false));
+            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, isHost: false, hostMayEnd: false));
+            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, isHost: true, hostMayEnd: true));
+            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, isHost: false, hostMayEnd: false));
         }
 
         // --- Two-team lobby (Tudor, 2026-09-26): the host can set the room to two teams before the countdown. ---
@@ -129,13 +133,6 @@ namespace Overpower.Tests
             Assert.IsTrue(MatchStartRules.IsTeamOpen(3, 2));
             Assert.IsFalse(MatchStartRules.MayJoin(teamsFixed: false, inMatch: false, eliminated: false, teamOpen: false));
             Assert.IsTrue(MatchStartRules.MayJoin(true, true, false, false), "after the countdown the existing rule wins");
-        }
-
-        [Test]
-        public void TwoTeamModeNeverStartsItself()
-        {
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 2));
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 3));
         }
 
         private static readonly SeatLayout ThreeTeamLobby = new SeatLayout(new[] { 0, 1, 2 }, 3, 2);
@@ -193,16 +190,5 @@ namespace Overpower.Tests
             Assert.AreEqual(0, ((int[])props[MatchDirector.EliminatedKey]).Length);
         }
 
-        [Test]
-        public void TheWarmupLineSaysTwoTeams()
-        {
-            Assert.AreEqual(WarmupMessage.TwoTeamsHostMayStart, MatchStartRules.WarmupMessageFor(StartState.Warmup, teamsWithPlayers: 2, isHost: true, mode: 2));
-            Assert.AreEqual(WarmupMessage.TwoTeamsWaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, false, 2));
-            Assert.AreEqual(WarmupMessage.TwoTeamsWaitingForPlayers, MatchStartRules.WarmupMessageFor(StartState.Warmup, 1, true, 2));
-            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, 2, true, 2));
-            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, 2, true, 2));
-            // Mode 3: the old answers.
-            Assert.AreEqual(WarmupMessage.HostMayStart, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, true, 3));
-        }
     }
 }

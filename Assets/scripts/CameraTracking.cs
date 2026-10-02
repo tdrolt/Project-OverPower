@@ -109,8 +109,8 @@ public class CameraTracking : MonoBehaviour
     private float yaw = 0f;         // degrees rotated around the player
     private bool teamYawResolved = false;
     // Review fix 6 (2026-09-26): which team teamYawResolved was resolved FOR - so ResolveTeamYaw can tell a
-    // genuine re-seat (a two-team switch moving the local player, RoomManager.ReseatLocalPlayerIfTeamClosed)
-    // apart from "already resolved, nothing to do". PlayerTeam.NoTeam until the first resolve.
+    // body that moved onto another team (the old two-team switch did this; seats are locked at Start now, so it is a
+    // safety net) apart from "already resolved, nothing to do". PlayerTeam.NoTeam until the first resolve.
     private int teamYawResolvedForTeam = PlayerTeam.NoTeam;
 
     // Scope ability (Tudor, 2026-09-18): a SEPARATE keyed stack from currentZoom above, on purpose - see
@@ -234,9 +234,9 @@ public class CameraTracking : MonoBehaviour
         if (team == null || !team.HasTeam)
             return;
 
-        // Review fix 6 (2026-09-26): the two-team lobby's late re-seat (RoomManager.ReseatLocalPlayerIfTeamClosed)
-        // moves the LOCAL player onto a different team after this camera already resolved once - keeping team
-        // 2's angle for the rest of the match otherwise. Re-resolved below the same way as the very first time;
+        // Review fix 6 (2026-09-26): if the LOCAL player's body ever ends up on a different team after this camera already
+        // resolved once (the old two-team switch moved players; seats are locked at Start now, so this is a safety net) -
+        // keeping the first team's angle for the rest of the match otherwise. Re-resolved below the same way as the very first time;
         // CaptureRingView already self-corrects off Yaw's own value changing (Building capture.cs), not off this
         // flag, so a moment unresolved here breaks nothing.
         if (teamYawResolved)

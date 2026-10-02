@@ -286,6 +286,50 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void StartBlockReasonIsNullWhenTheGameMayStart()
+        {
+            var seats = Seats(("sT00", 1), ("sT10", 2));
+            Assert.IsNull(LobbySeatRules.StartBlockReason(Three, seats, new[] { 10 }), "No role fills the last empty team");
+            Assert.IsNull(LobbySeatRules.StartBlockReason(Three, Seats(("sT00", 1), ("sT10", 2), ("sT20", 3)), new int[0]));
+        }
+
+        [Test]
+        public void StartBlockReasonNamesTheTeamThatWouldStayEmpty()
+        {
+            var seats = Seats(("sT00", 1), ("sT10", 2));
+            Assert.AreEqual(2, LobbySeatRules.StartBlockReason(Three, seats, new int[0]));
+            Assert.AreEqual(0, LobbySeatRules.StartBlockReason(Three, Seats(("sT10", 2), ("sT20", 3)), new int[0]));
+            Assert.AreEqual(1, LobbySeatRules.StartBlockReason(Three, Seats(("sT00", 1), ("sT20", 3)), new int[0]));
+        }
+
+        [Test]
+        public void StartBlockReasonNamesTheFirstEmptyTeamWhenSeveralStayEmpty()
+        {
+            Assert.AreEqual(0, LobbySeatRules.StartBlockReason(Three, Seats(), new int[0]));
+            Assert.AreEqual(1, LobbySeatRules.StartBlockReason(Three, Seats(("sT00", 1)), new int[0]));
+        }
+
+        [Test]
+        public void StartBlockReasonOnTwoTeamsNeverNamesTeamTwo()
+        {
+            var seats = Seats(("sT00", 1), ("sT10", 2));
+            Assert.IsNull(LobbySeatRules.StartBlockReason(Two, seats, new int[0]));
+            Assert.AreEqual(1, LobbySeatRules.StartBlockReason(Two, Seats(("sT00", 1)), new int[0]));
+        }
+
+        [Test]
+        public void StartBlockReasonAgreesWithMayStartGame()
+        {
+            var cases = new[]
+            {
+                Seats(), Seats(("sT00", 1)), Seats(("sT00", 1), ("sT10", 2)), Seats(("sT00", 1), ("sT10", 2), ("sT20", 3)), Seats(("sS0", 5)),
+            };
+            foreach (var seats in cases)
+                foreach (var noRole in new[] { new int[0], new[] { 9 }, new[] { 9, 10 }, new[] { 9, 10, 11 } })
+                    Assert.AreEqual(LobbySeatRules.MayStartGame(Three, seats, noRole), LobbySeatRules.StartBlockReason(Three, seats, noRole) == null);
+        }
+
+        [Test]
         public void MayEndWarmupNeedsEveryLayoutTeam()
         {
             var present = new Dictionary<int, int> { { 0, 2 }, { 1, 0 }, { 2, 1 } };

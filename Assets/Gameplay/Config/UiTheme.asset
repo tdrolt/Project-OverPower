@@ -280,9 +280,9 @@ MonoBehaviour:
   minimapCutAreaColor: {r: 0.05, g: 0.05, b: 0.06, a: 0.75}
   minimapCutWallColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
   minimapCutWallWidth: 3
-  warmupWaitingText: 'Warm-up: nothing counts yet and the shop is free. The host starts once two teams have a player.'
-  warmupHostText: 'Warm-up: press Start when you''re ready (two or three teams).'
-  warmupGuestText: 'Warm-up: waiting for the host to start.'
+  warmupBlockedText: 'Warm-up: nothing counts yet and the shop is free. It can end once every team has a player.'
+  warmupHostText: 'Warm-up: every team has a player. End the warm-up when you''re ready.'
+  warmupGuestText: 'Warm-up: waiting for the host to end it.'
   matchCountdownText: Match starts in {0}
   matchStartButtonText: Start match ({0} teams)
   matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
@@ -291,12 +291,6 @@ MonoBehaviour:
   warmupLineSize: {x: 900, y: 64}
   matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
   matchLiveTwoTeamsToastText: 'Two teams: lose your base and you can''t respawn'
-  lobbyTwoTeamsButtonText: Two teams (up to 6)
-  lobbyThreeTeamsButtonText: Three teams (up to 9)
-  lobbyTwoTeamsTooManyText: Two teams needs 6 players or fewer
-  warmupTwoTeamsWaitingText: 'Warm-up (two teams): the host starts once both teams have a player.'
-  warmupTwoTeamsHostText: 'Warm-up (two teams): both teams are here. Start when you''re ready.'
-  warmupTwoTeamsGuestText: 'Warm-up (two teams): waiting for the host to start.'
   showDamageNumbers: 1
   damageNumberTextSize: 30
   damageNumberColor: {r: 1, g: 1, b: 1, a: 1}
@@ -368,6 +362,8 @@ MonoBehaviour:
   quitNoText: No
   matchLogSavedText: 'Your match log is saved: {0} - send this file to Tudor.'
   openLogFolderText: Open folder
+  matchLogSavedOffset: {x: 24, y: 70}
+  matchLogSavedWidth: 640
   connectionLostTitle: Connection lost
   connectionLostBody: Rejoin to come back to the same match as the same player - same team, gold and loadout. You respawn as after a death.
   connectionLostRejoinButton: Rejoin

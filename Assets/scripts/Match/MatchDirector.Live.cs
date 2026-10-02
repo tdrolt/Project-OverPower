@@ -36,14 +36,11 @@ namespace Overpower.Match
         /// (lobby Task 4), so it never changes afterwards.
         public const string LobbyModeKey = "mMode";
 
-        // Not gameplay values. The master re-checks every 0.5 s in the warm-up (a callback alone can be missed -
-        // clock not synced, snapshot not read yet - and would strand a full room there) and every frame while
-        // counting down (to go live on the frame its clock reaches mLiveAt). After sending a countdown or cancel
+        // Not gameplay values. The master re-checks every frame while counting down (to go live on the frame its clock
+        // reaches mLiveAt, and to cancel when a team of the countdown empties). After sending a countdown or cancel
         // write it waits for the room to echo it - or 1 s, in case a check-and-set was refused - so one decision
         // is never sent twice.
-        private const float StartCheckIntervalSeconds = 0.5f;
         private const float EchoWaitSeconds = 1f;
-        private float nextStartCheck;
         private float waitForEchoUntil = -1f; // cleared by OnRoomPropertiesUpdate when mTeams/mLiveAt/mPhase arrive
         private bool liveWritten;             // master: the live write was sent
 
@@ -70,9 +67,9 @@ namespace Overpower.Match
         /// <summary>"Match starts in N" (Decision 22) on this client's own synced clock. Review fix: before this
         /// client's own clock has synced, PhotonNetwork.ServerTimestamp reads 0 for its first frames (BuildingManager's
         /// own "FAIL #15" comment already records this) - liveAtMs - 0 would read as a nonsense huge number, so the
-        /// pure rule takes the configured countdown length as a fallback for exactly that case, sourced here from the
-        /// local player's own GameplayConfig (LocalPlayerConfig, the same getter StartCountdown already uses - it
-        /// needs no server clock, just the serialized reference on this player's own prefab).</summary>
+        /// pure rule takes the configured countdown length as a fallback for exactly that case, sourced here from
+        /// CountdownConfig() (the same getter StartCountdown uses: this player's own body's GameplayConfig, else the
+        /// RoomManager's, so a spectator seat has it too - it needs no server clock).</summary>
         public int CountdownSecondsShown =>
             MatchStartRules.CountdownSecondsShown(PhotonNetwork.ServerTimestamp, LiveAtMs,
                 CountdownConfig()?.MatchStartCountdownSeconds ?? 0f);
@@ -132,13 +129,13 @@ namespace Overpower.Match
             MatchStartRules.MayJoin(TeamsFixed, IsInMatch(team), IsEliminated(team), MatchStartRules.IsTeamOpen(LobbyMode, team));
 
         /// <summary>How many of the three teams currently have a player - the warm-up line's own question,
-        /// polled every frame (MatchStartPanel, step 8), so counted through PhotonNetwork.CurrentRoom.Players
+        /// polled every frame (the WarmupBar), so counted through PhotonNetwork.CurrentRoom.Players
         /// (a Dictionary; its enumerator is a struct, unlike PhotonNetwork.PlayerList's freshly sorted array -
         /// same reasoning as MinimapView.UpdatePlayers) and CountMembers' own reused array, so this allocates
         /// nothing per frame.</summary>
         public int TeamsWithPlayersNow => MatchStartRules.CountTeamsWithPlayers(CountMembers());
 
-        /// <summary>The host may end the warm-up (lobby Task 5; the button reads "End warm-up" from Task 10): this client
+        /// <summary>The host may end the warm-up (lobby Task 5; the WarmupBar's End warm-up button follows this): this client
         /// is the master, the lobby is in the warm-up and every team of the lobby's mode has a player present
         /// (MatchStartRules.HostMayEndWarmup). Polled every frame the warm-up panel is open: nothing is allocated per
         /// frame (CountMembers' scratch array, one reused dictionary).</summary>
@@ -184,8 +181,8 @@ namespace Overpower.Match
             { LobbyKeys.Stage, (int)LobbyStage.InMatch },
         };
 
-        /// <summary>Covers the countdown starting, being cancelled, and the match going live - MatchStartPanel
-        /// (step 8) subscribes instead of polling every frame for a change that happens rarely. Map shrink T3: the
+        /// <summary>Covers the countdown starting, being cancelled, and the match going live - the WarmupBar
+        /// subscribes instead of polling every frame for a change that happens rarely. Map shrink T3: the
         /// phase-two cut changing (derived from mElim) raises it too - the minimap already listens, to redraw its
         /// overlay.</summary>
         public event System.Action LiveStateChanged;
@@ -215,12 +212,7 @@ namespace Overpower.Match
                 return;
             }
 
-            if (Time.unscaledTime < nextStartCheck)
-                return;
-            nextStartCheck = Time.unscaledTime + StartCheckIntervalSeconds;
-            int[] members = CountMembers();
-            if (MatchStartRules.StartsCountdownAutomatically(TeamsFixed, members, LobbyMode))
-                StartCountdown(MatchStartRules.TeamsWithPlayers(members));
+            // Warm-up: nothing starts the countdown by itself. The host presses End warm-up (HostStartMatch).
         }
 
         /// <summary>The host's Start button calls this directly - the host IS the master, so this is a local call

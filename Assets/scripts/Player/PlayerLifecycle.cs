@@ -633,10 +633,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             elapsed += Time.deltaTime;
         }
 
-        // Review fix 4 (2026-09-26): re-seated while dead in the warm-up (a two-team switch moved this player
-        // off the closed team - RoomManager.ReseatLocalPlayerIfTeamClosed - while this wait was already running)
-        // used to keep whichever team PlayerDied captured when the wait STARTED, stale by the time it ends -
-        // SpawnCapitalFor below then answered for the closed team's own corner instead of the team this player
+        // Review fix 4 (2026-09-26): a team change while dead in the warm-up (the old two-team switch moved players
+        // off the closed team; seats are locked at Start now, so this is a safety net) used to keep whichever team
+        // PlayerDied captured when the wait STARTED, stale by the time it ends -
+        // SpawnCapitalFor below then answered for the old team's own corner instead of the team this player
         // actually landed on. Re-read now, at the same moment Decision 12 below already re-decides everything
         // else - Teams.TryGetTeam, the one place team membership is read and compared. Leaves teamID as PlayerDied
         // captured it if the property is (impossibly) still missing.
@@ -730,23 +730,6 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// same move ReturnToSpawn makes, just with a log line that does not claim they fell.</summary>
     public void ReturnToSpawnForPhaseChange() =>
         MoveToSpawnPoint("sent home for the two-team phase change");
-
-    /// <summary>Two-team lobby (Tudor, 2026-09-26; Decision L5): RoomManager.ReseatLocalPlayerIfTeamClosed calls
-    /// this, right after rewriting this player's own team property, to move its already-spawned body to the new
-    /// team's spawn point - the same mover every other path in this class uses (TeleportToSpawnPoint's own
-    /// comment: PlayerDisplacement.TeleportTo, never transform.position). Owner-only, like every other player-
-    /// moving method here. A no-op for a player with no PlayerLifecycle to call this on yet (RoomManager checks
-    /// that itself before calling) - the team property rewrite alone is enough while nothing is spawned.</summary>
-    public void TeleportToTeamSpawn(Transform spawn)
-    {
-        if (!photonView.IsMine || spawn == null)
-            return;
-        // Review fix 5 (2026-09-26): a knockback in flight (playerDisplacement's own Forced move) could
-        // otherwise finish AFTER this teleport and carry the body back off the new spawn - the same reason
-        // ResetForMatchStart and HandleLeftArena both cancel before they move the player.
-        playerDisplacement?.Cancel();
-        TeleportToSpawnPoint(spawn.position, spawn.rotation);
-    }
 
     private void MoveToSpawnPoint(string logReason)
     {
