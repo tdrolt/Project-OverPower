@@ -205,8 +205,8 @@ namespace Overpower.Tests
         public void ARoomWithoutAStampSortsByFirstSeenAfterStampedOnes()
         {
             var cache = new Dictionary<string, LobbyEntry>();
-            // a realistic first-seen time: what LobbyDirectory passes (Stopwatch ticks), far above any small offset
-            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            // a fixed, large first-seen time (about what Stopwatch ticks reach), so the test fails with a small offset on any machine
+            long now = 1L << 41;
             LobbyListCache.Merge(cache, new[] { WithName("old-build", new Hashtable()) }, now);
             LobbyListCache.Merge(cache, new[] { WithName("stamped", new Hashtable { { LobbyKeys.Created, 1 } }) }, now + 1);
             var names = LobbyListCache.Sorted(cache.Values).Select(e => e.RoomName).ToArray();
@@ -217,7 +217,7 @@ namespace Overpower.Tests
         public void UnstampedRoomsSortByFirstSeenNewestFirstAfterStampedOnes()
         {
             var cache = new Dictionary<string, LobbyEntry>();
-            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            long now = 1L << 41; // fixed and large, as above
             LobbyListCache.Merge(cache, new[] { WithName("old-1", new Hashtable()) }, now);
             LobbyListCache.Merge(cache, new[] { WithName("stamped", new Hashtable { { LobbyKeys.Created, -2000000000 } }) }, now + 5);
             LobbyListCache.Merge(cache, new[] { WithName("old-2", new Hashtable()) }, now + 10);

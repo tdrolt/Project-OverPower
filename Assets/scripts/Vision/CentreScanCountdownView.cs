@@ -131,7 +131,7 @@ namespace Overpower.Vision
         {
             TeamSight sight = TeamSight.Local;
             PlayerHealth health = sight != null ? sight.GetComponent<PlayerHealth>() : null;
-            return health != null ? health.Theme : null;
+            return health != null ? health.Theme : CentreScan.SpectatorTheme; // a spectator has no body: the view hands its theme over
         }
 
         // Built on first use, once the theme can be read: a screen-overlay canvas like the HUD's hit-feedback one.

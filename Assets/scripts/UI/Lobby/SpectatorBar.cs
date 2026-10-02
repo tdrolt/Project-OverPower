@@ -18,7 +18,10 @@ namespace Overpower.UI
         private Action onLeave;
         private TextMeshProUGUI nameLabel;
         private Material textMaterial;
-        private string shownLine = "\u0001"; // never a real line: forces the first Show to write
+        // What the name label shows now: rebuilt only when one of these changes (Show is called every frame).
+        private bool shownKnown;
+        private string shownPlayer, shownTeam;
+        private Color shownColor;
 
         /// <summary>What the name line says right now ("Mara - Purple" or "Whole map", without the colour tag). Recorders read it.</summary>
         public string NameLine { get; private set; } = "";
@@ -43,11 +46,13 @@ namespace Overpower.UI
         /// <summary>The watched player's name and team name in the team's colour; a null name shows the whole-map line instead.</summary>
         public void Show(string playerName, string teamName, Color teamColor)
         {
-            string line = playerName == null ? theme.spectatorBarWholeMapName : $"{playerName} · {teamName}";
-            if (line == shownLine)
+            if (shownKnown && playerName == shownPlayer && (playerName == null || (teamName == shownTeam && teamColor == shownColor)))
                 return;
-            shownLine = line;
-            NameLine = line;
+            shownKnown = true;
+            shownPlayer = playerName;
+            shownTeam = teamName;
+            shownColor = teamColor;
+            NameLine = playerName == null ? theme.spectatorBarWholeMapName : $"{playerName} · {teamName}";
             nameLabel.text = playerName == null
                 ? theme.spectatorBarWholeMapName
                 : $"{playerName} <color=#{ColorUtility.ToHtmlStringRGB(teamColor)}>· {teamName}</color>";

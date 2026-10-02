@@ -1226,5 +1226,9 @@ namespace Overpower.UI
         public string[] spectatorBarKeyTexts = { "Previous", "Next", "Whole map", "Zoom" };
         [Tooltip("The Leave button's label (back to the lobby list).")]
         public string spectatorBarLeaveText = "Leave";
+        [Tooltip("The whole-map view (Space): how much of the screen's height the arena fills, from 0.3 to 1. 0.88 = 88%, the arena centred.")]
+        public float spectatorWholeMapFill = 0.88f;
+        [Tooltip("The angle a spectator sees the arena from, in degrees turned round the map (0 = the camera behind the bottom edge, looking up the map). It is the same whoever is watched.")]
+        public float spectatorViewAngle = 0f;
     }
 }

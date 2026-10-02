@@ -827,6 +827,7 @@ MonoBehaviour:
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
   modeCatalogue: {fileID: 11400000, guid: e720a5fa40f26fd48bf4cafe3ab7d829, type: 2}
   lobbyConfig: {fileID: 11400000, guid: 8b0e874f150976448a033eed017ab4d9, type: 2}
+  visionConfig: {fileID: 11400000, guid: 8f976973125e6cc408a4086d6ba10c5d, type: 2}
 --- !u!114 &101938907
 MonoBehaviour:
   m_ObjectHideFlags: 0

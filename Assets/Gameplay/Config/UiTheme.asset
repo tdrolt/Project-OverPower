@@ -393,3 +393,32 @@ MonoBehaviour:
   rejoinMatchButtonSize: {x: 420, y: 52}
   rejoinButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   rejoinButtonGapAboveNameBox: 16
+  spectatorBarColor: {r: 0.06, g: 0.063, b: 0.078, a: 0.88}
+  spectatorBarPadding: {x: 36, y: 20}
+  spectatorBarGap: 42
+  spectatorBarBottom: 28
+  spectatorBarCaptionSize: 18
+  spectatorBarCaptionColor: {r: 0.557, g: 0.545, b: 0.522, a: 1}
+  spectatorBarNameSize: 36
+  spectatorBarKeyTextSize: 22
+  spectatorBarKeyCapSize: 22
+  spectatorBarKeyCapColor: {r: 0.557, g: 0.545, b: 0.522, a: 1}
+  spectatorBarOutline: 2
+  spectatorBarKeyCapPadding: {x: 15, y: 6}
+  spectatorBarLeaveSize: {x: 120, y: 60}
+  spectatorBarLeaveOutlineColor: {r: 0.29, g: 0.302, b: 0.341, a: 1}
+  spectatorBarCaption: SPECTATING
+  spectatorBarWholeMapName: Whole map
+  spectatorBarKeyCaps:
+  - Q
+  - E
+  - Space
+  - Wheel
+  spectatorBarKeyTexts:
+  - Previous
+  - Next
+  - Whole map
+  - Zoom
+  spectatorBarLeaveText: Leave
+  spectatorWholeMapFill: 0.88
+  spectatorViewAngle: 0

@@ -119,20 +119,80 @@ namespace Overpower.Match
                 radius = UnityEngine.Mathf.Max(radius, UnityEngine.Vector2.Distance(centre, outline[i]));
         }
 
-        /// <summary>How far the camera must stand from the middle of the map to keep a ground circle of this radius on screen.
-        /// The camera looks down at the target (tilt = degrees below the horizon): the circle's near and far edges are foreshortened
-        /// so the height is the tight one (the near edge sits closer and higher in the picture), and the width is the other limit
-        /// for a narrow window. margin &gt; 1 leaves a border. Zero for a zero radius.</summary>
-        public static float WholeMapDistance(float radius, float verticalFovDegrees, float aspect, float tiltDegrees, float margin)
+        /// <summary>The whole-map view (Space): where the camera aims on the ground and how far it stands from that point, so the arena
+        /// outline fills heightFill of the screen's height (0.88 = 88%), centred up and down, and never runs off the sides. The camera is the
+        /// follow camera's: tilted down (tiltDegrees below the horizon), turned so it looks up the map (+z), a vertical field of view and a
+        /// window aspect. The outline is projected through it exactly (a circle round the farthest point framed it too loosely: the outline
+        /// is no circle). Zero for no outline.</summary>
+        public static void WholeMapFraming(IReadOnlyList<UnityEngine.Vector2> outline, float verticalFovDegrees, float aspect, float tiltDegrees,
+            float heightFill, out UnityEngine.Vector2 aimPoint, out float distance)
         {
-            if (radius <= 0f)
-                return 0f;
-            float halfVertical = UnityEngine.Mathf.Deg2Rad * verticalFovDegrees * 0.5f;
-            float halfHorizontal = UnityEngine.Mathf.Atan(UnityEngine.Mathf.Tan(halfVertical) * UnityEngine.Mathf.Max(0.01f, aspect));
+            aimPoint = UnityEngine.Vector2.zero;
+            distance = 0f;
+            if (outline == null || outline.Count == 0)
+                return;
+
+            UnityEngine.Vector2 min = outline[0], max = outline[0];
+            for (int i = 1; i < outline.Count; i++)
+            {
+                min = UnityEngine.Vector2.Min(min, outline[i]);
+                max = UnityEngine.Vector2.Max(max, outline[i]);
+            }
+            float aimX = (min.x + max.x) * 0.5f;
+            float tanV = UnityEngine.Mathf.Tan(UnityEngine.Mathf.Deg2Rad * verticalFovDegrees * 0.5f);
+            float tanH = tanV * UnityEngine.Mathf.Max(0.01f, aspect);
             float tilt = UnityEngine.Mathf.Deg2Rad * tiltDegrees;
-            float forHeight = radius * (UnityEngine.Mathf.Cos(tilt) + UnityEngine.Mathf.Sin(tilt) / UnityEngine.Mathf.Tan(halfVertical));
-            float forWidth = radius / UnityEngine.Mathf.Tan(halfHorizontal);
-            return UnityEngine.Mathf.Max(forHeight, forWidth) * margin;
+            float sin = UnityEngine.Mathf.Sin(tilt), cos = UnityEngine.Mathf.Cos(tilt);
+            float fill = UnityEngine.Mathf.Clamp(heightFill, 0.3f, 1f);
+            const float WidthFill = 0.96f; // the map never gets closer than this to the left and right edges
+
+            float radius = 0f;
+            for (int i = 0; i < outline.Count; i++)
+                radius = UnityEngine.Mathf.Max(radius, UnityEngine.Vector2.Distance(new UnityEngine.Vector2(aimX, (min.y + max.y) * 0.5f), outline[i]));
+            radius = UnityEngine.Mathf.Max(radius, (max.y - min.y) * 0.5f) + 0.01f;
+
+            // For an aim point on the ground at z and a camera distance d, a ground point at (dx, dz) from it lands at
+            // screen y = dz*sin / ((d + dz*cos) * tanV) and screen x = dx / ((d + dz*cos) * tanH), in -1..1 half-screens.
+            void Extents(float aimZ, float d, out float top, out float bottom, out float halfWidth)
+            {
+                top = float.MinValue;
+                bottom = float.MaxValue;
+                halfWidth = 0f;
+                for (int i = 0; i < outline.Count; i++)
+                {
+                    float dz = outline[i].y - aimZ;
+                    float den = d + dz * cos;
+                    float ny = dz * sin / (den * tanV);
+                    top = UnityEngine.Mathf.Max(top, ny);
+                    bottom = UnityEngine.Mathf.Min(bottom, ny);
+                    halfWidth = UnityEngine.Mathf.Max(halfWidth, UnityEngine.Mathf.Abs(outline[i].x - aimX) / (den * tanH));
+                }
+            }
+
+            // The smallest distance at which the height fills no more than asked and the width fits (both only shrink as it grows).
+            float DistanceFor(float aimZ)
+            {
+                float lo = radius * 1.01f, hi = radius * 400f;
+                for (int step = 0; step < 50; step++)
+                {
+                    float mid = (lo + hi) * 0.5f;
+                    Extents(aimZ, mid, out float top, out float bottom, out float halfWidth);
+                    bool fits = (top - bottom) * 0.5f <= fill && halfWidth <= WidthFill;
+                    if (fits) hi = mid; else lo = mid;
+                }
+                return hi;
+            }
+
+            // Moving the aim point up the map moves the picture down: find where the arena sits in the middle of the screen.
+            float low = min.y, high = max.y, aimZBest = (min.y + max.y) * 0.5f;
+            for (int step = 0; step < 50; step++)
+            {
+                aimZBest = (low + high) * 0.5f;
+                Extents(aimZBest, DistanceFor(aimZBest), out float top, out float bottom, out _);
+                if ((top + bottom) * 0.5f > 0f) low = aimZBest; else high = aimZBest;
+            }
+            aimPoint = new UnityEngine.Vector2(aimX, aimZBest);
+            distance = DistanceFor(aimZBest);
         }
     }
 }

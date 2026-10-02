@@ -41,6 +41,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Tooltip("Read for how long a lobby name may be.")]
     [SerializeField] private LobbyConfig lobbyConfig;
 
+    [Tooltip("Read by a spectator seat's view for the centre scan's numbers (its wave and the countdown), which otherwise come from a player's own body.")]
+    [SerializeField] private VisionConfig visionConfig;
+
+    /// <summary>The vision numbers (the centre scan's wave and countdown) for a client with no body: a spectator seat's view (lobby Task 7).</summary>
+    public VisionConfig Vision => visionConfig;
+
     /// <summary>The live lobby list, and creating and joining lobbies (lobby Task 2).</summary>
     public LobbyDirectory Lobbies { get; private set; }
 

@@ -93,29 +93,66 @@ namespace Overpower.Tests
             Assert.AreEqual(0f, radius);
         }
 
-        [Test]
-        public void TheWholeMapDistanceKeepsTheNearEdgeOfTheMapOnScreen()
+        // A three-lobe arena like the real one: wide at the bottom, a long arm up the middle.
+        private static readonly List<Vector2> Lobes = new List<Vector2>
         {
-            // 50 m radius, 60 degree vertical view, 16:9, looking down 63.4 degrees (the camera's 10 up, 5 back): the tilted
-            // near edge of the circle is the tight one (about 99.8 m), not the width (about 48.7 m).
-            float distance = SpectateRules.WholeMapDistance(50f, 60f, 16f / 9f, 63.4349f, 1f);
-            Assert.AreEqual(99.82f, distance, 0.05f);
+            new Vector2(-60, -40), new Vector2(60, -40), new Vector2(20, 10), new Vector2(8, 90), new Vector2(-8, 90), new Vector2(-20, 10),
+        };
+
+        // Puts a real camera where the framing says (tilted down, yaw 0: behind the bottom edge, looking up the map) and projects the outline.
+        private static void ProjectOutline(IReadOnlyList<Vector2> outline, float fov, float aspect, float tilt, Vector2 aim, float distance,
+            out float minY, out float maxY, out float minX, out float maxX)
+        {
+            var go = new GameObject("framing test camera");
+            try
+            {
+                Camera cam = go.AddComponent<Camera>();
+                cam.fieldOfView = fov;
+                cam.aspect = aspect;
+                Vector3 target = new Vector3(aim.x, 0f, aim.y);
+                float t = tilt * Mathf.Deg2Rad;
+                cam.transform.position = target + distance * new Vector3(0f, Mathf.Sin(t), -Mathf.Cos(t));
+                cam.transform.LookAt(target);
+                minY = minX = float.MaxValue;
+                maxY = maxX = float.MinValue;
+                foreach (Vector2 p in outline)
+                {
+                    Vector3 v = cam.WorldToViewportPoint(new Vector3(p.x, 0f, p.y));
+                    minY = Mathf.Min(minY, v.y); maxY = Mathf.Max(maxY, v.y);
+                    minX = Mathf.Min(minX, v.x); maxX = Mathf.Max(maxX, v.x);
+                }
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [TestCase(0.88f)]
+        [TestCase(0.7f)]
+        public void TheWholeMapFillsTheAskedShareOfTheScreenHeightAndIsCentred(float fill)
+        {
+            SpectateRules.WholeMapFraming(Lobes, 60f, 16f / 9f, 63.4349f, fill, out Vector2 aim, out float distance);
+            ProjectOutline(Lobes, 60f, 16f / 9f, 63.4349f, aim, distance, out float minY, out float maxY, out float minX, out float maxX);
+            Assert.AreEqual(fill, maxY - minY, 0.01f, "share of the screen height");
+            Assert.AreEqual(0.5f, (maxY + minY) * 0.5f, 0.01f, "centred up and down");
+            Assert.Greater(minX, 0f);
+            Assert.Less(maxX, 1f);
         }
 
         [Test]
-        public void ANarrowWindowNeedsTheWidthToFit()
+        public void ANarrowWindowKeepsTheWholeWidthOnScreenInsteadOfFillingTheHeight()
         {
-            float wide = SpectateRules.WholeMapDistance(50f, 60f, 16f / 9f, 63.4349f, 1f);
-            float narrow = SpectateRules.WholeMapDistance(50f, 60f, 0.4f, 63.4349f, 1f);
-            Assert.Greater(narrow, wide);
+            SpectateRules.WholeMapFraming(Lobes, 60f, 0.5f, 63.4349f, 0.88f, out Vector2 aim, out float distance);
+            ProjectOutline(Lobes, 60f, 0.5f, 63.4349f, aim, distance, out float minY, out float maxY, out float minX, out float maxX);
+            Assert.GreaterOrEqual(minX, 0f);
+            Assert.LessOrEqual(maxX, 1f);
+            Assert.Less(maxY - minY, 0.88f);
         }
 
         [Test]
-        public void TheMarginScalesTheDistanceAndNoMapNeedsNoDistance()
+        public void NoOutlineNeedsNoFraming()
         {
-            float plain = SpectateRules.WholeMapDistance(50f, 60f, 16f / 9f, 63.4349f, 1f);
-            Assert.AreEqual(plain * 1.2f, SpectateRules.WholeMapDistance(50f, 60f, 16f / 9f, 63.4349f, 1.2f), 0.01f);
-            Assert.AreEqual(0f, SpectateRules.WholeMapDistance(0f, 60f, 16f / 9f, 63.4349f, 1.1f));
+            SpectateRules.WholeMapFraming(null, 60f, 16f / 9f, 63.4349f, 0.88f, out Vector2 aim, out float distance);
+            Assert.AreEqual(Vector2.zero, aim);
+            Assert.AreEqual(0f, distance);
         }
 
         // ---- the guards: nobody else's game counts a spectator

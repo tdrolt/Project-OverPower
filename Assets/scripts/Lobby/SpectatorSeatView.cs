@@ -3,6 +3,7 @@ using Overpower.Arena;
 using Overpower.Match;
 using Overpower.Net;
 using Overpower.UI;
+using Overpower.Vision;
 using Photon.Pun;
 using TMPro;
 using UnityEngine;
@@ -23,11 +24,9 @@ namespace Overpower.Lobby
     /// </summary>
     public sealed class SpectatorSeatView : MonoBehaviour
     {
-        // The border left round the map when it is framed, as a multiple of its farthest point.
-        private const float WholeMapMargin = 1.08f;
-
         private RoomManager roomManager;
         private CameraTracking cam;
+        private Camera cameraComponent; // the follow camera's Camera, found once per Begin (asked every frame while the map is framed)
         private Transform mapAnchor;
         private SpectatorBar bar;
         private readonly object zoomKey = new object();
@@ -36,6 +35,12 @@ namespace Overpower.Lobby
         private int currentActor = SpectateRules.None;
         private bool wholeMapChosen;
         private bool mapFramed;
+
+        // The last whole-map framing and what it was worked out for: the camera and the theme rarely change, so the search runs once.
+        private bool framingKnown;
+        private float framingFov, framingAspect, framingTilt, framingFill;
+        private Vector2 framingAim;
+        private float framingDistance;
 
         public void Init(RoomManager manager) => roomManager = manager;
 
@@ -68,8 +73,13 @@ namespace Overpower.Lobby
             IsWatching = true;
             wholeMapChosen = false;
             currentActor = SpectateRules.None;
-            cam.fixedYaw = 0f; // no team of their own decides the angle, and it must not swing round between teams
+            framingKnown = false;
+            cameraComponent = cam.GetComponent<Camera>();
             UiTheme theme = roomManager != null ? roomManager.Theme : null;
+            // No team of their own decides the angle, and it must not swing round between teams: one fixed angle (UiTheme > Spectator bar).
+            cam.fixedYaw = theme != null ? theme.spectatorViewAngle : 0f;
+            // The centre scan's wave and countdown need a vision config and a theme, which normally come from the player's own body.
+            CentreScan.SetSpectatorSupport(roomManager != null ? roomManager.Vision : null, theme);
             if (theme != null)
                 bar = SpectatorBar.Create(transform, theme, Leave);
             else
@@ -84,6 +94,7 @@ namespace Overpower.Lobby
             if (!IsWatching)
                 return;
             IsWatching = false;
+            CentreScan.SetSpectatorSupport(null, null);
             if (cam != null)
             {
                 cam.RemoveZoomMultiplier(zoomKey);
@@ -96,6 +107,7 @@ namespace Overpower.Lobby
             currentActor = SpectateRules.None;
             wholeMapChosen = false;
             mapFramed = false;
+            cameraComponent = null;
         }
 
         /// <summary>E: the next player in actor order (wrapping). Leaves the whole-map view.</summary>
@@ -157,12 +169,7 @@ namespace Overpower.Lobby
         }
 
         // A chat box has the keyboard: typing a Q must not move the camera.
-        private static bool TypingInAField()
-        {
-            EventSystem events = EventSystem.current;
-            return events != null && events.currentSelectedGameObject != null
-                && events.currentSelectedGameObject.GetComponent<TMP_InputField>() != null;
-        }
+        private static bool TypingInAField() => PlayerInputRouter.IsTypingInChat();
 
         private bool IsWatchable(int actor)
         {
@@ -227,8 +234,8 @@ namespace Overpower.Lobby
             bar?.Show(null, "", Color.white);
         }
 
-        // The whole arena in view: the camera follows a marker at the middle of the outline, from far enough away (the extra-zoom stack, so
-        // the mouse wheel still zooms from there) that its farthest point is on screen.
+        // The whole arena in view: the camera follows a marker on the ground, from far enough away (the extra-zoom stack, so the mouse wheel
+        // still zooms from there) that the arena fills UiTheme > Spectator bar > Whole map fill of the screen's height, centred.
         private void FrameWholeMap()
         {
             if (mapAnchor == null)
@@ -237,17 +244,22 @@ namespace Overpower.Lobby
                 mapAnchor.SetParent(transform, false);
             }
 
-            ArenaSymmetry arena = ArenaSymmetry.Active;
-            IReadOnlyList<Vector2> outline = arena != null && arena.FullBounds != null ? arena.FullBounds.Polygon : null;
-            SpectateRules.WholeMapFrame(outline, out Vector2 centre, out float radius);
-            mapAnchor.position = new Vector3(centre.x, 0f, centre.y);
+            float aspect = cameraComponent != null ? cameraComponent.aspect : 16f / 9f;
+            float fov = cameraComponent != null ? cameraComponent.fieldOfView : 60f;
+            float tilt = cam.TiltDegrees;
+            float fill = roomManager != null && roomManager.Theme != null ? roomManager.Theme.spectatorWholeMapFill : 0.88f;
+            if (!framingKnown || fov != framingFov || aspect != framingAspect || tilt != framingTilt || fill != framingFill)
+            {
+                ArenaSymmetry arena = ArenaSymmetry.Active;
+                IReadOnlyList<Vector2> outline = arena != null && arena.FullBounds != null ? arena.FullBounds.Polygon : null;
+                SpectateRules.WholeMapFraming(outline, fov, aspect, tilt, fill, out framingAim, out framingDistance);
+                framingFov = fov; framingAspect = aspect; framingTilt = tilt; framingFill = fill;
+                framingKnown = true;
+            }
+            mapAnchor.position = new Vector3(framingAim.x, 0f, framingAim.y);
             cam.target = mapAnchor;
 
-            Camera camera = cam.GetComponent<Camera>();
-            float aspect = camera != null ? camera.aspect : 16f / 9f;
-            float fov = camera != null ? camera.fieldOfView : 60f;
-            float distance = SpectateRules.WholeMapDistance(radius, fov, aspect, cam.TiltDegrees, WholeMapMargin);
-            float multiplier = Mathf.Max(1f, distance / Mathf.Max(0.01f, cam.baseOffset.magnitude));
+            float multiplier = Mathf.Max(1f, framingDistance / Mathf.Max(0.01f, cam.baseOffset.magnitude));
             if (!mapFramed)
                 cam.ResetScrollZoom(); // framed from the normal distance, whatever the wheel was at
             cam.AddZoomMultiplier(zoomKey, multiplier);

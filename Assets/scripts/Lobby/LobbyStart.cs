@@ -62,11 +62,12 @@ namespace Overpower.Lobby
         {
             float began = Time.unscaledTime;
             float sentAt = -1f;
+            bool timedOut = false;
             while (MayStartGame)
             {
                 if (Time.unscaledTime - began > GiveUpSeconds)
                 {
-                    Debug.LogWarning($"[LOBBY] Start game gave up after {GiveUpSeconds:0} s: the room kept refusing it");
+                    timedOut = true;
                     break;
                 }
                 if (sentAt < 0f || seatsChangedSinceSend || Time.unscaledTime - sentAt >= ResendSeconds)
@@ -80,6 +81,17 @@ namespace Overpower.Lobby
                 yield return null;
             }
             starting = null;
+            // Leaving with the stage still the lobby means the start did not land: say why (the loop also ends when it did land).
+            if (StageOfRoom() == LobbySeatRules.LobbyBeforeStart)
+                Debug.LogWarning("[LOBBY] Start game stopped with the lobby still open: " + WhyStartStopped(timedOut));
+        }
+
+        private string WhyStartStopped(bool timedOut)
+        {
+            if (timedOut) return $"the room kept refusing it for {GiveUpSeconds:0} s";
+            if (!PhotonNetwork.InRoom) return "this player left the room";
+            if (!PhotonNetwork.IsMasterClient) return "mastership moved to another player";
+            return "a team of the mode has no player any more";
         }
 
         private static Hashtable ToHashtable(Dictionary<string, object> values)
@@ -101,16 +113,26 @@ namespace Overpower.Lobby
         public override void OnJoinedRoom()
         {
             lastStage = StageOfRoom();
-            // A player coming back to a held place (HasRejoined) is looked after by RoomManager's rejoin branch.
-            if (lastStage >= 1 && !PhotonNetwork.LocalPlayer.HasRejoined)
-                ReactToStart();
+            if (lastStage < 1) return;
+            // A player coming back to a held place (HasRejoined) with a team is looked after by RoomManager's rejoin branch. One who has a
+            // seat but no team and is not a spectator dropped in the lobby and missed the lS 0 to 1 edge: their seat's reaction (a body)
+            // is due now. ReactToStart refuses a second body, and the rejoin watchdog adopts the new one once teamID is written.
+            if (PhotonNetwork.LocalPlayer.HasRejoined
+                && (Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) || Teams.IsSpectator(PhotonNetwork.LocalPlayer)
+                    || seats.SeatInRoom() == null))
+                return;
+            ReactToStart();
         }
 
         public override void OnLeftRoom()
         {
             lastStage = 0;
             if (roomManager != null) roomManager.SeatView?.End();
-            if (starting != null) StopCoroutine(starting);
+            if (starting != null)
+            {
+                StopCoroutine(starting);
+                Debug.LogWarning("[LOBBY] Start game stopped with the lobby still open: " + WhyStartStopped(false));
+            }
             starting = null;
         }
 
