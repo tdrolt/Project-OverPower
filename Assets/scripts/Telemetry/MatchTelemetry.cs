@@ -244,6 +244,13 @@ namespace Overpower.Telemetry
 
         public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) => ReadMatchIdentity(propertiesThatChanged);
 
+        /// <summary>The local player's team arriving (the game started and the seat became a team) is when their log opens.</summary>
+        public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+        {
+            if (targetPlayer != null && targetPlayer.IsLocal && changedProps != null && changedProps.ContainsKey(Teams.TeamKey))
+                TryOpenFile();
+        }
+
         private void LogJoinOrLeave(string eventName, Player player)
         {
             if (player == null) return;
@@ -483,6 +490,11 @@ namespace Overpower.Telemetry
 
             int actor = PhotonNetwork.LocalPlayer.ActorNumber;
             if (actor <= 0) return; // Not yet assigned an actor number - guards a race right after connecting.
+
+            // Lobby Task 6: the session line makes this player a row of the report. A spectator (no body, no team) writes no file, and nobody
+            // does while still in the lobby with no role: the file opens when this player is on a team (OnPlayerPropertiesUpdate below).
+            if (!TelemetryRoleRule.MayOpenFile(Teams.IsSpectator(PhotonNetwork.LocalPlayer), Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _)))
+                return;
 
             string folder = ResolveMatchFolder();
             string fileName = $"{actor}_{Sanitize(PhotonNetwork.LocalPlayer.NickName)}.jsonl";

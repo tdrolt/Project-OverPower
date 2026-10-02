@@ -672,7 +672,8 @@ namespace Overpower.Match
                 int? lastOutAtMs = null;
                 foreach (Player p in PhotonNetwork.PlayerList)
                 {
-                    if (!Teams.TryGetTeam(p, out int t) || t != team)
+                    // A seat spectator is no member of any team (lobby Task 6), whatever team property a stale value left on them.
+                    if (!Teams.TryGetPlayingTeam(p, out int t) || t != team)
                         continue;
                     members++;
 

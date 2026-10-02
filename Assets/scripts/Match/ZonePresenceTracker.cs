@@ -123,7 +123,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         Dictionary<int, Player> players = PhotonNetwork.CurrentRoom.Players;
         foreach (Player player in players.Values)
         {
-            if (!Teams.TryGetTeam(player, out int team))
+            if (!Teams.TryGetPlayingTeam(player, out int team)) // a seat spectator stands in no zone (lobby Task 6)
                 continue;
             int actor = player.ActorNumber;
             int previousZone = lastMeasured.TryGetValue(actor, out (int team, int zone) last) ? last.zone : -1;

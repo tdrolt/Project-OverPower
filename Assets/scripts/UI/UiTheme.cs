@@ -1186,5 +1186,45 @@ namespace Overpower.UI
         public float spectateStripBottom = 120f;
         [Tooltip("Distance of the Next and Quit buttons from the strip's centre, sideways, in reference pixels.")]
         public float spectateButtonOffset = 115f;
+
+        [Header("Spectator bar (lobby Task 6, board 8)")]
+        [Tooltip("The bar at the bottom of a spectator seat's screen: who they watch and the keys. Fill colour of the bar.")]
+        public Color spectatorBarColor = new Color(0.06f, 0.063f, 0.078f, 0.88f);
+        [Tooltip("Empty space inside the bar, in reference pixels: left and right, then top and bottom.")]
+        public Vector2 spectatorBarPadding = new Vector2(36f, 20f);
+        [Tooltip("Gap between the bar's parts (who is watched, each key, Leave), in reference pixels.")]
+        public float spectatorBarGap = 42f;
+        [Tooltip("Distance from the bottom of the screen to the bottom of the bar, in reference pixels.")]
+        public float spectatorBarBottom = 28f;
+        [Tooltip("Text size of the small SPECTATING caption, in reference pixels.")]
+        public float spectatorBarCaptionSize = 18f;
+        [Tooltip("Colour of the SPECTATING caption.")]
+        public Color spectatorBarCaptionColor = new Color(0.557f, 0.545f, 0.522f, 1f);
+        [Tooltip("Text size of the watched player's name (and team), in reference pixels.")]
+        public float spectatorBarNameSize = 36f;
+        [Tooltip("Text size of each key's description (Previous, Next, Whole map, Zoom), in reference pixels.")]
+        public float spectatorBarKeyTextSize = 22f;
+        [Tooltip("Text size of the key caps (Q, E, Space, Wheel), in reference pixels.")]
+        public float spectatorBarKeyCapSize = 22f;
+        [Tooltip("Colour of a key cap's outline.")]
+        public Color spectatorBarKeyCapColor = new Color(0.557f, 0.545f, 0.522f, 1f);
+        [Tooltip("Thickness of a key cap's and the Leave button's outline, in reference pixels.")]
+        public float spectatorBarOutline = 2f;
+        [Tooltip("Empty space inside a key cap, left and right, then top and bottom, in reference pixels.")]
+        public Vector2 spectatorBarKeyCapPadding = new Vector2(15f, 6f);
+        [Tooltip("Size of the Leave button, in reference pixels.")]
+        public Vector2 spectatorBarLeaveSize = new Vector2(120f, 60f);
+        [Tooltip("Outline colour of the Leave button.")]
+        public Color spectatorBarLeaveOutlineColor = new Color(0.29f, 0.302f, 0.341f, 1f);
+        [Tooltip("The small caption above the name.")]
+        public string spectatorBarCaption = "SPECTATING";
+        [Tooltip("Shown instead of a player's name while the whole map is in view.")]
+        public string spectatorBarWholeMapName = "Whole map";
+        [Tooltip("The four keys' caps, in order: previous player, next player, whole map, zoom.")]
+        public string[] spectatorBarKeyCaps = { "Q", "E", "Space", "Wheel" };
+        [Tooltip("What each of the four keys does, in the same order.")]
+        public string[] spectatorBarKeyTexts = { "Previous", "Next", "Whole map", "Zoom" };
+        [Tooltip("The Leave button's label (back to the lobby list).")]
+        public string spectatorBarLeaveText = "Leave";
     }
 }

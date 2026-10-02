@@ -80,6 +80,10 @@ public class CameraTracking : MonoBehaviour
     /// player watching someone else (SpectateView) sets their own body here, so the arena does not turn round to that player's
     /// team angle and the minimap's "up" stays where it was.</summary>
     [System.NonSerialized] public Transform yawSource;
+    /// <summary>Lobby Task 6: a spectator seat has no body of its own, so no team decides the view angle; the camera turns this many
+    /// degrees (Unity yaw) whoever it follows, so the arena never swings round between one team's player and the next. Null (the normal
+    /// case) leaves the team-based angle in charge.</summary>
+    [System.NonSerialized] public float? fixedYaw;
     public Vector3 baseOffset = new Vector3(0f, 10f, -5f); // Base offset
     public float zoomSpeed = 2f; // How fast zoom adjusts
     [Tooltip("Closest the camera can zoom in with the scroll wheel, as a multiple of Base Offset. " +
@@ -125,6 +129,13 @@ public class CameraTracking : MonoBehaviour
     /// toward +Z). 0 until this player's team is known - see ResolveTeamYaw - then fixed for the match. World
     /// direction (sin Yaw, cos Yaw) is the top of the screen.</summary>
     public float Yaw => yaw;
+
+    /// <summary>The scroll wheel's own zoom back to the normal distance (1 x Base Offset). A spectator's Space frames the whole map from
+    /// a known zoom; extra-zoom multipliers (AddZoomMultiplier) are not touched.</summary>
+    public void ResetScrollZoom() => currentZoom = 1f;
+
+    /// <summary>The camera's tilt: degrees the view looks down below the horizon, from Base Offset (it looks from there at the target).</summary>
+    public float TiltDegrees => Mathf.Atan2(baseOffset.y, new Vector2(baseOffset.x, baseOffset.z).magnitude) * Mathf.Rad2Deg;
 
     public bool YawResolved => teamYawResolved;
 
@@ -207,6 +218,14 @@ public class CameraTracking : MonoBehaviour
     /// known on the first frame.
     void ResolveTeamYaw()
     {
+        if (fixedYaw.HasValue)
+        {
+            yaw = fixedYaw.Value;
+            teamYawResolved = true;
+            teamYawResolvedForTeam = PlayerTeam.NoTeam;
+            return;
+        }
+
         Transform yawFrom = yawSource != null ? yawSource : target;
         if (yawFrom == null)
             return;

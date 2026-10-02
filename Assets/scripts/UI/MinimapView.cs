@@ -987,7 +987,7 @@ namespace Overpower.UI
                 foreach (KeyValuePair<int, Player> pair in room.Players)
                 {
                     Player player = pair.Value;
-                    if (player.IsLocal || !Teams.TryGetTeam(player, out int team))
+                    if (player.IsLocal || !Teams.TryGetPlayingTeam(player, out int team)) // a seat spectator is no dot (lobby Task 6)
                         continue;
                     bool friendly = team == friendlyTeam;
                     // Task 9e: a teammate whose connection dropped is not on the map (PresenceRules), whatever "alive" they last wrote.

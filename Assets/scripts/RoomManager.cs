@@ -50,6 +50,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// <summary>The host's Start game and what every client does when it lands (lobby Task 4).</summary>
     public LobbyStart GameStart { get; private set; }
 
+    /// <summary>What a player on a spectator seat sees: the camera, Q / E / Space and the bar (lobby Task 6). Idle until LobbyStart begins it.</summary>
+    public SpectatorSeatView SeatView { get; private set; }
+
+    /// <summary>The scene's UI theme (the spectator bar and the rejoin panel read their colours, sizes and texts from it).</summary>
+    public UiTheme Theme => theme;
+
     /// <summary>True from pressing the interim Join button (when not yet in the lobby) until OnJoinedLobby consumes it: only then does joining the lobby go on to join a random room.</summary>
     private bool joiningRandom;
 
@@ -77,6 +83,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
         Seats.Init(modeCatalogue, lobbyConfig);
         GameStart = gameObject.AddComponent<LobbyStart>();
         GameStart.Init(this, Seats);
+        SeatView = gameObject.AddComponent<SpectatorSeatView>();
+        SeatView.Init(this);
     }
 
     void Start()

@@ -59,5 +59,80 @@ namespace Overpower.Match
         /// screen (whose button leads back to the name screen) takes over.</summary>
         public static bool ButtonVisible(bool losePanelShown, MatchPhase phase) =>
             losePanelShown && phase != MatchPhase.Over;
+
+        // ---- the spectator seat (lobby Task 6): Q / E over everyone with a body, Space for the whole map
+
+        /// <summary>The players a seat spectator can watch, by actor number (whatever the team). Never null.</summary>
+        public static int[] SortedActors(IList<SpectateCandidate> watchable)
+        {
+            if (watchable == null || watchable.Count == 0)
+                return new int[0];
+            var actors = new int[watchable.Count];
+            for (int i = 0; i < actors.Length; i++)
+                actors[i] = watchable[i].Actor;
+            System.Array.Sort(actors);
+            return actors;
+        }
+
+        /// <summary>E: the watched player after the current one in actor order, wrapping. From no target, or one who has left, the
+        /// first actor above the current one (the first of all when there is none above). None when nobody can be watched.</summary>
+        public static int NextActor(IList<int> sortedActors, int currentActor)
+        {
+            if (sortedActors == null || sortedActors.Count == 0)
+                return None;
+            for (int i = 0; i < sortedActors.Count; i++)
+                if (sortedActors[i] > currentActor)
+                    return sortedActors[i];
+            return sortedActors[0];
+        }
+
+        /// <summary>Q: the watched player before the current one in actor order, wrapping. From no target, or one who has left, the
+        /// last actor below the current one (the last of all when there is none below). None when nobody can be watched.</summary>
+        public static int PreviousActor(IList<int> sortedActors, int currentActor)
+        {
+            if (sortedActors == null || sortedActors.Count == 0)
+                return None;
+            if (currentActor == None)
+                return sortedActors[sortedActors.Count - 1];
+            for (int i = sortedActors.Count - 1; i >= 0; i--)
+                if (sortedActors[i] < currentActor)
+                    return sortedActors[i];
+            return sortedActors[sortedActors.Count - 1];
+        }
+
+        /// <summary>Space: the middle of the arena outline (its bounding box) and the distance from there to its farthest point.
+        /// Zero for no outline.</summary>
+        public static void WholeMapFrame(IReadOnlyList<UnityEngine.Vector2> outline, out UnityEngine.Vector2 centre, out float radius)
+        {
+            centre = UnityEngine.Vector2.zero;
+            radius = 0f;
+            if (outline == null || outline.Count == 0)
+                return;
+            UnityEngine.Vector2 min = outline[0], max = outline[0];
+            for (int i = 1; i < outline.Count; i++)
+            {
+                min = UnityEngine.Vector2.Min(min, outline[i]);
+                max = UnityEngine.Vector2.Max(max, outline[i]);
+            }
+            centre = (min + max) * 0.5f;
+            for (int i = 0; i < outline.Count; i++)
+                radius = UnityEngine.Mathf.Max(radius, UnityEngine.Vector2.Distance(centre, outline[i]));
+        }
+
+        /// <summary>How far the camera must stand from the middle of the map to keep a ground circle of this radius on screen.
+        /// The camera looks down at the target (tilt = degrees below the horizon): the circle's near and far edges are foreshortened
+        /// so the height is the tight one (the near edge sits closer and higher in the picture), and the width is the other limit
+        /// for a narrow window. margin &gt; 1 leaves a border. Zero for a zero radius.</summary>
+        public static float WholeMapDistance(float radius, float verticalFovDegrees, float aspect, float tiltDegrees, float margin)
+        {
+            if (radius <= 0f)
+                return 0f;
+            float halfVertical = UnityEngine.Mathf.Deg2Rad * verticalFovDegrees * 0.5f;
+            float halfHorizontal = UnityEngine.Mathf.Atan(UnityEngine.Mathf.Tan(halfVertical) * UnityEngine.Mathf.Max(0.01f, aspect));
+            float tilt = UnityEngine.Mathf.Deg2Rad * tiltDegrees;
+            float forHeight = radius * (UnityEngine.Mathf.Cos(tilt) + UnityEngine.Mathf.Sin(tilt) / UnityEngine.Mathf.Tan(halfVertical));
+            float forWidth = radius / UnityEngine.Mathf.Tan(halfHorizontal);
+            return UnityEngine.Mathf.Max(forHeight, forWidth) * margin;
+        }
     }
 }

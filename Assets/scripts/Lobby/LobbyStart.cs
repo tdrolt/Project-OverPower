@@ -109,6 +109,7 @@ namespace Overpower.Lobby
         public override void OnLeftRoom()
         {
             lastStage = 0;
+            if (roomManager != null) roomManager.SeatView?.End();
             if (starting != null) StopCoroutine(starting);
             starting = null;
         }
@@ -145,6 +146,7 @@ namespace Overpower.Lobby
             {
                 Debug.Log($"[LOBBY] spectating (seat {seat}) - no body");
                 PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.SpectatorKey, true } });
+                roomManager.SeatView?.Begin();
             }
         }
     }

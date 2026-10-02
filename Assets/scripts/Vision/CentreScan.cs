@@ -173,7 +173,7 @@ namespace Overpower.Vision
             foreach (KeyValuePair<int, Photon.Realtime.Player> pair in room.Players)
             {
                 Photon.Realtime.Player player = pair.Value;
-                if (player.IsLocal || !Teams.TryGetTeam(player, out int team) || team < 0 || team == friendlyTeam)
+                if (player.IsLocal || !Teams.TryGetPlayingTeam(player, out int team) || team < 0 || team == friendlyTeam)
                     continue;
                 bool? flag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool isAlive ? isAlive : (bool?)null;
                 if (!PresenceRules.CountsAsAlive(player.IsInactive, flag))
