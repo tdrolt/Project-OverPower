@@ -37,22 +37,22 @@ namespace Overpower.Tests
         public void SeatOfFindsTheSeatOrNull()
         {
             var seats = Seats(("sT01", 5), ("sS0", 9));
-            Assert.AreEqual("sT01", LobbySeatRules.SeatOf(5, seats));
-            Assert.AreEqual("sS0", LobbySeatRules.SeatOf(9, seats));
-            Assert.IsNull(LobbySeatRules.SeatOf(7, seats));
+            Assert.AreEqual("sT01", LobbySeatRules.SeatOf(5, Two, seats));
+            Assert.AreEqual("sS0", LobbySeatRules.SeatOf(9, Two, seats));
+            Assert.IsNull(LobbySeatRules.SeatOf(7, Two, seats));
         }
 
         [Test]
         public void SeatOfIgnoresEmptyValues()
         {
             var seats = Seats(("sT00", 0), ("sT01", -1));
-            Assert.IsNull(LobbySeatRules.SeatOf(0, seats));
+            Assert.IsNull(LobbySeatRules.SeatOf(0, Two, seats));
         }
 
         [Test]
         public void TakingAFreeSeatWritesTheActorExpectingItEmpty()
         {
-            var w = LobbySeatRules.TakeSeat(4, "sT10", Seats());
+            var w = LobbySeatRules.TakeSeat(4, "sT10", Two, Seats());
             Assert.IsFalse(w.IsNone);
             Assert.AreEqual(4, w.Props["sT10"]);
             Assert.IsNull(w.Expected["sT10"]);
@@ -63,7 +63,7 @@ namespace Overpower.Tests
         [Test]
         public void MovingAlsoClearsTheOldSeatExpectingTheActor()
         {
-            var w = LobbySeatRules.TakeSeat(4, "sT10", Seats(("sT00", 4)));
+            var w = LobbySeatRules.TakeSeat(4, "sT10", Two, Seats(("sT00", 4)));
             Assert.AreEqual(4, w.Props["sT10"]);
             Assert.IsNull(w.Props["sT00"]);
             Assert.IsNull(w.Expected["sT10"]);
@@ -73,7 +73,7 @@ namespace Overpower.Tests
         [Test]
         public void ASeatTakenBySomeoneElseIsRefused()
         {
-            var w = LobbySeatRules.TakeSeat(4, "sT10", Seats(("sT10", 6)));
+            var w = LobbySeatRules.TakeSeat(4, "sT10", Two, Seats(("sT10", 6)));
             Assert.AreSame(SeatWrite.None, w);
             Assert.IsTrue(w.IsNone);
         }
@@ -81,14 +81,14 @@ namespace Overpower.Tests
         [Test]
         public void YourOwnSeatIsRefused()
         {
-            var w = LobbySeatRules.TakeSeat(4, "sT10", Seats(("sT10", 4)));
+            var w = LobbySeatRules.TakeSeat(4, "sT10", Two, Seats(("sT10", 4)));
             Assert.AreSame(SeatWrite.None, w);
         }
 
         [Test]
         public void LeavingClearsTheSeatExpectingTheActor()
         {
-            var w = LobbySeatRules.LeaveSeat(4, Seats(("sT01", 4)));
+            var w = LobbySeatRules.LeaveSeat(4, Two, Seats(("sT01", 4)));
             Assert.IsNull(w.Props["sT01"]);
             Assert.AreEqual(4, w.Expected["sT01"]);
         }
@@ -96,7 +96,7 @@ namespace Overpower.Tests
         [Test]
         public void LeavingWithoutASeatIsNone()
         {
-            Assert.AreSame(SeatWrite.None, LobbySeatRules.LeaveSeat(4, Seats(("sT01", 5))));
+            Assert.AreSame(SeatWrite.None, LobbySeatRules.LeaveSeat(4, Two, Seats(("sT01", 5))));
         }
 
         [Test]
@@ -212,6 +212,15 @@ namespace Overpower.Tests
         [Test]
         public void LateJoinerGoesToTheEmptiestTeamInTheMatch()
         {
+            // team 0 has 1 filled, team 1 has 2: "first team with room" would say team 0 too, but it must be the
+            // emptiest, and team 0's free seat is sT01
+            var seats = Seats(("sT00", 1), ("sT10", 2), ("sT11", 3));
+            Assert.AreEqual("sT01", LobbySeatRules.PlaceLateJoiner(Three, seats, new[] { 0, 1 }));
+        }
+
+        [Test]
+        public void LateJoinerPicksALaterTeamWhenItIsTheEmptiest()
+        {
             var seats = Seats(("sT00", 1), ("sT01", 2), ("sT10", 3));
             Assert.AreEqual("sT11", LobbySeatRules.PlaceLateJoiner(Three, seats, new[] { 0, 1 }));
         }
@@ -242,6 +251,84 @@ namespace Overpower.Tests
         {
             var seats = Seats(("sT00", 1), ("sT01", 2), ("sT10", 3), ("sT11", 4), ("sS0", 5));
             Assert.IsNull(LobbySeatRules.PlaceLateJoiner(Two, seats, new[] { 0, 1 }));
+        }
+
+        [Test]
+        public void RoomPropertiesThatLookLikeSeatsNeverReadAsSeats()
+        {
+            // lS (stage) = 2 and mMode = 3 live in the same dictionary: actors 2 and 3 are still in No role
+            var seats = Seats(("sT00", 1), ("lS", 2), ("mMode", 3));
+            Assert.IsNull(LobbySeatRules.SeatOf(2, Two, seats));
+            Assert.IsNull(LobbySeatRules.SeatOf(3, Two, seats));
+            Assert.AreEqual("sT00", LobbySeatRules.SeatOf(1, Two, seats));
+        }
+
+        [Test]
+        public void TakeSeatNeverTouchesANonSeatKey()
+        {
+            var seats = Seats(("lS", 2), ("mMode", 3));
+            var w = LobbySeatRules.TakeSeat(2, "sT10", Two, seats);
+            Assert.AreEqual(1, w.Props.Count);
+            Assert.IsFalse(w.Props.ContainsKey("lS"));
+            Assert.IsFalse(w.Expected.ContainsKey("lS"));
+            Assert.AreSame(SeatWrite.None, LobbySeatRules.LeaveSeat(3, Two, seats));
+        }
+
+        [Test]
+        public void AutoFillSortsItsOwnCopyOfTheNoRoleActors()
+        {
+            var ascending = LobbySeatRules.AutoFill(Three, Seats(), new[] { 10, 11, 12, 13 });
+            var descendingInput = new[] { 13, 12, 11, 10 };
+            var descending = LobbySeatRules.AutoFill(Three, Seats(), descendingInput);
+            CollectionAssert.AreEquivalent(ascending, descending);
+            Assert.AreEqual(13, descendingInput[0], "the caller's list must not be reordered");
+        }
+
+        [Test]
+        public void FillTextOfAnEmptyLobby()
+        {
+            // Three: 3 teams x 2 seats = 6 team seats, 2 spectator seats
+            Assert.AreEqual("0/6+0", LobbySeatRules.FillText(Three, Seats()));
+        }
+
+        [Test]
+        public void FillTextCountsAFullTeamSeatSet()
+        {
+            var seats = Seats(("sT00", 1), ("sT01", 2), ("sT10", 3), ("sT11", 4), ("sT20", 5), ("sT21", 6));
+            Assert.AreEqual("6/6+0", LobbySeatRules.FillText(Three, seats));
+        }
+
+        [Test]
+        public void FillTextCountsSpectatorsSeparately()
+        {
+            var seats = Seats(("sT00", 1), ("sS0", 2), ("sS1", 3));
+            Assert.AreEqual("1/6+2", LobbySeatRules.FillText(Three, seats));
+        }
+
+        [Test]
+        public void FillTextIgnoresNonSeatKeysAndEmptySeats()
+        {
+            var seats = Seats(("sT00", 1), ("sT01", 0), ("lS", 2), ("mMode", 3), ("sT50", 4));
+            Assert.AreEqual("1/6+0", LobbySeatRules.FillText(Three, seats));
+        }
+
+        [Test]
+        public void FillTextRoundTripsThroughTryParseFill()
+        {
+            Assert.IsTrue(LobbySeatRules.TryParseFill("4/9+2", out int team, out int teamSeats, out int spec));
+            Assert.AreEqual(4, team);
+            Assert.AreEqual(9, teamSeats);
+            Assert.AreEqual(2, spec);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("4/9")]
+        [TestCase("a/b+c")]
+        [TestCase("4-9+2")]
+        public void TryParseFillRefusesAnythingElse(string text)
+        {
+            Assert.IsFalse(LobbySeatRules.TryParseFill(text, out _, out _, out _));
         }
     }
 }

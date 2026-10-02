@@ -26,13 +26,21 @@ namespace Overpower.Lobby
         public static int TotalSeats(SeatLayout layout) =>
             layout.Teams.Length * layout.SeatsPerTeam + layout.SpectatorSeats;
 
-        /// <summary>The seat this actor holds, or null for No role.</summary>
-        public static string SeatOf(int actor, IReadOnlyDictionary<string, int> seats)
+        /// <summary>The seat this actor holds, or null for No role. Only the layout's real seat keys are looked at, so a
+        /// room property that happens to hold the actor's number (the stage "lS" = 2, say) can never read as a seat.</summary>
+        public static string SeatOf(int actor, SeatLayout layout, IReadOnlyDictionary<string, int> seats)
         {
             if (actor <= 0) return null;
-            foreach (var pair in seats)
-                if (pair.Value == actor) return pair.Key;
+            foreach (string key in AllSeatKeys(layout))
+                if (seats.TryGetValue(key, out int who) && who == actor) return key;
             return null;
+        }
+
+        private static bool IsSeatKey(string key, SeatLayout layout)
+        {
+            foreach (string seat in AllSeatKeys(layout))
+                if (seat == key) return true;
+            return false;
         }
 
         private static bool IsTaken(string key, IReadOnlyDictionary<string, int> seats, IReadOnlyDictionary<string, int> placed)
@@ -47,13 +55,13 @@ namespace Overpower.Lobby
         /// also empties the old seat, expecting it to still be this actor's. Refused when someone else holds the
         /// target or it is already the actor's own seat.
         /// </summary>
-        public static SeatWrite TakeSeat(int actor, string targetKey, IReadOnlyDictionary<string, int> seats)
+        public static SeatWrite TakeSeat(int actor, string targetKey, SeatLayout layout, IReadOnlyDictionary<string, int> seats)
         {
-            if (IsTaken(targetKey, seats, null)) return SeatWrite.None;
+            if (!IsSeatKey(targetKey, layout) || IsTaken(targetKey, seats, null)) return SeatWrite.None;
 
             var props = new Dictionary<string, object> { { targetKey, actor } };
             var expected = new Dictionary<string, object> { { targetKey, null } };
-            string old = SeatOf(actor, seats);
+            string old = SeatOf(actor, layout, seats);
             if (old != null)
             {
                 props[old] = null;
@@ -63,9 +71,9 @@ namespace Overpower.Lobby
         }
 
         /// <summary>Going back to No role: empties the actor's seat, expecting it to still be theirs.</summary>
-        public static SeatWrite LeaveSeat(int actor, IReadOnlyDictionary<string, int> seats)
+        public static SeatWrite LeaveSeat(int actor, SeatLayout layout, IReadOnlyDictionary<string, int> seats)
         {
-            string old = SeatOf(actor, seats);
+            string old = SeatOf(actor, layout, seats);
             if (old == null) return SeatWrite.None;
             return new SeatWrite(
                 new Dictionary<string, object> { { old, null } },
@@ -128,12 +136,15 @@ namespace Overpower.Lobby
         /// every team seat is full, the lowest free spectator seat; with nothing left they are left out. Returns only
         /// the new assignments, never changing seats that are already taken.
         /// </summary>
-        public static IReadOnlyDictionary<string, int> AutoFill(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> noRoleActorsAscending)
+        public static IReadOnlyDictionary<string, int> AutoFill(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> noRoleActors)
         {
+            // Sorted here, on a copy: the result must not depend on the caller's order (nor reorder the caller's list).
+            var ordered = new List<int>(noRoleActors);
+            ordered.Sort();
             var placed = new Dictionary<string, int>();
-            for (int n = 0; n < noRoleActorsAscending.Count; n++)
+            for (int n = 0; n < ordered.Count; n++)
             {
-                int actor = noRoleActorsAscending[n];
+                int actor = ordered[n];
                 string key = EmptiestTeamSeat(layout, seats, placed, null) ?? LowestFreeSpectator(layout, seats, placed);
                 if (key != null) placed[key] = actor;
             }
@@ -171,6 +182,32 @@ namespace Overpower.Lobby
         {
             var allowed = new HashSet<int>(teamsInMatch);
             return EmptiestTeamSeat(layout, seats, null, allowed) ?? LowestFreeSpectator(layout, seats, null);
+        }
+
+        /// <summary>The seat counts the lobby list shows without joining: "&lt;filled team seats&gt;/&lt;team seats&gt;+&lt;filled
+        /// spectator seats&gt;", for example "4/9+1". Only the layout's real seat keys are counted.</summary>
+        public static string FillText(SeatLayout layout, IReadOnlyDictionary<string, int> seats)
+        {
+            int filledTeam = 0;
+            foreach (int team in layout.Teams)
+                filledTeam += FilledOnTeam(layout, team, seats, null);
+            int filledSpectators = 0;
+            for (int i = 0; i < layout.SpectatorSeats; i++)
+                if (IsTaken(SpectatorSeatKey(i), seats, null)) filledSpectators++;
+            return filledTeam + "/" + layout.Teams.Length * layout.SeatsPerTeam + "+" + filledSpectators;
+        }
+
+        /// <summary>Reads what FillText wrote. False for anything else (absent, an old build's room, damaged text).</summary>
+        public static bool TryParseFill(string text, out int filledTeamSeats, out int teamSeats, out int filledSpectatorSeats)
+        {
+            filledTeamSeats = teamSeats = filledSpectatorSeats = 0;
+            if (string.IsNullOrEmpty(text)) return false;
+            int slash = text.IndexOf('/');
+            int plus = text.IndexOf('+');
+            if (slash <= 0 || plus <= slash + 1 || plus >= text.Length - 1) return false;
+            return int.TryParse(text.Substring(0, slash), out filledTeamSeats)
+                && int.TryParse(text.Substring(slash + 1, plus - slash - 1), out teamSeats)
+                && int.TryParse(text.Substring(plus + 1), out filledSpectatorSeats);
         }
     }
 }

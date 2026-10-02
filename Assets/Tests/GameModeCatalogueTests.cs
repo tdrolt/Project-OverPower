@@ -60,5 +60,30 @@ namespace Overpower.Tests
             Assert.GreaterOrEqual(conquest.Count, 1);
             foreach (var m in conquest) Assert.Greater(m.InfoCards.Count, 0, m.DisplayName);
         }
+
+        [Test]
+        public void EveryModesLobbyModeValueIsItsTeamCount()
+        {
+            foreach (var m in Load().Modes)
+                Assert.AreEqual(m.Teams.Length, m.LobbyModeValue, m.DisplayName);
+        }
+
+        [Test]
+        public void TeamIdsAreDistinctWithinAMode()
+        {
+            foreach (var m in Load().Modes)
+                Assert.AreEqual(m.Teams.Length, m.Teams.Distinct().Count(), m.DisplayName);
+        }
+
+        [Test]
+        public void TheLayoutOwnsACopyOfTheTeams()
+        {
+            var mode = Load().Modes.First();
+            int before = mode.Teams[0];
+            var layout = Overpower.Lobby.SeatLayoutFactory.From(mode);
+            layout.Teams[0] = before + 50;
+            Assert.AreEqual(before, mode.Teams[0], "changing the layout must never change the asset");
+            Assert.AreNotSame(mode.Teams, layout.Teams);
+        }
     }
 }

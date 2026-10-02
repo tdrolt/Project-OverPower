@@ -45,6 +45,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// <summary>The live lobby list, and creating and joining lobbies (lobby Task 2).</summary>
     public LobbyDirectory Lobbies { get; private set; }
 
+    /// <summary>Who sits where in the lobby this client is in (lobby Task 3).</summary>
+    public LobbySeats Seats { get; private set; }
+
     /// <summary>True from pressing the interim Join button (when not yet in the lobby) until OnJoinedLobby consumes it: only then does joining the lobby go on to join a random room.</summary>
     private bool joiningRandom;
 
@@ -65,6 +68,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
         Rejoin.Init(theme, RejoinWindowSeconds);
         Lobbies = gameObject.AddComponent<LobbyDirectory>();
         Lobbies.Init(this, modeCatalogue, lobbyConfig);
+        Seats = gameObject.AddComponent<LobbySeats>();
+        Seats.Init(modeCatalogue, lobbyConfig);
     }
 
     void Start()

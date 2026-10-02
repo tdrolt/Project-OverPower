@@ -20,8 +20,11 @@ namespace Overpower.Data
         [Serializable]
         public struct InfoCard
         {
+            [Tooltip("The heading of the card.")]
             public string title;
+            [Tooltip("The body of the card: a short explanation in a few sentences.")]
             [TextArea] public string text;
+            [Tooltip("The colour of the card's edge.")]
             public Color accent;
         }
 

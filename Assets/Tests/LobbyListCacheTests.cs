@@ -213,5 +213,61 @@ namespace Overpower.Tests
 
         private static RoomSnapshot WithName(string name, IDictionary props) =>
             new RoomSnapshot { Name = name, IsOpen = true, IsVisible = true, PlayerCount = 1, MaxPlayers = 12, Properties = props };
+
+        private static RoomSnapshot RoomWithFill(string name, string fill, int players = 1, int max = 9)
+        {
+            var props = new Hashtable { { LobbyKeys.Mode, 1 } };
+            if (fill != null) props[LobbyKeys.Fill] = fill;
+            return new RoomSnapshot { Name = name, IsOpen = true, IsVisible = true, PlayerCount = players, MaxPlayers = max, Properties = props };
+        }
+
+        private static readonly SeatLayout ThreeByThree = new SeatLayout(new[] { 0, 1, 2 }, 3, 3);
+
+        [Test]
+        public void TheSeatFillTextIsReadIntoTheEntry()
+        {
+            var cache = new Dictionary<string, LobbyEntry>();
+            LobbyListCache.Merge(cache, new[] { RoomWithFill("a", "4/9+2") }, 1, id => ThreeByThree);
+            var e = cache["a"];
+            Assert.IsTrue(e.FillKnown);
+            Assert.AreEqual(4, e.FilledTeamSeats);
+            Assert.AreEqual(2, e.FilledSpectatorSeats);
+            Assert.IsTrue(e.Layout.HasValue);
+        }
+
+        [Test]
+        public void WithoutTheFillTextTheFillIsUnknown()
+        {
+            var cache = new Dictionary<string, LobbyEntry>();
+            LobbyListCache.Merge(cache, new[] { RoomWithFill("a", null) }, 1, id => ThreeByThree);
+            Assert.IsFalse(cache["a"].FillKnown);
+        }
+
+        [Test]
+        public void TheButtonFollowsTheSeatFillWhenKnown()
+        {
+            var cache = new Dictionary<string, LobbyEntry>();
+            // two players only, but every team seat taken: not Join any more
+            LobbyListCache.Merge(cache, new[] { RoomWithFill("full", "9/9+1", players: 2), RoomWithFill("open", "8/9+0", players: 12), RoomWithFill("none", "9/9+3", players: 2) }, 1, id => ThreeByThree);
+            Assert.AreEqual(JoinAction.Spectate, LobbyListCache.ActionOf(cache["full"]));
+            Assert.AreEqual(JoinAction.Join, LobbyListCache.ActionOf(cache["open"]));
+            Assert.AreEqual(JoinAction.Full, LobbyListCache.ActionOf(cache["none"]));
+        }
+
+        [Test]
+        public void TheButtonFallsBackToPlayerCountWithoutTheFill()
+        {
+            var cache = new Dictionary<string, LobbyEntry>();
+            LobbyListCache.Merge(cache, new[] { RoomWithFill("a", null, players: 9, max: 9) }, 1, id => ThreeByThree);
+            Assert.AreEqual(JoinAction.Full, LobbyListCache.ActionOf(cache["a"]));
+        }
+
+        [Test]
+        public void TheButtonStillFollowsTheFillWhenTheModeIsUnknown()
+        {
+            var cache = new Dictionary<string, LobbyEntry>();
+            LobbyListCache.Merge(cache, new[] { RoomWithFill("a", "9/9+0", players: 1, max: 12) }, 1);
+            Assert.AreEqual(JoinAction.Full, LobbyListCache.ActionOf(cache["a"]));
+        }
     }
 }

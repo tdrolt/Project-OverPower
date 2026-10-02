@@ -190,9 +190,15 @@ namespace Overpower.Lobby
                     Properties = info.CustomProperties,
                 });
             }
-            LobbyListCache.Merge(cache, snapshots, System.Diagnostics.Stopwatch.GetTimestamp());
+            LobbyListCache.Merge(cache, snapshots, System.Diagnostics.Stopwatch.GetTimestamp(), LayoutOfMode);
             sortedStale = true;
             ListChanged?.Invoke();
+        }
+
+        private SeatLayout? LayoutOfMode(int modeId)
+        {
+            GameModeDefinition mode = catalogue != null ? catalogue.ById(modeId) : null;
+            return mode != null ? SeatLayoutFactory.From(mode) : (SeatLayout?)null;
         }
 
         public override void OnLeftLobby() => Clear();
