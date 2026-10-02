@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6ece7837f0e6c14ebcad7cfc05bc72e, type: 3}
+  m_Name: Conquest 3v3
+  m_EditorClassIdentifier: 
+  id: 2
+  displayName: Conquest 3v3
+  family: 0
+  familyName: Conquest
+  sizeName: 3v3
+  teams: 0000000001000000
+  seatsPerTeam: 3
+  spectatorSeats: 3
+  sceneName: Game Scene
+  available: 1
+  lobbyModeValue: 2
+  infoCards:
+  - title: Goal
+    text: Be the last team standing. A team is out once its base has been captured
+      and all its players are down.
+    accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
+  - title: Zones
+    text: The arena is covered in zones. Stand inside a zone to capture it. Every
+      zone your team holds pays you gold as the match goes on.
+    accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
+  - title: Gold and upgrades
+    text: Gold comes from the zones your team holds. Spend it in the shop on weapon
+      upgrades, abilities and armor. Your first attachment and movement ability are
+      free.
+    accent: {r: 0.9098039, g: 0.7254902, b: 0.19215687, a: 1}
+  - title: Last stand
+    text: A team that loses its base cannot respawn. It is out only when every one
+      of its players is down, and retaking a base brings the waiting players back.
+    accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
+  - title: The map shrinks
+    text: As the match goes on, the playable area closes in from the edges and pushes
+      everyone toward the middle.
+    accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
+  - title: Centre scan
+    text: At regular intervals the centre sends out a wave. The team holding the
+      centre sees enemy dots on its minimap and the current state of every zone.
+    accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
+  - title: Two teams
+    text: Only two teams play. The third corner of the map is closed from the start.
+    accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}

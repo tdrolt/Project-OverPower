@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6ece7837f0e6c14ebcad7cfc05bc72e, type: 3}
+  m_Name: Dominion 3v3v3
+  m_EditorClassIdentifier: 
+  id: 4
+  displayName: Dominion 3v3v3
+  family: 1
+  familyName: Dominion
+  sizeName: 3v3v3
+  teams: 000000000100000002000000
+  seatsPerTeam: 3
+  spectatorSeats: 3
+  sceneName: Game Scene
+  available: 0
+  lobbyModeValue: 3
+  infoCards: []
