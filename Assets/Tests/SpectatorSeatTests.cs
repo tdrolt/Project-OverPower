@@ -171,10 +171,18 @@ namespace Overpower.Tests
         public void ASeatSpectatorSeesEverythingWithNoFog(bool fogSwitchedOn, bool spectator, bool expected) =>
             Assert.AreEqual(expected, VisionRules.FogApplies(fogSwitchedOn, spectator));
 
-        [TestCase(false, true, true)]    // a player on a team logs
-        [TestCase(true, true, false)]    // a spectator logs no player row
-        [TestCase(false, false, false)]  // still in the lobby: no role yet, no row
-        public void OnlyAPlayerOnATeamOpensATelemetryFile(bool spectator, bool onATeam, bool expected) =>
-            Assert.AreEqual(expected, TelemetryRoleRule.MayOpenFile(spectator, onATeam));
+        // spectator, onATeam, isMaster, lobbyStage, expected
+        [TestCase(false, true, false, 1, true)]    // a player on a team logs
+        [TestCase(false, true, false, 2, true)]
+        [TestCase(true, false, true, 1, true)]     // a spectator who is the host logs: the master-only lines are the territory timeline
+        [TestCase(true, true, true, 2, true)]      // even with a stale team
+        [TestCase(true, false, false, 2, false)]   // a spectator who is not the host writes nothing
+        [TestCase(true, true, false, 2, false)]    // ... whatever stale team it carries
+        [TestCase(false, false, false, 1, false)]  // no role yet
+        [TestCase(false, false, true, 1, false)]   // the host with no seat and no team
+        [TestCase(false, true, false, 0, false)]   // still in the lobby (stage 0): no file yet
+        [TestCase(true, false, true, 0, false)]
+        public void WhoOpensATelemetryFile(bool spectator, bool onATeam, bool isMaster, int lobbyStage, bool expected) =>
+            Assert.AreEqual(expected, TelemetryRoleRule.MayOpenFile(spectator, onATeam, isMaster, lobbyStage));
     }
 }

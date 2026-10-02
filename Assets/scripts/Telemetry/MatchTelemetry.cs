@@ -7,6 +7,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
+using Overpower.Lobby;
 using Overpower.Match;
 using Overpower.Net;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -240,9 +241,24 @@ namespace Overpower.Telemetry
 
             // The old master may have left before ever writing the match identity.
             TryClaimMatchIdentity();
+
+            // A spectator who becomes the host starts writing (their file is the master-only lines').
+            if (newMasterClient != null && newMasterClient.IsLocal)
+                TryOpenFile();
         }
 
-        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) => ReadMatchIdentity(propertiesThatChanged);
+        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+        {
+            ReadMatchIdentity(propertiesThatChanged);
+            // The lobby stage reaching the warm-up (lS 1) is what lets a spectator host's file open (a player's opens on their team).
+            if (propertiesThatChanged != null && propertiesThatChanged.ContainsKey(LobbyKeys.Stage))
+                TryOpenFile();
+        }
+
+        /// <summary>The lobby stage in the room right now (lS): 0 lobby, 1 warm-up, 2 in match.</summary>
+        private static int LobbyStageNow =>
+            PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Stage, out object raw) && raw is int stage
+                ? stage : 0;
 
         /// <summary>The local player's team arriving (the game started and the seat became a team) is when their log opens.</summary>
         public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
@@ -491,9 +507,10 @@ namespace Overpower.Telemetry
             int actor = PhotonNetwork.LocalPlayer.ActorNumber;
             if (actor <= 0) return; // Not yet assigned an actor number - guards a race right after connecting.
 
-            // Lobby Task 6: the session line makes this player a row of the report. A spectator (no body, no team) writes no file, and nobody
-            // does while still in the lobby with no role: the file opens when this player is on a team (OnPlayerPropertiesUpdate below).
-            if (!TelemetryRoleRule.MayOpenFile(Teams.IsSpectator(PhotonNetwork.LocalPlayer), Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _)))
+            // Lobby Task 6: the session line makes this player a row of the report. Nobody writes a file in the lobby before the game starts
+            // (lS 0), and nobody without a role: the file opens when this player is on a team (OnPlayerPropertiesUpdate below) - or is a
+            // spectator HOST, whose master-only lines are the territory timeline (OnMasterClientSwitched and OnRoomPropertiesUpdate retry).
+            if (!TelemetryRoleRule.MayOpenFile(Teams.IsSpectator(PhotonNetwork.LocalPlayer), Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _), PhotonNetwork.IsMasterClient, LobbyStageNow))
                 return;
 
             string folder = ResolveMatchFolder();
@@ -547,7 +564,9 @@ namespace Overpower.Telemetry
 
         private void WriteSessionLine()
         {
-            Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int team);
+            bool spectator = Teams.IsSpectator(PhotonNetwork.LocalPlayer);
+            int team = -1;
+            if (!spectator && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int own)) team = own;
 
             line.Begin(TelemetryKeys.Session, Now);
             line.Int(TelemetryKeys.Schema, TelemetryKeys.SchemaVersion);
@@ -556,6 +575,7 @@ namespace Overpower.Telemetry
             line.String(TelemetryKeys.Nick, PhotonNetwork.LocalPlayer.NickName ?? "");
             line.Int(TelemetryKeys.Team, team);
             line.Bool(TelemetryKeys.IsMaster, PhotonNetwork.IsMasterClient);
+            if (spectator) line.Bool(TelemetryKeys.Spectator, true);
             line.String(TelemetryKeys.Commit, ReadCommitHash());
             line.String(TelemetryKeys.UnityVersion, Application.unityVersion);
             line.String(TelemetryKeys.Platform, Application.platform.ToString());

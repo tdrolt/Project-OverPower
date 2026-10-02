@@ -26,6 +26,30 @@ namespace Overpower.Tests
             "\",\"tm\":" + team + ",\"master\":" + (master ? "true" : "false") +
             ",\"commit\":\"c\",\"uv\":\"u\",\"plat\":\"p\",\"tuning\":" + tuningJson + "}\n";
 
+        // ---------------------------------------------------------------- lobby Task 6 review: a spectator host's log
+
+        [Test]
+        public void ASpectatorHostsLogGivesTheTimelineButNoPlayerRow()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string specSession = Session(1, -1, true, "{}").Replace("\"master\":true", "\"master\":true,\"spec\":true");
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), specSession +
+                    "{\"e\":\"ownership\",\"t\":30,\"zone\":0,\"tier\":2,\"old\":-1,\"new\":0,\"since\":1000}\n");
+                File.WriteAllText(Path.Combine(temp, "2.jsonl"), Session(2, 0, false, "{}"));
+
+                var log = TelemetryLog.Load(temp);
+                var tables = TelemetryAggregator.Build(log);
+
+                Assert.IsTrue(log.Sessions.Single(s => s.Actor == 1).Spectator);
+                Assert.IsFalse(log.Sessions.Single(s => s.Actor == 2).Spectator);
+                Assert.AreEqual(1, tables.Ownership.Count, "the host's territory line still reaches the report");
+                CollectionAssert.AreEqual(new[] { 2 }, tables.Players.Select(p => p.Actor).ToArray(), "only the player is a player row");
+            }
+            finally { Directory.Delete(temp, true); }
+        }
+
         // ---------------------------------------------------------------- item 1 (HIGH): captures rewrite
 
         [Test]

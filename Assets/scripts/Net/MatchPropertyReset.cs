@@ -11,7 +11,7 @@ namespace Overpower.Net
     /// across matches - the one list RoomManager.ResetMatchProperties writes when a match is given up (a deliberate leave, Leave or
     /// OK on the rejoin panel). A value of null REMOVES the key: gold and the loadout are then read as "never set", exactly like a
     /// first-time joiner (GoldWallet.Start falls through to StartingGold, PlayerLoadout.Start publishes the starter kit).
-    /// Not in the list: "teamID" (RoomManager.OnJoinedRoom clears it on every new join) and the nickname.
+    /// "teamID" is in the list: a stale team from the room just left must not open the next lobby's match log with the old team (MatchTelemetry.TryOpenFile) or make a spectator look like a player. Not in the list: the nickname.
     /// </summary>
     public static class MatchPropertyReset
     {
@@ -35,6 +35,7 @@ namespace Overpower.Net
             { AoeZoneRecast.PropertyKey, null },
             { ScopeSightProperty.Key, null },
             { Teams.SpectatorKey, null },
+            { Teams.TeamKey, null },
         };
     }
 }

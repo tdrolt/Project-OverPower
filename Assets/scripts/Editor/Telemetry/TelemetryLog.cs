@@ -36,13 +36,15 @@ namespace Overpower.EditorTools.Telemetry
         public readonly string Nick;
         public readonly int Team;
         public readonly bool IsMaster;
+        public readonly bool Spectator;
         public readonly string MatchId;
         public readonly string Commit;
         public readonly int Schema;
         public readonly JObject Tuning;
 
-        public TelemetrySession(string file, int actor, string nick, int team, bool isMaster, string matchId, string commit, int schema, JObject tuning)
+        public TelemetrySession(string file, int actor, string nick, int team, bool isMaster, string matchId, string commit, int schema, JObject tuning, bool spectator = false)
         {
+            Spectator = spectator;
             File = file;
             Actor = actor;
             Nick = nick;
@@ -264,7 +266,8 @@ namespace Overpower.EditorTools.Telemetry
             string commit = data[TelemetryKeys.Commit]?.ToString() ?? "";
             int schema = data[TelemetryKeys.Schema]?.ToObject<int?>() ?? 0;
             JObject tuning = data[TelemetryKeys.Tuning] as JObject;
-            return new TelemetrySession(file, actor, nick, team, master, matchId, commit, schema, tuning);
+            bool spectator = data[TelemetryKeys.Spectator]?.ToObject<bool?>() ?? false;
+            return new TelemetrySession(file, actor, nick, team, master, matchId, commit, schema, tuning, spectator);
         }
     }
 }

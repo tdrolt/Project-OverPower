@@ -389,7 +389,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// null-valued key from the local player's Custom Properties, so the next room's GoldWallet.Start
     /// finds no key at all and falls through to StartingGold, exactly like a first-time joiner.
     ///
-    /// Kept: "teamID" - OnJoinedRoom clears it on the very next (non-rejoin) join, nothing to reset.
+    /// "teamID" is reset too (null removes it): a stale team must not open the next lobby's match log (MatchPropertyReset).
     /// Kept: weapon/attachment/ultimate/mobility (LoadoutProperties) - PlayerLoadout.Start republishes
     /// the whole starting kit for every newly spawned player regardless of what is still on the local
     /// Custom Properties, so there is nothing here for a stale pick to leak into a new match. Treated

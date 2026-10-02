@@ -328,6 +328,7 @@ namespace Overpower.EditorTools.Telemetry
             }
             foreach (TelemetrySession s in log.Sessions)
             {
+                if (s.Spectator) continue; // a spectator host's file is no player row
                 header.Coverage.Add(new PlayerCoverageRow
                 {
                     Actor = s.Actor,
@@ -1700,6 +1701,7 @@ namespace Overpower.EditorTools.Telemetry
             {
                 int actor = kv.Key;
                 TelemetrySession session = kv.Value;
+                if (session.Spectator) continue; // a spectator host's file feeds the timeline, not a player row
                 var gold = goldByActor.GetValueOrDefault(actor);
                 (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
 
