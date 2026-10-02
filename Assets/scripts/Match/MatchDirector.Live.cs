@@ -2,6 +2,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
+using Overpower.Lobby;
 using Overpower.Net;
 using Overpower.Telemetry;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -74,7 +75,7 @@ namespace Overpower.Match
         /// needs no server clock, just the serialized reference on this player's own prefab).</summary>
         public int CountdownSecondsShown =>
             MatchStartRules.CountdownSecondsShown(PhotonNetwork.ServerTimestamp, LiveAtMs,
-                LocalPlayerConfig()?.MatchStartCountdownSeconds ?? 0f);
+                CountdownConfig()?.MatchStartCountdownSeconds ?? 0f);
 
         /// <summary>The teams fixed into the match (Decision 4), ascending - empty before the countdown starts.</summary>
         public int[] TeamsInMatch =>
@@ -137,11 +138,51 @@ namespace Overpower.Match
         /// nothing per frame.</summary>
         public int TeamsWithPlayersNow => MatchStartRules.CountTeamsWithPlayers(CountMembers());
 
-        /// <summary>Tudor: with only two teams, the host gets a Start button - polled every frame the warm-up
-        /// panel is open (step 8), same allocation reasoning as TeamsWithPlayersNow (nothing per frame). Mode 3
-        /// keeps the three-team answer; mode 2 (Decision L3) is the two-team lobby's own rule.</summary>
-        public bool HostMayStartNow =>
-            PhotonNetwork.IsMasterClient && MatchStartRules.HostMayStart(TeamsFixed, CountMembers(), PlayersWithoutATeam(), LobbyMode);
+        /// <summary>The host may end the warm-up (lobby Task 5; the button reads "End warm-up" from Task 10): this client
+        /// is the master, the lobby is in the warm-up and every team of the lobby's mode has a player present
+        /// (MatchStartRules.HostMayEndWarmup). Polled every frame the warm-up panel is open: nothing is allocated per
+        /// frame (CountMembers' scratch array, one reused dictionary).</summary>
+        public bool HostMayStartNow
+        {
+            get
+            {
+                if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom) return false;
+                LobbySeats seats = Seats();
+                if (seats == null || !seats.HasLayout) return false;
+                int[] members = CountMembers();
+                presentScratch.Clear();
+                foreach (int team in seats.Layout.Teams)
+                    presentScratch[team] = team >= 0 && team < members.Length ? members[team] : 0;
+                return MatchStartRules.HostMayEndWarmup(TeamsFixed, LobbyStageNow, seats.Layout, presentScratch);
+            }
+        }
+
+        private readonly System.Collections.Generic.Dictionary<int, int> presentScratch = new System.Collections.Generic.Dictionary<int, int>();
+        private LobbySeats cachedSeats;
+
+        private LobbySeats Seats()
+        {
+            if (cachedSeats == null)
+                cachedSeats = Rooms()?.Seats;
+            return cachedSeats;
+        }
+
+        /// <summary>The lobby stage in the room right now (lS): 0 lobby, 1 warm-up, 2 in match.</summary>
+        private static int LobbyStageNow =>
+            PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Stage, out object raw) && raw is int stage
+                ? stage : 0;
+
+        /// <summary>What goes live (Decision 5 + lobby Task 5): the teams, the phase, nobody eliminated, no winner, and the
+        /// lobby stage lS = 2 so the list shows "In match". One write, so every client sees them together.</summary>
+        public static Hashtable LiveProperties(int[] teams, MatchPhase phase) => new Hashtable
+        {
+            { TeamsInMatchKey, teams }, // the same value the countdown fixed - also lets GoLive be called
+                                        // directly by reflection in a single-client check that skips it.
+            { PhaseKey, (int)phase },
+            { EliminatedKey, new int[0] },
+            { WinnerKey, -1 },
+            { LobbyKeys.Stage, (int)LobbyStage.InMatch },
+        };
 
         /// <summary>Covers the countdown starting, being cancelled, and the match going live - MatchStartPanel
         /// (step 8) subscribes instead of polling every frame for a change that happens rarely. Map shrink T3: the
@@ -189,15 +230,15 @@ namespace Overpower.Match
         {
             if (!HostMayStartNow)
             {
-                Debug.LogWarning("[MATCH] Start refused: not the master, already started, or not exactly two teams.");
+                Debug.LogWarning("[MATCH] End warm-up refused: not the master, not in the warm-up, or a team of the mode has nobody present.");
                 return;
             }
-            StartCountdown(MatchStartRules.TeamsWithPlayers(CountMembers()));
+            StartCountdown(MatchStartRules.TeamsOfLayout(Seats().Layout));
         }
 
         private void StartCountdown(int[] teams)
         {
-            GameplayConfig config = LocalPlayerConfig();
+            GameplayConfig config = CountdownConfig();
             if (config == null || PhotonNetwork.ServerTimestamp == 0 || teams.Length < 2)
                 return; // player not spawned / clock not synced yet - the next poll tries again
 
@@ -256,15 +297,8 @@ namespace Overpower.Match
                 return; // snapshot not read / clock not synced yet - the next frame tries again
 
             MatchPhase phase = teams.Length >= MatchStartRules.TeamCount ? MatchPhase.ThreeTeams : MatchPhase.TwoTeams;
-            var props = new Hashtable
-            {
-                { TeamsInMatchKey, teams }, // the same value the countdown fixed - also lets GoLive be called
-                                            // directly by reflection in a single-client check that skips it.
-                { PhaseKey, (int)phase },
-                { EliminatedKey, new int[0] },
-                { WinnerKey, -1 },
-            };
-            // Check-and-set on the ABSENT mPhase: the match goes live once only, whichever master gets there.
+            Hashtable props = LiveProperties(teams, phase);
+            // Check-and-set on the ABSENT mPhase: the match goes live once only, whichever master gets there (lS = 2 rides in the same write).
             var expectedAbsent = new Hashtable { { PhaseKey, null } };
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent))
                 return;
@@ -309,22 +343,10 @@ namespace Overpower.Match
                 return countMembersScratch;
             foreach (System.Collections.Generic.KeyValuePair<int, Player> pair in room.Players)
                 // Task 9e: a player whose connection dropped is not "here" for the lobby (PresenceRules.CountsInTheLobby).
-                if (PresenceRules.CountsInTheLobby(pair.Value.IsInactive) && Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < countMembersScratch.Length)
+                // A spectator plays for no team, a dropped player is not here (MatchStartRules.CountsAsTeamPlayer).
+                if (MatchStartRules.CountsAsTeamPlayer(pair.Value.IsInactive, Teams.IsSpectator(pair.Value)) && Teams.TryGetTeam(pair.Value, out int t) && t >= 0 && t < countMembersScratch.Length)
                     countMembersScratch[t]++;
             return countMembersScratch;
-        }
-
-        /// <summary>How many players in the room have no team Custom Property yet (Decision 17, R3) - the host
-        /// cannot start while this is above 0, because one of them might be the third team.</summary>
-        private static int PlayersWithoutATeam()
-        {
-            int count = 0;
-            Room room = PhotonNetwork.CurrentRoom;
-            if (room != null)
-                foreach (System.Collections.Generic.KeyValuePair<int, Player> pair in room.Players)
-                    if (PresenceRules.CountsInTheLobby(pair.Value.IsInactive) && !Teams.TryGetTeam(pair.Value, out _))
-                        count++;
-            return count;
         }
 
         /// <summary>The countdown length (Decision 22, R15) is only ever read through the master's own player -
@@ -338,5 +360,14 @@ namespace Overpower.Match
             PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
             return lifecycle != null ? lifecycle.Config : null;
         }
+
+        /// <summary>The countdown length's config: the master's own body's, else the RoomManager's (lobby Task 5: a host on a
+        /// spectator seat has no body, and every spectator's "Match starts in N" fallback needs one too).</summary>
+        private static GameplayConfig CountdownConfig() =>
+            LocalPlayerConfig() ?? Rooms()?.Config;
+
+        private static RoomManager cachedRooms;
+
+        private static RoomManager Rooms() => cachedRooms != null ? cachedRooms : (cachedRooms = FindFirstObjectByType<RoomManager>());
     }
 }

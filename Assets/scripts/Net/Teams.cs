@@ -16,6 +16,10 @@ namespace Overpower.Net
         /// joining a room and on a deliberate leave (MatchPropertyReset).</summary>
         public const string SpectatorKey = "spec";
 
+        /// <summary>True for a player on a spectator seat (spec = true): they have no body and no team.</summary>
+        public static bool IsSpectator(Photon.Realtime.Player player) =>
+            player != null && player.CustomProperties.TryGetValue(SpectatorKey, out object raw) && raw is bool spectating && spectating;
+
         public static bool TryGetTeam(Photon.Realtime.Player player, out int teamId)
         {
             teamId = -1;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Overpower.Lobby;
 
 namespace Overpower.Match
 {
@@ -70,24 +71,26 @@ namespace Overpower.Match
             false; // Tudor, 2026-09-26: no automatic start in any mode - the host always presses Start.
 
         /// <summary>Decision L3: the two-team lobby never starts itself, whatever fills the room - the host presses
-        /// Start (HostMayStart). Mode 3 keeps the answer above.</summary>
+        /// Start (HostMayEndWarmup). Mode 3 keeps the answer above.</summary>
         public static bool StartsCountdownAutomatically(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int mode) =>
             mode != TwoTeams && StartsCountdownAutomatically(teamsFixed, membersPerTeam);
 
-        /// <summary>Tudor: with only two teams, the host gets a Start button. Refused while anyone in the room has no
-        /// team yet (Decision 17): they might be the third team.</summary>
-        public static bool HostMayStart(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int playersWithoutATeam) =>
-            !teamsFixed && playersWithoutATeam == 0 && CountTeamsWithPlayers(membersPerTeam) >= 2; // 2 or 3 teams (Tudor, 2026-09-26)
+        /// <summary>The host may end the warm-up (lobby Task 5): the teams are not fixed yet, the lobby is in the
+        /// warm-up (lS = 1) and every team of the lobby's mode has at least one player present - three teams for a
+        /// 3v3v3 lobby, two for a 3v3. Replaces the old "two or three teams with a player" start.</summary>
+        public static bool HostMayEndWarmup(bool teamsFixed, int lobbyStage, SeatLayout layout, IReadOnlyDictionary<int, int> presentPlayersPerTeam) =>
+            !teamsFixed && lobbyStage == LobbySeatRules.LobbyWarmup && LobbySeatRules.MayEndWarmup(layout, presentPlayersPerTeam);
 
-        /// <summary>The two-team lobby (Tudor, 2026-09-26; Decision L3): mode 3 keeps the answer above unchanged. In
-        /// two-team mode the host may start once teams 0 and 1 both have a player, team 2 (closed - see IsTeamOpen)
-        /// has nobody, and nobody in the room is still without a team.</summary>
-        public static bool HostMayStart(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int playersWithoutATeam, int mode)
+        /// <summary>Whether a player in the room counts toward their team's present players: a dropped (inactive)
+        /// player is not here, and a spectator plays for no team.</summary>
+        public static bool CountsAsTeamPlayer(bool inactive, bool spectator) => PresenceRules.CountsInTheLobby(inactive) && !spectator;
+
+        /// <summary>The teams fixed into the match when the warm-up ends: the layout's own teams, ascending.</summary>
+        public static int[] TeamsOfLayout(SeatLayout layout)
         {
-            if (mode != TwoTeams)
-                return HostMayStart(teamsFixed, membersPerTeam, playersWithoutATeam);
-            return !teamsFixed && playersWithoutATeam == 0
-                && membersPerTeam[0] > 0 && membersPerTeam[1] > 0 && membersPerTeam[TwoTeams] == 0;
+            int[] teams = (int[])layout.Teams.Clone();
+            System.Array.Sort(teams);
+            return teams;
         }
 
         /// <summary>Decision 1: mLiveAt = now + the countdown length, computed wrap-safe. 0 (or a negative length,

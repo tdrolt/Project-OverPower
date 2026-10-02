@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using NUnit.Framework;
+using Overpower.Lobby;
 using Overpower.Match;
 
 namespace Overpower.Tests
@@ -13,16 +15,6 @@ namespace Overpower.Tests
             Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }));
             Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 3, 2, 1 }));
             Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(true, new[] { 1, 1, 1 }), "a countdown or a live match already fixed the teams");
-        }
-
-        [Test]
-        public void TheHostMayStartOnlyWithExactlyTwoTeams()
-        {
-            Assert.IsTrue(MatchStartRules.HostMayStart(teamsFixed: false, new[] { 1, 0, 2 }, playersWithoutATeam: 0));
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 2, 0, 0 }, 0), "one team: nobody to play");
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0), "three teams: the host starts it too (Tudor, 2026-09-26)");
-            Assert.IsFalse(MatchStartRules.HostMayStart(true, new[] { 1, 1, 0 }, 0), "already counting down or live");
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 0 }, 1), "someone still joining may be the third team");
         }
 
         [Test]
@@ -146,17 +138,59 @@ namespace Overpower.Tests
             Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 3));
         }
 
-        [Test]
-        public void TheHostStartsATwoTeamMatchWhenBothTeamsHaveSomeone()
+        private static readonly SeatLayout ThreeTeamLobby = new SeatLayout(new[] { 0, 1, 2 }, 3, 2);
+        private static readonly SeatLayout TwoTeamLobby = new SeatLayout(new[] { 0, 1 }, 3, 2);
+
+        private static Dictionary<int, int> Present(params (int team, int n)[] entries)
         {
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 0 }, 0, mode: 2));
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 2, 0, 0 }, 0, mode: 2));
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0, mode: 2), "someone still on the third team");
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 0 }, 1, mode: 2), "a player without a team");
-            Assert.IsFalse(MatchStartRules.HostMayStart(true, new[] { 1, 1, 0 }, 0, mode: 2), "already counting down or live");
-            // Mode 3 keeps the old answers.
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 0, 2 }, 0, mode: 3));
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0, mode: 3), "three teams: the host starts it");
+            var d = new Dictionary<int, int>();
+            foreach (var e in entries) d[e.team] = e.n;
+            return d;
+        }
+
+        [Test]
+        public void TheHostEndsTheWarmupOnlyWhenEveryTeamOfTheModeHasAPlayer()
+        {
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 1, ThreeTeamLobby, Present((0, 1), (1, 1))), "a 3v3v3 lobby with two teams present");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 1, ThreeTeamLobby, Present((0, 2), (1, 0), (2, 1))), "team 1 has nobody left");
+            Assert.IsTrue(MatchStartRules.HostMayEndWarmup(false, 1, ThreeTeamLobby, Present((0, 1), (1, 1), (2, 1))));
+            Assert.IsTrue(MatchStartRules.HostMayEndWarmup(false, 1, TwoTeamLobby, Present((0, 1), (1, 3))), "a 3v3 never asks about team 2");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 1, TwoTeamLobby, Present((0, 1))), "a 3v3 with one team");
+        }
+
+        [Test]
+        public void TheWarmupCanOnlyEndWhileItIsTheWarmup()
+        {
+            var all = Present((0, 1), (1, 1), (2, 1));
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(true, 1, ThreeTeamLobby, all), "a countdown or a live match already fixed the teams");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 0, ThreeTeamLobby, all), "still the lobby: that is Start game");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 2, ThreeTeamLobby, all), "already in the match");
+        }
+
+        [Test]
+        public void ADroppedPlayerAndASpectatorCountForNoTeam()
+        {
+            Assert.IsTrue(MatchStartRules.CountsAsTeamPlayer(inactive: false, spectator: false));
+            Assert.IsFalse(MatchStartRules.CountsAsTeamPlayer(inactive: true, spectator: false), "a dropped player is not present");
+            Assert.IsFalse(MatchStartRules.CountsAsTeamPlayer(inactive: false, spectator: true), "a spectator plays for no team");
+        }
+
+        [Test]
+        public void TheMatchIsFixedToTheTeamsOfTheLayout()
+        {
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, MatchStartRules.TeamsOfLayout(ThreeTeamLobby));
+            CollectionAssert.AreEqual(new[] { 0, 1 }, MatchStartRules.TeamsOfLayout(TwoTeamLobby));
+        }
+
+        [Test]
+        public void TheLiveWriteMarksTheLobbyInMatch()
+        {
+            var props = MatchDirector.LiveProperties(new[] { 0, 1 }, MatchPhase.TwoTeams);
+            Assert.AreEqual(2, props[LobbyKeys.Stage], "the list shows In match");
+            Assert.AreEqual((int)MatchPhase.TwoTeams, props[MatchDirector.PhaseKey]);
+            CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])props[MatchDirector.TeamsInMatchKey]);
+            Assert.AreEqual(-1, props[MatchDirector.WinnerKey]);
+            Assert.AreEqual(0, ((int[])props[MatchDirector.EliminatedKey]).Length);
         }
 
         [Test]

@@ -60,6 +60,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// "Rejoin your match". One home: GameplayConfig.</summary>
     public float RejoinWindowSeconds => gameplayConfig != null ? gameplayConfig.RejoinWindowSeconds : 0f;
 
+    /// <summary>The gameplay config this scene's RoomManager holds: the countdown length when the master has no body (a spectator host, lobby Task 5).</summary>
+    public GameplayConfig Config => gameplayConfig;
+
     /// <summary>How long a rejoined player waits for PUN to hand their old body back before spawning a fresh one.</summary>
     private const float BodyReturnWaitSeconds = 1.5f;
 
