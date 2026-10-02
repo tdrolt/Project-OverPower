@@ -26,40 +26,24 @@ namespace Overpower.UI
     /// CountdownSecondsShown every single frame regardless - those can all change with no state edge at all (a
     /// second player joining during the warm-up, or the countdown's own number ticking down) - so the event is a
     /// belt-and-braces immediate refresh, not a replacement for the poll.
-    ///
-    /// Two-team lobby, Task 3 (Tudor, 2026-09-26): a second button sits beside Start, on the same clickable
-    /// canvas - the host's own switch between MatchStartRules.TwoTeams/ThreeTeams (MatchDirector.LobbyMode,
-    /// HostSetLobbyMode). Shown to the host only, only in the warm-up (Decision L4/L7): its label is always the
-    /// OTHER mode's text, and it greys out (with its own warm-up-line reason) only when switching TO two teams
-    /// would leave a 7th player with nowhere to go - switching back needs nothing but the warm-up still running.
     /// </summary>
     public class MatchStartPanel : MonoBehaviour
     {
         // A fixed visual gap under the warm-up line box, not a per-match tuning value - so it is not one of the
         // 11 designer fields step 8 added to UiTheme (Rule 10 reserves that asset for values a designer tunes).
         private const float ButtonGapBelowLine = 8f;
-        // Fixed horizontal gap between the Start button and the lobby-mode switch button beside it - same
-        // reasoning as ButtonGapBelowLine: a layout constant, not something a designer tunes per match.
-        private const float ButtonHorizontalGap = 12f;
 
         private UiTheme theme;
         private TextMeshProUGUI label; // Built (and owned) by PlayerHud.BuildWarmupLine - this class only writes to it.
         private GameObject buttonGo;
         private TextMeshProUGUI startButtonLabel;
-        private GameObject switchButtonGo;
-        private Button switchButton;
-        private TextMeshProUGUI switchButtonLabel;
         private Material textMaterial;
 
         private MatchDirector subscribedDirector;
         private WarmupMessage lastMessage = (WarmupMessage)(-1); // Never a real value - forces the first Update to write.
         private int lastSecondsShown = -1;
         private int lastStartTeams = -1; // Never a real team count - forces the first Update to write Start's label.
-        private bool lastTooManyForHost;
         private bool lastShowButton;
-        private bool lastShowSwitchButton;
-        private int lastSwitchButtonMode = -1; // Never a real LobbyMode value - forces the first Update to write its label.
-        private bool lastSwitchButtonInteractable;
         private bool loggedBadCountdownFormat;
 
         public static MatchStartPanel Create(Transform parent, UiTheme theme, TextMeshProUGUI label)
@@ -107,18 +91,15 @@ namespace Overpower.UI
             int mode = d.LobbyMode;
             WarmupMessage message = MatchStartRules.WarmupMessageFor(d.State, d.TeamsWithPlayersNow, isHost, mode);
             int secondsShown = message == WarmupMessage.Countdown ? d.CountdownSecondsShown : 0;
-            bool tooManyForHost = ShowTooManyForHost(isHost, d.State, mode, d.HostMaySwitchToTwoTeamsNow);
 
-            // The label's text and active state change ONLY when the message, the too-many reason or the
-            // countdown's own number changed - no string built (FormatCountdown allocates) on a frame nothing
-            // actually moved.
-            if (message != lastMessage || tooManyForHost != lastTooManyForHost
+            // The label's text and active state change ONLY when the message or the countdown's own number
+            // changed - no string built (FormatCountdown allocates) on a frame nothing actually moved.
+            if (message != lastMessage
                 || (message == WarmupMessage.Countdown && secondsShown != lastSecondsShown))
             {
-                ApplyMessage(message, secondsShown, tooManyForHost);
+                ApplyMessage(message, secondsShown);
                 lastMessage = message;
                 lastSecondsShown = secondsShown;
-                lastTooManyForHost = tooManyForHost;
             }
 
             bool showButton = d.HostMayStartNow;
@@ -138,49 +119,7 @@ namespace Overpower.UI
                     lastStartTeams = startTeams;
                 }
             }
-
-            // The switch button: host only, warm-up only (Decision L4/L7) - never while counting down or live,
-            // whether or not Start itself is showing (Start also needs both open teams filled; the switch does not).
-            bool showSwitch = isHost && d.State == StartState.Warmup;
-            if (showSwitch != lastShowSwitchButton)
-            {
-                switchButtonGo.SetActive(showSwitch);
-                lastShowSwitchButton = showSwitch;
-            }
-            if (showSwitch)
-            {
-                bool switchInteractable = SwitchButtonInteractable(mode, d.HostMaySwitchToTwoTeamsNow, d.HostMaySwitchToThreeTeamsNow);
-                if (mode != lastSwitchButtonMode || switchInteractable != lastSwitchButtonInteractable)
-                {
-                    switchButtonLabel.text = OtherLobbyMode(mode) == MatchStartRules.TwoTeams
-                        ? theme.lobbyTwoTeamsButtonText
-                        : theme.lobbyThreeTeamsButtonText;
-                    switchButton.interactable = switchInteractable;
-                    lastSwitchButtonMode = mode;
-                    lastSwitchButtonInteractable = switchInteractable;
-                }
-            }
         }
-
-        /// <summary>Decision L1/L4: the mode the switch button would move the room TO - its own label always
-        /// names this one, and clicking it passes this straight to HostSetLobbyMode. Pure (no Photon, no
-        /// MonoBehaviour) so an edit-mode test can cover it directly - see MatchStartPanelTests.</summary>
-        internal static int OtherLobbyMode(int mode) =>
-            mode == MatchStartRules.TwoTeams ? MatchStartRules.ThreeTeams : MatchStartRules.TwoTeams;
-
-        /// <summary>Decision L4: whether the switch button is clickable right now - switching to two needs
-        /// MaySwitchToTwoTeams (7+ already in the room greys it); switching back to three needs only
-        /// MaySwitchToThreeTeams (always true while the button itself is shown, but read here rather than assumed,
-        /// in case a stale frame races a master switch). Pure - see MatchStartPanelTests.</summary>
-        internal static bool SwitchButtonInteractable(int mode, bool maySwitchToTwoTeams, bool maySwitchToThreeTeams) =>
-            mode == MatchStartRules.TwoTeams ? maySwitchToThreeTeams : maySwitchToTwoTeams;
-
-        /// <summary>Decision L7/brief: while switching TO two teams is refused (7+ already in the room), the host
-        /// sees the reason (UiTheme.lobbyTwoTeamsTooManyText) instead of the ordinary warm-up line - the switch
-        /// button greys out beside it. Never true for a guest, while counting down/live, or already in two-team
-        /// mode (there is nothing to refuse switching back). Pure - see MatchStartPanelTests.</summary>
-        internal static bool ShowTooManyForHost(bool isHost, StartState state, int mode, bool maySwitchToTwoTeams) =>
-            isHost && state == StartState.Warmup && mode == MatchStartRules.ThreeTeams && !maySwitchToTwoTeams;
 
         /// <summary>How many teams the Start button names: the teams with a player right now, which is exactly what
         /// HostStartMatch fixes into the match (MatchStartRules.TeamsWithPlayers) - 2 in the two-team lobby (team 2
@@ -207,12 +146,10 @@ namespace Overpower.UI
         /// decision (which message wins, and that the too-many reason overrides all of them) is testable with no
         /// UiTheme asset or MonoBehaviour involved - see MatchStartPanelTests. ApplyMessage below is the only
         /// place that turns a key into the actual theme.* text (and, for Countdown, the formatted string).</summary>
-        internal enum WarmupLineKey { Waiting, Host, Guest, TwoTeamsWaiting, TwoTeamsHost, TwoTeamsGuest, TooManyForHost, Countdown }
+        internal enum WarmupLineKey { Waiting, Host, Guest, TwoTeamsWaiting, TwoTeamsHost, TwoTeamsGuest, Countdown }
 
-        internal static WarmupLineKey WarmupLineFor(WarmupMessage message, bool tooManyForHost)
+        internal static WarmupLineKey WarmupLineFor(WarmupMessage message)
         {
-            if (tooManyForHost)
-                return WarmupLineKey.TooManyForHost;
             return message switch
             {
                 WarmupMessage.Countdown => WarmupLineKey.Countdown,
@@ -225,14 +162,14 @@ namespace Overpower.UI
             };
         }
 
-        private void ApplyMessage(WarmupMessage message, int secondsShown, bool tooManyForHost)
+        private void ApplyMessage(WarmupMessage message, int secondsShown)
         {
             bool shown = message != WarmupMessage.None;
             label.gameObject.SetActive(shown);
             if (!shown)
                 return; // Live: nothing to say - ShowMatchLiveToast (MatchDirector.ReactToRoomState) covers it.
 
-            WarmupLineKey key = WarmupLineFor(message, tooManyForHost);
+            WarmupLineKey key = WarmupLineFor(message);
             label.text = key switch
             {
                 WarmupLineKey.Countdown => FormatCountdown(secondsShown),
@@ -241,7 +178,6 @@ namespace Overpower.UI
                 WarmupLineKey.TwoTeamsHost => theme.warmupTwoTeamsHostText,
                 WarmupLineKey.TwoTeamsGuest => theme.warmupTwoTeamsGuestText,
                 WarmupLineKey.TwoTeamsWaiting => theme.warmupTwoTeamsWaitingText,
-                WarmupLineKey.TooManyForHost => theme.lobbyTwoTeamsTooManyText,
                 _ => theme.warmupWaitingText, // Waiting
             };
         }
@@ -273,10 +209,7 @@ namespace Overpower.UI
         /// on a canvas that HAS a GraphicRaycaster - picks up a hover/click here and gates PrimaryHeld/AttachmentHeld
         /// off, exactly like the loadout toggle button already does. The HUD's own canvas (PlayerHud.BuildUi)
         /// deliberately carries none, because nothing on it is clickable; this one is, so it must.
-        ///
-        /// Two-team lobby, Task 3: the switch button sits on this SAME canvas, beside Start (left of it, same
-        /// row) - reusing Start's own size/colour tokens (Decision, Task 3 brief: no new UiTheme token unless
-        /// clearly needed - it wasn't).</summary>
+        /// </summary>
         private void BuildButtonCanvas()
         {
             EnsureEventSystem();
@@ -295,32 +228,17 @@ namespace Overpower.UI
 
             // Directly under the warm-up line box - same top-centre anchor and the same two theme numbers
             // (Warmup Top Offset, Warmup Line Size) PlayerHud.BuildWarmupLine positions that box with, plus one
-            // fixed gap, so the row always lines up under it regardless of screen size. The two buttons sit side
-            // by side, centred as a pair on that same point (Start on the right, the switch on the left).
+            // fixed gap, so the button always lines up under it regardless of screen size, centred on that same point
+            // (the host's two/three-team switch that used to sit beside it is gone, lobby Task 4).
             float rowY = -(theme.warmupTopOffset + theme.warmupLineSize.y + ButtonGapBelowLine);
-            float rowOffset = (theme.matchStartButtonSize.x + ButtonHorizontalGap) / 2f;
 
-            buttonGo = BuildRowButton(canvasGo.transform, "Start Match Button", rowOffset, rowY, StartButtonText(theme.matchStartButtonText, MatchStartRules.TwoTeams));
+            buttonGo = BuildRowButton(canvasGo.transform, "Start Match Button", 0f, rowY, StartButtonText(theme.matchStartButtonText, MatchStartRules.TwoTeams));
             startButtonLabel = buttonGo.GetComponentInChildren<TextMeshProUGUI>();
             buttonGo.GetComponent<Button>().onClick.AddListener(() => MatchDirector.Instance?.HostStartMatch());
             buttonGo.SetActive(false); // Refresh turns this on only while HostMayStartNow.
-
-            switchButtonGo = BuildRowButton(canvasGo.transform, "Lobby Mode Switch Button", -rowOffset, rowY, theme.lobbyTwoTeamsButtonText);
-            switchButton = switchButtonGo.GetComponent<Button>();
-            switchButtonLabel = switchButtonGo.GetComponentInChildren<TextMeshProUGUI>();
-            switchButton.onClick.AddListener(() =>
-            {
-                MatchDirector d = MatchDirector.Instance;
-                if (d == null)
-                    return;
-                d.HostSetLobbyMode(OtherLobbyMode(d.LobbyMode));
-            });
-            switchButtonGo.SetActive(false); // Refresh turns this on only for the host, in the warm-up.
         }
 
-        /// <summary>One row button - Start and the lobby-mode switch button share this build (same size/colour
-        /// tokens, same outline material, same no-navigation setting) and differ only in name, position and their
-        /// starting label.</summary>
+        /// <summary>The Start button's build: size/colour tokens, outline material and no-navigation setting.</summary>
         private GameObject BuildRowButton(Transform parent, string name, float xOffset, float y, string labelText)
         {
             GameObject buttonObject = TMP_DefaultControls.CreateButton(new TMP_DefaultControls.Resources());

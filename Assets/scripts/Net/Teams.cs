@@ -12,6 +12,10 @@ namespace Overpower.Net
     {
         public const string TeamKey = "teamID";
 
+        /// <summary>Set to true on a player who watches instead of playing (a spectator seat at Start, lobby Task 4); cleared on
+        /// joining a room and on a deliberate leave (MatchPropertyReset).</summary>
+        public const string SpectatorKey = "spec";
+
         public static bool TryGetTeam(Photon.Realtime.Player player, out int teamId)
         {
             teamId = -1;

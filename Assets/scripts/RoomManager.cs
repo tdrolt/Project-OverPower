@@ -26,7 +26,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
     public Transform[] capitalUnderAttackSpawnPoints;
 
     public const int TeamSize = 3;         // hard cap per team; 3 teams x 3 = the room's 9
-    private const int NoFreeTeam = -1;
 
     [Header("Rejoin (Task 9e)")]
     [Tooltip("Read for the rejoin window (Connection > Rejoin Window Seconds): how long the room keeps a dropped player's place.")]
@@ -47,6 +46,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     /// <summary>Who sits where in the lobby this client is in (lobby Task 3).</summary>
     public LobbySeats Seats { get; private set; }
+
+    /// <summary>The host's Start game and what every client does when it lands (lobby Task 4).</summary>
+    public LobbyStart GameStart { get; private set; }
 
     /// <summary>True from pressing the interim Join button (when not yet in the lobby) until OnJoinedLobby consumes it: only then does joining the lobby go on to join a random room.</summary>
     private bool joiningRandom;
@@ -70,6 +72,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
         Lobbies.Init(this, modeCatalogue, lobbyConfig);
         Seats = gameObject.AddComponent<LobbySeats>();
         Seats.Init(modeCatalogue, lobbyConfig);
+        GameStart = gameObject.AddComponent<LobbyStart>();
+        GameStart.Init(this, Seats);
     }
 
     void Start()
@@ -155,7 +159,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
         Debug.Log($"Joined Room: {PhotonNetwork.CurrentRoom.Name}");
 
         // Task 9e: the same actor coming back (ReconnectAndRejoin / RejoinRoom) is not a new player. Its team, gold and loadout
-        // are still Player Properties in the room, so no team is picked. Its old body was removed by the master when the drop
+        // are still Player Properties in the room, so its seat keeps its team (nothing is picked). Its old body was removed by the master when the drop
         // was noticed (RejoinController), so a new one is spawned on its own team a moment from now
         // (WatchOwnBodyAfterRejoin); if the room still holds the buffered spawn, PUN hands that body back instead and
         // nothing is spawned. Either way PlayerLifecycle respawns it as after a death.
@@ -174,12 +178,13 @@ public class RoomManager : MonoBehaviourPunCallbacks
                 else if (rejoinDirector.TeamsFixed && eliminated)
                     Debug.Log($"[REJOIN] team {heldTeam} was knocked out while this player was away - back as its spectator");
             }
-            ReseatLocalPlayerIfTeamClosed(); // a lobby whose mode was switched to two teams while this player was away
             StartCoroutine(WatchOwnBodyAfterRejoin());
             return;
         }
 
-        AssignTeamAndSpawnPlayer();
+        // A new player arrives seatless (lobby Task 4): no team and no body until the host starts the game (LobbyStart spawns
+        // them on their seat's team). A team or spectator flag left on the local player by a previous room is cleared here.
+        PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
     }
 
     /// <summary>Task 9e / 9e-2: the returning player's body, as a WATCHDOG. The master removes a dropped player's body (and with it the
@@ -352,7 +357,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// null-valued key from the local player's Custom Properties, so the next room's GoldWallet.Start
     /// finds no key at all and falls through to StartingGold, exactly like a first-time joiner.
     ///
-    /// Kept: "teamID" - PickSmallestTeam overwrites it on the very next join anyway, nothing to reset.
+    /// Kept: "teamID" - OnJoinedRoom clears it on the very next (non-rejoin) join, nothing to reset.
     /// Kept: weapon/attachment/ultimate/mobility (LoadoutProperties) - PlayerLoadout.Start republishes
     /// the whole starting kit for every newly spawned player regardless of what is still on the local
     /// Custom Properties, so there is nothing here for a stale pick to leak into a new match. Treated
@@ -383,26 +388,9 @@ public class RoomManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
-    void AssignTeamAndSpawnPlayer()
-    {
-        int teamID = PickSmallestTeam();
-
-        // Belt and braces alongside MaxPlayers. Photon's room cap stops a tenth client joining,
-        // but this also catches the case where the counts are momentarily wrong -- better to turn
-        // one player away with a clear reason than to let a team quietly reach four.
-        if (teamID == NoFreeTeam)
-        {
-            Debug.LogWarning("[TEAM] no free slot in any team, leaving the room");
-            PhotonNetwork.LeaveRoom(becomeInactive: false); // turned away: never hold a place for someone who was never in
-            return;
-        }
-
-        Debug.Log($"[TEAM] assigned team {teamID} on join");
-
-        SpawnPlayerOnTeam(teamID);
-    }
-
-    void SpawnPlayerOnTeam(int teamID)
+    /// <summary>Spawns this client's body on a team (lobby Task 4: LobbyStart calls it when the game starts; the rejoin watchdog
+    /// below calls it for a body that never came back).</summary>
+    public void SpawnPlayerOnTeam(int teamID)
     {
         if (!ValidateTeamResources(teamID)) return;
 
@@ -440,67 +428,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
         return true;
     }
 
-    /// Teams used to be (ActorNumber - 1) % 3. Photon never reuses actor numbers, so one player
-    /// reconnecting got a fresh number and the split skewed permanently -- that is how a team
-    /// ended up with four players while others had spare slots.
-    ///
-    /// Counting who is actually here handles reconnects, because a player who left stops being
-    /// counted. Known limitation: two people joining in the same instant can both read the same
-    /// counts and pick the same team, leaving it one over. Photon's check-and-swap on Room
-    /// Properties would close that, but it is not worth the complexity for a nine-player
-    /// prototype where people join over Discord.
-    int PickSmallestTeam()
-    {
-        int[] counts = new int[3];
-
-        foreach (var p in PhotonNetwork.PlayerList)
-        {
-            if (p == PhotonNetwork.LocalPlayer)
-                continue;
-
-            if (p.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out object raw)
-                && raw is int team && team >= 0 && team < counts.Length)
-            {
-                counts[team]++;
-            }
-        }
-
-        // 2.7b step 5 (MatchStartRules.MayJoin, Decision 4/17): before the teams are fixed, any team may be
-        // joined; from the countdown on, only a team in the match and not knocked out - which also covers the
-        // Task 2.7 review's original case (a team out of the match, sitting at 0, never gets a new player) since
-        // an eliminated team is never in MayJoinTeam's "in match and not eliminated" answer either. Read live, so
-        // a team fixed out or eliminated mid-session is skipped for every join after it.
-        MatchDirector director = MatchDirector.Instance;
-
-        int smallest = NoFreeTeam;
-        for (int i = 0; i < counts.Length; i++)
-        {
-            if (director != null && !director.MayJoinTeam(i))
-                continue;
-            if (smallest == NoFreeTeam || counts[i] < counts[smallest])
-                smallest = i;
-        }
-
-        if (smallest == NoFreeTeam)
-        {
-            Debug.LogWarning("[TEAM] no team may be joined right now (every team eliminated, or the match started without a free one) -- refusing to spawn");
-            return NoFreeTeam;
-        }
-
-        if (counts[smallest] >= TeamSize)
-        {
-            // Review fix: this used to say "every team is full", which read wrong once a host-started match can
-            // leave a team out of mTeams entirely - that team can sit at 0/3 and still never be smallest, because
-            // MayJoinTeam skipped it above. The raw counts below may include a team that isn't full at all, just
-            // not one you may join.
-            Debug.LogWarning($"[TEAM] no room on a team you may join ({counts[0]}/{counts[1]}/{counts[2]}, cap {TeamSize}) -- every joinable team is full, or the rest are left out of the match -- refusing to spawn");
-            return NoFreeTeam;
-        }
-
-        Debug.Log($"[TEAM] current split {counts[0]}/{counts[1]}/{counts[2]} -> joining team {smallest}");
-        return smallest;
-    }
-
     void SetupPlayerTeamComponent(GameObject player, int teamID)
     {
         PlayerTeam pt = player.GetComponent<PlayerTeam>();
@@ -523,104 +450,19 @@ public class RoomManager : MonoBehaviourPunCallbacks
         PhotonNetwork.LocalPlayer.SetCustomProperties(teamProperty);
     }
 
-    /// <summary>2.7b step 5 (Decision 17, R3): closes the joiner race on the joining side - a player the server
-    /// placed on a team before the countdown write reached them, but whose team is not in mTeams, re-picks the
-    /// moment they see the teams fixed (MatchDirector.ReactToRoomState's teams-fixed edge) or the match go live
-    /// (the live edge, for a player who joined mid-countdown - not firstRead there, so this covers them too).
-    /// Idempotent: a player already on a real team, or before the teams are fixed at all, just returns the
-    /// current team - so MatchDirector's live edge can call this unconditionally to learn which team
-    /// ResetForMatchStart should use.</summary>
+    /// <summary>Kept as a safety net after lobby Task 4: a player now always gets a team from a seat at Start, and the seats
+    /// only hold teams of the mode, so a seated player is on a team that is in the match and nothing needs re-picking. Callers
+    /// (the rejoin branch, MatchDirector's teams-fixed and live edges) still ask which team the local player is on: this
+    /// returns it (-1 when none) and only logs when it finds the team left out of a fixed match, which the seats make impossible
+    /// today. It never moves anyone (the old smallest-team re-pick is gone).</summary>
     public int EnsureLocalTeamInMatch()
     {
         MatchDirector director = MatchDirector.Instance;
         if (director == null || !Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam))
             return -1;
 
-        if (!director.TeamsFixed || director.MayJoinTeam(myTeam))
-            return myTeam;
-
-        int picked = PickSmallestTeam();
-        if (picked == NoFreeTeam)
-        {
-            Debug.LogWarning("[TEAM] joined the left-out team and no other team has room to re-pick into -- staying put");
-            return myTeam;
-        }
-
-        Debug.Log($"[TEAM] re-picked {myTeam} -> {picked} (joined the left-out team as the host started)");
-        UpdateNetworkProperties(picked);
-        return picked;
-    }
-
-    /// <summary>Two-team lobby (Tudor, 2026-09-26; Decision L5): MatchDirector.ReactToRoomState calls this on
-    /// EVERY client, for its own player only, on the edge to two-team mode. PickSmallestTeam already skips a
-    /// team MayJoinTeam refuses, so it already honours the mode - reused here rather than a second team-picking
-    /// rule. Idempotent through MayJoinTeam's own check: a local player already on an open team (team 0/1, or a
-    /// mode switched back to three before this ran) is left untouched, and so is a room whose teams are already
-    /// fixed (the switch itself can never land there - HostSetLobbyMode's check-and-set - but this stays
-    /// defensive rather than assuming that ordering). A joiner who picked team 2 with the old mode a moment
-    /// before the switch arrives is covered too: their own client runs this same method on the same edge.
-    ///
-    /// A player with no spawned body yet (e.g. AssignTeamAndSpawnPlayer still mid-flight) just gets its team
-    /// property rewritten - TeleportToTeamSpawn only runs once a local PlayerLifecycle actually exists.</summary>
-    public void ReseatLocalPlayerIfTeamClosed()
-    {
-        MatchDirector director = MatchDirector.Instance;
-        if (director == null || director.TeamsFixed || !Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam))
-            return;
-        if (director.MayJoinTeam(myTeam))
-            return; // Still open - team 0/1, or the mode is already back to three.
-
-        int mode = director.LobbyMode;
-        int myActor = PhotonNetwork.LocalPlayer.ActorNumber;
-
-        // Review fix 3 (2026-09-26): openCounts and the closed-team roster, read fresh off PhotonNetwork.
-        // PlayerList (ascending by actor number - PickSmallestTeam's own comment already relies on that same
-        // sort) rather than PickSmallestTeam's per-player snapshot: several players re-seating off the SAME
-        // switch have to walk the SAME list in the SAME order (MatchStartRules.ReseatTeamFor), or they all land
-        // on the same open team again - the bug this fix closes.
-        var openCounts = new int[MatchStartRules.TeamCount];
-        var closedActors = new System.Collections.Generic.List<int>();
-        foreach (var p in PhotonNetwork.PlayerList)
-        {
-            if (!Teams.TryGetTeam(p, out int team))
-                continue;
-            if (MatchStartRules.IsTeamOpen(mode, team))
-                openCounts[team]++;
-            else
-                closedActors.Add(p.ActorNumber);
-        }
-
-        int picked = MatchStartRules.ReseatTeamFor(mode, myActor, closedActors, openCounts, TeamSize);
-        if (picked == NoFreeTeam)
-        {
-            Debug.LogWarning("[TEAM] two-team switch closed my team and no other team has room to re-pick into -- staying put");
-            return;
-        }
-
-        Debug.Log($"[TEAM] two-team switch: re-picked {myTeam} -> {picked}");
-        UpdateNetworkProperties(picked);
-
-        if (teamSpawnPoints == null || picked < 0 || picked >= teamSpawnPoints.Length || teamSpawnPoints[picked] == null)
-            return;
-
-        PhotonView localView = PhotonNetwork.LocalPlayer != null
-            ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
-        localView?.GetComponent<PlayerLifecycle>()?.TeleportToTeamSpawn(teamSpawnPoints[picked]);
-    }
-
-    /// <summary>Review fix 1 (2026-09-26): closes the LATE ECHO race - a joiner who picked team 2 an instant
-    /// before the mode switch arrives can see the mode edge (MatchDirector.ReactToRoomState, which calls
-    /// ReseatLocalPlayerIfTeamClosed above) before the server's own echo of their teamID = 2 write lands on
-    /// their client. Teams.TryGetTeam finds nothing yet on that ordering, so the call above returns having done
-    /// nothing - and nothing else ever asks again, leaving the room stuck (the host can't start with a player
-    /// stranded on the closed team). Reacting to the echo itself, for the local player's own team key, closes
-    /// it. ReseatLocalPlayerIfTeamClosed's own TeamsFixed early return still runs first, so this can't loop: once
-    /// re-seated onto an open team (or once the teams are fixed), the next echo of this same key is a no-op.</summary>
-    public override void OnPlayerPropertiesUpdate(Player target, Hashtable changed)
-    {
-        if (target != PhotonNetwork.LocalPlayer || !changed.ContainsKey(PlayerTeam.TeamKey))
-            return;
-
-        ReseatLocalPlayerIfTeamClosed();
+        if (director.TeamsFixed && !director.MayJoinTeam(myTeam))
+            Debug.LogWarning($"[TEAM] team {myTeam} is not in the match although this player is seated on it - no re-pick any more");
+        return myTeam;
     }
 }

@@ -37,6 +37,16 @@ namespace Overpower.Lobby
         /// key after our send tells whether the room took it or another player got there first.</summary>
         private readonly Dictionary<string, int> awaitingEcho = new Dictionary<string, int>();
 
+        /// <summary>The seat this actor holds according to the room's properties right now (not the cached copy), or null. For
+        /// code that reacts inside a Photon callback, where this component may not have processed the same update yet.</summary>
+        public string SeatInRoom()
+        {
+            if (!hasLayout) ReadLayout();
+            if (!hasLayout || !PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || PhotonNetwork.LocalPlayer == null) return null;
+            Dictionary<string, int> fresh = SeatsFrom(PhotonNetwork.CurrentRoom.CustomProperties, layout);
+            return LobbySeatRules.SeatOf(PhotonNetwork.LocalPlayer.ActorNumber, layout, fresh);
+        }
+
         /// <summary>The name the player typed: what to save for the next lobby, not the numbered copy ("Tudor 2") this lobby may
         /// show.</summary>
         public string TypedNickName => typedNickName ?? PhotonNetwork.NickName;

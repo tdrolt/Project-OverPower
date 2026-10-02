@@ -82,7 +82,7 @@ namespace Overpower.Match
         public int Winner => lastAppliedWinner;
         /// <summary>Whether team is on the room's own eliminated list. Reads PhotonNetwork.CurrentRoom.
         /// CustomProperties directly rather than the cached lastAppliedEliminated (review round 2):
-        /// RoomManager.PickSmallestTeam calls this from ITS OWN OnJoinedRoom, which Photon dispatches
+        /// RoomManager's rejoin branch calls this from ITS OWN OnJoinedRoom, which Photon dispatches
         /// BEFORE this class's OnJoinedRoom runs ReactToRoomState - the room's own properties are
         /// already filled in by then (they arrive as part of the join itself), but the cached field
         /// is not written until this object's own callback gets its turn.</summary>
@@ -358,12 +358,6 @@ namespace Overpower.Match
             if (PhotonNetwork.IsMasterClient)
                 MasterRecompute();
 
-            // Two-team lobby: a promoted master must apply the room's own mode to MaxPlayers itself - the old
-            // master may have died mid-write, or simply never had to (ApplyLobbyModeMaxPlayers is idempotent
-            // either way, and a no-op once the teams are fixed).
-            if (PhotonNetwork.IsMasterClient)
-                ApplyLobbyModeMaxPlayers(LobbyMode);
-
             // Review fix F3, 2026-09-25: if the old master dropped after its phase write reached the server but
             // before all its neutralise writes did, a cut zone can stay owned (and keep paying income from behind
             // the wall) - the room already reads TwoTeams, so nothing else would ever re-run the neutralise.
@@ -429,7 +423,7 @@ namespace Overpower.Match
         /// reasoning as BuildingManager.OnLeftRoom. Found missing live (Task 2.7 review re-
         /// verification): without this, a client that leaves a finished match and joins another
         /// inside the same running process keeps this object's stale lastWrittenPhase/lastApplied*
-        /// from the match it just left - RoomManager.PickSmallestTeam then reads a stale
+        /// from the match it just left - the rejoin branch's IsEliminated then reads a stale
         /// IsEliminated for a team that was never even in the new room, and a promoted master's own
         /// MasterRecompute can refuse to ever write again because it still believes Over.</summary>
         public override void OnLeftRoom()
@@ -759,9 +753,8 @@ namespace Overpower.Match
         /// mPhase) also raises LiveStateChanged, which the minimap already listens to.
         ///
         /// Two-team lobby (Decision L1/L6): the mode changing also raises LiveStateChanged (the warm-up panel
-        /// redraws), applies MaxPlayers idempotently (ApplyLobbyModeMaxPlayers), and - !firstRead only, same
-        /// reasoning as the two edges above - drops the telemetry marker (master only) and asks RoomManager to
-        /// re-seat this client's own player off a team the switch just closed.
+        /// redraws) and - !firstRead only, same reasoning as the two edges above - drops the telemetry marker (master
+        /// only). The host's two/three-team switch, MaxPlayers writes and the re-seat are gone (lobby Task 4).
         private void ReactToRoomState(bool firstRead)
         {
             if (!PhotonNetwork.InRoom)
@@ -795,12 +788,7 @@ namespace Overpower.Match
             lastAppliedCutTeam = cutTeam;
             lastAppliedLobbyMode = mode;
 
-            // Two-team lobby (Decision L1): the master applies MaxPlayers whenever it reads the mode while the
-            // teams aren't fixed - on this edge and on its own first read alike (ApplyLobbyModeMaxPlayers is
-            // idempotent and a no-op once TeamsFixed, so calling it unconditionally here costs nothing on every
-            // OTHER read too - simpler than gating it to only the two cases that actually need it).
             bool modeChanged = mode != prevMode;
-            ApplyLobbyModeMaxPlayers(mode);
 
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
@@ -814,19 +802,12 @@ namespace Overpower.Match
                 if (teamsFixed && !prevTeamsFixed)
                     FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch();
 
-                // Two-team lobby (Decision L5/L8): every client reacts to the mode edge for its own player - the
-                // telemetry marker guarded to the master only (the report merges every client's own file, so only
-                // one of them may log the switch), the re-seat run by every client whose own player just lost its
-                // team (RoomManager.ReseatLocalPlayerIfTeamClosed - MayJoinTeam already honours the new mode). A
-                // joiner who picked team 2 a moment before the switch arrives is covered too: this is the same
-                // edge, reacted to on their own client the instant it sees the write.
-                if (modeChanged)
-                {
-                    if (PhotonNetwork.IsMasterClient)
-                        MatchTelemetry.Instance?.DropMarker(mode == MatchStartRules.TwoTeams ? "two-team lobby on" : "two-team lobby off");
-                    if (mode == MatchStartRules.TwoTeams)
-                        FindFirstObjectByType<RoomManager>()?.ReseatLocalPlayerIfTeamClosed();
-                }
+                // Two-team lobby (Decision L5/L8): the telemetry marker for the mode edge, guarded to the master only (the
+                // report merges every client's own file, so only one of them may log it). The mode is written once at
+                // creation now (lobby Task 4), so this fires only when a client first reads it; the re-seat that used to
+                // follow a host's switch is gone with the switch.
+                if (modeChanged && PhotonNetwork.IsMasterClient)
+                    MatchTelemetry.Instance?.DropMarker(mode == MatchStartRules.TwoTeams ? "two-team lobby on" : "two-team lobby off");
 
                 // Vision Task 9b: the live reset threw the warm-up captures away; what the team knows starts again from it.
                 if (live && !prevLive)

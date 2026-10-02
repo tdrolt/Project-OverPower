@@ -28,7 +28,8 @@ namespace Overpower.Match
         public const int TeamCount = 3;
 
         /// <summary>The two-team lobby mode (Tudor, 2026-09-26): the host can set the room to this before the
-        /// countdown so joiners fill two teams instead of three - see LobbyModeOf, MaySwitchToTwoTeams.</summary>
+        /// countdown so joiners fill two teams instead of three - see LobbyModeOf. Written once when the lobby is created
+        /// (the host's later switch is gone, lobby Task 4).</summary>
         public const int TwoTeams = 2;
 
         /// <summary>The default lobby mode - every room the host hasn't switched, spelled out for callers that read
@@ -89,20 +90,6 @@ namespace Overpower.Match
                 && membersPerTeam[0] > 0 && membersPerTeam[1] > 0 && membersPerTeam[TwoTeams] == 0;
         }
 
-        /// <summary>Decision L4: the host may switch to two teams while the teams aren't fixed and at most 2 ×
-        /// teamSize players are already in the room (a 7th would have nowhere open to join once MaxPlayersFor
-        /// shrinks the room - the panel greys the button and says why).</summary>
-        public static bool MaySwitchToTwoTeams(bool teamsFixed, int playersInRoom, int teamSize) =>
-            !teamsFixed && playersInRoom <= TwoTeams * teamSize;
-
-        /// <summary>Decision L4: switching back to three teams needs only that the teams aren't fixed yet - nobody
-        /// moves (team 2 simply reopens, IsTeamOpen).</summary>
-        public static bool MaySwitchToThreeTeams(bool teamsFixed) => !teamsFixed;
-
-        /// <summary>Decision L1: the same write that sets the lobby mode sets the room's MaxPlayers to this, so a
-        /// two-team room actually refuses a 7th player instead of merely hiding the option.</summary>
-        public static int MaxPlayersFor(int mode, int teamSize) => mode * teamSize;
-
         /// <summary>Decision 1: mLiveAt = now + the countdown length, computed wrap-safe. 0 (or a negative length,
         /// treated as 0) means live on the master's very next frame.</summary>
         public static int CountdownEndsAt(int nowMs, float countdownSeconds) =>
@@ -153,56 +140,6 @@ namespace Overpower.Match
         /// its whole match, but a rejoin still needs to be in the match and not knocked out).</summary>
         public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated, bool teamOpen) =>
             teamsFixed ? MayJoin(teamsFixed, inMatch, eliminated) : teamOpen;
-
-        /// <summary>Review fix 3 (2026-09-26): several players re-seating off the SAME closed team used to all
-        /// read the same frozen counts with the same tie-break (RoomManager.PickSmallestTeam, called once per
-        /// player with no memory of the others) - 0/0/{2 players} landed both on team 0. This walks every closed
-        /// actor in a FIXED order - ascending by actor number, the one order every client can compute identically
-        /// with no room property of its own - simulating each one filling in ahead of myActor: at each actor's
-        /// turn, whichever OPEN team (IsTeamOpen) is smallest right then (ties broken by the lowest team index,
-        /// PickSmallestTeam's own tie-break) gets them, and its count goes up by one before the next actor's turn.
-        /// Returns whichever team myActor was given this way; -1 if myActor is never on the closed list, or if by
-        /// its turn the smallest open team is already at teamSize (RoomManager's own NoFreeTeam - "staying put").
-        ///
-        /// Mode 3 never has a closed team (IsTeamOpen is true everywhere) - a call with it still walks the same
-        /// way and simply returns the smallest by the same tie-break, PickSmallestTeam's own answer for three
-        /// teams.
-        ///
-        /// openCounts is read once, not mutated - a local copy tracks the walk's own running counts, so calling
-        /// this twice for two different actors off the same room snapshot answers exactly as if they were
-        /// re-seated one after the other.</summary>
-        public static int ReseatTeamFor(int mode, int myActor, IReadOnlyList<int> closedActorsAscending,
-            IReadOnlyList<int> openCounts, int teamSize)
-        {
-            var counts = new int[openCounts.Count];
-            for (int i = 0; i < openCounts.Count; i++)
-                counts[i] = openCounts[i];
-
-            int result = -1;
-            for (int i = 0; i < closedActorsAscending.Count; i++)
-            {
-                int smallest = -1;
-                for (int t = 0; t < counts.Length; t++)
-                {
-                    if (!IsTeamOpen(mode, t))
-                        continue;
-                    if (smallest == -1 || counts[t] < counts[smallest])
-                        smallest = t;
-                }
-
-                int given = -1;
-                if (smallest != -1 && counts[smallest] < teamSize)
-                {
-                    given = smallest;
-                    counts[smallest]++;
-                }
-
-                if (closedActorsAscending[i] == myActor)
-                    result = given;
-            }
-
-            return result;
-        }
 
         /// <summary>The warm-up line's wording (Open for Tudor #5: default text, unchanged) - None once live, the
         /// countdown while counting down, else who is here and who is host.</summary>

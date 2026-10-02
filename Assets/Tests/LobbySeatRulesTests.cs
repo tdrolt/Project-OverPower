@@ -124,6 +124,69 @@ namespace Overpower.Tests
             Assert.AreSame(SeatWrite.None, LobbySeatRules.ClearSeats(Seats()));
         }
 
+        // ---- Start (lobby Task 4) ----
+
+        [Test]
+        public void StartWritesTheAutoFilledSeatsAndMovesTheStageToWarmup()
+        {
+            // team 0 has one player, teams 1 and 2 none: No role actors 7 and 8 go to team 1 and team 2
+            var seats = Seats(("sT00", 3));
+            var w = LobbySeatRules.StartWrite(Three, seats, new[] { 7, 8 });
+            Assert.IsFalse(w.IsNone);
+            Assert.AreEqual(7, w.Props["sT10"]);
+            Assert.AreEqual(8, w.Props["sT20"]);
+            Assert.AreEqual(1, w.Props[LobbyKeys.Stage]);
+            Assert.AreEqual(3, w.Props.Count);
+        }
+
+        [Test]
+        public void StartExpectsEverySeatOfTheLayoutAtItsCurrentValueAndTheStageToBeTheLobby()
+        {
+            var seats = Seats(("sT00", 3), ("sS0", 9));
+            var w = LobbySeatRules.StartWrite(Three, seats, new[] { 7 });
+            foreach (string key in LobbySeatRules.AllSeatKeys(Three))
+            {
+                Assert.IsTrue(w.Expected.ContainsKey(key), key + " is expected");
+                if (key == "sT00") Assert.AreEqual(3, w.Expected[key]);
+                else if (key == "sS0") Assert.AreEqual(9, w.Expected[key]);
+                else Assert.IsNull(w.Expected[key], key + " is empty");
+            }
+            Assert.AreEqual(0, w.Expected[LobbyKeys.Stage]);
+            Assert.AreEqual(LobbySeatRules.TotalSeats(Three) + 1, w.Expected.Count);
+        }
+
+        [Test]
+        public void StartWithNobodyInNoRoleWritesOnlyTheStage()
+        {
+            var seats = Seats(("sT00", 1), ("sT10", 2), ("sT20", 3));
+            var w = LobbySeatRules.StartWrite(Three, seats, new int[0]);
+            Assert.AreEqual(1, w.Props.Count);
+            Assert.AreEqual(1, w.Props[LobbyKeys.Stage]);
+        }
+
+        [Test]
+        public void StartSortsTheNoRolePlayersAndNeverTouchesTakenSeats()
+        {
+            var seats = Seats(("sT00", 1));
+            var w = LobbySeatRules.StartWrite(Three, seats, new[] { 9, 5 });
+            Assert.AreEqual(5, w.Props["sT10"], "the lower actor is placed first");
+            Assert.AreEqual(9, w.Props["sT20"]);
+            Assert.IsFalse(w.Props.ContainsKey("sT00"));
+        }
+
+        [Test]
+        public void ASeatKeyNamesItsTeamOrSpectating()
+        {
+            Assert.IsTrue(LobbySeatRules.TryTeamOfSeat("sT00", out int t0)); Assert.AreEqual(0, t0);
+            Assert.IsTrue(LobbySeatRules.TryTeamOfSeat("sT21", out int t2)); Assert.AreEqual(2, t2);
+            Assert.IsFalse(LobbySeatRules.TryTeamOfSeat("sS0", out _));
+            Assert.IsFalse(LobbySeatRules.TryTeamOfSeat(null, out _));
+            Assert.IsFalse(LobbySeatRules.TryTeamOfSeat("lS", out _));
+            Assert.IsTrue(LobbySeatRules.IsSpectatorSeat("sS1"));
+            Assert.IsFalse(LobbySeatRules.IsSpectatorSeat("sT01"));
+            Assert.IsFalse(LobbySeatRules.IsSpectatorSeat(null));
+        }
+
         [Test]
         public void LeavingWithoutASeatIsNone()
         {

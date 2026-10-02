@@ -13,6 +13,9 @@ namespace Overpower.Lobby
         /// so a seat can only change before Start.</summary>
         public const int LobbyBeforeStart = 0;
 
+        /// <summary>The stage value Start writes: the warm-up (LobbyStage.Warmup).</summary>
+        public const int LobbyWarmup = 1;
+
         public static string SeatKey(int team, int index) => "sT" + team + index;
 
         public static string SpectatorSeatKey(int index) => "sS" + index;
@@ -183,6 +186,39 @@ namespace Overpower.Lobby
                 if (FilledOnTeam(layout, team, seats, placed) < 1) return false;
             return true;
         }
+
+        /// <summary>
+        /// The host pressing Start: every No role player is placed (AutoFill) and the stage moves from the lobby to the
+        /// warm-up, all in one write. It expects EVERY seat of the layout still at the value it had when the host looked
+        /// (empty seats expected empty) and the stage still the lobby, so a No role player who takes a seat in the same
+        /// instant can never end up in two seats: the whole write is refused and the host retries with fresh seats.
+        /// </summary>
+        public static SeatWrite StartWrite(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> noRoleActors)
+        {
+            var props = new Dictionary<string, object>();
+            foreach (var pair in AutoFill(layout, seats, noRoleActors))
+                props[pair.Key] = pair.Value;
+            props[LobbyKeys.Stage] = LobbyWarmup;
+
+            var expected = new Dictionary<string, object>();
+            foreach (string key in AllSeatKeys(layout))
+                expected[key] = seats.TryGetValue(key, out int who) && who > 0 ? (object)who : null;
+            expected[LobbyKeys.Stage] = LobbyBeforeStart;
+            return new SeatWrite(props, expected);
+        }
+
+        /// <summary>The team a team seat key ("sT" + team + index) belongs to; false for a spectator seat or anything else.</summary>
+        public static bool TryTeamOfSeat(string seatKey, out int team)
+        {
+            team = -1;
+            if (seatKey == null || seatKey.Length != 4 || seatKey[0] != 's' || seatKey[1] != 'T') return false;
+            if (!char.IsDigit(seatKey[2]) || !char.IsDigit(seatKey[3])) return false;
+            team = seatKey[2] - '0';
+            return true;
+        }
+
+        public static bool IsSpectatorSeat(string seatKey) =>
+            seatKey != null && seatKey.Length == 3 && seatKey[0] == 's' && seatKey[1] == 'S' && char.IsDigit(seatKey[2]);
 
         /// <summary>The host may end the warm-up when every team of the layout has at least one player present; a
         /// team missing from the dictionary has none.</summary>
