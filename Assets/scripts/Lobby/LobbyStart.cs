@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using ExitGames.Client.Photon;
+using Overpower.Match;
 using Overpower.Net;
 using Photon.Pun;
 using UnityEngine;
@@ -44,6 +45,9 @@ namespace Overpower.Lobby
             seats != null && seats.HasLayout && PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient
             && StageOfRoom() == LobbySeatRules.LobbyBeforeStart
             && LobbySeatRules.MayStartGame(seats.Layout, seats.Seats, seats.NoRoleActors);
+
+        /// <summary>The room's game has started and this player holds no seat in it (a late joiner, or a returning player whose seat was freed).</summary>
+        public bool GameRunningWithoutMySeat => PhotonNetwork.InRoom && StageOfRoom() >= LobbySeatRules.LobbyWarmup && seats.SeatInRoom() == null;
 
         /// <summary>Starts the game (master only). Nothing is sent while MayStartGame is false. The write is refused by the room
         /// when a seat changed in the same instant; it is then sent again with the fresh seats, for up to a few seconds.</summary>
@@ -114,12 +118,20 @@ namespace Overpower.Lobby
         {
             lastStage = StageOfRoom();
             if (lastStage < 1) return;
-            // A player coming back to a held place (HasRejoined) with a team is looked after by RoomManager's rejoin branch. One who has a
-            // seat but no team and is not a spectator dropped in the lobby and missed the lS 0 to 1 edge: their seat's reaction (a body)
-            // is due now. ReactToStart refuses a second body, and the rejoin watchdog adopts the new one once teamID is written.
+
+            // The game is already running. No seat: a late joiner, who is given one (lobby Task 7).
+            string seat = seats.SeatInRoom();
+            if (seat == null)
+            {
+                StartLateJoin();
+                return;
+            }
+            // A player coming back to a held place (HasRejoined) with a team seat and a team is looked after by RoomManager's rejoin
+            // branch (its body comes back or is respawned by WatchOwnBodyAfterRejoin). The others still need the seat's reaction: a
+            // spectator seat starts the spectator view again, and a team seat that never spawned (the player dropped in the lobby and
+            // missed the lS 0 to 1 edge) gets its body now.
             if (PhotonNetwork.LocalPlayer.HasRejoined
-                && (Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) || Teams.IsSpectator(PhotonNetwork.LocalPlayer)
-                    || seats.SeatInRoom() == null))
+                && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && !Teams.IsSpectator(PhotonNetwork.LocalPlayer))
                 return;
             ReactToStart();
         }
@@ -134,6 +146,8 @@ namespace Overpower.Lobby
                 Debug.LogWarning("[LOBBY] Start game stopped with the lobby still open: " + WhyStartStopped(false));
             }
             starting = null;
+            if (lateJoining != null) StopCoroutine(lateJoining);
+            lateJoining = null;
         }
 
         public override void OnRoomPropertiesUpdate(Hashtable changed)
@@ -145,13 +159,97 @@ namespace Overpower.Lobby
             if (before < 1 && stage >= 1) ReactToStart();
         }
 
+        // ---- joining a running lobby (lobby Task 7) ----
+
+        /// <summary>How many seats a late joiner tries before giving up (each try is refused only when another joiner took the same seat first).</summary>
+        private const int LateJoinAttempts = 6;
+
+        /// <summary>How long a late joiner waits for the room's answer to one seat write before looking again.</summary>
+        private const float LateJoinWaitSeconds = 1.5f;
+
+        private Coroutine lateJoining;
+
+        private void StartLateJoin()
+        {
+            if (lateJoining != null) return;
+            lateJoining = StartCoroutine(PlaceLateJoinerInRoom());
+        }
+
+        /// <summary>The joiner has no seat in a lobby whose game is running: the emptiest team that is in the match, else a spectator seat.
+        /// The write expects the seat empty and the stage as seen, so it is refused when someone got there first (look again, a few times).
+        /// Nothing free: leave the room, with the reason for the list. Once the seat is theirs it acts like the start edge (team: body; spectator seat: view).</summary>
+        private IEnumerator PlaceLateJoinerInRoom()
+        {
+            for (int attempt = 0; attempt < LateJoinAttempts; attempt++)
+            {
+                if (!PhotonNetwork.InRoom || !seats.HasLayout)
+                    break;
+                if (seats.SeatInRoom() != null)
+                {
+                    lateJoining = null;
+                    ReactToStart();
+                    yield break;
+                }
+
+                int stage = StageOfRoom();
+                if (stage < LobbySeatRules.LobbyWarmup)
+                    break; // not started after all: an ordinary seatless player in the lobby
+                Dictionary<string, int> fresh = LobbySeats.SeatsFrom(PhotonNetwork.CurrentRoom.CustomProperties, seats.Layout);
+                int[] fixedTeams = PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(MatchDirector.TeamsInMatchKey, out object raw) && raw is int[] arr ? arr : null;
+                string seat = LobbySeatRules.PlaceLateJoiner(seats.Layout, fresh, LobbySeatRules.TeamsForLateJoin(seats.Layout, fixedTeams));
+                if (seat == null)
+                {
+                    GiveUpLateJoin("Lobby full");
+                    yield break;
+                }
+
+                SeatWrite write = LobbySeatRules.LateJoinWrite(PhotonNetwork.LocalPlayer.ActorNumber, seat, stage);
+                bool sent = PhotonNetwork.CurrentRoom.SetCustomProperties(ToHashtable(write.Props), ToHashtable(write.Expected));
+                Debug.Log($"[LOBBY] late join: asking for seat {seat} (try {attempt + 1}, stage {stage}) - " + (sent ? "sent" : "not sent"));
+
+                // Wait for the room's answer: our seat appears, or the seats or stage move on (our write was refused), or it times out.
+                float waited = 0f;
+                while (waited < LateJoinWaitSeconds && PhotonNetwork.InRoom && seats.SeatInRoom() == null
+                       && StageOfRoom() == stage && SameSeats(fresh, LobbySeats.SeatsFrom(PhotonNetwork.CurrentRoom.CustomProperties, seats.Layout)))
+                {
+                    waited += Time.unscaledDeltaTime;
+                    yield return null;
+                }
+            }
+            if (PhotonNetwork.InRoom && seats.SeatInRoom() == null && StageOfRoom() >= LobbySeatRules.LobbyWarmup)
+            {
+                GiveUpLateJoin("Could not get a seat");
+                yield break;
+            }
+            lateJoining = null;
+            if (PhotonNetwork.InRoom && seats.SeatInRoom() != null)
+                ReactToStart();
+        }
+
+        private static bool SameSeats(Dictionary<string, int> a, Dictionary<string, int> b)
+        {
+            if (a.Count != b.Count) return false;
+            foreach (var pair in a)
+                if (!b.TryGetValue(pair.Key, out int other) || other != pair.Value) return false;
+            return true;
+        }
+
+        private void GiveUpLateJoin(string reason)
+        {
+            lateJoining = null;
+            Debug.LogWarning($"[LOBBY] late join failed: {reason} - leaving the room");
+            PhotonNetwork.LeaveRoom(becomeInactive: false);
+            roomManager.Lobbies.ReportJoinRefused(reason);
+        }
+
         /// <summary>The game has started and this client was just told: its seat decides what it becomes.</summary>
         private void ReactToStart()
         {
             string seat = seats.SeatInRoom();
             if (seat == null)
             {
-                Debug.Log("[LOBBY] the game started and this player has no seat (a late joiner, lobby Task 7) - nothing to do yet");
+                // Someone who was in the room without a seat when the stage moved (they entered during the start write): like a late joiner.
+                StartLateJoin();
                 return;
             }
             if (LobbySeatRules.TryTeamOfSeat(seat, out int team))

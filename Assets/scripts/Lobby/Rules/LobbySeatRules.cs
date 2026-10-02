@@ -2,6 +2,9 @@ using System.Collections.Generic;
 
 namespace Overpower.Lobby
 {
+    /// <summary>Where a seat holder is, for the master's sweep: in the room, held for the rejoin window, or gone.</summary>
+    public enum SeatHolderPresence { Present, Inactive, LeftForGood }
+
     /// <summary>
     /// Pure C# rules for who sits where in a lobby. Seats are a dictionary seatKey -> actor number; an empty seat is a
     /// missing key or a value of 0 or less. No Photon types here: the lobby code reads the room's properties into
@@ -239,6 +242,59 @@ namespace Overpower.Lobby
             var allowed = new HashSet<int>(teamsInMatch);
             return EmptiestTeamSeat(layout, seats, null, allowed) ?? LowestFreeSpectator(layout, seats, null);
         }
+
+        /// <summary>
+        /// A player joining a lobby whose game has started takes a seat with its own write (the seat writes of the lobby stage
+        /// expect the stage to be the lobby, which is no longer true): set the seat to this actor, but only if it is still empty
+        /// AND the stage is still the one the joiner saw, so two joiners cannot share a seat and a stage move (warm-up to match)
+        /// cannot slip between the look and the write.
+        /// </summary>
+        public static SeatWrite LateJoinWrite(int actor, string seatKey, int stage) =>
+            new SeatWrite(
+                new Dictionary<string, object> { { seatKey, actor } },
+                new Dictionary<string, object> { { seatKey, null }, { LobbyKeys.Stage, stage } });
+
+        /// <summary>
+        /// The master's sweep of seats whose holder is not in the room as a live player. A holder who LEFT FOR GOOD (quit through
+        /// the menu, or the rejoin window ran out: not in the room at all) loses the seat at once at any stage, expecting it to
+        /// still be theirs and nothing about the stage. A holder who is only INACTIVE (dropped, may come back) loses it only while
+        /// the stage is the lobby; from Start on the seat is held for the rejoin window. An actor missing from the presence list
+        /// counts as left for good. Up to two writes (a quit and a drop at the same time need different stage expectations).
+        /// </summary>
+        public static IReadOnlyList<SeatWrite> SweepWrites(IReadOnlyDictionary<string, int> seats, IReadOnlyDictionary<int, SeatHolderPresence> presence, int stage)
+        {
+            Dictionary<string, int> gone = null, dropped = null;
+            foreach (var pair in seats)
+            {
+                SeatHolderPresence state = presence != null && presence.TryGetValue(pair.Value, out SeatHolderPresence known) ? known : SeatHolderPresence.LeftForGood;
+                if (state == SeatHolderPresence.LeftForGood)
+                    (gone ?? (gone = new Dictionary<string, int>()))[pair.Key] = pair.Value;
+                else if (state == SeatHolderPresence.Inactive && stage == LobbyBeforeStart)
+                    (dropped ?? (dropped = new Dictionary<string, int>()))[pair.Key] = pair.Value;
+            }
+            var writes = new List<SeatWrite>(2);
+            if (gone != null) writes.Add(ClearSeatsWithoutStage(gone));
+            SeatWrite inactive = ClearSeats(dropped);
+            if (!inactive.IsNone) writes.Add(inactive);
+            return writes;
+        }
+
+        private static SeatWrite ClearSeatsWithoutStage(IReadOnlyDictionary<string, int> toClear)
+        {
+            var props = new Dictionary<string, object>();
+            var expected = new Dictionary<string, object>();
+            foreach (var pair in toClear)
+            {
+                props[pair.Key] = null;
+                expected[pair.Key] = pair.Value;
+            }
+            return new SeatWrite(props, expected);
+        }
+
+        /// <summary>The teams a late joiner may be placed on: the ones the match fixed (mTeams) once it did, else (the warm-up)
+        /// every team of the layout.</summary>
+        public static int[] TeamsForLateJoin(SeatLayout layout, int[] fixedTeams) =>
+            fixedTeams != null ? fixedTeams : layout.Teams;
 
         /// <summary>The seat counts the lobby list shows without joining: "&lt;filled team seats&gt;/&lt;team seats&gt;+&lt;filled
         /// spectator seats&gt;", for example "4/9+1". Only the layout's real seat keys are counted.</summary>

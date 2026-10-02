@@ -165,6 +165,10 @@ namespace Overpower.Lobby
             JoinFailed?.Invoke(JoinFailureText(returnCode));
         }
 
+        /// <summary>A join that went through but then had to be undone (a running lobby with no free seat, lobby Task 7): reported to the
+        /// list like a refused join.</summary>
+        public void ReportJoinRefused(string reason) => JoinFailed?.Invoke(reason);
+
         public static string JoinFailureText(short returnCode)
         {
             if (returnCode == ErrorCode.GameFull) return "That lobby is full.";

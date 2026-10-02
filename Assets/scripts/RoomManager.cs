@@ -182,6 +182,21 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // nothing is spawned. Either way PlayerLifecycle respawns it as after a death.
         if (PhotonNetwork.LocalPlayer.HasRejoined)
         {
+            // The seat was given up while they were away (they dropped in the lobby and the master freed it before Start): they come back to a
+            // running game with no seat, i.e. as a late joiner. LobbyStart places them; the team they held is forgotten so nothing spawns for it.
+            if (GameStart != null && GameStart.GameRunningWithoutMySeat)
+            {
+                Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back but no longer has a seat - joining the running game as a late joiner");
+                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
+                return;
+            }
+            // A player who held a spectator seat comes back as a spectator: no body, no watchdog (LobbyStart starts the spectator view
+            // again from the seat; the "spec" flag is still on their Player Properties).
+            if (Teams.IsSpectator(PhotonNetwork.LocalPlayer))
+            {
+                Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back on a spectator seat - no body");
+                return;
+            }
             Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back - no new team pick, getting a body");
             // Task 9e-2 / 9e-3: the team this player held may have been left out of the match at go-live: pick again as a joiner would.
             // A team that was KNOCKED OUT while they were away is kept: they come back as its spectator (dead, no respawn - the

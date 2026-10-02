@@ -424,5 +424,103 @@ namespace Overpower.Tests
         {
             Assert.IsFalse(LobbySeatRules.TryParseFill(text, out _, out _, out _));
         }
+
+        // ---- late joiners and the sweep after Start (lobby Task 7) ----
+
+        [TestCase(1)]
+        [TestCase(2)]
+        public void LateJoinWriteExpectsTheSeatEmptyAndTheStageItSaw(int stage)
+        {
+            var w = LobbySeatRules.LateJoinWrite(7, "sT10", stage);
+            Assert.AreEqual(7, w.Props["sT10"]);
+            Assert.AreEqual(1, w.Props.Count, "only the seat is written");
+            Assert.IsTrue(w.Expected.ContainsKey("sT10"));
+            Assert.IsNull(w.Expected["sT10"], "expected empty");
+            Assert.AreEqual(stage, w.Expected[LobbyKeys.Stage], "the stage must not have moved");
+            Assert.AreEqual(2, w.Expected.Count);
+        }
+
+        private static Dictionary<int, SeatHolderPresence> Presence(params (int actor, SeatHolderPresence state)[] entries)
+        {
+            var d = new Dictionary<int, SeatHolderPresence>();
+            foreach (var e in entries) d[e.actor] = e.state;
+            return d;
+        }
+
+        [Test]
+        public void AnInactiveHolderAtStageZeroIsCleared()
+        {
+            var writes = LobbySeatRules.SweepWrites(Seats(("sT00", 4)), Presence((4, SeatHolderPresence.Inactive)), 0);
+            Assert.AreEqual(1, writes.Count);
+            Assert.IsNull(writes[0].Props["sT00"]);
+            Assert.AreEqual(4, writes[0].Expected["sT00"]);
+            Assert.AreEqual(0, writes[0].Expected[LobbyKeys.Stage]);
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        public void AnInactiveHolderAfterStartKeepsTheSeat(int stage)
+        {
+            var writes = LobbySeatRules.SweepWrites(Seats(("sT00", 4), ("sS0", 5)),
+                Presence((4, SeatHolderPresence.Inactive), (5, SeatHolderPresence.Inactive)), stage);
+            Assert.AreEqual(0, writes.Count);
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void AHolderWhoLeftForGoodIsClearedAtAnyStageWithoutAStageExpectation(int stage)
+        {
+            var writes = LobbySeatRules.SweepWrites(Seats(("sT01", 6)), Presence((6, SeatHolderPresence.LeftForGood)), stage);
+            Assert.AreEqual(1, writes.Count);
+            Assert.IsNull(writes[0].Props["sT01"]);
+            Assert.AreEqual(6, writes[0].Expected["sT01"], "expected to still be that actor");
+            Assert.IsFalse(writes[0].Expected.ContainsKey(LobbyKeys.Stage), "no stage expectation for a quit");
+        }
+
+        [Test]
+        public void AHolderMissingFromThePresenceListLeftForGood()
+        {
+            var writes = LobbySeatRules.SweepWrites(Seats(("sT01", 6)), Presence(), 1);
+            Assert.AreEqual(1, writes.Count);
+            Assert.IsNull(writes[0].Props["sT01"]);
+        }
+
+        [Test]
+        public void APresentHolderIsNeverCleared()
+        {
+            var writes = LobbySeatRules.SweepWrites(Seats(("sT00", 4)), Presence((4, SeatHolderPresence.Present)), 0);
+            Assert.AreEqual(0, writes.Count);
+        }
+
+        [Test]
+        public void AQuitAndADropAtStageZeroAreTwoWrites()
+        {
+            var writes = LobbySeatRules.SweepWrites(Seats(("sT00", 4), ("sT10", 5), ("sT11", 6)),
+                Presence((4, SeatHolderPresence.Inactive), (5, SeatHolderPresence.LeftForGood), (6, SeatHolderPresence.Present)), 0);
+            Assert.AreEqual(2, writes.Count);
+            int forGood = writes[0].Expected.ContainsKey(LobbyKeys.Stage) ? 1 : 0;
+            var quit = writes[forGood];
+            var drop = writes[1 - forGood];
+            Assert.IsTrue(quit.Props.ContainsKey("sT10") && quit.Props.Count == 1 && !quit.Expected.ContainsKey(LobbyKeys.Stage));
+            Assert.IsTrue(drop.Props.ContainsKey("sT00") && drop.Props.Count == 1 && drop.Expected[LobbyKeys.Stage].Equals(0));
+        }
+
+        [Test]
+        public void TeamsForALateJoinerAreTheFixedOnesOnceTheMatchFixedThemElseTheLayouts()
+        {
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, LobbySeatRules.TeamsForLateJoin(Three, null));
+            CollectionAssert.AreEqual(new[] { 0, 1 }, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1 }));
+        }
+
+        [Test]
+        public void ALateJoinerInAThreeTeamLayoutNeverGetsTeamTwoWhenTwoTeamsPlay()
+        {
+            // an empty team 2 and fuller teams 0 and 1: the emptiest playing team still wins
+            var seats = Seats(("sT00", 1), ("sT10", 2));
+            string seat = LobbySeatRules.PlaceLateJoiner(Three, seats, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1 }));
+            Assert.IsTrue(LobbySeatRules.TryTeamOfSeat(seat, out int team));
+            Assert.AreNotEqual(2, team);
+        }
     }
 }

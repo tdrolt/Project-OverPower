@@ -237,23 +237,25 @@ namespace Overpower.Lobby
             WriteFill();
         }
 
-        /// <summary>Before Start (stage 0) a player who has left the room, or dropped out of it, no longer holds a seat: the
-        /// seat is freed at once, expecting it to still be theirs. From stage 1 on the seat stays, as the rejoin window keeps
-        /// a dropped player's place.</summary>
+        /// <summary>A player who left the room for good (quit through the menu, or the rejoin window ran out) loses the seat at once,
+        /// at any stage; one who only dropped (inactive, may come back) loses it before Start and keeps it from Start on, for the
+        /// rejoin window (LobbySeatRules.SweepWrites). Each write expects the seat to still be that player's.</summary>
         private void FreeSeatsOfAbsentPlayers()
         {
-            if (StageOfRoom() != LobbySeatRules.LobbyBeforeStart) return;
-
-            Dictionary<string, int> gone = null;
+            var presence = new Dictionary<int, SeatHolderPresence>();
             foreach (var pair in seats)
             {
-                if (PhotonNetwork.CurrentRoom.Players.TryGetValue(pair.Value, out Player holder) && !holder.IsInactive) continue;
-                (gone ?? (gone = new Dictionary<string, int>()))[pair.Key] = pair.Value;
+                if (presence.ContainsKey(pair.Value)) continue;
+                presence[pair.Value] = !PhotonNetwork.CurrentRoom.Players.TryGetValue(pair.Value, out Player holder)
+                    ? SeatHolderPresence.LeftForGood
+                    : holder.IsInactive ? SeatHolderPresence.Inactive : SeatHolderPresence.Present;
             }
-            SeatWrite write = LobbySeatRules.ClearSeats(gone);
-            if (write.IsNone) return;
-            Debug.Log($"[SEATS] master frees {gone.Count} seat(s) of players who left: {string.Join(", ", gone.Keys)}");
-            Send(write);
+            foreach (SeatWrite write in LobbySeatRules.SweepWrites(seats, presence, StageOfRoom()))
+            {
+                Debug.Log($"[SEATS] master frees {write.Props.Count} seat(s) of players who left or dropped: {string.Join(", ", write.Props.Keys)}"
+                    + (write.Expected.ContainsKey(LobbyKeys.Stage) ? " (a drop before Start)" : " (left for good)"));
+                Send(write);
+            }
         }
 
         /// <summary>Keeps lF (the fill counts on the lobby list) equal to what the seats say.</summary>
