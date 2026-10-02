@@ -28,9 +28,11 @@ namespace Overpower.Lobby
         public SeatLayout? Layout;
 
         /// <summary>What "newest first" sorts by: the creation stamp when there is one, else when this client first saw the
-        /// room, placed after every stamped room (a room from an old build is older than any stamped one).</summary>
-        public long SortTime => CreatedKnown ? Created : FirstSeen - OldBuildOffset;
-        private const long OldBuildOffset = 1L << 40;
+        /// room, placed after every stamped room (a room from an old build is older than any stamped one). The stamp is an
+        /// int server clock in milliseconds, so it wraps about every 25 days: a lobby alive across a wrap sorts as the
+        /// oldest for one list refresh at most, which is accepted.</summary>
+        public long SortTime => CreatedKnown ? Created : UnstampedBase + FirstSeen;
+        private const long UnstampedBase = long.MinValue / 2;
 
         public string ModeIdText => ModeId < 0 ? "?" : ModeId.ToString();
         public LobbyStage StageValue => Stage == 1 ? LobbyStage.Warmup : Stage == 2 ? LobbyStage.InMatch : LobbyStage.Lobby;

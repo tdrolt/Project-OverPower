@@ -66,7 +66,7 @@ namespace Overpower.Lobby
             catalogue = modes;
             config = lobbyConfig;
             if (config == null)
-                Debug.LogError("[LOBBY] RoomManager has no LobbyConfig assigned - lobby names are cut at " + FallbackNameMaxLength + " characters and duplicate names use the format \"{0} {1}\".");
+                Debug.LogError("[LOBBY] RoomManager has no LobbyConfig assigned - lobby names are cut at " + FallbackNameMaxLength + " characters and duplicate names use the format \"" + LobbyConfig.DefaultDuplicateNameFormat + "\".");
         }
 
         /// <summary>Starts receiving the room list: joins Photon's default lobby when connected and not already in a room or
@@ -89,8 +89,7 @@ namespace Overpower.Lobby
         /// <summary>Joins the lobby with this room name.</summary>
         public void Join(string roomName)
         {
-            pendingJoin = true;
-            PhotonNetwork.JoinRoom(roomName);
+            pendingJoin = PhotonNetwork.JoinRoom(roomName); // a refused call leaves no flag behind
         }
 
         private void CreatePending()

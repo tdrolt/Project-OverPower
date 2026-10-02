@@ -205,10 +205,24 @@ namespace Overpower.Tests
         public void ARoomWithoutAStampSortsByFirstSeenAfterStampedOnes()
         {
             var cache = new Dictionary<string, LobbyEntry>();
-            LobbyListCache.Merge(cache, new[] { WithName("old-build", new Hashtable()) }, 5);
-            LobbyListCache.Merge(cache, new[] { WithName("stamped", new Hashtable { { LobbyKeys.Created, 1 } }) }, 6);
+            // a realistic first-seen time: what LobbyDirectory passes (Stopwatch ticks), far above any small offset
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            LobbyListCache.Merge(cache, new[] { WithName("old-build", new Hashtable()) }, now);
+            LobbyListCache.Merge(cache, new[] { WithName("stamped", new Hashtable { { LobbyKeys.Created, 1 } }) }, now + 1);
             var names = LobbyListCache.Sorted(cache.Values).Select(e => e.RoomName).ToArray();
             CollectionAssert.AreEqual(new[] { "stamped", "old-build" }, names);
+        }
+
+        [Test]
+        public void UnstampedRoomsSortByFirstSeenNewestFirstAfterStampedOnes()
+        {
+            var cache = new Dictionary<string, LobbyEntry>();
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            LobbyListCache.Merge(cache, new[] { WithName("old-1", new Hashtable()) }, now);
+            LobbyListCache.Merge(cache, new[] { WithName("stamped", new Hashtable { { LobbyKeys.Created, -2000000000 } }) }, now + 5);
+            LobbyListCache.Merge(cache, new[] { WithName("old-2", new Hashtable()) }, now + 10);
+            var names = LobbyListCache.Sorted(cache.Values).Select(e => e.RoomName).ToArray();
+            CollectionAssert.AreEqual(new[] { "stamped", "old-2", "old-1" }, names);
         }
 
         private static RoomSnapshot WithName(string name, IDictionary props) =>

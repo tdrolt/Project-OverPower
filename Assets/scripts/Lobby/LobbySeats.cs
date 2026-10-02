@@ -21,9 +21,6 @@ namespace Overpower.Lobby
     /// </summary>
     public sealed class LobbySeats : MonoBehaviourPunCallbacks
     {
-        /// <summary>How long after sending a seat write we wait for it to show up before logging that the room refused it.</summary>
-        private const float RefusedCheckSeconds = 1.5f;
-
         private GameModeCatalogue catalogue;
         private LobbyConfig config;
 
@@ -35,6 +32,14 @@ namespace Overpower.Lobby
         /// <summary>The nickname the player typed, kept while the room shows a numbered copy of it ("Tudor 2"); null when
         /// the name was not changed.</summary>
         private string typedNickName;
+
+        /// <summary>Seat writes we sent that have not been echoed yet (seat key -> our actor): the first update of that seat
+        /// key after our send tells whether the room took it or another player got there first.</summary>
+        private readonly Dictionary<string, int> awaitingEcho = new Dictionary<string, int>();
+
+        /// <summary>The name the player typed: what to save for the next lobby, not the numbered copy ("Tudor 2") this lobby may
+        /// show.</summary>
+        public string TypedNickName => typedNickName ?? PhotonNetwork.NickName;
 
         /// <summary>The seats of the lobby the player is in, empty seats left out.</summary>
         public IReadOnlyDictionary<string, int> Seats => seats;
@@ -70,7 +75,7 @@ namespace Overpower.Lobby
             var write = LobbySeatRules.TakeSeat(PhotonNetwork.LocalPlayer.ActorNumber, seatKey, layout, seats);
             bool sent = Send(write);
             Debug.Log($"[SEATS] take {seatKey}: " + (sent ? "sent" : "not sent (taken, not a seat, or already mine)"));
-            if (sent) StartCoroutine(LogIfRefused(seatKey, PhotonNetwork.LocalPlayer.ActorNumber));
+            if (sent) awaitingEcho[seatKey] = PhotonNetwork.LocalPlayer.ActorNumber;
             return sent;
         }
 
@@ -81,7 +86,16 @@ namespace Overpower.Lobby
             return Send(LobbySeatRules.LeaveSeat(PhotonNetwork.LocalPlayer.ActorNumber, layout, seats));
         }
 
-        private bool CanWrite() => hasLayout && PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null && PhotonNetwork.LocalPlayer != null;
+        /// <summary>Seats change only before Start: this refuses locally once the room's stage is no longer the lobby (the write
+        /// itself also expects it, so the room refuses a stale one).</summary>
+        private bool CanWrite() =>
+            hasLayout && PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null && PhotonNetwork.LocalPlayer != null && StageOfRoom() == LobbySeatRules.LobbyBeforeStart;
+
+        private static int StageOfRoom()
+        {
+            var props = PhotonNetwork.CurrentRoom.CustomProperties;
+            return props.ContainsKey(LobbyKeys.Stage) && props[LobbyKeys.Stage] is int stage ? stage : 0;
+        }
 
         private static bool Send(SeatWrite write)
         {
@@ -96,12 +110,21 @@ namespace Overpower.Lobby
             return table;
         }
 
-        private IEnumerator LogIfRefused(string seatKey, int actor)
+        /// <summary>The first update of a seat we asked for: if it shows another holder the room refused our write.</summary>
+        private void LogRefusedWrites(Hashtable changed)
         {
-            yield return new WaitForSecondsRealtime(RefusedCheckSeconds);
-            if (!hasLayout || !PhotonNetwork.InRoom) yield break;
-            if (seats.TryGetValue(seatKey, out int holder) && holder != actor)
-                Debug.Log($"[SEATS] the room refused the write for {seatKey}: actor {holder} got it first");
+            if (awaitingEcho.Count == 0) return;
+            List<string> done = null;
+            foreach (var pair in awaitingEcho)
+            {
+                if (!changed.ContainsKey(pair.Key)) continue;
+                (done ?? (done = new List<string>())).Add(pair.Key);
+                object raw = changed[pair.Key];
+                int holder = raw is int i ? i : raw is short sh ? sh : raw is byte b ? b : 0;
+                if (holder != pair.Value)
+                    Debug.Log($"[SEATS] the room refused the write for {pair.Key}: " + (holder > 0 ? $"actor {holder} got it first" : "the seat is empty"));
+            }
+            if (done != null) foreach (string key in done) awaitingEcho.Remove(key);
         }
 
         /// <summary>The seats as the room's properties hold them: exactly the layout's seat keys, each with an actor number
@@ -140,12 +163,14 @@ namespace Overpower.Lobby
             hasLayout = false;
             seats = new Dictionary<string, int>();
             noRole.Clear();
+            awaitingEcho.Clear();
         }
 
         public override void OnRoomPropertiesUpdate(Hashtable changed)
         {
             if (!hasLayout) ReadLayout();
             if (!hasLayout) return;
+            LogRefusedWrites(changed);
             bool seatChanged = false;
             foreach (string key in LobbySeatRules.AllSeatKeys(layout))
                 if (changed.ContainsKey(key)) { seatChanged = true; break; }
@@ -207,21 +232,18 @@ namespace Overpower.Lobby
         /// a dropped player's place.</summary>
         private void FreeSeatsOfAbsentPlayers()
         {
-            var props = PhotonNetwork.CurrentRoom.CustomProperties;
-            int stage = props.ContainsKey(LobbyKeys.Stage) && props[LobbyKeys.Stage] is int st ? st : 0;
-            if (stage != 0) return;
+            if (StageOfRoom() != LobbySeatRules.LobbyBeforeStart) return;
 
-            Dictionary<string, object> clear = null, expected = null;
+            Dictionary<string, int> gone = null;
             foreach (var pair in seats)
             {
                 if (PhotonNetwork.CurrentRoom.Players.TryGetValue(pair.Value, out Player holder) && !holder.IsInactive) continue;
-                if (clear == null) { clear = new Dictionary<string, object>(); expected = new Dictionary<string, object>(); }
-                clear[pair.Key] = null;
-                expected[pair.Key] = pair.Value;
+                (gone ?? (gone = new Dictionary<string, int>()))[pair.Key] = pair.Value;
             }
-            if (clear == null) return;
-            Debug.Log($"[SEATS] master frees {clear.Count} seat(s) of players who left: {string.Join(", ", clear.Keys)}");
-            PhotonNetwork.CurrentRoom.SetCustomProperties(ToHashtable(clear), ToHashtable(expected));
+            SeatWrite write = LobbySeatRules.ClearSeats(gone);
+            if (write.IsNone) return;
+            Debug.Log($"[SEATS] master frees {gone.Count} seat(s) of players who left: {string.Join(", ", gone.Keys)}");
+            Send(write);
         }
 
         /// <summary>Keeps lF (the fill counts on the lobby list) equal to what the seats say.</summary>
@@ -243,7 +265,7 @@ namespace Overpower.Lobby
             var others = new List<string>();
             foreach (Player p in PhotonNetwork.PlayerListOthers)
                 if (!p.IsInactive) others.Add(p.NickName);
-            string format = config != null ? config.DuplicateNameFormat : "{0} {1}";
+            string format = config != null ? config.DuplicateNameFormat : LobbyConfig.DefaultDuplicateNameFormat;
             string unique = PlayerNameRules.UniqueName(current, others, format);
             if (unique == current) return;
             if (typedNickName == null) typedNickName = current;

@@ -57,7 +57,7 @@ namespace Overpower.Tests
             Assert.AreEqual(4, w.Props["sT10"]);
             Assert.IsNull(w.Expected["sT10"]);
             Assert.AreEqual(1, w.Props.Count);
-            Assert.AreEqual(1, w.Expected.Count);
+            Assert.AreEqual(2, w.Expected.Count, "the seat, and the stage still being the lobby");
         }
 
         [Test]
@@ -91,6 +91,37 @@ namespace Overpower.Tests
             var w = LobbySeatRules.LeaveSeat(4, Two, Seats(("sT01", 4)));
             Assert.IsNull(w.Props["sT01"]);
             Assert.AreEqual(4, w.Expected["sT01"]);
+        }
+
+        [Test]
+        public void EverySeatWriteExpectsTheStageStillToBeTheLobby()
+        {
+            // Seats change only before Start: once the stage is 1 the room refuses any seat write (Task 3 review).
+            var take = LobbySeatRules.TakeSeat(4, "sT10", Two, Seats());
+            Assert.AreEqual(0, take.Expected[LobbyKeys.Stage]);
+            var move = LobbySeatRules.TakeSeat(4, "sT10", Two, Seats(("sT00", 4)));
+            Assert.AreEqual(0, move.Expected[LobbyKeys.Stage]);
+            var leave = LobbySeatRules.LeaveSeat(4, Two, Seats(("sT01", 4)));
+            Assert.AreEqual(0, leave.Expected[LobbyKeys.Stage]);
+            Assert.IsFalse(take.Props.ContainsKey(LobbyKeys.Stage), "the expectation is not a write");
+        }
+
+        [Test]
+        public void ClearingSeatsExpectsEachSeatToStillBeThatActorsAndTheStageToBeTheLobby()
+        {
+            var w = LobbySeatRules.ClearSeats(Seats(("sT00", 4), ("sS0", 9)));
+            Assert.IsNull(w.Props["sT00"]);
+            Assert.IsNull(w.Props["sS0"]);
+            Assert.AreEqual(2, w.Props.Count);
+            Assert.AreEqual(4, w.Expected["sT00"]);
+            Assert.AreEqual(9, w.Expected["sS0"]);
+            Assert.AreEqual(0, w.Expected[LobbyKeys.Stage]);
+        }
+
+        [Test]
+        public void ClearingNoSeatsIsNone()
+        {
+            Assert.AreSame(SeatWrite.None, LobbySeatRules.ClearSeats(Seats()));
         }
 
         [Test]
@@ -212,10 +243,9 @@ namespace Overpower.Tests
         [Test]
         public void LateJoinerGoesToTheEmptiestTeamInTheMatch()
         {
-            // team 0 has 1 filled, team 1 has 2: "first team with room" would say team 0 too, but it must be the
-            // emptiest, and team 0's free seat is sT01
-            var seats = Seats(("sT00", 1), ("sT10", 2), ("sT11", 3));
-            Assert.AreEqual("sT01", LobbySeatRules.PlaceLateJoiner(Three, seats, new[] { 0, 1 }));
+            // team 0 has 1 filled, team 1 has none: "first team with room" would say team 0 (sT01), the emptiest is team 1 (sT10)
+            var seats = Seats(("sT00", 1));
+            Assert.AreEqual("sT10", LobbySeatRules.PlaceLateJoiner(Three, seats, new[] { 0, 1 }));
         }
 
         [Test]
@@ -270,7 +300,8 @@ namespace Overpower.Tests
             var w = LobbySeatRules.TakeSeat(2, "sT10", Two, seats);
             Assert.AreEqual(1, w.Props.Count);
             Assert.IsFalse(w.Props.ContainsKey("lS"));
-            Assert.IsFalse(w.Expected.ContainsKey("lS"));
+            Assert.AreEqual(0, w.Expected["lS"], "only the stage expectation (0), never the room's stage 2 read as a seat");
+            Assert.AreEqual(2, w.Expected.Count);
             Assert.AreSame(SeatWrite.None, LobbySeatRules.LeaveSeat(3, Two, seats));
         }
 

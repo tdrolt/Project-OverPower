@@ -9,6 +9,10 @@ namespace Overpower.Lobby
     /// </summary>
     public static class LobbySeatRules
     {
+        /// <summary>The value of the stage property (lS) while the lobby has not been started: every seat write expects it,
+        /// so a seat can only change before Start.</summary>
+        public const int LobbyBeforeStart = 0;
+
         public static string SeatKey(int team, int index) => "sT" + team + index;
 
         public static string SpectatorSeatKey(int index) => "sS" + index;
@@ -60,7 +64,7 @@ namespace Overpower.Lobby
             if (!IsSeatKey(targetKey, layout) || IsTaken(targetKey, seats, null)) return SeatWrite.None;
 
             var props = new Dictionary<string, object> { { targetKey, actor } };
-            var expected = new Dictionary<string, object> { { targetKey, null } };
+            var expected = new Dictionary<string, object> { { targetKey, null }, { LobbyKeys.Stage, LobbyBeforeStart } };
             string old = SeatOf(actor, layout, seats);
             if (old != null)
             {
@@ -77,7 +81,23 @@ namespace Overpower.Lobby
             if (old == null) return SeatWrite.None;
             return new SeatWrite(
                 new Dictionary<string, object> { { old, null } },
-                new Dictionary<string, object> { { old, actor } });
+                new Dictionary<string, object> { { old, actor }, { LobbyKeys.Stage, LobbyBeforeStart } });
+        }
+
+        /// <summary>The master's sweep: empties the seats of players who left or dropped, each expecting to still be that
+        /// player's, and only while the stage is still the lobby (from Start on the seats stay, as the rejoin window keeps a
+        /// dropped player's place). None when there is nothing to clear.</summary>
+        public static SeatWrite ClearSeats(IReadOnlyDictionary<string, int> toClear)
+        {
+            if (toClear == null || toClear.Count == 0) return SeatWrite.None;
+            var props = new Dictionary<string, object>();
+            var expected = new Dictionary<string, object> { { LobbyKeys.Stage, LobbyBeforeStart } };
+            foreach (var pair in toClear)
+            {
+                props[pair.Key] = null;
+                expected[pair.Key] = pair.Value;
+            }
+            return new SeatWrite(props, expected);
         }
 
         private static int FilledOnTeam(SeatLayout layout, int team, IReadOnlyDictionary<string, int> seats, IReadOnlyDictionary<string, int> placed)
