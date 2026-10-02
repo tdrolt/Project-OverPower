@@ -509,8 +509,8 @@ namespace Overpower.Tests
         [Test]
         public void TeamsForALateJoinerAreTheFixedOnesOnceTheMatchFixedThemElseTheLayouts()
         {
-            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, LobbySeatRules.TeamsForLateJoin(Three, null));
-            CollectionAssert.AreEqual(new[] { 0, 1 }, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1 }));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, LobbySeatRules.TeamsForLateJoin(Three, null, null));
+            CollectionAssert.AreEqual(new[] { 0, 1 }, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1 }, null));
         }
 
         [Test]
@@ -518,9 +518,67 @@ namespace Overpower.Tests
         {
             // an empty team 2 and fuller teams 0 and 1: the emptiest playing team still wins
             var seats = Seats(("sT00", 1), ("sT10", 2));
-            string seat = LobbySeatRules.PlaceLateJoiner(Three, seats, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1 }));
+            string seat = LobbySeatRules.PlaceLateJoiner(Three, seats, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1 }, null));
             Assert.IsTrue(LobbySeatRules.TryTeamOfSeat(seat, out int team));
             Assert.AreNotEqual(2, team);
+        }
+
+        [Test]
+        public void AKnockedOutTeamIsNeverOfferedToALateJoiner()
+        {
+            CollectionAssert.AreEqual(new[] { 0, 2 }, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1, 2 }, new[] { 1 }));
+            // before the match fixed its teams (the warm-up) nobody can be knocked out, but a stale list still never offers its teams
+            CollectionAssert.AreEqual(new[] { 1, 2 }, LobbySeatRules.TeamsForLateJoin(Three, null, new[] { 0 }));
+        }
+
+        [Test]
+        public void AKnockedOutTeamThatIsTheEmptiestIsSkippedByThePlacement()
+        {
+            // team 1 is knocked out and empty, teams 0 and 2 have a player each: the joiner must sit on 0 or 2, never on 1
+            var seats = Seats(("sT00", 1), ("sT20", 3));
+            string seat = LobbySeatRules.PlaceLateJoiner(Three, seats, LobbySeatRules.TeamsForLateJoin(Three, new[] { 0, 1, 2 }, new[] { 1 }));
+            Assert.IsTrue(LobbySeatRules.TryTeamOfSeat(seat, out int team));
+            Assert.AreNotEqual(1, team);
+        }
+
+        // ---- a seatless player in a running game (Task 7 review)
+
+        [TestCase(true, 1, true, null, true)]    // in the room, started, a layout, no seat: needs one
+        [TestCase(true, 1, false, null, false)]  // the layout has not arrived yet: nobody can say they have no seat
+        [TestCase(true, 0, true, null, false)]   // still the lobby
+        [TestCase(true, 1, true, "sT00", false)] // has a seat
+        [TestCase(false, 1, true, null, false)]  // not in a room
+        public void AGameRunningWithoutMySeatNeedsTheLayoutToo(bool inRoom, int stage, bool hasLayout, string seat, bool expected) =>
+            Assert.AreEqual(expected, LobbySeatRules.GameRunningWithoutSeat(inRoom, stage, hasLayout, seat));
+
+        // ---- the same write is not sent twice
+
+        [Test]
+        public void TheSameWriteSentTwiceInOneInstantGoesOnce()
+        {
+            var gate = new RepeatWriteGate(1f);
+            Assert.IsTrue(gate.ShouldSend("sT00=3", 10f));
+            Assert.IsFalse(gate.ShouldSend("sT00=3", 10f));
+            Assert.IsFalse(gate.ShouldSend("sT00=3", 10.9f));
+        }
+
+        [Test]
+        public void ADifferentWriteOrALaterRetryGoesThrough()
+        {
+            var gate = new RepeatWriteGate(1f);
+            Assert.IsTrue(gate.ShouldSend("sT00=3", 10f));
+            Assert.IsTrue(gate.ShouldSend("sT10=4", 10f), "another write");
+            Assert.IsTrue(gate.ShouldSend("sT10=4", 11.5f), "the same one after the window: a lost write is retried");
+        }
+
+        [Test]
+        public void AWriteSignatureNamesEveryKeyAndValueInOrder()
+        {
+            var a = new SeatWrite(new Dictionary<string, object> { { "sT10", null }, { "sT00", null } }, new Dictionary<string, object> { { "sT10", 4 }, { "sT00", 3 } });
+            var b = new SeatWrite(new Dictionary<string, object> { { "sT00", null }, { "sT10", null } }, new Dictionary<string, object> { { "sT00", 3 }, { "sT10", 4 } });
+            var c = new SeatWrite(new Dictionary<string, object> { { "sT00", null } }, new Dictionary<string, object> { { "sT00", 3 } });
+            Assert.AreEqual(a.Signature(), b.Signature(), "order does not matter");
+            Assert.AreNotEqual(a.Signature(), c.Signature());
         }
     }
 }

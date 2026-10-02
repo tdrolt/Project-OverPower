@@ -292,9 +292,22 @@ namespace Overpower.Lobby
         }
 
         /// <summary>The teams a late joiner may be placed on: the ones the match fixed (mTeams) once it did, else (the warm-up)
-        /// every team of the layout.</summary>
-        public static int[] TeamsForLateJoin(SeatLayout layout, int[] fixedTeams) =>
-            fixedTeams != null ? fixedTeams : layout.Teams;
+        /// every team of the layout; a team already knocked out is never one of them (mTeams keeps it, but nobody could
+        /// play for it).</summary>
+        public static int[] TeamsForLateJoin(SeatLayout layout, int[] fixedTeams, ICollection<int> eliminated)
+        {
+            int[] teams = fixedTeams != null ? fixedTeams : layout.Teams;
+            if (eliminated == null || eliminated.Count == 0) return teams;
+            var playing = new List<int>(teams.Length);
+            foreach (int team in teams)
+                if (!eliminated.Contains(team)) playing.Add(team);
+            return playing.ToArray();
+        }
+
+        /// <summary>The game of this lobby has started and this client holds no seat in it. Needs the layout: until the room's mode is
+        /// read, nobody can say the seat is missing (it may simply not be readable yet).</summary>
+        public static bool GameRunningWithoutSeat(bool inRoom, int stage, bool hasLayout, string seat) =>
+            inRoom && hasLayout && stage >= LobbyWarmup && seat == null;
 
         /// <summary>The seat counts the lobby list shows without joining: "&lt;filled team seats&gt;/&lt;team seats&gt;+&lt;filled
         /// spectator seats&gt;", for example "4/9+1". Only the layout's real seat keys are counted.</summary>

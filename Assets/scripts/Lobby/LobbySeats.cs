@@ -252,11 +252,15 @@ namespace Overpower.Lobby
             }
             foreach (SeatWrite write in LobbySeatRules.SweepWrites(seats, presence, StageOfRoom()))
             {
+                // A player leaving and the mastership moving to us arrive in the same frame and both run this sweep: the identical write goes once.
+                if (!sweepGate.ShouldSend(write.Signature(), Time.unscaledTime)) continue;
                 Debug.Log($"[SEATS] master frees {write.Props.Count} seat(s) of players who left or dropped: {string.Join(", ", write.Props.Keys)}"
                     + (write.Expected.ContainsKey(LobbyKeys.Stage) ? " (a drop before Start)" : " (left for good)"));
                 Send(write);
             }
         }
+
+        private readonly RepeatWriteGate sweepGate = new RepeatWriteGate(1f);
 
         /// <summary>Keeps lF (the fill counts on the lobby list) equal to what the seats say.</summary>
         private void WriteFill()

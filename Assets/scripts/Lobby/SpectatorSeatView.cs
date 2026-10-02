@@ -38,7 +38,7 @@ namespace Overpower.Lobby
 
         // The last whole-map framing and what it was worked out for: the camera and the theme rarely change, so the search runs once.
         private bool framingKnown;
-        private float framingFov, framingAspect, framingTilt, framingFill;
+        private float framingFov, framingAspect, framingTilt, framingFill, framingYaw, framingReserve;
         private Vector2 framingAim;
         private float framingDistance;
 
@@ -234,6 +234,11 @@ namespace Overpower.Lobby
             bar?.Show(null, "", Color.white);
         }
 
+        /// <summary>How much of the screen's height the spectator bar covers from the bottom (its distance from the bottom, its padding and the
+        /// Leave button, the tallest part), from the theme, so the whole map is framed above it.</summary>
+        private static float BarShareOfScreen(UiTheme theme) =>
+            Mathf.Clamp01((theme.spectatorBarBottom + theme.spectatorBarLeaveSize.y + 2f * theme.spectatorBarPadding.y) / Mathf.Max(1f, theme.referenceResolution.y));
+
         // The whole arena in view: the camera follows a marker on the ground, from far enough away (the extra-zoom stack, so the mouse wheel
         // still zooms from there) that the arena fills UiTheme > Spectator bar > Whole map fill of the screen's height, centred.
         private void FrameWholeMap()
@@ -247,13 +252,18 @@ namespace Overpower.Lobby
             float aspect = cameraComponent != null ? cameraComponent.aspect : 16f / 9f;
             float fov = cameraComponent != null ? cameraComponent.fieldOfView : 60f;
             float tilt = cam.TiltDegrees;
-            float fill = roomManager != null && roomManager.Theme != null ? roomManager.Theme.spectatorWholeMapFill : 0.88f;
-            if (!framingKnown || fov != framingFov || aspect != framingAspect || tilt != framingTilt || fill != framingFill)
+            UiTheme theme = roomManager != null ? roomManager.Theme : null;
+            float fill = theme != null ? theme.spectatorWholeMapFill : 0.88f;
+            // The camera is turned by the fixed spectator angle (Begin sets cam.fixedYaw from the theme) and the bar covers the bottom of the screen.
+            float yaw = cam.fixedYaw ?? 0f;
+            float reserve = theme != null ? BarShareOfScreen(theme) : 0f;
+            if (!framingKnown || fov != framingFov || aspect != framingAspect || tilt != framingTilt || fill != framingFill
+                || yaw != framingYaw || reserve != framingReserve)
             {
                 ArenaSymmetry arena = ArenaSymmetry.Active;
                 IReadOnlyList<Vector2> outline = arena != null && arena.FullBounds != null ? arena.FullBounds.Polygon : null;
-                SpectateRules.WholeMapFraming(outline, fov, aspect, tilt, fill, out framingAim, out framingDistance);
-                framingFov = fov; framingAspect = aspect; framingTilt = tilt; framingFill = fill;
+                SpectateRules.WholeMapFraming(outline, fov, aspect, tilt, fill, yaw, reserve, out framingAim, out framingDistance);
+                framingFov = fov; framingAspect = aspect; framingTilt = tilt; framingFill = fill; framingYaw = yaw; framingReserve = reserve;
                 framingKnown = true;
             }
             mapAnchor.position = new Vector3(framingAim.x, 0f, framingAim.y);

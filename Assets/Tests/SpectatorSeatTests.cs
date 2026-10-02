@@ -75,24 +75,6 @@ namespace Overpower.Tests
 
         // ---- Space: the whole map
 
-        [Test]
-        public void TheWholeMapIsCentredOnTheOutlineAndReachesItsFarthestPoint()
-        {
-            var outline = new List<Vector2> { new Vector2(0, 0), new Vector2(40, 0), new Vector2(40, 20), new Vector2(0, 20) };
-            SpectateRules.WholeMapFrame(outline, out Vector2 centre, out float radius);
-            Assert.AreEqual(20f, centre.x, 0.001f);
-            Assert.AreEqual(10f, centre.y, 0.001f);
-            Assert.AreEqual(Mathf.Sqrt(20f * 20f + 10f * 10f), radius, 0.001f);
-        }
-
-        [Test]
-        public void NoOutlineFramesNothing()
-        {
-            SpectateRules.WholeMapFrame(null, out Vector2 centre, out float radius);
-            Assert.AreEqual(Vector2.zero, centre);
-            Assert.AreEqual(0f, radius);
-        }
-
         // A three-lobe arena like the real one: wide at the bottom, a long arm up the middle.
         private static readonly List<Vector2> Lobes = new List<Vector2>
         {
@@ -101,7 +83,7 @@ namespace Overpower.Tests
 
         // Puts a real camera where the framing says (tilted down, yaw 0: behind the bottom edge, looking up the map) and projects the outline.
         private static void ProjectOutline(IReadOnlyList<Vector2> outline, float fov, float aspect, float tilt, Vector2 aim, float distance,
-            out float minY, out float maxY, out float minX, out float maxX)
+            out float minY, out float maxY, out float minX, out float maxX, float yaw = 0f)
         {
             var go = new GameObject("framing test camera");
             try
@@ -111,7 +93,8 @@ namespace Overpower.Tests
                 cam.aspect = aspect;
                 Vector3 target = new Vector3(aim.x, 0f, aim.y);
                 float t = tilt * Mathf.Deg2Rad;
-                cam.transform.position = target + distance * new Vector3(0f, Mathf.Sin(t), -Mathf.Cos(t));
+                // exactly what CameraTracking does: the offset turned round the target by the yaw
+                cam.transform.position = target + Quaternion.AngleAxis(yaw, Vector3.up) * (distance * new Vector3(0f, Mathf.Sin(t), -Mathf.Cos(t)));
                 cam.transform.LookAt(target);
                 minY = minX = float.MaxValue;
                 maxY = maxX = float.MinValue;
@@ -129,7 +112,7 @@ namespace Overpower.Tests
         [TestCase(0.7f)]
         public void TheWholeMapFillsTheAskedShareOfTheScreenHeightAndIsCentred(float fill)
         {
-            SpectateRules.WholeMapFraming(Lobes, 60f, 16f / 9f, 63.4349f, fill, out Vector2 aim, out float distance);
+            SpectateRules.WholeMapFraming(Lobes, 60f, 16f / 9f, 63.4349f, fill, 0f, 0f, out Vector2 aim, out float distance);
             ProjectOutline(Lobes, 60f, 16f / 9f, 63.4349f, aim, distance, out float minY, out float maxY, out float minX, out float maxX);
             Assert.AreEqual(fill, maxY - minY, 0.01f, "share of the screen height");
             Assert.AreEqual(0.5f, (maxY + minY) * 0.5f, 0.01f, "centred up and down");
@@ -140,17 +123,44 @@ namespace Overpower.Tests
         [Test]
         public void ANarrowWindowKeepsTheWholeWidthOnScreenInsteadOfFillingTheHeight()
         {
-            SpectateRules.WholeMapFraming(Lobes, 60f, 0.5f, 63.4349f, 0.88f, out Vector2 aim, out float distance);
+            SpectateRules.WholeMapFraming(Lobes, 60f, 0.5f, 63.4349f, 0.88f, 0f, 0f, out Vector2 aim, out float distance);
             ProjectOutline(Lobes, 60f, 0.5f, 63.4349f, aim, distance, out float minY, out float maxY, out float minX, out float maxX);
             Assert.GreaterOrEqual(minX, 0f);
             Assert.LessOrEqual(maxX, 1f);
             Assert.Less(maxY - minY, 0.88f);
         }
 
+        [TestCase(37f)]
+        [TestCase(90f)]
+        [TestCase(-120f)]
+        public void ATurnedViewStillFramesTheWholeArenaCentredAndOnScreen(float yaw)
+        {
+            SpectateRules.WholeMapFraming(Lobes, 60f, 16f / 9f, 63.4349f, 0.88f, yaw, 0f, out Vector2 aim, out float distance);
+            ProjectOutline(Lobes, 60f, 16f / 9f, 63.4349f, aim, distance, out float minY, out float maxY, out float minX, out float maxX, yaw);
+            Assert.AreEqual(0.88f, maxY - minY, 0.015f, "share of the screen height");
+            Assert.AreEqual(0.5f, (maxY + minY) * 0.5f, 0.015f, "centred up and down");
+            Assert.Greater(minX, 0f);
+            Assert.Less(maxX, 1f);
+        }
+
+        [TestCase(0f, 0.15f)]
+        [TestCase(60f, 0.2f)]
+        public void TheArenaStaysInTheScreenAboveTheBar(float yaw, float reserve)
+        {
+            SpectateRules.WholeMapFraming(Lobes, 60f, 16f / 9f, 63.4349f, 0.9f, yaw, reserve, out Vector2 aim, out float distance);
+            ProjectOutline(Lobes, 60f, 16f / 9f, 63.4349f, aim, distance, out float minY, out float maxY, out float minX, out float maxX, yaw);
+            Assert.GreaterOrEqual(minY, reserve - 0.005f, "no lower than the top of the bar");
+            Assert.LessOrEqual(maxY, 1f);
+            Assert.AreEqual(0.9f * (1f - reserve), maxY - minY, 0.015f, "the asked share of the free height");
+            Assert.AreEqual(reserve + (1f - reserve) * 0.5f, (maxY + minY) * 0.5f, 0.015f, "centred in the free area");
+            Assert.Greater(minX, 0f);
+            Assert.Less(maxX, 1f);
+        }
+
         [Test]
         public void NoOutlineNeedsNoFraming()
         {
-            SpectateRules.WholeMapFraming(null, 60f, 16f / 9f, 63.4349f, 0.88f, out Vector2 aim, out float distance);
+            SpectateRules.WholeMapFraming(null, 60f, 16f / 9f, 63.4349f, 0.88f, 0f, 0f, out Vector2 aim, out float distance);
             Assert.AreEqual(Vector2.zero, aim);
             Assert.AreEqual(0f, distance);
         }

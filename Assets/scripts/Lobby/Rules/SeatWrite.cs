@@ -22,5 +22,30 @@ namespace Overpower.Lobby
         }
 
         public bool IsNone => Props == null;
+
+        /// <summary>The write as one comparable text: every key with its new and expected value, keys in order. Two writes that change
+        /// the same seats the same way have the same signature.</summary>
+        public string Signature()
+        {
+            if (IsNone) return "";
+            var keys = new List<string>(Props.Keys);
+            keys.Sort(System.StringComparer.Ordinal);
+            var text = new System.Text.StringBuilder();
+            foreach (string key in keys)
+            {
+                text.Append(key).Append('=').Append(Props[key] ?? "-").Append('?');
+                if (Expected != null && Expected.TryGetValue(key, out object expected)) text.Append(expected ?? "-");
+                else text.Append('*');
+                text.Append(';');
+            }
+            if (Expected != null)
+            {
+                var extra = new List<string>();
+                foreach (string key in Expected.Keys) if (!Props.ContainsKey(key)) extra.Add(key);
+                extra.Sort(System.StringComparer.Ordinal);
+                foreach (string key in extra) text.Append('+').Append(key).Append('?').Append(Expected[key] ?? "-").Append(';');
+            }
+            return text.ToString();
+        }
     }
 }

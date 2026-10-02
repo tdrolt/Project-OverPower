@@ -46,8 +46,10 @@ namespace Overpower.Lobby
             && StageOfRoom() == LobbySeatRules.LobbyBeforeStart
             && LobbySeatRules.MayStartGame(seats.Layout, seats.Seats, seats.NoRoleActors);
 
-        /// <summary>The room's game has started and this player holds no seat in it (a late joiner, or a returning player whose seat was freed).</summary>
-        public bool GameRunningWithoutMySeat => PhotonNetwork.InRoom && StageOfRoom() >= LobbySeatRules.LobbyWarmup && seats.SeatInRoom() == null;
+        /// <summary>The room's game has started and this player holds no seat in it (a late joiner, or a returning player whose seat was freed).
+        /// Only said once the room's layout is read: before that the seat cannot be told apart from one not yet readable.</summary>
+        public bool GameRunningWithoutMySeat =>
+            LobbySeatRules.GameRunningWithoutSeat(PhotonNetwork.InRoom, StageOfRoom(), seats.HasLayout, seats.SeatInRoom());
 
         /// <summary>Starts the game (master only). Nothing is sent while MayStartGame is false. The write is refused by the room
         /// when a seat changed in the same instant; it is then sent again with the fresh seats, for up to a few seconds.</summary>
@@ -195,8 +197,11 @@ namespace Overpower.Lobby
                 if (stage < LobbySeatRules.LobbyWarmup)
                     break; // not started after all: an ordinary seatless player in the lobby
                 Dictionary<string, int> fresh = LobbySeats.SeatsFrom(PhotonNetwork.CurrentRoom.CustomProperties, seats.Layout);
-                int[] fixedTeams = PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(MatchDirector.TeamsInMatchKey, out object raw) && raw is int[] arr ? arr : null;
-                string seat = LobbySeatRules.PlaceLateJoiner(seats.Layout, fresh, LobbySeatRules.TeamsForLateJoin(seats.Layout, fixedTeams));
+                var roomProps = PhotonNetwork.CurrentRoom.CustomProperties;
+                int[] fixedTeams = roomProps.TryGetValue(MatchDirector.TeamsInMatchKey, out object raw) && raw is int[] arr ? arr : null;
+                // A team knocked out stays in mTeams (it is listed in mElim): nobody may be seated on it.
+                int[] eliminated = roomProps.TryGetValue(MatchDirector.EliminatedKey, out object rawElim) && rawElim is int[] elim ? elim : null;
+                string seat = LobbySeatRules.PlaceLateJoiner(seats.Layout, fresh, LobbySeatRules.TeamsForLateJoin(seats.Layout, fixedTeams, eliminated));
                 if (seat == null)
                 {
                     GiveUpLateJoin("Lobby full");
@@ -215,6 +220,13 @@ namespace Overpower.Lobby
                     waited += Time.unscaledDeltaTime;
                     yield return null;
                 }
+            }
+            // The last try's answer may still be on its way: look once more, for as long as one try waits, before giving up.
+            float lastWait = 0f;
+            while (lastWait < LateJoinWaitSeconds && PhotonNetwork.InRoom && seats.SeatInRoom() == null && StageOfRoom() >= LobbySeatRules.LobbyWarmup)
+            {
+                lastWait += Time.unscaledDeltaTime;
+                yield return null;
             }
             if (PhotonNetwork.InRoom && seats.SeatInRoom() == null && StageOfRoom() >= LobbySeatRules.LobbyWarmup)
             {
