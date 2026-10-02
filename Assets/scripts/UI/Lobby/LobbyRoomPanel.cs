@@ -192,7 +192,8 @@ namespace Overpower.UI
         private void BuildHeader(Transform parent)
         {
             VerticalLayoutGroup header = LobbyUiKit.VGroup(parent, "Header", 3f);
-            titleLabel = kit.Text(header.transform, "Lobby name", "", kit.Display, theme.lobbyRoomTitleSize, theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineLeft);
+            titleLabel = kit.Text(header.transform, "Lobby name", "", kit.Display, theme.lobbyRoomTitleSize, theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineLeft,
+                richText: false); // the name a player typed
             LobbyUiKit.Size(titleLabel.gameObject, -1f, theme.lobbyRoomTitleSize * DisplayLine);
 
             HorizontalLayoutGroup row = LobbyUiKit.HGroup(header.transform, "Mode row", 15f, TextAnchor.MiddleLeft);

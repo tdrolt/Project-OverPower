@@ -145,7 +145,7 @@ namespace Overpower.UI
                 footerLabel.text = theme.lobbyListHintText;
                 footerLabel.color = theme.lobbyDimColor;
             }
-            float interval = config != null ? config.ListRedrawSeconds : 0.5f;
+            float interval = config != null ? config.ListRedrawSeconds : LobbyConfig.DefaultListRedrawSeconds;
             if (dirty || Time.unscaledTime >= nextRedrawAt)
             {
                 Redraw();
@@ -265,18 +265,18 @@ namespace Overpower.UI
 
         private void BuildHeader(Transform parent)
         {
-            HorizontalLayoutGroup header = LobbyUiKit.HGroup(parent, "Header", 24f, TextAnchor.LowerLeft);
+            HorizontalLayoutGroup header = LobbyUiKit.HGroup(parent, "Header", theme.lobbyListHeaderGap, TextAnchor.LowerLeft);
             header.childForceExpandWidth = false;
 
-            VerticalLayoutGroup left = LobbyUiKit.VGroup(header.transform, "Title", 6f, TextAnchor.LowerLeft, null, false);
+            VerticalLayoutGroup left = LobbyUiKit.VGroup(header.transform, "Title", theme.lobbyListTitleGap, TextAnchor.LowerLeft, null, false);
             kit.Text(left.transform, "Caption", theme.lobbyListKickerText, kit.Bold, theme.lobbyListKickerSize, theme.lobbyCyanColor,
                 TextAlignmentOptions.MidlineLeft, theme.lobbyListKickerSpacing);
             kit.Text(left.transform, "Heading", theme.lobbyListTitleText, kit.Display, theme.lobbyListTitleSize, theme.lobbyOffWhiteColor,
                 TextAlignmentOptions.MidlineLeft);
             LobbyUiKit.Spacer(header.transform);
 
-            HorizontalLayoutGroup right = LobbyUiKit.HGroup(header.transform, "Player and Create", 24f, TextAnchor.MiddleRight);
-            HorizontalLayoutGroup who = LobbyUiKit.HGroup(right.transform, "Playing as", 9f, TextAnchor.MiddleRight);
+            HorizontalLayoutGroup right = LobbyUiKit.HGroup(header.transform, "Player and Create", theme.lobbyListPlayerGap, TextAnchor.MiddleRight);
+            HorizontalLayoutGroup who = LobbyUiKit.HGroup(right.transform, "Playing as", theme.lobbyListPlayingAsGap, TextAnchor.MiddleRight);
             kit.Text(who.transform, "Playing as", theme.lobbyListPlayingAsText, kit.Body, theme.lobbyListPlayingAsSize, theme.lobbyMutedColor,
                 TextAlignmentOptions.MidlineRight);
             playerLabel = kit.Text(who.transform, "Player", "", kit.Bold, theme.lobbyListPlayingAsSize, theme.lobbyOffWhiteColor,
@@ -341,7 +341,7 @@ namespace Overpower.UI
             scroll.horizontal = false;
             scroll.vertical = true;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 40f;
+            scroll.scrollSensitivity = theme.lobbyListScrollSensitivity;
 
             emptyLabel = kit.Text(viewport.transform, "Empty", theme.lobbyListConnectingText, kit.Body, theme.lobbyListRowTextSize, theme.lobbyDimColor,
                 TextAlignmentOptions.Top);
@@ -355,7 +355,7 @@ namespace Overpower.UI
 
         private void BuildFooter(Transform parent)
         {
-            HorizontalLayoutGroup footer = LobbyUiKit.HGroup(parent, "Footer", 24f, TextAnchor.MiddleLeft);
+            HorizontalLayoutGroup footer = LobbyUiKit.HGroup(parent, "Footer", theme.lobbyListFooterGap, TextAnchor.MiddleLeft);
             howToButton = kit.MakeButton(footer.transform, "How to play", theme.lobbyListHowToText, kit.Bold, theme.lobbyListHowToTextSize,
                 theme.lobbyDarkTextColor, theme.lobbyCyanColor, theme.lobbyCornerRadius, theme.lobbyCyanColor, 0f);
             howToButton.Button.onClick.AddListener(() =>
@@ -388,11 +388,11 @@ namespace Overpower.UI
             group.childForceExpandHeight = false;
 
             float size = theme.lobbyListRowTextSize;
-            view.Name = kit.Text(go.transform, "Name", "", kit.Bold, size, theme.lobbyOffWhiteColor);
+            view.Name = kit.Text(go.transform, "Name", "", kit.Bold, size, theme.lobbyOffWhiteColor, richText: false); // typed by a player
             view.Mode = kit.Text(go.transform, "Mode", "", kit.Body, size, theme.lobbyOffWhiteColor);
             view.Players = kit.Text(go.transform, "Players", "", kit.Body, size, theme.lobbyOffWhiteColor);
             view.Status = kit.Text(go.transform, "Status", "", kit.Body, size, theme.lobbyCyanColor);
-            view.Host = kit.Text(go.transform, "Host", "", kit.Body, size, theme.lobbyOffWhiteColor);
+            view.Host = kit.Text(go.transform, "Host", "", kit.Body, size, theme.lobbyOffWhiteColor, richText: false); // typed by a player
             SizeColumn(view.Name.gameObject, 0);
             SizeColumn(view.Mode.gameObject, 1);
             SizeColumn(view.Players.gameObject, 2);

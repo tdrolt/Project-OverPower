@@ -9,17 +9,22 @@ namespace Overpower.Lobby
     public sealed class RepeatWriteGate
     {
         private readonly float window;
-        private string lastSignature;
-        private float lastSentAt;
+        private readonly System.Collections.Generic.Dictionary<string, float> sentAt = new System.Collections.Generic.Dictionary<string, float>();
+        private readonly System.Collections.Generic.List<string> expired = new System.Collections.Generic.List<string>();
 
         public RepeatWriteGate(float windowSeconds) => window = windowSeconds;
 
-        /// <summary>True the first time a signature is seen, and again once the window has passed since it was last sent.</summary>
+        /// <summary>True the first time a signature is seen, and again once the window has passed since it was last sent. Every write sent inside
+        /// the window is remembered (A, then B, then A again is still a repeat of A), and a write older than the window is forgotten.</summary>
         public bool ShouldSend(string signature, float now)
         {
-            if (signature == lastSignature && now - lastSentAt < window) return false;
-            lastSignature = signature;
-            lastSentAt = now;
+            expired.Clear();
+            foreach (var pair in sentAt)
+                if (now - pair.Value >= window) expired.Add(pair.Key);
+            foreach (string key in expired) sentAt.Remove(key);
+
+            if (sentAt.ContainsKey(signature)) return false;
+            sentAt[signature] = now;
             return true;
         }
     }

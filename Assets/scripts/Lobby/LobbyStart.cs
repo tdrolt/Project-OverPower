@@ -204,7 +204,7 @@ namespace Overpower.Lobby
                 string seat = LobbySeatRules.PlaceLateJoiner(seats.Layout, fresh, LobbySeatRules.TeamsForLateJoin(seats.Layout, fixedTeams, eliminated));
                 if (seat == null)
                 {
-                    GiveUpLateJoin("Lobby full");
+                    GiveUpLateJoin(roomManager.Theme.lobbyLateJoinFullText);
                     yield break;
                 }
 
@@ -230,7 +230,7 @@ namespace Overpower.Lobby
             }
             if (PhotonNetwork.InRoom && seats.SeatInRoom() == null && StageOfRoom() >= LobbySeatRules.LobbyWarmup)
             {
-                GiveUpLateJoin("Could not get a seat");
+                GiveUpLateJoin(roomManager.Theme.lobbyLateJoinNoSeatText);
                 yield break;
             }
             lateJoining = null;

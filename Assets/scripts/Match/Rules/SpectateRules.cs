@@ -106,6 +106,19 @@ namespace Overpower.Match
         /// map by yawDegrees exactly as CameraTracking turns its offset (0 = looking up the map, +z). bottomReserve is the share of the
         /// screen's height kept free at the bottom (the spectator bar): the arena is framed in the area above it. The outline is projected
         /// through the camera exactly (a circle round the farthest point framed it too loosely: the outline is no circle). Zero for no outline.</summary>
+        /// <summary>How much of the screen's height a bar of this height (in the canvas's reference pixels) covers, through the canvas scaler: Unity's
+        /// ScaleWithScreenSize scales by 2 to the power of the blend, by the match value, of the log2 of the width ratio and of the height ratio. At
+        /// the reference aspect the share is the bar over the reference height; on a wider screen the scaler grows the bar (match 0.5), on a taller
+        /// one it shrinks it. 0 while the screen size is not known.</summary>
+        public static float BarShareOfScreen(float barHeight, UnityEngine.Vector2 referenceResolution, float match, float screenWidth, float screenHeight)
+        {
+            if (screenWidth <= 0f || screenHeight <= 0f || referenceResolution.x <= 0f || referenceResolution.y <= 0f) return 0f;
+            float logWidth = UnityEngine.Mathf.Log(screenWidth / referenceResolution.x, 2f);
+            float logHeight = UnityEngine.Mathf.Log(screenHeight / referenceResolution.y, 2f);
+            float scale = UnityEngine.Mathf.Pow(2f, UnityEngine.Mathf.Lerp(logWidth, logHeight, UnityEngine.Mathf.Clamp01(match)));
+            return UnityEngine.Mathf.Clamp01(barHeight * scale / screenHeight);
+        }
+
         public static void WholeMapFraming(IReadOnlyList<UnityEngine.Vector2> outline, float verticalFovDegrees, float aspect, float tiltDegrees,
             float heightFill, float yawDegrees, float bottomReserve, out UnityEngine.Vector2 aimPoint, out float distance)
         {

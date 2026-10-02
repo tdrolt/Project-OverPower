@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Overpower.Data;
 using Overpower.Lobby;
+using Photon.Pun;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -42,9 +43,6 @@ namespace Overpower.UI
         /// <summary>Cancel was pressed.</summary>
         public event Action Cancelled;
 
-        /// <summary>Create was pressed and the directory was asked for the lobby.</summary>
-        public event Action CreateRequested;
-
         public bool IsShowing => root != null && root.activeSelf;
         public GameModeDefinition SelectedMode => selected;
         public string LobbyName => nameField != null ? nameField.text : "";
@@ -63,7 +61,7 @@ namespace Overpower.UI
         /// <summary>Opens the screen with the name box prefilled for this player and the first available mode chosen.</summary>
         public void Show(string playerName)
         {
-            int max = config != null ? config.LobbyNameMaxLength : 24;
+            int max = config != null ? config.LobbyNameMaxLength : LobbyConfig.DefaultLobbyNameMaxLength;
             nameField.characterLimit = max;
             nameField.text = LobbyScreenRules.LobbyNamePrefill(playerName, theme.createNamePrefillFormat, max, theme.createNameFallbackText);
             selected = LobbyScreenRules.DefaultMode(Modes);
@@ -133,8 +131,11 @@ namespace Overpower.UI
             errorNote.text = "";
             Refresh();
             Debug.Log($"[LOBBY] create pressed: \"{name}\" {selected.DisplayName}");
-            roomManager.Lobbies.Create(name, selected);
-            CreateRequested?.Invoke();
+            if (!roomManager.Lobbies.Create(name, selected))
+            {
+                // Photon refused the call (not connected, or busy joining): no room was asked for, so no answer will ever come back
+                ShowFailure(theme.createFailedText);
+            }
         }
 
         /// <summary>Redraws the buttons from the current choice.</summary>
@@ -150,7 +151,7 @@ namespace Overpower.UI
                 entry.button.DisabledText = theme.lobbyDimColor;
                 entry.button.SetEnabled(available);
                 entry.soon.gameObject.SetActive(!available);
-                entry.label.rectTransform.offsetMin = new Vector2(0f, available ? 0f : theme.createComingSoonSize * 1.2f);
+                entry.label.rectTransform.offsetMin = new Vector2(0f, available ? 0f : theme.createComingSoonSize * theme.createComingSoonLabelShift);
             }
 
             familyNote.text = selected != null ? FamilyNote(selected.Family) : "";
@@ -171,7 +172,16 @@ namespace Overpower.UI
             sizeNote.gameObject.SetActive(sizeNote.text.Length > 0);
             errorNote.gameObject.SetActive(errorNote.text.Length > 0);
 
-            createButton.SetEnabled(!creating && selected != null && nameField.text.Trim().Length > 0);
+            lastReady = PhotonNetwork.IsConnectedAndReady;
+            createButton.SetEnabled(LobbyScreenRules.CreateMayBePressed(creating, lastReady, selected != null, nameField.text));
+        }
+
+        private bool lastReady;
+
+        /// <summary>Create lobby is greyed while the connection is not ready and comes back by itself when it is.</summary>
+        private void Update()
+        {
+            if (IsShowing && PhotonNetwork.IsConnectedAndReady != lastReady) Refresh();
         }
 
         private string FamilyNote(GameModeFamily family)
@@ -227,18 +237,18 @@ namespace Overpower.UI
 
             kit.Text(content, "Title", theme.createTitleText, kit.Display, theme.createTitleSize, theme.lobbyOffWhiteColor);
 
-            VerticalLayoutGroup nameBlock = LobbyUiKit.VGroup(content, "Lobby name", 12f);
+            VerticalLayoutGroup nameBlock = LobbyUiKit.VGroup(content, "Lobby name", theme.createBlockGap);
             Label(nameBlock.transform, theme.createNameLabelText);
             nameField = kit.InputBox(nameBlock.transform, "Name box", "", theme.createFieldHeight, theme.createFieldTextSize, theme.createFieldPadding,
-                TextAlignmentOptions.MidlineLeft, config != null ? config.LobbyNameMaxLength : 24, false, out _);
+                TextAlignmentOptions.MidlineLeft, config != null ? config.LobbyNameMaxLength : LobbyConfig.DefaultLobbyNameMaxLength, false, out _);
             nameField.onValueChanged.AddListener(_ => { if (IsShowing) Refresh(); });
 
-            VerticalLayoutGroup modeBlock = LobbyUiKit.VGroup(content, "Mode", 12f);
+            VerticalLayoutGroup modeBlock = LobbyUiKit.VGroup(content, "Mode", theme.createBlockGap);
             Label(modeBlock.transform, theme.createModeLabelText);
             BuildFamilyRow(modeBlock.transform);
             familyNote = kit.Text(modeBlock.transform, "Mode note", "", kit.Body, theme.createNoteSize, theme.lobbyMutedColor, TextAlignmentOptions.MidlineLeft, 0f, true);
 
-            VerticalLayoutGroup teamsBlock = LobbyUiKit.VGroup(content, "Teams", 12f);
+            VerticalLayoutGroup teamsBlock = LobbyUiKit.VGroup(content, "Teams", theme.createBlockGap);
             Label(teamsBlock.transform, theme.createTeamsLabelText);
             HorizontalLayoutGroup sizes = LobbyUiKit.HGroup(teamsBlock.transform, "Sizes", theme.createSizeGap, TextAnchor.MiddleLeft);
             sizeRow = sizes.transform;
@@ -291,8 +301,8 @@ namespace Overpower.UI
                 soonRect.anchorMin = new Vector2(0f, 0f);
                 soonRect.anchorMax = new Vector2(1f, 0f);
                 soonRect.pivot = new Vector2(0.5f, 0f);
-                soonRect.anchoredPosition = new Vector2(0f, 4f);
-                soonRect.sizeDelta = new Vector2(0f, theme.createComingSoonSize * 1.3f);
+                soonRect.anchoredPosition = new Vector2(0f, theme.createComingSoonLift);
+                soonRect.sizeDelta = new Vector2(0f, theme.createComingSoonSize * theme.createComingSoonBoxHeight);
                 soon.gameObject.SetActive(false);
                 familyButtons.Add((family, button, button.Fill, button.Label, soon));
             }

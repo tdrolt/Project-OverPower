@@ -74,8 +74,8 @@ namespace Overpower.UI
         /// <summary>The hint line under the name box as drawn.</summary>
         public string HintText => hintLabel != null ? hintLabel.text : "";
 
-        private int MinLength => roomManager != null && roomManager.LobbyCfg != null ? roomManager.LobbyCfg.NameMinLength : 4;
-        private int MaxLength => roomManager != null && roomManager.LobbyCfg != null ? roomManager.LobbyCfg.NameMaxLength : 10;
+        private int MinLength => roomManager != null && roomManager.LobbyCfg != null ? roomManager.LobbyCfg.NameMinLength : LobbyConfig.DefaultNameMinLength;
+        private int MaxLength => roomManager != null && roomManager.LobbyCfg != null ? roomManager.LobbyCfg.NameMaxLength : LobbyConfig.DefaultNameMaxLength;
 
         private void Start()
         {
@@ -151,7 +151,7 @@ namespace Overpower.UI
             columnRect.sizeDelta = new Vector2(theme.nameScreenWidth, 0f);
             column.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            VerticalLayoutGroup title = LobbyUiKit.VGroup(column.transform, "Title", 9f, TextAnchor.UpperCenter);
+            VerticalLayoutGroup title = LobbyUiKit.VGroup(column.transform, "Title", theme.nameScreenTitleGap, TextAnchor.UpperCenter);
             kit.Text(title.transform, "Caption", theme.nameScreenKickerText, kit.Bold, theme.nameScreenKickerSize, theme.lobbyCyanColor,
                 TextAlignmentOptions.Midline, theme.lobbyKickerSpacing);
             TextMeshProUGUI big = kit.OutlinedTitle(title.transform, "OVERPOWER", theme.nameScreenTitleText, theme.nameScreenTitleSize);
@@ -210,7 +210,22 @@ namespace Overpower.UI
 
         /// <summary>Joins Photon's lobby for the list as soon as the connection is ready (checked every frame in Update). A join or a create that
         /// was refused leaves Photon's lobby, and Photon only sends list changes while in it, so those ask for the list again too.</summary>
-        private void RequestList() => enterListWhenConnected = true;
+        private void RequestList()
+        {
+            enterListWhenConnected = true;
+            ConnectIfDropped();
+        }
+
+        /// <summary>A client that dropped off Photon (or never connected) connects again; nothing else will, and the list would wait for ever.
+        /// Also tried every frame while the list is waited for, so a press made mid-disconnect is picked up when the disconnect finishes.</summary>
+        private void ConnectIfDropped()
+        {
+            if (LobbyScreenRules.MustConnectForList(PhotonNetwork.NetworkClientState))
+            {
+                Debug.Log("[LOBBY] not connected - connecting again for the list");
+                PhotonNetwork.ConnectUsingSettings();
+            }
+        }
 
         // ---- moving between the screens ----
 
@@ -280,6 +295,7 @@ namespace Overpower.UI
 
         private void Update()
         {
+            if (enterListWhenConnected) ConnectIfDropped();
             if (enterListWhenConnected && roomManager != null && roomManager.Lobbies != null && PhotonNetwork.IsConnectedAndReady && !PhotonNetwork.InRoom)
             {
                 enterListWhenConnected = false;

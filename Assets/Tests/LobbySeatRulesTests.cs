@@ -616,6 +616,18 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void SeveralRecentWritesAreRememberedNotOnlyTheLastOne()
+        {
+            var gate = new RepeatWriteGate(1f);
+            Assert.IsTrue(gate.ShouldSend("A", 10f));
+            Assert.IsTrue(gate.ShouldSend("B", 10f));
+            Assert.IsFalse(gate.ShouldSend("A", 10.1f), "A went out before B: still a repeat");
+            Assert.IsFalse(gate.ShouldSend("B", 10.2f));
+            Assert.IsTrue(gate.ShouldSend("A", 11.5f), "after the window a lost write is retried");
+            Assert.IsTrue(gate.ShouldSend("B", 11.5f));
+        }
+
+        [Test]
         public void AWriteSignatureNamesEveryKeyAndValueInOrder()
         {
             var a = new SeatWrite(new Dictionary<string, object> { { "sT10", null }, { "sT00", null } }, new Dictionary<string, object> { { "sT10", 4 }, { "sT00", 3 } });

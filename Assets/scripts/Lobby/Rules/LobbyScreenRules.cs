@@ -11,20 +11,6 @@ namespace Overpower.Lobby
     {
         // ---- the players text on a list row ----
 
-        /// <summary>The two parts of a row's players text: "5 / 9" and, when someone watches or the seat counts say spectator seats exist,
-        /// "+1 spec" (the list draws the second part small and muted). Read from the lobby's fill text (lF, "5/9+1"); a room without a
-        /// readable fill text shows the room's own player count over its maximum.</summary>
-        public static void PlayersParts(string fill, int playerCount, int maxPlayers, out string main, out string spectators)
-        {
-            if (LobbySeatRules.TryParseFill(fill, out int filled, out int teamSeats, out int watching))
-            {
-                Parts(filled, teamSeats, watching, out main, out spectators);
-                return;
-            }
-            main = playerCount + " / " + maxPlayers;
-            spectators = "";
-        }
-
         private static void Parts(int filledTeamSeats, int teamSeats, int filledSpectatorSeats, out string main, out string spectators)
         {
             main = filledTeamSeats + " / " + teamSeats;
@@ -32,20 +18,14 @@ namespace Overpower.Lobby
         }
 
         /// <summary>"5 / 9 +1 spec", or "5 / 9" with nobody watching.</summary>
-        public static string PlayersText(string fill, int playerCount, int maxPlayers)
-        {
-            PlayersParts(fill, playerCount, maxPlayers, out string main, out string spectators);
-            return spectators.Length == 0 ? main : main + " " + spectators;
-        }
-
-        /// <summary>The same for a row of the lobby directory, whose fill text is already read into numbers.</summary>
         public static string PlayersText(LobbyEntry entry)
         {
             PlayersPartsOf(entry, out string main, out string spectators);
             return spectators.Length == 0 ? main : main + " " + spectators;
         }
 
-        /// <summary>The two parts for a row of the lobby directory.</summary>
+        /// <summary>The two parts of a lobby row's players text: "5 / 9" and, when someone watches or spectator seats exist, "+1 spec" (the list
+        /// draws the second part small and muted). A row without a readable fill text shows the room's own player count over its maximum.</summary>
         public static void PlayersPartsOf(LobbyEntry entry, out string main, out string spectators)
         {
             if (entry.FillKnown)
@@ -56,6 +36,17 @@ namespace Overpower.Lobby
                 spectators = "";
             }
         }
+
+        // ---- the connection behind the screens ----
+
+        /// <summary>Find a lobby on a client that dropped off Photon (or never connected) must connect again: nothing else will, and the list would
+        /// wait for ever. A client already connecting, joining or disconnecting is left alone (the same check as the rejoin's Leave).</summary>
+        public static bool MustConnectForList(Photon.Realtime.ClientState state) =>
+            Overpower.Match.BackToNameScreenRules.NextStep(state) == Overpower.Match.ReturnStep.Reconnect;
+
+        /// <summary>Create lobby can be pressed: not already creating, connected to the master server, a mode chosen and a name typed.</summary>
+        public static bool CreateMayBePressed(bool creating, bool connectedAndReady, bool hasMode, string name) =>
+            !creating && connectedAndReady && hasMode && !string.IsNullOrWhiteSpace(name);
 
         // ---- the create screen's mode choice ----
 

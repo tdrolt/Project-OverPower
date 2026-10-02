@@ -121,12 +121,11 @@ namespace Overpower.Match
         private static int ReadLobbyMode(Hashtable props) =>
             MatchStartRules.LobbyModeOf(props.TryGetValue(LobbyModeKey, out object raw) ? raw : null);
 
-        /// <summary>Decision 4/17 (R3), extended by L2: before the teams are fixed, any OPEN team (IsTeamOpen,
-        /// honouring the two-team lobby mode); from the countdown on, only a team in the match and not knocked
-        /// out, whatever the mode. RoomManager.EnsureLocalTeamInMatch reads this (a safety net since lobby Task 4: seats
-        /// decide the team, nothing is picked any more).</summary>
+        /// <summary>Decision 4/17 (R3): before the teams are fixed, any team; from the countdown on, only a team in the match and
+        /// not knocked out. RoomManager.EnsureLocalTeamInMatch reads this (a safety net since lobby Task 4: seats decide the team,
+        /// nothing is picked any more).</summary>
         public bool MayJoinTeam(int team) =>
-            MatchStartRules.MayJoin(TeamsFixed, IsInMatch(team), IsEliminated(team), MatchStartRules.IsTeamOpen(LobbyMode, team));
+            MatchStartRules.MayJoin(TeamsFixed, IsInMatch(team), IsEliminated(team));
 
         /// <summary>How many players are on a team right now (spectators and dropped players are not counted): the warm-up bar's
         /// "N players". Counted through CountMembers' reused array, so it allocates nothing per frame.</summary>

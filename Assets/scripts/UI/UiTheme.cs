@@ -1034,50 +1034,6 @@ namespace Overpower.UI
         [Tooltip("Shown for a team the scoreboard cannot name (a player whose team has not arrived yet).")]
         public string scoreboardUnknownTeamText = "Joining";
 
-        [Header("Name screen tips")]
-        [Tooltip("The keys block on the name screen. Written from the Gameplay actions in OverpowerControls (WASD, " +
-                 "left / right mouse, Left Shift, Space, R, P, M, Tab) plus Enter for chat and Escape: if you " +
-                 "rebind a key there, change it here too. <b> makes the heading bold.")]
-        [TextArea(4, 14)] public string nameTipsKeysText =
-            "<b>Keys</b>\n" +
-            "WASD  move\n" +
-            "Mouse  aim, left click shoots\n" +
-            "Right click  Attachment ability\n" +
-            "Left Shift  Mobility ability\n" +
-            "Space  Ultimate ability (meter full)\n" +
-            "R  Vent (see Overheat)\n" +
-            "P  Shop\n" +
-            "M  Map\n" +
-            "Hold Tab  Scoreboard\n" +
-            "Enter  Chat\n" +
-            "Escape  Close the game";
-        [Tooltip("The overheat block on the name screen: what overheat is and what the Vent does.")]
-        [TextArea(3, 8)] public string nameTipsOverheatText =
-            "<b>Overheat and the Vent</b>\n" +
-            "Shooting and Sprint build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\n" +
-            "While locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout.";
-        [Tooltip("The ability charges block on the name screen.")]
-        [TextArea(3, 8)] public string nameTipsChargesText =
-            "<b>Ability charges</b>\n" +
-            "Some abilities hold several charges. Spent charges come back one at a time. Dash locks until 2 charges are back once you use all 3.";
-        [Tooltip("The game mode block on the name screen: capture zones, respawning, winning. Worded so it stays true " +
-                 "whatever the last stand's exact rule is.")]
-        [TextArea(3, 8)] public string nameTipsModeText =
-            "<b>The match</b>\n" +
-            "Capture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake it or take another team's base. The last team standing wins.";
-        [Tooltip("Text size of the name screen tips, in reference pixels.")]
-        [Min(8f)] public float nameTipsFontSize = 20f;
-        [Tooltip("Colour of the name screen tips text.")]
-        public Color nameTipsColor = new Color(1f, 1f, 1f, 0.9f);
-        [Tooltip("Width of the keys column on the name screen, in reference pixels.")]
-        public float nameTipsKeysWidth = 560f;
-        [Tooltip("Width of the column holding the overheat, charges and match blocks, in reference pixels.")]
-        public float nameTipsRulesWidth = 800f;
-        [Tooltip("Empty space between the two tip columns, in reference pixels.")]
-        public float nameTipsColumnGap = 60f;
-        [Tooltip("Distance from the bottom of the Join button to the top of the tips, in reference pixels.")]
-        public float nameTipsGapBelowJoin = 30f;
-
         [Header("Connection lost and rejoin (Task 9e, Tudor D21)")]
         [Tooltip("Title of the panel that appears when your connection to the match drops (ConnectionLostPanel).")]
         public string connectionLostTitle = "Connection lost";
@@ -1577,6 +1533,42 @@ namespace Overpower.UI
         public float lobbyRoomOverlayCloseSize = 60f;
         [Tooltip("The dark layer behind the mode info and How to play pages.")]
         public Color lobbyRoomOverlayShade = new Color(0f, 0f, 0f, 0.7f);
+
+        [Header("Lobby screens: layout, words (lobby Task 9 review)")]
+        [Tooltip("Space between the parts of the lobby list's top row, in reference pixels.")]
+        public float lobbyListHeaderGap = 24f;
+        [Tooltip("Space between the small caption and the heading of the lobby list, in reference pixels.")]
+        public float lobbyListTitleGap = 6f;
+        [Tooltip("Space between the player's name and the Create lobby button, in reference pixels.")]
+        public float lobbyListPlayerGap = 24f;
+        [Tooltip("Space between 'Playing as' and the player's name, in reference pixels.")]
+        public float lobbyListPlayingAsGap = 9f;
+        [Tooltip("Space between the parts of the lobby list's bottom row, in reference pixels.")]
+        public float lobbyListFooterGap = 24f;
+        [Tooltip("How far one turn of the mouse wheel scrolls the lobby list.")]
+        public float lobbyListScrollSensitivity = 40f;
+        [Tooltip("Space between the name, mode and team size blocks of the create screen, in reference pixels.")]
+        public float createBlockGap = 12f;
+        [Tooltip("A mode that is coming soon: how many text heights the mode name is lifted to make room for the words under it.")]
+        public float createComingSoonLabelShift = 1.2f;
+        [Tooltip("A mode that is coming soon: height of the words under the name, in text heights.")]
+        public float createComingSoonBoxHeight = 1.3f;
+        [Tooltip("A mode that is coming soon: how far the words sit above the bottom edge of the button, in reference pixels.")]
+        public float createComingSoonLift = 4f;
+        [Tooltip("Space between the small caption and OVERPOWER on the name screen, in reference pixels.")]
+        public float nameScreenTitleGap = 9f;
+        [Tooltip("Shown when a late joiner finds every seat taken.")]
+        public string lobbyLateJoinFullText = "Lobby full";
+        [Tooltip("Shown when a late joiner's seat request was not answered in time.")]
+        public string lobbyLateJoinNoSeatText = "Could not get a seat";
+        [Tooltip("Shown when a join was refused because the lobby is full.")]
+        public string lobbyJoinFullText = "That lobby is full.";
+        [Tooltip("Shown when a join was refused because the lobby has closed.")]
+        public string lobbyJoinClosedText = "That lobby has closed.";
+        [Tooltip("Shown when a join was refused because the lobby is gone.")]
+        public string lobbyJoinGoneText = "That lobby no longer exists.";
+        [Tooltip("Shown when a join was refused for any other reason.")]
+        public string lobbyJoinFailedText = "Could not join that lobby.";
 
         [Header("Warm-up bar (lobby Task 10)")]
         [Tooltip("Fill of the warm-up bar at the top of the arena.")]

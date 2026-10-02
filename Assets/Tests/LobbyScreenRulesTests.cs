@@ -12,27 +12,25 @@ namespace Overpower.Tests
     {
         // ---- the players text on a list row: "5 / 9 +1 spec"
 
-        [TestCase("2/9+1", 4, 12, "2 / 9", "+1 spec")]
-        [TestCase("0/6+0", 1, 9, "0 / 6", "")]
-        [TestCase("9/9+3", 12, 12, "9 / 9", "+3 spec")]
-        public void ThePlayersTextReadsTheFillText(string fill, int playerCount, int maxPlayers, string main, string spectators)
+        [TestCase(2, 9, 1, 4, 12, "2 / 9", "+1 spec")]
+        [TestCase(0, 6, 0, 1, 9, "0 / 6", "")]
+        [TestCase(9, 9, 3, 12, 12, "9 / 9", "+3 spec")]
+        public void ThePlayersTextReadsTheRowsSeatCounts(int filled, int teamSeats, int watching, int playerCount, int maxPlayers, string main, string spectators)
         {
-            LobbyScreenRules.PlayersParts(fill, playerCount, maxPlayers, out string gotMain, out string gotSpec);
+            var entry = new LobbyEntry { FillKnown = true, FilledTeamSeats = filled, TeamSeats = teamSeats, FilledSpectatorSeats = watching, PlayerCount = playerCount, MaxPlayers = maxPlayers };
+            LobbyScreenRules.PlayersPartsOf(entry, out string gotMain, out string gotSpec);
             Assert.AreEqual(main, gotMain);
             Assert.AreEqual(spectators, gotSpec);
-            Assert.AreEqual(spectators.Length == 0 ? main : main + " " + spectators, LobbyScreenRules.PlayersText(fill, playerCount, maxPlayers));
+            Assert.AreEqual(spectators.Length == 0 ? main : main + " " + spectators, LobbyScreenRules.PlayersText(entry));
         }
 
         [Test]
         public void TheBriefsExamples() =>
-            Assert.AreEqual("2 / 9 +1 spec", LobbyScreenRules.PlayersText("2/9+1", 3, 12));
+            Assert.AreEqual("2 / 9 +1 spec", LobbyScreenRules.PlayersText(new LobbyEntry { FillKnown = true, FilledTeamSeats = 2, TeamSeats = 9, FilledSpectatorSeats = 1, PlayerCount = 3, MaxPlayers = 12 }));
 
-        [TestCase(null)]
-        [TestCase("")]
-        [TestCase("garbage")]
-        [TestCase("2/9")]
-        public void WithoutAReadableFillTheRoomsOwnCountsAreShown(string fill) =>
-            Assert.AreEqual("3 / 9", LobbyScreenRules.PlayersText(fill, 3, 9));
+        [Test]
+        public void WithoutAReadableFillTheRoomsOwnCountsAreShown() =>
+            Assert.AreEqual("3 / 9", LobbyScreenRules.PlayersText(new LobbyEntry { FillKnown = false, PlayerCount = 3, MaxPlayers = 9 }));
 
         [Test]
         public void ARowReadsItsParsedSeatCounts()

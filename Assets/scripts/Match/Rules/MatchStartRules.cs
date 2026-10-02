@@ -37,16 +37,6 @@ namespace Overpower.Match
         /// the same as a room the host never switched.</summary>
         public static int LobbyModeOf(object raw) => raw is int mode && mode == TwoTeams ? TwoTeams : ThreeTeams;
 
-        /// <summary>The teams in the match are fixed the moment the countdown starts (Decision 4): the teams with
-        /// players at that instant, ascending.</summary>
-        public static int[] TeamsWithPlayers(IReadOnlyList<int> membersPerTeam)
-        {
-            var teams = new List<int>(membersPerTeam.Count);
-            for (int i = 0; i < membersPerTeam.Count; i++)
-                if (membersPerTeam[i] > 0) teams.Add(i);
-            return teams.ToArray();
-        }
-
         /// <summary>Warmup/CountingDown/Live, from the two Room Property facts (Decision 1-2): mTeams present means
         /// counting down, mPhase present means live - MatchPhase.Warmup is never stored.</summary>
         public static StartState StartStateFor(bool teamsFixed, bool phaseWritten) =>
@@ -109,17 +99,6 @@ namespace Overpower.Match
         /// match and not knocked out.</summary>
         public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated) =>
             !teamsFixed || (inMatch && !eliminated);
-
-        /// <summary>Decision L2: in two-team mode, only teams 0 and 1 are open before the countdown - team 2 is
-        /// closed so a joiner never lands on the third, disappearing team. Mode 3 leaves every team open (the
-        /// countdown-or-live rule takes over once teamsFixed, in MayJoin below).</summary>
-        public static bool IsTeamOpen(int mode, int team) => mode != TwoTeams || team < TwoTeams;
-
-        /// <summary>Decision L2: before the countdown, a joiner may only pick an open team (IsTeamOpen); from the
-        /// countdown on, the existing rule above wins regardless of teamOpen (a two-team room stays two teams for
-        /// its whole match, but a rejoin still needs to be in the match and not knocked out).</summary>
-        public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated, bool teamOpen) =>
-            teamsFixed ? MayJoin(teamsFixed, inMatch, eliminated) : teamOpen;
 
         /// <summary>The warm-up bar's wording: nothing once live, the countdown while counting down, else the host's line
         /// (the offer to end the warm-up only while HostMayEndWarmup holds, otherwise the blocked wording) or everyone

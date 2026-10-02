@@ -235,9 +235,10 @@ namespace Overpower.Lobby
         }
 
         /// <summary>How much of the screen's height the spectator bar covers from the bottom (its distance from the bottom, its padding and the
-        /// Leave button, the tallest part), from the theme, so the whole map is framed above it.</summary>
+        /// Leave button, the tallest part), from the theme through the bar canvas scaler (so a wide screen reserves more than the reference height says), so the whole map is framed above it.</summary>
         private static float BarShareOfScreen(UiTheme theme) =>
-            Mathf.Clamp01((theme.spectatorBarBottom + theme.spectatorBarLeaveSize.y + 2f * theme.spectatorBarPadding.y) / Mathf.Max(1f, theme.referenceResolution.y));
+            SpectateRules.BarShareOfScreen(theme.spectatorBarBottom + theme.spectatorBarLeaveSize.y + 2f * theme.spectatorBarPadding.y,
+                theme.referenceResolution, theme.matchWidthOrHeight, Screen.width, Screen.height);
 
         // The whole arena in view: the camera follows a marker on the ground, from far enough away (the extra-zoom stack, so the mouse wheel
         // still zooms from there) that the arena fills UiTheme > Spectator bar > Whole map fill of the screen's height, centred.

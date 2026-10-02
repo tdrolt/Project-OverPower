@@ -316,10 +316,11 @@ namespace Overpower.UI
         /// <summary>TextMeshPro's character spacing is in hundredths of the text size: this turns a spacing in reference pixels into it.</summary>
         public static float SpacingFor(float pixels, float textSize) => textSize > 0.01f ? pixels / textSize * 100f : 0f;
 
+        /// <param name="richText">Pass false for text a player typed (a lobby name, a host name): it is drawn as typed, never read for markup.</param>
         /// <remarks>Trap: a line of the display font (Oswald) is about 1.5 times its size tall. A text box shorter than that does not show a smaller
         /// line, it shows no line at all (the ellipsis overflow drops what does not fit vertically), so a heading's box must be at least 1.5 x its size.</remarks>
         public TextMeshProUGUI Text(Transform parent, string name, string text, TMP_FontAsset font, float size, Color colour,
-            TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft, float spacingPixels = 0f, bool wrap = false)
+            TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft, float spacingPixels = 0f, bool wrap = false, bool richText = true)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -334,7 +335,7 @@ namespace Overpower.UI
             if (spacingPixels > 0.01f) tmp.enableKerning = false;
             tmp.enableWordWrapping = wrap;
             tmp.overflowMode = wrap ? TextOverflowModes.Overflow : TextOverflowModes.Ellipsis;
-            tmp.richText = true;
+            tmp.richText = richText;
             tmp.raycastTarget = false;
             return tmp;
         }

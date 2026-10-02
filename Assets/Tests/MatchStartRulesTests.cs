@@ -63,13 +63,6 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheTeamsInTheMatchAreTheTeamsWithPlayersAtThatMoment()
-        {
-            CollectionAssert.AreEqual(new[] { 0, 2 }, MatchStartRules.TeamsWithPlayers(new[] { 2, 0, 1 }));
-            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, MatchStartRules.TeamsWithPlayers(new[] { 1, 1, 1 }));
-        }
-
-        [Test]
         public void OnlyTheCapitalOfATeamLeftOutOfALiveMatchIsOutOfPlay()
         {
             var inMatch = new[] { 0, 1 };
@@ -122,17 +115,6 @@ namespace Overpower.Tests
             Assert.AreEqual(3, MatchStartRules.LobbyModeOf(null), "absent reads as three");
             Assert.AreEqual(3, MatchStartRules.LobbyModeOf("x"), "not an int");
             Assert.AreEqual(3, MatchStartRules.LobbyModeOf(5), "not a mode anyone can write");
-        }
-
-        [Test]
-        public void TwoTeamModeOpensOnlyTheFirstTwoTeamsBeforeTheCountdown()
-        {
-            Assert.IsTrue(MatchStartRules.IsTeamOpen(2, 0));
-            Assert.IsTrue(MatchStartRules.IsTeamOpen(2, 1));
-            Assert.IsFalse(MatchStartRules.IsTeamOpen(2, 2), "the third team is closed in two-team mode");
-            Assert.IsTrue(MatchStartRules.IsTeamOpen(3, 2));
-            Assert.IsFalse(MatchStartRules.MayJoin(teamsFixed: false, inMatch: false, eliminated: false, teamOpen: false));
-            Assert.IsTrue(MatchStartRules.MayJoin(true, true, false, false), "after the countdown the existing rule wins");
         }
 
         private static readonly SeatLayout ThreeTeamLobby = new SeatLayout(new[] { 0, 1, 2 }, 3, 2);

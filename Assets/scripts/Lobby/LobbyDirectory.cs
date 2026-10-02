@@ -5,6 +5,7 @@ using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
 using Photon.Pun;
+using Overpower.UI;
 using Photon.Realtime;
 using UnityEngine;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -20,9 +21,6 @@ namespace Overpower.Lobby
     {
         /// <summary>How often a create is retried with a fresh room name when Photon says the name is taken.</summary>
         public const int MaxCreateRetries = 3;
-
-        /// <summary>The lobby name length used when no LobbyConfig is assigned (an error is logged once in Init).</summary>
-        private const int FallbackNameMaxLength = 24;
 
         private RoomManager roomManager;
         private GameModeCatalogue catalogue;
@@ -66,7 +64,7 @@ namespace Overpower.Lobby
             catalogue = modes;
             config = lobbyConfig;
             if (config == null)
-                Debug.LogError("[LOBBY] RoomManager has no LobbyConfig assigned - lobby names are cut at " + FallbackNameMaxLength + " characters and duplicate names use the format \"" + LobbyConfig.DefaultDuplicateNameFormat + "\".");
+                Debug.LogError("[LOBBY] RoomManager has no LobbyConfig assigned - lobby names are cut at " + LobbyConfig.DefaultLobbyNameMaxLength + " characters and duplicate names use the format \"" + LobbyConfig.DefaultDuplicateNameFormat + "\".");
         }
 
         /// <summary>Starts receiving the room list: joins Photon's default lobby when connected and not already in a room or
@@ -78,13 +76,17 @@ namespace Overpower.Lobby
         }
 
         /// <summary>Creates a lobby: a new room, visible and open, carrying its name, mode, stage and host.</summary>
-        public void Create(string displayName, GameModeDefinition mode)
+        public bool Create(string displayName, GameModeDefinition mode)
         {
             pendingName = displayName;
             pendingMode = mode;
             createRetries = 0;
-            CreatePending();
+            if (CreatePending()) return true;
+            pendingMode = null; // a refused call leaves nothing pending
+            return false;
         }
+
+        public bool HasPendingCreate => pendingMode != null;
 
         /// <summary>Joins the lobby with this room name.</summary>
         public void Join(string roomName)
@@ -92,9 +94,9 @@ namespace Overpower.Lobby
             pendingJoin = PhotonNetwork.JoinRoom(roomName); // a refused call leaves no flag behind
         }
 
-        private void CreatePending()
+        private bool CreatePending()
         {
-            int maxLen = config != null ? config.LobbyNameMaxLength : FallbackNameMaxLength;
+            int maxLen = config != null ? config.LobbyNameMaxLength : LobbyConfig.DefaultLobbyNameMaxLength;
             string name = (pendingName ?? "").Trim();
             if (name.Length > maxLen) name = name.Substring(0, maxLen);
 
@@ -122,7 +124,7 @@ namespace Overpower.Lobby
             };
             string roomName = "L_" + Guid.NewGuid().ToString("N").Substring(0, 8);
             Debug.Log($"[LOBBY] creating {roomName} \"{name}\" mode {pendingMode.Id}, {options.MaxPlayers} places");
-            PhotonNetwork.CreateRoom(roomName, options, TypedLobby.Default);
+            return PhotonNetwork.CreateRoom(roomName, options, TypedLobby.Default);
         }
 
         public override void OnCreateRoomFailed(short returnCode, string message)
@@ -131,8 +133,7 @@ namespace Overpower.Lobby
             if (returnCode == ErrorCode.GameIdAlreadyExists && createRetries < MaxCreateRetries)
             {
                 createRetries++;
-                CreatePending();
-                return;
+                if (CreatePending()) return; // a refused retry falls through to the failure below
             }
             Debug.LogWarning($"[LOBBY] could not create a lobby ({returnCode}): {message}");
             pendingMode = null;
@@ -159,22 +160,23 @@ namespace Overpower.Lobby
             bool wasJoining = pendingJoin;
             pendingJoin = false;
             bool rejoinBusy = roomManager != null && roomManager.Rejoin != null && roomManager.Rejoin.CurrentStage != RejoinController.Stage.Idle;
-            if (!wasJoining || rejoinBusy) return;
+            if (!wasJoining || rejoinBusy || roomManager == null || roomManager.Theme == null) return;
 
             Debug.Log($"[LOBBY] join refused ({returnCode}): {message}");
-            JoinFailed?.Invoke(JoinFailureText(returnCode));
+            JoinFailed?.Invoke(JoinFailureText(returnCode, roomManager.Theme));
         }
 
         /// <summary>A join that went through but then had to be undone (a running lobby with no free seat, lobby Task 7): reported to the
         /// list like a refused join.</summary>
         public void ReportJoinRefused(string reason) => JoinFailed?.Invoke(reason);
 
-        public static string JoinFailureText(short returnCode)
+        /// <summary>The short line that tells why a join was refused, in the theme's words.</summary>
+        public static string JoinFailureText(short returnCode, UiTheme theme)
         {
-            if (returnCode == ErrorCode.GameFull) return "That lobby is full.";
-            if (returnCode == ErrorCode.GameClosed) return "That lobby has closed.";
-            if (returnCode == ErrorCode.GameDoesNotExist) return "That lobby no longer exists.";
-            return "Could not join that lobby.";
+            if (returnCode == ErrorCode.GameFull) return theme.lobbyJoinFullText;
+            if (returnCode == ErrorCode.GameClosed) return theme.lobbyJoinClosedText;
+            if (returnCode == ErrorCode.GameDoesNotExist) return theme.lobbyJoinGoneText;
+            return theme.lobbyJoinFailedText;
         }
 
         public override void OnRoomListUpdate(List<RoomInfo> roomList)
