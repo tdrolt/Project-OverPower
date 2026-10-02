@@ -3,10 +3,10 @@ using Photon.Realtime;
 
 namespace Overpower.Match
 {
-    /// <summary>What the result panel's button does (Task 9f, Tudor D22).</summary>
-    public enum ResultButtonAction { CloseGame, BackToNameScreen }
+    /// <summary>What the result panel's button does (Task 9f, Tudor D22; lobby Task 8: it leads back to the lobby list).</summary>
+    public enum ResultButtonAction { CloseGame, BackToLobbyList }
 
-    /// <summary>What the return-to-the-name-screen sequence does next while it waits for the connection.</summary>
+    /// <summary>What the return-to-the-lobby-list sequence does next while it waits for the connection.</summary>
     public enum ReturnStep { Wait, ReloadScene, Reconnect }
 
     /// <summary>Task 9f (Tudor D22): after a match the result screen's button starts a fresh game on the name screen instead of
@@ -18,7 +18,11 @@ namespace Overpower.Match
         /// knocked-out player sees their lose panel mid-match: their button stays a plain Quit, so they cannot re-join the running
         /// room as a fresh player on another team. The waiting panel's button is a Quit too.</summary>
         public static ResultButtonAction ButtonAction(MatchPhase phase) =>
-            phase == MatchPhase.Over ? ResultButtonAction.BackToNameScreen : ResultButtonAction.CloseGame;
+            phase == MatchPhase.Over ? ResultButtonAction.BackToLobbyList : ResultButtonAction.CloseGame;
+
+        /// <summary>The button's label follows what it will do (UiTheme texts).</summary>
+        public static string ButtonLabel(ResultButtonAction action, string lobbyListLabel, string quitLabel) =>
+            action == ResultButtonAction.BackToLobbyList ? lobbyListLabel : quitLabel;
 
         /// <summary>The wait for the leave timed out: unless the client is on the master server, disconnect before the scene is rebuilt so
         /// the new scene's Start connects from a clean state (it only connects when not connected).</summary>

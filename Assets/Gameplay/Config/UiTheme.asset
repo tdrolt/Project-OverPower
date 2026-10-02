@@ -377,7 +377,7 @@ MonoBehaviour:
   rejoinFailedOkButton: OK
   rejoinPlaceHeldText: You still hold a place in a match you dropped out of, but it could not be reached. Try again in a minute, or join a new match once it is given up.
   rejoinMatchButton: Rejoin your match
-  resultButtonMainMenu: Main menu
+  resultButtonLobbyList: Back to the lobby list
   resultButtonQuit: Quit
   spectateButton: Spectate
   spectateNextButton: Next

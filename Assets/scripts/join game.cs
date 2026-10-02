@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using System.Text.RegularExpressions;
 using Photon.Pun;
 using TMPro;
+using Overpower.Lobby;
 using Overpower.Net;
 using Overpower.UI;
 
@@ -37,12 +38,42 @@ public class JoinGameUI : MonoBehaviourPunCallbacks
             nameInput.text = PhotonNetwork.NickName;
         if (roomManager != null && roomManager.Rejoin != null)
             roomManager.Rejoin.ReturnToNameScreen += ShowNameScreenAgain;
+
+        // Lobby Task 8: coming back from a match (or a spectator's Leave) skips the name step and goes to the lobby list. The list screen
+        // is lobby Task 9; until then the name panel is simply hidden and the list is loaded (logged below).
+        openListWhenConnected = LobbyReturn.Consume();
+        if (openListWhenConnected)
+        {
+            if (joinUIPanel != null) joinUIPanel.SetActive(false);
+            if (roomManager != null && roomManager.Lobbies != null)
+                roomManager.Lobbies.ListChanged += LogBackOnTheList;
+            if (PhotonNetwork.IsConnectedAndReady)
+                EnterTheList();
+        }
+    }
+
+    private bool openListWhenConnected;
+
+    private void EnterTheList()
+    {
+        openListWhenConnected = false;
+        if (roomManager != null && roomManager.Lobbies != null)
+            roomManager.Lobbies.EnterList();
+    }
+
+    private void LogBackOnTheList()
+    {
+        if (roomManager == null || roomManager.Lobbies == null) return;
+        roomManager.Lobbies.ListChanged -= LogBackOnTheList;
+        Debug.Log($"[LOBBY] back on the list ({roomManager.Lobbies.Entries.Count} lobbies)");
     }
 
     void OnDestroy()
     {
         if (roomManager != null && roomManager.Rejoin != null)
             roomManager.Rejoin.ReturnToNameScreen -= ShowNameScreenAgain;
+        if (roomManager != null && roomManager.Lobbies != null)
+            roomManager.Lobbies.ListChanged -= LogBackOnTheList;
     }
 
     void Update()
@@ -143,6 +174,8 @@ public class JoinGameUI : MonoBehaviourPunCallbacks
 
     public override void OnConnectedToMaster()
     {
+        if (openListWhenConnected)
+            EnterTheList();
         if (!joinRequestedEarly)
             return;
 

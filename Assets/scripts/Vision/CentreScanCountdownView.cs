@@ -82,11 +82,20 @@ namespace Overpower.Vision
                 label.text = text;
                 minimapLabel.text = text;
             }
-            minimapLabel.fontSize = theme.scanMinimapCountdownFontSize;
-            minimapLabel.color = config.ScanWaveColour;
-            PlaceUnderCornerMinimap(theme);
-            if (!minimapLabel.gameObject.activeSelf)
-                minimapLabel.gameObject.SetActive(true);
+            // A seat spectator has no corner minimap, so the label under it would float at the right edge: only the one over the tower stays.
+            if (Overpower.Net.Teams.IsSpectator(Photon.Pun.PhotonNetwork.LocalPlayer))
+            {
+                if (minimapLabel.gameObject.activeSelf)
+                    minimapLabel.gameObject.SetActive(false);
+            }
+            else
+            {
+                minimapLabel.fontSize = theme.scanMinimapCountdownFontSize;
+                minimapLabel.color = config.ScanWaveColour;
+                PlaceUnderCornerMinimap(theme);
+                if (!minimapLabel.gameObject.activeSelf)
+                    minimapLabel.gameObject.SetActive(true);
+            }
 
             Vector3 screenPoint = cam.WorldToScreenPoint(scan.CountdownPosition);
             if (screenPoint.z < 0f)

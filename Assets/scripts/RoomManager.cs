@@ -300,20 +300,27 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// <summary>The view id of the body THIS client last spawned itself (SpawnPlayerOnTeam); -1 = none.</summary>
     private int spawnedBodyViewId = -1;
 
-    // ---- back to the name screen (Task 9f, Tudor D22) ----
+    // ---- back to the lobby list (Task 9f, Tudor D22; lobby Task 8) ----
 
     private bool returningToNameScreen;
 
-    /// <summary>The result screen's button: leave the room for good, then REBUILD the scene and land on the name screen. The scene is
+    /// <summary>The result screen's button (and a spectator's Leave): leave the room for good, then REBUILD the scene and land back in
+    /// Photon's lobby with the list loaded (the rebuilt name screen sees LobbyReturn and goes straight to the list; the typed name is kept).
+    /// The scene is
     /// reloaded (rather than only hiding panels) because everything a match leaves in it - territory, capitals, zones, packs, portals,
     /// minimap, chat, panels, scoreboard - is then a fresh copy by construction instead of a list of things to remember to clear.
     /// The connection stays up on the master server, so Join works at once. LeaveRoom(false) frees the seat, OnLeftRoom resets
     /// the match properties, and the saved match is forgotten so the name screen offers no Rejoin.</summary>
-    public void ReturnToNameScreen()
+    public void ReturnToLobbyList()
     {
         if (returningToNameScreen)
             return;
         returningToNameScreen = true;
+
+        // The name kept is the one typed, not the numbered copy ("Tudor 2") the lobby just left may have shown.
+        if (Seats != null && !string.IsNullOrEmpty(Seats.TypedNickName))
+            PhotonNetwork.NickName = Seats.TypedNickName;
+        LobbyReturn.OpenListOnLoad = true;
 
         Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
         PlayerIdentity.ClearLastMatch();

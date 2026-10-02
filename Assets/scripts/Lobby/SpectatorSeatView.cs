@@ -125,8 +125,8 @@ namespace Overpower.Lobby
             Refresh();
         }
 
-        /// <summary>The bar's Leave: back to the lobby list (for now the name screen, until lobby Task 8).</summary>
-        public void Leave() => roomManager?.ReturnToNameScreen();
+        /// <summary>The bar's Leave: back to the lobby list.</summary>
+        public void Leave() => roomManager?.ReturnToLobbyList();
 
         private void Step(bool next)
         {

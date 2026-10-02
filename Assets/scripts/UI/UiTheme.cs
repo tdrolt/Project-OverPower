@@ -1125,8 +1125,9 @@ namespace Overpower.UI
         public string rejoinFailedOkButton = "OK";
         [Tooltip("The name screen's button, shown while a match you dropped out of is still holding your place.")]
         public string rejoinMatchButton = "Rejoin your match";
-        [Tooltip("Label of the result screen's button once the match is really over: it leads back to the name screen.")]
-        public string resultButtonMainMenu = "Main menu";
+        [Tooltip("Label of the result screen's button once the match is really over: it leads back to the lobby list.")]
+        [UnityEngine.Serialization.FormerlySerializedAs("resultButtonMainMenu")]
+        public string resultButtonLobbyList = "Back to the lobby list";
         [Tooltip("Label of the same button while the match is still running (a knocked-out player's lose screen): it closes the game.")]
         public string resultButtonQuit = "Quit";
         [Tooltip("Width of the connection lost panel, in reference pixels.")]

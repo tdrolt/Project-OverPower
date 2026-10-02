@@ -10,8 +10,25 @@ namespace Overpower.Tests
         // ---- the panel button (decided by the match PHASE: a knocked-out player's lose panel shows mid-match)
 
         [Test]
-        public void WhenTheMatchIsReallyOverTheButtonGoesBackToTheNameScreen() =>
-            Assert.AreEqual(ResultButtonAction.BackToNameScreen, BackToNameScreenRules.ButtonAction(MatchPhase.Over));
+        public void WhenTheMatchIsReallyOverTheButtonGoesBackToTheLobbyList() =>
+            Assert.AreEqual(ResultButtonAction.BackToLobbyList, BackToNameScreenRules.ButtonAction(MatchPhase.Over));
+
+        [Test]
+        public void TheLabelFollowsTheActionFromTheThemeFields()
+        {
+            Assert.AreEqual("Back to the lobby list", BackToNameScreenRules.ButtonLabel(ResultButtonAction.BackToLobbyList, "Back to the lobby list", "Quit"));
+            Assert.AreEqual("Quit", BackToNameScreenRules.ButtonLabel(ResultButtonAction.CloseGame, "Back to the lobby list", "Quit"));
+        }
+
+        [Test]
+        public void ReturningToTheListIsRememberedOnceForTheRebuiltScene()
+        {
+            Overpower.Lobby.LobbyReturn.OpenListOnLoad = false;
+            Assert.IsFalse(Overpower.Lobby.LobbyReturn.Consume(), "nothing asked for the list");
+            Overpower.Lobby.LobbyReturn.OpenListOnLoad = true;
+            Assert.IsTrue(Overpower.Lobby.LobbyReturn.Consume(), "the rebuilt name screen opens on the list");
+            Assert.IsFalse(Overpower.Lobby.LobbyReturn.Consume(), "and only once");
+        }
 
         [TestCase(MatchPhase.Warmup)]
         [TestCase(MatchPhase.ThreeTeams)]
