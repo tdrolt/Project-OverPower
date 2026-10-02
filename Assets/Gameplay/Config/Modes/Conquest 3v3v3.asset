@@ -25,27 +25,29 @@ MonoBehaviour:
   lobbyModeValue: 3
   infoCards:
   - title: Goal
-    text: Be the last team standing. A team is out once its base has been captured
-      and all its players are down.
+    text: Be the last team standing. Take the enemy capitals, then finish off their
+      players.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Zones
-    text: The arena is covered in zones. Stand inside a zone to capture it. Every
-      zone your team holds pays you gold as the match goes on.
+    text: You can only capture a zone next to one your team holds. Tier 3 zones fall
+      fastest. Your capital heals you quickest; Tier 2 zones heal you more slowly.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Gold and upgrades
-    text: Gold comes from the zones your team holds. Spend it in the shop on weapon
-      upgrades, abilities and armor. Your first attachment and movement ability are
-      free.
+    text: Every zone you hold outside your capital pays your whole team gold while
+      you keep it. Spend it in the shop inside your own territory when you're out
+      of combat, or while you wait to respawn. Hold a zone long enough and it builds
+      a bounty; whoever takes it from you collects it. Your first attachment and
+      movement ability are free.
     accent: {r: 0.9098039, g: 0.7254902, b: 0.19215687, a: 1}
   - title: Last stand
-    text: A team that loses its base cannot respawn. It is out only when every one
-      of its players is down, and retaking a base brings the waiting players back.
+    text: Lose your capital and your team stops respawning. Win it back, or take
+      an enemy capital, before the last of you falls.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: The map shrinks
-    text: As the match goes on, the playable area closes in from the edges and pushes
-      everyone toward the middle.
+    text: When the first team is knocked out, its corner of the map closes and the
+      remaining teams fight in a smaller arena.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Centre scan
-    text: At regular intervals the centre sends out a wave. The team holding the
-      centre sees enemy dots on its minimap and the current state of every zone.
+    text: The centre sends out a scan on a fixed clock. If your team holds the centre
+      when a scan starts, you see every enemy it passes over.
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}

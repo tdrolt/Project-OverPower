@@ -3,6 +3,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using Overpower.Data;
+using Overpower.Lobby;
 using Overpower.Match;
 using Overpower.Net;
 using Overpower.UI;
@@ -34,6 +35,19 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Tooltip("Read for the Connection lost panel and the name screen's Rejoin your match button.")]
     [SerializeField] private UiTheme theme;
 
+    [Header("Lobbies (lobby Task 2)")]
+    [Tooltip("Every game mode a lobby can be created with. The interim Join button creates its room with the first available one.")]
+    [SerializeField] private GameModeCatalogue modeCatalogue;
+
+    [Tooltip("Read for how long a lobby name may be.")]
+    [SerializeField] private LobbyConfig lobbyConfig;
+
+    /// <summary>The live lobby list, and creating and joining lobbies (lobby Task 2).</summary>
+    public LobbyDirectory Lobbies { get; private set; }
+
+    /// <summary>True from pressing the interim Join button until a room is joined: only then does joining the lobby go on to join a random room.</summary>
+    private bool joiningRandom;
+
     /// <summary>The client side of coming back after a drop (Task 9e). The name screen asks it whether to offer a rejoin.</summary>
     public RejoinController Rejoin { get; private set; }
 
@@ -49,6 +63,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // Created in Awake, not Start: the name screen (JoinGameUI.Start) subscribes to it and Start order is not fixed.
         Rejoin = gameObject.AddComponent<RejoinController>();
         Rejoin.Init(theme, RejoinWindowSeconds);
+        Lobbies = gameObject.AddComponent<LobbyDirectory>();
+        Lobbies.Init(this, modeCatalogue, lobbyConfig);
     }
 
     void Start()
@@ -81,13 +97,19 @@ public class RoomManager : MonoBehaviourPunCallbacks
     // ✅ Called from UI when "Join Game" is pressed
     public void JoinGame()
     {
-        PhotonNetwork.JoinLobby();
+        joiningRandom = true;
+        if (PhotonNetwork.InLobby)
+            PhotonNetwork.JoinRandomRoom();
+        else
+            PhotonNetwork.JoinLobby();
     }
 
     public override void OnJoinedLobby()
     {
         Debug.Log("Joined Lobby");
-        PhotonNetwork.JoinRandomRoom();
+        // Entering the lobby for the list (LobbyDirectory.EnterList) must not also join a room.
+        if (joiningRandom)
+            PhotonNetwork.JoinRandomRoom();
     }
 
     public override void OnJoinRandomFailed(short returnCode, string message)
@@ -98,18 +120,24 @@ public class RoomManager : MonoBehaviourPunCallbacks
             return;
 
         Debug.Log($"No room found ({returnCode}), creating one.");
-        string roomName = "Room_" + Random.Range(1000, 9999);
-        RoomOptions options = new RoomOptions();
-        options.MaxPlayers = (byte)(TeamSize * 3);   // 3 teams at the hard cap
-        // Task 9e (Tudor D21): a player whose connection drops stays in the room as an inactive actor for this long, keeping
-        // their team, gold and loadout (Player Properties) and their body, and can come back as the same player. Part of the
-        // room's options, so every build in a room must match this one.
-        options.PlayerTtl = RejoinRules.PlayerTtlMs(RejoinWindowSeconds);
-        PhotonNetwork.CreateRoom(roomName, options, TypedLobby.Default);
+        // Every room is a lobby now (lobby Task 2): created through the directory so it carries the lobby properties.
+        // The interim path uses the catalogue's first available mode; Task 9 replaces it with the create screen.
+        GameModeDefinition mode = null;
+        if (modeCatalogue != null)
+            foreach (GameModeDefinition m in modeCatalogue.Modes)
+                if (m != null && m.Available) { mode = m; break; }
+        if (mode == null)
+        {
+            Debug.LogError("[LOBBY] RoomManager has no available game mode in its catalogue - cannot create a room.");
+            joiningRandom = false;
+            return;
+        }
+        Lobbies.Create(PhotonNetwork.NickName + "'s lobby", mode);
     }
 
     public override void OnJoinedRoom()
     {
+        joiningRandom = false;
         Debug.Log($"Joined Room: {PhotonNetwork.CurrentRoom.Name}");
 
         // Task 9e: the same actor coming back (ReconnectAndRejoin / RejoinRoom) is not a new player. Its team, gold and loadout
