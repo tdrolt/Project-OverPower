@@ -87,9 +87,10 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ARoomThatIsClosedWhenFirstSeenIsNeverAdded()
+        public void ARoomThatIsClosedWhenFirstSeenIsNeverAddedButItsNeighbourIs()
         {
-            Assert.IsEmpty(Merged(1, Room("L_a", open: false)));
+            var cache = Merged(1, Room("L_closed", open: false), Room("L_open"));
+            CollectionAssert.AreEquivalent(new[] { "L_open" }, cache.Keys);
         }
 
         [Test]
@@ -129,5 +130,88 @@ namespace Overpower.Tests
             var bare = new RoomSnapshot { Name = "x", IsOpen = true, IsVisible = true, PlayerCount = 0, MaxPlayers = 9, Properties = null };
             Assert.AreEqual("x", Merged(1, bare)["x"].DisplayName);
         }
+
+        private static RoomSnapshot WithProps(IDictionary props) =>
+            new RoomSnapshot { Name = "p", IsOpen = true, IsVisible = true, PlayerCount = 1, MaxPlayers = 9, Properties = props };
+
+        [Test]
+        public void IntegerPropertiesArriveAsAnyIntegerWidth()
+        {
+            // Photon can hand a number back as a byte, short or long depending on how it travelled
+            var asByte = Merged(1, WithProps(new Hashtable { { LobbyKeys.Mode, (byte)3 }, { LobbyKeys.Stage, (byte)1 } }))["p"];
+            Assert.AreEqual(3, asByte.ModeId);
+            Assert.AreEqual(1, asByte.Stage);
+            var asShort = Merged(1, WithProps(new Hashtable { { LobbyKeys.Mode, (short)2 } }))["p"];
+            Assert.AreEqual(2, asShort.ModeId);
+            var asLong = Merged(1, WithProps(new Hashtable { { LobbyKeys.Mode, 7L } }))["p"];
+            Assert.AreEqual(7, asLong.ModeId);
+        }
+
+        [Test]
+        public void ALongTooBigForAnIntFallsBack()
+        {
+            var e = Merged(1, WithProps(new Hashtable { { LobbyKeys.Mode, long.MaxValue } }))["p"];
+            Assert.AreEqual(-1, e.ModeId);
+        }
+
+        [Test]
+        public void ATextWhereANumberBelongsFallsBack()
+        {
+            var e = Merged(1, WithProps(new Hashtable { { LobbyKeys.Mode, "3" }, { LobbyKeys.Stage, "1" } }))["p"];
+            Assert.AreEqual(-1, e.ModeId);
+            Assert.AreEqual(0, e.Stage);
+        }
+
+        [Test]
+        public void ARoomWithoutAHostShowsAQuestionMark()
+        {
+            var e = Merged(1, Room("L_a", host: null))["L_a"];
+            Assert.AreEqual("?", e.HostName);
+        }
+
+        [Test]
+        public void AnEmptyHostNameAlsoShowsAQuestionMark()
+        {
+            var e = Merged(1, WithProps(new Hashtable { { LobbyKeys.Host, "" } }))["p"];
+            Assert.AreEqual("?", e.HostName);
+        }
+
+        [Test]
+        public void TheRealPhotonHashtableReadsLikeAnyOther()
+        {
+            var props = new ExitGames.Client.Photon.Hashtable
+            {
+                { LobbyKeys.Name, "Alpha" }, { LobbyKeys.Mode, 1 }, { LobbyKeys.Stage, 2 }, { LobbyKeys.Host, "Tudor" },
+            };
+            var e = Merged(1, WithProps(props))["p"];
+            Assert.AreEqual("Alpha", e.DisplayName);
+            Assert.AreEqual(1, e.ModeId);
+            Assert.AreEqual(2, e.Stage);
+            Assert.AreEqual("Tudor", e.HostName);
+        }
+
+        [Test]
+        public void NewestFirstUsesTheCreationStampWhenTheRoomCarriesOne()
+        {
+            // seen in the opposite order to how they were made: the stamp wins over first-seen
+            var cache = new Dictionary<string, LobbyEntry>();
+            LobbyListCache.Merge(cache, new[] { WithName("made-later", new Hashtable { { LobbyKeys.Created, 900 } }) }, 1);
+            LobbyListCache.Merge(cache, new[] { WithName("made-earlier", new Hashtable { { LobbyKeys.Created, 100 } }) }, 2);
+            var names = LobbyListCache.Sorted(cache.Values).Select(e => e.RoomName).ToArray();
+            CollectionAssert.AreEqual(new[] { "made-later", "made-earlier" }, names);
+        }
+
+        [Test]
+        public void ARoomWithoutAStampSortsByFirstSeenAfterStampedOnes()
+        {
+            var cache = new Dictionary<string, LobbyEntry>();
+            LobbyListCache.Merge(cache, new[] { WithName("old-build", new Hashtable()) }, 5);
+            LobbyListCache.Merge(cache, new[] { WithName("stamped", new Hashtable { { LobbyKeys.Created, 1 } }) }, 6);
+            var names = LobbyListCache.Sorted(cache.Values).Select(e => e.RoomName).ToArray();
+            CollectionAssert.AreEqual(new[] { "stamped", "old-build" }, names);
+        }
+
+        private static RoomSnapshot WithName(string name, IDictionary props) =>
+            new RoomSnapshot { Name = name, IsOpen = true, IsVisible = true, PlayerCount = 1, MaxPlayers = 12, Properties = props };
     }
 }

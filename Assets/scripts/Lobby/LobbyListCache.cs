@@ -16,6 +16,14 @@ namespace Overpower.Lobby
         public int MaxPlayers;
         /// <summary>When this client first saw the room (any increasing number); keeps the newest-first order steady.</summary>
         public long FirstSeen;
+        /// <summary>The room's creation stamp (lC), when it carries one.</summary>
+        public bool CreatedKnown;
+        public long Created;
+
+        /// <summary>What "newest first" sorts by: the creation stamp when there is one, else when this client first saw the
+        /// room, placed after every stamped room (a room from an old build is older than any stamped one).</summary>
+        public long SortTime => CreatedKnown ? Created : FirstSeen - OldBuildOffset;
+        private const long OldBuildOffset = 1L << 40;
 
         public string ModeIdText => ModeId < 0 ? "?" : ModeId.ToString();
         public LobbyStage StageValue => Stage == 1 ? LobbyStage.Warmup : Stage == 2 ? LobbyStage.InMatch : LobbyStage.Lobby;
@@ -59,6 +67,8 @@ namespace Overpower.Lobby
                     PlayerCount = room.PlayerCount,
                     MaxPlayers = room.MaxPlayers,
                     FirstSeen = firstSeen,
+                    CreatedKnown = HasInt(room.Properties, LobbyKeys.Created),
+                    Created = IntProp(room.Properties, LobbyKeys.Created, 0),
                 };
             }
         }
@@ -69,10 +79,12 @@ namespace Overpower.Lobby
             LobbyListRules.ActionFor(new SeatLayout(new int[1], e.MaxPlayers, 0), e.PlayerCount, 0);
 
         public static IReadOnlyList<LobbyEntry> Sorted(IEnumerable<LobbyEntry> entries) =>
-            LobbyListRules.Sort(entries, ActionOf, e => e.StageValue, e => e.FirstSeen);
+            LobbyListRules.Sort(entries, ActionOf, e => e.StageValue, e => e.SortTime);
 
         private static string StringProp(IDictionary props, string key, string fallback) =>
             props != null && props.Contains(key) && props[key] is string s && s.Length > 0 ? s : fallback;
+
+        private static bool HasInt(IDictionary props, string key) => IntProp(props, key, int.MinValue) != int.MinValue;
 
         private static int IntProp(IDictionary props, string key, int fallback)
         {

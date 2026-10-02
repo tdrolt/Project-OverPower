@@ -45,7 +45,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// <summary>The live lobby list, and creating and joining lobbies (lobby Task 2).</summary>
     public LobbyDirectory Lobbies { get; private set; }
 
-    /// <summary>True from pressing the interim Join button until a room is joined: only then does joining the lobby go on to join a random room.</summary>
+    /// <summary>True from pressing the interim Join button (when not yet in the lobby) until OnJoinedLobby consumes it: only then does joining the lobby go on to join a random room.</summary>
     private bool joiningRandom;
 
     /// <summary>The client side of coming back after a drop (Task 9e). The name screen asks it whether to offer a rejoin.</summary>
@@ -97,11 +97,17 @@ public class RoomManager : MonoBehaviourPunCallbacks
     // ✅ Called from UI when "Join Game" is pressed
     public void JoinGame()
     {
-        joiningRandom = true;
         if (PhotonNetwork.InLobby)
+        {
             PhotonNetwork.JoinRandomRoom();
+        }
         else
+        {
+            // Only this branch waits for OnJoinedLobby; the flag is consumed there, so a join that fails some other way can
+            // never later turn LobbyDirectory.EnterList() into a random join.
+            joiningRandom = true;
             PhotonNetwork.JoinLobby();
+        }
     }
 
     public override void OnJoinedLobby()
@@ -109,7 +115,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
         Debug.Log("Joined Lobby");
         // Entering the lobby for the list (LobbyDirectory.EnterList) must not also join a room.
         if (joiningRandom)
+        {
+            joiningRandom = false;
             PhotonNetwork.JoinRandomRoom();
+        }
     }
 
     public override void OnJoinRandomFailed(short returnCode, string message)

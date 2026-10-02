@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using ExitGames.Client.Photon;
 using Overpower.Data;
 using Overpower.Match;
+using Overpower.Net;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
@@ -20,6 +21,9 @@ namespace Overpower.Lobby
         /// <summary>How often a create is retried with a fresh room name when Photon says the name is taken.</summary>
         public const int MaxCreateRetries = 3;
 
+        /// <summary>The lobby name length used when no LobbyConfig is assigned (an error is logged once in Init).</summary>
+        private const int FallbackNameMaxLength = 24;
+
         private RoomManager roomManager;
         private GameModeCatalogue catalogue;
         private LobbyConfig config;
@@ -28,6 +32,7 @@ namespace Overpower.Lobby
         private IReadOnlyList<LobbyEntry> sorted = new List<LobbyEntry>();
         private bool sortedStale;
 
+        private bool pendingJoin;
         private string pendingName;
         private GameModeDefinition pendingMode;
         private int createRetries;
@@ -60,6 +65,8 @@ namespace Overpower.Lobby
             roomManager = manager;
             catalogue = modes;
             config = lobbyConfig;
+            if (config == null)
+                Debug.LogError("[LOBBY] RoomManager has no LobbyConfig assigned - lobby names are cut at " + FallbackNameMaxLength + " characters and duplicate names use the format \"{0} {1}\".");
         }
 
         /// <summary>Starts receiving the room list: joins Photon's default lobby when connected and not already in a room or
@@ -82,12 +89,13 @@ namespace Overpower.Lobby
         /// <summary>Joins the lobby with this room name.</summary>
         public void Join(string roomName)
         {
+            pendingJoin = true;
             PhotonNetwork.JoinRoom(roomName);
         }
 
         private void CreatePending()
         {
-            int maxLen = config != null ? config.LobbyNameMaxLength : 24;
+            int maxLen = config != null ? config.LobbyNameMaxLength : FallbackNameMaxLength;
             string name = (pendingName ?? "").Trim();
             if (name.Length > maxLen) name = name.Substring(0, maxLen);
 
@@ -97,6 +105,7 @@ namespace Overpower.Lobby
                 { LobbyKeys.Mode, pendingMode.Id },
                 { LobbyKeys.Stage, 0 },
                 { LobbyKeys.Host, PhotonNetwork.NickName ?? "" },
+                { LobbyKeys.Created, PhotonNetwork.ServerTimestamp },
             };
             // Absent reads as three teams (MatchStartRules.LobbyModeOf), so only the two-team mode writes the key.
             if (pendingMode.LobbyModeValue == MatchStartRules.TwoTeams)
@@ -136,12 +145,22 @@ namespace Overpower.Lobby
             pendingMode = null;
         }
 
+        /// <summary>A player inside a room (or just back from one) must never see an old list: Photon only reports the changes
+        /// from the moment of entering the lobby, so what was cached before is stale.</summary>
+        public override void OnJoinedRoom()
+        {
+            pendingJoin = false;
+            Clear();
+        }
+
         public override void OnJoinRoomFailed(short returnCode, string message)
         {
-            // Task 9e-2: Photon refuses a normal join while this user id still holds a dropped place in that room: that is our
-            // own place being held, so go back to it instead of reporting a failure.
-            if (roomManager != null && roomManager.Rejoin != null && roomManager.Rejoin.TryRejoinHeldPlace(returnCode))
-                return;
+            // RejoinController is added to the RoomManager before this component, so it has already seen this failure: while a
+            // held-place rejoin runs (or its retries fail) the player is not "joining a lobby", and nothing is reported here.
+            bool wasJoining = pendingJoin;
+            pendingJoin = false;
+            bool rejoinBusy = roomManager != null && roomManager.Rejoin != null && roomManager.Rejoin.CurrentStage != RejoinController.Stage.Idle;
+            if (!wasJoining || rejoinBusy) return;
 
             Debug.Log($"[LOBBY] join refused ({returnCode}): {message}");
             JoinFailed?.Invoke(JoinFailureText(returnCode));

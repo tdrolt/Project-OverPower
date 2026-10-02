@@ -15,7 +15,11 @@ namespace Overpower.Lobby
         /// <summary>The seat fill counts, written by the seat code (lobby Task 3).</summary>
         public const string Fill = "lF";
 
+        /// <summary>When the lobby was created: the server clock in milliseconds (PhotonNetwork.ServerTimestamp), so the list
+        /// sorts newest first by real creation time instead of by when this client first saw the room.</summary>
+        public const string Created = "lC";
+
         /// <summary>The properties the lobby list can see without joining the room.</summary>
-        public static readonly string[] ForLobby = { Name, Mode, Stage, Host, Fill };
+        public static readonly string[] ForLobby = { Name, Mode, Stage, Host, Fill, Created };
     }
 }
