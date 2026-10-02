@@ -14,8 +14,7 @@ namespace Overpower.UI
     /// OVERPOWER, the name box, Find a lobby, and Rejoin your match while a match still holds this player's place), then the lobby list and the
     /// create screen, all built in code from UiTheme (LobbyUiKit). Find a lobby needs a valid name (PlayerNameRules with the LobbyConfig
     /// lengths); the typed name is what Photon calls the player for the session. After a match (or a spectator's Leave) RoomManager sets
-    /// LobbyReturn and the rebuilt scene opens straight on the list. Joining or creating a room hides the screens; the lobby room screen (Task 10)
-    /// takes over there. The scene's old name panel and its tips are switched off at start (they stay in the scene, hidden).
+    /// LobbyReturn and the rebuilt scene opens straight on the list. Joining or creating a room hides the screens; the lobby room screen (Task 10) takes over there. The scene's old name panel and its tips are switched off at start (they stay in the scene, hidden).
     /// </summary>
     public sealed class NameScreen : MonoBehaviourPunCallbacks
     {
@@ -45,6 +44,10 @@ namespace Overpower.UI
         private CanvasGroup rejoinGroup;
         private LobbyListPanel list;
         private CreateLobbyPanel create;
+        private LobbyRoomPanel room;
+        private ModeInfoPanel modeInfo;
+        private HowToPlayPanel howToPlay;
+        private WarmupBar warmupBar;
 
         private Screen current = Screen.Name;
         private bool enterListWhenConnected;
@@ -60,6 +63,10 @@ namespace Overpower.UI
         public LobbyButton RejoinButton => rejoinButton;
         public LobbyListPanel List => list;
         public CreateLobbyPanel CreatePanel => create;
+        public LobbyRoomPanel Room => room;
+        public ModeInfoPanel ModeInfo => modeInfo;
+        public HowToPlayPanel HowToPlay => howToPlay;
+        public WarmupBar Warmup => warmupBar;
 
         /// <summary>The name in the box (what Find a lobby would use).</summary>
         public string TypedName => nameInput != null ? nameInput.text : "";
@@ -84,9 +91,16 @@ namespace Overpower.UI
             BuildNameScreen(canvas.transform);
             list = LobbyListPanel.Create(canvas.transform, kit, roomManager);
             create = CreateLobbyPanel.Create(canvas.transform, kit, roomManager);
+            room = LobbyRoomPanel.Create(canvas.transform, kit, roomManager);
+            warmupBar = WarmupBar.Create(canvas.transform, kit);
+            modeInfo = ModeInfoPanel.Create(canvas.transform, kit);
+            howToPlay = HowToPlayPanel.Create(canvas.transform, kit);
 
             list.CreateClicked += OpenCreate;
             list.JoinRequested += OnJoinRequested;
+            list.HowToPlayClicked += howToPlay.Show;
+            room.HowToPlayRequested += howToPlay.Show;
+            room.ModeInfoRequested += modeInfo.Show;
             create.Cancelled += OpenList;
             roomManager.Lobbies.JoinFailed += OnJoinFailed;
             roomManager.Lobbies.CreateFailed += OnCreateFailed;
@@ -206,6 +220,9 @@ namespace Overpower.UI
             nameRoot.SetActive(screen == Screen.Name);
             if (screen != Screen.List) list.Hide();
             if (screen != Screen.Create) create.Hide();
+            if (screen == Screen.InRoom) room.Show(); else room.Hide();
+            modeInfo.Hide();
+            howToPlay.Hide();
             if (screen == Screen.List) list.Show(PhotonNetwork.NickName);
             if (screen == Screen.Name) nextOfferCheckAt = 0f;
         }

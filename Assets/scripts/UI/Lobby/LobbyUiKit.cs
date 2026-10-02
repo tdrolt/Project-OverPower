@@ -142,6 +142,60 @@ namespace Overpower.UI
             }
         }
 
+        private static Sprite dashed;
+        private const int DashThickness = 5;   // texture pixels: with a 9 px corner radius this draws a line about 1.4 reference pixels thick
+        private const int DashLength = 16;     // texture pixels of a 32 pixel edge piece: half dash, half gap
+
+        /// <summary>A rounded OUTLINE (nothing inside) whose straight edges are dashed. Its edge pieces repeat along a long edge (Image type Tiled),
+        /// so one small sprite dashes a box of any size; the corners are drawn solid.</summary>
+        private static Sprite DashedRounded
+        {
+            get
+            {
+                if (dashed != null) return dashed;
+                var texture = new Texture2D(SpriteSize, SpriteSize, TextureFormat.RGBA32, false)
+                {
+                    name = "Lobby Dashed Box",
+                    filterMode = FilterMode.Bilinear,
+                    wrapMode = TextureWrapMode.Clamp,
+                    hideFlags = HideFlags.HideAndDontSave,
+                };
+                var pixels = new Color32[SpriteSize * SpriteSize];
+                float half = SpriteSize * 0.5f;
+                int edgeStart = SpriteRadius, edgeEnd = SpriteSize - SpriteRadius;
+                for (int y = 0; y < SpriteSize; y++)
+                {
+                    for (int x = 0; x < SpriteSize; x++)
+                    {
+                        float dx = Mathf.Max(Mathf.Abs(x + 0.5f - half) - (half - SpriteRadius), 0f);
+                        float dy = Mathf.Max(Mathf.Abs(y + 0.5f - half) - (half - SpriteRadius), 0f);
+                        float distance = Mathf.Sqrt(dx * dx + dy * dy) - SpriteRadius; // negative inside the box
+                        float alpha = Mathf.Clamp01(0.5f - distance) * Mathf.Clamp01(distance + DashThickness + 0.5f);
+                        bool inColumn = x >= edgeStart && x < edgeEnd, inRow = y >= edgeStart && y < edgeEnd;
+                        // along a top or bottom edge the piece repeats in x, along a left or right edge in y; the middle of the sprite is empty anyway
+                        if (inColumn && !inRow && x - edgeStart >= DashLength) alpha = 0f;
+                        if (inRow && !inColumn && y - edgeStart >= DashLength) alpha = 0f;
+                        pixels[y * SpriteSize + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * alpha));
+                    }
+                }
+                texture.SetPixels32(pixels);
+                texture.Apply(false, true);
+                dashed = Sprite.Create(texture, new Rect(0, 0, SpriteSize, SpriteSize), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect,
+                    new Vector4(SpriteRadius, SpriteRadius, SpriteRadius, SpriteRadius));
+                dashed.hideFlags = HideFlags.HideAndDontSave;
+                return dashed;
+            }
+        }
+
+        /// <summary>Gives an Image the dashed outline (a see-through box with a dashed line round it) with this corner radius (reference pixels).</summary>
+        public static void Dash(Image image, float radius)
+        {
+            image.sprite = DashedRounded;
+            image.type = Image.Type.Tiled;
+            image.fillCenter = true;
+            image.pixelsPerUnitMultiplier = SpriteRadius / Mathf.Max(0.01f, radius);
+        }
+
         /// <summary>Gives an Image the rounded-box sprite with this corner radius (reference pixels).</summary>
         public static void Round(Image image, float radius)
         {
@@ -262,6 +316,8 @@ namespace Overpower.UI
         /// <summary>TextMeshPro's character spacing is in hundredths of the text size: this turns a spacing in reference pixels into it.</summary>
         public static float SpacingFor(float pixels, float textSize) => textSize > 0.01f ? pixels / textSize * 100f : 0f;
 
+        /// <remarks>Trap: a line of the display font (Oswald) is about 1.5 times its size tall. A text box shorter than that does not show a smaller
+        /// line, it shows no line at all (the ellipsis overflow drops what does not fit vertically), so a heading's box must be at least 1.5 x its size.</remarks>
         public TextMeshProUGUI Text(Transform parent, string name, string text, TMP_FontAsset font, float size, Color colour,
             TextAlignmentOptions align = TextAlignmentOptions.MidlineLeft, float spacingPixels = 0f, bool wrap = false)
         {

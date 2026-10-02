@@ -37,15 +37,6 @@ namespace Overpower.Match
         /// the same as a room the host never switched.</summary>
         public static int LobbyModeOf(object raw) => raw is int mode && mode == TwoTeams ? TwoTeams : ThreeTeams;
 
-        /// <summary>Allocation-free - the per-frame UI (host button, countdown line) calls this every frame.</summary>
-        public static int CountTeamsWithPlayers(IReadOnlyList<int> membersPerTeam)
-        {
-            int count = 0;
-            for (int i = 0; i < membersPerTeam.Count; i++)
-                if (membersPerTeam[i] > 0) count++;
-            return count;
-        }
-
         /// <summary>The teams in the match are fixed the moment the countdown starts (Decision 4): the teams with
         /// players at that instant, ascending.</summary>
         public static int[] TeamsWithPlayers(IReadOnlyList<int> membersPerTeam)

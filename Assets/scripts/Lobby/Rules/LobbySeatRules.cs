@@ -229,11 +229,16 @@ namespace Overpower.Lobby
 
         /// <summary>The host may end the warm-up when every team of the layout has at least one player present; a
         /// team missing from the dictionary has none.</summary>
-        public static bool MayEndWarmup(SeatLayout layout, IReadOnlyDictionary<int, int> presentPlayersPerTeam)
+        public static bool MayEndWarmup(SeatLayout layout, IReadOnlyDictionary<int, int> presentPlayersPerTeam) =>
+            EndWarmupBlockReason(layout, presentPlayersPerTeam) == null;
+
+        /// <summary>Why the host may not end the warm-up yet: the first team of the layout (in layout order) with nobody present, or
+        /// null when it may end. Only the layout's own teams are looked at, so a two-team layout never names a third team.</summary>
+        public static int? EndWarmupBlockReason(SeatLayout layout, IReadOnlyDictionary<int, int> presentPlayersPerTeam)
         {
             foreach (int team in layout.Teams)
-                if (!presentPlayersPerTeam.TryGetValue(team, out int n) || n < 1) return false;
-            return true;
+                if (!presentPlayersPerTeam.TryGetValue(team, out int n) || n < 1) return team;
+            return null;
         }
 
         /// <summary>

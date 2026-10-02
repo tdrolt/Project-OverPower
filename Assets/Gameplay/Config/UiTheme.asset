@@ -280,15 +280,10 @@ MonoBehaviour:
   minimapCutAreaColor: {r: 0.05, g: 0.05, b: 0.06, a: 0.75}
   minimapCutWallColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
   minimapCutWallWidth: 3
-  warmupBlockedText: 'Warm-up: nothing counts yet and the shop is free. It can end once every team has a player.'
-  warmupHostText: 'Warm-up: every team has a player. End the warm-up when you''re ready.'
-  warmupGuestText: 'Warm-up: waiting for the host to end it.'
-  matchCountdownText: Match starts in {0}
-  matchStartButtonText: Start match ({0} teams)
+  matchCountdownText: MATCH STARTS IN {0}
   matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   matchStartButtonSize: {x: 260, y: 52}
   warmupTopOffset: 130
-  warmupLineSize: {x: 900, y: 64}
   matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
   matchLiveTwoTeamsToastText: 'Two teams: lose your base and you can''t respawn'
   showDamageNumbers: 1
@@ -550,3 +545,89 @@ MonoBehaviour:
   createCreateText: CREATE
   createFailedText: Could not create the lobby. Try again.
   lobbyConnectionLostText: Disconnected. Check your connection.
+  lobbyRoomSeatFill: {r: 0.2, g: 0.212, b: 0.247, a: 1}
+  lobbyRoomSideFill: {r: 0.125, g: 0.133, b: 0.165, a: 1}
+  lobbyRoomSideBorder: {r: 0.2, g: 0.212, b: 0.247, a: 1}
+  lobbyRoomHeadingColor: {r: 0.847, g: 0.835, b: 0.808, a: 1}
+  lobbyRoomTeamColors:
+  - {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  - {r: 0.42, g: 0.247, b: 0.749, a: 1}
+  - {r: 0.169, g: 0.722, b: 0.769, a: 1}
+  lobbyRoomPadding: {x: 72, y: 54}
+  lobbyRoomGap: 30
+  lobbyRoomBoxRadius: 12
+  lobbyRoomTitleSize: 57
+  lobbyRoomModeHeight: 51
+  lobbyRoomModePadding: 21
+  lobbyRoomModeTextSize: 22.5
+  lobbyRoomHostLineSize: 22.5
+  lobbyRoomTeamGap: 24
+  lobbyRoomBoxPadding: 21
+  lobbyRoomStripeHeight: 6
+  lobbyRoomTeamNameSize: 33
+  lobbyRoomSeatHeight: 69
+  lobbyRoomSeatGap: 12
+  lobbyRoomSeatPadding: 21
+  lobbyRoomSeatTextSize: 24
+  lobbyRoomSeatEmptyTextSize: 22.5
+  lobbyRoomMineBorderWidth: 3
+  lobbyRoomSpectatorTitleSize: 30
+  lobbyRoomSpectatorSeatHeight: 63
+  lobbyRoomSpectatorTextSize: 22.5
+  lobbyRoomSpectatorGap: 18
+  lobbyRoomSideWidth: 375
+  lobbyRoomSideTitleSize: 30
+  lobbyRoomSideNameSize: 24
+  lobbyRoomSideNoteSize: 19.5
+  lobbyRoomSideButtonHeight: 60
+  lobbyRoomSideButtonTextSize: 21
+  lobbyRoomBottomHeight: 72
+  lobbyRoomBottomPadding: 33
+  lobbyRoomBottomTextSize: 24
+  lobbyRoomBottomGap: 18
+  lobbyRoomStartHeight: 84
+  lobbyRoomStartPadding: 54
+  lobbyRoomStartTextSize: 36
+  lobbyRoomStartHintSize: 21
+  lobbyRoomStartGap: 24
+  lobbyRoomModeFormat: "{0} \u00B7"
+  lobbyRoomInfoIconSize: 30
+  lobbyRoomInfoIconText: i
+  lobbyRoomHostFormat: "\u00B7 host {0} \u00B7 click a seat to take it"
+  lobbyRoomEmptySeatText: Empty seat
+  lobbyRoomYouSuffix: ' (you)'
+  lobbyRoomHostSuffix: " \u00B7 host"
+  lobbyRoomSpectatorsText: Spectators
+  lobbyRoomNoRoleFormat: 'No role ({0})'
+  lobbyRoomNoRoleNote: 'At the start they fill the emptiest team, then the spectator seats.'
+  lobbyRoomLeaveSeatText: Leave my seat
+  lobbyRoomLeaveLobbyText: Leave lobby
+  lobbyRoomStartText: START GAME
+  lobbyRoomStartHintText: Everyone spawns into the warm-up
+  lobbyRoomStartBlockedFormat: '{0} needs a player'
+  lobbyRoomWaitingFormat: 'Waiting for {0} to start the game'
+  lobbyRoomCloseText: X
+  lobbyRoomHowToStubText: Coming soon.
+  lobbyRoomOverlayWidth: 1500
+  lobbyRoomOverlayHeight: 840
+  lobbyRoomOverlayTitleSize: 54
+  lobbyRoomOverlayCloseSize: 60
+  lobbyRoomOverlayShade: {r: 0, g: 0, b: 0, a: 0.7}
+  warmupBarFill: {r: 0.102, g: 0.11, b: 0.133, a: 0.88}
+  warmupBarRadius: 12
+  warmupBarPaddingHost: {x: 36, y: 18}
+  warmupBarPaddingGuest: {x: 42, y: 18}
+  warmupBarGap: 30
+  warmupBarTitleSize: 36
+  warmupBarInfoSize: 21
+  warmupBarButtonHeight: 72
+  warmupBarButtonPadding: 39
+  warmupBarButtonTextSize: 30
+  warmupBarTitleText: WARM-UP
+  warmupBarInfoFormat: "Free shop \u00B7 nothing counts \u00B7 {0}"
+  warmupBarPlayersText: '{0} players'
+  warmupBarOnePlayerText: 1 player
+  warmupBarGuestFormat: "Free shop \u00B7 nothing counts \u00B7 {0} ends the warm-up"
+  warmupBarButtonText: END WARM-UP
+  warmupBarBlockedFormat: '{0} has no player'
+  warmupBarCountdownInfo: Everything resets when it goes live

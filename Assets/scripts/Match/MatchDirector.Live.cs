@@ -128,12 +128,34 @@ namespace Overpower.Match
         public bool MayJoinTeam(int team) =>
             MatchStartRules.MayJoin(TeamsFixed, IsInMatch(team), IsEliminated(team), MatchStartRules.IsTeamOpen(LobbyMode, team));
 
-        /// <summary>How many of the three teams currently have a player - the warm-up line's own question,
-        /// polled every frame (the WarmupBar), so counted through PhotonNetwork.CurrentRoom.Players
-        /// (a Dictionary; its enumerator is a struct, unlike PhotonNetwork.PlayerList's freshly sorted array -
-        /// same reasoning as MinimapView.UpdatePlayers) and CountMembers' own reused array, so this allocates
-        /// nothing per frame.</summary>
-        public int TeamsWithPlayersNow => MatchStartRules.CountTeamsWithPlayers(CountMembers());
+        /// <summary>How many players are on a team right now (spectators and dropped players are not counted): the warm-up bar's
+        /// "N players". Counted through CountMembers' reused array, so it allocates nothing per frame.</summary>
+        public int PlayersNow
+        {
+            get
+            {
+                int[] members = CountMembers();
+                int total = 0;
+                for (int i = 0; i < members.Length; i++) total += members[i];
+                return total;
+            }
+        }
+
+        /// <summary>The first team of the lobby's mode that has nobody present (what blocks End warm-up), or null when none does or the
+        /// layout is not read yet. The warm-up bar names it under the greyed button.</summary>
+        public int? EndWarmupBlockedTeam
+        {
+            get
+            {
+                LobbySeats seats = Seats();
+                if (!PhotonNetwork.InRoom || seats == null || !seats.HasLayout) return null;
+                int[] members = CountMembers();
+                presentScratch.Clear();
+                foreach (int team in seats.Layout.Teams)
+                    presentScratch[team] = team >= 0 && team < members.Length ? members[team] : 0;
+                return LobbySeatRules.EndWarmupBlockReason(seats.Layout, presentScratch);
+            }
+        }
 
         /// <summary>The host may end the warm-up (lobby Task 5; the WarmupBar's End warm-up button follows this): this client
         /// is the master, the lobby is in the warm-up and every team of the lobby's mode has a player present
@@ -165,7 +187,7 @@ namespace Overpower.Match
         }
 
         /// <summary>The lobby stage in the room right now (lS): 0 lobby, 1 warm-up, 2 in match.</summary>
-        private static int LobbyStageNow =>
+        public static int LobbyStageNow =>
             PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Stage, out object raw) && raw is int stage
                 ? stage : 0;
 
@@ -318,7 +340,7 @@ namespace Overpower.Match
         }
 
         // Reused across every CountMembers() call - Update's own poll, HostStartMatch, StartCountdown, and
-        // (step 8) TeamsWithPlayersNow/HostMayStartNow, both polled every frame the warm-up panel is open. Not
+        // (the WarmupBar) PlayersNow/HostMayStartNow, polled every frame the warm-up bar is up. Not
         // static any more (it wraps an instance field now), but MatchDirector is a singleton (Instance), so this
         // still costs nothing per frame instead of a fresh int[3] every single call.
         private readonly int[] countMembersScratch = new int[MatchStartRules.TeamCount];

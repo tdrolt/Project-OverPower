@@ -25,6 +25,7 @@ namespace Overpower.Lobby
         private LobbyConfig config;
 
         private SeatLayout layout;
+        private GameModeDefinition mode;
         private bool hasLayout;
         private Dictionary<string, int> seats = new Dictionary<string, int>();
         private readonly List<int> noRole = new List<int>();
@@ -58,6 +59,10 @@ namespace Overpower.Lobby
         public SeatLayout Layout => layout;
 
         public bool HasLayout => hasLayout;
+
+        /// <summary>The game mode of the current lobby (null until the room's mode is read; valid while HasLayout). The lobby room screen draws its
+        /// teams and names from it.</summary>
+        public GameModeDefinition Mode => hasLayout ? mode : null;
 
         /// <summary>Raised when any seat changed, someone entered or left (the No role list changed) and on joining.</summary>
         public event Action SeatsChanged;
@@ -206,7 +211,7 @@ namespace Overpower.Lobby
             if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null) return;
             var props = PhotonNetwork.CurrentRoom.CustomProperties;
             if (catalogue == null || !props.ContainsKey(LobbyKeys.Mode) || !(props[LobbyKeys.Mode] is int modeId)) return;
-            GameModeDefinition mode = catalogue.ById(modeId);
+            mode = catalogue.ById(modeId);
             if (mode == null)
             {
                 Debug.LogWarning($"[SEATS] the lobby's game mode {modeId} is not in the catalogue - no seats");
