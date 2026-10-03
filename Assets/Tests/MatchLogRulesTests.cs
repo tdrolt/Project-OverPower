@@ -131,6 +131,15 @@ namespace Overpower.Tests
             Assert.IsNull(MatchLogZipRule.FolderUrl(null));
         }
 
+        [Test]
+        public void OpenFolderOnWindowsHandsExplorerAQuotedBackslashPath()
+        {
+            Assert.AreEqual("\"" + @"C:\Games\Match logs\2026-10-02_2130_Conquest-3v3v3_Lobby-2 (2)" + "\"",
+                MatchLogZipRule.ExplorerArguments("C:/Games/Match logs/2026-10-02_2130_Conquest-3v3v3_Lobby-2 (2)"));
+            Assert.IsNull(MatchLogZipRule.ExplorerArguments(""));
+            Assert.IsNull(MatchLogZipRule.ExplorerArguments(null));
+        }
+
         private static int CountOf(string text, char c)
         {
             int n = 0;

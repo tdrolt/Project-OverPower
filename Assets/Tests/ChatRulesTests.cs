@@ -135,10 +135,17 @@ namespace Overpower.Tests
         [Test]
         public void TheOpenChatClosesWhenTheRoomIsLeftOrAPageOpens()
         {
-            Assert.IsTrue(ChatPanelRule.MustClose(true, null, false), "the room was left");
-            Assert.IsTrue(ChatPanelRule.MustClose(true, "Alpha", true), "How to play or the mode info page opened");
-            Assert.IsFalse(ChatPanelRule.MustClose(true, "Alpha", false));
-            Assert.IsFalse(ChatPanelRule.MustClose(false, null, true), "a closed chat has nothing to close");
+            Assert.IsTrue(ChatPanelRule.MustClose(true, false, false), "the room was left");
+            Assert.IsTrue(ChatPanelRule.MustClose(true, true, true), "How to play or the mode info page opened");
+            Assert.IsFalse(ChatPanelRule.MustClose(true, true, false));
+            Assert.IsFalse(ChatPanelRule.MustClose(false, false, true), "a closed chat has nothing to close");
+        }
+
+        [Test]
+        public void AShortChatServerReconnectDoesNotCloseTheChatWhileTyping()
+        {
+            // The room is still ours (inRoom), only the chat subscription is gone for a moment: the panel stays open.
+            Assert.IsFalse(ChatPanelRule.MustClose(true, true, false));
         }
 
         [Test]

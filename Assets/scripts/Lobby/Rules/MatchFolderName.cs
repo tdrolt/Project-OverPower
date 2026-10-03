@@ -65,8 +65,9 @@ namespace Overpower.Lobby
             return For(localStart, modeDisplayName, lobbyName, taken.Contains);
         }
 
-        /// <summary>One part of the name: control characters and the characters a Windows path cannot hold (\ / : * ? " &lt; &gt; |) removed,
-        /// apostrophes dropped, runs of spaces turned into one dash, cut to <paramref name="maxLength"/>; <paramref name="fallback"/> when
+        /// <summary>One part of the name: only ASCII letters, digits, '-' and '_' kept (accents folded to the plain letter; control characters,
+        /// path characters, apostrophes, '#' and '%' dropped, so the folder opens by path and by file address alike), runs of spaces turned
+        /// into one dash, cut to <paramref name="maxLength"/>; <paramref name="fallback"/> when
         /// nothing is left.</summary>
         private static string Part(string text, int maxLength, string fallback)
         {
@@ -75,18 +76,19 @@ namespace Overpower.Lobby
             bool pendingDash = false;
             foreach (char c in text)
             {
-                if (char.IsControl(c) || IsUnsafe(c) || IsApostrophe(c)) continue;
                 if (char.IsWhiteSpace(c))
                 {
                     pendingDash = sb.Length > 0;
                     continue;
                 }
+                string plain = Fold(c);
+                if (plain.Length == 0) continue;
                 if (pendingDash)
                 {
                     sb.Append('-');
                     pendingDash = false;
                 }
-                sb.Append(c);
+                sb.Append(plain);
             }
             string cleaned = sb.ToString();
             if (cleaned.Length > maxLength) cleaned = cleaned.Substring(0, maxLength);
@@ -94,8 +96,27 @@ namespace Overpower.Lobby
             return cleaned.Length == 0 ? fallback : cleaned;
         }
 
-        private static bool IsUnsafe(char c) => c == '\u005C' || c == '/' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|';
-
-        private static bool IsApostrophe(char c) => c == '\'' || c == '\u2019' || c == '\u2018' || c == '`';
+        /// <summary>One character as plain ASCII: letters and digits stay, accented letters lose their accent (ș to s, ă to a, é to e), a few
+        /// letters with no accent to strip are spelled out (ß to ss), '-' and '_' stay; everything else (apostrophes, '#', '%', brackets,
+        /// symbols, other scripts) gives "" and is dropped.</summary>
+        private static string Fold(char c)
+        {
+            if (c < 128) return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' ? c.ToString() : "";
+            switch (c)
+            {
+                case 'ß': return "ss";
+                case 'Æ': return "AE";
+                case 'æ': return "ae";
+                case 'Ø': return "O";
+                case 'ø': return "o";
+                case 'Đ': return "D";
+                case 'đ': return "d";
+                case 'Ł': return "L";
+                case 'ł': return "l";
+            }
+            foreach (char d in c.ToString().Normalize(NormalizationForm.FormD))
+                if ((d >= 'a' && d <= 'z') || (d >= 'A' && d <= 'Z')) return d.ToString(); // the base letter; the accent marks are not ASCII letters
+            return "";
+        }
     }
 }

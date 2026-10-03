@@ -462,7 +462,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         if (lookApplied && lastLayout != (inLobbyRoom ? 1 : 0)) PlacePanel(inLobbyRoom);
 
         // The chat closes itself when its channel is gone (the room was left) or How to play / the mode info page opens over it.
-        if (ChatPanelRule.MustClose(chatPanel.activeSelf, subscribedChannel, LobbyOverlayPanel.AnyPageOpen))
+        if (ChatPanelRule.MustClose(chatPanel.activeSelf, PhotonNetwork.InRoom, LobbyOverlayPanel.AnyPageOpen))
             SetOpen(false);
 
         // Toggle chat panel visibility on Enter key press

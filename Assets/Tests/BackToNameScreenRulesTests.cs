@@ -71,7 +71,7 @@ namespace Overpower.Tests
 
         [Test]
         public void AnEmptyNickFallsBackToTheRememberedOne() =>
-            Assert.AreEqual("Radu", Overpower.Telemetry.MatchLogZipRule.ResolveNick("", "Radu"));
+            Assert.AreEqual("Radu", Overpower.Telemetry.MatchLogZipRule.ResolveNick("", "Radu", 3));
 
         [Test]
         public void AnActorSeenInTheRoomIsStillThereAfterTheLeave()
@@ -81,9 +81,19 @@ namespace Overpower.Tests
             Assert.AreEqual(4, Overpower.Telemetry.MatchLogZipRule.ResolveActor(-1, remembered));
         }
 
+        [TestCase(-1)]
+        [TestCase(0)]
+        public void AfterTheLeaveTheNickWornInTheRoomIsUsedNotTheRestoredTypedName(int liveActor) =>
+            Assert.AreEqual("Tudor 2", Overpower.Telemetry.MatchLogZipRule.ResolveNick("Tudor", "Tudor 2", liveActor),
+                "one zip per player per match: the actor-number-and-nick name must not change at the leave");
+
+        [Test]
+        public void ALiveNickWithoutARememberedOneStillWorks() =>
+            Assert.AreEqual("Tudor", Overpower.Telemetry.MatchLogZipRule.ResolveNick("Tudor", "", -1));
+
         [Test]
         public void ALiveNickIsKept() =>
-            Assert.AreEqual("Live", Overpower.Telemetry.MatchLogZipRule.ResolveNick("Live", "Radu"));
+            Assert.AreEqual("Live", Overpower.Telemetry.MatchLogZipRule.ResolveNick("Live", "Radu", 3));
 
         // ---- waiting for the leave
 

@@ -32,9 +32,9 @@ namespace Overpower.Chat
         /// <summary>Enter opens the panel only when a channel is subscribed.</summary>
         public static bool MayOpen(string subscribedChannel) => subscribedChannel != null;
 
-        /// <summary>An open panel closes when its channel is gone or a page (How to play / mode info) is open.</summary>
-        public static bool MustClose(bool open, string subscribedChannel, bool pageOpen) =>
-            open && (subscribedChannel == null || pageOpen);
+        /// <summary>An open panel closes when the room is left (not when only the chat subscription is gone for a moment: a short chat-server reconnect must not close it while typing) or a page (How to play / mode info) is open.</summary>
+        public static bool MustClose(bool open, bool inRoom, bool pageOpen) =>
+            open && (!inRoom || pageOpen);
 
         public static int SortingOrder(bool lobbyRoomShowing) => lobbyRoomShowing ? LobbyRoomOrder : MatchOrder;
     }

@@ -19,8 +19,19 @@ namespace Overpower.Telemetry
         /// remembered while still in the room, or it would look for "-1_..." files and miss the whole log.</summary>
         public static int ResolveActor(int live, int remembered) => live > 0 ? live : remembered;
 
-        /// <summary>The nick counterpart of <see cref="ResolveActor"/>: the live one if there is one, else the remembered one.</summary>
-        public static string ResolveNick(string live, string remembered) => string.IsNullOrEmpty(live) ? remembered : live;
+        /// <summary>The nick counterpart of <see cref="ResolveActor"/>: the live one while in a room, else the remembered one.</summary>
+        public static string ResolveNick(string live, string remembered, int liveActor)
+        {
+            // After a leave the actor is gone (<= 0) but Photon's NickName is back to the typed name ("Tudor", not the "Tudor 2" worn in the
+            // room): the remembered one keeps the zip under its one name (one zip per player per match).
+            if (liveActor <= 0 && !string.IsNullOrEmpty(remembered)) return remembered;
+            return string.IsNullOrEmpty(live) ? remembered : live;
+        }
+
+        /// <summary>The command line for explorer.exe to open a folder on Windows: the path in quotes with backslashes. Unlike a file:// address
+        /// it survives '#', '%' and non-ASCII letters in the path. Null for no folder.</summary>
+        public static string ExplorerArguments(string folder) =>
+            string.IsNullOrEmpty(folder) ? null : "\"" + folder.Replace('/', '\\') + "\"";
 
         public static List<string> SelectOwnFiles(IEnumerable<string> fileNames, int actor)
         {
@@ -45,9 +56,9 @@ namespace Overpower.Telemetry
             return result;
         }
 
-        /// <summary>OverPower-log_&lt;matchFolderName&gt;_&lt;sanitizedNick&gt;.zip. matchFolderName is
+        /// <summary>OverPower-log_&lt;matchFolderName&gt;_&lt;actor&gt;_&lt;sanitizedNick&gt;.zip. matchFolderName is
         /// a plain parameter (never computed in here) - MatchLogZip passes the match folder's own name
-        /// (MatchTelemetry.ResolveMatchFolder's "&lt;dateStamp&gt;_&lt;matchId8&gt;", Path.GetFileName of
+        /// (MatchTelemetry.ResolveMatchFolder's "&lt;date&gt;_&lt;mode&gt;_&lt;lobby&gt;" since lobby Task 13, Path.GetFileName of
         /// MatchTelemetry.CurrentFolder). 2026-09-26 fix: this used to be a wall-clock read
         /// (DateTime.Now) taken the first time either caller zipped, cached for the rest of the match
         /// so a same-minute repeat overwrote itself - but a real two-client check found a genuine quit

@@ -14,7 +14,7 @@ namespace Overpower.Telemetry
     /// <summary>
     /// Playtest extras P5 (2026-09-26): zips THIS client's own match-log files (its own
     /// "{actor}_*.jsonl" and "bug_{actor}_*.png" - see MatchLogZipRule) into
-    /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;nick&gt;.zip" (2026-09-27:
+    /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;actor&gt;_&lt;nick&gt;.zip" (2026-09-27:
     /// directly in the root, not the dated per-match subfolder - see TryZip), so each tester finds and
     /// sends one file right away. Called from two places, both fine to call more than once and both
     /// through the same ZipNow (2026-09-26 fix - see its own comment on why there is no longer a
@@ -153,7 +153,7 @@ namespace Overpower.Telemetry
                 // HandleBeforeClose never sees a valid one there (Task 9f review) - the zip made at the button press does.
                 int actor = MatchLogZipRule.ResolveActor(PhotonNetwork.LocalPlayer.ActorNumber, lastKnownActor);
                 lastKnownActor = actor;
-                string nick = MatchLogZipRule.ResolveNick(PhotonNetwork.LocalPlayer.NickName, lastKnownNick);
+                string nick = MatchLogZipRule.ResolveNick(PhotonNetwork.LocalPlayer.NickName, lastKnownNick, PhotonNetwork.LocalPlayer.ActorNumber);
                 lastKnownNick = nick;
 
                 string[] allNames = Directory.GetFiles(folder).Select(Path.GetFileName).ToArray();
@@ -344,6 +344,14 @@ namespace Overpower.Telemetry
         /// whoever is sitting at this machine's screen; check this wiring by reading it instead.</summary>
         private void OnOpenFolderClicked()
         {
+            if (string.IsNullOrEmpty(lastKnownFolder)) return;
+            if (Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor)
+            {
+                // explorer.exe with the plain path: a file:// address breaks on '#', '%' and non-ASCII letters.
+                try { System.Diagnostics.Process.Start("explorer.exe", MatchLogZipRule.ExplorerArguments(lastKnownFolder)); }
+                catch (Exception e) { Debug.LogWarning($"[MatchLogZip] could not open the match folder: {e.Message}"); }
+                return;
+            }
             string url = MatchLogZipRule.FolderUrl(lastKnownFolder);
             if (url != null)
                 Application.OpenURL(url);

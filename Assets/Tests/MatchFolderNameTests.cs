@@ -28,6 +28,26 @@ namespace Overpower.Tests
             StringAssert.Contains("abcdefghij", name);
         }
 
+        [TestCase("Lobby #2", "_Lobby-2")]
+        [TestCase("100%", "_100")]
+        [TestCase("Ștefan's ăîâ", "_Stefans-aia")]
+        public void NamesWithFragmentPercentAndAccentsBecomeSafeAsciiNames(string lobby, string expectedEnd)
+        {
+            string name = MatchFolderName.For(Start, "Conquest 3v3v3", lobby, Never);
+            foreach (char c in name.Substring("2026-10-02_2130_".Length))
+                Assert.IsTrue(c < 128 && (char.IsLetterOrDigit(c) || c == '-' || c == '_'), "unsafe char " + (int)c + " in " + name);
+            StringAssert.EndsWith(expectedEnd, name);
+            Assert.IsFalse(name.Contains("#") || name.Contains("%"));
+            Assert.IsTrue(new Uri("file:///C:/Logs/" + name).AbsoluteUri.EndsWith(name), "no fragment, no encoded bytes");
+        }
+
+        [Test]
+        public void AccentsFoldToPlainLetters()
+        {
+            StringAssert.EndsWith("_Stefan", MatchFolderName.For(Start, "Conquest 3v3v3", "Ștefan", Never));
+            StringAssert.EndsWith("_aatCe", MatchFolderName.For(Start, "Conquest 3v3v3", "ăâțÇe", Never));
+        }
+
         [Test]
         public void SpacesBecomeDashesAndApostrophesAreDropped()
         {
