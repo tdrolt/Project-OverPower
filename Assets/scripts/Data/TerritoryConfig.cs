@@ -45,7 +45,8 @@ namespace Overpower.Data
 
             [Tooltip("Seconds an enemy standing alone in a zone of this tier that your team owns takes to drain it back " +
                      "to neutral (a defender stepping in pauses it). Compare with Capture Seconds above: lower drains " +
-                     "faster than it was captured. Per tier since Tudor, 2026-09-26.")]
+                     "faster than it was captured. The Capture Speed By Players list also speeds this up when more enemies drain " +
+                     "together. Per tier since Tudor, 2026-09-26.")]
             [Min(0.01f)] public float decaySeconds;
         }
 
@@ -85,7 +86,7 @@ namespace Overpower.Data
 
         [Header("Capture")]
         [Tooltip("How fast a zone is captured or drained with 1, 2, 3... players of one team in it, as a multiple of one " +
-                 "player's speed. Past the end of the list the last value is used. Keep it filled with values above 0: an empty " +
+                 "player's speed. The same list speeds up the drain of an owned zone by the enemies in it. Past the end of the list the last value is used. Keep it filled with values above 0: an empty " +
                  "list quietly means 1, 2, 3 and a 0 stops captures.")]
         [SerializeField] private float[] captureSpeedByPlayers = { 1f, 1.5f, 1.75f };
 

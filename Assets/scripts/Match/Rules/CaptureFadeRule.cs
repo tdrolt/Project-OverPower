@@ -17,6 +17,23 @@ namespace Overpower.Match
     /// </summary>
     public static class CaptureFadeRule
     {
+        /// <summary>Tudor, 4 Oct: how many players drain an owned zone: the players of the one draining team (the team DrainRule
+        /// named, the one the bar shows) standing in it. Another enemy team in the zone at the same time does not add to it, in line
+        /// with DrainRule, which lets only one team drain at a time.</summary>
+        public static int DrainerCount(int drainingTeam, IReadOnlyList<int> teamsInZone)
+        {
+            int n = 0;
+            for (int i = 0; i < teamsInZone.Count; i++)
+                if (teamsInZone[i] == drainingTeam) n++;
+            return n;
+        }
+
+        /// <summary>How much of an owned zone's progress (in one-player seconds, same units as captureProgress) its drain removes per
+        /// real second: one drainer takes captureSeconds / decaySeconds, more take that times the capture-speed list's factor for
+        /// that many players (1 / 1.5 / 1.75 by default). The one place BuildingCapture.UpdateDecay and the published rate share.</summary>
+        public static float DrainProgressPerSecond(float captureSeconds, float decaySeconds, int drainers, IReadOnlyList<float> captureSpeedByPlayers) =>
+            captureSeconds / System.Math.Max(0.01f, decaySeconds) * CaptureSpeedRule.For(System.Math.Max(1, drainers), captureSpeedByPlayers);
+
         /// <summary>True when a neutral zone's current claim should fade this tick: it has a real claiming team
         /// (capturingId >= 0) and none of that team's players are currently listed in the zone - whether the zone
         /// is entirely empty or only another team stands there. False for an unclaimed zone (-1, nothing to fade)

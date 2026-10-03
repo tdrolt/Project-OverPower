@@ -429,7 +429,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// CaptureProgress.NeedsRepublishComparedTo. A capture in progress: team = the capturing team,
     /// progress01/rate scaled by CaptureSeconds (one-player-seconds, same units captureProgress is
     /// already tracked in). A decay in progress: team = the ENEMY doing the draining, rate =
-    /// -1/DecaySeconds (matches UpdateDecay's own maths - see its comment). A capture or drain on
+    /// -speed(drainers)/DecaySeconds (matches UpdateDecay's own maths - see its comment). A capture or drain on
     /// hold with something banked (contested, its link under attack, a paused drain):
     /// CaptureProgress.Held, rate 0. Nothing in progress (idle, on cooldown, captured with nobody
     /// contesting it): Idle.</summary>
@@ -467,6 +467,7 @@ public class BuildingCapture : MonoBehaviourPun
         bool enemyPresent = false;
         bool mayCaptureNow = false;
         float fadeRate = FadeRatePerSecond;
+        int drainerCount = isCaptured && isDecaying ? CountPlayersOfTeam(capturingID) : 1; // only read for a running drain
         if (!isCaptured && !isOnCooldown && capturingID != -1 && playersInZone.Count != 0)
         {
             // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
@@ -501,7 +502,7 @@ public class BuildingCapture : MonoBehaviourPun
 
         return CaptureProgressPublishRule.Decide(isCaptured, isDecaying, isDrainPaused, CaptureSeconds, DecaySeconds,
             isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs,
-            CaptureSpeeds, fadeRate);
+            CaptureSpeeds, drainerCount, fadeRate);
     }
 
     /// <summary>Forces this tower to tell the room its current capture progress right now,
@@ -629,7 +630,7 @@ public class BuildingCapture : MonoBehaviourPun
         {
             // Stop the capturing sound if decaying
             StopCapturingSound();
-            UpdateDecay();
+            UpdateDecay(CaptureFadeRule.DrainerCount(drain.Team, teamsInZone));
 
             if (captureProgress <= 0)
             {
@@ -662,10 +663,19 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
 
-    void UpdateDecay()
+    /// <summary>Tudor, 4 Oct: the drain scales with the enemies draining it, by the same capture-speed list as a capture
+    /// (CaptureFadeRule.DrainProgressPerSecond); drainers = the draining team's players in the zone (CaptureFadeRule.DrainerCount).</summary>
+    void UpdateDecay(int drainers)
     {
-        float seconds = Mathf.Max(0.01f, DecaySeconds);
-        captureProgress -= (CaptureSeconds / seconds) * Time.deltaTime;
+        captureProgress -= CaptureFadeRule.DrainProgressPerSecond(CaptureSeconds, DecaySeconds, drainers, CaptureSpeeds) * Time.deltaTime;
+    }
+
+    private int CountPlayersOfTeam(int team)
+    {
+        int n = 0;
+        foreach (PlayerTeam p in playersInZone)
+            if (p.teamID == team) n++;
+        return n;
     }
 
     void NeutralizeBuilding()

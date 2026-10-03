@@ -28,11 +28,12 @@ namespace Overpower.Match
         /// <param name="fadeRatePerSecond">captureFadeSpeed - the tooltip's captureFadeSpeed x
         /// ProgressPerPlayerPerSecond, one-player-seconds per real second. 0 means "holds where it was" (published
         /// as an ordinary Held/Paused, not a moving-but-zero fade) - see BuildingCapture.FadeRatePerSecond.</param>
+        /// <param name="drainerCount">How many players of the draining team stand in the zone (CaptureFadeRule.DrainerCount); the drain speeds up by the list like a capture does.</param>
         /// <param name="captureSpeedByPlayers">TerritoryConfig.CaptureSpeedByPlayers: how fast 1, 2, 3 players capture (CaptureSpeedRule); required; an empty list = n times one player's speed.</param>
         public static CaptureProgress Decide(bool isCaptured, bool isDecaying, bool isDrainPaused, float captureSeconds,
                                               float decaySeconds, bool isOnCooldown, int capturingID, int eligibleCount,
                                               bool enemyPresent, bool mayCaptureNow, float captureProgress, int nowMs,
-                                              System.Collections.Generic.IReadOnlyList<float> captureSpeedByPlayers, float fadeRatePerSecond = 0f)
+                                              System.Collections.Generic.IReadOnlyList<float> captureSpeedByPlayers, int drainerCount, float fadeRatePerSecond = 0f)
         {
             if (captureSeconds <= 0f)
                 return CaptureProgress.Idle;
@@ -62,7 +63,8 @@ namespace Overpower.Match
                 if (isDrainPaused)
                     return CaptureProgress.Held(capturingID, decayProgress01, nowMs);
 
-                float decayRate = decaySeconds > 0f ? -1f / decaySeconds : 0f;
+                // Tudor, 4 Oct: more drainers drain faster by the capture-speed list's factor (the 01 rate: captureSeconds cancels out).
+                float decayRate = decaySeconds > 0f ? -CaptureFadeRule.DrainProgressPerSecond(captureSeconds, decaySeconds, drainerCount, captureSpeedByPlayers) / captureSeconds : 0f;
                 return new CaptureProgress(capturingID, decayProgress01, decayRate, nowMs);
             }
 

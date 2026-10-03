@@ -304,5 +304,33 @@ namespace Overpower.Tests
             Assert.AreEqual(1, capturingId);
             Assert.AreEqual(0f, fresh);
         }
+
+        // ---- Tudor, 4 Oct: an owned zone drains faster with more enemies, by the capture-speed list ----
+
+        [Test]
+        public void DrainersAreTheDrainingTeamsPlayersOnly()
+        {
+            Assert.AreEqual(2, CaptureFadeRule.DrainerCount(1, new List<int> { 1, 2, 1, 2, 2 }), "team 2 standing there too does not add");
+            Assert.AreEqual(0, CaptureFadeRule.DrainerCount(1, new List<int> { 2 }));
+            Assert.AreEqual(0, CaptureFadeRule.DrainerCount(1, new List<int>()));
+        }
+
+        [Test]
+        public void TheDrainTakesTheListsFactorForOneTwoAndThreeDrainers()
+        {
+            var list = new float[] { 1f, 1.5f, 1.75f };
+            // captureSeconds 15, decaySeconds 3: one drainer removes 5 one-player-seconds per second
+            Assert.AreEqual(5f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 1, list), 1e-4f);
+            Assert.AreEqual(7.5f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 2, list), 1e-4f);
+            Assert.AreEqual(8.75f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 3, list), 1e-4f);
+            Assert.AreEqual(8.75f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 4, list), 1e-4f, "past the end: the last value");
+        }
+
+        [Test]
+        public void TheDrainWithAnEmptyListIsNTimesAsFastAndNoDrainersCountsAsOne()
+        {
+            Assert.AreEqual(10f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 2, System.Array.Empty<float>()), 1e-4f);
+            Assert.AreEqual(5f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 0, new float[] { 1f }), 1e-4f);
+        }
     }
 }
