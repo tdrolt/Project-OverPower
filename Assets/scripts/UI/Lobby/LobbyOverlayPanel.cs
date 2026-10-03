@@ -10,9 +10,10 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// A page that opens over a lobby screen: a dark shade over everything, a card with a title and a close button at the top right (lobby Task 10).
-    /// The game mode info page and the How to play page are this card with different contents (ModeInfoPanel, HowToPlayPanel: lobby Task 12 fills them).
-    /// Built in code from UiTheme (LobbyUiKit); the card's Body is where the contents go. Shown and hidden with Show / Hide; the close button hides it.
+    /// A page that opens over a lobby screen: a dark shade over everything and a big card with a cross at its top right that always closes it
+    /// (lobby Task 10, filled in by lobby Task 12). How to play (HowToPlayPanel) and the game mode info page (ModeInfoPanel) are this shell with
+    /// different contents: the card's Content is where they build theirs. Built in code from UiTheme (LobbyUiKit). Shown and hidden with Show /
+    /// Hide; the cross and Escape hide it, and it hides itself the moment a match starts in the room.
     /// </summary>
     public abstract class LobbyOverlayPanel : MonoBehaviour
     {
@@ -22,16 +23,37 @@ namespace Overpower.UI
         private TextMeshProUGUI titleLabel;
         private LobbyButton closeButton;
 
-        /// <summary>Where the page's contents go (below the title).</summary>
-        protected RectTransform Body { get; private set; }
+        /// <summary>The card the page is drawn on: the page builds its contents here.</summary>
+        protected RectTransform Content { get; private set; }
+
+        /// <summary>The page's heading, set by the page once it has built it; Show(title) writes the title into it.</summary>
+        protected TextMeshProUGUI Heading
+        {
+            get => titleLabel;
+            set => titleLabel = value;
+        }
 
         public bool IsShowing => root != null && root.activeSelf;
+
+        /// <summary>The title as drawn.</summary>
+        public string TitleText => titleLabel != null ? titleLabel.text : "";
+
+        /// <summary>The close button (what a click on the cross does).</summary>
+        public LobbyButton CloseButton => closeButton;
 
         // Every page that is open right now: Escape belongs to an open page (QuitConfirmPanel must not open on top of it).
         private static readonly HashSet<LobbyOverlayPanel> OpenPages = new HashSet<LobbyOverlayPanel>();
 
-        /// <summary>True while any How to play / mode info page is open.</summary>
-        public static bool AnyPageOpen => OpenPages.Count > 0;
+        /// <summary>True while any How to play / mode info page is open. A page that was destroyed or hidden without a callback (edit mode runs
+        /// none) is dropped from the list here.</summary>
+        public static bool AnyPageOpen
+        {
+            get
+            {
+                OpenPages.RemoveWhere(page => page == null || !page.IsShowing);
+                return OpenPages.Count > 0;
+            }
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ForgetPages() => OpenPages.Clear();
@@ -47,13 +69,8 @@ namespace Overpower.UI
 
         private void OnDestroy() => OpenPages.Remove(this);
 
-        /// <summary>The title as drawn.</summary>
-        public string TitleText => titleLabel != null ? titleLabel.text : "";
-
-        /// <summary>The close button (what a click on the cross does).</summary>
-        public LobbyButton CloseButton => closeButton;
-
-        protected void BuildCard(LobbyUiKit kit, string rootName)
+        /// <summary>Builds the shade, the card and the cross. The page fills Content afterwards.</summary>
+        protected void BuildShell(LobbyUiKit kit, string rootName)
         {
             Kit = kit;
             Theme = kit.Theme;
@@ -64,35 +81,42 @@ namespace Overpower.UI
             RectTransform cardRect = card.Outer;
             cardRect.anchorMin = cardRect.anchorMax = cardRect.pivot = new Vector2(0.5f, 0.5f);
             cardRect.sizeDelta = new Vector2(Theme.lobbyRoomOverlayWidth, Theme.lobbyRoomOverlayHeight);
+            card.Inner.gameObject.AddComponent<RectMask2D>(); // a page never draws outside its card
+            Content = card.Inner;
 
-            VerticalLayoutGroup column = card.Inner.gameObject.AddComponent<VerticalLayoutGroup>();
-            column.padding = LobbyUiKit.Pad(Theme.createCardPadding, Theme.createCardPadding, Theme.createCardPadding * 0.8f, Theme.createCardPadding);
-            column.spacing = Theme.createCardGap;
-            column.childControlWidth = column.childControlHeight = true;
-            column.childForceExpandWidth = true;
-            column.childForceExpandHeight = false;
-
-            titleLabel = Kit.Text(card.Inner, "Title", "", Kit.Display, Theme.lobbyRoomOverlayTitleSize, Theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineLeft);
-            LobbyUiKit.Size(titleLabel.gameObject, -1f, Theme.lobbyRoomOverlayTitleSize * 1.5f);
-
-            var body = new GameObject("Body", typeof(RectTransform));
-            body.transform.SetParent(card.Inner, false);
-            LobbyUiKit.Size(body, -1f, 0f, 1f, 1f);
-            Body = (RectTransform)body.transform;
-
-            closeButton = Kit.MakeButton(card.Outer, "Close", Theme.lobbyRoomCloseText, Kit.Bold, Theme.lobbyRoomOverlayCloseSize * 0.5f,
+            // The cross sits at the card's top right, over the contents, and is drawn as two lines (the fonts have no cross).
+            closeButton = Kit.MakeButton(card.Outer, "Close", "", Kit.Bold, Theme.lobbyRoomOverlayCloseSize * 0.5f,
                 Theme.lobbyOffWhiteColor, Theme.lobbyPanelColor, Theme.lobbyCornerRadius, Theme.lobbyBorderColor, Theme.lobbyBorderWidth);
             closeButton.Root.AddComponent<LayoutElement>().ignoreLayout = true;
             RectTransform closeRect = closeButton.Rect;
             closeRect.anchorMin = closeRect.anchorMax = closeRect.pivot = new Vector2(1f, 1f);
             closeRect.sizeDelta = new Vector2(Theme.lobbyRoomOverlayCloseSize, Theme.lobbyRoomOverlayCloseSize);
-            closeRect.anchoredPosition = new Vector2(-Theme.createCardPadding * 0.5f, -Theme.createCardPadding * 0.5f);
+            closeRect.anchoredPosition = new Vector2(-Theme.howToPlayCardPaddingX, -Theme.howToPlayCardPaddingY);
+            DrawCross(closeButton.Fill.transform);
             closeButton.Button.onClick.AddListener(Hide);
             root.SetActive(false);
         }
 
-        /// <summary>Opens the page with this title. Refused (false, a log line) while a match is under way in the room this client is in: the
-        /// page's shade would block every shot.</summary>
+        private void DrawCross(Transform parent)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                var line = new GameObject(i == 0 ? "Cross down" : "Cross up", typeof(RectTransform), typeof(Image));
+                line.transform.SetParent(parent, false);
+                RectTransform rect = (RectTransform)line.transform;
+                rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = Vector2.zero;
+                // a square's diagonal is 1.41 times its side: each line is as long as the cross is wide
+                rect.sizeDelta = new Vector2(Theme.lobbyRoomCloseCrossSize * 1.4142f, Theme.lobbyRoomCloseCrossThickness);
+                rect.localRotation = Quaternion.Euler(0f, 0f, i == 0 ? -45f : 45f);
+                Image image = line.GetComponent<Image>();
+                image.color = Theme.lobbyOffWhiteColor;
+                image.raycastTarget = false;
+            }
+        }
+
+        /// <summary>Opens the page with this title (a null title keeps the heading as it is). Refused (false, a log line) while a match is under way
+        /// in the room this client is in: the page's shade would block every shot.</summary>
         public bool Show(string title)
         {
             if (!LobbyScreenRules.OverlayMayBeShown(PhotonNetwork.InRoom, MatchDirector.LobbyStageNow))
@@ -100,7 +124,7 @@ namespace Overpower.UI
                 Debug.Log("[LOBBY] a page cannot be opened during a match");
                 return false;
             }
-            titleLabel.text = title ?? "";
+            if (titleLabel != null && title != null) titleLabel.text = title;
             root.SetActive(true);
             root.transform.SetAsLastSibling();
             OpenPages.Add(this);

@@ -596,12 +596,10 @@ MonoBehaviour:
   lobbyRoomStartHintText: Everyone spawns into the warm-up
   lobbyRoomStartBlockedFormat: '{0} needs a player'
   lobbyRoomWaitingFormat: 'Waiting for {0} to start the game'
-  lobbyRoomCloseText: X
-  lobbyRoomHowToStubText: Coming soon.
-  lobbyRoomOverlayWidth: 1500
-  lobbyRoomOverlayHeight: 840
-  lobbyRoomOverlayTitleSize: 54
-  lobbyRoomOverlayCloseSize: 60
+  lobbyRoomOverlayWidth: 1824
+  lobbyRoomOverlayHeight: 984
+  lobbyRoomOverlayTitleSize: 60
+  lobbyRoomOverlayCloseSize: 66
   lobbyRoomOverlayShade: {r: 0, g: 0, b: 0, a: 0.7}
   warmupBarFill: {r: 0.102, g: 0.11, b: 0.133, a: 0.88}
   warmupBarRadius: 12
@@ -662,3 +660,54 @@ MonoBehaviour:
   warmupBarHostRightPadding: 20.88
   nameScreenFieldPadding: 23.04
   createModeRadiusExtra: 3
+  howToPlayPages: {fileID: 11400000, guid: 4b7ba35d353c0ab49adedbc8abbcebe1, type: 2}
+  howToPlaySidebarTitle: HOW TO PLAY
+  howToPlayPreviousFormat: "<size=150%>\u2039</size> {0}"
+  howToPlayNextFormat: "{0} <size=150%>\u203A</size>"
+  howToPlayCounterFormat: "{0} / {1}"
+  howToPlayNoPagesText: No pages yet.
+  modeInfoKickerText: GAME MODE
+  modeInfoNoCardsText: Nothing to read about this mode yet.
+  howToPlaySidebarColor: {r: 0.082, g: 0.086, b: 0.106, a: 1}
+  howToPlayPictureColor: {r: 0.055, g: 0.059, b: 0.075, a: 1}
+  howToPlayTextColor: {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  howToPlayCardPaddingX: 54
+  howToPlayCardPaddingY: 42
+  howToPlayContentGap: 30
+  howToPlaySidebarWidth: 390
+  howToPlaySidebarPaddingX: 36
+  howToPlaySidebarPaddingY: 36
+  howToPlaySidebarGap: 6
+  howToPlaySidebarTitleSize: 18
+  howToPlaySidebarTitleGap: 18
+  howToPlaySidebarTitleSpacing: 3
+  howToPlayEntryHeight: 58
+  howToPlayEntryTextSize: 24
+  howToPlaySelectedBarWidth: 4.5
+  howToPlayTitleSize: 60
+  howToPlayPictureWidth: 741
+  howToPlayPictureHeight: 570
+  howToPlayPictureRadius: 12
+  howToPlayPictureGap: 48
+  howToPlayTextSize: 28.5
+  howToPlayTextMinSize: 21
+  howToPlayTextLineSpacing: 35
+  howToPlayButtonHeight: 66
+  howToPlayButtonPadding: 30
+  howToPlayButtonTextSize: 22.5
+  howToPlayCounterSize: 21
+  modeInfoKickerSize: 18
+  modeInfoKickerSpacing: 3
+  modeInfoColumns: 3
+  modeInfoGap: 24
+  modeInfoCardPadding: 30
+  modeInfoCardGap: 15
+  modeInfoCardRadius: 12
+  modeInfoAccentHeight: 6
+  modeInfoCardTitleSize: 36
+  modeInfoCardTextSize: 24
+  modeInfoCardTextMinSize: 17
+  modeInfoFitSlack: 6
+  modeInfoCardTextLineSpacing: 20
+  lobbyRoomCloseCrossSize: 21
+  lobbyRoomCloseCrossThickness: 3

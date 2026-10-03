@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b124c880b6f43a4b856fab0c65ce040, type: 3}
+  m_Name: HowToPlayPages
+  m_EditorClassIdentifier: 
+  pages:
+  - title: Moving and aiming
+    text: Move with WASD. Your character faces your cursor, and that's where your
+      shots go. Scroll the mouse wheel to zoom the camera in or out. Your shots are
+      more accurate when you stand still, so stop for a moment before a long shot.
+    picture: {fileID: 21300000, guid: c7a379147ed6da147bb7775a3e48f95e, type: 3}
+  - title: Shooting and overheat
+    text: 'Left click fires your weapon. Every shot builds heat, and so does sprinting.
+      Fill the bar and you overheat: no shots and no abilities until it cools all
+      the way down. Partway through an overheat a small window opens on the bar.
+      Press R inside it to vent and get back into the fight sooner.'
+    picture: {fileID: 21300000, guid: a19e311976fa1924e9649c1a33336989, type: 3}
+  - title: Ability slots
+    text: 'You carry four tools: your weapon on left click, an attachment on right
+      click, a movement ability on Shift and an ultimate on Space. You start with
+      a pistol and buy the rest in the shop. The ultimate charges as you deal damage,
+      take damage and take part in kills, and it only fires when the meter is full.
+      You can upgrade your armor twice; each upgrade either lets it take more damage
+      or makes it recharge sooner.'
+    picture: {fileID: 21300000, guid: f0ed4ce77673397479ba202a6ef11802, type: 3}
+  - title: Vision
+    text: You see in a cone toward your cursor, plus a small circle around you. Walls
+      block your sight; short barriers don't. Your teammates share what they see,
+      so you can stay together or split up to scout. Everything outside your team's
+      sight goes dark, and enemies in the dark are hidden. You can still hear their
+      guns when they shoot close by.
+    picture: {fileID: 21300000, guid: edd03d2852d0839459cdc4ba8e5e86ce, type: 3}
+  - title: The shop
+    text: 'Press P to open the shop. It has two pages: weapons with their upgrade
+      tree, and abilities and armor. Rest your cursor on an item to see what it does.
+      You can sell a weapon or armor back for part of what you paid; swapping an
+      ability gives nothing back. When and where you can buy depends on the game
+      mode, so check its info in the lobby.'
+    picture: {fileID: 21300000, guid: 85a5df7d87709ee45b92df4a3513e085, type: 3}
+  - title: Capturing zones
+    text: Stand inside a zone's circle to capture it. Bring teammates and it goes
+      faster. If enemies stand in it too, the capture holds until only one team is
+      left. Walk away halfway and the progress fades slowly instead of vanishing.
+      An enemy can only drain a zone you own while none of your team is inside it.
+    picture: {fileID: 21300000, guid: 437a27b7a1f608a4b8aea9a1af16262f, type: 3}

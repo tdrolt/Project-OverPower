@@ -1519,18 +1519,14 @@ namespace Overpower.UI
         public string lobbyRoomStartBlockedFormat = "{0} needs a player";
         [Tooltip("What everyone but the host reads at the bottom right: {0} is the host's name.")]
         public string lobbyRoomWaitingFormat = "Waiting for {0} to start the game";
-        [Tooltip("The close button of the mode info and How to play pages.")]
-        public string lobbyRoomCloseText = "X";
-        [Tooltip("Written on the How to play page until it is filled in (lobby Task 12).")]
-        public string lobbyRoomHowToStubText = "Coming soon.";
         [Tooltip("Width of the mode info and How to play pages, in reference pixels.")]
-        public float lobbyRoomOverlayWidth = 1500f;
+        public float lobbyRoomOverlayWidth = 1824f;
         [Tooltip("Height of the mode info and How to play pages, in reference pixels.")]
-        public float lobbyRoomOverlayHeight = 840f;
+        public float lobbyRoomOverlayHeight = 984f;
         [Tooltip("Text size of the title of those pages, in reference pixels.")]
-        public float lobbyRoomOverlayTitleSize = 54f;
+        public float lobbyRoomOverlayTitleSize = 60f;
         [Tooltip("Size of the close button of those pages, in reference pixels.")]
-        public float lobbyRoomOverlayCloseSize = 60f;
+        public float lobbyRoomOverlayCloseSize = 66f;
         [Tooltip("The dark layer behind the mode info and How to play pages.")]
         public Color lobbyRoomOverlayShade = new Color(0f, 0f, 0f, 0.7f);
 
@@ -1659,5 +1655,109 @@ namespace Overpower.UI
         public float nameScreenFieldPadding = 23.04f;
         [Tooltip("How much rounder the mode and size buttons of the create screen are than the other buttons, in reference pixels.")]
         public float createModeRadiusExtra = 3f;
+
+        [Header("How to play and the game mode info page (lobby Task 12)")]
+        [Tooltip("The pages of the How to play wiki: title, text and picture of each (the HowToPlayPages asset).")]
+        public Overpower.Data.HowToPlayPages howToPlayPages;
+        [Tooltip("The small heading over the page list of How to play.")]
+        public string howToPlaySidebarTitle = "HOW TO PLAY";
+        [Tooltip("The previous button: {0} is the title of the page before this one.")]
+        public string howToPlayPreviousFormat = "<size=150%>\u2039</size> {0}";
+        [Tooltip("The next button: {0} is the title of the page after this one.")]
+        public string howToPlayNextFormat = "{0} <size=150%>\u203a</size>";
+        [Tooltip("The page counter between the two buttons: {0} is this page's number, {1} how many pages there are.")]
+        public string howToPlayCounterFormat = "{0} / {1}";
+        [Tooltip("Written on How to play when the pages asset has no pages.")]
+        public string howToPlayNoPagesText = "No pages yet.";
+        [Tooltip("The small heading over the mode's name on the game mode info page.")]
+        public string modeInfoKickerText = "GAME MODE";
+        [Tooltip("Written on the game mode info page when the mode has no info cards.")]
+        public string modeInfoNoCardsText = "Nothing to read about this mode yet.";
+        [Tooltip("Background of the page list on the left of How to play.")]
+        public Color howToPlaySidebarColor = new Color(0.082f, 0.086f, 0.106f, 1f);
+        [Tooltip("Background behind a page's picture (the pictures are drawn on the same colour).")]
+        public Color howToPlayPictureColor = new Color(0.055f, 0.059f, 0.075f, 1f);
+        [Tooltip("Colour of a page's text.")]
+        public Color howToPlayTextColor = new Color(0.957f, 0.949f, 0.929f, 1f);
+        [Tooltip("Empty space left and right of the content of How to play and the mode info page, in reference pixels.")]
+        public float howToPlayCardPaddingX = 54f;
+        [Tooltip("Empty space above and below the content of those pages, in reference pixels.")]
+        public float howToPlayCardPaddingY = 42f;
+        [Tooltip("Space between the parts of the content column of How to play, in reference pixels.")]
+        public float howToPlayContentGap = 30f;
+        [Tooltip("Width of the page list of How to play, in reference pixels.")]
+        public float howToPlaySidebarWidth = 390f;
+        [Tooltip("Empty space left of a page list entry's text, in reference pixels.")]
+        public float howToPlaySidebarPaddingX = 36f;
+        [Tooltip("Empty space above and below the page list, in reference pixels.")]
+        public float howToPlaySidebarPaddingY = 36f;
+        [Tooltip("Space between two page list entries, in reference pixels.")]
+        public float howToPlaySidebarGap = 6f;
+        [Tooltip("Text size of the small heading over the page list, in reference pixels.")]
+        public float howToPlaySidebarTitleSize = 18f;
+        [Tooltip("Space between that heading and the first entry, in reference pixels.")]
+        public float howToPlaySidebarTitleGap = 18f;
+        [Tooltip("Extra space between the letters of that heading, in reference pixels.")]
+        public float howToPlaySidebarTitleSpacing = 3f;
+        [Tooltip("Height of one page list entry, in reference pixels.")]
+        public float howToPlayEntryHeight = 58f;
+        [Tooltip("Text size of a page list entry, in reference pixels.")]
+        public float howToPlayEntryTextSize = 24f;
+        [Tooltip("Width of the cyan bar beside the selected page, in reference pixels.")]
+        public float howToPlaySelectedBarWidth = 4.5f;
+        [Tooltip("Text size of a page's title, in reference pixels.")]
+        public float howToPlayTitleSize = 60f;
+        [Tooltip("Width of a page's picture, in reference pixels.")]
+        public float howToPlayPictureWidth = 741f;
+        [Tooltip("Height of a page's picture, in reference pixels (the pictures are 1040 x 800).")]
+        public float howToPlayPictureHeight = 570f;
+        [Tooltip("How round the corners of the picture are, in reference pixels.")]
+        public float howToPlayPictureRadius = 12f;
+        [Tooltip("Space between the picture and the text, in reference pixels.")]
+        public float howToPlayPictureGap = 48f;
+        [Tooltip("Largest text size of a page's text, in reference pixels. A longer page takes a smaller size so every page fits, all pages at the same size.")]
+        public float howToPlayTextSize = 28.5f;
+        [Tooltip("Smallest text size a page's text may shrink to, in reference pixels.")]
+        public float howToPlayTextMinSize = 21f;
+        [Tooltip("Extra space between the lines of a page's text, as a percentage of the text size.")]
+        public float howToPlayTextLineSpacing = 35f;
+        [Tooltip("Height of the previous and next buttons, in reference pixels.")]
+        public float howToPlayButtonHeight = 66f;
+        [Tooltip("Empty space left and right inside the previous and next buttons, in reference pixels.")]
+        public float howToPlayButtonPadding = 30f;
+        [Tooltip("Text size of the previous and next buttons, in reference pixels.")]
+        public float howToPlayButtonTextSize = 22.5f;
+        [Tooltip("Text size of the page counter, in reference pixels.")]
+        public float howToPlayCounterSize = 21f;
+        [Tooltip("Text size of the small heading over the mode's name, in reference pixels.")]
+        public float modeInfoKickerSize = 18f;
+        [Tooltip("Extra space between the letters of that heading, in reference pixels.")]
+        public float modeInfoKickerSpacing = 3f;
+        [Tooltip("How many cards stand side by side on the game mode info page.")]
+        public int modeInfoColumns = 3;
+        [Tooltip("Space between the cards of the game mode info page, in reference pixels.")]
+        public float modeInfoGap = 24f;
+        [Tooltip("Empty space inside a card, in reference pixels.")]
+        public float modeInfoCardPadding = 30f;
+        [Tooltip("Space between a card's title and its text, in reference pixels.")]
+        public float modeInfoCardGap = 15f;
+        [Tooltip("How round the corners of a card are, in reference pixels.")]
+        public float modeInfoCardRadius = 12f;
+        [Tooltip("Thickness of the coloured edge across the top of a card, in reference pixels.")]
+        public float modeInfoAccentHeight = 6f;
+        [Tooltip("Text size of a card's title, in reference pixels.")]
+        public float modeInfoCardTitleSize = 36f;
+        [Tooltip("Largest text size of a card's text, in reference pixels. A mode with a lot to say takes a smaller size so every card fits, all cards at the same size.")]
+        public float modeInfoCardTextSize = 24f;
+        [Tooltip("Smallest text size a card's text may shrink to, in reference pixels.")]
+        public float modeInfoCardTextMinSize = 17f;
+        [Tooltip("Extra height kept free in every row of cards when working out whether the text fits, in reference pixels.")]
+        public float modeInfoFitSlack = 6f;
+        [Tooltip("Extra space between the lines of a card's text, as a percentage of the text size.")]
+        public float modeInfoCardTextLineSpacing = 20f;
+        [Tooltip("Width and height of the cross on the close button of those pages, in reference pixels. It is drawn (the fonts have no cross).")]
+        public float lobbyRoomCloseCrossSize = 21f;
+        [Tooltip("Thickness of the lines of that cross, in reference pixels.")]
+        public float lobbyRoomCloseCrossThickness = 3f;
     }
 }

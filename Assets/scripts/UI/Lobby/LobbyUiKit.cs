@@ -340,6 +340,63 @@ namespace Overpower.UI
             return tmp;
         }
 
+        /// <summary>The height of a wrapped text of this size and width: what a layout would give it (the label's own font, spacing and line spacing).</summary>
+        public static float WrappedHeight(TMP_Text label, string text, float size, float width)
+        {
+            label.fontSize = size;
+            return label.GetPreferredValues(text ?? "", width, 0f).y;
+        }
+
+        /// <summary>The largest size, from max down to min in steps of half a pixel, at which every text fits in a box of this width and height
+        /// when wrapped; min (and allFit false) when even that is too big. One size for all the texts, so a page or card never reads smaller than its
+        /// neighbours. The label is only the measuring tool: its size is left at the answer.</summary>
+        public static float FitTextSize(TMP_Text label, IReadOnlyList<string> texts, float width, float height, float max, float min, out bool allFit)
+        {
+            for (float size = max; size >= min - 0.001f; size -= 0.5f)
+            {
+                bool fits = true;
+                for (int i = 0; i < texts.Count && fits; i++)
+                    fits = WrappedHeight(label, texts[i], size, width) <= height + 0.01f;
+                if (fits)
+                {
+                    label.fontSize = size;
+                    allFit = true;
+                    return size;
+                }
+            }
+            label.fontSize = min;
+            allFit = false;
+            return min;
+        }
+
+        /// <summary>The coloured edge across the top of a rounded box: the box's own rounded top in this colour, cut off after height (a mask over the
+        /// top strip), so it follows the box's corners. Not part of the box's layout.</summary>
+        public static void TopStripe(RectTransform box, Color colour, float height, float radius, string name = "Edge")
+        {
+            var mask = new GameObject(name, typeof(RectTransform), typeof(RectMask2D));
+            mask.transform.SetParent(box, false);
+            mask.AddComponent<LayoutElement>().ignoreLayout = true;
+            RectTransform maskRect = (RectTransform)mask.transform;
+            maskRect.anchorMin = new Vector2(0f, 1f);
+            maskRect.anchorMax = new Vector2(1f, 1f);
+            maskRect.pivot = new Vector2(0.5f, 1f);
+            maskRect.sizeDelta = new Vector2(0f, height);
+            maskRect.anchoredPosition = Vector2.zero;
+
+            var fill = new GameObject("Colour", typeof(RectTransform), typeof(Image));
+            fill.transform.SetParent(mask.transform, false);
+            RectTransform fillRect = (RectTransform)fill.transform;
+            fillRect.anchorMin = new Vector2(0f, 1f);
+            fillRect.anchorMax = new Vector2(1f, 1f);
+            fillRect.pivot = new Vector2(0.5f, 1f);
+            fillRect.sizeDelta = new Vector2(0f, Mathf.Max(radius * 3f, height * 2f));
+            fillRect.anchoredPosition = Vector2.zero;
+            Image image = fill.GetComponent<Image>();
+            Round(image, radius);
+            image.color = colour;
+            image.raycastTarget = false;
+        }
+
         /// <summary>OVERPOWER: off-white letters with an orange outline (TextMeshPro's outline on a copy of the font's material).</summary>
         public TextMeshProUGUI OutlinedTitle(Transform parent, string name, string text, float size)
         {

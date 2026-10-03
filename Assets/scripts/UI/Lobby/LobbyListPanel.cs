@@ -121,6 +121,9 @@ namespace Overpower.UI
         /// <summary>Presses How to play.</summary>
         public void PressHowToPlay() => howToButton.Press();
 
+        /// <summary>The cyan How to play button (a check reads whether it is on screen).</summary>
+        public LobbyButton HowToPlayButton => howToButton;
+
         /// <summary>A short message in place of the hint (a join that was refused), for the theme's message time.</summary>
         public void ShowMessage(string text)
         {

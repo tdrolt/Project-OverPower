@@ -97,9 +97,9 @@ namespace Overpower.UI
 
             list.CreateClicked += OpenCreate;
             list.JoinRequested += OnJoinRequested;
-            list.HowToPlayClicked += howToPlay.Show;
-            room.HowToPlayRequested += howToPlay.Show;
-            room.ModeInfoRequested += modeInfo.Show;
+            list.HowToPlayClicked += () => howToPlay.Show();
+            room.HowToPlayRequested += () => howToPlay.Show();
+            room.ModeInfoRequested += mode => modeInfo.Show(mode);
             create.Cancelled += OpenList;
             roomManager.Lobbies.JoinFailed += OnJoinFailed;
             roomManager.Lobbies.CreateFailed += OnCreateFailed;
