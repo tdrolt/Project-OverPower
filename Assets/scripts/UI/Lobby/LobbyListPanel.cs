@@ -67,7 +67,7 @@ namespace Overpower.UI
         /// <summary>The Create lobby button was pressed.</summary>
         public event Action CreateClicked;
 
-        /// <summary>The How to play button was pressed (the panel itself is lobby Task 12).</summary>
+        /// <summary>The How to play button was pressed (the page itself is HowToPlayPanel).</summary>
         public event Action HowToPlayClicked;
 
         /// <summary>A Join / Spectate button was pressed for this room.</summary>
@@ -363,7 +363,7 @@ namespace Overpower.UI
                 theme.lobbyDarkTextColor, theme.lobbyCyanColor, theme.lobbyCornerRadius, theme.lobbyCyanColor, 0f);
             howToButton.Button.onClick.AddListener(() =>
             {
-                Debug.Log("[LOBBY] How to play pressed (the panel itself is lobby Task 12)");
+                Debug.Log("[LOBBY] How to play pressed (the page is HowToPlayPanel)");
                 HowToPlayClicked?.Invoke();
             });
             LobbyUiKit.Size(howToButton.Root, -1f, theme.lobbyListHowToHeight);

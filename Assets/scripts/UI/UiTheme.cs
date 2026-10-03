@@ -1741,6 +1741,12 @@ namespace Overpower.UI
         public float howToPlayButtonTextSize = 22.5f;
         [Tooltip("Text size of the page counter, in reference pixels.")]
         public float howToPlayCounterSize = 21f;
+        [Tooltip("Width of the page counter's box, as a multiple of its text size.")]
+        public float howToPlayCounterWidthFactor = 8f;
+        [Tooltip("Height of a line of page text, as a multiple of its text size (titles, kickers, counters, card titles).")]
+        public float howToPlayLineHeightFactor = 1.5f;
+        [Tooltip("Space between the small heading over a mode's name and the name, in reference pixels.")]
+        public float modeInfoHeaderGap = 3f;
         [Tooltip("Text size of the small heading over the mode's name, in reference pixels.")]
         public float modeInfoKickerSize = 18f;
         [Tooltip("Extra space between the letters of that heading, in reference pixels.")]

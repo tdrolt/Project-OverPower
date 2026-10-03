@@ -112,6 +112,23 @@ namespace Overpower.UI
             bool inWarmup = d != null && PhotonNetwork.InRoom && MatchDirector.LobbyStageNow == LobbySeatRules.LobbyWarmup && d.State != StartState.Live;
             if (!inWarmup)
             {
+                Tick(false, WarmupMessage.None, 0, "", -1, 0);
+                return;
+            }
+
+            WarmupMessage message = MatchStartRules.WarmupMessageFor(d.State, PhotonNetwork.IsMasterClient, d.HostMayStartNow);
+            int number = message == WarmupMessage.Countdown ? d.CountdownSecondsShown : message == WarmupMessage.WaitingForHost ? 0 : d.PlayersNow;
+            string hostName = PhotonNetwork.MasterClient != null ? PhotonNetwork.MasterClient.NickName : "";
+            int blocked = message == WarmupMessage.HostBlocked ? d.EndWarmupBlockedTeam ?? -1 : -1;
+            Tick(true, message, number, hostName, blocked, d.PlayersNow);
+        }
+
+        /// <summary>One frame of the bar, from what the match director says: hidden outside the warm-up, otherwise redrawn (through
+        /// WarmupBarRules) only when the message, the number, the blocked team or the host's name changed.</summary>
+        internal void Tick(bool inWarmup, WarmupMessage message, int number, string hostName, int blocked, int playersNow)
+        {
+            if (!inWarmup)
+            {
                 if (shownVisible)
                 {
                     bar.SetActive(false);
@@ -121,18 +138,11 @@ namespace Overpower.UI
                 return;
             }
 
-            bool isHost = PhotonNetwork.IsMasterClient;
-            bool mayEnd = d.HostMayStartNow;
-            WarmupMessage message = MatchStartRules.WarmupMessageFor(d.State, isHost, mayEnd);
             if (message == WarmupMessage.None) return;
-
-            int number = message == WarmupMessage.Countdown ? d.CountdownSecondsShown : message == WarmupMessage.WaitingForHost ? 0 : d.PlayersNow;
-            string hostName = PhotonNetwork.MasterClient != null ? PhotonNetwork.MasterClient.NickName : "";
-            int blocked = message == WarmupMessage.HostBlocked ? d.EndWarmupBlockedTeam ?? -1 : -1;
             if (shownVisible && message == shownMessage && number == shownNumber && blocked == shownBlocked && (message != WarmupMessage.WaitingForHost || hostName == shownName))
                 return;
 
-            Apply(message, number, hostName, blocked, d.PlayersNow);
+            Apply(message, number, hostName, blocked, playersNow);
             shownMessage = message;
             shownNumber = number;
             shownName = hostName;

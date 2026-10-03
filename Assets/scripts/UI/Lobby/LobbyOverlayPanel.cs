@@ -58,11 +58,22 @@ namespace Overpower.UI
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ForgetPages() => OpenPages.Clear();
 
+        private bool chatWasOpenLastFrame;
+
         private void Update()
         {
+            Tick(PhotonNetwork.InRoom, MatchDirector.LobbyStageNow, Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame, PhotonChat.IsOpen);
+        }
+
+        /// <summary>One frame of the page: closes itself when the match started, and closes on Escape unless the chat is open (this frame or last
+        /// frame), because that Escape already closed the chat: one Escape closes one thing.</summary>
+        internal void Tick(bool inRoom, int lobbyStage, bool escapePressed, bool chatOpen)
+        {
+            bool chatBlocks = chatOpen || chatWasOpenLastFrame;
+            chatWasOpenLastFrame = chatOpen;
             if (!IsShowing) return;
-            ApplyMatchState(PhotonNetwork.InRoom, MatchDirector.LobbyStageNow);
-            CloseOnEscape(Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame);
+            ApplyMatchState(inRoom, lobbyStage);
+            CloseOnEscape(escapePressed && !chatBlocks);
         }
 
         private void OnDisable() => OpenPages.Remove(this);
@@ -117,9 +128,11 @@ namespace Overpower.UI
 
         /// <summary>Opens the page with this title (a null title keeps the heading as it is). Refused (false, a log line) while a match is under way
         /// in the room this client is in: the page's shade would block every shot.</summary>
-        public bool Show(string title)
+        public bool Show(string title) => TryShow(title, PhotonNetwork.InRoom, MatchDirector.LobbyStageNow);
+
+        internal bool TryShow(string title, bool inRoom, int lobbyStage)
         {
-            if (!LobbyScreenRules.OverlayMayBeShown(PhotonNetwork.InRoom, MatchDirector.LobbyStageNow))
+            if (!LobbyScreenRules.OverlayMayBeShown(inRoom, lobbyStage))
             {
                 Debug.Log("[LOBBY] a page cannot be opened during a match");
                 return false;

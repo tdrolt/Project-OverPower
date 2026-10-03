@@ -700,6 +700,9 @@ MonoBehaviour:
   howToPlayButtonPadding: 30
   howToPlayButtonTextSize: 22.5
   howToPlayCounterSize: 21
+  howToPlayCounterWidthFactor: 8
+  howToPlayLineHeightFactor: 1.5
+  modeInfoHeaderGap: 3
   modeInfoKickerSize: 18
   modeInfoKickerSpacing: 3
   modeInfoColumns: 3

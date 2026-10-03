@@ -126,7 +126,7 @@ namespace Overpower.UI
                 LobbyUiKit.Pad(Theme.howToPlayCardPaddingX, Theme.howToPlayCardPaddingX, Theme.howToPlayCardPaddingY, Theme.howToPlayCardPaddingY));
             LobbyUiKit.Size(column.gameObject, 0f, -1f, 1f, 1f);
 
-            float titleHeight = Theme.howToPlayTitleSize * 1.5f;
+            float titleHeight = Theme.howToPlayTitleSize * Theme.howToPlayLineHeightFactor;
             Heading = Kit.Text(column.transform, "Title", "", Kit.Display, Theme.howToPlayTitleSize, Theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineLeft);
             LobbyUiKit.Size(Heading.gameObject, -1f, titleHeight);
 
@@ -198,7 +198,7 @@ namespace Overpower.UI
             TextMeshProUGUI heading = Kit.Text(go.transform, "Heading", Theme.howToPlaySidebarTitle, Kit.Bold, Theme.howToPlaySidebarTitleSize, Theme.lobbyDimColor,
                 TextAlignmentOptions.MidlineLeft, Theme.howToPlaySidebarTitleSpacing);
             heading.margin = new Vector4(Theme.howToPlaySidebarPaddingX, 0f, 0f, 0f);
-            LobbyUiKit.Size(heading.gameObject, -1f, Theme.howToPlaySidebarTitleSize * 1.5f);
+            LobbyUiKit.Size(heading.gameObject, -1f, Theme.howToPlaySidebarTitleSize * Theme.howToPlayLineHeightFactor);
             var gap = new GameObject("Gap", typeof(RectTransform));
             gap.transform.SetParent(go.transform, false);
             LobbyUiKit.Size(gap, 0f, Mathf.Max(0f, Theme.howToPlaySidebarTitleGap - Theme.howToPlaySidebarGap), 0f, 0f);
@@ -244,7 +244,7 @@ namespace Overpower.UI
             counterLabel.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
             RectTransform counterRect = (RectTransform)counterLabel.transform;
             counterRect.anchorMin = counterRect.anchorMax = counterRect.pivot = new Vector2(0.5f, 0.5f);
-            counterRect.sizeDelta = new Vector2(Theme.howToPlayCounterSize * 8f, Theme.howToPlayCounterSize * 1.5f);
+            counterRect.sizeDelta = new Vector2(Theme.howToPlayCounterSize * Theme.howToPlayCounterWidthFactor, Theme.howToPlayCounterSize * Theme.howToPlayLineHeightFactor);
             counterRect.anchoredPosition = Vector2.zero;
 
             nextButton = Kit.MakeButton(footer.transform, "Next", "", Kit.Bold, Theme.howToPlayButtonTextSize, Theme.lobbyDarkTextColor,

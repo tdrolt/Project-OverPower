@@ -83,13 +83,13 @@ namespace Overpower.UI
             column.childForceExpandWidth = true;
             column.childForceExpandHeight = false;
 
-            VerticalLayoutGroup header = LobbyUiKit.VGroup(Content, "Header", 3f);
+            VerticalLayoutGroup header = LobbyUiKit.VGroup(Content, "Header", Theme.modeInfoHeaderGap);
             kickerLabel = Kit.Text(header.transform, "Kicker", Theme.modeInfoKickerText, Kit.Bold, Theme.modeInfoKickerSize, Theme.lobbyDimColor,
                 TextAlignmentOptions.MidlineLeft, Theme.modeInfoKickerSpacing);
-            LobbyUiKit.Size(kickerLabel.gameObject, -1f, Theme.modeInfoKickerSize * 1.5f);
+            LobbyUiKit.Size(kickerLabel.gameObject, -1f, Theme.modeInfoKickerSize * Theme.howToPlayLineHeightFactor);
             Heading = Kit.Text(header.transform, "Mode name", "", Kit.Display, Theme.howToPlayTitleSize, Theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineLeft,
                 0f, false, false);
-            LobbyUiKit.Size(Heading.gameObject, -1f, Theme.howToPlayTitleSize * 1.5f);
+            LobbyUiKit.Size(Heading.gameObject, -1f, Theme.howToPlayTitleSize * Theme.howToPlayLineHeightFactor);
 
             var gridGo = new GameObject("Cards", typeof(RectTransform));
             gridGo.transform.SetParent(Content, false);
@@ -103,7 +103,7 @@ namespace Overpower.UI
 
             emptyLabel = Kit.Text(Content, "Nothing to read", Theme.modeInfoNoCardsText, Kit.Body, Theme.howToPlayTextSize, Theme.lobbyDimColor,
                 TextAlignmentOptions.TopLeft);
-            LobbyUiKit.Size(emptyLabel.gameObject, -1f, Theme.howToPlayTextSize * 1.5f);
+            LobbyUiKit.Size(emptyLabel.gameObject, -1f, Theme.howToPlayTextSize * Theme.howToPlayLineHeightFactor);
             emptyLabel.gameObject.SetActive(false);
         }
 
@@ -132,13 +132,13 @@ namespace Overpower.UI
             rows = Mathf.CeilToInt(count / (float)columns);
             float border = Theme.lobbyBorderWidth;
             float pad = Theme.modeInfoCardPadding;
-            float titleHeight = Theme.modeInfoCardTitleSize * 1.5f;
+            float titleHeight = Theme.modeInfoCardTitleSize * Theme.howToPlayLineHeightFactor;
 
             // The room a card's text has: the card's width without its padding, and what is left of the page once the heading, the gaps and the
             // other rows are taken (the rows share the height by what their text needs).
             float cardWidth = (Theme.lobbyRoomOverlayWidth - border * 2f - Theme.howToPlayCardPaddingX * 2f - Theme.modeInfoGap * (columns - 1)) / columns;
             float textWidth = cardWidth - pad * 2f;
-            float headerHeight = Theme.modeInfoKickerSize * 1.5f + 3f + Theme.howToPlayTitleSize * 1.5f;
+            float headerHeight = Theme.modeInfoKickerSize * Theme.howToPlayLineHeightFactor + Theme.modeInfoHeaderGap + Theme.howToPlayTitleSize * Theme.howToPlayLineHeightFactor;
             float gridHeight = Theme.lobbyRoomOverlayHeight - border * 2f - Theme.howToPlayCardPaddingY * 2f - headerHeight - Theme.howToPlayContentGap;
             float chrome = Theme.modeInfoAccentHeight + pad * 2f + titleHeight + Theme.modeInfoCardGap + Theme.modeInfoFitSlack; // everything in a card but its text, and a little to spare
 
@@ -217,7 +217,7 @@ namespace Overpower.UI
 
             TextMeshProUGUI title = Kit.Text(box.Inner, "Title", info.title, Kit.Display, Theme.modeInfoCardTitleSize, Theme.lobbyOffWhiteColor,
                 TextAlignmentOptions.MidlineLeft, 0f, false, false);
-            LobbyUiKit.Size(title.gameObject, -1f, Theme.modeInfoCardTitleSize * 1.5f);
+            LobbyUiKit.Size(title.gameObject, -1f, Theme.modeInfoCardTitleSize * Theme.howToPlayLineHeightFactor);
             TextMeshProUGUI text = Kit.Text(box.Inner, "Text", info.text, Kit.Body, Theme.modeInfoCardTextSize, Theme.lobbyRoomHeadingColor,
                 TextAlignmentOptions.TopLeft, 0f, true, false);
             text.lineSpacing = Theme.modeInfoCardTextLineSpacing;
