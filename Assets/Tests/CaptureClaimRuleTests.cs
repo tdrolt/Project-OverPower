@@ -74,7 +74,7 @@ namespace Overpower.Tests
             Assert.AreEqual(0, capturingId);
 
             CaptureProgress capturing = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
-                capturingId, eligibleCount: 1, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 1000);
+                capturingId, eligibleCount: 1, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 1000, captureSpeedByPlayers: System.Array.Empty<float>());
             Assert.AreEqual(0, capturing.Team);
             Assert.IsTrue(capturing.RatePerSecond01 > 0f);
 
@@ -83,7 +83,7 @@ namespace Overpower.Tests
             Assert.AreEqual(3f, captureProgress, "and its banked progress must not reset just because it's contested");
 
             CaptureProgress contested = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
-                capturingId, eligibleCount: 1, enemyPresent: true, mayCaptureNow: true, captureProgress: captureProgress, nowMs: 2000);
+                capturingId, eligibleCount: 1, enemyPresent: true, mayCaptureNow: true, captureProgress: captureProgress, nowMs: 2000, captureSpeedByPlayers: System.Array.Empty<float>());
             Assert.AreEqual(0, contested.Team);
             Assert.IsTrue(contested.IsHeld);
             Assert.Greater(contested.Progress01, 0f);

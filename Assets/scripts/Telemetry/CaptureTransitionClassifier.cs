@@ -36,7 +36,7 @@ namespace Overpower.Telemetry
         /// contribution for a SLOW transition - a solo Tier 2 capture (15s for one player) fills
         /// about 0.0011 in one frame at 60 Hz, two orders of magnitude below this - but it is NOT
         /// enough headroom for a fast one: Tier 3 (10s, the fastest tier TerritoryConfig ships by
-        /// default) with several capturers multiplies the rate (rate = eligibleCount / captureSeconds
+        /// default) with several capturers multiplies the rate (rate = CaptureSpeedRule.For(eligibleCount, list) / captureSeconds
         /// - see BuildingCapture.ComputeCurrentProgress), and a drain's DecaySeconds can be short
         /// too. A slow or lagged master frame (well under 60 Hz) multiplies whichever rate further.
         /// Classify scales this floor by the transition's own rate (review fix, 2026-09-17: the old

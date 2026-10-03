@@ -75,7 +75,7 @@ namespace Overpower.Match
         ///     either case (nobody to ask about).</summary>
         public static float NeutralFadeRate(float fadeRate, int claimTeam, IReadOnlyList<int> teamsInZone,
                                              float perPlayerSpeed, System.Func<int, bool> mayCapture,
-                                             IReadOnlyList<float> captureSpeedByPlayers = null)
+                                             IReadOnlyList<float> captureSpeedByPlayers)
         {
             if (teamsInZone.Count == 0 || Contains(teamsInZone, claimTeam))
                 return fadeRate;

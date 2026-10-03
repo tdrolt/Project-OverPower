@@ -102,8 +102,8 @@ namespace Overpower.Tests
         public void EscapeThatClosesTheChatDoesNotAlsoCloseThePage()
         {
             HowToPlayPanel panel = NewPage();
-            panel.Tick(false, 0, false, true); // chat open
-            panel.Tick(false, 0, true, true);  // the Escape: the chat is open this frame
+            panel.Tick(false, 0, false, false); // the chat was NOT open last frame
+            panel.Tick(false, 0, true, true);   // the Escape: the chat is open this frame (and only this frame)
             Assert.IsTrue(panel.IsShowing, "the chat is open: Escape closes it first");
         }
 

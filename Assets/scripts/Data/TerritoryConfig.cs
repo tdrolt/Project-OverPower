@@ -85,7 +85,8 @@ namespace Overpower.Data
 
         [Header("Capture")]
         [Tooltip("How fast a zone is captured or drained with 1, 2, 3... players of one team in it, as a multiple of one " +
-                 "player's speed. Past the end of the list the last value is used.")]
+                 "player's speed. Past the end of the list the last value is used. Keep it filled with values above 0: an empty " +
+                 "list quietly means 1, 2, 3 and a 0 stops captures.")]
         [SerializeField] private float[] captureSpeedByPlayers = { 1f, 1.5f, 1.75f };
 
         [Header("Sounds")]
@@ -98,6 +99,21 @@ namespace Overpower.Data
 
         public int PlayersPerTeam => playersPerTeam;
         public float BountyHoldSeconds => bountyHoldSeconds;
+        private void OnValidate()
+        {
+            if (captureSpeedByPlayers == null || captureSpeedByPlayers.Length == 0)
+            {
+                Debug.LogWarning("[TerritoryConfig] captureSpeedByPlayers is empty: captures quietly use 1, 2, 3 for 1, 2, 3 players.", this);
+                return;
+            }
+            foreach (float speed in captureSpeedByPlayers)
+                if (speed <= 0f)
+                {
+                    Debug.LogWarning("[TerritoryConfig] captureSpeedByPlayers has an entry of 0 or less: that many players cannot capture or drain.", this);
+                    return;
+                }
+        }
+
         public int StartingGold => startingGold;
         public float RecaptureCooldownSeconds => recaptureCooldownSeconds;
         public float UnderAttackLingerSeconds => underAttackLingerSeconds;

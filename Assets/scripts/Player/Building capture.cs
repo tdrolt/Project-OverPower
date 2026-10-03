@@ -501,7 +501,7 @@ public class BuildingCapture : MonoBehaviourPun
 
         return CaptureProgressPublishRule.Decide(isCaptured, isDecaying, isDrainPaused, CaptureSeconds, DecaySeconds,
             isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs,
-            fadeRate, CaptureSpeeds);
+            CaptureSpeeds, fadeRate);
     }
 
     /// <summary>Forces this tower to tell the room its current capture progress right now,
