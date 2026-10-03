@@ -38,8 +38,10 @@ public sealed class ChatClientReaper : MonoBehaviour
             ChatClient client = closing[i];
             client.Service();
             bool done = client.State == ChatState.Disconnected || client.State == ChatState.Uninitialized;
-            if (done || Time.unscaledTime - startedAt[i] > GiveUpSeconds)
+            bool gaveUp = !done && Time.unscaledTime - startedAt[i] > GiveUpSeconds;
+            if (done || gaveUp)
             {
+                if (gaveUp) client.StopThread(); // the client's own service thread must not outlive the object we drop
                 closing.RemoveAt(i);
                 startedAt.RemoveAt(i);
             }

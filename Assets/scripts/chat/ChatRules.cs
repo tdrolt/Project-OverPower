@@ -17,6 +17,28 @@ namespace Overpower.Chat
             subscribedChannel != null && channel != null && subscribedChannel == channel;
     }
 
+    /// <summary>Lobby Task 13 (Task 11 review): when the chat panel may be open, and how high its canvas draws. The chat only opens while it has a
+    /// channel (a lobby it is in) - on the name, list and create screens Enter does nothing - and it closes itself the moment the channel goes (room
+    /// left) or a How to play / mode info page opens over it. Its canvas draws over the lobby screens only while the lobby room shows; in the match
+    /// it sits under the scoreboard and the result / match-log panels.</summary>
+    public static class ChatPanelRule
+    {
+        /// <summary>Above the lobby screens' canvas (LobbyUiKit.CanvasSortingOrder, 100).</summary>
+        public const int LobbyRoomOrder = 101;
+
+        /// <summary>In the match: above the HUD canvases (-10 .. -20) and under the result panels (0), the match-log box (10) and the scoreboard (30).</summary>
+        public const int MatchOrder = -1;
+
+        /// <summary>Enter opens the panel only when a channel is subscribed.</summary>
+        public static bool MayOpen(string subscribedChannel) => subscribedChannel != null;
+
+        /// <summary>An open panel closes when its channel is gone or a page (How to play / mode info) is open.</summary>
+        public static bool MustClose(bool open, string subscribedChannel, bool pageOpen) =>
+            open && (subscribedChannel == null || pageOpen);
+
+        public static int SortingOrder(bool lobbyRoomShowing) => lobbyRoomShowing ? LobbyRoomOrder : MatchOrder;
+    }
+
     /// <summary>What one chat line carries: who (display name, team, spectator seat) and what they typed. Photon Chat's own sender is the chat user id
     /// (the install's stable player id), which is never shown - everything shown comes from this.</summary>
     public readonly struct ChatMessage

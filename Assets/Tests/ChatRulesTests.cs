@@ -123,6 +123,57 @@ namespace Overpower.Tests
             StringAssert.DoesNotContain("chattext", screen, "nothing switches the old hint object on any more");
         }
 
+        // ---- lobby Task 13 (Task 11 review) ----
+
+        [Test]
+        public void EnterOpensTheChatOnlyWhileItHasAChannel()
+        {
+            Assert.IsFalse(ChatPanelRule.MayOpen(null), "name, list and Create screens: no channel, Enter does nothing");
+            Assert.IsTrue(ChatPanelRule.MayOpen("Alpha"));
+        }
+
+        [Test]
+        public void TheOpenChatClosesWhenTheRoomIsLeftOrAPageOpens()
+        {
+            Assert.IsTrue(ChatPanelRule.MustClose(true, null, false), "the room was left");
+            Assert.IsTrue(ChatPanelRule.MustClose(true, "Alpha", true), "How to play or the mode info page opened");
+            Assert.IsFalse(ChatPanelRule.MustClose(true, "Alpha", false));
+            Assert.IsFalse(ChatPanelRule.MustClose(false, null, true), "a closed chat has nothing to close");
+        }
+
+        [Test]
+        public void TheChatDrawsOverTheLobbyRoomButUnderTheMatchPanels()
+        {
+            Assert.Greater(ChatPanelRule.SortingOrder(true), Overpower.UI.LobbyUiKit.CanvasSortingOrder, "above the lobby screens while the lobby room shows");
+            Assert.Less(ChatPanelRule.SortingOrder(false), 0, "in the match: under the result panels (0)");
+            Assert.Less(ChatPanelRule.SortingOrder(false), 10, "under the match-log box");
+            Assert.Less(ChatPanelRule.SortingOrder(false), UnityEngine.ScriptableObject.CreateInstance<Overpower.UI.UiTheme>().scoreboardSortingOrder, "under the scoreboard");
+            Assert.Greater(ChatPanelRule.SortingOrder(false), -10, "over the HUD canvases");
+        }
+
+        [Test]
+        public void TheChatManagerObjectStartsSwitchedOffInTheScene()
+        {
+            string scene = System.IO.File.ReadAllText("Assets/Scenes/Game Scene.unity").Replace("\r\n", "\n");
+            int name = scene.IndexOf("value: chat manager\n", System.StringComparison.Ordinal);
+            Assert.GreaterOrEqual(name, 0);
+            int active = scene.IndexOf("propertyPath: m_IsActive", name, System.StringComparison.Ordinal);
+            Assert.Greater(active, name);
+            int valueAt = scene.IndexOf("value: ", active, System.StringComparison.Ordinal);
+            Assert.AreEqual("value: 0", scene.Substring(valueAt, 8), "NameScreen switches the chat on when a room is joined; idle title-screen clients hold no chat connection");
+        }
+
+        [Test]
+        public void TheChatLookNumbersLiveInTheTheme()
+        {
+            string source = System.IO.File.ReadAllText("Assets/scripts/chat/chatmanager.cs");
+            StringAssert.DoesNotContain("15f / 255f", source);
+            StringAssert.DoesNotContain("new Vector2(18f, 0f)", source);
+            StringAssert.DoesNotContain("new Vector2(1.5f, 1.5f)", source);
+            StringAssert.DoesNotContain("* 0.75f", source);
+            StringAssert.DoesNotContain(": 40;", source);
+        }
+
         [Test]
         public void OnlyTheNewestLinesAreKept()
         {

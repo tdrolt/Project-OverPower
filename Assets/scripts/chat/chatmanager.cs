@@ -48,6 +48,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     bool lookApplied;
     bool connectPending;            // set when enabled; the connection is made once the previous one has closed (ChatClientReaper)
     UiTheme theme;
+    Canvas chatCanvas;
     RoomManager roomManager;
     NameScreen nameScreen;
     int lastLayout = -1;            // 0 = arena corner, 1 = lobby room corner
@@ -223,9 +224,10 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         lookApplied = true;
 
         Canvas canvas = chatPanel.GetComponentInParent<Canvas>();
+        chatCanvas = canvas;
         if (canvas != null)
         {
-            canvas.sortingOrder = LobbyUiKit.CanvasSortingOrder + 1; // above the lobby screens
+            canvas.sortingOrder = ChatPanelRule.SortingOrder(false); // PlacePanel raises it while the lobby room shows
             CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
             if (scaler != null)
             {
@@ -239,7 +241,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         PlacePanel(false);
         Image panelImage = chatPanel.GetComponent<Image>();
         LobbyUiKit.Round(panelImage, theme.chatPanelRadius);
-        panelImage.color = new Color(15f / 255f, 16f / 255f, 20f / 255f, theme.chatPanelAlpha);
+        panelImage.color = new Color(theme.chatPanelColor.r, theme.chatPanelColor.g, theme.chatPanelColor.b, theme.chatPanelAlpha);
         panelImage.raycastTarget = false;
 
         // "Chat room" holds the lines, the typing box and the old Send button.
@@ -260,7 +262,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         Image fieldImage = chatField.GetComponent<Image>();
         if (fieldImage != null)
         {
-            float radius = theme.chatPanelRadius * 0.75f;
+            float radius = theme.chatPanelRadius * theme.chatInputCornerFactor;
             LobbyUiKit.Round(fieldImage, radius);
             fieldImage.color = theme.lobbyBorderColor;
             var inner = new GameObject("Fill", typeof(RectTransform), typeof(Image));
@@ -268,10 +270,10 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
             inner.transform.SetAsFirstSibling();
             var innerRect = (RectTransform)inner.transform;
             LobbyUiKit.Stretch(innerRect);
-            innerRect.offsetMin = new Vector2(1.5f, 1.5f);
-            innerRect.offsetMax = new Vector2(-1.5f, -1.5f);
+            innerRect.offsetMin = new Vector2(theme.chatInputBorderWidth, theme.chatInputBorderWidth);
+            innerRect.offsetMax = new Vector2(-theme.chatInputBorderWidth, -theme.chatInputBorderWidth);
             Image innerImage = inner.GetComponent<Image>();
-            LobbyUiKit.Round(innerImage, radius - 1.5f);
+            LobbyUiKit.Round(innerImage, radius - theme.chatInputBorderWidth);
             innerImage.color = theme.lobbyPanelColor;
             innerImage.raycastTarget = false;
             chatField.targetGraphic = fieldImage;
@@ -279,8 +281,8 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         TMP_FontAsset body = theme.lobbyBodyFont;
         if (chatField.textViewport != null)
         {
-            chatField.textViewport.offsetMin = new Vector2(18f, 0f);
-            chatField.textViewport.offsetMax = new Vector2(-18f, 0f);
+            chatField.textViewport.offsetMin = new Vector2(theme.chatInputTextInset, 0f);
+            chatField.textViewport.offsetMax = new Vector2(-theme.chatInputTextInset, 0f);
         }
         StyleInputText(chatField.textComponent, body, theme.lobbyOffWhiteColor, theme.chatInputTextSize);
         TMP_Text hint = chatField.placeholder as TMP_Text;
@@ -327,6 +329,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     {
         if (theme == null || chatPanel == null) return;
         lastLayout = lobbyRoom ? 1 : 0;
+        if (chatCanvas != null) chatCanvas.sortingOrder = ChatPanelRule.SortingOrder(lobbyRoom); // over the lobby screens only while the lobby room shows
         var panel = (RectTransform)chatPanel.transform;
         panel.anchoredPosition = lobbyRoom ? theme.chatLobbyMargin : theme.chatPanelMargin;
         panel.sizeDelta = lobbyRoom ? theme.chatLobbySize : theme.chatPanelSize;
@@ -383,7 +386,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
             added = true;
         }
         if (!added) return;
-        int keep = theme != null ? theme.chatMaxLines : 40;
+        int keep = theme != null ? theme.chatMaxLines : UiTheme.DefaultChatMaxLines;
         ChatLine.Trim(lines, keep);
         ChatLine.Trim(plainLines, keep);
         chatDisplay.text = string.Join("\n", lines); // display the received public message
@@ -458,12 +461,19 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         bool inLobbyRoom = nameScreen != null && nameScreen.Room != null && nameScreen.Room.IsShowing;
         if (lookApplied && lastLayout != (inLobbyRoom ? 1 : 0)) PlacePanel(inLobbyRoom);
 
+        // The chat closes itself when its channel is gone (the room was left) or How to play / the mode info page opens over it.
+        if (ChatPanelRule.MustClose(chatPanel.activeSelf, subscribedChannel, LobbyOverlayPanel.AnyPageOpen))
+            SetOpen(false);
+
         // Toggle chat panel visibility on Enter key press
         if (Input.GetKeyDown(KeyCode.Return))
         {
-            // If the chat is closed, open it and focus on the input field; if it is open, send the message
+            // If the chat is closed, open it and focus on the input field (only while it has a channel: on the name, list and Create
+            // screens Enter does nothing); if it is open, send the message
             if (!chatPanel.activeSelf)
-                SetOpen(true);
+            {
+                if (ChatPanelRule.MayOpen(subscribedChannel)) SetOpen(true);
+            }
             else
                 SubmitPublicChatOnClick();
         }

@@ -651,6 +651,10 @@ MonoBehaviour:
   chatInputPlaceholder: Enter to type, Escape to close
   chatSpectatorTag: '[SPEC]'
   chatMaxLines: 40
+  chatPanelColor: {r: 0.05882353, g: 0.0627451, b: 0.078431375, a: 1}
+  chatInputTextInset: 18
+  chatInputBorderWidth: 1.5
+  chatInputCornerFactor: 0.75
   lobbyRoomHeaderGap: 3
   lobbyRoomModeRowGap: 15
   lobbyRoomInfoIconTextFactor: 0.62

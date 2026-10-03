@@ -1634,7 +1634,17 @@ namespace Overpower.UI
         [Tooltip("Written before a spectator's name in chat.")]
         public string chatSpectatorTag = "[SPEC]";
         [Tooltip("How many chat lines are kept on screen; older ones are dropped.")]
-        public int chatMaxLines = 40;
+        public int chatMaxLines = DefaultChatMaxLines;
+        /// <summary>The line count used when no theme is assigned (and the default of chatMaxLines).</summary>
+        public const int DefaultChatMaxLines = 40;
+        [Tooltip("Colour of the chat panel's dark background (how see-through it is comes from Chat Panel Alpha).")]
+        public Color chatPanelColor = new Color(15f / 255f, 16f / 255f, 20f / 255f, 1f);
+        [Tooltip("Empty space between the typing box's edge and the text inside it, left and right, in reference pixels.")]
+        public float chatInputTextInset = 18f;
+        [Tooltip("Thickness of the typing box's border line, in reference pixels.")]
+        public float chatInputBorderWidth = 1.5f;
+        [Tooltip("How round the typing box's corners are compared with the chat panel's corners: 1 = the same, 0.5 = half as round.")]
+        public float chatInputCornerFactor = 0.75f;
 
         [Header("Lobby screens: layout numbers (lobby Task 10 review)")]
         [Tooltip("Space between the lobby name and the mode row of the lobby room, in reference pixels.")]
