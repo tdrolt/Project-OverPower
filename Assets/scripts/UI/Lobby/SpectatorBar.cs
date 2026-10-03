@@ -8,7 +8,7 @@ namespace Overpower.UI
 {
     /// <summary>
     /// The bar at the bottom of a spectator seat's screen (lobby Task 6, board 8): "SPECTATING", who is watched in their team's colour (or
-    /// "Whole map"), the four keys and a Leave button. Built in code like MatchStartPanel (uGUI + TMP on its own overlay canvas with a
+    /// "Whole map"), the four keys and a Leave button. Built in code like WarmupBar, the panel that replaced MatchStartPanel (uGUI + TMP on its own overlay canvas with a
     /// GraphicRaycaster so Leave is clickable); every colour, size and text is a UiTheme field in the "Spectator bar" section. It only
     /// shows what SpectatorSeatView tells it; the keys themselves are read there.
     /// </summary>

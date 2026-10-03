@@ -1639,5 +1639,25 @@ namespace Overpower.UI
         public string chatSpectatorTag = "[SPEC]";
         [Tooltip("How many chat lines are kept on screen; older ones are dropped.")]
         public int chatMaxLines = 40;
+
+        [Header("Lobby screens: layout numbers (lobby Task 10 review)")]
+        [Tooltip("Space between the lobby name and the mode row of the lobby room, in reference pixels.")]
+        public float lobbyRoomHeaderGap = 3f;
+        [Tooltip("Space between the mode button and the host line, in reference pixels.")]
+        public float lobbyRoomModeRowGap = 15f;
+        [Tooltip("Size of the i inside the mode button's circle, as a share of the circle's size.")]
+        public float lobbyRoomInfoIconTextFactor = 0.62f;
+        [Tooltip("Space between the mode name and the circled i, as a share of the mode button's padding.")]
+        public float lobbyRoomModeIconGapFactor = 0.4f;
+        [Tooltip("A little extra width of the mode button so its text never touches the edge, in reference pixels.")]
+        public float lobbyRoomModeButtonSlack = 4f;
+        [Tooltip("Height of a name line in the No role box, as a share of its text size.")]
+        public float lobbyRoomSideNameLine = 1.4f;
+        [Tooltip("Empty space right of End warm-up inside the host's bar, in reference pixels (the left side uses the padding above).")]
+        public float warmupBarHostRightPadding = 20.88f;
+        [Tooltip("Empty space left and right inside the name box on the name screen, in reference pixels.")]
+        public float nameScreenFieldPadding = 23.04f;
+        [Tooltip("How much rounder the mode and size buttons of the create screen are than the other buttons, in reference pixels.")]
+        public float createModeRadiusExtra = 3f;
     }
 }

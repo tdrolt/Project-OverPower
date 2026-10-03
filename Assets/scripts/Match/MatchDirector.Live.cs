@@ -203,8 +203,8 @@ namespace Overpower.Match
         };
 
         /// <summary>Covers the countdown starting, being cancelled, and the match going live - the WarmupBar
-        /// subscribes instead of polling every frame for a change that happens rarely. Map shrink T3: the
-        /// phase-two cut changing (derived from mElim) raises it too - the minimap already listens, to redraw its
+        /// does not subscribe: it polls the state every frame and rewrites itself only when something it shows
+        /// changed. Map shrink T3: the phase-two cut changing (derived from mElim) raises it too - the minimap already listens, to redraw its
         /// overlay.</summary>
         public event System.Action LiveStateChanged;
 
@@ -237,7 +237,7 @@ namespace Overpower.Match
         }
 
         /// <summary>The host's Start button calls this directly - the host IS the master, so this is a local call
-        /// and no RPC is needed. Starts the countdown; refused (and the button hides next frame) if mastership
+        /// and no RPC is needed. Starts the countdown; refused (and the button greys next frame) if mastership
         /// moved or the rule no longer holds.</summary>
         public void HostStartMatch()
         {
@@ -252,8 +252,21 @@ namespace Overpower.Match
         private void StartCountdown(int[] teams)
         {
             GameplayConfig config = CountdownConfig();
-            if (config == null || PhotonNetwork.ServerTimestamp == 0 || teams.Length < 2)
-                return; // player not spawned / clock not synced yet - the next poll tries again
+            if (config == null)
+            {
+                Debug.LogWarning("[MATCH] countdown not started: no GameplayConfig yet (this player's body has not spawned)");
+                return;
+            }
+            if (PhotonNetwork.ServerTimestamp == 0)
+            {
+                Debug.LogWarning("[MATCH] countdown not started: the server clock has not synced yet");
+                return;
+            }
+            if (teams.Length < 2)
+            {
+                Debug.LogWarning($"[MATCH] countdown not started: the layout has {teams.Length} team(s), a match needs at least 2");
+                return;
+            }
 
             int liveAt = MatchStartRules.CountdownEndsAt(PhotonNetwork.ServerTimestamp, config.MatchStartCountdownSeconds);
             var props = new Hashtable { { TeamsInMatchKey, teams }, { LiveAtKey, liveAt } };
@@ -269,7 +282,10 @@ namespace Overpower.Match
             PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyModeKey, out object modeSeen);
             var expectedAbsent = new Hashtable { { TeamsInMatchKey, null }, { LobbyModeKey, modeSeen } };
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent))
+            {
+                Debug.LogWarning("[MATCH] countdown not started: the room refused the check-and-set (teams already fixed, or the mode changed)");
                 return;
+            }
 
             waitForEchoUntil = Time.unscaledTime + EchoWaitSeconds;
             // MaxPlayers is no longer written here (lobby Task 4): a room keeps the size it was created with.

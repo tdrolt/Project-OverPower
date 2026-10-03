@@ -100,12 +100,6 @@ namespace Overpower.Match
             return sortedActors[sortedActors.Count - 1];
         }
 
-        /// <summary>The whole-map view (Space): where the camera aims on the ground and how far it stands from that point, so the arena
-        /// outline fills heightFill of the free screen height (0.88 = 88%), centred in it, and never runs off the sides. The camera is the
-        /// follow camera's: tilted down (tiltDegrees below the horizon), a vertical field of view and a window aspect, turned round the
-        /// map by yawDegrees exactly as CameraTracking turns its offset (0 = looking up the map, +z). bottomReserve is the share of the
-        /// screen's height kept free at the bottom (the spectator bar): the arena is framed in the area above it. The outline is projected
-        /// through the camera exactly (a circle round the farthest point framed it too loosely: the outline is no circle). Zero for no outline.</summary>
         /// <summary>How much of the screen's height a bar of this height (in the canvas's reference pixels) covers, through the canvas scaler: Unity's
         /// ScaleWithScreenSize scales by 2 to the power of the blend, by the match value, of the log2 of the width ratio and of the height ratio. At
         /// the reference aspect the share is the bar over the reference height; on a wider screen the scaler grows the bar (match 0.5), on a taller
@@ -119,6 +113,12 @@ namespace Overpower.Match
             return UnityEngine.Mathf.Clamp01(barHeight * scale / screenHeight);
         }
 
+        /// <summary>The whole-map view (Space): where the camera aims on the ground and how far it stands from that point, so the arena
+        /// outline fills heightFill of the free screen height (0.88 = 88%), centred in it, and never runs off the sides. The camera is the
+        /// follow camera's: tilted down (tiltDegrees below the horizon), a vertical field of view and a window aspect, turned round the
+        /// map by yawDegrees exactly as CameraTracking turns its offset (0 = looking up the map, +z). bottomReserve is the share of the
+        /// screen's height kept free at the bottom (the spectator bar): the arena is framed in the area above it. The outline is projected
+        /// through the camera exactly (a circle round the farthest point framed it too loosely: the outline is no circle). Zero for no outline.</summary>
         public static void WholeMapFraming(IReadOnlyList<UnityEngine.Vector2> outline, float verticalFovDegrees, float aspect, float tiltDegrees,
             float heightFill, float yawDegrees, float bottomReserve, out UnityEngine.Vector2 aimPoint, out float distance)
         {

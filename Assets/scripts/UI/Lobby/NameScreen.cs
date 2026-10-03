@@ -161,7 +161,7 @@ namespace Overpower.UI
             kit.Text(nameBlock.transform, "Label", theme.nameScreenLabelText, kit.Bold, theme.nameScreenLabelSize, theme.lobbyMutedColor,
                 TextAlignmentOptions.Midline, theme.lobbyLabelSpacing);
             nameInput = kit.InputBox(nameBlock.transform, "Name box", "", theme.nameScreenFieldHeight, theme.nameScreenFieldTextSize,
-                theme.nameScreenFieldHeight * 0.32f, TextAlignmentOptions.Midline, MaxLength, true, out _);
+                theme.nameScreenFieldPadding, TextAlignmentOptions.Midline, MaxLength, true, out _);
             nameInput.onValueChanged.AddListener(_ => OnNameChanged());
             hintLabel = kit.Text(nameBlock.transform, "Hint", NameHint(), kit.Body, theme.nameScreenHintSize, theme.lobbyDimColor, TextAlignmentOptions.Midline);
 
@@ -216,7 +216,8 @@ namespace Overpower.UI
         }
 
         /// <summary>A client that dropped off Photon (or never connected) connects again; nothing else will, and the list would wait for ever.
-        /// Also tried every frame while the list is waited for, so a press made mid-disconnect is picked up when the disconnect finishes.</summary>
+        /// Asked once, by RequestList (every way onto the list goes through it); a press made while a disconnect is still finishing is not retried: the
+        /// disconnect's OnDisconnected gives the name screen back, and the next Find a lobby connects.</summary>
         private void ConnectIfDropped()
         {
             if (LobbyScreenRules.MustConnectForList(PhotonNetwork.NetworkClientState))
@@ -293,7 +294,6 @@ namespace Overpower.UI
 
         private void Update()
         {
-            if (enterListWhenConnected) ConnectIfDropped();
             if (enterListWhenConnected && roomManager != null && roomManager.Lobbies != null && PhotonNetwork.IsConnectedAndReady && !PhotonNetwork.InRoom)
             {
                 enterListWhenConnected = false;

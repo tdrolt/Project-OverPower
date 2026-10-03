@@ -191,12 +191,12 @@ namespace Overpower.UI
 
         private void BuildHeader(Transform parent)
         {
-            VerticalLayoutGroup header = LobbyUiKit.VGroup(parent, "Header", 3f);
+            VerticalLayoutGroup header = LobbyUiKit.VGroup(parent, "Header", theme.lobbyRoomHeaderGap);
             titleLabel = kit.Text(header.transform, "Lobby name", "", kit.Display, theme.lobbyRoomTitleSize, theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineLeft,
                 richText: false); // the name a player typed
             LobbyUiKit.Size(titleLabel.gameObject, -1f, theme.lobbyRoomTitleSize * DisplayLine);
 
-            HorizontalLayoutGroup row = LobbyUiKit.HGroup(header.transform, "Mode row", 15f, TextAnchor.MiddleLeft);
+            HorizontalLayoutGroup row = LobbyUiKit.HGroup(header.transform, "Mode row", theme.lobbyRoomModeRowGap, TextAnchor.MiddleLeft);
             modeButton = kit.MakeButton(row.transform, "Mode", "", kit.Bold, theme.lobbyRoomModeTextSize, theme.lobbyCyanColor, theme.lobbyDarkColor,
                 theme.lobbyCornerRadius, theme.lobbyCyanColor, theme.lobbyRoomMineBorderWidth);
             LobbyUiKit.Size(modeButton.Root, -1f, theme.lobbyRoomModeHeight);
@@ -217,21 +217,21 @@ namespace Overpower.UI
             icon.Outer.anchoredPosition = new Vector2(-theme.lobbyRoomModePadding, 0f);
             icon.Outer.GetComponent<Image>().raycastTarget = false;
             if (icon.Fill != null) icon.Fill.raycastTarget = false;
-            TextMeshProUGUI i = kit.Text(icon.Inner, "i", theme.lobbyRoomInfoIconText, kit.Bold, size * 0.62f, theme.lobbyCyanColor, TextAlignmentOptions.Midline);
+            TextMeshProUGUI i = kit.Text(icon.Inner, "i", theme.lobbyRoomInfoIconText, kit.Bold, size * theme.lobbyRoomInfoIconTextFactor, theme.lobbyCyanColor, TextAlignmentOptions.Midline);
             LobbyUiKit.Stretch((RectTransform)i.transform);
 
             button.Label.alignment = TextAlignmentOptions.MidlineLeft;
             RectTransform labelRect = (RectTransform)button.Label.transform;
             labelRect.offsetMin = new Vector2(theme.lobbyRoomModePadding, 0f);
-            labelRect.offsetMax = new Vector2(-(theme.lobbyRoomModePadding + size + theme.lobbyRoomModePadding * 0.4f), 0f);
+            labelRect.offsetMax = new Vector2(-(theme.lobbyRoomModePadding + size + theme.lobbyRoomModePadding * theme.lobbyRoomModeIconGapFactor), 0f);
         }
 
         /// <summary>Widens the mode button to its text, the icon and the padding (the text arrives after the button is built).</summary>
         private void FitModeButton()
         {
             float text = modeButton.Label.GetPreferredValues(modeButton.Label.text).x;
-            float width = theme.lobbyRoomModePadding + text + theme.lobbyRoomModePadding * 0.4f + theme.lobbyRoomInfoIconSize + theme.lobbyRoomModePadding;
-            LobbyUiKit.Size(modeButton.Root, width + theme.lobbyRoomMineBorderWidth * 2f + 4f); // the outline takes its width off both sides of the label's room
+            float width = theme.lobbyRoomModePadding + text + theme.lobbyRoomModePadding * theme.lobbyRoomModeIconGapFactor + theme.lobbyRoomInfoIconSize + theme.lobbyRoomModePadding;
+            LobbyUiKit.Size(modeButton.Root, width + theme.lobbyRoomMineBorderWidth * 2f + theme.lobbyRoomModeButtonSlack); // the outline takes its width off both sides of the label's room
         }
 
         private void BuildBody(Transform parent, GameModeDefinition mode)
@@ -492,7 +492,7 @@ namespace Overpower.UI
                 if (i >= noRoleNames.Count)
                 {
                     TextMeshProUGUI label = kit.Text(noRoleList, "Name " + i, "", kit.Body, theme.lobbyRoomSideNameSize, theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineLeft);
-                    LobbyUiKit.Size(label.gameObject, -1f, theme.lobbyRoomSideNameSize * 1.4f);
+                    LobbyUiKit.Size(label.gameObject, -1f, theme.lobbyRoomSideNameSize * theme.lobbyRoomSideNameLine);
                     noRoleNames.Add(label);
                 }
                 Player p = room.GetPlayer(noRole[i]);

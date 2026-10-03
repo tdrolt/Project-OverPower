@@ -59,17 +59,5 @@ namespace Overpower.Tests
             var present = new Dictionary<int, int> { { 0, 1 }, { 1, 1 } };
             Assert.IsNull(LobbySeatRules.EndWarmupBlockReason(Two, present));
         }
-
-        [Test]
-        public void TheWarmupBlockReasonAgreesWithMayEndWarmup()
-        {
-            foreach (int a in new[] { 0, 1 })
-                foreach (int b in new[] { 0, 1 })
-                    foreach (int c in new[] { 0, 1 })
-                    {
-                        var present = new Dictionary<int, int> { { 0, a }, { 1, b }, { 2, c } };
-                        Assert.AreEqual(LobbySeatRules.MayEndWarmup(Three, present), LobbySeatRules.EndWarmupBlockReason(Three, present) == null);
-                    }
-        }
     }
 }

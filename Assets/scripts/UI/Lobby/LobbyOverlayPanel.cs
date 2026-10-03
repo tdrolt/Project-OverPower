@@ -1,5 +1,10 @@
+using System.Collections.Generic;
+using Overpower.Lobby;
+using Overpower.Match;
+using Photon.Pun;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Overpower.UI
@@ -21,6 +26,26 @@ namespace Overpower.UI
         protected RectTransform Body { get; private set; }
 
         public bool IsShowing => root != null && root.activeSelf;
+
+        // Every page that is open right now: Escape belongs to an open page (QuitConfirmPanel must not open on top of it).
+        private static readonly HashSet<LobbyOverlayPanel> OpenPages = new HashSet<LobbyOverlayPanel>();
+
+        /// <summary>True while any How to play / mode info page is open.</summary>
+        public static bool AnyPageOpen => OpenPages.Count > 0;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ForgetPages() => OpenPages.Clear();
+
+        private void Update()
+        {
+            if (!IsShowing) return;
+            ApplyMatchState(PhotonNetwork.InRoom, MatchDirector.LobbyStageNow);
+            CloseOnEscape(Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame);
+        }
+
+        private void OnDisable() => OpenPages.Remove(this);
+
+        private void OnDestroy() => OpenPages.Remove(this);
 
         /// <summary>The title as drawn.</summary>
         public string TitleText => titleLabel != null ? titleLabel.text : "";
@@ -66,16 +91,45 @@ namespace Overpower.UI
             root.SetActive(false);
         }
 
-        public void Show(string title)
+        /// <summary>Opens the page with this title. Refused (false, a log line) while a match is under way in the room this client is in: the
+        /// page's shade would block every shot.</summary>
+        public bool Show(string title)
         {
+            if (!LobbyScreenRules.OverlayMayBeShown(PhotonNetwork.InRoom, MatchDirector.LobbyStageNow))
+            {
+                Debug.Log("[LOBBY] a page cannot be opened during a match");
+                return false;
+            }
             titleLabel.text = title ?? "";
             root.SetActive(true);
             root.transform.SetAsLastSibling();
+            OpenPages.Add(this);
+            return true;
+        }
+
+        /// <summary>The page hides itself whenever the match has started in the room this client is in (lS is not the lobby any more): an open page
+        /// would otherwise stay up into the arena.</summary>
+        internal void ApplyMatchState(bool inRoom, int lobbyStage)
+        {
+            if (IsShowing && !LobbyScreenRules.OverlayMayBeShown(inRoom, lobbyStage))
+            {
+                Debug.Log("[LOBBY] the match started: the open page closes");
+                Hide();
+            }
+        }
+
+        /// <summary>Escape closes an open page, as a player expects of a big overlay. True when it did.</summary>
+        internal bool CloseOnEscape(bool escapePressed)
+        {
+            if (!escapePressed || !IsShowing) return false;
+            Hide();
+            return true;
         }
 
         public void Hide()
         {
             if (root != null) root.SetActive(false);
+            OpenPages.Remove(this);
         }
     }
 }

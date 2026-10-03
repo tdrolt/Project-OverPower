@@ -37,6 +37,12 @@ namespace Overpower.Lobby
             }
         }
 
+        // ---- the pages that open over the lobby screens ----
+
+        /// <summary>How to play and the mode info page can be open (and their buttons shown) only while no match is under way in the room this
+        /// client is in: not in a room at all (the list), or in a room whose stage (lS) is still the lobby.</summary>
+        public static bool OverlayMayBeShown(bool inRoom, int lobbyStage) => !inRoom || lobbyStage == LobbySeatRules.LobbyBeforeStart;
+
         // ---- the connection behind the screens ----
 
         /// <summary>Find a lobby on a client that dropped off Photon (or never connected) must connect again: nothing else will, and the list would

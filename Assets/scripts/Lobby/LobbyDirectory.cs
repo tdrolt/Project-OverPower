@@ -86,7 +86,7 @@ namespace Overpower.Lobby
             return false;
         }
 
-        public bool HasPendingCreate => pendingMode != null;
+        internal bool HasPendingCreate => pendingMode != null; // a test hook
 
         /// <summary>Joins the lobby with this room name.</summary>
         public void Join(string roomName)
@@ -160,19 +160,34 @@ namespace Overpower.Lobby
             bool wasJoining = pendingJoin;
             pendingJoin = false;
             bool rejoinBusy = roomManager != null && roomManager.Rejoin != null && roomManager.Rejoin.CurrentStage != RejoinController.Stage.Idle;
-            if (!wasJoining || rejoinBusy || roomManager == null || roomManager.Theme == null) return;
+            if (!wasJoining || rejoinBusy) return;
 
             Debug.Log($"[LOBBY] join refused ({returnCode}): {message}");
-            JoinFailed?.Invoke(JoinFailureText(returnCode, roomManager.Theme));
+            JoinFailed?.Invoke(JoinFailureText(returnCode, roomManager != null ? roomManager.Theme : null));
         }
 
         /// <summary>A join that went through but then had to be undone (a running lobby with no free seat, lobby Task 7): reported to the
         /// list like a refused join.</summary>
         public void ReportJoinRefused(string reason) => JoinFailed?.Invoke(reason);
 
-        /// <summary>The short line that tells why a join was refused, in the theme's words.</summary>
+        // What the list says when the theme is missing (a scene without its UiTheme): the same words the theme starts with.
+        internal const string FallbackFullText = "That lobby is full.";
+        internal const string FallbackClosedText = "That lobby has closed.";
+        internal const string FallbackGoneText = "That lobby no longer exists.";
+        internal const string FallbackFailedText = "Could not join that lobby.";
+
+        /// <summary>The short line that tells why a join was refused, in the theme's words. A missing theme logs an error and gives the
+        /// built-in words instead, so the player still reads why.</summary>
         public static string JoinFailureText(short returnCode, UiTheme theme)
         {
+            if (theme == null)
+            {
+                Debug.LogError("[LOBBY] no UiTheme on the RoomManager - the join failure is shown in the built-in words");
+                if (returnCode == ErrorCode.GameFull) return FallbackFullText;
+                if (returnCode == ErrorCode.GameClosed) return FallbackClosedText;
+                if (returnCode == ErrorCode.GameDoesNotExist) return FallbackGoneText;
+                return FallbackFailedText;
+            }
             if (returnCode == ErrorCode.GameFull) return theme.lobbyJoinFullText;
             if (returnCode == ErrorCode.GameClosed) return theme.lobbyJoinClosedText;
             if (returnCode == ErrorCode.GameDoesNotExist) return theme.lobbyJoinGoneText;

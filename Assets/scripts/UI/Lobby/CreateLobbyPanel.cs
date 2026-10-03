@@ -278,7 +278,7 @@ namespace Overpower.UI
         /// <summary>The Conquest / Dominion buttons side by side in one outlined, rounded strip.</summary>
         private void BuildFamilyRow(Transform parent)
         {
-            LobbyBox strip = kit.Box(parent, "Mode strip", theme.lobbyPanelColor, theme.lobbyCornerRadius + 3f, theme.lobbyBorderColor, theme.lobbyBorderWidth);
+            LobbyBox strip = kit.Box(parent, "Mode strip", theme.lobbyPanelColor, theme.lobbyCornerRadius + theme.createModeRadiusExtra, theme.lobbyBorderColor, theme.lobbyBorderWidth);
             LobbyUiKit.Size(strip.Outer.gameObject, -1f, theme.createModeHeight);
             strip.Inner.gameObject.AddComponent<Mask>().showMaskGraphic = true; // the buttons are cut to the strip's rounded corners
             HorizontalLayoutGroup row = strip.Inner.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -315,7 +315,7 @@ namespace Overpower.UI
             Color fill = chosen ? Blend(theme.lobbyDarkColor, theme.lobbyCreateSelectedFill) : theme.lobbyPanelColor;
             Color border = chosen ? theme.lobbyPurpleColor : theme.lobbyCardBorderColor;
             LobbyButton button = kit.MakeButton(sizeRow, mode.SizeName, mode.SizeName, kit.Bold, theme.createSizeTextSize,
-                selectable ? theme.lobbyOffWhiteColor : theme.lobbyDimColor, fill, theme.lobbyCornerRadius + 3f, border, theme.lobbyChosenBorderWidth);
+                selectable ? theme.lobbyOffWhiteColor : theme.lobbyDimColor, fill, theme.lobbyCornerRadius + theme.createModeRadiusExtra, border, theme.lobbyChosenBorderWidth);
             LobbyUiKit.Size(button.Root, theme.createSizeButton.x, theme.createSizeButton.y);
             button.DisabledFill = fill;
             button.SetEnabled(selectable);

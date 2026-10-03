@@ -53,7 +53,7 @@ namespace Overpower.Telemetry
         private string lastKnownNick = "";
 
         // One shared TMP material for both overlay button labels (playtest extras P6 follow-up, item 2)
-        // - same reasoning as QuitConfirmPanel/MatchStartPanel's own ApplyOutline.
+        // - same reasoning as QuitConfirmPanel/ConnectionLostPanel's own ApplyOutline (MatchStartPanel, which had one too, was replaced by WarmupBar and LobbyRoomPanel).
         private Material textMaterial;
 
         private void Awake()
@@ -325,7 +325,7 @@ namespace Overpower.Telemetry
             button.navigation = new UnityEngine.UI.Navigation { mode = UnityEngine.UI.Navigation.Mode.None };
         }
 
-        /// <summary>Same reasoning as QuitConfirmPanel.ApplyOutline/MatchStartPanel.ApplyOutline: one
+        /// <summary>Same reasoning as QuitConfirmPanel.ApplyOutline/ConnectionLostPanel.ApplyOutline: one
         /// shared Material instance for every button label this overlay builds.</summary>
         private void ApplyOutline(TextMeshProUGUI tmp)
         {

@@ -11,12 +11,13 @@ namespace Overpower.UI
     /// </summary>
     public static class EscapeOwnershipRule
     {
-        /// <summary>True if this Escape press belongs to the shop or chat (so QuitConfirmPanel must
-        /// do nothing) - either one was open THIS frame (about to consume/already consuming the key
+        /// <summary>True if this Escape press belongs to the shop, the chat or an open How to play / mode info page (so
+        /// QuitConfirmPanel must do nothing; a page closes itself on Escape, lobby Task 12) - either one was open THIS frame (about to consume/already consuming the key
         /// itself) or LAST frame (it just closed itself on this exact key press, and QuitConfirmPanel's
         /// own Update() happened to run after it).</summary>
         public static bool BelongsToShopOrChat(bool shopOpenThisFrame, bool shopOpenLastFrame,
-                                                bool chatOpenThisFrame, bool chatOpenLastFrame) =>
-            shopOpenThisFrame || shopOpenLastFrame || chatOpenThisFrame || chatOpenLastFrame;
+                                                bool chatOpenThisFrame, bool chatOpenLastFrame,
+                                                bool pageOpenThisFrame = false, bool pageOpenLastFrame = false) =>
+            shopOpenThisFrame || shopOpenLastFrame || chatOpenThisFrame || chatOpenLastFrame || pageOpenThisFrame || pageOpenLastFrame;
     }
 }

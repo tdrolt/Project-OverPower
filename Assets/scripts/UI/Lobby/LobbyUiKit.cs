@@ -44,7 +44,7 @@ namespace Overpower.UI
 
     /// <summary>
     /// The shared builders of the lobby screens (lobby Task 9): the name screen, the lobby list and the create screen are code-built
-    /// uGUI + TextMeshPro like MatchStartPanel, so the scene needs no objects for them. One kit per screen set, made from the
+    /// uGUI + TextMeshPro like QuitConfirmPanel (and like MatchStartPanel before WarmupBar and LobbyRoomPanel replaced it), so the scene needs no objects for them. One kit per screen set, made from the
     /// UiTheme: it makes the screen canvas, rounded boxes with an outline, text in the lobby fonts, buttons, the name box, the
     /// outlined title. Sizes are in reference pixels (the boards' pixels x 1.5 at 1920 x 1080).
     ///

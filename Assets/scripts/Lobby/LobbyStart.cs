@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using ExitGames.Client.Photon;
 using Overpower.Match;
 using Overpower.Net;
+using Overpower.UI;
 using Photon.Pun;
 using UnityEngine;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -204,7 +205,7 @@ namespace Overpower.Lobby
                 string seat = LobbySeatRules.PlaceLateJoiner(seats.Layout, fresh, LobbySeatRules.TeamsForLateJoin(seats.Layout, fixedTeams, eliminated));
                 if (seat == null)
                 {
-                    GiveUpLateJoin(roomManager.Theme.lobbyLateJoinFullText);
+                    GiveUpLateJoin(LateJoinText(roomManager.Theme, noSeatInTime: false));
                     yield break;
                 }
 
@@ -230,7 +231,7 @@ namespace Overpower.Lobby
             }
             if (PhotonNetwork.InRoom && seats.SeatInRoom() == null && StageOfRoom() >= LobbySeatRules.LobbyWarmup)
             {
-                GiveUpLateJoin(roomManager.Theme.lobbyLateJoinNoSeatText);
+                GiveUpLateJoin(LateJoinText(roomManager.Theme, noSeatInTime: true));
                 yield break;
             }
             lateJoining = null;
@@ -244,6 +245,21 @@ namespace Overpower.Lobby
             foreach (var pair in a)
                 if (!b.TryGetValue(pair.Key, out int other) || other != pair.Value) return false;
             return true;
+        }
+
+        internal const string FallbackLateJoinFullText = "Lobby full";
+        internal const string FallbackLateJoinNoSeatText = "Could not get a seat";
+
+        /// <summary>The words shown when a late join gives up: the theme's (Lobby full, or Could not get a seat), the built-in ones with an error
+        /// in the log when the theme is missing.</summary>
+        internal static string LateJoinText(UiTheme theme, bool noSeatInTime)
+        {
+            if (theme == null)
+            {
+                Debug.LogError("[LOBBY] no UiTheme on the RoomManager - the late-join failure is shown in the built-in words");
+                return noSeatInTime ? FallbackLateJoinNoSeatText : FallbackLateJoinFullText;
+            }
+            return noSeatInTime ? theme.lobbyLateJoinNoSeatText : theme.lobbyLateJoinFullText;
         }
 
         private void GiveUpLateJoin(string reason)

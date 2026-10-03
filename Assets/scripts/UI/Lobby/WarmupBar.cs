@@ -17,6 +17,9 @@ namespace Overpower.UI
     /// </summary>
     public sealed class WarmupBar : MonoBehaviour
     {
+        /// <summary>Where the bar's canvas sorts: below the Loadout screen (-5), under the scoreboard (30), like the spectator bar.</summary>
+        public const int SortingOrder = -10;
+
         private LobbyUiKit kit;
         private UiTheme theme;
         private GameObject bar;
@@ -48,6 +51,11 @@ namespace Overpower.UI
             var go = new GameObject("Warm-up Bar", typeof(RectTransform));
             go.transform.SetParent(canvas, false);
             LobbyUiKit.Stretch((RectTransform)go.transform);
+            // Its own canvas, below the shop (-5) and the scoreboard (30): on the lobby canvas (sort order 100) the bar drew over both.
+            Canvas own = go.AddComponent<Canvas>();
+            own.overrideSorting = true;
+            own.sortingOrder = SortingOrder;
+            go.AddComponent<GraphicRaycaster>();
             WarmupBar panel = go.AddComponent<WarmupBar>();
             panel.kit = kit;
             panel.theme = kit.Theme;
@@ -124,7 +132,7 @@ namespace Overpower.UI
             if (shownVisible && message == shownMessage && number == shownNumber && blocked == shownBlocked && (message != WarmupMessage.WaitingForHost || hostName == shownName))
                 return;
 
-            Apply(message, number, hostName, blocked);
+            Apply(message, number, hostName, blocked, d.PlayersNow);
             shownMessage = message;
             shownNumber = number;
             shownName = hostName;
@@ -136,10 +144,11 @@ namespace Overpower.UI
             }
         }
 
-        private void Apply(WarmupMessage message, int number, string hostName, int blockedTeam)
+        private void Apply(WarmupMessage message, int number, string hostName, int blockedTeam, int playersNow)
         {
-            bool countdown = message == WarmupMessage.Countdown;
-            bool hostButton = message == WarmupMessage.HostMayEnd || message == WarmupMessage.HostBlocked;
+            WarmupBarView view = WarmupBarRules.ViewFor(message, blockedTeam, playersNow);
+            bool countdown = view.Countdown;
+            bool hostButton = view.ButtonShown;
 
             titleLabel.text = countdown ? Format(theme.matchCountdownText, number) : theme.warmupBarTitleText;
             titleLabel.color = countdown ? theme.lobbyYellowColor : theme.lobbyOffWhiteColor;
@@ -147,20 +156,19 @@ namespace Overpower.UI
                 : message == WarmupMessage.WaitingForHost ? Format(theme.warmupBarGuestFormat, hostName)
                 : Format(theme.warmupBarInfoFormat, number == 1 ? theme.warmupBarOnePlayerText : Format(theme.warmupBarPlayersText, number));
 
-            bool blocked = message == WarmupMessage.HostBlocked;
-            reasonLabel.gameObject.SetActive(blocked && blockedTeam >= 0);
-            if (blocked && blockedTeam >= 0)
+            reasonLabel.gameObject.SetActive(view.ReasonShown);
+            if (view.ReasonShown)
                 reasonLabel.text = Format(theme.warmupBarBlockedFormat, LobbyRoomRules.TeamName(theme.scoreboardTeamNames, blockedTeam));
 
             endButton.Root.SetActive(hostButton);
-            if (hostButton) endButton.SetEnabled(message == WarmupMessage.HostMayEnd);
+            if (hostButton) endButton.SetEnabled(view.ButtonEnabled);
 
             // The host's bar sets its two lines flush left beside the button (board 4 A); the others are centred (B, C).
             TextAlignmentOptions align = hostButton ? TextAlignmentOptions.MidlineLeft : TextAlignmentOptions.Midline;
             titleLabel.alignment = infoLabel.alignment = reasonLabel.alignment = align;
             textColumn.childAlignment = hostButton ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
             Vector2 pad = hostButton ? theme.warmupBarPaddingHost : theme.warmupBarPaddingGuest;
-            row.padding = LobbyUiKit.Pad(pad.x, hostButton ? pad.x * 0.58f : pad.x, pad.y, pad.y);
+            row.padding = LobbyUiKit.Pad(pad.x, hostButton ? theme.warmupBarHostRightPadding : pad.x, pad.y, pad.y);
         }
 
         /// <summary>string.Format that a broken theme text cannot turn into an exception every frame: the raw text is shown instead.</summary>

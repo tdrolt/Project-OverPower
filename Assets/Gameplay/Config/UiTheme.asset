@@ -653,3 +653,12 @@ MonoBehaviour:
   chatInputPlaceholder: Enter to type, Escape to close
   chatSpectatorTag: '[SPEC]'
   chatMaxLines: 40
+  lobbyRoomHeaderGap: 3
+  lobbyRoomModeRowGap: 15
+  lobbyRoomInfoIconTextFactor: 0.62
+  lobbyRoomModeIconGapFactor: 0.4
+  lobbyRoomModeButtonSlack: 4
+  lobbyRoomSideNameLine: 1.4
+  warmupBarHostRightPadding: 20.88
+  nameScreenFieldPadding: 23.04
+  createModeRadiusExtra: 3
