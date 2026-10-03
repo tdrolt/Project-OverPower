@@ -345,7 +345,7 @@ MonoBehaviour:
   quitPromptText: Close the game?
   quitYesText: Yes
   quitNoText: No
-  matchLogSavedText: 'Your match log is saved: {0} - send this file to Tudor.'
+  matchLogSavedText: "Your match log is saved.\nSaved in: {0}\nSend this zip to Tudor: {1}"
   openLogFolderText: Open folder
   matchLogSavedOffset: {x: 24, y: 70}
   matchLogSavedWidth: 640

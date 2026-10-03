@@ -14,6 +14,14 @@ namespace Overpower.Tests
             Assert.AreEqual(ResultButtonAction.BackToLobbyList, BackToNameScreenRules.ButtonAction(MatchPhase.Over));
 
         [Test]
+        public void TheQuitButtonTakesItsLabelFromTheRule()
+        {
+            Assert.AreEqual("Back to the lobby list", QuitButton.LabelFor(true, MatchPhase.Over, "Back to the lobby list", "Quit"));
+            Assert.AreEqual("Quit", QuitButton.LabelFor(true, MatchPhase.TwoTeams, "Back to the lobby list", "Quit"), "a knocked-out player's panel mid-match closes the game");
+            Assert.AreEqual("Quit", QuitButton.LabelFor(false, MatchPhase.Over, "Back to the lobby list", "Quit"), "the waiting panel (match not over for this panel) closes the game");
+        }
+
+        [Test]
         public void TheLabelFollowsTheActionFromTheThemeFields()
         {
             Assert.AreEqual("Back to the lobby list", BackToNameScreenRules.ButtonLabel(ResultButtonAction.BackToLobbyList, "Back to the lobby list", "Quit"));

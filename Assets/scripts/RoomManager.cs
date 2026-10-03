@@ -278,9 +278,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
             return;
         returningToNameScreen = true;
 
-        // The name kept is the one typed, not the numbered copy ("Tudor 2") the lobby just left may have shown.
-        if (Seats != null && !string.IsNullOrEmpty(Seats.TypedNickName))
-            PhotonNetwork.NickName = Seats.TypedNickName;
+        // The name kept is the one typed, not the numbered copy ("Tudor 2") the lobby just left may have shown: LobbySeats restores it when the
+        // room is left (not here - the zip below is named after the nickname still in the room, so two clients on one PC do not clash).
         LobbyReturn.OpenListOnLoad = true;
 
         Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();

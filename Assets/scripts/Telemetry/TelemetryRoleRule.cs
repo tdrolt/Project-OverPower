@@ -7,6 +7,12 @@ namespace Overpower.Telemetry
     /// (its session line is marked as a spectator so the report counts no player row for it).</summary>
     public static class TelemetryRoleRule
     {
+        /// <summary>Whether a change of a player's properties should make the local client try to open its file again. The local player's team
+        /// (a player's file opens on their team) or spectator flag (a spectator HOST's file opens once the flag has arrived: it comes after the
+        /// stage edge) changing both qualify.</summary>
+        public static bool RetriesOpenOnChange(bool isLocal, bool teamChanged, bool spectatorChanged) =>
+            isLocal && (teamChanged || spectatorChanged);
+
         public static bool MayOpenFile(bool spectator, bool onATeam, bool isMaster, int lobbyStage)
         {
             if (lobbyStage < 1) return false;

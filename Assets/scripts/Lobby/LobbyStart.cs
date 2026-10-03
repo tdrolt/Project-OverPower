@@ -88,6 +88,9 @@ namespace Overpower.Lobby
                 yield return null;
             }
             starting = null;
+            // The start landed (the stage moved on) while this client is still the host: the lobby marker (lobby Task 13).
+            if (StageOfRoom() != LobbySeatRules.LobbyBeforeStart && PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient)
+                Overpower.Telemetry.MatchTelemetry.Instance?.DropMarker(Overpower.Telemetry.LobbyMarkerNotes.StartGame);
             // Leaving with the stage still the lobby means the start did not land: say why (the loop also ends when it did land).
             if (StageOfRoom() == LobbySeatRules.LobbyBeforeStart)
                 Debug.LogWarning("[LOBBY] Start game stopped with the lobby still open: " + WhyStartStopped(timedOut));

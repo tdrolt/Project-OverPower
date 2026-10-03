@@ -53,8 +53,8 @@ namespace Overpower.Tests
             // "<dateStamp>_<matchId8>"), not a wall-clock read taken at zip time (2026-09-26 fix) - it
             // never changes for the life of a match, which is exactly what makes every zip of the same
             // match come out under the same name.
-            Assert.AreEqual("OverPower-log_2026-09-26_0745_1361e7bf_Tudor.zip",
-                MatchLogZipRule.ZipFileName("2026-09-26_0745_1361e7bf", "Tudor"));
+            Assert.AreEqual("OverPower-log_2026-09-26_0745_1361e7bf_3_Tudor.zip",
+                MatchLogZipRule.ZipFileName("2026-09-26_0745_1361e7bf", "Tudor", 3));
         }
 
         // Playtest extras P6 follow-up (2026-09-26, the zip-name-fix brief): the two-client check found

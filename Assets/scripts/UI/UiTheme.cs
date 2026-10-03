@@ -984,8 +984,10 @@ namespace Overpower.UI
         public string quitNoText = "No";
         [Tooltip("MatchLogZip's saved-log overlay, shown once this client's own match log has been " +
                  "zipped (the win/lose panel, and again on quit if that had not already happened). " +
-                 "{0} is filled in with the zip file's own full path.")]
-        public string matchLogSavedText = "Your match log is saved: {0} - send this file to Tudor.";
+                 "{0} is filled in with the match log folder's full path (inside the Match logs folder) and {1} with the zip file's full path. " +
+                 "Each new line of the text is a new line in the box.")]
+        [TextArea(2, 5)]
+        public string matchLogSavedText = "Your match log is saved.\nSaved in: {0}\nSend this zip to Tudor: {1}";
         [Tooltip("MatchLogZip's saved-log overlay button - Application.OpenURL of the match folder.")]
         public string openLogFolderText = "Open folder";
         [Tooltip("Where the saved-log overlay sits: how far from the left edge and from the bottom edge of the screen, in reference pixels. " +

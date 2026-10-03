@@ -166,7 +166,7 @@ namespace Overpower.Telemetry
                 // MatchLogZipRule.ZipFileName's own comment on the real bug this replaces): stable for
                 // the whole match, so every zip of it - result panel, then maybe again on quit - comes
                 // out under the SAME name no matter what the clock reads when each call happens to run.
-                string zipName = MatchLogZipRule.ZipFileName(Path.GetFileName(folder), sanitizedNick);
+                string zipName = MatchLogZipRule.ZipFileName(Path.GetFileName(folder), sanitizedNick, actor);
                 // 2026-09-27 designer change: the zip goes directly in the "Match logs" ROOT (folder's own
                 // parent), not inside the dated per-match subfolder, so testers find it at once instead of
                 // having to open one more folder. Falls back to folder itself if, somehow, it has no parent
@@ -212,7 +212,9 @@ namespace Overpower.Telemetry
                 // so the raw zipPath read "C:/Users/...\Match logs\..." (the brief's own capture). Display
                 // only: GetFullPath normalises every separator to this platform's own without touching
                 // the actual path used to write the file above.
-                savedLabel.text = string.Format(theme.matchLogSavedText, Path.GetFullPath(zipPath));
+                // Lobby Task 13 (Tudor, 3 Oct #7): the match folder (inside the Match logs root) and the zip, each readable and wrapping.
+                savedLabel.text = string.Format(theme.matchLogSavedText,
+                    MatchLogZipRule.WrappablePath(Path.GetFullPath(folder)), MatchLogZipRule.WrappablePath(Path.GetFullPath(zipPath)));
             }
             overlayRoot.SetActive(true);
         }
@@ -342,8 +344,9 @@ namespace Overpower.Telemetry
         /// whoever is sitting at this machine's screen; check this wiring by reading it instead.</summary>
         private void OnOpenFolderClicked()
         {
-            if (!string.IsNullOrEmpty(lastKnownFolder))
-                Application.OpenURL(lastKnownFolder);
+            string url = MatchLogZipRule.FolderUrl(lastKnownFolder);
+            if (url != null)
+                Application.OpenURL(url);
         }
 
         private void OnDismissClicked()

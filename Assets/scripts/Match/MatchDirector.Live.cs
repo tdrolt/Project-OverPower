@@ -246,6 +246,8 @@ namespace Overpower.Match
                 Debug.LogWarning("[MATCH] End warm-up refused: not the master, not in the warm-up, or a team of the mode has nobody present.");
                 return;
             }
+            // Lobby Task 13: the host pressing End warm-up is a lobby marker of its own (the "countdown start" marker follows once the room accepts it).
+            MatchTelemetry.Instance?.DropMarker(LobbyMarkerNotes.EndWarmup);
             StartCountdown(MatchStartRules.TeamsOfLayout(Seats().Layout));
         }
 

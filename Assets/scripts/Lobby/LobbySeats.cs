@@ -175,6 +175,7 @@ namespace Overpower.Lobby
         private void Reset()
         {
             RestoreTypedName();
+            lastNotedSeat = null;
             hasLayout = false;
             seats = new Dictionary<string, int>();
             noRole.Clear();
@@ -230,7 +231,20 @@ namespace Overpower.Lobby
                 if (!p.IsInactive && LobbySeatRules.SeatOf(p.ActorNumber, layout, seats) == null)
                     noRole.Add(p.ActorNumber);
             noRole.Sort();
+            NoteOwnSeat();
             if (raise) SeatsChanged?.Invoke();
+        }
+
+        private string lastNotedSeat;
+
+        /// <summary>Lobby Task 13: this client's own seat taken or left goes into its match log as a marker (the log opens at Start; the markers wait
+        /// for it).</summary>
+        private void NoteOwnSeat()
+        {
+            string now = MySeat;
+            foreach (string note in Overpower.Telemetry.LobbyMarkerNotes.SeatChange(lastNotedSeat, now))
+                Overpower.Telemetry.MatchTelemetry.Instance?.DropMarker(note);
+            lastNotedSeat = now;
         }
 
         // ---- the master keeps the room tidy ----

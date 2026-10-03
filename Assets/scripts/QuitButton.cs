@@ -47,6 +47,11 @@ public class QuitButton : MonoBehaviour
         GameQuit.Quit();
     }
 
+    /// <summary>The label the button shows: the rule's label for the action it will take - "Back to the lobby list" once the match is over (and this
+    /// is the match-over panel), else "Quit".</summary>
+    public static string LabelFor(bool matchOver, MatchPhase phase, string lobbyListLabel, string quitLabel) =>
+        BackToNameScreenRules.ButtonLabel(matchOver ? BackToNameScreenRules.ButtonAction(phase) : ResultButtonAction.CloseGame, lobbyListLabel, quitLabel);
+
     private static ResultButtonAction CurrentAction()
     {
         MatchDirector director = MatchDirector.Instance;
@@ -63,7 +68,8 @@ public class QuitButton : MonoBehaviour
             label = GetComponentInChildren<TMP_Text>(true);
         if (label == null)
             return;
-        string wanted = BackToNameScreenRules.ButtonLabel(ui.MatchOver ? CurrentAction() : ResultButtonAction.CloseGame,
+        MatchDirector director = MatchDirector.Instance;
+        string wanted = LabelFor(ui.MatchOver, director != null ? director.Phase : MatchPhase.Warmup,
             ui.Theme.resultButtonLobbyList, ui.Theme.resultButtonQuit);
         if (label.text != wanted)
             label.text = wanted;

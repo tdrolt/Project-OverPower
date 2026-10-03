@@ -56,8 +56,26 @@ namespace Overpower.Telemetry
         /// through here instead makes "the SAME name every time this match is zipped again" (the
         /// brief's own "overwriting its own earlier zip of the same match") true unconditionally, not
         /// just within one clock minute.</summary>
-        public static string ZipFileName(string matchFolderName, string sanitizedNick) =>
-            $"OverPower-log_{matchFolderName}_{sanitizedNick}.zip";
+        public static string ZipFileName(string matchFolderName, string sanitizedNick, int actor) =>
+            $"OverPower-log_{matchFolderName}_{actor}_{sanitizedNick}.zip";
+
+        /// <summary>The file:// address Application.OpenURL needs to open a folder in the OS file browser: System.Uri percent-encodes the spaces
+        /// ("Match logs") and the brackets of " (2)" and turns the backslashes round. Null for no folder.</summary>
+        public static string FolderUrl(string folder) => string.IsNullOrEmpty(folder) ? null : new System.Uri(folder).AbsoluteUri;
+
+        /// <summary>A path with a line-break chance (zero-width space) after every separator, so a long path wraps inside the saved box instead of
+        /// running out of it (a path has no spaces for the text to break at).</summary>
+        public static string WrappablePath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            var sb = new System.Text.StringBuilder(path.Length + 16);
+            foreach (char c in path)
+            {
+                sb.Append(c);
+                if (c == '/' || c == '\u005C') sb.Append('\u200B');
+            }
+            return sb.ToString();
+        }
 
         /// <summary>2026-09-26 fix (the zip-name-fix brief): which folder MatchLogZip.TryZip should
         /// zip into - the live one when MatchTelemetry still has it, otherwise the last one this client
