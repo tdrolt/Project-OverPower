@@ -68,10 +68,13 @@ public class BuildingCapture : MonoBehaviourPun
     private float CaptureSeconds =>
         territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureSeconds : FallbackCaptureSeconds;
 
-    // Progress per player per second of capture time. N players capture N times faster - the GDD
-    // doesn't specify multi-player capture speed, so this keeps the game's existing behaviour
-    // (the old baseCaptureRate was tuned so that N players finished a capture N times sooner).
+    // Progress per player per second of capture time: ONE player's speed. N players capture faster by the
+    // TerritoryConfig's captureSpeedByPlayers list (1 / 1.5 / 1.75 for 1 / 2 / 3, lobby Task 14), read through
+    // CaptureSpeedRule - the capture step, the neutral push-down and the published rate all use it.
     private const float ProgressPerPlayerPerSecond = 1f;
+
+    private System.Collections.Generic.IReadOnlyList<float> CaptureSpeeds =>
+        territoryConfig != null ? territoryConfig.CaptureSpeedByPlayers : null;
 
     // captureFadeSpeed (Tudor, 2026-09-24): how fast unfinished progress slides back (neutral) or refills (owned)
     // once nobody is capturing/draining it, in the same one-player-seconds-per-real-second unit as
@@ -498,7 +501,7 @@ public class BuildingCapture : MonoBehaviourPun
 
         return CaptureProgressPublishRule.Decide(isCaptured, isDecaying, isDrainPaused, CaptureSeconds, DecaySeconds,
             isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs,
-            fadeRate);
+            fadeRate, CaptureSpeeds);
     }
 
     /// <summary>Forces this tower to tell the room its current capture progress right now,
@@ -575,7 +578,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// sites this replaces were never actually exercised by a test; reverting either one to the plain fadeRate,
     /// or asking TeamMayCaptureNow(capturingID) instead of the pushing team, passed every test in the project.</summary>
     private float CurrentNeutralFadeRate() =>
-        CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, TeamMayCaptureNow);
+        CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, TeamMayCaptureNow, CaptureSpeeds);
 
     void HandleCapturedState()
     {
@@ -758,8 +761,8 @@ public class BuildingCapture : MonoBehaviourPun
         if (eligiblePlayers.Any() && !enemyPlayers && TeamMayCaptureNow(capturingID))
         {
             int count = eligiblePlayers.Count;
-            // N players contribute N progress-per-second - see ProgressPerPlayerPerSecond above.
-            float contribution = count * ProgressPerPlayerPerSecond * Time.deltaTime;
+            // N players contribute CaptureSpeedRule.For(N) progress-per-second - see ProgressPerPlayerPerSecond above.
+            float contribution = CaptureSpeedRule.For(count, CaptureSpeeds) * ProgressPerPlayerPerSecond * Time.deltaTime;
             captureProgress += contribution;
             captureProgress = Mathf.Clamp(captureProgress, 0, CaptureSeconds);
 

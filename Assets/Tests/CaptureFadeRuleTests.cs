@@ -212,6 +212,34 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void NeutralFadeRatePushesAtTheSpeedTheListGivesForThatManyPlayers()
+        {
+            var list = new float[] { 1f, 1.5f, 1.75f };
+            float one = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            float two = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            float three = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            Assert.AreEqual(1f, one, 1e-5f);
+            Assert.AreEqual(1.5f, two, 1e-5f, "two pushers use the second entry, the same speed two capturers would have");
+            Assert.AreEqual(1.75f, three, 1e-5f);
+        }
+
+        [Test]
+        public void NeutralFadeRateScalesTheListByThePerPlayerSpeed()
+        {
+            var list = new float[] { 1f, 1.5f };
+            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2 }, perPlayerSpeed: 2f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            Assert.AreEqual(3f, rate, 1e-5f);
+        }
+
+        [Test]
+        public void NeutralFadeRateStillNeverGoesBelowTheFadeRateWithAList()
+        {
+            var list = new float[] { 1f, 1.5f };
+            float rate = CaptureFadeRule.NeutralFadeRate(5f, claimTeam: 1, new List<int> { 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            Assert.AreEqual(5f, rate, 1e-5f);
+        }
+
+        [Test]
         public void NeutralFadeRateNeverGoesBelowTheConfiguredFadeRate()
         {
             // A slow lone enemy (0.2 progress/s) must never slow the fade below the configured speed.

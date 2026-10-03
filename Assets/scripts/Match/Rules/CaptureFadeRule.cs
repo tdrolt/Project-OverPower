@@ -68,13 +68,14 @@ namespace Overpower.Match
         ///     already gates this function out of that case in both production callers).
         ///   - Exactly ONE other team inside (SinglePushingTeam, above) and mayCapture(pushingTeam) says yes →
         ///     pushes the claim down at least as fast as that team could capture the zone itself: max(fadeRate,
-        ///     N x perPlayerSpeed), N = that team's listed players, so N players push N times as fast as one,
-        ///     exactly like capturing.
+        ///     speed(N) x perPlayerSpeed), N = that team's listed players, speed from CaptureSpeedRule (1 / 1.5 / 1.75 for 1 / 2 / 3
+        ///     players by default), the same speed N players would capture at.
         ///   - Two or more different other teams inside, or the single other team present may NOT capture right
         ///     now → fadeRate; they don't push, the plain fade still applies. mayCapture is never even called in
         ///     either case (nobody to ask about).</summary>
         public static float NeutralFadeRate(float fadeRate, int claimTeam, IReadOnlyList<int> teamsInZone,
-                                             float perPlayerSpeed, System.Func<int, bool> mayCapture)
+                                             float perPlayerSpeed, System.Func<int, bool> mayCapture,
+                                             IReadOnlyList<float> captureSpeedByPlayers = null)
         {
             if (teamsInZone.Count == 0 || Contains(teamsInZone, claimTeam))
                 return fadeRate;
@@ -88,7 +89,7 @@ namespace Overpower.Match
                 if (teamsInZone[i] == pushingTeam)
                     n++;
 
-            return System.Math.Max(fadeRate, n * perPlayerSpeed);
+            return System.Math.Max(fadeRate, CaptureSpeedRule.For(n, captureSpeedByPlayers) * perPlayerSpeed);
         }
 
         /// <summary>One tick of a neutral zone's claim fading toward 0, never past it.</summary>

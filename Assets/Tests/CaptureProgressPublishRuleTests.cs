@@ -19,6 +19,20 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ThePublishedCaptureRateFollowsTheSpeedListSoEveryClientsBarMatches()
+        {
+            var list = new float[] { 1f, 1.5f, 1.75f };
+            // 15s tower: one player 1/15 of the bar a second, two 1.5/15, three 1.75/15.
+            for (int players = 1; players <= 3; players++)
+            {
+                CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
+                    capturingID: 1, eligibleCount: players, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000,
+                    captureSpeedByPlayers: list);
+                Assert.AreEqual(list[players - 1] / 15f, p.RatePerSecond01, 1e-5f, players + " players");
+            }
+        }
+
+        [Test]
         public void AContestedCaptureIsHeld()
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,

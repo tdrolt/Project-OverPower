@@ -28,10 +28,11 @@ namespace Overpower.Match
         /// <param name="fadeRatePerSecond">captureFadeSpeed - the tooltip's captureFadeSpeed x
         /// ProgressPerPlayerPerSecond, one-player-seconds per real second. 0 means "holds where it was" (published
         /// as an ordinary Held/Paused, not a moving-but-zero fade) - see BuildingCapture.FadeRatePerSecond.</param>
+        /// <param name="captureSpeedByPlayers">TerritoryConfig.CaptureSpeedByPlayers: how fast 1, 2, 3 players capture (CaptureSpeedRule); null or empty = n times one player's speed.</param>
         public static CaptureProgress Decide(bool isCaptured, bool isDecaying, bool isDrainPaused, float captureSeconds,
                                               float decaySeconds, bool isOnCooldown, int capturingID, int eligibleCount,
                                               bool enemyPresent, bool mayCaptureNow, float captureProgress, int nowMs,
-                                              float fadeRatePerSecond = 0f)
+                                              float fadeRatePerSecond = 0f, System.Collections.Generic.IReadOnlyList<float> captureSpeedByPlayers = null)
         {
             if (captureSeconds <= 0f)
                 return CaptureProgress.Idle;
@@ -94,7 +95,7 @@ namespace Overpower.Match
                 // this is Idle then: Held returns Idle when nothing is banked.
                 return CaptureProgress.Held(capturingID, progress01, nowMs);
 
-            float rate = eligibleCount / captureSeconds;
+            float rate = CaptureSpeedRule.For(eligibleCount, captureSpeedByPlayers) / captureSeconds;
             return new CaptureProgress(capturingID, progress01, rate, nowMs);
         }
     }

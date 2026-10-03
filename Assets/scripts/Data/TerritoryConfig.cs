@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Overpower.Data
@@ -21,7 +22,7 @@ namespace Overpower.Data
         public struct TierSettings
         {
             [Tooltip("Seconds for ONE player standing alone to capture a neutral zone of this tier. " +
-                     "Two players take half as long, three a third.")]
+                     "More players are faster, by the Capture Speed By Players list below.")]
             public float captureSeconds;
 
             [Tooltip("Gold per second this zone earns the team that owns it. Each player on that team receives " +
@@ -82,6 +83,11 @@ namespace Overpower.Data
                  "fast as it could capture.")]
         [SerializeField, Min(0f)] private float captureFadeSpeed = 1f;
 
+        [Header("Capture")]
+        [Tooltip("How fast a zone is captured or drained with 1, 2, 3... players of one team in it, as a multiple of one " +
+                 "player's speed. Past the end of the list the last value is used.")]
+        [SerializeField] private float[] captureSpeedByPlayers = { 1f, 1.5f, 1.75f };
+
         [Header("Sounds")]
         [Tooltip("The looping sound a zone plays while it is being captured or drained. Off since Tudor, 2026-09-26.")]
         [SerializeField] private bool playCaptureProgressSound = false;
@@ -96,6 +102,7 @@ namespace Overpower.Data
         public float RecaptureCooldownSeconds => recaptureCooldownSeconds;
         public float UnderAttackLingerSeconds => underAttackLingerSeconds;
         public float CaptureFadeSpeed => captureFadeSpeed;
+        public IReadOnlyList<float> CaptureSpeedByPlayers => captureSpeedByPlayers;
         public bool PlayCaptureProgressSound => playCaptureProgressSound;
         public bool PlayCapturedSound => playCapturedSound;
         public int TierCount => tiers != null ? tiers.Length : 0;
