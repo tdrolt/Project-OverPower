@@ -26,9 +26,8 @@ namespace Overpower.UI
         [Tooltip("Read for every colour, size, font and text of the lobby screens, and for the Rejoin your match wording.")]
         [SerializeField] private UiTheme theme;
 
-        [Tooltip("The chat objects the scene keeps switched off until a room is joined.")]
+        [Tooltip("The chat object the scene keeps switched off until a room is joined.")]
         [SerializeField] private GameObject chatmanager;
-        [SerializeField] private GameObject chattext;
 
         [Tooltip("The scene's old name panel (name box, Join button, tips). It is switched off when the game starts; the new screens replace it.")]
         [FormerlySerializedAs("joinUIPanel")]
@@ -286,7 +285,6 @@ namespace Overpower.UI
             backToListWhenLeft = false;
             messageForList = null;
             if (chatmanager != null) chatmanager.SetActive(false);
-            if (chattext != null) chattext.SetActive(false);
             ShowOnly(Screen.Name);
             ApplyNameValidity();
         }
@@ -342,7 +340,6 @@ namespace Overpower.UI
             if (nameInput == null) return;
             ShowOnly(Screen.InRoom);
             if (chatmanager != null) chatmanager.SetActive(true);
-            if (chattext != null) chattext.SetActive(true);
         }
 
         public override void OnLeftRoom()
@@ -350,7 +347,6 @@ namespace Overpower.UI
             if (!backToListWhenLeft || nameInput == null) return;
             backToListWhenLeft = false;
             if (chatmanager != null) chatmanager.SetActive(false);
-            if (chattext != null) chattext.SetActive(false);
             OpenList();
             if (messageForList != null) list.ShowMessage(messageForList);
             messageForList = null;

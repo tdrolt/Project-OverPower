@@ -638,3 +638,18 @@ MonoBehaviour:
   lobbyJoinClosedText: That lobby has closed.
   lobbyJoinGoneText: That lobby no longer exists.
   lobbyJoinFailedText: Could not join that lobby.
+  chatPanelAlpha: 0.38
+  chatPanelSize: {x: 630, y: 360}
+  chatPanelMargin: {x: 72, y: 54}
+  chatLobbyMargin: {x: 520, y: 54}
+  chatLobbySize: {x: 630, y: 270}
+  chatPanelPadding: 24
+  chatPanelGap: 12
+  chatPanelRadius: 12
+  chatTextSize: 27
+  chatLineSpacing: 30
+  chatInputHeight: 66
+  chatInputTextSize: 24
+  chatInputPlaceholder: Enter to type, Escape to close
+  chatSpectatorTag: '[SPEC]'
+  chatMaxLines: 40

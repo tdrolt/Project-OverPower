@@ -1607,5 +1607,37 @@ namespace Overpower.UI
         public string warmupBarBlockedFormat = "{0} has no player";
         [Tooltip("The second line of the countdown.")]
         public string warmupBarCountdownInfo = "Everything resets when it goes live";
+
+        [Header("Chat (lobby Task 11, board 7A)")]
+        [Tooltip("How see-through the dark chat panel is: 0 = invisible, 1 = solid. Board 7A: about 0.38.")]
+        [Range(0f, 1f)] public float chatPanelAlpha = 0.38f;
+        [Tooltip("Width and height of the chat panel, in reference pixels.")]
+        public Vector2 chatPanelSize = new Vector2(630f, 360f);
+        [Tooltip("Space between the chat panel and the bottom-left corner of the screen, in reference pixels.")]
+        public Vector2 chatPanelMargin = new Vector2(72f, 54f);
+        [Tooltip("In the lobby room: space between the chat panel and the bottom-left corner. The left edge clears the Leave lobby and How to play buttons.")]
+        public Vector2 chatLobbyMargin = new Vector2(520f, 54f);
+        [Tooltip("In the lobby room: width and height of the chat panel. It sits right of the bottom buttons and under the spectator row.")]
+        public Vector2 chatLobbySize = new Vector2(630f, 270f);
+        [Tooltip("Empty space between the chat panel's edge and what is in it, in reference pixels.")]
+        public float chatPanelPadding = 24f;
+        [Tooltip("Space between the lines and the typing box, in reference pixels.")]
+        public float chatPanelGap = 12f;
+        [Tooltip("How round the corners of the chat panel are, in reference pixels.")]
+        public float chatPanelRadius = 12f;
+        [Tooltip("Text size of a chat line, in reference pixels (board: 18 px x 1.5).")]
+        public float chatTextSize = 27f;
+        [Tooltip("Extra space between chat lines, as a percentage of the line height.")]
+        public float chatLineSpacing = 30f;
+        [Tooltip("Height of the typing box, in reference pixels.")]
+        public float chatInputHeight = 66f;
+        [Tooltip("Text size inside the typing box, in reference pixels.")]
+        public float chatInputTextSize = 24f;
+        [Tooltip("What the typing box says while it is empty.")]
+        public string chatInputPlaceholder = "Enter to type, Escape to close";
+        [Tooltip("Written before a spectator's name in chat.")]
+        public string chatSpectatorTag = "[SPEC]";
+        [Tooltip("How many chat lines are kept on screen; older ones are dropped.")]
+        public int chatMaxLines = 40;
     }
 }
