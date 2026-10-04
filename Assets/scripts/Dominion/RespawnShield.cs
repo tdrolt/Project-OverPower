@@ -15,15 +15,17 @@ namespace Overpower.Dominion
     /// <summary>
     /// Dominion Task 7, the respawn shield, on the player prefab. After a death-respawn in a live Dominion match the owner writes the Player
     /// Property dShd (the server ms the shield ends). Every client draws a blue bubble from dShd and the server clock alone, so it vanishes on time
-    /// everywhere even if nobody writes. While it is up PlayerHealth asks BlocksHit before any health, armour or combat-clock change; a stopped
-    /// hit stamps dBlk (at most once per Blocked Popup Seconds) and every client that can see the player pops BLOCKED over them. Dealing damage
-    /// (the credit RPC reaching this attacker) clears dShd; a cast that hits nobody does not. Zones read the same property (IsUpFor) and ignore the
-    /// player. Conquest never writes dShd.
+    /// everywhere even if nobody writes. While it is up PlayerHealth asks BlocksHit before any health, armour or combat-clock change, and
+    /// PlayerStatusEffects / PlayerDisplacement ask StopsEnemyEffectFrom before an enemy's stun, slow or push lands (A24); a stopped hit stamps
+    /// dBlk (at most once per Blocked Popup Seconds) and every client that can see the player pops BLOCKED over them. Any hit of this player's
+    /// on an enemy clears dShd (A25: CombatEvents.LocalEnemyAffected - damage from the credit message, a status or push from this client's own
+    /// simulation of it); a cast that hits nobody does not, and neither does an effect set up before the respawn (A26). Zones read the same
+    /// property (IsUpFor) and ignore the player. Conquest never writes dShd.
     ///
     /// No RPC: the state is two Player Properties, so late joiners and rejoiners read it like any other player value.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class RespawnShield : MonoBehaviourPun
+    public sealed class RespawnShield : MonoBehaviourPun, IEffectShield
     {
         [SerializeField, Tooltip("The Invulnerability ultimate's prefab. The respawn shield's bubble is built from its shield size (times Shield Bubble Scale in the " +
                  "Dominion Config), so the size is tuned in one place and never copied.")]
@@ -38,7 +40,7 @@ namespace Overpower.Dominion
         private bool setupErrorLogged;
 
         private bool diedBefore;          // owner: this body has died since it spawned, so its next AliveChanged(true) is a respawn
-        private int lastStampWritten;     // owner: the dBlk value last written (0 = none)
+        private ShieldJudge judge;        // owner: the per-hit judgement and the dBlk stamp spacing
         private int stampSeen;            // every client: the dBlk value already popped
         private bool stampPrimed;         // the first read only takes the value in: a joiner never pops an old stamp
 
@@ -48,11 +50,21 @@ namespace Overpower.Dominion
             health = GetComponent<PlayerHealth>();
             // Subscribed in Awake, not Start: PlayerLifecycle's own Start can already raise AliveChanged (AbilityRunner does the same).
             if (lifecycle != null) lifecycle.AliveChanged += HandleAliveChanged;
+            judge = new ShieldJudge(() => IsUp, () => PhotonNetwork.ServerTimestamp, PopupMs, WriteBlockedStamp);
         }
 
-        private void OnEnable() => CombatEvents.LocalDamageDealt += HandleDamageDealt;
+        private void OnEnable() => CombatEvents.LocalEnemyAffected += HandleEnemyAffected;
 
-        private void OnDisable() => CombatEvents.LocalDamageDealt -= HandleDamageDealt;
+        private void OnDisable() => CombatEvents.LocalEnemyAffected -= HandleEnemyAffected;
+
+        private static int PopupMs()
+        {
+            DominionConfig config = DominionMode.Config();
+            return config != null ? Mathf.RoundToInt(config.BlockedPopupSeconds * 1000f) : 0;
+        }
+
+        private static void WriteBlockedStamp(int now) =>
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.BlockedKey, now } });
 
         private void OnDestroy()
         {
@@ -125,12 +137,37 @@ namespace Overpower.Dominion
             ClearShield();
         }
 
-        private void HandleDamageDealt(float amount)
+        private void HandleEnemyAffected(bool victimShielded, bool fromBeforeRespawn)
         {
-            // LocalDamageDealt is raised only on the machine whose player dealt the damage, so this is the owner of the shield that dealt it.
-            if (!photonView.IsMine || !RespawnShieldRules.ClearsOnDamageDealt(amount) || !IsUp) return;
+            // LocalEnemyAffected is raised only on the machine whose player did the thing, so this is the owner of the shield that did it.
+            if (!photonView.IsMine || !RespawnShieldRules.EndsOnEnemyAffected(IsUp, victimShielded, fromBeforeRespawn)) return;
             ClearShield();
-            Debug.Log("[DOMINION] respawn shield ended: this player dealt damage");
+            Debug.Log("[DOMINION] respawn shield ended: this player hit an enemy");
+        }
+
+        /// <summary>The attacker's side of A25, called by a status or push that this client simulates on its copy of a player it does not own.
+        /// When that effect is this client's own player's and the target is a living enemy, the attacker's shield hears of it (no message: the
+        /// attacker's client simulates the effect anyway, and the victim's own shield is read from dShd). A direct hit, never from before the respawn.</summary>
+        public static void NoteMyEffectOnCopy(PhotonView victim, int sourceActor)
+        {
+            if (victim == null || victim.IsMine || victim.Owner == null || !PhotonNetwork.InRoom) return;
+            Player me = PhotonNetwork.LocalPlayer;
+            if (me == null || sourceActor != me.ActorNumber) return;
+            PlayerLifecycle victimLife = victim.GetComponent<PlayerLifecycle>();
+            if (victimLife != null && !victimLife.IsAlive) return;
+            if (RespawnShieldRules.OriginOf(false, Teams.AreSameTeam(me, victim.Owner)) != RespawnShieldRules.Origin.Enemy) return;
+            CombatEvents.RaiseEnemyAffected(IsUpFor(victim.Owner), false);
+        }
+
+        /// <summary>The server ms that player's shield ends (0 = none). Read from dShd.</summary>
+        public static int ShieldEndOf(Player player) => ReadInt(player, RespawnShieldRules.ShieldKey);
+
+        /// <summary>A26, on the victim's client: true when the effect that hurt it was set up before the attacker's current shield began (a mine laid
+        /// before its respawn). effectPlacedMs 0 = a direct hit.</summary>
+        public static bool IsFromBeforeRespawn(Player attacker, int effectPlacedMs)
+        {
+            DominionConfig config = DominionMode.Config();
+            return config != null && RespawnShieldRules.IsFromBeforeRespawn(effectPlacedMs, ShieldEndOf(attacker), config.ShieldSeconds);
         }
 
         // ---------------------------------------------------------------- victim: stop a hit
@@ -138,19 +175,16 @@ namespace Overpower.Dominion
         /// <summary>Called by PlayerHealth.ApplyDamage on the victim's own client before anything changes: true = stop the hit here. A stopped hit
         /// stamps dBlk when one is due; the combat clock and the credit message are never reached, so the attacker earns neither charge nor an
         /// early end to its own shield.</summary>
-        public bool BlocksHit(RespawnShieldRules.Origin origin)
+        public bool BlocksHit(RespawnShieldRules.Origin origin) => photonView.IsMine && judge != null && judge.JudgeHit(origin);
+
+        /// <summary>A24: called by PlayerStatusEffects.Apply and PlayerDisplacement.Displace on this player's own client before an enemy's stun,
+        /// slow, burn, vulnerability or push lands. True = stop it (and BLOCKED is stamped like for a stopped hit). Own and teammate effects land.</summary>
+        public bool StopsEnemyEffectFrom(int sourceActor)
         {
-            if (!photonView.IsMine) return false;
-            int now = PhotonNetwork.ServerTimestamp;
-            DominionConfig config = DominionMode.Config();
-            int popupMs = config != null ? Mathf.RoundToInt(config.BlockedPopupSeconds * 1000f) : 0;
-            RespawnShieldRules.HitDecision decision = RespawnShieldRules.OnIncomingHit(IsUp, origin, lastStampWritten, now, popupMs);
-            if (decision.WriteStamp && now != 0)
-            {
-                lastStampWritten = now;
-                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.BlockedKey, now } });
-            }
-            return decision.Blocked;
+            if (!photonView.IsMine || judge == null) return false;
+            bool itself = sourceActor == photonView.OwnerActorNr;
+            bool sameTeam = !itself && Teams.AreSameTeam(PhotonNetwork.CurrentRoom?.GetPlayer(sourceActor), photonView.Owner);
+            return judge.JudgeEffect(RespawnShieldRules.OriginOf(itself, sameTeam));
         }
 
         // ---------------------------------------------------------------- every client: bubble and BLOCKED

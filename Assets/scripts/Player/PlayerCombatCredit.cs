@@ -113,7 +113,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
 
         var drained = ledger.Drain();
         for (int i = 0; i < drained.Count; i++)
-            SendCredit(drained[i].actor, drained[i].amount, takedown: 0, cashedMark: drained[i].cashedMark);
+            SendCredit(drained[i].actor, drained[i].amount, takedown: 0, cashedMark: drained[i].cashedMark, endsShield: drained[i].endsShield);
     }
 
     /// <summary>Go-live's fresh start (PlayerLifecycle.ResetForMatchStart): forgets every warm-up hit so none of
@@ -135,7 +135,11 @@ public class PlayerCombatCredit : MonoBehaviourPun
         // Total, not HealthLost alone: armor absorbed is still damage the attacker actually dealt,
         // the same figure PlayerHealth's own UpdateOverheadBar and DamageResolver's callers use.
         // Mark plan step 4: whether THIS hit cashed a mark ORs into the attacker's own ledger entry.
-        ledger.Record(info.SourceActorNumber, result.Total, Time.time, result.Mark == MarkOutcome.Cashed);
+        // Dominion Task 7b (A26): a hit from a mine, field or burn set up before the attacker's respawn is flagged, so it never ends the shield
+        // the attacker got on coming back. Read here, on the victim's client, from the attacker's replicated dShd - no new message needed.
+        Player attacker = PhotonNetwork.CurrentRoom != null ? PhotonNetwork.CurrentRoom.GetPlayer(info.SourceActorNumber) : null;
+        bool endsShield = !Overpower.Dominion.RespawnShield.IsFromBeforeRespawn(attacker, info.EffectPlacedMs);
+        ledger.Record(info.SourceActorNumber, result.Total, Time.time, result.Mark == MarkOutcome.Cashed, endsShield);
     }
 
     /// <summary>
@@ -159,7 +163,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
         if (killerActor > 0)
         {
             var killerEntry = EntryFor(drained, killerActor);
-            SendCredit(killerActor, killerEntry.amount, takedown: 1, cashedMark: killerEntry.cashedMark);
+            SendCredit(killerActor, killerEntry.amount, takedown: 1, cashedMark: killerEntry.cashedMark, endsShield: killerEntry.endsShield);
             notified.Add(killerActor);
         }
 
@@ -169,7 +173,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
                 continue;
 
             var assistEntry = EntryFor(drained, assistActor);
-            SendCredit(assistActor, assistEntry.amount, takedown: 2, cashedMark: assistEntry.cashedMark);
+            SendCredit(assistActor, assistEntry.amount, takedown: 2, cashedMark: assistEntry.cashedMark, endsShield: assistEntry.endsShield);
         }
 
         // Anyone who dealt damage this fight but neither landed the kill nor stayed within the
@@ -178,7 +182,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
         foreach (var entry in drained)
         {
             if (notified.Add(entry.actor))
-                SendCredit(entry.actor, entry.amount, takedown: 0, cashedMark: entry.cashedMark);
+                SendCredit(entry.actor, entry.amount, takedown: 0, cashedMark: entry.cashedMark, endsShield: entry.endsShield);
         }
 
         // Mark plan step 4: every SendCredit call above already read playerHealth.MarkSecondsLeftFor,
@@ -188,16 +192,16 @@ public class PlayerCombatCredit : MonoBehaviourPun
         ledger.Clear();
     }
 
-    private static (float amount, bool cashedMark) EntryFor(
-        System.Collections.Generic.IReadOnlyList<(int actor, float amount, bool cashedMark)> drained, int actor)
+    private static (float amount, bool cashedMark, bool endsShield) EntryFor(
+        System.Collections.Generic.IReadOnlyList<(int actor, float amount, bool cashedMark, bool endsShield)> drained, int actor)
     {
         for (int i = 0; i < drained.Count; i++)
         {
             if (drained[i].actor == actor)
-                return (drained[i].amount, drained[i].cashedMark);
+                return (drained[i].amount, drained[i].cashedMark, drained[i].endsShield);
         }
 
-        return (0f, false);
+        return (0f, false, false);
     }
 
     /// <summary>Targets exactly one attacker, so credit is never seen by anyone but the player it
@@ -205,14 +209,14 @@ public class PlayerCombatCredit : MonoBehaviourPun
     /// to credit. Mark plan step 4: also reads this victim's own MarkLedger for how many seconds
     /// THIS attacker's mark (if any) still has left, so the attacker's diamond (mark step 5) always
     /// rides on the same message as the damage/takedown it goes with, never a separate RPC.</summary>
-    private void SendCredit(int actorNumber, float amount, byte takedown, bool cashedMark)
+    private void SendCredit(int actorNumber, float amount, byte takedown, bool cashedMark, bool endsShield)
     {
         Player attacker = PhotonNetwork.CurrentRoom != null ? PhotonNetwork.CurrentRoom.GetPlayer(actorNumber) : null;
         if (attacker == null)
             return;
 
         float markSecondsLeft = playerHealth != null ? playerHealth.MarkSecondsLeftFor(actorNumber) : 0f;
-        photonView.RPC(nameof(RPC_DamageCredit), attacker, amount, takedown, cashedMark, markSecondsLeft);
+        photonView.RPC(nameof(RPC_DamageCredit), attacker, amount, takedown, cashedMark, markSecondsLeft, endsShield);
     }
 
     /// <summary>
@@ -236,9 +240,13 @@ public class PlayerCombatCredit : MonoBehaviourPun
     /// method signature, logs "RPC method ... not found" for the mismatch, and drops the call outright,
     /// rather than the parameters "silently misaligning" as an earlier version of this comment claimed.
     /// Every client build must come from this exact commit on.
+    ///
+    /// Dominion Task 7b (A26): endsShield is appended the same way (still one RPC, the RpcList untouched - the same all-builds-from-one-commit
+    /// rule applies). It is false when every hit in this report came from a mine, field or burn set up before this attacker's respawn, so such
+    /// a hit does not end the attacker's new respawn shield; the victim works that out from the attacker's dShd and DamageInfo.EffectPlacedMs.
     /// </summary>
     [PunRPC]
-    private void RPC_DamageCredit(float amount, byte takedown, bool cashedMark, float markSecondsLeft, PhotonMessageInfo info)
+    private void RPC_DamageCredit(float amount, byte takedown, bool cashedMark, float markSecondsLeft, bool endsShield, PhotonMessageInfo info)
     {
         if (info.Sender == null || info.Sender != photonView.Owner)
             return;
@@ -253,6 +261,9 @@ public class PlayerCombatCredit : MonoBehaviourPun
             // `transform` here is the VICTIM as this attacker sees it - this RPC runs on the victim's
             // own replicated object, merely targeted at the attacker (the class comment above).
             CombatEvents.RaiseHitReported(transform, amount, cashedMark);
+            // Dominion Task 7b (A25/A26): damage that landed on an enemy. A hit the victim's own shield stopped never gets here (no credit is sent),
+            // so the victim is not shielded; endsShield is false when every hit in this report came from an effect set up before the respawn.
+            CombatEvents.RaiseEnemyAffected(false, !endsShield);
         }
 
         // Always, even when amount is 0 (a death flush that carries no fresh damage still needs to

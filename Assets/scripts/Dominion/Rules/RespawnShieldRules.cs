@@ -11,8 +11,8 @@ namespace Overpower.Dominion
         /// <summary>True while now is before the end time. 0 = never any shield (the cleared value).</summary>
         public static bool IsUp(int endMs, int nowMs) => endMs != 0 && unchecked(nowMs - endMs) < 0;
 
-        /// <summary>The value the shield owner writes when it learns it dealt damage: 0 = cleared, shield down. Attacking from inside the
-        /// shield would be a free shot, so the first hit dealt drops it.</summary>
+        /// <summary>The value the shield owner writes when it learns it hit an enemy: 0 = cleared, shield down. Attacking from inside the
+        /// shield would be a free shot, so the first hit on an enemy (damage, stun, slow or push) drops it.</summary>
         public static int EndAfterDamageDealt() => 0;
 
         /// <summary>An up shield blocks incoming damage (and shows BLOCKED).</summary>
@@ -39,12 +39,54 @@ namespace Overpower.Dominion
         public static bool StartsAfterRespawn(bool dominion, bool matchLive, bool diedBefore, bool freshStart, bool afterRejoin = false) =>
             dominion && matchLive && (diedBefore || afterRejoin) && !freshStart;
 
-        /// <summary>Who an incoming damage comes from, as the shielded victim sees it.</summary>
+        /// <summary>Who an incoming damage, status or push comes from, as the shielded victim sees it.</summary>
         public enum Origin { Enemy, Teammate, Self }
 
         /// <summary>Who a source actor is to the victim: the victim itself, a teammate, or anyone else. An unknown source counts as an enemy, the
         /// same fail-open Teams.AreSameTeam makes for damage.</summary>
         public static Origin OriginOf(bool isVictimItself, bool sameTeam) => isVictimItself ? Origin.Self : sameTeam ? Origin.Teammate : Origin.Enemy;
+
+        /// <summary>What a victim does with an incoming hit, status or push: Blocked = stop it before anything changes; WriteStamp = also
+        /// stamp dBlk now (at most once per popup length).</summary>
+        public readonly struct HitDecision
+        {
+            public readonly bool Blocked;
+            public readonly bool WriteStamp;
+            public HitDecision(bool blocked, bool writeStamp) { Blocked = blocked; WriteStamp = writeStamp; }
+        }
+
+        /// <summary>An enemy's damage on a shielded victim is stopped and shows BLOCKED. A teammate's is left to the friendly-fire rule (ignored
+        /// as before, no BLOCKED). The victim's own is stopped too, silently: no stamp, so nobody sees BLOCKED for a self-hit. With no shield up
+        /// the hit is none of the shield's business.</summary>
+        public static HitDecision OnIncomingHit(bool shieldUp, Origin origin, int lastStampMs, int nowMs, int popupMs)
+        {
+            if (!BlocksDamage(shieldUp) || origin == Origin.Teammate) return new HitDecision(false, false);
+            if (origin == Origin.Self) return new HitDecision(true, false);
+            return new HitDecision(true, StampDue(lastStampMs, nowMs, popupMs));
+        }
+
+        /// <summary>A24: a shielded victim is also untouchable by an enemy's stun, slow or push (any status or displacement), and BLOCKED shows
+        /// for it. Own and teammate effects land as today (a shielded player can still be helped, and can still push or boost themselves).</summary>
+        public static HitDecision OnIncomingEffect(bool shieldUp, Origin origin, int lastStampMs, int nowMs, int popupMs)
+        {
+            if (!shieldUp || origin != Origin.Enemy) return new HitDecision(false, false);
+            return new HitDecision(true, StampDue(lastStampMs, nowMs, popupMs));
+        }
+
+        /// <summary>A25: a shielded attacker's bubble ends when something it did reaches an enemy, unless that enemy is shielded too (the effect
+        /// was stopped, so nothing was hit) or the effect was set up before the attacker's respawn (A26). A hit on nobody never gets here.</summary>
+        public static bool EndsOnEnemyAffected(bool attackerShieldUp, bool victimShieldUp, bool fromBeforeRespawn) =>
+            attackerShieldUp && !victimShieldUp && !fromBeforeRespawn;
+
+        /// <summary>A26: true when an effect (a mine, a fire field, a burn) was set up before the attacker's current shield began. The shield began
+        /// ShieldSeconds before it ends, so the start is derived from dShd alone and every client that reads it agrees. placedMs 0 = a direct hit
+        /// (a shot, a pulse), never from before. A cleared shield (0) has no start to be before.</summary>
+        public static bool IsFromBeforeRespawn(int effectPlacedMs, int shieldEndMs, float shieldSeconds)
+        {
+            if (effectPlacedMs == 0 || shieldEndMs == 0) return false;
+            int startMs = unchecked(shieldEndMs - (int)System.Math.Round(shieldSeconds * 1000f));
+            return unchecked(effectPlacedMs - startMs) < 0;
+        }
 
         /// <summary>Who stays on a zone's capture roster and who is held out while a shield is up. A counted player whose shield is up is held
         /// out; a held-out player who died is dropped (they come back through the trigger); one whose shield is down comes back.</summary>
@@ -66,28 +108,6 @@ namespace Overpower.Dominion
                 heldOut.RemoveAt(i);
                 if (!counted.Contains(player)) counted.Add(player);
             }
-        }
-
-        /// <summary>Damage dealt (amount above 0, as the victim reported it) ends the shield; a cast that hit nobody reports nothing.</summary>
-        public static bool ClearsOnDamageDealt(float amount) => amount > 0f;
-
-        /// <summary>What a victim does with an incoming hit: Blocked = stop it before any health, armour or combat-clock change; WriteStamp = also
-        /// stamp dBlk now (at most once per popup length).</summary>
-        public readonly struct HitDecision
-        {
-            public readonly bool Blocked;
-            public readonly bool WriteStamp;
-            public HitDecision(bool blocked, bool writeStamp) { Blocked = blocked; WriteStamp = writeStamp; }
-        }
-
-        /// <summary>An enemy's damage on a shielded victim is stopped and shows BLOCKED. A teammate's is left to the friendly-fire rule (ignored
-        /// as before, no BLOCKED). The victim's own is stopped too, silently: no stamp, so nobody sees BLOCKED for a self-hit. With no shield up
-        /// the hit is none of the shield's business.</summary>
-        public static HitDecision OnIncomingHit(bool shieldUp, Origin origin, int lastStampMs, int nowMs, int popupMs)
-        {
-            if (!BlocksDamage(shieldUp) || origin == Origin.Teammate) return new HitDecision(false, false);
-            if (origin == Origin.Self) return new HitDecision(true, false);
-            return new HitDecision(true, StampDue(lastStampMs, nowMs, popupMs));
         }
 
         /// <summary>True when a new dBlk stamp may be written: none yet, or the last one is a full popup old.</summary>

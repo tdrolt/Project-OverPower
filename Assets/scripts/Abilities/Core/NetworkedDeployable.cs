@@ -95,6 +95,10 @@ namespace Overpower.Abilities
         /// info.SentServerTime.</summary>
         public double Age { get; private set; }
 
+        /// <summary>The placer's server time in ms when this was ORIGINALLY placed (the same value Age is worked out from). Dominion Task 7b (A26):
+        /// the damage this object deals carries it, so the victim can tell a mine laid before its owner's respawn from one laid after.</summary>
+        public int PlacedServerTimestampMs { get; private set; }
+
         /// <summary>True once Age has already reached or passed Lifetime Seconds the moment this
         /// client first placed/received this object - the defensive backstop the class comment
         /// describes. Always false when Lifetime Seconds is 0 (Portal, AoeZone - something else
@@ -201,6 +205,7 @@ namespace Overpower.Abilities
                                   "calibrate - Age is falling back to 0 for this object.");
             }
 
+            PlacedServerTimestampMs = placedServerTimestampMs;
             Age = DeployableAge.SecondsSince(placedServerTimestampMs, PhotonNetwork.ServerTimestamp);
 
             OnPlaced(subclassData, info);

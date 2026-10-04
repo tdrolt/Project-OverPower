@@ -48,6 +48,7 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     private Rigidbody rb;
     private PlayerMotor motor;
     private PlayerLifecycle lifecycle;
+    private Overpower.Dominion.IEffectShield effectShield; // Dominion respawn shield: stops an enemy's push while it is up (null in a scene without Dominion)
 
     // Not a design tunable, the way a weapon's hit mask is: a dash that could be tuned to pass
     // through walls would break the arena, so which layers can block a displacement is fixed here
@@ -113,6 +114,7 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
         rb = GetComponent<Rigidbody>();
         motor = GetComponent<PlayerMotor>();
         lifecycle = GetComponent<PlayerLifecycle>();
+        effectShield = GetComponent<Overpower.Dominion.IEffectShield>();
         voluntaryBlockMask = LayerMask.GetMask("Default", "Building");
         forcedBlockMask = ArenaLayers.BodiesWallsAndBarriers;
         capsule = GetComponent<CapsuleCollider>();
@@ -220,6 +222,26 @@ public class PlayerDisplacement : MonoBehaviour, IDisplaceable
     public void Displace(Vector3 direction, float distance, float speed, Action<DisplaceEnd> onEnd)
     {
         if (!photonView.IsMine)
+            return;
+
+        StartMove(DisplaceKind.Forced, direction, distance, speed, onEnd);
+    }
+
+    /// <summary>
+    /// A knockback that somebody else caused (the sonic pulse): Forced priority like Displace, but it knows who pushed. On this player's own
+    /// client a shielded player (Dominion respawn bubble) is not pushed by an enemy - nothing moves, BLOCKED is stamped, and onEnd never fires
+    /// (nothing started, the same contract a refused DisplaceVoluntary has). On a copy of a player this client does not own nothing moves either,
+    /// but when the push is this client's own player's on a living enemy, its respawn shield hears of it (Dominion A25).
+    /// </summary>
+    public void Displace(Vector3 direction, float distance, float speed, Action<DisplaceEnd> onEnd, int sourceActor)
+    {
+        if (!photonView.IsMine)
+        {
+            Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActor);
+            return;
+        }
+
+        if (effectShield != null && effectShield.StopsEnemyEffectFrom(sourceActor))
             return;
 
         StartMove(DisplaceKind.Forced, direction, distance, speed, onEnd);

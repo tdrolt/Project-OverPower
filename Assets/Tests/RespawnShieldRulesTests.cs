@@ -71,14 +71,6 @@ namespace Overpower.Tests
             Assert.IsFalse(RespawnShieldRules.StartsAfterRespawn(dominion: true, matchLive: true, diedBefore: true, freshStart: true), "a round's or break's fresh start (A16)");
         }
 
-        [Test] public void OnlyDamageActuallyDealtEndsTheShield()
-        {
-            Assert.IsTrue(RespawnShieldRules.ClearsOnDamageDealt(0.5f));
-            Assert.IsTrue(RespawnShieldRules.ClearsOnDamageDealt(120f));
-            Assert.IsFalse(RespawnShieldRules.ClearsOnDamageDealt(0f), "an ability that hit nobody reports nothing");
-            Assert.IsFalse(RespawnShieldRules.ClearsOnDamageDealt(-3f));
-        }
-
         [Test] public void AHitOnAShieldedVictimIsStoppedAndAsksForAStamp()
         {
             RespawnShieldRules.HitDecision d = RespawnShieldRules.OnIncomingHit(shieldUp: true, RespawnShieldRules.Origin.Enemy, lastStampMs: 0, nowMs: 5000, popupMs: 800);

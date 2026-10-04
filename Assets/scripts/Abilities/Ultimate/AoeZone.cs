@@ -250,7 +250,8 @@ namespace Overpower.Abilities
             foreach (IDamageable target in targets)
             {
                 target.ApplyDamage(new DamageInfo(damagePerTick, OwnerActor, OwnerTeam, -1,
-                                                   DamageSource.Zone, false, transform.position, AbilityId));
+                                                   DamageSource.Zone, false, transform.position, AbilityId,
+                                                   effectPlacedMs: PlacedServerTimestampMs));
             }
         }
     }

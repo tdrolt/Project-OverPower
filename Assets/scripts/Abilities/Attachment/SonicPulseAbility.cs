@@ -175,8 +175,13 @@ namespace Overpower.Abilities
                 // The victim reference is captured by this specific closure, not shared across
                 // iterations - C#'s per-iteration foreach variable makes that safe without an extra
                 // local copy.
-                displaceable.Displace(pushDirection, knockbackDistance, knockbackSpeed,
-                    end => HandlePushEnd(end, victim, casterActor, casterTeam));
+                // A player knows who pushed them (the Dominion respawn bubble refuses an enemy's push, and the pusher's own bubble ends on a push
+                // that lands); a dummy has neither.
+                System.Action<DisplaceEnd> onEnd = end => HandlePushEnd(end, victim, casterActor, casterTeam);
+                if (displaceable is PlayerDisplacement player)
+                    player.Displace(pushDirection, knockbackDistance, knockbackSpeed, onEnd, casterActor);
+                else
+                    displaceable.Displace(pushDirection, knockbackDistance, knockbackSpeed, onEnd);
             }
         }
 

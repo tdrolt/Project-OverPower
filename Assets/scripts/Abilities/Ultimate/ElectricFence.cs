@@ -235,7 +235,8 @@ namespace Overpower.Abilities
                     continue;
 
                 target.ApplyDamage(new DamageInfo(damagePerPass, OwnerActor, OwnerTeam, -1,
-                                                   DamageSource.Zone, false, targetComponent.transform.position, AbilityId));
+                                                   DamageSource.Zone, false, targetComponent.transform.position, AbilityId,
+                                                   effectPlacedMs: PlacedServerTimestampMs));
 
                 var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude, abilityId = AbilityId };
                 (target as IStatusReceiver)?.ApplyStatus(slow, OwnerActor);

@@ -99,5 +99,14 @@ namespace Overpower.Combat
         public static event Action<Transform, float> LocalShieldBlockedSeen;
 
         public static void RaiseShieldBlockedSeen(Transform victim, float popupSeconds) => LocalShieldBlockedSeen?.Invoke(victim, popupSeconds);
+
+        /// <summary>Dominion Task 7b (A25): something THIS client's own player did reached an enemy - damage (read from the victim's credit
+        /// message), a stun, slow, burn or vulnerability (this client's own simulation of the effect, on its copy of the victim) or a push (the
+        /// same, from the pulse). Raised only on the machine of the player who did it, so no RPC carries it. victimShielded = the enemy's own
+        /// respawn shield was up (the effect was stopped, so nothing was hit); fromBeforeRespawn = the effect was set up before the attacker's
+        /// respawn (a mine, a fire field, a burn: A26). The attacker's RespawnShield is the one subscriber.</summary>
+        public static event Action<bool, bool> LocalEnemyAffected;
+
+        public static void RaiseEnemyAffected(bool victimShielded, bool fromBeforeRespawn) => LocalEnemyAffected?.Invoke(victimShielded, fromBeforeRespawn);
     }
 }

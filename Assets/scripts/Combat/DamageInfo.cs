@@ -49,9 +49,15 @@ namespace Overpower.Combat
         /// Defaults to 1 (no change) for every call site that never mentions marks at all.</summary>
         public readonly float MarkedDamageMultiplier;
 
+        /// <summary>Dominion Task 7b (A26): the server time in ms when the lasting effect behind this hit was set up - a mine, a fire field, an
+        /// electric fence, a zone, a burn. The victim compares it with the attacker's respawn shield to tell an effect from before the respawn
+        /// (it must not end the attacker's new bubble) from one set up after it. 0 = a direct hit (a shot, a blast) with nothing set up earlier.
+        /// Appended last with a default, so every existing call site keeps compiling.</summary>
+        public readonly int EffectPlacedMs;
+
         public DamageInfo(float amount, int sourceActorNumber, int sourceTeamId, int weaponId,
                           DamageSource source, bool ignoresArmor, Vector3 hitPoint, int abilityId = -1,
-                          float markWindowSeconds = 0f, float markedDamageMultiplier = 1f)
+                          float markWindowSeconds = 0f, float markedDamageMultiplier = 1f, int effectPlacedMs = 0)
         {
             Amount = amount;
             SourceActorNumber = sourceActorNumber;
@@ -63,6 +69,7 @@ namespace Overpower.Combat
             AbilityId = abilityId;
             MarkWindowSeconds = markWindowSeconds;
             MarkedDamageMultiplier = markedDamageMultiplier;
+            EffectPlacedMs = effectPlacedMs;
         }
 
         /// <summary>Mark plan step 3: a copy of this hit with only Amount changed - PlayerHealth/
@@ -71,7 +78,7 @@ namespace Overpower.Combat
         /// mark fields included, so a scaled DamageInfo still reports truthfully what marked it).</summary>
         public DamageInfo WithAmount(float amount) =>
             new DamageInfo(amount, SourceActorNumber, SourceTeamId, WeaponId, Source, IgnoresArmor,
-                           HitPoint, AbilityId, MarkWindowSeconds, MarkedDamageMultiplier);
+                           HitPoint, AbilityId, MarkWindowSeconds, MarkedDamageMultiplier, EffectPlacedMs);
     }
 
     public readonly struct DamageResult

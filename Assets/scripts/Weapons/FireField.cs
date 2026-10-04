@@ -114,6 +114,7 @@ namespace Overpower.Weapons
 
         private int weaponId = -1;
         private int sourceActorNumber = -1;
+        private int placedServerTimestampMs;
         private int sourceTeamId = -1;
 
         /// <summary>
@@ -203,6 +204,9 @@ namespace Overpower.Weapons
             // is exactly how MineView/PortalView/FenceCageView already read an owner's team for their own look.
             sourceActorNumber = info.Sender != null ? info.Sender.ActorNumber : -1;
             Teams.TryGetTeam(info.Sender, out sourceTeamId);
+            // Dominion Task 7b (A26): when this field was set up, so its burn can say whether it predates its owner's respawn. A late joiner's
+            // replay of an old field reads a later time here; fields are short-lived and the worst case is one tick counted as new.
+            placedServerTimestampMs = info.SentServerTimestamp;
 
             Color teamColor = theme != null ? theme.ShotColorFor(sourceTeamId) : Color.white;
 
@@ -293,7 +297,8 @@ namespace Overpower.Weapons
                 // abilityId -1: FireField's DoT is always a weapon's cursor leaf (the rocket) -
                 // the weapon id stays, per Task T3's own note.
                 target.ApplyDamage(new DamageInfo(amount, sourceActorNumber, sourceTeamId, weaponId,
-                                                   DamageSource.Burn, false, transform.position, -1));
+                                                   DamageSource.Burn, false, transform.position, -1,
+                                                   effectPlacedMs: placedServerTimestampMs));
             }
         }
 

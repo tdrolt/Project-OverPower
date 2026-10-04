@@ -26,6 +26,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     private PlayerHealth playerHealth;
     private PlayerLifecycle lifecycle;
     private PlayerMotor motor;
+    private Overpower.Dominion.IEffectShield effectShield; // Dominion respawn shield: stops an enemy's status while it is up (null in a scene without Dominion)
     private StatusEffectState state;
     private DamageReductionStack reductionStack;
 
@@ -71,6 +72,10 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     // identically, since Burn stacks with StackRule.Refresh).
     private int burnAbilityId = -1;
 
+    // Dominion Task 7b (A26): the server ms the CURRENT burn was last applied or refreshed. Its damage carries it (DamageInfo.EffectPlacedMs), so
+    // a burn lit before its owner's respawn does not end the owner's new shield, while one re-lit after the respawn does.
+    private int burnAppliedMs;
+
     // Pushed into the motor only when the total actually changes, per AddSpeedMultiplier's own
     // contract - not every frame.
     private float appliedSlow;
@@ -113,6 +118,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         playerHealth = GetComponent<PlayerHealth>();
         lifecycle = GetComponent<PlayerLifecycle>();
         motor = GetComponent<PlayerMotor>();
+        effectShield = GetComponent<Overpower.Dominion.IEffectShield>();
 
         state = new StatusEffectState(
             gameplayConfig != null ? gameplayConfig.SlowCap : 0f,
@@ -237,12 +243,23 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
     public void Apply(in StatusEffectSpec spec, int sourceActorNumber = -1)
     {
         if (!photonView.IsMine)
+        {
+            // Dominion A25: this client simulates its own player's effect on its copy of someone else; if it is an effect of ours on a living enemy,
+            // our respawn shield hears of it. Nothing is applied here - only the victim's own client does that.
+            Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActorNumber);
+            return;
+        }
+
+        // Dominion A24: a respawned player is untouchable - no stun, slow, burn or vulnerability from an enemy while the bubble is up. Own and
+        // teammate statuses land as always.
+        if (effectShield != null && effectShield.StopsEnemyEffectFrom(sourceActorNumber))
             return;
 
         if (spec.kind == StatusKind.Burn)
         {
             burnSourceActorNumber = sourceActorNumber;
             burnAbilityId = spec.abilityId;
+            burnAppliedMs = PhotonNetwork.ServerTimestamp;
         }
 
         state.Apply(spec);
@@ -418,6 +435,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         state.ClearAll();
         burnSourceActorNumber = -1;
         burnAbilityId = -1;
+        burnAppliedMs = 0;
         reductionStack.Clear();
         DisarmReactiveInvulnerability(); // Death and respawn must never carry an armed shield or a stale trigger forward - one home for that, see its own comment.
         ApplySlowToMotor(); // Slow is now 0 - make sure the motor's multiplier is dropped with it.
@@ -437,7 +455,8 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
 
         Teams.TryGetTeam(burnSourceActorNumber, out int sourceTeamId);
         var info = new DamageInfo(burn, burnSourceActorNumber, sourceTeamId, -1,
-                                   DamageSource.Burn, false, transform.position, burnAbilityId);
+                                   DamageSource.Burn, false, transform.position, burnAbilityId,
+                                   effectPlacedMs: burnAppliedMs);
         playerHealth.ApplyDamage(info);
     }
 

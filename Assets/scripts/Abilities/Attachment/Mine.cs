@@ -292,7 +292,8 @@ namespace Overpower.Abilities
 
             foreach (IDamageable target in targets)
             {
-                target.ApplyDamage(new DamageInfo(damage, OwnerActor, OwnerTeam, -1, DamageSource.Splash, false, at, AbilityId));
+                target.ApplyDamage(new DamageInfo(damage, OwnerActor, OwnerTeam, -1, DamageSource.Splash, false, at, AbilityId,
+                                                   effectPlacedMs: PlacedServerTimestampMs));
                 (target as IStatusReceiver)?.ApplyStatus(slow, OwnerActor);
             }
 
