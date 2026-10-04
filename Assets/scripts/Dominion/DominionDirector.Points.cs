@@ -60,7 +60,7 @@ namespace Overpower.Dominion
         private DominionRoomState WithLatestPoints(DominionRoomState room)
         {
             if (room.Stage != DominionStage.Round) return room;
-            pointsLedger.Basis(Time.unscaledTime, PointsEchoTimeoutSeconds, room.Points, room.CentreMs, out int[] points, out _);
+            pointsLedger.Basis(Time.unscaledTime, PointsEchoTimeoutSeconds, room.Points, room.CentreMs, room.PointsSeq, out int[] points, out _, out _);
             room.Points = points;
             return room;
         }
@@ -145,12 +145,12 @@ namespace Overpower.Dominion
                 if (capital.Key >= 0 && capital.Key < zones) spawnScratch[capital.Key] = true;
 
             MatchDirector match = MatchDirector.Instance;
-            pointsLedger.Basis(Time.unscaledTime, PointsEchoTimeoutSeconds, room.Points, room.CentreMs, out int[] basePoints, out int baseCentre);
+            pointsLedger.Basis(Time.unscaledTime, PointsEchoTimeoutSeconds, room.Points, room.CentreMs, room.PointsSeq, out int[] basePoints, out int baseCentre, out int baseSeq);
             bool hasCentre = CentreInPlay(out int centre);
             DominionTickPlan plan = DominionPointsRules.Plan(new DominionTickInput
             {
                 NowMs = now, LastTickMs = lastTickMs, Room = room,
-                BasePoints = basePoints, BaseCentreMs = baseCentre,
+                BasePoints = basePoints, BaseCentreMs = baseCentre, BasePointsSeq = baseSeq,
                 TeamsInMatch = match != null ? match.TeamsInMatch : DominionMode.TeamsOfCurrentRoom(),
                 ZoneOwner = ownerScratch, ZoneTier = tierScratch, IsSpawnZone = spawnScratch,
                 PointsPerTier = config.PointsPerZonePerSecond,
@@ -171,7 +171,8 @@ namespace Overpower.Dominion
 
             int[] sentPoints = plan.Write.Props.TryGetValue(DominionKeys.Points, out object p) ? (int[])p : basePoints;
             int sentCentre = plan.Write.Props.TryGetValue(DominionKeys.CentrePayout, out object c) ? (int)c : baseCentre;
-            pointsLedger.Sent(sentPoints, sentCentre, Time.unscaledTime);
+            int sentSeq = plan.Write.Props.TryGetValue(DominionKeys.PointsSeq, out object q) ? (int)q : baseSeq;
+            pointsLedger.Sent(sentPoints, sentCentre, sentSeq, Time.unscaledTime);
             Debug.Log($"[DOMINION] master wrote: points [{string.Join(",", sentPoints)}] centre {sentCentre} (round {room.Round})");
 
             MatchTelemetry telemetry = MatchTelemetry.Instance;

@@ -235,7 +235,9 @@ namespace Overpower.Dominion
 
         /// <summary>Master: while the room's stage (a Round or a Break) has not had its zone reset (dRz differs from dEnd), reset the zones and
         /// write dRz. Asked of the room every frame, so any master finishes a reset the previous one never did. Not repeated until the dRz
-        /// write has had a second to echo (a second reset would wipe a capture made in between).</summary>
+        /// write has had a second to echo (a second reset would wipe a capture made in between). Known and accepted (Task 3 review): a NEW master
+        /// that takes over while the old master's dRz write is still in flight may redo the reset once; the zones are neutral either way and the
+        /// chance of a capture in that instant is negligible.</summary>
         private void RunZoneReset(MatchDirector match)
         {
             DominionRoomState room = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);

@@ -7,13 +7,15 @@ namespace Overpower.Dominion
     {
         private int[] written;
         private int writtenCentreMs;
+        private int writtenSeq;
         private int pending;
         private float lastSentAt;
 
-        public void Sent(int[] points, int centreMs, float nowSeconds)
+        public void Sent(int[] points, int centreMs, int seq, float nowSeconds)
         {
             written = points != null ? (int[])points.Clone() : null;
             writtenCentreMs = centreMs;
+            writtenSeq = seq;
             pending++;
             lastSentAt = nowSeconds;
         }
@@ -32,10 +34,11 @@ namespace Overpower.Dominion
         public bool Pending(float nowSeconds, float timeoutSeconds) => pending > 0 && written != null && nowSeconds - lastSentAt <= timeoutSeconds;
 
         /// <summary>The values to build the next write on: the last write while its echo is pending, else the room's.</summary>
-        public void Basis(float nowSeconds, float timeoutSeconds, int[] roomPoints, int roomCentreMs, out int[] points, out int centreMs)
+        public void Basis(float nowSeconds, float timeoutSeconds, int[] roomPoints, int roomCentreMs, int roomSeq,
+                          out int[] points, out int centreMs, out int seq)
         {
-            if (Pending(nowSeconds, timeoutSeconds)) { points = (int[])written.Clone(); centreMs = writtenCentreMs; }
-            else { points = roomPoints != null ? (int[])roomPoints.Clone() : new int[DominionKeys.TeamSlots]; centreMs = roomCentreMs; }
+            if (Pending(nowSeconds, timeoutSeconds)) { points = (int[])written.Clone(); centreMs = writtenCentreMs; seq = writtenSeq; }
+            else { points = roomPoints != null ? (int[])roomPoints.Clone() : new int[DominionKeys.TeamSlots]; centreMs = roomCentreMs; seq = roomSeq; }
         }
     }
 }

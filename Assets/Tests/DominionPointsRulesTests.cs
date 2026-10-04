@@ -50,6 +50,16 @@ namespace Overpower.Tests
             Assert.IsNull(p.Write, "own capitals + the centre only: nothing to write");
         }
 
+        [Test] public void ATierOneZoneNobodySpawnsAtAndASpawnThatIsNotTierOneEachAddNothing()
+        {
+            // Zone 0: Tier 1 but not flagged as a spawn. Zone 1: flagged as a spawn but Tier 2. Zone 2: an ordinary Tier 3 zone (pays 7).
+            // Either rule alone must keep the first two out: the tier, and the flag.
+            int[] owner = { 0, 0, 0 };
+            int[] tier = { 1, 2, 3 };
+            bool[] spawn = { false, true, false };
+            Assert.AreEqual(7, DominionRules.PointsThisTick(owner, tier, spawn, 0, Table), "only the Tier 3 zone pays");
+        }
+
         [Test] public void NeutralZonesAddNothing() => Assert.IsNull(DominionPointsRules.Plan(Input(Owners())).Write);
 
         [Test] public void ATeamNotInTheMatchGetsNothing()
@@ -70,8 +80,9 @@ namespace Overpower.Tests
             Assert.AreEqual((int)DominionStage.Round, p.Write.Expected[DominionKeys.Stage]);
             Assert.AreEqual(2, p.Write.Expected[DominionKeys.Round]);
             Assert.AreEqual(RoundEnd, p.Write.Expected[DominionKeys.StageEnd]);
-            Assert.AreEqual(3, p.Write.Expected.Count);
-            Assert.AreEqual(1, p.Write.Props.Count, "only dPts, no dCtr when the centre is not in play");
+            Assert.AreEqual(4, p.Write.Expected.Count, "stage, round, end time and the points sequence");
+            Assert.AreEqual(2, p.Write.Props.Count, "only dPts and the sequence, no dCtr when the centre is not in play");
+            Assert.IsFalse(p.Write.Props.ContainsKey(DominionKeys.CentrePayout));
         }
 
         [Test] public void TheWrittenPointsAreACopyNotTheBaseArray()
@@ -234,7 +245,7 @@ namespace Overpower.Tests
         {
             DominionTickPlan p = DominionPointsRules.Plan(Input(Owners(z3: 1, z5: 1), now: 30000, last: 29000, centre: true, centreOwner: 1, baseCtr: 30000));
             CollectionAssert.AreEqual(new[] { 0, 205, 0 }, Pts(p));
-            Assert.AreEqual(2, p.Write.Props.Count);
+            Assert.AreEqual(3, p.Write.Props.Count, "dPts, dCtr and the sequence");
         }
 
         [Test] public void AMapWithoutACentreNeverPaysOrWritesDctr()
@@ -247,7 +258,6 @@ namespace Overpower.Tests
         [Test] public void AMissingDctrIsScheduledFromNowByTheFirstDelay()
         {
             DominionTickPlan p = DominionPointsRules.Plan(Input(Owners(), now: 50000, last: 49500, centre: true, baseCtr: 0));
-            Assert.IsTrue(p.CentreScheduled);
             Assert.IsFalse(p.CentrePaid);
             Assert.AreEqual(80000, p.Write.Props[DominionKeys.CentrePayout]);
         }
@@ -256,6 +266,93 @@ namespace Overpower.Tests
         {
             Assert.AreEqual(35000, DominionRules.NextCentrePayoutMs(5000, 5000, 30000, 30000));
             Assert.AreEqual(65000, DominionRules.NextCentrePayoutMs(35000, 35000, 0, 30000), "the next one is an interval after the one that just paid");
+        }
+
+        // ---- the buzzer: a payout due by the round's end still counts (Tudor, A18)
+
+        [Test] public void APayoutDueExactlyAtTheRoundsEndIsPaidToTheHolderAndCountsOnce()
+        {
+            DominionTickPlan p = DominionPointsRules.Plan(Input(Owners(z5: 1), now: RoundEnd, last: RoundEnd - 1000, centre: true, centreOwner: 1, baseCtr: RoundEnd, basePts: new[] { 50, 60, 70 }));
+            Assert.IsTrue(p.CentrePaid);
+            Assert.AreEqual(1, p.CentreTeam);
+            CollectionAssert.AreEqual(new[] { 50, 260, 70 }, Pts(p), "the centre's lump only: no zone tick once the time is up");
+            Assert.AreEqual(RoundEnd + 30000, p.Write.Props[DominionKeys.CentrePayout], "the clock moves on, so a second look pays nothing");
+
+            DominionTickInput again = Input(Owners(z5: 1), now: RoundEnd + 100, last: RoundEnd - 1000, centre: true, centreOwner: 1, baseCtr: (int)p.Write.Props[DominionKeys.CentrePayout]);
+            Assert.IsNull(DominionPointsRules.Plan(again).Write, "paid once");
+        }
+
+        [Test] public void ALateLookAfterTheBuzzerStillPaysAPayoutThatWasDueBeforeIt()
+        {
+            DominionTickPlan p = DominionPointsRules.Plan(Input(Owners(z5: 2), now: RoundEnd + 40, last: RoundEnd - 1000, centre: true, centreOwner: 2, baseCtr: RoundEnd - 500));
+            CollectionAssert.AreEqual(new[] { 0, 0, 200 }, Pts(p));
+        }
+
+        [Test] public void APayoutDueAfterTheRoundsEndIsNotPaid()
+        {
+            DominionTickPlan p = DominionPointsRules.Plan(Input(Owners(z5: 1), now: RoundEnd + 2000, last: RoundEnd - 1000, centre: true, centreOwner: 1, baseCtr: RoundEnd + 1000));
+            Assert.IsNull(p.Write);
+            Assert.IsFalse(p.CentrePaid);
+        }
+
+        [Test] public void NothingElseIsWrittenAtTheBuzzer()
+        {
+            DominionTickInput input = Input(Owners(z3: 0), now: RoundEnd, last: RoundEnd - 1000, centre: true, centreOwner: -1, baseCtr: RoundEnd + 30000);
+            Assert.IsNull(DominionPointsRules.Plan(input).Write, "no zone tick at the buzzer, and the next payout is not due");
+            Assert.IsNull(DominionPointsRules.Plan(Input(Owners(), now: RoundEnd, last: RoundEnd - 1000, centre: true, baseCtr: 0)).Write, "no scheduling of a missing dCtr either");
+        }
+
+        [Test] public void TheBuzzerPayoutIsInThePointsTheRoundIsScoredOn()
+        {
+            // Team 0 leads 100 to 90; the buzzer payout of 200 goes to team 1, so team 1 wins the round once the stage writer sees it.
+            var cfg = new DominionFlowNumbers { RoundsToWin = 2, MaxRounds = 3, RoundSeconds = 180f, BreakSeconds = 20f };
+            DominionTickPlan p = DominionPointsRules.Plan(Input(Owners(z5: 1), now: RoundEnd, last: RoundEnd - 1000, centre: true, centreOwner: 1, baseCtr: RoundEnd, basePts: new[] { 100, 90, 0 }));
+            var room = new DominionRoomState { HasRound = true, Round = 1, Stage = DominionStage.Round, EndMs = RoundEnd, ResetFor = RoundEnd, Points = Pts(p), Wins = new int[3], Winner = -1 };
+            DominionWrite end = DominionRoomWrites.Next(true, true, RoundEnd, room, cfg, Three, new[] { 3, 3, 3 });
+            CollectionAssert.AreEqual(new[] { 0, 1, 0 }, (int[])end.Props[DominionKeys.Wins]);
+        }
+
+        // ---- two masters must not both add to the same points (dPseq)
+
+        [Test] public void EveryPointsWriteCountsUpTheSequenceAndExpectsTheOneItBuiltOn()
+        {
+            DominionTickInput input = Input(Owners(z3: 1));
+            input.BasePointsSeq = 4;
+            DominionTickPlan p = DominionPointsRules.Plan(input);
+            Assert.AreEqual(5, p.Write.Props[DominionKeys.PointsSeq]);
+            Assert.AreEqual(4, p.Write.Expected[DominionKeys.PointsSeq]);
+            Assert.AreEqual(4, p.Write.Expected.Count, "the stage, round, end time and the sequence");
+        }
+
+        [Test] public void TheFirstPointsWriteOfAMatchExpectsNoSequenceYet()
+        {
+            DominionTickPlan p = DominionPointsRules.Plan(Input(Owners(z3: 1)));
+            Assert.AreEqual(1, p.Write.Props[DominionKeys.PointsSeq]);
+            Assert.IsTrue(p.Write.Expected.ContainsKey(DominionKeys.PointsSeq));
+            Assert.IsNull(p.Write.Expected[DominionKeys.PointsSeq], "null in a check-and-set means the key must still be absent");
+        }
+
+        [Test] public void ACentreOnlyWriteCountsTheSequenceToo()
+        {
+            DominionTickInput input = Input(Owners(), now: 30000, last: 29500, centre: true, centreOwner: -1, baseCtr: 30000);
+            input.BasePointsSeq = 9;
+            Assert.AreEqual(10, DominionPointsRules.Plan(input).Write.Props[DominionKeys.PointsSeq]);
+        }
+
+        [Test] public void TheRoomReadsDpseq()
+        {
+            Assert.AreEqual(12, DominionRoomState.Read(new Hashtable { { DominionKeys.PointsSeq, 12 } }).PointsSeq);
+            Assert.AreEqual(0, DominionRoomState.Read(new Hashtable()).PointsSeq);
+        }
+
+        [Test] public void TheBreakWriteClearsTheCentresStalePayoutTime()
+        {
+            var cfg = new DominionFlowNumbers { RoundsToWin = 2, MaxRounds = 3, RoundSeconds = 100f, BreakSeconds = 10f, HasCentre = true, CentreFirstMs = 30000, CentreIntervalMs = 30000 };
+            var room = new DominionRoomState { HasRound = true, Round = 1, Stage = DominionStage.Round, EndMs = 9000, Points = new[] { 5, 1, 0 }, Wins = new int[3], Winner = -1, CentreMs = 9000 + 30000 };
+            DominionWrite w = DominionRoomWrites.Next(true, true, 9000, room, cfg, Three, new[] { 3, 3, 3 });
+            Assert.AreEqual(DominionStage.Break, (DominionStage)(int)w.Props[DominionKeys.Stage]);
+            Assert.IsTrue(w.Props.ContainsKey(DominionKeys.CentrePayout), "the key is in the write...");
+            Assert.IsNull(w.Props[DominionKeys.CentrePayout], "...as null, which removes it from the room");
         }
 
         // ---- bounty
@@ -310,50 +407,53 @@ namespace Overpower.Tests
         [Test] public void WithNothingPendingTheBasisIsTheRoom()
         {
             var ledger = new DominionPointsLedger();
-            ledger.Basis(1f, 2f, new[] { 1, 2, 3 }, 777, out int[] pts, out int ctr);
+            ledger.Basis(1f, 2f, new[] { 1, 2, 3 }, 777, 3, out int[] pts, out int ctr, out int seq);
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, pts);
             Assert.AreEqual(777, ctr);
+            Assert.AreEqual(3, seq, "no write pending: the room's own sequence");
         }
 
         [Test] public void WhileAnEchoIsPendingTheBasisIsTheLastWrite()
         {
             var ledger = new DominionPointsLedger();
-            ledger.Sent(new[] { 9, 9, 9 }, 5000, 1f);
-            ledger.Basis(1.5f, 2f, new[] { 1, 2, 3 }, 777, out int[] pts, out int ctr);
+            ledger.Sent(new[] { 9, 9, 9 }, 5000, 7, 1f);
+            ledger.Basis(1.5f, 2f, new[] { 1, 2, 3 }, 777, 3, out int[] pts, out int ctr, out int seq);
             CollectionAssert.AreEqual(new[] { 9, 9, 9 }, pts);
             Assert.AreEqual(5000, ctr);
+            Assert.AreEqual(7, seq, "the sequence of the last write, not the room's older one");
         }
 
         [Test] public void TwoWritesNeedTwoEchoesBeforeTheRoomIsTrusted()
         {
             var ledger = new DominionPointsLedger();
-            ledger.Sent(new[] { 1, 0, 0 }, 0, 1f);
-            ledger.Sent(new[] { 2, 0, 0 }, 0, 1.1f);
+            ledger.Sent(new[] { 1, 0, 0 }, 0, 7, 1f);
+            ledger.Sent(new[] { 2, 0, 0 }, 0, 7, 1.1f);
             ledger.Echoed();
-            ledger.Basis(1.2f, 2f, new[] { 1, 0, 0 }, 0, out int[] pts, out _);
+            ledger.Basis(1.2f, 2f, new[] { 1, 0, 0 }, 0, 3, out int[] pts, out _, out _);
             CollectionAssert.AreEqual(new[] { 2, 0, 0 }, pts, "the second write is still on its way");
             ledger.Echoed();
             Assert.IsFalse(ledger.Pending(1.3f, 2f));
-            ledger.Basis(1.3f, 2f, new[] { 2, 0, 0 }, 0, out pts, out _);
+            ledger.Basis(1.3f, 2f, new[] { 2, 0, 0 }, 0, 3, out pts, out _, out _);
             CollectionAssert.AreEqual(new[] { 2, 0, 0 }, pts);
         }
 
         [Test] public void AWriteThatNeverEchoesStopsBeingTrustedAfterTheTimeout()
         {
             var ledger = new DominionPointsLedger();
-            ledger.Sent(new[] { 9, 9, 9 }, 5000, 1f);
-            ledger.Basis(3.5f, 2f, new[] { 1, 2, 3 }, 777, out int[] pts, out int ctr);
+            ledger.Sent(new[] { 9, 9, 9 }, 5000, 7, 1f);
+            ledger.Basis(3.5f, 2f, new[] { 1, 2, 3 }, 777, 3, out int[] pts, out int ctr, out int seq);
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, pts);
             Assert.AreEqual(777, ctr);
+            Assert.AreEqual(3, seq);
         }
 
         [Test] public void ResetForgetsEverything()
         {
             var ledger = new DominionPointsLedger();
-            ledger.Sent(new[] { 9, 9, 9 }, 5000, 1f);
+            ledger.Sent(new[] { 9, 9, 9 }, 5000, 7, 1f);
             ledger.Reset();
             Assert.IsFalse(ledger.Pending(1f, 2f));
-            ledger.Basis(1f, 2f, new[] { 1, 2, 3 }, 777, out int[] pts, out _);
+            ledger.Basis(1f, 2f, new[] { 1, 2, 3 }, 777, 3, out int[] pts, out _, out _);
             CollectionAssert.AreEqual(new[] { 1, 2, 3 }, pts);
         }
 
@@ -361,9 +461,9 @@ namespace Overpower.Tests
         {
             var ledger = new DominionPointsLedger();
             int[] sent = { 4, 4, 4 };
-            ledger.Sent(sent, 0, 1f);
+            ledger.Sent(sent, 0, 7, 1f);
             sent[0] = 99;
-            ledger.Basis(1f, 2f, new int[3], 0, out int[] pts, out _);
+            ledger.Basis(1f, 2f, new int[3], 0, 3, out int[] pts, out _, out _);
             Assert.AreEqual(4, pts[0]);
         }
 

@@ -672,7 +672,25 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         if (written && bountyPaid > 0)
             RaiseBountyPaid(zone, team, payingTeam, bountyPaid, basis.LastHeldMs(zone));
         if (written)
-            CaptureWritten?.Invoke(zone, team, payingTeam, basis.LastHeldMs(zone));
+            RaiseCaptureWritten(zone, team, payingTeam, basis.LastHeldMs(zone));
+    }
+
+    /// <summary>Dominion Task 3 review fix: like every sibling event here, one listener that throws must not stop the others (or the capture's caller).</summary>
+    private void RaiseCaptureWritten(int zone, int newOwner, int previousOwner, int previousHeldMs)
+    {
+        if (CaptureWritten == null)
+            return;
+        foreach (Delegate listener in CaptureWritten.GetInvocationList())
+        {
+            try
+            {
+                ((Action<int, int, int, int>)listener)(zone, newOwner, previousOwner, previousHeldMs);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e, this);
+            }
+        }
     }
 
     private void RaiseBountyPaid(int zone, int paidTeam, int payingTeam, int amount, int heldMs)

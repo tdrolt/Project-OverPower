@@ -19,6 +19,8 @@ namespace Overpower.Dominion
         public int CentreMs;
         /// <summary>dRz: the dEnd of the stage the zones were last reset for; 0 = never.</summary>
         public int ResetFor;
+        /// <summary>dPseq: how many points writes the room has had; 0 = none yet.</summary>
+        public int PointsSeq;
 
         /// <summary>The state from the room's properties. Missing keys read as: no round, stage None, no points or wins (arrays of three zeros),
         /// no winner (-1). A wrong type reads as missing.</summary>
@@ -39,6 +41,7 @@ namespace Overpower.Dominion
             if (props.TryGetValue(DominionKeys.Winner, out object winner) && winner is int win) state.Winner = win;
             if (props.TryGetValue(DominionKeys.CentrePayout, out object ctr) && ctr is int c) state.CentreMs = c;
             if (props.TryGetValue(DominionKeys.ZonesResetFor, out object rz) && rz is int z) state.ResetFor = z;
+            if (props.TryGetValue(DominionKeys.PointsSeq, out object seq) && seq is int q) state.PointsSeq = q;
             return state;
         }
     }
@@ -159,6 +162,7 @@ namespace Overpower.Dominion
                         { DominionKeys.Stage, (int)DominionStage.Break },
                         { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.BreakSeconds) },
                         { DominionKeys.Wins, wins },
+                        { DominionKeys.CentrePayout, null }, // null removes the key: the round's last payout time is stale in the break (the next round start writes a fresh one)
                     });
             }
         }

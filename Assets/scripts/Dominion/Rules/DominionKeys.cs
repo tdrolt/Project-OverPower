@@ -26,6 +26,10 @@ namespace Overpower.Dominion
         /// <summary>int: the server ms of the centre's next payout (3v3v3 on a map with a Tier 4 zone only). Written with each round start.</summary>
         public const string CentrePayout = "dCtr";
 
+        /// <summary>int: counts up with every points write (dPts and/or dCtr). Every points write expects the value it built on, so two clients
+        /// that both think they are master cannot both add to the same points (the second write is refused). Absent until the first points write.</summary>
+        public const string PointsSeq = "dPseq";
+
         // Reserved for a later task - named here so nothing else claims it; nothing reads or writes it yet.
         /// <summary>Task 8: sudden death's start time.</summary>
         public const string SuddenDeathStart = "dSd";
