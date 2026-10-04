@@ -39,8 +39,8 @@ namespace Overpower.Dominion
             lateJoinerPickOpen && stage != DominionStage.Break;
 
         /// <summary>A late joiner's one pick lasts only while the round they joined in is still going.</summary>
-        public static bool LateJoinerWindowOpen(bool joinedMidRound, DominionStage stage) =>
-            joinedMidRound && (stage == DominionStage.Round || stage == DominionStage.SuddenDeath);
+        public static bool LateJoinerWindowOpen(DominionStage stage) =>
+            stage == DominionStage.Round || stage == DominionStage.SuddenDeath;
 
         /// <summary>The most armour upgrades the + buttons offer: the smaller of the shop's own maximum and the round's allowance.</summary>
         public static int ArmorCap(int shopMax, int round, int[] table) => Math.Min(shopMax, ArmorUpgradesAllowed(round, table));

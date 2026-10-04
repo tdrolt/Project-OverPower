@@ -118,6 +118,12 @@ namespace Overpower.UI
                 MatchDirector.Instance != null && MatchDirector.Instance.IsLive,
                 DominionMode.IsActive());
 
+        /// <summary>Whether a reset hands out the prefab's starting ultimate (ShopRules.StartingUltimateHandedOut, with the live inputs).</summary>
+        public static bool StartingUltimateHandedOut(GameplayConfig config) =>
+            ShopRules.StartingUltimateHandedOut(config == null || config.FreeLoadout,
+                MatchDirector.Instance != null && MatchDirector.Instance.IsLive,
+                DominionMode.IsActive());
+
         /// <summary>True in a live Dominion match (not the warm-up, where the shop is the free sandbox and the break rule does not apply).</summary>
         public static bool DominionLive() =>
             DominionMode.IsActive() && MatchDirector.Instance != null && MatchDirector.Instance.IsLive;
@@ -136,8 +142,20 @@ namespace Overpower.UI
         {
             if (dominion == null || !DominionLive()) return null;
             DominionDirector director = DominionDirector.Instance;
-            return new DominionShopLimits(director != null ? director.Round : 1, dominion.WeaponDepthByRound, dominion.ArmorUpgradesByRound, dominion.LockedTierLabelFormat);
+            int round = director != null ? director.Round : 1;
+            // Asked every frame while the shop is open: kept per round (and per config), not built anew each time.
+            if (cachedLimits == null || cachedLimitsRound != round || cachedLimitsConfig != dominion)
+            {
+                cachedLimits = new DominionShopLimits(round, dominion.WeaponDepthByRound, dominion.ArmorUpgradesByRound, dominion.LockedTierLabelFormat);
+                cachedLimitsRound = round;
+                cachedLimitsConfig = dominion;
+            }
+            return cachedLimits;
         }
+
+        private static DominionShopLimits cachedLimits;
+        private static int cachedLimitsRound;
+        private static DominionConfig cachedLimitsConfig;
 
         public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position, bool isAlive,
                                         bool lateJoinerPickOpen = false, DominionConfig dominion = null, string dominionFreeText = "", string closedText = "",

@@ -47,6 +47,20 @@ namespace Overpower.Tests
             Assert.AreEqual("The shop opens in the break", Dominion(PurchaseBlock.NotInBreak).ReasonText(PurchaseBlock.NotInBreak, 0));
         }
 
+        [Test] public void ALiveDominionMatchNeverHandsOutAStartingUltimateEvenThoughItsShopIsFree()
+        {
+            Assert.IsFalse(ShopRules.StartingUltimateHandedOut(freeLoadout: false, matchLive: true, dominionMatch: true));
+            Assert.IsFalse(ShopRules.StartingUltimateHandedOut(freeLoadout: true, matchLive: true, dominionMatch: true));
+        }
+
+        [Test] public void TheOtherFreeShopsStillHandOutTheStartingUltimateAndTheRealEconomyDoesNot()
+        {
+            Assert.IsTrue(ShopRules.StartingUltimateHandedOut(freeLoadout: true, matchLive: true, dominionMatch: false), "Free Loadout test mode");
+            Assert.IsTrue(ShopRules.StartingUltimateHandedOut(freeLoadout: false, matchLive: false, dominionMatch: false), "the warm-up sandbox");
+            Assert.IsTrue(ShopRules.StartingUltimateHandedOut(freeLoadout: false, matchLive: false, dominionMatch: true), "the Dominion warm-up sandbox");
+            Assert.IsFalse(ShopRules.StartingUltimateHandedOut(freeLoadout: false, matchLive: true, dominionMatch: false), "Conquest, live");
+        }
+
         [Test] public void TheShopIsFreeInAnyDominionMatchLiveOrNot()
         {
             Assert.IsTrue(ShopRules.IsFree(freeLoadout: false, matchLive: true, dominionMatch: true));

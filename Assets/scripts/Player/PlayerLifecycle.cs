@@ -5,6 +5,7 @@ using UnityEngine;
 using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Dominion;
 using Overpower.Match;
 using Overpower.Net;
 using Overpower.UI;
@@ -860,7 +861,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // IsUnderAttack judges the CURRENT owner of the capital; a respawn capital already read as "this team
         // holds it" a moment ago (SpawnCapitalFor), but the attack/capture race is the same one B3 review
         // (2026-09-16) found for the static case: trust the presence check only while this team STILL owns it.
-        if (manager.Current == null || manager.Current.OwnerOf(capital) != teamID || !presence.IsUnderAttack(capital))
+        bool underAttackNow = manager.Current != null && manager.Current.OwnerOf(capital) == teamID && presence.IsUnderAttack(capital);
+
+        // Dominion (A21): always the team's normal spawn. The under-attack points sit 28.6 m from each capital, outside its healing circle,
+        // and the respawn shield already protects a player who comes back next to enemies.
+        if (!DominionRules.UsesCapitalUnderAttackSpawn(DominionMode.IsActive(), underAttackNow))
             return normal;
 
         Transform[] underAttack = roomManager.capitalUnderAttackSpawnPoints;

@@ -8,6 +8,20 @@ namespace Overpower.Tests
     /// <summary>Dominion Task 6: the fixed respawn wait and the spawn's healing. Every number is a literal made up for the test, never the asset's.</summary>
     public class DominionRespawnAndSpawnHealTests
     {
+        // ---- which spawn point a respawn uses (A21)
+
+        [Test] public void InDominionARespawnNeverUsesTheCapitalUnderAttackSpawn()
+        {
+            Assert.IsFalse(DominionRules.UsesCapitalUnderAttackSpawn(true, true));
+            Assert.IsFalse(DominionRules.UsesCapitalUnderAttackSpawn(true, false));
+        }
+
+        [Test] public void InConquestTheUnderAttackSpawnIsUsedOnlyWhileTheCapitalIsUnderAttack()
+        {
+            Assert.IsTrue(DominionRules.UsesCapitalUnderAttackSpawn(false, true));
+            Assert.IsFalse(DominionRules.UsesCapitalUnderAttackSpawn(false, false));
+        }
+
         // ---- the respawn wait
 
         [Test] public void InDominionEveryDeathWaitsTheSameFixedTime()

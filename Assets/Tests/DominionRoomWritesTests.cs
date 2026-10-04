@@ -22,12 +22,16 @@ namespace Overpower.Tests
         private static DominionWrite Next(DominionRoomState room, int now, int[] players = null, bool dominion = true, bool live = true) =>
             DominionRoomWrites.Next(dominion, live, now, room, Cfg, Three, players ?? Everyone);
 
-        private static void AssertExpectsWhatItWasComputedFrom(DominionWrite w, DominionRoomState room)
+        /// <summary>A write that scores a round also expects the points sequence it built on (null while the room has had no points write).</summary>
+        private static void AssertExpectsWhatItWasComputedFrom(DominionWrite w, DominionRoomState room, bool scoresRound = false)
         {
             Assert.AreEqual((int)room.Stage, w.Expected[DominionKeys.Stage]);
             Assert.AreEqual(room.Round, w.Expected[DominionKeys.Round]);
             Assert.AreEqual(room.EndMs, w.Expected[DominionKeys.StageEnd]);
-            Assert.AreEqual(3, w.Expected.Count);
+            if (!scoresRound) { Assert.AreEqual(3, w.Expected.Count); return; }
+            Assert.AreEqual(4, w.Expected.Count);
+            Assert.IsTrue(w.Expected.ContainsKey(DominionKeys.PointsSeq));
+            Assert.AreEqual(room.PointsSeq == 0 ? null : (object)room.PointsSeq, w.Expected[DominionKeys.PointsSeq]);
         }
 
         // ---- the start
@@ -80,7 +84,7 @@ namespace Overpower.Tests
             Assert.AreEqual(115000, w.Props[DominionKeys.StageEnd]);
             CollectionAssert.AreEqual(new[] { 0, 1, 0 }, (int[])w.Props[DominionKeys.Wins]);
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.Points), "the round's final points stay for the break card");
-            AssertExpectsWhatItWasComputedFrom(w, room);
+            AssertExpectsWhatItWasComputedFrom(w, room, scoresRound: true);
         }
 
         [Test] public void ATiedRoundGivesNoWin()
@@ -90,7 +94,7 @@ namespace Overpower.Tests
             Assert.AreEqual((int)DominionStage.Break, w.Props[DominionKeys.Stage]);
             Assert.AreEqual(2, w.Props[DominionKeys.Round]);
             CollectionAssert.AreEqual(new[] { 1, 0, 0 }, (int[])w.Props[DominionKeys.Wins]);
-            AssertExpectsWhatItWasComputedFrom(w, room);
+            AssertExpectsWhatItWasComputedFrom(w, room, scoresRound: true);
         }
 
         [Test] public void ATeamReachingTheTargetWinsTheMatchAndRoundThreeIsNotPlayed()
@@ -101,7 +105,7 @@ namespace Overpower.Tests
             Assert.AreEqual(1, w.Props[DominionKeys.Winner]);
             CollectionAssert.AreEqual(new[] { 0, 2, 0 }, (int[])w.Props[DominionKeys.Wins]);
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.Round), "the round number does not move");
-            AssertExpectsWhatItWasComputedFrom(w, room);
+            AssertExpectsWhatItWasComputedFrom(w, room, scoresRound: true);
         }
 
         [Test] public void AfterTheLastRoundWithTopTeamsLevelSuddenDeathStartsWithNoClock()
@@ -112,7 +116,7 @@ namespace Overpower.Tests
             Assert.AreEqual(0, w.Props[DominionKeys.StageEnd]);
             CollectionAssert.AreEqual(new[] { 1, 1, 0 }, (int[])w.Props[DominionKeys.Wins]);
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.Winner));
-            AssertExpectsWhatItWasComputedFrom(w, room);
+            AssertExpectsWhatItWasComputedFrom(w, room, scoresRound: true);
         }
 
         [Test] public void AfterTheLastRoundALoneLeaderOnRoundWinsWinsTheMatch()
@@ -130,6 +134,25 @@ namespace Overpower.Tests
             DominionWrite w = Next(room, 500000);
             Assert.AreEqual((int)DominionStage.SuddenDeath, w.Props[DominionKeys.Stage]);
             CollectionAssert.AreEqual(new[] { 1, 1, 1 }, (int[])w.Props[DominionKeys.Wins]);
+        }
+
+        [Test] public void ScoringARoundExpectsTheRoomToStillHoldThePointsSequenceItWasScoredOn()
+        {
+            var room = Room(1, DominionStage.Round, 105000, points: new[] { 50, 200, 10 });
+            room.PointsSeq = 41;
+            DominionWrite w = Next(room, 105000);
+            Assert.AreEqual(41, w.Expected[DominionKeys.PointsSeq], "a points write refused in between must make this stage write refused too");
+            AssertExpectsWhatItWasComputedFrom(w, room, scoresRound: true);
+        }
+
+        [Test] public void EveryWayAScoredRoundCanEndExpectsThePointsSequence()
+        {
+            var matchWon = Room(2, DominionStage.Round, 300000, points: new[] { 10, 300, 0 }, wins: new[] { 0, 1, 0 });
+            matchWon.PointsSeq = 7;
+            var suddenDeath = Room(3, DominionStage.Round, 500000, points: new[] { 5, 5, 0 }, wins: new[] { 1, 1, 0 });
+            suddenDeath.PointsSeq = 8;
+            Assert.AreEqual(7, Next(matchWon, 300000).Expected[DominionKeys.PointsSeq]);
+            Assert.AreEqual(8, Next(suddenDeath, 500000).Expected[DominionKeys.PointsSeq]);
         }
 
         // ---- a break ends

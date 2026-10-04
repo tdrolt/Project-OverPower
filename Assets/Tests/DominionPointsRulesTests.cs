@@ -467,6 +467,48 @@ namespace Overpower.Tests
             Assert.AreEqual(4, pts[0]);
         }
 
+        // ---- a refused points write (Task 5 review fix 3)
+
+        [Test] public void ARoomSequencePastOurWriteMeansItWasRefusedAndTheRoomIsTrustedAtOnce()
+        {
+            var ledger = new DominionPointsLedger();
+            ledger.Sent(new[] { 9, 9, 9 }, 0, 7, 1f);
+            ledger.Basis(1.1f, 2f, new[] { 4, 0, 0 }, 0, 8, out int[] pts, out _, out int seq);
+            CollectionAssert.AreEqual(new[] { 4, 0, 0 }, pts, "not the refused copy, and not after the 2 s timeout either");
+            Assert.AreEqual(8, seq);
+            Assert.IsFalse(ledger.Pending(1.1f, 2f));
+        }
+
+        [Test] public void TheSameSequenceWithOtherPointsMeansAnotherMasterWroteItFirst()
+        {
+            var ledger = new DominionPointsLedger();
+            ledger.Sent(new[] { 9, 9, 9 }, 0, 7, 1f);
+            Assert.IsTrue(ledger.RefusedByRoom(new[] { 5, 0, 0 }, 0, 7));
+            Assert.IsTrue(ledger.RefusedByRoom(new[] { 9, 9, 9 }, 123, 7), "a different centre time is a different write too");
+            ledger.Basis(1.1f, 2f, new[] { 5, 0, 0 }, 0, 7, out int[] pts, out _, out _);
+            CollectionAssert.AreEqual(new[] { 5, 0, 0 }, pts);
+        }
+
+        [Test] public void OurOwnEchoOrAnOlderRoomIsNotARefusal()
+        {
+            var ledger = new DominionPointsLedger();
+            ledger.Sent(new[] { 9, 9, 9 }, 5000, 7, 1f);
+            Assert.IsFalse(ledger.RefusedByRoom(new[] { 9, 9, 9 }, 5000, 7), "the room holds exactly what we sent");
+            Assert.IsFalse(ledger.RefusedByRoom(new[] { 1, 1, 1 }, 0, 6), "the room has not reached our write yet");
+            ledger.Basis(1.1f, 2f, new[] { 1, 1, 1 }, 0, 6, out int[] pts, out _, out int seq);
+            CollectionAssert.AreEqual(new[] { 9, 9, 9 }, pts);
+            Assert.AreEqual(7, seq);
+        }
+
+        [Test] public void NothingPendingMeansNothingToRefuseAndTheSequenceCompareSurvivesTheWrap()
+        {
+            var ledger = new DominionPointsLedger();
+            Assert.IsFalse(ledger.RefusedByRoom(new[] { 1, 1, 1 }, 0, 99));
+            ledger.Sent(new[] { 2, 2, 2 }, 0, int.MaxValue, 1f);
+            Assert.IsTrue(ledger.RefusedByRoom(new[] { 3, 3, 3 }, 0, int.MinValue), "one past int.MaxValue wraps to int.MinValue");
+            Assert.IsFalse(ledger.RefusedByRoom(new[] { 3, 3, 3 }, 0, int.MaxValue - 1));
+        }
+
         // ---- the markers
 
         [Test] public void TheMarkerNamesTheZoneTeamAndPoints()

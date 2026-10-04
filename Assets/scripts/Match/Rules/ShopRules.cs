@@ -64,6 +64,11 @@ namespace Overpower.Match
         /// gold in it); when it may be shopped in is a separate question (DominionShopRules.PickBlock).</summary>
         public static bool IsFree(bool freeLoadout, bool matchLive, bool dominionMatch = false) => dominionMatch || freeLoadout || !matchLive;
 
+        /// <summary>Whether a reset hands out the prefab's starting ultimate: only while the shop is free, and never in a live Dominion match
+        /// (the shop is free there too, but the ultimate is picked in the break like everything else).</summary>
+        public static bool StartingUltimateHandedOut(bool freeLoadout, bool matchLive, bool dominionMatch) =>
+            !(dominionMatch && matchLive) && IsFree(freeLoadout, matchLive, dominionMatch);
+
         /// <summary>What one ability pick actually costs. The prefab ships with the Mobility and
         /// Attachment slots EMPTY (Task 2.5a) rather than pre-loaded with a free starting pick, so
         /// the GDD's "starting kit is free" [G p.17-18] has to be read here instead: the FIRST pick

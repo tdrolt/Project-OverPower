@@ -309,6 +309,7 @@ namespace Overpower.UI
         // the gate. A full Refresh() only fires when one of these actually changes; otherwise
         // Update() still calls the cheap RefreshHeader() every frame so the countdown keeps ticking.
         private int lastKnownGold = int.MinValue;
+        private int lastKnownRound = -1; // Dominion: the round the open shop was drawn for (its weapon and armour limits change with it)
         private bool lastKnownBlocked;
 
         // One Material instance shared by every text this screen builds - see PlayerHud.ApplyOutline
@@ -372,7 +373,7 @@ namespace Overpower.UI
             if (!photonView.IsMine || photonView.Owner == null || photonView.Owner.HasRejoined || !ShopPricing.DominionLive())
                 return;
             DominionDirector director = DominionDirector.Instance;
-            if (director == null || !DominionShopRules.LateJoinerWindowOpen(true, director.Stage))
+            if (director == null || !DominionShopRules.LateJoinerWindowOpen(director.Stage))
                 return;
             lateJoinerPick = true;
             Open();
@@ -421,7 +422,7 @@ namespace Overpower.UI
 
             // Dominion: a late joiner's one pick ends with the round they joined in; the shop is shut outside the break.
             if (lateJoinerPick && DominionMode.IsActive() && DominionDirector.Instance != null
-                && !DominionShopRules.LateJoinerWindowOpen(true, DominionDirector.Instance.Stage))
+                && !DominionShopRules.LateJoinerWindowOpen(DominionDirector.Instance.Stage))
                 lateJoinerPick = false;
             bool shopShut = ShopPricing.DominionClosed(lateJoinerPick) != PurchaseBlock.None;
 
@@ -485,7 +486,7 @@ namespace Overpower.UI
             bool blocked = ctx.Check(0) != PurchaseBlock.None;
 
             if (weaponId != lastKnownWeaponId || absorbLevel != lastKnownAbsorbLevel || rechargeLevel != lastKnownRechargeLevel
-                || gold != lastKnownGold || blocked != lastKnownBlocked)
+                || gold != lastKnownGold || blocked != lastKnownBlocked || CurrentRound() != lastKnownRound)
                 Refresh(ctx);
             else
                 RefreshHeader(ctx); // Still cheap even when nothing else changed - see RefreshHeader's own comment.
@@ -623,7 +624,11 @@ namespace Overpower.UI
             lastKnownRechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
             lastKnownGold = goldWallet != null ? goldWallet.Balance : 0;
             lastKnownBlocked = ctx.Check(0) != PurchaseBlock.None;
+            lastKnownRound = CurrentRound();
         }
+
+        /// <summary>The Dominion round the shop's limits are for (0 outside Dominion), so an open shop redraws when the round moves on.</summary>
+        private static int CurrentRound() => DominionDirector.Instance != null ? DominionDirector.Instance.Round : 0;
 
         /// <summary>This player's shop gate and balance right now - built fresh each call (cheap:
         /// a couple of dictionary/property reads, no allocation) rather than cached, so every caller

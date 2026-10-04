@@ -56,12 +56,14 @@ namespace Overpower.Dominion
             hookedBuildings = null;
         }
 
-        /// <summary>The room with the points this master has written but not yet seen echoed, in place of the room's older copy.</summary>
+        /// <summary>The room with the points this master has written but not yet seen echoed, in place of the room's older copy, and the
+        /// sequence those points were built on (so the round-over write expects it and is refused if a points write in between was).</summary>
         private DominionRoomState WithLatestPoints(DominionRoomState room)
         {
             if (room.Stage != DominionStage.Round) return room;
-            pointsLedger.Basis(Time.unscaledTime, PointsEchoTimeoutSeconds, room.Points, room.CentreMs, room.PointsSeq, out int[] points, out _, out _);
+            pointsLedger.Basis(Time.unscaledTime, PointsEchoTimeoutSeconds, room.Points, room.CentreMs, room.PointsSeq, out int[] points, out _, out int seq);
             room.Points = points;
+            room.PointsSeq = seq;
             return room;
         }
 
@@ -104,7 +106,7 @@ namespace Overpower.Dominion
 
         // ---------------------------------------------------------------- the tick
 
-        private void RunPoints()
+        private void RunPoints(int now)
         {
             BuildingManager buildings = BuildingManager.Instance;
             if (buildings == null) return;
@@ -125,7 +127,6 @@ namespace Overpower.Dominion
 
             DominionConfig config = Config();
             TerritorySnapshot snapshot = buildings.LatestForMaster;
-            int now = PhotonNetwork.ServerTimestamp;
             if (config == null || snapshot == null || now == 0) return;
 
             int zones = snapshot.ZoneCount;

@@ -150,14 +150,14 @@ namespace Overpower.Dominion
                         { DominionKeys.Stage, (int)DominionStage.Over },
                         { DominionKeys.Winner, outcome.Winner },
                         { DominionKeys.Wins, wins },
-                    });
+                    }, scoresRound: true);
                 case DominionStage.SuddenDeath:
                     return Stage(room, "sudden death", new Hashtable
                     {
                         { DominionKeys.Stage, (int)DominionStage.SuddenDeath },
                         { DominionKeys.StageEnd, 0 },
                         { DominionKeys.Wins, wins },
-                    });
+                    }, scoresRound: true);
                 default:
                     return Stage(room, "round over, break", new Hashtable
                     {
@@ -166,7 +166,7 @@ namespace Overpower.Dominion
                         { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.BreakSeconds) },
                         { DominionKeys.Wins, wins },
                         { DominionKeys.CentrePayout, null }, // null removes the key: the round's last payout time is stale in the break (the next round start writes a fresh one)
-                    });
+                    }, scoresRound: true);
             }
         }
 
@@ -187,17 +187,19 @@ namespace Overpower.Dominion
             Stage(room, "zones reset", new Hashtable { { DominionKeys.ZonesResetFor, room.EndMs } });
 
         /// <summary>The write for a stage change: the props, expecting the stage, round and end time this client computed it from.</summary>
-        private static DominionWrite Stage(DominionRoomState room, string what, Hashtable props) => new DominionWrite
+        private static DominionWrite Stage(DominionRoomState room, string what, Hashtable props, bool scoresRound = false)
         {
-            What = what,
-            Props = props,
-            Expected = new Hashtable
+            var expected = new Hashtable
             {
                 { DominionKeys.Stage, (int)room.Stage },
                 { DominionKeys.Round, room.Round },
                 { DominionKeys.StageEnd, room.EndMs },
-            },
-        };
+            };
+            // A write that scores the round also expects the points it scored on to still be the room's: if a points write was refused in
+            // between, this one is refused too and the next try scores from the room (null: no points write yet, the key must be absent).
+            if (scoresRound) expected[DominionKeys.PointsSeq] = room.PointsSeq == 0 ? null : (object)room.PointsSeq;
+            return new DominionWrite { What = what, Props = props, Expected = expected };
+        }
 
         /// <summary>A copy of the per-team array padded to the team slots (a short or missing array reads as zeros).</summary>
         private static int[] Slots(int[] values)

@@ -82,11 +82,15 @@ namespace Overpower.Dominion
             MatchDirector match = MatchDirector.Instance;
             if (match == null || !match.IsLive) return;
 
+            // The server clock is read once per Update and handed to every step: the points beat and the stage writer must agree on which side
+            // of a stage's end this frame is (the buzzer payout lives exactly on that edge).
+            int now = PhotonNetwork.ServerTimestamp;
+
             // A new master (or the old one, after a lost write) first finishes what the room already says: the zone reset the stage asked for
             // (dRz), and the match-over announcement once the room says Over. Points have their own pace and echo wait (Points file), so
             // neither this writer's wait nor theirs holds the other back.
             RunZoneReset(match);
-            RunPoints();
+            RunPoints(now);
             AnnounceOverIfDecided(match);
 
             if (Time.unscaledTime < waitForEchoUntil || Time.unscaledTime < nextPresenceCheckAt) return;
@@ -94,12 +98,12 @@ namespace Overpower.Dominion
 
             DominionConfig config = Config();
             if (config == null) return;
-            if (PhotonNetwork.ServerTimestamp == 0) return; // the server clock has not synced: never write
+            if (now == 0) return; // the server clock has not synced: never write
 
             Hashtable roomProps = PhotonNetwork.CurrentRoom.CustomProperties;
             DominionRoomState room = WithLatestPoints(DominionRoomState.Read(roomProps)); // the round is scored on what the master has written, echoed or not
             bool counted = CountPlayers();
-            DominionWrite write = DominionRoomWrites.Next(true, true, PhotonNetwork.ServerTimestamp, room,
+            DominionWrite write = DominionRoomWrites.Next(true, true, now, room,
                 new DominionFlowNumbers
                 {
                     RoundsToWin = config.RoundsToWin, MaxRounds = config.MaxRounds,

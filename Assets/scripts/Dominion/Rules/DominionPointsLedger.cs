@@ -33,10 +33,27 @@ namespace Overpower.Dominion
         /// <summary>True while a write's echo is awaited (and not given up on after the timeout: a refused check-and-set never echoes).</summary>
         public bool Pending(float nowSeconds, float timeoutSeconds) => pending > 0 && written != null && nowSeconds - lastSentAt <= timeoutSeconds;
 
-        /// <summary>The values to build the next write on: the last write while its echo is pending, else the room's.</summary>
+        /// <summary>True when the room shows our last write was refused: its sequence moved past what we sent without our echo, or it is the
+        /// very sequence we sent but holds someone else's points or centre time (a check-and-set that lost the race never echoes). Wrap-safe.</summary>
+        public bool RefusedByRoom(int[] roomPoints, int roomCentreMs, int roomSeq)
+        {
+            if (pending <= 0 || written == null) return false;
+            int ahead = unchecked(roomSeq - writtenSeq);
+            if (ahead > 0) return true;
+            if (ahead < 0) return false; // our write (or an earlier one of ours) is simply still on its way
+            if (roomCentreMs != writtenCentreMs) return true;
+            if (roomPoints == null || roomPoints.Length != written.Length) return true;
+            for (int i = 0; i < written.Length; i++)
+                if (roomPoints[i] != written[i]) return true;
+            return false;
+        }
+
+        /// <summary>The values to build the next write on: the last write while its echo is pending, else the room's. A write the room shows
+        /// was refused is dropped here at once, so the next write builds on the room and no points are lost waiting out the timeout.</summary>
         public void Basis(float nowSeconds, float timeoutSeconds, int[] roomPoints, int roomCentreMs, int roomSeq,
                           out int[] points, out int centreMs, out int seq)
         {
+            if (RefusedByRoom(roomPoints, roomCentreMs, roomSeq)) Reset();
             if (Pending(nowSeconds, timeoutSeconds)) { points = (int[])written.Clone(); centreMs = writtenCentreMs; seq = writtenSeq; }
             else { points = roomPoints != null ? (int[])roomPoints.Clone() : new int[DominionKeys.TeamSlots]; centreMs = roomCentreMs; seq = roomSeq; }
         }

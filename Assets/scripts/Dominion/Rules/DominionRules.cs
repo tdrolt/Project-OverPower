@@ -36,6 +36,10 @@ namespace Overpower.Dominion
     /// </summary>
     public static class DominionRules
     {
+        /// <summary>Whether a respawn uses the "capital under attack" spawn point. Not in Dominion (A21): those points are 28.6 m from each capital,
+        /// outside its healing circle, and the respawn shield already protects a player who spawns next to enemies.</summary>
+        public static bool UsesCapitalUnderAttackSpawn(bool dominion, bool capitalUnderAttack) => !dominion && capitalUnderAttack;
+
         /// <summary>The team with the single highest points, or -1 on a tie for first (or no points at all). A tied round counts for
         /// nobody (Tudor): neither team gets a round win, and 0-0 is a tie like any other.</summary>
         public static int RoundWinner(int[] points)

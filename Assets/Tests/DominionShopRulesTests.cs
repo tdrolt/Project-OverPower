@@ -153,11 +153,11 @@ namespace Overpower.Tests
 
         [Test] public void ALateJoinersPickLastsOnlyWhileTheRoundTheyJoinedInIsGoing()
         {
-            Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.Round));
-            Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.SuddenDeath));
-            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.Break), "the round ended: the break's shop is everyone's");
-            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.Over));
-            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(false, DominionStage.Round), "only someone who joined mid-round");
+            Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(DominionStage.Round));
+            Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(DominionStage.SuddenDeath));
+            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(DominionStage.Break), "the round ended: the break's shop is everyone's");
+            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(DominionStage.Over));
+            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(DominionStage.None));
         }
 
         [Test] public void TheArmourCapIsTheSmallerOfTheShopMaximumAndTheRoundsAllowance()
