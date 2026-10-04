@@ -244,11 +244,14 @@ namespace Overpower.Lobby
         /// <summary>
         /// Where someone joining a running match sits: the lowest free seat of the emptiest team that is playing
         /// (ties: left-most), else the lowest free spectator seat, else null. A team not in the match is never
-        /// chosen, since nobody could play for it.
+        /// chosen, since nobody could play for it. With preferSpectator (Dominion's sudden death) the spectator seat is tried first.
         /// </summary>
-        public static string PlaceLateJoiner(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> teamsInMatch)
+        public static string PlaceLateJoiner(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> teamsInMatch, bool preferSpectator = false)
         {
             var allowed = new HashSet<int>(teamsInMatch);
+            // Dominion's sudden death (A4): a joiner could only wait dead on a team seat, so a free spectator seat comes first.
+            if (preferSpectator)
+                return LowestFreeSpectator(layout, seats, null) ?? EmptiestTeamSeat(layout, seats, null, allowed);
             return EmptiestTeamSeat(layout, seats, null, allowed) ?? LowestFreeSpectator(layout, seats, null);
         }
 

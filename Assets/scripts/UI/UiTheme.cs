@@ -948,6 +948,18 @@ namespace Overpower.UI
         [Tooltip("Colour of the respawn shield's BLOCKED word. The shield's blue on purpose, so it never reads as the grey Invulnerability Blocked.")]
         public Color respawnShieldBlockedColor = new Color(0.3098f, 0.6392f, 1f, 1f);
 
+        [Header("Dominion sudden death")]
+        [Tooltip("The red of the sudden-death circle's edge and of everything outside it, in the world and on the minimap (#E5484D).")]
+        public Color suddenDeathColor = new Color(0.898f, 0.2824f, 0.302f, 1f);
+        [Tooltip("How strongly the red covers the ground outside the circle in the world, from 0 (not at all) to 1 (solid). Low enough to still see the arena through it.")]
+        [Range(0f, 1f)] public float suddenDeathOutsideAlpha = 0.3f;
+        [Tooltip("How strongly the red covers everything outside the circle on the minimap, from 0 (not at all) to 1 (solid).")]
+        [Range(0f, 1f)] public float suddenDeathMinimapOutsideAlpha = 0.45f;
+        [Tooltip("How wide the circle's edge line is on the ground, in metres.")]
+        public float suddenDeathRingWidthMetres = 0.6f;
+        [Tooltip("How thick the circle's edge line is on the minimap, in canvas units.")]
+        public float suddenDeathMinimapRingWidth = 2.5f;
+
         [Header("Mark (2026-09-18)")]
         [Tooltip("Canvas units, the mark diamond's width and height (both the shooter's own diamond over an " +
                  "enemy, and the marked player's own diamond over their own head - Tudor's answer 1). Its colour " +

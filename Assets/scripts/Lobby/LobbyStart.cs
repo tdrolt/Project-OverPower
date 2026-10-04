@@ -205,7 +205,10 @@ namespace Overpower.Lobby
                 int[] fixedTeams = roomProps.TryGetValue(MatchDirector.TeamsInMatchKey, out object raw) && raw is int[] arr ? arr : null;
                 // A team knocked out stays in mTeams (it is listed in mElim): nobody may be seated on it.
                 int[] eliminated = roomProps.TryGetValue(MatchDirector.EliminatedKey, out object rawElim) && rawElim is int[] elim ? elim : null;
-                string seat = LobbySeatRules.PlaceLateJoiner(seats.Layout, fresh, LobbySeatRules.TeamsForLateJoin(seats.Layout, fixedTeams, eliminated));
+                // Dominion's sudden death (A4): nobody respawns, so a joiner takes a spectator seat when one is free (else a team seat, dead and waiting).
+                bool preferSpectator = Overpower.Dominion.DominionMode.IsActive() && Overpower.Dominion.DominionDirector.Instance != null
+                    && Overpower.Dominion.DominionRules.LateJoinerPrefersSpectatorSeat(Overpower.Dominion.DominionDirector.Instance.Stage);
+                string seat = LobbySeatRules.PlaceLateJoiner(seats.Layout, fresh, LobbySeatRules.TeamsForLateJoin(seats.Layout, fixedTeams, eliminated), preferSpectator);
                 if (seat == null)
                 {
                     GiveUpLateJoin(LateJoinText(roomManager.Theme, noSeatInTime: false));

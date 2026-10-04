@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Overpower.Arena;
 using Overpower.Data;
+using Overpower.Dominion;
 using Overpower.Match;
 using Overpower.Net;
 using Overpower.Vision;
@@ -173,6 +174,7 @@ namespace Overpower.UI
         // Phase two cut (Decision 11): the closed corner darkened and the wall line drawn, one overlay texture over
         // the baked arena picture - see PaintCutOverlay.
         private RawImage cutOverlay;
+        private SuddenDeathMinimapGraphic suddenDeath;
         private Texture2D cutTexture;
         private PhaseTwoCutGeometry paintedCut;
         private const int CutOverlayPixels = 256; // the overlay's sharpness, not a gameplay value
@@ -311,7 +313,27 @@ namespace Overpower.UI
             UpdateFog();
             UpdatePlayers();
             UpdateScan();
+            UpdateSuddenDeath();
             UpdateOpacity();
+        }
+
+        /// <summary>Dominion sudden death: the circle's edge and the red outside it, from the same circle the world draws (SuddenDeathZone), so the two
+        /// always agree. The large map is this one map scaled, so one pass draws both.</summary>
+        private void UpdateSuddenDeath()
+        {
+            SuddenDeathZone zone = SuddenDeathZone.Instance;
+            bool show = zone != null && zone.IsSuddenDeath && config.WorldSizeMetres > 0f;
+            if (suddenDeath.gameObject.activeSelf != show)
+                suddenDeath.gameObject.SetActive(show);
+            if (!show)
+                return;
+
+            Vector2 centre = MinimapLayout.WorldToMap(new Vector3(zone.Centre.x, 0f, zone.Centre.y), config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+            float radius = zone.CurrentRadius * theme.minimapCornerSize / config.WorldSizeMetres;
+            Color edge = theme.suddenDeathColor;
+            Color outside = edge;
+            outside.a = theme.suddenDeathMinimapOutsideAlpha;
+            suddenDeath.Set(centre, radius, theme.suddenDeathMinimapRingWidth, theme.minimapCornerSize * 3f, edge, outside);
         }
 
         /// <summary>Tudor, 2026-09-17: the corner map is a little see-through, M makes it solid, and moving with
@@ -539,6 +561,15 @@ namespace Overpower.UI
             cutOverlay.raycastTarget = false;
             cutOverlay.enabled = false;
             Stretch(cutOverlay.rectTransform);
+
+            // Dominion sudden death (Task 8): the red outside the circle, over the picture and under the links, bubbles and markers so they stay
+            // crisp. Hidden until a sudden death is on.
+            var suddenDeathGo = new GameObject("Sudden Death", typeof(RectTransform));
+            suddenDeathGo.transform.SetParent(map, false);
+            suddenDeath = suddenDeathGo.AddComponent<SuddenDeathMinimapGraphic>();
+            suddenDeath.raycastTarget = false; // never swallow a shot
+            Stretch(suddenDeath.rectTransform);
+            suddenDeathGo.SetActive(false);
 
             // Sibling order is draw order: lines under bubbles, bubbles under player markers.
             linksLayer = NewLayer("Links", map);

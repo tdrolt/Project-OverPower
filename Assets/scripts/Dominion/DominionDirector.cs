@@ -36,6 +36,7 @@ namespace Overpower.Dominion
         // ---- every client: the read side, so an edge is reacted to once (like MatchDirector's lastApplied*).
         private int lastAppliedRound;
         private DominionStage lastAppliedStage = DominionStage.None;
+        private int lastAppliedSuddenDeath;       // dSd as last seen: a new value is a new sudden death (or a replay)
 
         // ---- master: waiting for the echo of its own write / of a match-over announcement.
         private float waitForEchoUntil = -1f;
@@ -48,6 +49,8 @@ namespace Overpower.Dominion
         // Conquest knockouts do (so a quick reconnect never costs a team the match).
         private readonly Dictionary<int, float> inactiveSince = new Dictionary<int, float>();
         private readonly int[] playersPerTeam = new int[DominionKeys.TeamSlots];
+        private readonly int[] aliveInSuddenDeath = new int[DominionKeys.TeamSlots];
+        private readonly SuddenDeathVerdictSettle suddenDeathSettle = new SuddenDeathVerdictSettle(); // master: how long the same verdict has held
 
         private bool configMissingLogged;
         private bool healAreaWarned;
@@ -60,10 +63,37 @@ namespace Overpower.Dominion
         public DominionStage Stage => PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.Stage, out object s) && s is int stage
             ? (DominionStage)stage : DominionStage.None; // read straight off the key, no allocation: the shop asks every frame
 
+        /// <summary>dSd: the server ms the sudden-death circle starts to shrink (a replay writes a new one), 0 when none is written. Reads the room.</summary>
+        public int SuddenDeathStartMs => PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.SuddenDeathStart, out object s) && s is int ms ? ms : 0;
+
+        private int[] suddenDeathTeams = System.Array.Empty<int>();
+        private int[] suddenDeathTeamsForWins;
+
+        /// <summary>The teams that play sudden death (the tied leaders, derived from the room's round wins and the match's teams - no key of its own).
+        /// Kept per wins array, so asking every frame allocates nothing.</summary>
+        public int[] SuddenDeathTeams
+        {
+            get
+            {
+                if (!PhotonNetwork.InRoom) return System.Array.Empty<int>();
+                int[] wins = PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.Wins, out object raw) ? raw as int[] : null;
+                if (wins == null) return System.Array.Empty<int>();
+                if (!ReferenceEquals(wins, suddenDeathTeamsForWins))
+                {
+                    MatchDirector match = MatchDirector.Instance;
+                    int[] inMatch = match != null && match.TeamsInMatch != null && match.TeamsInMatch.Length > 0 ? match.TeamsInMatch : DominionMode.TeamsOfCurrentRoom();
+                    suddenDeathTeams = DominionRules.SuddenDeathTeams(wins, inMatch);
+                    suddenDeathTeamsForWins = wins;
+                }
+                return suddenDeathTeams;
+            }
+        }
+
         private void Awake()
         {
             if (Instance == null) Instance = this;
-            else Destroy(this); // BuildingManager.Awake adds exactly one.
+            else { Destroy(this); return; } // BuildingManager.Awake adds exactly one.
+            if (GetComponent<SuddenDeathZone>() == null) gameObject.AddComponent<SuddenDeathZone>(); // the circle: no scene footprint, like this component
         }
 
         private void OnDestroy()
@@ -104,6 +134,8 @@ namespace Overpower.Dominion
             Hashtable roomProps = PhotonNetwork.CurrentRoom.CustomProperties;
             DominionRoomState room = WithLatestPoints(DominionRoomState.Read(roomProps)); // the round is scored on what the master has written, echoed or not
             bool counted = CountPlayers();
+            bool judgingSuddenDeath = counted && room.Stage == DominionStage.SuddenDeath;
+            if (judgingSuddenDeath) CountAliveInSuddenDeath(Rooms.Config.DroppedGraceSeconds);
             DominionWrite write = DominionRoomWrites.Next(true, true, now, room,
                 new DominionFlowNumbers
                 {
@@ -112,7 +144,17 @@ namespace Overpower.Dominion
                     HasCentre = CentreInPlay(out _),
                     CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
                     CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),
-                }, match.TeamsInMatch, counted ? playersPerTeam : null); // null: the last-team check is skipped
+                    SuddenDeathCountdownSeconds = config.BreakCountdownSeconds,
+                }, match.TeamsInMatch, counted ? playersPerTeam : null, // null: the last-team check is skipped
+                judgingSuddenDeath ? aliveInSuddenDeath : null);        // null: sudden death is not judged on a guess
+            // A sudden-death verdict is written only once it has held for a moment: two players who fall at the same instant reach the room a
+            // fraction of a second apart, and a look in between must not crown the one who fell last.
+            if (judgingSuddenDeath)
+            {
+                string verdictKey = DominionRoomWrites.SuddenDeathVerdictKey(write);
+                if (!suddenDeathSettle.Settled(verdictKey, Time.unscaledTime, SuddenDeathRules.VerdictSettleSeconds)) return;
+            }
+            else suddenDeathSettle.Reset();
             if (write == null) return;
 
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(write.Props, write.Expected))
@@ -121,6 +163,7 @@ namespace Overpower.Dominion
                 return;
             }
             waitForEchoUntil = Time.unscaledTime + EchoWaitSeconds;
+            suddenDeathSettle.Reset(); // the next verdict is judged from the room as it will be
             Debug.Log($"[DOMINION] master wrote: {write.What} (round {room.Round}, stage {room.Stage})");
         }
 
@@ -185,10 +228,31 @@ namespace Overpower.Dominion
             {
                 Player p = pair.Value;
                 if (!Teams.TryGetPlayingTeam(p, out int team) || team < 0 || team >= playersPerTeam.Length) continue; // a spectator plays for no team
-                if (p.IsInactive && inactiveSince.TryGetValue(pair.Key, out float since) && Time.unscaledTime - since >= grace) continue;
+                if (!StillCounts(pair.Key, p, grace)) continue;
                 playersPerTeam[team]++;
             }
             return true;
+        }
+
+        /// <summary>A dropped player still counts until the dropped grace has run out (a quick reconnect never costs a team the match).</summary>
+        private bool StillCounts(int actor, Player p, float graceSeconds) =>
+            !(p.IsInactive && inactiveSince.TryGetValue(actor, out float since) && Time.unscaledTime - since >= graceSeconds);
+
+        /// <summary>Living players per team id, from each player's replicated alive flag (PlayerLifecycle.AliveKey; a player who never died has none,
+        /// which SuddenDeathRules.CountsAsAlive reads as alive); a player who dropped for good counts as gone, like CountPlayers. Called only while
+        /// judging sudden death.</summary>
+        private void CountAliveInSuddenDeath(float graceSeconds)
+        {
+            System.Array.Clear(aliveInSuddenDeath, 0, aliveInSuddenDeath.Length);
+            foreach (KeyValuePair<int, Player> pair in PhotonNetwork.CurrentRoom.Players)
+            {
+                Player p = pair.Value;
+                if (!Teams.TryGetPlayingTeam(p, out int team) || team < 0 || team >= aliveInSuddenDeath.Length) continue;
+                if (!StillCounts(pair.Key, p, graceSeconds)) continue;
+                bool hasFlag = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool;
+                if (SuddenDeathRules.CountsAsAlive(hasFlag, hasFlag && (bool)raw))
+                    aliveInSuddenDeath[team]++;
+            }
         }
 
         // ---------------------------------------------------------------- every client: react to an edge
@@ -199,6 +263,7 @@ namespace Overpower.Dominion
         {
             lastAppliedRound = 0;
             lastAppliedStage = DominionStage.None;
+            lastAppliedSuddenDeath = 0;
             waitForEchoUntil = -1f;
             announceAgainAt = -1f;
             zonesResetSentFor = 0;
@@ -214,13 +279,14 @@ namespace Overpower.Dominion
             DominionRoomState room = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
             lastAppliedRound = room.Round;
             lastAppliedStage = room.Stage;
+            lastAppliedSuddenDeath = room.SuddenDeathMs;
         }
 
         public override void OnRoomPropertiesUpdate(Hashtable changed)
         {
             if (changed == null || !PhotonNetwork.InRoom) return;
             NoteEchoForPoints(changed);
-            if (!changed.ContainsKey(DominionKeys.Stage) && !changed.ContainsKey(DominionKeys.Round)) return;
+            if (!changed.ContainsKey(DominionKeys.Stage) && !changed.ContainsKey(DominionKeys.Round) && !changed.ContainsKey(DominionKeys.SuddenDeathStart)) return;
             // The echo of the master's own write (or anyone's): the wait for it is over, the next decision may be made.
             waitForEchoUntil = -1f;
             if (!DominionMode.IsActive()) return;
@@ -228,12 +294,20 @@ namespace Overpower.Dominion
             DominionRoomState room = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
             int prevRound = lastAppliedRound;
             DominionStage prevStage = lastAppliedStage;
+            int prevSuddenDeath = lastAppliedSuddenDeath;
             lastAppliedRound = room.Round;
             lastAppliedStage = room.Stage;
+            lastAppliedSuddenDeath = room.SuddenDeathMs;
 
             DominionEdge edge = DominionRoomWrites.EdgeBetween(prevRound, prevStage, room.Round, room.Stage);
-            Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge})");
+            bool suddenDeathStart = DominionRoomWrites.IsSuddenDeathStart(prevStage, prevSuddenDeath, room.Stage, room.SuddenDeathMs);
+            Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} sd {room.SuddenDeathMs} points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge}{(suddenDeathStart ? ", sudden death start" : "")})");
             if (prevStage == DominionStage.None && room.Stage == DominionStage.Break) WarnAboutMissingHealAreas();
+            if (suddenDeathStart)
+            {
+                ResetLocalPlayerForSuddenDeath();
+                return;
+            }
             if (edge == DominionEdge.None) return;
 
             // The zones go back to neutral at the start of the break and again at the start of the round: the master does it from the room's
@@ -298,6 +372,20 @@ namespace Overpower.Dominion
                 Debug.LogWarning($"[DOMINION] team {team} has no SpawnHealArea in this scene - its players get no spawn healing until the scene places one (Task 11).");
         }
 
+        /// <summary>Sudden death starts, or starts over after everyone fell at once (every client, on the new dSd): a player of a tied team is alive at
+        /// their spawn with full health, no shield and refreshed abilities, keeping the build; a player of any other team is dead and waits, still
+        /// able to watch. The zones are left alone: points have stopped.</summary>
+        private void ResetLocalPlayerForSuddenDeath()
+        {
+            if (!Teams.TryGetPlayingTeam(PhotonNetwork.LocalPlayer, out int team)) return; // a spectator has no body to reset
+            PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
+            PlayerLifecycle lifecycle = localView != null ? localView.GetComponent<PlayerLifecycle>() : null;
+            if (lifecycle == null) return;
+            bool plays = SuddenDeathRules.TeamPlays(team, SuddenDeathTeams);
+            Debug.Log($"[DOMINION] sudden death starts: team {team} {(plays ? "plays - alive at its spawn" : "is not tied - dead and waiting")} (tied teams [{string.Join(",", SuddenDeathTeams)}])");
+            lifecycle.ResetForSuddenDeath(team, plays);
+        }
+
         public override void OnMasterClientSwitched(Player newMasterClient)
         {
             // Nothing of the old master's is carried: the new master reads the room in Update and carries on. Only the echo wait was this
@@ -305,6 +393,7 @@ namespace Overpower.Dominion
             waitForEchoUntil = -1f;
             announceAgainAt = -1f;
             zonesResetSentFor = 0;
+            suddenDeathSettle.Reset();
             ResetPointsState(); // the new master's first tick builds on the room's dPts / dCtr and starts its own beat
         }
     }

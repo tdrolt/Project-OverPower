@@ -341,6 +341,11 @@ MonoBehaviour:
   respawnShieldColor: {r: 0.3098, g: 0.6392, b: 1, a: 0.5}
   respawnShieldBlockedText: BLOCKED
   respawnShieldBlockedColor: {r: 0.3098, g: 0.6392, b: 1, a: 1}
+  suddenDeathColor: {r: 0.898, g: 0.2824, b: 0.302, a: 1}
+  suddenDeathOutsideAlpha: 0.3
+  suddenDeathMinimapOutsideAlpha: 0.45
+  suddenDeathRingWidthMetres: 0.6
+  suddenDeathMinimapRingWidth: 2.5
   markIndicatorSize: 22
   markIndicatorAnchorHeight: 3.6
   markIndicatorPulseSpeed: 2.5

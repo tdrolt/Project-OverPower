@@ -21,6 +21,8 @@ namespace Overpower.Dominion
         public int ResetFor;
         /// <summary>dPseq: how many points writes the room has had; 0 = none yet.</summary>
         public int PointsSeq;
+        /// <summary>dSd: the server ms the sudden-death circle starts shrinking; 0 = none written. A replay writes a new one.</summary>
+        public int SuddenDeathMs;
 
         /// <summary>The state from the room's properties. Missing keys read as: no round, stage None, no points or wins (arrays of three zeros),
         /// no winner (-1). A wrong type reads as missing.</summary>
@@ -42,6 +44,7 @@ namespace Overpower.Dominion
             if (props.TryGetValue(DominionKeys.CentrePayout, out object ctr) && ctr is int c) state.CentreMs = c;
             if (props.TryGetValue(DominionKeys.ZonesResetFor, out object rz) && rz is int z) state.ResetFor = z;
             if (props.TryGetValue(DominionKeys.PointsSeq, out object seq) && seq is int q) state.PointsSeq = q;
+            if (props.TryGetValue(DominionKeys.SuddenDeathStart, out object sd) && sd is int sdMs) state.SuddenDeathMs = sdMs;
             return state;
         }
     }
@@ -57,6 +60,8 @@ namespace Overpower.Dominion
         public bool HasCentre;
         public int CentreFirstMs;
         public int CentreIntervalMs;
+        /// <summary>Seconds of "get ready" between sudden death being written and its circle starting to shrink (the break's countdown length).</summary>
+        public float SuddenDeathCountdownSeconds;
     }
 
     /// <summary>One check-and-set the master should send: what to write and what the room must still hold for it to apply.</summary>
@@ -82,8 +87,10 @@ namespace Overpower.Dominion
         /// has not synced (0).</summary>
         /// <param name="teamsInMatch">The team ids fixed into the match (mTeams).</param>
         /// <param name="playersPerTeam">Players present per team id (index = team id).</param>
+        /// <param name="aliveInSuddenDeath">Living players per team id (index = team id), read from the players' alive flags; null = not known, so
+        /// sudden death is not judged.</param>
         public static DominionWrite Next(bool dominion, bool live, int nowMs, DominionRoomState room, DominionFlowNumbers cfg,
-                                         int[] teamsInMatch, int[] playersPerTeam)
+                                         int[] teamsInMatch, int[] playersPerTeam, int[] aliveInSuddenDeath = null)
         {
             if (!dominion || !live || nowMs == 0) return null;
 
@@ -122,7 +129,7 @@ namespace Overpower.Dominion
                     { DominionKeys.Wins, Slots(room.Wins) },
                 });
 
-            if (room.Stage == DominionStage.SuddenDeath) return null; // no clock here; Task 8 ends it
+            if (room.Stage == DominionStage.SuddenDeath) return NextInSuddenDeath(room, nowMs, cfg, teamsInMatch, aliveInSuddenDeath); // no clock: the players end it
             if (!MatchStartRules.HasReached(nowMs, room.EndMs)) return null;
 
             if (room.Stage == DominionStage.Break)
@@ -156,6 +163,8 @@ namespace Overpower.Dominion
                     {
                         { DominionKeys.Stage, (int)DominionStage.SuddenDeath },
                         { DominionKeys.StageEnd, 0 },
+                        // A17: a short get-ready with the circle at full size before it starts to move.
+                        { DominionKeys.SuddenDeathStart, DominionRules.StageEndMs(nowMs, cfg.SuddenDeathCountdownSeconds) },
                         { DominionKeys.Wins, wins },
                     }, scoresRound: true);
                 default:
@@ -168,6 +177,45 @@ namespace Overpower.Dominion
                         { DominionKeys.CentrePayout, null }, // null removes the key: the round's last payout time is stale in the break (the next round start writes a fresh one)
                     }, scoresRound: true);
             }
+        }
+
+        /// <summary>What a sudden-death write is called (DominionWrite.What) - the director settles on these.</summary>
+        public const string WhatSuddenDeathWon = "sudden death won";
+        public const string WhatSuddenDeathReplay = "sudden death replay";
+
+        /// <summary>The key SuddenDeathVerdictSettle watches for a write: one per verdict (the win names its team), null for any write that is not a
+        /// sudden-death verdict, so those are never held back.</summary>
+        public static string SuddenDeathVerdictKey(DominionWrite write)
+        {
+            if (write == null) return null;
+            if (write.What == WhatSuddenDeathReplay) return WhatSuddenDeathReplay;
+            if (write.What == WhatSuddenDeathWon)
+                return WhatSuddenDeathWon + ":" + (write.Props.TryGetValue(DominionKeys.Winner, out object team) ? team : "?");
+            return null;
+        }
+
+        /// <summary>Sudden death has no clock: the master judges it from who is alive. One team of the tied ones with anyone alive wins the match; nobody
+        /// left starts it over (Tudor A8) with a new circle start; two or more alive writes nothing. Only after the judging beat, and the write expects
+        /// the circle start it judged, so two masters cannot both replay or a replay cannot be followed by a stale win.</summary>
+        private static DominionWrite NextInSuddenDeath(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, int[] alive)
+        {
+            if (alive == null || room.SuddenDeathMs == 0 || !SuddenDeathRules.MayEvaluate(room.SuddenDeathMs, nowMs)) return null;
+            int[] playing = DominionRules.SuddenDeathTeams(room.Wins, teamsInMatch);
+            SuddenDeathResult verdict = SuddenDeathRules.Evaluate(alive, playing);
+            if (verdict.State == SuddenDeathState.Ongoing) return null;
+
+            DominionWrite write = verdict.State == SuddenDeathState.Won
+                ? Stage(room, WhatSuddenDeathWon, new Hashtable
+                {
+                    { DominionKeys.Stage, (int)DominionStage.Over },
+                    { DominionKeys.Winner, verdict.Team },
+                })
+                : Stage(room, WhatSuddenDeathReplay, new Hashtable
+                {
+                    { DominionKeys.SuddenDeathStart, DominionRules.StageEndMs(nowMs, cfg.SuddenDeathCountdownSeconds) },
+                });
+            write.Expected[DominionKeys.SuddenDeathStart] = room.SuddenDeathMs;
+            return write;
         }
 
         /// <summary>A round start with a centre in play also writes the centre's first payout: the first delay after the round starts.</summary>
@@ -233,6 +281,12 @@ namespace Overpower.Dominion
             if (stage == DominionStage.Round && prevStage == DominionStage.Break) return DominionEdge.RoundStarted;
             return DominionEdge.None;
         }
+
+        /// <summary>True when the room just went into sudden death or just restarted it (a new circle start, dSd, after everyone fell in the same
+        /// instant): every client then puts the tied teams back alive at their spawn and the others dead. The same stage with the same circle start is
+        /// not an edge, so another key changing re-runs nothing.</summary>
+        public static bool IsSuddenDeathStart(DominionStage prevStage, int prevSuddenDeathMs, DominionStage stage, int suddenDeathMs) =>
+            stage == DominionStage.SuddenDeath && suddenDeathMs != 0 && (prevStage != DominionStage.SuddenDeath || prevSuddenDeathMs != suddenDeathMs);
 
         /// <summary>Whether the Tab scoreboard (kills, deaths, damage) carries on counting through this edge. Both Dominion edges keep it: the
         /// scoreboard covers the whole match and is zeroed only at go-live (Tudor's default A15), so the break's fresh start must not wipe it.</summary>

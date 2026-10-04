@@ -286,6 +286,16 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return;
         joinCheckPending = false;
         int team = judged.Value;
+
+        // Dominion sudden death (A4): someone seated on a team after it started can only wait dead - nobody respawns there.
+        if (!RespawnAllowedNow())
+        {
+            Debug.Log($"[DOMINION] joined during sudden death on team {team}: waiting dead");
+            death = true;
+            DieForGoodInSuddenDeath();
+            return;
+        }
+
         if (!director.SpawnsIntoLastStand(team))
             return;
 
@@ -396,6 +406,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         int teamID = (int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey];
         int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
+
+        // Dominion's sudden death has no respawns: the death is for good, before any countdown or last-stand logic below is considered.
+        if (!RespawnAllowedNow())
+        {
+            DieForGoodInSuddenDeath();
+            return;
+        }
 
         MatchDirector director = MatchDirector.Instance;
 
@@ -651,6 +668,73 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         Debug.Log($"[DOMINION] round start: back at spawn team={team} position={rigidbody.position} deathCount={deathCount}");
     }
 
+    /// <summary>Dominion sudden death starts (or starts over after everyone fell at once): a player of a tied team is put back exactly as a round
+    /// start puts them - at their own spawn, full health, alive, no shield, abilities and cooldowns refreshed, the build and picks kept - and a
+    /// player of any other team is dead and waits (no respawn, no panel: they just watch). Only the owner's client does anything.</summary>
+    public void ResetForSuddenDeath(int team, bool playsSuddenDeath)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        if (playsSuddenDeath)
+        {
+            ResetForRoundStart(team);
+            return;
+        }
+        WaitDeadForSuddenDeath();
+    }
+
+    /// <summary>A team that is not tied sits sudden death out dead. Everything a round start would stop is stopped (a respawn countdown still
+    /// running must not bring the body back), then the body is dead on every client. respawnStarted stays true so no death path starts a respawn.
+    /// No waiting panel: its words are the last stand's ("capture a base"), which would be wrong here; the sudden-death banner is Task 9.</summary>
+    private void WaitDeadForSuddenDeath()
+    {
+        if (respawnRoutine != null)
+        {
+            StopCoroutine(respawnRoutine);
+            respawnRoutine = null;
+        }
+        death = true;
+        respawnStarted = true;
+        deathCounted = true;
+        rejoinRespawnPending = false;
+        GetComponent<RespawnShield>()?.ClearForFreshStart();
+        matchUI?.SetRespawnPanelVisible(false);
+        matchUI?.HideWaitingPanel();
+        matchUI?.SetRespawnNote("");
+        respawnNoteShowing = false;
+
+        GetComponent<AbilityRunner>()?.ResetForMatchStart();
+        playerDisplacement?.Cancel();
+        NetworkedDeployable.DestroyAllPlacedByLocalPlayer();
+
+        deathStampMs = PhotonNetwork.ServerTimestamp;
+        SetAlive(false, deathStampMs);
+        Debug.Log($"[DOMINION] sudden death: waiting dead (team not tied), position={rigidbody.position}");
+    }
+
+    /// <summary>The Dominion stage in the room right now (None outside a Dominion room).</summary>
+    private static Overpower.Dominion.DominionStage DominionStageNow() =>
+        Overpower.Dominion.DominionDirector.Instance != null ? Overpower.Dominion.DominionDirector.Instance.Stage : Overpower.Dominion.DominionStage.None;
+
+    /// <summary>The respawn rule, asked in every place a body could come back: false in a live Dominion match's sudden death (DominionRules.RespawnAllowed).</summary>
+    private static bool RespawnAllowedNow() =>
+        Overpower.Dominion.DominionRules.RespawnAllowed(Overpower.Dominion.DominionMode.IsLive(), DominionStageNow());
+
+    /// <summary>A death in sudden death is for good: dead on every client, no countdown, no respawn panel, no coroutine - the respawn itself never
+    /// starts (not only its delay). The Died event also sets the death flag.</summary>
+    private void DieForGoodInSuddenDeath()
+    {
+        if (respawnStarted)
+            return;
+        respawnStarted = true;
+        deathStampMs = PhotonNetwork.ServerTimestamp;
+        SetAlive(false, deathStampMs);
+        matchUI?.SetRespawnPanelVisible(false);
+        matchUI?.HideWaitingPanel();
+        Debug.Log("[DOMINION] died in sudden death: no respawn");
+    }
+
     /// The one place the respawn wait is computed, called from both death paths (a normal death in
     /// PlayerDied and the capital-recapture death in CheckForCathedralCapture) so they cannot
     /// quietly diverge again the way they had before Task 0.11a: the recapture path used to
@@ -713,6 +797,18 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             UpdateRespawnNote(teamID);
             yield return null;
             elapsed += Time.deltaTime;
+        }
+
+        // The stage can move into sudden death while the wait runs (the edge stops this coroutine, but a client that missed it must not bring
+        // the body back either): stay dead.
+        if (!RespawnAllowedNow())
+        {
+            matchUI?.SetRespawnPanelVisible(false);
+            matchUI?.SetRespawnNote("");
+            respawnNoteShowing = false;
+            respawnRoutine = null;
+            Debug.Log("[DOMINION] respawn wait ended in sudden death: staying dead");
+            yield break;
         }
 
         // Review fix 4 (2026-09-26): a team change while dead in the warm-up (the old two-team switch moved players

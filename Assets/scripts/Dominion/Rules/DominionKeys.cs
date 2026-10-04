@@ -10,7 +10,7 @@ namespace Overpower.Dominion
         public const string Round = "dRnd";
         /// <summary>int: the stage (DominionStage).</summary>
         public const string Stage = "dStg";
-        /// <summary>int: the server ms the current stage ends (a round's end or a break's end). 0 in sudden death, which has no clock here.</summary>
+        /// <summary>int: the server ms the current stage ends (a round's end or a break's end). 0 in sudden death, which has no clock: the players' alive flags end it.</summary>
         public const string StageEnd = "dEnd";
         /// <summary>int[]: points per team id 0..2 in the round (kept at the round's final points through the break).</summary>
         public const string Points = "dPts";
@@ -30,8 +30,8 @@ namespace Overpower.Dominion
         /// that both think they are master cannot both add to the same points (the second write is refused). Absent until the first points write.</summary>
         public const string PointsSeq = "dPseq";
 
-        // Reserved for a later task - named here so nothing else claims it; nothing reads or writes it yet.
-        /// <summary>Task 8: sudden death's start time.</summary>
+        /// <summary>int: the server ms the sudden-death circle starts to shrink. Written with the sudden-death stage (the stage's start plus the get-ready
+        /// countdown), and written again with a new value when everyone fell at once and sudden death starts over. Absent before sudden death.</summary>
         public const string SuddenDeathStart = "dSd";
 
         /// <summary>How many team ids the per-team arrays hold (team ids are always 0..2).</summary>
