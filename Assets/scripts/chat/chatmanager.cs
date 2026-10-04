@@ -427,8 +427,10 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     {
         if (!string.IsNullOrEmpty(chatField.text))
         {
-            Send(chatField.text); // to the current lobby's channel only
-            chatField.text = ""; // Clear input field after sending
+            // To the current lobby's channel only. The field clears only when the line really went out (Lobby Task 15b): a line typed
+            // during a chat reconnect (Send returns false while the client cannot chat) stays in the field to be sent again.
+            if (Send(chatField.text) || string.IsNullOrWhiteSpace(chatField.text))
+                chatField.text = "";
         }
     }
 
@@ -461,7 +463,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         bool inLobbyRoom = nameScreen != null && nameScreen.Room != null && nameScreen.Room.IsShowing;
         if (lookApplied && lastLayout != (inLobbyRoom ? 1 : 0)) PlacePanel(inLobbyRoom);
 
-        // The chat closes itself when its channel is gone (the room was left) or How to play / the mode info page opens over it.
+        // The chat closes itself when the room is left (not when only the chat subscription drops: a short chat-server reconnect keeps it open, with what was typed) or How to play / the mode info page opens over it.
         if (ChatPanelRule.MustClose(chatPanel.activeSelf, PhotonNetwork.InRoom, LobbyOverlayPanel.AnyPageOpen))
             SetOpen(false);
 

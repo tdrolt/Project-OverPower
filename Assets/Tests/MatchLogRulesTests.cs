@@ -140,6 +140,31 @@ namespace Overpower.Tests
             Assert.IsNull(MatchLogZipRule.ExplorerArguments(null));
         }
 
+        [TestCase("C:/Games/Match logs/Lobby/")]
+        [TestCase("C:/Games/Match logs/Lobby//")]
+        [TestCase(@"C:\Games\Match logs\Lobby\")]
+        public void ATrailingSeparatorIsTrimmedSoItCannotEscapeTheClosingQuote(string folder) =>
+            Assert.AreEqual("\"" + @"C:\Games\Match logs\Lobby" + "\"", MatchLogZipRule.ExplorerArguments(folder));
+
+        [Test]
+        public void ADriveRootKeepsItsOneBackslash() =>
+            Assert.AreEqual("\"C:\\\"", MatchLogZipRule.ExplorerArguments("C:/"));
+
+        [Test]
+        public void TheOpenFolderButtonRunsExplorerOnWindowsAndTheAddressElsewhere()
+        {
+            OpenFolderCommand windows = MatchLogZipRule.OpenFolder(true, "C:/Games/Match logs/Lobby #2/");
+            Assert.AreEqual(OpenFolderKind.Explorer, windows.Kind);
+            Assert.AreEqual("\"" + @"C:\Games\Match logs\Lobby #2" + "\"", windows.Argument);
+
+            OpenFolderCommand other = MatchLogZipRule.OpenFolder(false, "C:/Games/Match logs/Lobby");
+            Assert.AreEqual(OpenFolderKind.Url, other.Kind);
+            StringAssert.StartsWith("file:///", other.Argument);
+
+            Assert.AreEqual(OpenFolderKind.None, MatchLogZipRule.OpenFolder(true, "").Kind);
+            Assert.AreEqual(OpenFolderKind.None, MatchLogZipRule.OpenFolder(false, null).Kind);
+        }
+
         private static int CountOf(string text, char c)
         {
             int n = 0;

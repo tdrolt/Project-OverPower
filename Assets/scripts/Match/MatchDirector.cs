@@ -499,9 +499,26 @@ namespace Overpower.Match
             if (winner < 0)
                 return;
 
+            AnnounceResultToLocalClient(winner);
+        }
+
+        /// <summary>Lobby Task 15b: this client's own result screen. A player's is the MatchUI panel on their body; a spectator has no
+        /// body (spec section 11: they see the same result), so theirs is the result card their view builds
+        /// (SpectatorSeatView.ShowMatchResult). A client with neither yet is caught up when its body spawns (CatchUpLocalPlayer) or its
+        /// spectator view begins.</summary>
+        private static void AnnounceResultToLocalClient(int winner)
+        {
             PhotonView localView = PhotonNetwork.LocalPlayer != null
                 ? PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber) : null;
-            localView?.GetComponent<MatchUI>()?.ShowMatchResult(winner);
+            MatchUI ui = localView != null ? localView.GetComponent<MatchUI>() : null;
+            if (ui != null)
+            {
+                ui.ShowMatchResult(winner);
+                return;
+            }
+            Overpower.Lobby.SpectatorSeatView spectatorView = FindFirstObjectByType<RoomManager>()?.SeatView;
+            if (spectatorView != null)
+                spectatorView.ShowMatchResult(winner);
         }
 
         // ---------------------------------------------------------------- master: recompute + write
@@ -835,7 +852,7 @@ namespace Overpower.Match
             }
 
             if (winner >= 0 && winner != prevWinner)
-                localView?.GetComponent<MatchUI>()?.ShowMatchResult(winner);
+                AnnounceResultToLocalClient(winner);
 
             if (firstRead || teamsFixed != prevTeamsFixed || liveAtMs != prevLiveAtMs || live != prevLive
                 || cutTeam != prevCutTeam || modeChanged)

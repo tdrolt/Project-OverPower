@@ -461,13 +461,13 @@ public class BuildingCapture : MonoBehaviourPun
     /// already abandoned (capturingID reads -1 once CalculateCaptureProgress's own captureFadeSpeed fade reaches
     /// 0 and resolves fresh with nobody listed, so this exactly mirrors the guard the inline version used to
     /// early-return Idle on).</summary>
-    private CaptureProgress ComputeCurrentProgress(int nowMs)
+    internal CaptureProgress ComputeCurrentProgress(int nowMs)
     {
         int eligibleCount = 0;
         bool enemyPresent = false;
         bool mayCaptureNow = false;
         float fadeRate = FadeRatePerSecond;
-        int drainerCount = isCaptured && isDecaying ? CountPlayersOfTeam(capturingID) : 1; // only read for a running drain
+        int drainerCount = drainersThisFrame; // stored once per frame by ApplyDrain (the same number the step used); only read for a running drain
         if (!isCaptured && !isOnCooldown && capturingID != -1 && playersInZone.Count != 0)
         {
             // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
@@ -596,6 +596,22 @@ public class BuildingCapture : MonoBehaviourPun
         // Who drains, and whether the drain starts, goes on, pauses or stops: see DrainRule.
         DrainRule.Decision drain = DrainRule.Decide(controllingTeam, teamsInZone, DefenderPresent(), isDecaying,
                                                     capturingID, mayCaptureNow);
+        ApplyDrain(drain, Time.deltaTime);
+    }
+
+    // Master: how many players drain this zone this frame, counted ONCE in ApplyDrain (lobby Task 15b). The step (UpdateDecay) and the
+    // published rate (ComputeCurrentProgress) both read this one number, so they cannot count differently - they used to count
+    // separately (DrainerCount for the step, CountPlayersOfTeam for the publish). 1 whenever no drain is running.
+    private int drainersThisFrame = 1;
+
+    /// <summary>Carries out this frame's DrainRule decision: the state change, the drain step (or the refill once it stopped) and the
+    /// drainer count both the step and the publish use. Split out of HandleCapturedState so a test can drive it with a decision and a
+    /// roster (BuildingCaptureDrainWiringTests) - the wiring between the count, the step and the published rate is what it guards.</summary>
+    internal void ApplyDrain(DrainRule.Decision drain, float deltaTime)
+    {
+        // Only the draining team's players speed the drain; a second enemy team in the zone doesn't help (Tudor, 4 Oct).
+        drainersThisFrame = drain.Step == DrainRule.Step.Start || drain.Step == DrainRule.Step.Continue
+            ? CaptureFadeRule.DrainerCount(drain.Team, teamsInZone) : 1;
         isDrainPaused = drain.Step == DrainRule.Step.Pause;
 
         switch (drain.Step)
@@ -630,7 +646,7 @@ public class BuildingCapture : MonoBehaviourPun
         {
             // Stop the capturing sound if decaying
             StopCapturingSound();
-            UpdateDecay(CaptureFadeRule.DrainerCount(drain.Team, teamsInZone));
+            UpdateDecay(drainersThisFrame, deltaTime);
 
             if (captureProgress <= 0)
             {
@@ -644,7 +660,7 @@ public class BuildingCapture : MonoBehaviourPun
             // full at the fade speed instead of snapping to full (captureFadeSpeed, [C], 2026-09-24).
             // CaptureProgressPublishRule.Decide mirrors this exact step so every client's own
             // CaptureProgress.Evaluate extrapolates the same climb.
-            captureProgress = CaptureFadeRule.Refill(captureProgress, CaptureSeconds, FadeRatePerSecond, Time.deltaTime);
+            captureProgress = CaptureFadeRule.Refill(captureProgress, CaptureSeconds, FadeRatePerSecond, deltaTime);
         }
     }
 
@@ -665,17 +681,9 @@ public class BuildingCapture : MonoBehaviourPun
 
     /// <summary>Tudor, 4 Oct: the drain scales with the enemies draining it, by the same capture-speed list as a capture
     /// (CaptureFadeRule.DrainProgressPerSecond); drainers = the draining team's players in the zone (CaptureFadeRule.DrainerCount).</summary>
-    void UpdateDecay(int drainers)
+    internal void UpdateDecay(int drainers, float deltaTime)
     {
-        captureProgress -= CaptureFadeRule.DrainProgressPerSecond(CaptureSeconds, DecaySeconds, drainers, CaptureSpeeds) * Time.deltaTime;
-    }
-
-    private int CountPlayersOfTeam(int team)
-    {
-        int n = 0;
-        foreach (PlayerTeam p in playersInZone)
-            if (p.teamID == team) n++;
-        return n;
+        captureProgress -= CaptureFadeRule.DrainProgressPerSecond(CaptureSeconds, DecaySeconds, drainers, CaptureSpeeds) * deltaTime;
     }
 
     void NeutralizeBuilding()

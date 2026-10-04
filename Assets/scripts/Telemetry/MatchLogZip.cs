@@ -344,17 +344,20 @@ namespace Overpower.Telemetry
         /// whoever is sitting at this machine's screen; check this wiring by reading it instead.</summary>
         private void OnOpenFolderClicked()
         {
-            if (string.IsNullOrEmpty(lastKnownFolder)) return;
-            if (Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor)
+            bool windows = Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor;
+            // One tested method decides what runs (MatchLogZipRule.OpenFolder): explorer.exe with the plain path on Windows (a file://
+            // address breaks on '#', '%' and non-ASCII letters), the address elsewhere.
+            OpenFolderCommand command = MatchLogZipRule.OpenFolder(windows, lastKnownFolder);
+            switch (command.Kind)
             {
-                // explorer.exe with the plain path: a file:// address breaks on '#', '%' and non-ASCII letters.
-                try { System.Diagnostics.Process.Start("explorer.exe", MatchLogZipRule.ExplorerArguments(lastKnownFolder)); }
-                catch (Exception e) { Debug.LogWarning($"[MatchLogZip] could not open the match folder: {e.Message}"); }
-                return;
+                case OpenFolderKind.Explorer:
+                    try { System.Diagnostics.Process.Start("explorer.exe", command.Argument); }
+                    catch (Exception e) { Debug.LogWarning($"[MatchLogZip] could not open the match folder: {e.Message}"); }
+                    break;
+                case OpenFolderKind.Url:
+                    Application.OpenURL(command.Argument);
+                    break;
             }
-            string url = MatchLogZipRule.FolderUrl(lastKnownFolder);
-            if (url != null)
-                Application.OpenURL(url);
         }
 
         private void OnDismissClicked()

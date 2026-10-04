@@ -1161,6 +1161,16 @@ namespace Overpower.UI
         public float spectatorWholeMapFill = 0.88f;
         [Tooltip("The angle a spectator sees the arena from, in degrees turned round the map (0 = the camera behind the bottom edge, looking up the map). It is the same whoever is watched.")]
         public float spectatorViewAngle = 0f;
+        [Tooltip("The result card a spectator sees when the match ends (a spectator has no body, so no YOU WIN / YOU LOSE panel): the title, with {0} replaced by the winning team's name (team names: Scoreboard team names). The button under it reads 'Back to the lobby list' (Result button) and leads there.")]
+        public string spectatorResultTitle = "{0} wins the match";
+        [Tooltip("Text size of the spectator result card's title, in reference pixels.")]
+        public float spectatorResultTitleSize = 56f;
+        [Tooltip("Fill colour of the spectator result card.")]
+        public Color spectatorResultCardColor = new Color(0.06f, 0.063f, 0.078f, 0.92f);
+        [Tooltip("Empty space inside the spectator result card, left and right, then top and bottom, in reference pixels.")]
+        public Vector2 spectatorResultCardPadding = new Vector2(64f, 36f);
+        [Tooltip("How far the spectator result card sits below the top of the screen, in reference pixels.")]
+        public float spectatorResultCardTop = 150f;
 
         [Header("Lobby screens (lobby Task 9)")]
         [Tooltip("The font of the big letters on the lobby screens (title, buttons, headings): Oswald.")]

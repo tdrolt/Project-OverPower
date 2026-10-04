@@ -29,6 +29,8 @@ namespace Overpower.Lobby
         private Camera cameraComponent; // the follow camera's Camera, found once per Begin (asked every frame while the map is framed)
         private Transform mapAnchor;
         private SpectatorBar bar;
+        private SpectatorResultCard resultCard;
+        private int resultWinner = SpectateRules.None; // the winner the room named, kept until the card can go up (Begin may come after it)
         private readonly object zoomKey = new object();
         private readonly List<SpectateCandidate> watchable = new List<SpectateCandidate>(16);
 
@@ -55,6 +57,15 @@ namespace Overpower.Lobby
 
         /// <summary>The transform the camera follows right now (a player's body, or the map's centre marker), or null.</summary>
         public Transform CameraTarget => cam != null ? cam.target : null;
+
+        /// <summary>True once the match-end result card is up (a spectator's version of the YOU WIN / YOU LOSE screen).</summary>
+        public bool ResultShown => resultCard != null;
+
+        /// <summary>The card's title ("Purple wins the match"); empty before it is up.</summary>
+        public string ResultTitle => resultCard != null ? resultCard.Title : "";
+
+        /// <summary>The card, once built (checks read its button and press it through onClick).</summary>
+        public SpectatorResultCard ResultCard => resultCard;
 
         /// <summary>What the bar's name line reads ("Mara - Purple", "Whole map"); empty before Begin.</summary>
         public string BarLine => bar != null ? bar.NameLine : "";
@@ -86,6 +97,33 @@ namespace Overpower.Lobby
                 Debug.LogError("[SPECTATOR] the RoomManager has no UiTheme - the spectator bar cannot be built");
             Debug.Log("[SPECTATOR] watching from a spectator seat");
             Refresh();
+            TryShowResult(); // the match may already be decided
+        }
+
+        /// <summary>Lobby Task 15b (spec section 11): the room named a winner. A spectator has no body and so no MatchUI panel; they get the
+        /// result card instead - the winner, the same Back to the lobby list button and (through the zip run here, as for a player) the saved-log
+        /// box. Called by MatchDirector for a client with no body; a no-op for anyone not watching.</summary>
+        public void ShowMatchResult(int winningTeam)
+        {
+            resultWinner = winningTeam;
+            TryShowResult();
+        }
+
+        private void TryShowResult()
+        {
+            if (!SpectateRules.MustShowResult(IsWatching, resultWinner, resultCard != null))
+                return;
+            UiTheme theme = roomManager != null ? roomManager.Theme : null;
+            if (theme == null)
+            {
+                Debug.LogError("[SPECTATOR] the RoomManager has no UiTheme - the result card cannot be built");
+                return;
+            }
+            string title = SpectateRules.ResultTitle(theme.spectatorResultTitle, theme.scoreboardTeamNames, resultWinner);
+            resultCard = SpectatorResultCard.Create(transform, theme, title, theme.ShotColorFor(resultWinner), Leave);
+            Debug.Log("[SPECTATOR] match over: " + title);
+            // The zip is written at the match end, as for a player (MatchUI.ShowMatchResult); it also raises the saved-log box.
+            Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
         }
 
         /// <summary>Stops spectating (left the room): the camera is the normal follow camera again and the bar is gone.</summary>
@@ -104,6 +142,10 @@ namespace Overpower.Lobby
             if (bar != null)
                 Destroy(bar.gameObject);
             bar = null;
+            if (resultCard != null)
+                Destroy(resultCard.gameObject);
+            resultCard = null;
+            resultWinner = SpectateRules.None;
             currentActor = SpectateRules.None;
             wholeMapChosen = false;
             mapFramed = false;

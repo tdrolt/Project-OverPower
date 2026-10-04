@@ -98,6 +98,12 @@ namespace Overpower.Telemetry
                 // a fresh start here.
                 if (oldProgress.Fading && newProgress.Team != oldProgress.Team)
                     resuming = false;
+                // Lobby Task 15b: a rate change while the same team keeps going the same way (a second capturer or drainer walking
+                // in) is the same attempt carrying on. The rate-aware margin above only sees "a high rate, little progress", so a
+                // quick second arrival used to close the first attempt as abandoned and open a new one.
+                if (oldProgress.RatePerSecond01 != 0f && !oldProgress.Fading && oldProgress.Team == newProgress.Team
+                    && (oldProgress.RatePerSecond01 < 0f) == draining)
+                    resuming = true;
                 if (draining) return resuming ? DrainResumed : DrainStarted;
                 return resuming ? Resumed : Started;
             }

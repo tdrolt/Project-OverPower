@@ -15,6 +15,19 @@ namespace Overpower.Match
     {
         public const int None = -1;
 
+        /// <summary>Lobby Task 15b: the title of the result card a spectator sees at the match end - the template (UiTheme, "{0}" = the
+        /// team's name) with the winning team's name. A winner with no name in the list reads "Team N".</summary>
+        public static string ResultTitle(string template, string[] teamNames, int winner)
+        {
+            string name = teamNames != null && winner >= 0 && winner < teamNames.Length && !string.IsNullOrEmpty(teamNames[winner])
+                ? teamNames[winner] : "Team " + winner;
+            return string.Format(template, name);
+        }
+
+        /// <summary>Lobby Task 15b: a spectator has no body, so no MatchUI panel; their result card goes up once, as soon as the room names a
+        /// winner while they are watching.</summary>
+        public static bool MustShowResult(bool watching, int winner, bool alreadyShown) => watching && winner >= 0 && !alreadyShown;
+
         /// <summary>"The team that knocked you out". The room does not record it, and the base's owner is no help after the first knockout
         /// (the phase-two cut sends that corner's zones neutral), so it is what this player's own client saw: the team that landed the
         /// killing blow on them (their last death). When that is unknown (a rejoiner's new process, a self-inflicted death) it falls back to
