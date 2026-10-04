@@ -74,7 +74,7 @@ namespace Overpower.Data
         [Tooltip("How many seconds a freshly respawned player is shielded, unless they deal damage first (that ends it at once).")]
         [SerializeField, Min(0f)] private float shieldSeconds = 10f;
 
-        [Tooltip("How big the shield's bubble is, as a multiple of the Invulnerability ability's ring.")]
+        [Tooltip("How big the shield's bubble is, as a multiple of the Invulnerability ability's shield bubble.")]
         [SerializeField, Min(0.1f)] private float shieldBubbleScale = 1.5f;
 
         [Tooltip("How many seconds the word BLOCKED stays up when the shield stops a hit.")]

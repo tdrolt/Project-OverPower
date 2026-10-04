@@ -5,6 +5,7 @@ using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
+using Overpower.Net;
 using Overpower.UI;
 using Overpower.Vision;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -92,7 +93,9 @@ namespace Overpower.Dominion
 
             MatchDirector match = MatchDirector.Instance;
             bool fresh = lifecycle != null && lifecycle.LastAliveChangeWasFreshStart;
-            bool start = RespawnShieldRules.StartsAfterRespawn(DominionMode.IsActive(), match != null && match.IsLive, diedBefore, fresh);
+            // A rejoiner's new body spawns "dead" and respawns like after a death, but this component may not have seen a death in it.
+            bool afterRejoin = lifecycle != null && lifecycle.RespawnIsAfterRejoin;
+            bool start = RespawnShieldRules.StartsAfterRespawn(DominionMode.IsActive(), match != null && match.IsLive, diedBefore, fresh, afterRejoin);
             diedBefore = false; // one death, one shield
             if (start) StartShield();
         }
@@ -135,13 +138,13 @@ namespace Overpower.Dominion
         /// <summary>Called by PlayerHealth.ApplyDamage on the victim's own client before anything changes: true = stop the hit here. A stopped hit
         /// stamps dBlk when one is due; the combat clock and the credit message are never reached, so the attacker earns neither charge nor an
         /// early end to its own shield.</summary>
-        public bool BlocksHit(bool fromTeammate)
+        public bool BlocksHit(RespawnShieldRules.Origin origin)
         {
             if (!photonView.IsMine) return false;
             int now = PhotonNetwork.ServerTimestamp;
             DominionConfig config = DominionMode.Config();
             int popupMs = config != null ? Mathf.RoundToInt(config.BlockedPopupSeconds * 1000f) : 0;
-            RespawnShieldRules.HitDecision decision = RespawnShieldRules.OnIncomingHit(IsUp, fromTeammate, lastStampWritten, now, popupMs);
+            RespawnShieldRules.HitDecision decision = RespawnShieldRules.OnIncomingHit(IsUp, origin, lastStampWritten, now, popupMs);
             if (decision.WriteStamp && now != 0)
             {
                 lastStampWritten = now;
@@ -175,8 +178,9 @@ namespace Overpower.Dominion
             if (!RespawnShieldRules.IsNewStamp(stampSeen, stamp)) return;
             stampSeen = stamp;
 
-            // Like every other popup: only if this client can see the shielded player (the bubble carries the fog gate; the player's own is always shown).
-            if (!photonView.IsMine && bubbleGate != null && !bubbleGate.Shown) return;
+            // Like every other popup: only if this client can see the shielded player. Asked of the team's sight directly, not of the bubble: the
+            // bubble may not exist yet when the stamp arrives, and a popup must never show where the player is hidden in the fog.
+            if (TeamSight.Local != null && !TeamSight.Local.CanSeePlayer(photonView)) return;
             DominionConfig config = DominionMode.Config();
             if (config == null) return;
             CombatEvents.RaiseShieldBlockedSeen(transform, config.BlockedPopupSeconds);

@@ -119,6 +119,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// GameplayConfig.RejoinRespawnSeconds and charges no death (a drop is not a death): deathCount was restored at Start to exactly what the room's
     /// "sb" deaths held, and the rejoin respawn adds nothing to it. Cleared once that wait has been computed, and at go-live.</summary>
     private bool rejoinRespawnPending = false;
+
+    /// <summary>Dominion Task 7b: true while the respawn now under way is a rejoiner's first one (set when its wait is worked out, cleared once the
+    /// body is back). The respawn shield reads it from AliveChanged(true): a player who left while dead gets the shield on coming back, like
+    /// after a death, though this body never saw the death.</summary>
+    public bool RespawnIsAfterRejoin { get; private set; }
     /// <summary>True from the moment a respawn countdown starts (NextRespawnDelay charged that death) until the player is
     /// back: a countdown that ended in the wait already paid, so the retake respawn must not charge a second death
     /// (RespawnDelayRules.DeathCountForRetake). A last-stand death or a join into a last stand never counted, so the
@@ -772,6 +777,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             }
         }
 
+        RespawnIsAfterRejoin = rejoinRespawn;
         if (rejoinRespawn)
         {
             rejoinRespawnPending = false;
@@ -866,6 +872,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // speed freeze is LIFTED by removing a multiplier, never by assigning a speed. A respawn
         // that wrote a speed value here is exactly how "you move faster after respawning" happened.
         SetAlive(true);
+        RespawnIsAfterRejoin = false; // after AliveChanged(true) has been heard: the next respawn is judged on its own
 
         // Whichever path got this player here (an ordinary respawn never set it true in the first
         // place - this is then a harmless repeat write - or a last-stand recapture), they are back in

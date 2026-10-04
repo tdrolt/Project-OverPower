@@ -334,24 +334,10 @@ public class BuildingCapture : MonoBehaviourPun
 
     /// <summary>Dominion respawn shield, master: a player whose shield is up leaves the roster the capture counts (into shieldedInZone), and a
     /// held-out player whose shield is down, or who died while held, comes back or goes. Nothing happens in Conquest (nobody is ever shielded).</summary>
-    private void SortOutShieldedPlayers()
-    {
-        for (int i = playersInZone.Count - 1; i >= 0; i--)
-        {
-            PlayerTeam player = playersInZone[i];
-            if (RespawnShieldRules.CountsForCapture(RespawnShield.IsUpFor(player.photonView.Owner))) continue;
-            playersInZone.RemoveAt(i);
-            if (!shieldedInZone.Contains(player)) shieldedInZone.Add(player);
-        }
-        for (int i = shieldedInZone.Count - 1; i >= 0; i--)
-        {
-            PlayerTeam player = shieldedInZone[i];
-            if (player.TryGetComponent(out PlayerLifecycle lifecycle) && !lifecycle.IsAlive) { shieldedInZone.RemoveAt(i); continue; } // died while held out: re-enters through OnTriggerEnter
-            if (!RespawnShieldRules.CountsForCapture(RespawnShield.IsUpFor(player.photonView.Owner))) continue;
-            shieldedInZone.RemoveAt(i);
-            if (!playersInZone.Contains(player)) playersInZone.Add(player);
-        }
-    }
+    private void SortOutShieldedPlayers() =>
+        RespawnShieldRules.SortRoster(playersInZone, shieldedInZone,
+            player => RespawnShield.IsUpFor(player.photonView.Owner),
+            player => player.TryGetComponent(out PlayerLifecycle lifecycle) && !lifecycle.IsAlive); // died while held out: re-enters through OnTriggerEnter
 
     /// <summary>2.7b/phase-two: hides (or restores) everything this zone shows once IsOutOfPlay flips - its tower,
     /// ring and capture area disappear behind the wall rather than showing grey (Decision 9). Only acts on a real

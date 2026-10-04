@@ -575,8 +575,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         // Dominion respawn shield: stopped before anything else, so no health, armour, mark or combat-clock change and no damage credit follows
         // (the spawn keeps healing at its fast rate; the attacker earns no ultimate charge and keeps its own shield). A teammate's hit is left
-        // to the friendly-fire rule below. Self-damage is stopped too (default: a shielded player cannot hurt themselves).
-        if (respawnShield != null && respawnShield.BlocksHit(fromTeammate))
+        // to the friendly-fire rule below. Self-damage is stopped too (default: a shielded player cannot hurt themselves), silently - no
+        // BLOCKED for a self-hit.
+        if (respawnShield != null && respawnShield.BlocksHit(Overpower.Dominion.RespawnShieldRules.OriginOf(fromSelf, fromTeammate)))
             return default;
 
         HitVerdict verdict = HitVerdictRule.Classify(fromSelf, fromTeammate,

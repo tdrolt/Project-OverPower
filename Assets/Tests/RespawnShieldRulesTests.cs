@@ -34,8 +34,6 @@ namespace Overpower.Tests
             Assert.IsTrue(RespawnShieldRules.CountsForCapture(false));
         }
 
-        [Test] public void CastingAnAbilityWithoutHittingKeepsTheShield() => Assert.IsFalse(RespawnShieldRules.EndsOnAbilityWithoutHit);
-
         [Test] public void TheShieldCompareWorksAcrossTheIntWrap()
         {
             int end = unchecked(int.MaxValue - 1000 + 5000); // wrapped to negative
@@ -83,30 +81,30 @@ namespace Overpower.Tests
 
         [Test] public void AHitOnAShieldedVictimIsStoppedAndAsksForAStamp()
         {
-            RespawnShieldRules.HitDecision d = RespawnShieldRules.OnIncomingHit(shieldUp: true, fromTeammate: false, lastStampMs: 0, nowMs: 5000, popupMs: 800);
+            RespawnShieldRules.HitDecision d = RespawnShieldRules.OnIncomingHit(shieldUp: true, RespawnShieldRules.Origin.Enemy, lastStampMs: 0, nowMs: 5000, popupMs: 800);
             Assert.IsTrue(d.Blocked);
             Assert.IsTrue(d.WriteStamp);
         }
 
         [Test] public void AStampIsWrittenAtMostOncePerPopupButEveryHitIsStillStopped()
         {
-            RespawnShieldRules.HitDecision soon = RespawnShieldRules.OnIncomingHit(true, false, lastStampMs: 5000, nowMs: 5799, popupMs: 800);
+            RespawnShieldRules.HitDecision soon = RespawnShieldRules.OnIncomingHit(true, RespawnShieldRules.Origin.Enemy, lastStampMs: 5000, nowMs: 5799, popupMs: 800);
             Assert.IsTrue(soon.Blocked, "stopped even though no stamp is due");
             Assert.IsFalse(soon.WriteStamp);
-            RespawnShieldRules.HitDecision later = RespawnShieldRules.OnIncomingHit(true, false, lastStampMs: 5000, nowMs: 5800, popupMs: 800);
+            RespawnShieldRules.HitDecision later = RespawnShieldRules.OnIncomingHit(true, RespawnShieldRules.Origin.Enemy, lastStampMs: 5000, nowMs: 5800, popupMs: 800);
             Assert.IsTrue(later.WriteStamp);
         }
 
         [Test] public void WithoutAShieldAHitIsNoneOfTheShieldsBusiness()
         {
-            RespawnShieldRules.HitDecision d = RespawnShieldRules.OnIncomingHit(shieldUp: false, fromTeammate: false, lastStampMs: 0, nowMs: 5000, popupMs: 800);
+            RespawnShieldRules.HitDecision d = RespawnShieldRules.OnIncomingHit(shieldUp: false, RespawnShieldRules.Origin.Enemy, lastStampMs: 0, nowMs: 5000, popupMs: 800);
             Assert.IsFalse(d.Blocked);
             Assert.IsFalse(d.WriteStamp);
         }
 
         [Test] public void ATeammatesHitIsLeftToTheOrdinaryFriendlyFireRule()
         {
-            RespawnShieldRules.HitDecision d = RespawnShieldRules.OnIncomingHit(shieldUp: true, fromTeammate: true, lastStampMs: 0, nowMs: 5000, popupMs: 800);
+            RespawnShieldRules.HitDecision d = RespawnShieldRules.OnIncomingHit(shieldUp: true, RespawnShieldRules.Origin.Teammate, lastStampMs: 0, nowMs: 5000, popupMs: 800);
             Assert.IsFalse(d.Blocked, "ignored as today, with no BLOCKED");
             Assert.IsFalse(d.WriteStamp);
         }

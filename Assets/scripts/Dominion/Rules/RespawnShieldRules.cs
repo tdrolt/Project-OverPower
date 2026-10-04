@@ -21,9 +21,6 @@ namespace Overpower.Dominion
         /// <summary>A shielded player neither captures nor blocks a capture; once the shield is down they count as anyone.</summary>
         public static bool CountsForCapture(bool shieldUp) => !shieldUp;
 
-        /// <summary>Casting an ability that hits nothing keeps the shield: only dealing damage ends it early.</summary>
-        public static bool EndsOnAbilityWithoutHit => false;
-
         /// <summary>The Player Property the shield owner writes: the server ms the shield ends (0 = none). Every client draws and judges from it.</summary>
         public const string ShieldKey = "dShd";
         /// <summary>The Player Property the shield owner stamps (server ms) each time a hit is stopped, so every client can pop BLOCKED over them.</summary>
@@ -36,10 +33,40 @@ namespace Overpower.Dominion
             return end == 0 ? 1 : end;
         }
 
-        /// <summary>A shield starts only for a player coming back from a death in a live Dominion match. A fresh start (a round's or break's reset), a
-        /// first spawn or a joiner (no death before) gets none (A16).</summary>
-        public static bool StartsAfterRespawn(bool dominion, bool matchLive, bool diedBefore, bool freshStart) =>
-            dominion && matchLive && diedBefore && !freshStart;
+        /// <summary>A shield starts only for a player coming back from a death in a live Dominion match, a rejoiner coming back into a new
+        /// body included (afterRejoin: they left while dead, so their first respawn is a death-respawn). A fresh start (a round's or break's
+        /// reset), a first spawn or a joiner (no death before) gets none (A16).</summary>
+        public static bool StartsAfterRespawn(bool dominion, bool matchLive, bool diedBefore, bool freshStart, bool afterRejoin = false) =>
+            dominion && matchLive && (diedBefore || afterRejoin) && !freshStart;
+
+        /// <summary>Who an incoming damage comes from, as the shielded victim sees it.</summary>
+        public enum Origin { Enemy, Teammate, Self }
+
+        /// <summary>Who a source actor is to the victim: the victim itself, a teammate, or anyone else. An unknown source counts as an enemy, the
+        /// same fail-open Teams.AreSameTeam makes for damage.</summary>
+        public static Origin OriginOf(bool isVictimItself, bool sameTeam) => isVictimItself ? Origin.Self : sameTeam ? Origin.Teammate : Origin.Enemy;
+
+        /// <summary>Who stays on a zone's capture roster and who is held out while a shield is up. A counted player whose shield is up is held
+        /// out; a held-out player who died is dropped (they come back through the trigger); one whose shield is down comes back.</summary>
+        public static void SortRoster<T>(System.Collections.Generic.List<T> counted, System.Collections.Generic.List<T> heldOut,
+                                         System.Func<T, bool> shieldUp, System.Func<T, bool> dead)
+        {
+            for (int i = counted.Count - 1; i >= 0; i--)
+            {
+                T player = counted[i];
+                if (CountsForCapture(shieldUp(player))) continue;
+                counted.RemoveAt(i);
+                if (!heldOut.Contains(player)) heldOut.Add(player);
+            }
+            for (int i = heldOut.Count - 1; i >= 0; i--)
+            {
+                T player = heldOut[i];
+                if (dead(player)) { heldOut.RemoveAt(i); continue; }
+                if (!CountsForCapture(shieldUp(player))) continue;
+                heldOut.RemoveAt(i);
+                if (!counted.Contains(player)) counted.Add(player);
+            }
+        }
 
         /// <summary>Damage dealt (amount above 0, as the victim reported it) ends the shield; a cast that hit nobody reports nothing.</summary>
         public static bool ClearsOnDamageDealt(float amount) => amount > 0f;
@@ -53,11 +80,13 @@ namespace Overpower.Dominion
             public HitDecision(bool blocked, bool writeStamp) { Blocked = blocked; WriteStamp = writeStamp; }
         }
 
-        /// <summary>A hit on a shielded victim is stopped, whoever it is from, a teammate excepted (teammate hits are ignored as before, with no
-        /// BLOCKED). With no shield up the hit is none of the shield's business.</summary>
-        public static HitDecision OnIncomingHit(bool shieldUp, bool fromTeammate, int lastStampMs, int nowMs, int popupMs)
+        /// <summary>An enemy's damage on a shielded victim is stopped and shows BLOCKED. A teammate's is left to the friendly-fire rule (ignored
+        /// as before, no BLOCKED). The victim's own is stopped too, silently: no stamp, so nobody sees BLOCKED for a self-hit. With no shield up
+        /// the hit is none of the shield's business.</summary>
+        public static HitDecision OnIncomingHit(bool shieldUp, Origin origin, int lastStampMs, int nowMs, int popupMs)
         {
-            if (!BlocksDamage(shieldUp) || fromTeammate) return new HitDecision(false, false);
+            if (!BlocksDamage(shieldUp) || origin == Origin.Teammate) return new HitDecision(false, false);
+            if (origin == Origin.Self) return new HitDecision(true, false);
             return new HitDecision(true, StampDue(lastStampMs, nowMs, popupMs));
         }
 
