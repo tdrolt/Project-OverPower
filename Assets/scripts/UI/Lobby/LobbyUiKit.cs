@@ -484,7 +484,7 @@ namespace Overpower.UI
 
             if (!string.IsNullOrEmpty(heading))
             {
-                TextMeshProUGUI small = Text(box.Outer, "Heading", heading, Bold, headingSize, headingColour, TextAlignmentOptions.Midline, headingSize * 0.23f);
+                TextMeshProUGUI small = Text(box.Outer, "Heading", heading, Bold, headingSize, headingColour, TextAlignmentOptions.Midline, headingSize * Theme.resultHeadingSpacingShare);
                 Size(small.gameObject, -1f, headingSize * 1.5f);
             }
 
@@ -495,7 +495,7 @@ namespace Overpower.UI
                 // A fixed-width card (Dominion): a long title ("WHITE WINS IN SUDDEN DEATH") shrinks to fit instead of being cut off with dots.
                 titleLabel.enableAutoSizing = true;
                 titleLabel.fontSizeMax = size;
-                titleLabel.fontSizeMin = size * 0.4f;
+                titleLabel.fontSizeMin = size * Theme.resultTitleMinSizeShare;
                 Size(titleLabel.gameObject, -1f, size * 1.5f);
             }
             body?.Invoke(box.Outer);

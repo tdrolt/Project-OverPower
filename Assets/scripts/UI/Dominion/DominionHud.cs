@@ -147,7 +147,7 @@ namespace Overpower.UI
             if (!hadPrevious || round == null) return;
 
             // The centre paid out: the next payout time moved and one team's points rose by the payout. A joiner's first read never flashes.
-            int paid = DominionHudText.CentrePayoutTeam(previous.CentreMs, state.CentreMs, previous.Points, state.Points, config.CentrePayoutPoints);
+            int paid = DominionHudText.CentrePayoutTeam(previous.CentreMs, state.CentreMs, previous.Points, state.Points, config.CentrePayoutPoints, CentreHolder());
             if (paid >= 0) round.Flash(paid, config.CentrePayoutPoints, theme.scoreboardTeamNames);
         }
 
@@ -203,6 +203,9 @@ namespace Overpower.UI
 
         // ---------------------------------------------------------------- the result
 
+        /// <summary>Takes the result card down (a spectator who leaves the room: the card is DominionHud's, so the spectator view cannot destroy it itself).</summary>
+        public void HideResult() => result?.Destroy();
+
         /// <summary>The match is over and this client has to show the result: the Dominion result card, with the table of points per round. Called by
         /// MatchUI (a player) and SpectatorSeatView (a spectator) in a Dominion room. False when the HUD cannot be built (no theme yet), so the caller
         /// falls back to its own panel. Safe to call twice.</summary>
@@ -214,7 +217,7 @@ namespace Overpower.UI
             if (config == null) return false;
             ReadRoom(config);
             HideBars();
-            result.Show(winner, teams, state.Wins, state.History, config.RoundsToWin, theme.scoreboardTeamNames, onBack);
+            result.Show(winner, teams, state.Wins, state.History, state.SuddenDeathMs, theme.scoreboardTeamNames, onBack);
             Debug.Log($"[DOMINION] result: {result.HeadlineText} | {string.Join(" / ", result.TableRows)}");
             return true;
         }
@@ -223,8 +226,10 @@ namespace Overpower.UI
 
         private bool EnsureBuilt()
         {
-            if (kit != null) return true;
-            if (rooms == null) rooms = FindFirstObjectByType<RoomManager>();
+            // A canvas that was destroyed under a live kit (a scene change took the HUD's children but not this object) is rebuilt, not drawn into.
+            if (kit != null && canvas != null) return true;
+            if (kit != null) { kit.Dispose(); kit = null; if (resultCanvas != null) Destroy(resultCanvas.gameObject); }
+            rooms = rooms != null ? rooms : FindFirstObjectByType<RoomManager>();
             if (rooms == null || rooms.Theme == null || rooms.Theme.lobbyDisplayFont == null) return false;
             theme = rooms.Theme;
             kit = new LobbyUiKit(theme);

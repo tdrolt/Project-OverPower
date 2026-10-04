@@ -36,12 +36,12 @@ namespace Overpower.UI
             this.canvas = canvas;
         }
 
-        public void Show(int winner, int[] teams, int[] wins, int[] history, int roundsToWin, string[] teamNames, Action onBack)
+        public void Show(int winner, int[] teams, int[] wins, int[] history, int suddenDeathMs, string[] teamNames, Action onBack)
         {
             if (IsShowing) return;
             ModeText = DominionHudText.ModeLine(theme.dominionResultModeFormat, teams.Length);
             HeadlineText = DominionHudText.ResultHeadline(winner, wins, teams, teamNames, theme.dominionResultHeadlineFormat, theme.dominionResultSuddenFormat,
-                theme.dominionResultScoreSeparator, DominionHudText.WonInSuddenDeath(winner, wins, roundsToWin));
+                theme.dominionResultScoreSeparator, DominionHudText.WonInSuddenDeath(winner, suddenDeathMs));
             TableRows.Clear();
 
             back = kit.ResultCard(canvas, HeadlineText, Pick(theme.dominionTeamTextColors, winner), theme.resultButtonLobbyList, out card,
@@ -100,7 +100,7 @@ namespace Overpower.UI
 
         private HorizontalLayoutGroup Row(Transform parent, string name)
         {
-            HorizontalLayoutGroup row = LobbyUiKit.HGroup(parent, name, 16f, TextAnchor.MiddleCenter);
+            HorizontalLayoutGroup row = LobbyUiKit.HGroup(parent, name, theme.dominionResultRowGap, TextAnchor.MiddleCenter);
             row.childForceExpandWidth = false;
             return row;
         }

@@ -111,11 +111,16 @@ namespace Overpower.Dominion
         // ---------------------------------------------------------------- the points flash
 
         /// <summary>The team a centre payout just went to, seen as a change between two reads of the room: the centre's next-payout time moved
-        /// (dCtr: prev -> now, both written) and one team's points rose by at least the payout. -1 when nothing like that happened (first read,
-        /// no change, payout of 0, or the payout went to nobody). A joiner's first read never flashes (prevCentreMs 0).</summary>
-        public static int CentrePayoutTeam(int prevCentreMs, int centreMs, int[] prevPoints, int[] points, int centrePoints)
+        /// (dCtr: prev -> now, both written) and the centre's holder (its owner on this client's copy of the territory, -1 = not known) was paid, i.e.
+        /// its points rose by at least the payout. Only the holder flashes: another team's zones can rise by more than the payout in the same write.
+        /// When the holder is not known here (this client's territory copy lags the room) the team with the biggest rise of at least the payout is
+        /// taken instead. -1 when nothing like that happened (first read, no change, payout of 0, or the payout went to nobody). A joiner's first read
+        /// never flashes (prevCentreMs 0).</summary>
+        public static int CentrePayoutTeam(int prevCentreMs, int centreMs, int[] prevPoints, int[] points, int centrePoints, int holder)
         {
             if (centrePoints <= 0 || prevCentreMs == 0 || centreMs == 0 || prevCentreMs == centreMs || prevPoints == null || points == null) return -1;
+            if (holder >= 0)
+                return holder < points.Length && holder < prevPoints.Length && points[holder] - prevPoints[holder] >= centrePoints ? holder : -1;
             int best = -1, bestRise = centrePoints - 1;
             for (int team = 0; team < points.Length && team < prevPoints.Length; team++)
             {
@@ -156,8 +161,10 @@ namespace Overpower.Dominion
 
         private static int WinsOf(int[] wins, int team) => wins != null && team >= 0 && team < wins.Length ? wins[team] : 0;
 
-        /// <summary>True when the match was settled by sudden death: every round was played and nobody reached the wins needed.</summary>
-        public static bool WonInSuddenDeath(int winner, int[] wins, int roundsToWin) => winner >= 0 && WinsOf(wins, winner) < roundsToWin;
+        /// <summary>True when the match was settled by sudden death: the room ever held a circle start (dSd, non-zero). Decided from the room, never inferred
+        /// from the round wins: a match that ended 1-0-0 because the others left (A7), or with the last team standing mid-round (A3), has fewer wins than
+        /// the match needs too, but no circle was ever written.</summary>
+        public static bool WonInSuddenDeath(int winner, int suddenDeathMs) => winner >= 0 && suddenDeathMs != 0;
 
         /// <summary>"DOMINION 3v3v3" / "DOMINION 2v2" from a format with {0} = the size.</summary>
         public static string ModeLine(string format, int teamCount) => Fmt(format, teamCount >= 3 ? "3v3v3" : "2v2");

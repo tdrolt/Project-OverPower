@@ -33,7 +33,9 @@ namespace Overpower.UI
         private TextMeshProUGUI roundLabel, clockLabel, flashLabel;
         private int builtTeamCount;
         private float flashUntil;
-        private string shownRound, shownClock;
+        // The whole numbers the labels were last built from: compared every frame, so a label's words are only formatted when one moved.
+        private bool roundDrawn, clockDrawn;
+        private int drawnRoundNumber, drawnMaxRounds, drawnClockSeconds;
         private bool shownSudden;
 
         /// <summary>The words the round label and the clock slot show now. Recorders and wiring tests read them.</summary>
@@ -69,16 +71,19 @@ namespace Overpower.UI
             if (root == null || builtTeamCount != teams.Length || blocks.Count == 0 || blocks[0].Dots.Length != dotCountCache) Build(teams);
             SetVisible(true);
 
-            string roundText = DominionHudText.RoundLabel(theme.dominionRoundLabelFormat, round, maxRounds);
-            if (roundText != shownRound) { roundLabel.text = roundText; shownRound = roundText; }
-
-            string clockText = suddenDeath ? theme.dominionBarSuddenText : DominionHudText.Clock(clockSeconds);
-            if (clockText != shownClock || suddenDeath != shownSudden)
+            if (!roundDrawn || round != drawnRoundNumber || maxRounds != drawnMaxRounds)
             {
-                clockLabel.text = clockText;
+                roundLabel.text = DominionHudText.RoundLabel(theme.dominionRoundLabelFormat, round, maxRounds);
+                roundDrawn = true; drawnRoundNumber = round; drawnMaxRounds = maxRounds;
+            }
+
+            // In sudden death the clock slot says SUDDEN DEATH whatever the seconds are, so only the mode matters there.
+            if (!clockDrawn || suddenDeath != shownSudden || (!suddenDeath && clockSeconds != drawnClockSeconds))
+            {
+                clockLabel.text = suddenDeath ? theme.dominionBarSuddenText : DominionHudText.Clock(clockSeconds);
                 clockLabel.fontSize = suddenDeath ? theme.dominionBarSuddenSize : ClockSize();
                 clockLabel.color = suddenDeath ? theme.suddenDeathColor : theme.lobbyOffWhiteColor;
-                shownClock = clockText;
+                clockDrawn = true; drawnClockSeconds = clockSeconds;
                 shownSudden = suddenDeath;
             }
 
@@ -98,7 +103,7 @@ namespace Overpower.UI
             {
                 float left = flashUntil - Time.unscaledTime;
                 if (left <= 0f) flashLabel.gameObject.SetActive(false);
-                else flashLabel.alpha = Mathf.Clamp01(left / 0.5f); // fades out over its last half second
+                else flashLabel.alpha = Mathf.Clamp01(left / theme.dominionFlashFadeSeconds); // fades out over its last moments
             }
         }
 
@@ -113,7 +118,7 @@ namespace Overpower.UI
                 flashLabel.color = TextColour(team);
                 flashLabel.alpha = 1f;
                 RectTransform rect = flashLabel.rectTransform;
-                rect.anchoredPosition = new Vector2(block.CentreX, -(theme.dominionBarHeight + 6f));
+                rect.anchoredPosition = new Vector2(block.CentreX, -(theme.dominionBarHeight + theme.dominionFlashGap));
                 flashLabel.gameObject.SetActive(true);
                 flashUntil = Time.unscaledTime + theme.dominionFlashSeconds;
                 return;
@@ -174,7 +179,7 @@ namespace Overpower.UI
             flashRect.pivot = new Vector2(0.5f, 1f);
             flashRect.sizeDelta = new Vector2(side * 1.5f, theme.dominionFlashSize * 1.5f);
             flashLabel.gameObject.SetActive(false);
-            shownRound = shownClock = null;
+            roundDrawn = clockDrawn = false;
             foreach (Block block in blocks) { block.ShownScore = int.MinValue; block.ShownWins = -1; }
         }
 
@@ -207,7 +212,7 @@ namespace Overpower.UI
             scoreRect.anchorMax = new Vector2(1f, 1f);
             scoreRect.pivot = new Vector2(0.5f, 1f);
             scoreRect.sizeDelta = new Vector2(-2f * inset, scoreSize * 1.2f);
-            scoreRect.anchoredPosition = new Vector2(0f, -12f);
+            scoreRect.anchoredPosition = new Vector2(0f, -theme.dominionScoreTop);
 
             // Round-win dots under the score, as many as it takes to win the match, lined up with the score.
             int dotCount = Mathf.Max(1, DotCount());
@@ -216,7 +221,7 @@ namespace Overpower.UI
             float first = align == TextAlignmentOptions.MidlineRight ? width - inset - dotsWidth
                         : align == TextAlignmentOptions.MidlineLeft ? inset
                         : (width - dotsWidth) * 0.5f;
-            float top = 12f + scoreSize * 1.2f + 4f;
+            float top = theme.dominionScoreTop + scoreSize * 1.2f + theme.dominionDotsGap;
             for (int i = 0; i < dotCount; i++)
             {
                 var dotGo = new GameObject("Dot " + (i + 1), typeof(RectTransform), typeof(Image));
@@ -246,7 +251,7 @@ namespace Overpower.UI
             roundRect.anchorMax = new Vector2(1f, 1f);
             roundRect.pivot = new Vector2(0.5f, 1f);
             roundRect.sizeDelta = new Vector2(0f, theme.dominionRoundLabelSize * 1.5f);
-            roundRect.anchoredPosition = new Vector2(0f, -(height * 0.16f));
+            roundRect.anchoredPosition = new Vector2(0f, -(height * theme.dominionRoundLabelTopShare));
 
             clockLabel = kit.Text(clock.Outer, "Clock", "0:00", kit.Display, ClockSize(), theme.lobbyOffWhiteColor, TextAlignmentOptions.Midline);
             clockLabel.overflowMode = TextOverflowModes.Overflow;
@@ -255,7 +260,7 @@ namespace Overpower.UI
             clockRect.anchorMax = new Vector2(1f, 1f);
             clockRect.pivot = new Vector2(0.5f, 1f);
             clockRect.sizeDelta = new Vector2(0f, ClockSize() * 1.3f);
-            clockRect.anchoredPosition = new Vector2(0f, -(height * 0.16f + theme.dominionRoundLabelSize * 1.5f));
+            clockRect.anchoredPosition = new Vector2(0f, -(height * theme.dominionRoundLabelTopShare + theme.dominionRoundLabelSize * 1.5f));
         }
 
         // ---------------------------------------------------------------- the dots

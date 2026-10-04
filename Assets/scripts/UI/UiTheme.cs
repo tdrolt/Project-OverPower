@@ -1028,6 +1028,16 @@ namespace Overpower.UI
         public float dominionFlashSize = 36f;
         [Tooltip("How long the centre payout flash stays up, in seconds.")]
         public float dominionFlashSeconds = 2.5f;
+        [Tooltip("How long the centre payout flash takes to fade out at the end of its time, in seconds.")]
+        [Min(0.01f)] public float dominionFlashFadeSeconds = 0.5f;
+        [Tooltip("Gap between the bottom of the round bar and the centre payout flash under it.")]
+        public float dominionFlashGap = 6f;
+        [Tooltip("How far below the top of the round bar a team's score starts.")]
+        public float dominionScoreTop = 12f;
+        [Tooltip("Gap between a team's score and its round-win dots under it.")]
+        public float dominionDotsGap = 4f;
+        [Tooltip("How far below the top of the bar the 'ROUND 2 OF 3' label sits, as a share of the bar's height (0.16 = a sixth).")]
+        [Range(0f, 0.5f)] public float dominionRoundLabelTopShare = 0.16f;
 
         [Header("Dominion HUD: break card (between rounds)")]
         [Tooltip("How far the break card sits below the top edge of the screen. It sits high so the arena stays in view; the shop (P) opens on top of it.")]
@@ -1072,6 +1082,16 @@ namespace Overpower.UI
         public string dominionBreakFirstText = "GET READY";
         [Tooltip("The word between the two teams' points on the break card.")]
         public string dominionBreakPointsLabel = "points";
+        [Tooltip("Gap between the teams' points on the break card.")]
+        public float dominionBreakPointsGap = 28f;
+        [Tooltip("Size of the small word 'points' on the break card (between the two scores in 2v2, under the three scores in 3v3v3).")]
+        public float dominionBreakPointsLabelSize = 24f;
+        [Tooltip("Gap between the round-win dots and the labels around them on the break card.")]
+        public float dominionBreakWinsGap = 8f;
+        [Tooltip("The small mark between one team's round-win dots and the next team's.")]
+        public string dominionBreakWinsSeparator = "·";
+        [Tooltip("How thick the thin line is that divides the result of the round from what the next round opens, on the break card.")]
+        public float dominionBreakDividerThickness = 2f;
         [Tooltip("The label in front of the round-win dots on the break card.")]
         public string dominionBreakWinsLabel = "Round wins";
         [Tooltip("The button that points to the shop on the break card. The shop opens on P; clicking this opens it too.")]
@@ -1132,6 +1152,12 @@ namespace Overpower.UI
         public float dominionBannerRulesSize = 21f;
         [Tooltip("Size of the small SUDDEN DEATH line that stays under the round bar after the banner.")]
         public float dominionBannerSmallSize = 27f;
+        [Tooltip("Extra height of the full banner beyond its two lines of writing (the room above, between and below them).")]
+        public float dominionBannerExtraHeight = 30f;
+        [Tooltip("How far below the top of the full banner its big words start.")]
+        public float dominionBannerTitleTop = 12f;
+        [Tooltip("Extra height of the small SUDDEN DEATH line's box beyond its writing.")]
+        public float dominionBannerSmallExtraHeight = 12f;
 
         [Header("Dominion HUD: result")]
         [Tooltip("The small heading of the result card. {0} = the match size (2v2 or 3v3v3).")]
@@ -1163,6 +1189,8 @@ namespace Overpower.UI
         public float dominionResultNameWidth = 180f;
         [Tooltip("Width of one round's column of the result table.")]
         public float dominionResultCellWidth = 150f;
+        [Tooltip("Gap between the cells of a row of the result table.")]
+        public float dominionResultRowGap = 16f;
         [Tooltip("Size of the small note under the result table.")]
         public float dominionResultNoteSize = 21f;
         [Tooltip("Which sorting order the result card draws at: above the match panels, under the saved-log box.")]
@@ -1410,6 +1438,10 @@ namespace Overpower.UI
         public float spectatorResultCardTop = 150f;
         [Tooltip("Space between the title and the button on a result card (the spectator's match result), in reference pixels.")]
         public float spectatorResultCardGap = 24f;
+        [Tooltip("Letter spacing of the small heading above a result card's big line (and the Dominion break card's heading), as a share of the heading's size.")]
+        public float resultHeadingSpacingShare = 0.23f;
+        [Tooltip("How small a long big line on a fixed-width result card may shrink, as a share of its normal size (0.4 = down to 40%), before it is cut off.")]
+        [Range(0.1f, 1f)] public float resultTitleMinSizeShare = 0.4f;
 
         [Header("Lobby screens (lobby Task 9)")]
         [Tooltip("The font of the big letters on the lobby screens (title, buttons, headings): Oswald.")]

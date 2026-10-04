@@ -32,7 +32,14 @@ namespace Overpower.UI
         private readonly List<int> winDotTeam = new List<int>();
         private TextMeshProUGUI pointsLabel;
         private int builtTeamCount, builtDotCount;
-        private string shownKey;
+        // What the card was last drawn from. The card compares these whole numbers each frame and only builds its words when one moved
+        // (a string key built every frame would allocate 60 times a second for a card that changes a few times a break).
+        private bool drawn;
+        private int drawnRound;
+        private bool drawnFirstBreak, drawnCanPick;
+        private int[] drawnPoints = System.Array.Empty<int>(), drawnWins = System.Array.Empty<int>();
+        private bool countdownDrawn;
+        private int drawnSeconds, drawnCountdownRound, drawnBigFrom;
 
         public bool IsShowing => card != null && card.gameObject.activeSelf;
         public string HeaderText => header != null ? header.text : "";
@@ -65,12 +72,16 @@ namespace Overpower.UI
             if (card == null || builtTeamCount != teams.Length || builtDotCount != dots) Build(teams, dots);
             SetVisible(true);
 
-            int finished = Mathf.Max(1, round - 1);
-            int winner = firstBreak ? -1 : DominionRules.RoundWinner(points);
-            string key = $"{round}|{firstBreak}|{winner}|{string.Join(",", points ?? new int[0])}|{string.Join(",", wins ?? new int[0])}|{canPick}";
-            if (key != shownKey)
+            if (!drawn || round != drawnRound || firstBreak != drawnFirstBreak || canPick != drawnCanPick
+                || !SameInts(points, drawnPoints) || !SameInts(wins, drawnWins))
             {
-                shownKey = key;
+                drawn = true;
+                drawnRound = round; drawnFirstBreak = firstBreak; drawnCanPick = canPick;
+                drawnPoints = points != null ? (int[])points.Clone() : System.Array.Empty<int>();
+                drawnWins = wins != null ? (int[])wins.Clone() : System.Array.Empty<int>();
+
+                int finished = Mathf.Max(1, round - 1);
+                int winner = firstBreak ? -1 : DominionRules.RoundWinner(points);
                 header.text = string.Format(System.Globalization.CultureInfo.InvariantCulture, theme.dominionBreakHeaderFormat, firstBreak ? round : finished);
                 headline.text = firstBreak ? theme.dominionBreakFirstText : DominionHudText.BreakHeadline(winner, teamNames, theme.dominionBreakWinsFormat, theme.dominionBreakTiedText);
                 headline.color = firstBreak || winner < 0 ? theme.lobbyOffWhiteColor : TextColour(winner);
@@ -92,16 +103,30 @@ namespace Overpower.UI
                 onPickAction = onPick;
             }
 
-            string line = DominionHudText.BreakCountdown(theme.dominionBreakStartsFormat, theme.dominionBreakBigFormat, round, secondsLeft, bigFromSeconds, out bool isBig);
-            // The last seconds read big: the same line grows (in the card, under the button) instead of a second text over the arena, so nothing is covered.
-            if (isBig != countdownIsBig)
+            // The countdown line is rebuilt only when the second, the round or the big-from setting moved.
+            if (!countdownDrawn || secondsLeft != drawnSeconds || round != drawnCountdownRound || bigFromSeconds != drawnBigFrom)
             {
-                countdownIsBig = isBig;
-                float size = isBig ? theme.dominionBreakBigSize : theme.dominionBreakCountdownSize;
-                countdown.fontSize = size;
-                LobbyUiKit.Size(countdown.gameObject, -1f, size * 1.5f);
+                countdownDrawn = true;
+                drawnSeconds = secondsLeft; drawnCountdownRound = round; drawnBigFrom = bigFromSeconds;
+                string line = DominionHudText.BreakCountdown(theme.dominionBreakStartsFormat, theme.dominionBreakBigFormat, round, secondsLeft, bigFromSeconds, out bool isBig);
+                // The last seconds read big: the same line grows (in the card, under the button) instead of a second text over the arena, so nothing is covered.
+                if (isBig != countdownIsBig)
+                {
+                    countdownIsBig = isBig;
+                    float size = isBig ? theme.dominionBreakBigSize : theme.dominionBreakCountdownSize;
+                    countdown.fontSize = size;
+                    LobbyUiKit.Size(countdown.gameObject, -1f, size * 1.5f);
+                }
+                countdown.text = line;
             }
-            if (countdown.text != line) countdown.text = line;
+        }
+
+        private static bool SameInts(int[] a, int[] b)
+        {
+            int la = a != null ? a.Length : 0, lb = b != null ? b.Length : 0;
+            if (la != lb) return false;
+            for (int i = 0; i < la; i++) if (a[i] != b[i]) return false;
+            return true;
         }
 
         private int dotsToWin = 2;
@@ -116,7 +141,8 @@ namespace Overpower.UI
             card = null;
             countdownIsBig = false;
             pointsTexts.Clear(); winDots.Clear(); winDotTeam.Clear();
-            shownKey = null;
+            drawn = false;
+            countdownDrawn = false;
         }
 
         // ---------------------------------------------------------------- building
@@ -144,19 +170,27 @@ namespace Overpower.UI
             fit.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            header = Line("Header", kit.Bold, theme.dominionBreakHeaderSize, theme.dominionMutedColor, theme.dominionBreakHeaderSize * 0.23f);
+            header = Line("Header", kit.Bold, theme.dominionBreakHeaderSize, theme.dominionMutedColor, theme.dominionBreakHeaderSize * theme.resultHeadingSpacingShare);
             headline = Line("Headline", kit.Display, theme.dominionBreakHeadlineSize, theme.lobbyOffWhiteColor, 0f);
 
-            // The two (or three) teams' points; with two teams the small word "points" sits between them like the board.
-            HorizontalLayoutGroup points = LobbyUiKit.HGroup(card, "Points", 28f, TextAnchor.MiddleCenter);
-            pointsRow = points.gameObject;
-            LobbyUiKit.Size(pointsRow, -1f, theme.dominionBreakPointsSize * 1.5f);
+            // The two (or three) teams' points. With two teams the small word "points" sits between them like the board; with three it sits under the
+            // scores (a word trailing after the third number reads as part of it).
+            Transform pointsParent = card;
+            if (teams.Length != 2)
+            {
+                VerticalLayoutGroup block = LobbyUiKit.VGroup(card, "Points Block", 0f, TextAnchor.UpperCenter);
+                pointsParent = block.transform;
+                pointsRow = block.gameObject;
+            }
+            HorizontalLayoutGroup points = LobbyUiKit.HGroup(pointsParent, "Points", theme.dominionBreakPointsGap, TextAnchor.MiddleCenter);
+            if (teams.Length == 2) pointsRow = points.gameObject;
+            LobbyUiKit.Size(points.gameObject, -1f, theme.dominionBreakPointsSize * 1.5f);
             pointsTexts.Clear();
             for (int i = 0; i < teams.Length; i++)
             {
                 if (teams.Length == 2 && i == 1)
                 {
-                    pointsLabel = kit.Text(points.transform, "Points Label", theme.dominionBreakPointsLabel, kit.Display, theme.dominionBreakSmallSize + 2f, theme.dominionDimColor, TextAlignmentOptions.Midline);
+                    pointsLabel = kit.Text(points.transform, "Points Label", theme.dominionBreakPointsLabel, kit.Display, theme.dominionBreakPointsLabelSize, theme.dominionDimColor, TextAlignmentOptions.Midline);
                     pointsLabel.overflowMode = TextOverflowModes.Overflow;
                 }
                 TextMeshProUGUI value = kit.Text(points.transform, "Points " + teams[i], "0", kit.Display, theme.dominionBreakPointsSize,
@@ -166,12 +200,13 @@ namespace Overpower.UI
             }
             if (teams.Length != 2)
             {
-                pointsLabel = kit.Text(points.transform, "Points Label", theme.dominionBreakPointsLabel, kit.Display, theme.dominionBreakSmallSize + 2f, theme.dominionDimColor, TextAlignmentOptions.Midline);
+                pointsLabel = kit.Text(pointsParent, "Points Label", theme.dominionBreakPointsLabel, kit.Display, theme.dominionBreakPointsLabelSize, theme.dominionDimColor, TextAlignmentOptions.Midline);
                 pointsLabel.overflowMode = TextOverflowModes.Overflow;
+                LobbyUiKit.Size(pointsLabel.gameObject, -1f, theme.dominionBreakPointsLabelSize * 1.5f);
             }
 
             // "Round wins ○○ · ●○": one group of dots per team in its colour.
-            HorizontalLayoutGroup wins = LobbyUiKit.HGroup(card, "Round Wins", 8f, TextAnchor.MiddleCenter);
+            HorizontalLayoutGroup wins = LobbyUiKit.HGroup(card, "Round Wins", theme.dominionBreakWinsGap, TextAnchor.MiddleCenter);
             winsRow = wins.gameObject;
             LobbyUiKit.Size(winsRow, -1f, theme.dominionBreakSmallSize * 1.5f);
             TextMeshProUGUI winsLabel = kit.Text(wins.transform, "Label", theme.dominionBreakWinsLabel, kit.Body, theme.dominionBreakSmallSize, theme.lobbyMutedColor, TextAlignmentOptions.Midline);
@@ -181,7 +216,7 @@ namespace Overpower.UI
             {
                 if (t > 0)
                 {
-                    TextMeshProUGUI sep = kit.Text(wins.transform, "Separator", "·", kit.Body, theme.dominionBreakSmallSize, theme.lobbyMutedColor, TextAlignmentOptions.Midline);
+                    TextMeshProUGUI sep = kit.Text(wins.transform, "Separator", theme.dominionBreakWinsSeparator, kit.Body, theme.dominionBreakSmallSize, theme.lobbyMutedColor, TextAlignmentOptions.Midline);
                     sep.overflowMode = TextOverflowModes.Overflow;
                 }
                 for (int d = 0; d < dots; d++)
@@ -200,7 +235,7 @@ namespace Overpower.UI
             divider.transform.SetParent(card, false);
             divider.GetComponent<Image>().color = theme.lobbyBorderColor;
             divider.GetComponent<Image>().raycastTarget = false;
-            LobbyUiKit.Size(divider, -1f, 2f);
+            LobbyUiKit.Size(divider, -1f, theme.dominionBreakDividerThickness);
 
             opens = Line("Opens", kit.Body, theme.dominionBreakOpensSize, theme.lobbyOffWhiteColor, 0f);
             opens.enableWordWrapping = true;
@@ -218,7 +253,8 @@ namespace Overpower.UI
 
             countdown = Line("Countdown", kit.Display, theme.dominionBreakCountdownSize, theme.dominionGoldColor, 0f);
 
-            shownKey = null;
+            drawn = false;
+            countdownDrawn = false;
         }
 
         private TextMeshProUGUI Line(string name, TMPro.TMP_FontAsset font, float size, Color colour, float spacing)

@@ -387,58 +387,106 @@ namespace Overpower.Tests
 
         // ------------------------------------------------------------ the wiring: the game calls the tested rule (the method bodies are read, not run)
 
-        private static bool Uses(System.Type owner, MemberInfo target) => IlWiring.Uses(owner, target);
+        // Each check names the method that must do the calling (IlWiring.Uses with a method name): a call made somewhere else in the same class does
+        // not count, so moving the hand-off out of the method that matters fails the test.
+        private static bool Uses(System.Type owner, string method, MemberInfo target) => IlWiring.Uses(owner, method, target);
 
         private static MethodInfo Builder(string name) => typeof(PlacedEffects).GetMethod(name);
 
         [Test] public void MineBlastsAndSlowsGoThroughTheBuilders()
         {
             System.Type mine = typeof(Overpower.Abilities.Mine);
-            Assert.IsTrue(Uses(mine, Builder(nameof(PlacedEffects.MineBlast))), "the blast's damage");
-            Assert.IsTrue(Uses(mine, Builder(nameof(PlacedEffects.PlacedSlow))), "the slow carries the mine's placement time");
+            Assert.IsTrue(Uses(mine, "ApplyBlast", Builder(nameof(PlacedEffects.MineBlast))), "the blast's damage");
+            Assert.IsTrue(Uses(mine, "ApplyBlast", Builder(nameof(PlacedEffects.PlacedSlow))), "the slow carries the mine's placement time");
         }
 
         [Test] public void ElectricFenceTicksAndSlowsGoThroughTheBuilders()
         {
             System.Type fence = typeof(Overpower.Abilities.ElectricFence);
-            Assert.IsTrue(Uses(fence, Builder(nameof(PlacedEffects.FenceTick))));
-            Assert.IsTrue(Uses(fence, Builder(nameof(PlacedEffects.PlacedSlow))));
+            Assert.IsTrue(Uses(fence, "EvaluateTrackedTargets", Builder(nameof(PlacedEffects.FenceTick))));
+            Assert.IsTrue(Uses(fence, "EvaluateTrackedTargets", Builder(nameof(PlacedEffects.PlacedSlow))));
         }
 
         [Test] public void AoeZoneTicksGoThroughTheBuilder() =>
-            Assert.IsTrue(Uses(typeof(Overpower.Abilities.AoeZone), Builder(nameof(PlacedEffects.AoeZoneTick))));
+            Assert.IsTrue(Uses(typeof(Overpower.Abilities.AoeZone), "ApplyTick", Builder(nameof(PlacedEffects.AoeZoneTick))));
 
         [Test] public void FireFieldBurnsGoThroughTheBuilder() =>
-            Assert.IsTrue(Uses(typeof(Overpower.Weapons.FireField), Builder(nameof(PlacedEffects.FireFieldBurn))));
+            Assert.IsTrue(Uses(typeof(Overpower.Weapons.FireField), "BurnEveryoneInside", Builder(nameof(PlacedEffects.FireFieldBurn))));
 
         [Test] public void TheBurnStatusTickGoesThroughTheBuilder() =>
-            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), Builder(nameof(PlacedEffects.StatusBurn))));
+            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), "ApplyBurnDamage", Builder(nameof(PlacedEffects.StatusBurn))));
 
         [Test] public void AStatusOnACopyPassesItsPlacementTimeToTheAttackersShield()
         {
             FieldInfo placed = typeof(StatusEffectSpec).GetField(nameof(StatusEffectSpec.effectPlacedMs));
-            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), placed), "Apply must read spec.effectPlacedMs to hand it on");
+            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), "Apply", placed), "Apply must read spec.effectPlacedMs to hand it on");
+            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), "Apply", typeof(RespawnShield).GetMethod(nameof(RespawnShield.NoteMyEffectOnCopy))),
+                "and it is Apply that tells the shield");
+        }
+
+        // The placement-time hand-off, run for real: a mine with a placement time hits a stand-in victim, and the slow the victim receives carries that time.
+        // (The IL check above only proves the builder is called; this proves the number that goes in is the mine's own.)
+        private class FakeVictim : MonoBehaviour, IDamageable, IStatusReceiver
+        {
+            public int slowPlacedMs = int.MinValue;
+            public int damagePlacedMs = int.MinValue;
+            public DamageResult ApplyDamage(in DamageInfo info) { damagePlacedMs = info.EffectPlacedMs; return default; }
+            public void ApplyStatus(in StatusEffectSpec spec, int sourceActor) => slowPlacedMs = spec.effectPlacedMs;
+            public bool IsAlive => true;
+            public int TeamId => 1;
+            public int ActorNumber => 9;
+            public bool HasLocalAuthority => true;
+        }
+
+        [Test] public void AMineHandsItsPlacementTimeToTheSlowAndTheDamageItGives()
+        {
+            var mineObject = new GameObject("Test Mine");
+            var victimObject = new GameObject("Test Victim");
+            try
+            {
+                var mine = mineObject.AddComponent<Overpower.Abilities.Mine>();
+                System.Type deployable = typeof(Overpower.Abilities.NetworkedDeployable);
+                deployable.GetProperty("PlacedServerTimestampMs").SetValue(mine, 424242);
+                deployable.GetProperty("OwnerActor").SetValue(mine, 1);
+                deployable.GetProperty("OwnerTeam").SetValue(mine, 0);
+                victimObject.transform.position = new Vector3(0f, 0.5f, 0.5f);
+                victimObject.AddComponent<BoxCollider>().size = Vector3.one;
+                var victim = victimObject.AddComponent<FakeVictim>();
+                Physics.SyncTransforms();
+
+                int hit = (int)typeof(Overpower.Abilities.Mine).GetMethod("ApplyBlast", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(mine, new object[] { Vector3.zero });
+
+                Assert.AreEqual(1, hit, "the stand-in enemy was caught in the blast");
+                Assert.AreEqual(424242, victim.slowPlacedMs, "the slow carries when the mine was laid");
+                Assert.AreEqual(424242, victim.damagePlacedMs, "and so does the damage");
+            }
+            finally
+            {
+                Object.DestroyImmediate(mineObject);
+                Object.DestroyImmediate(victimObject);
+            }
         }
 
         [Test] public void TheAttackersNoteAsksTheTestedReportRuleAndTheStartProperty()
         {
             System.Type shield = typeof(RespawnShield);
-            Assert.IsTrue(Uses(shield, typeof(RespawnShieldRules).GetMethod(nameof(RespawnShieldRules.EffectReport))));
-            Assert.IsTrue(Uses(shield, typeof(RespawnShield).GetMethod(nameof(RespawnShield.ShieldStartOf))));
+            Assert.IsTrue(Uses(shield, "NoteMyEffectOnCopy", typeof(RespawnShieldRules).GetMethod(nameof(RespawnShieldRules.EffectReport))));
+            Assert.IsTrue(Uses(shield, "NoteMyEffectOnCopy", typeof(RespawnShield).GetMethod(nameof(RespawnShield.ShieldStartOf))));
         }
 
         [Test] public void SonicPulseUsesThePushThatKnowsWhoPushed()
         {
             MethodInfo sourceAware = typeof(PlayerDisplacement).GetMethods()
                 .Single(m => m.Name == "Displace" && m.GetParameters().Length == 5);
-            Assert.IsTrue(Uses(typeof(Overpower.Abilities.SonicPulseAbility), sourceAware));
+            Assert.IsTrue(Uses(typeof(Overpower.Abilities.SonicPulseAbility), "ExecuteCast", sourceAware));
         }
 
         [Test] public void ThePlayersDisplacementTellsTheAttackersShieldAboutAPushOnACopy()
         {
             MethodInfo note = typeof(RespawnShield).GetMethod(nameof(RespawnShield.NoteMyEffectOnCopy));
-            Assert.IsTrue(Uses(typeof(PlayerDisplacement), note));
-            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), note));
+            Assert.IsTrue(Uses(typeof(PlayerDisplacement), "Displace", note));
+            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), "Apply", note));
         }
     }
 }

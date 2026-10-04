@@ -352,19 +352,24 @@ MonoBehaviour:
   dominionFlashFormat: +{0} {1}
   dominionFlashSize: 36
   dominionFlashSeconds: 2.5
-  dominionBreakTop: 195
+  dominionFlashFadeSeconds: 0.5
+  dominionFlashGap: 6
+  dominionScoreTop: 12
+  dominionDotsGap: 4
+  dominionRoundLabelTopShare: 0.16
+  dominionBreakTop: 168
   dominionCardFill: {r: 0.059, g: 0.063, b: 0.078, a: 0.85}
   dominionCardRadius: 15
-  dominionCardPadding: {x: 42, y: 36}
-  dominionCardGap: 18
+  dominionCardPadding: {x: 42, y: 20}
+  dominionCardGap: 8
   dominionBreakWidth: 860
   dominionBreakHeaderSize: 19.5
-  dominionBreakHeadlineSize: 66
-  dominionBreakPointsSize: 45
+  dominionBreakHeadlineSize: 54
+  dominionBreakPointsSize: 38
   dominionBreakSmallSize: 22
   dominionBreakOpensSize: 24
   dominionBreakButtonSize: 30
-  dominionBreakButtonHeight: 72
+  dominionBreakButtonHeight: 56
   dominionBreakButtonPadding: 42
   dominionBreakCountdownSize: 33
   dominionBreakBigSize: 84
@@ -373,6 +378,11 @@ MonoBehaviour:
   dominionBreakTiedText: TIED
   dominionBreakFirstText: GET READY
   dominionBreakPointsLabel: points
+  dominionBreakPointsGap: 28
+  dominionBreakPointsLabelSize: 24
+  dominionBreakWinsGap: 8
+  dominionBreakWinsSeparator: "\xB7"
+  dominionBreakDividerThickness: 2
   dominionBreakWinsLabel: Round wins
   dominionBreakPickText: PICK YOUR BUILD (P)
   dominionBreakStartsFormat: ROUND {0} STARTS IN {1}
@@ -403,6 +413,9 @@ MonoBehaviour:
   dominionBannerTitleSize: 51
   dominionBannerRulesSize: 21
   dominionBannerSmallSize: 27
+  dominionBannerExtraHeight: 30
+  dominionBannerTitleTop: 12
+  dominionBannerSmallExtraHeight: 12
   dominionResultModeFormat: DOMINION {0}
   dominionResultHeadlineFormat: '{0} WINS {1}'
   dominionResultSuddenFormat: '{0} WINS IN SUDDEN DEATH'
@@ -418,6 +431,7 @@ MonoBehaviour:
   dominionResultRowHeight: 42
   dominionResultNameWidth: 180
   dominionResultCellWidth: 150
+  dominionResultRowGap: 16
   dominionResultNoteSize: 21
   dominionResultSortingOrder: 5
   markIndicatorSize: 22
@@ -537,6 +551,8 @@ MonoBehaviour:
   spectatorResultCardPadding: {x: 64, y: 36}
   spectatorResultCardTop: 150
   spectatorResultCardGap: 24
+  resultHeadingSpacingShare: 0.23
+  resultTitleMinSizeShare: 0.4
   lobbyDisplayFont: {fileID: 11400000, guid: 14d1d34ba8f7d8449a13152de47b27ae, type: 2}
   lobbyBodyFont: {fileID: 11400000, guid: 564195cefb6722440bfd615ee4597ba9, type: 2}
   lobbyBoldFont: {fileID: 11400000, guid: 81634db9a9ca57842b8bd3061d1d3649, type: 2}

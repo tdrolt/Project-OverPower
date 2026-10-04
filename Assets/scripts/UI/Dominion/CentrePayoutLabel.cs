@@ -16,7 +16,9 @@ namespace Overpower.UI
         private readonly Transform parent;
         private RectTransform root;
         private TextMeshProUGUI line, holder;
-        private string shownLine, shownHolder;
+        // The whole numbers the lines were last built from; the words are only formatted when one moved.
+        private bool lineDrawn;
+        private int drawnPoints, drawnSeconds;
         private int shownHolderTeam = -2;
 
         public bool IsShowing => root != null && root.gameObject.activeSelf;
@@ -39,14 +41,15 @@ namespace Overpower.UI
         {
             if (root == null) Build();
             SetVisible(true);
-            string text = DominionHudText.CentreLine(theme.dominionCentreFormat, points, secondsLeft);
-            if (text != shownLine) { line.text = text; shownLine = text; }
-            string who = DominionHudText.HolderLine(holderTeam, teamNames, theme.dominionCentreHoldsFormat, theme.dominionCentreNobodyText);
-            if (who != shownHolder || holderTeam != shownHolderTeam)
+            if (!lineDrawn || points != drawnPoints || secondsLeft != drawnSeconds)
             {
-                holder.text = who;
+                line.text = DominionHudText.CentreLine(theme.dominionCentreFormat, points, secondsLeft);
+                lineDrawn = true; drawnPoints = points; drawnSeconds = secondsLeft;
+            }
+            if (holderTeam != shownHolderTeam)
+            {
+                holder.text = DominionHudText.HolderLine(holderTeam, teamNames, theme.dominionCentreHoldsFormat, theme.dominionCentreNobodyText);
                 holder.color = holderTeam < 0 ? theme.dominionDimColor : Pick(theme.dominionTeamTextColors, holderTeam);
-                shownHolder = who;
                 shownHolderTeam = holderTeam;
             }
         }
@@ -69,7 +72,7 @@ namespace Overpower.UI
             holder = kit.Text(root, "Holder", "", kit.Bold, theme.dominionCentreHolderSize, theme.dominionDimColor, TextAlignmentOptions.Midline);
             holder.overflowMode = TextOverflowModes.Overflow;
             Place(holder.rectTransform, theme.dominionCentreSize * 1.5f, theme.dominionCentreHolderSize * 1.5f);
-            shownLine = shownHolder = null;
+            lineDrawn = false;
             shownHolderTeam = -2;
         }
 

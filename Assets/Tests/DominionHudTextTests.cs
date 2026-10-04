@@ -124,18 +124,34 @@ namespace Overpower.Tests
 
         // ---- the centre payout flash
 
-        [Test] public void TheTeamWhosePointsJumpedByThePayoutWhenTheNextPayoutMovedIsFlashed()
+        [Test] public void TheHolderOfTheCentreIsFlashedWhenTheNextPayoutMovedAndTheirPointsJumpedByThePayout()
         {
-            Assert.AreEqual(2, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 400, 300, 520 }, new[] { 400, 300, 720 }, 200));
-            Assert.AreEqual(1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 400, 300, 520 }, new[] { 400, 505, 520 }, 200), "the payout and a few ticks in one write");
+            Assert.AreEqual(2, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 400, 300, 520 }, new[] { 400, 300, 720 }, 200, holder: 2));
+            Assert.AreEqual(1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 400, 300, 520 }, new[] { 400, 505, 520 }, 200, holder: 1), "the payout and a few ticks in one write");
+        }
+
+        [Test] public void OnlyTheHolderFlashesEvenWhenAnotherTeamsPointsRoseMoreInTheSameWrite()
+        {
+            // Cyan (2) holds the centre and was paid 200; white (0) rose by 330 from zones in the same write. The biggest rise is not the payout.
+            Assert.AreEqual(2, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 400, 300, 520 }, new[] { 730, 300, 720 }, 200, holder: 2));
+        }
+
+        [Test] public void AHolderWhosePointsDidNotRiseByThePayoutIsNotFlashed() =>
+            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 400, 300, 520 }, new[] { 730, 300, 530 }, 200, holder: 2),
+                "this client's copy says cyan holds it, but the room did not pay cyan: nothing to flash");
+
+        [Test] public void WithNoKnownHolderTheBiggestRiseByAtLeastThePayoutIsFlashed()
+        {
+            Assert.AreEqual(2, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 400, 300, 520 }, new[] { 400, 300, 720 }, 200, holder: -1), "this client's territory copy has not caught up");
+            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 0, 0, 0 }, new[] { 10, 5, 0 }, 200, holder: -1));
         }
 
         [Test] public void OrdinaryTicksANoPayoutAndAJoinersFirstReadNeverFlash()
         {
-            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 30000, new[] { 0, 0, 0 }, new[] { 5, 5, 5 }, 200), "the next payout time did not move");
-            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 0, 0, 0 }, new[] { 10, 5, 0 }, 200), "nobody held it: the time moved, nobody was paid");
-            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(0, 60000, new[] { 0, 0, 0 }, new[] { 400, 0, 0 }, 200), "the first read of a joiner is no payout");
-            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 0, 0, 0 }, new[] { 200, 0, 0 }, 0), "a payout of 0 is nothing to flash");
+            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 30000, new[] { 0, 0, 0 }, new[] { 5, 5, 5 }, 200, holder: 1), "the next payout time did not move");
+            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 0, 0, 0 }, new[] { 10, 5, 0 }, 200, holder: -1), "nobody held it: the time moved, nobody was paid");
+            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(0, 60000, new[] { 0, 0, 0 }, new[] { 400, 0, 0 }, 200, holder: 0), "the first read of a joiner is no payout");
+            Assert.AreEqual(-1, DominionHudText.CentrePayoutTeam(30000, 60000, new[] { 0, 0, 0 }, new[] { 200, 0, 0 }, 0, holder: 0), "a payout of 0 is nothing to flash");
         }
 
         [Test] public void TheFlashNamesThePointsAndTheTeamInCapitals() =>
@@ -152,11 +168,25 @@ namespace Overpower.Tests
         [Test] public void AMatchWonInSuddenDeathSaysSoInsteadOfAScore() =>
             Assert.AreEqual("CYAN WINS IN SUDDEN DEATH", DominionHudText.ResultHeadline(2, new[] { 1, 1, 1 }, new[] { 0, 1, 2 }, Names, "{0} WINS {1}", "{0} WINS IN SUDDEN DEATH", "–", true));
 
-        [Test] public void AMatchIsWonInSuddenDeathOnlyWhenTheWinnerNeverReachedTheWinsNeeded()
+        [Test] public void AMatchIsWonInSuddenDeathOnlyWhenTheRoomEverHadASuddenDeathStart()
         {
-            Assert.IsTrue(DominionHudText.WonInSuddenDeath(2, new[] { 1, 1, 1 }, roundsToWin: 2));
-            Assert.IsFalse(DominionHudText.WonInSuddenDeath(1, new[] { 1, 2, 0 }, roundsToWin: 2));
-            Assert.IsFalse(DominionHudText.WonInSuddenDeath(-1, new[] { 1, 1, 1 }, roundsToWin: 2), "no winner is not a sudden-death win");
+            Assert.IsTrue(DominionHudText.WonInSuddenDeath(2, suddenDeathMs: 123456), "the circle was written, so the circle decided it");
+            Assert.IsFalse(DominionHudText.WonInSuddenDeath(1, suddenDeathMs: 0), "no dSd was ever written");
+            Assert.IsFalse(DominionHudText.WonInSuddenDeath(-1, suddenDeathMs: 123456), "no winner is not a sudden-death win");
+        }
+
+        [Test] public void AMatchEndedAfterOneRoundWithOneTeamLeftIsNotCalledSuddenDeath()
+        {
+            // A7: 1-0-0 after round 1, a team won by the others leaving. The old inference (fewer wins than needed) called this sudden death.
+            bool sudden = DominionHudText.WonInSuddenDeath(1, suddenDeathMs: 0);
+            Assert.AreEqual("PURPLE WINS 1–0", DominionHudText.ResultHeadline(1, new[] { 0, 1, 0 }, new[] { 0, 1 }, Names, "{0} WINS {1}", "{0} WINS IN SUDDEN DEATH", "–", sudden));
+        }
+
+        [Test] public void AMatchWonByTheLastTeamStandingMidRoundIsNotCalledSuddenDeath()
+        {
+            // A3: the last team with anyone in the room wins at once, wins as they stand (0-0).
+            bool sudden = DominionHudText.WonInSuddenDeath(0, suddenDeathMs: 0);
+            Assert.AreEqual("WHITE WINS 0–0", DominionHudText.ResultHeadline(0, new[] { 0, 0, 0 }, new[] { 0, 1 }, Names, "{0} WINS {1}", "{0} WINS IN SUDDEN DEATH", "–", sudden));
         }
 
         [Test] public void TheModeLineNamesTheSizeOfTheMatch()
@@ -238,6 +268,28 @@ namespace Overpower.Tests
             Assert.IsNull(DominionRoomState.Read(new ExitGames.Client.Photon.Hashtable()).History);
         }
 
+        // ---- the match ends with one team left: the unfinished round is in the table (Task 9 review, default A34)
+
+        private static DominionWrite LastTeamLeft(DominionStage stage, int[] points, int[] history) =>
+            DominionRoomWrites.Next(true, true, 200000,
+                new DominionRoomState { HasRound = true, Round = 2, Stage = stage, EndMs = 300000, Points = points, Wins = new[] { 1, 0, 0 }, Winner = -1, History = history },
+                Cfg, new[] { 0, 1 }, new[] { 2, 0, 0 });
+
+        [Test] public void WhenOneTeamIsLeftMidRoundTheAbandonedRoundsPointsGoIntoTheHistory()
+        {
+            DominionWrite w = LastTeamLeft(DominionStage.Round, new[] { 210, 340, 0 }, new[] { 540, 620, 0 });
+            Assert.AreEqual((int)DominionStage.Over, w.Props[DominionKeys.Stage]);
+            Assert.IsTrue(w.Props.ContainsKey(DominionKeys.History), "the result table needs the round that was cut short");
+            CollectionAssert.AreEqual(new[] { 540, 620, 0, 210, 340, 0 }, (int[])w.Props[DominionKeys.History]);
+        }
+
+        [Test] public void WhenOneTeamIsLeftInABreakNoRoundIsAddedToTheHistory()
+        {
+            DominionWrite w = LastTeamLeft(DominionStage.Break, new[] { 540, 620, 0 }, new[] { 540, 620, 0 });
+            Assert.AreEqual((int)DominionStage.Over, w.Props[DominionKeys.Stage]);
+            Assert.IsFalse(w.Props.ContainsKey(DominionKeys.History), "the break's points are round 1's, already in the history");
+        }
+
         // ---- the wiring: the screens call the tested words, and the result is reached from both result paths (method bodies are read, not run)
 
         private static System.Reflection.MethodInfo Text(string name) => typeof(DominionHudText).GetMethod(name);
@@ -292,6 +344,19 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(hud, Text(nameof(DominionHudText.CentrePayoutTeam))));
             Assert.IsTrue(IlWiring.Uses(hud, typeof(DominionRoomState).GetMethod(nameof(DominionRoomState.Read))));
         }
+
+        [Test] public void TheHudPassesTheCentresHolderToTheFlashRuleAndTheResultTheRoomsCircleStart()
+        {
+            System.Type hud = typeof(Overpower.UI.DominionHud);
+            Assert.IsTrue(IlWiring.Uses(hud, "ReadRoom", typeof(Overpower.UI.DominionHud).GetMethod("CentreHolder", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)),
+                "the flash is the holder's, so ReadRoom must ask who holds the centre");
+            Assert.IsTrue(IlWiring.Uses(hud, "ShowResult", typeof(DominionRoomState).GetField(nameof(DominionRoomState.SuddenDeathMs))),
+                "the result decides sudden death from the room's dSd");
+        }
+
+        [Test] public void ASpectatorWhoLeavesTakesTheDominionResultCardDown() =>
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Lobby.SpectatorSeatView), "End",
+                typeof(Overpower.UI.DominionHud).GetMethod(nameof(Overpower.UI.DominionHud.HideResult))));
 
         [Test] public void BothResultPathsAskTheDominionHudBeforeTheirOwnPanel()
         {

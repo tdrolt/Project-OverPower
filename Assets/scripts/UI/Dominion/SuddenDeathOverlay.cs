@@ -71,15 +71,15 @@ namespace Overpower.UI
             banner = box.Outer;
             banner.anchorMin = banner.anchorMax = banner.pivot = new Vector2(0.5f, 1f);
             banner.anchoredPosition = new Vector2(0f, -theme.dominionBannerTop);
-            banner.sizeDelta = new Vector2(theme.dominionBannerWidth, theme.dominionBannerTitleSize * 1.5f + theme.dominionBannerRulesSize * 1.5f + 30f);
+            banner.sizeDelta = new Vector2(theme.dominionBannerWidth, theme.dominionBannerTitleSize * 1.5f + theme.dominionBannerRulesSize * 1.5f + theme.dominionBannerExtraHeight);
             BannerTitle = theme.dominionBannerTitle;
             BannerRules = theme.dominionBannerRules;
             TextMeshProUGUI title = kit.Text(banner, "Title", BannerTitle, kit.Display, theme.dominionBannerTitleSize, theme.suddenDeathColor, TextAlignmentOptions.Midline, 1.5f);
             title.overflowMode = TextOverflowModes.Overflow;
-            Place(title.rectTransform, 12f, theme.dominionBannerTitleSize * 1.5f);
+            Place(title.rectTransform, theme.dominionBannerTitleTop, theme.dominionBannerTitleSize * 1.5f);
             TextMeshProUGUI rules = kit.Text(banner, "Rules", BannerRules, kit.Body, theme.dominionBannerRulesSize, theme.lobbyOffWhiteColor, TextAlignmentOptions.Midline);
             rules.overflowMode = TextOverflowModes.Overflow;
-            Place(rules.rectTransform, 12f + theme.dominionBannerTitleSize * 1.5f, theme.dominionBannerRulesSize * 1.5f);
+            Place(rules.rectTransform, theme.dominionBannerTitleTop + theme.dominionBannerTitleSize * 1.5f, theme.dominionBannerRulesSize * 1.5f);
 
             // The small line that stays after the banner.
             LobbyBox chip = kit.Box(parent, "Sudden Death Small", theme.dominionCardFill, theme.dominionCardRadius, Color.clear, 0f);
@@ -87,7 +87,7 @@ namespace Overpower.UI
             small = chip.Outer;
             small.anchorMin = small.anchorMax = small.pivot = new Vector2(0.5f, 1f);
             small.anchoredPosition = new Vector2(0f, -theme.dominionBannerTop);
-            small.sizeDelta = new Vector2(theme.dominionBannerSmallSize * 9f, theme.dominionBannerSmallSize * 1.5f + 12f);
+            small.sizeDelta = new Vector2(theme.dominionBannerSmallSize * 9f, theme.dominionBannerSmallSize * 1.5f + theme.dominionBannerSmallExtraHeight);
             TextMeshProUGUI chipText = kit.Text(small, "Title", BannerTitle, kit.Display, theme.dominionBannerSmallSize, theme.suddenDeathColor, TextAlignmentOptions.Midline, 1f);
             chipText.overflowMode = TextOverflowModes.Overflow;
             LobbyUiKit.Stretch(chipText.rectTransform);

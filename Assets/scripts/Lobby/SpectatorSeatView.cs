@@ -156,6 +156,8 @@ namespace Overpower.Lobby
             if (resultCard != null)
                 Destroy(resultCard.gameObject);
             resultCard = null;
+            if (dominionResultUp && Overpower.UI.DominionHud.Instance != null)
+                Overpower.UI.DominionHud.Instance.HideResult(); // leaving takes the Dominion result card down too
             dominionResultUp = false;
             currentActor = SpectateRules.None;
             wholeMapChosen = false;

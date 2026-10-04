@@ -130,12 +130,18 @@ namespace Overpower.Dominion
             // A3: a team that empties keeps the match going; the last team with anyone in the room wins it at once.
             int lastTeam = OnlyTeamWithPlayers(teamsInMatch, playersPerTeam);
             if (lastTeam >= 0)
-                return Stage(room, "last team standing", new Hashtable
+            {
+                var over = new Hashtable
                 {
                     { DominionKeys.Stage, (int)DominionStage.Over },
                     { DominionKeys.Winner, lastTeam },
                     { DominionKeys.Wins, Slots(room.Wins) },
-                });
+                };
+                // A round cut short by the others leaving is a row of the result table too (default A34): its points so far go into the history in
+                // this write. In a break the round just played is already there; in sudden death every round is.
+                if (room.Stage == DominionStage.Round) over[DominionKeys.History] = DominionHistory.Append(room.History, room.Points);
+                return Stage(room, "last team standing", over);
+            }
 
             if (room.Stage == DominionStage.SuddenDeath) return NextInSuddenDeath(room, nowMs, cfg, teamsInMatch, suddenDeath); // no clock: the players end it
             if (!MatchStartRules.HasReached(nowMs, room.EndMs)) return null;
