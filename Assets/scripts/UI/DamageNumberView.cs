@@ -73,6 +73,9 @@ namespace Overpower.UI
             // again after it is claimed - it just rides LateUpdate's ordinary hold/rise/fade like any
             // other slot, with its text and colour set once, up front.
             public bool blocked;
+            // Dominion respawn shield: > 0 for a BLOCKED pop with its own whole life in seconds (DominionConfig's Blocked Popup Seconds),
+            // 0 for every other slot, which rides the theme's hold + lifetime.
+            public float popupSeconds;
         }
 
         private UiTheme theme;
@@ -116,6 +119,7 @@ namespace Overpower.UI
             CombatEvents.LocalHitReported += HandleHitReported;
             CombatEvents.LocalImpactSeen += HandleImpactSeen;
             CombatEvents.LocalBlockedSeen += HandleBlockedSeen;
+            CombatEvents.LocalShieldBlockedSeen += HandleShieldBlockedSeen;
         }
 
         private void OnDisable()
@@ -123,6 +127,7 @@ namespace Overpower.UI
             CombatEvents.LocalHitReported -= HandleHitReported;
             CombatEvents.LocalImpactSeen -= HandleImpactSeen;
             CombatEvents.LocalBlockedSeen -= HandleBlockedSeen;
+            CombatEvents.LocalShieldBlockedSeen -= HandleShieldBlockedSeen;
         }
 
         private void HandleImpactSeen(Transform victim, Vector3 hitPoint)
@@ -157,6 +162,7 @@ namespace Overpower.UI
             slots[slot].amount = amount;
             slots[slot].marked = cashedMark;
             slots[slot].blocked = false; // In case this slot was stolen from an old "Blocked" pop.
+            slots[slot].popupSeconds = 0f;
             slots[slot].lastHitTime = Time.time;
             slots[slot].label.gameObject.SetActive(true);
             ApplyLabel(slot);
@@ -190,10 +196,25 @@ namespace Overpower.UI
             slots[slot].amount = 0f;
             slots[slot].marked = false;
             slots[slot].blocked = true;
+            slots[slot].popupSeconds = 0f;
             slots[slot].lastHitTime = Time.time; // Refreshed even for a reused slot - restarts its own hold/fade life.
             slots[slot].label.gameObject.SetActive(true);
             slots[slot].label.SetText(theme.blockedText);
             slots[slot].label.color = theme.blockedColor;
+        }
+
+        /// <summary>Dominion respawn shield: the same Blocked pop (same slot kind, text and colour), but raised on every client that sees the shielded
+        /// player, from their dBlk stamp, over the player at the usual anchor height, and living popupSeconds in all. Refreshes the pop already
+        /// showing for them rather than stacking one per stopped hit.</summary>
+        private void HandleShieldBlockedSeen(Transform victim, float popupSeconds)
+        {
+            if (!theme.showDamageNumbers || victim == null)
+                return;
+
+            HandleBlockedSeen(victim);
+            int slot = FindActiveBlockedSlot(victim);
+            if (slot >= 0)
+                slots[slot].popupSeconds = popupSeconds;
         }
 
         /// <summary>-1 if `victim` has no active Blocked pop right now. Never matches a REAL number's
@@ -309,7 +330,10 @@ namespace Overpower.UI
                 }
 
                 float ageSinceLastHit = Time.time - slots[i].lastHitTime;
-                if (ageSinceLastHit - theme.damageNumberHoldSeconds >= theme.damageNumberLifetimeSeconds)
+                // A shield pop lives its own popupSeconds in all (held for the first half, then rising and fading); every other slot the theme's.
+                float hold = slots[i].popupSeconds > 0f ? slots[i].popupSeconds * 0.5f : theme.damageNumberHoldSeconds;
+                float lifetime = slots[i].popupSeconds > 0f ? slots[i].popupSeconds * 0.5f : theme.damageNumberLifetimeSeconds;
+                if (ageSinceLastHit - hold >= lifetime)
                 {
                     FreeSlot(i);
                     continue;
@@ -338,8 +362,8 @@ namespace Overpower.UI
                 // "last hit" are always written together (see HandleHitReported), so there was never a
                 // case where a separate popTime field actually differed from lastHitTime - review fix
                 // (steps 1-2), dropped as trivial once traced through.
-                DamageNumberPose pose = DamageNumberMotion.Evaluate(ageSinceLastHit, ageSinceLastHit, theme.damageNumberHoldSeconds,
-                    theme.damageNumberLifetimeSeconds, theme.damageNumberPopSeconds, theme.damageNumberPopScale,
+                DamageNumberPose pose = DamageNumberMotion.Evaluate(ageSinceLastHit, ageSinceLastHit, hold,
+                    lifetime, theme.damageNumberPopSeconds, theme.damageNumberPopScale,
                     theme.damageNumberRise, theme.damageNumberFadeStart, theme.damageNumberMarkedScale, slots[i].marked);
 
                 slots[i].rect.anchoredPosition = local + theme.damageNumberScreenOffset + new Vector2(0f, pose.Rise);

@@ -92,5 +92,12 @@ namespace Overpower.Combat
             LocalMarkReported?.Invoke(victim, markSecondsLeft);
 
         public static void RaiseBlockedSeen(Transform victim) => LocalBlockedSeen?.Invoke(victim);
+
+        /// <summary>Dominion respawn shield: a hit on the shielded player was stopped (read from their dBlk stamp, so every client that can see
+        /// them raises it, not only the shooter). The seconds are how long BLOCKED stays up. Distinct from LocalBlockedSeen, the shooter's own
+        /// guess at the Invulnerability ultimate, so one hit can never pop twice.</summary>
+        public static event Action<Transform, float> LocalShieldBlockedSeen;
+
+        public static void RaiseShieldBlockedSeen(Transform victim, float popupSeconds) => LocalShieldBlockedSeen?.Invoke(victim, popupSeconds);
     }
 }

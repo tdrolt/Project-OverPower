@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Overpower.Abilities;
 using Overpower.Combat;
+using Overpower.Dominion;
 using Overpower.Match;
 using Overpower.Vision;
 
@@ -33,6 +34,8 @@ namespace Overpower.Net
             { AllyPortalTraveller.ReadyKey, null },
             { StatusLabelProperty.Key, null },
             { AoeZoneRecast.PropertyKey, null },
+            { RespawnShieldRules.ShieldKey, null },
+            { RespawnShieldRules.BlockedKey, null },
             { ScopeSightProperty.Key, null },
             { Teams.SpectatorKey, null },
             { Teams.TeamKey, null },

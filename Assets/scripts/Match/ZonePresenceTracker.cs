@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Overpower.Data;
+using Overpower.Dominion;
 using Overpower.Match;
 using Overpower.Net;
 using Photon.Pun;
@@ -230,6 +231,12 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
                 return false;
             countAgainFrom.Remove(actor);
         }
+
+        // Dominion respawn shield: a shielded player is in no zone for the master's purposes - they neither capture nor stand in an enemy's way.
+        // Counted like a dead player (standing nowhere), and again the moment the shield is down - the respawn settle wait above has run out by then.
+        if (!RespawnShieldRules.CountsForCapture(RespawnShield.IsUpFor(player)))
+            return false;
+
         return true;
     }
 

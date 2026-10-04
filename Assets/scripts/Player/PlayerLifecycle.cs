@@ -553,6 +553,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         deathCounted = false;
         deathCount = 0;
         rejoinRespawnPending = false;
+        GetComponent<RespawnShield>()?.ClearForFreshStart(); // Dominion A16: a fresh start comes with no shield
         matchUI?.SetRespawnPanelVisible(false);
         matchUI?.HideWaitingPanel();
         matchUI?.SetRespawnNote("");
@@ -619,6 +620,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         respawnStarted = false;
         deathCounted = false;
         rejoinRespawnPending = false;
+        GetComponent<RespawnShield>()?.ClearForFreshStart(); // Dominion A16: a new round comes with no shield
         matchUI?.SetRespawnPanelVisible(false);
         matchUI?.HideWaitingPanel();
         matchUI?.SetRespawnNote("");

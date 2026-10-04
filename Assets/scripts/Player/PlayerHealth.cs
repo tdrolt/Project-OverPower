@@ -128,6 +128,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private float health;
     private ArmorState armor;
     private PlayerStatusEffects statusEffects; // A status is not health - see PlayerStatusEffects.cs.
+    private Overpower.Dominion.RespawnShield respawnShield; // Dominion: stops every hit while the respawn shield is up
 
     // Mark plan step 4: this VICTIM's own marks, keyed by attacker - see MarkLedger's own class
     // comment for why it lives here rather than anywhere network-visible (damage is victim-side, so
@@ -176,6 +177,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         photonView = GetComponent<PhotonView>();
         lifecycle = GetComponent<PlayerLifecycle>();
         statusEffects = GetComponent<PlayerStatusEffects>();
+        respawnShield = GetComponent<Overpower.Dominion.RespawnShield>(); // null in a scene without Dominion
 
         // A silent null here would make this player un-damageable - the worst failure mode.
         if (gameplayConfig == null)
@@ -568,6 +570,12 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         bool fromSelf = sourcePlayer != null && sourcePlayer == photonView.Owner;
         // AreSameTeam deliberately fails OPEN: an unknown team must never silently make someone invulnerable.
         bool fromTeammate = !fromSelf && Teams.AreSameTeam(sourcePlayer, photonView.Owner);
+
+        // Dominion respawn shield: stopped before anything else, so no health, armour, mark or combat-clock change and no damage credit follows
+        // (the spawn keeps healing at its fast rate; the attacker earns no ultimate charge and keeps its own shield). A teammate's hit is left
+        // to the friendly-fire rule below. Self-damage is stopped too (default: a shielded player cannot hurt themselves).
+        if (respawnShield != null && respawnShield.BlocksHit(fromTeammate))
+            return default;
 
         HitVerdict verdict = HitVerdictRule.Classify(fromSelf, fromTeammate,
             statusEffects != null && statusEffects.IsInvulnerable, statusEffects, info.Amount);

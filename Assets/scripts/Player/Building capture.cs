@@ -6,6 +6,7 @@ using Photon.Pun;
 using System.Linq;
 using Overpower.Arena;
 using Overpower.Data;
+using Overpower.Dominion;
 using Overpower.Match;
 using Overpower.UI;
 
@@ -121,6 +122,11 @@ public class BuildingCapture : MonoBehaviourPun
     private Coroutine cooldownRoutine;
 
     private List<PlayerTeam> playersInZone = new List<PlayerTeam>();
+
+    // Dominion respawn shield: players standing in this zone whose shield is up. They are held out of playersInZone (so they neither capture nor stop
+    // an enemy's capture) and put back the moment the shield is down - a player who stays put fires no second OnTriggerEnter, so simply dropping
+    // them from the roster would lose them for good.
+    private readonly List<PlayerTeam> shieldedInZone = new List<PlayerTeam>();
 
     // The ring on the ground marking this zone and its capture progress (2026-09-16; it replaced the bar that floated
     // over the tower). Built in Start so every tower gets one - see CaptureRingView. Null if the theme is unassigned.
@@ -271,6 +277,7 @@ public class BuildingCapture : MonoBehaviourPun
         {
             if (playersInZone.Count > 0)
                 playersInZone.Clear();
+            shieldedInZone.Clear();
             return;
         }
 
@@ -281,6 +288,7 @@ public class BuildingCapture : MonoBehaviourPun
         {
             if (playersInZone.Count > 0)
                 playersInZone.Clear();
+            shieldedInZone.Clear();
             return;
         }
 
@@ -293,6 +301,7 @@ public class BuildingCapture : MonoBehaviourPun
         // this same frame, so removing it here is all a disconnect needs (captureFadeSpeed, [C],
         // 2026-09-24 - a neutral claim now fades rather than resetting, see that method's comment).
         playersInZone.RemoveAll(p => p == null);
+        shieldedInZone.RemoveAll(p => p == null);
 
         // A player who dies in the ring never leaves it either: death switches their collider off,
         // which fires no OnTriggerExit. Measured 2026-09-16, two clients: a killed attacker stayed
@@ -309,6 +318,8 @@ public class BuildingCapture : MonoBehaviourPun
             }
         }
 
+        SortOutShieldedPlayers();
+
         if (isCaptured)
             HandleCapturedState(); // handles recapture decay if an enemy is present
         else if (!isOnCooldown)
@@ -319,6 +330,27 @@ public class BuildingCapture : MonoBehaviourPun
         // idle" transitions, which the old early-returns above would otherwise skip on the very
         // frame that matters.
         PublishProgressIfNeeded();
+    }
+
+    /// <summary>Dominion respawn shield, master: a player whose shield is up leaves the roster the capture counts (into shieldedInZone), and a
+    /// held-out player whose shield is down, or who died while held, comes back or goes. Nothing happens in Conquest (nobody is ever shielded).</summary>
+    private void SortOutShieldedPlayers()
+    {
+        for (int i = playersInZone.Count - 1; i >= 0; i--)
+        {
+            PlayerTeam player = playersInZone[i];
+            if (RespawnShieldRules.CountsForCapture(RespawnShield.IsUpFor(player.photonView.Owner))) continue;
+            playersInZone.RemoveAt(i);
+            if (!shieldedInZone.Contains(player)) shieldedInZone.Add(player);
+        }
+        for (int i = shieldedInZone.Count - 1; i >= 0; i--)
+        {
+            PlayerTeam player = shieldedInZone[i];
+            if (player.TryGetComponent(out PlayerLifecycle lifecycle) && !lifecycle.IsAlive) { shieldedInZone.RemoveAt(i); continue; } // died while held out: re-enters through OnTriggerEnter
+            if (!RespawnShieldRules.CountsForCapture(RespawnShield.IsUpFor(player.photonView.Owner))) continue;
+            shieldedInZone.RemoveAt(i);
+            if (!playersInZone.Contains(player)) playersInZone.Add(player);
+        }
     }
 
     /// <summary>2.7b/phase-two: hides (or restores) everything this zone shows once IsOutOfPlay flips - its tower,
@@ -912,6 +944,7 @@ public class BuildingCapture : MonoBehaviourPun
     public void OnMasterClientChanged(int owner)
     {
         playersInZone.Clear();
+        shieldedInZone.Clear();
         ResetToOwner(owner);
 
         if (localPlayerViewIdInZone == 0)
@@ -1090,7 +1123,12 @@ public class BuildingCapture : MonoBehaviourPun
         var pv = PhotonView.Find(viewID);
         if (pv && pv.GetComponent<PlayerTeam>() is PlayerTeam pt)
         {
-            if (!playersInZone.Contains(pt))
+            if (!RespawnShieldRules.CountsForCapture(RespawnShield.IsUpFor(pt.photonView.Owner)))
+            {
+                // Entered inside a respawn shield: held out of the roster (no capture, no capture sound) until the shield is down.
+                if (!shieldedInZone.Contains(pt) && !playersInZone.Contains(pt)) shieldedInZone.Add(pt);
+            }
+            else if (!playersInZone.Contains(pt))
             {
                 playersInZone.Add(pt);
                 Debug.Log($"[RPC_AddToZone] Added player (Team {pt.teamID}) to zone.");
@@ -1114,6 +1152,7 @@ public class BuildingCapture : MonoBehaviourPun
     void RPC_RemoveFromZone(int viewID)
     {
         var pt = PhotonView.Find(viewID)?.GetComponent<PlayerTeam>();
+        if (pt) shieldedInZone.Remove(pt);
         if (pt && playersInZone.Contains(pt))
         {
             RemoveFromZone(pt);
@@ -1133,6 +1172,7 @@ public class BuildingCapture : MonoBehaviourPun
     private void RemoveFromZone(PlayerTeam pt)
     {
         playersInZone.Remove(pt);
+        shieldedInZone.Remove(pt);
     }
 
     [PunRPC]

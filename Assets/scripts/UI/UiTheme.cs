@@ -938,6 +938,10 @@ namespace Overpower.UI
         [Tooltip("Colour of the Blocked text above - drawn at the ordinary Damage Number Text Size, not a smaller " +
                  "one. Grey on purpose: it is a guess, not a confirmed hit.")]
         public Color blockedColor = new Color(0.7f, 0.7f, 0.7f, 1f);
+        [Tooltip("Colour of the bubble around a player who has just respawned in Dominion (their respawn shield), seen by everyone who can see " +
+                 "that player. Blue on purpose, so it never reads as the yellow Invulnerability look. Its alpha is how see-through the bubble is; " +
+                 "it starts at the same alpha the Invulnerability bubble uses. The bubble's size is set in the Dominion Config (Shield Bubble Scale).")]
+        public Color respawnShieldColor = new Color(0.3098f, 0.6392f, 1f, 0.5f);
 
         [Header("Mark (2026-09-18)")]
         [Tooltip("Canvas units, the mark diamond's width and height (both the shooter's own diamond over an " +
