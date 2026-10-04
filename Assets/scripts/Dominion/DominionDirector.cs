@@ -32,7 +32,6 @@ namespace Overpower.Dominion
         // never echoes), and how often it looks at the room's players.
         private const float EchoWaitSeconds = 1f;
         private const float PresenceCheckSeconds = 0.25f;
-        private const float FallbackGraceSeconds = 10f;
 
         // ---- every client: the read side, so an edge is reacted to once (like MatchDirector's lastApplied*).
         private int lastAppliedRound;
@@ -51,6 +50,7 @@ namespace Overpower.Dominion
         private readonly int[] playersPerTeam = new int[DominionKeys.TeamSlots];
 
         private bool configMissingLogged;
+        private bool gameplayMissingLogged;
 
         /// <summary>The round now in play (or the round a break leads to), 0 before round 1. Reads the room.</summary>
         public int Round => PhotonNetwork.InRoom ? DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties).Round : 0;
@@ -97,7 +97,7 @@ namespace Overpower.Dominion
 
             Hashtable roomProps = PhotonNetwork.CurrentRoom.CustomProperties;
             DominionRoomState room = WithLatestPoints(DominionRoomState.Read(roomProps)); // the round is scored on what the master has written, echoed or not
-            CountPlayers();
+            bool counted = CountPlayers();
             DominionWrite write = DominionRoomWrites.Next(true, true, PhotonNetwork.ServerTimestamp, room,
                 new DominionFlowNumbers
                 {
@@ -106,7 +106,7 @@ namespace Overpower.Dominion
                     HasCentre = CentreInPlay(out _),
                     CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
                     CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),
-                }, match.TeamsInMatch, playersPerTeam);
+                }, match.TeamsInMatch, counted ? playersPerTeam : null); // null: the last-team check is skipped
             if (write == null) return;
 
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(write.Props, write.Expected))
@@ -118,9 +118,13 @@ namespace Overpower.Dominion
             Debug.Log($"[DOMINION] master wrote: {write.What} (round {room.Round}, stage {room.Stage})");
         }
 
+        // Looked up once: Update asks every quarter second.
+        private RoomManager rooms;
+        private RoomManager Rooms => rooms != null ? rooms : (rooms = FindFirstObjectByType<RoomManager>());
+
         private DominionConfig Config()
         {
-            DominionConfig config = FindFirstObjectByType<RoomManager>()?.Dominion;
+            DominionConfig config = Rooms != null ? Rooms.Dominion : null;
             if (config == null && !configMissingLogged)
             {
                 configMissingLogged = true;
@@ -155,11 +159,22 @@ namespace Overpower.Dominion
             }
         }
 
-        /// <summary>Players per team id: a player counts while they are in the room, and a dropped one still counts for the dropped grace.</summary>
-        private void CountPlayers()
+        /// <summary>Players per team id: a player counts while they are in the room, and a dropped one still counts for the dropped grace. False when the gameplay config is missing (nothing was counted).</summary>
+        private bool CountPlayers()
         {
             System.Array.Clear(playersPerTeam, 0, playersPerTeam.Length);
-            float grace = FindFirstObjectByType<RoomManager>()?.Config != null ? FindFirstObjectByType<RoomManager>().Config.DroppedGraceSeconds : FallbackGraceSeconds;
+            // No gameplay config to read the dropped grace from: log once and skip the last-team check rather than guess a number.
+            GameplayConfig gameplay = Rooms != null ? Rooms.Config : null;
+            if (gameplay == null)
+            {
+                if (!gameplayMissingLogged)
+                {
+                    gameplayMissingLogged = true;
+                    Debug.LogError("[DOMINION] the RoomManager has no GameplayConfig - the last-team check is skipped.");
+                }
+                return false;
+            }
+            float grace = gameplay.DroppedGraceSeconds;
             foreach (KeyValuePair<int, Player> pair in PhotonNetwork.CurrentRoom.Players)
             {
                 Player p = pair.Value;
@@ -167,6 +182,7 @@ namespace Overpower.Dominion
                 if (p.IsInactive && inactiveSince.TryGetValue(pair.Key, out float since) && Time.unscaledTime - since >= grace) continue;
                 playersPerTeam[team]++;
             }
+            return true;
         }
 
         // ---------------------------------------------------------------- every client: react to an edge
@@ -253,10 +269,11 @@ namespace Overpower.Dominion
             if (edge == DominionEdge.BreakStarted)
             {
                 Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the zones are neutral again: what the team knew starts over, as at go-live
-                lifecycle.ResetForMatchStart(team);
+                lifecycle.ResetForMatchStart(team, DominionRoomWrites.KeepsScoreboard(edge));
             }
             else if (edge == DominionEdge.RoundStarted)
             {
+                Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the zones were reset again at the round's start: what the team learnt in the break goes too
                 lifecycle.ResetForRoundStart(team);
             }
         }

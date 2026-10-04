@@ -224,5 +224,9 @@ namespace Overpower.Dominion
             if (stage == DominionStage.Round && prevStage == DominionStage.Break) return DominionEdge.RoundStarted;
             return DominionEdge.None;
         }
+
+        /// <summary>Whether the Tab scoreboard (kills, deaths, damage) carries on counting through this edge. Both Dominion edges keep it: the
+        /// scoreboard covers the whole match and is zeroed only at go-live (Tudor's default A15), so the break's fresh start must not wipe it.</summary>
+        public static bool KeepsScoreboard(DominionEdge edge) => edge == DominionEdge.BreakStarted || edge == DominionEdge.RoundStarted;
     }
 }

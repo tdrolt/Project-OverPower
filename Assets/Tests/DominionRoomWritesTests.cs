@@ -235,6 +235,13 @@ namespace Overpower.Tests
             Assert.AreEqual(DominionEdge.None, DominionRoomWrites.EdgeBetween(2, DominionStage.Round, 2, DominionStage.Round));
             Assert.AreEqual(DominionEdge.None, DominionRoomWrites.EdgeBetween(3, DominionStage.Round, 3, DominionStage.SuddenDeath));
             Assert.AreEqual(DominionEdge.None, DominionRoomWrites.EdgeBetween(2, DominionStage.Break, 2, DominionStage.Over));
+            Assert.AreEqual(DominionEdge.None, DominionRoomWrites.EdgeBetween(0, DominionStage.None, 2, DominionStage.Break), "a break that does not follow a round is no edge");
+        }
+
+        [Test] public void TheScoreboardKeepsCountingThroughTheBreakAndTheNextRound()
+        {
+            Assert.IsTrue(DominionRoomWrites.KeepsScoreboard(DominionEdge.BreakStarted), "the break's fresh start must not zero kills, deaths and damage");
+            Assert.IsTrue(DominionRoomWrites.KeepsScoreboard(DominionEdge.RoundStarted));
         }
     }
 }

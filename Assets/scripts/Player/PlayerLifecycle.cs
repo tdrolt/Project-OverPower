@@ -535,7 +535,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// playerHealth.ResetForRespawn(), because armour capacity must already be at level 0 when that refill
     /// decides what "full" means.
     /// </summary>
-    public void ResetForMatchStart(int team)
+    public void ResetForMatchStart(int team, bool keepScoreboard = false)
     {
         if (!photonView.IsMine)
             return;
@@ -569,7 +569,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         goldWallet?.ResetForMatchStart();
         GetComponent<UltimateCharge>()?.ResetForMatchStart();
         GetComponent<PlayerCombatCredit>()?.ResetForMatchStart(); // Warm-up hits must not become live assists.
-        GetComponent<ScoreboardPublisher>()?.ResetForMatchStart(); // Tudor D12: the scoreboard starts from zero at go-live.
+        // Tudor D12: the scoreboard starts from zero at go-live. A Dominion break's fresh start keeps it (default A15: it counts the whole match).
+        if (!keepScoreboard)
+            GetComponent<ScoreboardPublisher>()?.ResetForMatchStart();
         GetComponentInChildren<PlayerOverheat>(true)?.Clear();
         GetComponent<LoadoutScreen>()?.ResetForMatchStart();
         playerHealth.ResetForRespawn();
@@ -621,7 +623,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         matchUI?.SetRespawnNote("");
         respawnNoteShowing = false;
 
+        // Whatever was started in the break must not carry into the round (A9): abilities stop and cooldowns refill (the picks are not
+        // touched - AbilityRunner.ResetForMatchStart only interrupts the modules and refills cooldowns), placed deployables go.
+        GetComponent<AbilityRunner>()?.ResetForMatchStart();
         playerDisplacement?.Cancel();
+        NetworkedDeployable.DestroyAllPlacedByLocalPlayer();
         playerHealth.ResetForRespawn();
 
         RoomManager roomManager = FindObjectOfType<RoomManager>();
