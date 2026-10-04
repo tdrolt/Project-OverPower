@@ -68,10 +68,13 @@ public class BuildingCapture : MonoBehaviourPun
     private float CaptureSeconds =>
         territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureSeconds : FallbackCaptureSeconds;
 
-    // Progress per player per second of capture time. N players capture N times faster - the GDD
-    // doesn't specify multi-player capture speed, so this keeps the game's existing behaviour
-    // (the old baseCaptureRate was tuned so that N players finished a capture N times sooner).
+    // Progress per player per second of capture time: ONE player's speed. N players capture faster by the
+    // TerritoryConfig's captureSpeedByPlayers list (1 / 1.5 / 1.75 for 1 / 2 / 3, lobby Task 14), read through
+    // CaptureSpeedRule - the capture step, the neutral push-down and the published rate all use it.
     private const float ProgressPerPlayerPerSecond = 1f;
+
+    private System.Collections.Generic.IReadOnlyList<float> CaptureSpeeds =>
+        territoryConfig != null ? territoryConfig.CaptureSpeedByPlayers : null;
 
     // captureFadeSpeed (Tudor, 2026-09-24): how fast unfinished progress slides back (neutral) or refills (owned)
     // once nobody is capturing/draining it, in the same one-player-seconds-per-real-second unit as
@@ -426,7 +429,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// CaptureProgress.NeedsRepublishComparedTo. A capture in progress: team = the capturing team,
     /// progress01/rate scaled by CaptureSeconds (one-player-seconds, same units captureProgress is
     /// already tracked in). A decay in progress: team = the ENEMY doing the draining, rate =
-    /// -1/DecaySeconds (matches UpdateDecay's own maths - see its comment). A capture or drain on
+    /// -speed(drainers)/DecaySeconds (matches UpdateDecay's own maths - see its comment). A capture or drain on
     /// hold with something banked (contested, its link under attack, a paused drain):
     /// CaptureProgress.Held, rate 0. Nothing in progress (idle, on cooldown, captured with nobody
     /// contesting it): Idle.</summary>
@@ -458,12 +461,13 @@ public class BuildingCapture : MonoBehaviourPun
     /// already abandoned (capturingID reads -1 once CalculateCaptureProgress's own captureFadeSpeed fade reaches
     /// 0 and resolves fresh with nobody listed, so this exactly mirrors the guard the inline version used to
     /// early-return Idle on).</summary>
-    private CaptureProgress ComputeCurrentProgress(int nowMs)
+    internal CaptureProgress ComputeCurrentProgress(int nowMs)
     {
         int eligibleCount = 0;
         bool enemyPresent = false;
         bool mayCaptureNow = false;
         float fadeRate = FadeRatePerSecond;
+        int drainerCount = drainersThisFrame; // stored once per frame by ApplyDrain (the same number the step used); only read for a running drain
         if (!isCaptured && !isOnCooldown && capturingID != -1 && playersInZone.Count != 0)
         {
             // Mirrors CalculateCaptureProgress's own eligibility check: only "N of my team, nobody
@@ -498,7 +502,7 @@ public class BuildingCapture : MonoBehaviourPun
 
         return CaptureProgressPublishRule.Decide(isCaptured, isDecaying, isDrainPaused, CaptureSeconds, DecaySeconds,
             isOnCooldown, capturingID, eligibleCount, enemyPresent, mayCaptureNow, captureProgress, nowMs,
-            fadeRate);
+            CaptureSpeeds, drainerCount, fadeRate);
     }
 
     /// <summary>Forces this tower to tell the room its current capture progress right now,
@@ -575,7 +579,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// sites this replaces were never actually exercised by a test; reverting either one to the plain fadeRate,
     /// or asking TeamMayCaptureNow(capturingID) instead of the pushing team, passed every test in the project.</summary>
     private float CurrentNeutralFadeRate() =>
-        CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, TeamMayCaptureNow);
+        CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, TeamMayCaptureNow, CaptureSpeeds);
 
     void HandleCapturedState()
     {
@@ -592,6 +596,22 @@ public class BuildingCapture : MonoBehaviourPun
         // Who drains, and whether the drain starts, goes on, pauses or stops: see DrainRule.
         DrainRule.Decision drain = DrainRule.Decide(controllingTeam, teamsInZone, DefenderPresent(), isDecaying,
                                                     capturingID, mayCaptureNow);
+        ApplyDrain(drain, Time.deltaTime);
+    }
+
+    // Master: how many players drain this zone this frame, counted ONCE in ApplyDrain (lobby Task 15b). The step (UpdateDecay) and the
+    // published rate (ComputeCurrentProgress) both read this one number, so they cannot count differently - they used to count
+    // separately (DrainerCount for the step, CountPlayersOfTeam for the publish). 1 whenever no drain is running.
+    private int drainersThisFrame = 1;
+
+    /// <summary>Carries out this frame's DrainRule decision: the state change, the drain step (or the refill once it stopped) and the
+    /// drainer count both the step and the publish use. Split out of HandleCapturedState so a test can drive it with a decision and a
+    /// roster (BuildingCaptureDrainWiringTests) - the wiring between the count, the step and the published rate is what it guards.</summary>
+    internal void ApplyDrain(DrainRule.Decision drain, float deltaTime)
+    {
+        // Only the draining team's players speed the drain; a second enemy team in the zone doesn't help (Tudor, 4 Oct).
+        drainersThisFrame = drain.Step == DrainRule.Step.Start || drain.Step == DrainRule.Step.Continue
+            ? CaptureFadeRule.DrainerCount(drain.Team, teamsInZone) : 1;
         isDrainPaused = drain.Step == DrainRule.Step.Pause;
 
         switch (drain.Step)
@@ -626,7 +646,7 @@ public class BuildingCapture : MonoBehaviourPun
         {
             // Stop the capturing sound if decaying
             StopCapturingSound();
-            UpdateDecay();
+            UpdateDecay(drainersThisFrame, deltaTime);
 
             if (captureProgress <= 0)
             {
@@ -640,7 +660,7 @@ public class BuildingCapture : MonoBehaviourPun
             // full at the fade speed instead of snapping to full (captureFadeSpeed, [C], 2026-09-24).
             // CaptureProgressPublishRule.Decide mirrors this exact step so every client's own
             // CaptureProgress.Evaluate extrapolates the same climb.
-            captureProgress = CaptureFadeRule.Refill(captureProgress, CaptureSeconds, FadeRatePerSecond, Time.deltaTime);
+            captureProgress = CaptureFadeRule.Refill(captureProgress, CaptureSeconds, FadeRatePerSecond, deltaTime);
         }
     }
 
@@ -659,10 +679,11 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
 
-    void UpdateDecay()
+    /// <summary>Tudor, 4 Oct: the drain scales with the enemies draining it, by the same capture-speed list as a capture
+    /// (CaptureFadeRule.DrainProgressPerSecond); drainers = the draining team's players in the zone (CaptureFadeRule.DrainerCount).</summary>
+    internal void UpdateDecay(int drainers, float deltaTime)
     {
-        float seconds = Mathf.Max(0.01f, DecaySeconds);
-        captureProgress -= (CaptureSeconds / seconds) * Time.deltaTime;
+        captureProgress -= CaptureFadeRule.DrainProgressPerSecond(CaptureSeconds, DecaySeconds, drainers, CaptureSpeeds) * deltaTime;
     }
 
     void NeutralizeBuilding()
@@ -758,8 +779,8 @@ public class BuildingCapture : MonoBehaviourPun
         if (eligiblePlayers.Any() && !enemyPlayers && TeamMayCaptureNow(capturingID))
         {
             int count = eligiblePlayers.Count;
-            // N players contribute N progress-per-second - see ProgressPerPlayerPerSecond above.
-            float contribution = count * ProgressPerPlayerPerSecond * Time.deltaTime;
+            // N players contribute CaptureSpeedRule.For(N) progress-per-second - see ProgressPerPlayerPerSecond above.
+            float contribution = CaptureSpeedRule.For(count, CaptureSpeeds) * ProgressPerPlayerPerSecond * Time.deltaTime;
             captureProgress += contribution;
             captureProgress = Mathf.Clamp(captureProgress, 0, CaptureSeconds);
 

@@ -8,7 +8,7 @@ namespace Overpower.UI
 {
     /// <summary>
     /// Playtest extras P6 (2026-09-26): Escape asks "Close the game?" - a runtime, scene-level
-    /// component (one instance, like TestRangePanel/MatchStartPanel, not per-player), built the same
+    /// component (one instance, like TestRangePanel and ConnectionLostPanel, not per-player), built the same
     /// way: a clickable overlay canvas with a GraphicRaycaster, controls built in code so every
     /// listener sits on the same line as the button it belongs to.
     ///
@@ -36,12 +36,13 @@ namespace Overpower.UI
         private bool visible;
 
         // One shared TMP material for both button labels (playtest extras P6 follow-up, item 1) - same
-        // reasoning as MatchStartPanel.ApplyOutline/PlayerHud.AddLabel: without it TMP clones a new
+        // reasoning as ConnectionLostPanel.ApplyOutline/PlayerHud.AddLabel: without it TMP clones a new
         // material the moment a label's outline is touched, one per button, for no reason.
         private Material textMaterial;
 
         private bool shopOpenLastFrame;
         private bool chatOpenLastFrame;
+        private bool pageOpenLastFrame;
 
         private GameObject cachedLocalPlayer;
         private PlayerInputRouter claimedRouter;
@@ -67,11 +68,12 @@ namespace Overpower.UI
         {
             bool shopOpenNow = LoadoutScreen.IsOpen;
             bool chatOpenNow = PhotonChat.IsOpen;
+            bool pageOpenNow = Overpower.UI.LobbyOverlayPanel.AnyPageOpen; // How to play / mode info close themselves on Escape
             bool escapePressed = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
 
             if (!visible)
             {
-                if (escapePressed && !EscapeOwnershipRule.BelongsToShopOrChat(shopOpenNow, shopOpenLastFrame, chatOpenNow, chatOpenLastFrame))
+                if (escapePressed && !EscapeOwnershipRule.BelongsToShopOrChat(shopOpenNow, shopOpenLastFrame, chatOpenNow, chatOpenLastFrame, pageOpenNow, pageOpenLastFrame))
                     Open();
             }
             else if (escapePressed)
@@ -81,6 +83,7 @@ namespace Overpower.UI
 
             shopOpenLastFrame = shopOpenNow;
             chatOpenLastFrame = chatOpenNow;
+            pageOpenLastFrame = pageOpenNow;
         }
 
         private void Open()
@@ -189,8 +192,8 @@ namespace Overpower.UI
 
             // Real buttons, not the bare default sprite these used to render with - tiny dark labels,
             // no fill at all against the dark panel (the brief's own capture, escape_popup.png). Same
-            // size/font/outline recipe as MatchStartPanel.BuildRowButton's own Start button, duplicated
-            // rather than shared - that method is private to its own canvas/layout, and every other
+            // size/font/outline recipe as WarmupBar's End warm-up button (WarmupBar replaced MatchStartPanel), duplicated
+            // rather than shared - that builder is private to its own canvas/layout, and every other
             // control on this panel is already built the same "copy the recipe" way (see the class
             // comment). Yes takes the Start button's own green (an affirmative action, like starting
             // the match); No takes Bar Track Colour, the same neutral/grey fill Loadout's own buttons
@@ -253,7 +256,7 @@ namespace Overpower.UI
             button.navigation = new Navigation { mode = Navigation.Mode.None }; // Same fix as every other code-built control here - see TestRangePanel.AddDropdown's comment.
         }
 
-        /// <summary>Same reasoning as MatchStartPanel.ApplyOutline: one shared Material instance for
+        /// <summary>Same reasoning as ConnectionLostPanel.ApplyOutline: one shared Material instance for
         /// every button label this panel builds, instead of letting TMP auto-clone one per label.</summary>
         private void ApplyOutline(TextMeshProUGUI tmp)
         {

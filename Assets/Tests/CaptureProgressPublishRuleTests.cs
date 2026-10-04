@@ -11,7 +11,7 @@ namespace Overpower.Tests
         {
             // 2 eligible players of 15s Tier 2 tower, 3 seconds in: progress 0.2, rate 2/15.
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
-                capturingID: 1, eligibleCount: 2, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000);
+                capturingID: 1, eligibleCount: 2, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(1, p.Team);
             Assert.AreEqual(0.2f, p.Progress01, 1e-5f);
             Assert.AreEqual(2f / 15f, p.RatePerSecond01, 1e-5f);
@@ -19,10 +19,24 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ThePublishedCaptureRateFollowsTheSpeedListSoEveryClientsBarMatches()
+        {
+            var list = new float[] { 1f, 1.5f, 1.75f };
+            // 15s tower: one player 1/15 of the bar a second, two 1.5/15, three 1.75/15.
+            for (int players = 1; players <= 3; players++)
+            {
+                CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
+                    capturingID: 1, eligibleCount: players, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000,
+                    captureSpeedByPlayers: list, drainerCount: 1);
+                Assert.AreEqual(list[players - 1] / 15f, p.RatePerSecond01, 1e-5f, players + " players");
+            }
+        }
+
+        [Test]
         public void AContestedCaptureIsHeld()
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
-                capturingID: 1, eligibleCount: 1, enemyPresent: true, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000);
+                capturingID: 1, eligibleCount: 1, enemyPresent: true, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(1, p.Team);
             Assert.AreEqual(0.2f, p.Progress01, 1e-5f);
             Assert.AreEqual(0f, p.RatePerSecond01);
@@ -33,7 +47,7 @@ namespace Overpower.Tests
         public void ALinkBlockedCaptureIsHeld()
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
-                capturingID: 1, eligibleCount: 1, enemyPresent: false, mayCaptureNow: false, captureProgress: 3f, nowMs: 5000);
+                capturingID: 1, eligibleCount: 1, enemyPresent: false, mayCaptureNow: false, captureProgress: 3f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(1, p.Team);
             Assert.AreEqual(0.2f, p.Progress01, 1e-5f);
             Assert.IsTrue(p.IsHeld);
@@ -46,7 +60,7 @@ namespace Overpower.Tests
             // reached 0 and reset it) - the isOnCooldown/capturingID guard fires regardless of
             // eligibleCount/captureProgress.
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
-                capturingID: -1, eligibleCount: 0, enemyPresent: false, mayCaptureNow: true, captureProgress: 0f, nowMs: 5000);
+                capturingID: -1, eligibleCount: 0, enemyPresent: false, mayCaptureNow: true, captureProgress: 0f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(CaptureProgress.Idle.Team, p.Team);
             Assert.AreEqual(0f, p.Progress01);
             Assert.AreEqual(0f, p.RatePerSecond01);
@@ -56,7 +70,7 @@ namespace Overpower.Tests
         public void OnCooldownIsIdle()
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, isOnCooldown: true,
-                capturingID: 1, eligibleCount: 2, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000);
+                capturingID: 1, eligibleCount: 2, enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(CaptureProgress.Idle.Team, p.Team);
         }
 
@@ -66,7 +80,7 @@ namespace Overpower.Tests
             // Owned zone, 12 of 15 one-player-seconds still banked (0.8 remaining hold), draining at -1/5.
             CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: true, isDrainPaused: false,
                 captureSeconds: 15f, decaySeconds: 5f, isOnCooldown: false, capturingID: 2, eligibleCount: 0,
-                enemyPresent: false, mayCaptureNow: false, captureProgress: 12f, nowMs: 5000);
+                enemyPresent: false, mayCaptureNow: false, captureProgress: 12f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(2, p.Team);
             Assert.AreEqual(0.8f, p.Progress01, 1e-5f);
             Assert.AreEqual(-0.2f, p.RatePerSecond01, 1e-5f);
@@ -78,7 +92,7 @@ namespace Overpower.Tests
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: true, isDrainPaused: true,
                 captureSeconds: 15f, decaySeconds: 5f, isOnCooldown: false, capturingID: 0, eligibleCount: 0,
-                enemyPresent: false, mayCaptureNow: false, captureProgress: 9f, nowMs: 5000);
+                enemyPresent: false, mayCaptureNow: false, captureProgress: 9f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(0, p.Team);
             Assert.AreEqual(0.6f, p.Progress01, 1e-5f);
             Assert.IsTrue(p.IsHeld);
@@ -89,7 +103,7 @@ namespace Overpower.Tests
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: false, isDrainPaused: false,
                 captureSeconds: 15f, decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0,
-                enemyPresent: false, mayCaptureNow: false, captureProgress: 15f, nowMs: 5000);
+                enemyPresent: false, mayCaptureNow: false, captureProgress: 15f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(CaptureProgress.Idle.Team, p.Team);
         }
 
@@ -99,7 +113,7 @@ namespace Overpower.Tests
             // Nothing banked yet (captureProgress 0): even a contested hold collapses to Idle through
             // CaptureProgress.Held's own zero-progress rule, not a bespoke check in this rule.
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, 15f, 5f, false,
-                capturingID: 1, eligibleCount: 1, enemyPresent: true, mayCaptureNow: true, captureProgress: 0f, nowMs: 5000);
+                capturingID: 1, eligibleCount: 1, enemyPresent: true, mayCaptureNow: true, captureProgress: 0f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(CaptureProgress.Idle.Team, p.Team);
             Assert.IsFalse(p.IsHeld);
         }
@@ -110,7 +124,7 @@ namespace Overpower.Tests
             // A misconfigured tier (Territory Config missing/zero) must never divide by zero.
             CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: true, isDrainPaused: false,
                 captureSeconds: 0f, decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 1,
-                enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000);
+                enemyPresent: false, mayCaptureNow: true, captureProgress: 3f, nowMs: 5000, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(CaptureProgress.Idle.Team, p.Team);
         }
 
@@ -124,7 +138,7 @@ namespace Overpower.Tests
             // eligibleCount 0 the same way - see BuildingCapture.ComputeCurrentProgress's own comment).
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: false,
-                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f);
+                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(1, p.Team, "keeps the fading team's colour until it reaches 0");
             Assert.AreEqual(0.4f, p.Progress01, 1e-5f);
             Assert.AreEqual(-0.2f, p.RatePerSecond01, 1e-5f, "2 one-player-seconds/s over a 10s tier = -0.2/s of progress01");
@@ -139,7 +153,7 @@ namespace Overpower.Tests
             // enemyPresent, so this is a fade too, not the contested Held branch (that needs eligibleCount > 0).
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: true,
-                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f);
+                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(1, p.Team);
             Assert.IsTrue(p.Fading);
             Assert.AreEqual(-0.2f, p.RatePerSecond01, 1e-5f);
@@ -150,7 +164,7 @@ namespace Overpower.Tests
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: false,
-                mayCaptureNow: true, captureProgress: 0f, nowMs: 5000, fadeRatePerSecond: 2f);
+                mayCaptureNow: true, captureProgress: 0f, nowMs: 5000, fadeRatePerSecond: 2f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(CaptureProgress.Idle.Team, p.Team);
         }
 
@@ -161,7 +175,7 @@ namespace Overpower.Tests
             // Held (rate 0, blinking), not a moving-but-zero fade.
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: false,
-                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 0f);
+                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 0f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(1, p.Team);
             Assert.AreEqual(0f, p.RatePerSecond01);
             Assert.IsTrue(p.IsHeld);
@@ -175,7 +189,7 @@ namespace Overpower.Tests
             // regress into a fade just because fadeRatePerSecond is now always passed in.
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 1, enemyPresent: true,
-                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f);
+                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.IsTrue(p.IsHeld);
             Assert.IsFalse(p.Fading);
         }
@@ -188,7 +202,7 @@ namespace Overpower.Tests
             // the already-full case, unchanged).
             CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: false, isDrainPaused: false,
                 captureSeconds: 10f, decaySeconds: 5f, isOnCooldown: false, capturingID: 2, eligibleCount: 0,
-                enemyPresent: false, mayCaptureNow: false, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f);
+                enemyPresent: false, mayCaptureNow: false, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(2, p.Team, "the last drainer's team, same field HandleCapturedState already tracks");
             Assert.AreEqual(0.4f, p.Progress01, 1e-5f);
             Assert.AreEqual(0.2f, p.RatePerSecond01, 1e-5f);
@@ -200,7 +214,7 @@ namespace Overpower.Tests
         {
             CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: false, isDrainPaused: false,
                 captureSeconds: 10f, decaySeconds: 5f, isOnCooldown: false, capturingID: 2, eligibleCount: 0,
-                enemyPresent: false, mayCaptureNow: false, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 0f);
+                enemyPresent: false, mayCaptureNow: false, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 0f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(0f, p.RatePerSecond01);
             Assert.IsTrue(p.IsHeld);
             Assert.IsFalse(p.Fading);
@@ -213,12 +227,12 @@ namespace Overpower.Tests
             // later timestamp must land exactly where the rate says it should, for both directions.
             CaptureProgress fade = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: false,
-                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f);
+                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(0.4f - 0.2f * 1.5f, fade.Evaluate(5000 + 1500), 1e-5f);
 
             CaptureProgress refill = CaptureProgressPublishRule.Decide(true, isDecaying: false, isDrainPaused: false,
                 captureSeconds: 10f, decaySeconds: 5f, isOnCooldown: false, capturingID: 2, eligibleCount: 0,
-                enemyPresent: false, mayCaptureNow: false, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f);
+                enemyPresent: false, mayCaptureNow: false, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: 2f, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(0.4f + 0.2f * 1.5f, refill.Evaluate(5000 + 1500), 1e-5f);
         }
 
@@ -238,12 +252,12 @@ namespace Overpower.Tests
         public void TwoPushersChainedThroughNeutralFadeRatePublishDoubleTheConfiguredRate()
         {
             float rate = CaptureFadeRule.NeutralFadeRate(fadeRate: 1f, claimTeam: 1,
-                teamsInZone: new List<int> { 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true);
+                teamsInZone: new List<int> { 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>());
             Assert.AreEqual(2f, rate, "two pushers beat the configured speed 1: max(1, 2x1)");
 
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: true,
-                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: rate);
+                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: rate, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.AreEqual(1, p.Team);
             Assert.AreEqual(-0.2f, p.RatePerSecond01, 1e-5f, "2 one-player-seconds/s over a 10s tier = -0.2/s of progress01");
             Assert.IsTrue(p.Fading);
@@ -255,15 +269,39 @@ namespace Overpower.Tests
             // The exact bug this round fixes: at fade speed 0 with a lone pusher, publishing the plain (unboosted)
             // FadeRatePerSecond gave a frozen Held band for the whole push-down instead of a moving Fading one.
             float rate = CaptureFadeRule.NeutralFadeRate(fadeRate: 0f, claimTeam: 1,
-                teamsInZone: new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true);
+                teamsInZone: new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>());
             Assert.AreEqual(1f, rate);
 
             CaptureProgress p = CaptureProgressPublishRule.Decide(false, false, false, captureSeconds: 10f,
                 decaySeconds: 5f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: true,
-                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: rate);
+                mayCaptureNow: true, captureProgress: 4f, nowMs: 5000, fadeRatePerSecond: rate, captureSpeedByPlayers: System.Array.Empty<float>(), drainerCount: 1);
             Assert.IsTrue(p.Fading);
             Assert.IsFalse(p.IsHeld);
             Assert.AreEqual(-0.1f, p.RatePerSecond01, 1e-5f);
+        }
+
+        // ---- Tudor, 4 Oct: the published drain rate carries the same factor ----
+
+        [TestCase(1, 1f)]
+        [TestCase(2, 1.5f)]
+        [TestCase(3, 1.75f)]
+        public void ADrainPublishesTheListsFactorForItsDrainers(int drainers, float factor)
+        {
+            var list = new float[] { 1f, 1.5f, 1.75f };
+            CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: true, isDrainPaused: false, captureSeconds: 15f,
+                decaySeconds: 3f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: false, mayCaptureNow: true,
+                captureProgress: 15f, nowMs: 5000, captureSpeedByPlayers: list, drainerCount: drainers);
+            Assert.AreEqual(-factor / 3f, p.RatePerSecond01, 1e-5f);
+        }
+
+        [Test]
+        public void APausedDrainStaysHeldWhateverTheDrainerCount()
+        {
+            CaptureProgress p = CaptureProgressPublishRule.Decide(true, isDecaying: true, isDrainPaused: true, captureSeconds: 15f,
+                decaySeconds: 3f, isOnCooldown: false, capturingID: 1, eligibleCount: 0, enemyPresent: false, mayCaptureNow: true,
+                captureProgress: 9f, nowMs: 5000, captureSpeedByPlayers: new float[] { 1f, 1.5f }, drainerCount: 2);
+            Assert.IsTrue(p.IsHeld);
+            Assert.AreEqual(0f, p.RatePerSecond01);
         }
     }
 }

@@ -1038,12 +1038,6 @@ namespace Overpower.UI
             BuildToast(canvasGo.transform);
             BuildStatusLabel(canvasGo.transform);
 
-            // 2.7b step 8: the warm-up/countdown/host line, built here (so it shares the HUD's own font/shadow/
-            // outline material like every other HUD text) and handed to MatchStartPanel, which decides what it
-            // says and whether it shows, and separately builds its own clickable button canvas alongside it.
-            TextMeshProUGUI warmupLabel = BuildWarmupLine(canvasGo.transform);
-            MatchStartPanel.Create(transform, theme, warmupLabel);
-
             // Tudor D12: hold Tab for the scoreboard. The publisher counts this player's own numbers and writes them
             // to their Player Properties; the panel reads everyone's. Both are owner-only, like the rest of this HUD.
             ScoreboardPublisher.Create(gameObject, gameplayConfig);
@@ -1124,31 +1118,6 @@ namespace Overpower.UI
             image.raycastTarget = false;
             go.SetActive(false);
             return image;
-        }
-
-        /// <summary>2.7b step 8: the warm-up/countdown/host line, top-centre - same construction as BuildToast just
-        /// above (see its own comment for why a toast-style label is parented directly to the canvas rather than
-        /// into Hud Panel's layout group), but at its own anchor (Warmup Top Offset) and size (Warmup Line Size) so
-        /// it sits clear above the toast instead of overlapping it. Returns the built label; MatchStartPanel owns
-        /// its text/active state from here on - this method only builds it.</summary>
-        private TextMeshProUGUI BuildWarmupLine(Transform canvasParent)
-        {
-            GameObject go = new GameObject("Warmup Line", typeof(RectTransform));
-            go.transform.SetParent(canvasParent, false);
-            RectTransform rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.pivot = new Vector2(0.5f, 1f);
-            rt.anchoredPosition = new Vector2(0f, -theme.warmupTopOffset);
-            rt.sizeDelta = theme.warmupLineSize;
-
-            TextMeshProUGUI text = AddLabel(go.transform, "", theme.titleTextSize, FontStyles.Bold);
-            RectTransform textRt = text.rectTransform;
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = Vector2.zero;
-            textRt.offsetMax = Vector2.zero;
-
-            return text;
         }
 
         /// <summary>The gold readout, bottom-right, directly above the "Loadout (P)" button (Tudor, 2026-09-17:

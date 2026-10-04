@@ -17,6 +17,24 @@ namespace Overpower.Match
     /// </summary>
     public static class CaptureFadeRule
     {
+        /// <summary>Tudor, 4 Oct: how many players drain an owned zone: the players of the one draining team (the team DrainRule
+        /// named, the one the bar shows) standing in it. Another enemy team in the zone at the same time does not add to it, in line
+        /// with DrainRule, which lets only one team drain at a time.
+        /// Only the draining team's players speed the drain; a second enemy team in the zone doesn't help (Tudor, 4 Oct).</summary>
+        public static int DrainerCount(int drainingTeam, IReadOnlyList<int> teamsInZone)
+        {
+            int n = 0;
+            for (int i = 0; i < teamsInZone.Count; i++)
+                if (teamsInZone[i] == drainingTeam) n++;
+            return n;
+        }
+
+        /// <summary>How much of an owned zone's progress (in one-player seconds, same units as captureProgress) its drain removes per
+        /// real second: one drainer takes captureSeconds / decaySeconds, more take that times the capture-speed list's factor for
+        /// that many players (1 / 1.5 / 1.75 by default). BuildingCapture.UpdateDecay (the step) and CaptureProgressPublishRule (the published rate) both call this, each with the one drainer count BuildingCapture.ApplyDrain stores per frame.</summary>
+        public static float DrainProgressPerSecond(float captureSeconds, float decaySeconds, int drainers, IReadOnlyList<float> captureSpeedByPlayers) =>
+            captureSeconds / System.Math.Max(0.01f, decaySeconds) * CaptureSpeedRule.For(System.Math.Max(1, drainers), captureSpeedByPlayers);
+
         /// <summary>True when a neutral zone's current claim should fade this tick: it has a real claiming team
         /// (capturingId >= 0) and none of that team's players are currently listed in the zone - whether the zone
         /// is entirely empty or only another team stands there. False for an unclaimed zone (-1, nothing to fade)
@@ -68,13 +86,14 @@ namespace Overpower.Match
         ///     already gates this function out of that case in both production callers).
         ///   - Exactly ONE other team inside (SinglePushingTeam, above) and mayCapture(pushingTeam) says yes →
         ///     pushes the claim down at least as fast as that team could capture the zone itself: max(fadeRate,
-        ///     N x perPlayerSpeed), N = that team's listed players, so N players push N times as fast as one,
-        ///     exactly like capturing.
+        ///     speed(N) x perPlayerSpeed), N = that team's listed players, speed from CaptureSpeedRule (1 / 1.5 / 1.75 for 1 / 2 / 3
+        ///     players by default), the same speed N players would capture at.
         ///   - Two or more different other teams inside, or the single other team present may NOT capture right
         ///     now → fadeRate; they don't push, the plain fade still applies. mayCapture is never even called in
         ///     either case (nobody to ask about).</summary>
         public static float NeutralFadeRate(float fadeRate, int claimTeam, IReadOnlyList<int> teamsInZone,
-                                             float perPlayerSpeed, System.Func<int, bool> mayCapture)
+                                             float perPlayerSpeed, System.Func<int, bool> mayCapture,
+                                             IReadOnlyList<float> captureSpeedByPlayers)
         {
             if (teamsInZone.Count == 0 || Contains(teamsInZone, claimTeam))
                 return fadeRate;
@@ -88,7 +107,7 @@ namespace Overpower.Match
                 if (teamsInZone[i] == pushingTeam)
                     n++;
 
-            return System.Math.Max(fadeRate, n * perPlayerSpeed);
+            return System.Math.Max(fadeRate, CaptureSpeedRule.For(n, captureSpeedByPlayers) * perPlayerSpeed);
         }
 
         /// <summary>One tick of a neutral zone's claim fading toward 0, never past it.</summary>

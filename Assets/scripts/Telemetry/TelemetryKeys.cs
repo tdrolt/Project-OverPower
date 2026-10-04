@@ -98,6 +98,8 @@ namespace Overpower.Telemetry
         public const string MatchId = "m";
         public const string Nick = "nick";
         public const string IsMaster = "master";
+        /// <summary>Lobby Task 6 review: true on the session line of a spectator host (no team, no player row in the report).</summary>
+        public const string Spectator = "spec";
         public const string Commit = "commit";
         public const string UnityVersion = "uv";
         public const string Platform = "plat";

@@ -30,22 +30,27 @@ public class QuitButton : MonoBehaviour
     private TMP_Text label;
     private RoomManager manager;
 
-    /// <summary>Task 9f (Tudor D22): once the MATCH is over (the room's phase) this leads back to the name screen for a fresh start; on the
+    /// <summary>Task 9f (Tudor D22): once the MATCH is over (the room's phase) this leads back to the lobby list for a fresh start; on the
     /// waiting panel, or on a knocked-out player's lose panel while the match still runs, it closes the game.</summary>
     public void Quit()
     {
-        if (CurrentAction() == ResultButtonAction.BackToNameScreen)
+        if (CurrentAction() == ResultButtonAction.BackToLobbyList)
         {
             if (manager == null)
                 manager = FindFirstObjectByType<RoomManager>();
             if (manager != null)
             {
-                manager.ReturnToNameScreen();
+                manager.ReturnToLobbyList();
                 return;
             }
         }
         GameQuit.Quit();
     }
+
+    /// <summary>The label the button shows: the rule's label for the action it will take - "Back to the lobby list" once the match is over (and this
+    /// is the match-over panel), else "Quit".</summary>
+    public static string LabelFor(bool matchOver, MatchPhase phase, string lobbyListLabel, string quitLabel) =>
+        BackToNameScreenRules.ButtonLabel(matchOver ? BackToNameScreenRules.ButtonAction(phase) : ResultButtonAction.CloseGame, lobbyListLabel, quitLabel);
 
     private static ResultButtonAction CurrentAction()
     {
@@ -53,7 +58,7 @@ public class QuitButton : MonoBehaviour
         return BackToNameScreenRules.ButtonAction(director != null ? director.Phase : MatchPhase.Warmup);
     }
 
-    /// <summary>The label follows what the button will do (UiTheme texts): "Main menu" once the match is over, else "Quit".</summary>
+    /// <summary>The label follows what the button will do (UiTheme texts): "Back to the lobby list" once the match is over, else "Quit".</summary>
     void Update()
     {
         MatchUI ui = GetComponentInParent<MatchUI>();
@@ -63,8 +68,9 @@ public class QuitButton : MonoBehaviour
             label = GetComponentInChildren<TMP_Text>(true);
         if (label == null)
             return;
-        string wanted = ui.MatchOver && CurrentAction() == ResultButtonAction.BackToNameScreen
-            ? ui.Theme.resultButtonMainMenu : ui.Theme.resultButtonQuit;
+        MatchDirector director = MatchDirector.Instance;
+        string wanted = LabelFor(ui.MatchOver, director != null ? director.Phase : MatchPhase.Warmup,
+            ui.Theme.resultButtonLobbyList, ui.Theme.resultButtonQuit);
         if (label.text != wanted)
             label.text = wanted;
     }

@@ -280,23 +280,12 @@ MonoBehaviour:
   minimapCutAreaColor: {r: 0.05, g: 0.05, b: 0.06, a: 0.75}
   minimapCutWallColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
   minimapCutWallWidth: 3
-  warmupWaitingText: 'Warm-up: nothing counts yet and the shop is free. The host starts once two teams have a player.'
-  warmupHostText: 'Warm-up: press Start when you''re ready (two or three teams).'
-  warmupGuestText: 'Warm-up: waiting for the host to start.'
-  matchCountdownText: Match starts in {0}
-  matchStartButtonText: Start match ({0} teams)
+  matchCountdownText: MATCH STARTS IN {0}
   matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   matchStartButtonSize: {x: 260, y: 52}
   warmupTopOffset: 130
-  warmupLineSize: {x: 900, y: 64}
   matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
   matchLiveTwoTeamsToastText: 'Two teams: lose your base and you can''t respawn'
-  lobbyTwoTeamsButtonText: Two teams (up to 6)
-  lobbyThreeTeamsButtonText: Three teams (up to 9)
-  lobbyTwoTeamsTooManyText: Two teams needs 6 players or fewer
-  warmupTwoTeamsWaitingText: 'Warm-up (two teams): the host starts once both teams have a player.'
-  warmupTwoTeamsHostText: 'Warm-up (two teams): both teams are here. Start when you''re ready.'
-  warmupTwoTeamsGuestText: 'Warm-up (two teams): waiting for the host to start.'
   showDamageNumbers: 1
   damageNumberTextSize: 30
   damageNumberColor: {r: 1, g: 1, b: 1, a: 1}
@@ -342,16 +331,6 @@ MonoBehaviour:
   - Purple
   - Cyan
   scoreboardUnknownTeamText: Joining
-  nameTipsKeysText: "<b>Keys</b>\nWASD  move\nMouse  aim, left click shoots\nRight click  Attachment ability\nLeft Shift  Mobility ability\nSpace  Ultimate ability (meter full)\nR  Vent (see Overheat)\nP  Shop\nM  Map\nHold Tab  Scoreboard\nEnter  Chat\nEscape  Close the game"
-  nameTipsOverheatText: "<b>Overheat and the Vent</b>\nShooting and Sprint build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\nWhile locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout."
-  nameTipsChargesText: "<b>Ability charges</b>\nSome abilities hold several charges. Spent charges come back one at a time. Dash locks until 2 charges are back once you use all 3."
-  nameTipsModeText: "<b>The match</b>\nCapture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake it or take another team's base. The last team standing wins."
-  nameTipsFontSize: 20
-  nameTipsColor: {r: 1, g: 1, b: 1, a: 0.9}
-  nameTipsKeysWidth: 560
-  nameTipsRulesWidth: 800
-  nameTipsColumnGap: 60
-  nameTipsGapBelowJoin: 30
   damageNumberScreenOffset: {x: 50, y: 0}
   blockedText: Blocked
   blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
@@ -366,8 +345,10 @@ MonoBehaviour:
   quitPromptText: Close the game?
   quitYesText: Yes
   quitNoText: No
-  matchLogSavedText: 'Your match log is saved: {0} - send this file to Tudor.'
+  matchLogSavedText: "Your match log is saved.\nSaved in: {0}\nSend this zip to Tudor: {1}"
   openLogFolderText: Open folder
+  matchLogSavedOffset: {x: 24, y: 70}
+  matchLogSavedWidth: 640
   connectionLostTitle: Connection lost
   connectionLostBody: Rejoin to come back to the same match as the same player - same team, gold and loadout. You respawn as after a death.
   connectionLostRejoinButton: Rejoin
@@ -377,7 +358,7 @@ MonoBehaviour:
   rejoinFailedOkButton: OK
   rejoinPlaceHeldText: You still hold a place in a match you dropped out of, but it could not be reached. Try again in a minute, or join a new match once it is given up.
   rejoinMatchButton: Rejoin your match
-  resultButtonMainMenu: Main menu
+  resultButtonLobbyList: Back to the lobby list
   resultButtonQuit: Quit
   spectateButton: Spectate
   spectateNextButton: Next
@@ -393,3 +374,347 @@ MonoBehaviour:
   rejoinMatchButtonSize: {x: 420, y: 52}
   rejoinButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   rejoinButtonGapAboveNameBox: 16
+  spectatorBarColor: {r: 0.06, g: 0.063, b: 0.078, a: 0.88}
+  spectatorBarPadding: {x: 36, y: 20}
+  spectatorBarGap: 42
+  spectatorBarBottom: 28
+  spectatorBarCaptionSize: 18
+  spectatorBarCaptionColor: {r: 0.557, g: 0.545, b: 0.522, a: 1}
+  spectatorBarNameSize: 36
+  spectatorBarKeyTextSize: 22
+  spectatorBarKeyCapSize: 22
+  spectatorBarKeyCapColor: {r: 0.557, g: 0.545, b: 0.522, a: 1}
+  spectatorBarOutline: 2
+  spectatorBarKeyCapPadding: {x: 15, y: 6}
+  spectatorBarLeaveSize: {x: 120, y: 60}
+  spectatorBarLeaveOutlineColor: {r: 0.29, g: 0.302, b: 0.341, a: 1}
+  spectatorBarCaption: SPECTATING
+  spectatorBarWholeMapName: Whole map
+  spectatorBarKeyCaps:
+  - Q
+  - E
+  - Space
+  - Wheel
+  spectatorBarKeyTexts:
+  - Previous
+  - Next
+  - Whole map
+  - Zoom
+  spectatorBarLeaveText: Leave
+  spectatorWholeMapFill: 0.88
+  spectatorViewAngle: 0
+  lobbyDisplayFont: {fileID: 11400000, guid: 14d1d34ba8f7d8449a13152de47b27ae, type: 2}
+  lobbyBodyFont: {fileID: 11400000, guid: 564195cefb6722440bfd615ee4597ba9, type: 2}
+  lobbyBoldFont: {fileID: 11400000, guid: 81634db9a9ca57842b8bd3061d1d3649, type: 2}
+  lobbyDarkColor: {r: 0.102, g: 0.1098, b: 0.1333, a: 1}
+  lobbyBackdropColor: {r: 0.0588, g: 0.0627, b: 0.0784, a: 1}
+  lobbyPanelColor: {r: 0.149, g: 0.1608, b: 0.1961, a: 1}
+  lobbyRowFullColor: {r: 0.1255, g: 0.1333, b: 0.1647, a: 1}
+  lobbyBorderColor: {r: 0.2902, g: 0.302, b: 0.3412, a: 1}
+  lobbyCardBorderColor: {r: 0.2275, g: 0.2392, b: 0.2784, a: 1}
+  lobbyPurpleColor: {r: 0.4196, g: 0.2471, b: 0.749, a: 1}
+  lobbyCyanColor: {r: 0.1686, g: 0.7216, b: 0.7686, a: 1}
+  lobbyOffWhiteColor: {r: 0.9569, g: 0.949, b: 0.9294, a: 1}
+  lobbyMutedColor: {r: 0.7255, g: 0.7137, b: 0.6824, a: 1}
+  lobbyDimColor: {r: 0.5569, g: 0.5451, b: 0.5216, a: 1}
+  lobbyYellowColor: {r: 0.9098, g: 0.7255, b: 0.1922, a: 1}
+  lobbyDisabledButtonColor: {r: 0.2, g: 0.2118, b: 0.2471, a: 1}
+  lobbyDarkTextColor: {r: 0.102, g: 0.1098, b: 0.1333, a: 1}
+  lobbyErrorColor: {r: 0.9098, g: 0.7255, b: 0.1922, a: 1}
+  lobbyTitleOutlineColor: {r: 0.949, g: 0.549, b: 0.1569, a: 1}
+  lobbyTitleOutlineWidth: 0.09
+  lobbyTitleMaterial: {fileID: 2100000, guid: 91f299c386dd23948a457ce323197502, type: 2}
+  lobbyCreateSelectedFill: {r: 0.4196, g: 0.2471, b: 0.749, a: 0.251}
+  lobbyCornerRadius: 9
+  lobbyCardRadius: 15
+  lobbyBorderWidth: 1.5
+  lobbyChosenBorderWidth: 3
+  lobbyLabelSpacing: 1.5
+  lobbyKickerSpacing: 6
+  lobbyButtonSpacing: 1.5
+  nameScreenWidth: 720
+  nameScreenGap: 42
+  nameScreenInnerGap: 12
+  nameScreenKickerSize: 21
+  nameScreenTitleSize: 144
+  nameScreenLabelSize: 19.5
+  nameScreenFieldHeight: 84
+  nameScreenFieldTextSize: 33
+  nameScreenHintSize: 19.5
+  nameScreenFindHeight: 90
+  nameScreenFindTextSize: 36
+  nameScreenRejoinHeight: 72
+  nameScreenRejoinTextSize: 24
+  lobbyListPadding: {x: 96, y: 72}
+  lobbyListGap: 36
+  lobbyListKickerSize: 19.5
+  lobbyListKickerSpacing: 4.5
+  lobbyListTitleSize: 72
+  lobbyListPlayingAsSize: 22.5
+  lobbyListCreateHeight: 72
+  lobbyListCreatePadding: 42
+  lobbyListCreateTextSize: 30
+  lobbyListHeadSize: 19.5
+  lobbyListColumnWeights:
+  - 3
+  - 2
+  - 1.4
+  - 1.6
+  - 1.4
+  lobbyListActionWidth: 180
+  lobbyListColumnGap: 24
+  lobbyListRowPadding: 30
+  lobbyListRowHeight: 96
+  lobbyListRowGap: 12
+  lobbyListRowTextSize: 25.5
+  lobbyListRowSpecSize: 21
+  lobbyListRowButtonHeight: 60
+  lobbyListRowButtonTextSize: 22.5
+  lobbyListHowToHeight: 72
+  lobbyListHowToPadding: 33
+  lobbyListHowToTextSize: 24
+  lobbyListHintSize: 21
+  createCardWidth: 1140
+  createCardPadding: 60
+  createCardGap: 39
+  createTitleSize: 54
+  createLabelSize: 19.5
+  createFieldHeight: 72
+  createFieldPadding: 24
+  createFieldTextSize: 27
+  createModeHeight: 84
+  createModeTextSize: 33
+  createNoteSize: 21
+  createComingSoonSize: 18
+  createSizeButton: {x: 210, y: 78}
+  createSizeTextSize: 30
+  createSizeGap: 18
+  createActionHeight: 72
+  createCancelPadding: 36
+  createCancelTextSize: 24
+  createCreatePadding: 48
+  createCreateTextSize: 30
+  createActionGap: 18
+  lobbyMessageSeconds: 6
+  nameScreenKickerText: PROJECT
+  nameScreenTitleText: OVERPOWER
+  nameScreenLabelText: YOUR NAME
+  nameScreenHintFormat: '{0} to {1} letters or numbers'
+  nameScreenFindText: FIND A LOBBY
+  lobbyListKickerText: PROJECT OVERPOWER
+  lobbyListTitleText: Lobbies
+  lobbyListPlayingAsText: Playing as
+  lobbyListCreateText: CREATE LOBBY
+  lobbyListColumnTexts:
+  - LOBBY
+  - MODE
+  - PLAYERS
+  - STATUS
+  - HOST
+  lobbyListJoinText: Join
+  lobbyListSpectateText: Spectate
+  lobbyListFullText: Full
+  lobbyListHowToText: How to play
+  lobbyListHintText: The list updates by itself. A lobby closes when everyone has left.
+  lobbyListEmptyText: No lobbies yet. Create one to get started.
+  lobbyListConnectingText: Connecting to the lobby list...
+  lobbyListUnknownModeText: Unknown mode
+  createTitleText: Create a lobby
+  createNameLabelText: LOBBY NAME
+  createNamePrefillFormat: '{0}''s lobby'
+  createNameFallbackText: My lobby
+  createModeLabelText: MODE
+  createTeamsLabelText: TEAMS
+  createComingSoonText: coming soon
+  createFamilyNotes:
+  - Capture territory for gold, take capitals, be the last team standing.
+  - A new mode, coming soon.
+  createOtherFamilyFormat: '{0} offers {1} here instead.'
+  createSizeJoiner: ' and '
+  createCancelText: Cancel
+  createCreateText: CREATE
+  createFailedText: Could not create the lobby. Try again.
+  lobbyConnectionLostText: Disconnected. Check your connection.
+  lobbyRoomSeatFill: {r: 0.2, g: 0.212, b: 0.247, a: 1}
+  lobbyRoomSideFill: {r: 0.125, g: 0.133, b: 0.165, a: 1}
+  lobbyRoomSideBorder: {r: 0.2, g: 0.212, b: 0.247, a: 1}
+  lobbyRoomHeadingColor: {r: 0.847, g: 0.835, b: 0.808, a: 1}
+  lobbyRoomTeamColors:
+  - {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  - {r: 0.42, g: 0.247, b: 0.749, a: 1}
+  - {r: 0.169, g: 0.722, b: 0.769, a: 1}
+  lobbyRoomPadding: {x: 72, y: 54}
+  lobbyRoomGap: 30
+  lobbyRoomBoxRadius: 12
+  lobbyRoomTitleSize: 57
+  lobbyRoomModeHeight: 51
+  lobbyRoomModePadding: 21
+  lobbyRoomModeTextSize: 22.5
+  lobbyRoomHostLineSize: 22.5
+  lobbyRoomTeamGap: 24
+  lobbyRoomBoxPadding: 21
+  lobbyRoomStripeHeight: 6
+  lobbyRoomTeamNameSize: 33
+  lobbyRoomSeatHeight: 69
+  lobbyRoomSeatGap: 12
+  lobbyRoomSeatPadding: 21
+  lobbyRoomSeatTextSize: 24
+  lobbyRoomSeatEmptyTextSize: 22.5
+  lobbyRoomMineBorderWidth: 3
+  lobbyRoomSpectatorTitleSize: 30
+  lobbyRoomSpectatorSeatHeight: 63
+  lobbyRoomSpectatorTextSize: 22.5
+  lobbyRoomSpectatorGap: 18
+  lobbyRoomSideWidth: 375
+  lobbyRoomSideTitleSize: 30
+  lobbyRoomSideNameSize: 24
+  lobbyRoomSideNoteSize: 19.5
+  lobbyRoomSideButtonHeight: 60
+  lobbyRoomSideButtonTextSize: 21
+  lobbyRoomBottomHeight: 72
+  lobbyRoomBottomPadding: 33
+  lobbyRoomBottomTextSize: 24
+  lobbyRoomBottomGap: 18
+  lobbyRoomStartHeight: 84
+  lobbyRoomStartPadding: 54
+  lobbyRoomStartTextSize: 36
+  lobbyRoomStartHintSize: 21
+  lobbyRoomStartGap: 24
+  lobbyRoomModeFormat: "{0} \u00B7"
+  lobbyRoomInfoIconSize: 30
+  lobbyRoomInfoIconText: i
+  lobbyRoomHostFormat: "\u00B7 host {0} \u00B7 click a seat to take it"
+  lobbyRoomEmptySeatText: Empty seat
+  lobbyRoomYouSuffix: ' (you)'
+  lobbyRoomHostSuffix: " \u00B7 host"
+  lobbyRoomSpectatorsText: Spectators
+  lobbyRoomNoRoleFormat: 'No role ({0})'
+  lobbyRoomNoRoleNote: 'At the start they fill the emptiest team, then the spectator seats.'
+  lobbyRoomLeaveSeatText: Leave my seat
+  lobbyRoomLeaveLobbyText: Leave lobby
+  lobbyRoomStartText: START GAME
+  lobbyRoomStartHintText: Everyone spawns into the warm-up
+  lobbyRoomStartBlockedFormat: '{0} needs a player'
+  lobbyRoomWaitingFormat: 'Waiting for {0} to start the game'
+  lobbyRoomOverlayWidth: 1824
+  lobbyRoomOverlayHeight: 984
+  lobbyRoomOverlayTitleSize: 60
+  lobbyRoomOverlayCloseSize: 66
+  lobbyRoomOverlayShade: {r: 0, g: 0, b: 0, a: 0.7}
+  warmupBarFill: {r: 0.102, g: 0.11, b: 0.133, a: 0.88}
+  warmupBarRadius: 12
+  warmupBarPaddingHost: {x: 36, y: 18}
+  warmupBarPaddingGuest: {x: 42, y: 18}
+  warmupBarGap: 30
+  warmupBarTitleSize: 36
+  warmupBarInfoSize: 21
+  warmupBarButtonHeight: 72
+  warmupBarButtonPadding: 39
+  warmupBarButtonTextSize: 30
+  warmupBarTitleText: WARM-UP
+  warmupBarInfoFormat: "Free shop \u00B7 nothing counts \u00B7 {0}"
+  warmupBarPlayersText: '{0} players'
+  warmupBarOnePlayerText: 1 player
+  warmupBarGuestFormat: "Free shop \u00B7 nothing counts \u00B7 {0} ends the warm-up"
+  warmupBarButtonText: END WARM-UP
+  warmupBarBlockedFormat: '{0} has no player'
+  warmupBarCountdownInfo: Everything resets when it goes live
+  lobbyListHeaderGap: 24
+  lobbyListTitleGap: 6
+  lobbyListPlayerGap: 24
+  lobbyListPlayingAsGap: 9
+  lobbyListFooterGap: 24
+  lobbyListScrollSensitivity: 40
+  createBlockGap: 12
+  createComingSoonLabelShift: 1.2
+  createComingSoonBoxHeight: 1.3
+  createComingSoonLift: 4
+  nameScreenTitleGap: 9
+  lobbyLateJoinFullText: Lobby full
+  lobbyLateJoinNoSeatText: Could not get a seat
+  lobbyJoinFullText: That lobby is full.
+  lobbyJoinClosedText: That lobby has closed.
+  lobbyJoinGoneText: That lobby no longer exists.
+  lobbyJoinFailedText: Could not join that lobby.
+  chatPanelAlpha: 0.38
+  chatPanelSize: {x: 630, y: 360}
+  chatPanelMargin: {x: 72, y: 54}
+  chatLobbyMargin: {x: 520, y: 54}
+  chatLobbySize: {x: 630, y: 270}
+  chatPanelPadding: 24
+  chatPanelGap: 12
+  chatPanelRadius: 12
+  chatTextSize: 27
+  chatLineSpacing: 30
+  chatInputHeight: 66
+  chatInputTextSize: 24
+  chatInputPlaceholder: Enter to type, Escape to close
+  chatSpectatorTag: '[SPEC]'
+  chatMaxLines: 40
+  chatPanelColor: {r: 0.05882353, g: 0.0627451, b: 0.078431375, a: 1}
+  chatInputTextInset: 18
+  chatInputBorderWidth: 1.5
+  chatInputCornerFactor: 0.75
+  lobbyRoomHeaderGap: 3
+  lobbyRoomModeRowGap: 15
+  lobbyRoomInfoIconTextFactor: 0.62
+  lobbyRoomModeIconGapFactor: 0.4
+  lobbyRoomModeButtonSlack: 4
+  lobbyRoomSideNameLine: 1.4
+  warmupBarHostRightPadding: 20.88
+  nameScreenFieldPadding: 23.04
+  createModeRadiusExtra: 3
+  howToPlayPages: {fileID: 11400000, guid: 4b7ba35d353c0ab49adedbc8abbcebe1, type: 2}
+  howToPlaySidebarTitle: HOW TO PLAY
+  howToPlayPreviousFormat: "<size=150%>\u2039</size> {0}"
+  howToPlayNextFormat: "{0} <size=150%>\u203A</size>"
+  howToPlayCounterFormat: "{0} / {1}"
+  howToPlayNoPagesText: No pages yet.
+  modeInfoKickerText: GAME MODE
+  modeInfoNoCardsText: Nothing to read about this mode yet.
+  howToPlaySidebarColor: {r: 0.082, g: 0.086, b: 0.106, a: 1}
+  howToPlayPictureColor: {r: 0.055, g: 0.059, b: 0.075, a: 1}
+  howToPlayTextColor: {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  howToPlayCardPaddingX: 54
+  howToPlayCardPaddingY: 42
+  howToPlayContentGap: 30
+  howToPlaySidebarWidth: 390
+  howToPlaySidebarPaddingX: 36
+  howToPlaySidebarPaddingY: 36
+  howToPlaySidebarGap: 6
+  howToPlaySidebarTitleSize: 18
+  howToPlaySidebarTitleGap: 18
+  howToPlaySidebarTitleSpacing: 3
+  howToPlayEntryHeight: 58
+  howToPlayEntryTextSize: 24
+  howToPlaySelectedBarWidth: 4.5
+  howToPlayTitleSize: 60
+  howToPlayPictureWidth: 741
+  howToPlayPictureHeight: 570
+  howToPlayPictureRadius: 12
+  howToPlayPictureGap: 48
+  howToPlayTextSize: 28.5
+  howToPlayTextMinSize: 21
+  howToPlayTextLineSpacing: 35
+  howToPlayButtonHeight: 66
+  howToPlayButtonPadding: 30
+  howToPlayButtonTextSize: 22.5
+  howToPlayCounterSize: 21
+  howToPlayCounterWidthFactor: 8
+  howToPlayLineHeightFactor: 1.5
+  modeInfoHeaderGap: 3
+  modeInfoKickerSize: 18
+  modeInfoKickerSpacing: 3
+  modeInfoColumns: 3
+  modeInfoGap: 24
+  modeInfoCardPadding: 30
+  modeInfoCardGap: 15
+  modeInfoCardRadius: 12
+  modeInfoAccentHeight: 6
+  modeInfoCardTitleSize: 36
+  modeInfoCardTextSize: 24
+  modeInfoCardTextMinSize: 17
+  modeInfoFitSlack: 6
+  modeInfoCardTextLineSpacing: 20
+  lobbyRoomCloseCrossSize: 21
+  lobbyRoomCloseCrossThickness: 3

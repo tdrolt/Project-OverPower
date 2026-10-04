@@ -171,8 +171,8 @@ namespace Overpower.Tests
         [Test]
         public void NeutralFadeRateWithNobodyElseIsThePlainFadeRateUnchanged()
         {
-            Assert.AreEqual(0f, CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 1, new List<int>(), perPlayerSpeed: 1f, mayCapture: _ => true));
-            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int>(), perPlayerSpeed: 1f, mayCapture: _ => true));
+            Assert.AreEqual(0f, CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 1, new List<int>(), perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>()));
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int>(), perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>()));
         }
 
         [Test]
@@ -181,8 +181,8 @@ namespace Overpower.Tests
             // The claim team standing there (alone, or contested with an enemy too) is never a fade at all - the
             // caller's ordinary capture/contest logic runs instead (CapturingTeamAbsent gates it out before this
             // is ever called in production); this pure function still returns a well-defined, harmless value.
-            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 1 }, perPlayerSpeed: 1f, mayCapture: _ => true));
-            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 1, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true));
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 1 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>()));
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 1, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>()));
         }
 
         [Test]
@@ -190,7 +190,7 @@ namespace Overpower.Tests
         {
             // fadeRate already at one player's own speed: max(1, 1) is still 1 - no regression for the
             // default/common case (captureFadeSpeed 1, one enemy standing alone who may capture).
-            Assert.AreEqual(1f, CaptureFadeRule.NeutralFadeRate(1f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true));
+            Assert.AreEqual(1f, CaptureFadeRule.NeutralFadeRate(1f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>()));
         }
 
         [Test]
@@ -198,24 +198,52 @@ namespace Overpower.Tests
         {
             // The "important" fix itself: speed 0 must not hold forever once another team is actually here alone
             // and may capture.
-            Assert.AreEqual(1f, CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true));
+            Assert.AreEqual(1f, CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>()));
         }
 
         [Test]
-        public void NeutralFadeRateForThreePlayersIsThreeTimesOnePlayersWhenThatBeatsTheFadeRate()
+        public void NeutralFadeRateWithAnEmptyListFallsBackToNTimesOnePlayersSpeed()
         {
-            float rateForOne = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true);
-            float rateForThree = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true);
+            float rateForOne = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>());
+            float rateForThree = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>());
             Assert.AreEqual(1f, rateForOne, 1e-5f);
             Assert.AreEqual(3f, rateForThree, 1e-5f);
-            Assert.AreEqual(3f, rateForThree / rateForOne, 1e-5f, "three push three times as fast as one, like capturing");
+            Assert.AreEqual(3f, rateForThree / rateForOne, 1e-5f, "an empty list: three push three times as fast as one (the n-times fallback)");
+        }
+
+        [Test]
+        public void NeutralFadeRatePushesAtTheSpeedTheListGivesForThatManyPlayers()
+        {
+            var list = new float[] { 1f, 1.5f, 1.75f };
+            float one = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            float two = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            float three = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            Assert.AreEqual(1f, one, 1e-5f);
+            Assert.AreEqual(1.5f, two, 1e-5f, "two pushers use the second entry, the same speed two capturers would have");
+            Assert.AreEqual(1.75f, three, 1e-5f);
+        }
+
+        [Test]
+        public void NeutralFadeRateScalesTheListByThePerPlayerSpeed()
+        {
+            var list = new float[] { 1f, 1.5f };
+            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2 }, perPlayerSpeed: 2f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            Assert.AreEqual(3f, rate, 1e-5f);
+        }
+
+        [Test]
+        public void NeutralFadeRateStillNeverGoesBelowTheFadeRateWithAList()
+        {
+            var list = new float[] { 1f, 1.5f };
+            float rate = CaptureFadeRule.NeutralFadeRate(5f, claimTeam: 1, new List<int> { 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: list);
+            Assert.AreEqual(5f, rate, 1e-5f);
         }
 
         [Test]
         public void NeutralFadeRateNeverGoesBelowTheConfiguredFadeRate()
         {
             // A slow lone enemy (0.2 progress/s) must never slow the fade below the configured speed.
-            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 0.2f, mayCapture: _ => true));
+            Assert.AreEqual(2f, CaptureFadeRule.NeutralFadeRate(2f, claimTeam: 1, new List<int> { 2 }, perPlayerSpeed: 0.2f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>()));
         }
 
         [Test]
@@ -224,7 +252,7 @@ namespace Overpower.Tests
             // Review fix (minor 2): two DIFFERENT enemy teams fighting inside a faded claim (3 total players, two
             // different teams) must NOT push at their combined headcount - contested among the pushers, plain
             // fade only, same as EffectiveFadeRate's old bug (N counted every non-claim player regardless of team).
-            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 3 }, perPlayerSpeed: 1f, mayCapture: _ => true);
+            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 3 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>());
             Assert.AreEqual(0.5f, rate);
         }
 
@@ -233,7 +261,7 @@ namespace Overpower.Tests
         {
             // Review fix (minor 3): a lone pushing team whose only way in is itself under attack (TeamMayCaptureNow
             // false) must not push the claim down at all - plain fade only, same as it can't capture the zone.
-            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => false);
+            float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 }, perPlayerSpeed: 1f, mayCapture: _ => false, captureSpeedByPlayers: System.Array.Empty<float>());
             Assert.AreEqual(0.5f, rate);
         }
 
@@ -254,7 +282,7 @@ namespace Overpower.Tests
             }
 
             float rate = CaptureFadeRule.NeutralFadeRate(0.5f, claimTeam: 1, new List<int> { 2, 2, 2 },
-                perPlayerSpeed: 1f, RecordAndAllow);
+                perPlayerSpeed: 1f, RecordAndAllow, captureSpeedByPlayers: System.Array.Empty<float>());
 
             Assert.AreEqual(3f, rate, 1e-5f);
             CollectionAssert.AreEqual(new[] { 2 }, askedTeams,
@@ -266,7 +294,7 @@ namespace Overpower.Tests
         {
             // Speed 0, one enemy player alone in the zone who may capture: must still reach 0 (not hold forever)
             // and let CaptureClaimRule.Resolve hand the claim to the team actually there - the bug this fixes.
-            float rate = CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 0, new List<int> { 1 }, perPlayerSpeed: 1f, mayCapture: _ => true);
+            float rate = CaptureFadeRule.NeutralFadeRate(0f, claimTeam: 0, new List<int> { 1 }, perPlayerSpeed: 1f, mayCapture: _ => true, captureSpeedByPlayers: System.Array.Empty<float>());
             float progress = 2f;
             for (int i = 0; i < 2; i++)
                 progress = CaptureFadeRule.Step(progress, rate, 1f);
@@ -275,6 +303,34 @@ namespace Overpower.Tests
             var (capturingId, fresh) = CaptureClaimRule.Resolve(-1, 0f, new List<int> { 1 });
             Assert.AreEqual(1, capturingId);
             Assert.AreEqual(0f, fresh);
+        }
+
+        // ---- Tudor, 4 Oct: an owned zone drains faster with more enemies, by the capture-speed list ----
+
+        [Test]
+        public void DrainersAreTheDrainingTeamsPlayersOnly()
+        {
+            Assert.AreEqual(2, CaptureFadeRule.DrainerCount(1, new List<int> { 1, 2, 1, 2, 2 }), "team 2 standing there too does not add");
+            Assert.AreEqual(0, CaptureFadeRule.DrainerCount(1, new List<int> { 2 }));
+            Assert.AreEqual(0, CaptureFadeRule.DrainerCount(1, new List<int>()));
+        }
+
+        [Test]
+        public void TheDrainTakesTheListsFactorForOneTwoAndThreeDrainers()
+        {
+            var list = new float[] { 1f, 1.5f, 1.75f };
+            // captureSeconds 15, decaySeconds 3: one drainer removes 5 one-player-seconds per second
+            Assert.AreEqual(5f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 1, list), 1e-4f);
+            Assert.AreEqual(7.5f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 2, list), 1e-4f);
+            Assert.AreEqual(8.75f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 3, list), 1e-4f);
+            Assert.AreEqual(8.75f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 4, list), 1e-4f, "past the end: the last value");
+        }
+
+        [Test]
+        public void TheDrainWithAnEmptyListIsNTimesAsFastAndNoDrainersCountsAsOne()
+        {
+            Assert.AreEqual(10f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 2, System.Array.Empty<float>()), 1e-4f);
+            Assert.AreEqual(5f, CaptureFadeRule.DrainProgressPerSecond(15f, 3f, 0, new float[] { 1f }), 1e-4f);
         }
     }
 }

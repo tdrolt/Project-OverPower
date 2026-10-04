@@ -14,7 +14,7 @@ namespace Overpower.Telemetry
     /// <summary>
     /// Playtest extras P5 (2026-09-26): zips THIS client's own match-log files (its own
     /// "{actor}_*.jsonl" and "bug_{actor}_*.png" - see MatchLogZipRule) into
-    /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;nick&gt;.zip" (2026-09-27:
+    /// "&lt;Match logs root&gt;/OverPower-log_&lt;match folder name&gt;_&lt;actor&gt;_&lt;nick&gt;.zip" (2026-09-27:
     /// directly in the root, not the dated per-match subfolder - see TryZip), so each tester finds and
     /// sends one file right away. Called from two places, both fine to call more than once and both
     /// through the same ZipNow (2026-09-26 fix - see its own comment on why there is no longer a
@@ -53,7 +53,7 @@ namespace Overpower.Telemetry
         private string lastKnownNick = "";
 
         // One shared TMP material for both overlay button labels (playtest extras P6 follow-up, item 2)
-        // - same reasoning as QuitConfirmPanel/MatchStartPanel's own ApplyOutline.
+        // - same reasoning as QuitConfirmPanel/ConnectionLostPanel's own ApplyOutline (MatchStartPanel, which had one too, was replaced by WarmupBar and LobbyRoomPanel).
         private Material textMaterial;
 
         private void Awake()
@@ -153,7 +153,7 @@ namespace Overpower.Telemetry
                 // HandleBeforeClose never sees a valid one there (Task 9f review) - the zip made at the button press does.
                 int actor = MatchLogZipRule.ResolveActor(PhotonNetwork.LocalPlayer.ActorNumber, lastKnownActor);
                 lastKnownActor = actor;
-                string nick = MatchLogZipRule.ResolveNick(PhotonNetwork.LocalPlayer.NickName, lastKnownNick);
+                string nick = MatchLogZipRule.ResolveNick(PhotonNetwork.LocalPlayer.NickName, lastKnownNick, PhotonNetwork.LocalPlayer.ActorNumber);
                 lastKnownNick = nick;
 
                 string[] allNames = Directory.GetFiles(folder).Select(Path.GetFileName).ToArray();
@@ -166,7 +166,7 @@ namespace Overpower.Telemetry
                 // MatchLogZipRule.ZipFileName's own comment on the real bug this replaces): stable for
                 // the whole match, so every zip of it - result panel, then maybe again on quit - comes
                 // out under the SAME name no matter what the clock reads when each call happens to run.
-                string zipName = MatchLogZipRule.ZipFileName(Path.GetFileName(folder), sanitizedNick);
+                string zipName = MatchLogZipRule.ZipFileName(Path.GetFileName(folder), sanitizedNick, actor);
                 // 2026-09-27 designer change: the zip goes directly in the "Match logs" ROOT (folder's own
                 // parent), not inside the dated per-match subfolder, so testers find it at once instead of
                 // having to open one more folder. Falls back to folder itself if, somehow, it has no parent
@@ -212,7 +212,9 @@ namespace Overpower.Telemetry
                 // so the raw zipPath read "C:/Users/...\Match logs\..." (the brief's own capture). Display
                 // only: GetFullPath normalises every separator to this platform's own without touching
                 // the actual path used to write the file above.
-                savedLabel.text = string.Format(theme.matchLogSavedText, Path.GetFullPath(zipPath));
+                // Lobby Task 13 (Tudor, 3 Oct #7): the match folder (inside the Match logs root) and the zip, each readable and wrapping.
+                savedLabel.text = string.Format(theme.matchLogSavedText,
+                    MatchLogZipRule.WrappablePath(Path.GetFullPath(folder)), MatchLogZipRule.WrappablePath(Path.GetFullPath(zipPath)));
             }
             overlayRoot.SetActive(true);
         }
@@ -237,16 +239,12 @@ namespace Overpower.Telemetry
             panel.transform.SetParent(canvasGo.transform, false);
             panel.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.95f); // Opaque (item 2) - 0.8 let the HUD's "not ready" labels show through it.
             RectTransform panelRt = panel.GetComponent<RectTransform>();
-            // Item 2: top-centre, under the warm-up line's own spot (theme.warmupTopOffset) - the exact
-            // anchor PlayerHud.BuildWarmupLine uses for that line - rather than bottom-centre, which sat
-            // directly over the ability bar's slots (the brief's own capture,
-            // zip_overlay_matchlog_saved.png). By the time this overlay can show (a result panel, or a
-            // quit), the warm-up line and the Start/switch buttons that shared this spot are always
-            // hidden - the match is over - so nothing there is free to overlap. Canvas units, so this
-            // holds at 1920x1080 and 1280x720 alike, same as everything else built against this theme.
-            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 1f);
-            panelRt.anchoredPosition = new Vector2(0f, -(theme != null ? theme.warmupTopOffset : 130f));
-            panelRt.sizeDelta = new Vector2(760f, 0f);
+            // Lobby Task 10: bottom left (theme.matchLogSavedOffset), not top centre. The result screen's YOU WIN / YOU LOSE title sits
+            // at the top, and this overlay used to cover it (captures/2026-10-02-lobby-task8/over_B.png); the bottom left is clear of the
+            // title, the result button and the ability slots. Canvas units, so this holds at 1920x1080 and 1280x720 alike.
+            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0f, 0f);
+            panelRt.anchoredPosition = theme != null ? theme.matchLogSavedOffset : new Vector2(24f, 70f);
+            panelRt.sizeDelta = new Vector2(theme != null ? theme.matchLogSavedWidth : 640f, 0f);
 
             VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(16, 16, 12, 12);
@@ -329,7 +327,7 @@ namespace Overpower.Telemetry
             button.navigation = new UnityEngine.UI.Navigation { mode = UnityEngine.UI.Navigation.Mode.None };
         }
 
-        /// <summary>Same reasoning as QuitConfirmPanel.ApplyOutline/MatchStartPanel.ApplyOutline: one
+        /// <summary>Same reasoning as QuitConfirmPanel.ApplyOutline/ConnectionLostPanel.ApplyOutline: one
         /// shared Material instance for every button label this overlay builds.</summary>
         private void ApplyOutline(TextMeshProUGUI tmp)
         {
@@ -346,8 +344,20 @@ namespace Overpower.Telemetry
         /// whoever is sitting at this machine's screen; check this wiring by reading it instead.</summary>
         private void OnOpenFolderClicked()
         {
-            if (!string.IsNullOrEmpty(lastKnownFolder))
-                Application.OpenURL(lastKnownFolder);
+            bool windows = Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor;
+            // One tested method decides what runs (MatchLogZipRule.OpenFolder): explorer.exe with the plain path on Windows (a file://
+            // address breaks on '#', '%' and non-ASCII letters), the address elsewhere.
+            OpenFolderCommand command = MatchLogZipRule.OpenFolder(windows, lastKnownFolder);
+            switch (command.Kind)
+            {
+                case OpenFolderKind.Explorer:
+                    try { System.Diagnostics.Process.Start("explorer.exe", command.Argument); }
+                    catch (Exception e) { Debug.LogWarning($"[MatchLogZip] could not open the match folder: {e.Message}"); }
+                    break;
+                case OpenFolderKind.Url:
+                    Application.OpenURL(command.Argument);
+                    break;
+            }
         }
 
         private void OnDismissClicked()

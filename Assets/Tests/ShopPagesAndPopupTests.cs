@@ -84,16 +84,6 @@ namespace Overpower.Tests
             StringAssert.Contains("Attachment", column);
             StringAssert.DoesNotContain("Equipment", column);
 
-            var asset = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            StringAssert.Contains("Attachment", asset.nameTipsKeysText);
-            StringAssert.DoesNotContain("Equipment", asset.nameTipsKeysText);
-            var fresh = ScriptableObject.CreateInstance<UiTheme>();
-            try
-            {
-                StringAssert.Contains("Attachment", fresh.nameTipsKeysText);
-                StringAssert.DoesNotContain("Equipment", fresh.nameTipsKeysText);
-            }
-            finally { Object.DestroyImmediate(fresh); }
         }
 
         // ---- placement ----

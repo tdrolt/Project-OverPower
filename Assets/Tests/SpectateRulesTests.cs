@@ -186,5 +186,27 @@ namespace Overpower.Tests
             Assert.AreEqual(5, count);
             Assert.AreEqual(13f, RespawnDelayRules.Delay(count, 5f, 2f, 35f), "fifth death: 5 + 2 * 4");
         }
+
+        // ---- Lobby Task 15b: the result card a spectator sees at the match end
+
+        private static readonly string[] Names = { "White", "Purple", "Cyan" };
+
+        [Test]
+        public void TheResultTitleNamesTheWinningTeam() =>
+            Assert.AreEqual("Purple wins the match", SpectateRules.ResultTitle("{0} wins the match", Names, 1));
+
+        [TestCase(3)]
+        [TestCase(7)]
+        public void AWinnerWithNoNameStillGivesAReadableTitle(int winner) =>
+            Assert.AreEqual("Team " + winner + " wins the match", SpectateRules.ResultTitle("{0} wins the match", Names, winner));
+
+        [Test]
+        public void TheResultCardGoesUpOnceForASpectatorWhenThereIsAWinner()
+        {
+            Assert.IsTrue(SpectateRules.MustShowResult(watching: true, winner: 2, alreadyShown: false));
+            Assert.IsFalse(SpectateRules.MustShowResult(watching: true, winner: 2, alreadyShown: true), "only once");
+            Assert.IsFalse(SpectateRules.MustShowResult(watching: true, winner: -1, alreadyShown: false), "no winner yet");
+            Assert.IsFalse(SpectateRules.MustShowResult(watching: false, winner: 2, alreadyShown: false), "not a spectator (a player's own panel handles it)");
+        }
     }
 }

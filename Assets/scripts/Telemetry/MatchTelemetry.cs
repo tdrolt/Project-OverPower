@@ -7,6 +7,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
+using Overpower.Lobby;
 using Overpower.Match;
 using Overpower.Net;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -71,14 +72,22 @@ namespace Overpower.Telemetry
         // Cap on how many log lines are held before the file has opened (match id + this client's own
         // actor number both known). Only ever a handful of lines in practice - join/leave/masterChanged
         // observed in the first frame or two after connecting - but a cap keeps a client that somehow
-        // never resolves its identity from growing this list forever.
+        // never resolves its identity from growing this list forever. Lobby Task 13: a lobby now fills
+        // this too (its markers, joins and leaves before the game starts), so when it is full the OLDEST
+        // lines go (PendingLineBuffer) and the file says how many - the newest (Start, first team lines) survive.
         private const int MaxPendingLines = 200;
 
         // Not readonly: OnLeftRoom replaces this with a fresh instance for the next match, so one
         // match's IO error (which permanently sets TelemetryWriter.Disabled) doesn't silently disable
         // telemetry for every match this client plays afterwards in the same session.
         private TelemetryWriter writer = new TelemetryWriter();
-        private readonly List<string> pendingLines = new List<string>();
+        private readonly PendingLineBuffer pending = new PendingLineBuffer(MaxPendingLines);
+
+        // Lobby Task 13: spectators this master has already noted with a marker (cleared when the room is left).
+        private readonly HashSet<int> spectatorsNoted = new HashSet<int>();
+
+        // The game modes, to name a lobby's mode in the log folder and the lobby-created marker (read from the RoomManager once, lazily).
+        private GameModeCatalogue modeCatalogue;
 
         private string matchId;
         private int matchStartMs;
@@ -219,12 +228,20 @@ namespace Overpower.Telemetry
             CurrentFolder = null;
             matchId = null;
             matchStartMs = 0;
-            pendingLines.Clear();
+            pending.Clear();
+            spectatorsNoted.Clear();
             if (claimIdentityRoutine != null)
             {
                 StopCoroutine(claimIdentityRoutine);
                 claimIdentityRoutine = null;
             }
+        }
+
+        /// <summary>Lobby Task 13: the creator (and only the creator - Photon raises this on the client that made the room) notes the new lobby.</summary>
+        public override void OnCreatedRoom()
+        {
+            if (PhotonNetwork.CurrentRoom == null) return;
+            DropMarker(LobbyMarkerNotes.LobbyCreated(LobbyNameOfRoom(), ModeNameOfRoom()));
         }
 
         public override void OnPlayerEnteredRoom(Player newPlayer) => LogJoinOrLeave(TelemetryKeys.Join, newPlayer);
@@ -240,9 +257,51 @@ namespace Overpower.Telemetry
 
             // The old master may have left before ever writing the match identity.
             TryClaimMatchIdentity();
+
+            // A spectator who becomes the host starts writing (their file is the master-only lines').
+            if (newMasterClient != null && newMasterClient.IsLocal)
+            {
+                TryOpenFile();
+                // Lobby Task 13: the new host notes the change, and every spectator it can already see (the old host may have left before it did).
+                DropMarker(LobbyMarkerNotes.HostChanged(newMasterClient.ActorNumber, newMasterClient.NickName ?? ""));
+                foreach (Player player in PhotonNetwork.PlayerList)
+                    NoteSpectator(player);
+            }
         }
 
-        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) => ReadMatchIdentity(propertiesThatChanged);
+        public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+        {
+            ReadMatchIdentity(propertiesThatChanged);
+            // The lobby stage reaching the warm-up (lS 1) is what lets a spectator host's file open (a player's opens on their team).
+            if (propertiesThatChanged != null && propertiesThatChanged.ContainsKey(LobbyKeys.Stage))
+                TryOpenFile();
+        }
+
+        /// <summary>The lobby stage in the room right now (lS): 0 lobby, 1 warm-up, 2 in match.</summary>
+        private static int LobbyStageNow =>
+            PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Stage, out object raw) && raw is int stage
+                ? stage : 0;
+
+        /// <summary>The local player's team arriving (the game started and the seat became a team) is when their log opens.</summary>
+        public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
+        {
+            if (targetPlayer == null || changedProps == null) return;
+            // Lobby Task 13 (Task 8 review): a spectator HOST's file opens when its spec flag arrives - that comes after the stage edge, so
+            // listening to the team key alone left it opening at go-live.
+            if (TelemetryRoleRule.RetriesOpenOnChange(targetPlayer.IsLocal, changedProps.ContainsKey(Teams.TeamKey), changedProps.ContainsKey(Teams.SpectatorKey)))
+                TryOpenFile();
+            if (changedProps.ContainsKey(Teams.SpectatorKey))
+                NoteSpectator(targetPlayer);
+        }
+
+        /// <summary>Master only: one marker per spectator the host sees, so the report knows they are watchers (they write no log, and "no log
+        /// from actor N" would be a false alarm for them).</summary>
+        private void NoteSpectator(Player player)
+        {
+            if (player == null || !PhotonNetwork.IsMasterClient || !Teams.IsSpectator(player)) return;
+            if (!spectatorsNoted.Add(player.ActorNumber)) return;
+            DropMarker(LobbyMarkerNotes.SpectatorSeen(player.ActorNumber));
+        }
 
         private void LogJoinOrLeave(string eventName, Player player)
         {
@@ -484,6 +543,12 @@ namespace Overpower.Telemetry
             int actor = PhotonNetwork.LocalPlayer.ActorNumber;
             if (actor <= 0) return; // Not yet assigned an actor number - guards a race right after connecting.
 
+            // Lobby Task 6: the session line makes this player a row of the report. Nobody writes a file in the lobby before the game starts
+            // (lS 0), and nobody without a role: the file opens when this player is on a team (OnPlayerPropertiesUpdate below) - or is a
+            // spectator HOST, whose master-only lines are the territory timeline (OnMasterClientSwitched and OnRoomPropertiesUpdate retry).
+            if (!TelemetryRoleRule.MayOpenFile(Teams.IsSpectator(PhotonNetwork.LocalPlayer), Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _), PhotonNetwork.IsMasterClient, LobbyStageNow))
+                return;
+
             string folder = ResolveMatchFolder();
             string fileName = $"{actor}_{Sanitize(PhotonNetwork.LocalPlayer.NickName)}.jsonl";
             writer.Open(Path.Combine(folder, fileName));
@@ -492,50 +557,99 @@ namespace Overpower.Telemetry
             CurrentFolder = folder;
 
             WriteSessionLine();
-            foreach (string pending in pendingLines)
-                writer.Write(pending);
-            pendingLines.Clear();
+            if (pending.Dropped > 0)
+                WriteDroppedNote(pending.Dropped);
+            foreach (string waiting in pending.Lines)
+                writer.Write(waiting);
+            pending.Clear();
 
             writer.Flush(); // Immediate, so the file and its header exist as soon as a client joins, not just after the first flush interval.
         }
 
-        /// <summary>One folder per match on one PC: reuses an existing folder ending in `_{mId8}` if
-        /// one already exists (a late-starting second client on the same machine), otherwise creates a
-        /// freshly dated one.
+        /// <summary>One folder per match on one PC. Lobby Task 13 (D13): its name says when, which mode and size and which lobby
+        /// ("2026-10-02_2130_Conquest-3v3v3_Tudors-lobby", see MatchFolderName), and it holds a small `match.id` file with the match id. A
+        /// folder is reused only when that id matches - so a second client of the same match on this machine finds the first one's folder
+        /// whatever its name, and two lobbies that happen to share a name and a minute get " (2)" and never mix their logs. The id also stays
+        /// inside every `.jsonl` line, which is what the report merges by (TelemetryLog groups by it, not by the folder name).
         ///
         /// 2026-09-27 designer change: testers complained the old location (persistentDataPath - AppData
         /// on Windows) was too hard to find, so the root now comes from TelemetryPaths.ResolveMatchLogsRoot
         /// - the game/project folder's own "Match logs" subfolder first, Documents\OverPower next, the
         /// old AppData location only as a last resort. TelemetryMenu (the Editor's "Open Telemetry
-        /// Folder"/"Build Report…") shares that same helper so both agree on where logs live.
+        /// Folder"/"Build Report...") shares that same helper so both agree on where logs live.
         ///
         /// Small same-instant race, accepted rather than fixed: two local clients opening their file for
-        /// the first time in the very same frame can both fail to see the other's not-yet-created
-        /// directory and each create their own `_{mId8}` folder. Not silently harmless - T5's
-        /// TelemetryLog.Load reads ONE folder (it merges every `.jsonl` FILE it finds there by `mId`,
-        /// it does not itself go looking across sibling folders), so two folders from this race need
-        /// their files copied into one before Build Report is pointed at them - the same manual step
-        /// a multi-PC playtest already requires (design doc, "Files").</summary>
+        /// the first time in the very same instant can both fail to see the other's folder (or its id
+        /// file, written right after the folder is made) and each create their own - the second gets " (2)". Then
+        /// TelemetryLog.Load, which reads ONE folder, needs their files copied into one before Build Report is pointed
+        /// at them - the same manual step a multi-PC playtest already requires (design doc, "Files").</summary>
         private string ResolveMatchFolder()
         {
             string root = TelemetryPaths.ResolveMatchLogsRoot(config.FolderName);
             Directory.CreateDirectory(root);
 
-            string suffix = "_" + matchId.Substring(0, 8);
+            var idsByFolder = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (string existing in Directory.GetDirectories(root))
-            {
-                if (Path.GetFileName(existing).EndsWith(suffix, StringComparison.Ordinal))
-                    return existing;
-            }
+                idsByFolder[Path.GetFileName(existing)] = ReadMatchIdFile(existing);
 
-            string created = Path.Combine(root, $"{DateTime.Now:yyyy-MM-dd_HHmm}{suffix}");
-            Directory.CreateDirectory(created);
-            return created;
+            string name = MatchFolderName.Resolve(DateTime.Now, ModeNameOfRoom(), LobbyNameOfRoom(), matchId, idsByFolder, out bool existing2);
+            string folder = Path.Combine(root, name);
+            if (!existing2)
+            {
+                Directory.CreateDirectory(folder);
+                try { File.WriteAllText(Path.Combine(folder, MatchIdFileName), matchId); }
+                catch (Exception e) { Debug.LogWarning($"[Telemetry] could not write {MatchIdFileName} in '{folder}': {e.Message}"); }
+            }
+            return folder;
+        }
+
+        /// <summary>The name of the small file inside a match folder that holds the match id.</summary>
+        public const string MatchIdFileName = "match.id";
+
+        private static string ReadMatchIdFile(string folder)
+        {
+            try
+            {
+                string path = Path.Combine(folder, MatchIdFileName);
+                return File.Exists(path) ? File.ReadAllText(path).Trim() : "";
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
+
+        private static string LobbyNameOfRoom() =>
+            PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Name, out object raw) && raw is string name ? name : "";
+
+        /// <summary>The display name of the room's game mode ("Conquest 3v3v3"), or "" when the room has none / the catalogue does not know it.</summary>
+        private string ModeNameOfRoom()
+        {
+            if (PhotonNetwork.CurrentRoom == null || !PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Mode, out object raw) || !(raw is int modeId))
+                return "";
+            if (modeCatalogue == null)
+            {
+                RoomManager manager = FindFirstObjectByType<RoomManager>();
+                modeCatalogue = manager != null ? manager.ModeCatalogue : null;
+            }
+            GameModeDefinition mode = modeCatalogue != null ? modeCatalogue.ById(modeId) : null;
+            return mode != null ? mode.DisplayName : "";
+        }
+
+        /// <summary>The one line that says how many of the earliest pending lines were dropped (PendingLineBuffer).</summary>
+        private void WriteDroppedNote(int count)
+        {
+            line.Begin(TelemetryKeys.Marker, Now);
+            line.Int(TelemetryKeys.Actor, PhotonNetwork.LocalPlayer.ActorNumber);
+            line.String(TelemetryKeys.Note, LobbyMarkerNotes.EarlyLinesDropped(count));
+            writer.Write(line.End());
         }
 
         private void WriteSessionLine()
         {
-            Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int team);
+            bool spectator = Teams.IsSpectator(PhotonNetwork.LocalPlayer);
+            int team = -1;
+            if (!spectator && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int own)) team = own;
 
             line.Begin(TelemetryKeys.Session, Now);
             line.Int(TelemetryKeys.Schema, TelemetryKeys.SchemaVersion);
@@ -544,6 +658,7 @@ namespace Overpower.Telemetry
             line.String(TelemetryKeys.Nick, PhotonNetwork.LocalPlayer.NickName ?? "");
             line.Int(TelemetryKeys.Team, team);
             line.Bool(TelemetryKeys.IsMaster, PhotonNetwork.IsMasterClient);
+            if (spectator) line.Bool(TelemetryKeys.Spectator, true);
             line.String(TelemetryKeys.Commit, ReadCommitHash());
             line.String(TelemetryKeys.UnityVersion, Application.unityVersion);
             line.String(TelemetryKeys.Platform, Application.platform.ToString());
@@ -594,8 +709,7 @@ namespace Overpower.Telemetry
                 return;
             }
 
-            if (pendingLines.Count < MaxPendingLines)
-                pendingLines.Add(text);
+            pending.Add(text);
         }
 
         /// <summary>F1 "Drop marker": a `marker` line with the local actor and an optional note, so the

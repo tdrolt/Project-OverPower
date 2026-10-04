@@ -357,6 +357,14 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void GivingUpAMatchForgetsTheTeamSoNoStaleOneOpensTheNextLobbysLog()
+        {
+            var resets = Overpower.Net.MatchPropertyReset.Build();
+            Assert.IsTrue(resets.ContainsKey(Overpower.Net.Teams.TeamKey), "teamID must be reset");
+            Assert.IsNull(resets[Overpower.Net.Teams.TeamKey]);
+        }
+
+        [Test]
         public void TheResetValuesAreTheOnesOfAFreshPlayer()
         {
             var resets = Overpower.Net.MatchPropertyReset.Build();
@@ -366,7 +374,6 @@ namespace Overpower.Tests
             Assert.IsNull(resets["gold"], "gold is removed, not written as 0: the next match reads it as 'never set'");
             Assert.IsNull(resets["sb"]);
             Assert.IsNull(resets["weaponId"]);
-            Assert.IsFalse(resets.ContainsKey("teamID"), "the team is re-picked on the next join, not reset here");
         }
 
         // ---- 9e-2 fix 3: placement counters after a rejoin

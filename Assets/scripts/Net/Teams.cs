@@ -12,6 +12,28 @@ namespace Overpower.Net
     {
         public const string TeamKey = "teamID";
 
+        /// <summary>Set to true on a player who watches instead of playing (a spectator seat at Start, lobby Task 4); cleared on
+        /// joining a room and on a deliberate leave (MatchPropertyReset).</summary>
+        public const string SpectatorKey = "spec";
+
+        /// <summary>True for a player on a spectator seat (spec = true): they have no body and no team.</summary>
+        public static bool IsSpectator(Photon.Realtime.Player player) =>
+            player != null && player.CustomProperties.TryGetValue(SpectatorKey, out object raw) && raw is bool spectating && spectating;
+
+        /// <summary>True when this player is a player of a team: has a team and is not a seat spectator. Every loop that counts the room's
+        /// members for a team (counts, scoreboard, minimap, zones, spectate targets) asks this, so a spectator (no body, no team) and a
+        /// seatless arrival are never counted.</summary>
+        public static bool PlaysForTeam(bool spectator, bool teamKnown) => teamKnown && !spectator;
+
+        /// <summary>The team of a player who plays for one: false for a seat spectator and for a player with no team yet.</summary>
+        public static bool TryGetPlayingTeam(Photon.Realtime.Player player, out int teamId)
+        {
+            if (TryGetTeam(player, out teamId) && PlaysForTeam(IsSpectator(player), true))
+                return true;
+            teamId = -1;
+            return false;
+        }
+
         public static bool TryGetTeam(Photon.Realtime.Player player, out int teamId)
         {
             teamId = -1;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Match;
+using Overpower.UI;
 using Overpower.Net;
 using Photon.Pun;
 using UnityEngine;
@@ -34,6 +35,18 @@ namespace Overpower.Vision
     public sealed class CentreScan : MonoBehaviour
     {
         public static CentreScan Instance { get; private set; }
+
+        /// <summary>A seat spectator has no body, so no TeamSight and no player prefab to read the vision numbers and the theme from:
+        /// the spectator view (SpectatorSeatView) gives them here so the wave and the countdown show for it like for everyone. Both null
+        /// when nobody spectates.</summary>
+        public static VisionConfig SpectatorVision { get; private set; }
+        public static UiTheme SpectatorTheme { get; private set; }
+
+        public static void SetSpectatorSupport(VisionConfig vision, UiTheme theme)
+        {
+            SpectatorVision = vision;
+            SpectatorTheme = theme;
+        }
 
         /// <summary>Highest tier in the game: the centre. The centre zone is found as the one tower of this tier.</summary>
         private const int CentreTier = 4;
@@ -103,10 +116,10 @@ namespace Overpower.Vision
         {
             BuildingManager buildings = BuildingManager.Instance;
             TeamSight sight = TeamSight.Local;
-            config = sight != null ? sight.Config : null;
+            config = sight != null ? sight.Config : SpectatorVision;
 
             // Not in a room, or the territory is not read: nothing is judged, and nothing is remembered as "last frame".
-            if (buildings == null || buildings.Current == null || !PhotonNetwork.InRoom || sight == null || config == null
+            if (buildings == null || buildings.Current == null || !PhotonNetwork.InRoom || config == null
                 || !config.FogEnabled)
             {
                 Stop();
@@ -137,7 +150,8 @@ namespace Overpower.Vision
                 ? -1
                 : CentreScanRules.CountdownSecondsShown(unchecked(CentreScanRules.NextScanStart(liveAtMs, nowMs, intervalMs) - nowMs));
 
-            int friendly = sight.FriendlyTeamId;
+            // A spectator (no body, so no sight) watches no team: nothing is caught or refreshed for them, the wave and the countdown still show.
+            int friendly = sight != null ? sight.FriendlyTeamId : -1;
             SeenByMyTeam = Frame.Active && CentreScanDisplayRules.SeesScan(friendly, Frame.HolderTeam);
             if (dotPool.Dots.Count > 0 && dotsTeam != friendly)
                 dotPool.Clear();
@@ -173,7 +187,7 @@ namespace Overpower.Vision
             foreach (KeyValuePair<int, Photon.Realtime.Player> pair in room.Players)
             {
                 Photon.Realtime.Player player = pair.Value;
-                if (player.IsLocal || !Teams.TryGetTeam(player, out int team) || team < 0 || team == friendlyTeam)
+                if (player.IsLocal || !Teams.TryGetPlayingTeam(player, out int team) || team < 0 || team == friendlyTeam)
                     continue;
                 bool? flag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool isAlive ? isAlive : (bool?)null;
                 if (!PresenceRules.CountsAsAlive(player.IsInactive, flag))

@@ -290,6 +290,8 @@ namespace Overpower.EditorTools.Telemetry
                 if (e.Name == TelemetryKeys.Marker)
                 {
                     if (!markerWindow.Contains(e.T)) continue;
+                    // Lobby Task 13: "spectator joined: actor N" is bookkeeping for the log-coverage table, not a moment somebody flagged.
+                    if (LobbyMarkerNotes.TryReadSpectator(e.Data[TelemetryKeys.Note]?.ToString(), out _)) continue;
                     header.Markers.Add(new MarkerRow
                     {
                         T = e.T,
@@ -328,6 +330,7 @@ namespace Overpower.EditorTools.Telemetry
             }
             foreach (TelemetrySession s in log.Sessions)
             {
+                if (s.Spectator) continue; // a spectator host's file is no player row
                 header.Coverage.Add(new PlayerCoverageRow
                 {
                     Actor = s.Actor,
@@ -351,6 +354,12 @@ namespace Overpower.EditorTools.Telemetry
             Dictionary<int, (double First, double Last)> coverageByActor, List<LogCoverageRow> outRows, double sampleInterval)
         {
             var seen = new HashSet<int>(sessionByActor.Keys);
+            // Lobby Task 13 (Task 8 review): a spectator has no match log of their own (only a spectator HOST writes one, and that file is no player
+            // row), so "no log from actor N" would be a false alarm. A spectator host's session says so (spec flag); any other spectator is named by
+            // the master's "spectator joined" marker (MatchTelemetry writes one when it sees their spec flag).
+            var spectators = new HashSet<int>();
+            foreach (TelemetrySession s in sessionByActor.Values)
+                if (s.Spectator) spectators.Add(s.Actor);
             // Review fix (item 10): a MISSING actor's own nick/first-seen/last-seen now come from
             // whoever else logged their `join`/`leave` (every client logs every OTHER player's join
             // and leave, even one whose own file never opened).
@@ -370,6 +379,11 @@ namespace Overpower.EditorTools.Telemetry
                         nickByActor[a] = nick;
                     if (!earliestJoinByActor.TryGetValue(a, out double existingJoin) || e.T < existingJoin)
                         earliestJoinByActor[a] = e.T;
+                }
+                else if (e.Name == TelemetryKeys.Marker)
+                {
+                    if (LobbyMarkerNotes.TryReadSpectator(e.Data[TelemetryKeys.Note]?.ToString(), out int spectator))
+                        spectators.Add(spectator);
                 }
                 else if (e.Name == TelemetryKeys.Leave)
                 {
@@ -403,6 +417,7 @@ namespace Overpower.EditorTools.Telemetry
 
             foreach (int actor in seen.OrderBy(a => a))
             {
+                if (spectators.Contains(actor)) continue;
                 bool filePresent = sessionByActor.TryGetValue(actor, out TelemetrySession session);
 
                 string nick;
@@ -1700,6 +1715,7 @@ namespace Overpower.EditorTools.Telemetry
             {
                 int actor = kv.Key;
                 TelemetrySession session = kv.Value;
+                if (session.Spectator) continue; // a spectator host's file feeds the timeline, not a player row
                 var gold = goldByActor.GetValueOrDefault(actor);
                 (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
 

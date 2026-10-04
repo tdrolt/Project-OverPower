@@ -1,30 +1,12 @@
+using System.Collections.Generic;
 using NUnit.Framework;
+using Overpower.Lobby;
 using Overpower.Match;
 
 namespace Overpower.Tests
 {
     public class MatchStartRulesTests
     {
-        [Test]
-        public void TheCountdownStartsTheMomentAllThreeTeamsHaveAPlayer()
-        {
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(teamsFixed: false, new[] { 1, 1, 0 }));
-            // Tudor, 2026-09-26: never automatic - the host presses Start.
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }));
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 3, 2, 1 }));
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(true, new[] { 1, 1, 1 }), "a countdown or a live match already fixed the teams");
-        }
-
-        [Test]
-        public void TheHostMayStartOnlyWithExactlyTwoTeams()
-        {
-            Assert.IsTrue(MatchStartRules.HostMayStart(teamsFixed: false, new[] { 1, 0, 2 }, playersWithoutATeam: 0));
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 2, 0, 0 }, 0), "one team: nobody to play");
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0), "three teams: the host starts it too (Tudor, 2026-09-26)");
-            Assert.IsFalse(MatchStartRules.HostMayStart(true, new[] { 1, 1, 0 }, 0), "already counting down or live");
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 0 }, 1), "someone still joining may be the third team");
-        }
-
         [Test]
         public void TheCountdownEndsItsLengthAfterItStartsEvenAcrossTheClockWrap()
         {
@@ -81,13 +63,6 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheTeamsInTheMatchAreTheTeamsWithPlayersAtThatMoment()
-        {
-            CollectionAssert.AreEqual(new[] { 0, 2 }, MatchStartRules.TeamsWithPlayers(new[] { 2, 0, 1 }));
-            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, MatchStartRules.TeamsWithPlayers(new[] { 1, 1, 1 }));
-        }
-
-        [Test]
         public void OnlyTheCapitalOfATeamLeftOutOfALiveMatchIsOutOfPlay()
         {
             var inMatch = new[] { 0, 1 };
@@ -107,13 +82,27 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheWarmupLineMatchesTheStateWhoIsHereAndWhoIsHost()
+        public void TheHostsLineOnlyOffersEndingTheWarmupWhileItIsAllowed()
         {
-            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, teamsWithPlayers: 2, isHost: true));
-            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, 2, true));
-            Assert.AreEqual(WarmupMessage.WaitingForTeams, MatchStartRules.WarmupMessageFor(StartState.Warmup, 1, true));
-            Assert.AreEqual(WarmupMessage.HostMayStart, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, true));
-            Assert.AreEqual(WarmupMessage.WaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, false));
+            Assert.AreEqual(WarmupMessage.HostMayEnd, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: true, hostMayEnd: true));
+            Assert.AreEqual(WarmupMessage.HostBlocked, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: true, hostMayEnd: false),
+                "no 'end it when ready' line while a team has nobody");
+        }
+
+        [Test]
+        public void TheWarmupLineOfEveryoneElseNamesTheHostWhateverTheRule()
+        {
+            Assert.AreEqual(WarmupMessage.WaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: false, hostMayEnd: false));
+            Assert.AreEqual(WarmupMessage.WaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, isHost: false, hostMayEnd: true));
+        }
+
+        [Test]
+        public void TheCountdownAndGoingLiveReadTheSameForEveryone()
+        {
+            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, isHost: true, hostMayEnd: false));
+            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, isHost: false, hostMayEnd: false));
+            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, isHost: true, hostMayEnd: true));
+            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, isHost: false, hostMayEnd: false));
         }
 
         // --- Two-team lobby (Tudor, 2026-09-26): the host can set the room to two teams before the countdown. ---
@@ -128,94 +117,60 @@ namespace Overpower.Tests
             Assert.AreEqual(3, MatchStartRules.LobbyModeOf(5), "not a mode anyone can write");
         }
 
-        [Test]
-        public void TwoTeamModeOpensOnlyTheFirstTwoTeamsBeforeTheCountdown()
+        private static readonly SeatLayout ThreeTeamLobby = new SeatLayout(new[] { 0, 1, 2 }, 3, 2);
+        private static readonly SeatLayout TwoTeamLobby = new SeatLayout(new[] { 0, 1 }, 3, 2);
+
+        private static Dictionary<int, int> Present(params (int team, int n)[] entries)
         {
-            Assert.IsTrue(MatchStartRules.IsTeamOpen(2, 0));
-            Assert.IsTrue(MatchStartRules.IsTeamOpen(2, 1));
-            Assert.IsFalse(MatchStartRules.IsTeamOpen(2, 2), "the third team is closed in two-team mode");
-            Assert.IsTrue(MatchStartRules.IsTeamOpen(3, 2));
-            Assert.IsFalse(MatchStartRules.MayJoin(teamsFixed: false, inMatch: false, eliminated: false, teamOpen: false));
-            Assert.IsTrue(MatchStartRules.MayJoin(true, true, false, false), "after the countdown the existing rule wins");
+            var d = new Dictionary<int, int>();
+            foreach (var e in entries) d[e.team] = e.n;
+            return d;
         }
 
         [Test]
-        public void TwoTeamModeNeverStartsItself()
+        public void TheHostEndsTheWarmupOnlyWhenEveryTeamOfTheModeHasAPlayer()
         {
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 2));
-            Assert.IsFalse(MatchStartRules.StartsCountdownAutomatically(false, new[] { 1, 1, 1 }, mode: 3));
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 1, ThreeTeamLobby, Present((0, 1), (1, 1))), "a 3v3v3 lobby with two teams present");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 1, ThreeTeamLobby, Present((0, 2), (1, 0), (2, 1))), "team 1 has nobody left");
+            Assert.IsTrue(MatchStartRules.HostMayEndWarmup(false, 1, ThreeTeamLobby, Present((0, 1), (1, 1), (2, 1))));
+            Assert.IsTrue(MatchStartRules.HostMayEndWarmup(false, 1, TwoTeamLobby, Present((0, 1), (1, 3))), "a 3v3 never asks about team 2");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 1, TwoTeamLobby, Present((0, 1))), "a 3v3 with one team");
         }
 
         [Test]
-        public void TheHostStartsATwoTeamMatchWhenBothTeamsHaveSomeone()
+        public void TheWarmupCanOnlyEndWhileItIsTheWarmup()
         {
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 0 }, 0, mode: 2));
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 2, 0, 0 }, 0, mode: 2));
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0, mode: 2), "someone still on the third team");
-            Assert.IsFalse(MatchStartRules.HostMayStart(false, new[] { 1, 1, 0 }, 1, mode: 2), "a player without a team");
-            Assert.IsFalse(MatchStartRules.HostMayStart(true, new[] { 1, 1, 0 }, 0, mode: 2), "already counting down or live");
-            // Mode 3 keeps the old answers.
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 0, 2 }, 0, mode: 3));
-            Assert.IsTrue(MatchStartRules.HostMayStart(false, new[] { 1, 1, 1 }, 0, mode: 3), "three teams: the host starts it");
+            var all = Present((0, 1), (1, 1), (2, 1));
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(true, 1, ThreeTeamLobby, all), "a countdown or a live match already fixed the teams");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 0, ThreeTeamLobby, all), "still the lobby: that is Start game");
+            Assert.IsFalse(MatchStartRules.HostMayEndWarmup(false, 2, ThreeTeamLobby, all), "already in the match");
         }
 
         [Test]
-        public void TheSwitchToTwoTeamsNeedsSixOrFewer()
+        public void ADroppedPlayerAndASpectatorCountForNoTeam()
         {
-            Assert.IsTrue(MatchStartRules.MaySwitchToTwoTeams(false, 6, teamSize: 3));
-            Assert.IsFalse(MatchStartRules.MaySwitchToTwoTeams(false, 7, 3));
-            Assert.IsFalse(MatchStartRules.MaySwitchToTwoTeams(true, 6, 3), "teams already fixed");
-            Assert.IsTrue(MatchStartRules.MaySwitchToThreeTeams(false));
-            Assert.IsFalse(MatchStartRules.MaySwitchToThreeTeams(true));
+            Assert.IsTrue(MatchStartRules.CountsAsTeamPlayer(inactive: false, spectator: false));
+            Assert.IsFalse(MatchStartRules.CountsAsTeamPlayer(inactive: true, spectator: false), "a dropped player is not present");
+            Assert.IsFalse(MatchStartRules.CountsAsTeamPlayer(inactive: false, spectator: true), "a spectator plays for no team");
         }
 
         [Test]
-        public void TheRoomHoldsModeTimesTeamSize()
+        public void TheMatchIsFixedToTheTeamsOfTheLayout()
         {
-            Assert.AreEqual(6, MatchStartRules.MaxPlayersFor(2, 3));
-            Assert.AreEqual(9, MatchStartRules.MaxPlayersFor(3, 3));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, MatchStartRules.TeamsOfLayout(ThreeTeamLobby));
+            CollectionAssert.AreEqual(new[] { 0, 1 }, MatchStartRules.TeamsOfLayout(TwoTeamLobby));
         }
 
         [Test]
-        public void TheWarmupLineSaysTwoTeams()
+        public void TheLiveWriteMarksTheLobbyInMatch()
         {
-            Assert.AreEqual(WarmupMessage.TwoTeamsHostMayStart, MatchStartRules.WarmupMessageFor(StartState.Warmup, teamsWithPlayers: 2, isHost: true, mode: 2));
-            Assert.AreEqual(WarmupMessage.TwoTeamsWaitingForHost, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, false, 2));
-            Assert.AreEqual(WarmupMessage.TwoTeamsWaitingForPlayers, MatchStartRules.WarmupMessageFor(StartState.Warmup, 1, true, 2));
-            Assert.AreEqual(WarmupMessage.Countdown, MatchStartRules.WarmupMessageFor(StartState.CountingDown, 2, true, 2));
-            Assert.AreEqual(WarmupMessage.None, MatchStartRules.WarmupMessageFor(StartState.Live, 2, true, 2));
-            // Mode 3: the old answers.
-            Assert.AreEqual(WarmupMessage.HostMayStart, MatchStartRules.WarmupMessageFor(StartState.Warmup, 2, true, 3));
+            var props = MatchDirector.LiveProperties(new[] { 0, 1 }, MatchPhase.TwoTeams);
+            Assert.AreEqual(2, props[LobbyKeys.Stage], "the list shows In match");
+            Assert.AreEqual((int)MatchPhase.TwoTeams, props[MatchDirector.PhaseKey]);
+            CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])props[MatchDirector.TeamsInMatchKey]);
+            Assert.AreEqual(-1, props[MatchDirector.WinnerKey]);
+            Assert.AreEqual(0, ((int[])props[MatchDirector.EliminatedKey]).Length);
         }
 
-        // --- Review fix 3 (2026-09-26): several players on a team the switch just closed must not all re-pick
-        // the same open team from the same counts - each walks the list in the SAME order, filling as it goes. ---
-
-        [Test]
-        public void ReseatingSeveralClosedPlayersSpreadsThemOverTheOpenTeams()
-        {
-            // 0/0/{2 players}: the lower actor gets 0, the higher gets 1 - not both onto 0.
-            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(mode: 2, myActor: 5,
-                closedActorsAscending: new[] { 5, 9 }, openCounts: new[] { 0, 0, 0 }, teamSize: 3));
-            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(2, 9, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
-
-            // 1/0/{1}: the one team with room wins.
-            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(2, 7, new[] { 7 }, new[] { 1, 0, 0 }, 3));
-
-            // 3/3/{1}: both open teams are already at the cap.
-            Assert.AreEqual(-1, MatchStartRules.ReseatTeamFor(2, 4, new[] { 4 }, new[] { 3, 3, 0 }, 3));
-
-            // 1/1/{3 players}, actor order: 0, 1, 0 - not all three onto the same team.
-            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(2, 1, new[] { 1, 2, 3 }, new[] { 1, 1, 0 }, 3));
-            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(2, 2, new[] { 1, 2, 3 }, new[] { 1, 1, 0 }, 3));
-            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(2, 3, new[] { 1, 2, 3 }, new[] { 1, 1, 0 }, 3));
-
-            // myActor never on the closed list: -1.
-            Assert.AreEqual(-1, MatchStartRules.ReseatTeamFor(2, 99, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
-
-            // Mode 3 never has a closed team - a call with it just returns the smallest by the same walk.
-            Assert.AreEqual(0, MatchStartRules.ReseatTeamFor(3, 5, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
-            Assert.AreEqual(1, MatchStartRules.ReseatTeamFor(3, 9, new[] { 5, 9 }, new[] { 0, 0, 0 }, 3));
-        }
     }
 }

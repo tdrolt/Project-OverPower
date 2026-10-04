@@ -212,7 +212,7 @@ public sealed class SpectateView : MonoBehaviour
         MatchDirector director = MatchDirector.Instance;
         foreach (Photon.Realtime.Player p in PhotonNetwork.PlayerList)
         {
-            if (p.IsLocal || !Teams.TryGetTeam(p, out int team))
+            if (p.IsLocal || !Teams.TryGetPlayingTeam(p, out int team)) // a seat spectator has no body to watch
                 continue;
             if (director != null && director.IsEliminated(team))
                 continue;

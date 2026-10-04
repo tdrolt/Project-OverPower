@@ -26,6 +26,129 @@ namespace Overpower.Tests
             "\",\"tm\":" + team + ",\"master\":" + (master ? "true" : "false") +
             ",\"commit\":\"c\",\"uv\":\"u\",\"plat\":\"p\",\"tuning\":" + tuningJson + "}\n";
 
+        // ---------------------------------------------------------------- lobby Task 6 review: a spectator host's log
+
+        [Test]
+        public void ASpectatorHostsLogGivesTheTimelineButNoPlayerRow()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                string specSession = Session(1, -1, true, "{}").Replace("\"master\":true", "\"master\":true,\"spec\":true");
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), specSession +
+                    "{\"e\":\"ownership\",\"t\":30,\"zone\":0,\"tier\":2,\"old\":-1,\"new\":0,\"since\":1000}\n");
+                File.WriteAllText(Path.Combine(temp, "2.jsonl"), Session(2, 0, false, "{}"));
+
+                var log = TelemetryLog.Load(temp);
+                var tables = TelemetryAggregator.Build(log);
+
+                Assert.IsTrue(log.Sessions.Single(s => s.Actor == 1).Spectator);
+                Assert.IsFalse(log.Sessions.Single(s => s.Actor == 2).Spectator);
+                Assert.AreEqual(1, tables.Ownership.Count, "the host's territory line still reaches the report");
+                CollectionAssert.AreEqual(new[] { 2 }, tables.Players.Select(p => p.Actor).ToArray(), "only the player is a player row");
+            }
+            finally { Directory.Delete(temp, true); }
+        }
+
+        // ---------------------------------------------------------------- lobby Task 13 (Task 8 review): spectators in the report
+
+        private static string SpectatorHostSession(int actor) =>
+            Session(actor, -1, true, "{}").Replace("\"master\":true", "\"master\":true,\"spec\":true");
+
+        private const string JoinOfThree = "{\"e\":\"join\",\"t\":1,\"a\":3,\"tm\":-1,\"nick\":\"Sam\"}\n";
+
+        [Test]
+        public void ANonHostSpectatorHasNoRowInTheLogCoverageTable()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), Session(1, 0, true, "{}") + JoinOfThree +
+                    "{\"e\":\"marker\",\"t\":2,\"a\":1,\"note\":\"" + Overpower.Telemetry.LobbyMarkerNotes.SpectatorSeen(3) + "\"}\n");
+                File.WriteAllText(Path.Combine(temp, "2.jsonl"), Session(2, 1, false, "{}"));
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp));
+
+                CollectionAssert.AreEqual(new[] { 1, 2 }, tables.Header.LogCoverage.Select(r => r.Actor).ToArray(), "the spectator (actor 3, no file) is not 'a player with no log'");
+            }
+            finally { Directory.Delete(temp, true); }
+        }
+
+        [Test]
+        public void ASeenPlayerWithNoFileIsStillFlaggedWhenNoSpectatorNoteNamesThem()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), Session(1, 0, true, "{}") + JoinOfThree);
+                File.WriteAllText(Path.Combine(temp, "2.jsonl"), Session(2, 1, false, "{}"));
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp));
+
+                var missing = tables.Header.LogCoverage.Single(r => r.Actor == 3);
+                Assert.IsFalse(missing.FilePresent, "a player whose file never arrived still reads 'no log from actor 3'");
+            }
+            finally { Directory.Delete(temp, true); }
+        }
+
+        [Test]
+        public void ASpectatorHostHasNoRowInTheLogCoverageTableEither()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), SpectatorHostSession(1));
+                File.WriteAllText(Path.Combine(temp, "2.jsonl"), Session(2, 0, false, "{}"));
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp));
+
+                CollectionAssert.AreEqual(new[] { 2 }, tables.Header.LogCoverage.Select(r => r.Actor).ToArray());
+            }
+            finally { Directory.Delete(temp, true); }
+        }
+
+        [Test]
+        public void ASpectatorNoteIsBookkeepingNotAMarkerRow()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), Session(1, 0, true, "{}") +
+                    "{\"e\":\"marker\",\"t\":2,\"a\":1,\"note\":\"" + Overpower.Telemetry.LobbyMarkerNotes.SpectatorSeen(3) + "\"}\n" +
+                    "{\"e\":\"marker\",\"t\":3,\"a\":1,\"note\":\"countdown start\"}\n");
+
+                var tables = TelemetryAggregator.Build(TelemetryLog.Load(temp), null, includeWarmupMarkers: true);
+
+                CollectionAssert.AreEqual(new[] { "countdown start" }, tables.Header.Markers.Select(m => m.Note).ToArray());
+            }
+            finally { Directory.Delete(temp, true); }
+        }
+
+        [Test]
+        public void ASpectatorHostsCaptureCountsInEveryScopeOfTheReport()
+        {
+            string temp = NewTempFolder();
+            try
+            {
+                // The host is a spectator (team -1) and the only one logging; a team takes zone 4 in phase one. Nothing keys the table by the
+                // writer's own team.
+                File.WriteAllText(Path.Combine(temp, "1.jsonl"), SpectatorHostSession(1) +
+                    "{\"e\":\"phase\",\"t\":5,\"num\":1,\"remain\":[0,1,2]}\n" +
+                    "{\"e\":\"capture\",\"t\":10,\"zone\":4,\"tm\":2,\"state\":\"started\",\"progress\":0.01,\"players\":1}\n" +
+                    "{\"e\":\"ownership\",\"t\":30,\"zone\":4,\"tier\":1,\"old\":-1,\"new\":2,\"since\":1000}\n" +
+                    "{\"e\":\"phase\",\"t\":90,\"num\":3,\"remain\":[2]}\n");
+                File.WriteAllText(Path.Combine(temp, "2.jsonl"), Session(2, 2, false, "{}"));
+
+                var set = TelemetryAggregator.BuildSet(TelemetryLog.Load(temp));
+
+                Assert.AreEqual(1, set.WholeMatch.Ownership.Count, "whole match");
+                Assert.AreEqual(2, set.WholeMatch.Ownership[0].Team);
+                Assert.AreEqual(1, set.Phase1.Ownership.Count, "phase one");
+                Assert.AreEqual(1, set.WholeMatch.Captures.Count);
+            }
+            finally { Directory.Delete(temp, true); }
+        }
+
         // ---------------------------------------------------------------- item 1 (HIGH): captures rewrite
 
         [Test]

@@ -102,7 +102,23 @@ namespace Overpower.Vision
             get { Refresh(); return SightEyes.FriendlyTeam(mode, localTeam, watchedTeam); }
         }
 
-        private bool FogOn => config != null && config.FogEnabled;
+        // A seat spectator (lobby Task 6) sees everything: no fog, no hidden enemies, every shot and zone shown. They have no body, so
+        // this component normally does not exist on their client (and nothing is hidden then anyway); this keeps the answer the same
+        // should one ever be there. Read once a frame - it is asked many times.
+        private bool FogOn => VisionRules.FogApplies(config != null && config.FogEnabled, LocalIsSeatSpectator());
+
+        private int seatSpectatorFrame = -1;
+        private bool seatSpectator;
+
+        private bool LocalIsSeatSpectator()
+        {
+            if (seatSpectatorFrame != Time.frameCount)
+            {
+                seatSpectatorFrame = Time.frameCount;
+                seatSpectator = Teams.IsSpectator(PhotonNetwork.LocalPlayer);
+            }
+            return seatSpectator;
+        }
 
         private void Awake()
         {
@@ -182,7 +198,7 @@ namespace Overpower.Vision
 
         private void LateUpdate()
         {
-            // No fog without a sight picture (the pass reads it), and none when the owner is gone (OnDisable / OnDestroy).
+            // No fog without a sight picture (the pass reads it), none when the owner is gone (OnDisable / OnDestroy), and none for a seat spectator.
             bool fogOn = FogOn && sightTexture != null;
             Shader.SetGlobalFloat(FogEnabledId, fogOn ? 1f : 0f);
             if (!fogOn)
@@ -465,8 +481,8 @@ namespace Overpower.Vision
                     PhotonView view = PlayerLookup.GetPhotonViewFor(player.ActorNumber);
                     if (view == null)
                         continue;
-                    if (!Teams.TryGetTeam(player, out int team))
-                        team = -1;
+                    if (!Teams.TryGetPlayingTeam(player, out int team))
+                        team = -1; // a seat spectator (no body) or a player with no team yet: no team's eye
                     // Same reading as MinimapView: a missing flag means alive, a dropped player is not.
                     bool? flag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool b ? b : (bool?)null;
                     bool alive = view.IsMine ? localAlive : PresenceRules.CountsAsAlive(player.IsInactive, flag); // my own state from the same source as the mode

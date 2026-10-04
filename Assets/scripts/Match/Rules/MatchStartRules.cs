@@ -1,23 +1,19 @@
 using System;
 using System.Collections.Generic;
+using Overpower.Lobby;
 
 namespace Overpower.Match
 {
     /// <summary>Where the warm-up/countdown/live state stands for the UI, per StartStateFor.</summary>
     public enum StartState { Warmup, CountingDown, Live }
 
-    /// <summary>What the warm-up line should say, per WarmupMessageFor. The three "TwoTeams..." values are the
-    /// two-team lobby's own wording (Tudor, 2026-09-26; Decision L7) - a room in two-team mode never returns one of
-    /// the older values while in the warm-up.</summary>
-    public enum WarmupMessage
-    {
-        None, Countdown, WaitingForTeams, HostMayStart, WaitingForHost,
-        TwoTeamsWaitingForPlayers, TwoTeamsHostMayStart, TwoTeamsWaitingForHost
-    }
+    /// <summary>What the warm-up bar should say, per WarmupMessageFor. The host's two wordings differ so that the offer to
+    /// end the warm-up is only ever made while ending it is allowed.</summary>
+    public enum WarmupMessage { None, Countdown, HostMayEnd, HostBlocked, WaitingForHost }
 
     /// <summary>
     /// Pure C# rules for 2.7b's match start (Tudor, 2026-09-18, "Going live" and answer 3): a 5-second countdown
-    /// starts automatically once all three teams have a player, or the host starts it with exactly two teams; "Match
+    /// that the host starts (lobby Task 5: End warm-up, once every team of the mode has a player); "Match
     /// starts in N" shows on every screen, then the match goes live. No UnityEngine here - MatchDirector.Live.cs (step
     /// 5) is the only Photon wiring around it, reading PhotonNetwork.PlayerList/ServerTimestamp into the plain values
     /// these methods take, so a new master and every client reach the same answer with no extra state.
@@ -28,7 +24,8 @@ namespace Overpower.Match
         public const int TeamCount = 3;
 
         /// <summary>The two-team lobby mode (Tudor, 2026-09-26): the host can set the room to this before the
-        /// countdown so joiners fill two teams instead of three - see LobbyModeOf, MaySwitchToTwoTeams.</summary>
+        /// countdown so joiners fill two teams instead of three - see LobbyModeOf. Written once when the lobby is created
+        /// (the host's later switch is gone, lobby Task 4).</summary>
         public const int TwoTeams = 2;
 
         /// <summary>The default lobby mode - every room the host hasn't switched, spelled out for callers that read
@@ -40,68 +37,28 @@ namespace Overpower.Match
         /// the same as a room the host never switched.</summary>
         public static int LobbyModeOf(object raw) => raw is int mode && mode == TwoTeams ? TwoTeams : ThreeTeams;
 
-        /// <summary>Allocation-free - the per-frame UI (host button, countdown line) calls this every frame.</summary>
-        public static int CountTeamsWithPlayers(IReadOnlyList<int> membersPerTeam)
-        {
-            int count = 0;
-            for (int i = 0; i < membersPerTeam.Count; i++)
-                if (membersPerTeam[i] > 0) count++;
-            return count;
-        }
-
-        /// <summary>The teams in the match are fixed the moment the countdown starts (Decision 4): the teams with
-        /// players at that instant, ascending.</summary>
-        public static int[] TeamsWithPlayers(IReadOnlyList<int> membersPerTeam)
-        {
-            var teams = new List<int>(membersPerTeam.Count);
-            for (int i = 0; i < membersPerTeam.Count; i++)
-                if (membersPerTeam[i] > 0) teams.Add(i);
-            return teams.ToArray();
-        }
-
         /// <summary>Warmup/CountingDown/Live, from the two Room Property facts (Decision 1-2): mTeams present means
         /// counting down, mPhase present means live - MatchPhase.Warmup is never stored.</summary>
         public static StartState StartStateFor(bool teamsFixed, bool phaseWritten) =>
             phaseWritten ? StartState.Live : teamsFixed ? StartState.CountingDown : StartState.Warmup;
 
-        /// <summary>Tudor, "Going live": the match goes live automatically once three teams have at least one player.</summary>
-        public static bool StartsCountdownAutomatically(bool teamsFixed, IReadOnlyList<int> membersPerTeam) =>
-            false; // Tudor, 2026-09-26: no automatic start in any mode - the host always presses Start.
+        /// <summary>The host may end the warm-up (lobby Task 5): the teams are not fixed yet, the lobby is in the
+        /// warm-up (lS = 1) and every team of the lobby's mode has at least one player present - three teams for a
+        /// 3v3v3 lobby, two for a 3v3. Replaces the old "two or three teams with a player" start.</summary>
+        public static bool HostMayEndWarmup(bool teamsFixed, int lobbyStage, SeatLayout layout, IReadOnlyDictionary<int, int> presentPlayersPerTeam) =>
+            !teamsFixed && lobbyStage == LobbySeatRules.LobbyWarmup && LobbySeatRules.MayEndWarmup(layout, presentPlayersPerTeam);
 
-        /// <summary>Decision L3: the two-team lobby never starts itself, whatever fills the room - the host presses
-        /// Start (HostMayStart). Mode 3 keeps the answer above.</summary>
-        public static bool StartsCountdownAutomatically(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int mode) =>
-            mode != TwoTeams && StartsCountdownAutomatically(teamsFixed, membersPerTeam);
+        /// <summary>Whether a player in the room counts toward their team's present players: a dropped (inactive)
+        /// player is not here, and a spectator plays for no team.</summary>
+        public static bool CountsAsTeamPlayer(bool inactive, bool spectator) => PresenceRules.CountsInTheLobby(inactive) && !spectator;
 
-        /// <summary>Tudor: with only two teams, the host gets a Start button. Refused while anyone in the room has no
-        /// team yet (Decision 17): they might be the third team.</summary>
-        public static bool HostMayStart(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int playersWithoutATeam) =>
-            !teamsFixed && playersWithoutATeam == 0 && CountTeamsWithPlayers(membersPerTeam) >= 2; // 2 or 3 teams (Tudor, 2026-09-26)
-
-        /// <summary>The two-team lobby (Tudor, 2026-09-26; Decision L3): mode 3 keeps the answer above unchanged. In
-        /// two-team mode the host may start once teams 0 and 1 both have a player, team 2 (closed - see IsTeamOpen)
-        /// has nobody, and nobody in the room is still without a team.</summary>
-        public static bool HostMayStart(bool teamsFixed, IReadOnlyList<int> membersPerTeam, int playersWithoutATeam, int mode)
+        /// <summary>The teams fixed into the match when the warm-up ends: the layout's own teams, ascending.</summary>
+        public static int[] TeamsOfLayout(SeatLayout layout)
         {
-            if (mode != TwoTeams)
-                return HostMayStart(teamsFixed, membersPerTeam, playersWithoutATeam);
-            return !teamsFixed && playersWithoutATeam == 0
-                && membersPerTeam[0] > 0 && membersPerTeam[1] > 0 && membersPerTeam[TwoTeams] == 0;
+            int[] teams = (int[])layout.Teams.Clone();
+            System.Array.Sort(teams);
+            return teams;
         }
-
-        /// <summary>Decision L4: the host may switch to two teams while the teams aren't fixed and at most 2 ×
-        /// teamSize players are already in the room (a 7th would have nowhere open to join once MaxPlayersFor
-        /// shrinks the room - the panel greys the button and says why).</summary>
-        public static bool MaySwitchToTwoTeams(bool teamsFixed, int playersInRoom, int teamSize) =>
-            !teamsFixed && playersInRoom <= TwoTeams * teamSize;
-
-        /// <summary>Decision L4: switching back to three teams needs only that the teams aren't fixed yet - nobody
-        /// moves (team 2 simply reopens, IsTeamOpen).</summary>
-        public static bool MaySwitchToThreeTeams(bool teamsFixed) => !teamsFixed;
-
-        /// <summary>Decision L1: the same write that sets the lobby mode sets the room's MaxPlayers to this, so a
-        /// two-team room actually refuses a 7th player instead of merely hiding the option.</summary>
-        public static int MaxPlayersFor(int mode, int teamSize) => mode * teamSize;
 
         /// <summary>Decision 1: mLiveAt = now + the countdown length, computed wrap-safe. 0 (or a negative length,
         /// treated as 0) means live on the master's very next frame.</summary>
@@ -143,87 +100,15 @@ namespace Overpower.Match
         public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated) =>
             !teamsFixed || (inMatch && !eliminated);
 
-        /// <summary>Decision L2: in two-team mode, only teams 0 and 1 are open before the countdown - team 2 is
-        /// closed so a joiner never lands on the third, disappearing team. Mode 3 leaves every team open (the
-        /// countdown-or-live rule takes over once teamsFixed, in MayJoin below).</summary>
-        public static bool IsTeamOpen(int mode, int team) => mode != TwoTeams || team < TwoTeams;
-
-        /// <summary>Decision L2: before the countdown, a joiner may only pick an open team (IsTeamOpen); from the
-        /// countdown on, the existing rule above wins regardless of teamOpen (a two-team room stays two teams for
-        /// its whole match, but a rejoin still needs to be in the match and not knocked out).</summary>
-        public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated, bool teamOpen) =>
-            teamsFixed ? MayJoin(teamsFixed, inMatch, eliminated) : teamOpen;
-
-        /// <summary>Review fix 3 (2026-09-26): several players re-seating off the SAME closed team used to all
-        /// read the same frozen counts with the same tie-break (RoomManager.PickSmallestTeam, called once per
-        /// player with no memory of the others) - 0/0/{2 players} landed both on team 0. This walks every closed
-        /// actor in a FIXED order - ascending by actor number, the one order every client can compute identically
-        /// with no room property of its own - simulating each one filling in ahead of myActor: at each actor's
-        /// turn, whichever OPEN team (IsTeamOpen) is smallest right then (ties broken by the lowest team index,
-        /// PickSmallestTeam's own tie-break) gets them, and its count goes up by one before the next actor's turn.
-        /// Returns whichever team myActor was given this way; -1 if myActor is never on the closed list, or if by
-        /// its turn the smallest open team is already at teamSize (RoomManager's own NoFreeTeam - "staying put").
-        ///
-        /// Mode 3 never has a closed team (IsTeamOpen is true everywhere) - a call with it still walks the same
-        /// way and simply returns the smallest by the same tie-break, PickSmallestTeam's own answer for three
-        /// teams.
-        ///
-        /// openCounts is read once, not mutated - a local copy tracks the walk's own running counts, so calling
-        /// this twice for two different actors off the same room snapshot answers exactly as if they were
-        /// re-seated one after the other.</summary>
-        public static int ReseatTeamFor(int mode, int myActor, IReadOnlyList<int> closedActorsAscending,
-            IReadOnlyList<int> openCounts, int teamSize)
-        {
-            var counts = new int[openCounts.Count];
-            for (int i = 0; i < openCounts.Count; i++)
-                counts[i] = openCounts[i];
-
-            int result = -1;
-            for (int i = 0; i < closedActorsAscending.Count; i++)
-            {
-                int smallest = -1;
-                for (int t = 0; t < counts.Length; t++)
-                {
-                    if (!IsTeamOpen(mode, t))
-                        continue;
-                    if (smallest == -1 || counts[t] < counts[smallest])
-                        smallest = t;
-                }
-
-                int given = -1;
-                if (smallest != -1 && counts[smallest] < teamSize)
-                {
-                    given = smallest;
-                    counts[smallest]++;
-                }
-
-                if (closedActorsAscending[i] == myActor)
-                    result = given;
-            }
-
-            return result;
-        }
-
-        /// <summary>The warm-up line's wording (Open for Tudor #5: default text, unchanged) - None once live, the
-        /// countdown while counting down, else who is here and who is host.</summary>
-        public static WarmupMessage WarmupMessageFor(StartState state, int teamsWithPlayers, bool isHost)
+        /// <summary>The warm-up bar's wording: nothing once live, the countdown while counting down, else the host's line
+        /// (the offer to end the warm-up only while HostMayEndWarmup holds, otherwise the blocked wording) or everyone
+        /// else's line naming the host.</summary>
+        public static WarmupMessage WarmupMessageFor(StartState state, bool isHost, bool hostMayEnd)
         {
             if (state == StartState.Live) return WarmupMessage.None;
             if (state == StartState.CountingDown) return WarmupMessage.Countdown;
-            if (teamsWithPlayers >= 2) return isHost ? WarmupMessage.HostMayStart : WarmupMessage.WaitingForHost;
-            return WarmupMessage.WaitingForTeams;
-        }
-
-        /// <summary>Decision L7: the two-team lobby's own wording (Tudor, 2026-09-26). Mode 3 keeps the answer
-        /// above; live and counting down read the same regardless of mode - only the warm-up wording differs.</summary>
-        public static WarmupMessage WarmupMessageFor(StartState state, int teamsWithPlayers, bool isHost, int mode)
-        {
-            if (mode != TwoTeams) return WarmupMessageFor(state, teamsWithPlayers, isHost);
-            if (state == StartState.Live) return WarmupMessage.None;
-            if (state == StartState.CountingDown) return WarmupMessage.Countdown;
-            if (teamsWithPlayers == TwoTeams)
-                return isHost ? WarmupMessage.TwoTeamsHostMayStart : WarmupMessage.TwoTeamsWaitingForHost;
-            return WarmupMessage.TwoTeamsWaitingForPlayers;
+            if (!isHost) return WarmupMessage.WaitingForHost;
+            return hostMayEnd ? WarmupMessage.HostMayEnd : WarmupMessage.HostBlocked;
         }
 
         private static bool Contains(IReadOnlyList<int> list, int value)

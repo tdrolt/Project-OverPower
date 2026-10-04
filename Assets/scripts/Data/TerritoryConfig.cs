@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Overpower.Data
@@ -21,7 +22,7 @@ namespace Overpower.Data
         public struct TierSettings
         {
             [Tooltip("Seconds for ONE player standing alone to capture a neutral zone of this tier. " +
-                     "Two players take half as long, three a third.")]
+                     "More players are faster, by the Capture Speed By Players list below.")]
             public float captureSeconds;
 
             [Tooltip("Gold per second this zone earns the team that owns it. Each player on that team receives " +
@@ -44,7 +45,8 @@ namespace Overpower.Data
 
             [Tooltip("Seconds an enemy standing alone in a zone of this tier that your team owns takes to drain it back " +
                      "to neutral (a defender stepping in pauses it). Compare with Capture Seconds above: lower drains " +
-                     "faster than it was captured. Per tier since Tudor, 2026-09-26.")]
+                     "faster than it was captured. The Capture Speed By Players list also speeds this up when more enemies drain " +
+                     "together. Per tier since Tudor, 2026-09-26.")]
             [Min(0.01f)] public float decaySeconds;
         }
 
@@ -82,6 +84,12 @@ namespace Overpower.Data
                  "fast as it could capture.")]
         [SerializeField, Min(0f)] private float captureFadeSpeed = 1f;
 
+        [Header("Capture")]
+        [Tooltip("How fast a zone is captured or drained with 1, 2, 3... players of one team in it, as a multiple of one " +
+                 "player's speed. The same list speeds up the drain of an owned zone by the enemies in it. Past the end of the list the last value is used. Keep it filled with values above 0: an empty " +
+                 "list quietly means 1, 2, 3 and a 0 stops captures.")]
+        [SerializeField] private float[] captureSpeedByPlayers = { 1f, 1.5f, 1.75f };
+
         [Header("Sounds")]
         [Tooltip("The looping sound a zone plays while it is being captured or drained. Off since Tudor, 2026-09-26.")]
         [SerializeField] private bool playCaptureProgressSound = false;
@@ -92,10 +100,26 @@ namespace Overpower.Data
 
         public int PlayersPerTeam => playersPerTeam;
         public float BountyHoldSeconds => bountyHoldSeconds;
+        private void OnValidate()
+        {
+            if (captureSpeedByPlayers == null || captureSpeedByPlayers.Length == 0)
+            {
+                Debug.LogWarning("[TerritoryConfig] captureSpeedByPlayers is empty: captures quietly use 1, 2, 3 for 1, 2, 3 players.", this);
+                return;
+            }
+            foreach (float speed in captureSpeedByPlayers)
+                if (speed <= 0f)
+                {
+                    Debug.LogWarning("[TerritoryConfig] captureSpeedByPlayers has an entry of 0 or less: that many players cannot capture or drain.", this);
+                    return;
+                }
+        }
+
         public int StartingGold => startingGold;
         public float RecaptureCooldownSeconds => recaptureCooldownSeconds;
         public float UnderAttackLingerSeconds => underAttackLingerSeconds;
         public float CaptureFadeSpeed => captureFadeSpeed;
+        public IReadOnlyList<float> CaptureSpeedByPlayers => captureSpeedByPlayers;
         public bool PlayCaptureProgressSound => playCaptureProgressSound;
         public bool PlayCapturedSound => playCapturedSound;
         public int TierCount => tiers != null ? tiers.Length : 0;

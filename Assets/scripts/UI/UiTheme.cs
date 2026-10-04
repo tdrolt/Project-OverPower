@@ -864,56 +864,23 @@ namespace Overpower.UI
         [Tooltip("How thick the phase-two wall's line is drawn on the minimap, in the same canvas units as the link " +
                  "widths (the real wall is under a metre - about one unit, too thin to see).")]
         public float minimapCutWallWidth = 3f;
-        [Tooltip("Warm-up line shown to everyone while fewer than two teams have a player yet - nothing counts, the shop is " +
-                 "free, and the match starts on its own once all three teams are here.")]
-        public string warmupWaitingText = "Warm-up: nothing counts yet and the shop is free. The match starts when all three teams have a player.";
-        [Tooltip("Warm-up line shown to the HOST once exactly two teams have a player - Start now with two, or wait for a " +
-                 "third team to arrive.")]
-        public string warmupHostText = "Warm-up: two teams are here. Start now with two teams, or wait for a third.";
-        [Tooltip("Warm-up line shown to everyone ELSE once exactly two teams have a player - the host has the Start button, " +
-                 "not you.")]
-        public string warmupGuestText = "Warm-up: waiting for the host to start, or for a third team.";
-        [Tooltip("Shown to everyone while the countdown counts down to going live. {0} is the whole seconds left, on this " +
+        [Tooltip("The first line of the warm-up bar while the countdown counts down to going live. {0} is the whole seconds left, on this " +
                  "client's own synced server clock - it MUST stay in the text, or the number never shows. The countdown's " +
                  "own length is GameplayConfig > Match Start Countdown Seconds.")]
-        public string matchCountdownText = "Match starts in {0}";
-        [Tooltip("The host's Start button label - shown while two or three teams have a player and nobody is still " +
-                 "team-less. {0} is the number of teams the match will start with (2 or 3) - it MUST stay in the text.")]
-        public string matchStartButtonText = "Start match ({0} teams)";
-        [Tooltip("Fill colour of the host's Start button. Deliberately its own colour, not Bar Track Colour (the ordinary " +
-                 "grey button fill, e.g. Loadout) - Start is the one button that begins the match, so it must stand out.")]
+        public string matchCountdownText = "MATCH STARTS IN {0}";
+        [Tooltip("Fill colour of the green confirm button of the saved-log overlay (Open folder). Kept from the old Start button.")]
         public Color matchStartButtonColor = new Color(0.16f, 0.45f, 0.25f, 0.95f);
-        [Tooltip("Width/height of the host's Start button, in canvas units.")]
+        [Tooltip("Width/height of the buttons of the saved-log overlay, in canvas units. Kept from the old Start button.")]
         public Vector2 matchStartButtonSize = new Vector2(260f, 52f);
-        [Tooltip("Gap from the top of the screen to the top of the warm-up/countdown line, in canvas units. It must clear " +
+        [Tooltip("Gap from the top of the screen to the top of the warm-up bar, in reference pixels. It must clear " +
                  "a two-line toast above it (the longest a warm-up can raise is the 'capital under attack' respawn " +
                  "toast), or the two run into each other.")]
         public float warmupTopOffset = 130f;
-        [Tooltip("Width/height of the warm-up/countdown line's own box, in canvas units - the text wraps inside it. The " +
-                 "host's Start button sits directly below this box.")]
-        public Vector2 warmupLineSize = new Vector2(900f, 64f);
         [Tooltip("Toast shown the instant the match goes live with all three teams - the ordinary case.")]
         public string matchLiveToastText = "The match is live! Zones, gold, loadouts and respawn timers are reset.";
         [Tooltip("Toast shown the instant a host-started match goes live with two teams - lose your base and your team " +
                  "can't respawn until it retakes one (Tudor D17). Two lines at most (about 52 characters), as the bounty toast.")]
         public string matchLiveTwoTeamsToastText = "Two teams: lose your base and you can't respawn";
-        [Tooltip("The host's switch button label while the room is in THREE-team mode - press it to open the " +
-                 "two-team lobby (Tudor, 2026-09-26; Decision L7).")]
-        public string lobbyTwoTeamsButtonText = "Two teams (up to 6)";
-        [Tooltip("The host's switch button label while the room is in TWO-team mode - press it to reopen the " +
-                 "third team.")]
-        public string lobbyThreeTeamsButtonText = "Three teams (up to 9)";
-        [Tooltip("Shown to the host instead of the ordinary warm-up line while the switch to two teams is " +
-                 "greyed out - the room already has more than six players.")]
-        public string lobbyTwoTeamsTooManyText = "Two teams needs 6 players or fewer";
-        [Tooltip("Warm-up line shown to everyone in two-team mode while fewer than both teams have a player yet.")]
-        public string warmupTwoTeamsWaitingText = "Warm-up (two teams): the host starts once both teams have a player.";
-        [Tooltip("Warm-up line shown to the HOST in two-team mode once both teams have a player - nothing " +
-                 "auto-starts here (Decision L3): Start when ready.")]
-        public string warmupTwoTeamsHostText = "Warm-up (two teams): both teams are here. Start when you're ready.";
-        [Tooltip("Warm-up line shown to everyone ELSE in two-team mode once both teams have a player - the host " +
-                 "has the Start button, not you.")]
-        public string warmupTwoTeamsGuestText = "Warm-up (two teams): waiting for the host to start.";
 
         [Header("Damage numbers (2026-09-18)")]
         [Tooltip("Pop a number beside an enemy each time your damage lands on them. Off hides them; nothing else about " +
@@ -1017,10 +984,17 @@ namespace Overpower.UI
         public string quitNoText = "No";
         [Tooltip("MatchLogZip's saved-log overlay, shown once this client's own match log has been " +
                  "zipped (the win/lose panel, and again on quit if that had not already happened). " +
-                 "{0} is filled in with the zip file's own full path.")]
-        public string matchLogSavedText = "Your match log is saved: {0} - send this file to Tudor.";
+                 "{0} is filled in with the match log folder's full path (inside the Match logs folder) and {1} with the zip file's full path. " +
+                 "Each new line of the text is a new line in the box.")]
+        [TextArea(2, 5)]
+        public string matchLogSavedText = "Your match log is saved.\nSaved in: {0}\nSend this zip to Tudor: {1}";
         [Tooltip("MatchLogZip's saved-log overlay button - Application.OpenURL of the match folder.")]
         public string openLogFolderText = "Open folder";
+        [Tooltip("Where the saved-log overlay sits: how far from the left edge and from the bottom edge of the screen, in reference pixels. " +
+                 "The bottom left keeps it clear of the YOU WIN / YOU LOSE title and the result button.")]
+        public Vector2 matchLogSavedOffset = new Vector2(24f, 70f);
+        [Tooltip("Width of the saved-log overlay, in reference pixels. Narrow enough to stay clear of the ability slots.")]
+        public float matchLogSavedWidth = 640f;
 
         [Header("Scoreboard (hold Tab)")]
         [Tooltip("Width of the Tab scoreboard, in reference pixels (the HUD's 1920x1080 grid).")]
@@ -1062,50 +1036,6 @@ namespace Overpower.UI
         [Tooltip("Shown for a team the scoreboard cannot name (a player whose team has not arrived yet).")]
         public string scoreboardUnknownTeamText = "Joining";
 
-        [Header("Name screen tips")]
-        [Tooltip("The keys block on the name screen. Written from the Gameplay actions in OverpowerControls (WASD, " +
-                 "left / right mouse, Left Shift, Space, R, P, M, Tab) plus Enter for chat and Escape: if you " +
-                 "rebind a key there, change it here too. <b> makes the heading bold.")]
-        [TextArea(4, 14)] public string nameTipsKeysText =
-            "<b>Keys</b>\n" +
-            "WASD  move\n" +
-            "Mouse  aim, left click shoots\n" +
-            "Right click  Attachment ability\n" +
-            "Left Shift  Mobility ability\n" +
-            "Space  Ultimate ability (meter full)\n" +
-            "R  Vent (see Overheat)\n" +
-            "P  Shop\n" +
-            "M  Map\n" +
-            "Hold Tab  Scoreboard\n" +
-            "Enter  Chat\n" +
-            "Escape  Close the game";
-        [Tooltip("The overheat block on the name screen: what overheat is and what the Vent does.")]
-        [TextArea(3, 8)] public string nameTipsOverheatText =
-            "<b>Overheat and the Vent</b>\n" +
-            "Shooting and Sprint build heat. Fill the bar and you cannot shoot or use abilities until it has cooled right down.\n" +
-            "While locked out, press R when the Vent window shows on the bar: it halves the wait. One try per lockout.";
-        [Tooltip("The ability charges block on the name screen.")]
-        [TextArea(3, 8)] public string nameTipsChargesText =
-            "<b>Ability charges</b>\n" +
-            "Some abilities hold several charges. Spent charges come back one at a time. Dash locks until 2 charges are back once you use all 3.";
-        [Tooltip("The game mode block on the name screen: capture zones, respawning, winning. Worded so it stays true " +
-                 "whatever the last stand's exact rule is.")]
-        [TextArea(3, 8)] public string nameTipsModeText =
-            "<b>The match</b>\n" +
-            "Capture zones to earn gold, and spend it in the shop. Your base is where your team respawns: lose your base and your team can't respawn until you retake it or take another team's base. The last team standing wins.";
-        [Tooltip("Text size of the name screen tips, in reference pixels.")]
-        [Min(8f)] public float nameTipsFontSize = 20f;
-        [Tooltip("Colour of the name screen tips text.")]
-        public Color nameTipsColor = new Color(1f, 1f, 1f, 0.9f);
-        [Tooltip("Width of the keys column on the name screen, in reference pixels.")]
-        public float nameTipsKeysWidth = 560f;
-        [Tooltip("Width of the column holding the overheat, charges and match blocks, in reference pixels.")]
-        public float nameTipsRulesWidth = 800f;
-        [Tooltip("Empty space between the two tip columns, in reference pixels.")]
-        public float nameTipsColumnGap = 60f;
-        [Tooltip("Distance from the bottom of the Join button to the top of the tips, in reference pixels.")]
-        public float nameTipsGapBelowJoin = 30f;
-
         [Header("Connection lost and rejoin (Task 9e, Tudor D21)")]
         [Tooltip("Title of the panel that appears when your connection to the match drops (ConnectionLostPanel).")]
         public string connectionLostTitle = "Connection lost";
@@ -1125,8 +1055,9 @@ namespace Overpower.UI
         public string rejoinFailedOkButton = "OK";
         [Tooltip("The name screen's button, shown while a match you dropped out of is still holding your place.")]
         public string rejoinMatchButton = "Rejoin your match";
-        [Tooltip("Label of the result screen's button once the match is really over: it leads back to the name screen.")]
-        public string resultButtonMainMenu = "Main menu";
+        [Tooltip("Label of the result screen's button once the match is really over: it leads back to the lobby list.")]
+        [UnityEngine.Serialization.FormerlySerializedAs("resultButtonMainMenu")]
+        public string resultButtonLobbyList = "Back to the lobby list";
         [Tooltip("Label of the same button while the match is still running (a knocked-out player's lose screen): it closes the game.")]
         public string resultButtonQuit = "Quit";
         [Tooltip("Width of the connection lost panel, in reference pixels.")]
@@ -1186,5 +1117,675 @@ namespace Overpower.UI
         public float spectateStripBottom = 120f;
         [Tooltip("Distance of the Next and Quit buttons from the strip's centre, sideways, in reference pixels.")]
         public float spectateButtonOffset = 115f;
+
+        [Header("Spectator bar (lobby Task 6, board 8)")]
+        [Tooltip("The bar at the bottom of a spectator seat's screen: who they watch and the keys. Fill colour of the bar.")]
+        public Color spectatorBarColor = new Color(0.06f, 0.063f, 0.078f, 0.88f);
+        [Tooltip("Empty space inside the bar, in reference pixels: left and right, then top and bottom.")]
+        public Vector2 spectatorBarPadding = new Vector2(36f, 20f);
+        [Tooltip("Gap between the bar's parts (who is watched, each key, Leave), in reference pixels.")]
+        public float spectatorBarGap = 42f;
+        [Tooltip("Distance from the bottom of the screen to the bottom of the bar, in reference pixels.")]
+        public float spectatorBarBottom = 28f;
+        [Tooltip("Text size of the small SPECTATING caption, in reference pixels.")]
+        public float spectatorBarCaptionSize = 18f;
+        [Tooltip("Colour of the SPECTATING caption.")]
+        public Color spectatorBarCaptionColor = new Color(0.557f, 0.545f, 0.522f, 1f);
+        [Tooltip("Text size of the watched player's name (and team), in reference pixels.")]
+        public float spectatorBarNameSize = 36f;
+        [Tooltip("Text size of each key's description (Previous, Next, Whole map, Zoom), in reference pixels.")]
+        public float spectatorBarKeyTextSize = 22f;
+        [Tooltip("Text size of the key caps (Q, E, Space, Wheel), in reference pixels.")]
+        public float spectatorBarKeyCapSize = 22f;
+        [Tooltip("Colour of a key cap's outline.")]
+        public Color spectatorBarKeyCapColor = new Color(0.557f, 0.545f, 0.522f, 1f);
+        [Tooltip("Thickness of a key cap's and the Leave button's outline, in reference pixels.")]
+        public float spectatorBarOutline = 2f;
+        [Tooltip("Empty space inside a key cap, left and right, then top and bottom, in reference pixels.")]
+        public Vector2 spectatorBarKeyCapPadding = new Vector2(15f, 6f);
+        [Tooltip("Size of the Leave button, in reference pixels.")]
+        public Vector2 spectatorBarLeaveSize = new Vector2(120f, 60f);
+        [Tooltip("Outline colour of the Leave button.")]
+        public Color spectatorBarLeaveOutlineColor = new Color(0.29f, 0.302f, 0.341f, 1f);
+        [Tooltip("The small caption above the name.")]
+        public string spectatorBarCaption = "SPECTATING";
+        [Tooltip("Shown instead of a player's name while the whole map is in view.")]
+        public string spectatorBarWholeMapName = "Whole map";
+        [Tooltip("The four keys' caps, in order: previous player, next player, whole map, zoom.")]
+        public string[] spectatorBarKeyCaps = { "Q", "E", "Space", "Wheel" };
+        [Tooltip("What each of the four keys does, in the same order.")]
+        public string[] spectatorBarKeyTexts = { "Previous", "Next", "Whole map", "Zoom" };
+        [Tooltip("The Leave button's label (back to the lobby list).")]
+        public string spectatorBarLeaveText = "Leave";
+        [Tooltip("The whole-map view (Space): how much of the screen's height the arena fills, from 0.3 to 1. 0.88 = 88%, the arena centred.")]
+        public float spectatorWholeMapFill = 0.88f;
+        [Tooltip("The angle a spectator sees the arena from, in degrees turned round the map (0 = the camera behind the bottom edge, looking up the map). It is the same whoever is watched.")]
+        public float spectatorViewAngle = 0f;
+        [Tooltip("The result card a spectator sees when the match ends (a spectator has no body, so no YOU WIN / YOU LOSE panel): the title, with {0} replaced by the winning team's name (team names: Scoreboard team names). The button under it reads 'Back to the lobby list' (Result button) and leads there.")]
+        public string spectatorResultTitle = "{0} wins the match";
+        [Tooltip("Text size of the spectator result card's title, in reference pixels.")]
+        public float spectatorResultTitleSize = 56f;
+        [Tooltip("Fill colour of the spectator result card.")]
+        public Color spectatorResultCardColor = new Color(0.06f, 0.063f, 0.078f, 0.92f);
+        [Tooltip("Empty space inside the spectator result card, left and right, then top and bottom, in reference pixels.")]
+        public Vector2 spectatorResultCardPadding = new Vector2(64f, 36f);
+        [Tooltip("How far the spectator result card sits below the top of the screen, in reference pixels.")]
+        public float spectatorResultCardTop = 150f;
+
+        [Header("Lobby screens (lobby Task 9)")]
+        [Tooltip("The font of the big letters on the lobby screens (title, buttons, headings): Oswald.")]
+        public TMP_FontAsset lobbyDisplayFont;
+        [Tooltip("The font of the ordinary text on the lobby screens: Public Sans regular.")]
+        public TMP_FontAsset lobbyBodyFont;
+        [Tooltip("The font of the bold text on the lobby screens (labels, lobby names, buttons): Public Sans bold.")]
+        public TMP_FontAsset lobbyBoldFont;
+        [Tooltip("Background of the name screen and the lobby list, and the card of the create screen.")]
+        public Color lobbyDarkColor = new Color(0.102f, 0.11f, 0.133f, 1f);
+        [Tooltip("Background behind the create screen's card.")]
+        public Color lobbyBackdropColor = new Color(0.059f, 0.063f, 0.078f, 1f);
+        [Tooltip("Fill of the name box, the lobby name box, the mode buttons and a lobby row.")]
+        public Color lobbyPanelColor = new Color(0.149f, 0.161f, 0.196f, 1f);
+        [Tooltip("Fill of a lobby row that is full.")]
+        public Color lobbyRowFullColor = new Color(0.125f, 0.133f, 0.165f, 1f);
+        [Tooltip("Outline of the boxes and of the Cancel button.")]
+        public Color lobbyBorderColor = new Color(0.29f, 0.302f, 0.341f, 1f);
+        [Tooltip("Outline of the create screen's card and of the team size buttons that are not chosen.")]
+        public Color lobbyCardBorderColor = new Color(0.227f, 0.239f, 0.278f, 1f);
+        [Tooltip("The main buttons (Find a lobby, Create lobby, Create) and the chosen mode and team size.")]
+        public Color lobbyPurpleColor = new Color(0.42f, 0.247f, 0.749f, 1f);
+        [Tooltip("The small PROJECT caption, the How to play button, the Rejoin outline and the In lobby status.")]
+        public Color lobbyCyanColor = new Color(0.169f, 0.722f, 0.769f, 1f);
+        [Tooltip("The main text colour, the title letters and the Join buttons.")]
+        public Color lobbyOffWhiteColor = new Color(0.957f, 0.949f, 0.929f, 1f);
+        [Tooltip("Labels and the second line of text.")]
+        public Color lobbyMutedColor = new Color(0.725f, 0.714f, 0.682f, 1f);
+        [Tooltip("Hints, column headings and text of a full lobby.")]
+        public Color lobbyDimColor = new Color(0.557f, 0.545f, 0.522f, 1f);
+        [Tooltip("The In match status.")]
+        public Color lobbyYellowColor = new Color(0.91f, 0.725f, 0.192f, 1f);
+        [Tooltip("Fill of a button that cannot be pressed (a full lobby's Full button, Find a lobby with a short name).")]
+        public Color lobbyDisabledButtonColor = new Color(0.2f, 0.212f, 0.247f, 1f);
+        [Tooltip("Text on the light buttons (Join, Spectate, How to play).")]
+        public Color lobbyDarkTextColor = new Color(0.102f, 0.11f, 0.133f, 1f);
+        [Tooltip("The short line that tells a lobby could not be joined or created.")]
+        public Color lobbyErrorColor = new Color(0.91f, 0.725f, 0.192f, 1f);
+        [Tooltip("The orange outline round the OVERPOWER letters.")]
+        public Color lobbyTitleOutlineColor = new Color(0.949f, 0.549f, 0.157f, 1f);
+        [Tooltip("How thick the orange outline round OVERPOWER is, 0 to 1. Around 0.1 is thin, 0.2 is bold.")]
+        public float lobbyTitleOutlineWidth = 0.09f;
+        [Tooltip("The material the OVERPOWER title is drawn with: the Oswald font's material with its outline switched on. The outline colour and thickness above are applied on top; this material makes sure the outline shader is in the game build.")]
+        public Material lobbyTitleMaterial;
+        [Tooltip("Fill of the team size that is chosen on the create screen (a see-through purple).")]
+        public Color lobbyCreateSelectedFill = new Color(0.42f, 0.247f, 0.749f, 0.251f);
+        [Tooltip("How round the corners of boxes and buttons are, in reference pixels.")]
+        public float lobbyCornerRadius = 9f;
+        [Tooltip("How round the corners of the create screen's card are, in reference pixels.")]
+        public float lobbyCardRadius = 15f;
+        [Tooltip("Thickness of the outline of boxes and buttons, in reference pixels.")]
+        public float lobbyBorderWidth = 1.5f;
+        [Tooltip("Thickness of the outline of the chosen team size, in reference pixels.")]
+        public float lobbyChosenBorderWidth = 3f;
+        [Tooltip("Extra space between the letters of the small capital labels (YOUR NAME, LOBBY, MODE), in reference pixels.")]
+        public float lobbyLabelSpacing = 1.5f;
+        [Tooltip("Extra space between the letters of the small cyan PROJECT caption, in reference pixels.")]
+        public float lobbyKickerSpacing = 6f;
+        [Tooltip("Extra space between the letters of the big purple buttons, in reference pixels.")]
+        public float lobbyButtonSpacing = 1.5f;
+        [Tooltip("Width of the name screen's column, in reference pixels.")]
+        public float nameScreenWidth = 720f;
+        [Tooltip("Space between the title, the name box and the buttons on the name screen, in reference pixels.")]
+        public float nameScreenGap = 42f;
+        [Tooltip("Space between the name box's label, the box and its hint, in reference pixels.")]
+        public float nameScreenInnerGap = 12f;
+        [Tooltip("Text size of PROJECT above the title, in reference pixels.")]
+        public float nameScreenKickerSize = 21f;
+        [Tooltip("Text size of OVERPOWER, in reference pixels.")]
+        public float nameScreenTitleSize = 144f;
+        [Tooltip("Text size of YOUR NAME, in reference pixels.")]
+        public float nameScreenLabelSize = 19.5f;
+        [Tooltip("Height of the name box, in reference pixels.")]
+        public float nameScreenFieldHeight = 84f;
+        [Tooltip("Text size of the typed name, in reference pixels.")]
+        public float nameScreenFieldTextSize = 33f;
+        [Tooltip("Text size of the hint under the name box, in reference pixels.")]
+        public float nameScreenHintSize = 19.5f;
+        [Tooltip("Height of Find a lobby, in reference pixels.")]
+        public float nameScreenFindHeight = 90f;
+        [Tooltip("Text size of Find a lobby, in reference pixels.")]
+        public float nameScreenFindTextSize = 36f;
+        [Tooltip("Height of Rejoin your match, in reference pixels.")]
+        public float nameScreenRejoinHeight = 72f;
+        [Tooltip("Text size of Rejoin your match, in reference pixels.")]
+        public float nameScreenRejoinTextSize = 24f;
+        [Tooltip("Empty space round the lobby list screen: left and right, then top and bottom, in reference pixels.")]
+        public Vector2 lobbyListPadding = new Vector2(96f, 72f);
+        [Tooltip("Space between the heading, the table and the bottom row of the lobby list, in reference pixels.")]
+        public float lobbyListGap = 36f;
+        [Tooltip("Text size of PROJECT OVERPOWER above the list heading, in reference pixels.")]
+        public float lobbyListKickerSize = 19.5f;
+        [Tooltip("Extra space between the letters of that caption, in reference pixels.")]
+        public float lobbyListKickerSpacing = 4.5f;
+        [Tooltip("Text size of the Lobbies heading, in reference pixels.")]
+        public float lobbyListTitleSize = 72f;
+        [Tooltip("Text size of Playing as <name>, in reference pixels.")]
+        public float lobbyListPlayingAsSize = 22.5f;
+        [Tooltip("Height of the Create lobby button, in reference pixels.")]
+        public float lobbyListCreateHeight = 72f;
+        [Tooltip("Empty space left and right inside the Create lobby button, in reference pixels.")]
+        public float lobbyListCreatePadding = 42f;
+        [Tooltip("Text size of the Create lobby button, in reference pixels.")]
+        public float lobbyListCreateTextSize = 30f;
+        [Tooltip("Text size of the column headings, in reference pixels.")]
+        public float lobbyListHeadSize = 19.5f;
+        [Tooltip("How the table's width is shared between the Lobby, Mode, Players, Status and Host columns.")]
+        public float[] lobbyListColumnWeights = { 3f, 2f, 1.4f, 1.6f, 1.4f };
+        [Tooltip("Width of the Join / Spectate / Full column, in reference pixels.")]
+        public float lobbyListActionWidth = 180f;
+        [Tooltip("Space between the table's columns, in reference pixels.")]
+        public float lobbyListColumnGap = 24f;
+        [Tooltip("Empty space left and right inside a lobby row, in reference pixels.")]
+        public float lobbyListRowPadding = 30f;
+        [Tooltip("Height of a lobby row, in reference pixels.")]
+        public float lobbyListRowHeight = 96f;
+        [Tooltip("Space between two lobby rows, in reference pixels.")]
+        public float lobbyListRowGap = 12f;
+        [Tooltip("Text size of a lobby row, in reference pixels.")]
+        public float lobbyListRowTextSize = 25.5f;
+        [Tooltip("Text size of the +1 spec part of the players text, in reference pixels.")]
+        public float lobbyListRowSpecSize = 21f;
+        [Tooltip("Height of a row's Join / Spectate / Full button, in reference pixels.")]
+        public float lobbyListRowButtonHeight = 60f;
+        [Tooltip("Text size of that button, in reference pixels.")]
+        public float lobbyListRowButtonTextSize = 22.5f;
+        [Tooltip("Height of the How to play button, in reference pixels.")]
+        public float lobbyListHowToHeight = 72f;
+        [Tooltip("Empty space left and right inside the How to play button, in reference pixels.")]
+        public float lobbyListHowToPadding = 33f;
+        [Tooltip("Text size of the How to play button, in reference pixels.")]
+        public float lobbyListHowToTextSize = 24f;
+        [Tooltip("Text size of the line at the bottom right of the list, in reference pixels.")]
+        public float lobbyListHintSize = 21f;
+        [Tooltip("Width of the create screen's card, in reference pixels.")]
+        public float createCardWidth = 1140f;
+        [Tooltip("Empty space inside the create screen's card, in reference pixels.")]
+        public float createCardPadding = 60f;
+        [Tooltip("Space between the create screen's parts, in reference pixels.")]
+        public float createCardGap = 39f;
+        [Tooltip("Text size of Create a lobby, in reference pixels.")]
+        public float createTitleSize = 54f;
+        [Tooltip("Text size of LOBBY NAME, MODE and TEAMS, in reference pixels.")]
+        public float createLabelSize = 19.5f;
+        [Tooltip("Height of the lobby name box, in reference pixels.")]
+        public float createFieldHeight = 72f;
+        [Tooltip("Empty space left and right inside the lobby name box, in reference pixels.")]
+        public float createFieldPadding = 24f;
+        [Tooltip("Text size of the lobby name, in reference pixels.")]
+        public float createFieldTextSize = 27f;
+        [Tooltip("Height of the mode buttons (Conquest / Dominion), in reference pixels.")]
+        public float createModeHeight = 84f;
+        [Tooltip("Text size of the mode buttons, in reference pixels.")]
+        public float createModeTextSize = 33f;
+        [Tooltip("Text size of the lines under the mode and the team sizes, in reference pixels.")]
+        public float createNoteSize = 21f;
+        [Tooltip("Text size of coming soon under a mode that cannot be created yet, in reference pixels.")]
+        public float createComingSoonSize = 18f;
+        [Tooltip("Size of a team size button (3v3v3, 3v3), in reference pixels.")]
+        public Vector2 createSizeButton = new Vector2(210f, 78f);
+        [Tooltip("Text size of a team size button, in reference pixels.")]
+        public float createSizeTextSize = 30f;
+        [Tooltip("Space between the team size buttons, in reference pixels.")]
+        public float createSizeGap = 18f;
+        [Tooltip("Height of Cancel and Create, in reference pixels.")]
+        public float createActionHeight = 72f;
+        [Tooltip("Empty space left and right inside Cancel, in reference pixels.")]
+        public float createCancelPadding = 36f;
+        [Tooltip("Text size of Cancel, in reference pixels.")]
+        public float createCancelTextSize = 24f;
+        [Tooltip("Empty space left and right inside Create, in reference pixels.")]
+        public float createCreatePadding = 48f;
+        [Tooltip("Text size of Create, in reference pixels.")]
+        public float createCreateTextSize = 30f;
+        [Tooltip("Space between Cancel and Create, in reference pixels.")]
+        public float createActionGap = 18f;
+        [Tooltip("How long the short line about a lobby that could not be joined or created stays on screen, in seconds.")]
+        public float lobbyMessageSeconds = 6f;
+        [Tooltip("The small caption above the title.")]
+        public string nameScreenKickerText = "PROJECT";
+        [Tooltip("The big title.")]
+        public string nameScreenTitleText = "OVERPOWER";
+        [Tooltip("The label above the name box.")]
+        public string nameScreenLabelText = "YOUR NAME";
+        [Tooltip("The hint under the name box: {0} is the fewest letters, {1} the most (Lobby Config).")]
+        public string nameScreenHintFormat = "{0} to {1} letters or numbers";
+        [Tooltip("The button that opens the lobby list.")]
+        public string nameScreenFindText = "FIND A LOBBY";
+        [Tooltip("The small caption above the list heading.")]
+        public string lobbyListKickerText = "PROJECT OVERPOWER";
+        [Tooltip("The list heading.")]
+        public string lobbyListTitleText = "Lobbies";
+        [Tooltip("Written before the player's name at the top right of the list.")]
+        public string lobbyListPlayingAsText = "Playing as";
+        [Tooltip("The button that opens the create screen.")]
+        public string lobbyListCreateText = "CREATE LOBBY";
+        [Tooltip("The column headings, in order.")]
+        public string[] lobbyListColumnTexts = { "LOBBY", "MODE", "PLAYERS", "STATUS", "HOST" };
+        [Tooltip("The button of a lobby with a free team seat.")]
+        public string lobbyListJoinText = "Join";
+        [Tooltip("The button of a lobby where only spectator seats are free.")]
+        public string lobbyListSpectateText = "Spectate";
+        [Tooltip("The greyed button of a lobby with no free seat.")]
+        public string lobbyListFullText = "Full";
+        [Tooltip("The cyan button at the bottom left.")]
+        public string lobbyListHowToText = "How to play";
+        [Tooltip("The line at the bottom right of the list.")]
+        public string lobbyListHintText = "The list updates by itself. A lobby closes when everyone has left.";
+        [Tooltip("Shown in place of the table when the list is empty.")]
+        public string lobbyListEmptyText = "No lobbies yet. Create one to get started.";
+        [Tooltip("Shown in place of the table until the list has arrived.")]
+        public string lobbyListConnectingText = "Connecting to the lobby list...";
+        [Tooltip("Shown for a lobby whose mode this version does not know.")]
+        public string lobbyListUnknownModeText = "Unknown mode";
+        [Tooltip("The create screen's heading.")]
+        public string createTitleText = "Create a lobby";
+        [Tooltip("The label above the lobby name box.")]
+        public string createNameLabelText = "LOBBY NAME";
+        [Tooltip("What the lobby name box starts with: {0} is the player's name.")]
+        public string createNamePrefillFormat = "{0}'s lobby";
+        [Tooltip("What the lobby name box starts with when the player has no name.")]
+        public string createNameFallbackText = "My lobby";
+        [Tooltip("The label above the mode buttons.")]
+        public string createModeLabelText = "MODE";
+        [Tooltip("The label above the team size buttons.")]
+        public string createTeamsLabelText = "TEAMS";
+        [Tooltip("Written on a mode that cannot be created yet.")]
+        public string createComingSoonText = "coming soon";
+        [Tooltip("The line under the mode buttons, one per mode family in order (Conquest, Dominion).")]
+        public string[] createFamilyNotes = { "Capture territory for gold, take capitals, be the last team standing.", "A new mode, coming soon." };
+        [Tooltip("The line under the team sizes about another family: {0} is its name, {1} its sizes.")]
+        public string createOtherFamilyFormat = "{0} offers {1} here instead.";
+        [Tooltip("Written between two sizes in that line.")]
+        public string createSizeJoiner = " and ";
+        [Tooltip("The button that closes the create screen.")]
+        public string createCancelText = "Cancel";
+        [Tooltip("The button that creates the lobby.")]
+        public string createCreateText = "CREATE";
+        [Tooltip("Shown when the lobby could not be created.")]
+        public string createFailedText = "Could not create the lobby. Try again.";
+        [Tooltip("Shown on the name screen when the connection to the game server is lost.")]
+        public string lobbyConnectionLostText = "Disconnected. Check your connection.";
+
+        [Header("Lobby room (lobby Task 10)")]
+        [Tooltip("Fill of a taken seat.")]
+        public Color lobbyRoomSeatFill = new Color(0.2f, 0.212f, 0.247f, 1f);
+        [Tooltip("Fill of the No role box.")]
+        public Color lobbyRoomSideFill = new Color(0.125f, 0.133f, 0.165f, 1f);
+        [Tooltip("Outline of the No role box.")]
+        public Color lobbyRoomSideBorder = new Color(0.2f, 0.212f, 0.247f, 1f);
+        [Tooltip("The Spectators heading.")]
+        public Color lobbyRoomHeadingColor = new Color(0.847f, 0.835f, 0.808f, 1f);
+        [Tooltip("The coloured edge on top of each team column, by team number (White, Purple, Cyan).")]
+        public Color[] lobbyRoomTeamColors = { new Color(0.957f, 0.949f, 0.929f, 1f), new Color(0.42f, 0.247f, 0.749f, 1f), new Color(0.169f, 0.722f, 0.769f, 1f) };
+        [Tooltip("Empty space round the lobby room screen: left and right, then top and bottom, in reference pixels.")]
+        public Vector2 lobbyRoomPadding = new Vector2(72f, 54f);
+        [Tooltip("Space between the heading, the seats and the bottom row of the lobby room, in reference pixels.")]
+        public float lobbyRoomGap = 30f;
+        [Tooltip("How round the corners of the team columns and the side box are, in reference pixels.")]
+        public float lobbyRoomBoxRadius = 12f;
+        [Tooltip("Text size of the lobby name, in reference pixels.")]
+        public float lobbyRoomTitleSize = 57f;
+        [Tooltip("Height of the mode button, in reference pixels.")]
+        public float lobbyRoomModeHeight = 51f;
+        [Tooltip("Empty space left and right inside the mode button, in reference pixels.")]
+        public float lobbyRoomModePadding = 21f;
+        [Tooltip("Text size of the mode button, in reference pixels.")]
+        public float lobbyRoomModeTextSize = 22.5f;
+        [Tooltip("Text size of the line after the mode button (the host and the hint), in reference pixels.")]
+        public float lobbyRoomHostLineSize = 22.5f;
+        [Tooltip("Space between the team columns, and between the teams and the spectators, in reference pixels.")]
+        public float lobbyRoomTeamGap = 24f;
+        [Tooltip("Empty space inside a team column, the spectators box and the No role box, in reference pixels.")]
+        public float lobbyRoomBoxPadding = 21f;
+        [Tooltip("Thickness of the coloured edge on top of a team column, in reference pixels.")]
+        public float lobbyRoomStripeHeight = 6f;
+        [Tooltip("Text size of a team column heading, in reference pixels.")]
+        public float lobbyRoomTeamNameSize = 33f;
+        [Tooltip("Height of a seat button in a team column, in reference pixels.")]
+        public float lobbyRoomSeatHeight = 69f;
+        [Tooltip("Space between two seats, in reference pixels.")]
+        public float lobbyRoomSeatGap = 12f;
+        [Tooltip("Empty space left and right of a seat button text, in reference pixels.")]
+        public float lobbyRoomSeatPadding = 21f;
+        [Tooltip("Text size of a taken seat, in reference pixels.")]
+        public float lobbyRoomSeatTextSize = 24f;
+        [Tooltip("Text size of an empty seat, in reference pixels.")]
+        public float lobbyRoomSeatEmptyTextSize = 22.5f;
+        [Tooltip("Thickness of the outline round your own seat, in reference pixels.")]
+        public float lobbyRoomMineBorderWidth = 3f;
+        [Tooltip("Text size of the Spectators heading, in reference pixels.")]
+        public float lobbyRoomSpectatorTitleSize = 30f;
+        [Tooltip("Height of a spectator seat, in reference pixels.")]
+        public float lobbyRoomSpectatorSeatHeight = 63f;
+        [Tooltip("Text size of a spectator seat, in reference pixels.")]
+        public float lobbyRoomSpectatorTextSize = 22.5f;
+        [Tooltip("Space between spectator seats, in reference pixels.")]
+        public float lobbyRoomSpectatorGap = 18f;
+        [Tooltip("Width of the No role box, in reference pixels.")]
+        public float lobbyRoomSideWidth = 375f;
+        [Tooltip("Text size of the No role heading, in reference pixels.")]
+        public float lobbyRoomSideTitleSize = 30f;
+        [Tooltip("Text size of a name in the No role box, in reference pixels.")]
+        public float lobbyRoomSideNameSize = 24f;
+        [Tooltip("Text size of the note in the No role box, in reference pixels.")]
+        public float lobbyRoomSideNoteSize = 19.5f;
+        [Tooltip("Height of Leave my seat, in reference pixels.")]
+        public float lobbyRoomSideButtonHeight = 60f;
+        [Tooltip("Text size of Leave my seat, in reference pixels.")]
+        public float lobbyRoomSideButtonTextSize = 21f;
+        [Tooltip("Height of Leave lobby and How to play, in reference pixels.")]
+        public float lobbyRoomBottomHeight = 72f;
+        [Tooltip("Empty space left and right inside Leave lobby and How to play, in reference pixels.")]
+        public float lobbyRoomBottomPadding = 33f;
+        [Tooltip("Text size of Leave lobby and How to play, in reference pixels.")]
+        public float lobbyRoomBottomTextSize = 24f;
+        [Tooltip("Space between Leave lobby and How to play, in reference pixels.")]
+        public float lobbyRoomBottomGap = 18f;
+        [Tooltip("Height of Start game, in reference pixels.")]
+        public float lobbyRoomStartHeight = 84f;
+        [Tooltip("Empty space left and right inside Start game, in reference pixels.")]
+        public float lobbyRoomStartPadding = 54f;
+        [Tooltip("Text size of Start game, in reference pixels.")]
+        public float lobbyRoomStartTextSize = 36f;
+        [Tooltip("Text size of the line beside Start game (what it does, why it is greyed, or who the others wait for), in reference pixels.")]
+        public float lobbyRoomStartHintSize = 21f;
+        [Tooltip("Space between that line and Start game, in reference pixels.")]
+        public float lobbyRoomStartGap = 24f;
+        [Tooltip("The mode button, before its circled i: {0} is the mode name (Conquest 3v3v3).")]
+        public string lobbyRoomModeFormat = "{0} \u00b7";
+        [Tooltip("Size of the circled i at the right end of the mode button, in reference pixels. It is drawn (the fonts have no circled-i letter).")]
+        public float lobbyRoomInfoIconSize = 30f;
+        [Tooltip("The letter inside that circle.")]
+        public string lobbyRoomInfoIconText = "i";
+        [Tooltip("The line after the mode button: {0} is the host's name (drawn bold).")]
+        public string lobbyRoomHostFormat = "\u00b7 host {0} \u00b7 click a seat to take it";
+        [Tooltip("What an empty seat says.")]
+        public string lobbyRoomEmptySeatText = "Empty seat";
+        [Tooltip("Written after your own name on your seat.")]
+        public string lobbyRoomYouSuffix = " (you)";
+        [Tooltip("Written after the host's name on the host's seat.")]
+        public string lobbyRoomHostSuffix = " \u00b7 host";
+        [Tooltip("The heading over the spectator seats.")]
+        public string lobbyRoomSpectatorsText = "Spectators";
+        [Tooltip("The heading of the side box: {0} is how many players have no seat yet.")]
+        public string lobbyRoomNoRoleFormat = "No role ({0})";
+        [Tooltip("The note at the bottom of the No role box.")]
+        public string lobbyRoomNoRoleNote = "At the start they fill the emptiest team, then the spectator seats.";
+        [Tooltip("The button that puts you back in No role.")]
+        public string lobbyRoomLeaveSeatText = "Leave my seat";
+        [Tooltip("The button that leaves the lobby for the list.")]
+        public string lobbyRoomLeaveLobbyText = "Leave lobby";
+        [Tooltip("The host's button.")]
+        public string lobbyRoomStartText = "START GAME";
+        [Tooltip("The line beside Start game while it can be pressed.")]
+        public string lobbyRoomStartHintText = "Everyone spawns into the warm-up";
+        [Tooltip("The line beside the greyed Start game: {0} is the team that would stay empty.")]
+        public string lobbyRoomStartBlockedFormat = "{0} needs a player";
+        [Tooltip("What everyone but the host reads at the bottom right: {0} is the host's name.")]
+        public string lobbyRoomWaitingFormat = "Waiting for {0} to start the game";
+        [Tooltip("Width of the mode info and How to play pages, in reference pixels.")]
+        public float lobbyRoomOverlayWidth = 1824f;
+        [Tooltip("Height of the mode info and How to play pages, in reference pixels.")]
+        public float lobbyRoomOverlayHeight = 984f;
+        [Tooltip("Text size of the title of those pages, in reference pixels.")]
+        public float lobbyRoomOverlayTitleSize = 60f;
+        [Tooltip("Size of the close button of those pages, in reference pixels.")]
+        public float lobbyRoomOverlayCloseSize = 66f;
+        [Tooltip("The dark layer behind the mode info and How to play pages.")]
+        public Color lobbyRoomOverlayShade = new Color(0f, 0f, 0f, 0.7f);
+
+        [Header("Lobby screens: layout, words (lobby Task 9 review)")]
+        [Tooltip("Space between the parts of the lobby list's top row, in reference pixels.")]
+        public float lobbyListHeaderGap = 24f;
+        [Tooltip("Space between the small caption and the heading of the lobby list, in reference pixels.")]
+        public float lobbyListTitleGap = 6f;
+        [Tooltip("Space between the player's name and the Create lobby button, in reference pixels.")]
+        public float lobbyListPlayerGap = 24f;
+        [Tooltip("Space between 'Playing as' and the player's name, in reference pixels.")]
+        public float lobbyListPlayingAsGap = 9f;
+        [Tooltip("Space between the parts of the lobby list's bottom row, in reference pixels.")]
+        public float lobbyListFooterGap = 24f;
+        [Tooltip("How far one turn of the mouse wheel scrolls the lobby list.")]
+        public float lobbyListScrollSensitivity = 40f;
+        [Tooltip("Space between the name, mode and team size blocks of the create screen, in reference pixels.")]
+        public float createBlockGap = 12f;
+        [Tooltip("A mode that is coming soon: how many text heights the mode name is lifted to make room for the words under it.")]
+        public float createComingSoonLabelShift = 1.2f;
+        [Tooltip("A mode that is coming soon: height of the words under the name, in text heights.")]
+        public float createComingSoonBoxHeight = 1.3f;
+        [Tooltip("A mode that is coming soon: how far the words sit above the bottom edge of the button, in reference pixels.")]
+        public float createComingSoonLift = 4f;
+        [Tooltip("Space between the small caption and OVERPOWER on the name screen, in reference pixels.")]
+        public float nameScreenTitleGap = 9f;
+        [Tooltip("Shown when a late joiner finds every seat taken.")]
+        public string lobbyLateJoinFullText = "Lobby full";
+        [Tooltip("Shown when a late joiner's seat request was not answered in time.")]
+        public string lobbyLateJoinNoSeatText = "Could not get a seat";
+        [Tooltip("Shown when a join was refused because the lobby is full.")]
+        public string lobbyJoinFullText = "That lobby is full.";
+        [Tooltip("Shown when a join was refused because the lobby has closed.")]
+        public string lobbyJoinClosedText = "That lobby has closed.";
+        [Tooltip("Shown when a join was refused because the lobby is gone.")]
+        public string lobbyJoinGoneText = "That lobby no longer exists.";
+        [Tooltip("Shown when a join was refused for any other reason.")]
+        public string lobbyJoinFailedText = "Could not join that lobby.";
+
+        [Header("Warm-up bar (lobby Task 10)")]
+        [Tooltip("Fill of the warm-up bar at the top of the arena.")]
+        public Color warmupBarFill = new Color(0.102f, 0.11f, 0.133f, 0.88f);
+        [Tooltip("How round the corners of the warm-up bar are, in reference pixels.")]
+        public float warmupBarRadius = 12f;
+        [Tooltip("Empty space inside the bar with the End warm-up button: left and right, then top and bottom, in reference pixels.")]
+        public Vector2 warmupBarPaddingHost = new Vector2(36f, 18f);
+        [Tooltip("Empty space inside the bar without a button: left and right, then top and bottom, in reference pixels.")]
+        public Vector2 warmupBarPaddingGuest = new Vector2(42f, 18f);
+        [Tooltip("Space between the bar's text and the End warm-up button, in reference pixels.")]
+        public float warmupBarGap = 30f;
+        [Tooltip("Text size of WARM-UP and of the countdown, in reference pixels.")]
+        public float warmupBarTitleSize = 36f;
+        [Tooltip("Text size of the second line, in reference pixels.")]
+        public float warmupBarInfoSize = 21f;
+        [Tooltip("Height of End warm-up, in reference pixels.")]
+        public float warmupBarButtonHeight = 72f;
+        [Tooltip("Empty space left and right inside End warm-up, in reference pixels.")]
+        public float warmupBarButtonPadding = 39f;
+        [Tooltip("Text size of End warm-up, in reference pixels.")]
+        public float warmupBarButtonTextSize = 30f;
+        [Tooltip("The first line of the bar.")]
+        public string warmupBarTitleText = "WARM-UP";
+        [Tooltip("The host's second line: {0} is the player count.")]
+        public string warmupBarInfoFormat = "Free shop \u00b7 nothing counts \u00b7 {0}";
+        [Tooltip("The player count: {0} is how many.")]
+        public string warmupBarPlayersText = "{0} players";
+        [Tooltip("The player count when there is one.")]
+        public string warmupBarOnePlayerText = "1 player";
+        [Tooltip("Everyone else's second line: {0} is the host's name.")]
+        public string warmupBarGuestFormat = "Free shop \u00b7 nothing counts \u00b7 {0} ends the warm-up";
+        [Tooltip("The host's button.")]
+        public string warmupBarButtonText = "END WARM-UP";
+        [Tooltip("Under the greyed End warm-up: {0} is the team with nobody present.")]
+        public string warmupBarBlockedFormat = "{0} has no player";
+        [Tooltip("The second line of the countdown.")]
+        public string warmupBarCountdownInfo = "Everything resets when it goes live";
+
+        [Header("Chat (lobby Task 11, board 7A)")]
+        [Tooltip("How see-through the dark chat panel is: 0 = invisible, 1 = solid. Board 7A: about 0.38.")]
+        [Range(0f, 1f)] public float chatPanelAlpha = 0.38f;
+        [Tooltip("Width and height of the chat panel, in reference pixels.")]
+        public Vector2 chatPanelSize = new Vector2(630f, 360f);
+        [Tooltip("Space between the chat panel and the bottom-left corner of the screen, in reference pixels.")]
+        public Vector2 chatPanelMargin = new Vector2(72f, 54f);
+        [Tooltip("In the lobby room: space between the chat panel and the bottom-left corner. The left edge clears the Leave lobby and How to play buttons.")]
+        public Vector2 chatLobbyMargin = new Vector2(520f, 54f);
+        [Tooltip("In the lobby room: width and height of the chat panel. It sits right of the bottom buttons and under the spectator row.")]
+        public Vector2 chatLobbySize = new Vector2(630f, 270f);
+        [Tooltip("Empty space between the chat panel's edge and what is in it, in reference pixels.")]
+        public float chatPanelPadding = 24f;
+        [Tooltip("Space between the lines and the typing box, in reference pixels.")]
+        public float chatPanelGap = 12f;
+        [Tooltip("How round the corners of the chat panel are, in reference pixels.")]
+        public float chatPanelRadius = 12f;
+        [Tooltip("Text size of a chat line, in reference pixels (board: 18 px x 1.5).")]
+        public float chatTextSize = 27f;
+        [Tooltip("Extra space between chat lines, as a percentage of the line height.")]
+        public float chatLineSpacing = 30f;
+        [Tooltip("Height of the typing box, in reference pixels.")]
+        public float chatInputHeight = 66f;
+        [Tooltip("Text size inside the typing box, in reference pixels.")]
+        public float chatInputTextSize = 24f;
+        [Tooltip("What the typing box says while it is empty.")]
+        public string chatInputPlaceholder = "Enter to type, Escape to close";
+        [Tooltip("Written before a spectator's name in chat.")]
+        public string chatSpectatorTag = "[SPEC]";
+        [Tooltip("How many chat lines are kept on screen; older ones are dropped.")]
+        public int chatMaxLines = DefaultChatMaxLines;
+        /// <summary>The line count used when no theme is assigned (and the default of chatMaxLines).</summary>
+        public const int DefaultChatMaxLines = 40;
+        [Tooltip("Colour of the chat panel's dark background (how see-through it is comes from Chat Panel Alpha).")]
+        public Color chatPanelColor = new Color(15f / 255f, 16f / 255f, 20f / 255f, 1f);
+        [Tooltip("Empty space between the typing box's edge and the text inside it, left and right, in reference pixels.")]
+        public float chatInputTextInset = 18f;
+        [Tooltip("Thickness of the typing box's border line, in reference pixels.")]
+        public float chatInputBorderWidth = 1.5f;
+        [Tooltip("How round the typing box's corners are compared with the chat panel's corners: 1 = the same, 0.5 = half as round.")]
+        public float chatInputCornerFactor = 0.75f;
+
+        [Header("Lobby screens: layout numbers (lobby Task 10 review)")]
+        [Tooltip("Space between the lobby name and the mode row of the lobby room, in reference pixels.")]
+        public float lobbyRoomHeaderGap = 3f;
+        [Tooltip("Space between the mode button and the host line, in reference pixels.")]
+        public float lobbyRoomModeRowGap = 15f;
+        [Tooltip("Size of the i inside the mode button's circle, as a share of the circle's size.")]
+        public float lobbyRoomInfoIconTextFactor = 0.62f;
+        [Tooltip("Space between the mode name and the circled i, as a share of the mode button's padding.")]
+        public float lobbyRoomModeIconGapFactor = 0.4f;
+        [Tooltip("A little extra width of the mode button so its text never touches the edge, in reference pixels.")]
+        public float lobbyRoomModeButtonSlack = 4f;
+        [Tooltip("Height of a name line in the No role box, as a share of its text size.")]
+        public float lobbyRoomSideNameLine = 1.4f;
+        [Tooltip("Empty space right of End warm-up inside the host's bar, in reference pixels (the left side uses the padding above).")]
+        public float warmupBarHostRightPadding = 20.88f;
+        [Tooltip("Empty space left and right inside the name box on the name screen, in reference pixels.")]
+        public float nameScreenFieldPadding = 23.04f;
+        [Tooltip("How much rounder the mode and size buttons of the create screen are than the other buttons, in reference pixels.")]
+        public float createModeRadiusExtra = 3f;
+
+        [Header("How to play and the game mode info page (lobby Task 12)")]
+        [Tooltip("The pages of the How to play wiki: title, text and picture of each (the HowToPlayPages asset).")]
+        public Overpower.Data.HowToPlayPages howToPlayPages;
+        [Tooltip("The small heading over the page list of How to play.")]
+        public string howToPlaySidebarTitle = "HOW TO PLAY";
+        [Tooltip("The previous button: {0} is the title of the page before this one.")]
+        public string howToPlayPreviousFormat = "<size=150%>\u2039</size> {0}";
+        [Tooltip("The next button: {0} is the title of the page after this one.")]
+        public string howToPlayNextFormat = "{0} <size=150%>\u203a</size>";
+        [Tooltip("The page counter between the two buttons: {0} is this page's number, {1} how many pages there are.")]
+        public string howToPlayCounterFormat = "{0} / {1}";
+        [Tooltip("Written on How to play when the pages asset has no pages.")]
+        public string howToPlayNoPagesText = "No pages yet.";
+        [Tooltip("The small heading over the mode's name on the game mode info page.")]
+        public string modeInfoKickerText = "GAME MODE";
+        [Tooltip("Written on the game mode info page when the mode has no info cards.")]
+        public string modeInfoNoCardsText = "Nothing to read about this mode yet.";
+        [Tooltip("Background of the page list on the left of How to play.")]
+        public Color howToPlaySidebarColor = new Color(0.082f, 0.086f, 0.106f, 1f);
+        [Tooltip("Background behind a page's picture (the pictures are drawn on the same colour).")]
+        public Color howToPlayPictureColor = new Color(0.055f, 0.059f, 0.075f, 1f);
+        [Tooltip("Colour of a page's text.")]
+        public Color howToPlayTextColor = new Color(0.957f, 0.949f, 0.929f, 1f);
+        [Tooltip("Empty space left and right of the content of How to play and the mode info page, in reference pixels.")]
+        public float howToPlayCardPaddingX = 54f;
+        [Tooltip("Empty space above and below the content of those pages, in reference pixels.")]
+        public float howToPlayCardPaddingY = 42f;
+        [Tooltip("Space between the parts of the content column of How to play, in reference pixels.")]
+        public float howToPlayContentGap = 30f;
+        [Tooltip("Width of the page list of How to play, in reference pixels.")]
+        public float howToPlaySidebarWidth = 390f;
+        [Tooltip("Empty space left of a page list entry's text, in reference pixels.")]
+        public float howToPlaySidebarPaddingX = 36f;
+        [Tooltip("Empty space above and below the page list, in reference pixels.")]
+        public float howToPlaySidebarPaddingY = 36f;
+        [Tooltip("Space between two page list entries, in reference pixels.")]
+        public float howToPlaySidebarGap = 6f;
+        [Tooltip("Text size of the small heading over the page list, in reference pixels.")]
+        public float howToPlaySidebarTitleSize = 18f;
+        [Tooltip("Space between that heading and the first entry, in reference pixels.")]
+        public float howToPlaySidebarTitleGap = 18f;
+        [Tooltip("Extra space between the letters of that heading, in reference pixels.")]
+        public float howToPlaySidebarTitleSpacing = 3f;
+        [Tooltip("Height of one page list entry, in reference pixels.")]
+        public float howToPlayEntryHeight = 58f;
+        [Tooltip("Text size of a page list entry, in reference pixels.")]
+        public float howToPlayEntryTextSize = 24f;
+        [Tooltip("Width of the cyan bar beside the selected page, in reference pixels.")]
+        public float howToPlaySelectedBarWidth = 4.5f;
+        [Tooltip("Text size of a page's title, in reference pixels.")]
+        public float howToPlayTitleSize = 60f;
+        [Tooltip("Width of a page's picture, in reference pixels.")]
+        public float howToPlayPictureWidth = 741f;
+        [Tooltip("Height of a page's picture, in reference pixels (the pictures are 1040 x 800).")]
+        public float howToPlayPictureHeight = 570f;
+        [Tooltip("How round the corners of the picture are, in reference pixels.")]
+        public float howToPlayPictureRadius = 12f;
+        [Tooltip("Space between the picture and the text, in reference pixels.")]
+        public float howToPlayPictureGap = 48f;
+        [Tooltip("Largest text size of a page's text, in reference pixels. A longer page takes a smaller size so every page fits, all pages at the same size.")]
+        public float howToPlayTextSize = 28.5f;
+        [Tooltip("Smallest text size a page's text may shrink to, in reference pixels.")]
+        public float howToPlayTextMinSize = 21f;
+        [Tooltip("Extra space between the lines of a page's text, as a percentage of the text size.")]
+        public float howToPlayTextLineSpacing = 35f;
+        [Tooltip("Height of the previous and next buttons, in reference pixels.")]
+        public float howToPlayButtonHeight = 66f;
+        [Tooltip("Empty space left and right inside the previous and next buttons, in reference pixels.")]
+        public float howToPlayButtonPadding = 30f;
+        [Tooltip("Text size of the previous and next buttons, in reference pixels.")]
+        public float howToPlayButtonTextSize = 22.5f;
+        [Tooltip("Text size of the page counter, in reference pixels.")]
+        public float howToPlayCounterSize = 21f;
+        [Tooltip("Width of the page counter's box, as a multiple of its text size.")]
+        public float howToPlayCounterWidthFactor = 8f;
+        [Tooltip("Height of a line of page text, as a multiple of its text size (titles, kickers, counters, card titles).")]
+        public float howToPlayLineHeightFactor = 1.5f;
+        [Tooltip("Space between the small heading over a mode's name and the name, in reference pixels.")]
+        public float modeInfoHeaderGap = 3f;
+        [Tooltip("Text size of the small heading over the mode's name, in reference pixels.")]
+        public float modeInfoKickerSize = 18f;
+        [Tooltip("Extra space between the letters of that heading, in reference pixels.")]
+        public float modeInfoKickerSpacing = 3f;
+        [Tooltip("How many cards stand side by side on the game mode info page.")]
+        public int modeInfoColumns = 3;
+        [Tooltip("Space between the cards of the game mode info page, in reference pixels.")]
+        public float modeInfoGap = 24f;
+        [Tooltip("Empty space inside a card, in reference pixels.")]
+        public float modeInfoCardPadding = 30f;
+        [Tooltip("Space between a card's title and its text, in reference pixels.")]
+        public float modeInfoCardGap = 15f;
+        [Tooltip("How round the corners of a card are, in reference pixels.")]
+        public float modeInfoCardRadius = 12f;
+        [Tooltip("Thickness of the coloured edge across the top of a card, in reference pixels.")]
+        public float modeInfoAccentHeight = 6f;
+        [Tooltip("Text size of a card's title, in reference pixels.")]
+        public float modeInfoCardTitleSize = 36f;
+        [Tooltip("Largest text size of a card's text, in reference pixels. A mode with a lot to say takes a smaller size so every card fits, all cards at the same size.")]
+        public float modeInfoCardTextSize = 24f;
+        [Tooltip("Smallest text size a card's text may shrink to, in reference pixels.")]
+        public float modeInfoCardTextMinSize = 17f;
+        [Tooltip("Extra height kept free in every row of cards when working out whether the text fits, in reference pixels.")]
+        public float modeInfoFitSlack = 6f;
+        [Tooltip("Extra space between the lines of a card's text, as a percentage of the text size.")]
+        public float modeInfoCardTextLineSpacing = 20f;
+        [Tooltip("Width and height of the cross on the close button of those pages, in reference pixels. It is drawn (the fonts have no cross).")]
+        public float lobbyRoomCloseCrossSize = 21f;
+        [Tooltip("Thickness of the lines of that cross, in reference pixels.")]
+        public float lobbyRoomCloseCrossThickness = 3f;
     }
 }

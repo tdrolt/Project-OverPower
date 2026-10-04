@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Overpower.Match;
+using Overpower.Net;
 
 namespace Overpower.UI
 {
@@ -134,9 +135,10 @@ namespace Overpower.UI
             {
                 foreach (Player p in room.Players.Values)
                 {
-                int team = PlayerTeam.NoTeam;
-                if (p.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out object rawTeam) && rawTeam is int t)
-                    team = t;
+                // A seat spectator is no row (lobby Task 6). A player whose team has not arrived yet still shows, under "Joining".
+                if (Teams.IsSpectator(p))
+                    continue;
+                int team = Teams.TryGetTeam(p, out int known) ? known : PlayerTeam.NoTeam;
 
                 int[] values = p.CustomProperties.TryGetValue(ScoreboardRules.Key, out object rawStats) ? rawStats as int[] : null;
                 rows.Add(ScoreboardRules.RowFrom(p.ActorNumber, team, p.NickName, values));

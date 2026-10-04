@@ -139,7 +139,14 @@ namespace Overpower.Net
                 PlayerIdentity.ClearLastMatch();
                 return;
             }
-            PlayerIdentity.SaveLastMatch(PhotonNetwork.CurrentRoom.Name, PhotonNetwork.NickName);
+            PlayerIdentity.SaveLastMatch(PhotonNetwork.CurrentRoom.Name, NickNameToSave());
+        }
+
+        /// <summary>The name the player typed, not the numbered copy a lobby may show ("Brisa 2"), so a rejoin never makes it stick.</summary>
+        private string NickNameToSave()
+        {
+            Overpower.Lobby.LobbySeats seats = GetComponent<Overpower.Lobby.LobbySeats>();
+            return seats != null ? seats.TypedNickName : PhotonNetwork.NickName;
         }
 
         public override void OnJoinedRoom()
@@ -148,7 +155,7 @@ namespace Overpower.Net
             lastRoomName = PhotonNetwork.CurrentRoom.Name;
             pendingRoomAtMaster = null;
             nextSaveAt = Time.unscaledTime + SaveIntervalSeconds;
-            PlayerIdentity.SaveLastMatch(lastRoomName, PhotonNetwork.NickName);
+            PlayerIdentity.SaveLastMatch(lastRoomName, NickNameToSave());
 
             bool rejoined = PhotonNetwork.LocalPlayer != null && PhotonNetwork.LocalPlayer.HasRejoined;
             Debug.Log($"[REJOIN] in room {lastRoomName} (rejoined={rejoined}) as {PlayerIdRule.ForLog(PlayerIdentity.UserId)}");
@@ -375,7 +382,7 @@ namespace Overpower.Net
             panel.Hide();
 
             if (PhotonNetwork.NetworkClientState == ClientState.Disconnected || PhotonNetwork.NetworkClientState == ClientState.PeerCreated)
-                PhotonNetwork.ConnectUsingSettings(); // the name screen's Join waits for the master (JoinGameUI.joinRequestedEarly)
+                PhotonNetwork.ConnectUsingSettings(); // the name screen's Find a lobby waits for the master (NameScreen.enterListWhenConnected)
             ReturnToNameScreen?.Invoke();
         }
     }

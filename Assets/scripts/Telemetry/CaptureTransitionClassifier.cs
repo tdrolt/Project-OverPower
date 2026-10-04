@@ -36,7 +36,7 @@ namespace Overpower.Telemetry
         /// contribution for a SLOW transition - a solo Tier 2 capture (15s for one player) fills
         /// about 0.0011 in one frame at 60 Hz, two orders of magnitude below this - but it is NOT
         /// enough headroom for a fast one: Tier 3 (10s, the fastest tier TerritoryConfig ships by
-        /// default) with several capturers multiplies the rate (rate = eligibleCount / captureSeconds
+        /// default) with several capturers multiplies the rate (rate = CaptureSpeedRule.For(eligibleCount, list) / captureSeconds
         /// - see BuildingCapture.ComputeCurrentProgress), and a drain's DecaySeconds can be short
         /// too. A slow or lagged master frame (well under 60 Hz) multiplies whichever rate further.
         /// Classify scales this floor by the transition's own rate (review fix, 2026-09-17: the old
@@ -98,6 +98,12 @@ namespace Overpower.Telemetry
                 // a fresh start here.
                 if (oldProgress.Fading && newProgress.Team != oldProgress.Team)
                     resuming = false;
+                // Lobby Task 15b: a rate change while the same team keeps going the same way (a second capturer or drainer walking
+                // in) is the same attempt carrying on. The rate-aware margin above only sees "a high rate, little progress", so a
+                // quick second arrival used to close the first attempt as abandoned and open a new one.
+                if (oldProgress.RatePerSecond01 != 0f && !oldProgress.Fading && oldProgress.Team == newProgress.Team
+                    && (oldProgress.RatePerSecond01 < 0f) == draining)
+                    resuming = true;
                 if (draining) return resuming ? DrainResumed : DrainStarted;
                 return resuming ? Resumed : Started;
             }

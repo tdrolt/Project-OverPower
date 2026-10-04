@@ -314,5 +314,48 @@ namespace Overpower.Tests
             Assert.AreEqual(CaptureTransitionClassifier.DrainResumed, state);
             Assert.AreEqual(2, team);
         }
+
+        // ---- Lobby Task 15b: a second capturer or drainer walking in changes the rate, not the attempt
+
+        [Test]
+        public void ASecondDrainerWalkingInIsDrainResumedNotAFreshDrainStart()
+        {
+            // One drainer from full (rate 1/3 per second), the master publishes again 0.1 s later when a second one arrives: the rate
+            // changes to 1.5/3 and the bar sits at 0.97 - above the 0.25 s rate-aware margin (0.125), so the margin alone said "started".
+            var oneDrainer = new CaptureProgress(1, 1.0f, -1f / 3f, 1000);
+            var twoDrainers = new CaptureProgress(1, 1.0f - 0.1f / 3f, -1.5f / 3f, 1100);
+            string state = CaptureTransitionClassifier.Classify(oneDrainer, twoDrainers, 1100, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainResumed, state);
+            Assert.AreEqual(1, team);
+        }
+
+        [Test]
+        public void ASecondCapturerWalkingInIsResumedNotAFreshStart()
+        {
+            var oneCapturer = new CaptureProgress(0, 0.0f, 1f / 15f, 1000);
+            var twoCapturers = new CaptureProgress(0, 0.1f / 15f, 1.5f / 15f, 1100);
+            string state = CaptureTransitionClassifier.Classify(oneCapturer, twoCapturers, 1100, out int team, out _);
+            Assert.AreEqual(CaptureTransitionClassifier.Resumed, state);
+            Assert.AreEqual(0, team);
+        }
+
+        [Test]
+        public void ARateChangeToAnotherTeamIsStillAFreshStart()
+        {
+            // The same direction but a different team (the master handed the drain over): that is a new attempt for the new team.
+            var teamOne = new CaptureProgress(1, 1.0f, -1f / 3f, 1000);
+            var teamTwo = new CaptureProgress(2, 1.0f, -1f / 3f, 1100);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, CaptureTransitionClassifier.Classify(teamOne, teamTwo, 1100, out int team, out _));
+            Assert.AreEqual(2, team);
+        }
+
+        [Test]
+        public void ADrainReplacingACaptureOfTheSameTeamIsStillAFreshStart()
+        {
+            // The opposite direction is not "the same thing going on": a capture bar that turns into a drain starts a drain attempt.
+            var capture = new CaptureProgress(1, 0.0f, 1f / 15f, 1000);
+            var drain = new CaptureProgress(1, 1.0f, -1f / 3f, 1100);
+            Assert.AreEqual(CaptureTransitionClassifier.DrainStarted, CaptureTransitionClassifier.Classify(capture, drain, 1100, out _, out _));
+        }
     }
 }
