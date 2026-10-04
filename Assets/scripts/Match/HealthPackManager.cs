@@ -142,6 +142,9 @@ namespace Overpower.Match
         private void EnsurePacks()
         {
             BuildingManager buildings = BuildingManager.Instance;
+            // 2v2 Dominion has no health packs (its two Tier 3 zones get none); 3v3v3 and Conquest keep them.
+            if (!Overpower.Dominion.DominionRules.HasHealthPacks(Overpower.Dominion.DominionMode.IsActive(), Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom()))
+                return;
             for (int zone = 0; zone < buildings.ZoneCount; zone++)
             {
                 // The tower's own tier, not TierOf: TierOf plays the centre as Tier III while a corner is cut.

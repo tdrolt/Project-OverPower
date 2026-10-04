@@ -125,6 +125,7 @@ namespace Overpower.Vision
             lifecycle = GetComponent<PlayerLifecycle>();
             abilities = GetComponent<AbilityRunner>();
             clearLine = ClearLine;
+            minimap = SceneMinimapConfig.Resolve(minimap); // a map with its own picture (the Dominion lane) replaces the prefab's
             if (!photonView.IsMine)
                 enabled = false;
             else if (config == null)

@@ -40,6 +40,9 @@ namespace Overpower.Dominion
         /// outside its healing circle, and the respawn shield already protects a player who spawns next to enemies.</summary>
         public static bool UsesCapitalUnderAttackSpawn(bool dominion, bool capitalUnderAttack) => !dominion && capitalUnderAttack;
 
+        /// <summary>Does this room have health packs? 2v2 has none (the spec); 3v3v3 keeps them, and so does every Conquest room.</summary>
+        public static bool HasHealthPacks(bool dominion, int teamCount) => !(dominion && teamCount == 2);
+
         /// <summary>Do Dominion's own match rules (the fixed respawn wait, the spawn healing) apply right now? Only in a Dominion room once the match
         /// is live: the warm-up stays the free sandbox it is in Conquest (default A22).</summary>
         public static bool RulesApply(bool dominionRoom, bool matchLive) => dominionRoom && matchLive;

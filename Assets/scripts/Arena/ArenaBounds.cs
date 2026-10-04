@@ -45,6 +45,11 @@ namespace Overpower.Arena
             return new ArenaBounds(points);
         }
 
+        /// <summary>The outline of an arena: three turned copies of the Source outline (the triangle map), or - for a map that is one piece, such as the
+        /// Dominion lane - the outline exactly as it is.</summary>
+        public static ArenaBounds FromOutline(IReadOnlyList<Vector2> outline, Vector3 centre, bool outlineIsWholeArena) =>
+            outlineIsWholeArena ? FromPolygon(outline) : FromSourceOutline(outline, centre);
+
         /// <summary>An outline that is already the whole closed polygon (arena step 4's wall-plan tests use any
         /// outline, real or synthetic, without going through the three-fold symmetry FromSourceOutline assumes).
         /// Null for fewer than three points: two points make an edge, not an enclosed area.</summary>

@@ -99,6 +99,10 @@ namespace Overpower.Arena
                  "them. Validate still reports any built wall more than 15 cm off this outline, as a sanity check.")]
         public List<Vector2> sourceOutline = new List<Vector2>();
 
+        [Tooltip("Tick for a map that is ONE piece (the Dominion lane): Source Outline is then the whole playable edge as it is, not one third to be turned " +
+                 "into three. Leave off for the triangle arena.")]
+        public bool outlineIsWholeArena;
+
         [Tooltip("The arena's build data (Assets/Gameplay/Config/ArenaLayout.asset). In play, the phase-two wall is " +
                  "built from its wall, barrier and Phase Two Cut values, so it matches what Build primitive arena makes.")]
         public ArenaLayout layout;
@@ -184,7 +188,7 @@ namespace Overpower.Arena
         {
             // Play Mode only: without ExecuteInEditMode, the Editor never runs this, and the tool reads the fields
             // directly anyway.
-            FullBounds = ArenaBounds.FromSourceOutline(sourceOutline, centre);
+            FullBounds = ArenaBounds.FromOutline(sourceOutline, centre, outlineIsWholeArena);
             Bounds = FullBounds;
             if (Bounds == null)
                 Debug.LogError($"[Arena] {name}: Source Outline has fewer than two points - blink, portals and the " +
@@ -218,7 +222,7 @@ namespace Overpower.Arena
             Gizmos.DrawWireSphere(centre, 1f);
 
             // The outline, all three thirds, so a designer can see it lying on the walls' inner faces.
-            ArenaBounds outline = ArenaBounds.FromSourceOutline(sourceOutline, centre);
+            ArenaBounds outline = ArenaBounds.FromOutline(sourceOutline, centre, outlineIsWholeArena);
             if (outline == null)
                 return;
             Gizmos.color = Color.cyan;

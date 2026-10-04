@@ -338,7 +338,7 @@ namespace Overpower.EditorTools
             return report;
         }
 
-        private static Transform NewMarkedGroup(Transform parent, string groupName)
+        public static Transform NewMarkedGroup(Transform parent, string groupName)
         {
             var go = new GameObject(groupName);
             go.transform.SetParent(parent, false);
@@ -346,7 +346,7 @@ namespace Overpower.EditorTools
             return go.transform;
         }
 
-        private static GameObject NewPrimitiveChild(Transform parent, string childName, Material material, string layerName)
+        public static GameObject NewPrimitiveChild(Transform parent, string childName, Material material, string layerName)
         {
             var go = new GameObject(childName);
             go.transform.SetParent(parent, false);

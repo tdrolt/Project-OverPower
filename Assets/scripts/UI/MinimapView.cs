@@ -212,6 +212,7 @@ namespace Overpower.UI
                 enabled = false;
                 return;
             }
+            config = SceneMinimapConfig.Resolve(config); // a map with its own picture (the Dominion lane) replaces the prefab's
             if (theme == null || config == null)
             {
                 Debug.LogError($"[Minimap] {name}: UiTheme or MinimapConfig is not assigned - the minimap is not built.");

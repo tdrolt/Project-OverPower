@@ -1,0 +1,116 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6b20c32d9d20c7e41a987b76e9febd6b, type: 3}
+  m_Name: DominionLaneLayout
+  m_EditorClassIdentifier: 
+  walls:
+  - name: Hall Wall Top
+    centre: {x: 0, y: 16}
+    size: {x: 24.833334, y: 0.8333333}
+  - name: Hall Wall Bottom
+    centre: {x: 0, y: -16}
+    size: {x: 24.833334, y: 0.8333333}
+  - name: Hall Stub Top Left
+    centre: {x: -12, y: 13.25}
+    size: {x: 0.8333333, y: 6.3333335}
+  - name: Hall Stub Bottom Left
+    centre: {x: -12, y: -13.25}
+    size: {x: 0.8333333, y: 6.3333335}
+  - name: Hall Stub Top Right
+    centre: {x: 12, y: 13.25}
+    size: {x: 0.8333333, y: 6.3333335}
+  - name: Hall Stub Bottom Right
+    centre: {x: 12, y: -13.25}
+    size: {x: 0.8333333, y: 6.3333335}
+  - name: Pocket Wall Left Top
+    centre: {x: -25.5, y: 10.5}
+    size: {x: 27.833334, y: 0.8333333}
+  - name: Pocket Wall Left Bottom
+    centre: {x: -25.5, y: -10.5}
+    size: {x: 27.833334, y: 0.8333333}
+  - name: Pocket Wall Left End
+    centre: {x: -39, y: -0}
+    size: {x: 0.8333333, y: 21.833334}
+  - name: Pocket Wall Right Top
+    centre: {x: 25.5, y: 10.5}
+    size: {x: 27.833334, y: 0.8333333}
+  - name: Pocket Wall Right Bottom
+    centre: {x: 25.5, y: -10.5}
+    size: {x: 27.833334, y: 0.8333333}
+  - name: Pocket Wall Right End
+    centre: {x: 39, y: -0}
+    size: {x: 0.8333333, y: 21.833334}
+  - name: H Wall Left
+    centre: {x: -8.5, y: -0}
+    size: {x: 0.8333333, y: 10}
+  - name: H Wall Right
+    centre: {x: 8.5, y: -0}
+    size: {x: 0.8333333, y: 10}
+  - name: H Arm Left
+    centre: {x: -5.75, y: -0}
+    size: {x: 5.5, y: 0.8333333}
+  - name: H Arm Right
+    centre: {x: 5.75, y: -0}
+    size: {x: 5.5, y: 0.8333333}
+  barriers:
+  - name: Plus Across
+    centre: {x: 0, y: -0}
+    size: {x: 6, y: 0.5}
+  - name: Plus Along
+    centre: {x: 0, y: -0}
+    size: {x: 0.5, y: 6}
+  boxes:
+  - {x: -22, y: 6}
+  - {x: -22, y: -0}
+  - {x: -22, y: -6}
+  - {x: -16.5, y: 3}
+  - {x: -16.5, y: -3}
+  - {x: 22, y: 6}
+  - {x: 22, y: -0}
+  - {x: 22, y: -6}
+  - {x: 16.5, y: 3}
+  - {x: 16.5, y: -3}
+  boxSizeMetres: 2.5
+  boxHeightMetres: 2.5
+  minimumGapMetres: 2.75
+  zoneCentres:
+  - {x: 0, y: 10}
+  - {x: 0, y: -10}
+  zoneTier: 3
+  zoneDrawnRadiusMetres: 5.4166665
+  spawns:
+  - team: 1
+    towerCentre: {x: -31, y: -0}
+    spawnPoint: {x: -28, y: 0}
+    healCentre: {x: -31.125, y: -0}
+    healSize: {x: 15.75, y: 21}
+  - team: 0
+    towerCentre: {x: 31, y: -0}
+    spawnPoint: {x: 28, y: 0}
+    healCentre: {x: 31.125, y: -0}
+    healSize: {x: 15.75, y: 21}
+  spawnToSpawnMetres: 56
+  outline:
+  - {x: -11.583333, y: 15.583333}
+  - {x: 11.583333, y: 15.583333}
+  - {x: 11.583333, y: 10.083333}
+  - {x: 38.583332, y: 10.083333}
+  - {x: 38.583332, y: -10.083333}
+  - {x: 11.583333, y: -10.083333}
+  - {x: 11.583333, y: -15.583333}
+  - {x: -11.583333, y: -15.583333}
+  - {x: -11.583333, y: -10.083333}
+  - {x: -38.583332, y: -10.083333}
+  - {x: -38.583332, y: 10.083333}
+  - {x: -11.583333, y: 10.083333}
+  floorSize: {x: 96, y: 56}
+  minimapMarginMetres: 4
