@@ -403,6 +403,7 @@ MonoBehaviour:
   spectatorBarLeaveText: Leave
   spectatorWholeMapFill: 0.88
   spectatorViewAngle: 0
+  spectatorResultCardGap: 24
   lobbyDisplayFont: {fileID: 11400000, guid: 14d1d34ba8f7d8449a13152de47b27ae, type: 2}
   lobbyBodyFont: {fileID: 11400000, guid: 564195cefb6722440bfd615ee4597ba9, type: 2}
   lobbyBoldFont: {fileID: 11400000, guid: 81634db9a9ca57842b8bd3061d1d3649, type: 2}
@@ -655,6 +656,9 @@ MonoBehaviour:
   chatInputTextInset: 18
   chatInputBorderWidth: 1.5
   chatInputCornerFactor: 0.75
+  chatNotSentHint: Not sent, chat reconnecting
+  chatNotSentHintSeconds: 3
+  chatNotSentHintSize: 22
   lobbyRoomHeaderGap: 3
   lobbyRoomModeRowGap: 15
   lobbyRoomInfoIconTextFactor: 0.62

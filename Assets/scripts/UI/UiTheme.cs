@@ -1171,6 +1171,8 @@ namespace Overpower.UI
         public Vector2 spectatorResultCardPadding = new Vector2(64f, 36f);
         [Tooltip("How far the spectator result card sits below the top of the screen, in reference pixels.")]
         public float spectatorResultCardTop = 150f;
+        [Tooltip("Space between the title and the button on a result card (the spectator's match result), in reference pixels.")]
+        public float spectatorResultCardGap = 24f;
 
         [Header("Lobby screens (lobby Task 9)")]
         [Tooltip("The font of the big letters on the lobby screens (title, buttons, headings): Oswald.")]
@@ -1657,6 +1659,12 @@ namespace Overpower.UI
         public float chatInputBorderWidth = 1.5f;
         [Tooltip("How round the typing box's corners are compared with the chat panel's corners: 1 = the same, 0.5 = half as round.")]
         public float chatInputCornerFactor = 0.75f;
+        [Tooltip("What the chat says for a moment when the line you pressed Enter on could not be sent (the chat server is reconnecting). The line stays in the typing box so you can press Enter again.")]
+        public string chatNotSentHint = "Not sent, chat reconnecting";
+        [Tooltip("How long the 'not sent' hint stays up, in seconds.")]
+        public float chatNotSentHintSeconds = 3f;
+        [Tooltip("Text size of the 'not sent' hint, in reference pixels.")]
+        public float chatNotSentHintSize = 22f;
 
         [Header("Lobby screens: layout numbers (lobby Task 10 review)")]
         [Tooltip("Space between the lobby name and the mode row of the lobby room, in reference pixels.")]

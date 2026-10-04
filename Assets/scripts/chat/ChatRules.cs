@@ -17,6 +17,34 @@ namespace Overpower.Chat
             subscribedChannel != null && channel != null && subscribedChannel == channel;
     }
 
+    /// <summary>What pressing Enter in the typing box does with the typed line (Dominion Task 1 Part 0). A line the client cannot send right now
+    /// (chat reconnecting, no channel yet) is Refused: it stays in the box for another try, the player is told, and it is NOT written to the
+    /// match telemetry - only a line that really went out is logged, so a retried line is never logged twice.</summary>
+    public enum ChatSendOutcome
+    {
+        /// <summary>Nothing typed (or only spaces): the box is cleared, nothing is sent or logged.</summary>
+        Ignored,
+        /// <summary>Could not be sent now: keep the line in the box and show the hint; not logged.</summary>
+        Refused,
+        /// <summary>Went out: clear the box; log it once.</summary>
+        Sent,
+    }
+
+    public static class ChatSendRule
+    {
+        /// <param name="canPublish">The chat client is up, subscribed to this lobby's channel, and the channel is still the room's.</param>
+        /// <param name="published">What the chat client answered when asked to publish (only read when canPublish).</param>
+        public static ChatSendOutcome Outcome(string typed, bool canPublish, bool published)
+        {
+            if (string.IsNullOrWhiteSpace(typed)) return ChatSendOutcome.Ignored;
+            return canPublish && published ? ChatSendOutcome.Sent : ChatSendOutcome.Refused;
+        }
+
+        public static bool ClearsTheBox(ChatSendOutcome outcome) => outcome != ChatSendOutcome.Refused;
+        public static bool ShowsHint(ChatSendOutcome outcome) => outcome == ChatSendOutcome.Refused;
+        public static bool IsLogged(ChatSendOutcome outcome) => outcome == ChatSendOutcome.Sent;
+    }
+
     /// <summary>Lobby Task 13 (Task 11 review): when the chat panel may be open, and how high its canvas draws. The chat only opens while it has a
     /// channel (a lobby it is in) - on the name, list and create screens Enter does nothing - and it closes itself the moment the channel goes (room
     /// left) or a How to play / mode info page opens over it. Its canvas draws over the lobby screens only while the lobby room shows; in the match

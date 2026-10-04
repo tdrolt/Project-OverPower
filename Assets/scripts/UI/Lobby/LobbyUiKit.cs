@@ -453,6 +453,35 @@ namespace Overpower.UI
             Size(button.Root, labelWidth + paddingEachSide * 2f);
         }
 
+        // ---- the result card ----
+
+        /// <summary>The look of a result card (Dominion Task 1 Part 0): a rounded dark card holding a big Oswald title in the winner's colour and
+        /// one purple button under it, the same button as Create on the create screen. Built here so the spectator's match result and (later)
+        /// Dominion's own result screen look the same. The card sizes itself to its contents; the caller places it.</summary>
+        /// <param name="card">The card's rect (anchor and position are the caller's to set).</param>
+        public LobbyButton ResultCard(Transform parent, string title, Color titleColour, string buttonLabel, out RectTransform card)
+        {
+            LobbyBox box = Box(parent, "Card", Theme.spectatorResultCardColor, Theme.lobbyCornerRadius, Theme.lobbyBorderColor, 0f);
+            card = box.Outer;
+            VerticalLayoutGroup column = box.Outer.gameObject.AddComponent<VerticalLayoutGroup>();
+            column.childAlignment = TextAnchor.MiddleCenter;
+            column.spacing = Theme.spectatorResultCardGap;
+            column.padding = Pad(Theme.spectatorResultCardPadding.x, Theme.spectatorResultCardPadding.x,
+                Theme.spectatorResultCardPadding.y, Theme.spectatorResultCardPadding.y);
+            column.childControlWidth = column.childControlHeight = true;
+            column.childForceExpandWidth = column.childForceExpandHeight = false;
+            ContentSizeFitter fit = box.Outer.gameObject.AddComponent<ContentSizeFitter>();
+            fit.horizontalFit = fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            Text(box.Outer, "Title", title, Display, Theme.spectatorResultTitleSize, titleColour, TextAlignmentOptions.Midline);
+
+            LobbyButton button = MakeButton(box.Outer, "Back Button", buttonLabel, Display, Theme.createCreateTextSize, Theme.lobbyOffWhiteColor,
+                Theme.lobbyPurpleColor, Theme.lobbyCornerRadius, Theme.lobbyPurpleColor, 0f, Theme.lobbyButtonSpacing);
+            Size(button.Root, -1f, Theme.createActionHeight);
+            WidenToLabel(button, Theme.createCreatePadding);
+            return button;
+        }
+
         // ---- the name box ----
 
         /// <summary>A single-line text box: the typed text, a placeholder, a limit and (optionally) letters and digits only.</summary>

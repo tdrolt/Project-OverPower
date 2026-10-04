@@ -101,8 +101,8 @@ namespace Overpower.Lobby
         }
 
         /// <summary>Lobby Task 15b (spec section 11): the room named a winner. A spectator has no body and so no MatchUI panel; they get the
-        /// result card instead - the winner, the same Back to the lobby list button and (through the zip run here, as for a player) the saved-log
-        /// box. Called by MatchDirector for a client with no body; a no-op for anyone not watching.</summary>
+        /// result card instead - the winner and the same Back to the lobby list button. (The zip run here raises the saved-log box only for a
+        /// spectator who is the room's host; an ordinary spectator writes no log, by design.) Called by MatchDirector for a client with no body; a no-op for anyone not watching.</summary>
         public void ShowMatchResult(int winningTeam)
         {
             resultWinner = winningTeam;
@@ -122,13 +122,14 @@ namespace Overpower.Lobby
             string title = SpectateRules.ResultTitle(theme.spectatorResultTitle, theme.scoreboardTeamNames, resultWinner);
             resultCard = SpectatorResultCard.Create(transform, theme, title, theme.ShotColorFor(resultWinner), Leave);
             Debug.Log("[SPECTATOR] match over: " + title);
-            // The zip is written at the match end, as for a player (MatchUI.ShowMatchResult); it also raises the saved-log box.
+            // The zip is written at the match end, as for a player (MatchUI.ShowMatchResult); only a spectator HOST has a log, so only they get the saved-log box.
             Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
         }
 
         /// <summary>Stops spectating (left the room): the camera is the normal follow camera again and the bar is gone.</summary>
         public void End()
         {
+            resultWinner = SpectateRules.None; // cleared first: a winner named before Begin must not outlive a leave that was never a watch
             if (!IsWatching)
                 return;
             IsWatching = false;
@@ -145,7 +146,6 @@ namespace Overpower.Lobby
             if (resultCard != null)
                 Destroy(resultCard.gameObject);
             resultCard = null;
-            resultWinner = SpectateRules.None;
             currentActor = SpectateRules.None;
             wholeMapChosen = false;
             mapFramed = false;

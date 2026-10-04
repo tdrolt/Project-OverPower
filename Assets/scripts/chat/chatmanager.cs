@@ -56,6 +56,8 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     readonly List<string> plainLines = new List<string>();
 
     const float ReconnectSeconds = 3f;
+    TextMeshProUGUI notSentHint;    // built on the first refused line
+    float notSentHintUntil;
 
     /// <summary>The channel this client is subscribed to (or has just asked for); null on the list.</summary>
     public string SubscribedChannel => subscribedChannel;
@@ -79,6 +81,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
 
     void OnDisable()
     {
+        if (notSentHint != null) notSentHint.gameObject.SetActive(false);
         SetOpen(false);
         connectPending = false;
         ChatClientReaper.Close(chatClient);
@@ -173,20 +176,26 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         }
     }
 
-    /// <summary>Publishes a line to the current lobby's channel as this player (name, team, spectator seat). Nothing is sent outside a room.</summary>
+    /// <summary>Publishes a line to the current lobby's channel as this player (name, team, spectator seat). Nothing is sent outside a room.
+    /// Returns true only when the line really went out; a refused line is neither logged nor cleared (ChatSendRule), so a retry is logged once.</summary>
     public bool Send(string typed)
     {
-        if (string.IsNullOrWhiteSpace(typed) || chatClient == null || !chatClient.CanChat || subscribedChannel == null) return false;
-        if (subscribedChannel != ChatChannelRule.ChannelFor(PhotonNetwork.InRoom ? PhotonNetwork.CurrentRoom.Name : null)) return false;
-
-        // Playtest extras P3 (2026-09-26): the SENDER's own text, logged right before it
-        // publishes - never OnGetMessages' receive callback, which is not guaranteed to be this
-        // client's own copy of what was just typed. No-ops if telemetry is off or no match file
-        // is open yet.
-        Overpower.Telemetry.MatchTelemetry.Instance?.LogChat(typed);
-        ResolveSender(out int team, out bool spectator);
-        var message = new ChatMessage(PhotonNetwork.NickName, team, spectator, typed);
-        return chatClient.PublishMessage(subscribedChannel, message.Encode());
+        if (string.IsNullOrWhiteSpace(typed)) return false;
+        bool canPublish = chatClient != null && chatClient.CanChat && subscribedChannel != null
+            && subscribedChannel == ChatChannelRule.ChannelFor(PhotonNetwork.InRoom ? PhotonNetwork.CurrentRoom.Name : null);
+        bool published = false;
+        if (canPublish)
+        {
+            ResolveSender(out int team, out bool spectator);
+            var message = new ChatMessage(PhotonNetwork.NickName, team, spectator, typed);
+            published = chatClient.PublishMessage(subscribedChannel, message.Encode());
+        }
+        ChatSendOutcome outcome = ChatSendRule.Outcome(typed, canPublish, published);
+        // Playtest extras P3 (2026-09-26): the SENDER's own text, never OnGetMessages' receive callback. Logged only once the line really went
+        // out (Dominion Task 1 Part 0): a line refused during a chat reconnect stays in the box and would otherwise be logged on every retry.
+        if (ChatSendRule.IsLogged(outcome))
+            Overpower.Telemetry.MatchTelemetry.Instance?.LogChat(typed);
+        return outcome == ChatSendOutcome.Sent;
     }
 
     /// <summary>The team and spectator flag this player chats under: from the match (player properties) once the game has started, from the
@@ -429,9 +438,42 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         {
             // To the current lobby's channel only. The field clears only when the line really went out (Lobby Task 15b): a line typed
             // during a chat reconnect (Send returns false while the client cannot chat) stays in the field to be sent again.
-            if (Send(chatField.text) || string.IsNullOrWhiteSpace(chatField.text))
+            string typed = chatField.text;
+            bool sent = Send(typed);
+            if (sent || string.IsNullOrWhiteSpace(typed))
                 chatField.text = "";
+            else
+                ShowNotSentHint();
         }
+    }
+
+    /// <summary>The short "not sent, chat reconnecting" hint above the typing box (UiTheme chatNotSent*); hides itself after a few seconds.</summary>
+    public bool NotSentHintShowing => notSentHint != null && notSentHint.gameObject.activeSelf;
+    public string NotSentHintText => notSentHint != null ? notSentHint.text : "";
+
+    private void ShowNotSentHint()
+    {
+        if (theme == null || chatPanel == null || chatField == null) return;
+        if (notSentHint == null)
+        {
+            var go = new GameObject("Not sent hint", typeof(RectTransform));
+            go.transform.SetParent(chatPanel.transform, false);
+            notSentHint = go.AddComponent<TextMeshProUGUI>();
+            if (theme.lobbyBodyFont != null) notSentHint.font = theme.lobbyBodyFont;
+            notSentHint.fontSize = theme.chatNotSentHintSize;
+            notSentHint.color = theme.lobbyErrorColor;
+            notSentHint.alignment = TextAlignmentOptions.BottomRight;
+            notSentHint.raycastTarget = false;
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot = new Vector2(1f, 0f);
+            rt.sizeDelta = new Vector2(-theme.chatPanelPadding * 2f, theme.chatNotSentHintSize * 1.6f);
+            rt.anchoredPosition = new Vector2(0f, theme.chatPanelPadding + theme.chatInputHeight + 2f);
+        }
+        notSentHint.text = theme.chatNotSentHint;
+        notSentHint.gameObject.SetActive(true);
+        notSentHintUntil = Time.unscaledTime + theme.chatNotSentHintSeconds;
     }
 
     public void SubmitPrivateChatOnClick()
@@ -449,6 +491,8 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
 
     void Update()
     {
+        if (notSentHint != null && notSentHint.gameObject.activeSelf && Time.unscaledTime >= notSentHintUntil)
+            notSentHint.gameObject.SetActive(false);
         if (connectPending && !ChatClientReaper.Busy)
         {
             connectPending = false;

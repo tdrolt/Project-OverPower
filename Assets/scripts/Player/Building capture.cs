@@ -946,6 +946,7 @@ public class BuildingCapture : MonoBehaviourPun
         captureProgress = captured ? CaptureSeconds : 0f;
         isDecaying = false;
         isDrainPaused = false;
+        drainersThisFrame = 1; // no drain is running after a reset, so the next decay step sees one drainer, not last frame's count
         StopCooldown();
     }
 
