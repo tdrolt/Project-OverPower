@@ -575,9 +575,13 @@ public class BuildingCapture : MonoBehaviourPun
     // Cached so the per-frame capture check below doesn't allocate a new delegate for every tower every frame.
     // Dominion Task 6: an enemy standing in a capital (not capturable there) still counts as "under attack" for the warnings,
     // but never closes the link to the zones next to it - ZoneThreat.ClosesLink holds that rule.
+    // The two answers are cached delegates too (a method group would allocate on every call); ZoneThreat.ZoneClosesLink is the one rule the test covers.
+    private static readonly System.Func<int, bool> ZoneCapturable =
+        zone => BuildingManager.Instance != null && BuildingManager.Instance.IsCapturableZone(zone);
+    private static readonly System.Func<int, bool> ZoneTrackedUnderAttack =
+        zone => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(zone);
     private static readonly System.Func<int, bool> ZoneUnderAttack =
-        zone => ZonePresenceTracker.Instance != null && BuildingManager.Instance != null
-                && ZoneThreat.ClosesLink(BuildingManager.Instance.IsCapturableZone(zone), ZonePresenceTracker.Instance.IsUnderAttack(zone));
+        zone => ZoneThreat.ZoneClosesLink(zone, ZoneCapturable, ZoneTrackedUnderAttack);
 
     // 2.7b Decision 8/9: a zone out of play - not only the host-start left-out capital, but since the phase-two cut
     // also any zone behind the wall - is never capturable, not even by its own team - checked before the own-capital

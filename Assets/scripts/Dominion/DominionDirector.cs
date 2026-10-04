@@ -50,6 +50,7 @@ namespace Overpower.Dominion
         private readonly int[] playersPerTeam = new int[DominionKeys.TeamSlots];
 
         private bool configMissingLogged;
+        private bool healAreaWarned;
         private bool gameplayMissingLogged;
 
         /// <summary>The round now in play (or the round a break leads to), 0 before round 1. Reads the room.</summary>
@@ -203,6 +204,7 @@ namespace Overpower.Dominion
             zonesResetSentFor = 0;
             ResetPointsState();
             inactiveSince.Clear();
+            healAreaWarned = false;
         }
 
         /// <summary>A joiner (or a client that rejoined) takes the room's stage as it stands; it is not an edge, so nothing is reset for it.</summary>
@@ -231,6 +233,7 @@ namespace Overpower.Dominion
 
             DominionEdge edge = DominionRoomWrites.EdgeBetween(prevRound, prevStage, room.Round, room.Stage);
             Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge})");
+            if (prevStage == DominionStage.None && room.Stage == DominionStage.Break) WarnAboutMissingHealAreas();
             if (edge == DominionEdge.None) return;
 
             // The zones go back to neutral at the start of the break and again at the start of the round: the master does it from the room's
@@ -283,6 +286,16 @@ namespace Overpower.Dominion
                 Overpower.Vision.ZoneKnowledge.ResetKnowledge(); // the zones were reset again at the round's start: what the team learnt in the break goes too
                 lifecycle.ResetForRoundStart(team);
             }
+        }
+
+        /// <summary>Once, when the match goes live: a 2v2 team with no SpawnHealArea in the scene heals nowhere (Task 11 places them). Logged, not
+        /// guessed around.</summary>
+        private void WarnAboutMissingHealAreas()
+        {
+            if (healAreaWarned) return;
+            healAreaWarned = true;
+            foreach (int team in DominionHealRules.TeamsMissingHealArea(DominionMode.TeamsOfCurrentRoom(), SpawnHealArea.HasAreaFor))
+                Debug.LogWarning($"[DOMINION] team {team} has no SpawnHealArea in this scene - its players get no spawn healing until the scene places one (Task 11).");
         }
 
         public override void OnMasterClientSwitched(Player newMasterClient)

@@ -33,6 +33,10 @@ namespace Overpower.Dominion
         public static PurchaseBlock PickBlock(bool dominionLive, DominionStage stage, bool lateJoinerPickOpen) =>
             dominionLive && !MayPick(stage, lateJoinerPickOpen) ? PurchaseBlock.NotInBreak : PurchaseBlock.None;
 
+        /// <summary>The words of the shop header's free note: the late joiner's own while their one pick is open mid-round, the break's otherwise.</summary>
+        public static string HeaderFreeText(DominionStage stage, bool lateJoinerPickOpen, string breakText, string lateJoinerText) =>
+            HeaderNamesLateJoinerPick(stage, lateJoinerPickOpen) ? lateJoinerText : breakText;
+
         /// <summary>True when the shop header should name the late joiner's one pick ("Free (your one pick)") instead of the break: the pick is
         /// open and the room is not in a break.</summary>
         public static bool HeaderNamesLateJoinerPick(DominionStage stage, bool lateJoinerPickOpen) =>

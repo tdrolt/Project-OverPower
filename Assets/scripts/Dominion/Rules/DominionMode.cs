@@ -2,6 +2,7 @@ using System;
 using ExitGames.Client.Photon;
 using Overpower.Data;
 using Overpower.Lobby;
+using Overpower.Match;
 using Photon.Pun;
 
 namespace Overpower.Dominion
@@ -54,6 +55,11 @@ namespace Overpower.Dominion
             cachedAnswer = IsDominion(room.CustomProperties, catalogue.ById);
             return cachedAnswer;
         }
+
+        /// <summary>True in a Dominion room once the match is live (DominionRules.RulesApply). The warm-up is false: it stays the free sandbox
+        /// (default A22), so the fixed respawn wait and the spawn healing wait for go-live.</summary>
+        public static bool IsLive() =>
+            DominionRules.RulesApply(IsActive(), MatchDirector.Instance != null && MatchDirector.Instance.IsLive);
 
         // Per Room object like IsActive: the spawn heal asks every frame, and TeamsOf clones the array.
         private static Photon.Realtime.Room teamCountRoom;

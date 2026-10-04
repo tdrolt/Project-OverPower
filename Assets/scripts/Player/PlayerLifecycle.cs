@@ -657,36 +657,49 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// hardcode 5f and skip deathCount entirely. Each death costs a bit more than the last, up to
     /// a cap, so repeated deaths carry a growing price without benching anyone for an unreasonable
     /// stretch - all three numbers live on GameplayConfig, not here.
+    // Only used when the scene has no DominionConfig (a setup error, logged once): not a design number.
+    private const float MissingDominionConfigRespawnSeconds = 6f;
+    private bool dominionConfigMissingLogged;
+
     private float NextRespawnDelay(bool chargeDeath = true)
     {
         bool rejoinRespawn = rejoinRespawnPending;
         deathCount = RespawnDelayRules.DeathCountForRetake(deathCount, countdownAlreadyCounted: !chargeDeath, rejoinRespawn: rejoinRespawn);
 
-        // Dominion Task 6: every death waits the same fixed time for the match size (the count above still feeds the scoreboard), a rejoiner
-        // included (default A13).
-        bool dominion = Overpower.Dominion.DominionMode.IsActive();
+        // Dominion Task 6: in a LIVE Dominion match every death waits the same fixed time for the match size (the count above still feeds the
+        // scoreboard), a rejoiner included (default A13). The warm-up keeps the Conquest wait (default A22). RespawnDelayRules.WaitFor is the one
+        // decision; this only gathers its inputs.
+        bool dominion = Overpower.Dominion.DominionMode.IsLive();
         float dominionSeconds = 0f;
         if (dominion)
         {
             Overpower.Data.DominionConfig dominionConfig = Overpower.Dominion.DominionMode.Config();
-            dominionSeconds = dominionConfig != null
-                ? Overpower.Dominion.DominionHealRules.RespawnSeconds(Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom(),
-                    dominionConfig.RespawnSeconds2v2, dominionConfig.RespawnSeconds3v3v3)
-                : 6f;
+            if (dominionConfig != null)
+                dominionSeconds = Overpower.Dominion.DominionHealRules.RespawnSeconds(Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom(),
+                    dominionConfig.RespawnSeconds2v2, dominionConfig.RespawnSeconds3v3v3);
+            else
+            {
+                dominionSeconds = MissingDominionConfigRespawnSeconds;
+                if (!dominionConfigMissingLogged)
+                {
+                    dominionConfigMissingLogged = true;
+                    Debug.LogError($"[DOMINION] the RoomManager has no DominionConfig - every respawn waits {MissingDominionConfigRespawnSeconds:0} s (a stand-in, not a tuned number).");
+                }
+            }
         }
 
         if (rejoinRespawn)
         {
             rejoinRespawnPending = false;
             if (dominion) Debug.Log($"[DOMINION] rejoin respawn waits the fixed {dominionSeconds}s like everyone");
-            return RespawnDelayRules.RejoinDelayFor(dominion, dominionSeconds, gameplayConfig != null ? gameplayConfig.RejoinRespawnSeconds : 5f);
         }
 
         float baseSeconds = gameplayConfig != null ? gameplayConfig.RespawnBaseSeconds : 5f;
         float perDeathSeconds = gameplayConfig != null ? gameplayConfig.RespawnPerDeathSeconds : 1f;
         float maxSeconds = gameplayConfig != null ? gameplayConfig.RespawnMaxSeconds : 10f;
+        float rejoinSeconds = gameplayConfig != null ? gameplayConfig.RejoinRespawnSeconds : 5f;
 
-        return RespawnDelayRules.DelayFor(dominion, dominionSeconds, deathCount, baseSeconds, perDeathSeconds, maxSeconds);
+        return RespawnDelayRules.WaitFor(dominion, rejoinRespawn, dominionSeconds, deathCount, baseSeconds, perDeathSeconds, maxSeconds, rejoinSeconds);
     }
 
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)

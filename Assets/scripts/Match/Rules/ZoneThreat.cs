@@ -18,6 +18,10 @@ namespace Overpower.Match
         /// be captured, so an enemy standing in it still warns the team but never closes the link.</summary>
         public static bool ClosesLink(bool zoneIsCapturable, bool underAttack) => zoneIsCapturable && underAttack;
 
+        /// <summary>The whole question a tower asks about a neighbour: does this zone's "under attack" close the link? Asks both answers about the SAME zone.</summary>
+        public static bool ZoneClosesLink(int zone, System.Func<int, bool> isCapturable, System.Func<int, bool> isUnderAttack) =>
+            ClosesLink(isCapturable(zone), isUnderAttack(zone));
+
         public static int TeamBit(int team) => team >= 0 && team < MaxTeams ? 1 << team : 0;
 
         /// <param name="owner">The zone's owner, or -1 for neutral.</param>

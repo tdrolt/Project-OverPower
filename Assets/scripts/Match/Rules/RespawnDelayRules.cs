@@ -15,6 +15,13 @@ namespace Overpower.Match
         public static float DelayFor(bool dominion, float dominionFixedSeconds, int deathCount, float baseSeconds, float perDeathSeconds, float maxSeconds) =>
             dominion ? Mathf.Max(0f, dominionFixedSeconds) : Delay(deathCount, baseSeconds, perDeathSeconds, maxSeconds);
 
+        /// <summary>The one decision behind PlayerLifecycle.NextRespawnDelay: how long this death waits. A rejoiner waits the rejoin time, anyone else
+        /// the death-scaled one; in a live Dominion match both are the fixed seconds instead (dominionLive false = Conquest or the Dominion warm-up).</summary>
+        public static float WaitFor(bool dominionLive, bool rejoin, float dominionFixedSeconds, int deathCount, float baseSeconds, float perDeathSeconds,
+                                    float maxSeconds, float flatRejoinSeconds) =>
+            rejoin ? RejoinDelayFor(dominionLive, dominionFixedSeconds, flatRejoinSeconds)
+                   : DelayFor(dominionLive, dominionFixedSeconds, deathCount, baseSeconds, perDeathSeconds, maxSeconds);
+
         /// <summary>Dominion Task 6 (default A13): a rejoiner in Dominion waits the same fixed time as everyone; in Conquest the flat rejoin seconds.</summary>
         public static float RejoinDelayFor(bool dominion, float dominionFixedSeconds, float flatSeconds) =>
             dominion ? Mathf.Max(0f, dominionFixedSeconds) : RejoinDelay(flatSeconds);

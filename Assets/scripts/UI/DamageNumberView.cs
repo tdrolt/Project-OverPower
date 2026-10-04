@@ -183,7 +183,11 @@ namespace Overpower.UI
         /// a 24-slot scan costs nothing, and a second Dictionary&lt;Transform,int&gt; just for this would
         /// have to stay in lockstep with slots[] every time a Blocked slot got evicted for something
         /// else.</summary>
-        private void HandleBlockedSeen(Transform victim)
+        private void HandleBlockedSeen(Transform victim) => ShowBlockedPop(victim, theme.blockedText, theme.blockedColor);
+
+        /// <summary>The Blocked pop itself, with the words and colour the caller's source uses: the Invulnerability look's grey Blocked, or the
+        /// Dominion respawn shield's own BLOCKED (A23).</summary>
+        private void ShowBlockedPop(Transform victim, string text, Color colour)
         {
             if (!theme.showDamageNumbers || victim == null)
                 return;
@@ -199,11 +203,11 @@ namespace Overpower.UI
             slots[slot].popupSeconds = 0f;
             slots[slot].lastHitTime = Time.time; // Refreshed even for a reused slot - restarts its own hold/fade life.
             slots[slot].label.gameObject.SetActive(true);
-            slots[slot].label.SetText(theme.blockedText);
-            slots[slot].label.color = theme.blockedColor;
+            slots[slot].label.SetText(text);
+            slots[slot].label.color = colour;
         }
 
-        /// <summary>Dominion respawn shield: the same Blocked pop (same slot kind, text and colour), but raised on every client that sees the shielded
+        /// <summary>Dominion respawn shield: the same Blocked pop (same slot kind) with the shield's own words and colour (UiTheme respawnShieldBlockedText / Color, A23), but raised on every client that sees the shielded
         /// player, from their dBlk stamp, over the player at the usual anchor height, and living popupSeconds in all. Refreshes the pop already
         /// showing for them rather than stacking one per stopped hit.</summary>
         private void HandleShieldBlockedSeen(Transform victim, float popupSeconds)
@@ -211,7 +215,7 @@ namespace Overpower.UI
             if (!theme.showDamageNumbers || victim == null)
                 return;
 
-            HandleBlockedSeen(victim);
+            ShowBlockedPop(victim, theme.respawnShieldBlockedText, theme.respawnShieldBlockedColor);
             int slot = FindActiveBlockedSlot(victim);
             if (slot >= 0)
                 slots[slot].popupSeconds = popupSeconds;

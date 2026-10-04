@@ -6,7 +6,7 @@ namespace Overpower.Dominion
     /// </summary>
     public static class DominionKeys
     {
-        /// <summary>int: the round now in play, or (during a break) the round the break leads to, 1..3. Absent until round 1 starts.</summary>
+        /// <summary>int: the round now in play, or (during a break) the round the break leads to, 1..3. Written at go-live together with the break before round 1 (Task 6), so it is absent only before the match is live.</summary>
         public const string Round = "dRnd";
         /// <summary>int: the stage (DominionStage).</summary>
         public const string Stage = "dStg";

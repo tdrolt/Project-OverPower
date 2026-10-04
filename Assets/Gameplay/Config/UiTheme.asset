@@ -339,6 +339,8 @@ MonoBehaviour:
   blockedText: Blocked
   blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
   respawnShieldColor: {r: 0.3098, g: 0.6392, b: 1, a: 0.5}
+  respawnShieldBlockedText: BLOCKED
+  respawnShieldBlockedColor: {r: 0.3098, g: 0.6392, b: 1, a: 1}
   markIndicatorSize: 22
   markIndicatorAnchorHeight: 3.6
   markIndicatorPulseSpeed: 2.5

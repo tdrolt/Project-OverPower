@@ -484,13 +484,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
                                                       secondsSinceCombat, gameplayConfig.OutOfCombatSeconds);
 
         // Dominion Task 6: the player's own spawn heals at its own rates, also mid-fight (default A14: owned Tier 2/3 zones elsewhere keep the
-        // Conquest regen above).
-        if (Overpower.Dominion.DominionMode.IsActive())
+        // Conquest regen above). Only once the match is live (A22): the warm-up keeps today's sandbox. The rate is DominionHealRules.HealRate's
+        // answer, not a copy of its branching here.
+        if (Overpower.Dominion.DominionMode.IsLive())
         {
             Overpower.Data.DominionConfig dominion = Overpower.Dominion.DominionMode.Config();
-            if (dominion != null && Overpower.Dominion.SpawnHealArea.InOwnSpawn(TeamId, transform.position))
-                rate = Overpower.Dominion.DominionHealRules.RatePerSecond(true, secondsSinceCombat, dominion.SpawnHealOutOfCombatPerSecond,
-                    dominion.SpawnHealInCombatPerSecond, dominion.SpawnHealOutOfCombatDelaySeconds);
+            if (dominion != null)
+                rate = Overpower.Dominion.DominionHealRules.HealRate(Overpower.Dominion.SpawnHealArea.InOwnSpawn(TeamId, transform.position),
+                    secondsSinceCombat, dominion.SpawnHealOutOfCombatPerSecond, dominion.SpawnHealInCombatPerSecond,
+                    dominion.SpawnHealOutOfCombatDelaySeconds, rate);
         }
         if (rate <= 0f)
             return;

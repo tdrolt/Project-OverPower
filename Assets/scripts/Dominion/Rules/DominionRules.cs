@@ -40,6 +40,10 @@ namespace Overpower.Dominion
         /// outside its healing circle, and the respawn shield already protects a player who spawns next to enemies.</summary>
         public static bool UsesCapitalUnderAttackSpawn(bool dominion, bool capitalUnderAttack) => !dominion && capitalUnderAttack;
 
+        /// <summary>Do Dominion's own match rules (the fixed respawn wait, the spawn healing) apply right now? Only in a Dominion room once the match
+        /// is live: the warm-up stays the free sandbox it is in Conquest (default A22).</summary>
+        public static bool RulesApply(bool dominionRoom, bool matchLive) => dominionRoom && matchLive;
+
         /// <summary>The team with the single highest points, or -1 on a tie for first (or no points at all). A tied round counts for
         /// nobody (Tudor): neither team gets a round win, and 0-0 is a tie like any other.</summary>
         public static int RoundWinner(int[] points)

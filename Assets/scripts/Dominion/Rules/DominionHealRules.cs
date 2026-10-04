@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Overpower.Dominion
@@ -29,5 +31,22 @@ namespace Overpower.Dominion
         /// <summary>The fixed respawn wait for the match size: 2 teams = 2v2, otherwise 3v3v3.</summary>
         public static float RespawnSeconds(int teamCount, float seconds2v2, float seconds3v3v3) =>
             teamCount <= 2 ? seconds2v2 : seconds3v3v3;
+
+        /// <summary>Is the player in their own spawn: inside a spawn area the scene registered for their team (the 2v2 pocket), or - in a 3v3v3
+        /// match only - inside their own capital circle (the 3v3v3 map needs no scene object). An enemy's capital is never this team's, and a
+        /// 2v2 match has no capital circle.</summary>
+        public static bool InOwnSpawn(bool inRegisteredArea, int teamCount, bool zoneIsOwnCapital) =>
+            inRegisteredArea || (teamCount == 3 && zoneIsOwnCapital);
+
+        /// <summary>The teams of a match that have no healing area registered (empty when the match has three teams: the capital circle is the
+        /// spawn there). Used to warn once when a 2v2 match goes live without its spawn areas.</summary>
+        public static List<int> TeamsMissingHealArea(int[] teamsInMatch, Func<int, bool> hasArea)
+        {
+            var missing = new List<int>();
+            if (teamsInMatch == null || hasArea == null || teamsInMatch.Length >= 3) return missing;
+            foreach (int team in teamsInMatch)
+                if (!hasArea(team)) missing.Add(team);
+            return missing;
+        }
     }
 }

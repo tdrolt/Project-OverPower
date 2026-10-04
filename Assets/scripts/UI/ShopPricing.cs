@@ -125,8 +125,7 @@ namespace Overpower.UI
                 DominionMode.IsActive());
 
         /// <summary>True in a live Dominion match (not the warm-up, where the shop is the free sandbox and the break rule does not apply).</summary>
-        public static bool DominionLive() =>
-            DominionMode.IsActive() && MatchDirector.Instance != null && MatchDirector.Instance.IsLive;
+        public static bool DominionLive() => DominionMode.IsLive();
 
         /// <summary>Dominion Task 5: why the shop takes no picks right now (NotInBreak), or None. The stage comes from the room via DominionDirector.</summary>
         public static PurchaseBlock DominionClosed(bool lateJoinerPickOpen)
@@ -178,7 +177,7 @@ namespace Overpower.UI
         {
             DominionDirector director = DominionDirector.Instance;
             DominionStage stage = director != null ? director.Stage : DominionStage.None;
-            return DominionShopRules.HeaderNamesLateJoinerPick(stage, lateJoinerPickOpen) ? lateJoinerText : breakText;
+            return DominionShopRules.HeaderFreeText(stage, lateJoinerPickOpen, breakText, lateJoinerText);
         }
 
         private static bool InOwnTerritory(Player owner, Vector3 position)

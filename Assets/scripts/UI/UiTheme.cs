@@ -942,6 +942,11 @@ namespace Overpower.UI
                  "that player. Blue on purpose, so it never reads as the yellow Invulnerability look. Its alpha is how see-through the bubble is; " +
                  "it starts at the same alpha the Invulnerability bubble uses. The bubble's size is set in the Dominion Config (Shield Bubble Scale).")]
         public Color respawnShieldColor = new Color(0.3098f, 0.6392f, 1f, 0.5f);
+        [Tooltip("The word that pops over a player whose Dominion respawn shield just stopped a hit, seen by everyone who can see that player. " +
+                 "Separate from Blocked Text above, which belongs to the Invulnerability ultimate and stays as it is.")]
+        public string respawnShieldBlockedText = "BLOCKED";
+        [Tooltip("Colour of the respawn shield's BLOCKED word. The shield's blue on purpose, so it never reads as the grey Invulnerability Blocked.")]
+        public Color respawnShieldBlockedColor = new Color(0.3098f, 0.6392f, 1f, 1f);
 
         [Header("Mark (2026-09-18)")]
         [Tooltip("Canvas units, the mark diamond's width and height (both the shooter's own diamond over an " +

@@ -88,10 +88,23 @@ namespace Overpower.Dominion
         public static bool InOwnSpawn(int forTeam, Vector3 position)
         {
             if (forTeam < 0) return false;
-            if (Contains(forTeam, position)) return true;
-            if (DominionMode.TeamCountOfCurrentRoom() != 3) return false;
-            BuildingManager manager = BuildingManager.Instance;
-            return manager != null && manager.Map != null && manager.TryGetZoneAt(position, out int zone) && manager.Map.IsCapitalOf(zone, forTeam);
+            bool inArea = Contains(forTeam, position);
+            int teamCount = DominionMode.TeamCountOfCurrentRoom();
+            bool inOwnCapital = false;
+            if (!inArea && teamCount == 3) // the capital circle only matters in 3v3v3; skip the zone lookup otherwise
+            {
+                BuildingManager manager = BuildingManager.Instance;
+                inOwnCapital = manager != null && manager.Map != null && manager.TryGetZoneAt(position, out int zone) && manager.Map.IsCapitalOf(zone, forTeam);
+            }
+            return DominionHealRules.InOwnSpawn(inArea, teamCount, inOwnCapital);
+        }
+
+        /// <summary>True when the scene has registered at least one healing area for this team.</summary>
+        public static bool HasAreaFor(int forTeam)
+        {
+            for (int i = 0; i < registered.Count; i++)
+                if (registered[i] != null && registered[i].team == forTeam) return true;
+            return false;
         }
     }
 }
