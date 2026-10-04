@@ -444,6 +444,13 @@ namespace Overpower.UI
             if (goldWallet == null)
                 return;
 
+            // Dominion has no gold: the readout is not drawn at all (the shop's own header is Task 5's).
+            bool showGold = Overpower.Dominion.DominionTerritoryRules.ShowsGold(Overpower.Dominion.DominionMode.IsActive());
+            if (goldText.gameObject.activeSelf != showGold)
+                goldText.gameObject.SetActive(showGold);
+            if (!showGold)
+                return;
+
             int balance = goldWallet.Balance;
             double income = goldWallet.IncomePerSecond;
             if (balance == lastGoldBalance && income == lastGoldIncome)

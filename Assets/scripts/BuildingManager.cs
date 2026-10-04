@@ -171,6 +171,14 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// grepping the console log.
     public int CaptureProgressPublishCount { get; private set; }
 
+    /// <summary>Whether this zone can be captured or drained in this room: a capital cannot in Dominion (DominionTerritoryRules). The capital
+    /// still counts as held for adjacency; this only stops its own capture, drain, ring and "under attack".</summary>
+    public bool IsCapturableZone(int zone)
+    {
+        bool isCapital = Map != null && Map.CapitalTeamOf(zone) != TerritoryMap.Neutral;
+        return Overpower.Dominion.DominionTerritoryRules.IsCapturable(Overpower.Dominion.DominionMode.IsActive(), isCapital);
+    }
+
     /// <summary>Map shrink T3, 2026-09-25: the tower's own tier as set in the scene - PhaseTwoCutRules finds the cut
     /// from this, never from the phase-two stand-in (TierOf below), or a cut corner's Tier III towers would
     /// stop reading as Tier III to the very rule that is supposed to find them. Review fix F6: 0 while the tower

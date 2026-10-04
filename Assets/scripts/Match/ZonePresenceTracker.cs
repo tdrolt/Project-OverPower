@@ -95,6 +95,8 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         BuildingManager manager = BuildingManager.Instance;
         if (manager == null || manager.Current == null || presentMasks == null || zone < 0 || zone >= presentMasks.Length)
             return false;
+        if (!manager.IsCapturableZone(zone))
+            return false; // Dominion: a capital cannot be attacked, so an enemy standing in it never closes the link to the zones beside it
         float lingerSeconds = territoryConfig != null ? territoryConfig.UnderAttackLingerSeconds : FallbackLingerSeconds;
         return ZoneThreat.IsUnderAttack(manager.Current.OwnerOf(zone), presentMasks[zone], lastSeenMs,
                                         zone * ZoneThreat.MaxTeams, PhotonNetwork.ServerTimestamp,

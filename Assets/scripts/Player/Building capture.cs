@@ -274,6 +274,16 @@ public class BuildingCapture : MonoBehaviourPun
             return;
         }
 
+        // Dominion Task 4: a capital cannot be captured or drained there. Nobody is listed (OnTriggerEnter refuses too, this
+        // clears a roster an RPC could still fill), nothing is simulated and no progress is published - the owner stays the team
+        // whose capital it is, which is what keeps it "held" for the capture-next-to-a-zone-you-hold rule.
+        if (!BuildingManager.Instance.IsCapturableZone(buildingID))
+        {
+            if (playersInZone.Count > 0)
+                playersInZone.Clear();
+            return;
+        }
+
         // A player who disconnected while standing in the ring leaves a destroyed reference
         // behind: OnTriggerExit cannot fire for an object that no longer exists. Every consumer
         // below reads p.teamID, so one stale entry throws a MissingReferenceException every frame
@@ -397,7 +407,12 @@ public class BuildingCapture : MonoBehaviourPun
             : manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
         PaintKnownCarpet(owner, filtered);
 
-        if (ringView == null && towerLook == null)
+        // Dominion Task 4: a capital cannot be captured there, so the capture ring on the ground is not shown at all.
+        bool capturable = manager.IsCapturableZone(buildingID);
+        if (ringView != null && ringView.gameObject.activeSelf != capturable)
+            ringView.gameObject.SetActive(capturable);
+
+        if ((ringView == null || !capturable) && towerLook == null)
             return;
 
         CaptureRingState state;
@@ -412,7 +427,7 @@ public class BuildingCapture : MonoBehaviourPun
                                           PhotonNetwork.ServerTimestamp, outOfPlay: false);
         }
 
-        if (ringView != null)
+        if (ringView != null && capturable)
         {
             // Yaw reads 0 (world +Z as "top") until ResolveTeamYaw resolves it for this match - CaptureRingView only
             // rebuilds the band/track points when this value CHANGES, so the first resolved yaw self-corrects their
@@ -999,6 +1014,10 @@ public class BuildingCapture : MonoBehaviourPun
         // CurrentOwners is the cached dictionary (BuildingManager.cs ~77-80) - OwnersByZone() builds
         // a fresh one on every call, and every player's collider fires this on every zone entry.
         if (!manager.Map.MayCapture(player.teamID, buildingID, manager.CurrentOwners, null, ZoneOutOfPlay))
+            return;
+
+        // Dominion Task 4: nobody joins the roster of a capital - there is nothing to capture or drain there.
+        if (!manager.IsCapturableZone(buildingID))
             return;
 
         // capturingID is no longer set from here (bug fix, 2026-09-17): this runs on EVERY client for

@@ -172,7 +172,9 @@ namespace Overpower.Match
             if (!Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam) || newOwner != myTeam)
                 return;
 
-            int bounty = snapshot.BountyPaidOnLastCapture(zone);
+            // Dominion has no gold: the capture still scores its bounty points (Task 3, paid on the master), only the gold is silenced.
+            int bounty = Overpower.Dominion.DominionTerritoryRules.BountyGoldFor(
+                Overpower.Dominion.DominionMode.IsActive(), snapshot.BountyPaidOnLastCapture(zone));
             if (bounty <= 0)
                 return;
 
@@ -197,7 +199,10 @@ namespace Overpower.Match
                 int[] tiers = BuildingManager.Instance.TierByZone();
                 int[] teamGoldByTier = TeamGoldByTierFromConfig();
 
-                int teamIncome = GoldMath.TeamIncomePerSecond(team, ownersScratch, tiers, teamGoldByTier);
+                // Dominion has no gold income at all, whatever the held zones would pay in Conquest.
+                int teamIncome = Overpower.Dominion.DominionTerritoryRules.TeamIncomeFor(
+                    Overpower.Dominion.DominionMode.IsActive(),
+                    GoldMath.TeamIncomePerSecond(team, ownersScratch, tiers, teamGoldByTier));
                 double playerIncome = GoldMath.PlayerIncomePerSecond(teamIncome, territoryConfig.PlayersPerTeam);
                 IncomePerSecond = playerIncome;
 
