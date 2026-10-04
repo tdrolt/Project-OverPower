@@ -167,7 +167,8 @@ MonoBehaviour:
   loadoutArmorRechargeTipName: Recharge armor
   loadoutArmorRechargeTipText: Your armor starts refilling sooner after a fight.
   loadoutArmorRechargeNowFormat: 'Now: level {0}, refills after {1}s out of combat'
-  loadoutArmorRechargeNextFormat: 'Next: level {0}, refills after {1}s out of combat ({2})'
+  loadoutArmorRechargeNextFormat: 'Next: level {0}, refills after {1}s out of combat
+    ({2})'
   loadoutArmorNoNextText: 'Next: no upgrade left'
   loadoutToggleButtonWidth: 190
   loadoutToggleButtonHeight: 48
@@ -288,7 +289,8 @@ MonoBehaviour:
   matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   matchStartButtonSize: {x: 260, y: 52}
   warmupTopOffset: 130
-  matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers are reset.
+  matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers
+    are reset.
   matchLiveTwoTeamsToastText: 'Two teams: lose your base and you can''t respawn'
   showDamageNumbers: 1
   damageNumberTextSize: 30
@@ -302,39 +304,6 @@ MonoBehaviour:
   damageNumberRise: 60
   damageNumberFadeStart: 0.55
   damageNumberAnchorHeight: 2
-  scoreboardWidth: 1100
-  scoreboardRowHeight: 42
-  scoreboardTextSize: 26
-  scoreboardHeadingTextSize: 28
-  scoreboardPanelColor: {r: 0.04, g: 0.04, b: 0.06, a: 0.88}
-  scoreboardSelfRowColor: {r: 1, g: 1, b: 1, a: 0.16}
-  scoreboardRefreshesPerSecond: 5
-  scoreboardColumnEdges:
-  - 0.02
-  - 0.42
-  - 0.53
-  - 0.64
-  - 0.75
-  - 0.88
-  - 0.99
-  scoreboardSortingOrder: 30
-  scoreboardPaddingHorizontal: 12
-  scoreboardPaddingVertical: 11
-  scoreboardLineSpacing: 2
-  scoreboardTitleExtraSize: 6
-  scoreboardTitleText: Scoreboard
-  scoreboardColumnTexts:
-  - Player
-  - Kills
-  - Deaths
-  - Assists
-  - Damage
-  - Zones
-  scoreboardTeamNames:
-  - White
-  - Purple
-  - Cyan
-  scoreboardUnknownTeamText: Joining
   damageNumberScreenOffset: {x: 50, y: 0}
   blockedText: Blocked
   blockedColor: {r: 0.7, g: 0.7, b: 0.7, a: 1}
@@ -442,6 +411,7 @@ MonoBehaviour:
   dominionResultNote: The winner of each round in bold. Tab still shows kills and
     damage.
   dominionResultWidth: 960
+  dominionResultRaise: 150
   dominionResultHeadlineSize: 84
   dominionResultModeSize: 19.5
   dominionResultTableSize: 24
@@ -461,26 +431,63 @@ MonoBehaviour:
   quitPromptText: Close the game?
   quitYesText: Yes
   quitNoText: No
-  matchLogSavedText: "Your match log is saved.\nSaved in: {0}\nSend this zip to Tudor: {1}"
+  matchLogSavedText: 'Your match log is saved.
+
+    Saved in: {0}
+
+    Send this
+    zip to Tudor: {1}'
   openLogFolderText: Open folder
   matchLogSavedOffset: {x: 24, y: 70}
   matchLogSavedWidth: 640
+  scoreboardWidth: 1100
+  scoreboardRowHeight: 42
+  scoreboardTextSize: 26
+  scoreboardHeadingTextSize: 28
+  scoreboardPanelColor: {r: 0.04, g: 0.04, b: 0.06, a: 0.88}
+  scoreboardSelfRowColor: {r: 1, g: 1, b: 1, a: 0.16}
+  scoreboardRefreshesPerSecond: 5
+  scoreboardColumnEdges:
+  - 0.02
+  - 0.42
+  - 0.53
+  - 0.64
+  - 0.75
+  - 0.88
+  - 0.99
+  scoreboardSortingOrder: 30
+  scoreboardPaddingHorizontal: 12
+  scoreboardPaddingVertical: 11
+  scoreboardLineSpacing: 2
+  scoreboardTitleExtraSize: 6
+  scoreboardTitleText: Scoreboard
+  scoreboardColumnTexts:
+  - Player
+  - Kills
+  - Deaths
+  - Assists
+  - Damage
+  - Zones
+  scoreboardTeamNames:
+  - White
+  - Purple
+  - Cyan
+  scoreboardUnknownTeamText: Joining
   connectionLostTitle: Connection lost
-  connectionLostBody: Rejoin to come back to the same match as the same player - same team, gold and loadout. You respawn as after a death.
+  connectionLostBody: Rejoin to come back to the same match as the same player -
+    same team, gold and loadout. You respawn as after a death.
   connectionLostRejoinButton: Rejoin
   connectionLostLeaveButton: Leave
   rejoinWorkingText: Reconnecting...
-  rejoinFailedText: The match has ended, or your place in it was given up. You can join a new match.
+  rejoinFailedText: The match has ended, or your place in it was given up. You can
+    join a new match.
+  rejoinPlaceHeldText: You still hold a place in a match you dropped out of, but
+    it could not be reached. Try again in a minute, or join a new match once it is
+    given up.
   rejoinFailedOkButton: OK
-  rejoinPlaceHeldText: You still hold a place in a match you dropped out of, but it could not be reached. Try again in a minute, or join a new match once it is given up.
   rejoinMatchButton: Rejoin your match
   resultButtonLobbyList: Back to the lobby list
   resultButtonQuit: Quit
-  spectateButton: Spectate
-  spectateNextButton: Next
-  spectateStripSize: {x: 460, y: 70}
-  spectateStripBottom: 120
-  spectateButtonOffset: 115
   connectionLostPanelWidth: 640
   connectionLostPanelColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.95}
   connectionLostTitleColor: {r: 1, g: 0.55, b: 0.35, a: 1}
@@ -490,6 +497,11 @@ MonoBehaviour:
   rejoinMatchButtonSize: {x: 420, y: 52}
   rejoinButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   rejoinButtonGapAboveNameBox: 16
+  spectateButton: Spectate
+  spectateNextButton: Next
+  spectateStripSize: {x: 460, y: 70}
+  spectateStripBottom: 120
+  spectateButtonOffset: 115
   spectatorBarColor: {r: 0.06, g: 0.063, b: 0.078, a: 0.88}
   spectatorBarPadding: {x: 36, y: 20}
   spectatorBarGap: 42
@@ -519,6 +531,11 @@ MonoBehaviour:
   spectatorBarLeaveText: Leave
   spectatorWholeMapFill: 0.88
   spectatorViewAngle: 0
+  spectatorResultTitle: '{0} wins the match'
+  spectatorResultTitleSize: 56
+  spectatorResultCardColor: {r: 0.06, g: 0.063, b: 0.078, a: 0.92}
+  spectatorResultCardPadding: {x: 64, y: 36}
+  spectatorResultCardTop: 150
   spectatorResultCardGap: 24
   lobbyDisplayFont: {fileID: 11400000, guid: 14d1d34ba8f7d8449a13152de47b27ae, type: 2}
   lobbyBodyFont: {fileID: 11400000, guid: 564195cefb6722440bfd615ee4597ba9, type: 2}
@@ -632,7 +649,8 @@ MonoBehaviour:
   lobbyListSpectateText: Spectate
   lobbyListFullText: Full
   lobbyListHowToText: How to play
-  lobbyListHintText: The list updates by itself. A lobby closes when everyone has left.
+  lobbyListHintText: The list updates by itself. A lobby closes when everyone has
+    left.
   lobbyListEmptyText: No lobbies yet. Create one to get started.
   lobbyListConnectingText: Connecting to the lobby list...
   lobbyListUnknownModeText: Unknown mode
@@ -697,45 +715,28 @@ MonoBehaviour:
   lobbyRoomStartTextSize: 36
   lobbyRoomStartHintSize: 21
   lobbyRoomStartGap: 24
-  lobbyRoomModeFormat: "{0} \u00B7"
+  lobbyRoomModeFormat: "{0} \xB7"
   lobbyRoomInfoIconSize: 30
   lobbyRoomInfoIconText: i
-  lobbyRoomHostFormat: "\u00B7 host {0} \u00B7 click a seat to take it"
+  lobbyRoomHostFormat: "\xB7 host {0} \xB7 click a seat to take it"
   lobbyRoomEmptySeatText: Empty seat
   lobbyRoomYouSuffix: ' (you)'
-  lobbyRoomHostSuffix: " \u00B7 host"
+  lobbyRoomHostSuffix: " \xB7 host"
   lobbyRoomSpectatorsText: Spectators
-  lobbyRoomNoRoleFormat: 'No role ({0})'
-  lobbyRoomNoRoleNote: 'At the start they fill the emptiest team, then the spectator seats.'
+  lobbyRoomNoRoleFormat: No role ({0})
+  lobbyRoomNoRoleNote: At the start they fill the emptiest team, then the spectator
+    seats.
   lobbyRoomLeaveSeatText: Leave my seat
   lobbyRoomLeaveLobbyText: Leave lobby
   lobbyRoomStartText: START GAME
   lobbyRoomStartHintText: Everyone spawns into the warm-up
   lobbyRoomStartBlockedFormat: '{0} needs a player'
-  lobbyRoomWaitingFormat: 'Waiting for {0} to start the game'
+  lobbyRoomWaitingFormat: Waiting for {0} to start the game
   lobbyRoomOverlayWidth: 1824
   lobbyRoomOverlayHeight: 984
   lobbyRoomOverlayTitleSize: 60
   lobbyRoomOverlayCloseSize: 66
   lobbyRoomOverlayShade: {r: 0, g: 0, b: 0, a: 0.7}
-  warmupBarFill: {r: 0.102, g: 0.11, b: 0.133, a: 0.88}
-  warmupBarRadius: 12
-  warmupBarPaddingHost: {x: 36, y: 18}
-  warmupBarPaddingGuest: {x: 42, y: 18}
-  warmupBarGap: 30
-  warmupBarTitleSize: 36
-  warmupBarInfoSize: 21
-  warmupBarButtonHeight: 72
-  warmupBarButtonPadding: 39
-  warmupBarButtonTextSize: 30
-  warmupBarTitleText: WARM-UP
-  warmupBarInfoFormat: "Free shop \u00B7 nothing counts \u00B7 {0}"
-  warmupBarPlayersText: '{0} players'
-  warmupBarOnePlayerText: 1 player
-  warmupBarGuestFormat: "Free shop \u00B7 nothing counts \u00B7 {0} ends the warm-up"
-  warmupBarButtonText: END WARM-UP
-  warmupBarBlockedFormat: '{0} has no player'
-  warmupBarCountdownInfo: Everything resets when it goes live
   lobbyListHeaderGap: 24
   lobbyListTitleGap: 6
   lobbyListPlayerGap: 24
@@ -753,6 +754,24 @@ MonoBehaviour:
   lobbyJoinClosedText: That lobby has closed.
   lobbyJoinGoneText: That lobby no longer exists.
   lobbyJoinFailedText: Could not join that lobby.
+  warmupBarFill: {r: 0.102, g: 0.11, b: 0.133, a: 0.88}
+  warmupBarRadius: 12
+  warmupBarPaddingHost: {x: 36, y: 18}
+  warmupBarPaddingGuest: {x: 42, y: 18}
+  warmupBarGap: 30
+  warmupBarTitleSize: 36
+  warmupBarInfoSize: 21
+  warmupBarButtonHeight: 72
+  warmupBarButtonPadding: 39
+  warmupBarButtonTextSize: 30
+  warmupBarTitleText: WARM-UP
+  warmupBarInfoFormat: "Free shop \xB7 nothing counts \xB7 {0}"
+  warmupBarPlayersText: '{0} players'
+  warmupBarOnePlayerText: 1 player
+  warmupBarGuestFormat: "Free shop \xB7 nothing counts \xB7 {0} ends the warm-up"
+  warmupBarButtonText: END WARM-UP
+  warmupBarBlockedFormat: '{0} has no player'
+  warmupBarCountdownInfo: Everything resets when it goes live
   chatPanelAlpha: 0.38
   chatPanelSize: {x: 630, y: 360}
   chatPanelMargin: {x: 72, y: 54}
@@ -790,7 +809,7 @@ MonoBehaviour:
   howToPlaySidebarTitle: HOW TO PLAY
   howToPlayPreviousFormat: "<size=150%>\u2039</size> {0}"
   howToPlayNextFormat: "{0} <size=150%>\u203A</size>"
-  howToPlayCounterFormat: "{0} / {1}"
+  howToPlayCounterFormat: '{0} / {1}'
   howToPlayNoPagesText: No pages yet.
   modeInfoKickerText: GAME MODE
   modeInfoNoCardsText: Nothing to read about this mode yet.

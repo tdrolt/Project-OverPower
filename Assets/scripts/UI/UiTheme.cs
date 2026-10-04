@@ -1148,6 +1148,9 @@ namespace Overpower.UI
         public string dominionResultNote = "The winner of each round in bold. Tab still shows kills and damage.";
         [Tooltip("Width of the result card.")]
         public float dominionResultWidth = 960f;
+        [Tooltip("How far above the middle of the screen the result card sits, in reference pixels (the HUD's 1920x1080 grid). Raised so the card " +
+                 "never covers the 'your match log is saved' box in the bottom left. Lower it and the two overlap.")]
+        [Min(0f)] public float dominionResultRaise = 150f;
         [Tooltip("Size of the big line of the result card.")]
         public float dominionResultHeadlineSize = 84f;
         [Tooltip("Size of the small heading of the result card.")]

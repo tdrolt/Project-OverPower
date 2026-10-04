@@ -141,13 +141,10 @@ namespace Overpower.Dominion
             {
                 bool isCapital = buildings.CathedralBuildingIDs.ContainsKey(zone);
                 bool outOfPlay = match != null && match.IsOutOfPlay(zone);
-                if (!SuddenDeathRules.ZoneShapesTheCircle(buildings.BaseTierOf(zone), isCapital, outOfPlay)) continue;
+                SuddenDeathRules.CircleZone kind = SuddenDeathRules.ClassifyZone(buildings.BaseTierOf(zone), isCapital, outOfPlay, threeTeams, DominionRules.CentreTier);
+                if (kind == SuddenDeathRules.CircleZone.Skip) continue;
                 if (!buildings.TryGetZoneCentre(zone, out Vector3 at)) continue;
-                if (buildings.BaseTierOf(zone) == DominionRules.CentreTier)
-                {
-                    if (threeTeams) centreZones.Add(at);
-                }
-                else scoringZones.Add(at);
+                (kind == SuddenDeathRules.CircleZone.Centre ? centreZones : scoringZones).Add(at);
             }
             if (!SuddenDeathRules.TryCentre(centreZones, scoringZones, out Vector2 centre, out float floorY)) return false;
             Centre = centre;

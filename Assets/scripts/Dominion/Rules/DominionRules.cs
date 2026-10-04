@@ -92,6 +92,11 @@ namespace Overpower.Dominion
             return result.ToArray();
         }
 
+        /// <summary>Who plays the current sudden death: the teams the room names (dSdT, A33 - narrowed by every replay), else, for a room that
+        /// has none, the teams level on round wins. An empty stored list reads as none written.</summary>
+        public static int[] TeamsPlayingSuddenDeath(int[] stored, int[] wins, int[] teamsInMatch) =>
+            stored != null && stored.Length > 0 ? stored : SuddenDeathTeams(wins, teamsInMatch);
+
         private static int WinsOf(int[] wins, int team) => team >= 0 && team < wins.Length ? wins[team] : 0;
 
         /// <summary>What comes after round <paramref name="round"/> (1-based), with <paramref name="wins"/> already counting that round.

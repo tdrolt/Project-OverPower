@@ -48,7 +48,7 @@ namespace Overpower.UI
                 ModeText, theme.dominionResultModeSize, theme.dominionMutedColor,
                 body => BuildBody(body, teams, history, teamNames), theme.dominionResultHeadlineSize, theme.dominionResultWidth);
             card.anchorMin = card.anchorMax = card.pivot = new Vector2(0.5f, 0.5f);
-            card.anchoredPosition = Vector2.zero;
+            card.anchoredPosition = new Vector2(0f, theme.dominionResultRaise); // raised clear of the saved-log box in the bottom left
             if (onBack != null) back.Button.onClick.AddListener(() => onBack());
         }
 

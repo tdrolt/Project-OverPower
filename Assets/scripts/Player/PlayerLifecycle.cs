@@ -244,7 +244,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             death = true; // a body that is already "dead" must not die again on the next lethal tick
             // Published at once (not just applied here): no flash of a hittable, standing body on everyone else's screen while the
             // respawn path below waits for the team and the territory.
-            SetAlive(false, PhotonNetwork.ServerTimestamp);
+            arrivedDeadInSuddenDeath = DominionStageNow() == Overpower.Dominion.DominionStage.SuddenDeath; // only a sudden-death arrival is stamped specially
+            SetAlive(false, ArrivalStampMs()); // in sudden death: the real stamp of a player who was already dead, else the earliest moment (never "now" - that could win the verdict)
             // Dominion sudden death (Tudor A32): someone who drops and rejoins while it is on comes back DEAD. TryRespawnAfterRejoin below takes the
             // ordinary death path, which refuses a respawn there (RespawnAllowedNow) - so the rejoiner waits dead like anyone who fell, and the master
             // counts them dead (their flag and stamp were just written above). Deliberate: a drop is no way back into a fight nobody can re-enter.
@@ -300,6 +301,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         {
             Debug.Log($"[DOMINION] joined during sudden death on team {team}: waiting dead");
             death = true;
+            arrivedDeadInSuddenDeath = true;
             DieForGoodInSuddenDeath();
             return;
         }
@@ -721,6 +723,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         Debug.Log($"[DOMINION] sudden death: waiting dead (team not tied), position={rigidbody.position}");
     }
 
+    /// <summary>True from a join or rejoin that lands dead in sudden death until the death is recorded (see DieForGoodInSuddenDeath).</summary>
+    private bool arrivedDeadInSuddenDeath;
+
+    /// <summary>The stamp this player's arrival-death carries (DominionRoomWrites.ArrivalDeathStamp, through the director which reads the room).</summary>
+    private int ArrivalStampMs() =>
+        Overpower.Dominion.DominionDirector.Instance != null ? Overpower.Dominion.DominionDirector.Instance.ArrivalStampMs(PhotonNetwork.LocalPlayer) : PhotonNetwork.ServerTimestamp;
+
     /// <summary>The Dominion stage in the room right now (None outside a Dominion room).</summary>
     private static Overpower.Dominion.DominionStage DominionStageNow() =>
         Overpower.Dominion.DominionDirector.Instance != null ? Overpower.Dominion.DominionDirector.Instance.Stage : Overpower.Dominion.DominionStage.None;
@@ -736,7 +745,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (respawnStarted)
             return;
         respawnStarted = true;
-        deathStampMs = PhotonNetwork.ServerTimestamp;
+        // A body that ARRIVES dead (a late joiner on a team seat, a rejoiner) keeps its real stamp or gets the earliest moment, never "now": a stamp of now
+        // could make their team the one that "fell last" and win. A player who really dies here is stamped with now.
+        deathStampMs = arrivedDeadInSuddenDeath ? ArrivalStampMs() : PhotonNetwork.ServerTimestamp;
+        arrivedDeadInSuddenDeath = false;
         SetAlive(false, deathStampMs);
         matchUI?.SetRespawnPanelVisible(false);
         matchUI?.HideWaitingPanel();

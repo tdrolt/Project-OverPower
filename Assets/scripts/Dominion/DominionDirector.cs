@@ -68,25 +68,43 @@ namespace Overpower.Dominion
 
         private int[] suddenDeathTeams = System.Array.Empty<int>();
         private int[] suddenDeathTeamsForWins;
+        private int[] suddenDeathTeamsForStored;
 
-        /// <summary>The teams that play sudden death (the tied leaders, derived from the room's round wins and the match's teams - no key of its own).
-        /// Kept per wins array, so asking every frame allocates nothing.</summary>
+        /// <summary>The teams that play the current sudden death: the room's dSdT (written with sudden death's start and narrowed by every replay,
+        /// Tudor A33), or for a room without it the teams level on round wins. Kept per source array, so asking every frame allocates nothing.</summary>
         public int[] SuddenDeathTeams
         {
             get
             {
                 if (!PhotonNetwork.InRoom) return System.Array.Empty<int>();
-                int[] wins = PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.Wins, out object raw) ? raw as int[] : null;
-                if (wins == null) return System.Array.Empty<int>();
-                if (!ReferenceEquals(wins, suddenDeathTeamsForWins))
+                Hashtable props = PhotonNetwork.CurrentRoom.CustomProperties;
+                int[] wins = props.TryGetValue(DominionKeys.Wins, out object raw) ? raw as int[] : null;
+                int[] stored = props.TryGetValue(DominionKeys.SuddenDeathTeams, out object rawTeams) ? rawTeams as int[] : null;
+                if (wins == null && stored == null) return System.Array.Empty<int>();
+                if (!ReferenceEquals(wins, suddenDeathTeamsForWins) || !ReferenceEquals(stored, suddenDeathTeamsForStored))
                 {
                     MatchDirector match = MatchDirector.Instance;
                     int[] inMatch = match != null && match.TeamsInMatch != null && match.TeamsInMatch.Length > 0 ? match.TeamsInMatch : DominionMode.TeamsOfCurrentRoom();
-                    suddenDeathTeams = DominionRules.SuddenDeathTeams(wins, inMatch);
+                    suddenDeathTeams = DominionRules.TeamsPlayingSuddenDeath(stored, wins, inMatch);
                     suddenDeathTeamsForWins = wins;
+                    suddenDeathTeamsForStored = stored;
                 }
                 return suddenDeathTeams;
             }
+        }
+
+        /// <summary>The death stamp for a player who arrives dead in sudden death (late joiner, rejoiner, a body loading): see
+        /// DominionRoomWrites.ArrivalDeathStamp. Reads the room and the player's own properties.</summary>
+        public int ArrivalStampMs(Player player)
+        {
+            int now = PhotonNetwork.ServerTimestamp;
+            if (player == null || !PhotonNetwork.InRoom) return now;
+            DominionConfig config = DominionMode.Config();
+            int earliest = config != null
+                ? DominionRoomWrites.EarliestFallMs(SuddenDeathStartMs, config.BreakCountdownSeconds, Mathf.RoundToInt(config.SameInstantToleranceSeconds * 1000f)) : 0;
+            bool dead = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object flag) && flag is bool alive && !alive;
+            bool hasStamp = player.CustomProperties.TryGetValue(PlayerLifecycle.LastStandAtKey, out object stamp) && stamp is int;
+            return DominionRoomWrites.ArrivalDeathStamp(Stage, dead, hasStamp, hasStamp ? (int)stamp : 0, earliest, now);
         }
 
         private void Awake()
@@ -303,7 +321,7 @@ namespace Overpower.Dominion
 
             DominionEdge edge = DominionRoomWrites.EdgeBetween(prevRound, prevStage, room.Round, room.Stage);
             bool suddenDeathStart = DominionRoomWrites.IsSuddenDeathStart(prevStage, prevSuddenDeath, room.Stage, room.SuddenDeathMs);
-            Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} sd {room.SuddenDeathMs} points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge}{(suddenDeathStart ? ", sudden death start" : "")})");
+            Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} sd {room.SuddenDeathMs} sdTeams [{(room.SuddenDeathTeams != null ? string.Join(",", room.SuddenDeathTeams) : "-")}] points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge}{(suddenDeathStart ? ", sudden death start" : "")})");
             if (prevStage == DominionStage.None && room.Stage == DominionStage.Break) WarnAboutMissingHealAreas();
             if (suddenDeathStart)
             {

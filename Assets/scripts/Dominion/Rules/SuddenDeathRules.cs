@@ -12,11 +12,13 @@ namespace Overpower.Dominion
         Replay = 2,
     }
 
-    /// <summary>The verdict of SuddenDeathRules.Evaluate. Team is the winner when State is Won, else -1.</summary>
+    /// <summary>The verdict of SuddenDeathRules.Evaluate. Team is the winner when State is Won, else -1. ReplayTeams (Judge only) names, when State is Replay,
+    /// the teams whose last players fell together and so play again (Tudor A33); null when it does not say (Evaluate: the caller keeps its own list).</summary>
     public struct SuddenDeathResult
     {
         public SuddenDeathState State;
         public int Team;
+        public int[] ReplayTeams;
     }
 
     /// <summary>
@@ -215,15 +217,30 @@ namespace Overpower.Dominion
                 if (!tally.HasDeath[team]) continue; // nobody of this team was ever there: it fell at no moment
                 if (latest < 0 || unchecked(tally.LastDeathMs[team] - tally.LastDeathMs[latest]) > 0) latest = team;
             }
-            if (latest < 0) return byCount; // nobody anywhere: the old replay
+            if (latest < 0) return new SuddenDeathResult { State = SuddenDeathState.Replay, Team = -1, ReplayTeams = (int[])teamsInSuddenDeath.Clone() }; // nobody anywhere: the old replay, all of them
 
-            int sameMoment = 0;
+            // A33: only the teams whose last players fell together play again; a team that fell earlier stays out.
+            var together = new List<int>();
             foreach (int team in teamsInSuddenDeath)
             {
                 if (team < 0 || team >= tally.Alive.Length || !tally.HasDeath[team]) continue;
-                if (unchecked(tally.LastDeathMs[latest] - tally.LastDeathMs[team]) <= Math.Max(0, toleranceMs)) sameMoment++;
+                if (unchecked(tally.LastDeathMs[latest] - tally.LastDeathMs[team]) <= Math.Max(0, toleranceMs)) together.Add(team);
             }
-            return sameMoment > 1 ? byCount : new SuddenDeathResult { State = SuddenDeathState.Won, Team = latest };
+            together.Sort();
+            return together.Count > 1
+                ? new SuddenDeathResult { State = SuddenDeathState.Replay, Team = -1, ReplayTeams = together.ToArray() }
+                : new SuddenDeathResult { State = SuddenDeathState.Won, Team = latest };
+        }
+
+        /// <summary>What a zone is to the circle: left out, the centre (a Tier 4 zone of a three-team match) or a scoring zone whose midpoint places a two-team circle.</summary>
+        public enum CircleZone { Skip, Centre, Scoring }
+
+        /// <summary>Sorts one zone for placing the circle. Called by SuddenDeathZone for every zone, so the choice is tested rather than inlined.</summary>
+        public static CircleZone ClassifyZone(int tier, bool isCapital, bool outOfPlay, bool threeTeams, int centreTier)
+        {
+            if (!ZoneShapesTheCircle(tier, isCapital, outOfPlay)) return CircleZone.Skip;
+            if (tier == centreTier) return threeTeams ? CircleZone.Centre : CircleZone.Skip;
+            return CircleZone.Scoring;
         }
 
         private static void Count(int[] alive, int[] teams, out int standing, out int teamsAlive)

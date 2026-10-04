@@ -23,6 +23,8 @@ namespace Overpower.Dominion
         public int PointsSeq;
         /// <summary>dSd: the server ms the sudden-death circle starts shrinking; 0 = none written. A replay writes a new one.</summary>
         public int SuddenDeathMs;
+        /// <summary>dSdT: the teams playing the current sudden death; null = none written (a room from before A33, or no sudden death yet).</summary>
+        public int[] SuddenDeathTeams;
         /// <summary>dHist: every finished round's final points, rounds x team slots flattened (DominionHistory); empty until round 1 is over.</summary>
         public int[] History;
 
@@ -47,6 +49,7 @@ namespace Overpower.Dominion
             if (props.TryGetValue(DominionKeys.ZonesResetFor, out object rz) && rz is int z) state.ResetFor = z;
             if (props.TryGetValue(DominionKeys.PointsSeq, out object seq) && seq is int q) state.PointsSeq = q;
             if (props.TryGetValue(DominionKeys.SuddenDeathStart, out object sd) && sd is int sdMs) state.SuddenDeathMs = sdMs;
+            if (props.TryGetValue(DominionKeys.SuddenDeathTeams, out object sdt) && sdt is int[] sdTeams) state.SuddenDeathTeams = sdTeams;
             if (props.TryGetValue(DominionKeys.History, out object hist) && hist is int[] h) state.History = h;
             return state;
         }
@@ -173,6 +176,7 @@ namespace Overpower.Dominion
                         { DominionKeys.StageEnd, 0 },
                         // A17: a short get-ready with the circle at full size before it starts to move.
                         { DominionKeys.SuddenDeathStart, DominionRules.StageEndMs(nowMs, cfg.SuddenDeathCountdownSeconds) },
+                        { DominionKeys.SuddenDeathTeams, outcome.SuddenDeathTeams ?? DominionRules.SuddenDeathTeams(wins, teamsInMatch) }, // A33: stored, since a replay narrows it
                         { DominionKeys.Wins, wins },
                         { DominionKeys.History, history },
                     }, scoresRound: true);
@@ -211,7 +215,7 @@ namespace Overpower.Dominion
         private static DominionWrite NextInSuddenDeath(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, SuddenDeathRules.Tally tally)
         {
             if (tally == null || room.SuddenDeathMs == 0 || !SuddenDeathRules.MayEvaluate(room.SuddenDeathMs, nowMs)) return null;
-            int[] playing = DominionRules.SuddenDeathTeams(room.Wins, teamsInMatch);
+            int[] playing = DominionRules.TeamsPlayingSuddenDeath(room.SuddenDeathTeams, room.Wins, teamsInMatch);
             SuddenDeathResult verdict = SuddenDeathRules.Judge(tally, playing, cfg.SameInstantToleranceMs);
             if (verdict.State == SuddenDeathState.Ongoing) return null;
 
@@ -224,6 +228,8 @@ namespace Overpower.Dominion
                 : Stage(room, WhatSuddenDeathReplay, new Hashtable
                 {
                     { DominionKeys.SuddenDeathStart, DominionRules.StageEndMs(nowMs, cfg.SuddenDeathCountdownSeconds) },
+                    // A33: only the teams whose last players fell together play again; the others stay out (dead and waiting).
+                    { DominionKeys.SuddenDeathTeams, verdict.ReplayTeams ?? playing },
                 });
             write.Expected[DominionKeys.SuddenDeathStart] = room.SuddenDeathMs;
             return write;
@@ -284,15 +290,36 @@ namespace Overpower.Dominion
         }
 
         /// <summary>The Player Properties a late joiner writes together with the seat write when they take a TEAM seat during sudden death (Tudor A4):
-        /// alive = false with a death stamp of now. Nobody respawns there, so they can only wait dead; without the flag the master would count them as
-        /// alive (a player with no flag has never died) for the whole time the body loads, and a tied team could never be judged out. Null for any
-        /// other join (a spectator seat, another stage), and no stamp while the server clock is not synced (the master then waits for the body's own).</summary>
-        public static Hashtable LateJoinerPlayerProps(DominionStage stage, bool takingTeamSeat, int nowMs)
+        /// alive = false with the given death stamp (ArrivalDeathStamp: the earliest moment, so the joiner can never be the one who "fell last").
+        /// Nobody respawns there, so they can only wait dead; without the flag the master would count them as alive (a player with no flag has never
+        /// died) for the whole time the body loads. Null for any other join (a spectator seat, another stage), and no stamp (0) while the server
+        /// clock is not synced (the master then waits for the body's own).</summary>
+        public static Hashtable LateJoinerPlayerProps(DominionStage stage, bool takingTeamSeat, int stampMs)
         {
             if (stage != DominionStage.SuddenDeath || !takingTeamSeat) return null;
             var props = new Hashtable { { PlayerLifecycle.AliveKey, false } };
-            if (nowMs != 0) props[PlayerLifecycle.LastStandAtKey] = nowMs;
+            if (stampMs != 0) props[PlayerLifecycle.LastStandAtKey] = stampMs;
             return props;
+        }
+
+        /// <summary>The moment no real fall in this sudden death can be earlier than, with room to spare: the circle's start minus the get-ready
+        /// countdown (when the stage was written, before which nobody can fall) minus the same-instant tolerance and one more ms, so an arrival
+        /// stamped with it is never within the tolerance of a real fall. 0 when no circle start is known.</summary>
+        public static int EarliestFallMs(int suddenDeathStartMs, float countdownSeconds, int toleranceMs)
+        {
+            if (suddenDeathStartMs == 0) return 0;
+            int moment = unchecked(suddenDeathStartMs - (int)Math.Round(Math.Max(0f, countdownSeconds) * 1000f) - Math.Max(0, toleranceMs) - 1);
+            return moment == 0 ? 1 : moment; // 0 means "no stamp" everywhere
+        }
+
+        /// <summary>The death stamp of a player who ARRIVES dead in sudden death (a late joiner on a team seat, a rejoiner, a body loading in): a player
+        /// already dead keeps the stamp they have (their real moment of falling), anyone else gets the earliest moment, so arriving never makes a team
+        /// the one that fell last and wins on it. Outside sudden death, or with no earliest moment known, it is the time now.</summary>
+        public static int ArrivalDeathStamp(DominionStage stage, bool alreadyDead, bool hasStamp, int existingStamp, int earliestMs, int nowMs)
+        {
+            if (stage != DominionStage.SuddenDeath) return nowMs;
+            if (alreadyDead && hasStamp) return existingStamp;
+            return earliestMs != 0 ? earliestMs : nowMs;
         }
 
         /// <summary>What a client does once on seeing the room go from (prevRound, prevStage) to (round, stage): a break starting is a full fresh

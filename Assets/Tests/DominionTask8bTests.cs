@@ -86,6 +86,7 @@ namespace Overpower.Tests
         {
             SuddenDeathResult same = SuddenDeathRules.Judge(TallyOf(Fell(0, 70000), Fell(1, 90000), Fell(2, 90010)), TiedThree, Tolerance);
             Assert.AreEqual(SuddenDeathState.Replay, same.State, "the two that fell last fell together");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, same.ReplayTeams, "A33: the team that fell earlier stays out of the replay");
             SuddenDeathResult later = SuddenDeathRules.Judge(TallyOf(Fell(0, 70000), Fell(1, 90300), Fell(2, 90000)), TiedThree, Tolerance);
             Assert.AreEqual(SuddenDeathState.Won, later.State);
             Assert.AreEqual(1, later.Team);
@@ -113,6 +114,124 @@ namespace Overpower.Tests
             Assert.AreEqual(SuddenDeathState.Replay, SuddenDeathRules.Judge(TallyOf(), TiedTwo, Tolerance).State);
             Assert.AreEqual(SuddenDeathState.Ongoing, SuddenDeathRules.Judge(null, TiedTwo, Tolerance).State);
             Assert.AreEqual(SuddenDeathState.Ongoing, SuddenDeathRules.Judge(TallyOf(Fell(0, 1)), new int[0], Tolerance).State);
+        }
+
+        [Test] public void ATeamsLastDeathIsTheLatestStampAcrossTheClockWrap()
+        {
+            int before = unchecked(int.MaxValue - 100);
+            int after = unchecked(before + 300);
+            SuddenDeathRules.Tally forward = TallyOf(Fell(0, before), Fell(0, after));
+            SuddenDeathRules.Tally backward = TallyOf(Fell(0, after), Fell(0, before));
+            Assert.AreEqual(after, forward.LastDeathMs[0], "the later stamp wins although it wrapped to a smaller number");
+            Assert.AreEqual(after, backward.LastDeathMs[0], "in either order");
+        }
+
+        // ---- A33: only the teams whose last players fell together play again
+
+        [Test] public void AReplayNamesOnlyTheTeamsThatFellTogether()
+        {
+            SuddenDeathResult r = SuddenDeathRules.Judge(TallyOf(Fell(0, 70000), Fell(1, 90010), Fell(2, 90000)), TiedThree, Tolerance);
+            Assert.AreEqual(SuddenDeathState.Replay, r.State);
+            CollectionAssert.AreEqual(new[] { 1, 2 }, r.ReplayTeams);
+        }
+
+        [Test] public void AllThreeFallingTogetherReplayAllThree()
+        {
+            SuddenDeathResult r = SuddenDeathRules.Judge(TallyOf(Fell(0, 90000), Fell(1, 90010), Fell(2, 90020)), TiedThree, Tolerance);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, r.ReplayTeams);
+        }
+
+        [Test] public void NobodyEverThereReplaysTheTiedTeams()
+        {
+            CollectionAssert.AreEqual(TiedTwo, SuddenDeathRules.Judge(TallyOf(), TiedTwo, Tolerance).ReplayTeams);
+        }
+
+        [Test] public void TheReplayWriteStoresTheNarrowedTeamsInTheRoom()
+        {
+            // 3v3v3, all three level in sudden death; team 0 fell earlier, teams 1 and 2 fell together
+            DominionRoomState room = SuddenDeathRoom();
+            room.Wins = new[] { 1, 1, 1 };
+            room.SuddenDeathTeams = TiedThree;
+            DominionWrite w = DominionRoomWrites.Next(true, true, 160000, room, Cfg, TiedThree, new[] { 2, 2, 2 }, TallyOf(Fell(0, 140000), Fell(1, 150000), Fell(2, 150020)));
+            Assert.AreEqual(DominionRoomWrites.WhatSuddenDeathReplay, w.What);
+            CollectionAssert.AreEqual(new[] { 1, 2 }, (int[])w.Props[DominionKeys.SuddenDeathTeams]);
+        }
+
+        [Test] public void AfterAReplayTheRoomsNarrowedTeamsDecideNotTheRoundWins()
+        {
+            // the wins say teams 0 and 1 are level, but the room's stored teams are 1 and 2: team 0 (alive) is not playing, so team 2 (fell last) wins
+            DominionRoomState room = SuddenDeathRoom();
+            room.SuddenDeathTeams = new[] { 1, 2 };
+            DominionWrite w = DominionRoomWrites.Next(true, true, 160000, room, Cfg, TiedThree, new[] { 2, 2, 2 }, TallyOf(Lives(0), Fell(1, 150000), Fell(2, 150300)));
+            Assert.AreEqual(DominionRoomWrites.WhatSuddenDeathWon, w.What);
+            Assert.AreEqual(2, w.Props[DominionKeys.Winner]);
+        }
+
+        [Test] public void ARoomWithoutStoredTeamsFallsBackToTheTeamsLevelOnWins()
+        {
+            CollectionAssert.AreEqual(new[] { 0, 1 }, DominionRules.TeamsPlayingSuddenDeath(null, new[] { 1, 1, 0 }, TiedThree));
+            CollectionAssert.AreEqual(new[] { 0, 1 }, DominionRules.TeamsPlayingSuddenDeath(new int[0], new[] { 1, 1, 0 }, TiedThree));
+            CollectionAssert.AreEqual(new[] { 2 }, DominionRules.TeamsPlayingSuddenDeath(new[] { 2 }, new[] { 1, 1, 0 }, TiedThree));
+        }
+
+        [Test] public void SuddenDeathsStartStoresTheTeamsLevelOnWins()
+        {
+            // round 3 ends 0-0-0 in points: nobody wins it, the wins stay 1-1-0 -> sudden death for teams 0 and 1
+            var room = new DominionRoomState { HasRound = true, Round = 3, Stage = DominionStage.Round, EndMs = 105000, Points = new[] { 0, 0, 0 }, Wins = new[] { 1, 1, 0 }, Winner = -1 };
+            DominionWrite w = DominionRoomWrites.Next(true, true, 105000, room, Cfg, TiedThree, new[] { 2, 2, 2 });
+            Assert.AreEqual("sudden death", w.What);
+            CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])w.Props[DominionKeys.SuddenDeathTeams]);
+        }
+
+        [Test] public void TheRoomStateReadsTheStoredTeams()
+        {
+            var props = new Hashtable { { DominionKeys.SuddenDeathTeams, new[] { 1, 2 } } };
+            CollectionAssert.AreEqual(new[] { 1, 2 }, DominionRoomState.Read(props).SuddenDeathTeams);
+            Assert.IsNull(DominionRoomState.Read(new Hashtable()).SuddenDeathTeams);
+        }
+
+        // ---- review item 2 (Task 8b): arriving dead never stamps "now"
+
+        [Test] public void ALateArrivalGetsTheEarliestMomentNotNow()
+        {
+            int earliest = DominionRoomWrites.EarliestFallMs(100000, 4f, Tolerance);
+            Assert.AreEqual(100000 - 4000 - Tolerance - 1, earliest);
+            Assert.AreEqual(earliest, DominionRoomWrites.ArrivalDeathStamp(DominionStage.SuddenDeath, false, false, 0, earliest, 150000));
+        }
+
+        [Test] public void APlayerAlreadyDeadKeepsTheirRealStampWhenTheirBodyLoads()
+        {
+            Assert.AreEqual(123000, DominionRoomWrites.ArrivalDeathStamp(DominionStage.SuddenDeath, true, true, 123000, 95000, 150000));
+        }
+
+        [Test] public void ADeadPlayerWithNoStampYetGetsTheEarliestAndOutsideSuddenDeathItIsNow()
+        {
+            Assert.AreEqual(95000, DominionRoomWrites.ArrivalDeathStamp(DominionStage.SuddenDeath, true, false, 0, 95000, 150000));
+            Assert.AreEqual(150000, DominionRoomWrites.ArrivalDeathStamp(DominionStage.Round, false, false, 0, 95000, 150000));
+            Assert.AreEqual(150000, DominionRoomWrites.ArrivalDeathStamp(DominionStage.SuddenDeath, false, false, 0, 0, 150000), "no circle start known: the time now");
+        }
+
+        [Test] public void TheEarliestMomentIsNeverWithinTheToleranceOfARealFall()
+        {
+            int start = 100000;
+            int earliest = DominionRoomWrites.EarliestFallMs(start, 4f, Tolerance);
+            int firstPossibleFall = start - 4000; // the stage is written then; nobody falls before it
+            Assert.Greater(firstPossibleFall - earliest, Tolerance);
+            Assert.AreEqual(0, DominionRoomWrites.EarliestFallMs(0, 4f, Tolerance), "no circle start: none");
+        }
+
+        // ---- review item 5: the zone sort the circle uses
+
+        [Test] public void TheCircleSortsEachZoneByTierCapitalAndTeamCount()
+        {
+            const int centreTier = 4;
+            Assert.AreEqual(SuddenDeathRules.CircleZone.Centre, SuddenDeathRules.ClassifyZone(4, false, false, true, centreTier));
+            Assert.AreEqual(SuddenDeathRules.CircleZone.Skip, SuddenDeathRules.ClassifyZone(4, false, false, false, centreTier), "a two-team match has no playing centre");
+            Assert.AreEqual(SuddenDeathRules.CircleZone.Scoring, SuddenDeathRules.ClassifyZone(3, false, false, true, centreTier));
+            Assert.AreEqual(SuddenDeathRules.CircleZone.Scoring, SuddenDeathRules.ClassifyZone(2, false, false, false, centreTier));
+            Assert.AreEqual(SuddenDeathRules.CircleZone.Skip, SuddenDeathRules.ClassifyZone(1, false, false, true, centreTier), "a Tier 1 zone is a spawn");
+            Assert.AreEqual(SuddenDeathRules.CircleZone.Skip, SuddenDeathRules.ClassifyZone(3, true, false, true, centreTier), "a capital");
+            Assert.AreEqual(SuddenDeathRules.CircleZone.Skip, SuddenDeathRules.ClassifyZone(3, false, true, true, centreTier), "out of play");
         }
 
         // ---- A31 through what the master writes
@@ -227,7 +346,7 @@ namespace Overpower.Tests
 
         [Test] public void ALateJoinerOnATeamSeatInSuddenDeathIsWrittenDeadWithAStamp()
         {
-            Hashtable props = DominionRoomWrites.LateJoinerPlayerProps(DominionStage.SuddenDeath, takingTeamSeat: true, nowMs: 123456);
+            Hashtable props = DominionRoomWrites.LateJoinerPlayerProps(DominionStage.SuddenDeath, takingTeamSeat: true, stampMs: 123456);
             Assert.IsNotNull(props);
             Assert.AreEqual(false, props[PlayerLifecycle.AliveKey]);
             Assert.AreEqual(123456, props[PlayerLifecycle.LastStandAtKey]);
@@ -242,23 +361,24 @@ namespace Overpower.Tests
 
         [Test] public void OnlyATeamSeatInSuddenDeathMakesTheJoinerDead()
         {
-            Assert.IsNull(DominionRoomWrites.LateJoinerPlayerProps(DominionStage.SuddenDeath, takingTeamSeat: false, nowMs: 5), "a spectator seat");
+            Assert.IsNull(DominionRoomWrites.LateJoinerPlayerProps(DominionStage.SuddenDeath, takingTeamSeat: false, stampMs: 5), "a spectator seat");
             Assert.IsNull(DominionRoomWrites.LateJoinerPlayerProps(DominionStage.Round, true, 5));
             Assert.IsNull(DominionRoomWrites.LateJoinerPlayerProps(DominionStage.Break, true, 5));
         }
 
         [Test] public void AJoinerWrittenDeadNeverCountsAsAliveForATiedTeam()
         {
-            Hashtable props = DominionRoomWrites.LateJoinerPlayerProps(DominionStage.SuddenDeath, true, 150000);
+            int earliest = DominionRoomWrites.EarliestFallMs(100000, 4f, Tolerance);
+            Hashtable props = DominionRoomWrites.LateJoinerPlayerProps(DominionStage.SuddenDeath, true, DominionRoomWrites.ArrivalDeathStamp(DominionStage.SuddenDeath, false, false, 0, earliest, 150000));
             var joiner = new SuddenDeathRules.Player
             {
                 Team = 1, Counts = true, HasAliveFlag = true, AliveFlag = (bool)props[PlayerLifecycle.AliveKey],
                 HasDeathStamp = true, DeathStampMs = (int)props[PlayerLifecycle.LastStandAtKey],
             };
-            // team 0's last player fell 3 s earlier; team 1 has only the joiner, dead from the seat write: the joiner's team fell last and wins
-            SuddenDeathResult r = SuddenDeathRules.Judge(TallyOf(Fell(0, 147000), joiner), TiedTwo, Tolerance);
+            // team 0's last player fell later (150000); team 1 has only the joiner, dead from the seat write with the EARLIEST stamp: it never beats a team that fell later
+            SuddenDeathResult r = SuddenDeathRules.Judge(TallyOf(Fell(0, 150000), joiner), TiedTwo, Tolerance);
             Assert.AreEqual(SuddenDeathState.Won, r.State);
-            Assert.AreEqual(1, r.Team);
+            Assert.AreEqual(0, r.Team);
             Assert.AreEqual(0, TallyOf(joiner).Alive[1], "not counted alive while the body loads");
         }
 
@@ -316,8 +436,12 @@ namespace Overpower.Tests
             Assert.AreEqual(HitVerdict.Shielded, HitVerdictRule.Classify(false, false, false, armed, 5f, ignoresInvulnerability: false));
         }
 
-        [Test] public void TheCircleStillCountsAsCombatLikeAnyLandedHit() =>
-            Assert.IsTrue(HitVerdictRule.CountsAsCombat(HitVerdictRule.Classify(false, false, true, null, 5f, ignoresInvulnerability: true)));
+        [Test] public void TheCircleStillCountsAsCombatLikeAnyLandedHit()
+        {
+            HitVerdict verdict = HitVerdictRule.Classify(false, false, true, null, 5f, ignoresInvulnerability: true);
+            Assert.AreEqual(HitVerdict.Lands, verdict, "with the A30 exemption reverted this is Shielded, which also counts as combat");
+            Assert.IsTrue(HitVerdictRule.CountsAsCombat(verdict));
+        }
 
         // ---- review item 6: a death after Over never respawns
 
