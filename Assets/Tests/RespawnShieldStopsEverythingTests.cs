@@ -387,30 +387,7 @@ namespace Overpower.Tests
 
         // ------------------------------------------------------------ the wiring: the game calls the tested rule (the method bodies are read, not run)
 
-        private const BindingFlags All = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
-
-        // True when any method of the type (or a lambda / state machine nested in it) has an IL call, callvirt, newobj or field load of the target.
-        private static bool Uses(System.Type owner, MemberInfo target)
-        {
-            byte[] token = System.BitConverter.GetBytes(target.MetadataToken);
-            var types = new List<System.Type> { owner };
-            types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
-            foreach (System.Type type in types)
-            {
-                foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
-                {
-                    byte[] il = method.GetMethodBody()?.GetILAsByteArray();
-                    if (il == null) continue;
-                    for (int i = 0; i + 4 < il.Length; i++)
-                    {
-                        byte op = il[i];
-                        if (op != 0x28 && op != 0x6F && op != 0x73 && op != 0x7B) continue; // call, callvirt, newobj, ldfld
-                        if (il[i + 1] == token[0] && il[i + 2] == token[1] && il[i + 3] == token[2] && il[i + 4] == token[3]) return true;
-                    }
-                }
-            }
-            return false;
-        }
+        private static bool Uses(System.Type owner, MemberInfo target) => IlWiring.Uses(owner, target);
 
         private static MethodInfo Builder(string name) => typeof(PlacedEffects).GetMethod(name);
 

@@ -71,7 +71,10 @@ public class MatchUI : MonoBehaviour
     /// player object before the scene changes or the room closes. Phase 2's match loop (if it adds a
     /// rematch or a return-to-lobby-without-reloading path) will need to reset these panels, and this
     /// property, explicitly when that happens - it will not do so on its own.</summary>
-    public bool MatchOver => (youWonPanel != null && youWonPanel.activeSelf) || (youLostPanel != null && youLostPanel.activeSelf);
+    public bool MatchOver => dominionResultShown || (youWonPanel != null && youWonPanel.activeSelf) || (youLostPanel != null && youLostPanel.activeSelf);
+
+    // Dominion Task 9: in a Dominion match the result is DominionHud's result card, not the YOU WIN / YOU LOSE prefab panels; this latch stands in for them.
+    private bool dominionResultShown;
 
     /// <summary>The theme this panel set reads (Task 9f: the result button's label comes from it).</summary>
     public UiTheme Theme => theme;
@@ -218,6 +221,16 @@ public class MatchUI : MonoBehaviour
         HideWaitingPanel();
         SetRespawnPanelVisible(false);
 
+        // Dominion Task 9: the result card with the table of points per round replaces the win / lose panels (Dominion only; Conquest below is as it was).
+        if (Overpower.Dominion.DominionMode.IsActive() && Overpower.UI.DominionHud.Instance != null
+            && Overpower.UI.DominionHud.Instance.ShowResult(winningTeam, BackToTheLobbyList))
+        {
+            dominionResultShown = true;
+            FreezeForRestOfMatch();
+            Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
+            return;
+        }
+
         if (myTeam == winningTeam)
             youWonPanel?.SetActive(true);
         else
@@ -230,6 +243,9 @@ public class MatchUI : MonoBehaviour
         // quit (GameQuit.Quit) is still safe.
         Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
     }
+
+    /// <summary>The Dominion result card's button: back to the lobby list, the same place the win / lose panels' button leads in a finished match.</summary>
+    private static void BackToTheLobbyList() => Object.FindFirstObjectByType<RoomManager>()?.ReturnToLobbyList();
 
     /// Stops the player moving once the match is decided. Adds a zero multiplier rather than
     /// writing a speed value: PlayerMotor's speed is a product of keyed multipliers and has no

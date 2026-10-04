@@ -30,6 +30,7 @@ namespace Overpower.Lobby
         private Transform mapAnchor;
         private SpectatorBar bar;
         private SpectatorResultCard resultCard;
+        private bool dominionResultUp;   // Dominion Task 9: the result card is DominionHud's, not a SpectatorResultCard
         private int resultWinner = SpectateRules.None; // the winner the room named, kept until the card can go up (Begin may come after it)
         private readonly object zoomKey = new object();
         private readonly List<SpectateCandidate> watchable = new List<SpectateCandidate>(16);
@@ -59,7 +60,7 @@ namespace Overpower.Lobby
         public Transform CameraTarget => cam != null ? cam.target : null;
 
         /// <summary>True once the match-end result card is up (a spectator's version of the YOU WIN / YOU LOSE screen).</summary>
-        public bool ResultShown => resultCard != null;
+        public bool ResultShown => resultCard != null || dominionResultUp;
 
         /// <summary>The card's title ("Purple wins the match"); empty before it is up.</summary>
         public string ResultTitle => resultCard != null ? resultCard.Title : "";
@@ -111,12 +112,21 @@ namespace Overpower.Lobby
 
         private void TryShowResult()
         {
-            if (!SpectateRules.MustShowResult(IsWatching, resultWinner, resultCard != null))
+            if (!SpectateRules.MustShowResult(IsWatching, resultWinner, resultCard != null || dominionResultUp))
                 return;
             UiTheme theme = roomManager != null ? roomManager.Theme : null;
             if (theme == null)
             {
                 Debug.LogError("[SPECTATOR] the RoomManager has no UiTheme - the result card cannot be built");
+                return;
+            }
+            // Dominion Task 9: a spectator gets the same result card as the players (the table of points per round), not the plain winner card.
+            if (Overpower.Dominion.DominionMode.IsActive() && Overpower.UI.DominionHud.Instance != null
+                && Overpower.UI.DominionHud.Instance.ShowResult(resultWinner, Leave))
+            {
+                dominionResultUp = true;
+                Debug.Log("[SPECTATOR] match over: Dominion result card");
+                Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
                 return;
             }
             string title = SpectateRules.ResultTitle(theme.spectatorResultTitle, theme.scoreboardTeamNames, resultWinner);
@@ -146,6 +156,7 @@ namespace Overpower.Lobby
             if (resultCard != null)
                 Destroy(resultCard.gameObject);
             resultCard = null;
+            dominionResultUp = false;
             currentActor = SpectateRules.None;
             wholeMapChosen = false;
             mapFramed = false;

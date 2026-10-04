@@ -456,10 +456,18 @@ namespace Overpower.UI
         // ---- the result card ----
 
         /// <summary>The look of a result card (Dominion Task 1 Part 0): a rounded dark card holding a big Oswald title in the winner's colour and
-        /// one purple button under it, the same button as Create on the create screen. Built here so the spectator's match result and (later)
-        /// Dominion's own result screen look the same. The card sizes itself to its contents; the caller places it.</summary>
+        /// one purple button under it, the same button as Create on the create screen. Built here so the spectator's match result and Dominion's
+        /// own result screen (Task 9) look the same. The card sizes itself to its contents; the caller places it. Dominion adds a small heading
+        /// above the title and its own contents (the table of points per round) between the title and the button; the spectator card passes
+        /// none of those and is unchanged.</summary>
         /// <param name="card">The card's rect (anchor and position are the caller's to set).</param>
-        public LobbyButton ResultCard(Transform parent, string title, Color titleColour, string buttonLabel, out RectTransform card)
+        /// <param name="heading">A small line above the title, or null for none.</param>
+        /// <param name="body">Builds the card's contents between the title and the button (given the card to put them in), or null for none.</param>
+        /// <param name="titleSize">The title's size; 0 or less = the spectator card's size.</param>
+        /// <param name="cardWidth">A fixed card width; 0 or less = as wide as the contents.</param>
+        public LobbyButton ResultCard(Transform parent, string title, Color titleColour, string buttonLabel, out RectTransform card,
+            string heading = null, float headingSize = 0f, Color headingColour = default, System.Action<Transform> body = null,
+            float titleSize = 0f, float cardWidth = 0f)
         {
             LobbyBox box = Box(parent, "Card", Theme.spectatorResultCardColor, Theme.lobbyCornerRadius, Theme.lobbyBorderColor, 0f);
             card = box.Outer;
@@ -472,8 +480,25 @@ namespace Overpower.UI
             column.childForceExpandWidth = column.childForceExpandHeight = false;
             ContentSizeFitter fit = box.Outer.gameObject.AddComponent<ContentSizeFitter>();
             fit.horizontalFit = fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            if (cardWidth > 0f) Size(box.Outer.gameObject, cardWidth);
 
-            Text(box.Outer, "Title", title, Display, Theme.spectatorResultTitleSize, titleColour, TextAlignmentOptions.Midline);
+            if (!string.IsNullOrEmpty(heading))
+            {
+                TextMeshProUGUI small = Text(box.Outer, "Heading", heading, Bold, headingSize, headingColour, TextAlignmentOptions.Midline, headingSize * 0.23f);
+                Size(small.gameObject, -1f, headingSize * 1.5f);
+            }
+
+            float size = titleSize > 0f ? titleSize : Theme.spectatorResultTitleSize;
+            TextMeshProUGUI titleLabel = Text(box.Outer, "Title", title, Display, size, titleColour, TextAlignmentOptions.Midline);
+            if (cardWidth > 0f)
+            {
+                // A fixed-width card (Dominion): a long title ("WHITE WINS IN SUDDEN DEATH") shrinks to fit instead of being cut off with dots.
+                titleLabel.enableAutoSizing = true;
+                titleLabel.fontSizeMax = size;
+                titleLabel.fontSizeMin = size * 0.4f;
+                Size(titleLabel.gameObject, -1f, size * 1.5f);
+            }
+            body?.Invoke(box.Outer);
 
             LobbyButton button = MakeButton(box.Outer, "Back Button", buttonLabel, Display, Theme.createCreateTextSize, Theme.lobbyOffWhiteColor,
                 Theme.lobbyPurpleColor, Theme.lobbyCornerRadius, Theme.lobbyPurpleColor, 0f, Theme.lobbyButtonSpacing);

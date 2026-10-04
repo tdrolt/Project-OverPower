@@ -34,6 +34,11 @@ namespace Overpower.Dominion
         /// countdown), and written again with a new value when everyone fell at once and sudden death starts over. Absent before sudden death.</summary>
         public const string SuddenDeathStart = "dSd";
 
+        /// <summary>int[]: each finished round's final points, rounds x TeamSlots flattened (round 1's three teams, then round 2's, ...). The master appends one
+        /// round in the same write that scores it (Task 9), because dPts is cleared at the next round's start and the result table needs every round.
+        /// Absent until round 1 is over.</summary>
+        public const string History = "dHist";
+
         /// <summary>How many team ids the per-team arrays hold (team ids are always 0..2).</summary>
         public const int TeamSlots = 3;
     }

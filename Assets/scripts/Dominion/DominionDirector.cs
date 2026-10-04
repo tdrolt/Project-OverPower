@@ -22,7 +22,7 @@ namespace Overpower.Dominion
     /// spawn keeping their picks (A9: players may move in the break; the zones reset at the break's start and again at the round's start, so
     /// nothing done in the break counts).
     ///
-    /// Nothing is drawn here (the round card and break UI are Task 9); points, the centre and bounties are Task 3.
+    /// Nothing is drawn here (the round HUD, break card and result are DominionHud, Task 9); points, the centre and bounties are Task 3.
     /// </summary>
     public sealed partial class DominionDirector : MonoBehaviourPunCallbacks
     {
@@ -94,6 +94,7 @@ namespace Overpower.Dominion
             if (Instance == null) Instance = this;
             else { Destroy(this); return; } // BuildingManager.Awake adds exactly one.
             if (GetComponent<SuddenDeathZone>() == null) gameObject.AddComponent<SuddenDeathZone>(); // the circle: no scene footprint, like this component
+            if (GetComponent<Overpower.UI.DominionHud>() == null) gameObject.AddComponent<Overpower.UI.DominionHud>(); // the round HUD, break card and result (Task 9): drawn on every client, spectators included
         }
 
         private void OnDestroy()

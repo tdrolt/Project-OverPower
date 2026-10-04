@@ -960,6 +960,211 @@ namespace Overpower.UI
         [Tooltip("How thick the circle's edge line is on the minimap, in canvas units.")]
         public float suddenDeathMinimapRingWidth = 2.5f;
 
+        // ------------------------------------------------------------------------------------------------
+        // Dominion HUD (Task 9). Sizes are in reference pixels (the boards' pixels x 1.5 at 1920 x 1080), like the lobby screens.
+        // ------------------------------------------------------------------------------------------------
+        [Header("Dominion HUD: team colours")]
+        [Tooltip("Each team's colour in the Dominion HUD (the underline of its score, its round-win dots, its name on the break card), in team order: white, purple, cyan.")]
+        public Color[] dominionTeamColors = { new Color(0.957f, 0.949f, 0.929f, 1f), new Color(0.42f, 0.247f, 0.749f, 1f), new Color(0.169f, 0.722f, 0.769f, 1f) };
+        [Tooltip("Each team's lighter colour for writing its name or number on a dark card (a plain purple is too dark to read there), in team order: white, purple, cyan.")]
+        public Color[] dominionTeamTextColors = { new Color(0.957f, 0.949f, 0.929f, 1f), new Color(0.612f, 0.482f, 0.878f, 1f), new Color(0.31f, 0.827f, 0.871f, 1f) };
+        [Tooltip("The gold of the Dominion HUD's accents: the points of the centre payout, the break countdown.")]
+        public Color dominionGoldColor = new Color(0.91f, 0.725f, 0.192f, 1f);
+        [Tooltip("The dim grey of an empty round-win dot and of the small labels on the Dominion cards.")]
+        public Color dominionDimColor = new Color(0.557f, 0.545f, 0.522f, 1f);
+        [Tooltip("The soft light grey of the small headings on the Dominion HUD and cards (ROUND 2 OF 3, ROUND 1).")]
+        public Color dominionMutedColor = new Color(0.725f, 0.714f, 0.682f, 1f);
+
+        [Header("Dominion HUD: round bar (top of the screen during a round)")]
+        [Tooltip("How far the round bar sits below the top edge of the screen.")]
+        public float dominionBarTop = 30f;
+        [Tooltip("The dark box behind the round bar.")]
+        public Color dominionBarFill = new Color(0.059f, 0.063f, 0.078f, 0.75f);
+        [Tooltip("The rounded corners of the round bar.")]
+        public float dominionBarRadius = 12f;
+        [Tooltip("Height of the round bar.")]
+        public float dominionBarHeight = 126f;
+        [Tooltip("The slightly darker box behind the round clock in the middle of the bar.")]
+        public Color dominionBarClockFill = new Color(0f, 0f, 0f, 0.25f);
+        [Tooltip("Width of each team's score block in a 2v2 match (the clock sits between the two).")]
+        public float dominionBarSideWidth = 270f;
+        [Tooltip("Width of the clock block in a 2v2 match.")]
+        public float dominionBarClockWidth = 255f;
+        [Tooltip("Width of each team's score block in a 3v3v3 match (three blocks, then the clock).")]
+        public float dominionBar3SideWidth = 195f;
+        [Tooltip("Width of the clock block in a 3v3v3 match.")]
+        public float dominionBar3ClockWidth = 225f;
+        [Tooltip("Thickness of the line under each team's score, in the team's colour.")]
+        public float dominionBarEdgeThickness = 6f;
+        [Tooltip("In a 2v2 match, how far a score sits from the clock side of its block.")]
+        public float dominionBarScoreInset = 27f;
+        [Tooltip("Size of a team's points in a 2v2 match.")]
+        public float dominionScoreSize = 51f;
+        [Tooltip("Size of a team's points in a 3v3v3 match (smaller, there are three).")]
+        public float dominionScore3Size = 45f;
+        [Tooltip("Size of the round clock in a 2v2 match.")]
+        public float dominionClockSize = 54f;
+        [Tooltip("Size of the round clock in a 3v3v3 match.")]
+        public float dominionClock3Size = 48f;
+        [Tooltip("Size of the small heading over the clock (ROUND 2 OF 3).")]
+        public float dominionRoundLabelSize = 18f;
+        [Tooltip("Extra space between the letters of the small headings, in reference pixels.")]
+        public float dominionLabelSpacing = 3f;
+        [Tooltip("Width and height of one round-win dot.")]
+        public float dominionDotSize = 18f;
+        [Tooltip("Space between two round-win dots.")]
+        public float dominionDotGap = 9f;
+        [Tooltip("Thickness of the ring of an empty round-win dot.")]
+        public float dominionDotRing = 3f;
+        [Tooltip("What the small heading over the round clock says. {0} = the round, {1} = how many rounds there are.")]
+        public string dominionRoundLabelFormat = "ROUND {0} OF {1}";
+        [Tooltip("What the round bar's clock slot says once the rounds are over and sudden death is on (there is no clock then).")]
+        public string dominionBarSuddenText = "SUDDEN DEATH";
+        [Tooltip("Size of the words in the clock slot during sudden death.")]
+        public float dominionBarSuddenSize = 30f;
+        [Tooltip("What flashes by the scores when the centre pays out. {0} = the points, {1} = the team's name in capitals.")]
+        public string dominionFlashFormat = "+{0} {1}";
+        [Tooltip("Size of the centre payout flash.")]
+        public float dominionFlashSize = 36f;
+        [Tooltip("How long the centre payout flash stays up, in seconds.")]
+        public float dominionFlashSeconds = 2.5f;
+
+        [Header("Dominion HUD: break card (between rounds)")]
+        [Tooltip("How far the break card sits below the top edge of the screen. It sits high so the arena stays in view; the shop (P) opens on top of it.")]
+        public float dominionBreakTop = 195f;
+        [Tooltip("The dark box of the break card and the sudden-death banner.")]
+        public Color dominionCardFill = new Color(0.059f, 0.063f, 0.078f, 0.85f);
+        [Tooltip("The rounded corners of the break card.")]
+        public float dominionCardRadius = 15f;
+        [Tooltip("Empty space inside the break card, left and right, then top and bottom.")]
+        public Vector2 dominionCardPadding = new Vector2(42f, 36f);
+        [Tooltip("Space between the lines of the break card.")]
+        public float dominionCardGap = 18f;
+        [Tooltip("Width of the break card.")]
+        public float dominionBreakWidth = 860f;
+        [Tooltip("Size of the small heading at the top of the break card (ROUND 1).")]
+        public float dominionBreakHeaderSize = 19.5f;
+        [Tooltip("Size of the big line of the break card (PURPLE WINS).")]
+        public float dominionBreakHeadlineSize = 66f;
+        [Tooltip("Size of the two teams' points on the break card.")]
+        public float dominionBreakPointsSize = 45f;
+        [Tooltip("Size of the small words on the break card (points, Round wins).")]
+        public float dominionBreakSmallSize = 22f;
+        [Tooltip("Size of the line saying what the next round opens.")]
+        public float dominionBreakOpensSize = 24f;
+        [Tooltip("Size of the PICK YOUR BUILD button's words.")]
+        public float dominionBreakButtonSize = 30f;
+        [Tooltip("Height of the PICK YOUR BUILD button.")]
+        public float dominionBreakButtonHeight = 72f;
+        [Tooltip("Space left and right of the words inside the PICK YOUR BUILD button.")]
+        public float dominionBreakButtonPadding = 42f;
+        [Tooltip("Size of the countdown line at the bottom of the break card (ROUND 2 STARTS IN 14).")]
+        public float dominionBreakCountdownSize = 33f;
+        [Tooltip("Size of the countdown line in the card for the last seconds of the break, when it grows (the number of seconds is Break Countdown Seconds in the Dominion Config).")]
+        public float dominionBreakBigSize = 84f;
+        [Tooltip("The small heading of the break card. {0} = the round that just ended (or the round about to start, before round 1).")]
+        public string dominionBreakHeaderFormat = "ROUND {0}";
+        [Tooltip("The big line of the break card when one team won the round. {0} = the team's name in capitals.")]
+        public string dominionBreakWinsFormat = "{0} WINS";
+        [Tooltip("The big line of the break card when the round was tied (nobody gets a round win).")]
+        public string dominionBreakTiedText = "TIED";
+        [Tooltip("The big line of the break before round 1, when there is no result yet.")]
+        public string dominionBreakFirstText = "GET READY";
+        [Tooltip("The word between the two teams' points on the break card.")]
+        public string dominionBreakPointsLabel = "points";
+        [Tooltip("The label in front of the round-win dots on the break card.")]
+        public string dominionBreakWinsLabel = "Round wins";
+        [Tooltip("The button that points to the shop on the break card. The shop opens on P; clicking this opens it too.")]
+        public string dominionBreakPickText = "PICK YOUR BUILD (P)";
+        [Tooltip("The small countdown line at the bottom of the break card. {0} = the round that starts next, {1} = seconds left.")]
+        public string dominionBreakStartsFormat = "ROUND {0} STARTS IN {1}";
+        [Tooltip("The big countdown for the last seconds of the break. {0} = the round that starts next, {1} = seconds left.")]
+        public string dominionBreakBigFormat = "Round {0} starts in {1}…";
+        [Tooltip("The line saying what the next round opens in the shop. {0} = the round, {1} = what it opens (the next lines).")]
+        public string dominionOpensFormat = "Round {0} opens: {1}";
+        [Tooltip("What the break before round 1 says instead: round 1 opens no weapon or armour tier, only the free abilities.")]
+        public string dominionOpensFirstText = "Round 1: pick a <b>movement ability</b>, an <b>attachment</b> and an <b>ultimate</b>";
+        [Tooltip("What a round opens when it makes the shop's weapon tree one step deeper (a weapon family).")]
+        public string dominionOpensWeaponFamily = "a weapon family";
+        [Tooltip("What a round opens when it makes the weapon tree two or more steps deep (an upgrade of the family).")]
+        public string dominionOpensWeaponUpgrade = "a weapon upgrade";
+        [Tooltip("What a round opens when it allows exactly one more armour upgrade.")]
+        public string dominionOpensArmorOne = "one armor upgrade";
+        [Tooltip("What a round opens when it allows several more armour upgrades. {0} = how many.")]
+        public string dominionOpensArmorMore = "{0} armor upgrades";
+        [Tooltip("The word that joins two things a round opens.")]
+        public string dominionOpensAnd = " and ";
+        [Tooltip("What a round says when it opens nothing new in the shop.")]
+        public string dominionOpensNothing = "nothing new";
+
+        [Header("Dominion HUD: under the minimap")]
+        [Tooltip("Gap between the minimap's lower edge and the Dominion lines under it (the centre countdown, the circle countdown).")]
+        public float dominionUnderMinimapGap = 12f;
+        [Tooltip("Size of the centre countdown line (CENTRE +200 IN 12).")]
+        public float dominionCentreSize = 30f;
+        [Tooltip("Size of the line saying who holds the centre.")]
+        public float dominionCentreHolderSize = 21f;
+        [Tooltip("The centre countdown under the minimap in a 3v3v3 match. {0} = the points the centre pays, {1} = seconds to the payout. The tags colour the points gold.")]
+        public string dominionCentreFormat = "CENTRE <color=#E8B931>+{0}</color> IN {1}";
+        [Tooltip("Who holds the centre. {0} = the team's name.")]
+        public string dominionCentreHoldsFormat = "{0} holds it";
+        [Tooltip("What the line says when nobody holds the centre.")]
+        public string dominionCentreNobodyText = "Nobody holds it";
+        [Tooltip("The line under the minimap while the sudden-death circle is still shrinking. {0} = the time left (m:ss).")]
+        public string dominionShrinkFormat = "CIRCLE SHRINKS · {0}";
+        [Tooltip("Size of the circle countdown line.")]
+        public float dominionShrinkSize = 27f;
+
+        [Header("Dominion HUD: sudden-death banner")]
+        [Tooltip("How far the banner sits below the top edge of the screen (under the round bar).")]
+        public float dominionBannerTop = 175f;
+        [Tooltip("How many seconds the full banner stays up after sudden death starts; then it shrinks to the small line under the round bar for the rest of the match. A restarted sudden death shows the full banner again.")]
+        public float dominionBannerSeconds = 8f;
+        [Tooltip("Width of the full sudden-death banner.")]
+        public float dominionBannerWidth = 900f;
+        [Tooltip("The big words of the sudden-death banner.")]
+        public string dominionBannerTitle = "SUDDEN DEATH";
+        [Tooltip("The rules line under the banner's big words.")]
+        public string dominionBannerRules = "No respawns · stay inside the circle · last team standing wins";
+        [Tooltip("Size of the banner's big words.")]
+        public float dominionBannerTitleSize = 51f;
+        [Tooltip("Size of the banner's rules line.")]
+        public float dominionBannerRulesSize = 21f;
+        [Tooltip("Size of the small SUDDEN DEATH line that stays under the round bar after the banner.")]
+        public float dominionBannerSmallSize = 27f;
+
+        [Header("Dominion HUD: result")]
+        [Tooltip("The small heading of the result card. {0} = the match size (2v2 or 3v3v3).")]
+        public string dominionResultModeFormat = "DOMINION {0}";
+        [Tooltip("The big line of the result card. {0} = the winner's name in capitals, {1} = the round wins (2–1, or 2–1–0 with three teams).")]
+        public string dominionResultHeadlineFormat = "{0} WINS {1}";
+        [Tooltip("The big line when the match was settled by sudden death. {0} = the winner's name in capitals.")]
+        public string dominionResultSuddenFormat = "{0} WINS IN SUDDEN DEATH";
+        [Tooltip("What goes between the round wins in the big line.")]
+        public string dominionResultScoreSeparator = "–";
+        [Tooltip("The heading of a column of the result table. {0} = the round.")]
+        public string dominionResultRoundFormat = "Round {0}";
+        [Tooltip("The small note under the result table.")]
+        public string dominionResultNote = "The winner of each round in bold. Tab still shows kills and damage.";
+        [Tooltip("Width of the result card.")]
+        public float dominionResultWidth = 960f;
+        [Tooltip("Size of the big line of the result card.")]
+        public float dominionResultHeadlineSize = 84f;
+        [Tooltip("Size of the small heading of the result card.")]
+        public float dominionResultModeSize = 19.5f;
+        [Tooltip("Size of the writing in the result table.")]
+        public float dominionResultTableSize = 24f;
+        [Tooltip("Height of one row of the result table.")]
+        public float dominionResultRowHeight = 42f;
+        [Tooltip("Width of the team-name column of the result table.")]
+        public float dominionResultNameWidth = 180f;
+        [Tooltip("Width of one round's column of the result table.")]
+        public float dominionResultCellWidth = 150f;
+        [Tooltip("Size of the small note under the result table.")]
+        public float dominionResultNoteSize = 21f;
+        [Tooltip("Which sorting order the result card draws at: above the match panels, under the saved-log box.")]
+        public int dominionResultSortingOrder = 5;
+
         [Header("Mark (2026-09-18)")]
         [Tooltip("Canvas units, the mark diamond's width and height (both the shooter's own diamond over an " +
                  "enemy, and the marked player's own diamond over their own head - Tudor's answer 1). Its colour " +

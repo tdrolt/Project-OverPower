@@ -346,6 +346,110 @@ MonoBehaviour:
   suddenDeathMinimapOutsideAlpha: 0.45
   suddenDeathRingWidthMetres: 0.6
   suddenDeathMinimapRingWidth: 2.5
+  dominionTeamColors:
+  - {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  - {r: 0.42, g: 0.247, b: 0.749, a: 1}
+  - {r: 0.169, g: 0.722, b: 0.769, a: 1}
+  dominionTeamTextColors:
+  - {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  - {r: 0.612, g: 0.482, b: 0.878, a: 1}
+  - {r: 0.31, g: 0.827, b: 0.871, a: 1}
+  dominionGoldColor: {r: 0.91, g: 0.725, b: 0.192, a: 1}
+  dominionDimColor: {r: 0.557, g: 0.545, b: 0.522, a: 1}
+  dominionMutedColor: {r: 0.725, g: 0.714, b: 0.682, a: 1}
+  dominionBarTop: 30
+  dominionBarFill: {r: 0.059, g: 0.063, b: 0.078, a: 0.75}
+  dominionBarRadius: 12
+  dominionBarHeight: 126
+  dominionBarClockFill: {r: 0, g: 0, b: 0, a: 0.25}
+  dominionBarSideWidth: 270
+  dominionBarClockWidth: 255
+  dominionBar3SideWidth: 195
+  dominionBar3ClockWidth: 225
+  dominionBarEdgeThickness: 6
+  dominionBarScoreInset: 27
+  dominionScoreSize: 51
+  dominionScore3Size: 45
+  dominionClockSize: 54
+  dominionClock3Size: 48
+  dominionRoundLabelSize: 18
+  dominionLabelSpacing: 3
+  dominionDotSize: 18
+  dominionDotGap: 9
+  dominionDotRing: 3
+  dominionRoundLabelFormat: ROUND {0} OF {1}
+  dominionBarSuddenText: SUDDEN DEATH
+  dominionBarSuddenSize: 30
+  dominionFlashFormat: +{0} {1}
+  dominionFlashSize: 36
+  dominionFlashSeconds: 2.5
+  dominionBreakTop: 195
+  dominionCardFill: {r: 0.059, g: 0.063, b: 0.078, a: 0.85}
+  dominionCardRadius: 15
+  dominionCardPadding: {x: 42, y: 36}
+  dominionCardGap: 18
+  dominionBreakWidth: 860
+  dominionBreakHeaderSize: 19.5
+  dominionBreakHeadlineSize: 66
+  dominionBreakPointsSize: 45
+  dominionBreakSmallSize: 22
+  dominionBreakOpensSize: 24
+  dominionBreakButtonSize: 30
+  dominionBreakButtonHeight: 72
+  dominionBreakButtonPadding: 42
+  dominionBreakCountdownSize: 33
+  dominionBreakBigSize: 84
+  dominionBreakHeaderFormat: ROUND {0}
+  dominionBreakWinsFormat: '{0} WINS'
+  dominionBreakTiedText: TIED
+  dominionBreakFirstText: GET READY
+  dominionBreakPointsLabel: points
+  dominionBreakWinsLabel: Round wins
+  dominionBreakPickText: PICK YOUR BUILD (P)
+  dominionBreakStartsFormat: ROUND {0} STARTS IN {1}
+  dominionBreakBigFormat: "Round {0} starts in {1}\u2026"
+  dominionOpensFormat: 'Round {0} opens: {1}'
+  dominionOpensFirstText: 'Round 1: pick a <b>movement ability</b>, an <b>attachment</b>
+    and an <b>ultimate</b>'
+  dominionOpensWeaponFamily: a weapon family
+  dominionOpensWeaponUpgrade: a weapon upgrade
+  dominionOpensArmorOne: one armor upgrade
+  dominionOpensArmorMore: '{0} armor upgrades'
+  dominionOpensAnd: ' and '
+  dominionOpensNothing: nothing new
+  dominionUnderMinimapGap: 12
+  dominionCentreSize: 30
+  dominionCentreHolderSize: 21
+  dominionCentreFormat: CENTRE <color=#E8B931>+{0}</color> IN {1}
+  dominionCentreHoldsFormat: '{0} holds it'
+  dominionCentreNobodyText: Nobody holds it
+  dominionShrinkFormat: "CIRCLE SHRINKS \xB7 {0}"
+  dominionShrinkSize: 27
+  dominionBannerTop: 175
+  dominionBannerSeconds: 8
+  dominionBannerWidth: 900
+  dominionBannerTitle: SUDDEN DEATH
+  dominionBannerRules: "No respawns \xB7 stay inside the circle \xB7 last team standing
+    wins"
+  dominionBannerTitleSize: 51
+  dominionBannerRulesSize: 21
+  dominionBannerSmallSize: 27
+  dominionResultModeFormat: DOMINION {0}
+  dominionResultHeadlineFormat: '{0} WINS {1}'
+  dominionResultSuddenFormat: '{0} WINS IN SUDDEN DEATH'
+  dominionResultScoreSeparator: "\u2013"
+  dominionResultRoundFormat: Round {0}
+  dominionResultNote: The winner of each round in bold. Tab still shows kills and
+    damage.
+  dominionResultWidth: 960
+  dominionResultHeadlineSize: 84
+  dominionResultModeSize: 19.5
+  dominionResultTableSize: 24
+  dominionResultRowHeight: 42
+  dominionResultNameWidth: 180
+  dominionResultCellWidth: 150
+  dominionResultNoteSize: 21
+  dominionResultSortingOrder: 5
   markIndicatorSize: 22
   markIndicatorAnchorHeight: 3.6
   markIndicatorPulseSpeed: 2.5
