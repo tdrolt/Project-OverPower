@@ -155,6 +155,8 @@ namespace Overpower.UI
         private RectTransform root;
         private RectTransform canvasRect;
         private RectTransform viewport;
+        /// <summary>The picture's size in canvas units: a square for the triangle arena, the map's own shape in a rectangular frame (MinimapLayout.FrameSize).</summary>
+        private Vector2 frameSize;
         private RectTransform edgeShape;
         private RectTransform map;
         private RectTransform linksLayer;
@@ -222,6 +224,8 @@ namespace Overpower.UI
             if (config.ArenaImage == null)
                 Debug.LogError("[Minimap] MinimapConfig has no arena image - press OverPower > Arena > Bake minimap image. " +
                                "The minimap draws zones on a plain background meanwhile.");
+
+            frameSize = MinimapLayout.FrameSize(config.RectangularFrame, config.WorldSizeMetres, config.WorldDepthMetres, theme.minimapCornerSize);
 
             inputRouter = GetComponent<PlayerInputRouter>();
             loadoutScreen = GetComponent<LoadoutScreen>();
@@ -329,8 +333,8 @@ namespace Overpower.UI
             if (!show)
                 return;
 
-            Vector2 centre = MinimapLayout.WorldToMap(new Vector3(zone.Centre.x, 0f, zone.Centre.y), config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
-            float radius = zone.CurrentRadius * theme.minimapCornerSize / config.WorldSizeMetres;
+            Vector2 centre = MinimapLayout.WorldToMap(new Vector3(zone.Centre.x, 0f, zone.Centre.y), config.WorldCentre, config.WorldSizeMetres, frameSize.x);
+            float radius = zone.CurrentRadius * frameSize.x / config.WorldSizeMetres;
             Color edge = theme.suddenDeathColor;
             Color outside = edge;
             outside.a = theme.suddenDeathMinimapOutsideAlpha;
@@ -414,7 +418,7 @@ namespace Overpower.UI
             // with the capital it targets at every yaw - see the field's own comment. map keeps turning by exactly
             // the camera yaw (nothing else moves): its constant offset here just cancels viewport's own constant
             // part, set once rather than every frame because it never changes after this.
-            triangleBaseRotationDegrees = ComputeTriangleBaseRotationDegrees(zoneIds);
+            triangleBaseRotationDegrees = config.RectangularFrame ? 0f : ComputeTriangleBaseRotationDegrees(zoneIds); // a rectangle has no vertex to point at a capital
             map.localEulerAngles = new Vector3(0f, 0f, -triangleBaseRotationDegrees);
 
             foreach (int zone in zoneIds)
@@ -528,13 +532,15 @@ namespace Overpower.UI
             // itself carries the yaw+base rotation (ApplyYawIfChanged) so the triangle turns with the map; map's
             // own rotation only ever cancels viewport's constant part (set once in TryBuild), so the picture/
             // bubbles/links/markers underneath still turn by exactly the camera yaw.
-            Image viewportImage = NewImage("Viewport", root, GeneratedSprites.BuildTriangleMask(frameBandFraction), Color.white, theme.minimapCornerSize);
+            Image viewportImage = config.RectangularFrame
+                ? NewRectangleImage("Viewport", root, Color.white, frameSize)
+                : NewImage("Viewport", root, GeneratedSprites.BuildTriangleMask(frameBandFraction), Color.white, theme.minimapCornerSize);
             viewport = viewportImage.rectTransform;
             // Triangular mask: the turned square picture never shows a corner, and the shape frames the arena.
             viewportImage.gameObject.AddComponent<Mask>().showMaskGraphic = false;
 
             map = NewRect("Map", viewport);
-            map.sizeDelta = Vector2.one * theme.minimapCornerSize;
+            map.sizeDelta = frameSize;
 
             var pictureGo = new GameObject("Arena Picture", typeof(RectTransform));
             pictureGo.transform.SetParent(map, false);
@@ -591,14 +597,16 @@ namespace Overpower.UI
             // ordinarily anti-aliased triangular ring covering the mask's remaining stencil seam (review fix,
             // 2026-09-17). Rotated the same as viewport (ApplyYawIfChanged), independently of it (a sibling, not a
             // child, so it isn't itself masked), to stay aligned with the triangle underneath.
-            edgeShape = NewImage("Edge Triangle", root, GeneratedSprites.BuildTriangleEdge(frameBandFraction), theme.minimapFrameColor, theme.minimapCornerSize).rectTransform;
+            edgeShape = config.RectangularFrame
+                ? BuildRectangleEdge(root, frameSize, theme.minimapFrameWidth, theme.minimapFrameColor)
+                : NewImage("Edge Triangle", root, GeneratedSprites.BuildTriangleEdge(frameBandFraction), theme.minimapFrameColor, theme.minimapCornerSize).rectTransform;
         }
 
         private void BuildZone(int zone)
         {
             manager.TryGetZoneCentre(zone, out Vector3 centre);
             var ui = new ZoneUi { Zone = zone };
-            ui.MapPosition = MinimapLayout.WorldToMap(centre, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+            ui.MapPosition = MinimapLayout.WorldToMap(centre, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
 
             ui.Upright = NewRect($"Zone {zone}", zonesLayer);
             ui.Upright.anchoredPosition = ui.MapPosition;
@@ -809,7 +817,7 @@ namespace Overpower.UI
                 {
                     name = "Minimap Phase Two Cut", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp,
                 };
-            float metresPerCanvasUnit = config.WorldSizeMetres / Mathf.Max(1f, theme.minimapCornerSize);
+            float metresPerCanvasUnit = config.WorldSizeMetres / Mathf.Max(1f, frameSize.x);
             cutTexture.SetPixels32(MinimapCutMask.Paint(CutOverlayPixels, config.WorldCentre, config.WorldSizeMetres, cut,
                 theme.minimapCutWallWidth * 0.5f * metresPerCanvasUnit, theme.minimapCutAreaColor, theme.minimapCutWallColor));
             cutTexture.Apply();
@@ -959,7 +967,7 @@ namespace Overpower.UI
             float outline = theme.minimapBubbleOutlineWidth * 0.5f;
             RectTransform badge = NewRect($"Health Pack {zone.Zone}", packsLayer);
             badge.sizeDelta = Vector2.one * size;
-            badge.anchoredPosition = MinimapLayout.WorldToMap(packWorld, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+            badge.anchoredPosition = MinimapLayout.WorldToMap(packWorld, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
             badge.localRotation = zone.Upright.localRotation;
             Color dark = theme.minimapBubbleOutlineColor;
             NewImage("Outline Horizontal", badge, null, dark, 0f).rectTransform.sizeDelta = new Vector2(size + 2f * outline, bar + 2f * outline);
@@ -1001,7 +1009,7 @@ namespace Overpower.UI
                 ownMarker.gameObject.SetActive(alive);
             if (alive)
             {
-                ownMarker.anchoredPosition = MinimapLayout.WorldToMap(transform.position, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                ownMarker.anchoredPosition = MinimapLayout.WorldToMap(transform.position, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
                 ownMarker.localEulerAngles = new Vector3(0f, 0f, MinimapLayout.FacingRotationDegrees(transform.eulerAngles.y));
             }
 
@@ -1031,7 +1039,7 @@ namespace Overpower.UI
                     if (view == null)
                         continue;
 
-                    Vector2 mapPosition = MinimapLayout.WorldToMap(view.transform.position, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                    Vector2 mapPosition = MinimapLayout.WorldToMap(view.transform.position, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
                     if (friendly)
                         DotAt(teammateDots, used++, "Teammate", theme.minimapTeammateDotColor).anchoredPosition = mapPosition;
                     else if (MinimapEnemyRule.ShowDot(false, playerAlive, sight.CanSeePlayer(view), fogOn))
@@ -1066,8 +1074,8 @@ namespace Overpower.UI
                 scanRing.gameObject.SetActive(ring);
             if (ring)
             {
-                Vector2 centre = MinimapLayout.WorldToMap(scan.CentrePosition, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
-                float radius = CentreScanDisplayRules.MinimapRadius(scan.Frame.Radius, config.WorldSizeMetres, theme.minimapCornerSize);
+                Vector2 centre = MinimapLayout.WorldToMap(scan.CentrePosition, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
+                float radius = CentreScanDisplayRules.MinimapRadius(scan.Frame.Radius, config.WorldSizeMetres, frameSize.x);
                 while (scanRingSegments.Count < ScanRingSegments)
                     scanRingSegments.Add(NewImage("Segment", scanRing, null, vision.ScanWaveColour, 0f));
                 for (int i = 0; i < ScanRingSegments; i++)
@@ -1094,7 +1102,7 @@ namespace Overpower.UI
                 RectTransform dot = scanDotMarkers[i];
                 if (!dot.gameObject.activeSelf)
                     dot.gameObject.SetActive(true);
-                dot.anchoredPosition = MinimapLayout.WorldToMap(dots[i].Position, config.WorldCentre, config.WorldSizeMetres, theme.minimapCornerSize);
+                dot.anchoredPosition = MinimapLayout.WorldToMap(dots[i].Position, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
                 Image fill = dotFills[dot];
                 if (fill.color != vision.MinimapEnemyColour)
                     fill.color = vision.MinimapEnemyColour;
@@ -1179,6 +1187,32 @@ namespace Overpower.UI
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>A solid rectangle of the given size (the rectangular frame's mask: a Mask reads its alpha, so it is plain white).</summary>
+        private static Image NewRectangleImage(string name, Transform parent, Color colour, Vector2 size)
+        {
+            RectTransform rect = NewRect(name, parent);
+            rect.sizeDelta = size;
+            Image image = rect.gameObject.AddComponent<Image>();
+            image.color = colour;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        /// <summary>The rectangular frame's edge: four bars of the frame width lying just inside the rectangle's sides, drawn on top of the mask.</summary>
+        private static RectTransform BuildRectangleEdge(Transform parent, Vector2 size, float width, Color colour)
+        {
+            RectTransform edge = NewRect("Edge Rectangle", parent);
+            edge.sizeDelta = size;
+            for (int i = 0; i < 4; i++)
+            {
+                bool horizontal = i < 2;
+                RectTransform bar = NewRectangleImage("Bar " + i, edge, colour, horizontal ? new Vector2(size.x, width) : new Vector2(width, size.y)).rectTransform;
+                bar.anchorMin = bar.anchorMax = bar.pivot = horizontal ? new Vector2(0.5f, i == 0 ? 1f : 0f) : new Vector2(i == 2 ? 0f : 1f, 0.5f);
+                bar.anchoredPosition = Vector2.zero;
+            }
+            return edge;
         }
 
         private static Image NewImage(string name, Transform parent, Sprite sprite, Color colour, float size)

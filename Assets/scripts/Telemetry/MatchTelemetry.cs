@@ -217,7 +217,9 @@ namespace Overpower.Telemetry
             ReadMatchIdentity(PhotonNetwork.CurrentRoom.CustomProperties);
             TryClaimMatchIdentity();
             TryOpenFile();
-            LogJoinOrLeave(TelemetryKeys.Join, PhotonNetwork.LocalPlayer);
+            // A scene that loads inside the room asks again for the same player: that join was already written in this process.
+            if (TelemetryWrittenMemory.Process.FirstTime("join", PhotonNetwork.CurrentRoom.Name, PhotonNetwork.LocalPlayer.ActorNumber))
+                LogJoinOrLeave(TelemetryKeys.Join, PhotonNetwork.LocalPlayer);
         }
 
         public override void OnLeftRoom()
@@ -230,6 +232,7 @@ namespace Overpower.Telemetry
             matchStartMs = 0;
             pending.Clear();
             spectatorsNoted.Clear();
+            TelemetryWrittenMemory.Process.ForgetAll(); // leaving the room: the next one (or this one again) is a new beginning
             if (claimIdentityRoutine != null)
             {
                 StopCoroutine(claimIdentityRoutine);
@@ -556,7 +559,8 @@ namespace Overpower.Telemetry
 
             CurrentFolder = folder;
 
-            WriteSessionLine();
+            if (TelemetryWrittenMemory.Process.FirstTime("session", PhotonNetwork.CurrentRoom.Name, actor))
+                WriteSessionLine();
             if (pending.Dropped > 0)
                 WriteDroppedNote(pending.Dropped);
             foreach (string waiting in pending.Lines)

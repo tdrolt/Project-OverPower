@@ -39,8 +39,14 @@ namespace Overpower.Lobby
         /// not be repeated.</summary>
         private static readonly string[] ResumedAfterSceneLoad =
         {
-            "LobbySeats", "LobbyStart", "MatchDirector", "MatchTelemetry", "DominionDirector", "DominionHud", "HealthPackManager", "RejoinController",
+            nameof(LobbySeats), nameof(LobbyStart), nameof(Overpower.Match.MatchDirector), nameof(Overpower.Telemetry.MatchTelemetry),
+            nameof(Overpower.Dominion.DominionDirector), nameof(Overpower.UI.DominionHud), nameof(Overpower.Match.HealthPackManager),
+            nameof(Overpower.Net.RejoinController),
         };
+
+        /// <summary>Whether Photon's message queue runs while a scene that arrived inside a room is still reading the room. It does not: room updates wait
+        /// until every component has read the room once, so none meets its blank "last seen" values.</summary>
+        public static bool QueueRunsWhileResuming() => false;
 
         public static bool ResumesAfterSceneLoad(string componentTypeName) => componentTypeName != null && System.Array.IndexOf(ResumedAfterSceneLoad, componentTypeName) >= 0;
     }
@@ -74,6 +80,25 @@ namespace Overpower.Lobby
                 if (spawnPresentByTeam == null || team < 0 || team >= spawnPresentByTeam.Count || !spawnPresentByTeam[team]) return team;
             }
             return -1;
+        }
+    }
+
+    /// <summary>Which of a team's spawn points a player stands on, so teammates do not appear on the same spot.</summary>
+    public static class SpawnSlotRules
+    {
+        /// <summary>The slot (0 .. slotCount-1) for a player: their place in the ascending order of the team's actor numbers, wrapped when the team is bigger than
+        /// the list of points. A player not in the list (or an empty list) takes slot 0; no slots gives 0.</summary>
+        public static int SlotFor(IReadOnlyList<int> teamActors, int myActor, int slotCount)
+        {
+            if (slotCount <= 0 || teamActors == null) return 0;
+            int below = 0;
+            bool found = false;
+            foreach (int actor in teamActors)
+            {
+                if (actor == myActor) found = true;
+                else if (actor < myActor) below++;
+            }
+            return found ? below % slotCount : 0;
         }
     }
 }

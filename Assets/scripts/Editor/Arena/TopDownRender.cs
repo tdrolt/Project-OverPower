@@ -10,8 +10,14 @@ namespace Overpower.EditorTools
     /// </summary>
     public static class TopDownRender
     {
-        public static byte[] RenderPng(Vector2 centreXZ, float spanMetres, int pixels)
+        public static byte[] RenderPng(Vector2 centreXZ, float spanMetres, int pixels) => RenderPng(centreXZ, spanMetres, spanMetres, pixels);
+
+        /// <summary>A picture of widthMetres (along X) by depthMetres (along Z), pixelsAcross wide; its height in pixels keeps the same scale on both axes.</summary>
+        public static byte[] RenderPng(Vector2 centreXZ, float widthMetres, float depthMetres, int pixelsAcross)
         {
+            int pixels = pixelsAcross;
+            int pixelsUp = Mathf.Max(1, Mathf.RoundToInt(pixelsAcross * depthMetres / widthMetres));
+            float spanMetres = depthMetres;
             // Captured before the try so `finally` can always restore it - even if ReadPixels/Apply/EncodeToPNG
             // throws while rt is still the active RenderTexture, leaving RenderTexture.active pointing at rt right
             // as it's about to be destroyed below.
@@ -31,13 +37,13 @@ namespace Overpower.EditorTools
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 cam.backgroundColor = Color.black;
 
-                rt = new RenderTexture(pixels, pixels, 24);
+                rt = new RenderTexture(pixels, pixelsUp, 24);
                 cam.targetTexture = rt;
                 cam.Render();
 
                 RenderTexture.active = rt;
-                tex = new Texture2D(pixels, pixels, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, pixels, pixels), 0, 0);
+                tex = new Texture2D(pixels, pixelsUp, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, pixels, pixelsUp), 0, 0);
                 tex.Apply();
                 return ImageConversion.EncodeToPNG(tex);
             }

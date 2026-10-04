@@ -101,7 +101,7 @@ namespace Overpower.Dominion
             if (player == null || !PhotonNetwork.InRoom) return now;
             DominionConfig config = DominionMode.Config();
             int earliest = config != null
-                ? DominionRoomWrites.EarliestFallMs(SuddenDeathStartMs, config.BreakCountdownSeconds, Mathf.RoundToInt(config.SameInstantToleranceSeconds * 1000f)) : 0;
+                ? DominionRoomWrites.EarliestFallMs(SuddenDeathStartMs, config.SuddenDeathCountdownSeconds, Mathf.RoundToInt(config.SameInstantToleranceSeconds * 1000f)) : 0;
             bool dead = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object flag) && flag is bool alive && !alive;
             bool hasStamp = player.CustomProperties.TryGetValue(PlayerLifecycle.LastStandAtKey, out object stamp) && stamp is int;
             return DominionRoomWrites.ArrivalDeathStamp(Stage, dead, hasStamp, hasStamp ? (int)stamp : 0, earliest, now);
@@ -163,7 +163,7 @@ namespace Overpower.Dominion
                     HasCentre = CentreInPlay(out _),
                     CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
                     CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),
-                    SuddenDeathCountdownSeconds = config.BreakCountdownSeconds,
+                    SuddenDeathCountdownSeconds = config.SuddenDeathCountdownSeconds,
                     SameInstantToleranceMs = Mathf.RoundToInt(config.SameInstantToleranceSeconds * 1000f),
                 }, match.TeamsInMatch, counted ? playersPerTeam : null, // null: the last-team check is skipped
                 judgingSuddenDeath ? suddenDeathTally : null);          // null: sudden death is not judged on a guess

@@ -118,6 +118,10 @@ namespace Overpower.Data
         public float BreakSeconds => breakSeconds;
         public float BreakCountdownSeconds => breakCountdownSeconds;
 
+        /// <summary>The wait before sudden death starts and the earliest a fall can count: the same countdown the break ends with. One place for the mapping, so the
+        /// director's flow numbers and the arrival stamp always agree.</summary>
+        public float SuddenDeathCountdownSeconds => breakCountdownSeconds;
+
         /// <summary>Indexed like TerritoryConfig tiers: 0 = Tier 1 (capital), 1 = Tier 2, 2 = Tier 3, 3 = Tier 4 (centre).</summary>
         public int[] PointsPerZonePerSecond => pointsPerZonePerSecond;
 

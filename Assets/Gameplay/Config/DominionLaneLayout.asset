@@ -87,6 +87,8 @@ MonoBehaviour:
   - {x: 0, y: -10}
   zoneTier: 3
   zoneDrawnRadiusMetres: 5.4166665
+  zoneTowerSizeMetres: 2
+  spawnTowerSizeMetres: 3.8
   spawns:
   - team: 1
     towerCentre: {x: -31, y: -0}
@@ -99,6 +101,7 @@ MonoBehaviour:
     healCentre: {x: 31.125, y: -0}
     healSize: {x: 15.75, y: 21}
   spawnToSpawnMetres: 56
+  spawnSideOffsetMetres: 2
   outline:
   - {x: -11.583333, y: 15.583333}
   - {x: 11.583333, y: 15.583333}

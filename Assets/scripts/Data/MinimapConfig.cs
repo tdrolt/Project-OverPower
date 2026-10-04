@@ -26,6 +26,14 @@ namespace Overpower.Data
         [Tooltip("How many metres the picture's side covers. Written by the bake.")]
         [SerializeField, Min(1f)] private float worldSizeMetres = 154f;
 
+        [Header("Frame shape")]
+        [Tooltip("Draw the minimap as a rectangle in the map's own shape instead of the triangle made for three corners. Turn it on for a two-team map that is long and " +
+                 "narrow (the Dominion lane); the arena keeps the triangle.")]
+        [SerializeField] private bool rectangularFrame;
+
+        [Tooltip("Only for a rectangular frame: how many metres the picture covers up the map (along Z). 'World Size Metres' above is then how many it covers across (along X). Written by the bake.")]
+        [SerializeField, Min(1f)] private float worldDepthMetres = 154f;
+
         [Header("Bake settings")]
         [Tooltip("Pixels along each side of the baked picture. 1024 stays sharp on the large map; more costs memory " +
                  "for no visible gain at minimap sizes. Press Bake minimap image after changing it.")]
@@ -38,6 +46,9 @@ namespace Overpower.Data
         public Texture2D ArenaImage => arenaImage;
         public Vector2 WorldCentre => worldCentre;
         public float WorldSizeMetres => worldSizeMetres;
+        public bool RectangularFrame => rectangularFrame;
+        /// <summary>How many metres the picture covers along Z: its own number in a rectangular frame, else the same as the width (a square).</summary>
+        public float WorldDepthMetres => rectangularFrame ? worldDepthMetres : worldSizeMetres;
         public int ImagePixels => imagePixels;
         public float MarginMetres => marginMetres;
     }

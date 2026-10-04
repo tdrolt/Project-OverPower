@@ -28,6 +28,17 @@ namespace Overpower.UI
             return new Vector2((world.x - worldCentreXZ.x) * scale, (world.z - worldCentreXZ.y) * scale);
         }
 
+        /// <summary>The picture's size in canvas units. The triangle arena's frame is a square of <paramref name="cornerSize"/>; a rectangular frame (a map
+        /// that is much longer than it is wide) is the map's own shape with its LONGER side at cornerSize, so the map fills the frame and the scale is the same on
+        /// both axes. The picture shows worldWidthMetres along X and worldDepthMetres along Z.</summary>
+        public static Vector2 FrameSize(bool rectangular, float worldWidthMetres, float worldDepthMetres, float cornerSize)
+        {
+            if (!rectangular || worldWidthMetres <= 0f || worldDepthMetres <= 0f)
+                return new Vector2(cornerSize, cornerSize);
+            float longer = Mathf.Max(worldWidthMetres, worldDepthMetres);
+            return new Vector2(cornerSize * worldWidthMetres / longer, cornerSize * worldDepthMetres / longer);
+        }
+
         public static bool IsInsideBakedArea(Vector3 world, Vector2 worldCentreXZ, float worldSizeMetres)
         {
             float half = worldSizeMetres / 2f;

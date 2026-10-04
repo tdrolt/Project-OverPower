@@ -134,8 +134,17 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         // This scene was loaded while already inside a room (the mode's scene, loaded for everyone): nobody joins again here, so the room is read again.
         if (PhotonNetwork.InRoom)
+        {
+            // Photon restarts its message queue as the scene loads, BEFORE any Start has run: a room update arriving now would reach the new scene's
+            // components while they still hold their blank "last seen" values (a second "two-team lobby" marker, a match-start reset on a rejoiner's old
+            // body, round edges worked out from nothing). Held back until the components have read the room once (the end of the routine below).
+            SetMessageQueueRunning(SceneLoadRules.QueueRunsWhileResuming());
             StartCoroutine(ResumeInRoomAfterSceneLoad());
+        }
     }
+
+    /// <summary>The one place this class holds or releases Photon's message queue (so the wiring can be read from the methods that must call it).</summary>
+    private static void SetMessageQueueRunning(bool running) => PhotonNetwork.IsMessageQueueRunning = running;
 
     /// <summary>The scene the room's game is played on (its mode's GameModeDefinition.SceneName), or "" when the room's mode is unknown or
     /// names none (then the game is played wherever the lobby is).</summary>
@@ -161,15 +170,24 @@ public class RoomManager : MonoBehaviourPunCallbacks
     private System.Collections.IEnumerator ResumeInRoomAfterSceneLoad()
     {
         yield return null;
-        if (!PhotonNetwork.InRoom) yield break;
-        Debug.Log($"[SCENE] {SceneManager.GetActiveScene().name} loaded inside room {PhotonNetwork.CurrentRoom.Name}: reading the room again");
-        foreach (MonoBehaviourPunCallbacks callbacks in FindObjectsByType<MonoBehaviourPunCallbacks>(FindObjectsSortMode.None))
+        // Whatever happens below, the queue runs again afterwards (a client left holding it would never see another room update).
+        try
         {
-            if (callbacks == this || !SceneLoadRules.ResumesAfterSceneLoad(callbacks.GetType().Name)) continue;
-            callbacks.OnJoinedRoom();
+            if (!PhotonNetwork.InRoom) yield break;
+            Debug.Log($"[SCENE] {SceneManager.GetActiveScene().name} loaded inside room {PhotonNetwork.CurrentRoom.Name}: reading the room again");
+            foreach (MonoBehaviourPunCallbacks callbacks in FindObjectsByType<MonoBehaviourPunCallbacks>(FindObjectsSortMode.None))
+            {
+                if (callbacks == this || !SceneLoadRules.ResumesAfterSceneLoad(callbacks.GetType().Name)) continue;
+                callbacks.OnJoinedRoom();
+            }
+            if (PhotonNetwork.LocalPlayer.HasRejoined)
+                HandleRejoinedPlayer();
         }
-        if (PhotonNetwork.LocalPlayer.HasRejoined)
-            HandleRejoinedPlayer();
+        finally
+        {
+            SetMessageQueueRunning(true);
+            Debug.Log("[SCENE] message queue running again");
+        }
     }
 
     public override void OnConnectedToMaster()
@@ -463,9 +481,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
         }
         if (!ValidateTeamResources(teamID)) return;
 
+        Transform spawnPoint = SpawnPointFor(teamID, teamID) ?? teamSpawnPoints[teamID];
         GameObject player = PhotonNetwork.Instantiate(
             playerPrefab.name,
-            teamSpawnPoints[teamID].position,
+            spawnPoint.position,
             Quaternion.identity,
             0,
             // The picked team travels with the spawn (Task 9b-3): a fresh process has no team property of its own yet
@@ -479,6 +498,28 @@ public class RoomManager : MonoBehaviourPunCallbacks
         spawnedBodyViewId = spawnedView != null ? spawnedView.ViewID : -1;
 
         SetupPlayerTeamComponent(player, teamID);
+    }
+
+    /// <summary>Where THIS player stands when they appear for a team: the team's spawn point, or - when that point has child points (a map where a team's
+    /// players should not pile onto one spot, e.g. the Dominion lane) - the child that is theirs. Teammates take different children (SpawnSlotRules: the order
+    /// of their actor numbers), the same one every time they come back. Null when the team has no spawn point.</summary>
+    public Transform SpawnPointFor(int spawnIndex, int ownTeam = -1)
+    {
+        if (teamSpawnPoints == null || spawnIndex < 0 || spawnIndex >= teamSpawnPoints.Length || teamSpawnPoints[spawnIndex] == null)
+            return null;
+        Transform home = teamSpawnPoints[spawnIndex];
+        if (home.childCount == 0 || PhotonNetwork.LocalPlayer == null)
+            return home;
+        var teammates = new System.Collections.Generic.List<int>();
+        if (ownTeam < 0 && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int propertyTeam))
+            ownTeam = propertyTeam;
+        if (ownTeam >= 0)
+            foreach (Photon.Realtime.Player other in PhotonNetwork.PlayerList)
+                if (!Teams.IsSpectator(other) && Teams.TryGetTeam(other, out int otherTeam) && otherTeam == ownTeam)
+                    teammates.Add(other.ActorNumber);
+        if (!teammates.Contains(PhotonNetwork.LocalPlayer.ActorNumber))
+            teammates.Add(PhotonNetwork.LocalPlayer.ActorNumber);
+        return home.GetChild(SpawnSlotRules.SlotFor(teammates, PhotonNetwork.LocalPlayer.ActorNumber, home.childCount));
     }
 
     bool ValidateTeamResources(int teamID)

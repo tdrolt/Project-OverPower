@@ -260,6 +260,12 @@ namespace Overpower.EditorTools
             }
             if (layout == null) { report.Add("PROBLEM: no ArenaLayout given."); return report; }
 
+            if (arena.outlineIsWholeArena)
+            {
+                report.Add("PROBLEM: this arena's outline is the whole map (a one-piece map such as the Dominion lane), not a third of a triangle - this builder would " +
+                           "treat it as a third. Use OverPower > Build Dominion Lane Map for the lane.");
+                return report;
+            }
             for (int i = 0; i < arena.source.childCount; i++)
             {
                 Transform child = arena.source.GetChild(i);

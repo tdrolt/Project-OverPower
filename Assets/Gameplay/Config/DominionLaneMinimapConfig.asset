@@ -13,7 +13,9 @@ MonoBehaviour:
   m_Name: DominionLaneMinimapConfig
   m_EditorClassIdentifier: 
   arenaImage: {fileID: 2800000, guid: 55dd8676bd2e57a468079a8ec448f889, type: 3}
-  worldCentre: {x: 65.05, y: 53.34}
-  worldSizeMetres: 173.66667
+  worldCentre: {x: 65.05, y: 53.339996}
+  worldSizeMetres: 86.83333
+  rectangularFrame: 1
+  worldDepthMetres: 40.83333
   imagePixels: 1024
   marginMetres: 4

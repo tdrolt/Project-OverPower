@@ -48,7 +48,8 @@ namespace Overpower.Data
     {
         [Header("Walls and barriers")]
         [Tooltip("The white pieces of the drawing: the outer walls of the pocket and the middle hall, and the H in the middle (two big walls and the arms joining them to the plus). " +
-                 "They all stop shots and sight and are built as boundary walls.")]
+                 "They all stop shots, sight and walking. The outer walls are boundary walls, which also stop a Portal; every piece whose name starts with 'H ' is a block " +
+                 "like the triangle arena's middle wall, which a Portal can cross.")]
         [SerializeField] private List<LaneRect> walls = new List<LaneRect>();
 
         [Tooltip("The yellow plus in the middle: jersey barriers. They stop walking only; shots, Dash, Zip, Blink and Portals cross them.")]
@@ -77,12 +78,21 @@ namespace Overpower.Data
         [Tooltip("The radius the drawing gave the zone circles, in metres (130 pixels across). The tests compare it with the Tier 3 radius in the Territory Config.")]
         [SerializeField, Min(0.1f)] private float zoneDrawnRadiusMetres = 5.4167f;
 
+        [Tooltip("How wide the body of each zone tower is, in metres (the board draws a 24 pixel square at 12 pixels to the metre = 2 m).")]
+        [SerializeField, Min(0.5f)] private float zoneTowerSizeMetres = 2f;
+
+        [Tooltip("How wide the body of each team's spawn tower is, in metres (the board draws a 46 pixel circle = 3.8 m).")]
+        [SerializeField, Min(0.5f)] private float spawnTowerSizeMetres = 3.8f;
+
         [Header("Spawns")]
         [Tooltip("One row per team: spawn tower, spawn point and healing ground. The drawing has the Purple pocket on the left and the White pocket on the right.")]
         [SerializeField] private List<LaneSpawn> spawns = new List<LaneSpawn>();
 
         [Tooltip("The distance the drawing's title gives between the two spawns ('56 m spawn to spawn'), in metres: the straight line between the two teams' spawn points.")]
         [SerializeField, Min(1f)] private float spawnToSpawnMetres = 56f;
+
+        [Tooltip("A team's two players appear this many metres to either side of the spawn point (one to the left, one to the right as the team faces the middle), so teammates do not stand on the same spot.")]
+        [SerializeField, Min(0f)] private float spawnSideOffsetMetres = 2f;
 
         [Header("Outline and floor")]
         [Tooltip("The playable ground seen from above: the inner faces of the outer walls, in order round the edge (first number X, second Z). " +
@@ -105,6 +115,12 @@ namespace Overpower.Data
         public IReadOnlyList<Vector2> ZoneCentres => zoneCentres;
         public int ZoneTier => zoneTier;
         public float ZoneDrawnRadiusMetres => zoneDrawnRadiusMetres;
+        public float ZoneTowerSizeMetres => zoneTowerSizeMetres;
+        public float SpawnTowerSizeMetres => spawnTowerSizeMetres;
+        public float SpawnSideOffsetMetres => spawnSideOffsetMetres;
+
+        /// <summary>True for the pieces of the H in the middle ("H Wall Left", "H Arm Right", ...): built as blocks, not boundary walls, so a Portal crosses them as it crosses the triangle's middle wall.</summary>
+        public static bool IsBlockWall(string wallName) => wallName != null && wallName.StartsWith("H ", StringComparison.Ordinal);
         public IReadOnlyList<LaneSpawn> Spawns => spawns;
         public float SpawnToSpawnMetres => spawnToSpawnMetres;
         public IReadOnlyList<Vector2> Outline => outline;

@@ -163,7 +163,7 @@ namespace Overpower.EditorTools
             if (arena.source.Find(BoundaryGroupName) == null)
                 return;
 
-            ArenaBounds outline = ArenaBounds.FromSourceOutline(arena.sourceOutline, arena.centre);
+            ArenaBounds outline = ArenaBounds.FromOutline(arena.sourceOutline, arena.centre, arena.outlineIsWholeArena); // a one-piece map's outline is the whole map, not a third
             if (outline == null)
             {
                 problems.Add("Source has boundary walls but Source Outline has fewer than two points: set it to the " +
@@ -173,7 +173,7 @@ namespace Overpower.EditorTools
 
             foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })
             {
-                Transform walls = third.Find(BoundaryGroupName);
+                Transform walls = third != null ? third.Find(BoundaryGroupName) : null; // a one-piece map has no copies
                 if (walls == null)
                     continue; // The copy check above already says a rebuild is needed.
 

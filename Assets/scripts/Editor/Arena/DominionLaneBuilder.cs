@@ -97,12 +97,13 @@ namespace Overpower.EditorTools
             arena.outlineIsWholeArena = true;
             arena.sourceOutline = layout.Outline.Select(p => new Vector2(arena.centre.x + p.x, arena.centre.z + p.y)).ToList();
 
-            // ---- 2. walls (boundary group: the outer walls and the H, stop shots and sight and block a portal's path), boxes, the plus
+            // ---- 2. walls (the outer walls are boundary walls and block a portal's path; the H is in the blocks group), boxes, the plus
             float wallCentreY = (arenaLayout.WallBottomY + arenaLayout.WallTopY) * 0.5f;
             float wallHeight = arenaLayout.WallTopY - arenaLayout.WallBottomY;
             foreach (LaneRect wall in layout.Walls)
             {
-                GameObject go = ArenaPrimitiveBuilder.NewPrimitiveChild(boundry, wall.name, arenaLayout.WallMaterial, "Building");
+                // The H stands in the Blocks group (a Portal crosses it, like the triangle's middle wall); the outer walls stay boundary walls.
+                GameObject go = ArenaPrimitiveBuilder.NewPrimitiveChild(DominionLaneLayout.IsBlockWall(wall.name) ? blocks : boundry, wall.name, arenaLayout.WallMaterial, "Building");
                 Vector3 at = World(arena, wall.centre);
                 go.transform.SetPositionAndRotation(new Vector3(at.x, wallCentreY, at.z), Quaternion.identity);
                 go.transform.localScale = new Vector3(wall.size.x, wallHeight, wall.size.y);
@@ -199,11 +200,30 @@ namespace Overpower.EditorTools
                 tower.buildingID = Plan[i].zone;
                 tower.tier = Plan[i].tier;
                 if (tower.flagRenderer != null) tower.flagRenderer.transform.position = tower.transform.position + carpetOffset;
+                ScaleBody(tower, i < 2 ? layout.ZoneTowerSizeMetres : layout.SpawnTowerSizeMetres, report);
                 RecordIfPrefab(tower.transform); RecordIfPrefab(tower.gameObject); RecordIfPrefab(tower);
                 if (tower.flagRenderer != null) RecordIfPrefab(tower.flagRenderer.transform);
                 report.Add($"zone {Plan[i].zone} = {NewNames[i]} tier {Plan[i].tier} at lane {centres[i]}");
             }
             return report;
+        }
+
+        /// <summary>
+        /// The tower's body ("Tower Look": the plinth, drum, crown and columns, with the capsule that is its cover) is the triangle's, 5.2 m across; the lane's board
+        /// draws a 2 m zone tower and a 3.8 m spawn tower. Scales the body sideways (never its height) so its capsule is <paramref name="widthMetres"/> across.
+        /// Re-running changes nothing once the width is right. The capture trigger and ring are not part of the body and keep the Territory Config's radius.
+        /// </summary>
+        private static void ScaleBody(BuildingCapture tower, float widthMetres, List<string> report)
+        {
+            Transform look = tower.transform.Find("Tower Look");
+            CapsuleCollider capsule = look != null ? look.GetComponent<CapsuleCollider>() : null;
+            if (capsule == null) { report.Add($"PROBLEM: {tower.name} has no 'Tower Look' capsule to size."); return; }
+            float sideways = Mathf.Max(look.lossyScale.x, look.lossyScale.z);
+            float widthNow = capsule.radius * 2f * sideways;
+            float factor = widthMetres / widthNow;
+            look.localScale = new Vector3(look.localScale.x * factor, look.localScale.y, look.localScale.z * factor);
+            RecordIfPrefab(look);
+            report.Add($"{tower.name}: body {widthNow:0.00} m -> {capsule.radius * 2f * Mathf.Max(look.lossyScale.x, look.lossyScale.z):0.00} m across");
         }
 
         private static void RecordIfPrefab(Object target)
@@ -235,6 +255,15 @@ namespace Overpower.EditorTools
                 string colour = index == 0 ? "White" : "Purple";
                 normal.SetPositionAndRotation(World(arena, spawn.spawnPoint), Quaternion.Euler(0f, yaw, 0f));
                 normal.gameObject.name = "Spawn " + colour;
+                // Two points, to either side of the spawn point: the team's two players take one each (RoomManager.SpawnPointFor).
+                for (int c = normal.childCount - 1; c >= 0; c--) Object.DestroyImmediate(normal.GetChild(c).gameObject);
+                for (int side = 0; side < 2; side++)
+                {
+                    var slot = new GameObject($"Spawn {colour} {(side == 0 ? "A" : "B")}");
+                    slot.transform.SetParent(normal, false);
+                    slot.transform.SetPositionAndRotation(World(arena, spawn.spawnPoint + new Vector2(0f, side == 0 ? -layout.SpawnSideOffsetMetres : layout.SpawnSideOffsetMetres)),
+                                                          Quaternion.Euler(0f, yaw, 0f));
+                }
                 // Dominion never uses the "capital under attack" spawn; it stands next to the normal one so the array stays whole.
                 Vector2 beside = spawn.spawnPoint + new Vector2(0f, 2f);
                 attacked.SetPositionAndRotation(World(arena, beside), Quaternion.Euler(0f, yaw, 0f));
@@ -311,39 +340,25 @@ namespace Overpower.EditorTools
 
         private static string BakeMinimap(Scene scene, ArenaSymmetry arena, DominionLaneLayout layout, Transform root)
         {
-            var points = new List<Vector2>();
+            // The lane is long and narrow, so its minimap is a rectangle (MinimapConfig.RectangularFrame): the picture covers the walls' bounding box plus the margin.
+            Vector2 min = new Vector2(float.MaxValue, float.MaxValue), max = new Vector2(float.MinValue, float.MinValue);
+            bool any = false;
             foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>(true))
             {
                 Bounds b = renderer.bounds;
-                foreach (float x in new[] { b.min.x, b.max.x })
-                    foreach (float z in new[] { b.min.z, b.max.z })
-                        points.Add(new Vector2(x - arena.centre.x, z - arena.centre.z));
+                min = Vector2.Min(min, new Vector2(b.min.x, b.min.z));
+                max = Vector2.Max(max, new Vector2(b.max.x, b.max.z));
+                any = true;
             }
-            if (points.Count == 0) return "not baked: no meshes.";
-
-            // The minimap's triangle points one vertex at the lowest-numbered Tier 1 zone (MinimapView.ComputeTriangleBaseRotationDegrees); the bake frames the
-            // map the same way.
-            Vector2 reference = Vector2.up;
-            foreach (BuildingCapture tower in scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<BuildingCapture>(true)).OrderBy(t => t.buildingID))
-            {
-                if (tower.tier != 1) continue;
-                reference = new Vector2(tower.transform.position.x - arena.centre.x, tower.transform.position.z - arena.centre.z).normalized;
-                break;
-            }
-            const float cos120 = -0.5f, sin120 = 0.8660254f;
-            var directions = new[]
-            {
-                reference,
-                new Vector2(reference.x * cos120 - reference.y * sin120, reference.x * sin120 + reference.y * cos120),
-                new Vector2(reference.x * cos120 + reference.y * sin120, -reference.x * sin120 + reference.y * cos120),
-            };
-            float circumradius = MinimapLayout.TriangleCircumradius(points, directions, layout.MinimapMarginMetres);
-            float size = 2f * circumradius;
-            var centre = new Vector2(arena.centre.x, arena.centre.z);
+            if (!any) return "not baked: no meshes.";
+            float margin = layout.MinimapMarginMetres;
+            float width = max.x - min.x + 2f * margin;
+            float depth = max.y - min.y + 2f * margin;
+            var centre = (min + max) * 0.5f;
             const int pixels = 1024;
 
             string full = Path.Combine(Directory.GetParent(Application.dataPath).FullName, MinimapImagePath);
-            File.WriteAllBytes(full, TopDownRender.RenderPng(centre, size, pixels));
+            File.WriteAllBytes(full, TopDownRender.RenderPng(centre, width, depth, pixels));
             AssetDatabase.ImportAsset(MinimapImagePath, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
             var importer = (TextureImporter)AssetImporter.GetAtPath(MinimapImagePath);
             if (importer != null)
@@ -365,7 +380,9 @@ namespace Overpower.EditorTools
             var so = new SerializedObject(config);
             so.FindProperty("arenaImage").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Texture2D>(MinimapImagePath);
             so.FindProperty("worldCentre").vector2Value = centre;
-            so.FindProperty("worldSizeMetres").floatValue = size;
+            so.FindProperty("worldSizeMetres").floatValue = width;
+            so.FindProperty("worldDepthMetres").floatValue = depth;
+            so.FindProperty("rectangularFrame").boolValue = true;
             so.FindProperty("imagePixels").intValue = pixels;
             so.FindProperty("marginMetres").floatValue = layout.MinimapMarginMetres;
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -383,7 +400,7 @@ namespace Overpower.EditorTools
             var holderSo = new SerializedObject(holder);
             holderSo.FindProperty("config").objectReferenceValue = config;
             holderSo.ApplyModifiedPropertiesWithoutUndo();
-            return $"baked {MinimapImagePath} ({pixels} px) covering {size:0.0} m square centred on ({centre.x:0.00}, {centre.y:0.00}); triangle vertex towards ({reference.x:0.0}, {reference.y:0.0}).";
+            return $"baked {MinimapImagePath} ({pixels} px across) covering {width:0.0} x {depth:0.0} m centred on ({centre.x:0.00}, {centre.y:0.00}); rectangular frame.";
         }
 
         // ------------------------------------------------------------------------------------------------ checks
@@ -420,7 +437,7 @@ namespace Overpower.EditorTools
             var items = new List<(string name, Bounds bounds, bool isBox)>();
             foreach (Collider c in root.GetComponentsInChildren<Collider>(false))
                 if (c.enabled && !c.isTrigger)
-                    items.Add((c.name, c.bounds, c.transform.parent != null && c.transform.parent.name == ArenaSymmetry.BlocksGroupName));
+                    items.Add((c.name, c.bounds, c.name.StartsWith("Box ")));
             foreach (BuildingCapture tower in scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<BuildingCapture>(false)))
                 foreach (Collider c in tower.GetComponentsInChildren<Collider>(false))
                     if (c.enabled && !c.isTrigger && c.gameObject.activeInHierarchy)

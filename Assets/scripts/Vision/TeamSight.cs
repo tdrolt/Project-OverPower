@@ -176,7 +176,8 @@ namespace Overpower.Vision
             // The minimap's world square and Sight Texture Size are read once, here; changing them needs a restart.
             Vector2 centre = minimap.WorldCentre;
             float side = minimap.WorldSizeMetres;
-            sightRect = new Vector4(centre.x - side * 0.5f, centre.y - side * 0.5f, side, side);
+            float depth = minimap.WorldDepthMetres; // a rectangular minimap covers a rectangle of the world; the sight picture covers the same one
+            sightRect = new Vector4(centre.x - side * 0.5f, centre.y - depth * 0.5f, side, depth);
 
             fillMaterial = new Material(sightFillShader) { hideFlags = HideFlags.HideAndDontSave };
             fillMaterial.SetVector("_SightRect", sightRect);

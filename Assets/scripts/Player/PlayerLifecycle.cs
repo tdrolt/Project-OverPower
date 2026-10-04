@@ -578,6 +578,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         death = false;
         respawnStarted = false;
         deathCounted = false;
+        Overpower.Dominion.ArrivalDeathRules.Take(ref arrivedDeadInSuddenDeath); // a fresh start: nobody is "arriving dead" any more
         deathCount = 0;
         rejoinRespawnPending = false;
         GetComponent<RespawnShield>()?.ClearForFreshStart(); // Dominion A16: a fresh start comes with no shield
@@ -607,12 +608,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         // 4. Back to your own team's spawn - guarded like MoveToSpawnPoint.
         RoomManager roomManager = FindObjectOfType<RoomManager>();
-        if (roomManager != null && roomManager.teamSpawnPoints != null
-            && team >= 0 && team < roomManager.teamSpawnPoints.Length && roomManager.teamSpawnPoints[team] != null)
-        {
-            Transform spawn = roomManager.teamSpawnPoints[team];
-            TeleportToSpawnPoint(spawn.position, spawn.rotation);
-        }
+        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team) : null;
+        if (teamSpawn != null)
+            TeleportToSpawnPoint(teamSpawn.position, teamSpawn.rotation);
 
         // 5. Alive with no last stand. An already-alive player gets no AliveChanged here (SetAlive is only
         // called when isAlive was false), which avoids a telemetry `respawn` line firing for everyone at once
@@ -647,6 +645,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         respawnStarted = false;
         deathCounted = false;
         rejoinRespawnPending = false;
+        Overpower.Dominion.ArrivalDeathRules.Take(ref arrivedDeadInSuddenDeath); // a new round: nobody is "arriving dead" any more
         GetComponent<RespawnShield>()?.ClearForFreshStart(); // Dominion A16: a new round comes with no shield
         matchUI?.SetRespawnPanelVisible(false);
         matchUI?.HideWaitingPanel();
@@ -661,12 +660,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         playerHealth.ResetForRespawn();
 
         RoomManager roomManager = FindObjectOfType<RoomManager>();
-        if (roomManager != null && roomManager.teamSpawnPoints != null
-            && team >= 0 && team < roomManager.teamSpawnPoints.Length && roomManager.teamSpawnPoints[team] != null)
-        {
-            Transform spawn = roomManager.teamSpawnPoints[team];
-            TeleportToSpawnPoint(spawn.position, spawn.rotation);
-        }
+        Transform teamSpawn = roomManager != null ? roomManager.SpawnPointFor(team, team) : null;
+        if (teamSpawn != null)
+            TeleportToSpawnPoint(teamSpawn.position, teamSpawn.rotation);
 
         if (!isAlive)
         {
@@ -742,13 +738,14 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// starts (not only its delay). The Died event also sets the death flag.</summary>
     private void DieForGoodInSuddenDeath()
     {
+        // Taken (and cleared) before the early return: a flag left standing by a call that returned here would stamp a LATER real death as an arrival.
+        bool arrivedDead = Overpower.Dominion.ArrivalDeathRules.Take(ref arrivedDeadInSuddenDeath);
         if (respawnStarted)
             return;
         respawnStarted = true;
         // A body that ARRIVES dead (a late joiner on a team seat, a rejoiner) keeps its real stamp or gets the earliest moment, never "now": a stamp of now
         // could make their team the one that "fell last" and win. A player who really dies here is stamped with now.
-        deathStampMs = arrivedDeadInSuddenDeath ? ArrivalStampMs() : PhotonNetwork.ServerTimestamp;
-        arrivedDeadInSuddenDeath = false;
+        deathStampMs = Overpower.Dominion.ArrivalDeathRules.StampFor(arrivedDead, arrivedDead ? ArrivalStampMs() : 0, PhotonNetwork.ServerTimestamp);
         SetAlive(false, deathStampMs);
         matchUI?.SetRespawnPanelVisible(false);
         matchUI?.HideWaitingPanel();
@@ -957,11 +954,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
                 spawnIndex = buildings.Map.CapitalTeamOf(spawnCapital);
         }
 
-        if (spawnIndex < 0 || spawnIndex >= roomManager.teamSpawnPoints.Length || roomManager.teamSpawnPoints[spawnIndex] == null)
+        Transform home = roomManager.SpawnPointFor(spawnIndex);
+        if (home == null)
             return;
 
-        TeleportToSpawnPoint(roomManager.teamSpawnPoints[spawnIndex].position,
-                              roomManager.teamSpawnPoints[spawnIndex].rotation);
+        TeleportToSpawnPoint(home.position, home.rotation);
 
         Debug.Log($"[VIS] {logReason}, returned to spawn at {rigidbody.position}");
     }
@@ -984,8 +981,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return null;
 
         int spawnIndex = manager.Map.CapitalTeamOf(capital);
-        Transform normal = spawnIndex >= 0 && roomManager.teamSpawnPoints != null && roomManager.teamSpawnPoints.Length > spawnIndex
-            ? roomManager.teamSpawnPoints[spawnIndex] : null;
+        Transform normal = roomManager.SpawnPointFor(spawnIndex);
 
         ZonePresenceTracker presence = ZonePresenceTracker.Instance;
         if (presence == null)
