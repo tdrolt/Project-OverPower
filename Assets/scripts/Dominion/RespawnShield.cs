@@ -77,7 +77,20 @@ namespace Overpower.Dominion
 
         /// <summary>True while this player's respawn shield is up, from the room's server clock and their dShd. False outside a room, before the
         /// clock has synced, and in Conquest (nothing is ever written there).</summary>
-        public bool IsUp => IsUpFor(photonView != null ? photonView.Owner : null);
+        public bool IsUp => photonView != null && photonView.IsMine ? OwnerIsUp() : IsUpFor(photonView != null ? photonView.Owner : null);
+
+        /// <summary>The server ms the owner's client itself started the shield to end at (0 = none). The property only comes back after the server's echo, so until then this
+        /// is what the owner's own hit-block asks (RespawnShieldRules.IsUpForOwner).</summary>
+        private int ownEndMs;
+
+        private bool OwnerIsUp()
+        {
+            Player owner = photonView.Owner;
+            if (owner == null || !PhotonNetwork.InRoom) return false;
+            int now = PhotonNetwork.ServerTimestamp;
+            if (now == 0) return false;
+            return RespawnShieldRules.IsUpForOwner(ReadInt(owner, RespawnShieldRules.ShieldKey), ownEndMs, now);
+        }
 
         /// <summary>True while that player's respawn shield is up. The one answer the damage block, the bubble and the zones all share.</summary>
         public static bool IsUpFor(Player player)
@@ -119,6 +132,7 @@ namespace Overpower.Dominion
             if (config == null || now == 0) return; // no number to use and no clock to count on: no shield, rather than a guessed one
             int end = RespawnShieldRules.EndMs(now, config.ShieldSeconds);
             // Start and end together in one write: A26 judges an old effect from the start, so nobody subtracts their own Shield Seconds from the end.
+            ownEndMs = end; // up on this client at once, not a round trip later
             PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
             Debug.Log($"[DOMINION] respawn shield up for {config.ShieldSeconds:0.#} s (ends {end})");
         }
@@ -127,7 +141,9 @@ namespace Overpower.Dominion
         public void ClearShield()
         {
             if (!photonView.IsMine || photonView.Owner == null) return;
-            if (ReadInt(photonView.Owner, RespawnShieldRules.ShieldKey) == RespawnShieldRules.EndAfterDamageDealt()) return;
+            bool startedHere = ownEndMs != 0; // started on this client and maybe not echoed yet: the cleared value must still be written
+            ownEndMs = 0;
+            if (!startedHere && ReadInt(photonView.Owner, RespawnShieldRules.ShieldKey) == RespawnShieldRules.EndAfterDamageDealt()) return;
             PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
             {
                 { RespawnShieldRules.ShieldKey, RespawnShieldRules.EndAfterDamageDealt() },

@@ -159,6 +159,16 @@ namespace Overpower.Tests
             });
         }
 
+        [Test] public void OnlyTheLaneAsksForTheStraightCamera()
+        {
+            WithScene(LanePath, scene =>
+            {
+                SceneCameraConfig rule = All<SceneCameraConfig>(scene).Single();
+                Assert.IsTrue(rule.OwnSpawnOnLeft);
+            });
+            WithScene(GamePath, scene => Assert.AreEqual(0, All<SceneCameraConfig>(scene).Length, "the triangle arena keeps the angled camera"));
+        }
+
         [Test] public void TheLaneMinimapIsARectangleAndTheArenaKeepsItsTriangle()
         {
             WithScene(LanePath, scene =>

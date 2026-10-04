@@ -71,6 +71,19 @@ namespace Overpower.Lobby
         /// <summary>What the bar's name line reads ("Mara - Purple", "Whole map"); empty before Begin.</summary>
         public string BarLine => bar != null ? bar.NameLine : "";
 
+        /// <summary>The fixed angle a spectator watches from: the theme's one angle, or - on a map with a straight camera (SceneCameraConfig) - White's own view.</summary>
+        private float SpectatorYaw(float themeAngle)
+        {
+            Vector3 toWhite = Vector3.zero;
+            if (roomManager != null && roomManager.teamSpawnPoints != null && roomManager.teamSpawnPoints.Length > 0 && roomManager.teamSpawnPoints[0] != null)
+            {
+                Vector3 centre = Vector3.zero; int counted = 0;
+                foreach (Transform spawn in roomManager.teamSpawnPoints) { if (spawn == null) continue; centre += spawn.position; counted++; }
+                toWhite = roomManager.teamSpawnPoints[0].position - centre / Mathf.Max(1, counted);
+            }
+            return Overpower.Data.CameraYawRules.SpectatorYaw(Overpower.Data.SceneCameraConfig.SceneWantsOwnSpawnOnLeft(), themeAngle, toWhite.x, toWhite.z);
+        }
+
         /// <summary>Starts spectating (the spec = true edge): the bar goes up and the camera starts on the first player.</summary>
         public void Begin()
         {
@@ -89,7 +102,7 @@ namespace Overpower.Lobby
             cameraComponent = cam.GetComponent<Camera>();
             UiTheme theme = roomManager != null ? roomManager.Theme : null;
             // No team of their own decides the angle, and it must not swing round between teams: one fixed angle (UiTheme > Spectator bar).
-            cam.fixedYaw = theme != null ? theme.spectatorViewAngle : 0f;
+            cam.fixedYaw = SpectatorYaw(theme != null ? theme.spectatorViewAngle : 0f);
             // The centre scan's wave and countdown need a vision config and a theme, which normally come from the player's own body.
             CentreScan.SetSpectatorSupport(roomManager != null ? roomManager.Vision : null, theme);
             if (theme != null)

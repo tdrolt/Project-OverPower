@@ -147,6 +147,9 @@ namespace Overpower.EditorTools
             // ---- 6. the minimap picture
             report.Add(BakeMinimap(scene, arena, layout, rootGo.transform));
 
+            // ---- 6b. the straight camera (A41): own spawn on the left of the screen
+            report.Add(EnsureCameraConfig(scene));
+
             // ---- 7. checks
             report.AddRange(CheckSceneViewIds(scene));
             EditorSceneManager.MarkSceneDirty(scene);
@@ -401,6 +404,20 @@ namespace Overpower.EditorTools
             holderSo.FindProperty("config").objectReferenceValue = config;
             holderSo.ApplyModifiedPropertiesWithoutUndo();
             return $"baked {MinimapImagePath} ({pixels} px across) covering {width:0.0} x {depth:0.0} m centred on ({centre.x:0.00}, {centre.y:0.00}); rectangular frame.";
+        }
+
+        /// <summary>Puts the scene's camera rule on the lane's config object (the lane plays on a straight view; see SceneCameraConfig). Safe to run again.</summary>
+        public static string EnsureCameraConfig(Scene scene)
+        {
+            SceneMinimapConfig holder = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<SceneMinimapConfig>(true)).FirstOrDefault();
+            if (holder == null) return "PROBLEM: no scene config object for the camera rule.";
+            SceneCameraConfig camera = holder.GetComponent<SceneCameraConfig>();
+            if (camera == null) camera = holder.gameObject.AddComponent<SceneCameraConfig>();
+            var so = new SerializedObject(camera);
+            so.FindProperty("ownSpawnOnLeft").boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+            EditorSceneManager.MarkSceneDirty(scene);
+            return "camera rule: own spawn on the left of the screen (straight lane view).";
         }
 
         // ------------------------------------------------------------------------------------------------ checks

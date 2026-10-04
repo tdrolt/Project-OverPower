@@ -11,6 +11,10 @@ namespace Overpower.Dominion
         /// <summary>True while now is before the end time. 0 = never any shield (the cleared value).</summary>
         public static bool IsUp(int endMs, int nowMs) => endMs != 0 && unchecked(nowMs - endMs) < 0;
 
+        /// <summary>True for the shield's OWNER: the written property, or the end the owner's own client has just worked out. A Player Property reaches the
+        /// owner's own copy only after the server echoes it (a round trip, about 0.1 s), and a hit must not get through in between.</summary>
+        public static bool IsUpForOwner(int propertyEndMs, int ownEndMs, int nowMs) => IsUp(propertyEndMs, nowMs) || IsUp(ownEndMs, nowMs);
+
         /// <summary>The value the shield owner writes when it learns it hit an enemy: 0 = cleared, shield down. Attacking from inside the
         /// shield would be a free shot, so the first hit on an enemy (damage, stun, slow or push) drops it.</summary>
         public static int EndAfterDamageDealt() => 0;

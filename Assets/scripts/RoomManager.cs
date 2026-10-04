@@ -517,6 +517,16 @@ public class RoomManager : MonoBehaviourPunCallbacks
             foreach (Photon.Realtime.Player other in PhotonNetwork.PlayerList)
                 if (!Teams.IsSpectator(other) && Teams.TryGetTeam(other, out int otherTeam) && otherTeam == ownTeam)
                     teammates.Add(other.ActorNumber);
+        // The seat table knows the whole team at once; the players' own team properties arrive one by one (the first body would otherwise think it is alone).
+        // Read from the room itself, not from this scene's LobbySeats: in the mode's scene that component may not have read the room yet when the first body is placed.
+        if (ownTeam >= 0 && PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null)
+        {
+            var seatPairs = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>>();
+            foreach (System.Collections.DictionaryEntry entry in PhotonNetwork.CurrentRoom.CustomProperties)
+                if (entry.Key is string key && entry.Value is int actorNumber) seatPairs.Add(new System.Collections.Generic.KeyValuePair<string, int>(key, actorNumber));
+            foreach (int actor in SpawnSlotRules.TeammatesFromSeats(seatPairs, ownTeam))
+                if (!teammates.Contains(actor)) teammates.Add(actor);
+        }
         if (!teammates.Contains(PhotonNetwork.LocalPlayer.ActorNumber))
             teammates.Add(PhotonNetwork.LocalPlayer.ActorNumber);
         return home.GetChild(SpawnSlotRules.SlotFor(teammates, PhotonNetwork.LocalPlayer.ActorNumber, home.childCount));

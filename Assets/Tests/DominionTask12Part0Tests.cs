@@ -87,6 +87,18 @@ namespace Overpower.Tests
             Assert.IsTrue(memory.FirstTime("session", "room a", 3), "after leaving, the same room again is a new beginning");
         }
 
+        [Test] public void AQueuedLineIsNotWrittenUntilItIsMarkedSoTheNextSceneStillWritesIt()
+        {
+            var memory = new TelemetryWrittenMemory();
+            Assert.IsFalse(memory.WasWritten("join", "room a", 3), "nothing has reached a file yet: a join that was only queued in a scene that is gone must be written by the next one");
+            memory.MarkWritten("join", "room a", 3);
+            Assert.IsTrue(memory.WasWritten("join", "room a", 3));
+            Assert.IsFalse(memory.WasWritten("join", "room a", 4));
+            Assert.IsFalse(memory.WasWritten("join", "", 3));
+            memory.ForgetAll();
+            Assert.IsFalse(memory.WasWritten("join", "room a", 3));
+        }
+
         [Test] public void ARoomWithNoNameIsAlwaysWritten()
         {
             var memory = new TelemetryWrittenMemory();
@@ -97,7 +109,8 @@ namespace Overpower.Tests
         [Test] public void TelemetryAsksTheMemoryBeforeTheJoinLineAndTheSessionLineAndForgetsOnLeaving()
         {
             MethodInfo first = Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.FirstTime));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "OnJoinedRoom", first));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "OnJoinedRoom", Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.WasWritten))));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "TryOpenFile", Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.MarkWritten))), "a join queued before the file opened is in the file after the flush");
             Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "TryOpenFile", first));
             Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "OnLeftRoom", Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.ForgetAll))));
         }
@@ -230,6 +243,82 @@ namespace Overpower.Tests
             Assert.Greater(layout.ZoneTowerSizeMetres, 0f);
             Assert.Greater(layout.SpawnTowerSizeMetres, layout.ZoneTowerSizeMetres, "the spawn tower is the bigger one on the board");
             Assert.Greater(layout.SpawnSideOffsetMetres, 0f);
+        }
+
+        // ---------------------------------------------------------------- A41/A42: the straight lane camera
+
+        [Test] public void WhiteOnTheEastAndPurpleOnTheWestEachHaveTheirOwnSpawnOnTheLeft()
+        {
+            Assert.AreEqual(180f, CameraYawRules.OwnSpawnLeftYaw(28f, 0f), 0.001f, "the spawn is east of the middle: turn the view round so east is the left of the screen");
+            Assert.AreEqual(0f, CameraYawRules.OwnSpawnLeftYaw(-28f, 0f), 0.001f, "the spawn is west: the ordinary view already has west on the left");
+        }
+
+        [Test] public void ScreenRightPointsAwayFromTheOwnSpawnWhateverTheSpawnDirection()
+        {
+            foreach (Vector2 toSpawn in new[] { new Vector2(30f, 0f), new Vector2(-30f, 0f), new Vector2(0f, 20f), new Vector2(0f, -20f), new Vector2(17f, -9f), new Vector2(-4f, 12f) })
+            {
+                float yaw = CameraYawRules.OwnSpawnLeftYaw(toSpawn.x, toSpawn.y) * Mathf.Deg2Rad;
+                var screenRight = new Vector2(Mathf.Cos(yaw), -Mathf.Sin(yaw)); // camera forward is (sin yaw, cos yaw); right is forward turned clockwise
+                Assert.AreEqual(-1f, Vector2.Dot(screenRight, toSpawn.normalized), 0.0001f, toSpawn.ToString());
+            }
+        }
+
+        [Test] public void ASceneWithoutTheStraightViewKeepsTheAngledYawExactly()
+        {
+            float old = Mathf.Atan2(3f, 4f) * Mathf.Rad2Deg + 120f; // the formula CameraTracking had before
+            Assert.AreEqual(old, CameraYawRules.TeamYaw(false, 3f, 4f, 120f), 0.0001f);
+            Assert.AreEqual(CameraYawRules.OwnSpawnLeftYaw(3f, 4f), CameraYawRules.TeamYaw(true, 3f, 4f, 120f), 0.0001f, "the offset belongs to the angled view only");
+        }
+
+        [Test] public void SpectatorsWatchFromWhitesSideOnAStraightMapAndFromTheThemesAngleElsewhere()
+        {
+            Assert.AreEqual(180f, CameraYawRules.SpectatorYaw(true, 33f, 28f, 0f), 0.001f);
+            Assert.AreEqual(33f, CameraYawRules.SpectatorYaw(false, 33f, 28f, 0f), 0.001f);
+        }
+
+        [Test] public void TheCameraAndTheSpectatorViewAskTheYawRules()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(CameraTracking), "ResolveTeamYaw", Method(typeof(CameraYawRules), nameof(CameraYawRules.TeamYaw))));
+            Assert.IsTrue(IlWiring.Uses(typeof(CameraTracking), "ResolveTeamYaw", Method(typeof(SceneCameraConfig), nameof(SceneCameraConfig.SceneWantsOwnSpawnOnLeft))));
+            Assert.IsTrue(IlWiring.Uses(typeof(SpectatorSeatView), "SpectatorYaw", Method(typeof(CameraYawRules), nameof(CameraYawRules.SpectatorYaw))));
+            Assert.IsTrue(IlWiring.Uses(typeof(SpectatorSeatView), "Begin", Method(typeof(SpectatorSeatView), "SpectatorYaw")));
+        }
+
+        // ---------------------------------------------------------------- Task 12 findings: teammates from the seat table, the shield up at once
+
+        [Test] public void TheSeatTableNamesEveryTeammateEvenBeforeTheirTeamPropertiesHaveArrived()
+        {
+            var seats = new System.Collections.Generic.Dictionary<string, int> { { "sT00", 5 }, { "sT01", 9 }, { "sT10", 7 }, { "sS0", 11 }, { "sT02", 0 } };
+            CollectionAssert.AreEquivalent(new[] { 5, 9 }, SpawnSlotRules.TeammatesFromSeats(seats, 0));
+            CollectionAssert.AreEquivalent(new[] { 7 }, SpawnSlotRules.TeammatesFromSeats(seats, 1), "a spectator seat is nobody's teammate");
+            CollectionAssert.IsEmpty(SpawnSlotRules.TeammatesFromSeats(seats, 2));
+            CollectionAssert.IsEmpty(SpawnSlotRules.TeammatesFromSeats(null, 0));
+        }
+
+        [Test] public void TwoPlayersOnOneSeatTableTakeDifferentSpawnSlots()
+        {
+            var seats = new System.Collections.Generic.Dictionary<string, int> { { "sT00", 5 }, { "sT01", 9 } };
+            var team = SpawnSlotRules.TeammatesFromSeats(seats, 0);
+            Assert.AreNotEqual(SpawnSlotRules.SlotFor(team, 5, 2), SpawnSlotRules.SlotFor(team, 9, 2));
+        }
+
+        [Test] public void TheFirstBodyAsksTheSeatTableForItsTeammates()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(RoomManager), "SpawnPointFor", Method(typeof(SpawnSlotRules), nameof(SpawnSlotRules.TeammatesFromSeats))));
+        }
+
+        [Test] public void TheOwnersShieldIsUpAsSoonAsTheOwnerStartedItBeforeTheServerEchoesIt()
+        {
+            Assert.IsTrue(RespawnShieldRules.IsUpForOwner(0, 5000, 4000), "nothing written back yet, but this client started it");
+            Assert.IsTrue(RespawnShieldRules.IsUpForOwner(5000, 0, 4000), "the property alone, as for everyone else");
+            Assert.IsFalse(RespawnShieldRules.IsUpForOwner(0, 0, 4000));
+            Assert.IsFalse(RespawnShieldRules.IsUpForOwner(3000, 3500, 4000), "both ended");
+        }
+
+        [Test] public void TheOwnersHitBlockAsksTheOwnerRule()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "OwnerIsUp", Method(typeof(RespawnShieldRules), nameof(RespawnShieldRules.IsUpForOwner))));
+            Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "get_IsUp", Method(typeof(RespawnShield), "OwnerIsUp")));
         }
     }
 }

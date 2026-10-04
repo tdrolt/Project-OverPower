@@ -22,6 +22,16 @@ namespace Overpower.Telemetry
             return written.Add(kind + "|" + roomName + "|" + actor);
         }
 
+        /// <summary>True when a line of this kind for this room and actor has already been WRITTEN to the match file in this process. A line that was only queued
+        /// (the file was not open yet) is not written: the scene that queued it may be gone before the file ever opens.</summary>
+        public bool WasWritten(string kind, string roomName, int actor) => !string.IsNullOrEmpty(roomName) && written.Contains(kind + "|" + roomName + "|" + actor);
+
+        /// <summary>Notes that a line of this kind for this room and actor is now in the match file.</summary>
+        public void MarkWritten(string kind, string roomName, int actor)
+        {
+            if (!string.IsNullOrEmpty(roomName)) written.Add(kind + "|" + roomName + "|" + actor);
+        }
+
         public void ForgetAll() => written.Clear();
     }
 }

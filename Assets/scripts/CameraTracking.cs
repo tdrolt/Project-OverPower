@@ -1,3 +1,4 @@
+using Overpower.Data;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -267,7 +268,7 @@ public class CameraTracking : MonoBehaviour
         Vector3 toSpawn = room.teamSpawnPoints[team.teamID].position - centre;
         toSpawn.y = 0f;
 
-        yaw = Mathf.Atan2(toSpawn.x, toSpawn.z) * Mathf.Rad2Deg + teamYawOffset;
+        yaw = CameraYawRules.TeamYaw(SceneCameraConfig.SceneWantsOwnSpawnOnLeft(), toSpawn.x, toSpawn.z, teamYawOffset); // the straight lane view, or the arena's angled one
         teamYawResolved = true;
         teamYawResolvedForTeam = team.teamID;
 

@@ -218,8 +218,13 @@ namespace Overpower.Telemetry
             TryClaimMatchIdentity();
             TryOpenFile();
             // A scene that loads inside the room asks again for the same player: that join was already written in this process.
-            if (TelemetryWrittenMemory.Process.FirstTime("join", PhotonNetwork.CurrentRoom.Name, PhotonNetwork.LocalPlayer.ActorNumber))
+            // Only a line that reached the FILE counts as written: one still queued dies with this scene if the file never opened here (the mode's map is loaded first).
+            string roomName = PhotonNetwork.CurrentRoom.Name; int me = PhotonNetwork.LocalPlayer.ActorNumber;
+            if (!TelemetryWrittenMemory.Process.WasWritten("join", roomName, me))
+            {
                 LogJoinOrLeave(TelemetryKeys.Join, PhotonNetwork.LocalPlayer);
+                if (writer.IsOpen) TelemetryWrittenMemory.Process.MarkWritten("join", roomName, me);
+            }
         }
 
         public override void OnLeftRoom()
@@ -566,6 +571,7 @@ namespace Overpower.Telemetry
             foreach (string waiting in pending.Lines)
                 writer.Write(waiting);
             pending.Clear();
+            TelemetryWrittenMemory.Process.MarkWritten("join", PhotonNetwork.CurrentRoom.Name, actor); // the queued join of this player (if any) is in the file now
 
             writer.Flush(); // Immediate, so the file and its header exist as soon as a client joins, not just after the first flush interval.
         }

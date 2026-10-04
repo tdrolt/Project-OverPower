@@ -86,6 +86,18 @@ namespace Overpower.Lobby
     /// <summary>Which of a team's spawn points a player stands on, so teammates do not appear on the same spot.</summary>
     public static class SpawnSlotRules
     {
+        /// <summary>The actors the room's seat table puts on a team (the seats' team keys, "sT" + team + index). A body spawns the moment the game starts, before
+        /// every teammate's team property has arrived, so the seat table - which every client already holds - is what tells a player who their teammates are.</summary>
+        public static List<int> TeammatesFromSeats(IEnumerable<KeyValuePair<string, int>> seats, int team)
+        {
+            var actors = new List<int>();
+            if (seats == null) return actors;
+            foreach (KeyValuePair<string, int> seat in seats)
+                if (seat.Value > 0 && LobbySeatRules.TryTeamOfSeat(seat.Key, out int seatTeam) && seatTeam == team && !actors.Contains(seat.Value))
+                    actors.Add(seat.Value);
+            return actors;
+        }
+
         /// <summary>The slot (0 .. slotCount-1) for a player: their place in the ascending order of the team's actor numbers, wrapped when the team is bigger than
         /// the list of points. A player not in the list (or an empty list) takes slot 0; no slots gives 0.</summary>
         public static int SlotFor(IReadOnlyList<int> teamActors, int myActor, int slotCount)
