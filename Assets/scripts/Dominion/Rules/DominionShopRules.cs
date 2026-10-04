@@ -27,17 +27,18 @@ namespace Overpower.Dominion
             stage == DominionStage.Break || lateJoinerFirstPick;
 
         /// <summary>A weapon's depth in the tree: 0 for the root, 1 for its children, and so on; -1 for a weapon the tree does not know or
-        /// whose parents loop. <paramref name="parentOf"/> returns a weapon's parent id: exactly -1 for the root (as WeaponDefinition.Parent
-        /// does) and any other negative number for an unknown weapon.</summary>
-        public static int WeaponDepth(int weaponId, Func<int, int> parentOf)
+        /// whose parents loop. <paramref name="parentOf"/> returns a weapon's parent id: any negative number for a root
+        /// (WeaponUpgradeTree treats every negative parent as one) and null for a weapon it does not know.</summary>
+        public static int WeaponDepth(int weaponId, Func<int, int?> parentOf)
         {
             const int MaxSteps = 64; // a parent chain longer than this can only be a loop
             int depth = 0, current = weaponId;
             for (int step = 0; step < MaxSteps; step++)
             {
-                int parent = parentOf(current);
-                if (parent == -1) return depth;
-                if (parent < 0) return -1;
+                int? known = parentOf(current);
+                if (known == null) return -1;
+                int parent = known.Value;
+                if (parent < 0) return depth;
                 depth++;
                 current = parent;
             }

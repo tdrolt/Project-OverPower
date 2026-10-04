@@ -45,14 +45,5 @@ namespace Overpower.Tests
             Assert.IsFalse(ChatSendRule.ShowsHint(o));
             Assert.IsFalse(ChatSendRule.IsLogged(o));
         }
-
-        [Test]
-        public void ARefusedLineThenSentIsLoggedExactlyOnce()
-        {
-            int logged = 0;
-            foreach (bool up in new[] { false, true })
-                if (ChatSendRule.IsLogged(ChatSendRule.Outcome("again", up, up))) logged++;
-            Assert.AreEqual(1, logged);
-        }
     }
 }

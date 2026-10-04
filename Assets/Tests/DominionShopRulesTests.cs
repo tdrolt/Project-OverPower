@@ -72,7 +72,7 @@ namespace Overpower.Tests
         [Test] public void TheBaselineIsDepthZeroAFamilyOneAndItsUpgradeTwo()
         {
             var parents = new Dictionary<int, int> { { 10, -1 }, { 11, 10 }, { 12, 11 }, { 20, 10 } };
-            System.Func<int, int> parentOf = id => parents.TryGetValue(id, out int p) ? p : -2;
+            System.Func<int, int?> parentOf = id => parents.TryGetValue(id, out int p) ? p : (int?)null;
             Assert.AreEqual(0, DominionShopRules.WeaponDepth(10, parentOf));
             Assert.AreEqual(1, DominionShopRules.WeaponDepth(11, parentOf));
             Assert.AreEqual(2, DominionShopRules.WeaponDepth(12, parentOf));
@@ -88,10 +88,32 @@ namespace Overpower.Tests
 
         [Test] public void DepthAgreesWithTheWeaponUpgradeTree()
         {
-            var tree = new WeaponUpgradeTree(new[] { (1, -1), (2, 1), (3, 2) });
-            var parents = new Dictionary<int, int> { { 1, -1 }, { 2, 1 }, { 3, 2 } };
-            Assert.AreEqual(tree.RootId, 1);
-            Assert.AreEqual(2, DominionShopRules.WeaponDepth(3, id => parents[id]));
+            // One list feeds both the tree and the depth lookup, so they cannot drift apart.
+            var nodes = new[] { (1, -1), (2, 1), (3, 2), (4, 2), (5, 1) };
+            var tree = new WeaponUpgradeTree(nodes);
+            var parents = new Dictionary<int, int>();
+            foreach (var (id, parent) in nodes) parents[id] = parent;
+            System.Func<int, int?> parentOf = id => parents.TryGetValue(id, out int p) ? p : (int?)null;
+
+            Assert.AreEqual(1, tree.RootId);
+            Assert.AreEqual(0, DominionShopRules.WeaponDepth(tree.RootId, parentOf));
+            foreach (var (id, _) in nodes)
+                foreach (int child in tree.ChildrenOf(id))
+                    Assert.AreEqual(DominionShopRules.WeaponDepth(id, parentOf) + 1, DominionShopRules.WeaponDepth(child, parentOf),
+                        $"weapon {child} is one deeper than its parent {id}");
+            Assert.AreEqual(2, DominionShopRules.WeaponDepth(3, parentOf));
+            Assert.AreEqual(2, DominionShopRules.WeaponDepth(4, parentOf));
+            Assert.AreEqual(1, DominionShopRules.WeaponDepth(5, parentOf));
+        }
+
+        [Test] public void AnyNegativeParentIsARootLikeTheTreeSaysNotOnlyMinusOne()
+        {
+            var tree = new WeaponUpgradeTree(new[] { (7, -5), (8, 7) });
+            var parents = new Dictionary<int, int> { { 7, -5 }, { 8, 7 } };
+            System.Func<int, int?> parentOf = id => parents.TryGetValue(id, out int p) ? p : (int?)null;
+            Assert.AreEqual(7, tree.RootId);
+            Assert.AreEqual(0, DominionShopRules.WeaponDepth(7, parentOf));
+            Assert.AreEqual(1, DominionShopRules.WeaponDepth(8, parentOf));
         }
     }
 }

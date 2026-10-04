@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Overpower.Dominion;
+using Overpower.Match;
 
 namespace Overpower.Tests
 {
@@ -112,6 +113,9 @@ namespace Overpower.Tests
             Assert.AreEqual(7, DominionRules.PointsThisTick(owner, tier, spawn, 0, Table));
         }
 
+        [Test] public void Tier1AddsNothingPerTickEvenWithANonZeroTableEntry() =>
+            Assert.AreEqual(0, DominionRules.PointsThisTick(new[] { 0 }, new[] { 1 }, new[] { false }, 0, new[] { 5, 7, 3, 9 }));
+
         [Test] public void TheCentreAddsNothingPerTickEvenWithANonZeroTableEntry() =>
             Assert.AreEqual(0, DominionRules.PointsThisTick(new[] { 0 }, new[] { 4 }, new[] { false }, 0, Table));
 
@@ -155,14 +159,26 @@ namespace Overpower.Tests
 
         [Test] public void ABountyIsDueAfterAnUnbrokenHoldOfAtLeastTheHoldTime()
         {
-            Assert.IsTrue(DominionRules.BountyDue(1000, 61000, 60000, previousOwner: 0, newOwner: 1));
-            Assert.IsTrue(DominionRules.BountyDue(1000, 90000, 60000, 0, 1));
+            Assert.IsTrue(DominionRules.BountyDue(60000, 60000, lastOwner: 0, newOwner: 1));
+            Assert.IsTrue(DominionRules.BountyDue(90000, 60000, 0, 1));
         }
 
-        [Test] public void ATooShortHoldPaysNoBounty() => Assert.IsFalse(DominionRules.BountyDue(1000, 60999, 60000, 0, 1));
-        [Test] public void RetakingYourOwnZonePaysNoBounty() => Assert.IsFalse(DominionRules.BountyDue(1000, 90000, 60000, 0, 0));
-        [Test] public void ANeutralZoneNeverPaysABounty() => Assert.IsFalse(DominionRules.BountyDue(1000, 90000, 60000, -1, 1));
-        [Test] public void AZoneTakenByNobodyPaysNoBounty() => Assert.IsFalse(DominionRules.BountyDue(1000, 90000, 60000, 0, -1));
+        [Test] public void ATooShortHoldPaysNoBounty() => Assert.IsFalse(DominionRules.BountyDue(59999, 60000, 0, 1));
+        [Test] public void RetakingYourOwnZonePaysNoBounty() => Assert.IsFalse(DominionRules.BountyDue(90000, 60000, 0, 0));
+        [Test] public void ANeverHeldZonePaysNoBounty() => Assert.IsFalse(DominionRules.BountyDue(90000, 60000, -1, 1));
+        [Test] public void AZoneTakenByNobodyPaysNoBounty() => Assert.IsFalse(DominionRules.BountyDue(90000, 60000, 0, -1));
+
+        // The room's data: a zone always goes neutral before it is captured, and WithNeutral stores the finished hold.
+        [Test] public void ABountyReadsTheHoldTheNeutralStepSettled()
+        {
+            var held = new TerritorySnapshot(4).WithCapture(2, 0, 1000, 0);
+            var gone = held.WithNeutral(2, 61000);                   // team 0 held it 60 s, then it drained to neutral
+            var due = DominionRules.BountyDue(gone.LastHeldMs(2), 60000, gone.LastOwnerOf(2), 1); // team 1 takes it 10 s later
+            Assert.IsTrue(due);
+
+            var shortHold = new TerritorySnapshot(4).WithCapture(2, 0, 1000, 0).WithNeutral(2, 6000); // 5 s hold
+            Assert.IsFalse(DominionRules.BountyDue(shortHold.LastHeldMs(2), 60000, shortHold.LastOwnerOf(2), 1), "a 5 s hold, even after a 70 s neutral gap");
+        }
 
         // ---- the int clock wraps
 
@@ -173,8 +189,18 @@ namespace Overpower.Tests
             Assert.Less(end, start, "the end really wrapped");
             Assert.IsFalse(DominionRules.CentrePayoutDue(end, unchecked(end - 1)));
             Assert.IsTrue(DominionRules.CentrePayoutDue(end, end));
-            Assert.IsTrue(DominionRules.BountyDue(start, unchecked(start + 61000), 60000, 0, 1));
+            Assert.IsTrue(DominionRules.BountyDue(unchecked((start + 61000) - start), 60000, 0, 1));
             Assert.AreEqual(unchecked(start + 30000), DominionRules.NextCentrePayoutMs(start, unchecked(start + 100), 30000, 20000));
+        }
+
+        [Test] public void ThePayoutStepsStillCountRightWhenTheFirstPayoutIsBeforeTheWrapAndNowIsAfterIt()
+        {
+            int start = int.MaxValue - 40000;
+            int first = unchecked(start + 30000);                    // still before the wrap
+            int now = unchecked(start + 55000);                      // past the wrap
+            Assert.Less(now, 0, "now really wrapped");
+            Assert.Greater(first, 0, "the first payout did not");
+            Assert.AreEqual(unchecked(first + 40000), DominionRules.NextCentrePayoutMs(start, now, 30000, 20000), "payouts at +0 and +20 s are past; the next is +40 s");
         }
 
         [Test] public void AStageEndIsTheStartPlusTheSeconds() => Assert.AreEqual(4500, DominionRules.StageEndMs(1000, 3.5f));

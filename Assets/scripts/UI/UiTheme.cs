@@ -1665,6 +1665,10 @@ namespace Overpower.UI
         public float chatNotSentHintSeconds = 3f;
         [Tooltip("Text size of the 'not sent' hint, in reference pixels.")]
         public float chatNotSentHintSize = 22f;
+        [Tooltip("Height of the 'not sent' hint as a multiple of its text size (1.6 = a line and a bit of air).")]
+        public float chatNotSentHintLineHeight = 1.6f;
+        [Tooltip("Gap between the top of the typing box and the bottom of the 'not sent' hint, in reference pixels.")]
+        public float chatNotSentHintGap = 2f;
 
         [Header("Lobby screens: layout numbers (lobby Task 10 review)")]
         [Tooltip("Space between the lobby name and the mode row of the lobby room, in reference pixels.")]

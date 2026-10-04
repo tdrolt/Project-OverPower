@@ -76,13 +76,9 @@ namespace Overpower.Tests
         {
             // Tudor A8: the last players die in the same instant -> sudden death starts over; no points tie-break.
             int[] alive = { 0, 0, 3 };
-            Assert.IsTrue(SuddenDeathRules.NobodyLeft(alive, new[] { 0, 1 }));
             Assert.AreEqual(-1, SuddenDeathRules.LastTeamStanding(alive, new[] { 0, 1 }));
             Assert.AreEqual(SuddenDeathState.Replay, SuddenDeathRules.Evaluate(alive, new[] { 0, 1 }).State);
         }
-
-        [Test] public void NobodyLeftIsFalseWhileAnySuddenDeathTeamHasSomeone() =>
-            Assert.IsFalse(SuddenDeathRules.NobodyLeft(new[] { 1, 0 }, new[] { 0, 1 }));
 
         [Test] public void AMissingOrEmptyListNeverDecidesAnything()
         {

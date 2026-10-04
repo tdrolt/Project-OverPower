@@ -49,13 +49,6 @@ namespace Overpower.Dominion
             return standing;
         }
 
-        /// <summary>True when no team in sudden death has anyone alive.</summary>
-        public static bool NobodyLeft(int[] aliveCountPerTeam, int[] teamsInSuddenDeath)
-        {
-            Count(aliveCountPerTeam, teamsInSuddenDeath, out _, out int teamsAlive);
-            return teamsAlive == 0 && teamsInSuddenDeath != null && teamsInSuddenDeath.Length > 0;
-        }
-
         /// <summary>The verdict. One team with anyone alive: Won. Two or more: Ongoing. Nobody left (the last players of the sudden-death
         /// teams fall in the same instant): Replay - sudden death starts over, everyone back at their spawn and the circle full size again
         /// (Tudor A8; there is no points tie-break). Missing arrays decide nothing (Ongoing).</summary>

@@ -178,9 +178,13 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
 
     /// <summary>Publishes a line to the current lobby's channel as this player (name, team, spectator seat). Nothing is sent outside a room.
     /// Returns true only when the line really went out; a refused line is neither logged nor cleared (ChatSendRule), so a retry is logged once.</summary>
-    public bool Send(string typed)
+    public bool Send(string typed) => SendWithOutcome(typed) == ChatSendOutcome.Sent;
+
+    /// <summary>Send, and say what happened (Ignored / Refused / Sent): the typing box's Enter handler acts on this outcome through
+    /// ChatSendRule, so the helper the tests cover is the code that decides.</summary>
+    public ChatSendOutcome SendWithOutcome(string typed)
     {
-        if (string.IsNullOrWhiteSpace(typed)) return false;
+        if (string.IsNullOrWhiteSpace(typed)) return ChatSendOutcome.Ignored;
         bool canPublish = chatClient != null && chatClient.CanChat && subscribedChannel != null
             && subscribedChannel == ChatChannelRule.ChannelFor(PhotonNetwork.InRoom ? PhotonNetwork.CurrentRoom.Name : null);
         bool published = false;
@@ -195,7 +199,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         // out (Dominion Task 1 Part 0): a line refused during a chat reconnect stays in the box and would otherwise be logged on every retry.
         if (ChatSendRule.IsLogged(outcome))
             Overpower.Telemetry.MatchTelemetry.Instance?.LogChat(typed);
-        return outcome == ChatSendOutcome.Sent;
+        return outcome;
     }
 
     /// <summary>The team and spectator flag this player chats under: from the match (player properties) once the game has started, from the
@@ -438,18 +442,21 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         {
             // To the current lobby's channel only. The field clears only when the line really went out (Lobby Task 15b): a line typed
             // during a chat reconnect (Send returns false while the client cannot chat) stays in the field to be sent again.
-            string typed = chatField.text;
-            bool sent = Send(typed);
-            if (sent || string.IsNullOrWhiteSpace(typed))
-                chatField.text = "";
-            else
-                ShowNotSentHint();
+            ChatSendOutcome outcome = SendWithOutcome(chatField.text);
+            if (ChatSendRule.ClearsTheBox(outcome)) chatField.text = "";
+            if (ChatSendRule.ShowsHint(outcome)) ShowNotSentHint();
+            else if (outcome == ChatSendOutcome.Sent) HideNotSentHint();
         }
     }
 
     /// <summary>The short "not sent, chat reconnecting" hint above the typing box (UiTheme chatNotSent*); hides itself after a few seconds.</summary>
     public bool NotSentHintShowing => notSentHint != null && notSentHint.gameObject.activeSelf;
     public string NotSentHintText => notSentHint != null ? notSentHint.text : "";
+
+    private void HideNotSentHint()
+    {
+        if (notSentHint != null) notSentHint.gameObject.SetActive(false);
+    }
 
     private void ShowNotSentHint()
     {
@@ -468,8 +475,11 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
             rt.anchorMin = new Vector2(0f, 0f);
             rt.anchorMax = new Vector2(1f, 0f);
             rt.pivot = new Vector2(1f, 0f);
-            rt.sizeDelta = new Vector2(-theme.chatPanelPadding * 2f, theme.chatNotSentHintSize * 1.6f);
-            rt.anchoredPosition = new Vector2(0f, theme.chatPanelPadding + theme.chatInputHeight + 2f);
+            // Stretch between the panel's padding on both sides (offsetMin/offsetMax), height from the text size.
+            rt.offsetMin = new Vector2(theme.chatPanelPadding, rt.offsetMin.y);
+            rt.offsetMax = new Vector2(-theme.chatPanelPadding, rt.offsetMax.y);
+            rt.sizeDelta = new Vector2(rt.sizeDelta.x, theme.chatNotSentHintSize * theme.chatNotSentHintLineHeight);
+            rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, theme.chatPanelPadding + theme.chatInputHeight + theme.chatNotSentHintGap);
         }
         notSentHint.text = theme.chatNotSentHint;
         notSentHint.gameObject.SetActive(true);

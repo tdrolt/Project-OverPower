@@ -95,7 +95,7 @@ namespace Overpower.Dominion
         }
 
         /// <summary>Points <paramref name="team"/> earns this one second: for each zone it owns, the table entry of the zone's tier
-        /// (pointsPerTier[tier - 1]). Spawn zones and Tier 4 (the centre) never pay here whatever the table says: camping your own spawn
+        /// (pointsPerTier[tier - 1]). Spawn zones, Tier 1 (the capitals) and Tier 4 (the centre) never pay here whatever the table says: camping your own spawn
         /// earns nothing, and the centre pays in lumps instead (NextCentrePayoutMs) - Tudor's "alternative way to win".</summary>
         public static int PointsThisTick(int[] zoneOwner, int[] zoneTier, bool[] isSpawnZone, int team, int[] pointsPerTier)
         {
@@ -106,7 +106,7 @@ namespace Overpower.Dominion
                 if (zoneOwner[z] != team) continue;
                 if (isSpawnZone != null && z < isSpawnZone.Length && isSpawnZone[z]) continue;
                 int tier = zoneTier[z];
-                if (tier == CentreTier || tier < 1 || tier > pointsPerTier.Length) continue;
+                if (tier == CentreTier || tier == CapitalTier || tier < 1 || tier > pointsPerTier.Length) continue;
                 total += Math.Max(0, pointsPerTier[tier - 1]);
             }
             return total;
@@ -114,6 +114,9 @@ namespace Overpower.Dominion
 
         /// <summary>The Tier 4 zone: the centre.</summary>
         public const int CentreTier = 4;
+
+        /// <summary>Tier 1: the capitals. They never pay per tick whatever the table says.</summary>
+        public const int CapitalTier = 1;
 
         /// <summary>PointsThisTick for every team 0..teamCount-1.</summary>
         public static int[] PointsThisTickAll(int[] zoneOwner, int[] zoneTier, bool[] isSpawnZone, int teamCount, int[] pointsPerTier)
@@ -142,10 +145,12 @@ namespace Overpower.Dominion
         /// <summary>The team a centre payout goes to: whoever holds the centre at that moment, or -1 (nobody holding = nobody paid).</summary>
         public static int CentrePayoutTeam(int centreOwner) => centreOwner >= 0 ? centreOwner : -1;
 
-        /// <summary>A zone's bounty is due when it changes hands from a real owner to a different team after an unbroken hold of at least
-        /// holdMs. This wraps BountyRule (the same rule the Control mode uses) rather than repeating it; holdSince to now is the held time.</summary>
-        public static bool BountyDue(int holdSinceMs, int nowMs, int holdMs, int previousOwner, int newOwner) =>
-            BountyRule.PayoutOnCapture(newOwner, previousOwner, unchecked(nowMs - holdSinceMs), 1, holdMs) > 0;
+        /// <summary>A zone's bounty is due when it is captured by a different team than the one that held it, after that hold lasted at
+        /// least holdMs. It reads what the room stores, as BuildingManager.SetCaptured does: a zone always goes neutral before it is captured,
+        /// and TerritorySnapshot.WithNeutral keeps the finished hold (LastOwnerOf / LastHeldMs), so the arguments are those two, not a
+        /// "held since" time. This wraps BountyRule (the same rule the Control mode uses) rather than repeating it.</summary>
+        public static bool BountyDue(int lastHeldMs, int holdMs, int lastOwner, int newOwner) =>
+            BountyRule.PayoutOnCapture(newOwner, lastOwner, lastHeldMs, 1, holdMs) > 0;
 
         /// <summary>The server time a stage that started at startMs and lasts <paramref name="seconds"/> ends (wrap-safe).</summary>
         public static int StageEndMs(int startMs, float seconds) => unchecked(startMs + (int)Math.Round(seconds * 1000f));

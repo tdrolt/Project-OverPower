@@ -659,6 +659,8 @@ MonoBehaviour:
   chatNotSentHint: Not sent, chat reconnecting
   chatNotSentHintSeconds: 3
   chatNotSentHintSize: 22
+  chatNotSentHintLineHeight: 1.6
+  chatNotSentHintGap: 2
   lobbyRoomHeaderGap: 3
   lobbyRoomModeRowGap: 15
   lobbyRoomInfoIconTextFactor: 0.62
