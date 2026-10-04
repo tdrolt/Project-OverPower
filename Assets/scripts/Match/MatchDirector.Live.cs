@@ -2,6 +2,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
+using Overpower.Dominion;
 using Overpower.Lobby;
 using Overpower.Net;
 using Overpower.Telemetry;
@@ -87,7 +88,7 @@ namespace Overpower.Match
         /// after a master switch. Centre-circle-and-cut-rule, 2026-09-26: no longer a stored Room Property of its
         /// own - PhaseTwoCutRules.CutTeam derives it from mTeams and mElim, the same two facts every client
         /// already reads, so a corner can never disagree with who was actually knocked out.</summary>
-        public int CutTeam => PhotonNetwork.InRoom
+        public int CutTeam => PhotonNetwork.InRoom && !DominionMode.IsActive() // Dominion never cuts a corner (Task 2)
             ? PhaseTwoCutRules.CutTeam(IsLive, TeamsInMatch, ReadEliminatedArray(PhotonNetwork.CurrentRoom.CustomProperties))
             : PhaseTwoCutRules.NoCut;
 

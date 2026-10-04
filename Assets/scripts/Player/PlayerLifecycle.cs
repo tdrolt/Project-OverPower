@@ -401,7 +401,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         // 2.7b step 7 (Decision 10): TeamHasACapital already reads "any capital in play" - this team's own, an
         // enemy's, or a knocked-out team's (adoption), never one behind the phase-two wall - in both phases, so IsLastStandDeath's own capital-less
         // check below covers adoption for free; nothing here has to special-case it.
-        bool live = director != null && director.IsLive;
+        // Dominion has no last stand: a death there is always an ordinary respawn (Dominion Task 2).
+        bool live = director != null && director.IsLive && !Overpower.Dominion.DominionMode.IsActive();
         bool hasCapital = director != null && director.TeamHasACapital(teamID);
 
         // 2.7b step 5 (Decision 3): live comes from MatchDirector.IsLive, the room's own echoed mPhase - a
@@ -595,6 +596,50 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         Debug.Log($"[MATCH] fresh start team={team} position={rigidbody.position} " +
                   $"gold={(goldWallet != null ? goldWallet.Balance : 0)} deathCount={deathCount}");
+    }
+
+    /// <summary>Dominion: a new round starts after a break. Back at this team's own spawn with full health, alive and out of any respawn wait -
+    /// and nothing else: the build, gold, ultimate charge and every pick the player made in the break stay exactly as they are (that is what
+    /// ResetForMatchStart, the fresh start a break begins with, is not). Only the owner's client does anything.</summary>
+    public void ResetForRoundStart(int team)
+    {
+        if (!photonView.IsMine)
+            return;
+
+        // The same respawn wait cleanup as the fresh start, so a coroutine still counting down cannot teleport the player again afterwards.
+        if (respawnRoutine != null)
+        {
+            StopCoroutine(respawnRoutine);
+            respawnRoutine = null;
+        }
+        death = false;
+        respawnStarted = false;
+        deathCounted = false;
+        rejoinRespawnPending = false;
+        matchUI?.SetRespawnPanelVisible(false);
+        matchUI?.HideWaitingPanel();
+        matchUI?.SetRespawnNote("");
+        respawnNoteShowing = false;
+
+        playerDisplacement?.Cancel();
+        playerHealth.ResetForRespawn();
+
+        RoomManager roomManager = FindObjectOfType<RoomManager>();
+        if (roomManager != null && roomManager.teamSpawnPoints != null
+            && team >= 0 && team < roomManager.teamSpawnPoints.Length && roomManager.teamSpawnPoints[team] != null)
+        {
+            Transform spawn = roomManager.teamSpawnPoints[team];
+            TeleportToSpawnPoint(spawn.position, spawn.rotation);
+        }
+
+        if (!isAlive)
+        {
+            LastAliveChangeWasFreshStart = true;
+            SetAlive(true);
+        }
+        SetLastStandOut(false);
+
+        Debug.Log($"[DOMINION] round start: back at spawn team={team} position={rigidbody.position} deathCount={deathCount}");
     }
 
     /// The one place the respawn wait is computed, called from both death paths (a normal death in

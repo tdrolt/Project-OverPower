@@ -400,6 +400,11 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // Vision Task 11: the centre scan (wave on the ground, dots and zone refresh for the team that held the centre when the wave started; the countdown above the tower is for everyone). Same reasoning.
         if (GetComponent<Overpower.Vision.CentreScan>() == null)
             gameObject.AddComponent<Overpower.Vision.CentreScan>();
+
+        // Dominion Task 2: the round flow (rounds, breaks, the match winner). Same reasoning as MatchDirector: no scene footprint; it does nothing
+        // unless the room is a Dominion room.
+        if (GetComponent<Overpower.Dominion.DominionDirector>() == null)
+            gameObject.AddComponent<Overpower.Dominion.DominionDirector>();
     }
 
     void Start()
@@ -990,6 +995,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     {
         if (!PhotonNetwork.IsMasterClient || territoryWinAnnounced)
             return;
+        if (Overpower.Dominion.DominionMode.IsActive())
+            return; // Dominion is decided by its rounds, never by holding every capital (Task 2)
 
         MatchDirector director = MatchDirector.Instance;
         if (director == null)

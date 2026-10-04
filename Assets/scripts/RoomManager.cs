@@ -44,8 +44,15 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Tooltip("Read by a spectator seat's view for the centre scan's numbers (its wave and the countdown), which otherwise come from a player's own body.")]
     [SerializeField] private VisionConfig visionConfig;
 
+    [Header("Dominion (Task 2)")]
+    [Tooltip("Every Dominion number (round and break length, points, bounties, respawns, shop). Read by the Dominion round flow.")]
+    [SerializeField] private DominionConfig dominionConfig;
+
     /// <summary>Every game mode a lobby can be created with (the create screen lists them).</summary>
     public GameModeCatalogue ModeCatalogue => modeCatalogue;
+
+    /// <summary>The Dominion numbers.</summary>
+    public DominionConfig Dominion => dominionConfig;
 
     /// <summary>The lobby and player name lengths and the list's redraw time.</summary>
     public LobbyConfig LobbyCfg => lobbyConfig;

@@ -1,0 +1,196 @@
+using System;
+using ExitGames.Client.Photon;
+using Overpower.Match;
+
+namespace Overpower.Dominion
+{
+    /// <summary>The Dominion values as the room holds them right now.</summary>
+    public struct DominionRoomState
+    {
+        /// <summary>False until round 1 has been written (dRnd absent).</summary>
+        public bool HasRound;
+        public int Round;
+        public DominionStage Stage;
+        public int EndMs;
+        public int[] Points;
+        public int[] Wins;
+        public int Winner;
+
+        /// <summary>The state from the room's properties. Missing keys read as: no round, stage None, no points or wins (arrays of three zeros),
+        /// no winner (-1). A wrong type reads as missing.</summary>
+        public static DominionRoomState Read(Hashtable props)
+        {
+            var state = new DominionRoomState
+            {
+                Points = new int[DominionKeys.TeamSlots],
+                Wins = new int[DominionKeys.TeamSlots],
+                Winner = -1,
+            };
+            if (props == null) return state;
+            if (props.TryGetValue(DominionKeys.Round, out object round) && round is int r) { state.HasRound = true; state.Round = r; }
+            if (props.TryGetValue(DominionKeys.Stage, out object stage) && stage is int s) state.Stage = (DominionStage)s;
+            if (props.TryGetValue(DominionKeys.StageEnd, out object end) && end is int e) state.EndMs = e;
+            if (props.TryGetValue(DominionKeys.Points, out object points) && points is int[] p) state.Points = p;
+            if (props.TryGetValue(DominionKeys.Wins, out object wins) && wins is int[] w) state.Wins = w;
+            if (props.TryGetValue(DominionKeys.Winner, out object winner) && winner is int win) state.Winner = win;
+            return state;
+        }
+    }
+
+    /// <summary>The numbers the stage flow needs from DominionConfig, passed in so the tests use made-up ones.</summary>
+    public struct DominionFlowNumbers
+    {
+        public int RoundsToWin;
+        public int MaxRounds;
+        public float RoundSeconds;
+        public float BreakSeconds;
+    }
+
+    /// <summary>One check-and-set the master should send: what to write and what the room must still hold for it to apply.</summary>
+    public sealed class DominionWrite
+    {
+        public Hashtable Props;
+        public Hashtable Expected;
+        public string What;
+    }
+
+    /// <summary>What a client does once, when it sees the stage change in the room.</summary>
+    public enum DominionEdge { None, BreakStarted, RoundStarted }
+
+    /// <summary>
+    /// What the master writes into the room next, as pure rules (Dominion Task 2): given the room's Dominion values, the server clock, the
+    /// config numbers and who is in the match, the one check-and-set to send now, or nothing. DominionDirector only reads the room, asks this and
+    /// sends the answer; a new master asks the same question of the same room and carries on (A1). Every write expects the values it was
+    /// computed from, so two clients that both think they are master cannot both advance one stage.
+    /// </summary>
+    public static class DominionRoomWrites
+    {
+        /// <summary>The write to send now, or null. Nothing is written for a Conquest room, before the match is live or while the server clock
+        /// has not synced (0).</summary>
+        /// <param name="teamsInMatch">The team ids fixed into the match (mTeams).</param>
+        /// <param name="playersPerTeam">Players present per team id (index = team id).</param>
+        public static DominionWrite Next(bool dominion, bool live, int nowMs, DominionRoomState room, DominionFlowNumbers cfg,
+                                         int[] teamsInMatch, int[] playersPerTeam)
+        {
+            if (!dominion || !live || nowMs == 0) return null;
+
+            if (!room.HasRound)
+            {
+                return new DominionWrite
+                {
+                    What = "round 1 starts",
+                    Props = new Hashtable
+                    {
+                        { DominionKeys.Round, 1 },
+                        { DominionKeys.Stage, (int)DominionStage.Round },
+                        { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.RoundSeconds) },
+                        { DominionKeys.Points, new int[DominionKeys.TeamSlots] },
+                        { DominionKeys.Wins, new int[DominionKeys.TeamSlots] },
+                        { DominionKeys.Winner, -1 },
+                    },
+                    Expected = new Hashtable { { DominionKeys.Round, null } },
+                };
+            }
+
+            if (room.Stage == DominionStage.Over || room.Stage == DominionStage.None) return null;
+
+            // A3: a team that empties keeps the match going; the last team with anyone in the room wins it at once.
+            int lastTeam = OnlyTeamWithPlayers(teamsInMatch, playersPerTeam);
+            if (lastTeam >= 0)
+                return Stage(room, "last team standing", new Hashtable
+                {
+                    { DominionKeys.Stage, (int)DominionStage.Over },
+                    { DominionKeys.Winner, lastTeam },
+                    { DominionKeys.Wins, Slots(room.Wins) },
+                });
+
+            if (room.Stage == DominionStage.SuddenDeath) return null; // no clock here; Task 8 ends it
+            if (!MatchStartRules.HasReached(nowMs, room.EndMs)) return null;
+
+            if (room.Stage == DominionStage.Break)
+                return Stage(room, "break over, round starts", new Hashtable
+                {
+                    { DominionKeys.Stage, (int)DominionStage.Round },
+                    { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.RoundSeconds) },
+                    { DominionKeys.Points, new int[DominionKeys.TeamSlots] },
+                });
+
+            // A round ended: score it, then break, match over or sudden death.
+            int[] wins = Slots(room.Wins);
+            int roundWinner = DominionRules.RoundWinner(room.Points);
+            if (roundWinner >= 0 && roundWinner < wins.Length) wins[roundWinner]++;
+            RoundOutcome outcome = DominionRules.AfterRound(room.Round, wins, cfg.RoundsToWin, cfg.MaxRounds, teamsInMatch);
+            switch (outcome.Next)
+            {
+                case DominionStage.Over:
+                    return Stage(room, "match won", new Hashtable
+                    {
+                        { DominionKeys.Stage, (int)DominionStage.Over },
+                        { DominionKeys.Winner, outcome.Winner },
+                        { DominionKeys.Wins, wins },
+                    });
+                case DominionStage.SuddenDeath:
+                    return Stage(room, "sudden death", new Hashtable
+                    {
+                        { DominionKeys.Stage, (int)DominionStage.SuddenDeath },
+                        { DominionKeys.StageEnd, 0 },
+                        { DominionKeys.Wins, wins },
+                    });
+                default:
+                    return Stage(room, "round over, break", new Hashtable
+                    {
+                        { DominionKeys.Round, room.Round + 1 },
+                        { DominionKeys.Stage, (int)DominionStage.Break },
+                        { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.BreakSeconds) },
+                        { DominionKeys.Wins, wins },
+                    });
+            }
+        }
+
+        /// <summary>The write for a stage change: the props, expecting the stage, round and end time this client computed it from.</summary>
+        private static DominionWrite Stage(DominionRoomState room, string what, Hashtable props) => new DominionWrite
+        {
+            What = what,
+            Props = props,
+            Expected = new Hashtable
+            {
+                { DominionKeys.Stage, (int)room.Stage },
+                { DominionKeys.Round, room.Round },
+                { DominionKeys.StageEnd, room.EndMs },
+            },
+        };
+
+        /// <summary>A copy of the per-team array padded to the team slots (a short or missing array reads as zeros).</summary>
+        private static int[] Slots(int[] values)
+        {
+            var copy = new int[Math.Max(DominionKeys.TeamSlots, values != null ? values.Length : 0)];
+            if (values != null) Array.Copy(values, copy, values.Length);
+            return copy;
+        }
+
+        /// <summary>The one team of the match that still has a player, or -1 (two or more teams have players, or nobody does, or the match has
+        /// fewer than two teams).</summary>
+        public static int OnlyTeamWithPlayers(int[] teamsInMatch, int[] playersPerTeam)
+        {
+            if (teamsInMatch == null || teamsInMatch.Length < 2 || playersPerTeam == null) return -1;
+            int found = -1, count = 0;
+            foreach (int team in teamsInMatch)
+            {
+                if (team < 0 || team >= playersPerTeam.Length || playersPerTeam[team] <= 0) continue;
+                found = team;
+                count++;
+            }
+            return count == 1 ? found : -1;
+        }
+
+        /// <summary>What a client does once on seeing the room go from (prevRound, prevStage) to (round, stage): a break starting is a full fresh
+        /// start for every player, a round starting after a break puts everyone back at their spawn keeping their picks. Round 1 starting needs
+        /// nothing (going live already did the fresh start), and nothing else is an edge.</summary>
+        public static DominionEdge EdgeBetween(int prevRound, DominionStage prevStage, int round, DominionStage stage)
+        {
+            if (stage == DominionStage.Break && prevStage == DominionStage.Round) return DominionEdge.BreakStarted;
+            if (stage == DominionStage.Round && prevStage == DominionStage.Break) return DominionEdge.RoundStarted;
+            return DominionEdge.None;
+        }
+    }
+}

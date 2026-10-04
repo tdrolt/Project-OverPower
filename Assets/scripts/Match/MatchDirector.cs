@@ -4,6 +4,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Data;
+using Overpower.Dominion;
 using Overpower.Net;
 using Overpower.Telemetry;
 using Overpower.UI;
@@ -164,6 +165,9 @@ namespace Overpower.Match
         {
             BuildingManager buildings = BuildingManager.Instance;
             int ownCapital = buildings != null && buildings.Map != null ? buildings.Map.CapitalOf(team) : TerritoryMap.Neutral;
+            // Dominion: a death always respawns at the team's own spawn (no last stand, nobody adopts another capital).
+            if (DominionMode.IsActive())
+                return ownCapital;
             return MatchPhaseRules.SpawnCapitalFor(Phase, IsEliminated(team), ownCapital, RespawnCapitalOf(team));
         }
 
@@ -185,6 +189,8 @@ namespace Overpower.Match
 
         public bool SpawnsIntoLastStand(int team)
         {
+            if (DominionMode.IsActive())
+                return false; // Dominion has no last stand
             BuildingManager buildings = BuildingManager.Instance;
             if (buildings == null || buildings.Map == null || buildings.Current == null)
                 return false;
@@ -459,7 +465,12 @@ namespace Overpower.Match
         /// exactly as MatchPhaseRules last computed it - a territory win does not necessarily mean
         /// every other team also lost its capital, so this must not invent elimination facts
         /// MatchPhaseRules never decided.</summary>
-        public void AnnounceTerritoryWin(int winningTeam)
+        public void AnnounceTerritoryWin(int winningTeam) => AnnounceMatchOver(winningTeam);
+
+        /// <summary>Ends the match with this winner whichever way it was decided: the one path to the result card and the closed room. Conquest's
+        /// territory win calls it (through AnnounceTerritoryWin), and so does Dominion's DominionDirector once the room says the match is over.
+        /// Master only; calling it again for the same winner changes nothing.</summary>
+        public void AnnounceMatchOver(int winningTeam)
         {
             if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom)
                 return;
@@ -536,6 +547,10 @@ namespace Overpower.Match
             // countdown's own Update() poll going live, which writes territory and then mPhase as two separate,
             // ordered events (Decision 5) - never from reacting to either write's own echo.
             if (!IsLive)
+                return;
+
+            // Dominion (Task 2): no knockouts, last stand or phase two - the rounds decide it (DominionDirector).
+            if (DominionMode.IsActive())
                 return;
 
             // A decided match is final - it must never be rebuilt from whoever happens to still be
