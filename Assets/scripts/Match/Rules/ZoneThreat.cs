@@ -14,6 +14,10 @@ namespace Overpower.Match
     {
         public const int MaxTeams = 3;
 
+        /// <summary>Dominion Task 6: does "under attack" close the link to the zones next to this one? A Dominion capital cannot
+        /// be captured, so an enemy standing in it still warns the team but never closes the link.</summary>
+        public static bool ClosesLink(bool zoneIsCapturable, bool underAttack) => zoneIsCapturable && underAttack;
+
         public static int TeamBit(int team) => team >= 0 && team < MaxTeams ? 1 << team : 0;
 
         /// <param name="owner">The zone's owner, or -1 for neutral.</param>

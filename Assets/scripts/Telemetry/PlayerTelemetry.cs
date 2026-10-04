@@ -451,6 +451,7 @@ namespace Overpower.Telemetry
                 case PurchaseBlock.NotInOwnTerritory: return "territory";
                 case PurchaseBlock.InCombat: return "combat";
                 case PurchaseBlock.CannotAfford: return "gold";
+                case PurchaseBlock.NotInBreak: return "not in break";
                 default: return "unknown";
             }
         }

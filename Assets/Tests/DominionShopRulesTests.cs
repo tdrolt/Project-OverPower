@@ -142,6 +142,15 @@ namespace Overpower.Tests
                 Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(false, stage, false), stage.ToString());
         }
 
+        [Test]
+        public void TheShopHeaderNamesTheLateJoinersPickOnlyOutsideTheBreak()
+        {
+            Assert.IsTrue(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.Round, true));
+            Assert.IsTrue(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.SuddenDeath, true));
+            Assert.IsFalse(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.Break, true), "in a break everyone's pick is the break's");
+            Assert.IsFalse(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.Round, false));
+        }
+
         [Test] public void ALateJoinersPickLastsOnlyWhileTheRoundTheyJoinedInIsGoing()
         {
             Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.Round));

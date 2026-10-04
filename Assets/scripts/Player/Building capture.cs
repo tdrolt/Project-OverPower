@@ -407,12 +407,13 @@ public class BuildingCapture : MonoBehaviourPun
             : manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
         PaintKnownCarpet(owner, filtered);
 
-        // Dominion Task 4: a capital cannot be captured there, so the capture ring on the ground is not shown at all.
+        // Dominion Task 4/6: a capital cannot be captured there, so its capture progress band and track are never shown;
+        // the outline stays, because it marks where the spawn's healing ends (Task 6).
         bool capturable = manager.IsCapturableZone(buildingID);
-        if (ringView != null && ringView.gameObject.activeSelf != capturable)
-            ringView.gameObject.SetActive(capturable);
+        if (ringView != null && !ringView.gameObject.activeSelf)
+            ringView.gameObject.SetActive(true);
 
-        if ((ringView == null || !capturable) && towerLook == null)
+        if (ringView == null && towerLook == null)
             return;
 
         CaptureRingState state;
@@ -427,12 +428,12 @@ public class BuildingCapture : MonoBehaviourPun
                                           PhotonNetwork.ServerTimestamp, outOfPlay: false);
         }
 
-        if (ringView != null && capturable)
+        if (ringView != null)
         {
             // Yaw reads 0 (world +Z as "top") until ResolveTeamYaw resolves it for this match - CaptureRingView only
             // rebuilds the band/track points when this value CHANGES, so the first resolved yaw self-corrects their
             // rotation the very next frame; nothing here needs to wait for YawResolved.
-            ringView.Refresh(state, CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f);
+            ringView.Refresh(state, CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f, outlineOnly: !capturable);
         }
 
         towerLook?.Refresh(state, Time.unscaledTime);
@@ -540,8 +541,11 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
     // Cached so the per-frame capture check below doesn't allocate a new delegate for every tower every frame.
+    // Dominion Task 6: an enemy standing in a capital (not capturable there) still counts as "under attack" for the warnings,
+    // but never closes the link to the zones next to it - ZoneThreat.ClosesLink holds that rule.
     private static readonly System.Func<int, bool> ZoneUnderAttack =
-        zone => ZonePresenceTracker.Instance != null && ZonePresenceTracker.Instance.IsUnderAttack(zone);
+        zone => ZonePresenceTracker.Instance != null && BuildingManager.Instance != null
+                && ZoneThreat.ClosesLink(BuildingManager.Instance.IsCapturableZone(zone), ZonePresenceTracker.Instance.IsUnderAttack(zone));
 
     // 2.7b Decision 8/9: a zone out of play - not only the host-start left-out capital, but since the phase-two cut
     // also any zone behind the wall - is never capturable, not even by its own team - checked before the own-capital

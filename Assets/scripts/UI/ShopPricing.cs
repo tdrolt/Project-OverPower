@@ -140,7 +140,8 @@ namespace Overpower.UI
         }
 
         public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position, bool isAlive,
-                                        bool lateJoinerPickOpen = false, DominionConfig dominion = null, string dominionFreeText = "", string closedText = "")
+                                        bool lateJoinerPickOpen = false, DominionConfig dominion = null, string dominionFreeText = "", string closedText = "",
+                                        string lateJoinerFreeText = "")
         {
             bool freeLoadout = config == null || config.FreeLoadout;
             bool isFree = IsFreeNow(config);
@@ -151,7 +152,15 @@ namespace Overpower.UI
             float required = config != null ? config.ShopOutOfCombatSeconds : 0f;
             int balance = wallet != null ? wallet.Balance : 0;
             return new ShopContext(isFree, isWarmupSandbox, inOwnTerritory, secondsSinceCombat, required, balance,
-                DominionClosed(lateJoinerPickOpen), DominionLimits(dominion), dominionFreeText, closedText);
+                DominionClosed(lateJoinerPickOpen), DominionLimits(dominion), HeaderFreeText(lateJoinerPickOpen, dominionFreeText, lateJoinerFreeText), closedText);
+        }
+
+        /// <summary>The header's free note: the late joiner's own wording while their one pick is open mid-round, the break's otherwise.</summary>
+        private static string HeaderFreeText(bool lateJoinerPickOpen, string breakText, string lateJoinerText)
+        {
+            DominionDirector director = DominionDirector.Instance;
+            DominionStage stage = director != null ? director.Stage : DominionStage.None;
+            return DominionShopRules.HeaderNamesLateJoinerPick(stage, lateJoinerPickOpen) ? lateJoinerText : breakText;
         }
 
         private static bool InOwnTerritory(Player owner, Vector3 position)

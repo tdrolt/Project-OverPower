@@ -89,22 +89,25 @@ namespace Overpower.Dominion
 
             if (!room.HasRound)
             {
-                var first = new DominionWrite
+                // Every match opens with the break (Task 6, A20), so round 1's free movement ability, attachment and ultimate can be picked
+                // like every other round's. Going live already did the fresh start for players and zones, so dRz is written with the break's
+                // dEnd: no second zone reset for this break; the round's start resets the zones as for any round.
+                int breakEnd = DominionRules.StageEndMs(nowMs, cfg.BreakSeconds);
+                return new DominionWrite
                 {
-                    What = "round 1 starts",
+                    What = "break before round 1",
                     Props = new Hashtable
                     {
                         { DominionKeys.Round, 1 },
-                        { DominionKeys.Stage, (int)DominionStage.Round },
-                        { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.RoundSeconds) },
+                        { DominionKeys.Stage, (int)DominionStage.Break },
+                        { DominionKeys.StageEnd, breakEnd },
+                        { DominionKeys.ZonesResetFor, breakEnd },
                         { DominionKeys.Points, new int[DominionKeys.TeamSlots] },
                         { DominionKeys.Wins, new int[DominionKeys.TeamSlots] },
                         { DominionKeys.Winner, -1 },
                     },
                     Expected = new Hashtable { { DominionKeys.Round, null } },
                 };
-                AddCentre(first.Props, cfg, nowMs);
-                return first;
             }
 
             if (room.Stage == DominionStage.Over || room.Stage == DominionStage.None) return null;
@@ -220,7 +223,7 @@ namespace Overpower.Dominion
         }
 
         /// <summary>What a client does once on seeing the room go from (prevRound, prevStage) to (round, stage): a break starting is a full fresh
-        /// start for every player, a round starting after a break puts everyone back at their spawn keeping their picks. Round 1 starting needs
+        /// start for every player, a round starting after a break puts everyone back at their spawn keeping their picks. The break before round 1 needs
         /// nothing (going live already did the fresh start), and nothing else is an edge.</summary>
         public static DominionEdge EdgeBetween(int prevRound, DominionStage prevStage, int round, DominionStage stage)
         {

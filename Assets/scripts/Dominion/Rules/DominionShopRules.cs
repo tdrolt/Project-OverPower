@@ -33,6 +33,11 @@ namespace Overpower.Dominion
         public static PurchaseBlock PickBlock(bool dominionLive, DominionStage stage, bool lateJoinerPickOpen) =>
             dominionLive && !MayPick(stage, lateJoinerPickOpen) ? PurchaseBlock.NotInBreak : PurchaseBlock.None;
 
+        /// <summary>True when the shop header should name the late joiner's one pick ("Free (your one pick)") instead of the break: the pick is
+        /// open and the room is not in a break.</summary>
+        public static bool HeaderNamesLateJoinerPick(DominionStage stage, bool lateJoinerPickOpen) =>
+            lateJoinerPickOpen && stage != DominionStage.Break;
+
         /// <summary>A late joiner's one pick lasts only while the round they joined in is still going.</summary>
         public static bool LateJoinerWindowOpen(bool joinedMidRound, DominionStage stage) =>
             joinedMidRound && (stage == DominionStage.Round || stage == DominionStage.SuddenDeath);

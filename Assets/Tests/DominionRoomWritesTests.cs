@@ -32,19 +32,33 @@ namespace Overpower.Tests
 
         // ---- the start
 
-        [Test] public void ALiveDominionRoomWithNoRoundWritesRoundOneExpectingNoRound()
+        [Test] public void ALiveDominionRoomWithNoRoundWritesTheBreakBeforeRoundOneExpectingNoRound()
         {
             DominionWrite w = Next(default, 5000);
             Assert.IsNotNull(w);
             Assert.AreEqual(1, w.Props[DominionKeys.Round]);
-            Assert.AreEqual((int)DominionStage.Round, w.Props[DominionKeys.Stage]);
-            Assert.AreEqual(105000, w.Props[DominionKeys.StageEnd]);
+            Assert.AreEqual((int)DominionStage.Break, w.Props[DominionKeys.Stage], "every match opens with the pick break");
+            Assert.AreEqual(15000, w.Props[DominionKeys.StageEnd], "the break's length, not the round's");
+            Assert.AreEqual(5000 + 10000, w.Props[DominionKeys.ZonesResetFor], "going live already reset the zones: the break needs no second reset");
+            Assert.IsFalse(w.Props.ContainsKey(DominionKeys.CentrePayout), "the centre starts paying when the round starts, not in the break");
             CollectionAssert.AreEqual(new[] { 0, 0, 0 }, (int[])w.Props[DominionKeys.Points]);
             CollectionAssert.AreEqual(new[] { 0, 0, 0 }, (int[])w.Props[DominionKeys.Wins]);
             Assert.AreEqual(-1, w.Props[DominionKeys.Winner]);
             Assert.AreEqual(1, w.Expected.Count);
             Assert.IsTrue(w.Expected.ContainsKey(DominionKeys.Round));
             Assert.IsNull(w.Expected[DominionKeys.Round]);
+        }
+
+        [Test] public void TheBreakBeforeRoundOneIsFollowedByRoundOneAndItsFreshZones()
+        {
+            DominionRoomState afterGoLive = DominionRoomState.Read(Next(default, 5000).Props);
+            Assert.IsFalse(DominionRoomWrites.ZoneResetDue(afterGoLive), "no second reset on the first break");
+            DominionWrite start = Next(afterGoLive, 15000);
+            Assert.AreEqual((int)DominionStage.Round, start.Props[DominionKeys.Stage]);
+            Assert.IsFalse(start.Props.ContainsKey(DominionKeys.Round), "still round 1");
+            DominionRoomState inRound = afterGoLive;
+            inRound.Stage = DominionStage.Round; inRound.EndMs = (int)start.Props[DominionKeys.StageEnd];
+            Assert.IsTrue(DominionRoomWrites.ZoneResetDue(inRound), "the round's start resets the zones again, wiping anything done in the break");
         }
 
         [Test] public void AConquestRoomWritesNothing() => Assert.IsNull(Next(default, 5000, dominion: false));
@@ -229,7 +243,8 @@ namespace Overpower.Tests
 
         [Test] public void AStageChangeIsAnEdgeOnlyAfterTheFirstRead()
         {
-            Assert.AreEqual(DominionEdge.None, DominionRoomWrites.EdgeBetween(0, DominionStage.None, 1, DominionStage.Round), "round 1 starts: go-live already did the fresh start");
+            Assert.AreEqual(DominionEdge.None, DominionRoomWrites.EdgeBetween(0, DominionStage.None, 1, DominionStage.Break), "the break before round 1: go-live already did the fresh start");
+            Assert.AreEqual(DominionEdge.RoundStarted, DominionRoomWrites.EdgeBetween(1, DominionStage.Break, 1, DominionStage.Round), "round 1 starts after its break like any other");
             Assert.AreEqual(DominionEdge.BreakStarted, DominionRoomWrites.EdgeBetween(1, DominionStage.Round, 2, DominionStage.Break));
             Assert.AreEqual(DominionEdge.RoundStarted, DominionRoomWrites.EdgeBetween(2, DominionStage.Break, 2, DominionStage.Round));
             Assert.AreEqual(DominionEdge.None, DominionRoomWrites.EdgeBetween(2, DominionStage.Round, 2, DominionStage.Round));

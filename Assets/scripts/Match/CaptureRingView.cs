@@ -123,8 +123,9 @@ namespace Overpower.Match
             shownTrackStartYaw = float.NaN;
         }
 
-        /// <summary>Called every frame by BuildingCapture.Update on every client.</summary>
-        public void Refresh(CaptureRingState state, float cameraYawDegrees)
+        /// <summary>Called every frame by BuildingCapture.Update on every client. <paramref name="outlineOnly"/> hides the
+        /// progress band and track (a Dominion capital), keeping the outline.</summary>
+        public void Refresh(CaptureRingState state, float cameraYawDegrees, bool outlineOnly = false)
         {
             float time = Time.unscaledTime; // presentation only: a paused Time.timeScale must not freeze a pulse
 
@@ -143,7 +144,8 @@ namespace Overpower.Match
                 edgeColorSet = true;
             }
 
-            if (!state.ShowsArc)
+            // outlineOnly: a Dominion capital - nothing can be captured there, so no band or track, only the outline.
+            if (outlineOnly || !state.ShowsArc)
             {
                 if (band.enabled)
                     band.enabled = false;

@@ -144,6 +144,7 @@ MonoBehaviour:
   loadoutArmorMaxFormat: '{0} of {0} (max)'
   loadoutArmorRoundMaxFormat: '{0} of {0} this round'
   loadoutDominionFreeText: Free (break)
+  loadoutDominionLateJoinerFreeText: Free (your one pick)
   loadoutShopClosedText: The shop opens in the break
   loadoutArmorTopLevelText: top level
   loadoutArmorAbsorbRowFormat: 'Absorb lv {0}: {1}'

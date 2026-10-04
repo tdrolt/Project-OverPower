@@ -482,7 +482,9 @@ namespace Overpower.Tests
         {
             var cfg = new DominionFlowNumbers { RoundsToWin = 2, MaxRounds = 3, RoundSeconds = 100f, BreakSeconds = 10f, HasCentre = true, CentreFirstMs = 30000, CentreIntervalMs = 30000 };
             DominionWrite first = DominionRoomWrites.Next(true, true, 5000, default, cfg, Three, new[] { 3, 3, 3 });
-            Assert.AreEqual(35000, first.Props[DominionKeys.CentrePayout]);
+            Assert.IsFalse(first.Props.ContainsKey(DominionKeys.CentrePayout), "the break before round 1 pays nothing; the round start writes the first payout");
+            DominionWrite round1 = DominionRoomWrites.Next(true, true, 15000, DominionRoomState.Read(first.Props), cfg, Three, new[] { 3, 3, 3 });
+            Assert.AreEqual(45000, round1.Props[DominionKeys.CentrePayout]);
 
             var breakRoom = new DominionRoomState { HasRound = true, Round = 2, Stage = DominionStage.Break, EndMs = 9000, Points = new[] { 1, 2, 3 }, Wins = new[] { 1, 0, 0 }, Winner = -1 };
             DominionWrite second = DominionRoomWrites.Next(true, true, 9000, breakRoom, cfg, Three, new[] { 3, 3, 3 });

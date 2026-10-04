@@ -633,7 +633,8 @@ namespace Overpower.UI
         private ShopContext CurrentShopContext() =>
             ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position,
                 lifecycle == null || lifecycle.IsAlive, lateJoinerPick, DominionCfg,
-                theme != null ? theme.loadoutDominionFreeText : "", theme != null ? theme.loadoutShopClosedText : "");
+                theme != null ? theme.loadoutDominionFreeText : "", theme != null ? theme.loadoutShopClosedText : "",
+                theme != null ? theme.loadoutDominionLateJoinerFreeText : "");
 
         /// <summary>Dominion: a refused pick because the shop is shut (outside the break). True when the caller should stop.</summary>
         private bool RefuseIfClosed(ShopContext ctx, int itemId = -1)

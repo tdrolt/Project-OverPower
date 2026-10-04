@@ -373,6 +373,8 @@ namespace Overpower.UI
         public string loadoutArmorRoundMaxFormat = "{0} of {0} this round";
         [Tooltip("The shop header's note in a Dominion break: picks are free there, no gold involved.")]
         public string loadoutDominionFreeText = "Free (break)";
+        [Tooltip("The shop header's note for a player who joined a Dominion match in the middle of a round: they get one free pick before they spawn, outside the break.")]
+        public string loadoutDominionLateJoinerFreeText = "Free (your one pick)";
         [Tooltip("What the shop says when it is asked to open (P, or the Loadout button) in a Dominion match outside the break, and what its header says if it is somehow open then. Shown as a short toast over the game when the shop stays shut.")]
         public string loadoutShopClosedText = "The shop opens in the break";
         [Tooltip("Armour row wording for a row that is at its own top level with upgrades still left in the shared limit.")]

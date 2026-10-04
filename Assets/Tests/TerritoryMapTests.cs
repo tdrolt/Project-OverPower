@@ -22,6 +22,23 @@ namespace Overpower.Tests
         private static Dictionary<int, int> StartOwners() =>
             new Dictionary<int, int> { { 6, 0 }, { 7, 1 }, { 8, 2 } };
 
+        // Dominion Task 6: an enemy standing in a capital (which cannot be captured there) still warns the team but never closes the link.
+        [Test]
+        public void AnEnemyInADominionCapitalDoesNotCloseTheLinkToTheZoneBesideIt()
+        {
+            System.Func<int, bool> closes = zone => ZoneThreat.ClosesLink(zoneIsCapturable: zone != 6, underAttack: true);
+            Assert.IsTrue(RealMap().MayCapture(0, 0, StartOwners(), closes), "capital 6 is attacked, but zone 0 is still reachable from it");
+        }
+
+        [Test]
+        public void AnEnemyInACapturableOwnedZoneStillClosesTheLink()
+        {
+            System.Func<int, bool> closes = zone => ZoneThreat.ClosesLink(zoneIsCapturable: true, underAttack: true);
+            Assert.IsFalse(RealMap().MayCapture(0, 0, StartOwners(), closes));
+            Assert.IsFalse(ZoneThreat.ClosesLink(false, true));
+            Assert.IsFalse(ZoneThreat.ClosesLink(true, false));
+        }
+
         [Test]
         public void AZoneNextToOneYouOwnIsCapturable()
         {
