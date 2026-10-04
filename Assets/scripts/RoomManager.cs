@@ -110,7 +110,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         // The random id kept on this install is the Photon user id: it is what lets the server give a dropped player their own
         // place back. Set before connecting. Only its first 8 characters are ever logged.
-        PhotonNetwork.AuthValues = new Photon.Realtime.AuthenticationValues(PlayerIdentity.UserId);
+        // Only while not connected: a scene that loads INSIDE a room (the mode's map, Dominion Task 10) must keep the AuthenticationValues the live
+        // connection holds - they carry the token Photon needs to come back to the master server when the room is left (replacing them made every
+        // back-to-the-list from a map fail with "Authenticate without Token" and wait 20 s). The id itself never changes within a session.
+        if (SceneLoadRules.MustSetAuthValues(PhotonNetwork.IsConnected))
+            PhotonNetwork.AuthValues = new Photon.Realtime.AuthenticationValues(PlayerIdentity.UserId);
         Debug.Log($"[REJOIN] user id {PlayerIdRule.ForLog(PlayerIdentity.UserId)}..., rejoin window {RejoinWindowSeconds:0} s");
 
         // Default is 10 Hz, which makes the remote position a staircase updating once per
@@ -118,10 +122,54 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // Must stay <= SendRate (default 30).
         PhotonNetwork.SerializationRate = 20;
 
+        // Dominion Task 10: the host's Start game loads the mode's scene for everyone (LobbyStart -> PhotonNetwork.LoadLevel), and a player who
+        // joins or rejoins that room lands in the same scene. Set once, here, before the first connect or join. It changes nothing for a
+        // lobby whose mode has no other scene: no scene is ever put in such a room, so nobody is moved.
+        PhotonNetwork.AutomaticallySyncScene = true;
+
         // Task 9f: after "back to name screen" the scene is rebuilt while the connection stays up on the master server: a second
         // ConnectUsingSettings then would be refused and only log noise.
         if (!PhotonNetwork.IsConnected)
             PhotonNetwork.ConnectUsingSettings();
+
+        // This scene was loaded while already inside a room (the mode's scene, loaded for everyone): nobody joins again here, so the room is read again.
+        if (PhotonNetwork.InRoom)
+            StartCoroutine(ResumeInRoomAfterSceneLoad());
+    }
+
+    /// <summary>The scene the room's game is played on (its mode's GameModeDefinition.SceneName), or "" when the room's mode is unknown or
+    /// names none (then the game is played wherever the lobby is).</summary>
+    public string SceneOfRoom
+    {
+        get
+        {
+            if (!PhotonNetwork.InRoom || PhotonNetwork.CurrentRoom == null || modeCatalogue == null) return "";
+            if (!PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(LobbyKeys.Mode, out object raw) || !(raw is int id)) return "";
+            GameModeDefinition mode = modeCatalogue.ById(id);
+            return mode != null && mode.SceneName != null ? mode.SceneName : "";
+        }
+    }
+
+    /// <summary>True when the active scene is the one the room's game is played on (see SceneLoadRules.RoomIsHere). Bodies are spawned and the
+    /// start is acted on only then.</summary>
+    public bool RoomSceneIsLoaded => SceneLoadRules.RoomIsHere(SceneOfRoom, SceneManager.GetActiveScene().name);
+
+    /// <summary>A scene that starts with the client already in a room (the mode's scene, loaded by the master's LoadLevel or by Photon's scene sync for
+    /// a joiner): no "joined room" callback will come in this scene, so the components that read the room get it once, a frame after every Start has
+    /// run. Only those that merely READ the room (SceneLoadRules.ResumesAfterSceneLoad); this class's own callback is not repeated - it clears a new
+    /// player's team - except for a player who rejoined, whose body this scene must give back (the rejoin branch).</summary>
+    private System.Collections.IEnumerator ResumeInRoomAfterSceneLoad()
+    {
+        yield return null;
+        if (!PhotonNetwork.InRoom) yield break;
+        Debug.Log($"[SCENE] {SceneManager.GetActiveScene().name} loaded inside room {PhotonNetwork.CurrentRoom.Name}: reading the room again");
+        foreach (MonoBehaviourPunCallbacks callbacks in FindObjectsByType<MonoBehaviourPunCallbacks>(FindObjectsSortMode.None))
+        {
+            if (callbacks == this || !SceneLoadRules.ResumesAfterSceneLoad(callbacks.GetType().Name)) continue;
+            callbacks.OnJoinedRoom();
+        }
+        if (PhotonNetwork.LocalPlayer.HasRejoined)
+            HandleRejoinedPlayer();
     }
 
     public override void OnConnectedToMaster()
@@ -150,41 +198,48 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // nothing is spawned. Either way PlayerLifecycle respawns it as after a death.
         if (PhotonNetwork.LocalPlayer.HasRejoined)
         {
-            // The seat was given up while they were away (they dropped in the lobby and the master freed it before Start): they come back to a
-            // running game with no seat, i.e. as a late joiner. LobbyStart places them; the team they held is forgotten so nothing spawns for it.
-            if (GameStart != null && GameStart.GameRunningWithoutMySeat)
-            {
-                Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back but no longer has a seat - joining the running game as a late joiner");
-                PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
-                return;
-            }
-            // A player who held a spectator seat comes back as a spectator: no body, no watchdog (LobbyStart starts the spectator view
-            // again from the seat; the "spec" flag is still on their Player Properties).
-            if (Teams.IsSpectator(PhotonNetwork.LocalPlayer))
-            {
-                Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back on a spectator seat - no body");
-                return;
-            }
-            Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back - no new team pick, getting a body");
-            // Task 9e-2 / 9e-3: the team this player held may have been left out of the match at go-live: pick again as a joiner would.
-            // A team that was KNOCKED OUT while they were away is kept: they come back as its spectator (dead, no respawn - the
-            // ordinary death path already waits for an eliminated team), not moved to a team that is still in.
-            MatchDirector rejoinDirector = MatchDirector.Instance;
-            if (rejoinDirector != null && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int heldTeam))
-            {
-                bool eliminated = rejoinDirector.IsEliminated(heldTeam);
-                if (RejoinRules.TeamOnRejoin(rejoinDirector.TeamsFixed, eliminated, rejoinDirector.IsInMatch(heldTeam)) == RejoinTeamAction.Repick)
-                    EnsureLocalTeamInMatch();
-                else if (rejoinDirector.TeamsFixed && eliminated)
-                    Debug.Log($"[REJOIN] team {heldTeam} was knocked out while this player was away - back as its spectator");
-            }
-            StartCoroutine(WatchOwnBodyAfterRejoin());
+            HandleRejoinedPlayer();
             return;
         }
 
         // A new player arrives seatless (lobby Task 4): no team and no body until the host starts the game (LobbyStart spawns
         // them on their seat's team). A team or spectator flag left on the local player by a previous room is cleared here.
         PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
+    }
+
+    /// <summary>The rejoin branch of OnJoinedRoom (also run when a rejoined player's scene was swapped for the mode's: see ResumeInRoomAfterSceneLoad).</summary>
+    private void HandleRejoinedPlayer()
+    {
+        // The seat was given up while they were away (they dropped in the lobby and the master freed it before Start): they come back to a
+        // running game with no seat, i.e. as a late joiner. LobbyStart places them; the team they held is forgotten so nothing spawns for it.
+        if (GameStart != null && GameStart.GameRunningWithoutMySeat)
+        {
+            Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back but no longer has a seat - joining the running game as a late joiner");
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { Teams.TeamKey, null }, { Teams.SpectatorKey, null } });
+            return;
+        }
+        // A player who held a spectator seat comes back as a spectator: no body, no watchdog (LobbyStart starts the spectator view
+        // again from the seat; the "spec" flag is still on their Player Properties).
+        if (Teams.IsSpectator(PhotonNetwork.LocalPlayer))
+        {
+            Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back on a spectator seat - no body");
+            return;
+        }
+        Debug.Log($"[REJOIN] actor {PhotonNetwork.LocalPlayer.ActorNumber} is back - no new team pick, getting a body");
+        // Task 9e-2 / 9e-3: the team this player held may have been left out of the match at go-live: pick again as a joiner would.
+        // A team that was KNOCKED OUT while they were away is kept: they come back as its spectator (dead, no respawn - the
+        // ordinary death path already waits for an eliminated team), not moved to a team that is still in.
+        MatchDirector rejoinDirector = MatchDirector.Instance;
+        if (rejoinDirector != null && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int heldTeam))
+        {
+            bool eliminated = rejoinDirector.IsEliminated(heldTeam);
+            if (RejoinRules.TeamOnRejoin(rejoinDirector.TeamsFixed, eliminated, rejoinDirector.IsInMatch(heldTeam)) == RejoinTeamAction.Repick)
+                EnsureLocalTeamInMatch();
+            else if (rejoinDirector.TeamsFixed && eliminated)
+                Debug.Log($"[REJOIN] team {heldTeam} was knocked out while this player was away - back as its spectator");
+        }
+        StartCoroutine(WatchOwnBodyAfterRejoin());
+        return;
     }
 
     /// <summary>Task 9e / 9e-2: the returning player's body, as a WATCHDOG. The master removes a dropped player's body (and with it the
@@ -342,7 +397,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         PlayerLookup.Clear();
         Debug.Log($"[NAME SCREEN] rebuilding the scene ({PhotonNetwork.NetworkClientState})");
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        // Dominion Task 10: always the lobby scene by name - a match played on another map returns to the list in Game Scene (the active scene is the map).
+        SceneManager.LoadScene(SceneLoadRules.SceneForLobbyList(SceneManager.GetActiveScene().name));
     }
 
     /// <summary>Review round 2: Photon carries the local player's own Custom Properties into the
@@ -398,6 +454,13 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// below calls it for a body that never came back).</summary>
     public void SpawnPlayerOnTeam(int teamID)
     {
+        // A mode that plays on another scene spawns its bodies there, never in the scene the lobby was in (the rejoin watchdog can ask while that
+        // scene is still being swapped out).
+        if (!RoomSceneIsLoaded)
+        {
+            Debug.Log($"[SCENE] not spawning a body on team {teamID} in {SceneManager.GetActiveScene().name}: the room plays on {SceneOfRoom}");
+            return;
+        }
         if (!ValidateTeamResources(teamID)) return;
 
         GameObject player = PhotonNetwork.Instantiate(
@@ -426,7 +489,19 @@ public class RoomManager : MonoBehaviourPunCallbacks
             return false;
         }
 
-        if (teamSpawnPoints.Length < 3 || teamSpawnPoints[teamID] == null)
+        // The teams of the room's mode need a spawn point each: three for a three-team map, two for a two-team one. A room whose mode is unknown
+        // keeps the old demand for the three of the triangle arena.
+        int[] modeTeams = Overpower.Dominion.DominionMode.TeamsOfCurrentRoom();
+        if (modeTeams.Length == 0) modeTeams = new[] { 0, 1, 2 };
+        var present = new bool[teamSpawnPoints != null ? teamSpawnPoints.Length : 0];
+        for (int i = 0; i < present.Length; i++) present[i] = teamSpawnPoints[i] != null;
+        int missing = SceneMapRules.FirstTeamWithoutSpawn(present, modeTeams);
+        if (missing >= 0)
+        {
+            Debug.LogError($"Missing spawn point for team {missing}!");
+            return false;
+        }
+        if (teamID < 0 || teamID >= present.Length || !present[teamID])
         {
             Debug.LogError($"Missing spawn point for team {teamID}!");
             return false;

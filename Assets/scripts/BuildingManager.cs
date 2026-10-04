@@ -24,7 +24,38 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public static BuildingManager Instance { get; private set; }
 
     [SerializeField] public SerializableDictionary<int, TowerData> TowerDictionary;
-    public Dictionary<int, int> CathedralBuildingIDs = new Dictionary<int, int>() { { 6, 0 }, { 7, 1 }, { 8, 2 } };
+
+    /// <summary>One capital zone of a map: the zone id and the team whose spawn it is.</summary>
+    [Serializable]
+    public struct CapitalZone
+    {
+        [Tooltip("The zone (tower) id of this capital.")]
+        public int zone;
+        [Tooltip("The team whose capital and spawn this zone is.")]
+        public int team;
+    }
+
+    [SerializeField, Tooltip("This map's capitals: which zone is each team's capital (and spawn). The triangle arena has three (zones 6, 7 and 8 for teams 0, 1 and 2). " +
+             "A two-team map lists two. Every scene that plays a match carries its own list.")]
+    private CapitalZone[] capitalZones = { new CapitalZone { zone = 6, team = 0 }, new CapitalZone { zone = 7, team = 1 }, new CapitalZone { zone = 8, team = 2 } };
+
+    private Dictionary<int, int> cathedralBuildingIDs;
+
+    /// <summary>Zone id to team id for this scene's capitals (the Capital Zones list, read once). Read everywhere exactly as before.</summary>
+    public Dictionary<int, int> CathedralBuildingIDs
+    {
+        get
+        {
+            if (cathedralBuildingIDs == null)
+            {
+                var pairs = new List<(int zone, int team)>(capitalZones != null ? capitalZones.Length : 0);
+                if (capitalZones != null)
+                    foreach (CapitalZone capital in capitalZones) pairs.Add((capital.zone, capital.team));
+                cathedralBuildingIDs = Overpower.Lobby.SceneMapRules.CapitalLookup(pairs);
+            }
+            return cathedralBuildingIDs;
+        }
+    }
 
     // Towers register themselves here so ownership changes can drive their flag colour.
     // TowerData.Building exists for this but is null on all nine towers in the scene, and a new

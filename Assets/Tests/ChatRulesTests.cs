@@ -161,7 +161,8 @@ namespace Overpower.Tests
         [Test]
         public void TheChatManagerObjectStartsSwitchedOffInTheScene()
         {
-            string scene = System.IO.File.ReadAllText("Assets/Scenes/Game Scene.unity").Replace("\r\n", "\n");
+            // The chat manager lives in the shared match systems prefab (Dominion Task 10), so every map's scene gets it switched off the same way.
+            string scene = System.IO.File.ReadAllText("Assets/Prefabs/Systems/MatchSystems.prefab").Replace("\r\n", "\n");
             int name = scene.IndexOf("value: chat manager\n", System.StringComparison.Ordinal);
             Assert.GreaterOrEqual(name, 0);
             int active = scene.IndexOf("propertyPath: m_IsActive", name, System.StringComparison.Ordinal);

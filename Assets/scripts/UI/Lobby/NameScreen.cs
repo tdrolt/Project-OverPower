@@ -117,6 +117,14 @@ namespace Overpower.UI
                 OpenList();
                 RequestList();
             }
+            else if (PhotonNetwork.InRoom)
+            {
+                // This scene was loaded for the whole room (the mode's map, Dominion Task 10): the player is already in their lobby, which is
+                // now a running game - the room screen draws nothing once the game has started, and the chat is switched on as on joining.
+                Debug.Log("[LOBBY] scene loaded inside the room - no name screen");
+                ShowOnly(Screen.InRoom);
+                if (chatmanager != null) chatmanager.SetActive(true);
+            }
             else
             {
                 ShowOnly(Screen.Name);

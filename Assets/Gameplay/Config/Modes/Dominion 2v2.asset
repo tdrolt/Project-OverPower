@@ -20,7 +20,7 @@ MonoBehaviour:
   teams: 0000000001000000
   seatsPerTeam: 2
   spectatorSeats: 3
-  sceneName: 
+  sceneName: Dominion 2v2
   available: 0
   lobbyModeValue: 2
   infoCards: []

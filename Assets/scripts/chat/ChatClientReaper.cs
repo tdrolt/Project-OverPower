@@ -17,16 +17,21 @@ public sealed class ChatClientReaper : MonoBehaviour
     /// <summary>True while some connection is still closing: the next connection waits for it.</summary>
     public static bool Busy => instance != null && instance.closing.Count > 0;
 
+    /// <summary>Makes sure the reaper exists. Called when a chat connection STARTS, so it is never first created while a scene is closing (a scene
+    /// loaded for the whole room closes the one with the chat in it: Unity reports an object made during that as an error).</summary>
+    public static void Ensure()
+    {
+        if (instance != null) return;
+        var go = new GameObject("Chat client reaper");
+        DontDestroyOnLoad(go);
+        instance = go.AddComponent<ChatClientReaper>();
+    }
+
     public static void Close(ChatClient client)
     {
         if (client == null) return;
         client.Disconnect();
-        if (instance == null)
-        {
-            var go = new GameObject("Chat client reaper");
-            DontDestroyOnLoad(go);
-            instance = go.AddComponent<ChatClientReaper>();
-        }
+        Ensure();
         instance.closing.Add(client);
         instance.startedAt.Add(Time.unscaledTime);
     }

@@ -32,7 +32,8 @@ namespace Overpower.Lobby
 
         /// <summary>The nickname the player typed, kept while the room shows a numbered copy of it ("Tudor 2"); null when
         /// the name was not changed.</summary>
-        private string typedNickName;
+        // Static: a scene loaded for the whole room (Dominion Task 10) builds a new LobbySeats, and the typed name must still be put back on leaving.
+        private static string typedNickName;
 
         /// <summary>Seat writes we sent that have not been echoed yet (seat key -> our actor): the first update of that seat
         /// key after our send tells whether the room took it or another player got there first.</summary>

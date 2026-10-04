@@ -6,6 +6,7 @@ using Overpower.Net;
 using Overpower.UI;
 using Photon.Pun;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 namespace Overpower.Lobby
@@ -125,6 +126,10 @@ namespace Overpower.Lobby
             lastStage = StageOfRoom();
             if (lastStage < 1) return;
 
+            // The game runs on another scene (Dominion Task 10): act on it only there. Photon's scene sync is about to load it for a joiner
+            // (a master that comes back loads it itself); the arriving scene reads the room again and gets here with the right scene.
+            if (WaitForTheRoomsScene()) return;
+
             // The game is already running. No seat: a late joiner, who is given one (lobby Task 7).
             string seat = seats.SeatInRoom();
             if (seat == null)
@@ -145,6 +150,7 @@ namespace Overpower.Lobby
         public override void OnLeftRoom()
         {
             lastStage = 0;
+            loadRequested = false;
             if (roomManager != null) roomManager.SeatView?.End();
             if (starting != null)
             {
@@ -283,9 +289,38 @@ namespace Overpower.Lobby
             roomManager.Lobbies.ReportJoinRefused(reason);
         }
 
+        /// <summary>The scene to load for everyone when the game starts, or null (see SceneLoadRules.SceneToLoadOnStart).</summary>
+        private string SceneToLoad() =>
+            roomManager != null ? SceneLoadRules.SceneToLoadOnStart(roomManager.SceneOfRoom, SceneManager.GetActiveScene().name) : null;
+
+        private bool loadRequested;
+
+        /// <summary>True while the room's game belongs to another scene than the active one: nothing is spawned or started here. The master
+        /// (once) asks Photon to load the scene for everyone: PhotonNetwork.LoadLevel also puts the scene in the room, so a client joining or
+        /// rejoining later is taken there by Photon's own scene sync (AutomaticallySyncScene, set by RoomManager).</summary>
+        private bool WaitForTheRoomsScene()
+        {
+            string scene = SceneToLoad();
+            if (scene == null) return false;
+            if (PhotonNetwork.IsMasterClient && !loadRequested)
+            {
+                loadRequested = true;
+                Debug.Log($"[SCENE] Start game: loading {scene} for everyone (this lobby was in {SceneManager.GetActiveScene().name})");
+                PhotonNetwork.LoadLevel(scene);
+            }
+            return true;
+        }
+
+        public override void OnMasterClientSwitched(Photon.Realtime.Player newMasterClient)
+        {
+            // The master that pressed Start may have gone before it loaded the scene: the next master does it.
+            if (PhotonNetwork.IsMasterClient && StageOfRoom() >= 1) WaitForTheRoomsScene();
+        }
+
         /// <summary>The game has started and this client was just told: its seat decides what it becomes.</summary>
         private void ReactToStart()
         {
+            if (WaitForTheRoomsScene()) return; // nobody's body is spawned in the scene the lobby was in
             string seat = seats.SeatInRoom();
             if (seat == null)
             {

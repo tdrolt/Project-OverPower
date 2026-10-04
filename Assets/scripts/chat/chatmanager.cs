@@ -102,6 +102,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
 
     private void ConnectToChat()
     {
+        ChatClientReaper.Ensure(); // before any scene can close with this connection in it (see Ensure)
         ChatClientReaper.Close(chatClient);
         isConnected = true;
         chatClient = new ChatClient(this);
