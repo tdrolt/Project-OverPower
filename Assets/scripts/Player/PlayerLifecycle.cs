@@ -245,6 +245,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             // Published at once (not just applied here): no flash of a hittable, standing body on everyone else's screen while the
             // respawn path below waits for the team and the territory.
             SetAlive(false, PhotonNetwork.ServerTimestamp);
+            // Dominion sudden death (Tudor A32): someone who drops and rejoins while it is on comes back DEAD. TryRespawnAfterRejoin below takes the
+            // ordinary death path, which refuses a respawn there (RespawnAllowedNow) - so the rejoiner waits dead like anyone who fell, and the master
+            // counts them dead (their flag and stamp were just written above). Deliberate: a drop is no way back into a fight nobody can re-enter.
             Debug.LogWarning($"[REJOIN] actor {photonView.OwnerActorNr} has a body again - respawning as after a death");
             TryRespawnAfterRejoin();
         }

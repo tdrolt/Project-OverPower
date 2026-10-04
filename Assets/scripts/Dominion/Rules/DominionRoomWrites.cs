@@ -62,6 +62,8 @@ namespace Overpower.Dominion
         public int CentreIntervalMs;
         /// <summary>Seconds of "get ready" between sudden death being written and its circle starting to shrink (the break's countdown length).</summary>
         public float SuddenDeathCountdownSeconds;
+        /// <summary>How close two sudden-death stamps (server ms) must be to count as the same moment (DominionConfig Same Instant Tolerance Seconds, in ms).</summary>
+        public int SameInstantToleranceMs;
     }
 
     /// <summary>One check-and-set the master should send: what to write and what the room must still hold for it to apply.</summary>
@@ -87,10 +89,10 @@ namespace Overpower.Dominion
         /// has not synced (0).</summary>
         /// <param name="teamsInMatch">The team ids fixed into the match (mTeams).</param>
         /// <param name="playersPerTeam">Players present per team id (index = team id).</param>
-        /// <param name="aliveInSuddenDeath">Living players per team id (index = team id), read from the players' alive flags; null = not known, so
-        /// sudden death is not judged.</param>
+        /// <param name="suddenDeath">Who lives per team and when each team's last player fell (SuddenDeathRules.Tally, read from the players'
+        /// alive flags and death stamps); null = not known, so sudden death is not judged.</param>
         public static DominionWrite Next(bool dominion, bool live, int nowMs, DominionRoomState room, DominionFlowNumbers cfg,
-                                         int[] teamsInMatch, int[] playersPerTeam, int[] aliveInSuddenDeath = null)
+                                         int[] teamsInMatch, int[] playersPerTeam, SuddenDeathRules.Tally suddenDeath = null)
         {
             if (!dominion || !live || nowMs == 0) return null;
 
@@ -129,7 +131,7 @@ namespace Overpower.Dominion
                     { DominionKeys.Wins, Slots(room.Wins) },
                 });
 
-            if (room.Stage == DominionStage.SuddenDeath) return NextInSuddenDeath(room, nowMs, cfg, teamsInMatch, aliveInSuddenDeath); // no clock: the players end it
+            if (room.Stage == DominionStage.SuddenDeath) return NextInSuddenDeath(room, nowMs, cfg, teamsInMatch, suddenDeath); // no clock: the players end it
             if (!MatchStartRules.HasReached(nowMs, room.EndMs)) return null;
 
             if (room.Stage == DominionStage.Break)
@@ -194,14 +196,15 @@ namespace Overpower.Dominion
             return null;
         }
 
-        /// <summary>Sudden death has no clock: the master judges it from who is alive. One team of the tied ones with anyone alive wins the match; nobody
-        /// left starts it over (Tudor A8) with a new circle start; two or more alive writes nothing. Only after the judging beat, and the write expects
+        /// <summary>Sudden death has no clock: the master judges it from who is alive and, when nobody is, from the death stamps (Tudor A31). One team of
+        /// the tied ones with anyone alive wins the match; when all have fallen the team whose last player fell latest wins, and only the exact same
+        /// server moment starts it over (Tudor A8) with a new circle start; two or more alive writes nothing. Only after the judging beat, and the write expects
         /// the circle start it judged, so two masters cannot both replay or a replay cannot be followed by a stale win.</summary>
-        private static DominionWrite NextInSuddenDeath(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, int[] alive)
+        private static DominionWrite NextInSuddenDeath(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, SuddenDeathRules.Tally tally)
         {
-            if (alive == null || room.SuddenDeathMs == 0 || !SuddenDeathRules.MayEvaluate(room.SuddenDeathMs, nowMs)) return null;
+            if (tally == null || room.SuddenDeathMs == 0 || !SuddenDeathRules.MayEvaluate(room.SuddenDeathMs, nowMs)) return null;
             int[] playing = DominionRules.SuddenDeathTeams(room.Wins, teamsInMatch);
-            SuddenDeathResult verdict = SuddenDeathRules.Evaluate(alive, playing);
+            SuddenDeathResult verdict = SuddenDeathRules.Judge(tally, playing, cfg.SameInstantToleranceMs);
             if (verdict.State == SuddenDeathState.Ongoing) return null;
 
             DominionWrite write = verdict.State == SuddenDeathState.Won
@@ -270,6 +273,18 @@ namespace Overpower.Dominion
                 count++;
             }
             return count == 1 ? found : -1;
+        }
+
+        /// <summary>The Player Properties a late joiner writes together with the seat write when they take a TEAM seat during sudden death (Tudor A4):
+        /// alive = false with a death stamp of now. Nobody respawns there, so they can only wait dead; without the flag the master would count them as
+        /// alive (a player with no flag has never died) for the whole time the body loads, and a tied team could never be judged out. Null for any
+        /// other join (a spectator seat, another stage), and no stamp while the server clock is not synced (the master then waits for the body's own).</summary>
+        public static Hashtable LateJoinerPlayerProps(DominionStage stage, bool takingTeamSeat, int nowMs)
+        {
+            if (stage != DominionStage.SuddenDeath || !takingTeamSeat) return null;
+            var props = new Hashtable { { PlayerLifecycle.AliveKey, false } };
+            if (nowMs != 0) props[PlayerLifecycle.LastStandAtKey] = nowMs;
+            return props;
         }
 
         /// <summary>What a client does once on seeing the room go from (prevRound, prevStage) to (round, stage): a break starting is a full fresh

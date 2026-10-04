@@ -37,6 +37,7 @@ MonoBehaviour:
   finalRadius2v2: 4
   finalRadius3v3v3: 8
   damagePerSecondOutside: 10
+  sameInstantToleranceSeconds: 0.05
   weaponDepthByRound: 000000000100000002000000
   armorUpgradesByRound: 000000000100000002000000
   lockedTierLabelFormat: Round {0}

@@ -37,6 +37,13 @@ namespace Overpower.Tests
             Assert.Less(c.FinalRadius3v3v3, c.SuddenDeathStartRadius3v3v3);
         }
 
+        [Test] public void TheSameInstantToleranceIsASmallNonNegativeNumberOfSeconds()
+        {
+            float tolerance = Load().SameInstantToleranceSeconds;
+            Assert.GreaterOrEqual(tolerance, 0f);
+            Assert.Less(tolerance, 1f, "about one network frame, never a settle-sized wait");
+        }
+
         [Test] public void TheTimesAreSensible()
         {
             DominionConfig c = Load();

@@ -17,6 +17,7 @@ namespace Overpower.Tests
         // ---- no respawns in sudden death
 
         [Test] public void ADeathInASuddenDeathOfALiveDominionMatchIsForGood() => Assert.IsFalse(DominionRules.RespawnAllowed(true, DominionStage.SuddenDeath));
+        [Test] public void ADeathAfterTheMatchIsOverNeverRespawns() => Assert.IsFalse(DominionRules.RespawnAllowed(true, DominionStage.Over));
 
         [Test] public void ADeathInARoundOrABreakStillRespawns()
         {
@@ -84,7 +85,7 @@ namespace Overpower.Tests
         {
             DominionRoomState room = SuddenDeathRoom(100000, new[] { 1, 1, 0 });
             Assert.AreEqual("sudden death won:1", DominionRoomWrites.SuddenDeathVerdictKey(Judge(room, 160000, new[] { 0, 2, 0 })));
-            Assert.AreEqual("sudden death replay", DominionRoomWrites.SuddenDeathVerdictKey(Judge(room, 160000, new[] { 0, 0, 3 })));
+            Assert.AreEqual("sudden death replay", DominionRoomWrites.SuddenDeathVerdictKey(Judge(room, 160000, new[] { 0, 0, 3 }, new[] { 5000, 5000, 0 })));
             Assert.IsNull(DominionRoomWrites.SuddenDeathVerdictKey(null));
             var roundEnd = new DominionRoomState { HasRound = true, Round = 1, Stage = DominionStage.Round, EndMs = 105000, Points = new[] { 1, 0, 0 }, Wins = new[] { 0, 0, 0 }, Winner = -1 };
             Assert.IsNull(DominionRoomWrites.SuddenDeathVerdictKey(DominionRoomWrites.Next(true, true, 105000, roundEnd, Cfg, Three, new[] { 3, 3, 3 })), "a round's end is never held back");
@@ -122,22 +123,39 @@ namespace Overpower.Tests
 
         [Test] public void TheCentreZoneIsTheCentreWhenTheMapHasOne()
         {
-            Assert.IsTrue(SuddenDeathRules.TryCentre(new[] { new Vector2(3f, 4f) }, new[] { new Vector2(0f, 0f), new Vector2(10f, 20f) }, out Vector2 c));
+            Assert.IsTrue(SuddenDeathRules.TryCentre(new[] { new Vector3(3f, 7f, 4f) }, new[] { new Vector3(0f, 0f, 0f), new Vector3(10f, 0f, 20f) }, out Vector2 c, out float y));
             Assert.AreEqual(new Vector2(3f, 4f), c);
+            Assert.AreEqual(7f, y, "the floor is the centre zone's");
         }
 
         [Test] public void WithoutACentreZoneTheCentreIsHalfwayBetweenTheTwoScoringZones()
         {
-            Assert.IsTrue(SuddenDeathRules.TryCentre(new Vector2[0], new[] { new Vector2(0f, 0f), new Vector2(10f, 20f) }, out Vector2 c));
+            Assert.IsTrue(SuddenDeathRules.TryCentre(new Vector3[0], new[] { new Vector3(0f, 0f, 0f), new Vector3(10f, 0f, 20f) }, out Vector2 c, out _));
             Assert.AreEqual(new Vector2(5f, 10f), c);
-            Assert.IsTrue(SuddenDeathRules.TryCentre(null, new[] { new Vector2(-4f, 2f), new Vector2(4f, 6f) }, out Vector2 d));
+            Assert.IsTrue(SuddenDeathRules.TryCentre(null, new[] { new Vector3(-4f, 0f, 2f), new Vector3(4f, 0f, 6f) }, out Vector2 d, out _));
             Assert.AreEqual(new Vector2(0f, 4f), d);
+        }
+
+        [Test] public void TheFloorOfATwoZoneCircleIsBetweenTheTwoZones()
+        {
+            Assert.IsTrue(SuddenDeathRules.TryCentre(null, new[] { new Vector3(0f, 2f, 0f), new Vector3(10f, 6f, 20f) }, out _, out float y));
+            Assert.AreEqual(4f, y, 1e-4f, "the average height, not whichever zone happened to come first");
         }
 
         [Test] public void WithNoZonesAtAllTheCircleCannotBePlaced()
         {
-            Assert.IsFalse(SuddenDeathRules.TryCentre(null, null, out _));
-            Assert.IsFalse(SuddenDeathRules.TryCentre(new Vector2[0], new Vector2[0], out _));
+            Assert.IsFalse(SuddenDeathRules.TryCentre(null, null, out _, out _));
+            Assert.IsFalse(SuddenDeathRules.TryCentre(new Vector3[0], new Vector3[0], out _, out _));
+        }
+
+        [Test] public void OnlyAScoringZoneInPlayShapesTheCircle()
+        {
+            Assert.IsTrue(SuddenDeathRules.ZoneShapesTheCircle(tier: 3, isCapital: false, outOfPlay: false));
+            Assert.IsTrue(SuddenDeathRules.ZoneShapesTheCircle(tier: 4, isCapital: false, outOfPlay: false), "the centre");
+            Assert.IsFalse(SuddenDeathRules.ZoneShapesTheCircle(tier: 1, isCapital: false, outOfPlay: false), "a Tier 1 zone is a spawn");
+            Assert.IsFalse(SuddenDeathRules.ZoneShapesTheCircle(tier: 3, isCapital: true, outOfPlay: false), "a capital, whatever its tier");
+            Assert.IsFalse(SuddenDeathRules.ZoneShapesTheCircle(tier: 3, isCapital: false, outOfPlay: true), "cut off the map");
+            Assert.IsFalse(SuddenDeathRules.ZoneShapesTheCircle(tier: 0, isCapital: false, outOfPlay: false), "a tower that has not registered yet");
         }
 
         // ---- the circle's size follows the match size
@@ -178,7 +196,7 @@ namespace Overpower.Tests
 
         private static readonly DominionFlowNumbers Cfg = new DominionFlowNumbers
         {
-            RoundsToWin = 2, MaxRounds = 3, RoundSeconds = 100f, BreakSeconds = 10f, SuddenDeathCountdownSeconds = 4f,
+            RoundsToWin = 2, MaxRounds = 3, RoundSeconds = 100f, BreakSeconds = 10f, SuddenDeathCountdownSeconds = 4f, SameInstantToleranceMs = 50,
         };
         private static readonly int[] Three = { 0, 1, 2 };
 
@@ -189,8 +207,23 @@ namespace Overpower.Tests
                 Points = new[] { 0, 0, 0 }, Wins = wins, Winner = -1,
             };
 
-        private static DominionWrite Judge(DominionRoomState room, int now, int[] alive) =>
-            DominionRoomWrites.Next(true, true, now, room, Cfg, Three, new[] { 3, 3, 3 }, alive);
+        /// <summary>A tally with these living counts; a team with none alive has one player who fell at the given stamp (teams with a stamp of 0 and living
+        /// players have no fallen player, a team with none alive and no stamp given falls at 1000).</summary>
+        private static SuddenDeathRules.Tally TallyOf(int[] alive, int[] fellAt = null)
+        {
+            var tally = new SuddenDeathRules.Tally(3);
+            for (int team = 0; team < alive.Length; team++)
+            {
+                for (int i = 0; i < alive[team]; i++)
+                    tally.Add(new SuddenDeathRules.Player { Team = team, Counts = true, HasAliveFlag = true, AliveFlag = true });
+                if (alive[team] == 0)
+                    tally.Add(new SuddenDeathRules.Player { Team = team, Counts = true, HasAliveFlag = true, AliveFlag = false, HasDeathStamp = true, DeathStampMs = fellAt != null ? fellAt[team] : 1000 });
+            }
+            return tally;
+        }
+
+        private static DominionWrite Judge(DominionRoomState room, int now, int[] alive, int[] fellAt = null) =>
+            DominionRoomWrites.Next(true, true, now, room, Cfg, Three, new[] { 3, 3, 3 }, TallyOf(alive, fellAt));
 
         [Test] public void SuddenDeathStartsWithItsCircleAfterTheGetReadyCountdown()
         {
@@ -224,7 +257,7 @@ namespace Overpower.Tests
         [Test] public void NobodyLeftStartsSuddenDeathOverWithANewCircleStart()
         {
             DominionRoomState room = SuddenDeathRoom(100000, new[] { 1, 1, 0 });
-            DominionWrite w = Judge(room, 160000, new[] { 0, 0, 3 });
+            DominionWrite w = Judge(room, 160000, new[] { 0, 0, 3 }, new[] { 5000, 5000, 0 });
             Assert.IsNotNull(w);
             Assert.AreEqual(164000, w.Props[DominionKeys.SuddenDeathStart], "now plus the countdown: the circle is full size again");
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.Stage), "still sudden death");
@@ -237,7 +270,7 @@ namespace Overpower.Tests
         {
             DominionRoomState room = SuddenDeathRoom(100000, new[] { 1, 1, 0 });
             Assert.IsNull(Judge(room, 100000, new[] { 0, 0, 0 }), "the flags are still catching up");
-            Assert.IsNull(Judge(room, 160000, null), "no flags read");
+            Assert.IsNull(DominionRoomWrites.Next(true, true, 160000, room, Cfg, Three, new[] { 3, 3, 3 }, null), "no flags read");
         }
 
         [Test] public void TheRoomReadsTheCircleStart()

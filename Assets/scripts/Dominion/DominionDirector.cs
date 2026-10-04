@@ -49,7 +49,7 @@ namespace Overpower.Dominion
         // Conquest knockouts do (so a quick reconnect never costs a team the match).
         private readonly Dictionary<int, float> inactiveSince = new Dictionary<int, float>();
         private readonly int[] playersPerTeam = new int[DominionKeys.TeamSlots];
-        private readonly int[] aliveInSuddenDeath = new int[DominionKeys.TeamSlots];
+        private readonly SuddenDeathRules.Tally suddenDeathTally = new SuddenDeathRules.Tally(DominionKeys.TeamSlots); // master: who lives per team and when each team's last player fell
         private readonly SuddenDeathVerdictSettle suddenDeathSettle = new SuddenDeathVerdictSettle(); // master: how long the same verdict has held
 
         private bool configMissingLogged;
@@ -135,7 +135,7 @@ namespace Overpower.Dominion
             DominionRoomState room = WithLatestPoints(DominionRoomState.Read(roomProps)); // the round is scored on what the master has written, echoed or not
             bool counted = CountPlayers();
             bool judgingSuddenDeath = counted && room.Stage == DominionStage.SuddenDeath;
-            if (judgingSuddenDeath) CountAliveInSuddenDeath(Rooms.Config.DroppedGraceSeconds);
+            if (judgingSuddenDeath) TallySuddenDeath(Rooms.Config.DroppedGraceSeconds);
             DominionWrite write = DominionRoomWrites.Next(true, true, now, room,
                 new DominionFlowNumbers
                 {
@@ -145,17 +145,12 @@ namespace Overpower.Dominion
                     CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
                     CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),
                     SuddenDeathCountdownSeconds = config.BreakCountdownSeconds,
+                    SameInstantToleranceMs = Mathf.RoundToInt(config.SameInstantToleranceSeconds * 1000f),
                 }, match.TeamsInMatch, counted ? playersPerTeam : null, // null: the last-team check is skipped
-                judgingSuddenDeath ? aliveInSuddenDeath : null);        // null: sudden death is not judged on a guess
-            // A sudden-death verdict is written only once it has held for a moment: two players who fall at the same instant reach the room a
-            // fraction of a second apart, and a look in between must not crown the one who fell last.
-            if (judgingSuddenDeath)
-            {
-                string verdictKey = DominionRoomWrites.SuddenDeathVerdictKey(write);
-                if (!suddenDeathSettle.Settled(verdictKey, Time.unscaledTime, SuddenDeathRules.VerdictSettleSeconds)) return;
-            }
-            else suddenDeathSettle.Reset();
-            if (write == null) return;
+                judgingSuddenDeath ? suddenDeathTally : null);          // null: sudden death is not judged on a guess
+            // A sudden-death verdict (a win or a replay) is written only once it has held for a network beat, so every death report has arrived
+            // before the stamps are read; any other write goes at once. The decision is SuddenDeathVerdictSettle.ShouldWrite (tested).
+            if (!suddenDeathSettle.ShouldWrite(write, judgingSuddenDeath, Time.unscaledTime, SuddenDeathRules.VerdictSettleSeconds)) return;
 
             if (!PhotonNetwork.CurrentRoom.SetCustomProperties(write.Props, write.Expected))
             {
@@ -238,20 +233,26 @@ namespace Overpower.Dominion
         private bool StillCounts(int actor, Player p, float graceSeconds) =>
             !(p.IsInactive && inactiveSince.TryGetValue(actor, out float since) && Time.unscaledTime - since >= graceSeconds);
 
-        /// <summary>Living players per team id, from each player's replicated alive flag (PlayerLifecycle.AliveKey; a player who never died has none,
-        /// which SuddenDeathRules.CountsAsAlive reads as alive); a player who dropped for good counts as gone, like CountPlayers. Called only while
-        /// judging sudden death.</summary>
-        private void CountAliveInSuddenDeath(float graceSeconds)
+        /// <summary>Fills the sudden-death tally from the room's players: each player's replicated alive flag (PlayerLifecycle.AliveKey; a player who
+        /// never died has none, which counts as alive) and, for the fallen, the server stamp they wrote with it (PlayerLifecycle.LastStandAtKey, one
+        /// write with the flag). A player who dropped for good counts as gone, like CountPlayers. The counting itself is SuddenDeathRules.Tally.Add
+        /// (tested); this only reads the room. Called only while judging sudden death.</summary>
+        private void TallySuddenDeath(float graceSeconds)
         {
-            System.Array.Clear(aliveInSuddenDeath, 0, aliveInSuddenDeath.Length);
+            suddenDeathTally.Clear();
             foreach (KeyValuePair<int, Player> pair in PhotonNetwork.CurrentRoom.Players)
             {
                 Player p = pair.Value;
-                if (!Teams.TryGetPlayingTeam(p, out int team) || team < 0 || team >= aliveInSuddenDeath.Length) continue;
-                if (!StillCounts(pair.Key, p, graceSeconds)) continue;
-                bool hasFlag = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool;
-                if (SuddenDeathRules.CountsAsAlive(hasFlag, hasFlag && (bool)raw))
-                    aliveInSuddenDeath[team]++;
+                if (!Teams.TryGetPlayingTeam(p, out int team)) continue;
+                bool hasFlag = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object flag) && flag is bool;
+                bool hasStamp = p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandAtKey, out object stamp) && stamp is int;
+                suddenDeathTally.Add(new SuddenDeathRules.Player
+                {
+                    Team = team,
+                    Counts = StillCounts(pair.Key, p, graceSeconds),
+                    HasAliveFlag = hasFlag, AliveFlag = hasFlag && (bool)flag,
+                    HasDeathStamp = hasStamp, DeathStampMs = hasStamp ? (int)stamp : 0,
+                });
             }
         }
 

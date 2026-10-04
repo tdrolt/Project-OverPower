@@ -2,7 +2,12 @@ using UnityEngine;
 
 namespace Overpower.Combat
 {
-    public enum DamageSource { Projectile, Splash, Burn, Zone, Contact }
+    public enum DamageSource
+    {
+        Projectile, Splash, Burn, Zone, Contact,
+        /// <summary>The Dominion sudden-death circle (Task 8): no attacker, and it ignores Invulnerability (Tudor A30). Appended last: the numbers are logged.</summary>
+        SuddenDeath,
+    }
 
     /// <summary>
     /// Everything the damage funnel needs to resolve one hit. Immutable on purpose: a hit is a

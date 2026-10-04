@@ -28,6 +28,10 @@ namespace Overpower.Dominion
             inOwnSpawn ? RatePerSecond(true, secondsSinceCombat, outOfCombatPerSecond, inCombatPerSecond, outOfCombatDelaySeconds)
                        : ordinaryZoneRate;
 
+        /// <summary>The rate a player actually heals at in this stage (Tudor A29): none at all in sudden death - neither the spawn's healing nor an owned
+        /// zone's regen - and the given rate in every other stage (a Conquest room reads as stage None). Health packs do not come through here.</summary>
+        public static float RateInStage(DominionStage stage, float rate) => stage == DominionStage.SuddenDeath ? 0f : rate;
+
         /// <summary>The fixed respawn wait for the match size: 2 teams = 2v2, otherwise 3v3v3.</summary>
         public static float RespawnSeconds(int teamCount, float seconds2v2, float seconds3v3v3) =>
             teamCount <= 2 ? seconds2v2 : seconds3v3v3;

@@ -92,7 +92,7 @@ namespace Overpower.Telemetry
         // Index-matched to their enums (Combat/DamageInfo.cs, Combat/StatusEffectState.cs) - T3
         // review item 11: avoids a ToString()/ToLowerInvariant() allocation on every hit/dot/status
         // line. NameFor falls back to ToString() only if an enum ever grows past these arrays.
-        private static readonly string[] DamageSourceNames = { "Projectile", "Splash", "Burn", "Zone", "Contact" };
+        private static readonly string[] DamageSourceNames = { "Projectile", "Splash", "Burn", "Zone", "Contact", "SuddenDeath" };
         private static readonly string[] StatusKindNames = { "burn", "slow", "stun", "vulnerability", "invulnerability" };
 
         private static string NameFor(DamageSource source)

@@ -3,6 +3,7 @@ using Photon.Pun;
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Match;
 using Overpower.Net;
 using Overpower.UI;
 
@@ -17,7 +18,7 @@ namespace Overpower.Dominion
     ///  2. the answers other things ask - IsSuddenDeath, CurrentRadius, SecondsUntilStopped, Centre - the minimap draws its own red outside from them, and the
     ///     sudden-death banner and shrink timer (Task 9) read them;
     ///  3. the damage: this client's own living player on a tied team loses Damage Per Second Outside while outside the circle. Victim-side, through
-    ///     PlayerHealth's one damage funnel, as a Zone hit with no attacker (like a burn with no owner), so armour behaves as for any damage. The cost is
+    ///     PlayerHealth's one damage funnel, as a SuddenDeath hit with no attacker (like a burn with no owner): armour and damage reduction behave as for any damage, but Invulnerability (running or armed) does not stop it (A30). The cost is
     ///     added up every frame and applied every DamageTickSeconds (half a second), so the rate is exact whatever the frame rate.
     ///
     /// The circle's centre is the Tier 4 zone's tower (3v3v3) or halfway between the scoring zones (2v2); SuddenDeathRules.TryCentre decides.
@@ -54,8 +55,8 @@ namespace Overpower.Dominion
         public float FloorY { get; private set; }
 
         private bool centreResolved;
-        private readonly List<Vector2> centreZones = new List<Vector2>();
-        private readonly List<Vector2> scoringZones = new List<Vector2>();
+        private readonly List<Vector3> centreZones = new List<Vector3>();
+        private readonly List<Vector3> scoringZones = new List<Vector3>();
 
         private RoomManager rooms;
         private LineRenderer ringLine;
@@ -134,19 +135,21 @@ namespace Overpower.Dominion
             if (buildings == null) return false;
             centreZones.Clear();
             scoringZones.Clear();
-            float floorY = 0f;
-            bool anyY = false;
+            MatchDirector match = MatchDirector.Instance;
+            bool threeTeams = DominionMode.TeamCountOfCurrentRoom() == 3; // only a 3v3v3 match has a centre that plays (as the points beat's CentreInPlay)
             for (int zone = 0; zone < buildings.ZoneCount; zone++)
             {
-                int tier = buildings.BaseTierOf(zone);
-                if (tier <= DominionRules.CapitalTier) continue; // 0 = not registered yet, 1 = a capital (a spawn): neither scores
+                bool isCapital = buildings.CathedralBuildingIDs.ContainsKey(zone);
+                bool outOfPlay = match != null && match.IsOutOfPlay(zone);
+                if (!SuddenDeathRules.ZoneShapesTheCircle(buildings.BaseTierOf(zone), isCapital, outOfPlay)) continue;
                 if (!buildings.TryGetZoneCentre(zone, out Vector3 at)) continue;
-                var flat = new Vector2(at.x, at.z);
-                if (tier == DominionRules.CentreTier) centreZones.Add(flat);
-                else scoringZones.Add(flat);
-                if (!anyY) { floorY = at.y; anyY = true; }
+                if (buildings.BaseTierOf(zone) == DominionRules.CentreTier)
+                {
+                    if (threeTeams) centreZones.Add(at);
+                }
+                else scoringZones.Add(at);
             }
-            if (!SuddenDeathRules.TryCentre(centreZones, scoringZones, out Vector2 centre)) return false;
+            if (!SuddenDeathRules.TryCentre(centreZones, scoringZones, out Vector2 centre, out float floorY)) return false;
             Centre = centre;
             FloorY = floorY;
             return true;
@@ -182,8 +185,8 @@ namespace Overpower.Dominion
             float amount = owedDamage;
             owedDamage = 0f;
             // No attacker (actor -1, team -1, no weapon): the funnel treats it as neither self nor teammate damage, and the credit and kill-feed code skips
-            // a source with no actor, as it does for a burn with no owner. Armour absorbs first, like for any hit.
-            health.ApplyDamage(new DamageInfo(amount, -1, -1, -1, DamageSource.Zone, false, at));
+            // a source with no actor, as it does for a burn with no owner. Armour absorbs first, like for any hit; Invulnerability does not stop it.
+            health.ApplyDamage(new DamageInfo(amount, -1, -1, -1, DamageSource.SuddenDeath, false, at));
         }
 
         // ---------------------------------------------------------------- the red in the world

@@ -494,6 +494,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
                     secondsSinceCombat, dominion.SpawnHealOutOfCombatPerSecond, dominion.SpawnHealInCombatPerSecond,
                     dominion.SpawnHealOutOfCombatDelaySeconds, rate);
         }
+        // Dominion sudden death (Tudor A29): no healing at all - neither the spawn's nor an owned zone's. Health packs (Heal below) still work.
+        Overpower.Dominion.DominionDirector dominionDirector = Overpower.Dominion.DominionDirector.Instance;
+        rate = Overpower.Dominion.DominionHealRules.RateInStage(dominionDirector != null ? dominionDirector.Stage : Overpower.Dominion.DominionStage.None, rate);
         if (rate <= 0f)
             return;
 
@@ -581,7 +584,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             return default;
 
         HitVerdict verdict = HitVerdictRule.Classify(fromSelf, fromTeammate,
-            statusEffects != null && statusEffects.IsInvulnerable, statusEffects, info.Amount);
+            statusEffects != null && statusEffects.IsInvulnerable, statusEffects, info.Amount,
+            HitVerdictRule.IgnoresInvulnerability(info.Source)); // the sudden-death circle goes through Invulnerability (A30)
 
         // Tudor, 2026-09-18: being shot while the shield is up IS combat (no armour recharge, no shop, no
         // regen while being shot). Self and teammate hits are classified above, but CountsAsCombat is false

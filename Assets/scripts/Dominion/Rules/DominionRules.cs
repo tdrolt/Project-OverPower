@@ -44,9 +44,11 @@ namespace Overpower.Dominion
         /// is live: the warm-up stays the free sandbox it is in Conquest (default A22).</summary>
         public static bool RulesApply(bool dominionRoom, bool matchLive) => dominionRoom && matchLive;
 
-        /// <summary>May a dead player come back? Not in a live Dominion match's sudden death: nobody respawns there, so a death is for good. Everywhere
-        /// else (a round, a break, Conquest, the warm-up) the ordinary respawn applies.</summary>
-        public static bool RespawnAllowed(bool dominionLive, DominionStage stage) => !(dominionLive && stage == DominionStage.SuddenDeath);
+        /// <summary>May a dead player come back? Not in a live Dominion match's sudden death, and not once the match is Over: a death there is for good
+        /// (after the last whistle nobody gets back up while the result shows). Everywhere else (a round, a break, Conquest, the warm-up) the ordinary
+        /// respawn applies.</summary>
+        public static bool RespawnAllowed(bool dominionLive, DominionStage stage) =>
+            !(dominionLive && (stage == DominionStage.SuddenDeath || stage == DominionStage.Over));
 
         /// <summary>A player joining while sudden death is on is seated as a spectator when a spectator seat is free (they could only wait dead).</summary>
         public static bool LateJoinerPrefersSpectatorSeat(DominionStage stage) => stage == DominionStage.SuddenDeath;

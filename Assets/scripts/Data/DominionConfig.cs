@@ -99,6 +99,9 @@ namespace Overpower.Data
         [Tooltip("Health per second a player loses while standing outside the circle.")]
         [SerializeField, Min(0f)] private float damagePerSecondOutside = 10f;
 
+        [Tooltip("In sudden death, the team whose last player falls last wins, even if it is only a moment after the others. Only when the last players of the teams still in it fall at the very same moment does nobody win and sudden death start over. This is how many seconds apart two falls may be and still count as the very same moment (about one network frame). Keep it small: the longer it is, the more often a player who really lasted a little longer than the others is denied the win.")]
+        [SerializeField, Min(0f)] private float sameInstantToleranceSeconds = 0.05f;
+
         [Header("Build per round")]
         [Tooltip("How far up the weapon tree the shop lets you buy, for rounds 1, 2 and 3. 0 = the Baseline pistol only, 1 = a weapon family, 2 = a family's upgrade. A round past the list uses the last entry.")]
         [SerializeField] private int[] weaponDepthByRound = { 0, 1, 2 };
@@ -137,6 +140,7 @@ namespace Overpower.Data
         public float FinalRadius2v2 => finalRadius2v2;
         public float FinalRadius3v3v3 => finalRadius3v3v3;
         public float DamagePerSecondOutside => damagePerSecondOutside;
+        public float SameInstantToleranceSeconds => sameInstantToleranceSeconds;
         public int[] WeaponDepthByRound => weaponDepthByRound;
         public int[] ArmorUpgradesByRound => armorUpgradesByRound;
         public string LockedTierLabelFormat => lockedTierLabelFormat;

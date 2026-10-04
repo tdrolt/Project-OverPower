@@ -215,6 +215,12 @@ namespace Overpower.Lobby
                     yield break;
                 }
 
+                // Dominion sudden death: a joiner who takes a team seat is dead from the moment of the seat write (no flag would read as alive).
+                Overpower.Dominion.DominionStage dominionStage = Overpower.Dominion.DominionMode.IsActive() && Overpower.Dominion.DominionDirector.Instance != null
+                    ? Overpower.Dominion.DominionDirector.Instance.Stage : Overpower.Dominion.DominionStage.None;
+                Hashtable deadProps = Overpower.Dominion.DominionRoomWrites.LateJoinerPlayerProps(dominionStage, LobbySeatRules.TryTeamOfSeat(seat, out _), PhotonNetwork.ServerTimestamp);
+                if (deadProps != null) PhotonNetwork.LocalPlayer.SetCustomProperties(deadProps);
+
                 SeatWrite write = LobbySeatRules.LateJoinWrite(PhotonNetwork.LocalPlayer.ActorNumber, seat, stage);
                 bool sent = PhotonNetwork.CurrentRoom.SetCustomProperties(ToHashtable(write.Props), ToHashtable(write.Expected));
                 Debug.Log($"[LOBBY] late join: asking for seat {seat} (try {attempt + 1}, stage {stage}) - " + (sent ? "sent" : "not sent"));

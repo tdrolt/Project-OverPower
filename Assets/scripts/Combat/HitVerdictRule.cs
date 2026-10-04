@@ -29,11 +29,17 @@ namespace Overpower.Combat
     /// </summary>
     public static class HitVerdictRule
     {
+        /// <summary>Does this kind of damage go straight through Invulnerability (a running one and an armed trap alike)? Only the Dominion sudden-death
+        /// circle does (Tudor A30): it is not an enemy's hit, so it neither meets a running immunity nor springs an armed trap. Armour and damage
+        /// reduction or vulnerability still apply to it afterwards, as to any damage.</summary>
+        public static bool IgnoresInvulnerability(DamageSource source) => source == DamageSource.SuddenDeath;
+
         public static HitVerdict Classify(bool fromSelf, bool fromTeammate, bool alreadyInvulnerable,
-                                          IArmedShield armedShield, float damageAmount)
+                                          IArmedShield armedShield, float damageAmount, bool ignoresInvulnerability = false)
         {
             if (fromSelf) return HitVerdict.IgnoredSelf;
             if (fromTeammate) return HitVerdict.IgnoredTeammate;
+            if (ignoresInvulnerability) return HitVerdict.Lands; // before the shield: an armed trap must not be used up by a hit it would not stop
             if (alreadyInvulnerable) return HitVerdict.Shielded;
             if (armedShield != null && armedShield.TryConsume(damageAmount)) return HitVerdict.Shielded;
             return HitVerdict.Lands;
