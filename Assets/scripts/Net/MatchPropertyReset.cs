@@ -35,6 +35,7 @@ namespace Overpower.Net
             { StatusLabelProperty.Key, null },
             { AoeZoneRecast.PropertyKey, null },
             { RespawnShieldRules.ShieldKey, null },
+            { RespawnShieldRules.StartKey, null },
             { RespawnShieldRules.BlockedKey, null },
             { ScopeSightProperty.Key, null },
             { Teams.SpectatorKey, null },

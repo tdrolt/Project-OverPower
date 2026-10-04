@@ -25,6 +25,9 @@ namespace Overpower.Dominion
         public const string ShieldKey = "dShd";
         /// <summary>The Player Property the shield owner stamps (server ms) each time a hit is stopped, so every client can pop BLOCKED over them.</summary>
         public const string BlockedKey = "dBlk";
+        /// <summary>The Player Property written together with dShd: the server ms the shield began. Judging an old effect (A26) reads it, so no
+        /// client has to subtract its own Shield Seconds from the end. 0 = none.</summary>
+        public const string StartKey = "dShs";
 
         /// <summary>The server ms a shield started now ends. Never 0 (that value means no shield); the int wraps like the room's other times.</summary>
         public static int EndMs(int nowMs, float seconds)
@@ -78,14 +81,37 @@ namespace Overpower.Dominion
         public static bool EndsOnEnemyAffected(bool attackerShieldUp, bool victimShieldUp, bool fromBeforeRespawn) =>
             attackerShieldUp && !victimShieldUp && !fromBeforeRespawn;
 
-        /// <summary>A26: true when an effect (a mine, a fire field, a burn) was set up before the attacker's current shield began. The shield began
-        /// ShieldSeconds before it ends, so the start is derived from dShd alone and every client that reads it agrees. placedMs 0 = a direct hit
-        /// (a shot, a pulse), never from before. A cleared shield (0) has no start to be before.</summary>
-        public static bool IsFromBeforeRespawn(int effectPlacedMs, int shieldEndMs, float shieldSeconds)
+        /// <summary>A26: true when an effect (a mine, a fire field, a burn) was set up before the attacker's current shield began. The start is the
+        /// server ms the shield owner wrote beside its end (dShs), so no client recomputes it from its own Shield Seconds (a mid-match tuning or two
+        /// builds would skew that). placedMs 0 = a direct hit (a shot, a pulse), never from before. A cleared shield (start 0) has no start to be
+        /// before.</summary>
+        public static bool IsFromBeforeRespawn(int effectPlacedMs, int shieldStartMs)
         {
-            if (effectPlacedMs == 0 || shieldEndMs == 0) return false;
-            int startMs = unchecked(shieldEndMs - (int)System.Math.Round(shieldSeconds * 1000f));
-            return unchecked(effectPlacedMs - startMs) < 0;
+            if (effectPlacedMs == 0 || shieldStartMs == 0) return false;
+            return unchecked(effectPlacedMs - shieldStartMs) < 0;
+        }
+
+        /// <summary>What the attacker's client does when its own player's stun, slow, burn or push reaches its copy of someone else: Report =
+        /// tell the attacker's shield (the victim is a living enemy and the effect is this client's own player's), with whether the victim's shield
+        /// stopped it and whether the effect was set up before the attacker's current shield (A25/A26).</summary>
+        public readonly struct EffectReportDecision
+        {
+            public readonly bool Report;
+            public readonly bool VictimShielded;
+            public readonly bool FromBeforeRespawn;
+            public EffectReportDecision(bool report, bool victimShielded, bool fromBeforeRespawn)
+            { Report = report; VictimShielded = victimShielded; FromBeforeRespawn = fromBeforeRespawn; }
+        }
+
+        /// <summary>The attacker's side of A25/A26 for a status or push, judged on the attacker's own copy of the victim (isMine = that copy is the
+        /// local player's own, so nothing is reported - the victim's own client has the real answer). A teammate, a dead victim or someone else's
+        /// effect is no business of this client's shield. The effect's setup time is compared with myShieldStartMs, the dShs this client wrote.</summary>
+        public static EffectReportDecision EffectReport(bool victimIsMine, bool sourceIsMe, bool victimAlive, bool sameTeam,
+                                                        bool victimShielded, int effectPlacedMs, int myShieldStartMs)
+        {
+            if (victimIsMine || !sourceIsMe || !victimAlive || OriginOf(false, sameTeam) != Origin.Enemy)
+                return new EffectReportDecision(false, false, false);
+            return new EffectReportDecision(true, victimShielded, IsFromBeforeRespawn(effectPlacedMs, myShieldStartMs));
         }
 
         /// <summary>Who stays on a zone's capture roster and who is held out while a shield is up. A counted player whose shield is up is held

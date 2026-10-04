@@ -234,11 +234,10 @@ namespace Overpower.Abilities
                 if (!pair.Value.ShouldHit(distance, now))
                     continue;
 
-                target.ApplyDamage(new DamageInfo(damagePerPass, OwnerActor, OwnerTeam, -1,
-                                                   DamageSource.Zone, false, targetComponent.transform.position, AbilityId,
-                                                   effectPlacedMs: PlacedServerTimestampMs));
+                target.ApplyDamage(PlacedEffects.FenceTick(damagePerPass, OwnerActor, OwnerTeam, targetComponent.transform.position, AbilityId,
+                                                            PlacedServerTimestampMs));
 
-                var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude, abilityId = AbilityId };
+                StatusEffectSpec slow = PlacedEffects.PlacedSlow(slowSeconds, slowMagnitude, AbilityId, PlacedServerTimestampMs);
                 (target as IStatusReceiver)?.ApplyStatus(slow, OwnerActor);
             }
 

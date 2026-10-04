@@ -288,12 +288,12 @@ namespace Overpower.Abilities
             List<IDamageable> candidates = OverlapDamageables(at, explosionRadius);
             List<IDamageable> targets = MineTargeting.SelectTargets(candidates, OwnerActor, OwnerTeam);
 
-            var slow = new StatusEffectSpec { kind = StatusKind.Slow, duration = slowSeconds, magnitude = slowMagnitude, abilityId = AbilityId };
+            // The slow remembers when this mine was laid: the owner's own copy of the victim hears of it too, and an old mine must not end the owner's new respawn bubble (A26).
+            StatusEffectSpec slow = PlacedEffects.PlacedSlow(slowSeconds, slowMagnitude, AbilityId, PlacedServerTimestampMs);
 
             foreach (IDamageable target in targets)
             {
-                target.ApplyDamage(new DamageInfo(damage, OwnerActor, OwnerTeam, -1, DamageSource.Splash, false, at, AbilityId,
-                                                   effectPlacedMs: PlacedServerTimestampMs));
+                target.ApplyDamage(PlacedEffects.MineBlast(damage, OwnerActor, OwnerTeam, at, AbilityId, PlacedServerTimestampMs));
                 (target as IStatusReceiver)?.ApplyStatus(slow, OwnerActor);
             }
 

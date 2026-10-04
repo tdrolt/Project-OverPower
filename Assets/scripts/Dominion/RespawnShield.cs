@@ -118,7 +118,8 @@ namespace Overpower.Dominion
             int now = PhotonNetwork.ServerTimestamp;
             if (config == null || now == 0) return; // no number to use and no clock to count on: no shield, rather than a guessed one
             int end = RespawnShieldRules.EndMs(now, config.ShieldSeconds);
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.ShieldKey, end } });
+            // Start and end together in one write: A26 judges an old effect from the start, so nobody subtracts their own Shield Seconds from the end.
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
             Debug.Log($"[DOMINION] respawn shield up for {config.ShieldSeconds:0.#} s (ends {end})");
         }
 
@@ -127,7 +128,11 @@ namespace Overpower.Dominion
         {
             if (!photonView.IsMine || photonView.Owner == null) return;
             if (ReadInt(photonView.Owner, RespawnShieldRules.ShieldKey) == RespawnShieldRules.EndAfterDamageDealt()) return;
-            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.ShieldKey, RespawnShieldRules.EndAfterDamageDealt() } });
+            PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
+            {
+                { RespawnShieldRules.ShieldKey, RespawnShieldRules.EndAfterDamageDealt() },
+                { RespawnShieldRules.StartKey, 0 },
+            });
         }
 
         /// <summary>A round's or break's fresh start: no shield (A16), and the next respawn must follow a new death.</summary>
@@ -147,27 +152,31 @@ namespace Overpower.Dominion
 
         /// <summary>The attacker's side of A25, called by a status or push that this client simulates on its copy of a player it does not own.
         /// When that effect is this client's own player's and the target is a living enemy, the attacker's shield hears of it (no message: the
-        /// attacker's client simulates the effect anyway, and the victim's own shield is read from dShd). A direct hit, never from before the respawn.</summary>
-        public static void NoteMyEffectOnCopy(PhotonView victim, int sourceActor)
+        /// attacker's client simulates the effect anyway, and the victim's own shield is read from dShd). effectPlacedMs is when the mine or fence
+        /// behind the effect was set up (0 = a direct effect), so an old one does not end the new bubble (A26).</summary>
+        public static void NoteMyEffectOnCopy(PhotonView victim, int sourceActor, int effectPlacedMs = 0)
         {
-            if (victim == null || victim.IsMine || victim.Owner == null || !PhotonNetwork.InRoom) return;
+            if (victim == null || victim.Owner == null || !PhotonNetwork.InRoom) return;
             Player me = PhotonNetwork.LocalPlayer;
-            if (me == null || sourceActor != me.ActorNumber) return;
+            if (me == null) return;
             PlayerLifecycle victimLife = victim.GetComponent<PlayerLifecycle>();
-            if (victimLife != null && !victimLife.IsAlive) return;
-            if (RespawnShieldRules.OriginOf(false, Teams.AreSameTeam(me, victim.Owner)) != RespawnShieldRules.Origin.Enemy) return;
-            CombatEvents.RaiseEnemyAffected(IsUpFor(victim.Owner), false);
+            RespawnShieldRules.EffectReportDecision decision = RespawnShieldRules.EffectReport(
+                victim.IsMine, sourceActor == me.ActorNumber, victimLife == null || victimLife.IsAlive, Teams.AreSameTeam(me, victim.Owner),
+                IsUpFor(victim.Owner), effectPlacedMs, ShieldStartOf(me));
+            if (decision.Report) CombatEvents.RaiseEnemyAffected(decision.VictimShielded, decision.FromBeforeRespawn);
         }
 
         /// <summary>The server ms that player's shield ends (0 = none). Read from dShd.</summary>
         public static int ShieldEndOf(Player player) => ReadInt(player, RespawnShieldRules.ShieldKey);
 
+        /// <summary>The server ms that player's shield began (0 = none). Read from dShs.</summary>
+        public static int ShieldStartOf(Player player) => ReadInt(player, RespawnShieldRules.StartKey);
+
         /// <summary>A26, on the victim's client: true when the effect that hurt it was set up before the attacker's current shield began (a mine laid
         /// before its respawn). effectPlacedMs 0 = a direct hit.</summary>
         public static bool IsFromBeforeRespawn(Player attacker, int effectPlacedMs)
         {
-            DominionConfig config = DominionMode.Config();
-            return config != null && RespawnShieldRules.IsFromBeforeRespawn(effectPlacedMs, ShieldEndOf(attacker), config.ShieldSeconds);
+            return RespawnShieldRules.IsFromBeforeRespawn(effectPlacedMs, ShieldStartOf(attacker));
         }
 
         // ---------------------------------------------------------------- victim: stop a hit

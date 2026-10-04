@@ -23,6 +23,11 @@ namespace Overpower.Combat
         /// default(int) of 0, which could collide with a real ability id.
         /// </summary>
         public int abilityId;
+
+        /// <summary>Dominion Task 7b review (A26): the server time in ms when the lasting thing behind this status (a mine, an electric fence)
+        /// was set up. The attacker's own copy of the victim compares it with the attacker's respawn shield, so an old mine's slow does not end
+        /// the new bubble. 0 = a direct effect with nothing set up earlier. Zero by default, so every existing call site is unchanged.</summary>
+        public int effectPlacedMs;
     }
 
     /// <summary>

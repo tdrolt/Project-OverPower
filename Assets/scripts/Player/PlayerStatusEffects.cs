@@ -246,7 +246,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         {
             // Dominion A25: this client simulates its own player's effect on its copy of someone else; if it is an effect of ours on a living enemy,
             // our respawn shield hears of it. Nothing is applied here - only the victim's own client does that.
-            Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActorNumber);
+            Overpower.Dominion.RespawnShield.NoteMyEffectOnCopy(photonView, sourceActorNumber, spec.effectPlacedMs);
             return;
         }
 
@@ -454,10 +454,7 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
             return;
 
         Teams.TryGetTeam(burnSourceActorNumber, out int sourceTeamId);
-        var info = new DamageInfo(burn, burnSourceActorNumber, sourceTeamId, -1,
-                                   DamageSource.Burn, false, transform.position, burnAbilityId,
-                                   effectPlacedMs: burnAppliedMs);
-        playerHealth.ApplyDamage(info);
+        playerHealth.ApplyDamage(PlacedEffects.StatusBurn(burn, burnSourceActorNumber, sourceTeamId, transform.position, burnAbilityId, burnAppliedMs));
     }
 
     private void ApplySlowToMotor()

@@ -67,24 +67,29 @@ namespace Overpower.Tests
 
         [Test] public void AnEffectIsFromBeforeTheRespawnWhenItWasSetUpBeforeTheShieldBegan()
         {
-            // shield ends at 20000 and lasts 10 s, so it began at 10000
-            Assert.IsTrue(RespawnShieldRules.IsFromBeforeRespawn(9999, 20000, 10f), "a mine laid before the respawn");
-            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(10000, 20000, 10f), "laid the instant the shield began");
-            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(15000, 20000, 10f), "laid after the respawn");
+            // the shield began at 10000 (dShs)
+            Assert.IsTrue(RespawnShieldRules.IsFromBeforeRespawn(9999, 10000), "a mine laid before the respawn");
+            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(10000, 10000), "laid the instant the shield began");
+            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(15000, 10000), "laid after the respawn");
         }
 
         [Test] public void ADirectHitOrAClearedShieldIsNeverFromBeforeTheRespawn()
         {
-            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(0, 20000, 10f), "0 = a direct hit with nothing set up earlier");
-            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(9999, 0, 10f), "no shield, so no respawn to be before");
+            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(0, 10000), "0 = a direct hit with nothing set up earlier");
+            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(9999, 0), "no shield, so no respawn to be before");
         }
 
         [Test] public void TheBeforeRespawnComparisonSurvivesTheIntWrap()
         {
-            int end = unchecked(int.MaxValue - 2000 + 10000);   // wrapped to negative
-            int started = unchecked(end - 10000);               // just before the wrap
-            Assert.IsTrue(RespawnShieldRules.IsFromBeforeRespawn(unchecked(started - 1), end, 10f));
-            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(unchecked(started + 1), end, 10f));
+            int started = unchecked(int.MaxValue - 500);   // just before the wrap
+            Assert.IsTrue(RespawnShieldRules.IsFromBeforeRespawn(unchecked(started - 1), started));
+            Assert.IsFalse(RespawnShieldRules.IsFromBeforeRespawn(unchecked(started + 1000), started), "a mine laid after the wrap");
+        }
+
+        [Test] public void TheShieldStartIsAPlayerPropertyThatIsClearedWhenALobbyIsLeft()
+        {
+            Assert.AreEqual("dShs", RespawnShieldRules.StartKey);
+            Assert.IsTrue(MatchPropertyReset.Build().ContainsKey(RespawnShieldRules.StartKey));
         }
 
         // ------------------------------------------------------------ the rejoin respawn (Task 7 review, default A28)
@@ -299,6 +304,164 @@ namespace Overpower.Tests
             Assert.AreEqual(12345, info.EffectPlacedMs);
             Assert.AreEqual(12345, info.WithAmount(15f).EffectPlacedMs);
             Assert.AreEqual(0, new DamageInfo(10f, 1, 0, -1, DamageSource.Projectile, false, Vector3.zero).EffectPlacedMs, "a direct hit");
+        }
+
+        // ------------------------------------------------------------ Task 7b review: an old mine's slow, the attacker side, the builders
+
+        [Test] public void AStatusCarriesWhenItsMineOrFenceWasSetUp()
+        {
+            StatusEffectSpec slow = PlacedEffects.PlacedSlow(2f, 0.4f, 7, placedMs: 4242);
+            Assert.AreEqual(4242, slow.effectPlacedMs);
+            Assert.AreEqual(StatusKind.Slow, slow.kind);
+            Assert.AreEqual(2f, slow.duration);
+            Assert.AreEqual(0.4f, slow.magnitude);
+            Assert.AreEqual(7, slow.abilityId);
+            Assert.AreEqual(0, new StatusEffectSpec { kind = StatusKind.Stun }.effectPlacedMs, "a direct status has nothing set up earlier");
+        }
+
+        [Test] public void AMinesBlastCarriesWhenTheMineWasLaid()
+        {
+            DamageInfo info = PlacedEffects.MineBlast(30f, 3, 1, Vector3.one, 9, placedMs: 111);
+            Assert.AreEqual(111, info.EffectPlacedMs);
+            Assert.AreEqual(DamageSource.Splash, info.Source);
+            Assert.AreEqual(30f, info.Amount);
+            Assert.AreEqual(3, info.SourceActorNumber);
+        }
+
+        [Test] public void AnElectricFencesTickCarriesWhenTheFenceWasRaised()
+        {
+            DamageInfo info = PlacedEffects.FenceTick(12f, 3, 1, Vector3.one, 9, placedMs: 222);
+            Assert.AreEqual(222, info.EffectPlacedMs);
+            Assert.AreEqual(DamageSource.Zone, info.Source);
+        }
+
+        [Test] public void AnAoeZonesTickCarriesWhenTheZoneWasPlaced()
+        {
+            DamageInfo info = PlacedEffects.AoeZoneTick(8f, 3, 1, Vector3.one, 9, placedMs: 333);
+            Assert.AreEqual(333, info.EffectPlacedMs);
+            Assert.AreEqual(DamageSource.Zone, info.Source);
+        }
+
+        [Test] public void AFireFieldsBurnCarriesWhenTheFieldWasLit()
+        {
+            DamageInfo info = PlacedEffects.FireFieldBurn(5f, 3, 1, weaponId: 4, Vector3.one, placedMs: 444);
+            Assert.AreEqual(444, info.EffectPlacedMs);
+            Assert.AreEqual(DamageSource.Burn, info.Source);
+            Assert.AreEqual(4, info.WeaponId);
+            Assert.AreEqual(-1, info.AbilityId, "a weapon's field, as before");
+        }
+
+        [Test] public void ABurnStatusTickCarriesWhenTheBurnWasLastLit()
+        {
+            DamageInfo info = PlacedEffects.StatusBurn(2f, 3, 1, Vector3.one, 9, appliedMs: 555);
+            Assert.AreEqual(555, info.EffectPlacedMs);
+            Assert.AreEqual(DamageSource.Burn, info.Source);
+            Assert.AreEqual(9, info.AbilityId);
+        }
+
+        // The attacker side, pure: PlayerStatusEffects.Apply / PlayerDisplacement.Displace on a copy of someone else ask this and nothing else.
+        [Test] public void AnEnemyCopyHitByMyOwnEffectIsReportedWithWhetherItWasSetUpBeforeMyRespawn()
+        {
+            RespawnShieldRules.EffectReportDecision old = RespawnShieldRules.EffectReport(false, true, true, false, false, effectPlacedMs: 900, myShieldStartMs: 1000);
+            Assert.IsTrue(old.Report);
+            Assert.IsTrue(old.FromBeforeRespawn, "an old mine's slow");
+            RespawnShieldRules.EffectReportDecision fresh = RespawnShieldRules.EffectReport(false, true, true, false, true, effectPlacedMs: 1500, myShieldStartMs: 1000);
+            Assert.IsTrue(fresh.Report);
+            Assert.IsFalse(fresh.FromBeforeRespawn);
+            Assert.IsTrue(fresh.VictimShielded);
+        }
+
+        [Test] public void OnlyMyOwnEffectOnALivingEnemyCopyIsReported()
+        {
+            Assert.IsFalse(RespawnShieldRules.EffectReport(true, true, true, false, false, 0, 1000).Report, "my own body: the victim's own client has the answer");
+            Assert.IsFalse(RespawnShieldRules.EffectReport(false, false, true, false, false, 0, 1000).Report, "someone else's effect");
+            Assert.IsFalse(RespawnShieldRules.EffectReport(false, true, false, false, false, 0, 1000).Report, "a dead victim");
+            Assert.IsFalse(RespawnShieldRules.EffectReport(false, true, true, true, false, 0, 1000).Report, "a teammate");
+        }
+
+        [Test] public void ADirectEffectOrNoShieldStartIsNeverFromBeforeTheRespawnInTheReport()
+        {
+            Assert.IsFalse(RespawnShieldRules.EffectReport(false, true, true, false, false, effectPlacedMs: 0, myShieldStartMs: 1000).FromBeforeRespawn);
+            Assert.IsFalse(RespawnShieldRules.EffectReport(false, true, true, false, false, effectPlacedMs: 900, myShieldStartMs: 0).FromBeforeRespawn);
+        }
+
+        // ------------------------------------------------------------ the wiring: the game calls the tested rule (the method bodies are read, not run)
+
+        private const BindingFlags All = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+
+        // True when any method of the type (or a lambda / state machine nested in it) has an IL call, callvirt, newobj or field load of the target.
+        private static bool Uses(System.Type owner, MemberInfo target)
+        {
+            byte[] token = System.BitConverter.GetBytes(target.MetadataToken);
+            var types = new List<System.Type> { owner };
+            types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+            foreach (System.Type type in types)
+            {
+                foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
+                {
+                    byte[] il = method.GetMethodBody()?.GetILAsByteArray();
+                    if (il == null) continue;
+                    for (int i = 0; i + 4 < il.Length; i++)
+                    {
+                        byte op = il[i];
+                        if (op != 0x28 && op != 0x6F && op != 0x73 && op != 0x7B) continue; // call, callvirt, newobj, ldfld
+                        if (il[i + 1] == token[0] && il[i + 2] == token[1] && il[i + 3] == token[2] && il[i + 4] == token[3]) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static MethodInfo Builder(string name) => typeof(PlacedEffects).GetMethod(name);
+
+        [Test] public void MineBlastsAndSlowsGoThroughTheBuilders()
+        {
+            System.Type mine = typeof(Overpower.Abilities.Mine);
+            Assert.IsTrue(Uses(mine, Builder(nameof(PlacedEffects.MineBlast))), "the blast's damage");
+            Assert.IsTrue(Uses(mine, Builder(nameof(PlacedEffects.PlacedSlow))), "the slow carries the mine's placement time");
+        }
+
+        [Test] public void ElectricFenceTicksAndSlowsGoThroughTheBuilders()
+        {
+            System.Type fence = typeof(Overpower.Abilities.ElectricFence);
+            Assert.IsTrue(Uses(fence, Builder(nameof(PlacedEffects.FenceTick))));
+            Assert.IsTrue(Uses(fence, Builder(nameof(PlacedEffects.PlacedSlow))));
+        }
+
+        [Test] public void AoeZoneTicksGoThroughTheBuilder() =>
+            Assert.IsTrue(Uses(typeof(Overpower.Abilities.AoeZone), Builder(nameof(PlacedEffects.AoeZoneTick))));
+
+        [Test] public void FireFieldBurnsGoThroughTheBuilder() =>
+            Assert.IsTrue(Uses(typeof(Overpower.Weapons.FireField), Builder(nameof(PlacedEffects.FireFieldBurn))));
+
+        [Test] public void TheBurnStatusTickGoesThroughTheBuilder() =>
+            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), Builder(nameof(PlacedEffects.StatusBurn))));
+
+        [Test] public void AStatusOnACopyPassesItsPlacementTimeToTheAttackersShield()
+        {
+            FieldInfo placed = typeof(StatusEffectSpec).GetField(nameof(StatusEffectSpec.effectPlacedMs));
+            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), placed), "Apply must read spec.effectPlacedMs to hand it on");
+        }
+
+        [Test] public void TheAttackersNoteAsksTheTestedReportRuleAndTheStartProperty()
+        {
+            System.Type shield = typeof(RespawnShield);
+            Assert.IsTrue(Uses(shield, typeof(RespawnShieldRules).GetMethod(nameof(RespawnShieldRules.EffectReport))));
+            Assert.IsTrue(Uses(shield, typeof(RespawnShield).GetMethod(nameof(RespawnShield.ShieldStartOf))));
+        }
+
+        [Test] public void SonicPulseUsesThePushThatKnowsWhoPushed()
+        {
+            MethodInfo sourceAware = typeof(PlayerDisplacement).GetMethods()
+                .Single(m => m.Name == "Displace" && m.GetParameters().Length == 5);
+            Assert.IsTrue(Uses(typeof(Overpower.Abilities.SonicPulseAbility), sourceAware));
+        }
+
+        [Test] public void ThePlayersDisplacementTellsTheAttackersShieldAboutAPushOnACopy()
+        {
+            MethodInfo note = typeof(RespawnShield).GetMethod(nameof(RespawnShield.NoteMyEffectOnCopy));
+            Assert.IsTrue(Uses(typeof(PlayerDisplacement), note));
+            Assert.IsTrue(Uses(typeof(PlayerStatusEffects), note));
         }
     }
 }

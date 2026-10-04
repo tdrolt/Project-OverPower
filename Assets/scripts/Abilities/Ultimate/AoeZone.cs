@@ -249,9 +249,7 @@ namespace Overpower.Abilities
             List<IDamageable> targets = MineTargeting.SelectTargets(candidateBuffer, OwnerActor, OwnerTeam);
             foreach (IDamageable target in targets)
             {
-                target.ApplyDamage(new DamageInfo(damagePerTick, OwnerActor, OwnerTeam, -1,
-                                                   DamageSource.Zone, false, transform.position, AbilityId,
-                                                   effectPlacedMs: PlacedServerTimestampMs));
+                target.ApplyDamage(PlacedEffects.AoeZoneTick(damagePerTick, OwnerActor, OwnerTeam, transform.position, AbilityId, PlacedServerTimestampMs));
             }
         }
     }
