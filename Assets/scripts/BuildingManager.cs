@@ -155,6 +155,12 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// raised for a zero-bounty capture, or if the room never actually got the write.</summary>
     public event Action<int, int, int, int, int> BountyPaid;
 
+    /// <summary>Dominion Task 3: raised on the master only, from inside SetCaptured, once the capture write has reached Photon:
+    /// (zone, newOwner, previousOwner, previousHeldMs). The previous owner and the length of the hold it ended are read from the write
+    /// basis BEFORE the capture clears them (WithCapture forgets them), so a mode with its own bounty (Dominion pays points) can judge the
+    /// hold against its own number. OwnershipChanged cannot say it: it only carries the new snapshot, where they are already cleared.</summary>
+    public event Action<int, int, int, int> CaptureWritten;
+
     /// How many OwnershipChanged events this client has raised. Diagnostic only: lets a test read
     /// from outside that a late joiner's first read raised none.
     public int OwnershipChangedRaisedCount { get; private set; }
@@ -657,6 +663,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // when any one client's echo of the write above lands.
         if (written && bountyPaid > 0)
             RaiseBountyPaid(zone, team, payingTeam, bountyPaid, basis.LastHeldMs(zone));
+        if (written)
+            CaptureWritten?.Invoke(zone, team, payingTeam, basis.LastHeldMs(zone));
     }
 
     private void RaiseBountyPaid(int zone, int paidTeam, int payingTeam, int amount, int heldMs)

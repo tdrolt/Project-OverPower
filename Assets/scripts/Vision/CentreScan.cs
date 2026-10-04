@@ -119,8 +119,9 @@ namespace Overpower.Vision
             config = sight != null ? sight.Config : SpectatorVision;
 
             // Not in a room, or the territory is not read: nothing is judged, and nothing is remembered as "last frame".
+            // Dominion has no scan: the centre pays points in lumps instead (Dominion Task 3), so no wave and no countdown.
             if (buildings == null || buildings.Current == null || !PhotonNetwork.InRoom || config == null
-                || !config.FogEnabled)
+                || !config.FogEnabled || Overpower.Dominion.DominionMode.IsActive())
             {
                 Stop();
                 return;

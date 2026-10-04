@@ -24,7 +24,7 @@ namespace Overpower.Dominion
     ///
     /// Nothing is drawn here (the round card and break UI are Task 9); points, the centre and bounties are Task 3.
     /// </summary>
-    public sealed class DominionDirector : MonoBehaviourPunCallbacks
+    public sealed partial class DominionDirector : MonoBehaviourPunCallbacks
     {
         public static DominionDirector Instance { get; private set; }
 
@@ -41,7 +41,8 @@ namespace Overpower.Dominion
         // ---- master: waiting for the echo of its own write / of a match-over announcement.
         private float waitForEchoUntil = -1f;
         private float announceAgainAt = -1f;
-        private bool territoryResetPending;   // master: a territory reset to do (the snapshot or the clock was not ready yet)
+        private int zonesResetSentFor;            // master: the dEnd whose reset-done write (dRz) is on its way
+        private float zonesResetSentAt = -10f;
         private float nextPresenceCheckAt;
 
         // Players whose connection dropped, with when this client learned it: they count as still present for the dropped grace, like the
@@ -65,6 +66,7 @@ namespace Overpower.Dominion
 
         private void OnDestroy()
         {
+            UnhookBuildings();
             if (Instance == this) Instance = null;
         }
 
@@ -79,9 +81,11 @@ namespace Overpower.Dominion
             MatchDirector match = MatchDirector.Instance;
             if (match == null || !match.IsLive) return;
 
-            // A new master (or the old one, after a lost write) first finishes what the room already says: a territory reset an edge asked for,
-            // and the match-over announcement once the room says Over.
-            if (territoryResetPending) TryResetTerritory(match);
+            // A new master (or the old one, after a lost write) first finishes what the room already says: the zone reset the stage asked for
+            // (dRz), and the match-over announcement once the room says Over. Points have their own pace and echo wait (Points file), so
+            // neither this writer's wait nor theirs holds the other back.
+            RunZoneReset(match);
+            RunPoints();
             AnnounceOverIfDecided(match);
 
             if (Time.unscaledTime < waitForEchoUntil || Time.unscaledTime < nextPresenceCheckAt) return;
@@ -92,13 +96,16 @@ namespace Overpower.Dominion
             if (PhotonNetwork.ServerTimestamp == 0) return; // the server clock has not synced: never write
 
             Hashtable roomProps = PhotonNetwork.CurrentRoom.CustomProperties;
-            DominionRoomState room = DominionRoomState.Read(roomProps);
+            DominionRoomState room = WithLatestPoints(DominionRoomState.Read(roomProps)); // the round is scored on what the master has written, echoed or not
             CountPlayers();
             DominionWrite write = DominionRoomWrites.Next(true, true, PhotonNetwork.ServerTimestamp, room,
                 new DominionFlowNumbers
                 {
                     RoundsToWin = config.RoundsToWin, MaxRounds = config.MaxRounds,
                     RoundSeconds = config.RoundSeconds, BreakSeconds = config.BreakSeconds,
+                    HasCentre = CentreInPlay(out _),
+                    CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
+                    CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),
                 }, match.TeamsInMatch, playersPerTeam);
             if (write == null) return;
 
@@ -172,7 +179,8 @@ namespace Overpower.Dominion
             lastAppliedStage = DominionStage.None;
             waitForEchoUntil = -1f;
             announceAgainAt = -1f;
-            territoryResetPending = false;
+            zonesResetSentFor = 0;
+            ResetPointsState();
             inactiveSince.Clear();
         }
 
@@ -188,6 +196,7 @@ namespace Overpower.Dominion
         public override void OnRoomPropertiesUpdate(Hashtable changed)
         {
             if (changed == null || !PhotonNetwork.InRoom) return;
+            NoteEchoForPoints(changed);
             if (!changed.ContainsKey(DominionKeys.Stage) && !changed.ContainsKey(DominionKeys.Round)) return;
             // The echo of the master's own write (or anyone's): the wait for it is over, the next decision may be made.
             waitForEchoUntil = -1f;
@@ -203,26 +212,35 @@ namespace Overpower.Dominion
             Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge})");
             if (edge == DominionEdge.None) return;
 
-            // Master: the zones go back to neutral at the start of the break and again at the start of the round. (Retried each frame until the
-            // snapshot and the clock are ready.)
-            if (PhotonNetwork.IsMasterClient)
-            {
-                territoryResetPending = true;
-                if (MatchDirector.Instance != null) TryResetTerritory(MatchDirector.Instance);
-            }
-
+            // The zones go back to neutral at the start of the break and again at the start of the round: the master does it from the room's
+            // dRz (RunZoneReset), not from seeing this edge, so a master that takes over mid-way finishes it.
             ResetLocalPlayer(edge);
         }
 
-        private void TryResetTerritory(MatchDirector match)
+        /// <summary>Master: while the room's stage (a Round or a Break) has not had its zone reset (dRz differs from dEnd), reset the zones and
+        /// write dRz. Asked of the room every frame, so any master finishes a reset the previous one never did. Not repeated until the dRz
+        /// write has had a second to echo (a second reset would wipe a capture made in between).</summary>
+        private void RunZoneReset(MatchDirector match)
+        {
+            DominionRoomState room = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
+            if (!DominionRoomWrites.ZoneResetDue(room)) return;
+            if (zonesResetSentFor == room.EndMs && Time.unscaledTime - zonesResetSentAt < EchoWaitSeconds) return;
+            if (PhotonNetwork.ServerTimestamp == 0 || !TryResetTerritory(match)) return;
+
+            DominionWrite done = DominionRoomWrites.ZonesResetDone(room);
+            if (!PhotonNetwork.CurrentRoom.SetCustomProperties(done.Props, done.Expected)) return;
+            zonesResetSentFor = room.EndMs;
+            zonesResetSentAt = Time.unscaledTime;
+            Debug.Log($"[DOMINION] master wrote: zones reset for stage ending {room.EndMs} (round {room.Round}, stage {room.Stage})");
+        }
+
+        private bool TryResetTerritory(MatchDirector match)
         {
             BuildingManager buildings = BuildingManager.Instance;
-            if (buildings == null) return;
-            if (buildings.ResetForMatchStart(match.TeamsInMatch))
-            {
-                territoryResetPending = false;
-                Debug.Log("[DOMINION] master reset the territory (all zones neutral, capitals home)");
-            }
+            if (buildings == null) return false;
+            if (!buildings.ResetForMatchStart(match.TeamsInMatch)) return false;
+            Debug.Log("[DOMINION] master reset the territory (all zones neutral, capitals home)");
+            return true;
         }
 
         private void ResetLocalPlayer(DominionEdge edge)
@@ -249,6 +267,8 @@ namespace Overpower.Dominion
             // client's own as a master.
             waitForEchoUntil = -1f;
             announceAgainAt = -1f;
+            zonesResetSentFor = 0;
+            ResetPointsState(); // the new master's first tick builds on the room's dPts / dCtr and starts its own beat
         }
     }
 }

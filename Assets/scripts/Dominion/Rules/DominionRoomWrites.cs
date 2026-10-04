@@ -15,6 +15,10 @@ namespace Overpower.Dominion
         public int[] Points;
         public int[] Wins;
         public int Winner;
+        /// <summary>The server ms of the centre's next payout (dCtr); 0 = none written.</summary>
+        public int CentreMs;
+        /// <summary>dRz: the dEnd of the stage the zones were last reset for; 0 = never.</summary>
+        public int ResetFor;
 
         /// <summary>The state from the room's properties. Missing keys read as: no round, stage None, no points or wins (arrays of three zeros),
         /// no winner (-1). A wrong type reads as missing.</summary>
@@ -33,6 +37,8 @@ namespace Overpower.Dominion
             if (props.TryGetValue(DominionKeys.Points, out object points) && points is int[] p) state.Points = p;
             if (props.TryGetValue(DominionKeys.Wins, out object wins) && wins is int[] w) state.Wins = w;
             if (props.TryGetValue(DominionKeys.Winner, out object winner) && winner is int win) state.Winner = win;
+            if (props.TryGetValue(DominionKeys.CentrePayout, out object ctr) && ctr is int c) state.CentreMs = c;
+            if (props.TryGetValue(DominionKeys.ZonesResetFor, out object rz) && rz is int z) state.ResetFor = z;
             return state;
         }
     }
@@ -44,6 +50,10 @@ namespace Overpower.Dominion
         public int MaxRounds;
         public float RoundSeconds;
         public float BreakSeconds;
+        /// <summary>True when this match has a centre that pays lumps (3v3v3 on a map with a Tier 4 zone): a round start then writes dCtr.</summary>
+        public bool HasCentre;
+        public int CentreFirstMs;
+        public int CentreIntervalMs;
     }
 
     /// <summary>One check-and-set the master should send: what to write and what the room must still hold for it to apply.</summary>
@@ -76,7 +86,7 @@ namespace Overpower.Dominion
 
             if (!room.HasRound)
             {
-                return new DominionWrite
+                var first = new DominionWrite
                 {
                     What = "round 1 starts",
                     Props = new Hashtable
@@ -90,6 +100,8 @@ namespace Overpower.Dominion
                     },
                     Expected = new Hashtable { { DominionKeys.Round, null } },
                 };
+                AddCentre(first.Props, cfg, nowMs);
+                return first;
             }
 
             if (room.Stage == DominionStage.Over || room.Stage == DominionStage.None) return null;
@@ -108,12 +120,16 @@ namespace Overpower.Dominion
             if (!MatchStartRules.HasReached(nowMs, room.EndMs)) return null;
 
             if (room.Stage == DominionStage.Break)
-                return Stage(room, "break over, round starts", new Hashtable
+            {
+                DominionWrite start = Stage(room, "break over, round starts", new Hashtable
                 {
                     { DominionKeys.Stage, (int)DominionStage.Round },
                     { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.RoundSeconds) },
                     { DominionKeys.Points, new int[DominionKeys.TeamSlots] },
                 });
+                AddCentre(start.Props, cfg, nowMs);
+                return start;
+            }
 
             // A round ended: score it, then break, match over or sudden death.
             int[] wins = Slots(room.Wins);
@@ -146,6 +162,22 @@ namespace Overpower.Dominion
                     });
             }
         }
+
+        /// <summary>A round start with a centre in play also writes the centre's first payout: the first delay after the round starts.</summary>
+        private static void AddCentre(Hashtable props, DominionFlowNumbers cfg, int roundStartMs)
+        {
+            if (cfg.HasCentre)
+                props[DominionKeys.CentrePayout] = DominionRules.NextCentrePayoutMs(roundStartMs, roundStartMs, cfg.CentreFirstMs, cfg.CentreIntervalMs);
+        }
+
+        /// <summary>True when the zones still have to be reset for the stage the room is in: a Round or a Break whose dEnd is not the one dRz
+        /// names. Any master asks this, so a master that took over mid-way finishes the reset the old one never did.</summary>
+        public static bool ZoneResetDue(DominionRoomState room) =>
+            room.HasRound && (room.Stage == DominionStage.Round || room.Stage == DominionStage.Break) && room.ResetFor != room.EndMs;
+
+        /// <summary>The write that records the zones were reset for this stage (after the master reset them), expecting the stage it saw.</summary>
+        public static DominionWrite ZonesResetDone(DominionRoomState room) =>
+            Stage(room, "zones reset", new Hashtable { { DominionKeys.ZonesResetFor, room.EndMs } });
 
         /// <summary>The write for a stage change: the props, expecting the stage, round and end time this client computed it from.</summary>
         private static DominionWrite Stage(DominionRoomState room, string what, Hashtable props) => new DominionWrite

@@ -19,9 +19,14 @@ namespace Overpower.Dominion
         /// <summary>int: the match winner's team id, -1 while there is none.</summary>
         public const string Winner = "dWin";
 
-        // Reserved for later tasks - named here so nothing else claims them; nothing reads or writes them yet.
-        /// <summary>Task 3: the centre's next payout time.</summary>
+        /// <summary>int: the dEnd of the stage (a round or a break) whose start the master has reset the zones for. A master that sees the
+        /// stage's dEnd differ from dRz resets the zones and writes it, so a new master finishes a reset the old one never did (Task 2 review).</summary>
+        public const string ZonesResetFor = "dRz";
+
+        /// <summary>int: the server ms of the centre's next payout (3v3v3 on a map with a Tier 4 zone only). Written with each round start.</summary>
         public const string CentrePayout = "dCtr";
+
+        // Reserved for a later task - named here so nothing else claims it; nothing reads or writes it yet.
         /// <summary>Task 8: sudden death's start time.</summary>
         public const string SuddenDeathStart = "dSd";
 
