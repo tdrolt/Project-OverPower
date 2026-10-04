@@ -55,6 +55,31 @@ namespace Overpower.Dominion
             return cachedAnswer;
         }
 
+        // Per Room object like IsActive: the spawn heal asks every frame, and TeamsOf clones the array.
+        private static Photon.Realtime.Room teamCountRoom;
+        private static int teamCount;
+
+        /// <summary>How many teams the current room's mode has (2 = 2v2, 3 = 3v3v3); 0 outside a room or when the mode is unknown.</summary>
+        public static int TeamCountOfCurrentRoom()
+        {
+            Photon.Realtime.Room room = PhotonNetwork.CurrentRoom;
+            if (room == null) return 0;
+            if (room == teamCountRoom) return teamCount;
+            if (rooms == null) rooms = UnityEngine.Object.FindFirstObjectByType<RoomManager>();
+            GameModeCatalogue catalogue = rooms != null ? rooms.ModeCatalogue : null;
+            if (catalogue == null) return 0; // not cached: ask again once the RoomManager is there
+            teamCountRoom = room;
+            teamCount = TeamsOf(room.CustomProperties, catalogue.ById).Length;
+            return teamCount;
+        }
+
+        /// <summary>The scene's DominionConfig (the RoomManager's), or null when there is no RoomManager yet.</summary>
+        public static DominionConfig Config()
+        {
+            if (rooms == null) rooms = UnityEngine.Object.FindFirstObjectByType<RoomManager>();
+            return rooms != null ? rooms.Dominion : null;
+        }
+
         /// <summary>The team ids of the current room's mode (Dominion size), or empty.</summary>
         public static int[] TeamsOfCurrentRoom()
         {

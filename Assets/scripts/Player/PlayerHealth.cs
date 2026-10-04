@@ -480,6 +480,16 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         float rate = HealthRegenRule.RegenPerSecond(standingInOwnZone, tierRegenPerSecond,
                                                       secondsSinceCombat, gameplayConfig.OutOfCombatSeconds);
+
+        // Dominion Task 6: the player's own spawn heals at its own rates, also mid-fight (default A14: owned Tier 2/3 zones elsewhere keep the
+        // Conquest regen above).
+        if (Overpower.Dominion.DominionMode.IsActive())
+        {
+            Overpower.Data.DominionConfig dominion = Overpower.Dominion.DominionMode.Config();
+            if (dominion != null && Overpower.Dominion.SpawnHealArea.InOwnSpawn(TeamId, transform.position))
+                rate = Overpower.Dominion.DominionHealRules.RatePerSecond(true, secondsSinceCombat, dominion.SpawnHealOutOfCombatPerSecond,
+                    dominion.SpawnHealInCombatPerSecond, dominion.SpawnHealOutOfCombatDelaySeconds);
+        }
         if (rate <= 0f)
             return;
 

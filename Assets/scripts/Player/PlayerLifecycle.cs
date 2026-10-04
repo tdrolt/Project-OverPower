@@ -658,17 +658,32 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     {
         bool rejoinRespawn = rejoinRespawnPending;
         deathCount = RespawnDelayRules.DeathCountForRetake(deathCount, countdownAlreadyCounted: !chargeDeath, rejoinRespawn: rejoinRespawn);
+
+        // Dominion Task 6: every death waits the same fixed time for the match size (the count above still feeds the scoreboard), a rejoiner
+        // included (default A13).
+        bool dominion = Overpower.Dominion.DominionMode.IsActive();
+        float dominionSeconds = 0f;
+        if (dominion)
+        {
+            Overpower.Data.DominionConfig dominionConfig = Overpower.Dominion.DominionMode.Config();
+            dominionSeconds = dominionConfig != null
+                ? Overpower.Dominion.DominionHealRules.RespawnSeconds(Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom(),
+                    dominionConfig.RespawnSeconds2v2, dominionConfig.RespawnSeconds3v3v3)
+                : 6f;
+        }
+
         if (rejoinRespawn)
         {
             rejoinRespawnPending = false;
-            return RespawnDelayRules.RejoinDelay(gameplayConfig != null ? gameplayConfig.RejoinRespawnSeconds : 5f);
+            if (dominion) Debug.Log($"[DOMINION] rejoin respawn waits the fixed {dominionSeconds}s like everyone");
+            return RespawnDelayRules.RejoinDelayFor(dominion, dominionSeconds, gameplayConfig != null ? gameplayConfig.RejoinRespawnSeconds : 5f);
         }
 
         float baseSeconds = gameplayConfig != null ? gameplayConfig.RespawnBaseSeconds : 5f;
         float perDeathSeconds = gameplayConfig != null ? gameplayConfig.RespawnPerDeathSeconds : 1f;
         float maxSeconds = gameplayConfig != null ? gameplayConfig.RespawnMaxSeconds : 10f;
 
-        return RespawnDelayRules.Delay(deathCount, baseSeconds, perDeathSeconds, maxSeconds);
+        return RespawnDelayRules.DelayFor(dominion, dominionSeconds, deathCount, baseSeconds, perDeathSeconds, maxSeconds);
     }
 
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)

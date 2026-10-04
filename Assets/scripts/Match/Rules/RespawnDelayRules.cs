@@ -10,6 +10,15 @@ namespace Overpower.Match
         public static float Delay(int deathCount, float baseSeconds, float perDeathSeconds, float maxSeconds) =>
             Mathf.Min(baseSeconds + perDeathSeconds * (deathCount - 1), maxSeconds);
 
+        /// <summary>Dominion Task 6: the wait before coming back. In Dominion it is the match size's fixed seconds however many times the player
+        /// has died; in Conquest it grows with each death as Delay says.</summary>
+        public static float DelayFor(bool dominion, float dominionFixedSeconds, int deathCount, float baseSeconds, float perDeathSeconds, float maxSeconds) =>
+            dominion ? Mathf.Max(0f, dominionFixedSeconds) : Delay(deathCount, baseSeconds, perDeathSeconds, maxSeconds);
+
+        /// <summary>Dominion Task 6 (default A13): a rejoiner in Dominion waits the same fixed time as everyone; in Conquest the flat rejoin seconds.</summary>
+        public static float RejoinDelayFor(bool dominion, float dominionFixedSeconds, float flatSeconds) =>
+            dominion ? Mathf.Max(0f, dominionFixedSeconds) : RejoinDelay(flatSeconds);
+
         /// <summary>A player who waited after their countdown already paid for that death when it started; the retake
         /// respawn must not charge a second one. A last-stand death (no countdown) is charged here, once.</summary>
         public static int DeathCountForRetake(int deathCount, bool countdownAlreadyCounted) =>
