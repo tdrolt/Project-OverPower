@@ -35,6 +35,35 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ARoundsUpgradeCapStopsTheUpgradesBeforeTheShopsOwnMaximum()
+        {
+            SetMaxUpgrades(config, 3);
+            var path = new ArmorUpgradePath(config, upgradeCap: 1);
+            Assert.IsTrue(path.TryUpgradeAbsorb());
+            Assert.IsFalse(path.CanUpgradeAbsorb);
+            Assert.IsFalse(path.CanUpgradeRecharge, "the cap is one budget for both paths");
+            Assert.IsFalse(path.TryUpgradeRecharge());
+            Assert.AreEqual(1, path.TotalUpgrades);
+        }
+
+        [Test]
+        public void ACapOfZeroOffersNoUpgradeAtAll()
+        {
+            var path = new ArmorUpgradePath(config, upgradeCap: 0);
+            Assert.IsFalse(path.CanUpgradeAbsorb);
+            Assert.IsFalse(path.CanUpgradeRecharge);
+        }
+
+        [Test]
+        public void ACapAboveTheShopsMaximumChangesNothing()
+        {
+            SetMaxUpgrades(config, 1);
+            var path = new ArmorUpgradePath(config, upgradeCap: 5);
+            Assert.IsTrue(path.TryUpgradeRecharge());
+            Assert.IsFalse(path.CanUpgradeRecharge);
+        }
+
+        [Test]
         public void ANewPathStartsAtLevelZeroOnBothPaths()
         {
             var path = new ArmorUpgradePath(config);

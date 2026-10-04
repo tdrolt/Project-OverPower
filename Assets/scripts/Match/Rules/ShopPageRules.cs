@@ -95,10 +95,10 @@ namespace Overpower.Match
     public static class ArmorPopupText
     {
         public static string Numbers(bool absorbRow, ArmorConfig config, int absorbLevel, int rechargeLevel, string priceLine,
-            string nowFormat, string nextFormat, string noNextText)
+            string nowFormat, string nextFormat, string noNextText, int upgradeCap = int.MaxValue)
         {
             var c = System.Globalization.CultureInfo.InvariantCulture;
-            var path = new ArmorUpgradePath(config, absorbLevel, rechargeLevel);
+            var path = new ArmorUpgradePath(config, absorbLevel, rechargeLevel, upgradeCap);
             int level = absorbRow ? path.AbsorbLevel : path.RechargeLevel;
             bool canUpgrade = absorbRow ? path.CanUpgradeAbsorb : path.CanUpgradeRecharge;
             string Value(int lv) => ShopNumberFormat.Compact(absorbRow ? config.AbsorbFor(lv) : config.RechargeSecondsFor(lv));

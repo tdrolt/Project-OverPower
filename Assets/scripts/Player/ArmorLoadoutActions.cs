@@ -19,12 +19,12 @@ public static class ArmorLoadoutActions
     /// (false), if the combined cap and that path's own top level both still allow it. Returns
     /// false and changes nothing when refused - the caller decides how to show that (TestRangePanel
     /// logs it; LoadoutScreen disables the button before this is ever called).</summary>
-    public static bool TryUpgrade(PlayerHealth health, PlayerLoadout loadout, ArmorConfig armorConfig, bool upgradeAbsorb)
+    public static bool TryUpgrade(PlayerHealth health, PlayerLoadout loadout, ArmorConfig armorConfig, bool upgradeAbsorb, int upgradeCap = int.MaxValue)
     {
         if (health == null || loadout == null || armorConfig == null)
             return false;
 
-        var path = new ArmorUpgradePath(armorConfig, health.AbsorbLevel, health.RechargeLevel);
+        var path = new ArmorUpgradePath(armorConfig, health.AbsorbLevel, health.RechargeLevel, upgradeCap);
         bool upgraded = upgradeAbsorb ? path.TryUpgradeAbsorb() : path.TryUpgradeRecharge();
         if (!upgraded)
             return false;

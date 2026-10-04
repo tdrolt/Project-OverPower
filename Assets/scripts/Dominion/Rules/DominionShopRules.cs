@@ -1,4 +1,6 @@
 using System;
+using Overpower.Combat;
+using Overpower.Match;
 
 namespace Overpower.Dominion
 {
@@ -25,6 +27,18 @@ namespace Overpower.Dominion
         /// <summary>The shop takes picks in the Break only - plus the one pick a late joiner makes before spawning.</summary>
         public static bool MayPick(DominionStage stage, bool lateJoinerFirstPick) =>
             stage == DominionStage.Break || lateJoinerFirstPick;
+
+        /// <summary>NotInBreak while a live Dominion match is outside the break (and the late joiner's one pick is not open), else None.
+        /// Conquest and the warm-up are never blocked by this.</summary>
+        public static PurchaseBlock PickBlock(bool dominionLive, DominionStage stage, bool lateJoinerPickOpen) =>
+            dominionLive && !MayPick(stage, lateJoinerPickOpen) ? PurchaseBlock.NotInBreak : PurchaseBlock.None;
+
+        /// <summary>A late joiner's one pick lasts only while the round they joined in is still going.</summary>
+        public static bool LateJoinerWindowOpen(bool joinedMidRound, DominionStage stage) =>
+            joinedMidRound && (stage == DominionStage.Round || stage == DominionStage.SuddenDeath);
+
+        /// <summary>The most armour upgrades the + buttons offer: the smaller of the shop's own maximum and the round's allowance.</summary>
+        public static int ArmorCap(int shopMax, int round, int[] table) => Math.Min(shopMax, ArmorUpgradesAllowed(round, table));
 
         /// <summary>A weapon's depth in the tree: 0 for the root, 1 for its children, and so on; -1 for a weapon the tree does not know or
         /// whose parents loop. <paramref name="parentOf"/> returns a weapon's parent id: any negative number for a root
@@ -53,10 +67,10 @@ namespace Overpower.Dominion
         public static string LockedLabel(string format, int firstRoundOpen) =>
             firstRoundOpen < 1 ? "" : string.Format(format ?? "Round {0}", firstRoundOpen);
 
-        /// <summary>The first round (1-based) whose table entry reaches this depth, or -1 if no round does.</summary>
+        /// <summary>The first round (1-based) whose table entry reaches this depth, or -1 if no round does (or the depth is unknown, below 0).</summary>
         public static int FirstRoundAllowingDepth(int depth, int[] table)
         {
-            if (table == null) return -1;
+            if (table == null || depth < 0) return -1;
             for (int i = 0; i < table.Length; i++)
                 if (table[i] >= depth) return i + 1;
             return -1;

@@ -8,6 +8,7 @@ using UnityEngine.UI;
 using Overpower.Abilities;
 using Overpower.Combat;
 using Overpower.Data;
+using Overpower.Dominion;
 using Overpower.Match;
 using Overpower.Net;
 using Overpower.Weapons;
@@ -272,6 +273,26 @@ namespace Overpower.UI
         /// and once from OnDisable during teardown) never double-releases.</summary>
         private bool isOpenLocal;
 
+        // ---- Dominion (Task 5) ---------------------------------------------------------------------
+
+        /// <summary>A player who joined a Dominion match mid-round may pick once before spawning (Tudor's default A12): the shop opens by
+        /// itself once, free, with the current round's limits, and stays pickable until they close it or the round ends. After that it is
+        /// break-only like everyone's. A local flag, set in Start for a fresh joiner (never a rejoiner, who keeps the round's picks).</summary>
+        private bool lateJoinerPick;
+        private readonly Dictionary<int, int> weaponDepth = new Dictionary<int, int>();
+        private RoomManager roomManager;
+        private PlayerHud playerHud;
+        private bool lastDisplayedIsDominion;
+
+        private DominionConfig DominionCfg
+        {
+            get
+            {
+                if (roomManager == null) roomManager = FindFirstObjectByType<RoomManager>();
+                return roomManager != null ? roomManager.Dominion : null;
+            }
+        }
+
         // Snapshot of what Refresh() last drew, so Update() (while open) can tell when the weapon
         // or armor changed from OUTSIDE this screen's own clicks - the F1 panel's dropdown/buttons,
         // or a property echo from a remote change - and catch up (Task 9a review finding 2).
@@ -320,6 +341,7 @@ namespace Overpower.UI
             // Optional: not every rig this component might run on has one, and there is nothing
             // this screen cannot do without it besides the match-over gate below.
             matchUI = GetComponent<MatchUI>();
+            playerHud = GetComponent<PlayerHud>();
 
             if (playerHealth == null || playerLoadout == null || weaponFiring == null || inputRouter == null || abilityRunner == null)
                 Debug.LogError($"[LoadoutScreen] {name}: missing PlayerHealth/PlayerLoadout/WeaponFiring/PlayerInputRouter/AbilityRunner on this player - the loadout screen cannot apply choices.");
@@ -342,6 +364,19 @@ namespace Overpower.UI
                 inputRouter.ShopToggled += Toggle;
             if (abilityRunner != null)
                 abilityRunner.SlotChanged += HandleAbilitySlotChanged;
+        }
+
+        private void Start()
+        {
+            // Owner only (Awake switched every other copy off). A joiner mid-round gets the shop once, free; a rejoiner keeps what they had.
+            if (!photonView.IsMine || photonView.Owner == null || photonView.Owner.HasRejoined || !ShopPricing.DominionLive())
+                return;
+            DominionDirector director = DominionDirector.Instance;
+            if (director == null || !DominionShopRules.LateJoinerWindowOpen(true, director.Stage))
+                return;
+            lateJoinerPick = true;
+            Open();
+            Debug.Log($"[SHOP] late joiner: shop opened once, free, round {director.Round} limits");
         }
 
         private void OnDisable()
@@ -384,15 +419,29 @@ namespace Overpower.UI
         {
             bool matchOver = matchUI != null && matchUI.MatchOver;
 
+            // Dominion: a late joiner's one pick ends with the round they joined in; the shop is shut outside the break.
+            if (lateJoinerPick && DominionMode.IsActive() && DominionDirector.Instance != null
+                && !DominionShopRules.LateJoinerWindowOpen(true, DominionDirector.Instance.Stage))
+                lateJoinerPick = false;
+            bool shopShut = ShopPricing.DominionClosed(lateJoinerPick) != PurchaseBlock.None;
+
             // The always-visible toggle button must stop offering a loadout once the match is over
             // too (Task 9b quality review) - runs regardless of isOpenLocal below, since the button
             // is visible and clickable whether this screen is open or closed. Previously it stayed
-            // interactable and Toggle()/Open() just silently refused.
+            // interactable and Toggle()/Open() just silently refused. Dominion Task 5: also not offered
+            // while the shop is shut (outside the break).
             if (loadoutToggleButton != null)
-                loadoutToggleButton.interactable = !matchOver;
+                loadoutToggleButton.interactable = !matchOver && !shopShut;
 
             if (!isOpenLocal)
                 return;
+
+            // The round started (the break ended): an open shop closes the moment the stage leaves the break.
+            if (shopShut)
+            {
+                Close();
+                return;
+            }
 
             // A raw keyboard poll, not an InputAction, matching TestRangePanel's own reasoning for
             // F1: Esc-closes-a-tool is a tool convention, not a rebindable gameplay control.
@@ -461,6 +510,13 @@ namespace Overpower.UI
             // (ShopRules.EffectiveInOwnTerritory, applied in ShopPricing.Build; the combat gate needs none - PlayerHealth puts the clock out of combat on death).
             if (matchUI != null && matchUI.MatchOver)
                 return; // The match is already decided - see Update()'s own MatchOver check (Task 9a review).
+            if (ShopPricing.DominionClosed(lateJoinerPick) != PurchaseBlock.None)
+            {
+                // Dominion outside the break: stays shut, with a short word on why (the header is not on screen to say it).
+                Debug.Log($"[SHOP] open refused: NotInBreak (stage {DominionDirector.Instance?.Stage})");
+                if (playerHud != null && theme != null) playerHud.ShowToast(theme.loadoutShopClosedText);
+                return;
+            }
 
             isOpenLocal = true;
             IsOpen = true;
@@ -494,6 +550,7 @@ namespace Overpower.UI
 
             isOpenLocal = false;
             IsOpen = false;
+            lateJoinerPick = false; // a late joiner's one pick ends when they close the shop
             HideTooltip();
             screenRoot.SetActive(false);
             inputRouter?.SetToolFocus(this, false);
@@ -575,7 +632,21 @@ namespace Overpower.UI
         /// class comment for why this was pulled out of LoadoutScreen itself.</summary>
         private ShopContext CurrentShopContext() =>
             ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position,
-                lifecycle == null || lifecycle.IsAlive);
+                lifecycle == null || lifecycle.IsAlive, lateJoinerPick, DominionCfg,
+                theme != null ? theme.loadoutDominionFreeText : "", theme != null ? theme.loadoutShopClosedText : "");
+
+        /// <summary>Dominion: a refused pick because the shop is shut (outside the break). True when the caller should stop.</summary>
+        private bool RefuseIfClosed(ShopContext ctx, int itemId = -1)
+        {
+            if (ctx.Closed == PurchaseBlock.None)
+                return false;
+            ShowBlockedReason(ctx, ctx.Closed, 0, itemId);
+            return true;
+        }
+
+        /// <summary>The most armour upgrades the + buttons offer right now: ArmorConfig's maximum, or this Dominion round's smaller allowance.</summary>
+        private int ArmorCapFor(ShopContext ctx) =>
+            armorConfig == null ? 0 : ctx.Limits != null ? ctx.Limits.ArmorCap(armorConfig.MaxArmorUpgrades) : armorConfig.MaxArmorUpgrades;
 
         /// <summary>Header row: "Gold 1234" and the status line - a refused click's own reason
         /// (Task 2.5b review fix 2, see ShowBlockedReason) while its timer runs, else the shop
@@ -588,10 +659,11 @@ namespace Overpower.UI
         private void RefreshHeader(ShopContext ctx)
         {
             int gold = goldWallet != null ? goldWallet.Balance : 0;
-            if (!headerInitialized || gold != lastDisplayedGold)
+            if (!headerInitialized || gold != lastDisplayedGold || ctx.IsDominion != lastDisplayedIsDominion)
             {
-                goldLabel.text = ShopPricing.GoldLabel(gold);
+                goldLabel.text = ctx.IsDominion ? "" : ShopPricing.GoldLabel(gold); // Dominion has no gold
                 lastDisplayedGold = gold;
+                lastDisplayedIsDominion = ctx.IsDominion;
             }
 
             bool reasonActive = blockedReasonExpiryTime > 0f && Time.unscaledTime < blockedReasonExpiryTime;
@@ -710,6 +782,14 @@ namespace Overpower.UI
             }
 
             tree = new WeaponUpgradeTree(nodes);
+
+            // How deep each weapon sits (Dominion opens the tree a level per round); computed once, from the same list the tree is built from.
+            weaponDepth.Clear();
+            var parentById = new Dictionary<int, int>();
+            foreach (var (id, parentId) in nodes)
+                parentById[id] = parentId;
+            foreach (var (id, _) in nodes)
+                weaponDepth[id] = DominionShopRules.WeaponDepth(id, w => parentById.TryGetValue(w, out int p) ? p : (int?)null);
             // Logged once here in Awake, not from Refresh - Refresh runs on every open and every
             // click, and a data problem does not change between those.
             foreach (string problem in tree.Problems)
@@ -719,9 +799,16 @@ namespace Overpower.UI
         private void OnWeaponNodeClicked(int weaponId)
         {
             int equipped = CurrentWeaponId();
+            ShopContext ctx = CurrentShopContext();
             // Guards regardless of the button's own interactable flag (only Locked nodes are set
             // non-interactable - see StyleNode) - clicking Equipped or Owned must simply do nothing.
-            if (!tree.CanUpgrade(equipped, weaponId))
+            // Dominion: every pick is free, so a weapon the round opens is pickable from anywhere (a family switch is one click).
+            bool pickable = ctx.Limits != null
+                ? ctx.Limits.NodeState(tree.StateOf(weaponId, equipped), DepthOf(weaponId)) == UpgradeNodeState.Selectable
+                : tree.CanUpgrade(equipped, weaponId);
+            if (!pickable)
+                return;
+            if (RefuseIfClosed(ctx, weaponId))
                 return;
 
             // Task 2.5b review fix 2: a Selectable node stays clickable even while shop-blocked (see
@@ -729,7 +816,6 @@ namespace Overpower.UI
             // ShowBlockedReason is what actually tells the player why, in the header status line.
             WeaponDefinition target = weapons.Resolve(weaponId);
             int price = target != null ? target.GoldCost : 0;
-            ShopContext ctx = CurrentShopContext();
             bool free = ctx.IsFree;
             int chargedPrice = 0;
 
@@ -761,6 +847,8 @@ namespace Overpower.UI
             // never trips CannotAfford) - so the same Check(0) the header status line reads decides
             // whether the refund is allowed here too.
             ShopContext ctx = CurrentShopContext();
+            if (RefuseIfClosed(ctx))
+                return;
             if (!ctx.IsFree)
             {
                 PurchaseBlock block = ctx.Check(0);
@@ -789,6 +877,8 @@ namespace Overpower.UI
         private int CurrentWeaponId() =>
             weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : tree.RootId;
 
+        private int DepthOf(int weaponId) => weaponDepth.TryGetValue(weaponId, out int depth) ? depth : -1;
+
         private void RefreshWeaponTree(ShopContext ctx)
         {
             if (tree == null || weapons == null)
@@ -813,12 +903,25 @@ namespace Overpower.UI
         /// disabled button would also stop this node being hoverable for its pop-up.</summary>
         private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state, WeaponDefinition def, ShopContext ctx, int swapRefund)
         {
+            // Dominion: the round decides what is open. A weapon the round has not opened is Locked and says which round does ("Round 2");
+            // anything it has opened is pickable from where you stand, because every pick is free.
+            string lockedText = "";
+            if (ctx.Limits != null && def != null)
+            {
+                int depth = DepthOf(def.Id);
+                if (ctx.Limits.IsRoundLocked(state, depth))
+                    lockedText = ctx.Limits.LockedLabel(depth);
+                state = ctx.Limits.NodeState(state, depth);
+                swapRefund = -1; // nothing is sold back in a free shop
+            }
+
             PurchaseBlock block = state == UpgradeNodeState.Selectable && def != null ? ctx.Check(def.GoldCost) : PurchaseBlock.None;
             bool shopBlocked = block != PurchaseBlock.None;
 
             string suffix = state == UpgradeNodeState.Equipped ? "Equipped"
                           : state == UpgradeNodeState.Owned ? "Owned"
-                          : def != null ? ShopPricing.PriceLine(def.GoldCost, block, ctx.Balance) : "";
+                          : lockedText.Length > 0 ? lockedText
+                          : def != null ? ctx.PriceLine(def.GoldCost, block) : "";
             // Loadout Price Line Size Percent (UiTheme) on the price/status line only - the node is
             // small (Loadout Node Width x Height) and two full-size lines would not both fit.
             // Task 5b-1 (D19): a weapon on another branch says its price AND what selling back gives now; with
@@ -881,12 +984,15 @@ namespace Overpower.UI
             if (playerHealth == null || armorConfig == null)
                 return;
 
-            var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel);
+            ShopContext ctx = CurrentShopContext();
+            int cap = ArmorCapFor(ctx);
+            var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel, cap);
             if (!(upgradeAbsorb ? path.CanUpgradeAbsorb : path.CanUpgradeRecharge))
+                return;
+            if (RefuseIfClosed(ctx))
                 return;
 
             int price = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
-            ShopContext ctx = CurrentShopContext();
             bool free = ctx.IsFree;
             int chargedPrice = 0;
 
@@ -911,7 +1017,7 @@ namespace Overpower.UI
                 chargedPrice = price;
             }
 
-            ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb);
+            ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb, cap);
 
             // Read AFTER TryUpgrade so it reflects what was actually bought, rather than trusting
             // the prospective level computed above went through exactly as predicted.
@@ -925,6 +1031,8 @@ namespace Overpower.UI
         {
             // Same "no price of its own, only the gate applies" reasoning as OnResetWeaponClicked.
             ShopContext ctx = CurrentShopContext();
+            if (RefuseIfClosed(ctx))
+                return;
             if (!ctx.IsFree)
             {
                 PurchaseBlock block = ctx.Check(0);
@@ -962,22 +1070,24 @@ namespace Overpower.UI
             if (playerHealth == null || armorConfig == null)
                 return;
 
-            var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel);
+            int cap = ArmorCapFor(ctx); // Dominion: this round's allowance when it is lower than the shop's own maximum
+            var path = new ArmorUpgradePath(armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel, cap);
             int nextPrice = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
             PurchaseBlock block = ctx.Check(nextPrice);
             bool gateBlocked = block != PurchaseBlock.None;
-            string priceLine = ShopPricing.PriceLine(nextPrice, block, ctx.Balance);
+            string priceLine = ctx.PriceLine(nextPrice, block);
 
             // Task 5b-2 (D5): the limit is ONE budget shared by both rows (ArmorUpgradePath.TotalUpgrades against
             // ArmorConfig.MaxArmorUpgrades), so both rows say where the next click sits in it, or that it is spent.
-            string limit = ArmorLimitLabel.Text(path.TotalUpgrades, armorConfig.MaxArmorUpgrades,
-                theme.loadoutArmorUpgradeFormat, theme.loadoutArmorMaxFormat);
+            bool roundLimited = cap < armorConfig.MaxArmorUpgrades;
+            string limit = ArmorLimitLabel.Text(path.TotalUpgrades, cap,
+                theme.loadoutArmorUpgradeFormat, roundLimited ? theme.loadoutArmorRoundMaxFormat : theme.loadoutArmorMaxFormat);
             absorbText.text = path.CanUpgradeAbsorb
                 ? ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel, $"{limit} ({priceLine})")
-                : ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel, ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit));
+                : ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel, ArmorRowFull(path.TotalUpgrades, cap, limit));
             rechargeText.text = path.CanUpgradeRecharge
                 ? ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel, $"{limit} ({priceLine})")
-                : ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel, ArmorRowFull(path.TotalUpgrades, armorConfig.MaxArmorUpgrades, limit));
+                : ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel, ArmorRowFull(path.TotalUpgrades, cap, limit));
             absorbText.color = path.CanUpgradeAbsorb && gateBlocked ? theme.mutedTextColor : theme.textColor;
             rechargeText.color = path.CanUpgradeRecharge && gateBlocked ? theme.mutedTextColor : theme.textColor;
 
@@ -1016,6 +1126,8 @@ namespace Overpower.UI
             bool slotIsEmpty = equippedId == LoadoutProperties.Empty;
             int price = ShopRules.AbilityPrice(slotIsEmpty, slot, goldCost);
             ShopContext ctx = CurrentShopContext();
+            if (RefuseIfClosed(ctx, abilityId))
+                return;
             bool free = ctx.IsFree;
             int chargedPrice = 0;
 
@@ -1078,7 +1190,7 @@ namespace Overpower.UI
                 bool shopBlocked = block != PurchaseBlock.None;
 
                 AbilityCardUi ui = pair.Value;
-                string suffix = equipped ? "Equipped" : ShopPricing.PriceLine(price, block, ctx.Balance);
+                string suffix = equipped ? "Equipped" : ctx.PriceLine(price, block);
                 ui.label.text = def != null ? $"{def.DisplayName}\n<size={theme.loadoutPriceLineSizePercent}%>{suffix}</size>" : "";
                 ui.outer.color = equipped ? theme.highlightColor : Color.clear;
                 ui.inner.color = shopBlocked ? theme.loadoutShopBlockedColor : theme.loadoutSelectableColor;

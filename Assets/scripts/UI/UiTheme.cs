@@ -369,6 +369,12 @@ namespace Overpower.UI
         public string loadoutArmorUpgradeFormat = "Upgrade {0} of {1}";
         [Tooltip("Armour row wording once the limit is reached. {0} = the limit.")]
         public string loadoutArmorMaxFormat = "{0} of {0} (max)";
+        [Tooltip("Armour row wording in Dominion once this round's allowance is used up (the shop's own maximum is higher; later rounds open more). {0} = this round's allowance.")]
+        public string loadoutArmorRoundMaxFormat = "{0} of {0} this round";
+        [Tooltip("The shop header's note in a Dominion break: picks are free there, no gold involved.")]
+        public string loadoutDominionFreeText = "Free (break)";
+        [Tooltip("What the shop says when it is asked to open (P, or the Loadout button) in a Dominion match outside the break, and what its header says if it is somehow open then. Shown as a short toast over the game when the shop stays shut.")]
+        public string loadoutShopClosedText = "The shop opens in the break";
         [Tooltip("Armour row wording for a row that is at its own top level with upgrades still left in the shared limit.")]
         public string loadoutArmorTopLevelText = "top level";
         [Tooltip("The Absorb armour row. {0} = its level, {1} = the status text (which upgrade is next, or max).")]

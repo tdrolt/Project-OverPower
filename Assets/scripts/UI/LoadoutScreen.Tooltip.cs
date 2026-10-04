@@ -63,12 +63,13 @@ namespace Overpower.UI
                 return "";
             int nextPrice = armorConfig.CostFor(playerHealth.AbsorbLevel + playerHealth.RechargeLevel);
             ShopContext ctx = CurrentShopContext();
-            string priceLine = ShopPricing.PriceLine(nextPrice, ctx.Check(nextPrice), ctx.Balance);
+            string priceLine = ctx.PriceLine(nextPrice, ctx.Check(nextPrice));
+            int cap = ArmorCapFor(ctx);
             string numbers = absorbRow
                 ? ArmorPopupText.Numbers(true, armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel, priceLine,
-                    theme.loadoutArmorAbsorbNowFormat, theme.loadoutArmorAbsorbNextFormat, theme.loadoutArmorNoNextText)
+                    theme.loadoutArmorAbsorbNowFormat, theme.loadoutArmorAbsorbNextFormat, theme.loadoutArmorNoNextText, cap)
                 : ArmorPopupText.Numbers(false, armorConfig, playerHealth.AbsorbLevel, playerHealth.RechargeLevel, priceLine,
-                    theme.loadoutArmorRechargeNowFormat, theme.loadoutArmorRechargeNextFormat, theme.loadoutArmorNoNextText);
+                    theme.loadoutArmorRechargeNowFormat, theme.loadoutArmorRechargeNextFormat, theme.loadoutArmorNoNextText, cap);
             return absorbRow
                 ? PopUpText(theme.loadoutArmorAbsorbTipName, theme.loadoutArmorAbsorbTipText, numbers)
                 : PopUpText(theme.loadoutArmorRechargeTipName, theme.loadoutArmorRechargeTipText, numbers);

@@ -11,6 +11,8 @@ namespace Overpower.Match
         /// <summary>GDD: out of combat for the shop's required seconds.</summary>
         InCombat,
         CannotAfford,
+        /// <summary>Dominion: picks are only possible in the break (plus a late joiner's one pick).</summary>
+        NotInBreak,
     }
 
     /// <summary>Task T4: which shop section a purchase/refund/refusal belongs to - LoadoutScreen's
@@ -58,8 +60,9 @@ namespace Overpower.Match
         /// warm-up (countdown included) is a sandbox so testers can experiment - buy anything, reset for free,
         /// with no gate - and going live empties every loadout (PlayerLifecycle.ResetForMatchStart), so nothing
         /// bought free in the warm-up survives into the real match. Free Loadout keeps the whole match free, as
-        /// before, whether or not the match is live.</summary>
-        public static bool IsFree(bool freeLoadout, bool matchLive) => freeLoadout || !matchLive;
+        /// before, whether or not the match is live. Dominion Task 5: a Dominion match is free too (there is no
+        /// gold in it); when it may be shopped in is a separate question (DominionShopRules.PickBlock).</summary>
+        public static bool IsFree(bool freeLoadout, bool matchLive, bool dominionMatch = false) => dominionMatch || freeLoadout || !matchLive;
 
         /// <summary>What one ability pick actually costs. The prefab ships with the Mobility and
         /// Attachment slots EMPTY (Task 2.5a) rather than pre-loaded with a free starting pick, so

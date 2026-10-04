@@ -53,10 +53,11 @@ namespace Overpower.Dominion
         private bool gameplayMissingLogged;
 
         /// <summary>The round now in play (or the round a break leads to), 0 before round 1. Reads the room.</summary>
-        public int Round => PhotonNetwork.InRoom ? DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties).Round : 0;
+        public int Round => PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.Round, out object r) && r is int round ? round : 0;
 
         /// <summary>The Dominion stage in the room right now (None before round 1).</summary>
-        public DominionStage Stage => PhotonNetwork.InRoom ? DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties).Stage : DominionStage.None;
+        public DominionStage Stage => PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom.CustomProperties.TryGetValue(DominionKeys.Stage, out object s) && s is int stage
+            ? (DominionStage)stage : DominionStage.None; // read straight off the key, no allocation: the shop asks every frame
 
         private void Awake()
         {

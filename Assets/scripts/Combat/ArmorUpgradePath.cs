@@ -23,6 +23,7 @@ namespace Overpower.Combat
     public sealed class ArmorUpgradePath
     {
         private readonly ArmorConfig config;
+        private readonly int upgradeCap;
 
         public int AbsorbLevel { get; private set; }
         public int RechargeLevel { get; private set; }
@@ -38,11 +39,15 @@ namespace Overpower.Combat
 
         /// <summary>True while both the combined cap and the absorb path's own top level allow one more purchase.</summary>
         public bool CanUpgradeAbsorb =>
-            config != null && TotalUpgrades < config.MaxArmorUpgrades && AbsorbLevel < config.AbsorbLevelCount - 1;
+            config != null && TotalUpgrades < UpgradeLimit && AbsorbLevel < config.AbsorbLevelCount - 1;
 
         /// <summary>True while both the combined cap and the recharge path's own top level allow one more purchase.</summary>
         public bool CanUpgradeRecharge =>
-            config != null && TotalUpgrades < config.MaxArmorUpgrades && RechargeLevel < config.RechargeLevelCount - 1;
+            config != null && TotalUpgrades < UpgradeLimit && RechargeLevel < config.RechargeLevelCount - 1;
+
+        /// <summary>The most purchases allowed in total: the config's combined cap, or the caller's smaller one (Dominion's per-round
+        /// allowance). 0 for a missing config.</summary>
+        public int UpgradeLimit => config != null ? Mathf.Max(0, Mathf.Min(config.MaxArmorUpgrades, upgradeCap)) : 0;
 
         /// <param name="config">Armor tiers asset. A null config makes every upgrade refused and
         /// every reading 0 - the same fail-safe every other Combat class uses for a missing asset.</param>
@@ -52,9 +57,11 @@ namespace Overpower.Combat
         /// TotalUpgrades reading higher than the config can support, which would otherwise refuse
         /// every future upgrade.</param>
         /// <param name="rechargeLevel">Starting recharge level - see absorbLevel.</param>
-        public ArmorUpgradePath(ArmorConfig config, int absorbLevel = 0, int rechargeLevel = 0)
+        /// <param name="upgradeCap">A lower limit on the combined purchases than the config's (Dominion opens one more each round); the default changes nothing.</param>
+        public ArmorUpgradePath(ArmorConfig config, int absorbLevel = 0, int rechargeLevel = 0, int upgradeCap = int.MaxValue)
         {
             this.config = config;
+            this.upgradeCap = upgradeCap;
             int maxAbsorbLevel = config != null ? Mathf.Max(0, config.AbsorbLevelCount - 1) : 0;
             int maxRechargeLevel = config != null ? Mathf.Max(0, config.RechargeLevelCount - 1) : 0;
             AbsorbLevel = Mathf.Clamp(absorbLevel, 0, maxAbsorbLevel);

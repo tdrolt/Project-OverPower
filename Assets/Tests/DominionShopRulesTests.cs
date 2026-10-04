@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using Overpower.Combat;
 using Overpower.Dominion;
+using Overpower.Match;
 
 namespace Overpower.Tests
 {
@@ -64,6 +65,7 @@ namespace Overpower.Tests
             Assert.AreEqual(2, DominionShopRules.FirstRoundAllowingDepth(1, Depth));
             Assert.AreEqual(3, DominionShopRules.FirstRoundAllowingDepth(2, Depth));
             Assert.AreEqual(-1, DominionShopRules.FirstRoundAllowingDepth(3, Depth));
+            Assert.AreEqual(-1, DominionShopRules.FirstRoundAllowingDepth(-1, Depth), "an unknown weapon is opened by no round");
             Assert.AreEqual("Round 2", DominionShopRules.LockedLabel("Round {0}", 2));
             Assert.AreEqual("Round 3", DominionShopRules.LockedLabel("Round {0}", 3));
             Assert.AreEqual("", DominionShopRules.LockedLabel("Round {0}", -1));
@@ -114,6 +116,87 @@ namespace Overpower.Tests
             Assert.AreEqual(7, tree.RootId);
             Assert.AreEqual(0, DominionShopRules.WeaponDepth(7, parentOf));
             Assert.AreEqual(1, DominionShopRules.WeaponDepth(8, parentOf));
+        }
+
+        // ---- Task 5: the shop in a live Dominion match
+
+        [TestCase(DominionStage.Round)]
+        [TestCase(DominionStage.SuddenDeath)]
+        [TestCase(DominionStage.Over)]
+        [TestCase(DominionStage.None)]
+        public void PicksAreRefusedOutsideTheBreak(DominionStage stage) =>
+            Assert.AreEqual(PurchaseBlock.NotInBreak, DominionShopRules.PickBlock(true, stage, false));
+
+        [Test] public void PicksAreAllowedInTheBreak() =>
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, DominionStage.Break, false));
+
+        [Test] public void ALateJoinersOnePickIsAllowedWhateverTheStage()
+        {
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, DominionStage.Round, true));
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, DominionStage.SuddenDeath, true));
+        }
+
+        [Test] public void ConquestAndTheWarmupAreNeverBlockedByTheBreakRule()
+        {
+            foreach (DominionStage stage in System.Enum.GetValues(typeof(DominionStage)))
+                Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(false, stage, false), stage.ToString());
+        }
+
+        [Test] public void ALateJoinersPickLastsOnlyWhileTheRoundTheyJoinedInIsGoing()
+        {
+            Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.Round));
+            Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.SuddenDeath));
+            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.Break), "the round ended: the break's shop is everyone's");
+            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(true, DominionStage.Over));
+            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(false, DominionStage.Round), "only someone who joined mid-round");
+        }
+
+        [Test] public void TheArmourCapIsTheSmallerOfTheShopMaximumAndTheRoundsAllowance()
+        {
+            Assert.AreEqual(1, DominionShopRules.ArmorCap(3, 2, Armor));
+            Assert.AreEqual(2, DominionShopRules.ArmorCap(3, 3, Armor));
+            Assert.AreEqual(0, DominionShopRules.ArmorCap(3, 1, Armor));
+            Assert.AreEqual(2, DominionShopRules.ArmorCap(2, 9, new[] { 0, 1, 5 }), "the shop's own maximum still wins when it is lower");
+        }
+
+        private static DominionShopLimits Limits(int round) => new DominionShopLimits(round, Depth, Armor, "Round {0}");
+
+        [Test] public void AWeaponDeeperThanTheRoundOpensIsLockedAndSaysWhichRoundOpensIt()
+        {
+            DominionShopLimits r1 = Limits(1);
+            Assert.IsTrue(r1.IsRoundLocked(UpgradeNodeState.Selectable, 1));
+            Assert.AreEqual(UpgradeNodeState.Locked, r1.NodeState(UpgradeNodeState.Selectable, 1));
+            Assert.AreEqual("Round 2", r1.LockedLabel(1));
+            Assert.AreEqual("Round 3", r1.LockedLabel(2));
+            Assert.AreEqual(UpgradeNodeState.Locked, Limits(2).NodeState(UpgradeNodeState.Locked, 2));
+        }
+
+        [Test] public void AWeaponAtOrUnderTheRoundsDepthIsPickableFromAnywhereBecauseEveryPickIsFree()
+        {
+            Assert.AreEqual(UpgradeNodeState.Selectable, Limits(2).NodeState(UpgradeNodeState.Selectable, 1));
+            Assert.AreEqual(UpgradeNodeState.Selectable, Limits(3).NodeState(UpgradeNodeState.Locked, 1), "another family, switching: one click");
+            Assert.AreEqual(UpgradeNodeState.Selectable, Limits(3).NodeState(UpgradeNodeState.Locked, 2), "an upgrade straight from the Baseline");
+            Assert.IsFalse(Limits(2).IsRoundLocked(UpgradeNodeState.Locked, 1));
+        }
+
+        [Test] public void WhatYouHoldAndWhatYouPassedAreNeverRoundLocked()
+        {
+            Assert.AreEqual(UpgradeNodeState.Equipped, Limits(1).NodeState(UpgradeNodeState.Equipped, 2));
+            Assert.AreEqual(UpgradeNodeState.Owned, Limits(1).NodeState(UpgradeNodeState.Owned, 1));
+            Assert.IsFalse(Limits(1).IsRoundLocked(UpgradeNodeState.Equipped, 2));
+        }
+
+        [Test] public void AWeaponTheTreeDoesNotKnowIsLockedWithNoRoundToName()
+        {
+            Assert.IsTrue(Limits(3).IsRoundLocked(UpgradeNodeState.Locked, -1));
+            Assert.AreEqual(UpgradeNodeState.Locked, Limits(3).NodeState(UpgradeNodeState.Locked, -1));
+            Assert.AreEqual("", Limits(3).LockedLabel(-1));
+        }
+
+        [Test] public void TheLimitsReadTheirRoundsArmourAllowance()
+        {
+            Assert.AreEqual(1, Limits(2).ArmorCap(3));
+            Assert.AreEqual(0, Limits(1).ArmorCap(3));
         }
     }
 }
