@@ -43,6 +43,11 @@ namespace Overpower.Dominion
         /// Absent until round 1 is over.</summary>
         public const string History = "dHist";
 
+        /// <summary>int[]: the team that won each finished round, one entry per round in the same order as dHist (-1 for a tied round and for a round cut short
+        /// by "last team standing", which no one won). Written by the master in the same write that appends dHist, so the result table bolds the winner the
+        /// wins counted, not the points leader. Absent in a room from before it existed: the table then falls back to the points leader.</summary>
+        public const string HistoryWinners = "dHistW";
+
         /// <summary>How many team ids the per-team arrays hold (team ids are always 0..2).</summary>
         public const int TeamSlots = 3;
     }

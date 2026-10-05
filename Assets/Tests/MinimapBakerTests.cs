@@ -56,5 +56,27 @@ namespace Overpower.Tests
             Assert.AreEqual(Mathf.Sqrt(30.5f * 30.5f + 0.5f * 0.5f), radius, 1e-3f);
             Assert.AreEqual("Far wall", farthest);
         }
+
+        [Test] public void TheBakedPictureSizeIsHeldInsideTheAllowedRangeAndBothBakersAskForIt()
+        {
+            var config = ScriptableObject.CreateInstance<Overpower.Data.MinimapConfig>();
+            try
+            {
+                var so = new SerializedObject(config);
+                so.FindProperty("imagePixels").intValue = 100000;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Assert.AreEqual(2048, config.ClampedImagePixels);
+                so.FindProperty("imagePixels").intValue = 10;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Assert.AreEqual(256, config.ClampedImagePixels);
+                so.FindProperty("imagePixels").intValue = 1024;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Assert.AreEqual(1024, config.ClampedImagePixels);
+            }
+            finally { Object.DestroyImmediate(config); }
+            var getter = typeof(Overpower.Data.MinimapConfig).GetProperty(nameof(Overpower.Data.MinimapConfig.ClampedImagePixels)).GetGetMethod();
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(MinimapBaker), "Bake", getter), "the arena bake");
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(DominionLaneBuilder), "BakeMinimap", getter), "the lane bake");
+        }
     }
 }

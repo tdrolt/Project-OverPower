@@ -27,6 +27,8 @@ namespace Overpower.Dominion
         public int[] SuddenDeathTeams;
         /// <summary>dHist: every finished round's final points, rounds x team slots flattened (DominionHistory); empty until round 1 is over.</summary>
         public int[] History;
+        /// <summary>dHistW: the winning team of each finished round (-1 = none), one per dHist round; null in a room from before it existed.</summary>
+        public int[] HistoryWinners;
 
         /// <summary>The state from the room's properties. Missing keys read as: no round, stage None, no points or wins (arrays of three zeros),
         /// no winner (-1). A wrong type reads as missing.</summary>
@@ -51,6 +53,7 @@ namespace Overpower.Dominion
             if (props.TryGetValue(DominionKeys.SuddenDeathStart, out object sd) && sd is int sdMs) state.SuddenDeathMs = sdMs;
             if (props.TryGetValue(DominionKeys.SuddenDeathTeams, out object sdt) && sdt is int[] sdTeams) state.SuddenDeathTeams = sdTeams;
             if (props.TryGetValue(DominionKeys.History, out object hist) && hist is int[] h) state.History = h;
+            if (props.TryGetValue(DominionKeys.HistoryWinners, out object histW) && histW is int[] hw) state.HistoryWinners = hw;
             return state;
         }
     }
@@ -139,7 +142,12 @@ namespace Overpower.Dominion
                 };
                 // A round cut short by the others leaving is a row of the result table too (default A34): its points so far go into the history in
                 // this write. In a break the round just played is already there; in sudden death every round is.
-                if (room.Stage == DominionStage.Round) over[DominionKeys.History] = DominionHistory.Append(room.History, room.Points);
+                if (room.Stage == DominionStage.Round)
+                {
+                    over[DominionKeys.History] = DominionHistory.Append(room.History, room.Points);
+                    // Nobody won that round (A49): the wins above are the ones already counted, so the table must not bold the points leader.
+                    over[DominionKeys.HistoryWinners] = DominionHistory.AppendWinner(room.HistoryWinners, DominionHistory.CutShort);
+                }
                 return Stage(room, "last team standing", over);
             }
 
@@ -164,6 +172,8 @@ namespace Overpower.Dominion
             if (roundWinner >= 0 && roundWinner < wins.Length) wins[roundWinner]++;
             // The round's final points go into the history in the same write (dPts is cleared at the next round's start): the result table needs them.
             int[] history = DominionHistory.Append(room.History, room.Points);
+            // Its winner is kept beside the points (-1 for a tie), so the table bolds who the wins counted.
+            int[] historyWinners = DominionHistory.AppendWinner(room.HistoryWinners, roundWinner);
             RoundOutcome outcome = DominionRules.AfterRound(room.Round, wins, cfg.RoundsToWin, cfg.MaxRounds, teamsInMatch);
             switch (outcome.Next)
             {
@@ -174,6 +184,7 @@ namespace Overpower.Dominion
                         { DominionKeys.Winner, outcome.Winner },
                         { DominionKeys.Wins, wins },
                         { DominionKeys.History, history },
+                        { DominionKeys.HistoryWinners, historyWinners },
                     }, scoresRound: true);
                 case DominionStage.SuddenDeath:
                     return Stage(room, "sudden death", new Hashtable
@@ -185,6 +196,7 @@ namespace Overpower.Dominion
                         { DominionKeys.SuddenDeathTeams, outcome.SuddenDeathTeams ?? DominionRules.SuddenDeathTeams(wins, teamsInMatch) }, // A33: stored, since a replay narrows it
                         { DominionKeys.Wins, wins },
                         { DominionKeys.History, history },
+                        { DominionKeys.HistoryWinners, historyWinners },
                     }, scoresRound: true);
                 default:
                     return Stage(room, "round over, break", new Hashtable
@@ -194,6 +206,7 @@ namespace Overpower.Dominion
                         { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.BreakSeconds) },
                         { DominionKeys.Wins, wins },
                         { DominionKeys.History, history },
+                        { DominionKeys.HistoryWinners, historyWinners },
                         { DominionKeys.CentrePayout, null }, // null removes the key: the round's last payout time is stale in the break (the next round start writes a fresh one)
                     }, scoresRound: true);
             }

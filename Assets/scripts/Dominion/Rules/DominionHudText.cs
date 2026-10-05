@@ -198,6 +198,20 @@ namespace Overpower.Dominion
             return result;
         }
 
+        /// <summary>dHistW value for a round nobody won because the match ended in it: the others left and the last team standing took the match. A tied
+        /// round that was scored is -1 instead, so the match log can tell the two apart.</summary>
+        public const int CutShort = -2;
+
+        /// <summary>The winners list with one more round (a team id, -1 for a tied round, CutShort for a cut-short one). Never edits the input.</summary>
+        public static int[] AppendWinner(int[] winners, int winner)
+        {
+            int old = winners != null ? winners.Length : 0;
+            var result = new int[old + 1];
+            if (winners != null) Array.Copy(winners, result, old);
+            result[old] = winner;
+            return result;
+        }
+
         /// <summary>How many rounds the history holds.</summary>
         public static int RoundCount(int[] history) => history == null ? 0 : history.Length / DominionKeys.TeamSlots;
 
@@ -207,6 +221,14 @@ namespace Overpower.Dominion
             if (history == null || round < 0 || team < 0 || team >= DominionKeys.TeamSlots) return 0;
             int index = round * DominionKeys.TeamSlots + team;
             return index < history.Length ? history[index] : 0;
+        }
+
+        /// <summary>The team that won a round (0-based) as the room recorded it (dHistW); -1 when the round had none (tied, or cut short). A room with no
+        /// recorded winner for that round (from before dHistW) falls back to the points leader.</summary>
+        public static int WinnerOfRound(int[] history, int[] winners, int round)
+        {
+            if (winners != null && round >= 0 && round < winners.Length) return Math.Max(-1, winners[round]); // CutShort bolds nobody, like a tie
+            return WinnerOfRound(history, round);
         }
 
         /// <summary>The team that won a round (0-based) on its points, or -1 for a tied round (nobody gets bold in the table).</summary>

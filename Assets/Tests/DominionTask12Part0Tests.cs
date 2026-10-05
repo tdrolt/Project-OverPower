@@ -314,6 +314,7 @@ namespace Overpower.Tests
         [Test] public void TheLayoutKeepsTheBoardsTowerSizesAndTheSpawnOffset()
         {
             var layout = AssetDatabase.LoadAssetAtPath<DominionLaneLayout>(Overpower.EditorTools.DominionLaneBuilder.LayoutPath);
+            // The numbers are the board drawing's as it stands today (Tudor may redraw it): change them here when he does.
             // The drawing's numbers (a 24 px square at 12 px per metre, a 46 px circle, the two spawn points 2 m either side of the tower).
             Assert.AreEqual(2f, layout.ZoneTowerSizeMetres, 0.001f);
             Assert.AreEqual(3.8f, layout.SpawnTowerSizeMetres, 0.001f);
@@ -374,8 +375,13 @@ namespace Overpower.Tests
                 Assert.IsFalse(CameraYawRules.ToSpawnFromCentre(spawns, -1, out _));
                 Assert.IsFalse(CameraYawRules.ToSpawnFromCentre(null, 0, out _));
                 Assert.AreEqual(0, CameraYawRules.FirstTeamWithSpawn(spawns));
-                Assert.AreEqual(1, CameraYawRules.FirstTeamWithSpawn(Spawns(null, Vector3.one)), "no assumption that the first slot is the one that is filled");
-                Assert.AreEqual(-1, CameraYawRules.FirstTeamWithSpawn(Spawns(null, null)));
+                Transform[] second = Spawns(null, Vector3.one); // kept so the finally can destroy it: an undestroyed object dirties the open scene
+                try
+                {
+                    Assert.AreEqual(1, CameraYawRules.FirstTeamWithSpawn(second), "no assumption that the first slot is the one that is filled");
+                    Assert.AreEqual(-1, CameraYawRules.FirstTeamWithSpawn(Spawns(null, null)));
+                }
+                finally { Destroy(second); }
             }
             finally { Destroy(spawns); }
         }

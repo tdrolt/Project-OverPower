@@ -50,6 +50,8 @@ namespace Overpower.Data
         /// <summary>How many metres the picture covers along Z: its own number in a rectangular frame, else the same as the width (a square).</summary>
         public float WorldDepthMetres => rectangularFrame ? worldDepthMetres : worldSizeMetres;
         public int ImagePixels => imagePixels;
+        /// <summary>The bake's picture side: ImagePixels held inside the range the field allows (a hand-edited asset can hold anything). Both bakers use this.</summary>
+        public int ClampedImagePixels => Mathf.Clamp(imagePixels, 256, 2048);
         public float MarginMetres => marginMetres;
     }
 }

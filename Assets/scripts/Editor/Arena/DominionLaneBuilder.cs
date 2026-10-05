@@ -369,7 +369,7 @@ namespace Overpower.EditorTools
                 config = ScriptableObject.CreateInstance<MinimapConfig>();
                 AssetDatabase.CreateAsset(config, MinimapConfigPath);
             }
-            int pixels = Mathf.Clamp(config.ImagePixels, 256, 2048);
+            int pixels = config.ClampedImagePixels;
 
             string full = Path.Combine(Directory.GetParent(Application.dataPath).FullName, MinimapImagePath);
             File.WriteAllBytes(full, TopDownRender.RenderPng(centre, width, depth, pixels));

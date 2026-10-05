@@ -49,19 +49,27 @@ namespace Overpower.Dominion
         /// <summary>The markers to drop when the room goes from (prevRound, prevStage, prevSuddenDeathMs) to <paramref name="room"/>, in the order the
         /// story happened. Only the master drops them (every client sees the same edge, and the report merges every client's file, so one writer keeps
         /// each event once); <paramref name="teamsInMatch"/> names the teams that count in the lines.</summary>
-        public static List<string> ForEdge(bool isMaster, int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room, int[] teamsInMatch, int[] prevWins = null)
+        public static List<string> ForEdge(bool isMaster, int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room, int[] teamsInMatch, int[] prevWins)
         {
             var notes = new List<string>();
             if (!isMaster) return notes;
 
             // A round that stopped being a round: scored (its points are still in the room through the break) or cut short by the others leaving.
-            // Who won it is whose wins went up; a scored round where nobody's did was tied, and an Over where nobody's did was cut short.
+            // The master's own record of the round (dHistW) says which, the same record the result table bolds from. A room without the record
+            // (from before it existed) is read from the wins: whose went up won it, a scored round where nobody's did was tied, an Over where nobody's did was cut short.
             if (prevStage == DominionStage.Round && room.Stage != DominionStage.Round && prevRound >= 1)
             {
-                int winner = TeamWhoseWinsWentUp(prevWins, room.Wins);
-                if (winner >= 0) notes.Add(RoundEnd(prevRound, winner, teamsInMatch, room.Points));
-                else if (room.Stage == DominionStage.Over) notes.Add(RoundCutShort(prevRound, teamsInMatch, room.Points));
-                else notes.Add(RoundEnd(prevRound, -1, teamsInMatch, room.Points));
+                int recorded = room.HistoryWinners != null && prevRound - 1 < room.HistoryWinners.Length ? room.HistoryWinners[prevRound - 1] : int.MinValue;
+                if (recorded >= 0) notes.Add(RoundEnd(prevRound, recorded, teamsInMatch, room.Points));
+                else if (recorded == DominionHistory.CutShort) notes.Add(RoundCutShort(prevRound, teamsInMatch, room.Points));
+                else if (recorded == -1) notes.Add(RoundEnd(prevRound, -1, teamsInMatch, room.Points));
+                else
+                {
+                    int winner = TeamWhoseWinsWentUp(prevWins, room.Wins);
+                    if (winner >= 0) notes.Add(RoundEnd(prevRound, winner, teamsInMatch, room.Points));
+                    else if (room.Stage == DominionStage.Over) notes.Add(RoundCutShort(prevRound, teamsInMatch, room.Points));
+                    else notes.Add(RoundEnd(prevRound, -1, teamsInMatch, room.Points));
+                }
             }
 
             switch (room.Stage)

@@ -217,7 +217,7 @@ namespace Overpower.UI
             if (config == null) return false;
             ReadRoom(config);
             HideBars();
-            result.Show(winner, teams, state.Wins, state.History, state.SuddenDeathMs, theme.scoreboardTeamNames, onBack);
+            result.Show(winner, teams, state.Wins, state.History, state.HistoryWinners, state.SuddenDeathMs, theme.scoreboardTeamNames, onBack);
             Debug.Log($"[DOMINION] result: {result.HeadlineText} | {string.Join(" / ", result.TableRows)}");
             return true;
         }

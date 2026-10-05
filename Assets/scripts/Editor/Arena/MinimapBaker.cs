@@ -75,7 +75,7 @@ namespace Overpower.EditorTools
             float circumradius = MinimapLayout.TriangleCircumradius(points, vertexDirections, config.MarginMetres);
             float size = 2f * circumradius;
             var centre = new Vector2(arena.centre.x, arena.centre.z);
-            int pixels = Mathf.Clamp(config.ImagePixels, 256, 2048);
+            int pixels = config.ClampedImagePixels;
 
             string fullPath = Path.Combine(Directory.GetParent(Application.dataPath).FullName, ImagePath);
             File.WriteAllBytes(fullPath, TopDownRender.RenderPng(centre, size, pixels));

@@ -290,6 +290,94 @@ namespace Overpower.Tests
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.History), "the break's points are round 1's, already in the history");
         }
 
+        // ---- the room records each round's winner (dHistW): a round cut short has none (Task 14b, default A49)
+
+        [Test] public void AScoredRoundBoldsTheWinnerTheRoomRecorded()
+        {
+            int[] history = { 540, 620, 0, 710, 655, 0 };
+            int[] winners = { 1, 0 };
+            Assert.AreEqual(1, DominionHistory.WinnerOfRound(history, winners, 0));
+            Assert.AreEqual(0, DominionHistory.WinnerOfRound(history, winners, 1));
+        }
+
+        [Test] public void ATiedRoundAndACutShortRoundBoldNobody()
+        {
+            int[] history = { 500, 500, 0, 210, 340, 0 };
+            int[] winners = { -1, DominionHistory.CutShort };
+            Assert.AreEqual(-1, DominionHistory.WinnerOfRound(history, winners, 0), "tied");
+            Assert.AreEqual(-1, DominionHistory.WinnerOfRound(history, winners, 1), "cut short: purple led on points but won nothing");
+        }
+
+        [Test] public void ARoomFromBeforeTheWinnersKeyFallsBackToThePointsLeader()
+        {
+            int[] history = { 540, 620, 0, 500, 500, 0 };
+            Assert.AreEqual(1, DominionHistory.WinnerOfRound(history, null, 0));
+            Assert.AreEqual(-1, DominionHistory.WinnerOfRound(history, null, 1), "a tie stays a tie");
+            Assert.AreEqual(1, DominionHistory.WinnerOfRound(history, new int[0], 0), "a round the list does not reach also falls back");
+        }
+
+        [Test] public void AppendingAWinnerAddsOneEntryAndLeavesTheOldListAlone()
+        {
+            int[] one = DominionHistory.AppendWinner(null, 1);
+            CollectionAssert.AreEqual(new[] { 1 }, one);
+            int[] two = DominionHistory.AppendWinner(one, -1);
+            CollectionAssert.AreEqual(new[] { 1, -1 }, two);
+            CollectionAssert.AreEqual(new[] { 1 }, one, "a Photon array is shared: appending never edits the old one");
+        }
+
+        [Test] public void TheWinnersAreReadFromTheRoomLikeEveryOtherKey()
+        {
+            var props = new ExitGames.Client.Photon.Hashtable { { DominionKeys.HistoryWinners, new[] { 1, -1 } } };
+            CollectionAssert.AreEqual(new[] { 1, -1 }, DominionRoomState.Read(props).HistoryWinners);
+            Assert.IsNull(DominionRoomState.Read(new ExitGames.Client.Photon.Hashtable()).HistoryWinners);
+        }
+
+        [Test] public void ARoundThatEndsIntoABreakWritesItsWinnerWithItsPoints()
+        {
+            DominionWrite w = RoundEndsWith(1, new[] { 540, 620, 100 }, new[] { 0, 0, 0 }, null);
+            CollectionAssert.AreEqual(new[] { 1 }, (int[])w.Props[DominionKeys.HistoryWinners]);
+        }
+
+        [Test] public void ATiedRoundWritesNoWinnerAndAnEarlierWinnerStays()
+        {
+            DominionWrite w = RoundEndsWith(2, new[] { 400, 400, 0 }, new[] { 0, 1, 0 }, new[] { 540, 620, 100 });
+            // winners list as the room holds it after round 1
+            DominionWrite tied = DominionRoomWrites.Next(true, true, 200000,
+                new DominionRoomState { HasRound = true, Round = 2, Stage = DominionStage.Round, EndMs = 100000, Points = new[] { 400, 400, 0 }, Wins = new[] { 0, 1, 0 },
+                    Winner = -1, History = new[] { 540, 620, 100 }, HistoryWinners = new[] { 1 } },
+                Cfg, new[] { 0, 1, 2 }, new[] { 3, 3, 3 });
+            CollectionAssert.AreEqual(new[] { 1, -1 }, (int[])tied.Props[DominionKeys.HistoryWinners]);
+            Assert.IsNotNull(w);
+        }
+
+        [Test] public void TheRoundThatDecidesTheMatchWritesItsWinnerToo()
+        {
+            DominionWrite w = RoundEndsWith(2, new[] { 100, 700, 0 }, new[] { 0, 1, 0 }, new[] { 540, 620, 100 });
+            Assert.AreEqual((int)DominionStage.Over, w.Props[DominionKeys.Stage]);
+            Assert.IsTrue(w.Props.ContainsKey(DominionKeys.HistoryWinners));
+            Assert.AreEqual(1, ((int[])w.Props[DominionKeys.HistoryWinners])[^1]);
+        }
+
+        [Test] public void TheRoundThatSendsTheMatchToSuddenDeathWritesItsWinnerToo()
+        {
+            DominionWrite w = RoundEndsWith(3, new[] { 300, 300, 100 }, new[] { 1, 1, 0 }, new[] { 540, 620, 0, 700, 655, 0 });
+            Assert.AreEqual((int)DominionStage.SuddenDeath, w.Props[DominionKeys.Stage]);
+            Assert.AreEqual(-1, ((int[])w.Props[DominionKeys.HistoryWinners])[^1], "the last round was tied");
+        }
+
+        [Test] public void ARoundCutShortByLastTeamStandingIsWrittenWithNoWinner()
+        {
+            DominionWrite w = LastTeamLeft(DominionStage.Round, new[] { 210, 340, 0 }, new[] { 540, 620, 0 });
+            Assert.IsTrue(w.Props.ContainsKey(DominionKeys.HistoryWinners));
+            Assert.AreEqual(DominionHistory.CutShort, ((int[])w.Props[DominionKeys.HistoryWinners])[^1], "purple led on points, but the round counted for nobody");
+        }
+
+        [Test] public void WhenOneTeamIsLeftInABreakNoWinnerIsAdded()
+        {
+            DominionWrite w = LastTeamLeft(DominionStage.Break, new[] { 540, 620, 0 }, new[] { 540, 620, 0 });
+            Assert.IsFalse(w.Props.ContainsKey(DominionKeys.HistoryWinners));
+        }
+
         // ---- the wiring: the screens call the tested words, and the result is reached from both result paths (method bodies are read, not run)
 
         private static System.Reflection.MethodInfo Text(string name) => typeof(DominionHudText).GetMethod(name);
@@ -333,7 +421,6 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(panel, Text(nameof(DominionHudText.ResultHeadline))));
             Assert.IsTrue(IlWiring.Uses(panel, Text(nameof(DominionHudText.WonInSuddenDeath))));
             Assert.IsTrue(IlWiring.Uses(panel, Text(nameof(DominionHudText.ModeLine))));
-            Assert.IsTrue(IlWiring.Uses(panel, Hist(nameof(DominionHistory.WinnerOfRound))), "bold = the round's winner, none for a tie");
             Assert.IsTrue(IlWiring.Uses(panel, Hist(nameof(DominionHistory.PointsOf))));
         }
 
@@ -364,6 +451,19 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), show), "a player's result");
             Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Lobby.SpectatorSeatView), show), "a spectator's result");
         }
+
+        private static System.Reflection.MethodInfo HistWinnerOfRound() =>
+            typeof(DominionHistory).GetMethod(nameof(DominionHistory.WinnerOfRound), new[] { typeof(int[]), typeof(int[]), typeof(int) });
+
+        [Test] public void TheResultTableBoldsThroughTheRecordedWinnersAndTheResultReadsThem()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionResultPanel), HistWinnerOfRound()), "bold = the recorded winner");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionHud), "ShowResult", typeof(DominionRoomState).GetField(nameof(DominionRoomState.HistoryWinners))),
+                "the result card is given the room's dHistW");
+        }
+
+        [Test] public void TheMasterAppendsTheWinnerThroughTheTestedHelper() =>
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), Hist(nameof(DominionHistory.AppendWinner))));
 
         [Test] public void TheMasterAppendsTheRoundToTheHistoryThroughTheTestedHelper() =>
             Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), Hist(nameof(DominionHistory.Append))));

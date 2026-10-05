@@ -36,7 +36,7 @@ namespace Overpower.UI
             this.canvas = canvas;
         }
 
-        public void Show(int winner, int[] teams, int[] wins, int[] history, int suddenDeathMs, string[] teamNames, Action onBack)
+        public void Show(int winner, int[] teams, int[] wins, int[] history, int[] historyWinners, int suddenDeathMs, string[] teamNames, Action onBack)
         {
             if (IsShowing) return;
             ModeText = DominionHudText.ModeLine(theme.dominionResultModeFormat, teams.Length);
@@ -48,7 +48,7 @@ namespace Overpower.UI
 
             back = kit.ResultCard(canvas, HeadlineText, Pick(theme.dominionTeamTextColors, winner), theme.resultButtonLobbyList, out card,
                 ModeText, theme.dominionResultModeSize, theme.dominionMutedColor,
-                body => BuildBody(body, teams, history, teamNames), theme.dominionResultHeadlineSize, theme.dominionResultWidth);
+                body => BuildBody(body, teams, history, historyWinners, teamNames), theme.dominionResultHeadlineSize, theme.dominionResultWidth);
             card.anchorMin = card.anchorMax = card.pivot = new Vector2(0.5f, 0.5f);
             card.anchoredPosition = new Vector2(0f, theme.dominionResultRaise); // raised clear of the saved-log box in the bottom left
             if (onBack != null) back.Button.onClick.AddListener(() => onBack());
@@ -60,7 +60,7 @@ namespace Overpower.UI
             card = null;
         }
 
-        private void BuildBody(Transform body, int[] teams, int[] history, string[] teamNames)
+        private void BuildBody(Transform body, int[] teams, int[] history, int[] historyWinners, string[] teamNames)
         {
             int rounds = DominionHistory.RoundCount(history);
             float size = theme.dominionResultTableSize;
@@ -87,7 +87,7 @@ namespace Overpower.UI
                 Cell(row.transform, name, kit.Bold, size, Pick(theme.dominionTeamTextColors, team), theme.dominionResultNameWidth, rowHeight, TextAlignmentOptions.MidlineLeft);
                 for (int r = 0; r < rounds; r++)
                 {
-                    bool won = DominionHistory.WinnerOfRound(history, r) == team; // a tied round has no winner, so no cell is bold
+                    bool won = DominionHistory.WinnerOfRound(history, historyWinners, r) == team; // a tied or cut-short round has no winner, so no cell is bold
                     string points = DominionHistory.PointsOf(history, r, team).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     cells.Add(won ? "*" + points + "*" : points);
                     Cell(row.transform, points, won ? kit.Bold : kit.Body, size, theme.lobbyOffWhiteColor, theme.dominionResultCellWidth, rowHeight, TextAlignmentOptions.Midline);
