@@ -31,6 +31,36 @@ namespace Overpower.Data
         /// so the enemy lies the other way. Screen right is (cos yaw, -sin yaw); solving for -toOwnSpawn gives atan2(z, -x). White (spawn east) gets 180, Purple (west) 0.</summary>
         public static float OwnSpawnLeftYaw(float toOwnSpawnX, float toOwnSpawnZ) => Mathf.Atan2(toOwnSpawnZ, -toOwnSpawnX) * Mathf.Rad2Deg;
 
+        /// <summary>The horizontal vector from the middle of all the placed spawns to one team's spawn (the camera and the spectator both start from it). A
+        /// missing spawn is left out of the middle; false when that team has no spawn to point at or no spawn is placed at all.</summary>
+        public static bool ToSpawnFromCentre(Transform[] spawns, int team, out Vector2 toSpawn)
+        {
+            toSpawn = Vector2.zero;
+            if (spawns == null || team < 0 || team >= spawns.Length || spawns[team] == null) return false;
+            Vector3 centre = Vector3.zero;
+            int counted = 0;
+            foreach (Transform spawn in spawns)
+            {
+                if (spawn == null) continue;
+                centre += spawn.position;
+                counted++;
+            }
+            if (counted == 0) return false;
+            centre /= counted;
+            Vector3 delta = spawns[team].position - centre;
+            toSpawn = new Vector2(delta.x, delta.z);
+            return true;
+        }
+
+        /// <summary>The first team that has a spawn placed (-1 when none): the team a spectator watches from, so nothing assumes which index is which colour.</summary>
+        public static int FirstTeamWithSpawn(Transform[] spawns)
+        {
+            if (spawns == null) return -1;
+            for (int i = 0; i < spawns.Length; i++)
+                if (spawns[i] != null) return i;
+            return -1;
+        }
+
         /// <summary>The yaw of the angled view: the team's own spawn direction, plus the one offset that nudges all teams together.</summary>
         public static float AngledYaw(float toOwnSpawnX, float toOwnSpawnZ, float teamYawOffset) => Mathf.Atan2(toOwnSpawnX, toOwnSpawnZ) * Mathf.Rad2Deg + teamYawOffset;
 

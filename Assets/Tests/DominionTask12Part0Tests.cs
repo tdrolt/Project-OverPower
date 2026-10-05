@@ -24,11 +24,6 @@ namespace Overpower.Tests
 
         // ---------------------------------------------------------------- the room is read before its updates arrive
 
-        [Test] public void TheMessageQueueWaitsWhileANewSceneReadsTheRoom()
-        {
-            Assert.IsFalse(SceneLoadRules.QueueRunsWhileResuming());
-        }
-
         [Test] public void StartHoldsTheQueueAndTheResumeRoutineLetsItGo()
         {
             // PhotonNetwork lives in another assembly, so the calls are read through RoomManager's one method that sets the flag.
@@ -36,7 +31,21 @@ namespace Overpower.Tests
             Assert.IsNotNull(setter);
             Assert.IsTrue(IlWiring.Uses(typeof(RoomManager), "Start", setter));
             Assert.IsTrue(IlWiring.Uses(typeof(RoomManager), "Start", Method(typeof(SceneLoadRules), nameof(SceneLoadRules.QueueRunsWhileResuming))), "the hold is the tested rule's answer");
-            Assert.IsTrue(IlWiring.Uses(typeof(RoomManager), "ResumeInRoomAfterSceneLoad", setter), "and the routine sets it running again, whatever happens");
+            Assert.IsFalse(SceneLoadRules.QueueRunsWhileResuming(), "the queue is held while a new scene reads the room");
+
+            // The release must sit in the routine's finally block, after the loop that repeats OnJoinedRoom on the listeners: a release anywhere else
+            // would skip on an error (the client would never see another room update) or let a room update through before the listeners have read the room.
+            System.Type machine = typeof(RoomManager).GetNestedTypes(BindingFlags.NonPublic | BindingFlags.Public).First(t => t.Name.StartsWith("<ResumeInRoomAfterSceneLoad>"));
+            MethodBase moveNext = machine.GetMethod("MoveNext", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+            var releases = IlWiring.CallOffsets(moveNext, (MethodBase)setter);
+            var loopCalls = IlWiring.CallOffsets(moveNext, Method(typeof(MonoBehaviourPunCallbacks), "OnJoinedRoom"));
+            Assert.AreEqual(1, releases.Count, "one release, nowhere else in the routine");
+            Assert.IsNotEmpty(loopCalls, "the loop that repeats OnJoinedRoom is in the routine");
+            ExceptionHandlingClause guard = moveNext.GetMethodBody().ExceptionHandlingClauses.FirstOrDefault(c => c.Flags == ExceptionHandlingClauseOptions.Finally
+                && releases[0] >= c.HandlerOffset && releases[0] < c.HandlerOffset + c.HandlerLength);
+            Assert.IsNotNull(guard, "the release is inside a finally block");
+            foreach (int call in loopCalls)
+                Assert.IsTrue(call >= guard.TryOffset && call < guard.TryOffset + guard.TryLength, "the loop runs inside the try that this finally guards, so the release comes after it");
         }
 
         [Test] public void EveryListenerOfTheAllowlistIsAReadOnlyRoomListenerByItsRealTypeName()
@@ -109,10 +118,75 @@ namespace Overpower.Tests
         [Test] public void TelemetryAsksTheMemoryBeforeTheJoinLineAndTheSessionLineAndForgetsOnLeaving()
         {
             MethodInfo first = Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.FirstTime));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "OnJoinedRoom", Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.WasWritten))));
-            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "TryOpenFile", Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.MarkWritten))), "a join queued before the file opened is in the file after the flush");
             Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "TryOpenFile", first));
             Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "OnLeftRoom", Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.ForgetAll))));
+        }
+
+        // ---------------------------------------------------------------- Task 14 Part 0: the player's own join line (review item 1)
+
+        [Test] public void AFileThatOpensBeforeTheJoinCheckStillGetsTheJoinLine()
+        {
+            // The rejoiner's and the lane-scene joiner's order: the room already tells who they are, so the file opens first and the join check comes after.
+            var memory = new TelemetryWrittenMemory();
+            var join = new LocalJoinLine();
+            join.OnFileOpened(memory, "room a", 3);
+            Assert.IsFalse(memory.WasWritten("join", "room a", 3), "opening a file writes no join line, so it marks none");
+            Assert.IsTrue(join.OnJoinedRoom(memory, "room a", 3, fileIsOpen: true), "the join line is logged");
+            Assert.IsTrue(memory.WasWritten("join", "room a", 3), "and marked, being in the open file");
+        }
+
+        [Test] public void AJoinQueuedBehindAClosedFileIsMarkedWhenTheFileOpensAndOnlyThen()
+        {
+            var memory = new TelemetryWrittenMemory();
+            var join = new LocalJoinLine();
+            Assert.IsTrue(join.OnJoinedRoom(memory, "room a", 3, fileIsOpen: false));
+            Assert.IsFalse(memory.WasWritten("join", "room a", 3), "only queued: a scene that dies before the file opens must leave it to the next one");
+            join.OnFileOpened(memory, "room a", 3);
+            Assert.IsTrue(memory.WasWritten("join", "room a", 3));
+            Assert.IsFalse(join.OnJoinedRoom(memory, "room a", 3, fileIsOpen: true), "the new scene does not write it again");
+        }
+
+        [Test] public void TheQueuedFlagIsSpentByTheOpenThatWritesIt()
+        {
+            var memory = new TelemetryWrittenMemory();
+            var join = new LocalJoinLine();
+            join.OnJoinedRoom(memory, "room a", 3, fileIsOpen: false);
+            join.OnFileOpened(memory, "room a", 3);
+            memory.ForgetAll();
+            join.OnFileOpened(memory, "room a", 3);
+            Assert.IsFalse(memory.WasWritten("join", "room a", 3), "a later open (another room) must not mark a join nobody queued");
+            join.OnJoinedRoom(memory, "room a", 3, fileIsOpen: false);
+            join.Reset();
+            join.OnFileOpened(memory, "room a", 3);
+            Assert.IsFalse(memory.WasWritten("join", "room a", 3), "leaving the room drops a queued join");
+        }
+
+        [Test] public void TelemetryUsesTheJoinLineRuleAtBothPlaces()
+        {
+            MethodInfo onJoined = Method(typeof(LocalJoinLine), nameof(LocalJoinLine.OnJoinedRoom));
+            MethodInfo onOpened = Method(typeof(LocalJoinLine), nameof(LocalJoinLine.OnFileOpened));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "OnJoinedRoom", onJoined));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "TryOpenFile", onOpened));
+            Assert.IsFalse(IlWiring.Uses(typeof(MatchTelemetry), "TryOpenFile", Method(typeof(TelemetryWrittenMemory), nameof(TelemetryWrittenMemory.MarkWritten))), "no unconditional mark when the file opens");
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchTelemetry), "OnLeftRoom", Method(typeof(LocalJoinLine), nameof(LocalJoinLine.Reset))));
+        }
+
+        // ---------------------------------------------------------------- Task 14 Part 0: the shield's own clear (review item 2)
+
+        [Test] public void TheClearIsWrittenForAShieldStartedHereOrAnyValueStillSet()
+        {
+            Assert.IsTrue(RespawnShieldRules.MustWriteClear(true, 0), "started on this client: the echo may not be back, the room may hold the end time");
+            Assert.IsTrue(RespawnShieldRules.MustWriteClear(false, 12345), "the property still holds a shield");
+            Assert.IsFalse(RespawnShieldRules.MustWriteClear(false, 0), "nothing set and nothing started: no write");
+        }
+
+        [Test] public void ClearShieldAsksTheRuleAndStartShieldRemembersItsOwnEnd()
+        {
+            Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "ClearShield", Method(typeof(RespawnShieldRules), nameof(RespawnShieldRules.MustWriteClear))));
+            FieldInfo own = typeof(RespawnShield).GetField("ownEndMs", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(own);
+            Assert.IsTrue(IlWiring.Stores(typeof(RespawnShield), "StartShield", own), "the owner is shielded at once, not a round trip later");
+            Assert.IsTrue(IlWiring.Stores(typeof(RespawnShield), "ClearShield", own), "and the clear forgets it");
         }
 
         // ---------------------------------------------------------------- a stale "arrived dead" flag
@@ -240,9 +314,10 @@ namespace Overpower.Tests
         [Test] public void TheLayoutKeepsTheBoardsTowerSizesAndTheSpawnOffset()
         {
             var layout = AssetDatabase.LoadAssetAtPath<DominionLaneLayout>(Overpower.EditorTools.DominionLaneBuilder.LayoutPath);
-            Assert.Greater(layout.ZoneTowerSizeMetres, 0f);
-            Assert.Greater(layout.SpawnTowerSizeMetres, layout.ZoneTowerSizeMetres, "the spawn tower is the bigger one on the board");
-            Assert.Greater(layout.SpawnSideOffsetMetres, 0f);
+            // The drawing's numbers (a 24 px square at 12 px per metre, a 46 px circle, the two spawn points 2 m either side of the tower).
+            Assert.AreEqual(2f, layout.ZoneTowerSizeMetres, 0.001f);
+            Assert.AreEqual(3.8f, layout.SpawnTowerSizeMetres, 0.001f);
+            Assert.AreEqual(2f, layout.SpawnSideOffsetMetres, 0.001f);
         }
 
         // ---------------------------------------------------------------- A41/A42: the straight lane camera
@@ -261,6 +336,56 @@ namespace Overpower.Tests
                 var screenRight = new Vector2(Mathf.Cos(yaw), -Mathf.Sin(yaw)); // camera forward is (sin yaw, cos yaw); right is forward turned clockwise
                 Assert.AreEqual(-1f, Vector2.Dot(screenRight, toSpawn.normalized), 0.0001f, toSpawn.ToString());
             }
+        }
+
+        private static Transform[] Spawns(params Vector3?[] places)
+        {
+            var list = new Transform[places.Length];
+            for (int i = 0; i < places.Length; i++)
+                if (places[i].HasValue) { list[i] = new GameObject("spawn " + i).transform; list[i].position = places[i].Value; }
+            return list;
+        }
+
+        private static void Destroy(Transform[] spawns) { foreach (Transform t in spawns) if (t != null) Object.DestroyImmediate(t.gameObject); }
+
+        [Test] public void TheVectorToASpawnStartsAtTheMiddleOfAllThePlacedSpawns()
+        {
+            Transform[] spawns = Spawns(new Vector3(30f, 5f, 0f), new Vector3(-30f, 5f, 0f));
+            try
+            {
+                Assert.IsTrue(CameraYawRules.ToSpawnFromCentre(spawns, 0, out Vector2 toFirst));
+                Assert.AreEqual(30f, toFirst.x, 0.001f);
+                Assert.AreEqual(0f, toFirst.y, 0.001f, "height is dropped");
+                Assert.IsTrue(CameraYawRules.ToSpawnFromCentre(spawns, 1, out Vector2 toSecond));
+                Assert.AreEqual(-30f, toSecond.x, 0.001f);
+            }
+            finally { Destroy(spawns); }
+        }
+
+        [Test] public void AMissingSpawnIsLeftOutOfTheMiddleAndAMissingTeamHasNoVector()
+        {
+            Transform[] spawns = Spawns(new Vector3(0f, 0f, 10f), null, new Vector3(0f, 0f, -10f));
+            try
+            {
+                Assert.IsTrue(CameraYawRules.ToSpawnFromCentre(spawns, 2, out Vector2 v));
+                Assert.AreEqual(-10f, v.y, 0.001f, "the middle is of the two that exist");
+                Assert.IsFalse(CameraYawRules.ToSpawnFromCentre(spawns, 1, out _), "that team has no spawn");
+                Assert.IsFalse(CameraYawRules.ToSpawnFromCentre(spawns, 3, out _));
+                Assert.IsFalse(CameraYawRules.ToSpawnFromCentre(spawns, -1, out _));
+                Assert.IsFalse(CameraYawRules.ToSpawnFromCentre(null, 0, out _));
+                Assert.AreEqual(0, CameraYawRules.FirstTeamWithSpawn(spawns));
+                Assert.AreEqual(1, CameraYawRules.FirstTeamWithSpawn(Spawns(null, Vector3.one)), "no assumption that the first slot is the one that is filled");
+                Assert.AreEqual(-1, CameraYawRules.FirstTeamWithSpawn(Spawns(null, null)));
+            }
+            finally { Destroy(spawns); }
+        }
+
+        [Test] public void TheCameraAndTheSpectatorAskTheOneSharedVectorRule()
+        {
+            MethodInfo shared = Method(typeof(CameraYawRules), nameof(CameraYawRules.ToSpawnFromCentre));
+            Assert.IsTrue(IlWiring.Uses(typeof(CameraTracking), "ResolveTeamYaw", shared));
+            Assert.IsTrue(IlWiring.Uses(typeof(SpectatorSeatView), "SpectatorYaw", shared));
+            Assert.IsTrue(IlWiring.Uses(typeof(SpectatorSeatView), "SpectatorYaw", Method(typeof(CameraYawRules), nameof(CameraYawRules.FirstTeamWithSpawn))), "the spectator's team is the first one with a spawn, not index 0");
         }
 
         [Test] public void ASceneWithoutTheStraightViewKeepsTheAngledYawExactly()

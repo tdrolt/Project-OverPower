@@ -12,16 +12,31 @@ namespace Overpower.Match
         public const int RequestIdIndex = 2;
         public const int ValueLength = 3;
 
-        /// <summary>Which zones get a pack built now: none while packs are not wanted (or the room's mode is not known yet), otherwise every zone of
-        /// the pack tier that has none yet. The manager builds exactly this list, so there is no inline branch left to get backwards.</summary>
-        public static System.Collections.Generic.List<int> ZonesToBuild(bool packsWanted, int zoneCount, int packTier,
-                                                                         System.Func<int, int> baseTierOf, System.Func<int, bool> hasPack)
+        /// <summary>The tier of the zones that carry a health pack (Tier III: the corner zones between the capitals and the centre).</summary>
+        public const int PackTier = 3;
+
+        /// <summary>Which zones get a pack built now, from the three answers about the room's mode: none while the mode is unknown or the mode has no packs
+        /// (2v2 Dominion), otherwise every zone of the pack tier that has none yet. <paramref name="settled"/> says nothing more will ever be built in this
+        /// room (the mode has no packs, or every zone is registered and has what it needs), so the manager stops asking each frame. One method, taking the
+        /// answers, so swapping two of them is caught by a test of the value.</summary>
+        public static System.Collections.Generic.List<int> ZonesToBuild(bool modeKnown, bool dominion, int teamCount, int zoneCount,
+                                                                         System.Func<int, int> baseTierOf, System.Func<int, bool> hasPack, out bool settled)
         {
             var zones = new System.Collections.Generic.List<int>();
-            if (!packsWanted) return zones;
+            settled = false;
+            if (!Overpower.Dominion.DominionRules.MayBuildHealthPacks(modeKnown, dominion, teamCount))
+            {
+                settled = modeKnown; // known and no packs here: nothing to wait for; unknown: ask again next frame
+                return zones;
+            }
+            bool allRegistered = zoneCount > 0;
             for (int zone = 0; zone < zoneCount; zone++)
-                if (baseTierOf(zone) == packTier && !hasPack(zone))
-                    zones.Add(zone);
+            {
+                int tier = baseTierOf(zone);
+                if (tier == 0) allRegistered = false; // its tower has not registered yet
+                if (tier == PackTier && !hasPack(zone)) zones.Add(zone);
+            }
+            settled = allRegistered && zones.Count == 0;
             return zones;
         }
 

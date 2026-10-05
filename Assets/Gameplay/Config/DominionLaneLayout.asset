@@ -119,5 +119,4 @@ MonoBehaviour:
   minimapMarginMetres: 4
   barrierHeightMetres: 1
   unusedUnderAttackOffsetMetres: 2
-  minimapPixels: 1024
   wallLayerName: Building

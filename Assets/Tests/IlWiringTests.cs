@@ -14,6 +14,10 @@ namespace Overpower.Tests
             public void CallsItInALambda() { System.Action later = () => Target(); later(); }
             public System.Collections.Generic.IEnumerable<int> CallsItInAnIterator() { Target(); yield return 1; }
             public static void Target() { }
+            public bool CallsAnotherAssembly() => string.IsNullOrEmpty("x");
+            public int field;
+            public void StoresTheField() { field = 3; }
+            public int ReadsTheField() => field;
         }
 
         private static readonly MethodInfo Target = typeof(Probe).GetMethod(nameof(Probe.Target));
@@ -31,6 +35,28 @@ namespace Overpower.Tests
         {
             Assert.IsTrue(IlWiring.Uses(typeof(Probe), nameof(Probe.CallsItInALambda), Target));
             Assert.IsTrue(IlWiring.Uses(typeof(Probe), nameof(Probe.CallsItInAnIterator), Target));
+        }
+
+        [Test] public void AStoreIsFoundOnlyWhereTheFieldIsWritten()
+        {
+            FieldInfo field = typeof(Probe).GetField(nameof(Probe.field));
+            Assert.IsTrue(IlWiring.Stores(typeof(Probe), nameof(Probe.StoresTheField), field));
+            Assert.IsFalse(IlWiring.Stores(typeof(Probe), nameof(Probe.ReadsTheField), field), "a read is not a store");
+            Assert.IsFalse(IlWiring.Stores(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), field));
+        }
+
+        [Test] public void CallOffsetsListsEveryCallInOrder()
+        {
+            Assert.AreEqual(1, IlWiring.CallOffsets(typeof(Probe).GetMethod(nameof(Probe.CallsTheTarget)), Target).Count);
+            Assert.AreEqual(0, IlWiring.CallOffsets(typeof(Probe).GetMethod(nameof(Probe.DoesNotCallTheTarget)), Target).Count);
+        }
+
+        [Test] public void AMethodOfAnotherAssemblyIsFoundByResolvingTheCall()
+        {
+            MethodInfo other = typeof(string).GetMethod(nameof(string.IsNullOrEmpty));
+            Assert.IsFalse(IlWiring.Uses(typeof(Probe), nameof(Probe.CallsAnotherAssembly), other), "the byte compare cannot see across assemblies");
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(Probe), nameof(Probe.CallsAnotherAssembly), other));
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), other));
         }
 
         [Test] public void AMethodNameThatDoesNotExistFindsNothing() =>

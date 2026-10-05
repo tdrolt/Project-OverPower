@@ -362,7 +362,14 @@ namespace Overpower.EditorTools
             float width = max.x - min.x + 2f * margin;
             float depth = max.y - min.y + 2f * margin;
             var centre = (min + max) * 0.5f;
-            int pixels = layout.MinimapPixels;
+            // The picture's size is the minimap config's own Image Pixels (the triangle arena's baker reads the same field), not a number kept here.
+            var config = AssetDatabase.LoadAssetAtPath<MinimapConfig>(MinimapConfigPath);
+            if (config == null)
+            {
+                config = ScriptableObject.CreateInstance<MinimapConfig>();
+                AssetDatabase.CreateAsset(config, MinimapConfigPath);
+            }
+            int pixels = Mathf.Clamp(config.ImagePixels, 256, 2048);
 
             string full = Path.Combine(Directory.GetParent(Application.dataPath).FullName, MinimapImagePath);
             File.WriteAllBytes(full, TopDownRender.RenderPng(centre, width, depth, pixels));
@@ -378,12 +385,6 @@ namespace Overpower.EditorTools
                 importer.SaveAndReimport();
             }
 
-            var config = AssetDatabase.LoadAssetAtPath<MinimapConfig>(MinimapConfigPath);
-            if (config == null)
-            {
-                config = ScriptableObject.CreateInstance<MinimapConfig>();
-                AssetDatabase.CreateAsset(config, MinimapConfigPath);
-            }
             var so = new SerializedObject(config);
             so.FindProperty("arenaImage").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Texture2D>(MinimapImagePath);
             so.FindProperty("worldCentre").vector2Value = centre;

@@ -22,6 +22,19 @@ namespace Overpower.Dominion
         public static string RoundEnd(int round, int winner, int[] teams, int[] points) =>
             "dominion round " + N(round) + " end " + (winner < 0 ? "tied" : "winner team " + N(winner)) + " points" + PerTeam(teams, points);
 
+        /// <summary>A round that ended without being scored: the others left and the last team standing took the match, so no team's wins went up.</summary>
+        public static string RoundCutShort(int round, int[] teams, int[] points) =>
+            "dominion round " + N(round) + " end cut short points" + PerTeam(teams, points);
+
+        /// <summary>The team whose wins went up between two readings (-1 when none did). A missing array reads as no wins.</summary>
+        public static int TeamWhoseWinsWentUp(int[] before, int[] after)
+        {
+            if (after == null) return -1;
+            for (int team = 0; team < after.Length; team++)
+                if (after[team] > (before != null && team < before.Length ? before[team] : 0)) return team;
+            return -1;
+        }
+
         /// <summary>The break that leads to <paramref name="nextRound"/> (the one before round 1 included).</summary>
         public static string BreakStart(int nextRound) => "dominion break start before round " + N(nextRound);
 
@@ -36,14 +49,20 @@ namespace Overpower.Dominion
         /// <summary>The markers to drop when the room goes from (prevRound, prevStage, prevSuddenDeathMs) to <paramref name="room"/>, in the order the
         /// story happened. Only the master drops them (every client sees the same edge, and the report merges every client's file, so one writer keeps
         /// each event once); <paramref name="teamsInMatch"/> names the teams that count in the lines.</summary>
-        public static List<string> ForEdge(bool isMaster, int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room, int[] teamsInMatch)
+        public static List<string> ForEdge(bool isMaster, int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room, int[] teamsInMatch, int[] prevWins = null)
         {
             var notes = new List<string>();
             if (!isMaster) return notes;
 
-            // A round that stopped being a round: scored (its points are still in the room through the break), or cut short by the others leaving.
+            // A round that stopped being a round: scored (its points are still in the room through the break) or cut short by the others leaving.
+            // Who won it is whose wins went up; a scored round where nobody's did was tied, and an Over where nobody's did was cut short.
             if (prevStage == DominionStage.Round && room.Stage != DominionStage.Round && prevRound >= 1)
-                notes.Add(RoundEnd(prevRound, DominionRules.RoundWinner(room.Points), teamsInMatch, room.Points));
+            {
+                int winner = TeamWhoseWinsWentUp(prevWins, room.Wins);
+                if (winner >= 0) notes.Add(RoundEnd(prevRound, winner, teamsInMatch, room.Points));
+                else if (room.Stage == DominionStage.Over) notes.Add(RoundCutShort(prevRound, teamsInMatch, room.Points));
+                else notes.Add(RoundEnd(prevRound, -1, teamsInMatch, room.Points));
+            }
 
             switch (room.Stage)
             {

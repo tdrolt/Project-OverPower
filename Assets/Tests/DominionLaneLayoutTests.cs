@@ -249,7 +249,6 @@ namespace Overpower.Tests
             DominionLaneLayout layout = Layout();
             Assert.Greater(layout.BarrierHeightMetres, 0f);
             Assert.Greater(layout.UnusedUnderAttackOffsetMetres, 0f);
-            Assert.GreaterOrEqual(layout.MinimapPixels, 256);
             Assert.IsFalse(string.IsNullOrEmpty(layout.WallLayerName));
             Assert.AreNotEqual(-1, LayerMask.NameToLayer(layout.WallLayerName), "the layer exists");
         }

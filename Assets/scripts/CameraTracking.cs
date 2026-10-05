@@ -251,24 +251,10 @@ public class CameraTracking : MonoBehaviour
         if (room == null || room.teamSpawnPoints == null || team.teamID >= room.teamSpawnPoints.Length)
             return;
 
-        Vector3 centre = Vector3.zero;
-        int counted = 0;
-        foreach (Transform spawn in room.teamSpawnPoints)
-        {
-            if (spawn == null) continue;
-            centre += spawn.position;
-            counted++;
-        }
-
-        if (counted == 0)
+        if (!CameraYawRules.ToSpawnFromCentre(room.teamSpawnPoints, team.teamID, out Vector2 toSpawn))
             return;
 
-        centre /= counted;
-
-        Vector3 toSpawn = room.teamSpawnPoints[team.teamID].position - centre;
-        toSpawn.y = 0f;
-
-        yaw = CameraYawRules.TeamYaw(SceneCameraConfig.SceneWantsOwnSpawnOnLeft(), toSpawn.x, toSpawn.z, teamYawOffset); // the straight lane view, or the arena's angled one
+        yaw = CameraYawRules.TeamYaw(SceneCameraConfig.SceneWantsOwnSpawnOnLeft(), toSpawn.x, toSpawn.y, teamYawOffset); // the straight lane view, or the arena's angled one
         teamYawResolved = true;
         teamYawResolvedForTeam = team.teamID;
 

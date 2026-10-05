@@ -4,6 +4,7 @@ using NUnit.Framework;
 using Overpower.Data;
 using Overpower.Dominion;
 using Overpower.Lobby;
+using Photon.Pun;
 using UnityEditor;
 
 namespace Overpower.Tests
@@ -120,7 +121,7 @@ namespace Overpower.Tests
 
         [Test] public void ARoundEndingWithAWinnerThenTheBreakOfTheNextRound()
         {
-            var notes = DominionMarkerNotes.ForEdge(true, 1, DominionStage.Round, 0, Room(2, DominionStage.Break, new[] { 120, 80, 0 }, new[] { 1, 0, 0 }), Two);
+            var notes = DominionMarkerNotes.ForEdge(true, 1, DominionStage.Round, 0, Room(2, DominionStage.Break, new[] { 120, 80, 0 }, new[] { 1, 0, 0 }), Two, new[] { 0, 0, 0 });
             CollectionAssert.AreEqual(new[] { "dominion round 1 end winner team 0 points team0 120 team1 80", "dominion break start before round 2" }, notes);
         }
 
@@ -133,13 +134,13 @@ namespace Overpower.Tests
         [Test] public void TheLastRoundEndingInSuddenDeathNamesTheTeamsThatPlayIt()
         {
             var notes = DominionMarkerNotes.ForEdge(true, 3, DominionStage.Round, 0,
-                Room(3, DominionStage.SuddenDeath, new[] { 10, 20, 30 }, new[] { 1, 1, 1 }, sd: 5000, sdTeams: new[] { 0, 1, 2 }), Three);
+                Room(3, DominionStage.SuddenDeath, new[] { 10, 20, 30 }, new[] { 1, 1, 1 }, sd: 5000, sdTeams: new[] { 0, 1, 2 }), Three, new[] { 1, 1, 0 });
             CollectionAssert.AreEqual(new[] { "dominion round 3 end winner team 2 points team0 10 team1 20 team2 30", "dominion sudden death start teams 0,1,2" }, notes);
         }
 
         [Test] public void ARoundEndingTheMatchNamesTheWinnerAndTheWins()
         {
-            var notes = DominionMarkerNotes.ForEdge(true, 2, DominionStage.Round, 0, Room(2, DominionStage.Over, new[] { 50, 40, 0 }, new[] { 2, 0, 0 }, winner: 0), Two);
+            var notes = DominionMarkerNotes.ForEdge(true, 2, DominionStage.Round, 0, Room(2, DominionStage.Over, new[] { 50, 40, 0 }, new[] { 2, 0, 0 }, winner: 0), Two, new[] { 1, 0, 0 });
             CollectionAssert.AreEqual(new[] { "dominion round 2 end winner team 0 points team0 50 team1 40", "dominion match over winner team 0 wins team0 2 team1 0" }, notes);
         }
 
@@ -162,6 +163,30 @@ namespace Overpower.Tests
             CollectionAssert.IsEmpty(DominionMarkerNotes.ForEdge(true, 3, DominionStage.Over, 0, Room(3, DominionStage.Over, winner: 0), Two), "an Over that was already Over");
         }
 
+        [Test] public void ARoundCutShortByTheLastTeamStandingIsNotGivenToThePointsLeader()
+        {
+            // A3: Round to Over with the wins unchanged. Team 0 leads on points, but nobody won the round.
+            var notes = DominionMarkerNotes.ForEdge(true, 2, DominionStage.Round, 0, Room(2, DominionStage.Over, new[] { 50, 40, 0 }, new[] { 1, 0, 0 }, winner: 1), Two, new[] { 1, 0, 0 });
+            CollectionAssert.AreEqual(new[] { "dominion round 2 end cut short points team0 50 team1 40", "dominion match over winner team 1 wins team0 1 team1 0" }, notes);
+        }
+
+        [Test] public void TiedIsOnlyForARoundThatWasScoredAsATie()
+        {
+            var tied = DominionMarkerNotes.ForEdge(true, 1, DominionStage.Round, 0, Room(2, DominionStage.Break, new[] { 90, 90, 0 }, new[] { 0, 0, 0 }), Two, new[] { 0, 0, 0 });
+            Assert.AreEqual("dominion round 1 end tied points team0 90 team1 90", tied[0]);
+            var tiedIntoSuddenDeath = DominionMarkerNotes.ForEdge(true, 3, DominionStage.Round, 0, Room(3, DominionStage.SuddenDeath, new[] { 90, 90, 0 }, new[] { 1, 1, 0 }, sd: 5000, sdTeams: new[] { 0, 1 }), Two, new[] { 1, 1, 0 });
+            Assert.AreEqual("dominion round 3 end tied points team0 90 team1 90", tiedIntoSuddenDeath[0]);
+        }
+
+        [Test] public void TheWinnerOfARoundIsWhoseWinsWentUpNotWhoLedThePoints()
+        {
+            Assert.AreEqual(1, DominionMarkerNotes.TeamWhoseWinsWentUp(new[] { 1, 0, 0 }, new[] { 1, 1, 0 }));
+            Assert.AreEqual(-1, DominionMarkerNotes.TeamWhoseWinsWentUp(new[] { 1, 0, 0 }, new[] { 1, 0, 0 }));
+            Assert.AreEqual(0, DominionMarkerNotes.TeamWhoseWinsWentUp(null, new[] { 1, 0, 0 }), "no reading before reads as no wins");
+            Assert.AreEqual(-1, DominionMarkerNotes.TeamWhoseWinsWentUp(new[] { 1 }, null));
+            Assert.AreEqual("dominion round 2 end cut short points team0 5 team1 6", DominionMarkerNotes.RoundCutShort(2, Two, new[] { 5, 6, 9 }));
+        }
+
         [Test] public void OnlyTheMasterDropsTheMarkers()
         {
             CollectionAssert.IsEmpty(DominionMarkerNotes.ForEdge(false, 1, DominionStage.Round, 0, Room(2, DominionStage.Break, new[] { 120, 80, 0 }), Two));
@@ -177,6 +202,20 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "OnRoomPropertiesUpdate", typeof(DominionDirector).GetMethod("DropRoundMarkers", flags)), "the room's edge handler calls the dropper");
             Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "DropRoundMarkers", forEdge), "which asks the rule");
             Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "DropRoundMarkers", drop), "and drops what it says");
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(DominionDirector), "DropRoundMarkers", typeof(PhotonNetwork).GetProperty(nameof(PhotonNetwork.IsMasterClient)).GetGetMethod()), "the master-only answer comes from the live master check");
+            System.Reflection.FieldInfo wins = typeof(DominionDirector).GetField("lastAppliedWins", flags);
+            Assert.IsNotNull(wins);
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "OnRoomPropertiesUpdate", wins), "the wins before the edge are read");
+            Assert.IsTrue(IlWiring.Stores(typeof(DominionDirector), "OnRoomPropertiesUpdate", wins), "and the new ones kept");
+            Assert.IsTrue(IlWiring.Stores(typeof(DominionDirector), "ReadWithoutReacting", wins));
+        }
+
+        [Test] public void TheDirectorTakesTheRoomAsItStandsWhenItsSceneStartsInsideTheRoom()
+        {
+            // The lane scene loads after the room was joined: no joined-room callback comes, so Start must read the room, or a rejoiner sees a fake edge from nothing.
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "Start", typeof(DominionDirector).GetMethod("ReadWithoutReacting", flags)));
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "OnJoinedRoom", typeof(DominionDirector).GetMethod("ReadWithoutReacting", flags)), "and the ordinary join still does");
         }
     }
 }

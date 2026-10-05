@@ -82,6 +82,7 @@ namespace Overpower.Telemetry
         // telemetry for every match this client plays afterwards in the same session.
         private TelemetryWriter writer = new TelemetryWriter();
         private readonly PendingLineBuffer pending = new PendingLineBuffer(MaxPendingLines);
+        private readonly LocalJoinLine localJoin = new LocalJoinLine(); // whether this player's own join line is queued behind the file
 
         // Lobby Task 13: spectators this master has already noted with a marker (cleared when the room is left).
         private readonly HashSet<int> spectatorsNoted = new HashSet<int>();
@@ -220,11 +221,8 @@ namespace Overpower.Telemetry
             // A scene that loads inside the room asks again for the same player: that join was already written in this process.
             // Only a line that reached the FILE counts as written: one still queued dies with this scene if the file never opened here (the mode's map is loaded first).
             string roomName = PhotonNetwork.CurrentRoom.Name; int me = PhotonNetwork.LocalPlayer.ActorNumber;
-            if (!TelemetryWrittenMemory.Process.WasWritten("join", roomName, me))
-            {
+            if (localJoin.OnJoinedRoom(TelemetryWrittenMemory.Process, roomName, me, writer.IsOpen))
                 LogJoinOrLeave(TelemetryKeys.Join, PhotonNetwork.LocalPlayer);
-                if (writer.IsOpen) TelemetryWrittenMemory.Process.MarkWritten("join", roomName, me);
-            }
         }
 
         public override void OnLeftRoom()
@@ -236,6 +234,7 @@ namespace Overpower.Telemetry
             matchId = null;
             matchStartMs = 0;
             pending.Clear();
+            localJoin.Reset();
             spectatorsNoted.Clear();
             TelemetryWrittenMemory.Process.ForgetAll(); // leaving the room: the next one (or this one again) is a new beginning
             if (claimIdentityRoutine != null)
@@ -571,7 +570,7 @@ namespace Overpower.Telemetry
             foreach (string waiting in pending.Lines)
                 writer.Write(waiting);
             pending.Clear();
-            TelemetryWrittenMemory.Process.MarkWritten("join", PhotonNetwork.CurrentRoom.Name, actor); // the queued join of this player (if any) is in the file now
+            localJoin.OnFileOpened(TelemetryWrittenMemory.Process, PhotonNetwork.CurrentRoom.Name, actor); // marks the join written only if this player's join was queued
 
             writer.Flush(); // Immediate, so the file and its header exist as soon as a client joins, not just after the first flush interval.
         }

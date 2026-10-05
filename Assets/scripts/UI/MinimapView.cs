@@ -508,7 +508,8 @@ namespace Overpower.UI
             canvasRect = (RectTransform)canvasGo.transform;
 
             root = NewRect("Minimap", canvasGo.transform);
-            root.sizeDelta = Vector2.one * theme.minimapCornerSize;
+            // The root is the picture's own size, so a rectangular lane map does not hang below its frame (and the large map scales the same rectangle).
+            root.sizeDelta = frameSize;
 
             // One CanvasGroup over the whole map is what makes Tudor's three opacity states a single number
             // (HUD step 5): it multiplies every Graphic underneath, including the ones on the markers' own nested

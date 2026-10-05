@@ -19,6 +19,10 @@ namespace Overpower.Dominion
         /// shield would be a free shot, so the first hit on an enemy (damage, stun, slow or push) drops it.</summary>
         public static int EndAfterDamageDealt() => 0;
 
+        /// <summary>True when the owner must write the cleared shield: the shield was started on this client (its write may not have echoed back yet, so the
+        /// property can still read as nothing while the room holds the end time), or the property still holds something other than the cleared value.</summary>
+        public static bool MustWriteClear(bool startedHere, int propertyEndMs) => startedHere || propertyEndMs != EndAfterDamageDealt();
+
         /// <summary>An up shield blocks incoming damage (and shows BLOCKED).</summary>
         public static bool BlocksDamage(bool up) => up;
 

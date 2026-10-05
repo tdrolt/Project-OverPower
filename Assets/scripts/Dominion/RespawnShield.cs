@@ -143,7 +143,7 @@ namespace Overpower.Dominion
             if (!photonView.IsMine || photonView.Owner == null) return;
             bool startedHere = ownEndMs != 0; // started on this client and maybe not echoed yet: the cleared value must still be written
             ownEndMs = 0;
-            if (!startedHere && ReadInt(photonView.Owner, RespawnShieldRules.ShieldKey) == RespawnShieldRules.EndAfterDamageDealt()) return;
+            if (!RespawnShieldRules.MustWriteClear(startedHere, ReadInt(photonView.Owner, RespawnShieldRules.ShieldKey))) return;
             PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable
             {
                 { RespawnShieldRules.ShieldKey, RespawnShieldRules.EndAfterDamageDealt() },

@@ -75,23 +75,37 @@ namespace Overpower.Tests
             Assert.IsTrue(DominionRules.MayBuildHealthPacks(modeKnown: true, dominion: false, teamCount: 2));
         }
 
-        [Test] public void ThePackListIsEmptyWhenPacksAreNotWantedAndHoldsTheMissingTierThreeZonesWhenTheyAre()
+        [Test] public void ThePackListFollowsTheThreeModeAnswersAndHoldsTheMissingTierThreeZones()
         {
             // zones 0..4: tiers 2,3,3,1,4; zone 2 already has its pack
             System.Func<int, int> tierOf = z => new[] { 2, 3, 3, 1, 4 }[z];
             System.Func<int, bool> has = z => z == 2;
-            CollectionAssert.IsEmpty(Overpower.Match.HealthPackRules.ZonesToBuild(false, 5, 3, tierOf, has), "not wanted: nothing, however many Tier 3 zones there are");
-            CollectionAssert.AreEqual(new[] { 1 }, Overpower.Match.HealthPackRules.ZonesToBuild(true, 5, 3, tierOf, has));
-            CollectionAssert.AreEqual(new[] { 1, 2 }, Overpower.Match.HealthPackRules.ZonesToBuild(true, 5, 3, tierOf, z => false));
+            CollectionAssert.IsEmpty(Overpower.Match.HealthPackRules.ZonesToBuild(false, false, 3, 5, tierOf, has, out bool unknownSettled), "mode unknown: nothing, even for a Conquest-looking room");
+            Assert.IsFalse(unknownSettled, "and ask again next frame");
+            CollectionAssert.IsEmpty(Overpower.Match.HealthPackRules.ZonesToBuild(true, true, 2, 5, tierOf, has, out bool laneSettled), "2v2 Dominion: none");
+            Assert.IsTrue(laneSettled, "and never any, so stop asking");
+            CollectionAssert.AreEqual(new[] { 1 }, Overpower.Match.HealthPackRules.ZonesToBuild(true, false, 3, 5, tierOf, has, out bool conquestSettled), "Conquest keeps its packs");
+            Assert.IsFalse(conquestSettled, "one is still to build");
+            CollectionAssert.AreEqual(new[] { 1, 2 }, Overpower.Match.HealthPackRules.ZonesToBuild(true, true, 3, 5, tierOf, z => false, out _), "3v3v3 Dominion keeps them");
+            CollectionAssert.IsEmpty(Overpower.Match.HealthPackRules.ZonesToBuild(true, false, 3, 5, tierOf, z => z == 1 || z == 2, out bool doneSettled));
+            Assert.IsTrue(doneSettled, "every pack built and every tower registered");
+            CollectionAssert.IsEmpty(Overpower.Match.HealthPackRules.ZonesToBuild(true, false, 3, 5, z => z == 4 ? 0 : tierOf(z), z => z == 1 || z == 2, out bool waitingSettled));
+            Assert.IsFalse(waitingSettled, "a tower that has not registered yet may still turn out to be a pack zone");
         }
 
-        [Test] public void TheHealthPackManagerBuildsOnlyTheZonesTheRuleNamesAfterAskingWhetherPacksAreWanted()
+        [Test] public void TheHealthPackManagerBuildsOnlyTheZonesTheRuleNamesAndStopsAskingOnceSettled()
         {
-            // The branching lives in the two rules above (tested by value); this reads that the manager's EnsurePacks calls both and the mode check.
             System.Type manager = typeof(Overpower.Match.HealthPackManager);
-            Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(DominionRules).GetMethod(nameof(DominionRules.MayBuildHealthPacks))));
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            System.Reflection.FieldInfo settled = manager.GetField("packsSettled", flags);
+            Assert.IsNotNull(settled);
             Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(Overpower.Match.HealthPackRules).GetMethod(nameof(Overpower.Match.HealthPackRules.ZonesToBuild))));
             Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(DominionMode).GetMethod(nameof(DominionMode.IsKnown))), "the mode check is asked, not assumed");
+            Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(DominionMode).GetMethod(nameof(DominionMode.IsActive))));
+            Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(DominionMode).GetMethod(nameof(DominionMode.TeamCountOfCurrentRoom))));
+            Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", settled), "settled is read first, before anything is allocated");
+            Assert.IsTrue(IlWiring.Stores(manager, "EnsurePacks", settled), "and remembered");
+            Assert.IsTrue(IlWiring.Stores(manager, "OnJoinedRoom", settled), "a new room is asked again");
         }
     }
 }

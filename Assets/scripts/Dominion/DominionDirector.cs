@@ -37,6 +37,7 @@ namespace Overpower.Dominion
         // ---- every client: the read side, so an edge is reacted to once (like MatchDirector's lastApplied*).
         private int lastAppliedRound;
         private DominionStage lastAppliedStage = DominionStage.None;
+        private int[] lastAppliedWins;                // the wins as last seen: which team's went up tells who won a round
         private int lastAppliedSuddenDeath;       // dSd as last seen: a new value is a new sudden death (or a replay)
 
         // ---- master: waiting for the echo of its own write / of a match-over announcement.
@@ -114,6 +115,13 @@ namespace Overpower.Dominion
             else { Destroy(this); return; } // BuildingManager.Awake adds exactly one.
             if (GetComponent<SuddenDeathZone>() == null) gameObject.AddComponent<SuddenDeathZone>(); // the circle: no scene footprint, like this component
             if (GetComponent<Overpower.UI.DominionHud>() == null) gameObject.AddComponent<Overpower.UI.DominionHud>(); // the round HUD, break card and result (Task 9): drawn on every client, spectators included
+        }
+
+        // The mode's scene loads after the room was joined, so no joined-room callback comes to this component: it takes the room as it stands here,
+        // or a late joiner or rejoiner would see "round 0, no stage" and get a fresh start from a stage change nobody made.
+        private void Start()
+        {
+            if (PhotonNetwork.InRoom) ReadWithoutReacting();
         }
 
         private void OnDestroy()
@@ -285,6 +293,7 @@ namespace Overpower.Dominion
             lastAppliedRound = 0;
             lastAppliedStage = DominionStage.None;
             lastAppliedSuddenDeath = 0;
+            lastAppliedWins = null;
             waitForEchoUntil = -1f;
             announceAgainAt = -1f;
             zonesResetSentFor = 0;
@@ -301,6 +310,7 @@ namespace Overpower.Dominion
             lastAppliedRound = room.Round;
             lastAppliedStage = room.Stage;
             lastAppliedSuddenDeath = room.SuddenDeathMs;
+            lastAppliedWins = room.Wins;
         }
 
         public override void OnRoomPropertiesUpdate(Hashtable changed)
@@ -316,14 +326,16 @@ namespace Overpower.Dominion
             int prevRound = lastAppliedRound;
             DominionStage prevStage = lastAppliedStage;
             int prevSuddenDeath = lastAppliedSuddenDeath;
+            int[] prevWins = lastAppliedWins;
             lastAppliedRound = room.Round;
             lastAppliedStage = room.Stage;
             lastAppliedSuddenDeath = room.SuddenDeathMs;
+            lastAppliedWins = room.Wins;
 
             DominionEdge edge = DominionRoomWrites.EdgeBetween(prevRound, prevStage, room.Round, room.Stage);
             bool suddenDeathStart = DominionRoomWrites.IsSuddenDeathStart(prevStage, prevSuddenDeath, room.Stage, room.SuddenDeathMs);
             Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} sd {room.SuddenDeathMs} sdTeams [{(room.SuddenDeathTeams != null ? string.Join(",", room.SuddenDeathTeams) : "-")}] points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge}{(suddenDeathStart ? ", sudden death start" : "")})");
-            DropRoundMarkers(prevRound, prevStage, prevSuddenDeath, room);
+            DropRoundMarkers(prevRound, prevStage, prevSuddenDeath, room, prevWins);
             if (prevStage == DominionStage.None && room.Stage == DominionStage.Break) WarnAboutMissingHealAreas();
             if (suddenDeathStart)
             {
@@ -340,13 +352,13 @@ namespace Overpower.Dominion
         /// <summary>The match log's story of the match: round start and end, break, sudden death, match over. Written by the master only, from the
         /// echo it sees (the same edge every client sees), so each event is in the log once even though the report merges every client's file. The
         /// notes and the choice of which edge drops what are DominionMarkerNotes.ForEdge (tested).</summary>
-        private void DropRoundMarkers(int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room)
+        private void DropRoundMarkers(int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room, int[] prevWins)
         {
             MatchTelemetry telemetry = MatchTelemetry.Instance;
             if (telemetry == null) return;
             MatchDirector match = MatchDirector.Instance;
             int[] teams = match != null && match.TeamsInMatch != null && match.TeamsInMatch.Length > 0 ? match.TeamsInMatch : DominionMode.TeamsOfCurrentRoom();
-            foreach (string note in DominionMarkerNotes.ForEdge(PhotonNetwork.IsMasterClient, prevRound, prevStage, prevSuddenDeathMs, room, teams))
+            foreach (string note in DominionMarkerNotes.ForEdge(PhotonNetwork.IsMasterClient, prevRound, prevStage, prevSuddenDeathMs, room, teams, prevWins))
                 telemetry.DropMarker(note);
         }
 

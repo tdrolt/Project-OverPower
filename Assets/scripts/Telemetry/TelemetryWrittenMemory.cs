@@ -34,4 +34,34 @@ namespace Overpower.Telemetry
 
         public void ForgetAll() => written.Clear();
     }
+    /// <summary>
+    /// This player's own "join" line and when it counts as written. Marking "join" written whenever the file opens lost the line of a rejoiner and
+    /// of a lane-scene joiner: the file opened BEFORE the join check, marked a join nobody had logged, and the check then skipped it. Now the mark is
+    /// made only for a line that was queued while the file was closed, and the flag is spent by the open that writes it.
+    /// </summary>
+    public sealed class LocalJoinLine
+    {
+        private bool queued;
+
+        /// <summary>The room was joined: true when the join line must be logged now. A line logged into an open file is marked written at once;
+        /// one logged while the file is closed is only queued, and the open that follows writes it.</summary>
+        public bool OnJoinedRoom(TelemetryWrittenMemory memory, string roomName, int actor, bool fileIsOpen)
+        {
+            if (memory.WasWritten("join", roomName, actor)) return false;
+            if (fileIsOpen) memory.MarkWritten("join", roomName, actor);
+            else queued = true;
+            return true;
+        }
+
+        /// <summary>The file has just opened and its queued lines are written: marks the join written only when this player's join was among them.</summary>
+        public void OnFileOpened(TelemetryWrittenMemory memory, string roomName, int actor)
+        {
+            if (!queued) return;
+            memory.MarkWritten("join", roomName, actor);
+            queued = false;
+        }
+
+        /// <summary>Leaving the room drops a queued join with the rest of the pending lines.</summary>
+        public void Reset() => queued = false;
+    }
 }

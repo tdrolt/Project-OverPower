@@ -57,6 +57,7 @@ namespace Overpower.Match
         }
 
         private readonly Dictionary<int, Pack> packs = new Dictionary<int, Pack>();
+        private System.Func<int, bool> hasPackNow; // made once: a lambda written at the call would be a new object every frame
         private static readonly int ColorId = Shader.PropertyToID("_BaseColor");
         private MaterialPropertyBlock block;
         private Material crossMaterial;
@@ -102,6 +103,7 @@ namespace Overpower.Match
         private void Awake()
         {
             Instance = this;
+            hasPackNow = zone => packs.ContainsKey(zone);
             if (config == null)
                 Debug.LogError($"[HealthPackManager] {name}: Health Pack Config is not assigned - there will be no health packs.");
         }
@@ -139,20 +141,24 @@ namespace Overpower.Match
 
         // ---- building and drawing ------------------------------------------------------------------
 
+        private bool packsSettled; // nothing more to build in this room: EnsurePacks returns at once instead of allocating a list every frame
+
         private void EnsurePacks()
         {
+            if (packsSettled) return;
             BuildingManager buildings = BuildingManager.Instance;
             // 2v2 Dominion has no health packs (its two Tier 3 zones get none); 3v3v3 and Conquest keep them. Nothing is built while the room's mode is
             // still unknown (the mode catalogue is not reachable in a new scene's first frames): this runs again next frame.
-            bool wanted = Overpower.Dominion.DominionRules.MayBuildHealthPacks(Overpower.Dominion.DominionMode.IsKnown(),
-                Overpower.Dominion.DominionMode.IsActive(), Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom());
             // The tower's own tier, not TierOf: TierOf plays the centre as Tier III while a corner is cut.
-            foreach (int zone in HealthPackRules.ZonesToBuild(wanted, buildings.ZoneCount, 3, buildings.BaseTierOf, z => packs.ContainsKey(z)))
+            bool settled;
+            foreach (int zone in HealthPackRules.ZonesToBuild(Overpower.Dominion.DominionMode.IsKnown(), Overpower.Dominion.DominionMode.IsActive(),
+                         Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom(), buildings.ZoneCount, buildings.BaseTierOf, hasPackNow, out settled))
             {
                 if (!buildings.TryGetZoneCentre(zone, out Vector3 tower))
                     continue;
                 packs[zone] = Build(zone, tower);
             }
+            packsSettled = settled;
         }
 
         /// <summary>The pack's spot for the zone whose tower is at <paramref name="tower"/>: the authored recess point
@@ -330,6 +336,7 @@ namespace Overpower.Match
         /// otherwise its first few pack requests after a restart would look old and be ignored.</summary>
         public override void OnJoinedRoom()
         {
+            packsSettled = false; // a new room may be another mode
             if (PhotonNetwork.LocalPlayer == null
                 || !PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(RequestKey, out object raw)
                 || !(raw is int[] last) || last.Length < 2)
