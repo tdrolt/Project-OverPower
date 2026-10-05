@@ -106,6 +106,23 @@ namespace Overpower.Data
         [Tooltip("Extra metres of ground the minimap picture shows beyond the farthest wall, on every side.")]
         [SerializeField, Min(0f)] private float minimapMarginMetres = 4f;
 
+        [Header("Builder measures")]
+        [Tooltip("How tall the yellow jersey barriers are, in metres. Waist high, like the triangle arena's barriers: players see over them and shots cross them.")]
+        [SerializeField, Min(0.1f)] private float barrierHeightMetres = 1f;
+
+        [Tooltip("How far, in metres, the unused 'capital under attack' spawn point stands from the normal spawn point. Dominion never respawns anyone there; the point only keeps the scene's spawn list whole.")]
+        [SerializeField, Min(0f)] private float unusedUnderAttackOffsetMetres = 2f;
+
+        [Tooltip("How many pixels wide the minimap picture is when the builder takes it. More pixels is sharper and uses more memory.")]
+        [SerializeField, Min(256)] private int minimapPixels = 1024;
+
+        [Tooltip("The name of the physics layer the lane's walls and boxes are put on. It must be the same layer the triangle arena's walls use, so shots, sight and movement treat them the same.")]
+        [SerializeField] private string wallLayerName = "Building";
+
+        public float BarrierHeightMetres => barrierHeightMetres;
+        public float UnusedUnderAttackOffsetMetres => unusedUnderAttackOffsetMetres;
+        public int MinimapPixels => minimapPixels;
+        public string WallLayerName => wallLayerName;
         public IReadOnlyList<LaneRect> Walls => walls;
         public IReadOnlyList<LaneRect> Barriers => barriers;
         public IReadOnlyList<Vector2> Boxes => boxes;

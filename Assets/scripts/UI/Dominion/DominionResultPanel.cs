@@ -40,6 +40,8 @@ namespace Overpower.UI
         {
             if (IsShowing) return;
             ModeText = DominionHudText.ModeLine(theme.dominionResultModeFormat, teams.Length);
+            // suddenDeathMs is the room's dSd, which nothing ever clears. That is right while a room hosts exactly one match (a finished room closes);
+            // if rooms ever host a second match, dSd must be cleared at the new match's start or this headline would claim sudden death for a plain win.
             HeadlineText = DominionHudText.ResultHeadline(winner, wins, teams, teamNames, theme.dominionResultHeadlineFormat, theme.dominionResultSuddenFormat,
                 theme.dominionResultScoreSeparator, DominionHudText.WonInSuddenDeath(winner, suddenDeathMs));
             TableRows.Clear();

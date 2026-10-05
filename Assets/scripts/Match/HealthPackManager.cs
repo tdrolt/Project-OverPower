@@ -142,14 +142,13 @@ namespace Overpower.Match
         private void EnsurePacks()
         {
             BuildingManager buildings = BuildingManager.Instance;
-            // 2v2 Dominion has no health packs (its two Tier 3 zones get none); 3v3v3 and Conquest keep them.
-            if (!Overpower.Dominion.DominionRules.HasHealthPacks(Overpower.Dominion.DominionMode.IsActive(), Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom()))
-                return;
-            for (int zone = 0; zone < buildings.ZoneCount; zone++)
+            // 2v2 Dominion has no health packs (its two Tier 3 zones get none); 3v3v3 and Conquest keep them. Nothing is built while the room's mode is
+            // still unknown (the mode catalogue is not reachable in a new scene's first frames): this runs again next frame.
+            bool wanted = Overpower.Dominion.DominionRules.MayBuildHealthPacks(Overpower.Dominion.DominionMode.IsKnown(),
+                Overpower.Dominion.DominionMode.IsActive(), Overpower.Dominion.DominionMode.TeamCountOfCurrentRoom());
+            // The tower's own tier, not TierOf: TierOf plays the centre as Tier III while a corner is cut.
+            foreach (int zone in HealthPackRules.ZonesToBuild(wanted, buildings.ZoneCount, 3, buildings.BaseTierOf, z => packs.ContainsKey(z)))
             {
-                // The tower's own tier, not TierOf: TierOf plays the centre as Tier III while a corner is cut.
-                if (packs.ContainsKey(zone) || buildings.BaseTierOf(zone) != 3)
-                    continue;
                 if (!buildings.TryGetZoneCentre(zone, out Vector3 tower))
                     continue;
                 packs[zone] = Build(zone, tower);

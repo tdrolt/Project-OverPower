@@ -103,14 +103,14 @@ namespace Overpower.EditorTools
             foreach (LaneRect wall in layout.Walls)
             {
                 // The H stands in the Blocks group (a Portal crosses it, like the triangle's middle wall); the outer walls stay boundary walls.
-                GameObject go = ArenaPrimitiveBuilder.NewPrimitiveChild(DominionLaneLayout.IsBlockWall(wall.name) ? blocks : boundry, wall.name, arenaLayout.WallMaterial, "Building");
+                GameObject go = ArenaPrimitiveBuilder.NewPrimitiveChild(DominionLaneLayout.IsBlockWall(wall.name) ? blocks : boundry, wall.name, arenaLayout.WallMaterial, layout.WallLayerName);
                 Vector3 at = World(arena, wall.centre);
                 go.transform.SetPositionAndRotation(new Vector3(at.x, wallCentreY, at.z), Quaternion.identity);
                 go.transform.localScale = new Vector3(wall.size.x, wallHeight, wall.size.y);
             }
             for (int i = 0; i < layout.Boxes.Count; i++)
             {
-                GameObject go = ArenaPrimitiveBuilder.NewPrimitiveChild(blocks, "Box " + (i + 1), arenaLayout.BlockMaterial, "Building");
+                GameObject go = ArenaPrimitiveBuilder.NewPrimitiveChild(blocks, "Box " + (i + 1), arenaLayout.BlockMaterial, layout.WallLayerName);
                 Vector3 at = World(arena, layout.Boxes[i]);
                 go.transform.SetPositionAndRotation(new Vector3(at.x, layout.BoxHeightMetres * 0.5f, at.z), Quaternion.identity);
                 go.transform.localScale = new Vector3(layout.BoxSizeMetres, layout.BoxHeightMetres, layout.BoxSizeMetres);
@@ -119,7 +119,7 @@ namespace Overpower.EditorTools
             {
                 GameObject go = ArenaPrimitiveBuilder.NewPrimitiveChild(barriers, barrier.name, arenaLayout.BarrierMaterial, ArenaLayers.BarrierLayerName);
                 Vector3 at = World(arena, barrier.centre);
-                const float lookHeight = 1f; // waist high, as the triangle's barriers
+                float lookHeight = layout.BarrierHeightMetres; // waist high, as the triangle's barriers (set in the layout asset)
                 var position = new Vector3(at.x, lookHeight * 0.5f, at.z);
                 go.transform.SetPositionAndRotation(position, Quaternion.identity);
                 go.transform.localScale = new Vector3(barrier.size.x, lookHeight, barrier.size.y);
@@ -158,24 +158,28 @@ namespace Overpower.EditorTools
 
         // ------------------------------------------------------------------------------------------------ towers
 
-        private static readonly (int zone, string[] names, int tier)[] Plan =
+        private const int SpawnTowerTier = 1; // a capital (the respawn zone that cannot be captured)
+
+        // The two zones' tier comes from the layout asset (ZoneTier), the spawn towers are capitals.
+        public static (int zone, string[] names, int tier)[] PlanFor(DominionLaneLayout layout) => new[]
         {
-            (TopZone, new[] { "Zone Top", "House_05 (12)" }, 3),
-            (BottomZone, new[] { "Zone Bottom", "House_05 (18)" }, 3),
-            (WhiteSpawnZone, new[] { "Spawn Tower White", "Cathedral_Team0" }, 1),
-            (PurpleSpawnZone, new[] { "Spawn Tower Purple", "Cathedral_Team1" }, 1),
+            (TopZone, new[] { "Zone Top", "House_05 (12)" }, layout.ZoneTier),
+            (BottomZone, new[] { "Zone Bottom", "House_05 (18)" }, layout.ZoneTier),
+            (WhiteSpawnZone, new[] { "Spawn Tower White", "Cathedral_Team0" }, SpawnTowerTier),
+            (PurpleSpawnZone, new[] { "Spawn Tower Purple", "Cathedral_Team1" }, SpawnTowerTier),
         };
         private static readonly string[] NewNames = { "Zone Top", "Zone Bottom", "Spawn Tower White", "Spawn Tower Purple" };
 
         private static List<string> PlaceTowers(Scene scene, ArenaSymmetry arena, DominionLaneLayout layout)
         {
             var report = new List<string>();
+            var plan = PlanFor(layout);
             BuildingCapture[] all = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<BuildingCapture>(true)).ToArray();
             var keep = new BuildingCapture[4];
-            for (int i = 0; i < Plan.Length; i++)
+            for (int i = 0; i < plan.Length; i++)
             {
-                keep[i] = all.FirstOrDefault(t => Plan[i].names.Contains(t.name));
-                if (keep[i] == null) { report.Add($"PROBLEM: no tower called {string.Join(" / ", Plan[i].names)}."); return report; }
+                keep[i] = all.FirstOrDefault(t => plan[i].names.Contains(t.name));
+                if (keep[i] == null) { report.Add($"PROBLEM: no tower called {string.Join(" / ", plan[i].names)}."); return report; }
             }
 
             // Remove the others, and their flag carpets.
@@ -200,13 +204,13 @@ namespace Overpower.EditorTools
                 Vector3 target = World(arena, centres[i]);
                 tower.transform.position = new Vector3(target.x, tower.transform.position.y, target.z);
                 tower.gameObject.name = NewNames[i];
-                tower.buildingID = Plan[i].zone;
-                tower.tier = Plan[i].tier;
+                tower.buildingID = plan[i].zone;
+                tower.tier = plan[i].tier;
                 if (tower.flagRenderer != null) tower.flagRenderer.transform.position = tower.transform.position + carpetOffset;
                 ScaleBody(tower, i < 2 ? layout.ZoneTowerSizeMetres : layout.SpawnTowerSizeMetres, report);
                 RecordIfPrefab(tower.transform); RecordIfPrefab(tower.gameObject); RecordIfPrefab(tower);
                 if (tower.flagRenderer != null) RecordIfPrefab(tower.flagRenderer.transform);
-                report.Add($"zone {Plan[i].zone} = {NewNames[i]} tier {Plan[i].tier} at lane {centres[i]}");
+                report.Add($"zone {plan[i].zone} = {NewNames[i]} tier {plan[i].tier} at lane {centres[i]}");
             }
             return report;
         }
@@ -268,7 +272,7 @@ namespace Overpower.EditorTools
                                                           Quaternion.Euler(0f, yaw, 0f));
                 }
                 // Dominion never uses the "capital under attack" spawn; it stands next to the normal one so the array stays whole.
-                Vector2 beside = spawn.spawnPoint + new Vector2(0f, 2f);
+                Vector2 beside = spawn.spawnPoint + new Vector2(0f, layout.UnusedUnderAttackOffsetMetres);
                 attacked.SetPositionAndRotation(World(arena, beside), Quaternion.Euler(0f, yaw, 0f));
                 attacked.gameObject.name = "Spawn " + colour + " (unused under attack)";
                 keepers.Add(normal); keepers.Add(attacked);
@@ -358,7 +362,7 @@ namespace Overpower.EditorTools
             float width = max.x - min.x + 2f * margin;
             float depth = max.y - min.y + 2f * margin;
             var centre = (min + max) * 0.5f;
-            const int pixels = 1024;
+            int pixels = layout.MinimapPixels;
 
             string full = Path.Combine(Directory.GetParent(Application.dataPath).FullName, MinimapImagePath);
             File.WriteAllBytes(full, TopDownRender.RenderPng(centre, width, depth, pixels));

@@ -43,6 +43,11 @@ namespace Overpower.Dominion
         /// <summary>Does this room have health packs? 2v2 has none (the spec); 3v3v3 keeps them, and so does every Conquest room.</summary>
         public static bool HasHealthPacks(bool dominion, int teamCount) => !(dominion && teamCount == 2);
 
+        /// <summary>May the health packs be built right now? Not while the room's mode is still unknown (the catalogue is not reachable yet, e.g. in the
+        /// first frames of a new scene): a 2v2 room would get packs that then have to be taken away. Once the mode is known: HasHealthPacks.</summary>
+        public static bool MayBuildHealthPacks(bool modeKnown, bool dominion, int teamCount) =>
+            modeKnown && HasHealthPacks(dominion, teamCount);
+
         /// <summary>Do Dominion's own match rules (the fixed respawn wait, the spawn healing) apply right now? Only in a Dominion room once the match
         /// is live: the warm-up stays the free sandbox it is in Conquest (default A22).</summary>
         public static bool RulesApply(bool dominionRoom, bool matchLive) => dominionRoom && matchLive;

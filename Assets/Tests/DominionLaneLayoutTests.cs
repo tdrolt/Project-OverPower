@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor;
@@ -222,6 +223,50 @@ namespace Overpower.Tests
             Vector2 half = layout.FloorSize * 0.5f;
             foreach (LaneRect wall in layout.Walls)
                 Assert.IsTrue(wall.Max.x <= half.x && wall.Min.x >= -half.x && wall.Max.y <= half.y && wall.Min.y >= -half.y, wall.name);
+            for (int i = 0; i < layout.Boxes.Count; i++)
+            {
+                LaneRect box = layout.BoxRect(i);
+                Assert.IsTrue(box.Max.x <= half.x && box.Min.x >= -half.x && box.Max.y <= half.y && box.Min.y >= -half.y, box.name);
+            }
+        }
+
+        [Test] public void TheAnchorsAreTheBoardsOwnNumbersSoAMirroredPixelTypoIsCaught()
+        {
+            // Read straight off the board (12 px to the metre, middle (550, 342)): the pocket end walls' inner faces at x = (87 - 550) / 12, the spawn towers
+            // at x = (178 - 550) / 12, the hall's top wall's inner face at z = -(155 - 342) / 12. A pixel typed on the wrong side of the middle moves these.
+            DominionLaneLayout layout = Layout();
+            float maxX = 0f, maxZ = 0f;
+            foreach (Vector2 p in layout.Outline) { maxX = Mathf.Max(maxX, Mathf.Abs(p.x)); maxZ = Mathf.Max(maxZ, Mathf.Abs(p.y)); }
+            Assert.AreEqual(38.58f, maxX, Tolerance, "pocket inner faces");
+            Assert.AreEqual(15.58f, maxZ, Tolerance, "hall top inner face (the pocket walls' inner faces are at 10.08)");
+            foreach (LaneSpawn spawn in layout.Spawns) Assert.AreEqual(31f, Mathf.Abs(spawn.towerCentre.x), Tolerance, "spawn tower of team " + spawn.team);
+            Assert.AreEqual(-31f, layout.Spawns.First(s => s.team == 1).towerCentre.x, Tolerance, "Purple is the left pocket");
+            Assert.AreEqual(31f, layout.Spawns.First(s => s.team == 0).towerCentre.x, Tolerance, "White is the right pocket");
+        }
+
+        [Test] public void TheBuildersMeasuresLiveInTheLayoutNotInTheBuilder()
+        {
+            DominionLaneLayout layout = Layout();
+            Assert.Greater(layout.BarrierHeightMetres, 0f);
+            Assert.Greater(layout.UnusedUnderAttackOffsetMetres, 0f);
+            Assert.GreaterOrEqual(layout.MinimapPixels, 256);
+            Assert.IsFalse(string.IsNullOrEmpty(layout.WallLayerName));
+            Assert.AreNotEqual(-1, LayerMask.NameToLayer(layout.WallLayerName), "the layer exists");
+        }
+
+        [Test] public void TheBuildersPlanGivesTheZonesTheLayoutsTierAndTheSpawnTowersTierOne()
+        {
+            var layout = ScriptableObject.CreateInstance<DominionLaneLayout>();
+            try
+            {
+                typeof(DominionLaneLayout).GetField("zoneTier", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(layout, 2);
+                var plan = Overpower.EditorTools.DominionLaneBuilder.PlanFor(layout);
+                Assert.AreEqual(2, plan[Overpower.EditorTools.DominionLaneBuilder.TopZone].tier, "a different tier in the asset reaches the zones");
+                Assert.AreEqual(2, plan[Overpower.EditorTools.DominionLaneBuilder.BottomZone].tier);
+                Assert.AreEqual(1, plan[Overpower.EditorTools.DominionLaneBuilder.WhiteSpawnZone].tier, "a spawn tower is a capital whatever the zones are");
+                Assert.AreEqual(1, plan[Overpower.EditorTools.DominionLaneBuilder.PurpleSpawnZone].tier);
+            }
+            finally { Object.DestroyImmediate(layout); }
         }
 
         [Test] public void EverySpawnAndBoxIsInsideThePlayableOutline()

@@ -1,3 +1,4 @@
+#if UNITY_EDITOR || DEVELOPMENT_BUILD // a check tool: it must not ship in a player's build
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -118,3 +119,4 @@ namespace Overpower.Dominion
         }
     }
 }
+#endif

@@ -12,6 +12,19 @@ namespace Overpower.Match
         public const int RequestIdIndex = 2;
         public const int ValueLength = 3;
 
+        /// <summary>Which zones get a pack built now: none while packs are not wanted (or the room's mode is not known yet), otherwise every zone of
+        /// the pack tier that has none yet. The manager builds exactly this list, so there is no inline branch left to get backwards.</summary>
+        public static System.Collections.Generic.List<int> ZonesToBuild(bool packsWanted, int zoneCount, int packTier,
+                                                                         System.Func<int, int> baseTierOf, System.Func<int, bool> hasPack)
+        {
+            var zones = new System.Collections.Generic.List<int>();
+            if (!packsWanted) return zones;
+            for (int zone = 0; zone < zoneCount; zone++)
+                if (baseTierOf(zone) == packTier && !hasPack(zone))
+                    zones.Add(zone);
+            return zones;
+        }
+
         /// <summary>The master's answer to one request: whether it is granted, and if so the value to write.</summary>
         public readonly struct Decision
         {

@@ -59,15 +59,39 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Vision.TeamSight), "Awake", resolve));
         }
 
-        [Test] public void TheHealthPackManagerAsksTheTestedRuleBeforeBuildingPacks() =>
-            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Match.HealthPackManager), "EnsurePacks", typeof(DominionRules).GetMethod(nameof(DominionRules.HasHealthPacks))));
+        // ---- health packs: nothing is built while the room's mode is unknown (Task 11 review, item 2)
 
-        [Test] public void ScenesThatAreNotTheLaneAreNotChangedByTheNewSceneComponent()
+        [Test] public void NoHealthPacksAreBuiltWhileTheModeIsStillUnknown()
         {
-            // the config component only does anything when a scene carries one: the lookup returns the fallback for null
-            var prefab = ScriptableObject.CreateInstance<MinimapConfig>();
-            try { Assert.AreSame(prefab, SceneMinimapConfig.Choose(null, prefab)); }
-            finally { Object.DestroyImmediate(prefab); }
+            Assert.IsFalse(DominionRules.MayBuildHealthPacks(modeKnown: false, dominion: false, teamCount: 0), "the catalogue is not there yet: wait");
+            Assert.IsFalse(DominionRules.MayBuildHealthPacks(modeKnown: false, dominion: false, teamCount: 3), "even if the team count looks like Conquest");
+        }
+
+        [Test] public void OnceTheModeIsKnownThePacksFollowTheModeRule()
+        {
+            Assert.IsFalse(DominionRules.MayBuildHealthPacks(modeKnown: true, dominion: true, teamCount: 2), "2v2 Dominion: none");
+            Assert.IsTrue(DominionRules.MayBuildHealthPacks(modeKnown: true, dominion: true, teamCount: 3));
+            Assert.IsTrue(DominionRules.MayBuildHealthPacks(modeKnown: true, dominion: false, teamCount: 3));
+            Assert.IsTrue(DominionRules.MayBuildHealthPacks(modeKnown: true, dominion: false, teamCount: 2));
+        }
+
+        [Test] public void ThePackListIsEmptyWhenPacksAreNotWantedAndHoldsTheMissingTierThreeZonesWhenTheyAre()
+        {
+            // zones 0..4: tiers 2,3,3,1,4; zone 2 already has its pack
+            System.Func<int, int> tierOf = z => new[] { 2, 3, 3, 1, 4 }[z];
+            System.Func<int, bool> has = z => z == 2;
+            CollectionAssert.IsEmpty(Overpower.Match.HealthPackRules.ZonesToBuild(false, 5, 3, tierOf, has), "not wanted: nothing, however many Tier 3 zones there are");
+            CollectionAssert.AreEqual(new[] { 1 }, Overpower.Match.HealthPackRules.ZonesToBuild(true, 5, 3, tierOf, has));
+            CollectionAssert.AreEqual(new[] { 1, 2 }, Overpower.Match.HealthPackRules.ZonesToBuild(true, 5, 3, tierOf, z => false));
+        }
+
+        [Test] public void TheHealthPackManagerBuildsOnlyTheZonesTheRuleNamesAfterAskingWhetherPacksAreWanted()
+        {
+            // The branching lives in the two rules above (tested by value); this reads that the manager's EnsurePacks calls both and the mode check.
+            System.Type manager = typeof(Overpower.Match.HealthPackManager);
+            Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(DominionRules).GetMethod(nameof(DominionRules.MayBuildHealthPacks))));
+            Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(Overpower.Match.HealthPackRules).GetMethod(nameof(Overpower.Match.HealthPackRules.ZonesToBuild))));
+            Assert.IsTrue(IlWiring.Uses(manager, "EnsurePacks", typeof(DominionMode).GetMethod(nameof(DominionMode.IsKnown))), "the mode check is asked, not assumed");
         }
     }
 }

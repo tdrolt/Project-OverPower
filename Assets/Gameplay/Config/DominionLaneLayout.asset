@@ -117,3 +117,7 @@ MonoBehaviour:
   - {x: -11.583333, y: 10.083333}
   floorSize: {x: 96, y: 56}
   minimapMarginMetres: 4
+  barrierHeightMetres: 1
+  unusedUnderAttackOffsetMetres: 2
+  minimapPixels: 1024
+  wallLayerName: Building

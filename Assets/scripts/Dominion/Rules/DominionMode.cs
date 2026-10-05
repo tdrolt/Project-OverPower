@@ -56,6 +56,15 @@ namespace Overpower.Dominion
             return cachedAnswer;
         }
 
+        /// <summary>True once this client can say which mode its room is: it is in a room and the RoomManager's mode catalogue is reachable. False in the
+        /// first frames of a new scene (the RoomManager is not found yet), when IsActive would wrongly read "not Dominion".</summary>
+        public static bool IsKnown()
+        {
+            if (PhotonNetwork.CurrentRoom == null) return false;
+            if (rooms == null) rooms = UnityEngine.Object.FindFirstObjectByType<RoomManager>();
+            return rooms != null && rooms.ModeCatalogue != null;
+        }
+
         /// <summary>True in a Dominion room once the match is live (DominionRules.RulesApply). The warm-up is false: it stays the free sandbox
         /// (default A22), so the fixed respawn wait and the spawn healing wait for go-live.</summary>
         public static bool IsLive() =>
