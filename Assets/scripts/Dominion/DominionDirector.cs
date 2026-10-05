@@ -5,6 +5,7 @@ using UnityEngine;
 using Overpower.Data;
 using Overpower.Match;
 using Overpower.Net;
+using Overpower.Telemetry;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 namespace Overpower.Dominion
@@ -322,6 +323,7 @@ namespace Overpower.Dominion
             DominionEdge edge = DominionRoomWrites.EdgeBetween(prevRound, prevStage, room.Round, room.Stage);
             bool suddenDeathStart = DominionRoomWrites.IsSuddenDeathStart(prevStage, prevSuddenDeath, room.Stage, room.SuddenDeathMs);
             Debug.Log($"[DOMINION] room: round {room.Round} stage {room.Stage} ends {room.EndMs} sd {room.SuddenDeathMs} sdTeams [{(room.SuddenDeathTeams != null ? string.Join(",", room.SuddenDeathTeams) : "-")}] points [{string.Join(",", room.Points)}] wins [{string.Join(",", room.Wins)}] winner {room.Winner} (edge {edge}{(suddenDeathStart ? ", sudden death start" : "")})");
+            DropRoundMarkers(prevRound, prevStage, prevSuddenDeath, room);
             if (prevStage == DominionStage.None && room.Stage == DominionStage.Break) WarnAboutMissingHealAreas();
             if (suddenDeathStart)
             {
@@ -333,6 +335,19 @@ namespace Overpower.Dominion
             // The zones go back to neutral at the start of the break and again at the start of the round: the master does it from the room's
             // dRz (RunZoneReset), not from seeing this edge, so a master that takes over mid-way finishes it.
             ResetLocalPlayer(edge);
+        }
+
+        /// <summary>The match log's story of the match: round start and end, break, sudden death, match over. Written by the master only, from the
+        /// echo it sees (the same edge every client sees), so each event is in the log once even though the report merges every client's file. The
+        /// notes and the choice of which edge drops what are DominionMarkerNotes.ForEdge (tested).</summary>
+        private void DropRoundMarkers(int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room)
+        {
+            MatchTelemetry telemetry = MatchTelemetry.Instance;
+            if (telemetry == null) return;
+            MatchDirector match = MatchDirector.Instance;
+            int[] teams = match != null && match.TeamsInMatch != null && match.TeamsInMatch.Length > 0 ? match.TeamsInMatch : DominionMode.TeamsOfCurrentRoom();
+            foreach (string note in DominionMarkerNotes.ForEdge(PhotonNetwork.IsMasterClient, prevRound, prevStage, prevSuddenDeathMs, room, teams))
+                telemetry.DropMarker(note);
         }
 
         /// <summary>Master: while the room's stage (a Round or a Break) has not had its zone reset (dRz differs from dEnd), reset the zones and

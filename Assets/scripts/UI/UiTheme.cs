@@ -1671,7 +1671,7 @@ namespace Overpower.UI
         [Tooltip("Written on a mode that cannot be created yet.")]
         public string createComingSoonText = "coming soon";
         [Tooltip("The line under the mode buttons, one per mode family in order (Conquest, Dominion).")]
-        public string[] createFamilyNotes = { "Capture territory for gold, take capitals, be the last team standing.", "A new mode, coming soon." };
+        public string[] createFamilyNotes = { "Capture territory for gold, take capitals, be the last team standing.", "Hold zones to score points over three rounds and out-score the other teams." };
         [Tooltip("The line under the team sizes about another family: {0} is its name, {1} its sizes.")]
         public string createOtherFamilyFormat = "{0} offers {1} here instead.";
         [Tooltip("Written between two sizes in that line.")]

@@ -1,8 +1,11 @@
+using System.Collections.Generic;
 using System.Globalization;
+using System.Text;
 
 namespace Overpower.Dominion
 {
-    /// <summary>The telemetry marker notes of the points, bounties and the centre.</summary>
+    /// <summary>The telemetry marker notes of a Dominion match: the points, bounties and the centre (per tick), and the story round by round (round
+    /// start, round end with the points, break start, sudden death start and replays, match over). Pure strings; the director drops them.</summary>
     public static class DominionMarkerNotes
     {
         private static string N(int v) => v.ToString(CultureInfo.InvariantCulture);
@@ -12,5 +15,68 @@ namespace Overpower.Dominion
         /// <summary>team -1 = nobody was holding the centre.</summary>
         public static string CentrePayout(int team, int points) =>
             team < 0 ? "dominion centre payout nobody" : "dominion centre payout team " + N(team) + " +" + N(points);
+
+        public static string RoundStart(int round) => "dominion round " + N(round) + " start";
+
+        /// <summary>winner -1 = the round was tied (it counts for nobody). The points are listed for the teams of the match only (a missing slot reads 0).</summary>
+        public static string RoundEnd(int round, int winner, int[] teams, int[] points) =>
+            "dominion round " + N(round) + " end " + (winner < 0 ? "tied" : "winner team " + N(winner)) + " points" + PerTeam(teams, points);
+
+        /// <summary>The break that leads to <paramref name="nextRound"/> (the one before round 1 included).</summary>
+        public static string BreakStart(int nextRound) => "dominion break start before round " + N(nextRound);
+
+        public static string SuddenDeathStart(int[] teams) => "dominion sudden death start teams " + TeamList(teams);
+
+        /// <summary>Everyone fell in the same instant: the circle starts over, between these teams.</summary>
+        public static string SuddenDeathReplay(int[] teams) => "dominion sudden death replay teams " + TeamList(teams);
+
+        public static string MatchOver(int winner, int[] teams, int[] wins) =>
+            "dominion match over winner team " + N(winner) + " wins" + PerTeam(teams, wins);
+
+        /// <summary>The markers to drop when the room goes from (prevRound, prevStage, prevSuddenDeathMs) to <paramref name="room"/>, in the order the
+        /// story happened. Only the master drops them (every client sees the same edge, and the report merges every client's file, so one writer keeps
+        /// each event once); <paramref name="teamsInMatch"/> names the teams that count in the lines.</summary>
+        public static List<string> ForEdge(bool isMaster, int prevRound, DominionStage prevStage, int prevSuddenDeathMs, DominionRoomState room, int[] teamsInMatch)
+        {
+            var notes = new List<string>();
+            if (!isMaster) return notes;
+
+            // A round that stopped being a round: scored (its points are still in the room through the break), or cut short by the others leaving.
+            if (prevStage == DominionStage.Round && room.Stage != DominionStage.Round && prevRound >= 1)
+                notes.Add(RoundEnd(prevRound, DominionRules.RoundWinner(room.Points), teamsInMatch, room.Points));
+
+            switch (room.Stage)
+            {
+                case DominionStage.Break:
+                    if (prevStage != DominionStage.Break) notes.Add(BreakStart(room.Round));
+                    break;
+                case DominionStage.Round:
+                    if (prevStage == DominionStage.Break) notes.Add(RoundStart(room.Round));
+                    break;
+                case DominionStage.SuddenDeath:
+                    if (DominionRoomWrites.IsSuddenDeathStart(prevStage, prevSuddenDeathMs, room.Stage, room.SuddenDeathMs))
+                    {
+                        int[] playing = room.SuddenDeathTeams ?? teamsInMatch;
+                        notes.Add(prevStage == DominionStage.SuddenDeath ? SuddenDeathReplay(playing) : SuddenDeathStart(playing));
+                    }
+                    break;
+                case DominionStage.Over:
+                    if (prevStage != DominionStage.Over) notes.Add(MatchOver(room.Winner, teamsInMatch, room.Wins));
+                    break;
+            }
+            return notes;
+        }
+
+        // " team0 120 team1 80": one entry per team of the match; a missing slot reads 0.
+        private static string PerTeam(int[] teams, int[] values)
+        {
+            var sb = new StringBuilder();
+            if (teams == null) return "";
+            foreach (int team in teams)
+                sb.Append(" team").Append(N(team)).Append(' ').Append(N(values != null && team >= 0 && team < values.Length ? values[team] : 0));
+            return sb.ToString();
+        }
+
+        private static string TeamList(int[] teams) => teams == null ? "" : string.Join(",", System.Array.ConvertAll(teams, N));
     }
 }

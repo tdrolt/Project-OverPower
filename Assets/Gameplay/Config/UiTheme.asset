@@ -679,7 +679,7 @@ MonoBehaviour:
   createComingSoonText: coming soon
   createFamilyNotes:
   - Capture territory for gold, take capitals, be the last team standing.
-  - A new mode, coming soon.
+  - Hold zones to score points over three rounds and out-score the other teams.
   createOtherFamilyFormat: '{0} offers {1} here instead.'
   createSizeJoiner: ' and '
   createCancelText: Cancel

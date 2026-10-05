@@ -15,7 +15,6 @@ namespace Overpower.Tests
         private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
         private const string ConquestPath = "Assets/Gameplay/Config/Modes/Conquest 3v3v3.asset";
         private const string Conquest3v3Path = "Assets/Gameplay/Config/Modes/Conquest 3v3.asset";
-        private const string DominionPath = "Assets/Gameplay/Config/Modes/Dominion 3v3v3.asset";
 
         private UiTheme theme;
         private LobbyUiKit kit;
@@ -237,13 +236,17 @@ namespace Overpower.Tests
         [Test]
         public void AModeWithNoInfoCardsSaysSoInsteadOfShowingNothing()
         {
-            var mode = AssetDatabase.LoadAssetAtPath<GameModeDefinition>(DominionPath);
-            Assert.NotNull(mode);
-            Assert.AreEqual(0, mode.InfoCards.Count, "this test needs a mode without cards");
-            ModeInfoPanel panel = NewModeInfo();
-            panel.Show(mode);
-            Assert.AreEqual(0, panel.CardCount);
-            Assert.AreEqual(theme.modeInfoNoCardsText, panel.EmptyText);
+            // Every shipped mode has cards now (Dominion's came in Task 13), so a mode made here stands for "a mode nobody wrote cards for".
+            var mode = ScriptableObject.CreateInstance<GameModeDefinition>();
+            try
+            {
+                Assert.AreEqual(0, mode.InfoCards.Count, "this test needs a mode without cards");
+                ModeInfoPanel panel = NewModeInfo();
+                panel.Show(mode);
+                Assert.AreEqual(0, panel.CardCount);
+                Assert.AreEqual(theme.modeInfoNoCardsText, panel.EmptyText);
+            }
+            finally { Object.DestroyImmediate(mode); }
         }
 
         [Test]
