@@ -19,6 +19,11 @@ namespace Overpower.Dominion
         /// shield would be a free shot, so the first hit on an enemy (damage, stun, slow or push) drops it.</summary>
         public static int EndAfterDamageDealt() => 0;
 
+        /// <summary>A51: the respawn shield only protects a player while they are still in their own spawn (the 2v2 pocket, the 3v3v3 capital circle).
+        /// The first frame its owner stands outside that area the shield drops, so it cannot be carried out into the fight. No shield, nothing to drop;
+        /// a shield already dropped is not raised again by walking back in (only a new respawn raises one).</summary>
+        public static bool DropsOnLeavingSpawn(bool shieldUp, bool inOwnSpawn) => shieldUp && !inOwnSpawn;
+
         /// <summary>True when the owner must write the cleared shield: the shield was started on this client (its write may not have echoed back yet, so the
         /// property can still read as nothing while the room holds the end time), or the property still holds something other than the cleared value.</summary>
         public static bool MustWriteClear(bool startedHere, int propertyEndMs) => startedHere || propertyEndMs != EndAfterDamageDealt();

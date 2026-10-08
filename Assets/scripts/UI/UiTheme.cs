@@ -1141,6 +1141,22 @@ namespace Overpower.UI
         [Tooltip("Size of the circle countdown line.")]
         public float dominionShrinkSize = 27f;
 
+        [Header("Dominion HUD: score bars (bottom-right corner, during a round and overtime)")]
+        [Tooltip("How long each team's score bar is, not counting the little box with its number in front of it.")]
+        public float dominionScoreBarWidth = 255f;
+        [Tooltip("How tall each team's score bar is.")]
+        public float dominionScoreBarHeight = 33f;
+        [Tooltip("The gap between one team's score bar and the next.")]
+        public float dominionScoreBarGap = 9f;
+        [Tooltip("The width of the little box in front of each bar that holds the team's points as a number.")]
+        public float dominionScoreBarNumberWidth = 75f;
+        [Tooltip("The size of the points number in that box. Small, so it never fights the round bar at the top.")]
+        public float dominionScoreBarNumberSize = 24f;
+        [Tooltip("How far above the gold readout (which sits over the Loadout (P) button) the score bars start, so the two never touch.")]
+        public float dominionScoreBarsAboveGold = 12f;
+        [Tooltip("The dark colour behind each score bar and behind its number. The team's colour fills it from the left.")]
+        public Color dominionScoreBarTrackColor = new Color(0.059f, 0.063f, 0.078f, 0.75f);
+
         [Header("Dominion HUD: sudden-death banner")]
         [Tooltip("How far the banner sits below the top edge of the screen (under the round bar).")]
         public float dominionBannerTop = 175f;

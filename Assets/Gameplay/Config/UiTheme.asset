@@ -407,6 +407,13 @@ MonoBehaviour:
   dominionCentreNobodyText: Nobody holds it
   dominionShrinkFormat: "CIRCLE SHRINKS \xB7 {0}"
   dominionShrinkSize: 27
+  dominionScoreBarWidth: 255
+  dominionScoreBarHeight: 33
+  dominionScoreBarGap: 9
+  dominionScoreBarNumberWidth: 75
+  dominionScoreBarNumberSize: 24
+  dominionScoreBarsAboveGold: 12
+  dominionScoreBarTrackColor: {r: 0.059, g: 0.063, b: 0.078, a: 0.75}
   dominionBannerTop: 175
   dominionBannerSeconds: 8
   dominionBannerWidth: 900

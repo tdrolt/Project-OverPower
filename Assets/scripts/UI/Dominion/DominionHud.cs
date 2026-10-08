@@ -17,6 +17,7 @@ namespace Overpower.UI
     ///  - RoundHud: the round bar at the top centre during a round and sudden death;
     ///  - BreakCard: the card between rounds, plus the big last-seconds countdown;
     ///  - CentrePayoutLabel: the centre countdown under the minimap (3v3v3);
+    ///  - ScoreBars: one bar per team in the bottom-right corner during a round and overtime (Task 17), spectators included;
     ///  - SuddenDeathOverlay: the banner and the circle countdown under the minimap;
     ///  - DominionResultPanel: the match result, built on request from MatchUI (players) or SpectatorSeatView (spectators).
     /// Nothing here is drawn in Conquest, in the warm-up or on the lobby screens: the whole HUD is hidden until the match is live in a Dominion room.
@@ -37,6 +38,7 @@ namespace Overpower.UI
         private RoundHud round;
         private BreakCard breakCard;
         private CentrePayoutLabel centre;
+        private ScoreBars scoreBars;
         private SuddenDeathOverlay sudden;
         private DominionResultPanel result;
 
@@ -52,6 +54,7 @@ namespace Overpower.UI
         public RoundHud Round => round;
         public BreakCard Break => breakCard;
         public CentrePayoutLabel Centre => centre;
+        public ScoreBars Bars => scoreBars;
         public SuddenDeathOverlay Sudden => sudden;
         public DominionResultPanel Result => result;
 
@@ -67,6 +70,7 @@ namespace Overpower.UI
             round?.Destroy();
             breakCard?.Destroy();
             centre?.Destroy();
+            scoreBars?.Destroy();
             sudden?.Destroy();
             result?.Destroy();
             kit?.Dispose();
@@ -104,6 +108,9 @@ namespace Overpower.UI
 
             int now = PhotonNetwork.ServerTimestamp;
             string[] names = theme.scoreboardTeamNames;
+            // The score bars follow the stage rule alone: a round or its overtime shows them, every other stage (the break, sudden death, the result) hides them.
+            if (DominionScoreBarRules.ShownIn(state.Stage)) scoreBars.Refresh(teams, state.Points);
+            else scoreBars.SetVisible(false);
             switch (state.Stage)
             {
                 case DominionStage.Round:
@@ -191,6 +198,7 @@ namespace Overpower.UI
             round?.SetVisible(false);
             breakCard?.SetVisible(false);
             centre?.SetVisible(false);
+            scoreBars?.SetVisible(false);
             sudden?.Hide();
         }
 
@@ -246,6 +254,7 @@ namespace Overpower.UI
             round = new RoundHud(kit, canvas.transform);
             breakCard = new BreakCard(kit, canvas.transform);
             centre = new CentrePayoutLabel(kit, canvas.transform);
+            scoreBars = new ScoreBars(kit, canvas.transform);
             sudden = new SuddenDeathOverlay(kit, canvas.transform);
             result = new DominionResultPanel(kit, resultCanvas.transform);
             return true;

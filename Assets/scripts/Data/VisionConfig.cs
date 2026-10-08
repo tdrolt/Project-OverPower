@@ -66,16 +66,16 @@ namespace Overpower.Data
         [Tooltip("How fast the scan wave spreads out from the centre, in metres per second. Faster means zones refresh sooner after a scan starts.")]
         [SerializeField, Min(1f)] private float scanWaveSpeed = 40f;
 
-        [Tooltip("The colour of the scan wave as it crosses the arena.")]
-        [SerializeField] private Color scanWaveColour = new Color(0.898f, 0.282f, 0.302f, 1f);
+        [Tooltip("The colour of the scan wave as it crosses the arena, on the ground and on the minimap ring, and of the scan countdown. It is yellow (the jersey-barrier yellow of the UI theme) so it never reads as an enemy. The enemy dots the scan leaves on the minimap have their own colour, Minimap Enemy Colour.")]
+        [SerializeField] private Color scanWaveColour = new Color(0.91f, 0.725f, 0.192f, 1f);
 
-        [Tooltip("How thick the red ring on the ground is, in metres. Thicker is easier to see from the top-down camera.")]
+        [Tooltip("How thick the wave ring on the ground is, in metres. Thicker is easier to see from the top-down camera.")]
         [SerializeField, Min(0.1f)] private float scanWaveWidth = 1.5f;
 
         [Tooltip("How many seconds the dots the scan reveals stay on the minimap. Longer keeps enemy positions visible for longer.")]
         [SerializeField, Min(0f)] private float scanDotSeconds = 4f;
 
-        [Tooltip("How long the scan's red dots take to fade out at the end of Scan Dot Seconds.")]
+        [Tooltip("How long the scan's enemy dots take to fade out at the end of Scan Dot Seconds.")]
         [SerializeField, Min(0f)] private float scanDotFadeSeconds = 1f;
 
         [Tooltip("Zones of this tier get their state refreshed by the centre scan.")]

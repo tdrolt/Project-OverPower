@@ -4,7 +4,8 @@ using UnityEngine;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// The red wave on the ground (Tudor 2026-10-01: "everyone sees the red wave roll out from the centre"): a flat ring
+    /// The wave on the ground (Tudor 2026-10-01: "everyone sees the red wave roll out from the centre"; yellow since 8 Oct, so it never reads as an
+    /// enemy - Scan Wave Colour; the enemy dots it leaves on the minimap keep Minimap Enemy Colour): a flat ring
     /// that grows from the centre tower at the wave speed, the same size on every screen at the same moment because
     /// CentreScan works it out from the server clock. A LineRenderer lying flat just above the floor, in a material from the
     /// transparent queue: the fog pass runs before the transparents, so the ring is drawn over the fog and stays bright

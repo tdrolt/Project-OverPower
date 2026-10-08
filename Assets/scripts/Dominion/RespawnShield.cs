@@ -22,6 +22,10 @@ namespace Overpower.Dominion
     /// simulation of it); a cast that hits nobody does not, and neither does an effect set up before the respawn (A26). Zones read the same
     /// property (IsUpFor) and ignore the player. Conquest never writes dShd.
     ///
+    /// Task 17 (A51): the shield also drops the first frame its owner stands outside their own spawn - the 2v2 pocket (the team's SpawnHealArea) or
+    /// the 3v3v3 capital circle, the same place the spawn heals - by the same clear (dShd and dShs to 0). A shield that dropped stays dropped when the
+    /// owner walks back in; only a new respawn raises one.
+    ///
     /// No RPC: the state is two Player Properties, so late joiners and rejoiners read it like any other player value.
     /// </summary>
     [DisallowMultipleComponent]
@@ -33,6 +37,7 @@ namespace Overpower.Dominion
 
         private PlayerLifecycle lifecycle;
         private PlayerHealth health;
+        private Rigidbody body;
 
         private GameObject bubble;
         private Material bubbleMaterial;
@@ -41,6 +46,8 @@ namespace Overpower.Dominion
 
         private bool diedBefore;          // owner: this body has died since it spawned, so its next AliveChanged(true) is a respawn
         private ShieldJudge judge;        // owner: the per-hit judgement and the dBlk stamp spacing
+        private ShieldSpawnWatch spawnWatch; // owner: drops the shield on the first frame outside the player's own spawn (A51)
+        private bool leftSpawnDropSent;   // owner: the leave-spawn drop is written and its echo may not be back yet, so it is not written again every frame
         private int stampSeen;            // every client: the dBlk value already popped
         private bool stampPrimed;         // the first read only takes the value in: a joiner never pops an old stamp
 
@@ -48,9 +55,14 @@ namespace Overpower.Dominion
         {
             lifecycle = GetComponent<PlayerLifecycle>();
             health = GetComponent<PlayerHealth>();
+            body = GetComponent<Rigidbody>();
             // Subscribed in Awake, not Start: PlayerLifecycle's own Start can already raise AliveChanged (AbilityRunner does the same).
             if (lifecycle != null) lifecycle.AliveChanged += HandleAliveChanged;
             judge = new ShieldJudge(() => IsUp, () => PhotonNetwork.ServerTimestamp, PopupMs, WriteBlockedStamp);
+            spawnWatch = new ShieldSpawnWatch(
+                () => IsUp && !leftSpawnDropSent,
+                () => SpawnHealArea.InOwnSpawn(health != null ? health.TeamId : -1, BodyPosition()),
+                () => { leftSpawnDropSent = true; ClearShield(); Debug.Log("[DOMINION] respawn shield ended: this player left their spawn"); });
         }
 
         private void OnEnable() => CombatEvents.LocalEnemyAffected += HandleEnemyAffected;
@@ -125,6 +137,10 @@ namespace Overpower.Dominion
             if (start) StartShield();
         }
 
+        /// <summary>Where the owner's body is for the spawn check: the Rigidbody's position, which a respawn teleport sets at once, rather than the transform,
+        /// which can still read the death spot for a physics step after it (a shield must never drop on arrival).</summary>
+        private Vector3 BodyPosition() => body != null ? body.position : transform.position;
+
         private void StartShield()
         {
             DominionConfig config = DominionMode.Config();
@@ -133,6 +149,7 @@ namespace Overpower.Dominion
             int end = RespawnShieldRules.EndMs(now, config.ShieldSeconds);
             // Start and end together in one write: A26 judges an old effect from the start, so nobody subtracts their own Shield Seconds from the end.
             ownEndMs = end; // up on this client at once, not a round trip later
+            leftSpawnDropSent = false; // a new shield may drop again when it leaves the spawn
             PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
             Debug.Log($"[DOMINION] respawn shield up for {config.ShieldSeconds:0.#} s (ends {end})");
         }
@@ -217,6 +234,8 @@ namespace Overpower.Dominion
         private void Update()
         {
             if (photonView == null || photonView.Owner == null) return;
+
+            if (photonView.IsMine && (lifecycle == null || lifecycle.IsAlive)) spawnWatch.Tick();
 
             bool wanted = IsUp && (lifecycle == null || lifecycle.IsAlive);
             if (wanted && bubble == null) BuildBubble();

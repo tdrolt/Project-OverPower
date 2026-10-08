@@ -11,7 +11,7 @@ using UnityEngine;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// The centre scan in the game (Tudor 2026-10-01, Vision Tasks 11 and 16). A red wave rolls out from the centre on a
+    /// The centre scan in the game (Tudor 2026-10-01, Vision Tasks 11 and 16). A wave (yellow since 8 Oct, Scan Wave Colour) rolls out from the centre on a
     /// fixed clock, every Scan Interval Seconds, whoever holds the centre (the first one an interval after the match goes
     /// live; in the warm-up on whole multiples of the interval on the server clock); everyone sees it on the ground and
     /// everyone sees the countdown to the next one above the tower. The team that holds the centre at the moment a wave
