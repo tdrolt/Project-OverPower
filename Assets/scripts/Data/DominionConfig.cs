@@ -32,6 +32,13 @@ namespace Overpower.Data
         [Tooltip("The last seconds of the break that read Round N starts in ... as a countdown.")]
         [SerializeField, Min(0f)] private float breakCountdownSeconds = 5f;
 
+        [Header("Overtime")]
+        [Tooltip("The extra time, in seconds, a close round gets when the clock runs out. Only the teams that were close at the buzzer play it. If nobody pulls ahead by the lead before it ends, every team still in it gets a round win. 0 turns overtime off: the team with the most points simply wins the round, and a tie counts for nobody.")]
+        [SerializeField, Min(0f)] private float overtimeSeconds = 60f;
+
+        [Tooltip("How many points ahead a team must be to win a round. At the buzzer, a team this far ahead of every other team wins the round; if not, the teams less than this far behind the leader play overtime, and there the first team this far ahead of the other overtime teams wins the round at once. A team this far behind at the buzzer is out of the round.")]
+        [SerializeField, Min(1)] private int overtimeLeadPoints = 200;
+
         [Header("Points")]
         [Tooltip("Points per second a team earns for each zone of that tier it holds. The four entries are Tier 1 (capitals), Tier 2, Tier 3 and Tier 4 (the centre), in that order. " +
                  "Capitals and spawns, and the centre, never pay per second whatever is typed here (the rule enforces it); in 2v2 the two zones are Tier 3.")]
@@ -117,6 +124,8 @@ namespace Overpower.Data
         public float RoundSeconds => roundSeconds;
         public float BreakSeconds => breakSeconds;
         public float BreakCountdownSeconds => breakCountdownSeconds;
+        public float OvertimeSeconds => overtimeSeconds;
+        public int OvertimeLeadPoints => overtimeLeadPoints;
 
         /// <summary>The wait before sudden death starts and the earliest a fall can count: the same countdown the break ends with. One place for the mapping, so the
         /// director's flow numbers and the arrival stamp always agree.</summary>

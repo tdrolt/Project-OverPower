@@ -29,6 +29,8 @@ namespace Overpower.Dominion
         public int[] History;
         /// <summary>dHistW: the winning team of each finished round (-1 = none), one per dHist round; null in a room from before it existed.</summary>
         public int[] HistoryWinners;
+        /// <summary>dOtT: the teams playing the current overtime; null = none written (not in overtime).</summary>
+        public int[] OvertimeTeams;
 
         /// <summary>The state from the room's properties. Missing keys read as: no round, stage None, no points or wins (arrays of three zeros),
         /// no winner (-1). A wrong type reads as missing.</summary>
@@ -54,6 +56,7 @@ namespace Overpower.Dominion
             if (props.TryGetValue(DominionKeys.SuddenDeathTeams, out object sdt) && sdt is int[] sdTeams) state.SuddenDeathTeams = sdTeams;
             if (props.TryGetValue(DominionKeys.History, out object hist) && hist is int[] h) state.History = h;
             if (props.TryGetValue(DominionKeys.HistoryWinners, out object histW) && histW is int[] hw) state.HistoryWinners = hw;
+            if (props.TryGetValue(DominionKeys.OvertimeTeams, out object ot) && ot is int[] otTeams) state.OvertimeTeams = otTeams;
             return state;
         }
     }
@@ -65,6 +68,10 @@ namespace Overpower.Dominion
         public int MaxRounds;
         public float RoundSeconds;
         public float BreakSeconds;
+        /// <summary>Seconds of overtime after a close round (DominionConfig Overtime Seconds); 0 with the lead below = no overtime.</summary>
+        public float OvertimeSeconds;
+        /// <summary>The lead in points that decides a round at the buzzer and ends an overtime (DominionConfig Overtime Lead Points).</summary>
+        public int OvertimeLeadPoints;
         /// <summary>True when this match has a centre that pays lumps (3v3v3 on a map with a Tier 4 zone): a round start then writes dCtr.</summary>
         public bool HasCentre;
         public int CentreFirstMs;
@@ -142,16 +149,26 @@ namespace Overpower.Dominion
                 };
                 // A round cut short by the others leaving is a row of the result table too (default A34): its points so far go into the history in
                 // this write. In a break the round just played is already there; in sudden death every round is.
-                if (room.Stage == DominionStage.Round)
+                if (DominionRules.IsRoundPlay(room.Stage))
                 {
                     over[DominionKeys.History] = DominionHistory.Append(room.History, room.Points);
                     // Nobody won that round (A49): the wins above are the ones already counted, so the table must not bold the points leader.
                     over[DominionKeys.HistoryWinners] = DominionHistory.AppendWinner(room.HistoryWinners, DominionHistory.CutShort);
                 }
+                ClearOvertime(over, room);
                 return Stage(room, "last team standing", over);
             }
 
             if (room.Stage == DominionStage.SuddenDeath) return NextInSuddenDeath(room, nowMs, cfg, teamsInMatch, suddenDeath); // no clock: the players end it
+
+            // Overtime ends the moment a team is a lead ahead of the other overtime teams, however much of the minute is left. Judged on the points
+            // the master has written (room.Points), and the write expects the dPseq they were built on, exactly as the buzzer's does.
+            int[] overtimeTeams = room.Stage == DominionStage.Overtime ? OvertimeTeamsOf(room, teamsInMatch) : null;
+            if (overtimeTeams != null)
+            {
+                int leader = DominionRules.OvertimeLeader(room.Points, overtimeTeams, cfg.OvertimeLeadPoints);
+                if (leader >= 0) return ScoreRound(room, nowMs, cfg, teamsInMatch, new[] { leader });
+            }
             if (!MatchStartRules.HasReached(nowMs, room.EndMs)) return null;
 
             if (room.Stage == DominionStage.Break)
@@ -166,19 +183,54 @@ namespace Overpower.Dominion
                 return start;
             }
 
-            // A round ended: score it, then break, match over or sudden death.
-            int[] wins = Slots(room.Wins);
-            int roundWinner = DominionRules.RoundWinner(room.Points);
-            if (roundWinner >= 0 && roundWinner < wins.Length) wins[roundWinner]++;
+            // The clock ran out. A round: a team a lead ahead has won it, otherwise the close teams play overtime. An overtime: its minute is up, so a
+            // team with the lead wins and else every team still in it shares the round.
+            int[] winners;
+            if (room.Stage == DominionStage.Overtime)
+                winners = DominionRules.AtOvertimeEnd(room.Points, overtimeTeams, cfg.OvertimeLeadPoints);
+            else
+            {
+                DominionRules.BuzzerResult buzzer = DominionRules.AtBuzzer(room.Points, teamsInMatch, cfg.OvertimeLeadPoints,
+                    DominionRules.OvertimeOn(cfg.OvertimeSeconds, cfg.OvertimeLeadPoints));
+                if (buzzer.OvertimeTeams != null)
+                    return Stage(room, WhatOvertimeStart, new Hashtable
+                    {
+                        { DominionKeys.Stage, (int)DominionStage.Overtime },
+                        { DominionKeys.StageEnd, DominionRules.StageEndMs(nowMs, cfg.OvertimeSeconds) },
+                        { DominionKeys.OvertimeTeams, buzzer.OvertimeTeams },
+                    }, scoresRound: true); // built on the points the buzzer saw: a points write in between refuses it and the next try judges again
+                winners = buzzer.Winners;
+            }
+            return ScoreRound(room, nowMs, cfg, teamsInMatch, winners);
+        }
+
+        /// <summary>What the write that starts an overtime is called (DominionWrite.What).</summary>
+        public const string WhatOvertimeStart = "overtime start";
+
+        /// <summary>The teams playing the room's overtime: the stored dOtT, else (a room without it) every team of the match.</summary>
+        private static int[] OvertimeTeamsOf(DominionRoomState room, int[] teamsInMatch) =>
+            room.OvertimeTeams != null && room.OvertimeTeams.Length > 0 ? room.OvertimeTeams : teamsInMatch;
+
+        /// <summary>A write that leaves overtime takes the overtime's team list out of the room (null removes the key).</summary>
+        private static void ClearOvertime(Hashtable props, DominionRoomState room)
+        {
+            if (room.Stage == DominionStage.Overtime) props[DominionKeys.OvertimeTeams] = null;
+        }
+
+        /// <summary>A round is over with these winners (one, several for a shared round, or none): score it, then break, match over or sudden death.</summary>
+        private static DominionWrite ScoreRound(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, int[] roundWinners)
+        {
+            int[] wins = DominionRules.WinsAfterRound(room.Wins, roundWinners);
             // The round's final points go into the history in the same write (dPts is cleared at the next round's start): the result table needs them.
             int[] history = DominionHistory.Append(room.History, room.Points);
-            // Its winner is kept beside the points (-1 for a tie), so the table bolds who the wins counted.
-            int[] historyWinners = DominionHistory.AppendWinner(room.HistoryWinners, roundWinner);
+            // Its winners are kept beside the points (-1 for a tie, a shared entry for an overtime that ran out), so the table bolds who the wins counted.
+            int[] historyWinners = DominionHistory.AppendWinner(room.HistoryWinners, DominionHistory.EncodeWinners(roundWinners));
             RoundOutcome outcome = DominionRules.AfterRound(room.Round, wins, cfg.RoundsToWin, cfg.MaxRounds, teamsInMatch);
+            DominionWrite write;
             switch (outcome.Next)
             {
                 case DominionStage.Over:
-                    return Stage(room, "match won", new Hashtable
+                    write = Stage(room, "match won", new Hashtable
                     {
                         { DominionKeys.Stage, (int)DominionStage.Over },
                         { DominionKeys.Winner, outcome.Winner },
@@ -186,8 +238,9 @@ namespace Overpower.Dominion
                         { DominionKeys.History, history },
                         { DominionKeys.HistoryWinners, historyWinners },
                     }, scoresRound: true);
+                    break;
                 case DominionStage.SuddenDeath:
-                    return Stage(room, "sudden death", new Hashtable
+                    write = Stage(room, "sudden death", new Hashtable
                     {
                         { DominionKeys.Stage, (int)DominionStage.SuddenDeath },
                         { DominionKeys.StageEnd, 0 },
@@ -198,8 +251,9 @@ namespace Overpower.Dominion
                         { DominionKeys.History, history },
                         { DominionKeys.HistoryWinners, historyWinners },
                     }, scoresRound: true);
+                    break;
                 default:
-                    return Stage(room, "round over, break", new Hashtable
+                    write = Stage(room, "round over, break", new Hashtable
                     {
                         { DominionKeys.Round, room.Round + 1 },
                         { DominionKeys.Stage, (int)DominionStage.Break },
@@ -209,7 +263,10 @@ namespace Overpower.Dominion
                         { DominionKeys.HistoryWinners, historyWinners },
                         { DominionKeys.CentrePayout, null }, // null removes the key: the round's last payout time is stale in the break (the next round start writes a fresh one)
                     }, scoresRound: true);
+                    break;
             }
+            ClearOvertime(write.Props, room);
+            return write;
         }
 
         /// <summary>What a sudden-death write is called (DominionWrite.What) - the director settles on these.</summary>
@@ -264,7 +321,7 @@ namespace Overpower.Dominion
         /// <summary>True when the zones still have to be reset for the stage the room is in: a Round or a Break whose dEnd is not the one dRz
         /// names. Any master asks this, so a master that took over mid-way finishes the reset the old one never did.</summary>
         public static bool ZoneResetDue(DominionRoomState room) =>
-            room.HasRound && (room.Stage == DominionStage.Round || room.Stage == DominionStage.Break) && room.ResetFor != room.EndMs;
+            room.HasRound && (room.Stage == DominionStage.Round || room.Stage == DominionStage.Break) && room.ResetFor != room.EndMs; // never for Overtime: it carries on in the round's zones
 
         /// <summary>The write that records the zones were reset for this stage (after the master reset them), expecting the stage it saw.</summary>
         public static DominionWrite ZonesResetDone(DominionRoomState room) =>
@@ -346,7 +403,7 @@ namespace Overpower.Dominion
         /// nothing (going live already did the fresh start), and nothing else is an edge.</summary>
         public static DominionEdge EdgeBetween(int prevRound, DominionStage prevStage, int round, DominionStage stage)
         {
-            if (stage == DominionStage.Break && prevStage == DominionStage.Round) return DominionEdge.BreakStarted;
+            if (stage == DominionStage.Break && DominionRules.IsRoundPlay(prevStage)) return DominionEdge.BreakStarted; // a round, or the overtime after it
             if (stage == DominionStage.Round && prevStage == DominionStage.Break) return DominionEdge.RoundStarted;
             return DominionEdge.None;
         }

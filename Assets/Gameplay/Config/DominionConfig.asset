@@ -17,6 +17,8 @@ MonoBehaviour:
   roundSeconds: 180
   breakSeconds: 20
   breakCountdownSeconds: 5
+  overtimeSeconds: 60
+  overtimeLeadPoints: 200
   pointsPerZonePerSecond: 00000000050000000500000000000000
   centrePayoutPoints: 200
   centrePayoutIntervalSeconds: 30

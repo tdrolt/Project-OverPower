@@ -22,6 +22,13 @@ namespace Overpower.Dominion
         public static string RoundEnd(int round, int winner, int[] teams, int[] points) =>
             "dominion round " + N(round) + " end " + (winner < 0 ? "tied" : "winner team " + N(winner)) + " points" + PerTeam(teams, points);
 
+        /// <summary>The round's clock ran out within the lead: these teams play the extra minute.</summary>
+        public static string OvertimeStart(int round, int[] teams) => "dominion round " + N(round) + " overtime start teams " + TeamList(teams);
+
+        /// <summary>An overtime ran out with nobody a lead ahead: every team in sharedTeams got a round win. The points are listed for the match's teams.</summary>
+        public static string RoundEndShared(int round, int[] sharedTeams, int[] teams, int[] points) =>
+            "dominion round " + N(round) + " end shared teams " + TeamList(sharedTeams) + " points" + PerTeam(teams, points);
+
         /// <summary>A round that ended without being scored: the others left and the last team standing took the match, so no team's wins went up.</summary>
         public static string RoundCutShort(int round, int[] teams, int[] points) =>
             "dominion round " + N(round) + " end cut short points" + PerTeam(teams, points);
@@ -57,10 +64,11 @@ namespace Overpower.Dominion
             // A round that stopped being a round: scored (its points are still in the room through the break) or cut short by the others leaving.
             // The master's own record of the round (dHistW) says which, the same record the result table bolds from. A room without the record
             // (from before it existed) is read from the wins: whose went up won it, a scored round where nobody's did was tied, an Over where nobody's did was cut short.
-            if (prevStage == DominionStage.Round && room.Stage != DominionStage.Round && prevRound >= 1)
+            if (DominionRules.IsRoundPlay(prevStage) && !DominionRules.IsRoundPlay(room.Stage) && prevRound >= 1)
             {
                 int recorded = room.HistoryWinners != null && prevRound - 1 < room.HistoryWinners.Length ? room.HistoryWinners[prevRound - 1] : int.MinValue;
-                if (recorded >= 0) notes.Add(RoundEnd(prevRound, recorded, teamsInMatch, room.Points));
+                if (recorded >= DominionHistory.SharedFlag) notes.Add(RoundEndShared(prevRound, DominionHistory.DecodeWinners(recorded), teamsInMatch, room.Points));
+                else if (recorded >= 0) notes.Add(RoundEnd(prevRound, recorded, teamsInMatch, room.Points));
                 else if (recorded == DominionHistory.CutShort) notes.Add(RoundCutShort(prevRound, teamsInMatch, room.Points));
                 else if (recorded == -1) notes.Add(RoundEnd(prevRound, -1, teamsInMatch, room.Points));
                 else
@@ -79,6 +87,9 @@ namespace Overpower.Dominion
                     break;
                 case DominionStage.Round:
                     if (prevStage == DominionStage.Break) notes.Add(RoundStart(room.Round));
+                    break;
+                case DominionStage.Overtime:
+                    if (prevStage == DominionStage.Round) notes.Add(OvertimeStart(room.Round, room.OvertimeTeams ?? teamsInMatch));
                     break;
                 case DominionStage.SuddenDeath:
                     if (DominionRoomWrites.IsSuddenDeathStart(prevStage, prevSuddenDeathMs, room.Stage, room.SuddenDeathMs))

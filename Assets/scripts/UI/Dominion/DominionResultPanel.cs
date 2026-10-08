@@ -87,7 +87,7 @@ namespace Overpower.UI
                 Cell(row.transform, name, kit.Bold, size, Pick(theme.dominionTeamTextColors, team), theme.dominionResultNameWidth, rowHeight, TextAlignmentOptions.MidlineLeft);
                 for (int r = 0; r < rounds; r++)
                 {
-                    bool won = DominionHistory.WinnerOfRound(history, historyWinners, r) == team; // a tied or cut-short round has no winner, so no cell is bold
+                    bool won = System.Array.IndexOf(DominionHistory.WinnersOfRound(history, historyWinners, r), team) >= 0; // every winner of a shared round is bold; a tied or cut-short round has none
                     string points = DominionHistory.PointsOf(history, r, team).ToString(System.Globalization.CultureInfo.InvariantCulture);
                     cells.Add(won ? "*" + points + "*" : points);
                     Cell(row.transform, points, won ? kit.Bold : kit.Body, size, theme.lobbyOffWhiteColor, theme.dominionResultCellWidth, rowHeight, TextAlignmentOptions.Midline);

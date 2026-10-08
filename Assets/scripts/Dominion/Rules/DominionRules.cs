@@ -15,6 +15,8 @@ namespace Overpower.Dominion
         Round = 2,
         SuddenDeath = 3,
         Over = 4,
+        /// <summary>The extra minute after a close round (Tudor A50). Appended: the numbers above are already in rooms.</summary>
+        Overtime = 5,
     }
 
     /// <summary>What happens after a round has been scored. Winner is the match winner when Next is Over, else -1; SuddenDeathTeams is the
@@ -76,13 +78,114 @@ namespace Overpower.Dominion
             return tied ? -1 : best;
         }
 
-        /// <summary>The first team with at least roundsToWin round wins, else -1.</summary>
+
+        // ---------------------------------------------------------------- overtime (Tudor A50)
+
+        /// <summary>What the round's clock running out decides: either the winners (one team, or none when overtime is off and the top is tied) or the
+        /// teams that play overtime. Exactly one of the two is set.</summary>
+        public struct BuzzerResult
+        {
+            public int[] Winners;
+            public int[] OvertimeTeams;
+        }
+
+        /// <summary>Overtime exists only with both some time and a lead to reach: 0 seconds (or no lead) turns it off.</summary>
+        public static bool OvertimeOn(float seconds, int leadPoints) => seconds > 0f && leadPoints > 0;
+
+        /// <summary>Does the room's stage play for points: a round, or the overtime after it (zones, bounties and the centre keep paying there).</summary>
+        public static bool IsRoundPlay(DominionStage stage) => stage == DominionStage.Round || stage == DominionStage.Overtime;
+
+        /// <summary>The teams that play overtime: every team of the match less than <paramref name="leadPoints"/> behind the top at the buzzer
+        /// (a team exactly a lead behind is out). One team alone means it is a lead ahead of everyone and has simply won. A 0-0 buzzer is within the lead,
+        /// so every team plays. Only the match's teams count (a 2v2 room keeps team 2's slot at 0).</summary>
+        public static int[] OvertimeTeams(int[] points, int[] teamsInMatch, int leadPoints)
+        {
+            var result = new List<int>();
+            if (teamsInMatch == null || teamsInMatch.Length == 0) return result.ToArray();
+            int lead = Math.Max(1, leadPoints);
+            int top = int.MinValue;
+            foreach (int t in teamsInMatch) top = Math.Max(top, PointsOf(points, t));
+            foreach (int t in teamsInMatch)
+                if (top - PointsOf(points, t) < lead) result.Add(t);
+            result.Sort();
+            return result.ToArray();
+        }
+
+        /// <summary>The overtime team that is <paramref name="leadPoints"/> or more ahead of every OTHER overtime team, or -1. A team outside overtime
+        /// neither wins here nor stops anyone from winning: it was a lead behind at the buzzer and is out of the round.</summary>
+        public static int OvertimeLeader(int[] points, int[] overtimeTeams, int leadPoints)
+        {
+            if (overtimeTeams == null || overtimeTeams.Length < 2) return -1;
+            int lead = Math.Max(1, leadPoints);
+            foreach (int candidate in overtimeTeams)
+            {
+                bool ahead = true;
+                foreach (int other in overtimeTeams)
+                    if (other != candidate && PointsOf(points, candidate) - PointsOf(points, other) < lead) { ahead = false; break; }
+                if (ahead) return candidate;
+            }
+            return -1;
+        }
+
+        /// <summary>The clock ran out on a round: a team a lead ahead of every other team wins it; otherwise the teams within the lead play overtime.
+        /// With overtime off the old rule applies: the single top team wins, a tie for first counts for nobody (empty winners).</summary>
+        public static BuzzerResult AtBuzzer(int[] points, int[] teamsInMatch, int leadPoints, bool overtimeOn)
+        {
+            if (!overtimeOn)
+            {
+                int winner = RoundWinner(points);
+                return new BuzzerResult { Winners = winner >= 0 ? new[] { winner } : new int[0] };
+            }
+            int[] close = OvertimeTeams(points, teamsInMatch, leadPoints);
+            return close.Length == 1 ? new BuzzerResult { Winners = close } : new BuzzerResult { OvertimeTeams = close };
+        }
+
+        /// <summary>The overtime's minute ran out: a team that has the lead at the final points wins, else every team still in overtime shares the round.</summary>
+        public static int[] AtOvertimeEnd(int[] points, int[] overtimeTeams, int leadPoints)
+        {
+            int leader = OvertimeLeader(points, overtimeTeams, leadPoints);
+            if (leader >= 0) return new[] { leader };
+            if (overtimeTeams == null) return new int[0];
+            int[] shared = (int[])overtimeTeams.Clone();
+            Array.Sort(shared);
+            return shared;
+        }
+
+        /// <summary>The round wins after a round: a copy of <paramref name="wins"/> with one more for each round winner (a shared round has several).</summary>
+        public static int[] WinsAfterRound(int[] wins, int[] roundWinners)
+        {
+            var result = new int[Math.Max(DominionKeys.TeamSlots, wins != null ? wins.Length : 0)];
+            if (wins != null) Array.Copy(wins, result, wins.Length);
+            if (roundWinners != null)
+                foreach (int team in roundWinners)
+                    if (team >= 0 && team < result.Length) result[team]++;
+            return result;
+        }
+
+        private static int PointsOf(int[] points, int team) => points != null && team >= 0 && team < points.Length ? points[team] : 0;
+
+        /// <summary>The team with at least roundsToWin round wins, else -1. Two or more teams there together (a shared round can do it) have no single
+        /// winner: that is sudden death between them (AfterRound), so this says -1 for it too.</summary>
         public static int MatchWinner(int[] wins, int roundsToWin)
         {
             if (wins == null) return -1;
+            int found = -1;
             for (int i = 0; i < wins.Length; i++)
-                if (wins[i] >= roundsToWin) return i;
-            return -1;
+            {
+                if (wins[i] < roundsToWin) continue;
+                if (found >= 0) return -1;
+                found = i;
+            }
+            return found;
+        }
+
+        /// <summary>True when two or more teams stand at roundsToWin round wins at once (e.g. 2-2 after two shared rounds).</summary>
+        public static bool SeveralReachedTheTarget(int[] wins, int roundsToWin)
+        {
+            if (wins == null) return false;
+            int count = 0;
+            foreach (int w in wins) if (w >= roundsToWin) count++;
+            return count >= 2;
         }
 
         /// <summary>The teams in the match tied for the most round wins, lowest first (2v2 1-1: both; 3v3v3 1-1-1: all three; 1-1-0: the two).
@@ -108,7 +211,7 @@ namespace Overpower.Dominion
         private static int WinsOf(int[] wins, int team) => team >= 0 && team < wins.Length ? wins[team] : 0;
 
         /// <summary>What comes after round <paramref name="round"/> (1-based), with <paramref name="wins"/> already counting that round.
-        /// Someone on roundsToWin: Over, they win (so round 3 is not played after 2-0). Rounds left: a Break. After the last round with
+        /// Someone alone on roundsToWin: Over, they win (so round 3 is not played after 2-0); two or more there together: sudden death between them. Rounds left: a Break. After the last round with
         /// nobody there: the teams tied for the most round wins go to sudden death - but a single leader on round wins (say 1-0-0 after two
         /// tied rounds) simply wins the match (Tudor A7): sudden death is only for teams that are level.</summary>
         public static RoundOutcome AfterRound(int round, int[] wins, int roundsToWin, int maxRounds, int[] teamsInMatch)
@@ -116,6 +219,9 @@ namespace Overpower.Dominion
             int winner = MatchWinner(wins, roundsToWin);
             if (winner >= 0)
                 return new RoundOutcome { Next = DominionStage.Over, Winner = winner };
+            // Two or more at the target together (shared rounds): nobody has won the match, so those teams - level at the top - play sudden death.
+            if (SeveralReachedTheTarget(wins, roundsToWin))
+                return new RoundOutcome { Next = DominionStage.SuddenDeath, Winner = -1, SuddenDeathTeams = SuddenDeathTeams(wins, teamsInMatch) };
             if (round < maxRounds)
                 return new RoundOutcome { Next = DominionStage.Break, Winner = -1 };
             int[] level = SuddenDeathTeams(wins, teamsInMatch);

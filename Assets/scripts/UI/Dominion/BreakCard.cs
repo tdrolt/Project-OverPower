@@ -37,7 +37,7 @@ namespace Overpower.UI
         private bool drawn;
         private int drawnRound;
         private bool drawnFirstBreak, drawnCanPick;
-        private int[] drawnPoints = System.Array.Empty<int>(), drawnWins = System.Array.Empty<int>();
+        private int[] drawnPoints = System.Array.Empty<int>(), drawnWins = System.Array.Empty<int>(), drawnWinners = System.Array.Empty<int>();
         private bool countdownDrawn;
         private int drawnSeconds, drawnCountdownRound, drawnBigFrom;
 
@@ -63,8 +63,9 @@ namespace Overpower.UI
         }
 
         /// <summary>One frame of the card. round is the round the break leads to; points are the finished round's final points (the room keeps
-        /// them through the break); firstBreak is the break before round 1; canPick is true for a player with a body (a spectator has no shop).</summary>
-        public void Refresh(int[] teams, int round, bool firstBreak, int[] points, int[] wins, int secondsLeft, int bigFromSeconds,
+        /// them through the break); winners are the teams the room recorded as winning it (one, or several for a shared round, none for a tie); firstBreak is the
+        /// break before round 1; canPick is true for a player with a body (a spectator has no shop).</summary>
+        public void Refresh(int[] teams, int round, bool firstBreak, int[] points, int[] winners, int[] wins, int secondsLeft, int bigFromSeconds,
                             int[] depthByRound, int[] armorByRound, string[] teamNames, bool canPick, System.Action onPick)
         {
             if (teams == null || teams.Length < 2) { SetVisible(false); return; }
@@ -73,17 +74,22 @@ namespace Overpower.UI
             SetVisible(true);
 
             if (!drawn || round != drawnRound || firstBreak != drawnFirstBreak || canPick != drawnCanPick
-                || !SameInts(points, drawnPoints) || !SameInts(wins, drawnWins))
+                || !SameInts(points, drawnPoints) || !SameInts(wins, drawnWins) || !SameInts(winners, drawnWinners))
             {
                 drawn = true;
                 drawnRound = round; drawnFirstBreak = firstBreak; drawnCanPick = canPick;
                 drawnPoints = points != null ? (int[])points.Clone() : System.Array.Empty<int>();
                 drawnWins = wins != null ? (int[])wins.Clone() : System.Array.Empty<int>();
+                drawnWinners = winners != null ? (int[])winners.Clone() : System.Array.Empty<int>();
 
                 int finished = Mathf.Max(1, round - 1);
-                int winner = firstBreak ? -1 : DominionRules.RoundWinner(points);
+                // The room's record of who won the round decides the words (a shared round names every winner), never the points leader.
+                bool shared = !firstBreak && winners != null && winners.Length >= 2;
+                int winner = firstBreak || shared || winners == null || winners.Length == 0 ? -1 : winners[0];
                 header.text = string.Format(System.Globalization.CultureInfo.InvariantCulture, theme.dominionBreakHeaderFormat, firstBreak ? round : finished);
-                headline.text = firstBreak ? theme.dominionBreakFirstText : DominionHudText.BreakHeadline(winner, teamNames, theme.dominionBreakWinsFormat, theme.dominionBreakTiedText);
+                headline.text = firstBreak ? theme.dominionBreakFirstText
+                    : shared ? DominionHudText.BreakHeadlineShared(winners, teamNames, theme.dominionBreakSharedFormat, theme.dominionBreakNamesSeparator)
+                    : DominionHudText.BreakHeadline(winner, teamNames, theme.dominionBreakWinsFormat, theme.dominionBreakTiedText);
                 headline.color = firstBreak || winner < 0 ? theme.lobbyOffWhiteColor : TextColour(winner);
                 pointsRow.SetActive(!firstBreak);
                 for (int i = 0; i < teams.Length; i++)

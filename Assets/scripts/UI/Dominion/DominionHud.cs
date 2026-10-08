@@ -41,6 +41,7 @@ namespace Overpower.UI
         private DominionResultPanel result;
 
         private DominionRoomState state;
+        private int[] finishedWinners = Array.Empty<int>(); // who won the round the break follows, as the room recorded it (read when the room changes, not every frame)
         private DominionRoomState previous;
         private bool haveState;
         private bool dirty = true;
@@ -106,13 +107,15 @@ namespace Overpower.UI
             switch (state.Stage)
             {
                 case DominionStage.Round:
-                    round.Refresh(teams, state.Round, config.MaxRounds, DominionHudText.SecondsLeft(state.EndMs, now), false, state.Points, state.Wins, config.RoundsToWin, names);
+                case DominionStage.Overtime: // the same bar, its heading says OVERTIME and the clock is the overtime's own minute
+                    round.Refresh(teams, state.Round, config.MaxRounds, DominionHudText.SecondsLeft(state.EndMs, now), false, state.Stage == DominionStage.Overtime,
+                        state.Points, state.Wins, config.RoundsToWin, names);
                     breakCard.SetVisible(false);
                     sudden.Hide();
                     RefreshCentre(config, now, names);
                     break;
                 case DominionStage.SuddenDeath:
-                    round.Refresh(teams, state.Round, config.MaxRounds, 0, true, state.Points, state.Wins, config.RoundsToWin, names);
+                    round.Refresh(teams, state.Round, config.MaxRounds, 0, true, false, state.Points, state.Wins, config.RoundsToWin, names);
                     breakCard.SetVisible(false);
                     centre.SetVisible(false);
                     RefreshSudden(now);
@@ -122,7 +125,7 @@ namespace Overpower.UI
                     centre.SetVisible(false);
                     sudden.Hide();
                     breakCard.SetDotsToWin(config.RoundsToWin);
-                    breakCard.Refresh(teams, state.Round, state.Round <= 1, state.Points, state.Wins, DominionHudText.SecondsLeft(state.EndMs, now),
+                    breakCard.Refresh(teams, state.Round, state.Round <= 1, state.Points, finishedWinners, state.Wins, DominionHudText.SecondsLeft(state.EndMs, now),
                         Mathf.RoundToInt(config.BreakCountdownSeconds), config.WeaponDepthByRound, config.ArmorUpgradesByRound, names,
                         Teams.TryGetPlayingTeam(PhotonNetwork.LocalPlayer, out _), OpenTheShop);
                     break;
@@ -137,6 +140,7 @@ namespace Overpower.UI
             previous = state;
             bool hadPrevious = haveState;
             state = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
+            finishedWinners = DominionHistory.WinnersOfRound(state.History, state.HistoryWinners, state.Round - 2); // the break after round N names round N's winners (0-based N-1 = Round-2)
             haveState = true;
             dirty = false;
             if (teamsRoom != PhotonNetwork.CurrentRoom)

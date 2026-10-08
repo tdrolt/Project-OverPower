@@ -56,6 +56,16 @@ namespace Overpower.Dominion
         public static string BreakHeadline(int winner, string[] teamNames, string winsFormat, string tiedText) =>
             winner < 0 ? tiedText : Fmt(winsFormat, LobbyRoomRules.TeamName(teamNames, winner).ToUpperInvariant());
 
+        /// <summary>The big line of the break card after a shared round (an overtime that ran out): "SHARED · WHITE + PURPLE". Every winner's name in capitals,
+        /// joined by the separator, inside the format.</summary>
+        public static string BreakHeadlineShared(int[] winners, string[] teamNames, string sharedFormat, string namesSeparator)
+        {
+            var names = new List<string>();
+            if (winners != null)
+                foreach (int team in winners) names.Add(LobbyRoomRules.TeamName(teamNames, team).ToUpperInvariant());
+            return Fmt(sharedFormat, string.Join(namesSeparator ?? " + ", names));
+        }
+
         /// <summary>What the break's last line says. Until the last bigFromSeconds seconds it is the small card line ("ROUND 2 STARTS IN 14",
         /// big = false); from then on it is the big centre line ("Round 2 starts in 5…", big = true). {0} = the round, {1} = the seconds left.</summary>
         public static string BreakCountdown(string smallFormat, string bigFormat, int round, int secondsLeft, int bigFromSeconds, out bool big)
@@ -202,7 +212,35 @@ namespace Overpower.Dominion
         /// round that was scored is -1 instead, so the match log can tell the two apart.</summary>
         public const int CutShort = -2;
 
-        /// <summary>The winners list with one more round (a team id, -1 for a tied round, CutShort for a cut-short one). Never edits the input.</summary>
+        /// <summary>A dHistW entry at or above this is a SHARED round (Tudor A50: an overtime that ran out): the flag plus a bit per winning team (bit n = team n).
+        /// Below it the entry is the old one: a team id, -1 for a tied round, CutShort for a cut-short one, so a room written before overtime reads as it did.</summary>
+        public const int SharedFlag = 8;
+
+        /// <summary>The dHistW entry for a round's winners: none = -1 (tied), one = its team id (as before), several = SharedFlag plus a bit per team.</summary>
+        public static int EncodeWinners(int[] winners)
+        {
+            if (winners == null || winners.Length == 0) return -1;
+            if (winners.Length == 1) return winners[0];
+            int mask = 0;
+            foreach (int team in winners)
+                if (team >= 0 && team < DominionKeys.TeamSlots) mask |= 1 << team;
+            return SharedFlag | mask;
+        }
+
+        /// <summary>The teams a dHistW entry names, lowest first: a shared entry's teams, a team id's one team, nobody for a tie (-1) or a cut-short round.</summary>
+        public static int[] DecodeWinners(int entry)
+        {
+            var teams = new List<int>();
+            if (entry >= SharedFlag)
+            {
+                for (int team = 0; team < DominionKeys.TeamSlots; team++)
+                    if ((entry & (1 << team)) != 0) teams.Add(team);
+            }
+            else if (entry >= 0) teams.Add(entry);
+            return teams.ToArray();
+        }
+
+        /// <summary>The winners list with one more round (an EncodeWinners entry, or CutShort for a cut-short round). Never edits the input.</summary>
         public static int[] AppendWinner(int[] winners, int winner)
         {
             int old = winners != null ? winners.Length : 0;
@@ -223,12 +261,13 @@ namespace Overpower.Dominion
             return index < history.Length ? history[index] : 0;
         }
 
-        /// <summary>The team that won a round (0-based) as the room recorded it (dHistW); -1 when the round had none (tied, or cut short). A room with no
-        /// recorded winner for that round (from before dHistW) falls back to the points leader.</summary>
-        public static int WinnerOfRound(int[] history, int[] winners, int round)
+        /// <summary>The teams that won a round (0-based) as the room recorded it (dHistW): one, several for a shared round, none for a tied or cut-short one.
+        /// A room with no recorded entry for that round (from before dHistW) falls back to the points leader.</summary>
+        public static int[] WinnersOfRound(int[] history, int[] winners, int round)
         {
-            if (winners != null && round >= 0 && round < winners.Length) return Math.Max(-1, winners[round]); // CutShort bolds nobody, like a tie
-            return WinnerOfRound(history, round);
+            if (winners != null && round >= 0 && round < winners.Length) return DecodeWinners(winners[round]);
+            int leader = WinnerOfRound(history, round);
+            return leader >= 0 ? new[] { leader } : new int[0];
         }
 
         /// <summary>The team that won a round (0-based) on its points, or -1 for a tied round (nobody gets bold in the table).</summary>

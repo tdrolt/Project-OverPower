@@ -25,7 +25,7 @@ MonoBehaviour:
   lobbyModeValue: 3
   infoCards:
   - title: Rounds
-    text: "Three rounds against the clock. The team with the most points when time runs out wins the round; win two rounds to win the match."
+    text: "Three rounds against the clock. The team with the most points when time runs out wins the round. If the top teams finish close, they play a short overtime: the first to pull well ahead wins the round, and if nobody does, each of them gets it. Win two rounds, or lead on round wins after the third, to win the match."
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Zones and points
     text: "Every zone your team holds, apart from the centre, earns points every second. Your spawn heals you, but it can't be captured and earns nothing."
@@ -40,8 +40,8 @@ MonoBehaviour:
     text: "Every round starts from scratch. In the break before it you pick your gear for free. Round one is the pistol only, round two opens the weapon families and an armor upgrade, and round three opens the weapon upgrades and a second armor upgrade."
     accent: {r: 0.9098039, g: 0.7254902, b: 0.19215687, a: 1}
   - title: Respawns
-    text: "You always come back after the same short wait, inside a shield that blocks all damage. It breaks when its time runs out or when you hit an enemy, and you can't capture while it's up."
+    text: "You always come back after the same short wait, inside a shield that blocks all damage, stuns and pushes. It breaks when its time runs out, when you hit an enemy or when you leave your spawn, and you can't capture while it's up."
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Sudden death
-    text: "If nobody has won two rounds after the third, sudden death starts: no respawns, and a shrinking circle hurts anyone outside it. The last team standing wins."
+    text: "If the top teams are level on round wins after the third round, or reach two wins together, sudden death starts: no respawns, and a shrinking circle hurts anyone outside it. The last team standing wins."
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}

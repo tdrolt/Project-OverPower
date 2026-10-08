@@ -60,7 +60,7 @@ namespace Overpower.Dominion
         /// sequence those points were built on (so the round-over write expects it and is refused if a points write in between was).</summary>
         private DominionRoomState WithLatestPoints(DominionRoomState room)
         {
-            if (room.Stage != DominionStage.Round) return room;
+            if (!DominionRules.IsRoundPlay(room.Stage)) return room;
             pointsLedger.Basis(Time.unscaledTime, PointsEchoTimeoutSeconds, room.Points, room.CentreMs, room.PointsSeq, out int[] points, out _, out int seq);
             room.Points = points;
             room.PointsSeq = seq;
@@ -92,7 +92,7 @@ namespace Overpower.Dominion
         private void OnCaptureWritten(int zone, int newOwner, int previousOwner, int previousHeldMs)
         {
             if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient || !DominionMode.IsActive()) return;
-            if (DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties).Stage != DominionStage.Round) return;
+            if (!DominionRules.IsRoundPlay(DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties).Stage)) return;
             DominionConfig config = Config();
             if (config == null || newOwner < 0 || newOwner >= pendingBounty.Length) return;
 
@@ -118,7 +118,7 @@ namespace Overpower.Dominion
             }
 
             DominionRoomState room = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
-            if (room.Stage != DominionStage.Round || room.ResetFor != room.EndMs)
+            if (!DominionPointsRules.PointsRun(room))
             {
                 lastTickMs = 0; // not a round, or the zones are not reset for it yet: no beat, no bounty carried over
                 ClearPendingBounty();

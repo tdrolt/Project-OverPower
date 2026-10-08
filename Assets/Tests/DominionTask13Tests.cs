@@ -183,7 +183,7 @@ namespace Overpower.Tests
             var notes = DominionMarkerNotes.ForEdge(true, 2, DominionStage.Round, 0,
                 Room(2, DominionStage.Over, new[] { 90, 90, 0 }, new[] { 1, 0, 0 }, winner: 0, historyWinners: new[] { 0, DominionHistory.CutShort }), Two, new[] { 1, 0, 0 });
             Assert.AreEqual("dominion round 2 end cut short points team0 90 team1 90", notes[0]);
-            Assert.AreEqual(-1, DominionHistory.WinnerOfRound(new[] { 0, 0, 0, 90, 90, 0 }, new[] { 0, DominionHistory.CutShort }, 1), "and the table bolds nobody for it");
+            Assert.IsEmpty(DominionHistory.WinnersOfRound(new[] { 0, 0, 0, 90, 90, 0 }, new[] { 0, DominionHistory.CutShort }, 1), "and the table bolds nobody for it");
         }
 
         [Test] public void ARecordedWinnerNamesTheRoundsWinner()

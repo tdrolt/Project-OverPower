@@ -296,24 +296,24 @@ namespace Overpower.Tests
         {
             int[] history = { 540, 620, 0, 710, 655, 0 };
             int[] winners = { 1, 0 };
-            Assert.AreEqual(1, DominionHistory.WinnerOfRound(history, winners, 0));
-            Assert.AreEqual(0, DominionHistory.WinnerOfRound(history, winners, 1));
+            CollectionAssert.AreEqual(new[] { 1 }, DominionHistory.WinnersOfRound(history, winners, 0));
+            CollectionAssert.AreEqual(new[] { 0 }, DominionHistory.WinnersOfRound(history, winners, 1));
         }
 
         [Test] public void ATiedRoundAndACutShortRoundBoldNobody()
         {
             int[] history = { 500, 500, 0, 210, 340, 0 };
             int[] winners = { -1, DominionHistory.CutShort };
-            Assert.AreEqual(-1, DominionHistory.WinnerOfRound(history, winners, 0), "tied");
-            Assert.AreEqual(-1, DominionHistory.WinnerOfRound(history, winners, 1), "cut short: purple led on points but won nothing");
+            Assert.IsEmpty(DominionHistory.WinnersOfRound(history, winners, 0), "tied");
+            Assert.IsEmpty(DominionHistory.WinnersOfRound(history, winners, 1), "cut short: purple led on points but won nothing");
         }
 
         [Test] public void ARoomFromBeforeTheWinnersKeyFallsBackToThePointsLeader()
         {
             int[] history = { 540, 620, 0, 500, 500, 0 };
-            Assert.AreEqual(1, DominionHistory.WinnerOfRound(history, null, 0));
-            Assert.AreEqual(-1, DominionHistory.WinnerOfRound(history, null, 1), "a tie stays a tie");
-            Assert.AreEqual(1, DominionHistory.WinnerOfRound(history, new int[0], 0), "a round the list does not reach also falls back");
+            CollectionAssert.AreEqual(new[] { 1 }, DominionHistory.WinnersOfRound(history, null, 0));
+            Assert.IsEmpty(DominionHistory.WinnersOfRound(history, null, 1), "a tie stays a tie");
+            CollectionAssert.AreEqual(new[] { 1 }, DominionHistory.WinnersOfRound(history, new int[0], 0), "a round the list does not reach also falls back");
         }
 
         [Test] public void AppendingAWinnerAddsOneEntryAndLeavesTheOldListAlone()
@@ -397,7 +397,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(card, Text(nameof(DominionHudText.BreakHeadline))));
             Assert.IsTrue(IlWiring.Uses(card, Text(nameof(DominionHudText.BreakCountdown))));
             Assert.IsTrue(IlWiring.Uses(card, Text(nameof(DominionHudText.OpensLine))));
-            Assert.IsTrue(IlWiring.Uses(card, typeof(DominionRules).GetMethod(nameof(DominionRules.RoundWinner))), "the card names the same winner the master scored");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionHud), Hist(nameof(DominionHistory.WinnersOfRound))), "the card is given the winners the master recorded, not the points leader");
         }
 
         [Test] public void TheCentreLabelDrawsTheTestedLines()
@@ -452,8 +452,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Lobby.SpectatorSeatView), show), "a spectator's result");
         }
 
-        private static System.Reflection.MethodInfo HistWinnerOfRound() =>
-            typeof(DominionHistory).GetMethod(nameof(DominionHistory.WinnerOfRound), new[] { typeof(int[]), typeof(int[]), typeof(int) });
+        private static System.Reflection.MethodInfo HistWinnerOfRound() => typeof(DominionHistory).GetMethod(nameof(DominionHistory.WinnersOfRound));
 
         [Test] public void TheResultTableBoldsThroughTheRecordedWinnersAndTheResultReadsThem()
         {

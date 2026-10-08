@@ -349,6 +349,7 @@ MonoBehaviour:
   dominionRoundLabelFormat: ROUND {0} OF {1}
   dominionBarSuddenText: SUDDEN DEATH
   dominionBarSuddenSize: 30
+  dominionBarOvertimeText: OVERTIME
   dominionFlashFormat: +{0} {1}
   dominionFlashSize: 36
   dominionFlashSeconds: 2.5
@@ -376,6 +377,8 @@ MonoBehaviour:
   dominionBreakHeaderFormat: ROUND {0}
   dominionBreakWinsFormat: '{0} WINS'
   dominionBreakTiedText: TIED
+  dominionBreakSharedFormat: "SHARED \xB7 {0}"
+  dominionBreakNamesSeparator: ' + '
   dominionBreakFirstText: GET READY
   dominionBreakPointsLabel: points
   dominionBreakPointsGap: 28
@@ -870,7 +873,7 @@ MonoBehaviour:
   modeInfoAccentHeight: 6
   modeInfoCardTitleSize: 36
   modeInfoCardTextSize: 24
-  modeInfoCardTextMinSize: 17
+  modeInfoCardTextMinSize: 15
   modeInfoFitSlack: 6
   modeInfoCardTextLineSpacing: 20
   lobbyRoomCloseCrossSize: 21

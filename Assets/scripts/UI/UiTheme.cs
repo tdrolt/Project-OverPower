@@ -1022,6 +1022,8 @@ namespace Overpower.UI
         public string dominionBarSuddenText = "SUDDEN DEATH";
         [Tooltip("Size of the words in the clock slot during sudden death.")]
         public float dominionBarSuddenSize = 30f;
+        [Tooltip("What the small heading over the round clock says during overtime, in place of the round number. The clock under it then counts the overtime's own minute down.")]
+        public string dominionBarOvertimeText = "OVERTIME";
         [Tooltip("What flashes by the scores when the centre pays out. {0} = the points, {1} = the team's name in capitals.")]
         public string dominionFlashFormat = "+{0} {1}";
         [Tooltip("Size of the centre payout flash.")]
@@ -1078,6 +1080,10 @@ namespace Overpower.UI
         public string dominionBreakWinsFormat = "{0} WINS";
         [Tooltip("The big line of the break card when the round was tied (nobody gets a round win).")]
         public string dominionBreakTiedText = "TIED";
+        [Tooltip("The big line of the break card when an overtime ran out and the round was shared. {0} = the names of the teams that share it, in capitals, joined by the Names Separator.")]
+        public string dominionBreakSharedFormat = "SHARED · {0}";
+        [Tooltip("What sits between the team names on the break card when a round is shared (WHITE + PURPLE).")]
+        public string dominionBreakNamesSeparator = " + ";
         [Tooltip("The big line of the break before round 1, when there is no result yet.")]
         public string dominionBreakFirstText = "GET READY";
         [Tooltip("The word between the two teams' points on the break card.")]
@@ -2059,7 +2065,7 @@ namespace Overpower.UI
         [Tooltip("Largest text size of a card's text, in reference pixels. A mode with a lot to say takes a smaller size so every card fits, all cards at the same size.")]
         public float modeInfoCardTextSize = 24f;
         [Tooltip("Smallest text size a card's text may shrink to, in reference pixels.")]
-        public float modeInfoCardTextMinSize = 17f;
+        public float modeInfoCardTextMinSize = 15f;
         [Tooltip("Extra height kept free in every row of cards when working out whether the text fits, in reference pixels.")]
         public float modeInfoFitSlack = 6f;
         [Tooltip("Extra space between the lines of a card's text, as a percentage of the text size.")]

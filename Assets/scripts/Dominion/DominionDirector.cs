@@ -169,6 +169,7 @@ namespace Overpower.Dominion
                 {
                     RoundsToWin = config.RoundsToWin, MaxRounds = config.MaxRounds,
                     RoundSeconds = config.RoundSeconds, BreakSeconds = config.BreakSeconds,
+                    OvertimeSeconds = config.OvertimeSeconds, OvertimeLeadPoints = config.OvertimeLeadPoints,
                     HasCentre = CentreInPlay(out _),
                     CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
                     CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),

@@ -69,6 +69,12 @@ namespace Overpower.Dominion
         public static int BountyPoints(int lastHeldMs, int holdMs, int lastOwner, int newOwner, int bountyPoints) =>
             bountyPoints > 0 && DominionRules.BountyDue(lastHeldMs, holdMs, lastOwner, newOwner) ? bountyPoints : 0;
 
+        /// <summary>Do points, bounties and the centre accrue in the room's stage right now? In a Round once the zones were reset for it (dRz = dEnd:
+        /// a zone taken in the break never pays), and in Overtime (Tudor A50: zones, bounties and the centre keep paying; the zones are not reset for
+        /// it, so dRz still names the round's end). Everything else (break, sudden death, over) pays nothing.</summary>
+        public static bool PointsRun(DominionRoomState room) =>
+            room.HasRound && (room.Stage == DominionStage.Overtime || (room.Stage == DominionStage.Round && room.ResetFor == room.EndMs));
+
         /// <summary>What the master writes now, if anything. Nothing outside a Round, or before the zones were reset for this round (dRz = dEnd:
         /// so a zone taken in the break never pays). Once the round's time is up only one thing is still paid: a centre payout that fell due at
         /// or before the end (Tudor's A18: the buzzer payout counts), to whoever holds the centre at that moment. A write carries dPts and/or
@@ -78,8 +84,7 @@ namespace Overpower.Dominion
         {
             var plan = new DominionTickPlan();
             DominionRoomState room = i.Room;
-            if (!room.HasRound || room.Stage != DominionStage.Round) return plan;
-            if (room.ResetFor != room.EndMs) return plan;
+            if (!PointsRun(room)) return plan;
             // The buzzer: the clock stops, but a centre payout that was due by the end is still owed (the stage writer scores the round
             // from the points this write leaves).
             bool buzzer = room.EndMs != 0 && MatchStartRules.HasReached(i.NowMs, room.EndMs);

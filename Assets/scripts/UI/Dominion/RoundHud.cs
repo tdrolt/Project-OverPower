@@ -36,7 +36,7 @@ namespace Overpower.UI
         // The whole numbers the labels were last built from: compared every frame, so a label's words are only formatted when one moved.
         private bool roundDrawn, clockDrawn;
         private int drawnRoundNumber, drawnMaxRounds, drawnClockSeconds;
-        private bool shownSudden;
+        private bool shownSudden, shownOvertime;
 
         /// <summary>The words the round label and the clock slot show now. Recorders and wiring tests read them.</summary>
         public string RoundText => roundLabel != null ? roundLabel.text : "";
@@ -63,18 +63,20 @@ namespace Overpower.UI
             if (root != null && root.gameObject.activeSelf != visible) root.gameObject.SetActive(visible);
         }
 
-        /// <summary>One frame of the bar. teams are the match's team ids in order (2 or 3); clockSeconds is the round clock (ignored in sudden death).</summary>
-        public void Refresh(int[] teams, int round, int maxRounds, int clockSeconds, bool suddenDeath, int[] points, int[] wins, int winsToWin, string[] teamNames)
+        /// <summary>One frame of the bar. teams are the match's team ids in order (2 or 3); clockSeconds is the round clock (ignored in sudden death), or the
+        /// overtime's own clock when overtime is on: the small heading then says OVERTIME instead of the round.</summary>
+        public void Refresh(int[] teams, int round, int maxRounds, int clockSeconds, bool suddenDeath, bool overtime, int[] points, int[] wins, int winsToWin, string[] teamNames)
         {
             if (teams == null || teams.Length < 2) { SetVisible(false); return; }
             dotCountCache = Mathf.Clamp(winsToWin, 1, 5);
             if (root == null || builtTeamCount != teams.Length || blocks.Count == 0 || blocks[0].Dots.Length != dotCountCache) Build(teams);
             SetVisible(true);
 
-            if (!roundDrawn || round != drawnRoundNumber || maxRounds != drawnMaxRounds)
+            if (!roundDrawn || round != drawnRoundNumber || maxRounds != drawnMaxRounds || overtime != shownOvertime)
             {
-                roundLabel.text = DominionHudText.RoundLabel(theme.dominionRoundLabelFormat, round, maxRounds);
-                roundDrawn = true; drawnRoundNumber = round; drawnMaxRounds = maxRounds;
+                roundLabel.text = overtime ? theme.dominionBarOvertimeText : DominionHudText.RoundLabel(theme.dominionRoundLabelFormat, round, maxRounds);
+                roundLabel.color = overtime ? theme.dominionGoldColor : theme.dominionMutedColor;
+                roundDrawn = true; drawnRoundNumber = round; drawnMaxRounds = maxRounds; shownOvertime = overtime;
             }
 
             // In sudden death the clock slot says SUDDEN DEATH whatever the seconds are, so only the mode matters there.
@@ -180,6 +182,7 @@ namespace Overpower.UI
             flashRect.sizeDelta = new Vector2(side * 1.5f, theme.dominionFlashSize * 1.5f);
             flashLabel.gameObject.SetActive(false);
             roundDrawn = clockDrawn = false;
+            shownOvertime = false;
             foreach (Block block in blocks) { block.ShownScore = int.MinValue; block.ShownWins = -1; }
         }
 
