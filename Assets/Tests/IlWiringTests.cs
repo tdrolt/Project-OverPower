@@ -15,6 +15,9 @@ namespace Overpower.Tests
             public System.Collections.Generic.IEnumerable<int> CallsItInAnIterator() { Target(); yield return 1; }
             public static void Target() { }
             public bool CallsAnotherAssembly() => string.IsNullOrEmpty("x");
+            public static bool Flag() => true;
+            public void BranchesOnTheAnswer() { if (!Flag()) field = 1; }
+            public void ThrowsTheAnswerAway() { Flag(); field = 2; }
             public int field;
             public void StoresTheField() { field = 3; }
             public int ReadsTheField() => field;
@@ -43,6 +46,14 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Stores(typeof(Probe), nameof(Probe.StoresTheField), field));
             Assert.IsFalse(IlWiring.Stores(typeof(Probe), nameof(Probe.ReadsTheField), field), "a read is not a store");
             Assert.IsFalse(IlWiring.Stores(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), field));
+        }
+
+        [Test] public void ACallWhoseAnswerIsThrownAwayIsNotADecision()
+        {
+            MethodInfo flag = typeof(Probe).GetMethod(nameof(Probe.Flag));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(Probe), nameof(Probe.BranchesOnTheAnswer), flag));
+            Assert.IsFalse(IlWiring.ResultDecidesABranch(typeof(Probe), nameof(Probe.ThrowsTheAnswerAway), flag), "it calls the rule, but nothing follows from the answer");
+            Assert.IsTrue(IlWiring.Uses(typeof(Probe), nameof(Probe.ThrowsTheAnswerAway), flag), "which the plain 'uses' check cannot tell");
         }
 
         [Test] public void CallOffsetsListsEveryCallInOrder()

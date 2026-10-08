@@ -36,8 +36,8 @@ namespace Overpower.Data
         [Tooltip("The extra time, in seconds, a close round gets when the clock runs out. Only the teams that were close at the buzzer play it. If nobody pulls ahead by the lead before it ends, every team still in it gets a round win. 0 turns overtime off: the team with the most points simply wins the round, and a tie counts for nobody.")]
         [SerializeField, Min(0f)] private float overtimeSeconds = 60f;
 
-        [Tooltip("How many points ahead a team must be to win a round. At the buzzer, a team this far ahead of every other team wins the round; if not, the teams less than this far behind the leader play overtime, and there the first team this far ahead of the other overtime teams wins the round at once. A team this far behind at the buzzer is out of the round.")]
-        [SerializeField, Min(1)] private int overtimeLeadPoints = 200;
+        [Tooltip("How many points ahead a team must be to win a round. At the buzzer, a team this far ahead of every other team wins the round; if not, the teams less than this far behind the leader play overtime, and there the first team this far ahead of the other overtime teams wins the round at once. A team this far behind at the buzzer is out of the round. 0 turns overtime off (the team with the most points simply wins the round, and a tie counts for nobody).")]
+        [SerializeField, Min(0)] private int overtimeLeadPoints = 200;
 
         [Header("Points")]
         [Tooltip("Points per second a team earns for each zone of that tier it holds. The four entries are Tier 1 (capitals), Tier 2, Tier 3 and Tier 4 (the centre), in that order. " +

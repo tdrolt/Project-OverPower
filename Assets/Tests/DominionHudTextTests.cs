@@ -397,7 +397,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(card, Text(nameof(DominionHudText.BreakHeadline))));
             Assert.IsTrue(IlWiring.Uses(card, Text(nameof(DominionHudText.BreakCountdown))));
             Assert.IsTrue(IlWiring.Uses(card, Text(nameof(DominionHudText.OpensLine))));
-            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionHud), Hist(nameof(DominionHistory.WinnersOfRound))), "the card is given the winners the master recorded, not the points leader");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionHud), Hist(nameof(DominionHistory.WinnersOfFinishedRound))), "the card is given the winners the master recorded, not the points leader");
         }
 
         [Test] public void TheCentreLabelDrawsTheTestedLines()

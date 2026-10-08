@@ -111,6 +111,18 @@ namespace Overpower.Dominion
             return result.ToArray();
         }
 
+        /// <summary>Tudor A56: the overtime teams that still have anyone in the game. A team with nobody left drops out of the overtime - it can neither win
+        /// the round nor share it - and the others carry on (a single team left has won). "Anyone in the game" is the master's player count for the A3 last-team
+        /// rule (a dropped player still counts for the dropped grace). Null counts (the master could not count) leaves the teams as they were.</summary>
+        public static int[] OvertimeTeamsPresent(int[] overtimeTeams, int[] playersPerTeam)
+        {
+            if (overtimeTeams == null || playersPerTeam == null) return overtimeTeams;
+            var present = new List<int>();
+            foreach (int team in overtimeTeams)
+                if (team >= 0 && team < playersPerTeam.Length && playersPerTeam[team] > 0) present.Add(team);
+            return present.ToArray();
+        }
+
         /// <summary>The overtime team that is <paramref name="leadPoints"/> or more ahead of every OTHER overtime team, or -1. A team outside overtime
         /// neither wins here nor stops anyone from winning: it was a lead behind at the buzzer and is out of the round.</summary>
         public static int OvertimeLeader(int[] points, int[] overtimeTeams, int leadPoints)

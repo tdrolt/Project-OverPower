@@ -165,17 +165,7 @@ namespace Overpower.Dominion
             bool judgingSuddenDeath = counted && room.Stage == DominionStage.SuddenDeath;
             if (judgingSuddenDeath) TallySuddenDeath(Rooms.Config.DroppedGraceSeconds);
             DominionWrite write = DominionRoomWrites.Next(true, true, now, room,
-                new DominionFlowNumbers
-                {
-                    RoundsToWin = config.RoundsToWin, MaxRounds = config.MaxRounds,
-                    RoundSeconds = config.RoundSeconds, BreakSeconds = config.BreakSeconds,
-                    OvertimeSeconds = config.OvertimeSeconds, OvertimeLeadPoints = config.OvertimeLeadPoints,
-                    HasCentre = CentreInPlay(out _),
-                    CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
-                    CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),
-                    SuddenDeathCountdownSeconds = config.SuddenDeathCountdownSeconds,
-                    SameInstantToleranceMs = Mathf.RoundToInt(config.SameInstantToleranceSeconds * 1000f),
-                }, match.TeamsInMatch, counted ? playersPerTeam : null, // null: the last-team check is skipped
+                FlowNumbersOf(config, CentreInPlay(out _)), match.TeamsInMatch, counted ? playersPerTeam : null, // null: the last-team check is skipped
                 judgingSuddenDeath ? suddenDeathTally : null);          // null: sudden death is not judged on a guess
             // A sudden-death verdict (a win or a replay) is written only once it has held for a network beat, so every death report has arrived
             // before the stamps are read; any other write goes at once. The decision is SuddenDeathVerdictSettle.ShouldWrite (tested).
@@ -190,6 +180,20 @@ namespace Overpower.Dominion
             suddenDeathSettle.Reset(); // the next verdict is judged from the room as it will be
             Debug.Log($"[DOMINION] master wrote: {write.What} (round {room.Round}, stage {room.Stage})");
         }
+
+        /// <summary>The numbers the stage rules need, read from the config (seconds become server ms where the rules count in ms). A pure hand-over so a test can
+        /// give every field its own value and see each one land in the right place.</summary>
+        public static DominionFlowNumbers FlowNumbersOf(DominionConfig config, bool hasCentre) => new DominionFlowNumbers
+        {
+            RoundsToWin = config.RoundsToWin, MaxRounds = config.MaxRounds,
+            RoundSeconds = config.RoundSeconds, BreakSeconds = config.BreakSeconds,
+            OvertimeSeconds = config.OvertimeSeconds, OvertimeLeadPoints = config.OvertimeLeadPoints,
+            HasCentre = hasCentre,
+            CentreFirstMs = Mathf.RoundToInt(config.CentreFirstPayoutSeconds * 1000f),
+            CentreIntervalMs = Mathf.RoundToInt(config.CentrePayoutIntervalSeconds * 1000f),
+            SuddenDeathCountdownSeconds = config.SuddenDeathCountdownSeconds,
+            SameInstantToleranceMs = Mathf.RoundToInt(config.SameInstantToleranceSeconds * 1000f),
+        };
 
         // Looked up once: Update asks every quarter second.
         private RoomManager rooms;

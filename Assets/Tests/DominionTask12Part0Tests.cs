@@ -232,9 +232,9 @@ namespace Overpower.Tests
             MethodInfo mapping = Getter(typeof(DominionConfig), nameof(DominionConfig.SuddenDeathCountdownSeconds));
             MethodInfo raw = Getter(typeof(DominionConfig), nameof(DominionConfig.BreakCountdownSeconds));
             Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "ArrivalStampMs", mapping));
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "Update", mapping));
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "FlowNumbersOf", mapping), "the master's flow numbers (Update asks FlowNumbersOf)");
             Assert.IsFalse(IlWiring.Uses(typeof(DominionDirector), "ArrivalStampMs", raw));
-            Assert.IsFalse(IlWiring.Uses(typeof(DominionDirector), "Update", raw));
+            Assert.IsFalse(IlWiring.Uses(typeof(DominionDirector), "FlowNumbersOf", raw));
         }
 
         // ---------------------------------------------------------------- two spawn points per team
@@ -448,7 +448,8 @@ namespace Overpower.Tests
 
         [Test] public void TheOwnersHitBlockAsksTheOwnerRule()
         {
-            Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "OwnerIsUp", Method(typeof(RespawnShieldRules), nameof(RespawnShieldRules.IsUpForOwner))));
+            Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "OwnerIsUp", Method(typeof(RespawnShieldRules), nameof(RespawnShieldRules.OwnerShieldUp))));
+            Assert.IsTrue(IlWiring.Uses(typeof(RespawnShieldRules), nameof(RespawnShieldRules.OwnerShieldUp), Method(typeof(RespawnShieldRules), nameof(RespawnShieldRules.IsUpForOwner))));
             Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "get_IsUp", Method(typeof(RespawnShield), "OwnerIsUp")));
         }
     }

@@ -147,7 +147,7 @@ namespace Overpower.UI
             previous = state;
             bool hadPrevious = haveState;
             state = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
-            finishedWinners = DominionHistory.WinnersOfRound(state.History, state.HistoryWinners, state.Round - 2); // the break after round N names round N's winners (0-based N-1 = Round-2)
+            finishedWinners = DominionHistory.WinnersOfFinishedRound(state); // the break after round N names round N's winners
             haveState = true;
             dirty = false;
             if (teamsRoom != PhotonNetwork.CurrentRoom)
@@ -164,8 +164,7 @@ namespace Overpower.UI
 
         private void RefreshCentre(DominionConfig config, int now, string[] names)
         {
-            bool show = teams.Length == 3 && state.CentreMs != 0 && now != 0;
-            if (!show) { centre.SetVisible(false); return; }
+            if (!DominionHudText.CentreLabelShown(teams.Length == 3, state.Stage, state.CentreMs, state.EndMs, now)) { centre.SetVisible(false); return; }
             centre.Refresh(config.CentrePayoutPoints, DominionHudText.SecondsLeft(state.CentreMs, now), CentreHolder(), names);
         }
 

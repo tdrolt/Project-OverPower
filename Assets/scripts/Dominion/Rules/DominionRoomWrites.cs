@@ -163,9 +163,12 @@ namespace Overpower.Dominion
 
             // Overtime ends the moment a team is a lead ahead of the other overtime teams, however much of the minute is left. Judged on the points
             // the master has written (room.Points), and the write expects the dPseq they were built on, exactly as the buzzer's does.
-            int[] overtimeTeams = room.Stage == DominionStage.Overtime ? OvertimeTeamsOf(room, teamsInMatch) : null;
+            // A56: a team with nobody left in the game is out of the overtime (it can neither win nor share the round); one team left has won it.
+            int[] overtimeTeams = room.Stage == DominionStage.Overtime
+                ? DominionRules.OvertimeTeamsPresent(OvertimeTeamsOf(room, teamsInMatch), playersPerTeam) : null;
             if (overtimeTeams != null)
             {
+                if (overtimeTeams.Length < 2) return ScoreRound(room, nowMs, cfg, teamsInMatch, overtimeTeams);
                 int leader = DominionRules.OvertimeLeader(room.Points, overtimeTeams, cfg.OvertimeLeadPoints);
                 if (leader >= 0) return ScoreRound(room, nowMs, cfg, teamsInMatch, new[] { leader });
             }

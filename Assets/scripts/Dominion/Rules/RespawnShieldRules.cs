@@ -15,6 +15,13 @@ namespace Overpower.Dominion
         /// owner's own copy only after the server echoes it (a round trip, about 0.1 s), and a hit must not get through in between.</summary>
         public static bool IsUpForOwner(int propertyEndMs, int ownEndMs, int nowMs) => IsUp(propertyEndMs, nowMs) || IsUp(ownEndMs, nowMs);
 
+        /// <summary>True for the shield's owner, with the owner's own clear taken into account: once this client has sent a clear (a hit on an enemy, leaving the
+        /// spawn, a death, a fresh start) the shield is down for it at once, although the property still holds the old end until the clear's echo comes back.</summary>
+        public static bool OwnerShieldUp(int propertyEndMs, int ownEndMs, int nowMs, bool clearSent) => !clearSent && IsUpForOwner(propertyEndMs, ownEndMs, nowMs);
+
+        /// <summary>Whether the leave-the-spawn watch (ShieldSpawnWatch) looks at the player's position at all this frame: a shield is up and its clear has not been sent yet.</summary>
+        public static bool WatchArmed(bool shieldUp, bool clearSent) => shieldUp && !clearSent;
+
         /// <summary>The value the shield owner writes when it learns it hit an enemy: 0 = cleared, shield down. Attacking from inside the
         /// shield would be a free shot, so the first hit on an enemy (damage, stun, slow or push) drops it.</summary>
         public static int EndAfterDamageDealt() => 0;

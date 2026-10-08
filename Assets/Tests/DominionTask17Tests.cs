@@ -180,7 +180,7 @@ namespace Overpower.Tests
 
         [Test] public void TheBarsFillThroughTheTestedRuleAndSitWhereTheRuleSays()
         {
-            Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "Refresh", Method(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.Fills))));
+            Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "Refresh", Method(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.FillsInto))));
             Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "Build", Method(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.GoldReadoutTop))));
         }
 

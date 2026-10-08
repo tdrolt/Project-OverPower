@@ -47,7 +47,7 @@ namespace Overpower.Dominion
         private bool diedBefore;          // owner: this body has died since it spawned, so its next AliveChanged(true) is a respawn
         private ShieldJudge judge;        // owner: the per-hit judgement and the dBlk stamp spacing
         private ShieldSpawnWatch spawnWatch; // owner: drops the shield on the first frame outside the player's own spawn (A51)
-        private bool leftSpawnDropSent;   // owner: the leave-spawn drop is written and its echo may not be back yet, so it is not written again every frame
+        private bool shieldClearSent;     // owner: a clear (a hit on an enemy, leaving the spawn, a death, a fresh start) is written and its echo may not be back yet: the shield is down for this client now, and the leave-spawn watch does not write it again every frame
         private int stampSeen;            // every client: the dBlk value already popped
         private bool stampPrimed;         // the first read only takes the value in: a joiner never pops an old stamp
 
@@ -60,9 +60,9 @@ namespace Overpower.Dominion
             if (lifecycle != null) lifecycle.AliveChanged += HandleAliveChanged;
             judge = new ShieldJudge(() => IsUp, () => PhotonNetwork.ServerTimestamp, PopupMs, WriteBlockedStamp);
             spawnWatch = new ShieldSpawnWatch(
-                () => IsUp && !leftSpawnDropSent,
+                () => RespawnShieldRules.WatchArmed(IsUp, shieldClearSent),
                 () => SpawnHealArea.InOwnSpawn(health != null ? health.TeamId : -1, BodyPosition()),
-                () => { leftSpawnDropSent = true; ClearShield(); Debug.Log("[DOMINION] respawn shield ended: this player left their spawn"); });
+                () => { ClearShield(); Debug.Log("[DOMINION] respawn shield ended: this player left their spawn"); });
         }
 
         private void OnEnable() => CombatEvents.LocalEnemyAffected += HandleEnemyAffected;
@@ -101,7 +101,8 @@ namespace Overpower.Dominion
             if (owner == null || !PhotonNetwork.InRoom) return false;
             int now = PhotonNetwork.ServerTimestamp;
             if (now == 0) return false;
-            return RespawnShieldRules.IsUpForOwner(ReadInt(owner, RespawnShieldRules.ShieldKey), ownEndMs, now);
+            // The property still holds the end until the echo of a clear comes back: once this client has sent one, the shield is down here at once.
+            return RespawnShieldRules.OwnerShieldUp(ReadInt(owner, RespawnShieldRules.ShieldKey), ownEndMs, now, shieldClearSent);
         }
 
         /// <summary>True while that player's respawn shield is up. The one answer the damage block, the bubble and the zones all share.</summary>
@@ -149,7 +150,7 @@ namespace Overpower.Dominion
             int end = RespawnShieldRules.EndMs(now, config.ShieldSeconds);
             // Start and end together in one write: A26 judges an old effect from the start, so nobody subtracts their own Shield Seconds from the end.
             ownEndMs = end; // up on this client at once, not a round trip later
-            leftSpawnDropSent = false; // a new shield may drop again when it leaves the spawn
+            shieldClearSent = false; // a new shield (a second respawn's too) is up again at once and may drop again when it leaves the spawn
             PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
             Debug.Log($"[DOMINION] respawn shield up for {config.ShieldSeconds:0.#} s (ends {end})");
         }
@@ -158,6 +159,7 @@ namespace Overpower.Dominion
         public void ClearShield()
         {
             if (!photonView.IsMine || photonView.Owner == null) return;
+            shieldClearSent = true; // down for this client now, whatever the property still holds
             bool startedHere = ownEndMs != 0; // started on this client and maybe not echoed yet: the cleared value must still be written
             ownEndMs = 0;
             if (!RespawnShieldRules.MustWriteClear(startedHere, ReadInt(photonView.Owner, RespawnShieldRules.ShieldKey))) return;

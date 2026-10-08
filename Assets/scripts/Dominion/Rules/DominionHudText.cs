@@ -100,6 +100,15 @@ namespace Overpower.Dominion
             return table[Math.Min(Math.Max(round, 1), table.Length) - 1];
         }
 
+        /// <summary>Does the centre countdown show: a 3v3v3 match with a payout time written and a synced clock. In an overtime it hides when the next payout falls
+        /// after the overtime's end (the round is decided by then, so the label would count down to a payout that is never paid).</summary>
+        public static bool CentreLabelShown(bool threeTeams, DominionStage stage, int centreMs, int stageEndMs, int nowMs)
+        {
+            if (!threeTeams || centreMs == 0 || nowMs == 0) return false;
+            // A payout exactly at the end is still paid (the buzzer's payout, A18); one after it never is.
+            return stage != DominionStage.Overtime || unchecked(centreMs - stageEndMs) <= 0;
+        }
+
         /// <summary>"CENTRE +200 IN 12": {0} = the payout, {1} = seconds to it.</summary>
         public static string CentreLine(string format, int points, int secondsLeft) => Fmt(format, points, Math.Max(0, secondsLeft));
 
@@ -269,6 +278,12 @@ namespace Overpower.Dominion
             int leader = WinnerOfRound(history, round);
             return leader >= 0 ? new[] { leader } : new int[0];
         }
+
+        /// <summary>The teams that won the round the break card is about. The break after round N has the room's Round = N + 1, and round N is the history's
+        /// 0-based entry N - 1, which is Round - 2. The first break (Round 1) follows no round, so it names nobody. One pure answer for the HUD host, so the
+        /// "minus 2" is tested and not an inline sum.</summary>
+        public static int[] WinnersOfFinishedRound(DominionRoomState state) =>
+            state.Round < 2 ? new int[0] : WinnersOfRound(state.History, state.HistoryWinners, state.Round - 2);
 
         /// <summary>The team that won a round (0-based) on its points, or -1 for a tied round (nobody gets bold in the table).</summary>
         public static int WinnerOfRound(int[] history, int round)

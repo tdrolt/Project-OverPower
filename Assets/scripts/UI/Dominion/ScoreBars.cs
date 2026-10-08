@@ -30,6 +30,7 @@ namespace Overpower.UI
         private readonly List<Row> rows = new List<Row>();
         private RectTransform root;
         private int builtTeamCount;
+        private float[] fillBuffer = new float[0]; // reused every frame: the bars allocate nothing once built
 
         public bool IsShowing => root != null && root.gameObject.activeSelf;
 
@@ -66,14 +67,14 @@ namespace Overpower.UI
             if (root == null || builtTeamCount != teams.Length || !SameTeams(teams)) Build(teams);
             SetVisible(true);
 
-            float[] fills = DominionScoreBarRules.Fills(teams, points);
+            DominionScoreBarRules.FillsInto(teams, points, fillBuffer);
             for (int i = 0; i < rows.Count; i++)
             {
                 Row row = rows[i];
-                if (!Mathf.Approximately(fills[i], row.ShownFill))
+                if (!Mathf.Approximately(fillBuffer[i], row.ShownFill))
                 {
-                    row.Fill.anchorMax = new Vector2(fills[i], 1f);
-                    row.ShownFill = fills[i];
+                    row.Fill.anchorMax = new Vector2(fillBuffer[i], 1f);
+                    row.ShownFill = fillBuffer[i];
                 }
                 int shown = DominionScoreBarRules.PointsOf(points, row.Team);
                 if (shown != row.ShownPoints)
@@ -102,6 +103,7 @@ namespace Overpower.UI
         {
             Destroy();
             builtTeamCount = teams.Length;
+            fillBuffer = new float[teams.Length];
 
             float rowHeight = theme.dominionScoreBarHeight;
             float total = teams.Length * rowHeight + (teams.Length - 1) * theme.dominionScoreBarGap;
@@ -114,8 +116,9 @@ namespace Overpower.UI
             root.anchorMin = root.anchorMax = root.pivot = new Vector2(1f, 0f);
             root.sizeDelta = new Vector2(width, total);
             float bottom = DominionScoreBarRules.GoldReadoutTop(theme.loadoutToggleButtonMargin, theme.loadoutToggleButtonHeight, theme.goldShopGap,
-                theme.bodyTextSize, theme.hudScale) + theme.dominionScoreBarsAboveGold;
+                theme.bodyTextSize, theme.hudScale) + theme.dominionScoreBarsAboveGold * theme.hudScale;
             root.anchoredPosition = new Vector2(-theme.loadoutToggleButtonMargin * theme.hudScale, bottom);
+            root.localScale = Vector3.one * theme.hudScale; // scaled like the Gold Corner it sits on, so the bars grow and shrink with the rest of that corner
 
             for (int i = 0; i < teams.Length; i++)
                 rows.Add(BuildRow(teams[i], i * (rowHeight + theme.dominionScoreBarGap), rowHeight));

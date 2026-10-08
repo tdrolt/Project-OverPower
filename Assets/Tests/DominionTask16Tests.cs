@@ -440,18 +440,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), "ScoreRound", Rule(typeof(DominionHistory), nameof(DominionHistory.EncodeWinners))));
         }
 
-        [Test] public void TheDirectorHandsTheConfigsOvertimeNumbersToTheMastersRules()
-        {
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "Update", typeof(DominionConfig).GetProperty(nameof(DominionConfig.OvertimeSeconds)).GetGetMethod()));
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "Update", typeof(DominionConfig).GetProperty(nameof(DominionConfig.OvertimeLeadPoints)).GetGetMethod()));
-        }
-
-        [Test] public void TheDirectorPaysPointsThroughTheTestedStageRule()
-        {
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "RunPoints", Rule(typeof(DominionPointsRules), nameof(DominionPointsRules.PointsRun))));
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "WithLatestPoints", Rule(typeof(DominionRules), nameof(DominionRules.IsRoundPlay))), "the master scores on points it wrote but has not seen echoed, in overtime too");
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionDirector), "OnCaptureWritten", Rule(typeof(DominionRules), nameof(DominionRules.IsRoundPlay))), "a bounty is earned in overtime too");
-        }
+        // The director's hand-over of the config numbers and its acting on the stage rules' answers: DominionTask18Part0Tests (they could not fail here).
 
         [Test] public void ThePointsPlanAsksTheSameStageRule() =>
             Assert.IsTrue(IlWiring.Uses(typeof(DominionPointsRules), "Plan", Rule(typeof(DominionPointsRules), nameof(DominionPointsRules.PointsRun))));
@@ -464,7 +453,7 @@ namespace Overpower.Tests
 
         [Test] public void TheBreakCardNamesTheWinnersTheRoomRecordedThroughTheTestedRules()
         {
-            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionHud), "ReadRoom", Rule(typeof(DominionHistory), nameof(DominionHistory.WinnersOfRound))));
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionHud), "ReadRoom", Rule(typeof(DominionHistory), nameof(DominionHistory.WinnersOfFinishedRound))));
             Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.BreakCard), Rule(typeof(DominionHudText), nameof(DominionHudText.BreakHeadlineShared))));
         }
 
@@ -473,27 +462,5 @@ namespace Overpower.Tests
 
         [Test] public void TheDirectorDropsTheOvertimeMarkersThroughTheTestedNotes() =>
             Assert.IsTrue(IlWiring.Uses(typeof(DominionMarkerNotes), "ForEdge", Rule(typeof(DominionMarkerNotes), nameof(DominionMarkerNotes.OvertimeStart))));
-
-        // ---------------------------------------------------------------- the revised info cards (A54), both Dominion modes
-
-        private static string Card(string mode, string title)
-        {
-            var def = UnityEditor.AssetDatabase.LoadAssetAtPath<GameModeDefinition>("Assets/Gameplay/Config/Modes/" + mode + ".asset");
-            Assert.IsNotNull(def, mode);
-            return def.InfoCards.First(c => c.title == title).text;
-        }
-
-        [Test] public void TheRevisedCardsAreInBothDominionModes()
-        {
-            foreach (string mode in new[] { "Dominion 2v2", "Dominion 3v3v3" })
-            {
-                StringAssert.Contains("they play a short overtime", Card(mode, "Rounds"));
-                StringAssert.Contains("lead on round wins after the third", Card(mode, "Rounds"));
-                StringAssert.Contains("or reach two wins together", Card(mode, "Sudden death"));
-                StringAssert.Contains("stuns and pushes", Card(mode, "Respawns"));
-                StringAssert.Contains("when you leave your spawn", Card(mode, "Respawns"));
-                StringAssert.DoesNotContain("win two rounds to win the match.", Card(mode, "Rounds"), "the old Rounds text is gone");
-            }
-        }
     }
 }

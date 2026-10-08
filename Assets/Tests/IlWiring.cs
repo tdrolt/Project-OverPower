@@ -107,6 +107,46 @@ namespace Overpower.Tests
             return false;
         }
 
+        /// <summary>True when the named method (or its lambdas and state machine) calls the target AND the very next instruction branches on what it
+        /// returned (brtrue / brfalse): the "the answer is acted on" check, which a bare "it calls the rule" cannot give (a call whose result is thrown away
+        /// would pass that one). Only for a rule whose answer is a bool used directly in an if.</summary>
+        public static bool ResultDecidesABranch(System.Type owner, string methodName, MethodBase target)
+        {
+            string generated = "<" + methodName + ">";
+            var types = new List<System.Type> { owner };
+            types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+            foreach (System.Type type in types)
+            {
+                bool wholeTypeIsTheMethod = type != owner && type.Name.StartsWith(generated);
+                foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
+                {
+                    if (!wholeTypeIsTheMethod && method.Name != methodName && !method.Name.StartsWith(generated)) continue;
+                    byte[] il = method.GetMethodBody()?.GetILAsByteArray();
+                    if (il == null) continue;
+                    foreach (int at in CallOffsets(method, target))
+                        if (BranchFollows(il, at + 5)) return true; // call/callvirt/newobj + a 4-byte token
+                }
+            }
+            return false;
+        }
+
+        /// <summary>True when the instructions from <paramref name="at"/> on are only the plumbing a compiler puts between a bool and the branch that uses it (a
+        /// debug build negates with ldc.i4.0 / ceq and goes through a local: stloc / ldloc / nop) and then a brtrue or brfalse. Anything else first (a pop, a
+        /// store to a field, another call) means the answer was not what the branch used.</summary>
+        private static bool BranchFollows(byte[] il, int at)
+        {
+            for (int i = at; i < il.Length;)
+            {
+                byte op = il[i];
+                if (op == 0x2C || op == 0x2D || op == 0x39 || op == 0x3A) return true; // brfalse.s, brtrue.s, brfalse, brtrue
+                if (op == 0x00 || op == 0x16 || op == 0x17 || (op >= 0x06 && op <= 0x0D)) { i += 1; continue; } // nop, ldc.i4.0/1, ldloc.0-3, stloc.0-3
+                if (op == 0x11 || op == 0x13) { i += 2; continue; } // ldloc.s, stloc.s
+                if (op == 0xFE && i + 1 < il.Length && il[i + 1] == 0x01) { i += 2; continue; } // ceq
+                return false;
+            }
+            return false;
+        }
+
         private static List<int> OffsetsOf(MethodBase method, byte[] token, byte wanted)
         {
             var found = new List<int>();

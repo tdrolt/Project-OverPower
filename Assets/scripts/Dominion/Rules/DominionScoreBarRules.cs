@@ -32,10 +32,18 @@ namespace Overpower.Dominion
         public static float[] Fills(int[] teams, int[] points)
         {
             if (teams == null) return new float[0];
-            int leader = Leader(teams, points);
             var fills = new float[teams.Length];
-            for (int i = 0; i < teams.Length; i++) fills[i] = Fill(PointsOf(points, teams[i]), leader);
+            FillsInto(teams, points, fills);
             return fills;
+        }
+
+        /// <summary>Fills for each listed team written into a buffer the caller keeps (the bars are refreshed every frame, so they allocate nothing). The leader is
+        /// found once. Entries past the teams' count are left as they were.</summary>
+        public static void FillsInto(int[] teams, int[] points, float[] buffer)
+        {
+            if (teams == null || buffer == null) return;
+            int leader = Leader(teams, points);
+            for (int i = 0; i < teams.Length && i < buffer.Length; i++) buffer[i] = Fill(PointsOf(points, teams[i]), leader);
         }
 
         /// <summary>The points as shown in a bar (never negative).</summary>
@@ -46,7 +54,10 @@ namespace Overpower.Dominion
         /// button, the gap, the readout's two lines of body text and their padding (the same numbers PlayerHud.BuildGoldCorner uses), all scaled by the HUD
         /// scale. The score bars sit above this line, so they overlap neither.</summary>
         public static float GoldReadoutTop(float margin, float buttonHeight, float goldGap, float bodyTextSize, float hudScale) =>
-            (margin + buttonHeight + goldGap + 2f * bodyTextSize + GoldReadoutPadding) * hudScale;
+            (margin + buttonHeight + goldGap + GoldReadoutHeight(bodyTextSize)) * hudScale;
+
+        /// <summary>The gold readout's height: two lines of body text and the padding. PlayerHud sizes the readout with this, and the bars stand on top of it.</summary>
+        public static float GoldReadoutHeight(float bodyTextSize) => 2f * bodyTextSize + GoldReadoutPadding;
 
         /// <summary>The extra height PlayerHud gives the gold readout beyond its two lines of text.</summary>
         public const float GoldReadoutPadding = 10f;

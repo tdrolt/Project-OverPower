@@ -1156,7 +1156,7 @@ namespace Overpower.UI
                 theme.loadoutToggleButtonMargin + theme.loadoutToggleButtonHeight + theme.goldShopGap);
             // Two lines of Body Text Size, the second one smaller - the label writes its own <size> tag, so one
             // TextMeshProUGUI serves both instead of a second one to keep in step.
-            goldRt.sizeDelta = new Vector2(theme.loadoutToggleButtonWidth, 2f * theme.bodyTextSize + 10f);
+            goldRt.sizeDelta = new Vector2(theme.loadoutToggleButtonWidth, Overpower.Dominion.DominionScoreBarRules.GoldReadoutHeight(theme.bodyTextSize));
             goldText.color = theme.goldTextColor;
             goldText.alignment = TextAlignmentOptions.Right;
             goldText.enableWordWrapping = false;
