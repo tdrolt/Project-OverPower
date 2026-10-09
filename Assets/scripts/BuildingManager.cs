@@ -418,8 +418,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         }
 
         BuildMap();
-        if (GetComponent<TowerBountyView>() == null)
-            gameObject.AddComponent<TowerBountyView>();
+        TowerBountyView.AttachTo(gameObject);
 
         // MatchDirector needs no scene footprint and no PhotonView: it only reads and writes Room Properties, the
         // same authority model this class's own territory state uses. Added here at runtime on this same GameObject

@@ -53,34 +53,44 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheEnemyTakingAZoneAfterALongHoldPops()
+        public void ADominionTakeoverAfterALongHoldPopsThePoints()
         {
-            Assert.AreEqual(150, BountyLabelRules.PopAmount(newOwner: 1, lastOwner: 0, lastHeldMs: Hold, holdMs: Hold, bounty: 150));
+            Assert.AreEqual(150, BountyLabelRules.PopAmount(true, newOwner: 1, lastOwner: 0, lastHeldMs: Hold, holdMs: Hold, dominionPoints: 150, paidOnLastCapture: 900));
         }
 
         [Test]
-        public void TheOldHolderRetakingItPopsNothing()
+        public void TheOldDominionHolderRetakingItPopsNothing()
         {
-            Assert.AreEqual(0, BountyLabelRules.PopAmount(0, 0, Hold * 2, Hold, 150));
+            Assert.AreEqual(0, BountyLabelRules.PopAmount(true, 0, 0, Hold * 2, Hold, 150, 0));
         }
 
         [Test]
-        public void ATakeoverAfterAShortHoldPopsNothing()
+        public void ADominionTakeoverAfterAShortHoldPopsNothing()
         {
-            Assert.AreEqual(0, BountyLabelRules.PopAmount(1, 0, Hold - 1, Hold, 150));
+            Assert.AreEqual(0, BountyLabelRules.PopAmount(true, 1, 0, Hold - 1, Hold, 150, 0));
         }
 
         [Test]
-        public void ACaptureOfAZoneWithNoOldHolderPopsNothing()
+        public void ADominionCaptureOfAZoneWithNoOldHolderPopsNothing()
         {
-            Assert.AreEqual(0, BountyLabelRules.PopAmount(1, None, Hold * 2, Hold, 150));
+            Assert.AreEqual(0, BountyLabelRules.PopAmount(true, 1, None, Hold * 2, Hold, 150, 0));
         }
 
         [Test]
-        public void ThePopIsExactlyWhatTheMasterPays()
+        public void TheDominionPopIsExactlyWhatTheMasterScores()
         {
-            foreach (int held in new[] { 0, Hold - 1, Hold, Hold + 1 })
-                Assert.AreEqual(BountyRule.PayoutOnCapture(1, 0, held, 900, Hold), BountyLabelRules.PopAmount(1, 0, held, Hold, 900));
+            foreach (int held in new[] { 0, Hold - 1, Hold, Hold + 1, Hold * 3 })
+                foreach (int lastOwner in new[] { None, 0, 1 })
+                    foreach (int newOwner in new[] { None, 0, 1 })
+                        Assert.AreEqual(Overpower.Dominion.DominionPointsRules.BountyPoints(held, Hold, lastOwner, newOwner, 150),
+                                        BountyLabelRules.PopAmount(true, newOwner, lastOwner, held, Hold, 150, 900), "held " + held + " last " + lastOwner + " new " + newOwner);
+        }
+
+        [Test]
+        public void TheConquestPopIsWhatTheCaptureWroteIntoTheSnapshot()
+        {
+            Assert.AreEqual(900, BountyLabelRules.PopAmount(false, 1, None, 0, Hold, 150, 900));
+            Assert.AreEqual(0, BountyLabelRules.PopAmount(false, 1, None, 0, Hold, 150, 0));
         }
 
         [Test]

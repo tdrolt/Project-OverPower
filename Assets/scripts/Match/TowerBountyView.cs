@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using ExitGames.Client.Photon;
 using Overpower.Data;
 using Overpower.Dominion;
 using Overpower.UI;
 using Photon.Pun;
+using Photon.Realtime;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,35 +12,46 @@ using UnityEngine.UI;
 namespace Overpower.Match
 {
     /// <summary>
-    /// The bounty floating above a tower, and the pop when it is paid. A HUD label projected from a point above the tower onto its own
-    /// screen-overlay canvas (like CentreScanCountdownView), so it keeps one size however far the camera is zoomed out and can never be hidden
-    /// by the tower's glow or its capture ring. It is not fogged: zone owners are drawn without sight, and so is this.
-    /// Every client works it out from the replicated TerritorySnapshot and the server clock (BountyLabelRules), so there is no extra
-    /// network traffic. Text, colour, sizes and height: UiTheme > Bounty fields. Lives on the BuildingManager.
+    /// The bounty floating above a tower, and the pop when it is paid. A HUD label projected from the tower onto its own screen-overlay canvas
+    /// (like CentreScanCountdownView), so it keeps one size however far the camera is zoomed out and can never be hidden by the tower's glow or its
+    /// capture ring. It is not fogged: zone owners are drawn without sight, and so is this. BountyLabelPlacement keeps it on screen and off the
+    /// corner minimap. Every client works it out from the replicated TerritorySnapshot and the server clock (BountyLabelRules), so there is no extra
+    /// network traffic. Text, colour, sizes and heights: UiTheme > Bounty fields. Lives on the BuildingManager.
     /// </summary>
     [DefaultExecutionOrder(1000)] // after the camera has moved this frame
-    public sealed class TowerBountyView : MonoBehaviour
+    public sealed class TowerBountyView : MonoBehaviour, IInRoomCallbacks
     {
+        private const float ScreenMargin = 16f;
+
         private sealed class Pop
         {
             public int Zone;
             public float StartTime;
             public TextMeshProUGUI Label;
+            public Vector2 Size;
         }
 
         private GameObject canvasGo;
         private RectTransform canvasRect;
         private readonly Dictionary<int, TextMeshProUGUI> labels = new Dictionary<int, TextMeshProUGUI>();
         private readonly Dictionary<int, int> shownAmount = new Dictionary<int, int>();
+        private readonly Dictionary<int, Vector2> labelSizes = new Dictionary<int, Vector2>();
         private readonly List<Pop> pops = new List<Pop>();
         private readonly List<Material> materials = new List<Material>();
+        private readonly TerritoryHistory history = new TerritoryHistory();
         private BuildingManager hooked;
-        private TerritorySnapshot lastSeen;
-        private TerritorySnapshot handled;
-        private TerritorySnapshot beforeHandled;
+        private Room roundPaysRoom;
+        private bool roundPaysStale = true;
+        private bool roundPays;
+
+        public static TowerBountyView AttachTo(GameObject host)
+        {
+            TowerBountyView view = host.GetComponent<TowerBountyView>();
+            return view != null ? view : host.AddComponent<TowerBountyView>();
+        }
 
         /// <summary>What the label above a zone shows now, or empty while it is hidden.</summary>
-        public string ShownText(int zone) => labels.TryGetValue(zone, out TextMeshProUGUI l) && l.gameObject.activeSelf ? l.text : string.Empty;
+        public string ShownText(int zone) => labels.TryGetValue(zone, out TextMeshProUGUI l) && l != null && l.gameObject.activeSelf ? l.text : string.Empty;
 
         /// <summary>The texts of the pops on screen now.</summary>
         public List<string> PopTexts()
@@ -47,6 +60,10 @@ namespace Overpower.Match
             foreach (Pop pop in pops) texts.Add(pop.Label.text);
             return texts;
         }
+
+        private void OnEnable() => PhotonNetwork.AddCallbackTarget(this);
+
+        private void OnDisable() => PhotonNetwork.RemoveCallbackTarget(this);
 
         private void OnDestroy()
         {
@@ -59,6 +76,26 @@ namespace Overpower.Match
         {
             if (hooked != null) hooked.OwnershipChanged -= OnOwnershipChanged;
             hooked = null;
+        }
+
+        public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) => roundPaysStale = true;
+        public void OnPlayerEnteredRoom(Player newPlayer) { }
+        public void OnPlayerLeftRoom(Player otherPlayer) { }
+        public void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps) { }
+        public void OnMasterClientSwitched(Player newMasterClient) { }
+
+        // Dominion only: whether a bounty can be paid right now. Read from the room's properties only when they change.
+        private bool RoundPays(bool dominion)
+        {
+            if (!dominion) return false;
+            Room room = PhotonNetwork.CurrentRoom;
+            if (room != roundPaysRoom) { roundPaysRoom = room; roundPaysStale = true; }
+            if (roundPaysStale)
+            {
+                roundPaysStale = false;
+                roundPays = room != null && DominionPointsRules.PointsRun(DominionRoomState.Read(room.CustomProperties));
+            }
+            return roundPays;
         }
 
         private void LateUpdate()
@@ -74,13 +111,13 @@ namespace Overpower.Match
                 Unhook();
                 manager.OwnershipChanged += OnOwnershipChanged;
                 hooked = manager;
-                lastSeen = manager.Current; // the first read is the match as it already was: no pops for it
+                history.Seen(manager.Current); // the first read is the match as it already was: no pops for it
             }
 
             TerritorySnapshot snapshot = manager.Current;
             Camera cam = Camera.main;
             bool dominion = DominionMode.IsActive();
-            bool roundPays = dominion && DominionPointsRules.PointsRun(DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties));
+            bool paysNow = RoundPays(dominion);
             DominionConfig config = dominion ? DominionMode.Config() : null;
             int now = PhotonNetwork.ServerTimestamp;
 
@@ -90,11 +127,11 @@ namespace Overpower.Match
                 UiTheme theme = null;
                 if (cam != null && now != 0 && manager.TryGetZoneBounty(zone, out int tierBounty, out float tierHold, out theme))
                 {
-                    BountyLabelRules.Offer offer = OfferOf(manager, zone, dominion, roundPays, config, tierBounty, tierHold);
+                    BountyLabelRules.Offer offer = OfferOf(manager, zone, dominion, paysNow, config, tierBounty, tierHold);
                     amount = BountyLabelRules.LabelAmount(snapshot.OwnerOf(zone), snapshot.HeldSinceMs(zone), snapshot.LastOwnerOf(zone),
                                                           snapshot.LastHeldMs(zone), now, offer.HoldMs, offer.Amount);
                 }
-                if (amount <= 0 || !EnsureCanvas(theme) || !TryScreenPoint(manager, zone, theme, 0f, cam, out Vector2 local))
+                if (amount <= 0 || !EnsureCanvas(theme) || !TryScreenPoint(manager, zone, theme, cam, out Vector2 local))
                 {
                     HideLabel(zone);
                     continue;
@@ -103,53 +140,50 @@ namespace Overpower.Match
                 if (!shownAmount.TryGetValue(zone, out int shown) || shown != amount)
                 {
                     shownAmount[zone] = amount;
+                    label.fontSize = theme.bountyLabelFontSize;
                     label.text = string.Format(dominion ? theme.bountyLabelFormat : theme.bountyLabelGoldFormat, amount);
+                    labelSizes[zone] = SizeOf(label);
                 }
                 label.fontSize = theme.bountyLabelFontSize;
                 label.color = theme.bountyLabelColour;
-                label.rectTransform.anchoredPosition = local;
+                local.y += theme.bountyLabelLift;
+                bool hasAvoid = AvoidRect(theme, out Rect avoid);
+                label.rectTransform.anchoredPosition = BountyLabelPlacement.Place(local, labelSizes[zone], canvasRect.rect, ScreenMargin, hasAvoid, avoid);
                 if (!label.gameObject.activeSelf) label.gameObject.SetActive(true);
             }
 
             UpdatePops(manager, cam);
-            lastSeen = snapshot;
+            history.Seen(snapshot);
         }
 
-        private static BountyLabelRules.Offer OfferOf(BuildingManager manager, int zone, bool dominion, bool roundPays, DominionConfig config,
+        private static BountyLabelRules.Offer OfferOf(BuildingManager manager, int zone, bool dominion, bool paysNow, DominionConfig config,
                                                       int tierBounty, float tierHoldSeconds)
         {
             bool inPlay = manager.IsCapturableZone(zone) && (MatchDirector.Instance == null || !MatchDirector.Instance.IsOutOfPlay(zone));
-            bool paysNow = inPlay && (!dominion || (roundPays && config != null));
-            return BountyLabelRules.OfferFor(dominion, paysNow, tierBounty, tierHoldSeconds,
+            return BountyLabelRules.OfferFor(dominion, inPlay && (!dominion || (paysNow && config != null)), tierBounty, tierHoldSeconds,
                                              config != null ? config.BountyPoints : 0, config != null ? config.BountyHoldSeconds : 0f);
         }
 
-        // Several zones can change in one snapshot: every event of it must see the snapshot BEFORE it, not the one it carries.
         private void OnOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot)
         {
-            if (snapshot != handled)
-            {
-                beforeHandled = lastSeen;
-                handled = snapshot;
-            }
-            lastSeen = snapshot;
-            if (beforeHandled == null || newOwner < 0) return;
+            TerritorySnapshot before = history.BeforeEventIn(snapshot);
+            if (before == null || newOwner < 0) return;
 
             BuildingManager manager = BuildingManager.Instance;
             if (manager == null || !manager.TryGetZoneBounty(zone, out int tierBounty, out float tierHold, out UiTheme theme)) return;
             bool dominion = DominionMode.IsActive();
-            bool roundPays = dominion && DominionPointsRules.PointsRun(DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties));
             DominionConfig config = dominion ? DominionMode.Config() : null;
-            BountyLabelRules.Offer offer = OfferOf(manager, zone, dominion, roundPays, config, tierBounty, tierHold);
-            int paid = BountyLabelRules.PopAmount(newOwner, beforeHandled.LastOwnerOf(zone), beforeHandled.LastHeldMs(zone), offer.HoldMs, offer.Amount);
+            BountyLabelRules.Offer offer = OfferOf(manager, zone, dominion, RoundPays(dominion), config, tierBounty, tierHold);
+            int paid = BountyLabelRules.PopAmount(dominion, newOwner, before.LastOwnerOf(zone), before.LastHeldMs(zone), offer.HoldMs, offer.Amount,
+                                                  snapshot.BountyPaidOnLastCapture(zone));
             if (paid <= 0 || !EnsureCanvas(theme)) return;
 
             TextMeshProUGUI label = NewLabel("Bounty Pop " + zone, theme);
-            label.text = string.Format(dominion ? theme.bountyPopFormat : theme.bountyPopGoldFormat, paid);
             label.fontSize = theme.bountyPopFontSize;
+            label.text = string.Format(dominion ? theme.bountyPopFormat : theme.bountyPopGoldFormat, paid);
             label.color = theme.bountyLabelColour;
             label.gameObject.SetActive(false);
-            pops.Add(new Pop { Zone = zone, StartTime = Time.unscaledTime, Label = label });
+            pops.Add(new Pop { Zone = zone, StartTime = Time.unscaledTime, Label = label, Size = SizeOf(label) });
         }
 
         private void UpdatePops(BuildingManager manager, Camera cam)
@@ -171,34 +205,55 @@ namespace Overpower.Match
                     pops.RemoveAt(i);
                     continue;
                 }
-                if (!TryScreenPoint(manager, pop.Zone, theme, BountyLabelRules.PopRise(age, seconds, rise), cam, out Vector2 local))
+                if (!TryScreenPoint(manager, pop.Zone, theme, cam, out Vector2 local))
                 {
                     pop.Label.gameObject.SetActive(false);
                     continue;
                 }
+                local.y += theme.bountyLabelLift + BountyLabelRules.PopRise(age, seconds, rise);
                 Color colour = theme.bountyLabelColour;
                 colour.a *= BountyLabelRules.PopAlpha(age, seconds);
                 pop.Label.color = colour;
-                pop.Label.rectTransform.anchoredPosition = local;
+                bool hasAvoid = AvoidRect(theme, out Rect avoid);
+                pop.Label.rectTransform.anchoredPosition = BountyLabelPlacement.Place(local, pop.Size, canvasRect.rect, ScreenMargin, hasAvoid, avoid);
                 pop.Label.gameObject.SetActive(true);
             }
         }
 
-        private bool TryScreenPoint(BuildingManager manager, int zone, UiTheme theme, float liftPixels, Camera cam, out Vector2 local)
+        // The corner minimap's box on this canvas. Nothing to avoid when this player has no minimap or has the large one open (it covers the middle, not the corner).
+        private bool AvoidRect(UiTheme theme, out Rect rect)
+        {
+            MinimapView minimap = MinimapView.Local;
+            if (minimap == null || !minimap.IsBuilt || minimap.IsLargeOpen)
+            {
+                rect = default;
+                return false;
+            }
+            rect = BountyLabelPlacement.CornerRectInCanvas(canvasRect.rect,
+                HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize));
+            return true;
+        }
+
+        private static Vector2 SizeOf(TextMeshProUGUI label) =>
+            new Vector2(label.GetPreferredValues(label.text).x, BountyLabelPlacement.LabelHeight(label.fontSize));
+
+        // The zone's centre, anchorHeight metres up, on this canvas. False when it is behind the camera.
+        private bool TryScreenPoint(BuildingManager manager, int zone, UiTheme theme, Camera cam, out Vector2 local)
         {
             local = default;
             if (!manager.TryGetZoneCentre(zone, out Vector3 centre)) return false;
-            float top = manager.TryGetZoneTowerTopY(zone, out float topY) ? topY : centre.y;
-            Vector3 screen = cam.WorldToScreenPoint(new Vector3(centre.x, top, centre.z));
+            Vector3 screen = cam.WorldToScreenPoint(centre + Vector3.up * theme.bountyLabelAnchorHeight);
             if (screen.z < 0f) return false;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen, null, out local);
-            local.y += theme.bountyLabelLift + liftPixels;
             return true;
         }
 
         private void HideAll()
         {
-            foreach (int zone in new List<int>(labels.Keys)) HideLabel(zone);
+            foreach (TextMeshProUGUI label in labels.Values)
+                if (label != null && label.gameObject.activeSelf)
+                    label.gameObject.SetActive(false);
+            shownAmount.Clear();
             foreach (Pop pop in pops) Destroy(pop.Label.gameObject);
             pops.Clear();
         }
@@ -206,7 +261,7 @@ namespace Overpower.Match
         private void HideLabel(int zone)
         {
             shownAmount.Remove(zone);
-            if (labels.TryGetValue(zone, out TextMeshProUGUI label) && label.gameObject.activeSelf)
+            if (labels.TryGetValue(zone, out TextMeshProUGUI label) && label != null && label.gameObject.activeSelf)
                 label.gameObject.SetActive(false);
         }
 

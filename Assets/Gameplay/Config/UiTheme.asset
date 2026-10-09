@@ -247,6 +247,7 @@ MonoBehaviour:
   bountyLabelColour: {r: 1, g: 0.85, b: 0.1, a: 1}
   bountyLabelFontSize: 30
   bountyPopFontSize: 44
+  bountyLabelAnchorHeight: 1.5
   bountyLabelLift: 56
   bountyPopRise: 110
   bountyPopSeconds: 2.5

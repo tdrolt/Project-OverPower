@@ -714,8 +714,11 @@ namespace Overpower.UI
         [Min(1f)] public float bountyLabelFontSize = 30f;
         [Tooltip("Text size of the pop when a bounty is paid, in reference pixels (1080p). Bigger than the label so the payout is noticed.")]
         [Min(1f)] public float bountyPopFontSize = 44f;
-        [Tooltip("How far above the top of the tower the bounty label floats, in reference pixels (1080p). Pixels rather than metres: the game camera is only " +
-                 "a few metres above the tower tops, so a height in metres would swing wildly with the distance.")]
+        [Tooltip("How high above the middle of the tower's foot the bounty label is pinned, in metres, before its pixel lift below. About 1.5 m puts it at the " +
+                 "tower's base, where the game camera looks, so it stays on screen with the tower.")]
+        [Min(0f)] public float bountyLabelAnchorHeight = 1.5f;
+        [Tooltip("How far the bounty label floats above its anchor point, in reference pixels (1080p). Pixels rather than metres: the game camera is only " +
+                 "a few metres above the towers, so a height in metres would swing wildly with the distance.")]
         [Min(0f)] public float bountyLabelLift = 56f;
         [Tooltip("How far the pop rises above the label while it fades, in reference pixels (1080p).")]
         [Min(0f)] public float bountyPopRise = 110f;

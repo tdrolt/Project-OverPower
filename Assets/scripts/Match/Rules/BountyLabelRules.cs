@@ -23,9 +23,10 @@ namespace Overpower.Match
             return lastOwner >= 0 && lastHeldMs >= holdMs ? bounty : 0;
         }
 
-        /// <summary>What a capture just paid, from the zone as it stood before the capture (its old holder and how long it held).</summary>
-        public static int PopAmount(int newOwner, int lastOwner, int lastHeldMs, int holdMs, int bounty) =>
-            BountyRule.PayoutOnCapture(newOwner, lastOwner, lastHeldMs, bounty, holdMs);
+        /// <summary>What a capture just paid. Dominion: the points, worked out like the master's (DominionPointsRules.BountyPoints) from the zone as it
+        /// stood before the capture. Conquest: exactly what the capture wrote into the snapshot (the master already decided it).</summary>
+        public static int PopAmount(bool dominion, int newOwner, int lastOwner, int lastHeldMs, int holdMs, int dominionPoints, int paidOnLastCapture) =>
+            dominion ? Overpower.Dominion.DominionPointsRules.BountyPoints(lastHeldMs, holdMs, lastOwner, newOwner, dominionPoints) : paidOnLastCapture;
 
         /// <summary>The bounty a zone carries and the hold time it needs, in the mode's own units (Dominion points, Conquest gold per player).
         /// The hold time is converted the way each mode's payout converts it. Nothing is offered where it cannot be paid now.</summary>

@@ -23,6 +23,14 @@ namespace Overpower.UI
             return Mathf.Pow(2f, Mathf.Lerp(logWidth, logHeight, Mathf.Clamp01(match)));
         }
 
+        /// <summary>The corner minimap's box in canvas units, measured from the canvas's top right corner (x and y grow right and up, so both are negative
+        /// inside the screen): margin + frame band in from the edge, then the map's size.</summary>
+        public static Rect CornerMinimapRect(float cornerMargin, float frameWidth, float cornerSize)
+        {
+            float inset = cornerMargin + frameWidth;
+            return new Rect(-(inset + cornerSize), -(inset + cornerSize), cornerSize, cornerSize);
+        }
+
         /// <summary>Pixels down from the screen top where the corner minimap's reserved band ends. Frame width is in
         /// the sum because it is part of the map's inset from the screen edge (MinimapView: "inset = cornerMargin +
         /// frameWidth"), not just an inward border; without it the log overlaps the frame on screens above 1920x1080.</summary>

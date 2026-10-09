@@ -109,10 +109,8 @@ namespace Overpower.Vision
         // Straight under the corner minimap's box (top right: margin + frame band in, then the map's size down), centred on it.
         private void PlaceUnderCornerMinimap(UiTheme theme)
         {
-            float inset = theme.minimapCornerMargin + theme.minimapFrameWidth;
-            RectTransform rect = minimapLabel.rectTransform;
-            rect.anchoredPosition = new Vector2(-(inset + theme.minimapCornerSize / 2f) + theme.scanMinimapCountdownOffset.x,
-                                                -(inset + theme.minimapCornerSize) + theme.scanMinimapCountdownOffset.y);
+            Rect box = Overpower.UI.HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize);
+            minimapLabel.rectTransform.anchoredPosition = new Vector2(box.center.x + theme.scanMinimapCountdownOffset.x, box.yMin + theme.scanMinimapCountdownOffset.y);
         }
 
         private void Hide()
