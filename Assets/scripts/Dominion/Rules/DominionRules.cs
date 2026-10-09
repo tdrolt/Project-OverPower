@@ -4,10 +4,7 @@ using Overpower.Match;
 
 namespace Overpower.Dominion
 {
-    /// <summary>
-    /// The stages of a Dominion match. The numbers are what goes into the room later (Room Properties), so they are fixed: never renumber,
-    /// only add.
-    /// </summary>
+    /// <summary>The stages of a Dominion match. The numbers travel in Room Properties, so they are fixed: never renumber, only append.</summary>
     public enum DominionStage
     {
         None = 0,
@@ -15,7 +12,7 @@ namespace Overpower.Dominion
         Round = 2,
         SuddenDeath = 3,
         Over = 4,
-        /// <summary>The extra minute after a close round (Tudor A50). Appended: the numbers above are already in rooms.</summary>
+        /// <summary>The extra minute after a close round (A50). Appended: the numbers above are already in rooms.</summary>
         Overtime = 5,
     }
 
@@ -29,34 +26,30 @@ namespace Overpower.Dominion
     }
 
     /// <summary>
-    /// The pure rules of Dominion (Task 1): who wins a round and the match, when sudden death starts and between whom, what a held zone
-    /// earns, when the centre pays and when a bounty is due. No Photon types: ints, arrays and server-clock milliseconds. Every number comes in
-    /// as an argument (DominionConfig holds them), so the tests use made-up ones.
-    /// Read later by: the stage flow (Task 2: AfterRound, StageEndMs), points, centre and bounty (Task 3: PointsThisTick, the centre and
-    /// BountyDue).
-    /// Times are the room's server clock in ms, an int that wraps, so they are only ever compared as unchecked(a - b), like the other rules.
+    /// The pure rules of Dominion: who wins a round and the match, when sudden death starts and between whom, what a held zone earns, when the
+    /// centre pays and when a bounty is due. No Photon types; every number comes in as an argument (DominionConfig holds them), so tests use
+    /// made-up ones. Times are the room's server clock in ms, an int that wraps: compare only as unchecked(a - b).
     /// </summary>
     public static class DominionRules
     {
-        /// <summary>Whether a respawn uses the "capital under attack" spawn point. Not in Dominion (A21): those points are 28.6 m from each capital,
-        /// outside its healing circle, and the respawn shield already protects a player who spawns next to enemies.</summary>
+        /// <summary>Whether a respawn uses the "capital under attack" spawn point. Not in Dominion (A21): those points lie outside the capital's
+        /// healing circle, and the respawn shield already protects a player who spawns next to enemies.</summary>
         public static bool UsesCapitalUnderAttackSpawn(bool dominion, bool capitalUnderAttack) => !dominion && capitalUnderAttack;
 
-        /// <summary>Does this room have health packs? 2v2 has none (the spec); 3v3v3 keeps them, and so does every Conquest room.</summary>
+        /// <summary>Does this room have health packs? 2v2 has none; 3v3v3 keeps them, and so does every Conquest room.</summary>
         public static bool HasHealthPacks(bool dominion, int teamCount) => !(dominion && teamCount == 2);
 
-        /// <summary>May the health packs be built right now? Not while the room's mode is still unknown (the catalogue is not reachable yet, e.g. in the
-        /// first frames of a new scene): a 2v2 room would get packs that then have to be taken away. Once the mode is known: HasHealthPacks.</summary>
+        /// <summary>May the health packs be built right now? Not while the room's mode is still unknown (the first frames of a new scene): a 2v2 room
+        /// would get packs that then have to be taken away. Once the mode is known: HasHealthPacks.</summary>
         public static bool MayBuildHealthPacks(bool modeKnown, bool dominion, int teamCount) =>
             modeKnown && HasHealthPacks(dominion, teamCount);
 
         /// <summary>Do Dominion's own match rules (the fixed respawn wait, the spawn healing) apply right now? Only in a Dominion room once the match
-        /// is live: the warm-up stays the free sandbox it is in Conquest (default A22).</summary>
+        /// is live: the warm-up stays the free sandbox it is in Conquest (A22).</summary>
         public static bool RulesApply(bool dominionRoom, bool matchLive) => dominionRoom && matchLive;
 
-        /// <summary>May a dead player come back? Not in a live Dominion match's sudden death, and not once the match is Over: a death there is for good
-        /// (after the last whistle nobody gets back up while the result shows). Everywhere else (a round, a break, Conquest, the warm-up) the ordinary
-        /// respawn applies.</summary>
+        /// <summary>May a dead player come back? Not in a live Dominion match's sudden death, and not once the match is Over (nobody gets back up while
+        /// the result shows). Everywhere else the ordinary respawn applies.</summary>
         public static bool RespawnAllowed(bool dominionLive, DominionStage stage) =>
             !(dominionLive && (stage == DominionStage.SuddenDeath || stage == DominionStage.Over));
 
@@ -69,8 +62,8 @@ namespace Overpower.Dominion
         public static bool CountsAsPresent(bool isInactive, bool hasInactiveSince, float inactiveSinceSeconds, float nowSeconds, float graceSeconds) =>
             !(isInactive && hasInactiveSince && nowSeconds - inactiveSinceSeconds >= graceSeconds);
 
-        /// <summary>The team with the single highest points, or -1 on a tie for first (or no points at all). A tied round counts for
-        /// nobody (Tudor): neither team gets a round win, and 0-0 is a tie like any other.</summary>
+        /// <summary>The team with the single highest points, or -1 on a tie for first (or no points at all). A tied round counts for nobody, and
+        /// 0-0 is a tie like any other.</summary>
         public static int RoundWinner(int[] points)
         {
             if (points == null || points.Length == 0) return -1;
@@ -85,7 +78,7 @@ namespace Overpower.Dominion
         }
 
 
-        // ---------------------------------------------------------------- overtime (Tudor A50)
+        // ---------------------------------------------------------------- overtime (A50)
 
         /// <summary>What the round's clock running out decides: either the winners (one team, or none when overtime is off and the top is tied) or the
         /// teams that play overtime. Exactly one of the two is set.</summary>
@@ -117,9 +110,9 @@ namespace Overpower.Dominion
             return result.ToArray();
         }
 
-        /// <summary>Tudor A56: the overtime teams that still have anyone in the game. A team with nobody left drops out of the overtime - it can neither win
-        /// the round nor share it - and the others carry on (a single team left has won). "Anyone in the game" is the master's player count for the A3 last-team
-        /// rule (a dropped player still counts for the dropped grace). Null counts (the master could not count) leaves the teams as they were.</summary>
+        /// <summary>The overtime teams that still have anyone in the game (A56): a team with nobody left drops out of the overtime (it can neither win
+        /// nor share the round) and the others carry on; a single team left has won. The count is the master's player count for the A3 last-team rule
+        /// (a dropped player still counts for the dropped grace). Null counts (the master could not count) leave the teams as they were.</summary>
         public static int[] OvertimeTeamsPresent(int[] overtimeTeams, int[] playersPerTeam)
         {
             if (overtimeTeams == null || playersPerTeam == null) return overtimeTeams;
@@ -221,17 +214,17 @@ namespace Overpower.Dominion
             return result.ToArray();
         }
 
-        /// <summary>Who plays the current sudden death: the teams the room names (dSdT, A33 - narrowed by every replay), else, for a room that
-        /// has none, the teams level on round wins. An empty stored list reads as none written.</summary>
+        /// <summary>Who plays the current sudden death: the teams the room names (dSdT, narrowed by every replay, A33), else, for a room that has
+        /// none, the teams level on round wins. An empty stored list reads as none written.</summary>
         public static int[] TeamsPlayingSuddenDeath(int[] stored, int[] wins, int[] teamsInMatch) =>
             stored != null && stored.Length > 0 ? stored : SuddenDeathTeams(wins, teamsInMatch);
 
         private static int WinsOf(int[] wins, int team) => team >= 0 && team < wins.Length ? wins[team] : 0;
 
-        /// <summary>What comes after round <paramref name="round"/> (1-based), with <paramref name="wins"/> already counting that round.
-        /// Someone alone on roundsToWin: Over, they win (so round 3 is not played after 2-0); two or more there together: sudden death between them. Rounds left: a Break. After the last round with
-        /// nobody there: the teams tied for the most round wins go to sudden death - but a single leader on round wins (say 1-0-0 after two
-        /// tied rounds) simply wins the match (Tudor A7): sudden death is only for teams that are level.</summary>
+        /// <summary>What comes after round <paramref name="round"/> (1-based), with <paramref name="wins"/> already counting that round. Someone alone
+        /// on roundsToWin: Over, they win (round 3 is not played after 2-0); two or more there together: sudden death between them. Rounds left: a
+        /// Break. After the last round with nobody there: the teams tied for the most round wins go to sudden death, but a single leader on round
+        /// wins (1-0-0 after two tied rounds) simply wins the match (A7): sudden death is only for teams that are level.</summary>
         public static RoundOutcome AfterRound(int round, int[] wins, int roundsToWin, int maxRounds, int[] teamsInMatch)
         {
             int winner = MatchWinner(wins, roundsToWin);
@@ -249,8 +242,8 @@ namespace Overpower.Dominion
         }
 
         /// <summary>Points <paramref name="team"/> earns this one second: for each zone it owns, the table entry of the zone's tier
-        /// (pointsPerTier[tier - 1]). Spawn zones, Tier 1 (the capitals) and Tier 4 (the centre) never pay here whatever the table says: camping your own spawn
-        /// earns nothing, and the centre pays in lumps instead (NextCentrePayoutMs) - Tudor's "alternative way to win".</summary>
+        /// (pointsPerTier[tier - 1]). Spawn zones, Tier 1 (the capitals) and Tier 4 (the centre) never pay here whatever the table says: camping your
+        /// own spawn earns nothing, and the centre pays in lumps instead (NextCentrePayoutMs).</summary>
         public static int PointsThisTick(int[] zoneOwner, int[] zoneTier, bool[] isSpawnZone, int team, int[] pointsPerTier)
         {
             if (zoneOwner == null || zoneTier == null || pointsPerTier == null) return 0;
@@ -299,10 +292,9 @@ namespace Overpower.Dominion
         /// <summary>The team a centre payout goes to: whoever holds the centre at that moment, or -1 (nobody holding = nobody paid).</summary>
         public static int CentrePayoutTeam(int centreOwner) => centreOwner >= 0 ? centreOwner : -1;
 
-        /// <summary>A zone's bounty is due when it is captured by a different team than the one that held it, after that hold lasted at
-        /// least holdMs. It reads what the room stores, as BuildingManager.SetCaptured does: a zone always goes neutral before it is captured,
-        /// and TerritorySnapshot.WithNeutral keeps the finished hold (LastOwnerOf / LastHeldMs), so the arguments are those two, not a
-        /// "held since" time. This wraps BountyRule (the same rule the Control mode uses) rather than repeating it.</summary>
+        /// <summary>A zone's bounty is due when it is captured by a different team than the one that held it, after that hold lasted at least holdMs.
+        /// It reads what the room stores: a zone always goes neutral before it is captured, and TerritorySnapshot.WithNeutral keeps the finished hold
+        /// (LastOwnerOf / LastHeldMs), so the arguments are those two, not a "held since" time. Wraps BountyRule (Conquest's) rather than repeating it.</summary>
         public static bool BountyDue(int lastHeldMs, int holdMs, int lastOwner, int newOwner) =>
             BountyRule.PayoutOnCapture(newOwner, lastOwner, lastHeldMs, 1, holdMs) > 0;
 

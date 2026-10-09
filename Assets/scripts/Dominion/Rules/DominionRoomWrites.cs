@@ -23,11 +23,11 @@ namespace Overpower.Dominion
         public int PointsSeq;
         /// <summary>dSd: the server ms the sudden-death circle starts shrinking; 0 = none written. A replay writes a new one.</summary>
         public int SuddenDeathMs;
-        /// <summary>dSdT: the teams playing the current sudden death; null = none written (a room from before A33, or no sudden death yet).</summary>
+        /// <summary>dSdT: the teams playing the current sudden death; null = none written (an older room, or no sudden death yet).</summary>
         public int[] SuddenDeathTeams;
         /// <summary>dHist: every finished round's final points, rounds x team slots flattened (DominionHistory); empty until round 1 is over.</summary>
         public int[] History;
-        /// <summary>dHistW: the winning team of each finished round (-1 = none), one per dHist round; null in a room from before it existed.</summary>
+        /// <summary>dHistW: the winning team of each finished round (-1 = none), one per dHist round; null in an older room.</summary>
         public int[] HistoryWinners;
         /// <summary>dOtT: the teams playing the current overtime; null = none written (not in overtime).</summary>
         public int[] OvertimeTeams;
@@ -94,10 +94,10 @@ namespace Overpower.Dominion
     public enum DominionEdge { None, BreakStarted, RoundStarted }
 
     /// <summary>
-    /// What the master writes into the room next, as pure rules (Dominion Task 2): given the room's Dominion values, the server clock, the
-    /// config numbers and who is in the match, the one check-and-set to send now, or nothing. DominionDirector only reads the room, asks this and
-    /// sends the answer; a new master asks the same question of the same room and carries on (A1). Every write expects the values it was
-    /// computed from, so two clients that both think they are master cannot both advance one stage.
+    /// What the master writes into the room next, as pure rules: given the room's Dominion values, the server clock, the config numbers and who is
+    /// in the match, the one check-and-set to send now, or nothing. DominionDirector only reads the room, asks this and sends the answer; a new
+    /// master asks the same question of the same room and carries on. Every write expects the values it was computed from, so two clients that
+    /// both think they are master cannot both advance one stage.
     /// </summary>
     public static class DominionRoomWrites
     {
@@ -114,9 +114,9 @@ namespace Overpower.Dominion
 
             if (!room.HasRound)
             {
-                // Every match opens with the break (Task 6, A20), so round 1's free movement ability, attachment and ultimate can be picked
-                // like every other round's. Going live already did the fresh start for players and zones, so dRz is written with the break's
-                // dEnd: no second zone reset for this break; the round's start resets the zones as for any round.
+                // Every match opens with the break (A20), so round 1's free movement ability, attachment and ultimate can be picked like every
+                // other round's. Going live already did the fresh start for players and zones, so dRz is written with the break's dEnd: no second
+                // zone reset for this break; the round's start resets the zones as for any round.
                 int breakEnd = DominionRules.StageEndMs(nowMs, cfg.BreakSeconds);
                 return new DominionWrite
                 {
@@ -147,8 +147,8 @@ namespace Overpower.Dominion
                     { DominionKeys.Winner, lastTeam },
                     { DominionKeys.Wins, Slots(room.Wins) },
                 };
-                // A round cut short by the others leaving is a row of the result table too (default A34): its points so far go into the history in
-                // this write. In a break the round just played is already there; in sudden death every round is.
+                // A round cut short by the others leaving is a row of the result table too (A34): its points so far go into the history in this
+                // write. In a break the round just played is already there; in sudden death every round is.
                 if (DominionRules.IsRoundPlay(room.Stage))
                 {
                     over[DominionKeys.History] = DominionHistory.Append(room.History, room.Points);
@@ -287,10 +287,10 @@ namespace Overpower.Dominion
             return null;
         }
 
-        /// <summary>Sudden death has no clock: the master judges it from who is alive and, when nobody is, from the death stamps (Tudor A31). One team of
-        /// the tied ones with anyone alive wins the match; when all have fallen the team whose last player fell latest wins, and only the exact same
-        /// server moment starts it over (Tudor A8) with a new circle start; two or more alive writes nothing. Only after the judging beat, and the write expects
-        /// the circle start it judged, so two masters cannot both replay or a replay cannot be followed by a stale win.</summary>
+        /// <summary>Sudden death has no clock: the master judges it from who is alive and, when nobody is, from the death stamps (A31). One team of the
+        /// tied ones with anyone alive wins the match; when all have fallen the team whose last player fell latest wins, and only the exact same server
+        /// moment starts it over (A8) with a new circle start; two or more alive writes nothing. Only after the judging beat, and the write expects the
+        /// circle start it judged, so two masters cannot both replay and a replay cannot be followed by a stale win.</summary>
         private static DominionWrite NextInSuddenDeath(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, SuddenDeathRules.Tally tally)
         {
             if (tally == null || room.SuddenDeathMs == 0 || !SuddenDeathRules.MayEvaluate(room.SuddenDeathMs, nowMs)) return null;
@@ -368,7 +368,7 @@ namespace Overpower.Dominion
             return count == 1 ? found : -1;
         }
 
-        /// <summary>The Player Properties a late joiner writes together with the seat write when they take a TEAM seat during sudden death (Tudor A4):
+        /// <summary>The Player Properties a late joiner writes together with the seat write when they take a TEAM seat during sudden death (A4):
         /// alive = false with the given death stamp (ArrivalDeathStamp: the earliest moment, so the joiner can never be the one who "fell last").
         /// Nobody respawns there, so they can only wait dead; without the flag the master would count them as alive (a player with no flag has never
         /// died) for the whole time the body loads. Null for any other join (a spectator seat, another stage), and no stamp (0) while the server
@@ -418,7 +418,7 @@ namespace Overpower.Dominion
             stage == DominionStage.SuddenDeath && suddenDeathMs != 0 && (prevStage != DominionStage.SuddenDeath || prevSuddenDeathMs != suddenDeathMs);
 
         /// <summary>Whether the Tab scoreboard (kills, deaths, damage) carries on counting through this edge. Both Dominion edges keep it: the
-        /// scoreboard covers the whole match and is zeroed only at go-live (Tudor's default A15), so the break's fresh start must not wipe it.</summary>
+        /// scoreboard covers the whole match and is zeroed only at go-live (A15), so the break's fresh start must not wipe it.</summary>
         public static bool KeepsScoreboard(DominionEdge edge) => edge == DominionEdge.BreakStarted || edge == DominionEdge.RoundStarted;
     }
 }

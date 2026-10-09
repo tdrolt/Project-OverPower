@@ -13,20 +13,13 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 7, the respawn shield, on the player prefab. After a death-respawn in a live Dominion match the owner writes the Player
-    /// Property dShd (the server ms the shield ends). Every client draws a blue bubble from dShd and the server clock alone, so it vanishes on time
-    /// everywhere even if nobody writes. While it is up PlayerHealth asks BlocksHit before any health, armour or combat-clock change, and
-    /// PlayerStatusEffects / PlayerDisplacement ask StopsEnemyEffectFrom before an enemy's stun, slow or push lands (A24); a stopped hit stamps
-    /// dBlk (at most once per Blocked Popup Seconds) and every client that can see the player pops BLOCKED over them. Any hit of this player's
-    /// on an enemy clears dShd (A25: CombatEvents.LocalEnemyAffected - damage from the credit message, a status or push from this client's own
-    /// simulation of it); a cast that hits nobody does not, and neither does an effect set up before the respawn (A26). Zones read the same
-    /// property (IsUpFor) and ignore the player. Conquest never writes dShd.
-    ///
-    /// Task 17 (A51): the shield also drops the first frame its owner stands outside their own spawn - the 2v2 pocket (the team's SpawnHealArea) or
-    /// the 3v3v3 capital circle, the same place the spawn heals - by the same clear (dShd and dShs to 0). A shield that dropped stays dropped when the
-    /// owner walks back in; only a new respawn raises one.
-    ///
-    /// No RPC: the state is two Player Properties, so late joiners and rejoiners read it like any other player value.
+    /// The respawn shield, on the player prefab. After a death-respawn in a live Dominion match the owner writes two Player Properties: dShs (the
+    /// server ms the shield began) and dShd (the server ms it ends); every client draws the bubble from dShd and the server clock alone, so it
+    /// vanishes on time everywhere even if nobody writes. PlayerHealth asks BlocksHit before any health or armour change, PlayerStatusEffects and
+    /// PlayerDisplacement ask StopsEnemyEffectFrom before an enemy's stun, slow or push lands (A24); a stopped hit stamps dBlk (at most once per
+    /// Blocked Popup Seconds) and every client that can see the player pops BLOCKED. The shield ends early when this player affects an enemy (A25,
+    /// not for an effect set up before the respawn, A26) or stands outside their own spawn area (A51); it never comes back until a new respawn.
+    /// Zones read IsUpFor and ignore the player. Conquest never writes dShd. No RPC: late joiners read the properties like any other player value.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RespawnShield : MonoBehaviourPun, IEffectShield
@@ -46,8 +39,8 @@ namespace Overpower.Dominion
 
         private bool diedBefore;          // owner: this body has died since it spawned, so its next AliveChanged(true) is a respawn
         private ShieldJudge judge;        // owner: the per-hit judgement and the dBlk stamp spacing
-        private ShieldSpawnWatch spawnWatch; // owner: drops the shield on the first frame outside the player's own spawn (A51)
-        private bool shieldClearSent;     // owner: a clear (a hit on an enemy, leaving the spawn, a death, a fresh start) is written and its echo may not be back yet: the shield is down for this client now, and the leave-spawn watch does not write it again every frame
+        private ShieldSpawnWatch spawnWatch; // owner: drops the shield on the first frame outside the player's own spawn
+        private bool shieldClearSent;     // owner: a clear is written and its echo may not be back yet: down for this client now, and not written again every frame
         private int stampSeen;            // every client: the dBlk value already popped
         private bool stampPrimed;         // the first read only takes the value in: a joiner never pops an old stamp
 
@@ -56,7 +49,7 @@ namespace Overpower.Dominion
             lifecycle = GetComponent<PlayerLifecycle>();
             health = GetComponent<PlayerHealth>();
             body = GetComponent<Rigidbody>();
-            // Subscribed in Awake, not Start: PlayerLifecycle's own Start can already raise AliveChanged (AbilityRunner does the same).
+            // Subscribed in Awake, not Start: PlayerLifecycle's own Start can already raise AliveChanged.
             if (lifecycle != null) lifecycle.AliveChanged += HandleAliveChanged;
             judge = new ShieldJudge(() => IsUp, () => PhotonNetwork.ServerTimestamp, PopupMs, WriteBlockedStamp);
             spawnWatch = new ShieldSpawnWatch(
@@ -87,12 +80,12 @@ namespace Overpower.Dominion
 
         // ---------------------------------------------------------------- state
 
-        /// <summary>True while this player's respawn shield is up, from the room's server clock and their dShd. False outside a room, before the
-        /// clock has synced, and in Conquest (nothing is ever written there).</summary>
+        /// <summary>True while this player's respawn shield is up, from the server clock and their dShd. False outside a room, before the clock has
+        /// synced, and in Conquest.</summary>
         public bool IsUp => photonView != null && photonView.IsMine ? OwnerIsUp() : IsUpFor(photonView != null ? photonView.Owner : null);
 
-        /// <summary>The server ms the owner's client itself started the shield to end at (0 = none). The property only comes back after the server's echo, so until then this
-        /// is what the owner's own hit-block asks (RespawnShieldRules.IsUpForOwner).</summary>
+        /// <summary>The end the owner's client itself started the shield with (0 = none): the property only comes back after the server's echo, so until
+        /// then this is what the owner's own hit-block asks.</summary>
         private int ownEndMs;
 
         private bool OwnerIsUp()
@@ -138,8 +131,8 @@ namespace Overpower.Dominion
             if (start) StartShield();
         }
 
-        /// <summary>Where the owner's body is for the spawn check: the Rigidbody's position, which a respawn teleport sets at once, rather than the transform,
-        /// which can still read the death spot for a physics step after it (a shield must never drop on arrival).</summary>
+        /// <summary>The Rigidbody's position, which a respawn teleport sets at once, rather than the transform, which can still read the death spot for
+        /// a physics step after it: a shield must never drop on arrival.</summary>
         private Vector3 BodyPosition() => body != null ? body.position : transform.position;
 
         private void StartShield()
@@ -150,12 +143,12 @@ namespace Overpower.Dominion
             int end = RespawnShieldRules.EndMs(now, config.ShieldSeconds);
             // Start and end together in one write: A26 judges an old effect from the start, so nobody subtracts their own Shield Seconds from the end.
             ownEndMs = end; // up on this client at once, not a round trip later
-            shieldClearSent = false; // a new shield (a second respawn's too) is up again at once and may drop again when it leaves the spawn
+            shieldClearSent = false; // a new shield is up again at once and may drop again when it leaves the spawn
             PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { RespawnShieldRules.StartKey, now }, { RespawnShieldRules.ShieldKey, end } });
             Debug.Log($"[DOMINION] respawn shield up for {config.ShieldSeconds:0.#} s (ends {end})");
         }
 
-        /// <summary>Owner: drop the shield (writes 0, only when something is set). Called on death and at a round's or break's fresh start.</summary>
+        /// <summary>Owner: drop the shield (writes 0, only when something is set). Called on death, on a hit, on leaving the spawn and at a fresh start.</summary>
         public void ClearShield()
         {
             if (!photonView.IsMine || photonView.Owner == null) return;
@@ -185,10 +178,10 @@ namespace Overpower.Dominion
             Debug.Log("[DOMINION] respawn shield ended: this player hit an enemy");
         }
 
-        /// <summary>The attacker's side of A25, called by a status or push that this client simulates on its copy of a player it does not own.
-        /// When that effect is this client's own player's and the target is a living enemy, the attacker's shield hears of it (no message: the
-        /// attacker's client simulates the effect anyway, and the victim's own shield is read from dShd). effectPlacedMs is when the mine or fence
-        /// behind the effect was set up (0 = a direct effect), so an old one does not end the new bubble (A26).</summary>
+        /// <summary>The attacker's side of A25, called by a status or push this client simulates on its copy of a player it does not own. When the
+        /// effect is this client's own player's and the target is a living enemy, the attacker's shield hears of it (no message: the attacker's client
+        /// simulates the effect anyway, and the victim's own shield is read from dShd). effectPlacedMs is when the mine or fence behind the effect was
+        /// set up (0 = a direct effect), so an old one does not end the new bubble (A26).</summary>
         public static void NoteMyEffectOnCopy(PhotonView victim, int sourceActor, int effectPlacedMs = 0)
         {
             if (victim == null || victim.Owner == null || !PhotonNetwork.InRoom) return;
@@ -258,8 +251,8 @@ namespace Overpower.Dominion
             if (!RespawnShieldRules.IsNewStamp(stampSeen, stamp)) return;
             stampSeen = stamp;
 
-            // Like every other popup: only if this client can see the shielded player. Asked of the team's sight directly, not of the bubble: the
-            // bubble may not exist yet when the stamp arrives, and a popup must never show where the player is hidden in the fog.
+            // Only if this client can see the shielded player, asked of the team's sight directly: the bubble may not exist yet when the stamp
+            // arrives, and a popup must never show where the player is hidden in the fog.
             if (TeamSight.Local != null && !TeamSight.Local.CanSeePlayer(photonView)) return;
             DominionConfig config = DominionMode.Config();
             if (config == null) return;
