@@ -9,7 +9,8 @@ namespace Overpower.UI
     /// <summary>
     /// The round bar at the top centre during a round (board DomHud A, and "3v3v3 version of A"). It carries no points (ScoreBars shows them):
     /// 2v2: a team block either side of the round clock; 3v3v3: three team blocks and the clock at the end. A block is the team's colour line with
-    /// its round-win dots. "+200 CYAN" flashes under the holder's block when the centre pays out. DominionHudText builds the words; sizes, colours and words are UiTheme fields (Dominion HUD). It draws only what
+    /// its round-win dots. "+200 CYAN" flashes under the holder's block when the centre pays out. DominionHudText builds the words; sizes, colours
+    /// and words are UiTheme fields (Dominion HUD). It draws only what
     /// DominionHud hands it each frame and rewrites a text only when its value changed.
     /// </summary>
     public sealed class RoundHud
@@ -193,7 +194,7 @@ namespace Overpower.UI
             edgeImage.raycastTarget = false;
 
             // One dot per round win needed to win the match, centred above the colour line.
-            int dotCount = Mathf.Max(1, DotCount());
+            int dotCount = DotCount();
             block.Dots = new Image[dotCount];
             float first = (width - DotsWidth()) * 0.5f;
             float top = (height - theme.dominionBarEdgeThickness - theme.dominionDotSize) * 0.5f;

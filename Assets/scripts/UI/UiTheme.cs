@@ -960,11 +960,11 @@ namespace Overpower.UI
         public float dominionBarHeight = 80f;
         [Tooltip("The slightly darker box behind the round clock in the middle of the bar.")]
         public Color dominionBarClockFill = new Color(0f, 0f, 0f, 0.25f);
-        [Tooltip("Width of each team's block (its round-win dots) in a 2v2 match (the clock sits between the two).")]
+        [Tooltip("Narrowest a team's block gets in a 2v2 match (the clock sits between the two); it widens when more round-win dots need room.")]
         public float dominionBarSideWidth = 90f;
         [Tooltip("Width of the clock block in a 2v2 match.")]
         public float dominionBarClockWidth = 190f;
-        [Tooltip("Width of each team's block (its round-win dots) in a 3v3v3 match (three blocks, then the clock).")]
+        [Tooltip("Narrowest a team's block gets in a 3v3v3 match (three blocks, then the clock); it widens when more round-win dots need room.")]
         public float dominionBar3SideWidth = 90f;
         [Tooltip("Width of the clock block in a 3v3v3 match.")]
         public float dominionBar3ClockWidth = 200f;

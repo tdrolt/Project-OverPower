@@ -3,7 +3,6 @@ using Overpower.UI;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace Overpower.Tests
 {
@@ -50,8 +49,19 @@ namespace Overpower.Tests
                 Assert.AreEqual(0, t.GetComponentsInChildren<TextMeshProUGUI>(true).Length, t.name + " draws no text");
             }
             Assert.AreEqual(teamCount, blocks);
+            var names = new System.Collections.Generic.List<string>();
             foreach (TextMeshProUGUI text in bar.GetComponentsInChildren<TextMeshProUGUI>(true))
-                Assert.AreNotEqual("120", text.text, "the points are not drawn in the bar");
+                if (text.name != "Centre Flash") names.Add(text.name);
+            names.Sort();
+            CollectionAssert.AreEqual(new[] { "Clock", "Round" }, names, "besides the flash the bar holds only the round heading and the clock");
+        }
+
+        [Test] public void ABlockIsNeverNarrowerThanItsDotsPlusMargins()
+        {
+            Transform bar = Draw(2, 5);
+            float needed = 5 * theme.dominionDotSize + 4 * theme.dominionDotGap + 2f * theme.dominionBarDotsMargin;
+            foreach (Transform t in bar)
+                if (t.name.StartsWith("Team ")) Assert.GreaterOrEqual(((RectTransform)t).sizeDelta.x, needed - 0.01f, t.name);
         }
 
         [TestCase(2, 2)]
