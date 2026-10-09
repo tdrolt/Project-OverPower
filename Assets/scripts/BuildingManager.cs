@@ -295,6 +295,21 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return false;
     }
 
+    /// <summary>What a long hold of this zone pays in Conquest (its tier's capture bounty and the hold time, as SetCaptured gets them) and the UiTheme
+    /// the tower was built with. False while the tower has not registered.</summary>
+    public bool TryGetZoneBounty(int zone, out int tierBounty, out float holdSeconds, out Overpower.UI.UiTheme theme)
+    {
+        tierBounty = 0;
+        holdSeconds = 0f;
+        theme = null;
+        if (!captures.TryGetValue(zone, out BuildingCapture capture) || capture == null)
+            return false;
+        tierBounty = capture.TierBounty;
+        holdSeconds = capture.BountyHoldSeconds;
+        theme = capture.theme;
+        return true;
+    }
+
     /// <summary>The world height of the top of the zone's tower (the highest point of its look: columns, crown, plinth), so
     /// something can float just above it. False while the tower has not registered or has no look.</summary>
     public bool TryGetZoneTowerTopY(int zone, out float topY)
@@ -403,6 +418,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         }
 
         BuildMap();
+        if (GetComponent<TowerBountyView>() == null)
+            gameObject.AddComponent<TowerBountyView>();
 
         // MatchDirector needs no scene footprint and no PhotonView: it only reads and writes Room Properties, the
         // same authority model this class's own territory state uses. Added here at runtime on this same GameObject

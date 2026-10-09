@@ -699,6 +699,28 @@ namespace Overpower.UI
         [Tooltip("Where that countdown sits relative to the spot straight under the middle of the corner minimap, in canvas units: " +
                  "x moves it right, y moves it up (a negative y moves it further down, away from the map).")]
         public Vector2 scanMinimapCountdownOffset = new Vector2(0f, -4f);
+        [Tooltip("The yellow text floating above a tower that carries a bounty in Dominion. {0} is the points the team that takes the zone will get, " +
+                 "e.g. \"BOUNTY {0}\" reads \"BOUNTY 150\".")]
+        public string bountyLabelFormat = "BOUNTY {0}";
+        [Tooltip("The same label in Conquest, where the bounty is gold. {0} is the gold each player of the team that takes the zone will get.")]
+        public string bountyLabelGoldFormat = "BOUNTY {0} GOLD";
+        [Tooltip("The text that pops above a tower when its bounty is paid in Dominion. {0} is the points paid, e.g. \"+{0}\" reads \"+150\".")]
+        public string bountyPopFormat = "+{0}";
+        [Tooltip("The same pop in Conquest. {0} is the gold each player of the team got.")]
+        public string bountyPopGoldFormat = "+{0} GOLD";
+        [Tooltip("The colour of the bounty label and of the pop when it is paid. A warm yellow that stands out from the team colours.")]
+        public Color bountyLabelColour = new Color(1f, 0.85f, 0.1f, 1f);
+        [Tooltip("Text size of the bounty label above a tower, in reference pixels (1080p). It is a HUD label, so it keeps the same size on screen however far the camera is zoomed out.")]
+        [Min(1f)] public float bountyLabelFontSize = 30f;
+        [Tooltip("Text size of the pop when a bounty is paid, in reference pixels (1080p). Bigger than the label so the payout is noticed.")]
+        [Min(1f)] public float bountyPopFontSize = 44f;
+        [Tooltip("How far above the top of the tower the bounty label floats, in reference pixels (1080p). Pixels rather than metres: the game camera is only " +
+                 "a few metres above the tower tops, so a height in metres would swing wildly with the distance.")]
+        [Min(0f)] public float bountyLabelLift = 56f;
+        [Tooltip("How far the pop rises above the label while it fades, in reference pixels (1080p).")]
+        [Min(0f)] public float bountyPopRise = 110f;
+        [Tooltip("How long the pop lasts from appearing until it is gone, in seconds.")]
+        [Min(0.1f)] public float bountyPopSeconds = 2.5f;
         [Tooltip("Size of a way-in arrowhead, in canvas units. It points from a team's zone toward the neutral zone next to it.")]
         public float minimapArrowheadSize = 12f;
         [Tooltip("Size of your own arrow on the minimap, in canvas units. It points where you face.")]

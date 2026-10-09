@@ -240,6 +240,16 @@ MonoBehaviour:
   scanCountdownFontSize: 28
   scanMinimapCountdownFontSize: 22
   scanMinimapCountdownOffset: {x: 0, y: -4}
+  bountyLabelFormat: BOUNTY {0}
+  bountyLabelGoldFormat: BOUNTY {0} GOLD
+  bountyPopFormat: +{0}
+  bountyPopGoldFormat: +{0} GOLD
+  bountyLabelColour: {r: 1, g: 0.85, b: 0.1, a: 1}
+  bountyLabelFontSize: 30
+  bountyPopFontSize: 44
+  bountyLabelLift: 56
+  bountyPopRise: 110
+  bountyPopSeconds: 2.5
   minimapArrowheadSize: 12
   minimapOwnMarkerSize: 18
   minimapPackBadgeSize: 12

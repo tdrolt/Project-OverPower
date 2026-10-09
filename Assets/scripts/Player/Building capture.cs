@@ -31,6 +31,11 @@ public class BuildingCapture : MonoBehaviourPun
     [Tooltip("Shared per-tier numbers. Every tower should point at the same asset.")]
     public TerritoryConfig territoryConfig;
 
+    /// <summary>The Conquest gold this zone pays a team that takes it after a long hold (its tier's capture bounty), 0 without a territory config.</summary>
+    public int TierBounty => territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureBounty : 0;
+
+    public float BountyHoldSeconds => territoryConfig != null ? territoryConfig.BountyHoldSeconds : 0f;
+
     /// <summary>This tower's capture circle, from the Territory Config row of the tier it plays as RIGHT NOW
     /// (EffectiveTier): the centre's circle shrinks to the Tier III radius while it plays as one. The phase-two wall's
     /// recess was sized around the larger Tier IV radius; RefreshRingView re-sizes the ring (CaptureRingView.Resize)
@@ -853,7 +858,7 @@ public class BuildingCapture : MonoBehaviourPun
         // TowerDictionary and flag) follows when the room sends the snapshot back. The bounty PAYOUT
         // (BountyRule.PayoutOnCapture) is computed inside SetCaptured itself, from the same write basis that write
         // builds on; only this zone's tier numbers are passed in here.
-        int tierBounty = territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureBounty : 0;
+        int tierBounty = TierBounty;
         int holdMs = territoryConfig != null ? (int)(territoryConfig.BountyHoldSeconds * 1000f) : 0;
         BuildingManager.Instance.SetCaptured(buildingID, capturingTeam, tierBounty, holdMs);
 
