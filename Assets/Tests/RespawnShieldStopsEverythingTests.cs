@@ -92,12 +92,6 @@ namespace Overpower.Tests
             Assert.IsTrue(MatchPropertyReset.Build().ContainsKey(RespawnShieldRules.StartKey));
         }
 
-        // ------------------------------------------------------------ the rejoin respawn (Task 7 review, default A28)
-
-        // ------------------------------------------------------------ the capture roster hold-out (Task 7 review)
-
-        private static readonly System.Func<int, bool> NobodyDead = p => false;
-
         // ------------------------------------------------------------ the judge: one stamp spacing for hits, statuses and pushes
 
         private sealed class JudgeRig

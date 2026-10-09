@@ -266,28 +266,26 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(DominionDirector), "OnCaptureWritten", Rule(typeof(DominionRules), nameof(DominionRules.IsRoundPlay))));
         }
 
-        private const string RoundsCard =
-            "Three rounds against the clock. The team with the most points when time runs out wins the round. If the top teams finish close, they play a short overtime: the first to pull well ahead wins the round, and if nobody does, each of them gets it. Win two rounds, or lead on round wins after the third, to win the match.";
-        private const string SuddenDeathCard =
-            "If the top teams are level on round wins after the third round, or reach two wins together, sudden death starts: no respawns, and a shrinking circle hurts anyone outside it. The last team standing wins.";
-        private const string RespawnsCard =
-            "You always come back after the same short wait, inside a shield that blocks all damage, stuns and pushes. It breaks when its time runs out, when you hit an enemy or when you leave your spawn, and you can't capture while it's up.";
-
-        private static string Card(string mode, string title)
+        // The cards' wording is Tudor's (he edits it in the mode assets), so no test pins it; what is guarded is the rule of A54: the three revised
+        // cards exist in both modes, once each, with words and no exact numbers.
+        private static GameModeDefinition Mode(string mode)
         {
             var def = UnityEditor.AssetDatabase.LoadAssetAtPath<GameModeDefinition>("Assets/Gameplay/Config/Modes/" + mode + ".asset");
             Assert.IsNotNull(def, mode);
-            return def.InfoCards.First(c => c.title == title).text;
+            return def;
         }
 
-        [Test] public void TheThreeRevisedCardsAreWordForWordTheApprovedTextInBothModes()
+        [Test] public void BothModesCarryTheThreeRevisedCardsOnceEachWithNoExactNumbers()
         {
             foreach (string mode in new[] { "Dominion 2v2", "Dominion 3v3v3" })
-            {
-                Assert.AreEqual(RoundsCard, Card(mode, "Rounds"), mode);
-                Assert.AreEqual(SuddenDeathCard, Card(mode, "Sudden death"), mode);
-                Assert.AreEqual(RespawnsCard, Card(mode, "Respawns"), mode);
-            }
+                foreach (string title in new[] { "Rounds", "Sudden death", "Respawns" })
+                {
+                    var cards = Mode(mode).InfoCards.Where(c => c.title == title).ToList();
+                    Assert.AreEqual(1, cards.Count, $"{mode}: one card titled {title}");
+                    string text = cards[0].text;
+                    Assert.IsFalse(string.IsNullOrWhiteSpace(text), $"{mode} {title}: has words");
+                    Assert.IsFalse(text.Any(char.IsDigit), $"{mode} {title}: no exact numbers on a card (A54): {text}");
+                }
         }
 
         // The overtime's buzzer in the points plan: a centre payout due by the overtime's end is paid, the per-second ticks stop.

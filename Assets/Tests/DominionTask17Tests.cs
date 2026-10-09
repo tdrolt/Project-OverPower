@@ -188,16 +188,7 @@ namespace Overpower.Tests
 
         private static VisionConfig RealVision() => UnityEditor.AssetDatabase.LoadAssetAtPath<VisionConfig>("Assets/Gameplay/Config/VisionConfig.asset");
 
-        [Test] public void TheScanWaveReadsYellowOnTheRealConfig()
-        {
-            VisionConfig vision = RealVision();
-            Assert.IsNotNull(vision);
-            Color.RGBToHSV(vision.ScanWaveColour, out float hue, out float saturation, out float value);
-            Assert.That(hue, Is.InRange(0.10f, 0.20f), "a yellow hue (36 to 72 degrees), not the old red");
-            Assert.That(saturation, Is.GreaterThan(0.5f));
-            Assert.That(value, Is.GreaterThan(0.6f));
-        }
-
+        // The wave's colour itself is Tudor's (VisionConfig › Scan Wave Colour); the rule guarded here is that the wave and the dots have separate colours.
         [Test] public void TheWaveAndTheMinimapDotsReadSeparateColourFields()
         {
             VisionConfig vision = ScriptableObject.CreateInstance<VisionConfig>();
