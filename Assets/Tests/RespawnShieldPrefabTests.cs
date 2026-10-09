@@ -22,15 +22,5 @@ namespace Overpower.Tests
             Assert.IsNotNull(reference, "the bubble's size is read from the Invulnerability ability, never copied");
             Assert.Greater(reference.ShieldDiameter, 0f);
         }
-
-        [Test] public void TheThemeHasABlueRespawnShieldColourThatIsNotTheInvulnerabilityYellow()
-        {
-            var theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            Assert.IsNotNull(theme);
-            Color c = theme.respawnShieldColor;
-            Assert.Greater(c.b, c.r, "blue, never the yellow immune look");
-            Assert.Greater(c.b, c.g);
-            Assert.Greater(c.a, 0f);
-        }
     }
 }

@@ -104,10 +104,9 @@ namespace Overpower.Tests
         {
             var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
             Assert.IsNotNull(theme);
-            Assert.AreEqual(0.38f, theme.chatPanelAlpha, 0.001f, "board 7A: a panel at about 38% opacity");
-            Assert.AreEqual(27f, theme.chatTextSize, 0.001f, "board 7A: 18 px text x 1.5");
-            Assert.AreEqual("Enter to type, Escape to close", theme.chatInputPlaceholder);
-            Assert.AreEqual("[SPEC]", theme.chatSpectatorTag);
+            // The look (alpha, text size, placeholder, the spectator tag) is Tudor's, tuned in the asset: only the structure is guarded.
+            Assert.IsFalse(string.IsNullOrEmpty(theme.chatInputPlaceholder));
+            Assert.IsFalse(string.IsNullOrEmpty(theme.chatSpectatorTag));
             Assert.Greater(theme.chatPanelSize.x, 0f);
             Assert.Greater(theme.chatLobbySize.x, 0f);
             Assert.Greater(theme.chatMaxLines, 0);
