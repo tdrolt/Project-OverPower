@@ -19,11 +19,11 @@ namespace Overpower.UI
         [Tooltip("0 = scale with screen width, 1 = with height, 0.5 = a mix. 0.5 keeps ultrawide and 16:10 readable.")]
         [Range(0f, 1f)] public float matchWidthOrHeight = 0.5f;
         [Tooltip("How big the whole HUD is drawn, as a fraction of the sizes below: 1 is full size, 0.8 is 20% " +
-                 "smaller (Tudor, 2026-09-17). Applied ONCE, as a scale on the HUD panel and on the gold/shop " +
-                 "block in the bottom-right corner - every other size on this asset stays in its own units, so a " +
-                 "designer tunes Bar Width or Slot Width normally and this one number makes the whole group " +
-                 "bigger or smaller. It does NOT scale the minimap, the toast, the match panels, the chat or the " +
-                 "F1 test range panel, which each sit on their own.")]
+                 "smaller. Applied ONCE, as a scale on the HUD panel and on the gold/shop block in the bottom-right " +
+                 "corner - every other size on this asset stays in its own units, so a designer tunes Bar Width or " +
+                 "Slot Width normally and this one number makes the whole group bigger or smaller. It does NOT scale " +
+                 "the minimap, the toast, the match panels, the chat or the F1 test range panel, which each sit on " +
+                 "their own.")]
         [Range(0.5f, 1.5f)] public float hudScale = 0.8f;
 
         [Header("Text")]
@@ -56,22 +56,22 @@ namespace Overpower.UI
 
         [Header("Panels")]
         [Tooltip("Border / highlight for the equipped or selected item.")] public Color highlightColor = new Color(1f, 0.78f, 0.25f, 1f);
-        [Tooltip("Colour of items you cannot pick yet - a dark, mostly-opaque fill with muted text on top (Muted Text Colour), not a near-transparent wash: at low alpha over a translucent panel this read as barely-there rather than clearly locked (Task 9a review, 616x576 capture).")]
+        [Tooltip("Colour of items you cannot pick yet - a dark, mostly-opaque fill with muted text on top (Muted Text Colour), not a near-transparent wash: at low alpha over a translucent panel this read as barely-there rather than clearly locked.")]
         public Color lockedColor = new Color(0.09f, 0.09f, 0.10f, 0.92f);
         [Tooltip("Space between a panel's background edge and the bars/slots inside it, in canvas units, on every side.")]
         public float hudPanelPadding = 16f;
-        [Tooltip("Distance from the bottom of the screen to the bottom of the HUD panel, in canvas units. Kept " +
-                 "small - Task 5 shrank the chat prompt so the HUD no longer needs to clear a tall band.")]
+        [Tooltip("Distance from the bottom of the screen to the bottom of the HUD panel, in canvas units. Kept small: " +
+                 "the chat prompt is small, so the HUD does not need to clear a tall band.")]
         public float hudBottomOffset = 28f;
 
         [Header("Bars")]
         [Tooltip("Plain white sprite every filled bar uses. Without a sprite Unity ignores the fill amount and draws the bar full.")]
         public Sprite barSprite;
-        [Tooltip("Width of every HUD bar (health, armor, overheat), in canvas units. The slots row beneath them " +
-                 "does not read this directly (fix 7, Playtest polish review) - its own preferred width is " +
-                 "computed from Slot Width and Hud Slot Spacing below (4 slots: the weapon plus the three " +
-                 "ability slots - see PlayerHud.BuildUi). Keep 4 x Slot Width + 3 x Hud Slot Spacing equal to " +
-                 "this number, or the slot row will no longer line up under the bars above it.")]
+        [Tooltip("Width of every HUD bar (health, armor, overheat), in canvas units. The slots row beneath them does " +
+                 "not read this directly - its own preferred width is computed from Slot Width and Hud Slot Spacing " +
+                 "below (4 slots: the weapon plus the three ability slots - see PlayerHud.BuildUi). Keep 4 x Slot " +
+                 "Width + 3 x Hud Slot Spacing equal to this number, or the slot row will no longer line up under the " +
+                 "bars above it.")]
         public float barWidth = 590f;
         [Tooltip("Health fill.")] public Color healthColor = new Color(0.39f, 0.8f, 0.25f, 1f);
         [Tooltip("Shield fill.")] public Color shieldColor = new Color(0.25f, 0.6f, 1f, 1f);
@@ -141,13 +141,12 @@ namespace Overpower.UI
         [Tooltip("How long the hit flash (Vent Band Hit Colour) stays up before the band disappears, in " +
                  "seconds. Short on purpose - the bar dropping by half is the read, not the flash.")]
         public float ventHitFlashSeconds = 0.25f;
-        [Tooltip("Colour the Vent band turns on a miss (pressed early, pressed late, or the window passed " +
-                 "with nothing pressed) - stays this colour for the rest of the silence, so a player who " +
-                 "pressed early knows at once rather than wondering if it is still coming. Opaque dark grey " +
-                 "on purpose (review fix, captures d2/a2 2026-09-23): the earlier translucent mid-grey sat " +
-                 "over the red silenced fill and read pinkish, almost the same as the dim 'not yet' look " +
-                 "(white at 0.28 alpha over red also reads pink) - a player who pressed early could not " +
-                 "tell they had missed. Opaque so it reads as 'closed' regardless of what is under it.")]
+        [Tooltip("Colour the Vent band turns on a miss (pressed early, pressed late, or the window passed with " +
+                 "nothing pressed) - stays this colour for the rest of the silence, so a player who pressed early " +
+                 "knows at once rather than wondering if it is still coming. Opaque dark grey on purpose: the earlier " +
+                 "translucent mid-grey sat over the red silenced fill and read pinkish, almost the same as the dim " +
+                 "'not yet' look (white at 0.28 alpha over red also reads pink) - a player who pressed early could " +
+                 "not tell they had missed. Opaque so it reads as 'closed' regardless of what is under it.")]
         public Color ventBandMissColor = new Color(0.3f, 0.3f, 0.3f, 1f);
 
         [Header("HUD slots")]
@@ -156,11 +155,9 @@ namespace Overpower.UI
                  "The slots row's own width is 4 of these plus 3 gaps of Hud Slot Spacing below - see Bar " +
                  "Width's tooltip for why that total is kept equal to it.")]
         public float slotWidth = 140f;
-        [Tooltip("Horizontal gap between adjacent HUD slots (the weapon slot and the three ability slots), in " +
-                 "canvas units - fix 7, Playtest polish review: this used to be a number hardcoded in " +
-                 "PlayerHud.BuildUi that the slots row's own width (wrongly pinned to Bar Width instead of its " +
-                 "own content) never accounted for. Now the one home for that gap, read by both the layout " +
-                 "group's spacing and the row's own preferred-width calculation, so the two can never disagree.")]
+        [Tooltip("Horizontal gap between adjacent HUD slots (the weapon slot and the three ability slots), in canvas " +
+                 "units. It is the one home for that gap, read by both the layout group's spacing and the row's own " +
+                 "preferred-width calculation, so the two can never disagree.")]
         public float hudSlotSpacing = 10f;
         [Tooltip("Height of a slot's icon/name area, in canvas units - the only part the weapon slot has; the " +
                  "three ability slots add Slot Cooldown Area Height below it.")]
@@ -168,18 +165,17 @@ namespace Overpower.UI
         [Tooltip("Extra height below the icon box, in canvas units, reserved for the charge pips and the " +
                  "block-reason text on the three ability slots. The weapon slot has neither and never adds this.")]
         public float slotCooldownAreaHeight = 58f;
-        [Tooltip("Height of the key strip (LMB / RMB / SPACE / SHIFT) across the top of a slot, in canvas units " +
-                 "(Tudor, 2026-09-17: the key used to sit in the top-left corner). The icon and the ability name " +
-                 "centre themselves in whatever is left of the icon box below it, so both read as centred in the " +
-                 "square at once - which one shared rect could never do.")]
+        [Tooltip("Height of the key strip (LMB / RMB / SPACE / SHIFT) across the top of a slot, in canvas units. The " +
+                 "icon and the ability name centre themselves in whatever is left of the icon box below it, so both " +
+                 "read as centred in the square at once - which one shared rect could never do.")]
         public float slotKeyRowHeight = 30f;
         [Tooltip("Height of the block-reason line (\"recharging\", \"stunned\") under a slot's charge pips, in " +
                  "canvas units. Together with the pip row it has to fit inside Slot Cooldown Area Height above.")]
         public float slotReasonTextHeight = 26f;
-        [Tooltip("Thickness of the border drawn around a weapon/ability slot, in canvas units (HUD step 2). The " +
-                 "border is what carries the ready / blocked / active colour now: Tudor asked for the dark box " +
-                 "behind the abilities to go, so the slot is a thin frame over a faint wash instead of a filled " +
-                 "square. Raise it if the state colour is hard to see at a glance.")]
+        [Tooltip("Thickness of the border drawn around a weapon/ability slot, in canvas units. The border is what " +
+                 "carries the ready / blocked / active colour now: There is no dark box behind the abilities, so the " +
+                 "slot is a thin frame over a faint wash instead of a filled square. Raise it if the state colour is " +
+                 "hard to see at a glance.")]
         public float slotBorderWidth = 3f;
         [Tooltip("The faint wash inside a slot's border (HUD step 2) - just enough to keep an icon or an ability " +
                  "name readable over the arena's bright sand, low enough to see the ground through. Raise the " +
@@ -210,10 +206,9 @@ namespace Overpower.UI
         [Tooltip("Charge pip colour for a spent charge while the ability is locked - the same red, dimmer, so the " +
                  "count still reads.")]
         public Color pipLockedSpentColor = new Color(0.9f, 0.15f, 0.15f, 0.35f);
-        [Tooltip("Width and height of one charge pip, in canvas units (HUD step 3 - this used to be a number " +
-                 "typed into PlayerHud where no designer could reach it). Tudor asked for bigger indicators: at " +
-                 "14 a pip is a tenth of a 140-unit slot, where the old 8 was a seventeenth. The pips sit in a " +
-                 "row Pip Row Height tall, which has to be at least this plus twice Pip Outline Width.")]
+        [Tooltip("Width and height of one charge pip, in canvas units. Bigger pips read better: at 14 a pip is a " +
+                 "tenth of a 140-unit slot, where 8 was a seventeenth. The pips sit in a row Pip Row Height tall, " +
+                 "which has to be at least this plus twice Pip Outline Width.")]
         public float pipSize = 14f;
         [Tooltip("Gap between two charge pips, in canvas units. Wide enough to count them at a glance without " +
                  "the row running past the slot's edge.")]
@@ -292,11 +287,11 @@ namespace Overpower.UI
         [Header("Loadout screen")]
         [Tooltip("Colour of the full-screen wash behind the loadout panel - dims the game world so the panel reads as a modal screen.")]
         public Color loadoutDimColor = new Color(0f, 0f, 0f, 0.75f);
-        [Tooltip("Background behind the loadout panel itself - its OWN colour, separate from Panel Colour (the HUD's), because a HUD panel sits over solid HUD chrome while this one sits over the game world: at Panel Colour's own opacity the world, and a player's overhead health/shield bar, showed straight through the middle of it (Task 9a review, 616x576 capture). Kept nearly opaque (~0.96) so nothing behind the modal panel is visible through it.")]
+        [Tooltip("Background behind the loadout panel itself - its OWN colour, separate from Panel Colour (the HUD's), because a HUD panel sits over solid HUD chrome while this one sits over the game world: at Panel Colour's own opacity the world, and a player's overhead health/shield bar, showed straight through the middle of it. Kept nearly opaque (~0.96) so nothing behind the modal panel is visible through it.")]
         public Color loadoutPanelColor = new Color(0.05f, 0.05f, 0.07f, 0.96f);
         [Tooltip("Space between the loadout panel's background edge and its title/columns, in canvas units, on every side.")]
         public float loadoutPanelPadding = 20f;
-        [Tooltip("Extra vertical gap inserted above the 'Armor' heading, on top of the normal item spacing between it and the Reset Weapon button above it - at the normal spacing alone the heading read as crowding the button above it (Task 9a review, 616x576 capture).")]
+        [Tooltip("Extra vertical gap inserted above the 'Armor' heading, on top of the normal item spacing between it and the Reset Weapon button above it - at the normal spacing alone the heading read as crowding the button above it.")]
         public float loadoutSectionGap = 16f;
         [Tooltip("Gap from the top of the screen to the top of the loadout panel, in canvas units. The panel is anchored to the TOP of the screen rather than dead-centre so a tall tree/armor column never grows down into the HUD, which sits at the bottom.")]
         public float loadoutPanelTopMargin = 24f;
@@ -322,9 +317,9 @@ namespace Overpower.UI
         public float loadoutArmorRowGap = 90f;
         [Tooltip("Thickness of the highlight border drawn around the equipped weapon node or ability card, in canvas units.")]
         public float loadoutEquippedBorderWidth = 4f;
-        [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units. Raised from an original 44 (Task 9a review, 616x576 capture): a bigger button gives the bigger glyph below more room to stay legible.")]
+        [Tooltip("Width and height of a small square icon button - the close X and the armor +Absorb/+Recharge steppers - in canvas units. Raised from an original 44: a bigger button gives the bigger glyph below more room to stay legible.")]
         public float loadoutStepperButtonSize = 56f;
-        [Tooltip("Font size for the glyph inside a stepper button (the close X, the armor + buttons), in canvas units - bigger than Body Text Size on purpose: at Body Text Size a '+' drawn this small read as a flat dash rather than a clear plus (Task 9a review, 616x576 capture).")]
+        [Tooltip("Font size for the glyph inside a stepper button (the close X, the armor + buttons), in canvas units - bigger than Body Text Size on purpose: at Body Text Size a '+' drawn this small read as a flat dash rather than a clear plus.")]
         public float loadoutStepperFontSize = 32f;
         [Tooltip("Width of a labelled loadout button - Reset Weapon, Reset Armor - in canvas units.")]
         public float loadoutSmallButtonWidth = 170f;
@@ -334,11 +329,11 @@ namespace Overpower.UI
         public Color loadoutSelectableColor = new Color(0.16f, 0.16f, 0.19f, 0.95f);
         [Tooltip("Node fill for a weapon you already passed through on the way to your current one.")]
         public Color loadoutOwnedColor = new Color(0.30f, 0.30f, 0.33f, 0.85f);
-        [Tooltip("Node/card fill for a Selectable item the shop gate refuses right now (out of territory, in combat, or short of gold) - Task 2.5b review fix 1. Deliberately its OWN colour, distinct from Locked Colour: a shop-blocked item is still reachable (leave the zone, wait out combat, earn the gold) where a tree-Locked item genuinely cannot be picked yet, and the two used to be painted identically. Also distinct from the HUD's Slot Blocked Colour, which marks a HUD ability slot that cannot fire right now (dead/stunned/recharging) - a different question with its own look.")]
+        [Tooltip("Node/card fill for a Selectable item the shop gate refuses right now (out of territory, in combat, or short of gold). Deliberately its OWN colour, distinct from Locked Colour: a shop-blocked item is still reachable (leave the zone, wait out combat, earn the gold) where a tree-Locked item genuinely cannot be picked yet, and the two used to be painted identically. Also distinct from the HUD's Slot Blocked Colour, which marks a HUD ability slot that cannot fire right now (dead/stunned/recharging) - a different question with its own look.")]
         public Color loadoutShopBlockedColor = new Color(0.22f, 0.14f, 0.05f, 0.92f);
-        [Tooltip("Font size percentage (of Body/Small Text Size) for the price/status line under a weapon node or ability card's name - e.g. \"<size=70%>\" (Task 2.5b review fix 6: this used to be a magic string typed out at every call site).")]
+        [Tooltip("Font size percentage (of Body/Small Text Size) for the price/status line under a weapon node or ability card's name - e.g. \"<size=70%>\".")]
         [Range(10f, 100f)] public float loadoutPriceLineSizePercent = 70f;
-        [Tooltip("Seconds a refused click's reason (\"Need 700 more gold\", \"Out of combat in 2.4s\"...) stays shown in the header status line before it reverts to the ordinary gate status - Task 2.5b review fix 2. A click on a shop-blocked item used to do nothing visible at all.")]
+        [Tooltip("Seconds a refused click's reason (\"Need 700 more gold\", \"Out of combat in 2.4s\"...) stays shown in the header status line before it reverts to the ordinary gate status. A click on a shop-blocked item used to do nothing visible at all.")]
         public float loadoutBlockedReasonDurationSeconds = 2f;
         [Tooltip("Second line on a weapon node that can only be reached by selling your current weapon path first. {0} = the new weapon's price, {1} = the gold selling back gives right now (the same number the Reset Weapon button shows). Not shown when there is nothing to sell back.")]
         public string loadoutSwapFormat = "Swap {0} (sell back +{1})";
@@ -350,7 +345,7 @@ namespace Overpower.UI
         public string loadoutSoldArmorFormat = "Sold armour upgrades: +{0} gold";
         [Tooltip("Seconds a 'Sold ...' message stays on the shop's status line.")]
         public float loadoutSoldMessageDurationSeconds = 3f;
-        [Tooltip("Seconds the pointer must rest on a weapon node, ability card or armour row before its pop-up (name, what it does, numbers) appears next to the cursor (Task 13: 0.5 s). Moving off hides it at once; moving to another item restarts the wait.")]
+        [Tooltip("Seconds the pointer must rest on a weapon node, ability card or armour row before its pop-up (name, what it does, numbers) appears next to the cursor. Moving off hides it at once; moving to another item restarts the wait.")]
         public float loadoutTooltipDelaySeconds = 0.5f;
         [Tooltip("Widest a shop pop-up gets, in canvas units; longer text wraps onto more lines.")]
         public float loadoutTooltipMaxWidth = 400f;
@@ -382,13 +377,13 @@ namespace Overpower.UI
         public string loadoutArmorAbsorbRowFormat = "Absorb lv {0}: {1}";
         [Tooltip("The Recharge armour row. {0} = its level, {1} = the status text (which upgrade is next, or max).")]
         public string loadoutArmorRechargeRowFormat = "Recharge lv {0}: {1}";
-        [Tooltip("Colour of the arrows from each weapon to the upgrades it opens in the shop's weapon tree (neutral grey, Task 5b-2).")]
+        [Tooltip("Colour of the arrows from each weapon to the upgrades it opens in the shop's weapon tree (neutral grey).")]
         public Color loadoutArrowColor = new Color(0.42f, 0.42f, 0.47f, 1f);
         [Tooltip("Thickness of those arrows, in canvas units.")]
         public float loadoutArrowWidth = 3f;
         [Tooltip("Length of the arrowhead at the upgrade end of each tree arrow, in canvas units.")]
         public float loadoutArrowHeadSize = 12f;
-        [Tooltip("Vertical space between one weapon-tree row and the next, in canvas units - room for the arrows to read (Task 5b-2, widened in Task 13 now the tree has its own page).")]
+        [Tooltip("Vertical space between one weapon-tree row and the next, in canvas units - room for the arrows to read.")]
         public float loadoutTreeRowGap = 90f;
         [Tooltip("Horizontal space between the four weapon families (each family is its node with its two upgrades side by side beneath it), in canvas units. The whole tree must fit Loadout Page Width.")]
         public float loadoutTreeColumnGap = 50f;
@@ -442,48 +437,43 @@ namespace Overpower.UI
             new Color(0.68f, 0.32f, 1f, 1f),  // team 1 - violet (mesh is black - would be invisible as a trail)
             new Color(0.15f, 0.95f, 1f, 1f),  // team 2 - cyan (matches its mesh)
         };
-        [Tooltip("Trail/tint colour used when the shooter's team could not be resolved - Teams.TryGetTeam " +
-                 "returned -1. Should never actually appear in a real match; only a debug/test-range shot " +
-                 "fired with no team assigned reads this. Deliberately dimmer AND lower alpha than every " +
-                 "real team colour - both the trail's fade (reads straight off this colour's alpha) and " +
-                 "the core's glow (ShotTeamVisuals.TintCore scales emission by this same alpha) key off " +
-                 "it, so an unresolved shot reads as a faint, washed-out ghost rather than a fourth team " +
-                 "colour. Two earlier versions both still read as a near-duplicate of Team 0's near-white " +
-                 "once Team 0's own washed-out blue tint was fixed: a flat mid-grey at full alpha, then a " +
-                 "light grey whose CORE glow (before emission also scaled by alpha) was still just as " +
-                 "bright as a real team's (Task 11a follow-up review, 616x576 captures).")]
+        [Tooltip("Trail/tint colour used when the shooter's team could not be resolved - Teams.TryGetTeam returned " +
+                 "-1. Should never actually appear in a real match; only a debug/test-range shot fired with no team " +
+                 "assigned reads this. Deliberately dimmer AND lower alpha than every real team colour - both the " +
+                 "trail's fade (reads straight off this colour's alpha) and the core's glow (ShotTeamVisuals.TintCore " +
+                 "scales emission by this same alpha) key off it, so an unresolved shot reads as a faint, washed-out " +
+                 "ghost rather than a fourth team colour. Two earlier versions both still read as a near-duplicate of " +
+                 "Team 0's near-white once Team 0's own washed-out blue tint was fixed: a flat mid-grey at full " +
+                 "alpha, then a light grey whose CORE glow (before emission also scaled by alpha) was still just as " +
+                 "bright as a real team's.")]
         public Color unknownTeamShotColor = new Color(0.55f, 0.55f, 0.58f, 0.5f);
-        [Tooltip("How many seconds a shot's trail keeps fading behind it after the bullet itself is gone. " +
-                 "Raised from an original 0.25 - at the game's normal camera zoom a shot crosses almost the " +
-                 "whole visible frame in under half a second, and 0.25 left too little of the tail actually " +
-                 "drawn to compare colours by (Task 11a follow-up review, 616x576 capture).")]
+        [Tooltip("How many seconds a shot's trail keeps fading behind it after the bullet itself is gone. Raised from " +
+                 "an original 0.25 - at the game's normal camera zoom a shot crosses almost the whole visible frame " +
+                 "in under half a second, and 0.25 left too little of the tail actually drawn to compare colours by.")]
         public float trailTime = 0.35f;
-        [Tooltip("Trail width where it meets the bullet, in metres. Raised from an original 0.09 - too thin " +
-                 "a ribbon to read its colour at a glance at the game's normal camera zoom (Task 11a " +
-                 "follow-up review, 616x576 capture).")]
+        [Tooltip("Trail width where it meets the bullet, in metres. Raised from an original 0.09 - too thin a ribbon " +
+                 "to read its colour at a glance at the game's normal camera zoom.")]
         public float trailStartWidth = 0.15f;
         [Tooltip("Trail width at its fading tail end, in metres - thinner than Trail Start Width so the " +
                  "trail reads as tapering off rather than a solid ribbon.")]
         public float trailEndWidth = 0.02f;
-        [Tooltip("Shared unlit material every shot trail renders with - Assets/Gameplay/UI/ShotTrail.mat, " +
-                 "built the same way Task 7's Aim Cone Line Material was (URP Particles/Unlit, alpha " +
-                 "transparent, no shadows). Its own colour stays white: every trail tints itself through " +
-                 "TrailRenderer.colorGradient, which is what lets one material serve every team.")]
+        [Tooltip("Shared unlit material every shot trail renders with - Assets/Gameplay/UI/ShotTrail.mat, built the " +
+                 "same way as the Aim Cone Line Material (URP Particles/Unlit, alpha transparent, no shadows). Its " +
+                 "own colour stays white: every trail tints itself through TrailRenderer.colorGradient, which is what " +
+                 "lets one material serve every team.")]
         public Material trailMaterial;
-        [Tooltip("0 = the bullet's core keeps its own material colour, 1 = fully replaced by the team " +
-                 "colour. How far ShotTeamVisuals lerps the core's tint toward Shot Color For. Raised from " +
-                 "an original 0.65, which against Boolet Weapon.mat's ORIGINAL blue base colour left the " +
-                 "core reading as a washed-out version of that old blue for every team rather than the " +
-                 "team's own colour - fixed together with turning that base colour neutral white below, so " +
-                 "the tint now has a true white to blend from instead of fighting a saturated blue " +
-                 "(Task 11a follow-up review, 616x576 capture).")]
+        [Tooltip("0 = the bullet's core keeps its own material colour, 1 = fully replaced by the team colour. How far " +
+                 "ShotTeamVisuals lerps the core's tint toward Shot Color For. Raised from an original 0.65, which " +
+                 "against Boolet Weapon.mat's ORIGINAL blue base colour left the core reading as a washed-out version " +
+                 "of that old blue for every team rather than the team's own colour - fixed together with turning " +
+                 "that base colour neutral white below, so the tint now has a true white to blend from instead of " +
+                 "fighting a saturated blue.")]
         [Range(0f, 1f)] public float bulletTintStrength = 0.9f;
-        [Tooltip("Emission brightness multiplier on the bullet core's team colour, so the core itself - not " +
-                 "just its trail - reads as a bright, glowing shot rather than a flat-lit sphere at a " +
-                 "glance. 1 = no boost over the plain team colour. Raised from an original 2.4 - the scene's " +
-                 "Bloom (Assets/Settings/SampleSceneProfile.asset, threshold 1.0) only blooms a pixel whose " +
-                 "linear value clears that threshold, and 2.4 left the dimmer channels of some team colours " +
-                 "under it (Task 11a follow-up review).")]
+        [Tooltip("Emission brightness multiplier on the bullet core's team colour, so the core itself - not just its " +
+                 "trail - reads as a bright, glowing shot rather than a flat-lit sphere at a glance. 1 = no boost " +
+                 "over the plain team colour. Raised from an original 2.4 - the scene's Bloom " +
+                 "(Assets/Settings/SampleSceneProfile.asset, threshold 1.0) only blooms a pixel whose linear value " +
+                 "clears that threshold, and 2.4 left the dimmer channels of some team colours under it.")]
         public float bulletEmission = 5f;
 
         /// <summary>The trail/tint colour for a shot fired by teamId; Unknown Team Shot Colour for an unresolved
@@ -527,10 +517,9 @@ namespace Overpower.UI
         }
 
         [Header("Lasers")]
-        [Tooltip("Width of the wind-up warning line the instant the trigger is pulled, in metres. Grows to " +
-                 "Laser Warning End Width over the wind-up, so the line visibly thickens as the beam gets " +
-                 "closer to firing - part of the Task 11b telegraph (design reversed the earlier no-warning " +
-                 "call, see IgnoreWalls.cs).")]
+        [Tooltip("Width of the wind-up warning line the instant the trigger is pulled, in metres. Grows to Laser " +
+                 "Warning End Width over the wind-up, so the line visibly thickens as the beam gets closer to firing " +
+                 "- part of the laser telegraph (see IgnoreWalls.cs).")]
         public float laserWarningStartWidth = 0.03f;
         [Tooltip("Width of the wind-up warning line right before it fires, in metres.")]
         public float laserWarningEndWidth = 0.14f;
@@ -563,9 +552,9 @@ namespace Overpower.UI
                  "family as Highlight Colour/Ultimate Charge Colour, so gold reads as a reward the " +
                  "same way the ultimate-ready glow does, not just another stat.")]
         public Color goldTextColor = new Color(1f, 0.82f, 0.2f, 1f);
-        [Tooltip("Gap between the top of the 'Loadout (P)' button and the gold readout sitting above it, in " +
-                 "canvas units. Tudor, 2026-09-17: gold and the shop are the same system, so the readout moved " +
-                 "out of the ability bar and up against the button that spends it.")]
+        [Tooltip("Gap between the top of the 'Loadout (P)' button and the gold readout sitting above it, in canvas " +
+                 "units. Gold and the shop are the same system, so the readout sits up against the button that spends " +
+                 "it, out of the ability bar.")]
         public float goldShopGap = 8f;
         [Tooltip("Font size of the income line (\"+7.7/s\") as a percentage of the balance line above it. The " +
                  "balance is the number you act on; the income is context, so it is deliberately smaller - the " +
@@ -573,15 +562,14 @@ namespace Overpower.UI
         [Range(30f, 100f)] public float goldIncomeSizePercent = 75f;
 
         [Header("Bounty toast")]
-        [Tooltip("Text colour of the transient \"Bounty +900\" toast shown when a capture pays your " +
-                 "team a bounty (Task 2.4, GDD p.20) - the same warm amber family as Gold Text " +
-                 "Colour, so a bounty reads as an emphatic version of the same gold reward rather " +
-                 "than an unrelated alert colour.")]
+        [Tooltip("Text colour of the transient \"Bounty +900\" toast shown when a capture pays your team a bounty - " +
+                 "the same warm amber family as Gold Text Colour, so a bounty reads as an emphatic version of the " +
+                 "same gold reward rather than an unrelated alert colour.")]
         public Color bountyToastColor = new Color(1f, 0.82f, 0.2f, 1f);
         [Tooltip("Seconds the bounty toast stays on screen before it hides itself again.")]
         public float bountyToastDurationSeconds = 3f;
 
-        [Header("Capital under attack (Tudor, 2026-09-16)")]
+        [Header("Capital under attack")]
         [Tooltip("Shown on the respawn panel while a player waits to respawn and their capital is currently " +
                  "under attack, so their coming respawn will land at their Tier 2 zone instead of the capital.")]
         public string capitalUnderAttackRespawnNote = "Your capital is under attack - you will respawn at your Tier 2 zone";
@@ -589,32 +577,31 @@ namespace Overpower.UI
                  "capital was under attack. Uses the same toast label and duration as the bounty payout " +
                  "(Bounty Toast Duration Seconds above).")]
         public string capitalUnderAttackRespawnToast = "Respawned at Tier 2: capital under attack";
-        [Tooltip("Font size of the capital-under-attack respawn note, in canvas units (B3 review, 2026-09-16) - " +
-                 "its own dedicated size rather than Body Text Size: plain white text at that size read too " +
-                 "faint against the respawn panel's pale salmon wash (616x576 capture) to notice at a glance.")]
+        [Tooltip("Font size of the capital-under-attack respawn note, in canvas units - its own dedicated size rather " +
+                 "than Body Text Size: plain white text at that size read too faint against the respawn panel's pale " +
+                 "salmon wash (616x576 capture) to notice at a glance.")]
         public float capitalUnderAttackNoteFontSize = 30f;
-        [Tooltip("Text colour of the capital-under-attack respawn note (B3 review, 2026-09-16).")]
+        [Tooltip("Text colour of the capital-under-attack respawn note.")]
         public Color capitalUnderAttackNoteColor = Color.white;
-        [Tooltip("Background strip drawn behind the capital-under-attack respawn note (B3 review, 2026-09-16) - " +
-                 "the same readability trick the HUD's own Panel Colour gives every bar/slot group, applied here " +
-                 "because the note otherwise fights the respawn panel's own pale wash instead of standing out " +
-                 "against it. Semi-opaque dark so the note still reads as sitting ON the respawn panel, not as a " +
-                 "second, unrelated overlay.")]
+        [Tooltip("Background strip drawn behind the capital-under-attack respawn note - the same readability trick " +
+                 "the HUD's own Panel Colour gives every bar/slot group, applied here because the note otherwise " +
+                 "fights the respawn panel's own pale wash instead of standing out against it. Semi-opaque dark so " +
+                 "the note still reads as sitting ON the respawn panel, not as a second, unrelated overlay.")]
         public Color capitalUnderAttackNoteBackingColor = new Color(0f, 0f, 0f, 0.6f);
 
-        [Header("Phase transition (Task 2.7)")]
-        [Tooltip("HUD toast shown to every surviving player the instant the match narrows from three " +
-                 "teams to two (Tudor D17: the last stand is the same with two teams - a team with no base can't " +
-                 "respawn and is out once every member is dead, unless it retakes or takes a base). Uses the same " +
-                 "toast label and duration as the bounty payout (Bounty Toast Duration Seconds above). Keep it to two " +
-                 "lines (about 52 characters): the toast label grows upward and clips at the top of the screen.")]
+        [Header("Phase transition")]
+        [Tooltip("HUD toast shown to every surviving player the instant the match narrows from three teams to two " +
+                 "(the last stand is the same with two teams - a team with no base can't respawn and is out once " +
+                 "every member is dead, unless it retakes or takes a base). Uses the same toast label and duration as " +
+                 "the bounty payout (Bounty Toast Duration Seconds above). Keep it to two lines (about 52 " +
+                 "characters): the toast label grows upward and clips at the top of the screen.")]
         public string twoTeamsLeftBannerText = "Two teams left: lose your base and you can't respawn";
 
         [Tooltip("The panel a dead player sees while their team holds no base and nobody on it can respawn - shown by " +
-                 "MatchUI in place of the text baked into the waiting panel (Task 9b-2: one home for texts).")]
+                 "MatchUI in place of the text baked into the waiting panel.")]
         public string waitingPanelText = "Waiting for team to \n\ncapture Base territory ";
 
-        [Header("Capture ring (2026-09-16)")]
+        [Header("Capture ring")]
         [Tooltip("Material every capture ring line draws with. Keep it unlit, transparent, vertex-coloured and its own " +
                  "colour white: each ring tints itself per team. Points at the Aim Cone Line material, which is exactly that.")]
         public Material captureRingMaterial;
@@ -649,7 +636,7 @@ namespace Overpower.UI
         [Tooltip("The dark loop behind a capture's progress band, so how full it is reads like a loading bar.")]
         public Color captureRingTrackColor = new Color(0f, 0f, 0f, 0.4f);
 
-        [Header("Minimap (2026-09-16)")]
+        [Header("Minimap")]
         [Tooltip("Size (bounding diameter) of the triangular minimap in the top-right corner, in canvas units.")]
         public float minimapCornerSize = 340f;
         [Tooltip("Gap between the corner minimap's frame and the top and right screen edges, in canvas units.")]
@@ -658,11 +645,10 @@ namespace Overpower.UI
                  "Everything on it (bubbles, lines, labels) scales up from the corner sizes by the same amount. Shrinks " +
                  "to fit above Large Bottom Clearance if this would otherwise overlap it.")]
         public float minimapLargeSize = 860f;
-        [Tooltip("Height of the strip left clear at the bottom of the screen for the HUD's ability bar while the large " +
-                 "map (M) is open, in canvas units (controller review, 2026-09-17: the map used to cover the HUD). The " +
-                 "large map's diameter shrinks below Large Size if it would otherwise overlap this strip, and the map " +
-                 "centres itself in whatever space remains above it. HUD step 5 lowered it from 380 to 300 because the " +
-                 "HUD itself is 20% smaller (Hud Scale) and the gold row left it.")]
+        [Tooltip("Height of the strip left clear at the bottom of the screen for the HUD's ability bar while the " +
+                 "large map (M) is open, in canvas units. The large map's diameter shrinks below Large Size if it " +
+                 "would otherwise overlap this strip, and the map centres itself in whatever space remains above it. " +
+                 "It is low because the HUD is 20% smaller (Hud Scale) and the gold row left it.")]
         public float minimapLargeBottomClearance = 300f;
         [Tooltip("Width of the dark anti-aliased band framing the triangular minimap's edge, in canvas units at the " +
                  "corner size (it scales up with everything else on the large map). Also used as the corner map's " +
@@ -727,16 +713,15 @@ namespace Overpower.UI
         public float minimapTeammateDotSize = 10f;
         [Tooltip("Colour of a teammate's dot on the minimap.")]
         public Color minimapTeammateDotColor = new Color(0.45f, 1f, 0.45f, 1f);
-        [Tooltip("How solid the small corner map is, 0 is invisible and 1 is fully opaque (Tudor, 2026-09-17: " +
-                 "the corner map should be 20% more see-through, so 0.8). It multiplies everything on the map at " +
-                 "once - the picture, the bubbles, the links and the markers.")]
+        [Tooltip("How solid the small corner map is, 0 is invisible and 1 is fully opaque (0.8 makes it 20% more " +
+                 "see-through). It multiplies everything on the map at once - the picture, the bubbles, the links and " +
+                 "the markers.")]
         [Range(0f, 1f)] public float minimapCornerOpacity = 0.8f;
-        [Tooltip("How solid the large map is while M is held open, 0 to 1. Tudor asked for full opacity here: " +
-                 "you opened it on purpose, so nothing is hiding behind it that you would rather be looking at.")]
+        [Tooltip("How solid the large map is while M is held open, 0 to 1. Full opacity suits it: you opened it on " +
+                 "purpose, so nothing is hiding behind it that you would rather be looking at.")]
         [Range(0f, 1f)] public float minimapLargeOpacity = 1f;
-        [Tooltip("How much opacity the large map gives up while you are moving, 0 to 1 (Tudor, 2026-09-17: " +
-                 "\"decrease the opacity by 30%\"), so you can still see where you are running. Subtracted from " +
-                 "Large Opacity above; the corner map never dims for movement.")]
+        [Tooltip("How much opacity the large map gives up while you are moving, 0 to 1, so you can still see where " +
+                 "you are running. Subtracted from Large Opacity above; the corner map never dims for movement.")]
         [Range(0f, 1f)] public float minimapLargeMovingOpacityDrop = 0.3f;
         [Tooltip("Seconds a full fade from invisible to solid takes. The map fades between its opacity states " +
                  "rather than snapping, so starting and stopping reads as a change of state, not a flicker. 0 " +
@@ -764,7 +749,7 @@ namespace Overpower.UI
             _ => minimapBubbleDiameterTier2,
         };
 
-        [Header("OverPower (Task 2.6, GDD p.20)")]
+        [Header("OverPower")]
         [Tooltip("Text shown in the HUD's OverPower label while the buff is fully ACTIVE.")]
         public string overPowerActiveText = "OVERPOWER";
         [Tooltip("Text shown in the HUD's OverPower label while the buff is only ARMED - hit by both " +
@@ -794,7 +779,7 @@ namespace Overpower.UI
         [Tooltip("Shared unlit material every aim-cone line and arc draw with. Keep its own colour white - each line tints itself through its own LineRenderer start/end colour above, which is what lets one material serve every line on this list.")]
         public Material coneLineMaterial;
 
-        [Header("Charge ring (2026-09-17)")]
+        [Header("Charge ring")]
         [Tooltip("Show the ring at your own feet while you hold a charging weapon's trigger. Off draws nothing at " +
                  "all; the weapon still charges exactly the same.")]
         public bool showChargeRing = true;
@@ -840,18 +825,16 @@ namespace Overpower.UI
         [Range(0.1f, 1f)] public float debugLogMaxHeightFraction = 0.45f;
         [Tooltip("Gap between the F1 debug log and the edges of the screen, in SCREEN PIXELS.")]
         public float debugLogScreenMarginPixels = 8f;
-        [Tooltip("Gap between the bottom of the corner minimap and the top of the F1 debug log, in SCREEN " +
-                 "PIXELS (Tudor, 2026-09-17: the log used to open in the top-left corner, on top of the F1 test " +
-                 "range panel). The gap is measured against the CORNER map's reserved space even while the large " +
-                 "map is open, so the log does not jump every time someone presses M.")]
+        [Tooltip("Gap between the bottom of the corner minimap and the top of the F1 debug log, in SCREEN PIXELS. The " +
+                 "gap is measured against the CORNER map's reserved space even while the large map is open, so the " +
+                 "log does not jump every time someone presses M.")]
         public float debugLogGapBelowMinimapPixels = 6f;
 
         [Header("Match start (2.7b)")]
         [Tooltip("Only the colour the out-of-play paint path would use on a zone's ring and minimap bubble - and " +
-                 "nothing shows that path in play any more: since 2026-09-25 an out-of-play zone (a host start's " +
-                 "third capital, or any zone the phase-two cut closes) disappears entirely - tower, ring and " +
-                 "minimap bubble - instead of being painted this colour. Kept for whichever paint path might use " +
-                 "it again; not currently seen.")]
+                 "nothing shows that path in play any more: an out-of-play zone (a host start's third capital, or any " +
+                 "zone the phase-two cut closes) disappears entirely - tower, ring and minimap bubble - instead of " +
+                 "being painted this colour. Kept for whichever paint path might use it again; not currently seen.")]
         public Color outOfPlayZoneColor = new Color(0.12f, 0.12f, 0.12f, 0.45f);
         [Header("Phase two cut (a team knocked out)")]
         [Tooltip("The minimap's shade over the part of the arena a knockout closed (behind the phase-two wall). Dark and " +
@@ -876,11 +859,12 @@ namespace Overpower.UI
         public float warmupTopOffset = 130f;
         [Tooltip("Toast shown the instant the match goes live with all three teams - the ordinary case.")]
         public string matchLiveToastText = "The match is live! Zones, gold, loadouts and respawn timers are reset.";
-        [Tooltip("Toast shown the instant a host-started match goes live with two teams - lose your base and your team " +
-                 "can't respawn until it retakes one (Tudor D17). Two lines at most (about 52 characters), as the bounty toast.")]
+        [Tooltip("Toast shown the instant a host-started match goes live with two teams - lose your base and your " +
+                 "team can't respawn until it retakes one. Two lines at most (about 52 characters), as the bounty " +
+                 "toast.")]
         public string matchLiveTwoTeamsToastText = "Two teams: lose your base and you can't respawn";
 
-        [Header("Damage numbers (2026-09-18)")]
+        [Header("Damage numbers")]
         [Tooltip("Pop a number beside an enemy each time your damage lands on them. Off hides them; nothing else about " +
                  "combat changes.")]
         public bool showDamageNumbers = true;
@@ -903,11 +887,11 @@ namespace Overpower.UI
         public float damageNumberPopSeconds = 0.12f;
         [Tooltip("How big a number starts, as a multiple of its settled size.")]
         public float damageNumberPopScale = 1.5f;
-        [Tooltip("Tudor's override on the Mark plan (2026-09-18): one live number per enemy, not one per hit - every " +
-                 "new hit on the same enemy ADDS to its number, re-pops it and restarts this clock. This is how long " +
-                 "the number stays fully solid (no rise, no fade) after the LAST hit that touched it before it starts " +
-                 "rising and fading over Damage Number Lifetime Seconds above. While you keep damaging one enemy its " +
-                 "number just keeps counting up in place.")]
+        [Tooltip("Tudor's override on the Mark plan: one live number per enemy, not one per hit - every new hit on " +
+                 "the same enemy ADDS to its number, re-pops it and restarts this clock. This is how long the number " +
+                 "stays fully solid (no rise, no fade) after the LAST hit that touched it before it starts rising and " +
+                 "fading over Damage Number Lifetime Seconds above. While you keep damaging one enemy its number just " +
+                 "keeps counting up in place.")]
         public float damageNumberHoldSeconds = 0.6f;
         [Tooltip("Canvas units a number floats up over its post-hold life.")]
         public float damageNumberRise = 60f;
@@ -1208,7 +1192,7 @@ namespace Overpower.UI
         [Tooltip("Which sorting order the result card draws at: above the match panels, under the saved-log box.")]
         public int dominionResultSortingOrder = 5;
 
-        [Header("Mark (2026-09-18)")]
+        [Header("Mark")]
         [Tooltip("Canvas units, the mark diamond's width and height (both the shooter's own diamond over an " +
                  "enemy, and the marked player's own diamond over their own head - Tudor's answer 1). Its colour " +
                  "is Mark Colour above, shared with a marked hit's own damage number so the two teach each other.")]
@@ -1235,18 +1219,17 @@ namespace Overpower.UI
                  "piece still on the Lit 'Tower Stone' material, so it reads as the team colour with its own " +
                  "lighting/shading intact instead of going flat like everything else TowerLook paints (the Crown, " +
                  "caps, Plinth and shown shafts, all on the Unlit 'Tower Owner' material at the full colour, no " +
-                 "shade - Tudor, 2026-09-23: 'the exterior collumns and the base... glow the same color as the " +
-                 "top'). 1 would make the Drum just as bright/flat as the rest and lose the tower's silhouette; " +
-                 "kept here next to Tower Neutral Colour because the two are only ever read together through " +
-                 "OwnerPaintColours - chosen by capture, not calculation (Rule 6), see captures/towers-2026-09-21 " +
-                 "and captures/tower-glow-2026-09-23.")]
+                 "shade). 1 would make the Drum just as bright/flat as the rest and lose the tower's silhouette; kept " +
+                 "here next to Tower Neutral Colour because the two are only ever read together through " +
+                 "OwnerPaintColours - chosen by capture, not calculation (Rule 6), see captures/towers-2026-09-21 and " +
+                 "captures/tower-glow-2026-09-23.")]
         [Range(0f, 1f)] public float towerBodyShade = 0.8f;
         [Tooltip("How brightly an OWNED tower's crown, caps, columns and base glow in the owner's colour. 1 = " +
                  "flat colour, no glow; 1.3 = soft; 1.5 = clear glow; 1.75+ = strong, and violet starts turning " +
                  "lilac. Neutral and out-of-play towers never glow, so a glow means owned. The drum never glows.")]
         [Range(1f, 2.5f)] public float towerOwnerGlow = 1.5f;
 
-        [Header("Playtest extras (2026-09-26)")]
+        [Header("Playtest extras")]
         [Tooltip("HUD toast shown on Ctrl+B - 'a bug just happened' (BugMarkerKey): a screenshot is " +
                  "saved next to this client's own telemetry log, and its own `bug` line is written. " +
                  "Uses the same transient toast label every other HUD toast shares (PlayerHud.ShowToast).")]
@@ -1313,7 +1296,7 @@ namespace Overpower.UI
         [Tooltip("Shown for a team the scoreboard cannot name (a player whose team has not arrived yet).")]
         public string scoreboardUnknownTeamText = "Joining";
 
-        [Header("Connection lost and rejoin (Task 9e, Tudor D21)")]
+        [Header("Connection lost and rejoin")]
         [Tooltip("Title of the panel that appears when your connection to the match drops (ConnectionLostPanel).")]
         public string connectionLostTitle = "Connection lost";
         [Tooltip("The line under the title: what Rejoin does for you.")]
@@ -1383,7 +1366,7 @@ namespace Overpower.UI
                 material.DisableKeyword(ShaderUtilities.Keyword_Underlay);
         }
 
-        [Header("Spectate (Task 9g, Tudor D28)")]
+        [Header("Spectate")]
         [Tooltip("The button on a knocked-out player's lose screen that starts watching a living player.")]
         public string spectateButton = "Spectate";
         [Tooltip("The same button once you are watching: it moves to the next living player.")]
@@ -1395,7 +1378,7 @@ namespace Overpower.UI
         [Tooltip("Distance of the Next and Quit buttons from the strip's centre, sideways, in reference pixels.")]
         public float spectateButtonOffset = 115f;
 
-        [Header("Spectator bar (lobby Task 6, board 8)")]
+        [Header("Spectator bar")]
         [Tooltip("The bar at the bottom of a spectator seat's screen: who they watch and the keys. Fill colour of the bar.")]
         public Color spectatorBarColor = new Color(0.06f, 0.063f, 0.078f, 0.88f);
         [Tooltip("Empty space inside the bar, in reference pixels: left and right, then top and bottom.")]
@@ -1455,7 +1438,7 @@ namespace Overpower.UI
         [Tooltip("How small a long big line on a fixed-width result card may shrink, as a share of its normal size (0.4 = down to 40%), before it is cut off.")]
         [Range(0.1f, 1f)] public float resultTitleMinSizeShare = 0.4f;
 
-        [Header("Lobby screens (lobby Task 9)")]
+        [Header("Lobby screens")]
         [Tooltip("The font of the big letters on the lobby screens (title, buttons, headings): Oswald.")]
         public TMP_FontAsset lobbyDisplayFont;
         [Tooltip("The font of the ordinary text on the lobby screens: Public Sans regular.")]
@@ -1697,7 +1680,7 @@ namespace Overpower.UI
         [Tooltip("Shown on the name screen when the connection to the game server is lost.")]
         public string lobbyConnectionLostText = "Disconnected. Check your connection.";
 
-        [Header("Lobby room (lobby Task 10)")]
+        [Header("Lobby room")]
         [Tooltip("Fill of a taken seat.")]
         public Color lobbyRoomSeatFill = new Color(0.2f, 0.212f, 0.247f, 1f);
         [Tooltip("Fill of the No role box.")]
@@ -1825,7 +1808,7 @@ namespace Overpower.UI
         [Tooltip("The dark layer behind the mode info and How to play pages.")]
         public Color lobbyRoomOverlayShade = new Color(0f, 0f, 0f, 0.7f);
 
-        [Header("Lobby screens: layout, words (lobby Task 9 review)")]
+        [Header("Lobby screens: layout, words")]
         [Tooltip("Space between the parts of the lobby list's top row, in reference pixels.")]
         public float lobbyListHeaderGap = 24f;
         [Tooltip("Space between the small caption and the heading of the lobby list, in reference pixels.")]
@@ -1861,7 +1844,7 @@ namespace Overpower.UI
         [Tooltip("Shown when a join was refused for any other reason.")]
         public string lobbyJoinFailedText = "Could not join that lobby.";
 
-        [Header("Warm-up bar (lobby Task 10)")]
+        [Header("Warm-up bar")]
         [Tooltip("Fill of the warm-up bar at the top of the arena.")]
         public Color warmupBarFill = new Color(0.102f, 0.11f, 0.133f, 0.88f);
         [Tooltip("How round the corners of the warm-up bar are, in reference pixels.")]
@@ -1899,7 +1882,7 @@ namespace Overpower.UI
         [Tooltip("The second line of the countdown.")]
         public string warmupBarCountdownInfo = "Everything resets when it goes live";
 
-        [Header("Chat (lobby Task 11, board 7A)")]
+        [Header("Chat")]
         [Tooltip("How see-through the dark chat panel is: 0 = invisible, 1 = solid. Board 7A: about 0.38.")]
         [Range(0f, 1f)] public float chatPanelAlpha = 0.38f;
         [Tooltip("Width and height of the chat panel, in reference pixels.")]
@@ -1951,7 +1934,7 @@ namespace Overpower.UI
         [Tooltip("Gap between the top of the typing box and the bottom of the 'not sent' hint, in reference pixels.")]
         public float chatNotSentHintGap = 2f;
 
-        [Header("Lobby screens: layout numbers (lobby Task 10 review)")]
+        [Header("Lobby screens: layout numbers")]
         [Tooltip("Space between the lobby name and the mode row of the lobby room, in reference pixels.")]
         public float lobbyRoomHeaderGap = 3f;
         [Tooltip("Space between the mode button and the host line, in reference pixels.")]
@@ -1971,7 +1954,7 @@ namespace Overpower.UI
         [Tooltip("How much rounder the mode and size buttons of the create screen are than the other buttons, in reference pixels.")]
         public float createModeRadiusExtra = 3f;
 
-        [Header("How to play and the game mode info page (lobby Task 12)")]
+        [Header("How to play and the game mode info page")]
         [Tooltip("The pages of the How to play wiki: title, text and picture of each (the HowToPlayPages asset).")]
         public Overpower.Data.HowToPlayPages howToPlayPages;
         [Tooltip("The small heading over the page list of How to play.")]

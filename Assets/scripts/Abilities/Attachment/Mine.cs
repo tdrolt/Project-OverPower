@@ -66,7 +66,7 @@ namespace Overpower.Abilities
                  "layer has an IDamageable to find, so widening this only costs performance.")]
         private LayerMask detectionMask = ~0;
 
-        [Header("Visibility (A5, Tudor 2026-09-17 evening - GDD spec)")]
+        [Header("Visibility")]
         [SerializeField, Tooltip("Seconds after being placed before this mine turns invisible to the " +
                  "enemy team and fades to a translucent ghost for its own team, so only teammates can " +
                  "still tell where it is. Distinct from Arm Delay Seconds above: a mine can still " +

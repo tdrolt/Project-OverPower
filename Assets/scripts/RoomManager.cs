@@ -25,14 +25,14 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     public const int TeamSize = 3;         // hard cap per team; 3 teams x 3 = the room's 9
 
-    [Header("Rejoin (Task 9e)")]
+    [Header("Rejoin")]
     [Tooltip("Read for the rejoin window (Connection > Rejoin Window Seconds): how long the room keeps a dropped player's place.")]
     [SerializeField] private GameplayConfig gameplayConfig;
 
     [Tooltip("Read for the Connection lost panel and the name screen's Rejoin your match button.")]
     [SerializeField] private UiTheme theme;
 
-    [Header("Lobbies (lobby Task 2)")]
+    [Header("Lobbies")]
     [Tooltip("Every game mode a lobby can be created with. The create screen lists them in this order.")]
     [SerializeField] private GameModeCatalogue modeCatalogue;
 
@@ -42,7 +42,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Tooltip("Read by a spectator seat's view for the centre scan's numbers (its wave and the countdown), which otherwise come from a player's own body.")]
     [SerializeField] private VisionConfig visionConfig;
 
-    [Header("Dominion (Task 2)")]
+    [Header("Dominion")]
     [Tooltip("Every Dominion number (round and break length, points, bounties, respawns, shop). Read by the Dominion round flow.")]
     [SerializeField] private DominionConfig dominionConfig;
 

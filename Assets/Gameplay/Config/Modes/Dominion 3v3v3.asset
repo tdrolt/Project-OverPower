@@ -45,3 +45,4 @@ MonoBehaviour:
   - title: Sudden death
     text: "If the top teams are level on round wins after the third round, or reach two wins together, sudden death starts: no respawns, and a shrinking circle hurts anyone outside it. The last team standing wins."
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
+  infoColumns: 4

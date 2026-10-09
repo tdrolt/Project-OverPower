@@ -95,8 +95,7 @@ namespace Overpower.Dominion
         public static bool IsRoundPlay(DominionStage stage) => stage == DominionStage.Round || stage == DominionStage.Overtime;
 
         /// <summary>The teams that play overtime: every team of the match less than <paramref name="leadPoints"/> behind the top at the buzzer
-        /// (a team exactly a lead behind is out). One team alone means it is a lead ahead of everyone and has simply won. A 0-0 buzzer is within the lead,
-        /// so every team plays. Only the match's teams count (a 2v2 room keeps team 2's slot at 0).</summary>
+        /// (a team exactly a lead behind is out). One team alone means it is a lead ahead of everyone and has simply won. Only the match's teams count (a 2v2 room keeps team 2's slot at 0).</summary>
         public static int[] OvertimeTeams(int[] points, int[] teamsInMatch, int leadPoints)
         {
             var result = new List<int>();
@@ -122,6 +121,17 @@ namespace Overpower.Dominion
             return present.ToArray();
         }
 
+        /// <summary>The teams the round bar and the score bars show: in overtime only the teams still playing it (the room's stored list), else every team of
+        /// the match. The arrays are handed back as they are, so a per-frame call allocates nothing.</summary>
+        public static int[] TeamsShownIn(DominionStage stage, int[] matchTeams, int[] overtimeTeams) =>
+            stage == DominionStage.Overtime && overtimeTeams != null && overtimeTeams.Length > 0 ? overtimeTeams : matchTeams;
+
+        /// <summary>Has a team dropped out of the running overtime: two or more teams are still present and fewer than the stored list. The master then
+        /// writes the narrowed list, so a rejoin of the dropped team cannot bring it back. One team left has won and none left waits for the clock, so
+        /// neither is a list worth writing.</summary>
+        public static bool OvertimeNeedsNarrowing(int[] stored, int[] present) =>
+            stored != null && present != null && present.Length >= 2 && present.Length < stored.Length;
+
         /// <summary>The overtime team that is <paramref name="leadPoints"/> or more ahead of every OTHER overtime team, or -1. A team outside overtime
         /// neither wins here nor stops anyone from winning: it was a lead behind at the buzzer and is out of the round.</summary>
         public static int OvertimeLeader(int[] points, int[] overtimeTeams, int leadPoints)
@@ -138,10 +148,21 @@ namespace Overpower.Dominion
             return -1;
         }
 
+        /// <summary>True when every team of the match is on 0 points (a team outside the match, such as the unused third slot of a 2v2 room, is not looked at).</summary>
+        public static bool NobodyScored(int[] points, int[] teamsInMatch)
+        {
+            if (teamsInMatch == null) return false;
+            foreach (int team in teamsInMatch)
+                if (PointsOf(points, team) != 0) return false;
+            return true;
+        }
+
         /// <summary>The clock ran out on a round: a team a lead ahead of every other team wins it; otherwise the teams within the lead play overtime.
-        /// With overtime off the old rule applies: the single top team wins, a tie for first counts for nobody (empty winners).</summary>
+        /// With overtime off the old rule applies: the single top team wins, a tie for first counts for nobody (empty winners). A round in which every
+        /// team of the match has 0 points counts for nobody either, overtime or not.</summary>
         public static BuzzerResult AtBuzzer(int[] points, int[] teamsInMatch, int leadPoints, bool overtimeOn)
         {
+            if (NobodyScored(points, teamsInMatch)) return new BuzzerResult { Winners = new int[0] };
             if (!overtimeOn)
             {
                 int winner = RoundWinner(points);

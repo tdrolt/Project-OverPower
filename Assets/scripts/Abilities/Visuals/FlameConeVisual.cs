@@ -34,19 +34,19 @@ namespace Overpower.Abilities
                  "against a warm floor now - this is a secondary knob, not the primary fix.")]
         private float tipAlpha = 0.45f;
 
-        [SerializeField, Tooltip("Colour at the very tip, under the caster - pushed toward hot, pale yellow-white " +
-                 "rather than more orange (2026-09-18: this arena's tan/orange floor, about RGB 172,102,60, sits too " +
-                 "close to a plain-orange flame for alpha alone to separate from it - a real flame also reads hottest " +
-                 "and palest at its base). Blends toward the ability's own Colour (vfxColor) across the fan, so the " +
-                 "far half still reads as ordinary flame-orange fading to nothing, per A3. Alpha on this field is " +
-                 "unused - Tip Alpha above is the only opacity control.")]
+        [SerializeField, Tooltip("Colour at the very tip, under the caster - pushed toward hot, pale yellow-white rather than more " +
+                 "orange (this arena's tan/orange floor, about RGB 172,102,60, sits too close to a plain-orange flame " +
+                 "for alpha alone to separate from it - a real flame also reads hottest and palest at its base). " +
+                 "Blends toward the ability's own Colour (vfxColor) across the fan, so the far half still reads as " +
+                 "ordinary flame-orange fading to nothing. Alpha on this field is unused - Tip Alpha above is the " +
+                 "only opacity control.")]
         private Color coreColor = new Color(1f, 0.95f, 0.78f, 1f);
 
-        [SerializeField, Range(1, 12), Tooltip("Concentric rings beyond the tip the fan's radial fade is built from " +
-                 "(review finding, 2026-09-18): with only 1 (the tip and a single outer arc, no vertex between them), " +
-                 "Radial Hold Fraction had no vertex to hold ANY value at - the fade collapsed to one bright point " +
-                 "under the caster's feet and zero everywhere else. More rings make the hold-then-fall-off below read " +
-                 "as a real curve instead of a straight line to zero, and let the side fade finally have an effect.")]
+        [SerializeField, Range(1, 12), Tooltip("Concentric rings beyond the tip the fan's radial fade is built from: with only 1 (the tip and a " +
+                 "single outer arc, no vertex between them), Radial Hold Fraction had no vertex to hold ANY value at " +
+                 "- the fade collapsed to one bright point under the caster's feet and zero everywhere else. More " +
+                 "rings make the hold-then-fall-off below read as a real curve instead of a straight line to zero, " +
+                 "and let the side fade finally have an effect.")]
         private int radialRings = 6;
 
         [SerializeField, Range(0f, 1f), Tooltip("Fraction of Cone Range, measured from the tip, that keeps the fan " +
@@ -59,12 +59,9 @@ namespace Overpower.Abilities
         [SerializeField, Range(0f, 1f), Tooltip("Opacity of the aiming outline on the CASTER's own screen.")]
         private float edgeOpacity = 0.9f;
 
-        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the SAME aiming outline on everyone ELSE's screen. A3 " +
-                 "(Tudor, 2026-09-17 evening) originally asked for casters only (\"no hard outline for other " +
-                 "players\") and this was 0. Ability visuals step 7 (Tudor: \"you can turn it on\") turned it back " +
-                 "on at 0.35 - clearly under Edge Opacity's 0.9 above, so the caster's own line still reads as " +
-                 "THEIR aid, but enough for an enemy to read the cone's true boundary instead of only the soft " +
-                 "fill.")]
+        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the SAME aiming outline on everyone ELSE's screen. It started at 0 (casters only) and is " +
+                 "now 0.35 - clearly under Edge Opacity's 0.9 above, so the caster's own line still reads as THEIR " +
+                 "aid, but enough for an enemy to read the cone's true boundary instead of only the soft fill.")]
         private float nonCasterEdgeOpacity = 0.35f;
 
         [SerializeField, Tooltip("Straight pieces the arc is made of. 24 keeps the drawn edge within 1 cm of the real " +
@@ -79,12 +76,12 @@ namespace Overpower.Abilities
                  "flame, never a strobe.")]
         private float flickerDepth = 0.25f;
 
-        [SerializeField, Tooltip("How many times a second the flicker recomputes the fan's vertex colours (A3: 'at " +
-                 "most about 15'), clamped to at least 1 - the throttle exists specifically so several simultaneous " +
-                 "sprays stay cheap, and letting this reach 0 would flip that into recolouring every single frame " +
-                 "instead of turning the flicker off (review finding, 2026-09-18). Set Flicker Depth to 0 to turn the " +
-                 "flicker off instead; the mesh shape never changes for this update - only alpha - and the same " +
-                 "arrays are reused every time, so a spray never allocates.")]
+        [SerializeField, Tooltip("How many times a second the flicker recomputes the fan's vertex colours (about 15 at most), clamped " +
+                 "to at least 1 - the throttle exists specifically so several simultaneous sprays stay cheap, and " +
+                 "letting this reach 0 would flip that into recolouring every single frame instead of turning the " +
+                 "flicker off. Set Flicker Depth to 0 to turn the flicker off instead; the mesh shape never changes " +
+                 "for this update - only alpha - and the same arrays are reused every time, so a spray never " +
+                 "allocates.")]
         private float flickerUpdatesPerSecond = 15f;
 
         private Mesh mesh;

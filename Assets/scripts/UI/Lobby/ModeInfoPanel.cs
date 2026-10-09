@@ -36,7 +36,11 @@ namespace Overpower.UI
 
         public int CardCount => cards.Count;
         public string KickerText => kickerLabel != null ? kickerLabel.text : "";
-        public int Columns => cards.Count == 0 ? 0 : Mathf.Min(Mathf.Max(1, Theme.modeInfoColumns), cards.Count);
+        public int Columns => cards.Count == 0 ? 0 : ColumnsFor(cards.Count, Theme.modeInfoColumns, shownFor != null ? shownFor.InfoColumns : 0);
+
+        /// <summary>Cards standing side by side: the mode's own count when it sets one (above 0), else the theme's; never fewer than 1 or more than the cards.</summary>
+        public static int ColumnsFor(int cardCount, int themeColumns, int modeColumns) =>
+            Mathf.Min(Mathf.Max(1, modeColumns > 0 ? modeColumns : themeColumns), Mathf.Max(1, cardCount));
         public int Rows => rows;
 
         /// <summary>The line shown when the mode has no cards; null when there are cards.</summary>
@@ -128,7 +132,7 @@ namespace Overpower.UI
             emptyLabel.gameObject.SetActive(count == 0);
             if (count == 0) return;
 
-            int columns = Mathf.Min(Mathf.Max(1, Theme.modeInfoColumns), count);
+            int columns = ColumnsFor(count, Theme.modeInfoColumns, mode.InfoColumns);
             rows = Mathf.CeilToInt(count / (float)columns);
             float border = Theme.lobbyBorderWidth;
             float pad = Theme.modeInfoCardPadding;

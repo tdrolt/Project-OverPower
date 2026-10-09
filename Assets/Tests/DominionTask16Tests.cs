@@ -46,9 +46,6 @@ namespace Overpower.Tests
         [Test] public void AnEqualTopIsOvertimeNotATiedRound() =>
             CollectionAssert.AreEqual(new[] { 0, 1 }, DominionRules.AtBuzzer(new[] { 300, 300, 40 }, Three, Lead, true).OvertimeTeams);
 
-        [Test] public void ZeroZeroIsWithinTheLeadSoEveryTeamPlaysOvertime() =>
-            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, DominionRules.AtBuzzer(new[] { 0, 0, 0 }, Three, Lead, true).OvertimeTeams);
-
         [Test] public void OnlyTheTeamsOfTheMatchCountAtTheBuzzer()
         {
             // A 2v2 room keeps team 2's slot at 0; it must neither be in overtime nor stop a clear lead from being clear.

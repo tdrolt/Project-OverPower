@@ -38,7 +38,7 @@ namespace Overpower.UI
         [SerializeField, Tooltip("Armor tiers asset - the same one the F1 panel reads, so both call the exact same upgrade rule (ArmorLoadoutActions).")]
         private ArmorConfig armorConfig;
 
-        [SerializeField, Tooltip("Match tuning asset - Free Loadout, the sell refund rate, and the shop's own (shorter) out-of-combat timer. The same asset PlayerLoadout and GoldWallet read. Task 2.5b: missing this fails OPEN to Free Loadout (see ShopPricing.Build) rather than silently locking every purchase.")]
+        [SerializeField, Tooltip("Match tuning asset - Free Loadout, the sell refund rate, and the shop's own (shorter) out-of-combat timer. The same asset PlayerLoadout and GoldWallet read. Missing this fails OPEN to Free Loadout (see ShopPricing.Build) rather than silently locking every purchase.")]
         private GameplayConfig gameplayConfig;
 
         /// <summary>This player's gold, owner-authoritative (GoldWallet's own class comment). Read,

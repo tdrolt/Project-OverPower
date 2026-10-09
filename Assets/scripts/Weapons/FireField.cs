@@ -55,7 +55,7 @@ namespace Overpower.Weapons
                  "and is yours to author here.")]
         private Transform visual;
 
-        [Header("Look (visual only - ability visuals step 6 amendment, 2026-09-18)")]
+        [Header("Look (visual only)")]
         [SerializeField, Tooltip("The bright ring drawn at the fire's true edge - Assets/Gameplay/UI/AimConeLine.mat. " +
                  "This carries most of the 'don't stand here' read alongside the filled disc's own team colour.")]
         private LineRenderer rim;

@@ -19,15 +19,14 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     [SerializeField] private GameplayConfig gameplayConfig;
     [SerializeField] private ArmorConfig armorConfig;
 
-    [SerializeField, Tooltip("Shared per-tier numbers, used here for health regen (Task 2.3): the " +
-             "rate you heal while standing in a zone your own team owns. The same asset every tower " +
-             "and GoldWallet point at - one home for territory numbers.")]
+    [SerializeField, Tooltip("Shared per-tier numbers, used here for health regen: the rate you heal while standing in a zone " +
+             "your own team owns. The same asset every tower and GoldWallet point at - one home for territory " +
+             "numbers.")]
     private TerritoryConfig territoryConfig;
 
-    [SerializeField, Tooltip("The health fill on the overhead HealthBarCanvas - drawn first, so " +
-             "the shield fill can sit on top of it. A plain filled Image, not a Slider: Task 6 " +
-             "dropped the Slider (it cannot cleanly draw a second fill over its own) in favour of " +
-             "two Images PlayerHealth drives directly. Fraction is health / max health.")]
+    [SerializeField, Tooltip("The health fill on the overhead HealthBarCanvas - drawn first, so the shield fill can sit on top of " +
+             "it. A plain filled Image, not a Slider (a Slider cannot cleanly draw a second fill over its own): " +
+             "PlayerHealth drives the two Images directly. Fraction is health / max health.")]
     private Image healthFillImage;
 
     [SerializeField, Tooltip("The shield (armor) fill on the overhead HealthBarCanvas, same rect " +

@@ -40,8 +40,8 @@ namespace Overpower.Data
 
             [Tooltip("Seconds an enemy standing alone in a zone of this tier that your team owns takes to drain it back " +
                      "to neutral (a defender stepping in pauses it). Compare with Capture Seconds above: lower drains " +
-                     "faster than it was captured. The Capture Speed By Players list also speeds this up when more enemies drain " +
-                     "together. Per tier since Tudor, 2026-09-26.")]
+                     "faster than it was captured. The Capture Speed By Players list also speeds this up when more " +
+                     "enemies drain together. Set per tier.")]
             [Min(0.01f)] public float decaySeconds;
         }
 
@@ -86,11 +86,11 @@ namespace Overpower.Data
         [SerializeField] private float[] captureSpeedByPlayers = { 1f, 1.5f, 1.75f };
 
         [Header("Sounds")]
-        [Tooltip("The looping sound a zone plays while it is being captured or drained. Off since Tudor, 2026-09-26.")]
+        [Tooltip("The looping sound a zone plays while it is being captured or drained. Left off for now.")]
         [SerializeField] private bool playCaptureProgressSound = false;
 
         [Tooltip("The sound a zone plays when a team takes control of it (the same clip also marks a zone going " +
-                 "neutral). Off since Tudor, 2026-09-26.")]
+                 "neutral). Left off for now.")]
         [SerializeField] private bool playCapturedSound = false;
 
         public int PlayersPerTeam => playersPerTeam;

@@ -34,10 +34,9 @@ namespace Overpower.Abilities
                  "see it coming.")]
         private float projectileSpeed = 40f;
 
-        [SerializeField, Tooltip("Radius in metres of the bolt's own hit-detection sphere - the " +
-                 "same idea as a weapon's Projectile Radius. A4 (Tudor 2026-09-17 evening, gameplay " +
-                 "change): raised from 0.15 to 0.225 so the hit finally matches the hook's own look " +
-                 "(0.45 m head, Zip Bolt View) - the head used to be drawn bigger than what it hit.")]
+        [SerializeField, Tooltip("Radius in metres of the bolt's own hit-detection sphere - the same idea as a weapon's Projectile " +
+                 "Radius. Sized so the hit matches the hook's own look (0.45 m head, Zip Bolt View) - the head used " +
+                 "to be drawn bigger than what it hit.")]
         private float projectileRadius = 0.225f;
 
         [SerializeField, Tooltip("The projectile this ability fires - a ProjectileMotor plus " +

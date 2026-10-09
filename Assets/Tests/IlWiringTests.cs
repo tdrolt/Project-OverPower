@@ -19,6 +19,10 @@ namespace Overpower.Tests
             public void BranchesOnTheAnswer() { if (!Flag()) field = 1; }
             public void ThrowsTheAnswerAway() { Flag(); field = 2; }
             public int field;
+            public bool flagField;
+            public void BranchesOnAnotherLocal() { bool earlier = field > 5; bool answer = Flag(); if (earlier) field = 1; if (answer) field = 2; field += 0; }
+            public void StoresFalse() { flagField = false; }
+            public void StoresTrue() { flagField = true; }
             public void StoresTheField() { field = 3; }
             public int ReadsTheField() => field;
         }
@@ -54,6 +58,23 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(Probe), nameof(Probe.BranchesOnTheAnswer), flag));
             Assert.IsFalse(IlWiring.ResultDecidesABranch(typeof(Probe), nameof(Probe.ThrowsTheAnswerAway), flag), "it calls the rule, but nothing follows from the answer");
             Assert.IsTrue(IlWiring.Uses(typeof(Probe), nameof(Probe.ThrowsTheAnswerAway), flag), "which the plain 'uses' check cannot tell");
+        }
+
+        [Test] public void ABranchOnAnotherLocalThanTheAnswersIsNotADecision()
+        {
+            // "earlier" is branched on straight after the answer was stored into its own local; the answer itself is branched on later, after other code
+            MethodInfo flag = typeof(Probe).GetMethod(nameof(Probe.Flag));
+            Assert.IsFalse(IlWiring.ResultDecidesABranch(typeof(Probe), nameof(Probe.BranchesOnAnotherLocal), flag));
+        }
+
+        [Test] public void StoresBoolSeesWhichConstantWasStored()
+        {
+            FieldInfo flagField = typeof(Probe).GetField(nameof(Probe.flagField));
+            Assert.IsTrue(IlWiring.StoresBool(typeof(Probe), nameof(Probe.StoresFalse), flagField, false));
+            Assert.IsFalse(IlWiring.StoresBool(typeof(Probe), nameof(Probe.StoresFalse), flagField, true), "false was stored, not true");
+            Assert.IsTrue(IlWiring.StoresBool(typeof(Probe), nameof(Probe.StoresTrue), flagField, true));
+            Assert.IsFalse(IlWiring.StoresBool(typeof(Probe), nameof(Probe.StoresTrue), flagField, false));
+            Assert.IsFalse(IlWiring.StoresBool(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), flagField, false));
         }
 
         [Test] public void CallOffsetsListsEveryCallInOrder()

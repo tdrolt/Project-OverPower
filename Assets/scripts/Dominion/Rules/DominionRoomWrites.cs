@@ -168,9 +168,11 @@ namespace Overpower.Dominion
                 ? DominionRules.OvertimeTeamsPresent(OvertimeTeamsOf(room, teamsInMatch), playersPerTeam) : null;
             if (overtimeTeams != null)
             {
-                if (overtimeTeams.Length < 2) return ScoreRound(room, nowMs, cfg, teamsInMatch, overtimeTeams);
+                if (overtimeTeams.Length == 1) return ScoreRound(room, nowMs, cfg, teamsInMatch, overtimeTeams);
                 int leader = DominionRules.OvertimeLeader(room.Points, overtimeTeams, cfg.OvertimeLeadPoints);
                 if (leader >= 0) return ScoreRound(room, nowMs, cfg, teamsInMatch, new[] { leader });
+                if (DominionRules.OvertimeNeedsNarrowing(OvertimeTeamsOf(room, teamsInMatch), overtimeTeams))
+                    return Stage(room, WhatOvertimeNarrowed, new Hashtable { { DominionKeys.OvertimeTeams, overtimeTeams } });
             }
             if (!MatchStartRules.HasReached(nowMs, room.EndMs)) return null;
 
@@ -209,6 +211,9 @@ namespace Overpower.Dominion
 
         /// <summary>What the write that starts an overtime is called (DominionWrite.What).</summary>
         public const string WhatOvertimeStart = "overtime start";
+
+        /// <summary>What the write that drops a team out of the running overtime is called (DominionWrite.What).</summary>
+        public const string WhatOvertimeNarrowed = "overtime narrowed";
 
         /// <summary>The teams playing the room's overtime: the stored dOtT, else (a room without it) every team of the match.</summary>
         private static int[] OvertimeTeamsOf(DominionRoomState room, int[] teamsInMatch) =>

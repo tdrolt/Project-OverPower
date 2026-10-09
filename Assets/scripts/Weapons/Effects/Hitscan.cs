@@ -47,13 +47,12 @@ namespace Overpower.Weapons
                  "beam from UiTheme's Laser Beam Width/team colour, so set the real numbers there.")]
         private GameObject beamVfx;
 
-        [SerializeField, Tooltip("Where the beam's team colour, width, glow and linger time come " +
-                 "from - Assets/Gameplay/Config/UiTheme.asset, shared with the HUD, the aim cone " +
-                 "and every shot's trail (Task 11a/11b). Presentation only; nothing here is a " +
-                 "gameplay value. Serialized here rather than passed in from WeaponFiring because " +
-                 "this component ALREADY holds its other presentation fields (Beam Vfx above) as " +
-                 "plain serialized fields on this same never-spawned prefab asset - see the class " +
-                 "comment - so this is one more of the same, not a new pattern.")]
+        [SerializeField, Tooltip("Where the beam's team colour, width, glow and linger time come from - " +
+                 "Assets/Gameplay/Config/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
+                 "Presentation only; nothing here is a gameplay value. Serialized here rather than passed in from " +
+                 "WeaponFiring because this component ALREADY holds its other presentation fields (Beam Vfx above) as " +
+                 "plain serialized fields on this same never-spawned prefab asset - see the class comment - so this " +
+                 "is one more of the same, not a new pattern.")]
         private UiTheme theme;
 
         // Not a tuning value: how many colliders one ray considers. Nine players with a couple of

@@ -31,10 +31,9 @@ namespace Overpower.Telemetry
                  "separately here since MatchTelemetry keeps its own copy private.")]
         [SerializeField] private TelemetryConfig config;
 
-        [Tooltip("Task T4: the same Territory Config asset GoldWallet reads on this same prefab - " +
-                 "needed here too because per-zone income attribution (IncomeAttribution.Accumulate) " +
-                 "needs each tier's raw team gold/second and Players Per Team, which GoldWallet keeps " +
-                 "as a private field rather than exposing.")]
+        [Tooltip("The same Territory Config asset GoldWallet reads on this same prefab - needed here too because " +
+                 "per-zone income attribution (IncomeAttribution.Accumulate) needs each tier's raw team gold/second " +
+                 "and Players Per Team, which GoldWallet keeps as a private field rather than exposing.")]
         [SerializeField] private TerritoryConfig territoryConfig;
 
         private PlayerHealth playerHealth;

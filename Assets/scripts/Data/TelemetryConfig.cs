@@ -46,7 +46,7 @@ namespace Overpower.Data
         [SerializeField] private string folderName = "Telemetry";
         public string FolderName => folderName;
 
-        [Header("Console (playtest extras, 2026-09-26)")]
+        [Header("Console (playtest extras)")]
         [Tooltip("Write every player's own console output (errors, exceptions, warnings and asserts " +
                  "always; plain Debug.Log too once the match's file is open) into their own match log " +
                  "as `console` lines - see ConsoleTelemetry. Off = the listener never installs itself " +
@@ -67,7 +67,7 @@ namespace Overpower.Data
         [SerializeField, Min(1)] private int consoleMessageMaxChars = 500;
         public int ConsoleMessageMaxChars => consoleMessageMaxChars;
 
-        [Header("Bug mark key (playtest extras, 2026-09-26)")]
+        [Header("Bug mark key (playtest extras)")]
         [Tooltip("The key that marks 'a bug just happened' - a screenshot plus a note the reporter's " +
                  "next chat line supplies (see BugMarkerKey). Default B. In the EDITOR's own Play " +
                  "Mode, Ctrl+B is Unity's Build And Run shortcut (File menu) and may start a build - " +

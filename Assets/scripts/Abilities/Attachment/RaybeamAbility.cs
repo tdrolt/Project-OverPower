@@ -41,47 +41,36 @@ namespace Overpower.Abilities
                  "since it always shows whichever stack has the most time remaining.")]
         private float vulnerabilitySeconds = 4f;
 
-        [SerializeField, Tooltip("How far apart the two outer beams start either side of the muzzle, " +
-                 "in metres. Controller's call: wide enough that the three beams read as separate " +
-                 "shots at close range, narrow enough that all three still converge on one target at " +
-                 "the tuned range below. 2026-09-20: nudged 0.75 -> 0.9 to keep the same visible gap " +
-                 "between beam edges now that Beam Width is 30% fatter (see its own tooltip) - purely " +
-                 "a readability correction, not an attempt to change the spread.")]
+        [SerializeField, Tooltip("How far apart the two outer beams start either side of the muzzle, in metres. Controller's call: " +
+                 "wide enough that the three beams read as separate shots at close range, narrow enough that all " +
+                 "three still converge on one target at the tuned range below. The gap is kept wide enough to read " +
+                 "between beam edges now that Beam Width is thicker (see its own tooltip); it is not meant to change " +
+                 "the spread.")]
         private float beamOriginSpacing = 0.9f;
 
-        [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in " +
-                 "metres, pierce included. Two things at once: the CAMERA sets how far out you can " +
-                 "place the cursor on screen (roughly 19m out at default zoom, up to 38m fully " +
-                 "zoomed out) - but TryBuildCast pulls the convergence point back to THIS number " +
-                 "whenever the cursor sits further away than it, so the beams meet at this distance " +
-                 "instead of at the cursor. That makes this both how far a beam keeps hitting things " +
-                 "past its target AND the furthest point the three beams can ever converge, whatever " +
-                 "the camera would otherwise let you reach. Tudor, 2026-09-18: \"i want for the " +
-                 "beams to traverse\" - doubled from 12 to 24. Tudor, 2026-09-20: \"give them 20% " +
-                 "more range\" - 24 -> 28.8.")]
+        [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in metres, pierce included. Two things " +
+                 "at once: the CAMERA sets how far out you can place the cursor on screen (roughly 19m out at default " +
+                 "zoom, up to 38m fully zoomed out) - but TryBuildCast pulls the convergence point back to THIS " +
+                 "number whenever the cursor sits further away than it, so the beams meet at this distance instead of " +
+                 "at the cursor. That makes this both how far a beam keeps hitting things past its target AND the " +
+                 "furthest point the three beams can ever converge, whatever the camera would otherwise let you reach.")]
         private float beamRange = 28.8f;
 
-        [SerializeField, Tooltip("Diameter of each beam, in metres - BOTH what it hits (the " +
-                 "SphereCast radius below) AND what you see (DrawBeam sets the drawn line's width " +
-                 "from this same number, on the instantiated clone only - never on the shared Laser " +
-                 "Beam VFX prefab, which the two laser weapons also use). One number, one home: " +
-                 "before rework step 6 the drawn line was a flat 0.08m regardless of this value. " +
-                 "Tudor, 2026-09-18: \"thickness of the beam 1.5 times\" - 0.35 -> 0.525. Tudor, " +
-                 "2026-09-20: \"make the beams a bit thicker (30%)\" - 0.525 -> 0.6825.")]
+        [SerializeField, Tooltip("Diameter of each beam, in metres - BOTH what it hits (the SphereCast radius below) AND what you see " +
+                 "(DrawBeam sets the drawn line's width from this same number, on the instantiated clone only - never " +
+                 "on the shared Laser Beam VFX prefab, which the two laser weapons also use). One number, one home: " +
+                 "the drawn line used to be a flat 0.08m regardless of this value.")]
         private float beamWidth = 0.6825f;
 
-        [SerializeField, Tooltip("How far downrange, in metres, the two OUTER beams are aimed to " +
-                 "cross the centre beam's line - a fixed distance along the shooter's own aim " +
-                 "direction, not wherever the cursor happens to sit. 2026-09-20: this is the fix for " +
-                 "\"the raybeam is supposed to be a long range ultimate\" - converging on the cursor's " +
-                 "exact depth already works at any range for a pixel-perfect click, but a ground " +
-                 "cursor cannot deliver pixel-perfect depth at range, which is what actually limited " +
-                 "the old stacked-vulnerability bonus to close quarters. Fixing the crossing point " +
-                 "here instead means catching two or three beams is about closing to roughly this " +
-                 "distance and firing along the target, not about clicking one exact metre of ground. " +
-                 "Default 15 sits in the middle of the 10-20m band Tudor's ultimate is meant to reward; " +
-                 "clamped to Beam Range so it can never ask a beam to converge past where it stops " +
-                 "existing.")]
+        [SerializeField, Tooltip("How far downrange, in metres, the two OUTER beams are aimed to cross the centre beam's line - a " +
+                 "fixed distance along the shooter's own aim direction, not wherever the cursor happens to sit. The " +
+                 "raybeam is a long-range ultimate, so the crossing point is fixed here. Converging on the cursor's " +
+                 "exact depth already works at any range for a pixel-perfect click, but a ground cursor cannot " +
+                 "deliver pixel-perfect depth at range, which is what actually limited the old stacked-vulnerability " +
+                 "bonus to close quarters. Fixing the crossing point here instead means catching two or three beams " +
+                 "is about closing to roughly this distance and firing along the target, not about clicking one exact " +
+                 "metre of ground. Default 15 sits in the middle of the 10-20m band the ultimate is meant to reward; " +
+                 "clamped to Beam Range so it can never ask a beam to converge past where it stops existing.")]
         private float beamConvergenceRange = 15f;
 
         [SerializeField, Tooltip("Which layers a beam can hit. Default is where living players and " +

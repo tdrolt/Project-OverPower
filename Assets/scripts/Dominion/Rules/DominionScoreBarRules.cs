@@ -28,15 +28,6 @@ namespace Overpower.Dominion
             return Math.Min(1f, points / (float)leaderPoints);
         }
 
-        /// <summary>The fill of each listed team's bar, in the order of <paramref name="teams"/>. A missing points entry reads as 0.</summary>
-        public static float[] Fills(int[] teams, int[] points)
-        {
-            if (teams == null) return new float[0];
-            var fills = new float[teams.Length];
-            FillsInto(teams, points, fills);
-            return fills;
-        }
-
         /// <summary>Fills for each listed team written into a buffer the caller keeps (the bars are refreshed every frame, so they allocate nothing). The leader is
         /// found once. Entries past the teams' count are left as they were.</summary>
         public static void FillsInto(int[] teams, int[] points, float[] buffer)

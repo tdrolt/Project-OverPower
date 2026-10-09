@@ -98,9 +98,9 @@ namespace Overpower.Data
 
         [Header("Phase two cut (a team knocked out)")]
         [Tooltip("How far past the arena centre, toward the knocked-out team's capital, the phase-two wall's face " +
-                 "stands, in metres. Tudor 2026-09-25: below the two side Tier III, so they and their recesses end up " +
-                 "behind it (they start about 7.6 m and 6.7 m past the centre). Larger keeps more of the arena open. " +
-                 "Seen in Play Mode only: the wall is built when a corner closes.")]
+                 "stands, in metres. Below the two side Tier III, so they and their recesses end up behind it (they " +
+                 "start about 7.6 m and 6.7 m past the centre). Larger keeps more of the arena open. Seen in Play " +
+                 "Mode only: the wall is built when a corner closes.")]
         [SerializeField, Min(0f)] private float phaseTwoWallDistance = 6.3f;
 
         [Tooltip("The recess in the phase-two wall behind the centre tower (the centre plays as a Tier III once a " +
@@ -117,10 +117,9 @@ namespace Overpower.Data
                  "10.18 x 1 x 0.6). Length 0 = no barrier.")]
         [SerializeField] private Vector3 phaseTwoRecessBarrierSize = new Vector3(10.181736f, 1f, 0.6f);
 
-        [Tooltip("The two \"planks\" standing out from the recess mouth at each end of its barrier (Tudor 2026-09-26: " +
-                 "\"you can try to add the planks as i feel the zone is too empty\") - the same boxes as the planks at " +
-                 "the Tier III recesses in the outer walls: x = width along the wall, y = height, z = how far it " +
-                 "stands out. x 0 = no planks.")]
+        [Tooltip("The two \"planks\" standing out from the recess mouth at each end of its barrier - the same boxes " +
+                 "as the planks at the Tier III recesses in the outer walls: x = width along the wall, y = height, z " +
+                 "= how far it stands out. x 0 = no planks.")]
         [SerializeField] private Vector3 phaseTwoRecessPlankSize = new Vector3(2.609f, 5.729f, 7.181f);
 
         [Tooltip("Metres from the recess's middle to each plank's centre, along the wall.")]

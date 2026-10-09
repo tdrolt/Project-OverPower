@@ -34,14 +34,13 @@ namespace Overpower.Weapons
                  "position if it is empty, which looks wrong but still fires.")]
         private Transform muzzle;
 
-        [SerializeField, Tooltip("Where a laser's wind-up warning line gets its team colour and its " +
-                 "width/alpha/material numbers from - Assets/Gameplay/Config/UiTheme.asset, shared " +
-                 "with the HUD, the aim cone and every shot's trail (Task 11b). Presentation only; " +
-                 "every weapon still fires with this left empty, the warning line just falls back " +
+        [SerializeField, Tooltip("Where a laser's wind-up warning line gets its team colour and its width/alpha/material numbers from " +
+                 "- Assets/Gameplay/Config/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
+                 "Presentation only; every weapon still fires with this left empty, the warning line just falls back " +
                  "to plain numbers and no material instead of the theme's.")]
         private UiTheme theme;
 
-        [Header("Wall-hugging clearance (review finding, Task 1.9 follow-up)")]
+        [Header("Wall-hugging clearance")]
         [SerializeField, Tooltip("Radius, in metres, of the clearance check between the player's " +
                  "body and the muzzle tip - approximately a projectile's own radius. The muzzle sits " +
                  "just inside the body capsule, but the check still reaches past the capsule's surface; " +

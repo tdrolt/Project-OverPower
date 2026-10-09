@@ -67,6 +67,9 @@ namespace Overpower.Data
         [Tooltip("The cards on the mode's info page, shown in this order. Each has a title, a short text and an accent colour.")]
         [SerializeField] private List<InfoCard> infoCards = new List<InfoCard>();
 
+        [Tooltip("How many cards stand side by side on this mode's info page. 0 uses the number set for every mode in the UI theme (Mode Info Columns). More columns make each card narrower and give the page more room for bigger text when a mode has many cards.")]
+        [SerializeField, Min(0)] private int infoColumns = 0;
+
         public int Id => id;
         public string DisplayName => displayName;
         public GameModeFamily Family => family;
@@ -79,5 +82,6 @@ namespace Overpower.Data
         public bool Available => available;
         public int LobbyModeValue => lobbyModeValue;
         public IReadOnlyList<InfoCard> InfoCards => infoCards;
+        public int InfoColumns => infoColumns;
     }
 }

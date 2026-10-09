@@ -92,9 +92,9 @@ namespace Overpower.Arena
         [Tooltip("The arena's outer edge in the Source third, seen from above: the inner faces of the boundary walls " +
                  "under Source/Boundry, in order round the edge (x = world X, y = world Z). The other two thirds use " +
                  "it turned 120 and 240 degrees. Blink and portals can't land outside it, and a player who ends up " +
-                 "outside is put back. This is the SOURCE of a wall's position, not the other way round (corrected " +
-                 "2026-09-19 review): move these points, then run Build primitive arena to rebuild the wall from " +
-                 "them. Validate still reports any built wall more than 15 cm off this outline, as a sanity check.")]
+                 "outside is put back. This is the SOURCE of a wall's position, not the other way round: move these " +
+                 "points, then run Build primitive arena to rebuild the wall from them. Validate still reports any " +
+                 "built wall more than 15 cm off this outline, as a sanity check.")]
         public List<Vector2> sourceOutline = new List<Vector2>();
 
         [Tooltip("Tick for a map that is ONE piece (the Dominion lane): Source Outline is then the whole playable edge as it is, not one third to be turned " +

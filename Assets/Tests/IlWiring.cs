@@ -67,6 +67,30 @@ namespace Overpower.Tests
             return false;
         }
 
+        /// <summary>True when the named method (or its lambdas and state machine) stores the bool <paramref name="value"/> straight into the field: the constant
+        /// (ldc.i4.0 / ldc.i4.1) is the instruction right before the stfld. "Stores" alone cannot tell a reset to false from a set to true.</summary>
+        public static bool StoresBool(System.Type owner, string methodName, FieldInfo field, bool value)
+        {
+            byte[] token = System.BitConverter.GetBytes(field.MetadataToken);
+            byte constant = value ? (byte)0x17 : (byte)0x16;
+            string generated = "<" + methodName + ">";
+            var types = new List<System.Type> { owner };
+            types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+            foreach (System.Type type in types)
+            {
+                bool wholeTypeIsTheMethod = type != owner && type.Name.StartsWith(generated);
+                foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
+                {
+                    if (!wholeTypeIsTheMethod && method.Name != methodName && !method.Name.StartsWith(generated)) continue;
+                    byte[] il = method.GetMethodBody()?.GetILAsByteArray();
+                    if (il == null) continue;
+                    foreach (int at in OffsetsOf(method, token, 0x7D))
+                        if (at > 0 && il[at - 1] == constant) return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>The IL offsets of every call, callvirt or newobj of the target in one method body (empty when it is not called there). A method of
         /// ANOTHER assembly (Photon) is referenced by a token of this assembly's own, so every call's token is resolved and compared as a method, not as bytes.</summary>
         public static List<int> CallOffsets(MethodBase method, MethodBase target)
@@ -131,16 +155,20 @@ namespace Overpower.Tests
         }
 
         /// <summary>True when the instructions from <paramref name="at"/> on are only the plumbing a compiler puts between a bool and the branch that uses it (a
-        /// debug build negates with ldc.i4.0 / ceq and goes through a local: stloc / ldloc / nop) and then a brtrue or brfalse. Anything else first (a pop, a
-        /// store to a field, another call) means the answer was not what the branch used.</summary>
+        /// debug build negates with ldc.i4.0 / ceq and goes through a local: stloc / ldloc / nop) and then a brtrue or brfalse. A local that is loaded must be the
+        /// one the answer was stored in. Anything else first (a pop, a store to a field, another call, another local) means the answer was not what the branch used.</summary>
         private static bool BranchFollows(byte[] il, int at)
         {
+            int stored = -1; // the local the answer went into, once it has gone into one
             for (int i = at; i < il.Length;)
             {
                 byte op = il[i];
                 if (op == 0x2C || op == 0x2D || op == 0x39 || op == 0x3A) return true; // brfalse.s, brtrue.s, brfalse, brtrue
-                if (op == 0x00 || op == 0x16 || op == 0x17 || (op >= 0x06 && op <= 0x0D)) { i += 1; continue; } // nop, ldc.i4.0/1, ldloc.0-3, stloc.0-3
-                if (op == 0x11 || op == 0x13) { i += 2; continue; } // ldloc.s, stloc.s
+                if (op == 0x00 || op == 0x16 || op == 0x17) { i += 1; continue; } // nop, ldc.i4.0/1
+                if (op >= 0x0A && op <= 0x0D) { stored = op - 0x0A; i += 1; continue; } // stloc.0-3
+                if (op == 0x13 && i + 1 < il.Length) { stored = il[i + 1]; i += 2; continue; } // stloc.s
+                if (op >= 0x06 && op <= 0x09) { if (stored != op - 0x06) return false; i += 1; continue; } // ldloc.0-3
+                if (op == 0x11 && i + 1 < il.Length) { if (stored != il[i + 1]) return false; i += 2; continue; } // ldloc.s
                 if (op == 0xFE && i + 1 < il.Length && il[i + 1] == 0x01) { i += 2; continue; } // ceq
                 return false;
             }

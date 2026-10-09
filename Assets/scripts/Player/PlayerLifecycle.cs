@@ -62,8 +62,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// <summary>The character model root (EnemyVisibility collects the body renderers under it).</summary>
     public GameObject PlayerMesh => playerMesh;
 
-    [SerializeField, Tooltip("Colours and text for the capital-under-attack respawn note/toast (Tudor, " +
-             "2026-09-16). The same theme asset PlayerHud reads for the HUD.")]
+    [SerializeField, Tooltip("Colours and text for the capital-under-attack respawn note/toast. The same theme asset PlayerHud " +
+             "reads for the HUD.")]
     private UiTheme theme;
 
     private PhotonView photonView;
@@ -1175,7 +1175,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     public void RPC_HandleRespawnMaster(int teamID, int actorNumber)
     {
         if (!PhotonNetwork.IsMasterClient) return;
-        Debug.Log($"[PlayerLifecycle] (Master) RPC_HandleRespawnMaster retired (Task 2.7) - actor {actorNumber} " +
+        Debug.Log($"[PlayerLifecycle] (Master) RPC_HandleRespawnMaster retired - actor {actorNumber} " +
                   $"team {teamID}; MatchDirector already reacted to this player's own \"alive\" Player Property.");
     }
 
@@ -1183,7 +1183,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     public void RPC_HandleDeathMaster(int teamID, int actorNumber)
     {
         if (!PhotonNetwork.IsMasterClient) return;
-        Debug.Log($"[PlayerLifecycle] (Master) RPC_HandleDeathMaster retired (Task 2.7) - actor {actorNumber} " +
+        Debug.Log($"[PlayerLifecycle] (Master) RPC_HandleDeathMaster retired - actor {actorNumber} " +
                   $"team {teamID}; asking MatchDirector to recompute in case this RPC beats the \"lastStand\" " +
                   "Player Property SetLastStandOut(true) already published across the wire.");
         MatchDirector.Instance?.RequestRecompute();

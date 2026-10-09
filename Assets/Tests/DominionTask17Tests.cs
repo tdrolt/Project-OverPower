@@ -101,16 +101,23 @@ namespace Overpower.Tests
 
         // ---------------------------------------------------------------- A52: the score bars
 
+        private static float[] Fills(int[] teams, int[] points)
+        {
+            var fills = new float[teams.Length];
+            DominionScoreBarRules.FillsInto(teams, points, fills);
+            return fills;
+        }
+
         [Test] public void TheLeadingTeamsBarIsFullAndTheOthersFillInProportionToTheLeader()
         {
-            float[] fills = DominionScoreBarRules.Fills(new[] { 0, 1 }, new[] { 300, 100, 0 });
+            float[] fills = Fills(new[] { 0, 1 }, new[] { 300, 100, 0 });
             Assert.AreEqual(1f, fills[0], 1e-5f);
             Assert.AreEqual(1f / 3f, fills[1], 1e-5f);
         }
 
         [Test] public void ThreeTeamsFillByTheirShareOfTheLeader()
         {
-            float[] fills = DominionScoreBarRules.Fills(new[] { 0, 1, 2 }, new[] { 20, 80, 40 });
+            float[] fills = Fills(new[] { 0, 1, 2 }, new[] { 20, 80, 40 });
             Assert.AreEqual(0.25f, fills[0], 1e-5f);
             Assert.AreEqual(1f, fills[1], 1e-5f);
             Assert.AreEqual(0.5f, fills[2], 1e-5f);
@@ -118,13 +125,13 @@ namespace Overpower.Tests
 
         [Test] public void WhenEveryoneIsOnZeroEveryBarIsEmpty()
         {
-            float[] fills = DominionScoreBarRules.Fills(new[] { 0, 1, 2 }, new[] { 0, 0, 0 });
+            float[] fills = Fills(new[] { 0, 1, 2 }, new[] { 0, 0, 0 });
             CollectionAssert.AreEqual(new[] { 0f, 0f, 0f }, fills);
         }
 
         [Test] public void TeamsTiedForTheLeadAreBothFull()
         {
-            float[] fills = DominionScoreBarRules.Fills(new[] { 0, 1, 2 }, new[] { 50, 50, 10 });
+            float[] fills = Fills(new[] { 0, 1, 2 }, new[] { 50, 50, 10 });
             Assert.AreEqual(1f, fills[0], 1e-5f);
             Assert.AreEqual(1f, fills[1], 1e-5f);
             Assert.AreEqual(0.2f, fills[2], 1e-5f);
@@ -133,7 +140,7 @@ namespace Overpower.Tests
         [Test] public void OnlyTheTeamsOfTheMatchCountForTheLeader()
         {
             // a 2v2 room keeps team 2's slot in the array; whatever sits there must not become the leader
-            float[] fills = DominionScoreBarRules.Fills(new[] { 0, 1 }, new[] { 10, 20, 999 });
+            float[] fills = Fills(new[] { 0, 1 }, new[] { 10, 20, 999 });
             Assert.AreEqual(2, fills.Length);
             Assert.AreEqual(0.5f, fills[0], 1e-5f);
             Assert.AreEqual(1f, fills[1], 1e-5f);
@@ -142,9 +149,9 @@ namespace Overpower.Tests
 
         [Test] public void AMissingPointsEntryReadsAsZeroAndNeverThrows()
         {
-            Assert.DoesNotThrow(() => DominionScoreBarRules.Fills(new[] { 0, 1, 2 }, new[] { 5 }));
-            CollectionAssert.AreEqual(new[] { 1f, 0f, 0f }, DominionScoreBarRules.Fills(new[] { 0, 1, 2 }, new[] { 5 }));
-            CollectionAssert.AreEqual(new[] { 0f, 0f }, DominionScoreBarRules.Fills(new[] { 0, 1 }, null));
+            Assert.DoesNotThrow(() => Fills(new[] { 0, 1, 2 }, new[] { 5 }));
+            CollectionAssert.AreEqual(new[] { 1f, 0f, 0f }, Fills(new[] { 0, 1, 2 }, new[] { 5 }));
+            CollectionAssert.AreEqual(new[] { 0f, 0f }, Fills(new[] { 0, 1 }, null));
         }
 
         [Test] public void FillNeverLeavesZeroToOne()

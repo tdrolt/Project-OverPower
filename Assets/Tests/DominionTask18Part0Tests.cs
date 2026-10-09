@@ -146,8 +146,12 @@ namespace Overpower.Tests
         {
             var room = Room(DominionStage.Overtime, 160000, new[] { 500, 500, 500 }, otTeams: Three);
             int[] players = { 3, 0, 3 };
-            Assert.IsNull(Next(room, 130000, players), "two teams are still level inside the lead: the overtime runs");
-            DominionWrite end = Next(room, 160000, players);
+            DominionWrite narrowed = Next(room, 130000, players);
+            Assert.AreEqual(DominionRoomWrites.WhatOvertimeNarrowed, narrowed.What, "two teams are still level inside the lead: the overtime runs, on a list of two");
+            CollectionAssert.AreEqual(new[] { 0, 2 }, (int[])narrowed.Props[DominionKeys.OvertimeTeams]);
+            var carried = Room(DominionStage.Overtime, 160000, new[] { 500, 500, 500 }, otTeams: new[] { 0, 2 });
+            Assert.IsNull(Next(carried, 131000, players), "and nothing more is written");
+            DominionWrite end = Next(carried, 160000, players);
             CollectionAssert.AreEqual(new[] { 1, 0, 1 }, (int[])end.Props[DominionKeys.Wins], "the emptied team gets no win");
             Assert.AreEqual(DominionHistory.EncodeWinners(new[] { 0, 2 }), ((int[])end.Props[DominionKeys.HistoryWinners])[0]);
         }
@@ -161,7 +165,8 @@ namespace Overpower.Tests
         [Test] public void ThreeOvertimeTeamsWhereTheEmptiedOneWasTheOnlyThingStoppingALeadStillNeedsTheFullLead()
         {
             // team 0 emptied; team 1 leads team 2 by 199: not yet
-            Assert.IsNull(Next(Room(DominionStage.Overtime, 160000, new[] { 0, 699, 500 }, otTeams: Three), 130000, new[] { 0, 3, 3 }));
+            Assert.IsNull(Next(Room(DominionStage.Overtime, 160000, new[] { 0, 699, 500 }, otTeams: new[] { 1, 2 }), 130000, new[] { 0, 3, 3 }));
+            Assert.AreEqual(DominionRoomWrites.WhatOvertimeNarrowed, Next(Room(DominionStage.Overtime, 160000, new[] { 0, 699, 500 }, otTeams: Three), 130000, new[] { 0, 3, 3 }).What);
         }
 
         [Test] public void WhenTheMasterCouldNotCountPlayersTheOvertimeCarriesOnAsBefore()
@@ -178,10 +183,11 @@ namespace Overpower.Tests
             Assert.AreEqual(2, w.Props[DominionKeys.Winner]);
         }
 
-        [Test] public void NobodyLeftAnywhereScoresTheRoundForNobodyAndDoesNotThrow()
+        [Test] public void NobodyLeftAnywhereWaitsForTheClockThenScoresTheRoundForNobodyAndDoesNotThrow()
         {
+            Assert.IsNull(Next(Room(DominionStage.Overtime, 160000, new[] { 520, 600, 0 }, otTeams: Two), 130000, new[] { 0, 0, 0 }), "no instant verdict from an empty list");
             DominionWrite w = null;
-            Assert.DoesNotThrow(() => w = Next(Room(DominionStage.Overtime, 160000, new[] { 520, 600, 0 }, otTeams: Two), 130000, new[] { 0, 0, 0 }));
+            Assert.DoesNotThrow(() => w = Next(Room(DominionStage.Overtime, 160000, new[] { 520, 600, 0 }, otTeams: Two), 160000, new[] { 0, 0, 0 }));
             CollectionAssert.AreEqual(new[] { 0, 0, 0 }, (int[])w.Props[DominionKeys.Wins]);
         }
 
@@ -389,12 +395,12 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "OwnerIsUp", Rule(typeof(RespawnShieldRules), nameof(RespawnShieldRules.OwnerShieldUp))), "the owner's answer is the tested rule");
             Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "OwnerIsUp", ClearSentField()), "and it is given the remembered clear");
             Assert.IsTrue(IlWiring.Uses(typeof(RespawnShield), "Awake", Rule(typeof(RespawnShieldRules), nameof(RespawnShieldRules.WatchArmed))), "the watch is armed by the tested rule");
-            Assert.IsTrue(IlWiring.Stores(typeof(RespawnShield), "ClearShield", ClearSentField()), "every clear (a hit on an enemy, leaving the spawn, a death) is remembered");
+            Assert.IsTrue(IlWiring.StoresBool(typeof(RespawnShield), "ClearShield", ClearSentField(), true), "every clear (a hit on an enemy, leaving the spawn, a death) is remembered");
         }
 
         [Test] public void AnewShieldResetsTheRememberedClearSoASecondRespawnDropsOnLeavingToo()
         {
-            Assert.IsTrue(IlWiring.Stores(typeof(RespawnShield), "StartShield", ClearSentField()), "StartShield sets the flag back to false");
+            Assert.IsTrue(IlWiring.StoresBool(typeof(RespawnShield), "StartShield", ClearSentField(), false), "StartShield sets the flag back to false");
         }
 
         // ---------------------------------------------------------------- 9: the score bars
@@ -407,7 +413,7 @@ namespace Overpower.Tests
             DominionScoreBarRules.FillsInto(new[] { 0, 1 }, new[] { 10, 20, 999 }, buffer);
             Assert.AreEqual(0.5f, buffer[0], 1e-5f);
             Assert.AreEqual(1f, buffer[1], 1e-5f);
-            CollectionAssert.AreEqual(DominionScoreBarRules.Fills(new[] { 0, 1, 2 }, new[] { 5 }), Fill(new[] { 0, 1, 2 }, new[] { 5 }));
+            CollectionAssert.AreEqual(new[] { 1f, 0f, 0f }, Fill(new[] { 0, 1, 2 }, new[] { 5 }), "a missing points entry reads as 0");
             Assert.DoesNotThrow(() => DominionScoreBarRules.FillsInto(new[] { 0, 1, 2 }, null, buffer));
             Assert.DoesNotThrow(() => DominionScoreBarRules.FillsInto(null, null, buffer));
             Assert.DoesNotThrow(() => DominionScoreBarRules.FillsInto(new[] { 0, 1, 2, 3, 4 }, new[] { 1, 2 }, new float[2]), "a buffer shorter than the teams never throws");
@@ -423,7 +429,6 @@ namespace Overpower.Tests
         [Test] public void TheBarsRefreshEveryFrameIntoOneKeptBufferAndNeverAllocateAnArray()
         {
             Assert.IsTrue(IlWiring.Uses(typeof(ScoreBars), "Refresh", Rule(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.FillsInto))));
-            Assert.IsFalse(IlWiring.Uses(typeof(ScoreBars), "Refresh", Rule(typeof(DominionScoreBarRules), nameof(DominionScoreBarRules.Fills))), "the allocating form is not used per frame");
         }
 
         [Test] public void TheGoldReadoutHeightIsOneNumberForTheHudAndTheBars()

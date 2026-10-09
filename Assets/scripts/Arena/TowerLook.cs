@@ -47,19 +47,19 @@ namespace Overpower.Arena
         // its BATCH ROOT's combined mesh, so SetPropertyBlock on the ORIGINAL renderer (what VisualTint.SetMeshColor
         // calls) never reaches the screen, even though GetPropertyBlock/SetPropertyBlock both succeed and a test
         // reading the renderer's own block back looks green (TowerLookPrefabTests pins the flag).
-        [Tooltip("Each slot's Shaft renderer, in the same order as columnSlots - the Unlit 'Tower Owner' material, " +
-                 "so Refresh paints it (like Plinth below) at the full owner colour, exactly like the crown/caps " +
-                 "(no shade - Tudor, 2026-09-23). Only a SHOWN slot's shaft is painted, same rule as columnCaps. " +
-                 "Must not be Batching Static - see the comment above.")]
+        [Tooltip("Each slot's Shaft renderer, in the same order as columnSlots - the Unlit 'Tower Owner' material, so " +
+                 "Refresh paints it (like Plinth below) at the full owner colour, exactly like the crown/caps (no " +
+                 "shade). Only a SHOWN slot's shaft is painted, same rule as columnCaps. Must not be Batching Static " +
+                 "- see the comment above.")]
         public Renderer[] columnShafts = new Renderer[4];
 
-        [Tooltip("The tower's base (Unlit 'Tower Owner' material, since 2026-09-23) - painted with the full owner " +
-                 "colour, exactly like the crown/caps/shown shafts (no shade). Must not be Batching Static.")]
+        [Tooltip("The tower's base (Unlit 'Tower Owner' material) - painted with the full owner colour, exactly like " +
+                 "the crown/caps/shown shafts (no shade). Must not be Batching Static.")]
         public Renderer plinth;
 
         [Tooltip("The tower's body (Lit 'Tower Stone' material) - painted with the owner's colour times UiTheme's " +
-                 "Tower Body Shade (the only piece this shade still applies to, since 2026-09-23), so the tower " +
-                 "keeps a silhouette instead of turning into one flat block of colour. Must not be Batching Static.")]
+                 "Tower Body Shade (the only piece this shade still applies to), so the tower keeps a silhouette " +
+                 "instead of turning into one flat block of colour. Must not be Batching Static.")]
         public Renderer drum;
 
         // Decision 6's starting value; the cap is drawn wider in CapToShaftRatio whichever shaft radius is showing.

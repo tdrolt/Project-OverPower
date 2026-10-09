@@ -103,13 +103,14 @@ namespace Overpower.UI
             int now = PhotonNetwork.ServerTimestamp;
             string[] names = theme.scoreboardTeamNames;
             // The score bars follow the stage rule alone: a round or its overtime shows them, every other stage (the break, sudden death, the result) hides them.
-            if (DominionScoreBarRules.ShownIn(state.Stage)) scoreBars.Refresh(teams, state.Points);
+            int[] shownTeams = DominionRules.TeamsShownIn(state.Stage, teams, state.OvertimeTeams); // in overtime only the teams still playing it
+            if (DominionScoreBarRules.ShownIn(state.Stage)) scoreBars.Refresh(shownTeams, state.Points);
             else scoreBars.SetVisible(false);
             switch (state.Stage)
             {
                 case DominionStage.Round:
                 case DominionStage.Overtime: // the same bar, its heading says OVERTIME and the clock is the overtime's own minute
-                    round.Refresh(teams, state.Round, config.MaxRounds, DominionHudText.SecondsLeft(state.EndMs, now), false, state.Stage == DominionStage.Overtime,
+                    round.Refresh(shownTeams, state.Round, config.MaxRounds, DominionHudText.SecondsLeft(state.EndMs, now), false, state.Stage == DominionStage.Overtime,
                         state.Points, state.Wins, config.RoundsToWin, names);
                     breakCard.SetVisible(false);
                     sudden.Hide();

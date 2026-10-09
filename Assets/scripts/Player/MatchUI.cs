@@ -31,7 +31,7 @@ public class MatchUI : MonoBehaviour
     [SerializeField, Tooltip("Shown for the rest of the match when this player's team is eliminated.")]
     private GameObject youLostPanel;
 
-    [Header("Capital under attack (Tudor, 2026-09-16)")]
+    [Header("Capital under attack")]
     [SerializeField, Tooltip("Colours/font/text the respawn panel's under-attack note is styled from - the " +
              "same theme asset PlayerHud reads for the HUD.")]
     private UiTheme theme;

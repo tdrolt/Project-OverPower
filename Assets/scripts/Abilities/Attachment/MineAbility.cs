@@ -33,7 +33,7 @@ namespace Overpower.Abilities
                  "fuse would otherwise let mines pile up indefinitely over a long match.")]
         private int maxActiveMines = 4;
 
-        [Header("Placement (A9, Tudor 2026-09-17 evening)")]
+        [Header("Placement")]
         [SerializeField, Tooltip("How far from the player, in metres, a mine can be placed - horizontal " +
                  "distance from the player's centre, along the aim direction. The cursor's floor point " +
                  "is clamped to this distance when it points further away - see MinePlacementRule.")]

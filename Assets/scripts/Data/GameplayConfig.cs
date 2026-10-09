@@ -172,7 +172,7 @@ namespace Overpower.Data
         [SerializeField, Range(0f, 1f)] private float sellRefundRate = 0.5f;
         public float SellRefundRate => sellRefundRate;
 
-        [Header("OverPower (Task 2.6, GDD p.20)")]
+        [Header("OverPower")]
         [Tooltip("Turn off to disable the OverPower comeback buff entirely for a playtest. Nothing " +
                  "arms, triggers or shows on the HUD.")]
         [SerializeField] private bool enableOverPower = true;

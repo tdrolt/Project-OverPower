@@ -70,10 +70,9 @@ namespace Overpower.Abilities
                  "about the burn itself depends on it.")]
         private Color vfxColor = new Color(1f, 0.45f, 0.1f, 1f);
 
-        [SerializeField, Tooltip("The soft flame cone - Assets/Gameplay/Abilities/Flamethrower Cone.prefab. " +
-                 "Drawn from Cone Angle and Cone Range above, with its tip under the caster, so it always " +
-                 "shows exactly the area the burn checks (ability visuals step 5, A3: a soft tip-to-edge " +
-                 "gradient, not a hard outline). Visual only.")]
+        [SerializeField, Tooltip("The soft flame cone - Assets/Gameplay/Abilities/Flamethrower Cone.prefab. Drawn from Cone Angle and " +
+                 "Cone Range above, with its tip under the caster, so it always shows exactly the area the burn " +
+                 "checks (a soft tip-to-edge gradient, not a hard outline). Visual only.")]
         private FlameConeVisual sprayVfxPrefab;
 
         // Not a design tunable: how many overlapping colliders one cone check considers - matches
