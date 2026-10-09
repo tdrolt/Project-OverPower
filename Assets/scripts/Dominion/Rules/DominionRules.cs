@@ -121,10 +121,17 @@ namespace Overpower.Dominion
             return present.ToArray();
         }
 
-        /// <summary>The teams the round bar and the score bars show: in overtime only the teams still playing it (the room's stored list), else every team of
-        /// the match. The arrays are handed back as they are, so a per-frame call allocates nothing.</summary>
-        public static int[] TeamsShownIn(DominionStage stage, int[] matchTeams, int[] overtimeTeams) =>
-            stage == DominionStage.Overtime && overtimeTeams != null && overtimeTeams.Length > 0 ? overtimeTeams : matchTeams;
+        /// <summary>The teams the round bar and the score bars show: every team of the match, and in overtime less a team with nobody left in the game
+        /// (a team far behind at the buzzer stays up even though it is not in the overtime). A team whose presence is not known (no count, or past the end of
+        /// it) is shown, and so is every team when nobody was counted at all. The match's own array is handed back when nothing is hidden, so a per-frame call allocates nothing.</summary>
+        public static int[] TeamsShownIn(DominionStage stage, int[] matchTeams, int[] playersPerTeam)
+        {
+            if (stage != DominionStage.Overtime || matchTeams == null || playersPerTeam == null) return matchTeams;
+            var shown = new List<int>(matchTeams.Length);
+            foreach (int team in matchTeams)
+                if (team < 0 || team >= playersPerTeam.Length || playersPerTeam[team] > 0) shown.Add(team);
+            return shown.Count == 0 || shown.Count == matchTeams.Length ? matchTeams : shown.ToArray();
+        }
 
         /// <summary>Has a team dropped out of the running overtime: two or more teams are still present and fewer than the stored list. The master then
         /// writes the narrowed list, so a rejoin of the dropped team cannot bring it back. One team left has won and none left waits for the clock, so

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
@@ -44,6 +45,8 @@ namespace Overpower.UI
         private int[] teams = Array.Empty<int>();
         private Room teamsRoom;
         private int centreZone = -1;
+        private readonly int[] playersPerTeam = new int[DominionKeys.TeamSlots];
+        private readonly Dictionary<int, float> inactiveSince = new Dictionary<int, float>(); // when this client first saw a player drop
 
         public RoundHud Round => round;
         public BreakCard Break => breakCard;
@@ -103,7 +106,7 @@ namespace Overpower.UI
             int now = PhotonNetwork.ServerTimestamp;
             string[] names = theme.scoreboardTeamNames;
             // The score bars follow the stage rule alone: a round or its overtime shows them, every other stage (the break, sudden death, the result) hides them.
-            int[] shownTeams = DominionRules.TeamsShownIn(state.Stage, teams, state.OvertimeTeams); // in overtime only the teams still playing it
+            int[] shownTeams = DominionRules.TeamsShownIn(state.Stage, teams, state.Stage == DominionStage.Overtime ? CountPlayers() : null); // in overtime a team that left the game is hidden
             if (DominionScoreBarRules.ShownIn(state.Stage)) scoreBars.Refresh(shownTeams, state.Points);
             else scoreBars.SetVisible(false);
             switch (state.Stage)
@@ -135,6 +138,25 @@ namespace Overpower.UI
                     HideBars();
                     break;
             }
+        }
+
+        /// <summary>Players per team id, counted the way the master counts them for the last-team and overtime drop-out rules: a dropped player still counts
+        /// for the dropped grace from the moment this client first saw the drop. Null (show every team) when the grace cannot be read.</summary>
+        private int[] CountPlayers()
+        {
+            if (rooms == null || rooms.Config == null) return null;
+            float grace = rooms.Config.DroppedGraceSeconds;
+            Array.Clear(playersPerTeam, 0, playersPerTeam.Length);
+            foreach (KeyValuePair<int, Player> pair in PhotonNetwork.CurrentRoom.Players)
+            {
+                Player p = pair.Value;
+                if (p.IsInactive) { if (!inactiveSince.ContainsKey(pair.Key)) inactiveSince[pair.Key] = Time.unscaledTime; }
+                else inactiveSince.Remove(pair.Key);
+                if (!Teams.TryGetPlayingTeam(p, out int team) || team < 0 || team >= playersPerTeam.Length) continue;
+                bool timed = inactiveSince.TryGetValue(pair.Key, out float since);
+                if (DominionRules.CountsAsPresent(p.IsInactive, timed, since, Time.unscaledTime, grace)) playersPerTeam[team]++;
+            }
+            return playersPerTeam;
         }
 
         private void ReadRoom(DominionConfig config)

@@ -132,18 +132,81 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(DominionRoomWrites), nameof(DominionRoomWrites.Next), rule));
         }
 
-        [Test] public void OnlyTheTeamsStillInTheOvertimeAreShownDuringIt()
+        [Test] public void ATeamFarBehindAtTheBuzzerIsStillShownDuringTheOvertime() =>
+            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, new[] { 3, 2, 1 }));
+
+        [Test] public void ATeamWithNobodyLeftIsHiddenDuringTheOvertime()
         {
-            CollectionAssert.AreEqual(Two, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, Two));
-            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, null), "no stored list: all of them");
-            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, new int[0]));
-            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Round, Three, Two), "a leftover list outside overtime is ignored");
+            CollectionAssert.AreEqual(new[] { 0, 2 }, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, new[] { 3, 0, 3 }));
+            CollectionAssert.AreEqual(Two, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, new[] { 1, 1, 0 }));
         }
+
+        [Test] public void EveryTeamOfTheMatchIsShownOutsideTheOvertime()
+        {
+            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Round, Three, new[] { 3, 0, 3 }));
+            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.SuddenDeath, Three, new[] { 0, 0, 0 }));
+        }
+
+        [Test] public void ATeamWhosePresenceIsUnknownIsShown()
+        {
+            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, null), "no count at all");
+            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, new[] { 0, 0, 0 }), "nobody counted anywhere: nothing to hide for");
+            CollectionAssert.AreEqual(Three, DominionRules.TeamsShownIn(DominionStage.Overtime, Three, new[] { 3, 3 }), "a team past the end of the count");
+        }
+
+        [Test] public void ATwoTeamMatchStaysTwoTeamsWhateverTheUnusedSlotCounts() =>
+            CollectionAssert.AreEqual(Two, DominionRules.TeamsShownIn(DominionStage.Overtime, Two, new[] { 3, 3, 0 }));
 
         [Test] public void TheHudShowsTheTeamsThroughTheTestedRule()
         {
             MethodInfo rule = typeof(DominionRules).GetMethod(nameof(DominionRules.TeamsShownIn));
             Assert.IsTrue(IlWiring.Uses(typeof(DominionHud), "Update", rule));
+        }
+
+        [Test] public void TheRoundBarAndTheScoreBarsBothGetTheRulesResult()
+        {
+            MethodInfo rule = typeof(DominionRules).GetMethod(nameof(DominionRules.TeamsShownIn));
+            MethodInfo update = typeof(DominionHud).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
+            int shownLocal = LocalStoredRightAfter(update, rule);
+            Assert.GreaterOrEqual(shownLocal, 0, "Update keeps the rule's result in a local");
+            Assert.IsTrue(AFirstArgumentIsTheLocal(update, typeof(DominionHud).GetField("scoreBars", Any), typeof(ScoreBars).GetMethod(nameof(ScoreBars.Refresh)), shownLocal),
+                "the score bars are handed the rule's result");
+            Assert.IsTrue(AFirstArgumentIsTheLocal(update, typeof(DominionHud).GetField("round", Any), typeof(RoundHud).GetMethod(nameof(RoundHud.Refresh)), shownLocal),
+                "the round bar is handed the rule's result");
+        }
+
+        private const BindingFlags Any = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+
+        private static int LocalStoredRightAfter(MethodBase method, MethodBase rule)
+        {
+            byte[] il = method.GetMethodBody().GetILAsByteArray();
+            foreach (int at in IlWiring.CallOffsets(method, rule))
+            {
+                int next = at + 5;
+                if (il[next] >= 0x0A && il[next] <= 0x0D) return il[next] - 0x0A; // stloc.0 - stloc.3
+                if (il[next] == 0x13) return il[next + 1];                           // stloc.s
+            }
+            return -1;
+        }
+
+        /// <summary>Some call of <paramref name="refresh"/> on the object held in <paramref name="receiver"/> has the local as its first argument:
+        /// the instruction after the last load of that field before the call is the load of the local.</summary>
+        private static bool AFirstArgumentIsTheLocal(MethodBase method, FieldInfo receiver, MethodBase refresh, int local)
+        {
+            byte[] il = method.GetMethodBody().GetILAsByteArray();
+            byte[] field = System.BitConverter.GetBytes(receiver.MetadataToken);
+            foreach (int call in IlWiring.CallOffsets(method, refresh))
+            {
+                for (int i = call - 5; i >= 0; i--)
+                {
+                    if (il[i] != 0x7B || il[i + 1] != field[0] || il[i + 2] != field[1] || il[i + 3] != field[2] || il[i + 4] != field[3]) continue;
+                    int next = i + 5;
+                    bool loadsTheLocal = (il[next] >= 0x06 && il[next] <= 0x09 && il[next] - 0x06 == local) || (il[next] == 0x11 && il[next + 1] == local);
+                    if (loadsTheLocal) return true;
+                    break;
+                }
+            }
+            return false;
         }
 
         // ---------------------------------------------------------------- 3: the info page's column count
