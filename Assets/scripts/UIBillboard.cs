@@ -25,7 +25,6 @@ namespace RhinoGame
 		// Cache reference to this transform
 		private Transform trans;
 
-		// Calculate size depending on camera distance
 		private float size;
 
 		void Awake ()
@@ -35,7 +34,6 @@ namespace RhinoGame
 		}
 
 
-		// Face the camera
 		void Update ()
 		{
 			transform.LookAt (trans.position + camTrans.rotation * Vector3.forward,

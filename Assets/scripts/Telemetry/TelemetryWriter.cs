@@ -5,34 +5,24 @@ using UnityEngine;
 
 namespace Overpower.Telemetry
 {
-    /// <summary>Buffered append-only writer for one match's `.jsonl` file. Not a MonoBehaviour - it
-    /// owns no Unity lifecycle of its own, so MatchTelemetry (which does) decides when Flush/Close
-    /// happen and can unit-test this class without a scene.
-    ///
-    /// Every write goes through an in-memory buffer first; nothing touches disk until Flush. That
-    /// keeps `Log` calls from a hot path (a hit, a shot) cheap, and matches the design's Principle 1:
-    /// telemetry is exception-safe, so an IO error disables it for the rest of the session rather than
-    /// throwing into gameplay code.</summary>
+    /// <summary>Buffered append-only writer for one match's `.jsonl` file. Not a MonoBehaviour, so MatchTelemetry decides when
+    /// Flush/Close happen and this can be unit-tested without a scene. Nothing touches disk until Flush, which keeps `Log` calls from
+    /// a hot path (a hit, a shot) cheap. Telemetry is exception-safe: an IO error disables it for the rest of the session rather
+    /// than throwing into gameplay code.</summary>
     public sealed class TelemetryWriter
     {
         private readonly List<string> buffered = new List<string>();
         private string path;
 
-        /// <summary>True once Open or Flush has hit an exception. Every later call becomes a no-op -
-        /// this is the "an IO error disables telemetry for the session" rule from the design doc,
-        /// applied at the lowest level so nothing above has to remember to check it everywhere.</summary>
+        /// <summary>True once Open or Flush has hit an exception; every later call is a no-op, so nothing above has to check it.</summary>
         public bool Disabled { get; private set; }
 
-        /// <summary>True once Open has succeeded and Close has not yet been called.</summary>
         public bool IsOpen { get; private set; }
 
-        /// <summary>How many lines have actually been written to disk so far (i.e. flushed), not
-        /// counting whatever still sits in the buffer. Diagnostic only - the F1 status label and the
-        /// T2 verification step both read this.</summary>
+        /// <summary>Lines flushed to disk so far (not the buffer). Diagnostic: the F1 status label reads it.</summary>
         public int LineCount { get; private set; }
 
-        /// <summary>Creates the file's directory (if needed) and remembers its path. Does not touch
-        /// the file itself - the first Flush creates it via File.AppendAllLines.</summary>
+        /// <summary>Creates the file's directory and remembers the path; the first Flush creates the file itself.</summary>
         public void Open(string filePath)
         {
             if (Disabled) return;
@@ -53,18 +43,14 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>Appends one line to the in-memory buffer. Does nothing if disabled or not open -
-        /// callers never need to check either themselves.</summary>
         public void Write(string line)
         {
             if (Disabled || !IsOpen) return;
             buffered.Add(line);
         }
 
-        /// <summary>Appends every buffered line to disk in one call and clears the buffer. Any
-        /// exception here disables telemetry for the rest of the session (Principle 1) - the buffered
-        /// lines are dropped rather than retried, since retrying the same failing disk on every future
-        /// flush would just repeat the same error forever.</summary>
+        /// <summary>Any exception here disables telemetry for the session; the buffered lines are dropped, not retried, since
+        /// retrying the same failing disk on every flush would repeat the error forever.</summary>
         public void Flush()
         {
             if (Disabled || !IsOpen || buffered.Count == 0) return;
@@ -83,8 +69,7 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>Flushes whatever remains, then marks the writer closed. Open may be called again
-        /// afterwards (a second match in the same session) unless Disabled is set.</summary>
+        /// <summary>Flushes, then marks the writer closed. Open may be called again (a second match in the same session) unless Disabled.</summary>
         public void Close()
         {
             Flush();

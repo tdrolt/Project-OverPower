@@ -3,7 +3,7 @@ using System;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 17 (Tudor A52), the score bars in the bottom-right corner: one per team, the leading team's full, the others filled by their share
+    /// The score bars in the bottom-right corner (A52): one per team, the leading team's full, the others filled by their share
     /// of the leader's points. Pure, so the drawing code in UI/Dominion/ScoreBars only places what these return.
     /// </summary>
     public static class DominionScoreBarRules

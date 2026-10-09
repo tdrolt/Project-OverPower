@@ -46,7 +46,7 @@ namespace Overpower.Dominion
         public int CentreTeam = -1;
         public int CentrePoints;    }
 
-    /// <summary>The pure rules of Dominion Task 3: when a points tick is due, what a tick adds, when the centre pays and who gets it, what
+    /// <summary>The pure rules of Dominion's points: when a points tick is due, what a tick adds, when the centre pays and who gets it, what
     /// the next dCtr is, and the one check-and-set that carries it all. DominionDirector reads the room and the territory, asks this and
     /// sends the answer.</summary>
     public static class DominionPointsRules
@@ -70,14 +70,14 @@ namespace Overpower.Dominion
             bountyPoints > 0 && DominionRules.BountyDue(lastHeldMs, holdMs, lastOwner, newOwner) ? bountyPoints : 0;
 
         /// <summary>Do points, bounties and the centre accrue in the room's stage right now? In a Round once the zones were reset for it (dRz = dEnd:
-        /// a zone taken in the break never pays), and in Overtime (Tudor A50: zones, bounties and the centre keep paying; the zones are not reset for
+        /// a zone taken in the break never pays), and in Overtime (A50: zones, bounties and the centre keep paying; the zones are not reset for
         /// it, so dRz still names the round's end). Everything else (break, sudden death, over) pays nothing.</summary>
         public static bool PointsRun(DominionRoomState room) =>
             room.HasRound && (room.Stage == DominionStage.Overtime || (room.Stage == DominionStage.Round && room.ResetFor == room.EndMs));
 
         /// <summary>What the master writes now, if anything. Nothing outside a Round, or before the zones were reset for this round (dRz = dEnd:
         /// so a zone taken in the break never pays). Once the round's time is up only one thing is still paid: a centre payout that fell due at
-        /// or before the end (Tudor's A18: the buzzer payout counts), to whoever holds the centre at that moment. A write carries dPts and/or
+        /// or before the end (A18: the buzzer payout counts), to whoever holds the centre at that moment. A write carries dPts and/or
         /// dCtr plus the next dPseq, and expects the stage, round, end time and dPseq it was computed from, so a late one is refused once the
         /// stage has moved and two masters cannot both add to the same points.</summary>
         public static DominionTickPlan Plan(DominionTickInput i)

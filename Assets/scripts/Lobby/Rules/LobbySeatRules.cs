@@ -8,7 +8,7 @@ namespace Overpower.Lobby
     /// <summary>
     /// Pure C# rules for who sits where in a lobby. Seats are a dictionary seatKey -> actor number; an empty seat is a
     /// missing key or a value of 0 or less. No Photon types here: the lobby code reads the room's properties into
-    /// plain values, calls these and sends the SeatWrite back. Called by the lobby room (Tasks 2-7).
+    /// plain values, calls these and sends the SeatWrite back. Called by the lobby room.
     /// </summary>
     public static class LobbySeatRules
     {
@@ -135,8 +135,8 @@ namespace Overpower.Lobby
         }
 
         /// <summary>The lowest free seat of the team with the fewest filled seats that still has a free seat,
-        /// among the allowed teams (null = all). A tie goes to the earliest team in the layout, the left-most
-        /// column Tudor picked, so the result never depends on dictionary order.</summary>
+        /// among the allowed teams (null = all). A tie goes to the earliest team in the layout (the left-most
+        /// column), so the result never depends on dictionary order.</summary>
         private static string EmptiestTeamSeat(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyDictionary<string, int> placed, ICollection<int> allowedTeams)
         {
             string best = null;
@@ -244,12 +244,12 @@ namespace Overpower.Lobby
         /// <summary>
         /// Where someone joining a running match sits: the lowest free seat of the emptiest team that is playing
         /// (ties: left-most), else the lowest free spectator seat, else null. A team not in the match is never
-        /// chosen, since nobody could play for it. With preferSpectator (Dominion's sudden death) the spectator seat is tried first.
+        /// chosen, since nobody could play for it. With preferSpectator (Dominion's sudden death, A4) the spectator seat is tried first.
         /// </summary>
         public static string PlaceLateJoiner(SeatLayout layout, IReadOnlyDictionary<string, int> seats, IReadOnlyList<int> teamsInMatch, bool preferSpectator = false)
         {
             var allowed = new HashSet<int>(teamsInMatch);
-            // Dominion's sudden death (A4): a joiner could only wait dead on a team seat, so a free spectator seat comes first.
+            // A joiner could only wait dead on a team seat, so a free spectator seat comes first.
             if (preferSpectator)
                 return LowestFreeSpectator(layout, seats, null) ?? EmptiestTeamSeat(layout, seats, null, allowed);
             return EmptiestTeamSeat(layout, seats, null, allowed) ?? LowestFreeSpectator(layout, seats, null);
@@ -316,8 +316,6 @@ namespace Overpower.Lobby
             return playing.ToArray();
         }
 
-        /// <summary>The game of this lobby has started and this client holds no seat in it. Needs the layout: until the room's mode is
-        /// read, nobody can say the seat is missing (it may simply not be readable yet).</summary>
         /// <summary>Does a player who joined a started room act on their seat (a team seat spawns a body, a spectator seat starts the view)? Not when
         /// they came back to a held place with a team seat and a team: the rejoin path brings that body back, and a second one would be a double. A
         /// rejoiner on a spectator seat, or one who dropped in the lobby and never got a team, still needs the seat's reaction.</summary>
@@ -331,6 +329,8 @@ namespace Overpower.Lobby
         /// <summary>A Start that keeps being refused is given up once more than the give-up time has passed since the host pressed it.</summary>
         public static bool StartGaveUp(float beganSeconds, float nowSeconds, float giveUpSeconds) => nowSeconds - beganSeconds > giveUpSeconds;
 
+        /// <summary>The game of this lobby has started and this client holds no seat in it. Needs the layout: until the room's mode is
+        /// read, nobody can say the seat is missing (it may simply not be readable yet).</summary>
         public static bool GameRunningWithoutSeat(bool inRoom, int stage, bool hasLayout, string seat) =>
             inRoom && hasLayout && stage >= LobbyWarmup && seat == null;
 

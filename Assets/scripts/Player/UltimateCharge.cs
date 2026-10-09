@@ -3,27 +3,19 @@ using UnityEngine;
 using Overpower.Combat;
 
 /// <summary>
-/// Thin owner-only wrapper around UltimateChargeState for one player - the meter every ultimate
-/// module reads through AbilityModule.IsReady and spends through TryBuildCast (Task 1.11 addendum's
-/// own "fit with 1.0": IsReady => Owner.UltimateCharge.IsFull, TryBuildCast calls
-/// Owner.UltimateCharge.Spend()). Lives on the player root beside PlayerHealth, so AbilityOwner can
-/// cache it exactly like every other owner reference.
+/// Thin owner-only wrapper around UltimateChargeState: the meter every ultimate module reads in
+/// AbilityModule.IsReady (IsFull) and spends in TryBuildCast (Spend).
 ///
-/// OWNER-ONLY STATE, LIKE STUN OR OVERHEAT: only your own machine should ever accrue your charge.
-/// CombatEvents fires only on the machine that actually earned the damage or the takedown (see its
-/// own class comment) - a remote copy of THIS player subscribing to it would be listening to events
-/// raised by whichever OTHER player is local on that machine, and would silently add that player's
-/// damage and kills onto this player's meter. Every subscription below is therefore gated on
-/// photonView.IsMine, the same guard PlayerHealth and PlayerStatusEffects already use for their own
-/// owner-only state.
+/// OWNER-ONLY STATE, LIKE STUN OR OVERHEAT: CombatEvents fires only on the machine that earned the
+/// damage or takedown, so a remote copy of THIS player subscribing would hear events raised by
+/// whichever OTHER player is local there and add their damage and kills to this meter. Every
+/// subscription is gated on photonView.IsMine.
 ///
-/// NOT RESET ON RESPAWN (Task 1.11's own words) - PlayerLifecycle.HandleAliveChanged refills
-/// cooldowns on death and respawn but deliberately never touches this: dying should not cost you the
-/// ultimate you were building toward.
+/// NOT RESET ON RESPAWN: PlayerLifecycle.HandleAliveChanged refills cooldowns but deliberately
+/// never touches this; dying must not cost the ultimate you were building toward.
 ///
-/// NOT REPLICATED - PlayerNetSync stays the player's only observable (see its class comment), and
-/// nothing here needs to be seen by anyone but its own owner: every ultimate's readiness is decided
-/// entirely on the caster's machine, the same trust model as every other cast.
+/// NOT REPLICATED: PlayerNetSync stays the only observable; readiness is decided on the caster's
+/// machine, the same trust model as every other cast.
 /// </summary>
 public class UltimateCharge : MonoBehaviour
 {
@@ -71,8 +63,7 @@ public class UltimateCharge : MonoBehaviour
         state = new UltimateChargeState(maxCharge, chargePerDamageDealt, chargePerDamageTaken,
                                         chargePerKill, chargePerAssist);
 
-        // A silent null here would leave every ultimate permanently unreachable (IsReady always
-        // false) with no clue in the console why - matches PlayerHealth/AbilityRunner's own pattern.
+        // A silent null would leave every ultimate permanently unready with no clue why.
         if (photonView == null)
             Debug.LogError($"[UltimateCharge] {name}: no PhotonView on the player root - cannot tell which machine owns this meter.");
         if (playerHealth == null)
@@ -81,8 +72,7 @@ public class UltimateCharge : MonoBehaviour
 
     private void OnEnable()
     {
-        // Owner-only - see the class comment. Every subscription below stays off entirely on a
-        // remote copy of this player.
+        // Owner-only: stays off entirely on a remote copy (see the class comment).
         if (photonView == null || !photonView.IsMine)
             return;
 
@@ -100,16 +90,13 @@ public class UltimateCharge : MonoBehaviour
         CombatEvents.LocalTakedown -= HandleTakedown;
     }
 
-    /// <summary>Owner only. Refused unless the meter is full - called by an ultimate's own
-    /// TryBuildCast, never anywhere else.</summary>
+    /// <summary>Owner only. Refused unless full; called by an ultimate's own TryBuildCast only.</summary>
     public bool Spend() => state.Spend();
 
-    /// <summary>Owner only. F1's "Fill Ultimate" - see TestRangePanel.</summary>
+    /// <summary>Owner only. F1's "Fill Ultimate" (TestRangePanel).</summary>
     public void Fill() => state.Fill();
 
-    /// <summary>2.7b Decision 6: the fresh start at match-live empties the meter built up during the match
-    /// (warm-up combat included) - the one call to UltimateChargeState.Clear(). Owner only, like Fill/Spend
-    /// above; a remote copy has nothing of its own to clear.</summary>
+    /// <summary>Owner only. The fresh start at match-live empties the meter built up in warm-up combat.</summary>
     public void ResetForMatchStart()
     {
         if (photonView == null || !photonView.IsMine)
@@ -137,8 +124,7 @@ public class UltimateCharge : MonoBehaviour
         chargePerKill = Mathf.Max(0f, chargePerKill);
         chargePerAssist = Mathf.Max(0f, chargePerAssist);
 
-        // Only a live component has a state to retune yet - the prefab asset itself also runs
-        // OnValidate, before Awake has ever built one (AbilityModule.OnValidate's own guard).
+        // The prefab asset also runs OnValidate, before Awake has built a state.
         if (state != null)
             state.Retune(maxCharge, chargePerDamageDealt, chargePerDamageTaken, chargePerKill, chargePerAssist);
     }

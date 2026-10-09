@@ -10,10 +10,10 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// A page that opens over a lobby screen: a dark shade over everything and a big card with a cross at its top right that always closes it
-    /// (lobby Task 10, filled in by lobby Task 12). How to play (HowToPlayPanel) and the game mode info page (ModeInfoPanel) are this shell with
-    /// different contents: the card's Content is where they build theirs. Built in code from UiTheme (LobbyUiKit). Shown and hidden with Show /
-    /// Hide; the cross and Escape hide it, and it hides itself the moment a match starts in the room.
+    /// A page that opens over a lobby screen: a dark shade over everything and a big card with a cross at its top right that always closes it.
+    /// How to play (HowToPlayPanel) and the game mode info page (ModeInfoPanel) are this shell with different contents: the card's Content is
+    /// where they build theirs. Built in code from UiTheme (LobbyUiKit). Shown and hidden with Show / Hide; the cross and Escape hide it, and it
+    /// hides itself the moment a match starts in the room.
     /// </summary>
     public abstract class LobbyOverlayPanel : MonoBehaviour
     {
@@ -35,10 +35,8 @@ namespace Overpower.UI
 
         public bool IsShowing => root != null && root.activeSelf;
 
-        /// <summary>The title as drawn.</summary>
         public string TitleText => titleLabel != null ? titleLabel.text : "";
 
-        /// <summary>The close button (what a click on the cross does).</summary>
         public LobbyButton CloseButton => closeButton;
 
         // Every page that is open right now: Escape belongs to an open page (QuitConfirmPanel must not open on top of it).
@@ -155,7 +153,7 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>Escape closes an open page, as a player expects of a big overlay. True when it did.</summary>
+        /// <summary>Escape closes an open page. True when it did.</summary>
         internal bool CloseOnEscape(bool escapePressed)
         {
             if (!escapePressed || !IsShowing) return false;

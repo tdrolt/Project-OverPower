@@ -11,7 +11,7 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 /// <summary>
 /// Who stands in which capture zone, by team, kept separate from capture on purpose. BuildingCapture only tracks
 /// players the territory rule let in when they entered, so an enemy with no adjacent zone, or a defender walking into
-/// a zone their team already owns, never appears there. "Under attack" (Tudor, 2026-09-16: any living enemy standing
+/// a zone their team already owns, never appears there. "Under attack" (any living enemy standing
 /// in the zone, plus a short linger) needs every living player.
 ///
 /// The master measures it from every player's replicated position five times a second. It writes to Room Properties
@@ -28,12 +28,12 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     private const float MeasureIntervalSeconds = 0.2f;
 
     // Not a gameplay value. A player's "alive" flag and their new position reach the master on two separate channels,
-    // and the flag usually lands first: measured 2026-09-16, the master saw a respawned player alive but still standing
+    // and the flag usually lands first: measured, the master saw a respawned player alive but still standing
     // where they died for 41 ms. Counting that moment would put them in the zone they died in (a false attack, or a
     // false defender that resets a drain), so a player who just came back to life is skipped for this long.
     private const float RespawnSettleSeconds = 0.5f;
 
-    // Used only if territoryConfig is missing (logged as an error in Awake): the linger Tudor chose, 2026-09-16.
+    // Used only if territoryConfig is missing (logged as an error in Awake): the default linger.
     private const float FallbackLingerSeconds = 3f;
 
     [SerializeField, Tooltip("The shared territory numbers. The under-attack linger time is read from here.")]
@@ -44,7 +44,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     /// <summary>Diagnostic only: how many presence writes this client has sent (master only).</summary>
     public int PresenceWriteCount { get; private set; }
 
-    /// <summary>Task T4: raised on the master only, once per measure (see Update), the instant a
+    /// <summary>Raised on the master only, once per measure (see Update), the instant a
     /// zone's IsUnderAttack answer flips - not on every measure, only a change. MatchTelemetry is
     /// the only listener; it logs with the zone's current owner.</summary>
     public event System.Action<int, bool> UnderAttackChanged;
@@ -124,7 +124,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         Dictionary<int, Player> players = PhotonNetwork.CurrentRoom.Players;
         foreach (Player player in players.Values)
         {
-            if (!Teams.TryGetPlayingTeam(player, out int team)) // a seat spectator stands in no zone (lobby Task 6)
+            if (!Teams.TryGetPlayingTeam(player, out int team)) // a seat spectator stands in no zone
                 continue;
             int actor = player.ActorNumber;
             int previousZone = lastMeasured.TryGetValue(actor, out (int team, int zone) last) ? last.zone : -1;
@@ -164,7 +164,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         // mask, but their stamp must be there if that teammate then dies inside.
         bool stamped = ZoneThreat.StampDepartures(moves, lastSeenMs, nowMs);
 
-        // Task T4: evaluated here, after presentMasks/lastSeenMs are this measure's real values and
+        // Evaluated here, after presentMasks/lastSeenMs are this measure's real values and
         // before Publish - IsUnderAttack reads exactly those two arrays plus the server clock, all
         // already current for this frame.
         EvaluateUnderAttack(manager.ZoneCount);
@@ -175,7 +175,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
             publishPending = !Publish();
     }
 
-    /// <summary>Task T4: this measure's IsUnderAttack answer per zone, compared against the last
+    /// <summary>This measure's IsUnderAttack answer per zone, compared against the last
     /// measure's - a change (not a level) is what raises UnderAttackChanged. wasUnderAttack starts
     /// all-false (EnsureArrays), so the very first measure after a join or a scene load correctly
     /// raises a "start" for any zone that is already under attack the moment measuring begins,
@@ -192,7 +192,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
         }
     }
 
-    /// <summary>Opus review fix: sets wasUnderAttack to what IsUnderAttack says RIGHT NOW for every
+    /// <summary>Sets wasUnderAttack to what IsUnderAttack says RIGHT NOW for every
     /// zone, without raising UnderAttackChanged for any of it - see OnMasterClientSwitched's own
     /// comment for why a freshly promoted master needs this instead of starting from all-false.</summary>
     private void SeedUnderAttackBaseline()
@@ -212,7 +212,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     {
         int actor = player.ActorNumber;
         bool? aliveFlag = player.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object raw) && raw is bool alive ? alive : (bool?)null;
-        // Task 9e: a dropped (inactive) actor's body stands where it was; it is neither present nor alive (PresenceRules).
+        // A dropped (inactive) actor's body stands where it was; it is neither present nor alive (PresenceRules).
         if (!PresenceRules.CountsAsAlive(player.IsInactive, aliveFlag))
         {
             // A dead player isn't attacking or defending anything.
@@ -241,7 +241,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
     }
 
     /// <summary>Where the player really is. For a remote player that's the last position their own machine sent, not
-    /// this machine's smoothed copy of their body: measured 2026-09-16, after a respawn the copy slid ~290 ms across the
+    /// this machine's smoothed copy of their body: measured after a respawn, the copy slid ~290 ms across the
     /// map from the death spot to the spawn, through other zones on the way. Until their machine's first update has
     /// arrived there is no sent position yet (it would read as the world origin), so the copy is the best there is.</summary>
     private static Vector3 MeasuredPosition(PhotonView view)
@@ -295,7 +295,7 @@ public class ZonePresenceTracker : MonoBehaviourPunCallbacks
             // Who stood where is only known from this master's own measures, which start now.
             lastMeasured.Clear();
             ReadFrom(PhotonNetwork.CurrentRoom.CustomProperties);
-            // Opus review fix: without this, wasUnderAttack starts all-false (EnsureArrays' own
+            // Without this, wasUnderAttack starts all-false (EnsureArrays' own
             // default) on a freshly promoted master, so its first measure would read every zone
             // already under attack as a brand new "start" - a duplicate the OLD master (or this
             // client, the last time it was master) already told the report about. Seeded from

@@ -12,12 +12,11 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Lobby
 {
     /// <summary>
-    /// The host pressing Start game, and what every client does when the lobby starts (lobby Task 4). Start places everyone
-    /// still in No role (the seat rules' AutoFill), locks the seats by moving the stage from the lobby to the warm-up, all
-    /// in one compare-and-swap write; then every client sees the stage change (the lS 0 to 1 edge) and its own seat decides
-    /// what it becomes: a team seat spawns a body on that team, a spectator seat gets no body. It sits next to LobbySeats on
-    /// the RoomManager's GameObject (added by RoomManager.Awake, so the scene file does not change). The lobby screen
-    /// (lobby Task 10) reads MayStartGame and calls StartGame.
+    /// The host pressing Start game, and what every client does when the lobby starts. Start places everyone still in No role
+    /// (the seat rules' AutoFill) and locks the seats by moving the stage from the lobby to the warm-up, all in one
+    /// compare-and-swap write; then every client sees the stage change (the lS 0 to 1 edge) and its own seat decides what it
+    /// becomes: a team seat spawns a body on that team, a spectator seat gets no body. Sits next to LobbySeats (added by
+    /// RoomManager.Awake, so the scene file does not change). The lobby screen reads MayStartGame and calls StartGame.
     /// </summary>
     public sealed class LobbyStart : MonoBehaviourPunCallbacks
     {
@@ -89,7 +88,7 @@ namespace Overpower.Lobby
                 yield return null;
             }
             starting = null;
-            // The start landed (the stage moved on) while this client is still the host: the lobby marker (lobby Task 13).
+            // The start landed (the stage moved on) while this client is still the host: the lobby marker.
             if (StageOfRoom() != LobbySeatRules.LobbyBeforeStart && PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient)
                 Overpower.Telemetry.MatchTelemetry.Instance?.DropMarker(Overpower.Telemetry.LobbyMarkerNotes.StartGame);
             // Leaving with the stage still the lobby means the start did not land: say why (the loop also ends when it did land).
@@ -126,11 +125,11 @@ namespace Overpower.Lobby
             lastStage = StageOfRoom();
             if (lastStage < 1) return;
 
-            // The game runs on another scene (Dominion Task 10): act on it only there. Photon's scene sync is about to load it for a joiner
+            // The game runs on another scene: act on it only there. Photon's scene sync is about to load it for a joiner
             // (a master that comes back loads it itself); the arriving scene reads the room again and gets here with the right scene.
             if (WaitForTheRoomsScene()) return;
 
-            // The game is already running. No seat: a late joiner, who is given one (lobby Task 7).
+            // The game is already running. No seat: a late joiner, who is given one.
             string seat = seats.SeatInRoom();
             if (seat == null)
             {
@@ -169,7 +168,7 @@ namespace Overpower.Lobby
             if (before < 1 && stage >= 1) ReactToStart();
         }
 
-        // ---- joining a running lobby (lobby Task 7) ----
+        // ---- joining a running lobby ----
 
         /// <summary>How many seats a late joiner tries before giving up (each try is refused only when another joiner took the same seat first).</summary>
         private const int LateJoinAttempts = 6;

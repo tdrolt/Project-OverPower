@@ -3,26 +3,14 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Shared "is there real ground here" check for any ability that resolves a destination from a
-    /// flat cursor point - Blink's landing spot and Teleport's portal placement both delegate here
-    /// rather than keeping their own copy of the same physics. Extracted from BlinkAbility (Task
-    /// 1.7a code review): a portal placed with no ground check at all could sit over a void, off the
-    /// map edge, or buried/floating on a slope, because PlayerAim.GroundPointUnderCursor is only a
-    /// flat math plane at the player's own Y - it knows nothing about what is actually beneath it.
-    ///
-    /// Ground is looked for in the vertical band [refHeight + maxStepUp .. refHeight -
-    /// groundProbeDistance] - refHeight is normally the CASTER'S OWN current height, not the
-    /// candidate's (unknown) height, which is exactly what this probe exists to find. Starting the
-    /// ray only maxStepUp (a curb, not a ceiling) above refHeight, rather than groundProbeDistance
-    /// above it, is deliberate: a house's roof is Building layer like everything else, and starting
-    /// the ray at ceiling height would hit the ROOF'S TOP first, reading it as ground under an
-    /// overhang instead of the floor beneath it. This probe stays at roughly the caster's own level;
-    /// it is not a way onto a rooftop.
-    ///
-    /// RaycastAll, not Raycast, plus excludeRoot: a candidate close to the caster can put the ray's
-    /// span through the caster's OWN capsule, which sits on the same layers as ordinary ground - a
-    /// single Raycast would happily report that as "ground" and land the caster on their own head
-    /// instead of refusing.
+    /// Shared "is there real ground here" check for any ability that resolves a destination from a flat cursor
+    /// point (Blink's landing, Teleport's portal placement): PlayerAim.GroundPointUnderCursor is only a flat plane at
+    /// the player's own Y and knows nothing about voids, map edges or slopes beneath it.
+    /// Ground is searched in [refHeight + maxStepUp .. refHeight - groundProbeDistance], refHeight normally the
+    /// CASTER'S height. The ray starts only maxStepUp (a curb, not a ceiling) up on purpose: a roof is Building layer
+    /// like everything else, so a higher start would read the ROOF'S TOP as ground; this is not a way onto a rooftop.
+    /// RaycastAll plus excludeRoot: a candidate near the caster can put the ray through the caster's OWN capsule,
+    /// which a single Raycast would report as ground, landing the caster on their own head.
     /// </summary>
     public static class GroundProbe
     {

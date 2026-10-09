@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The result card a spectator sees when the match ends (lobby Task 15b, spec section 11): who won, and the same "Back to the lobby list"
+    /// The result card a spectator sees when the match ends (spec section 11): who won, and the same "Back to the lobby list"
     /// button the players' result screen has. A spectator has no body, so none of the MatchUI panels (which live on the player prefab) can
     /// show; this is built in code on its own overlay canvas like SpectatorBar, above the bar. The zip that runs when the card goes up
     /// raises the saved-log box only for a spectator who is the room's host (an ordinary spectator writes no log, by design). The look is
@@ -51,7 +51,7 @@ namespace Overpower.UI
             canvas.overrideSorting = true;
             canvas.sortingOrder = 5; // over the spectator bar (-10), under the saved-log box (10)
 
-            // The card itself (title and button) is the lobby look from LobbyUiKit.ResultCard, shared with Dominion's result screen later.
+            // The card itself (title and button) is the lobby look from LobbyUiKit.ResultCard, shared with Dominion's result screen.
             LobbyButton button = kit.ResultCard(canvas.transform, Title, teamColor, ButtonText, out RectTransform card);
             card.anchorMin = card.anchorMax = card.pivot = new Vector2(0.5f, 1f);
             card.anchoredPosition = new Vector2(0f, -theme.spectatorResultCardTop);

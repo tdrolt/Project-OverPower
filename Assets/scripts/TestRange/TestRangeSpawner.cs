@@ -4,13 +4,9 @@ using Overpower.Data;
 namespace Overpower.TestRange
 {
     /// <summary>
-    /// Populates the practice range near team 0's spawn point when the test range is switched on,
-    /// and does nothing at all when it is off - see GameplayConfig.TestRangeEnabled.
-    ///
-    /// Dummies are placed relative to RoomManager.teamSpawnPoints[0] rather than a hardcoded
-    /// position or a second direct reference to the same Transform, so moving the real spawn point
-    /// in the Editor moves the range with it and there is exactly one place that decides where
-    /// team 0 spawns.
+    /// Populates the practice range near team 0's spawn point when the test range is on, and does
+    /// nothing when off (GameplayConfig.TestRangeEnabled). Dummies are placed relative to
+    /// RoomManager.teamSpawnPoints[0], so moving that spawn point moves the range with it.
     /// </summary>
     public class TestRangeSpawner : MonoBehaviour
     {
@@ -112,13 +108,12 @@ namespace Overpower.TestRange
             }
         }
 
-        // ---- Pure position math (Decision 20 fix, item A) -------------------------------------------
-        // Kept as small static methods, shared by SpawnRange (which turns each into a live DummyTarget)
-        // and TestRangeSpawnerTests (which pins every one of them clear of solid geometry) - so the test
-        // can never silently drift from what actually spawns.
+        // ---- Pure position math ----
+        // Small static methods shared by SpawnRange and TestRangeSpawnerTests (which pins every one
+        // clear of solid geometry), so the test cannot drift from what actually spawns.
 
-        /// <summary>The range's baseline: the spawn point, shifted sideways clear of team 0's own capital.
-        /// See rangeSidewaysOffsetMetres's own tooltip for why this exists.</summary>
+        /// <summary>The range's baseline: the spawn point shifted sideways clear of team 0's own
+        /// capital (rangeSidewaysOffsetMetres's tooltip).</summary>
         public static Vector3 Baseline(Vector3 spawnPosition, Vector3 right, float sidewaysOffsetMetres) =>
             spawnPosition + right * sidewaysOffsetMetres;
 
@@ -130,14 +125,11 @@ namespace Overpower.TestRange
 
         /// <summary>
         /// Lifts a point on the ground to where the dummy's ROOT must sit for its collider to stand on
-        /// that ground. The dummy's collider copies the player's capsule, whose bottom is below the root
-        /// (local Y -0.5), just as a player standing on the floor has its root 0.5m up. Placing the root
-        /// ON the ground instead buried every dummy by 0.5m (measured 2026-09-13), so a shot fired from a
-        /// real player's muzzle crossed the narrow top of the dummy's capsule: it read as a ~0.4m-wide
-        /// target instead of 0.7m, and the shotgun spread was tuned against that buried target.
-        ///
-        /// Derived from the collider rather than a hardcoded 0.5, so it stays right if the capsule changes.
-        /// Also applied to the strafer's centre, which re-applies its position every frame.
+        /// it. The collider copies the player's capsule, whose bottom is below the root (local Y -0.5);
+        /// placing the root ON the ground buried the dummy by 0.5m, so a real player's muzzle shot
+        /// crossed the narrow top of the capsule (a ~0.4m-wide target, not 0.7m) and the shotgun
+        /// spread was tuned against it. Derived from the collider, not a hardcoded 0.5. Also applied
+        /// to the strafer's centre, which re-applies its position every frame.
         /// </summary>
         public static Vector3 Grounded(Vector3 groundPoint, GameObject dummyTargetPrefab)
         {
@@ -151,42 +143,30 @@ namespace Overpower.TestRange
 
         private GameObject SpawnDummy(Vector3 position, Quaternion rotation)
         {
-            // A plain Instantiate, never PhotonNetwork.Instantiate: PhotonNetwork.Instantiate would
-            // create a networked object and put a practice target into every other client's match.
-            // Dummies are local scenery for one Editor session - same reasoning as DummyTarget's
-            // own class comment.
+            // A plain Instantiate, never PhotonNetwork.Instantiate: that would put a practice target
+            // into every other client's match. Dummies are local scenery (see DummyTarget).
             return Instantiate(dummyTargetPrefab, position, rotation);
         }
 
         /// <summary>Moves a dummy left and right of a fixed centre at a fixed speed, for practicing
-        /// leading a moving target. Nested here rather than a third file, since nothing outside this
-        /// spawner ever needs to create one.
+        /// leading a moving target. Nested: nothing outside this spawner creates one.
         ///
-        /// SCALES WITH THE DUMMY'S OWN STATUS (Task 1.8): this rewrites transform.position directly
-        /// every frame rather than driving a real PlayerMotor, so it cannot go through a speed
-        /// multiplier the way a stunned or slowed player does - AddSpeedMultiplier has nothing to
-        /// multiply here. Multiplying the PingPong clock's own advance by (stunned ? 0 : 1 - Slow)
-        /// has the identical visible effect: a stunned dummy freezes in place (the clock stops
-        /// advancing, so it snaps back to full speed the instant the stun lifts, exactly like a
-        /// player's speed multiplier does) and a slowed one visibly crosses less ground per second.
+        /// SCALES WITH THE DUMMY'S STATUS: it rewrites transform.position every frame instead of
+        /// driving a PlayerMotor, so no speed multiplier applies. Multiplying the PingPong clock's
+        /// advance by (stunned ? 0 : 1 - Slow) has the same visible effect: a stunned dummy freezes
+        /// and resumes at full speed the instant the stun lifts.
         ///
-        /// KNOCKED BACK BY A SONIC PULSE (Task 1.10a): DummyTarget.Displace moves this same
-        /// transform directly while a push is in flight - if Update kept rewriting
-        /// transform.position from center + axis * offset every frame at the same time, the two
-        /// would fight every frame and the push would never visibly go anywhere. While
-        /// dummy.IsDisplacing is true this skips its own write AND stops advancing t, so the patrol
-        /// clock is exactly where it left off once the push ends; DummyTarget.Displaced then reports
-        /// the net movement the push caused, which is added straight onto center. Together those two
-        /// mean the very next frame computes center(shifted) + axis * offset(unchanged) - precisely
-        /// the position the push ended at - so the patrol resumes from there with no snap.</summary>
+        /// KNOCKED BACK BY A SONIC PULSE: DummyTarget.Displace moves the same transform, so while
+        /// dummy.IsDisplacing Update skips its own write AND stops advancing t, or the two would fight
+        /// and the push would go nowhere. DummyTarget.Displaced then reports the net movement, added
+        /// onto center, so the next frame's center(shifted) + axis * offset(unchanged) is exactly
+        /// where the push ended and the patrol resumes with no snap.</summary>
         private sealed class Strafer : MonoBehaviour
         {
             private Vector3 center;
 
-            // The row TestRangeSpawner actually calibrated this strafer to patrol, captured once in
-            // Configure and never written to again - center itself drifts with every push
-            // (OnDummyDisplaced) and needs a stable value to be restored to when the dummy resets.
-            // Review finding, Task 1.10a: without this, a pushed strafer's row was lost forever.
+            // The row this strafer was calibrated to patrol, captured once in Configure: center drifts
+            // with every push (OnDummyDisplaced), and this is what a dummy reset restores it to.
             private Vector3 originalCenter;
 
             private Vector3 axis;
@@ -226,16 +206,15 @@ namespace Overpower.TestRange
 
             private void OnDummyDisplaced(Vector3 worldDelta)
             {
-                // The full 3D delta, not just its component along axis: a pulse rarely pushes
-                // exactly along the patrol line, and dropping the sideways part would leave the
-                // dummy visibly off its own center the instant the patrol clock starts reading from
-                // it again.
+                // The full 3D delta, not just its component along axis: a pulse rarely pushes exactly
+                // along the patrol line, and dropping the sideways part would leave the dummy off its
+                // center the instant the patrol clock starts reading from it again.
                 center += worldDelta;
             }
 
-            /// <summary>The dummy just restored its own transform.position to its spawn point
-            /// (DummyTarget.ResetToFull) - the patrol centre must snap back to match, or the very
-            /// next frame's center + axis * offset would drag the dummy right back off of it.</summary>
+            /// <summary>The dummy restored its position to its spawn point (DummyTarget.ResetToFull):
+            /// the patrol centre must snap back, or the next frame's center + axis * offset would drag
+            /// the dummy right back off it.</summary>
             private void OnDummyReset()
             {
                 center = originalCenter;

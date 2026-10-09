@@ -7,23 +7,17 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// The ring at your own feet that fills while you hold a charging weapon's trigger (Tudor, 2026-09-17: "add a charge
-/// indicator"). Weapon 06 had no feedback of any kind before this - the only thing that read the charge was the aim
-/// cone's range arc, and only for a BEAM weapon whose range actually grows (AimConeView:201).
+/// The ring at your own feet that fills while you hold a charging weapon's trigger.
 ///
-/// OWNER ONLY, for the same reason AimConeView is: nobody needs to see how charged another player's gun is, and every
-/// read here is meaningless on a remote copy. Its lines are built as plain child GameObjects in Awake, not prefab
-/// children, so the prefab only ever carries this component and one Theme reference.
+/// OWNER ONLY, like AimConeView: every read here is meaningless on a remote copy. Its lines are built
+/// as plain child GameObjects in Awake, so the prefab only carries this component and one Theme reference.
 ///
-/// Three flat lines plus a tick per charge step, exactly the shape CaptureRingView already draws on the ground:
-/// - a dark full-loop TRACK, so a part-filled band reads as a meter rather than a stray arc;
-/// - a BAND on top of it, filling clockwise from the top of the screen;
-/// - one TICK per internal charge step, at the hold fraction where the next round is earned.
-/// Where the steps are comes from ChargeCountRule - the same rule WeaponFiring counts rounds with, so a tick can never
-/// promise a round the gun does not give.
+/// Flat lines, the shape CaptureRingView draws on the ground: a dark full-loop TRACK (so a part-filled
+/// band reads as a meter), a BAND filling clockwise from the top of the screen, and one TICK per internal
+/// charge step. Steps come from ChargeCountRule, the rule WeaponFiring counts rounds with, so a tick
+/// can never promise a round the gun does not give.
 ///
-/// Deliberately NOT IPunObservable: the player's PhotonView uses AutoFindAll and would absorb a second observable.
-/// PlayerNetSync is the only one.
+/// Deliberately NOT IPunObservable: the PhotonView uses AutoFindAll and would absorb a second observable.
 /// </summary>
 public class ChargeRingView : MonoBehaviourPun
 {
@@ -31,10 +25,8 @@ public class ChargeRingView : MonoBehaviourPun
              "asset the HUD, the aim cone and the capture rings read.")]
     private UiTheme theme;
 
-    // Not design tunables. The track sits a hair below the band and the ticks a hair above it, so three line polygons
-    // at the same radius never occupy the same depth and never z-fight - the same trick and the same 0.01 m
-    // CaptureRingView uses. MaxTicks caps how many tick lines are built once, in Awake; no weapon has, or should
-    // have, anywhere near this many charge steps.
+    // Not design tunables. Track a hair below the band and ticks a hair above, so line polygons at the
+    // same radius never z-fight (as CaptureRingView). MaxTicks caps the tick lines built once in Awake.
     private const float TrackBelowBand = 0.01f;
     private const float TicksAboveBand = 0.005f;
     private const int MaxTicks = 8;
@@ -63,8 +55,7 @@ public class ChargeRingView : MonoBehaviourPun
             return;
         }
 
-        // Loud, matching AimConeView and WeaponFiring: a silent null here leaves the ring invisible with no clue why,
-        // which for a visual-only component is easy to miss for days.
+        // Loud: a silent null leaves the ring invisible with no clue why.
         bool missing = false;
         if (theme == null)
         {
@@ -112,11 +103,10 @@ public class ChargeRingView : MonoBehaviourPun
     {
         var go = new GameObject(childName);
         go.transform.SetParent(transform, worldPositionStays: false);
-        // TransformZ alignment draws the line facing this object's own Z. Pointing Z straight up lays it flat on the
-        // ground instead of turning it toward the camera. The material is double-sided. The player TURNS as they aim
-        // (PlayerAim writes transform.rotation every Update), so this child's rotation is set in world terms and every
-        // point below is in world space - a local-space ring would spin with the body and its fill would start
-        // somewhere different every frame.
+        // TransformZ alignment faces the line along this object's Z; pointing Z up lays it flat on the ground.
+        // The player TURNS as they aim (PlayerAim writes transform.rotation every Update), so rotation and
+        // every point are in world space: a local-space ring would spin with the body and its fill would
+        // start somewhere different every frame.
         go.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
 
         var line = go.AddComponent<LineRenderer>();
@@ -134,14 +124,14 @@ public class ChargeRingView : MonoBehaviourPun
         line.lightProbeUsage = LightProbeUsage.Off;
         line.reflectionProbeUsage = ReflectionProbeUsage.Off;
         line.allowOcclusionWhenDynamic = false;
-        line.enabled = false; // LateUpdate decides visibility every frame; start hidden.
+        line.enabled = false; // LateUpdate decides visibility every frame
         return line;
     }
 
     private void LateUpdate()
     {
-        // The same four hide conditions AimConeView uses, plus the charge itself. Dead: nothing to charge. Suppressed:
-        // chatting, or a tool (F1) has claimed focus - and that case also clears the hold itself (WeaponFiring:268).
+        // AimConeView's hide conditions plus the charge itself. InputSuppressed (chat, or a tool like F1 has
+        // focus) also clears the hold itself in WeaponFiring.
         var weapon = weaponFiring.Weapon;
         bool hide = !theme.showChargeRing ||
                     (lifecycle != null && !lifecycle.IsAlive) ||
@@ -156,14 +146,13 @@ public class ChargeRingView : MonoBehaviourPun
             return;
         }
 
-        // Every point is rebuilt each visible frame, unlike CaptureRingView, which caches on the camera's yaw: a
-        // capture zone never moves, and a charging player does. One owner-only object at ~130 points and one downward
-        // raycast per frame, and only while a trigger is actually held.
+        // Rebuilt every visible frame, unlike CaptureRingView which caches on the camera's yaw: a capture
+        // zone never moves, a charging player does. Cheap: one owner-only object, only while a trigger is held.
         Vector3 root = transform.position;
         GroundSnap.TryFindGroundY(root, out float groundY);
         Vector3 centre = new Vector3(root.x, groundY + theme.chargeRingHeightOffset, root.z);
-        // The top of this player's own screen (CameraTracking.Yaw's own comment), so the ring fills clockwise on
-        // screen from 12 o'clock however the camera is turned for this team.
+        // The top of this player's own screen (CameraTracking.Yaw): fills clockwise from 12 o'clock
+        // however the camera is turned for this team.
         float startYaw = CameraTracking.Instance != null ? CameraTracking.Instance.Yaw : 0f;
         float radius = Mathf.Max(0.01f, theme.chargeRingRadius);
         float step = CaptureRingGeometry.ArcStepDegrees(segments);
@@ -191,14 +180,12 @@ public class ChargeRingView : MonoBehaviourPun
         }
         else
         {
-            // A hold that has not started charging yet - the Fire Interval it must wait out first. The empty track is
-            // exactly what should be on screen.
+            // A hold still waiting out the Fire Interval: the empty track is what belongs on screen.
             band.enabled = false;
         }
 
-        // A tick at each INTERNAL step boundary: the fraction where one more round is earned. The last boundary is the
-        // closed ring itself and needs no mark, and a weapon with no steps (weapon 6's own smooth burst charge - the
-        // only weapon that still charges since the laser tree dropped it, mark plan step 4 review) gets none.
+        // A tick at each INTERNAL step boundary (where one more round is earned). The last boundary is the
+        // closed ring itself, and a weapon with no steps (weapon 6's smooth burst charge) gets none.
         Vector3 tickCentre = new Vector3(centre.x, centre.y + TicksAboveBand, centre.z);
         float half = theme.chargeRingStepTickLength * 0.5f;
         int wanted = Mathf.Clamp(weapon.ChargeSteps - 1, 0, MaxTicks);

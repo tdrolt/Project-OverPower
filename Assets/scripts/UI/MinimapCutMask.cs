@@ -5,9 +5,8 @@ using Overpower.Arena;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The minimap's picture of a closed corner (Tudor, 2026-09-25: the minimap darkens the closed part and draws the
-    /// wall). One texture laid over the baked arena picture, covering the same square of the world, so it turns with
-    /// it. Pure: tested without a scene.
+    /// The minimap's picture of a closed corner: darkens the closed part and draws the wall. One texture laid over
+    /// the baked arena picture, covering the same square of the world, so it turns with it. Pure: tested without a scene.
     /// </summary>
     public static class MinimapCutMask
     {

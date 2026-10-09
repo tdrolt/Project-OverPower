@@ -26,7 +26,7 @@ namespace Overpower.Dominion
     }
 
     /// <summary>
-    /// The words and numbers of Dominion's round HUD, break card, centre countdown, sudden-death banner and result (Task 9), as pure functions:
+    /// The words and numbers of Dominion's round HUD, break card, centre countdown, sudden-death banner and result, as pure functions:
     /// the drawing code in UI/Dominion only places what these return. Formats come from UiTheme (a broken format falls back to the raw text, never
     /// an exception every frame). Times are the room's server clock in ms (an int that wraps), compared as unchecked(a - b).
     /// </summary>
@@ -221,11 +221,11 @@ namespace Overpower.Dominion
         /// round that was scored is -1 instead, so the match log can tell the two apart.</summary>
         public const int CutShort = -2;
 
-        /// <summary>A dHistW entry at or above this is a SHARED round (Tudor A50: an overtime that ran out): the flag plus a bit per winning team (bit n = team n).
+        /// <summary>A dHistW entry at or above this is a SHARED round (A50: an overtime that ran out): the flag plus a bit per winning team (bit n = team n).
         /// Below it the entry is the old one: a team id, -1 for a tied round, CutShort for a cut-short one, so a room written before overtime reads as it did.</summary>
         public const int SharedFlag = 8;
 
-        /// <summary>The dHistW entry for a round's winners: none = -1 (tied), one = its team id (as before), several = SharedFlag plus a bit per team.</summary>
+        /// <summary>The dHistW entry for a round's winners: none = -1 (tied), one = its team id, several = SharedFlag plus a bit per team.</summary>
         public static int EncodeWinners(int[] winners)
         {
             if (winners == null || winners.Length == 0) return -1;
@@ -259,7 +259,6 @@ namespace Overpower.Dominion
             return result;
         }
 
-        /// <summary>How many rounds the history holds.</summary>
         public static int RoundCount(int[] history) => history == null ? 0 : history.Length / DominionKeys.TeamSlots;
 
         /// <summary>A team's points in a round (0-based round); 0 for a cell that is not there.</summary>

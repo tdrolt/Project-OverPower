@@ -53,24 +53,20 @@ namespace Overpower.Match
         }
 
         /// <summary>
-        /// Ends the buff outright, armed or active, the instant its holder dies - [C, Task 2.6, not
-        /// in the GDD: see assumptions-for-tudor.md, "OverPower (built)"]. A buff surviving a respawn
-        /// at base (full health, full shield, still 3-second-window-armed from a fight that ended in
-        /// a death) would be an odd carry-over the GDD never considered, so death clears this exactly
-        /// like distancing yourself from the territory does (see UpdateDistance) rather than leaving
-        /// it to expire on its own on the next tick.
+        /// Ends the buff outright, armed or active, the instant its holder dies (not in the GDD: see
+        /// assumptions-for-tudor.md, "OverPower (built)"). A buff surviving a respawn at base (full health,
+        /// full shield, still armed from a fight that ended in a death) would be a carry-over the GDD never
+        /// considered, so death clears it exactly like distancing yourself from the territory does (see UpdateDistance).
         /// </summary>
         public void EndOnDeath()
         {
             Reset();
         }
 
-        /// <summary>Opus review fix (T6 item 1): GameplayConfig.EnableOverPower going false mid-match
-        /// must clear Armed/Active immediately, not just stop new arming - RegisterHitFrom's own gate
-        /// only blocks RecordEnemyHit, so without this an already-Armed player would still trigger,
-        /// and an already-Active one would keep its stat multipliers and overheat suppression forever
-        /// (nothing left running Update ever un-arms/deactivates it again). Same reset as EndOnDeath,
-        /// under its own name so a caller/test reads the reason, not just the mechanism.</summary>
+        /// <summary>GameplayConfig.EnableOverPower going false mid-match must clear Armed/Active immediately, not
+        /// just stop new arming: RegisterHitFrom's own gate only blocks RecordEnemyHit, so an already-Armed player
+        /// would still trigger and an already-Active one would keep its stat multipliers and overheat suppression
+        /// forever (nothing running Update un-arms it). Same reset as EndOnDeath, under its own name so a caller reads the reason.</summary>
         public void Disable()
         {
             Reset();

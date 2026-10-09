@@ -57,16 +57,13 @@ namespace Overpower.EditorTools.Telemetry
         }
     }
 
-    /// <summary>Task T5 step 1: parses every *.jsonl file in a match folder with Newtonsoft. Pure
-    /// file-system + JSON work - no aggregation logic lives here (see TelemetryAggregator).
+    /// <summary>Parses every *.jsonl file in a match folder with Newtonsoft. Pure file-system + JSON work; no aggregation
+    /// logic lives here (see TelemetryAggregator).
     ///
-    /// Merge key (the plan's own term): files are grouped by their own session's match id. A folder
-    /// holding two different match ids (a stray file, or two runs accidentally sharing one folder)
-    /// builds from whichever id has the most files and reports the other rather than silently
-    /// merging two matches' facts into one report - see <see cref="OtherMatchId"/>. Load reads a
-    /// SINGLE folder; it does not itself look across sibling folders for the rest of one match's
-    /// files (see MatchTelemetry.ResolveMatchFolder's own comment on the one race that can produce
-    /// two folders for one match).</summary>
+    /// Merge key: files are grouped by their own session's match id. A folder holding two different match ids (a stray file, or
+    /// two runs sharing one folder) builds from whichever id has the most files and reports the other rather than silently
+    /// merging two matches' facts - see <see cref="OtherMatchId"/>. Load reads a SINGLE folder; it does not look across sibling
+    /// folders (see MatchTelemetry.ResolveMatchFolder's comment on the one race that can produce two folders for one match).</summary>
     public sealed class TelemetryLog
     {
         private const string EventNameKey = "e";
@@ -77,14 +74,12 @@ namespace Overpower.EditorTools.Telemetry
         public IReadOnlyList<string> IncludedFiles { get; private set; }
         public IReadOnlyList<TelemetryEvent> Events { get; private set; }
         public IReadOnlyList<TelemetrySession> Sessions { get; private set; }
-        /// <summary>Malformed lines and unknown event names, counted only across the files that were
-        /// actually included in this build (opus review fix) - a stray "other match" file's own junk
-        /// no longer inflates the count for the match actually being reported.</summary>
+        /// <summary>Malformed lines and unknown event names, counted only across the files actually included in this build, so a
+        /// stray "other match" file's junk doesn't inflate the count for the match being reported.</summary>
         public int MalformedLineCount { get; private set; }
         public int UnknownEventCount { get; private set; }
-        /// <summary>A file that could not be opened/read at all (opus review fix - previously
-        /// silently skipped). Counted globally: an unreadable file has no session of its own, so it
-        /// can never be attributed to one match id or another.</summary>
+        /// <summary>A file that could not be opened/read at all. Counted globally: an unreadable file has no session of its own, so
+        /// it can never be attributed to one match id or another.</summary>
         public int UnreadableFileCount { get; private set; }
         /// <summary>A session whose own `schema` is newer than this build understands
         /// (TelemetryKeys.SchemaVersion) - counted, never a failure (design doc, Error handling).</summary>
@@ -92,9 +87,8 @@ namespace Overpower.EditorTools.Telemetry
         public string OtherMatchId { get; private set; }
         public int OtherMatchFileCount { get; private set; }
 
-        /// <summary>Every event name T1-T4 actually write. Anything else - an older/newer schema's
-        /// event, or a stray line - is counted in <see cref="UnknownEventCount"/> rather than failing
-        /// the whole report (design doc, Error handling).</summary>
+        /// <summary>Every event name the writers actually emit. Anything else - an older/newer schema's event, or a stray line - is
+        /// counted in <see cref="UnknownEventCount"/> rather than failing the whole report (design doc, Error handling).</summary>
         private static readonly HashSet<string> KnownEventNames = new HashSet<string>
         {
             TelemetryKeys.Session, TelemetryKeys.Sample, TelemetryKeys.GoldEarned, TelemetryKeys.Purchase,
@@ -104,15 +98,11 @@ namespace Overpower.EditorTools.Telemetry
             TelemetryKeys.UltimateUsed, TelemetryKeys.Ownership, TelemetryKeys.Capture, TelemetryKeys.Bounty,
             TelemetryKeys.UnderAttack, TelemetryKeys.Overpower, TelemetryKeys.Join, TelemetryKeys.Leave,
             TelemetryKeys.MasterChanged, TelemetryKeys.Marker,
-            // Review fix (T7): these two were added to TelemetryKeys in this same task but never
-            // added here, so every report - including one with no elimination at all, since
-            // MatchTelemetry's own phase-1 anchor is unconditional - showed a false "unknown
-            // event(s) were skipped" warning.
+            // Phase and Elimination must be listed: MatchTelemetry's phase-1 anchor is unconditional, so a missing entry showed a
+            // false "unknown event(s) were skipped" warning on every report.
             TelemetryKeys.Phase, TelemetryKeys.Elimination,
-            // 2.7b step 9: the telemetry `adopt` line.
             TelemetryKeys.Adopt,
-            // Playtest extras Task 2 (P4): console/bug/chat lines - TelemetryAggregator.
-            // BuildBugsAndConsole is the only reader.
+            // Console/bug/chat lines: TelemetryAggregator.BuildBugsAndConsole is the only reader.
             TelemetryKeys.Console, TelemetryKeys.Bug, TelemetryKeys.Chat,
         };
 
@@ -143,7 +133,7 @@ namespace Overpower.EditorTools.Telemetry
                 try { lines = File.ReadAllLines(path); }
                 catch
                 {
-                    unreadable++; // Opus review fix: counted, not silently dropped.
+                    unreadable++; // counted, not silently dropped.
                     continue;
                 }
 
@@ -157,9 +147,8 @@ namespace Overpower.EditorTools.Telemetry
                     double t;
                     try
                     {
-                        // Opus review fix: the "t" parse used to sit OUTSIDE this try, so a
-                        // non-numeric "t" (a corrupt or hand-edited line) threw uncaught instead of
-                        // counting as malformed like every other bad line.
+                        // The "t" parse sits INSIDE this try so a non-numeric "t" (corrupt or hand-edited line) counts as malformed
+                        // like every other bad line instead of throwing.
                         data = JObject.Parse(trimmed);
                         eventName = data[EventNameKey]?.ToString();
                         if (string.IsNullOrEmpty(eventName))
@@ -239,8 +228,7 @@ namespace Overpower.EditorTools.Telemetry
             log.IncludedFiles = included;
             log.Sessions = included.Where(sessionByFile.ContainsKey).Select(f => sessionByFile[f]).ToList();
 
-            // Opus review fix: only the chosen match's own files contribute to these counts now -
-            // previously summed across every file read, including an "other match" one never merged in.
+            // Only the chosen match's own files contribute to these counts, not an "other match" file never merged in.
             log.MalformedLineCount = included.Sum(f => malformedByFile.GetValueOrDefault(f));
             log.UnknownEventCount = included.Sum(f => unknownByFile.GetValueOrDefault(f));
 

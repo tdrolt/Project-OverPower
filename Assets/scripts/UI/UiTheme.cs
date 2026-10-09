@@ -6,10 +6,9 @@ namespace Overpower.UI
 {
     /// <summary>
     /// Every visual value the HUD, the loadout screen, the aim cone and the overhead bars share, in one asset so
-    /// readability is tuned in one place - plus, since Task 11a/11b, every shot's trail/core tint (ShotTeamVisuals)
-    /// and a laser's wind-up warning line and fired beam (Hitscan). Also the one home for the reference
-    /// resolution/match value a scene-built canvas that is not PlayerHud's own (chat's canvases) scales by, through
-    /// ThemedCanvasScaler - see that component's class comment. Presentation only - no gameplay number belongs here.
+    /// readability is tuned in one place; also every shot's trail/core tint (ShotTeamVisuals), a laser's wind-up
+    /// warning line and fired beam (Hitscan), and the reference resolution/match value that ThemedCanvasScaler
+    /// applies to scene-built canvases that are not PlayerHud's (chat). Presentation only - no gameplay number here.
     /// </summary>
     [CreateAssetMenu(menuName = "Overpower/UI Theme", fileName = "UiTheme")]
     public sealed class UiTheme : ScriptableObject
@@ -439,8 +438,7 @@ namespace Overpower.UI
         public Color[] teamShotColors = new Color[3]
         {
             new Color(0.93f, 0.97f, 1f, 1f),  // team 0 - cool near-white (mesh is white; a warm pale yellow
-                                               // was tried first and measured unreadable against the arena's
-                                               // orange/sand ground - Task 11a review, 616x576 capture)
+                                               // measured unreadable against the arena's orange/sand ground)
             new Color(0.68f, 0.32f, 1f, 1f),  // team 1 - violet (mesh is black - would be invisible as a trail)
             new Color(0.15f, 0.95f, 1f, 1f),  // team 2 - cyan (matches its mesh)
         };
@@ -488,9 +486,8 @@ namespace Overpower.UI
                  "under it (Task 11a follow-up review).")]
         public float bulletEmission = 5f;
 
-        /// <summary>The trail/tint colour for a shot fired by teamId, or Unknown Team Shot Colour for an
-        /// id Teams.TryGetTeam could not resolve (-1) or that falls outside Team Shot Colors - the same
-        /// fail-open reading ShooterTeamId already carries everywhere else in the weapons code.</summary>
+        /// <summary>The trail/tint colour for a shot fired by teamId; Unknown Team Shot Colour for an unresolved
+        /// (-1) or out-of-range id - the same fail-open reading ShooterTeamId carries in the rest of the weapons code.</summary>
         public Color ShotColorFor(int teamId)
         {
             if (teamShotColors != null && teamId >= 0 && teamId < teamShotColors.Length)
@@ -499,23 +496,16 @@ namespace Overpower.UI
             return unknownTeamShotColor;
         }
 
-        // Not serialized - rebuilt lazily the first time each bucket is asked for, then reused for the
-        // rest of the play session. Every client simulates every projectile (a nine-player SMG burst is a
-        // lot of bullets), so ShotTeamVisuals must not allocate a new Gradient per shot - see GradientFor.
+        // Not serialized - built lazily per bucket, then reused. Every client simulates every projectile, so
+        // ShotTeamVisuals must not allocate a Gradient per shot (see GradientFor).
         [System.NonSerialized] private Dictionary<int, Gradient> cachedShotGradients;
 
-        /// <summary>Playtest polish review fix 3: without this, editing Team Shot Colors (or the
-        /// unknown-team fallback) in the Inspector while the Editor is open kept handing out the
-        /// OLD Gradient objects until the next domain reload - a live colour tweak looked like it
-        /// did nothing. Clearing the cache here just means the next GradientFor call rebuilds it
-        /// from the field's new value; it costs nothing at runtime, since a build never calls
-        /// OnValidate at all.</summary>
+        /// <summary>Drops the cached Gradients so an Inspector edit of Team Shot Colors (or the unknown-team
+        /// fallback) shows at once in the Editor instead of after a domain reload.</summary>
         private void OnValidate() => cachedShotGradients = null;
 
-        /// <summary>The same colour ShotColorFor(teamId) returns, pre-built into the two-key fade-to-
-        /// transparent Gradient a shot's TrailRenderer wants, and cached by resolved bucket (0/1/2, or -1
-        /// for every unresolved id) so two calls for the same team return the exact same Gradient object
-        /// instead of allocating a fresh one - see the class comment on why that matters here.</summary>
+        /// <summary>ShotColorFor(teamId) as the two-key fade-to-transparent Gradient a shot's TrailRenderer wants,
+        /// cached by resolved bucket (0/1/2, -1 for every unresolved id) so equal teams share one object.</summary>
         public Gradient GradientFor(int teamId)
         {
             int bucket = (teamShotColors != null && teamId >= 0 && teamId < teamShotColors.Length) ? teamId : -1;
@@ -961,7 +951,7 @@ namespace Overpower.UI
         public float suddenDeathMinimapRingWidth = 2.5f;
 
         // ------------------------------------------------------------------------------------------------
-        // Dominion HUD (Task 9). Sizes are in reference pixels (the boards' pixels x 1.5 at 1920 x 1080), like the lobby screens.
+        // Dominion HUD. Sizes are in reference pixels (the boards' pixels x 1.5 at 1920 x 1080), like the lobby screens.
         // ------------------------------------------------------------------------------------------------
         [Header("Dominion HUD: team colours")]
         [Tooltip("Each team's colour in the Dominion HUD (the underline of its score, its round-win dots, its name on the break card), in team order: white, purple, cyan.")]
@@ -1369,11 +1359,11 @@ namespace Overpower.UI
 
         /// <summary>Writes this theme's outline, weight and drop-shadow onto one shared TextMeshPro material -
         /// the one home for those seven numbers, called by PlayerHud, the loadout screen and the minimap, which
-        /// each build exactly one material for every label they own (see PlayerHud.ApplyOutline's comment for why
-        /// one shared material beats letting TMP clone one per label).
+        /// each build one material for every label they own (see PlayerHud.ApplyOutline for why one shared
+        /// material beats letting TMP clone one per label).
         ///
-        /// The keyword is the part that is easy to get wrong: setting _UnderlayColor and friends does nothing at
-        /// all until UNDERLAY_ON is enabled on the material, so the shadow silently never appears.</summary>
+        /// Trap: setting _UnderlayColor and friends does nothing until UNDERLAY_ON is enabled on the material,
+        /// so the shadow silently never appears.</summary>
         public void ApplyHudTextStyle(Material material)
         {
             if (material == null)

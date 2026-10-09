@@ -7,30 +7,16 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// Hold right click (the Attachment slot) to pull the camera back further than the scroll zoom allows, so a
-    /// sniper-style loadout can actually see what it is shooting at - Tudor, 2026-09-18: "Laser, Charge Laser,
-    /// Baseline and Rockets can already hit targets the shooter can't see on screen." Let go and it eases back.
-    /// No toggle, no cooldown, no heat cost (charges 0 on this module, Sprint's own convention for "self-limiting
-    /// through something other than a cooldown" - here there is no limiter at all, by design), no movement slow,
-    /// and nothing shown to other players: carrying Scope in the Attachment slot means giving up mines, cover,
-    /// raybeam and so on, and that trade-off alone is the cost.
-    ///
-    /// OWNER ONLY, NO NETWORK MESSAGE AT ALL. The camera this ability moves exists only on the owner's own
-    /// machine (CameraTracking.Instance is that machine's local player's camera - there is nothing for any other
-    /// client to move, or even to know about). TryBuildCast always refuses below, which is the one path through
-    /// AbilityRunner.TryCast that spends no charge and sends no RPC - a refused press is simply consumed by the
-    /// buffer and forgotten, with nothing shown to the player either (see AbilityRunner.Update/TryCast). Every
-    /// bit of real behaviour lives in OwnerTick, which AbilityRunner already only ever calls on the owner.
-    ///
-    /// EASES, DOES NOT SNAP, WHILE HELD. CameraTracking.AddZoomMultiplier/RemoveZoomMultiplier apply a multiplier
-    /// instantly and have no notion of time (CameraZoomStack, scope step 1) - all of the smoothing is this
-    /// class's own job, done by easing appliedFactor toward its target every frame (ScopeEase) and writing it to
-    /// the camera each frame it sits above 1.
-    ///
-    /// SNAPS BACK AT ONCE FOR EVERY INTERRUPT REASON, AND ON RESPAWN. A silence, stun, death or unequip is not a
-    /// moment worth a smooth transition, and easing the multiplier out past any of them risks a stale entry
-    /// surviving into the next life - the exact shape of bug 2.10, PlayerMotor's own respawn speed bug, just for
-    /// the camera instead of movement speed. Interrupt runs for every InterruptReason on purpose: there is no
-    /// case here where continuing to ease out is better than an instant snap.
+    /// sniper-style loadout can see what it shoots at. Let go and it eases back. No toggle, cooldown or heat cost
+    /// (charges 0: no limiter at all, by design), no movement slow, nothing shown to other players: giving up mines,
+    /// cover and raybeam in the Attachment slot is the whole cost.
+    /// OWNER ONLY, NO NETWORK MESSAGE. The camera exists only on the owner's machine. TryBuildCast always refuses,
+    /// the one path through AbilityRunner.TryCast that spends no charge and sends no RPC; all behaviour is in
+    /// OwnerTick, which AbilityRunner calls on the owner only.
+    /// EASES, DOES NOT SNAP, WHILE HELD: CameraTracking's zoom multiplier has no notion of time (CameraZoomStack), so
+    /// this class eases appliedFactor toward its target (ScopeEase) and writes it each frame it sits above 1.
+    /// SNAPS BACK AT ONCE FOR EVERY INTERRUPT REASON AND ON RESPAWN: easing out past a silence, stun, death or
+    /// unequip risks a stale entry surviving into the next life (the shape of PlayerMotor's respawn speed bug).
     /// </summary>
     public sealed class ScopeAbility : AbilityModule
     {
@@ -83,10 +69,8 @@ namespace Overpower.Abilities
 
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
-            // Nothing to send: the camera this ability moves exists only on this machine, and the spec is
-            // explicit that other players see nothing at all. Refusing spends no charge and sends no RPC - see
-            // the class comment for why this is the "sends nothing, shows nothing odd" path through
-            // AbilityRunner.TryCast, unlike Sprint (which returns true purely to reserve a future cosmetic hook).
+            // Nothing to send: the camera exists only on this machine and other players see nothing. Refusing spends
+            // no charge and sends no RPC (unlike Sprint, which returns true to reserve a future cosmetic hook).
             payload = default;
             return false;
         }
@@ -110,15 +94,11 @@ namespace Overpower.Abilities
 
         public override void OnRespawned() => SnapBack();
 
-        /// <summary>A player root destroyed directly (leaving the room while holding RMB, say) skips
-        /// AbilityRunner.Equip's own Interrupt(Unequipped) entirely - neither Interrupt nor OnRespawned ever
-        /// runs. CameraTracking outlives this module and its stack is keyed by object reference, so without this
-        /// the 1.2 entry would stay forever and the local camera would sit ~20% further out for the rest of the
-        /// session. Same fix as InvulnerabilityAbility.OnDestroy/ClearShield for the same class of bug. Safe to
-        /// run twice - Interrupt(Unequipped) already calls SnapBack before this module is destroyed, and removing
-        /// an absent key is a no-op (CameraTracking.RemoveZoomMultiplier's own contract). Real Play Mode/build
-        /// destruction (leaving the room) DOES call this normally; only this project's edit-mode test harness has
-        /// to invoke it explicitly (see ScopeAbilityTests' own comment on why).</summary>
+        /// <summary>A player root destroyed directly (leaving the room while holding RMB) skips AbilityRunner.Equip's
+        /// Interrupt(Unequipped), so neither Interrupt nor OnRespawned runs. CameraTracking outlives this module and its
+        /// stack is keyed by object reference, so without this the entry would keep the local camera zoomed out for the
+        /// session (same fix as InvulnerabilityAbility.OnDestroy). Safe to run twice: removing an absent key is a no-op.
+        /// Only the edit-mode test harness has to invoke it explicitly (see ScopeAbilityTests).</summary>
         private void OnDestroy() => SnapBack();
 
         /// <summary>Removes the multiplier at once rather than easing it out - see the class comment on why every

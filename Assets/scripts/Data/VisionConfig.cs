@@ -4,8 +4,7 @@ namespace Overpower.Data
 {
     /// <summary>
     /// Every number behind the fog of war in one place: how far and wide a player sees, how dark the unseen world
-    /// is, and how the centre scan behaves. It exists so Tudor can tune sight and the scan in the Inspector without
-    /// touching code. Fields are [SerializeField] private with read-only properties, like the rest of the Data folder.
+    /// is, and how the centre scan behaves.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Vision Config", fileName = "VisionConfig")]
     public sealed class VisionConfig : ScriptableObject

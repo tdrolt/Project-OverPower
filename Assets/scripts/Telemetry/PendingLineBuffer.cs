@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Lobby Task 13 (Task 8 review): the lines logged before this client's file opens (the lobby's markers, joins, the match clock's first
+    /// The lines logged before this client's file opens (the lobby's markers, joins, the match clock's first
     /// lines). It holds at most <c>cap</c> lines; when full it drops the OLDEST line to make room, so the newest (the start marker, the first
     /// team lines) always survive, and it counts what it dropped so the file can say how many.
     /// </summary>

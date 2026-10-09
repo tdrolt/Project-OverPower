@@ -1,7 +1,7 @@
 namespace Overpower.Combat
 {
-    /// <summary>What a mine looks like to one particular viewer, right now (A5, Tudor 2026-09-17 evening: mines turn
-    /// invisible 1 s after placement, as the GDD always said).</summary>
+    /// <summary>What a mine looks like to one particular viewer, right now (A5: mines turn invisible a set time
+    /// after placement).</summary>
     public enum MineVisibility
     {
         /// <summary>Full colour, to everyone - before Invisible After Seconds elapses.</summary>
@@ -17,14 +17,11 @@ namespace Overpower.Combat
     }
 
     /// <summary>
-    /// Pure timing/team logic for MineVisibility - no Renderer, no PhotonNetwork, no scene - the same reasoning as
-    /// MineDetonationState: "does this particular viewer still see the mine" is provable without either.
-    ///
-    /// secondsSincePlaced is deliberately a plain float the caller already computed (Mine.SecondsSincePlaced: Age,
-    /// a one-time network-agreed snapshot, plus real time elapsed on THIS client since it arrived) rather than
-    /// anything this rule reads itself - every client evaluates the identical comparison against the identical
-    /// network-agreed placement time, so every client switches at the same moment regardless of its own lag. No
-    /// RPC, no timestamp of this rule's own.
+    /// Pure timing/team logic for MineVisibility, provable without a Renderer, PhotonNetwork or scene.
+    /// secondsSincePlaced is a plain float the caller already computed (Mine.SecondsSincePlaced: Age, a
+    /// one-time network-agreed snapshot, plus real time elapsed on THIS client since it arrived), so
+    /// every client evaluates the same comparison against the same placement time and switches at the
+    /// same moment regardless of its own lag. No RPC, no timestamp of this rule's own.
     /// </summary>
     public static class MineVisibilityRule
     {

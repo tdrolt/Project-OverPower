@@ -7,10 +7,9 @@ namespace Overpower.UI
     public enum StatusLabel { None = 0, Slowed = 1, Stunned = 2 }
 
     /// <summary>
-    /// Tudor D18 (playtest T1: "I'm stuck", and nothing showed it was a stun): the pure rule for the STUNNED
-    /// and SLOWED labels over a player's head and on their own HUD. Which label shows (stun is the stronger
-    /// effect, so it always wins), how full its thin countdown bar is, and how a remote copy turns the
-    /// server-time end it was told about into seconds left. No engine beyond Mathf.
+    /// The pure rule for the STUNNED and SLOWED labels over a player's head and on their own HUD (D18): which
+    /// label shows (stun wins), how full its countdown bar is, and how a remote copy turns the server-time end it
+    /// was told about into seconds left. No engine beyond Mathf.
     /// </summary>
     public static class StatusLabelRule
     {

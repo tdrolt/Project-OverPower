@@ -4,9 +4,9 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The floor under a point, for visuals that must lie on it (ability visuals step 2). Mines and the electric fence
-    /// are placed at the caster's ROOT, 0.5 m above their feet, and a rocket blows up at muzzle height - so their flat
-    /// visuals used to float. Visual only: nothing here moves a gameplay object or where a hit is measured from.
+    /// The floor under a point, for visuals that must lie on it. Mines and the electric fence are placed at the caster's
+    /// ROOT, 0.5 m above their feet, and a rocket blows up at muzzle height, so their flat visuals would float. Visual
+    /// only: nothing here moves a gameplay object or where a hit is measured from.
     ///
     /// Looks past anything with health (a player, a dummy, a cover wall), so the caster standing on the spot is never
     /// taken for the floor. Floor = Default (the terrain) or Building (floors, roofs): the same layers GroundProbe uses.

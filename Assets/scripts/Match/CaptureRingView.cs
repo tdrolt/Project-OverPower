@@ -5,14 +5,13 @@ using UnityEngine.Rendering;
 namespace Overpower.Match
 {
     /// <summary>
-    /// The ring on the ground that marks a capture zone and shows a capture or drain filling (Tudor, 2026-09-16: it
-    /// replaces the small bar that floated above each tower). BuildingCapture.Start builds one per tower, so a new
-    /// tower gets one with nothing to wire up.
+    /// The ring on the ground that marks a capture zone and shows a capture or drain filling. BuildingCapture.Start
+    /// builds one per tower, so a new tower gets one with nothing to wire up.
     ///
     /// Three flat lines:
     /// - a thin EDGE, always shown, on the Capture Radius: team colour when owned, dim white when neutral;
-    /// - a dark full-loop TRACK at the band's own radius, shown whenever the band is (readability polish,
-    ///   2026-09-17: a bare band on open ground read poorly as "how full" - a loading bar needs a track behind it);
+    /// - a dark full-loop TRACK at the band's own radius, shown whenever the band is (a bare band on open ground
+    ///   reads poorly as "how full" - a loading bar needs a track behind it);
     /// - a thicker BAND on top of the track that fills clockwise from the top of this player's screen.
     /// Which colours, fill, pulse and blink to use is decided by the pure CaptureRingState; this class only draws it.
     ///
@@ -96,8 +95,8 @@ namespace Overpower.Match
             return view;
         }
 
-        /// <summary>Centre-circle-and-cut-rule, 2026-09-26: re-sizes this ring in place when its tower's CaptureRadius
-        /// changes at runtime - today only the centre, when a cut starts or ends (BuildingCapture.RefreshRingView).
+        /// <summary>Re-sizes this ring in place when its tower's CaptureRadius changes at runtime - today only the
+        /// centre, when a cut starts or ends (BuildingCapture.RefreshRingView).
         /// Recomputes exactly what Create derived from captureRadius (the ground height under the new radius, and the
         /// edge/band radii); the edge is redrawn immediately (it is always visible), while the band and track are only
         /// invalidated here - their own Refresh below only rewrites their points on a fill or yaw change, neither of
@@ -129,12 +128,11 @@ namespace Overpower.Match
         {
             float time = Time.unscaledTime; // presentation only: a paused Time.timeScale must not freeze a pulse
 
-            // 2.7b Decision 8: an out-of-play zone's edge is the theme's own colour, with no pulse - state.Phase is
+            // An out-of-play zone's edge is the theme's own colour, with no pulse (Decision 8) - state.Phase is
             // always Idle and state.UnderAttack always false for an out-of-play state (CaptureRingState.From), so
             // neither pulse below can touch it once OwnerPaint.From's own OutOfPlay branch wins.
-            // Arena rebuild step 2: moved onto the same rule a tower's crown and caps use (OwnerPaint/
-            // OwnerPaintColours), so the ring and the tower can never disagree. Behaviour is unchanged - every branch
-            // was checked against the code this replaced (TowerLookPrefabTests/OwnerPaintColoursTests, ring-before.txt).
+            // The colour comes from the same rule a tower's crown and caps use (OwnerPaint/OwnerPaintColours), so the
+            // ring and the tower can never disagree.
             Color edgeColor = OwnerPaintColours.For(OwnerPaint.From(state), theme, theme.captureRingNeutralColor, time);
             if (!edgeColorSet || edgeColor != shownEdgeColor)
             {
@@ -230,8 +228,7 @@ namespace Overpower.Match
 
         /// <summary>The highest terrain point under the zone centre and eight points on its edge, so a ring on a slope
         /// never dips into the ground. The tower's own height where no terrain covers the zone. Called once per
-        /// tower by Create, and again by Resize whenever the radius it was built with changes (centre-circle-and-
-        /// cut-rule, 2026-09-26) - not just once.</summary>
+        /// tower by Create, and again by Resize whenever the radius it was built with changes.</summary>
         public static float GroundHeight(Vector3 towerPosition, float radius)
         {
             Terrain[] terrains = Terrain.activeTerrains;

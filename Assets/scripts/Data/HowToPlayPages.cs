@@ -5,9 +5,8 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// The pages of the How to play wiki, in the order the page list shows them: each has a title, a text and a picture. It is one asset so Tudor
-    /// can reword a page or swap a picture in the Inspector without touching code. Fields are [SerializeField] private with read-only
-    /// properties, like the rest of the Data folder.
+    /// The pages of the How to play wiki, in page-list order: a title, a text and a picture each. One asset, so a page
+    /// can be reworded or a picture swapped in the Inspector without code.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/How To Play Pages", fileName = "HowToPlayPages")]
     public sealed class HowToPlayPages : ScriptableObject
@@ -30,7 +29,6 @@ namespace Overpower.Data
         public IReadOnlyList<Page> Pages => pages;
         public int Count => pages.Count;
 
-        /// <summary>The titles in order, for the page list and the previous and next buttons.</summary>
         public List<string> Titles()
         {
             var titles = new List<string>(pages.Count);

@@ -4,9 +4,9 @@ using UnityEngine;
 namespace Overpower.Arena
 {
     /// <summary>
-    /// The arena's playable outline seen from above, and the one "is this spot inside the arena" rule (movement
-    /// step 3). Built from the Source third's outline (ArenaSymmetry.sourceOutline) turned into all three thirds with
-    /// RadialSymmetry, so the outline obeys the same symmetry as the walls it traces.
+    /// The arena's playable outline seen from above, and the one "is this spot inside the arena" rule. Built from the
+    /// Source third's outline (ArenaSymmetry.sourceOutline) turned into all three thirds with RadialSymmetry, so the
+    /// outline obeys the same symmetry as the walls it traces.
     ///
     /// Why it exists: the ground outside the boundary walls is real terrain on the same layer as the arena floor, so
     /// "is there ground here" cannot tell inside from outside. Blink's landing, a portal's placement and arrival, and
@@ -45,14 +45,14 @@ namespace Overpower.Arena
             return new ArenaBounds(points);
         }
 
-        /// <summary>The outline of an arena: three turned copies of the Source outline (the triangle map), or - for a map that is one piece, such as the
-        /// Dominion lane - the outline exactly as it is.</summary>
+        /// <summary>Three turned copies of the Source outline (the triangle map), or - for a one-piece map such as
+        /// the Dominion lane - the outline exactly as it is.</summary>
         public static ArenaBounds FromOutline(IReadOnlyList<Vector2> outline, Vector3 centre, bool outlineIsWholeArena) =>
             outlineIsWholeArena ? FromPolygon(outline) : FromSourceOutline(outline, centre);
 
-        /// <summary>An outline that is already the whole closed polygon (arena step 4's wall-plan tests use any
-        /// outline, real or synthetic, without going through the three-fold symmetry FromSourceOutline assumes).
-        /// Null for fewer than three points: two points make an edge, not an enclosed area.</summary>
+        /// <summary>An outline that is already the whole closed polygon, used as it is without the three-fold symmetry
+        /// FromSourceOutline assumes. Null for fewer than three points: two points make an edge, not an enclosed
+        /// area.</summary>
         public static ArenaBounds FromPolygon(IReadOnlyList<Vector2> polygon)
         {
             if (polygon == null || polygon.Count < 3)

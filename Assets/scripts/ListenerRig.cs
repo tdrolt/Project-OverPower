@@ -1,10 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Vision Task 7 (Tudor): gun sounds fade by distance from YOU, not from the camera that hangs about 11 m above and
-/// behind. The scene's AudioListener sits on the camera, so CameraTracking moves it onto a child object that is placed
-/// on the followed player every frame. The child keeps the camera's turn, so left and right in the headphones match
-/// the screen.
+/// Gun sounds fade by distance from YOU, not from the camera that hangs above and behind. The scene's AudioListener
+/// sits on the camera, so CameraTracking moves it onto a child object placed on the followed player every frame. The
+/// child keeps the camera's turn, so left and right in the headphones match the screen.
 /// </summary>
 public static class ListenerRig
 {

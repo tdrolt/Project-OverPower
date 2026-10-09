@@ -3,10 +3,9 @@ using System.Collections.Generic;
 namespace Overpower.Match
 {
     /// <summary>
-    /// captureFadeSpeed (Tudor, 2026-09-24): unfinished capture progress slides back instead of snapping when
-    /// nobody is capturing/draining it. Pure C# so Building capture.cs's CalculateCaptureProgress (neutral zone)
-    /// and HandleCapturedState (owned zone) can wire the same two ticks together and stay short - see their own
-    /// comments for exactly where each piece plugs in.
+    /// captureFadeSpeed: unfinished capture progress slides back instead of snapping when nobody is
+    /// capturing/draining it. Pure C# so Building capture.cs's CalculateCaptureProgress (neutral zone)
+    /// and HandleCapturedState (owned zone) can wire the same two ticks together and stay short.
     ///
     /// Two independent pieces: CapturingTeamAbsent decides WHETHER a neutral zone's claim should fade this tick
     /// (nobody of the claiming team currently listed - whether the zone is empty or only another team stands
@@ -17,10 +16,9 @@ namespace Overpower.Match
     /// </summary>
     public static class CaptureFadeRule
     {
-        /// <summary>Tudor, 4 Oct: how many players drain an owned zone: the players of the one draining team (the team DrainRule
+        /// <summary>How many players drain an owned zone: the players of the one draining team (the team DrainRule
         /// named, the one the bar shows) standing in it. Another enemy team in the zone at the same time does not add to it, in line
-        /// with DrainRule, which lets only one team drain at a time.
-        /// Only the draining team's players speed the drain; a second enemy team in the zone doesn't help (Tudor, 4 Oct).</summary>
+        /// with DrainRule, which lets only one team drain at a time.</summary>
         public static int DrainerCount(int drainingTeam, IReadOnlyList<int> teamsInZone)
         {
             int n = 0;
@@ -61,25 +59,13 @@ namespace Overpower.Match
             return pushing;
         }
 
-        /// <summary>Opus re-review, 2026-09-24 (replaces the same day's own first fix, EffectiveFadeRate): that
-        /// version counted EVERY non-claim player as pushing, so two DIFFERENT enemy teams fighting inside a faded
-        /// claim pushed it down at their combined speed, and it ignored TeamMayCaptureNow, so a team whose only
-        /// way in was itself under attack still pushed a claim down it could not actually capture. This is the ONE
-        /// function both the master's per-frame step (BuildingCapture.CalculateCaptureProgress) and the value it
-        /// publishes (BuildingCapture.ComputeCurrentProgress -> CaptureProgressPublishRule.Decide) call for a
-        /// neutral zone's current fade rate, so the two can never disagree on what a client extrapolates from -
-        /// the bug the opus review found: at speed 0 clients saw a frozen Held band for the whole push-down and
-        /// then a snap to 0; at the default speed 1 with two enemies clients slid at 1x while the master dropped
-        /// at 2x, then snapped.
-        ///
-        /// Opus re-review, 2026-09-24 (second pass, "the wiring still isn't tested"): picks the pushing team
-        /// itself (SinglePushingTeam, below) and asks the mayCapture delegate about THAT team, rather than taking
-        /// a plain bool the caller worked out beforehand - both production call sites used to compute
-        /// SinglePushingTeam and ask TeamMayCaptureNow(pushingTeam) themselves, copied at both sites, and nothing
-        /// caught a call site asking about claimTeam instead, or a call site reverted to the plain fadeRate; see
-        /// BuildingCapture.CurrentNeutralFadeRate, the one place both call sites now reach this function through,
-        /// and CaptureFadeRuleTests' recording-delegate test for proof mayCapture is always asked about the
-        /// pushing team, never claimTeam.
+        /// <summary>The ONE function both the master's per-frame step (BuildingCapture.CalculateCaptureProgress) and the
+        /// value it publishes (BuildingCapture.ComputeCurrentProgress -> CaptureProgressPublishRule.Decide) call, through
+        /// BuildingCapture.CurrentNeutralFadeRate, for a neutral zone's current fade rate, so the two can never disagree
+        /// on what a client extrapolates from (at speed 0 clients would see a frozen Held band for the whole push-down and
+        /// then a snap to 0; with two enemy teams they would slide at 1x while the master dropped at 2x). It picks the
+        /// pushing team itself (SinglePushingTeam) and asks the mayCapture delegate about THAT team, never claimTeam, so
+        /// two different enemy teams fighting in the zone, or a team whose only way in is under attack, push nothing.
         ///   - Nobody in the zone → fadeRate.
         ///   - The claim team is still listed there itself (alone, or contested alongside another team) → fadeRate
         ///     - not fading at all; the caller's ordinary capture/contest logic runs instead (CapturingTeamAbsent

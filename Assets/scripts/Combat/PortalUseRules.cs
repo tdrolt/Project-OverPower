@@ -56,7 +56,7 @@ namespace Overpower.Combat
         /// while its owner has a charge. A flag that has not been published yet counts as usable, so nothing greys by
         /// mistake before the owner's first publish.</summary>
         public static bool ShowsUsable(bool flagKnown, bool ownerHasCharge) => !flagKnown || ownerHasCharge;
-        // ---- group travel (Task 15) ----------------------------------------------------------------
+        // ---- group travel ---------------------------------------------------------------------------
 
         /// <summary>How old, in seconds, a "a trip just finished" signal may be and still pull bystanders along. A late
         /// joiner replaying buffered messages must not teleport anyone for a trip that ended long ago.</summary>

@@ -4,8 +4,8 @@ using UnityEngine;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 6: where a team's spawn heals its players, as a place in the scene. The 2v2 map has no capital circle, so its scene gets one of
-    /// these per team around the pocket behind the boxes (Task 11); in 3v3v3 the team's own capital circle is the spawn without any of these
+    /// Where a team's spawn heals its players, as a place in the scene. The 2v2 map has no capital circle, so its scene gets one of
+    /// these per team around the pocket behind the boxes; in 3v3v3 the team's own capital circle is the spawn without any of these
     /// (see InOwnSpawn). Only the flat ground position counts, not the height. Registered while enabled, so the lookup needs no scene search.
     /// </summary>
     public sealed class SpawnHealArea : MonoBehaviour

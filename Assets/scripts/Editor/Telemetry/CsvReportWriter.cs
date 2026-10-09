@@ -6,34 +6,27 @@ using System.Text;
 
 namespace Overpower.EditorTools.Telemetry
 {
-    /// <summary>Task T5 step 5: writes the 12 CSVs from a ReportTables. Formatting only - every number
-    /// already came out of TelemetryAggregator, so CsvReportWriter and (later) HtmlReportWriter can
-    /// never disagree about what a value is, only about how it's presented.
+    /// <summary>Writes the 12 CSVs from a ReportTables. Formatting only: every number already came out of
+    /// TelemetryAggregator, so CsvReportWriter and HtmlReportWriter can never disagree about what a value is, only about how
+    /// it's presented.
     ///
-    /// RFC-4180: invariant culture, CRLF line endings, a field quoted only when it contains a comma,
-    /// a quote or a newline, with inner quotes doubled.
-    ///
-    /// Opus review item 13: written UTF-8 WITH a BOM so Excel auto-detects the encoding and the
-    /// comma as a field separator on double-click; a Dutch-locale Windows install still defaults
-    /// Excel's own list separator to semicolon, so a Dutch reader may still need Data > From Text/CSV
-    /// and choose "Comma" explicitly rather than double-clicking the file directly - the BOM only
-    /// fixes character encoding, not that regional setting.</summary>
+    /// RFC-4180: invariant culture, CRLF line endings, a field quoted only when it contains a comma, a quote or a newline, with
+    /// inner quotes doubled. Written UTF-8 WITH a BOM so Excel auto-detects the encoding and the comma separator on
+    /// double-click; a Dutch-locale Windows install still defaults Excel's list separator to semicolon, so a Dutch reader may
+    /// need Data > From Text/CSV and choose "Comma" - the BOM fixes character encoding, not that regional setting.</summary>
     public static class CsvReportWriter
     {
-        /// <summary>The original, pre-T7 entry point - unchanged: exactly the 12 CSVs, straight into
-        /// folder/csv/. Kept for direct single-scope use (and CsvReportWriterTests, which counts
-        /// exactly 12 files) - the T7 three-folder layout is the separate Write(ReportSet, ...)
-        /// overload below, which calls this same per-table writing through WriteTables.</summary>
+        /// <summary>Exactly the 12 CSVs, straight into folder/csv/. Kept for direct single-scope use (and CsvReportWriterTests, which
+        /// counts exactly 12 files); the per-scope layout is the Write(ReportSet, ...) overload below, which calls the same
+        /// WriteTables.</summary>
         public static void Write(ReportTables tables, string folder)
         {
             WriteTables(tables, Path.Combine(folder, "csv"));
         }
 
-        /// <summary>Task T7: one folder per scope - csv/whole_match/, csv/phase1_3teams/ and, if the
-        /// match ever had one, csv/phase2_2teams/ - each with the same 12 files as the single-scope
-        /// overload above (no second copy of the writing logic - see WriteTables), plus a 13th file
-        /// in whole_match only: log_coverage.csv (which players' logs are actually in this report -
-        /// a whole-match fact, not scoped to one phase - see LogCoverageRow's own comment).</summary>
+        /// <summary>One folder per scope - csv/whole_match/, csv/phase1_3teams/ and, if the match ever had one, csv/phase2_2teams/ -
+        /// each with the same 12 files as the overload above (see WriteTables), plus extra files in whole_match only (log_coverage.csv:
+        /// which players' logs are in this report, a whole-match fact; see LogCoverageRow).</summary>
         public static void Write(ReportSet reportSet, string folder)
         {
             if (reportSet == null) return;
@@ -43,8 +36,7 @@ namespace Overpower.EditorTools.Telemetry
             string wholeMatchFolder = Path.Combine(csvRoot, "whole_match");
             WriteTables(reportSet.WholeMatch, wholeMatchFolder);
             WriteLogCoverage(reportSet.WholeMatch?.Header?.LogCoverage, wholeMatchFolder);
-            // Playtest extras Task 2 (P4): bugs.csv and console.csv, whole_match only - same
-            // "computed once, only ever written from the whole-match table" pattern as log_coverage.csv.
+            // bugs.csv and console.csv, whole_match only: computed once, written only from the whole-match table, like log_coverage.csv.
             WriteBugs(reportSet.WholeMatch?.Header?.Bugs, wholeMatchFolder);
             WriteConsole(reportSet.WholeMatch?.Header?.ConsoleByPlayer, wholeMatchFolder);
 
@@ -72,9 +64,8 @@ namespace Overpower.EditorTools.Telemetry
             WriteDeaths(tables, csvFolder);
         }
 
-        /// <summary>Task T7, the 13th file - whole_match only (see Write(ReportSet, ...)'s own
-        /// comment). One row per actor seen anywhere in the match; "present" is whether their own log
-        /// file was found.</summary>
+        /// <summary>The log-coverage file, whole_match only. One row per actor seen anywhere in the match; "present" is whether their
+        /// own log file was found.</summary>
         private static void WriteLogCoverage(System.Collections.Generic.List<LogCoverageRow> rows, string csvFolder)
         {
             rows ??= new System.Collections.Generic.List<LogCoverageRow>();
@@ -82,8 +73,7 @@ namespace Overpower.EditorTools.Telemetry
             WriteCsv(
                 Path.Combine(csvFolder, "log_coverage.csv"),
                 new[] { "actor", "name", "filePresent", "firstT", "lastT" },
-                // Review fix (item 10): a missing actor with no join/leave info at all writes "-"
-                // for firstT/lastT rather than a misleading "0".
+                // A missing actor with no join/leave info writes "-" for firstT/lastT rather than a misleading "0".
                 rows.Select(r => new[]
                 {
                     N(r.Actor), r.Nick, N(r.FilePresent),
@@ -92,9 +82,8 @@ namespace Overpower.EditorTools.Telemetry
                 }));
         }
 
-        /// <summary>Playtest extras Task 2 (P4), whole_match only. One row per Ctrl+B mark; the chat
-        /// note(s) and console-window line count are summarized, not spelled out in full (the HTML
-        /// report is where the full text lives - see HtmlReportWriter's Bug reports section).</summary>
+        /// <summary>bugs.csv, whole_match only. One row per Ctrl+B mark; the chat note(s) and console-window line count are
+        /// summarized (the HTML report holds the full text; see HtmlReportWriter's Bug reports section).</summary>
         private static void WriteBugs(System.Collections.Generic.List<BugRow> rows, string csvFolder)
         {
             rows ??= new System.Collections.Generic.List<BugRow>();
@@ -111,12 +100,9 @@ namespace Overpower.EditorTools.Telemetry
                 }));
         }
 
-        /// <summary>Playtest extras Task 2 (P4), whole_match only. Step 0 review fix (d), 2026-09-26:
-        /// used to be narrower than the HTML's own per-player Console section (only "error"/
-        /// "warning", dropping "exception"/"assert") - now matches it exactly: every row
-        /// ConsoleByPlayer already carries (TelemetryAggregator has already excluded plain "log" and
-        /// the "dropped" summary line - see its own BuildBugsAndConsole comment), no further
-        /// filtering here.</summary>
+        /// <summary>console.csv, whole_match only. Matches the HTML's per-player Console section exactly: every row ConsoleByPlayer
+        /// carries (TelemetryAggregator already excluded plain "log" and the "dropped" summary line; see BuildBugsAndConsole), no
+        /// further filtering here.</summary>
         private static void WriteConsole(System.Collections.Generic.List<ConsolePlayerGroupRow> rows, string csvFolder)
         {
             rows ??= new System.Collections.Generic.List<ConsolePlayerGroupRow>();
@@ -130,13 +116,9 @@ namespace Overpower.EditorTools.Telemetry
                 }));
         }
 
-        // Review fix (item 5): the plan's own "the whole-match tables also get a Phase column on
-        // time-based rows" was implemented on ReportTables/the HTML's embedded JSON but never
-        // reached the CSVs - added to the same 8 row types that carry a Phase field. Written for
-        // every scope (not just whole_match), since WriteTables is the one shared writing path for
-        // all three folders (no second copy) - in a phase-scoped folder every row simply reads the
-        // same constant phase, which still lets a spreadsheet pivot/filter uniformly across all
-        // three CSVs by this one column instead of needing scope-specific logic.
+        // The 8 row types that carry a Phase field get a Phase column, written for every scope since WriteTables is the one shared
+        // path: in a phase-scoped folder every row reads the same constant phase, which still lets a spreadsheet pivot/filter all the
+        // CSVs uniformly by this one column.
         private static void WriteGoldTimeline(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "gold_timeline.csv"),
             new[] { "t", "actor", "name", "team", "balance", "earnedSoFar", "spentSoFar", "phase" },
@@ -158,9 +140,8 @@ namespace Overpower.EditorTools.Telemetry
                 N(r.GoldGapToRichest), N(r.Phase),
             }));
 
-        // 2026-09-27 designer change: "he can't read team/zone NUMBERS" - a name column added right
-        // next to the id it names (id kept, never removed), from the same pure ArenaNames mapping the
-        // HTML report uses, so a CSV opened on its own reads the same way as the page.
+        // A name column right next to the id it names (id kept, never removed), from the same pure ArenaNames mapping the HTML
+        // report uses, so a CSV opened on its own reads the same way as the page.
         private static void WriteZoneIncome(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "zone_income.csv"),
             new[] { "zone", "zoneName", "team", "teamName", "tier", "secondsHeld", "goldGenerated" },
@@ -191,8 +172,7 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WriteHits(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "hits.csv"),
-            // mark (mark plan step 6): appended at the END, found by header name like every other
-            // column here - 0 for a non-marking hit (or any hit line written before this step existed).
+            // mark: appended at the END, found by header name like every other column - 0 for a non-marking hit.
             new[] { "t", "attacker", "attackerTeam", "victim", "victimTeam", "weapon", "ability", "source",
                     "raw", "armor", "healthLost", "lethal", "distance", "vulnerable", "overpower", "phase", "mark" },
             t.Hits.Select(r => new[]
@@ -204,9 +184,8 @@ namespace Overpower.EditorTools.Telemetry
 
         private static void WriteWeapons(ReportTables t, string folder) => WriteCsv(
             Path.Combine(folder, "weapons.csv"),
-            // splashHits (opus review item 6): counted separately from hits/accuracy, which are
-            // Projectile-source only - a rocket's own splash falloff no longer inflates accuracy past 100%.
-            // marksPlaced/marksCashed (mark plan step 6): appended at the END, found by header name.
+            // splashHits is counted separately from hits/accuracy, which are Projectile-source only: a rocket's splash falloff must
+            // not inflate accuracy past 100%. marksPlaced/marksCashed are appended at the END, found by header name.
             new[] { "weapon", "timeEquippedSeconds", "pulls", "projectiles", "hits", "splashHits", "accuracy",
                     "damageRaw", "armorDamage", "healthDamage", "damagePerEquippedMinute", "kills", "meanDistance", "medianDistance",
                     "marksPlaced", "marksCashed" },

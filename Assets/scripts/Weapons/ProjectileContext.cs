@@ -6,82 +6,51 @@ using Overpower.Data;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Everything one projectile needs to know about the shot that produced it: which weapon (or
-    /// ability) fired it, who fired it, which way it is going and how hard it hits. Rebuilt from the
-    /// fire RPC (a weapon) or the cast RPC (an ability) on every client, so every machine simulates
-    /// the identical projectile.
-    ///
-    /// A plain class rather than fields on ProjectileMotor, so that anything bolted onto a
-    /// projectile later - an explosion, a trail, a debug gizmo - reads the same one description of
-    /// the shot instead of each holding its own copy that can drift.
-    ///
-    /// WeaponFiring hands this over by calling ProjectileMotor.Initialize immediately after a local
-    /// Instantiate. That is correct HERE and only here, because a local Instantiate returns the one
-    /// and only object it created, so writing to it configures the thing that exists.
-    ///
-    /// Do NOT copy this pattern to PhotonNetwork.Instantiate. That returns only the CALLER's copy;
-    /// every other client builds its own from the prefab and never sees fields you assigned
-    /// afterwards, so the object silently behaves differently on each machine. Networked spawns
-    /// pass their setup through instantiationData instead, which is what the deployables use.
-    ///
-    /// TWO WAYS A SHOT IS BUILT (Task 1.7b). A weapon shot carries a WeaponDefinition and reads its
-    /// speed/radius/range/impact VFX from it, so retuning the weapon asset retunes shots already in
-    /// the air on the next trigger pull. An ABILITY shot (the zip gun, later the stun gun) has no
-    /// weapon at all - its own module's Inspector fields ARE the stat block - so it hands the motor
-    /// speed/radius/range/damage directly instead. ProjectileMotor reads ONLY the properties below
-    /// (ProjectileSpeed/ProjectileRadius/MaxRange/Damage/SourceId), never context.Weapon itself, so
-    /// it never needs to know which kind of shot it is simulating. Weapon-only extras - ImpactVfx,
-    /// beam range-charging, cursor detonation - are read straight off context.Weapon by the effect
-    /// components that use them, and those components only ever ride on a WEAPON'S projectile prefab,
-    /// so Weapon being null for an ability shot never reaches them.
+    /// Everything one projectile needs to know about its shot: which weapon or ability fired it, who, which way, how hard. Rebuilt from the fire RPC
+    /// (weapon) or cast RPC (ability) on every client so every machine simulates the identical projectile; a plain class so anything bolted on later
+    /// (explosion, trail, gizmo) reads one description of the shot instead of holding a copy that can drift.
+    /// A weapon shot reads speed/radius/range/impact VFX from its WeaponDefinition, so retuning the asset retunes shots already in the air. An ability
+    /// shot has no weapon (Weapon is null): its module's Inspector fields are the stat block. ProjectileMotor reads ONLY the properties below, never
+    /// context.Weapon; weapon-only extras (ImpactVfx, beam range-charging, cursor detonation) are read off context.Weapon by effect components that
+    /// only ride on a weapon's projectile prefab.
+    /// WeaponFiring hands this over via ProjectileMotor.Initialize right after a LOCAL Instantiate, which is correct only because a local Instantiate
+    /// returns the one object it created. Do NOT copy that to PhotonNetwork.Instantiate: it returns only the CALLER's copy, other clients build their
+    /// own from the prefab and never see fields assigned afterwards, so the object silently differs per machine. Networked spawns pass setup through
+    /// instantiationData (the deployables do).
     /// </summary>
     public sealed class ProjectileContext
     {
-        /// <summary>The stat block this shot came from, or null for an ability shot - see the class
-        /// comment. Everything a projectile needs that is not per-shot - speed, radius, range,
-        /// impact VFX - is read from here rather than duplicated, so retuning the weapon asset
-        /// retunes shots already in the air on the next trigger pull.</summary>
+        /// <summary>The stat block this shot came from, or null for an ability shot.</summary>
         public WeaponDefinition Weapon { get; }
 
-        /// <summary>The ability that fired this shot, or -1 for a weapon shot. Set once by the
-        /// ability constructor below; never used when Weapon is not null.</summary>
+        /// <summary>The ability that fired this shot, or -1 for a weapon shot.</summary>
         public int AbilityId { get; } = -1;
 
-        /// <summary>What DamageInfo.WeaponId should read for this shot: the weapon's own id for a
-        /// weapon shot, the ability's id otherwise. One place to ask "who gets credit" instead of
-        /// every caller null-checking Weapon itself.</summary>
+        /// <summary>The weapon's own id for a weapon shot, the ability's id otherwise - one place to ask "who gets credit" instead of every caller
+        /// null-checking Weapon.</summary>
         public int SourceId => Weapon != null ? Weapon.Id : AbilityId;
 
-        /// <summary>Metres per second. From the weapon for a weapon shot; from the ability module's
-        /// own field otherwise - see the class comment.</summary>
+        /// <summary>Metres per second.</summary>
         public float ProjectileSpeed { get; }
 
-        /// <summary>Metres. From the weapon for a weapon shot; from the ability module's own field
-        /// otherwise.</summary>
+        /// <summary>Metres.</summary>
         public float ProjectileRadius { get; }
 
-        /// <summary>Metres this shot may travel before it expires. From the weapon for a weapon
-        /// shot (already scaled by RangeMultiplier below), or from the ability module's own field
-        /// otherwise (never scaled - no ability reads OverPower's buff).</summary>
+        /// <summary>Metres this shot may travel before it expires. From the weapon (already scaled by RangeMultiplier) or the ability module's own
+        /// field (never scaled - no ability reads OverPower's buff).</summary>
         public float MaxRange { get; }
 
         /// <summary>
-        /// What MaxRange above was multiplied by at fire time - 1 for a shot nothing has boosted.
-        /// Task 2.6 (GDD p.20): OverPower's +10% range needs to reach every place range is measured
-        /// for THIS shot, not just the travel-distance cap MaxRange already covers - a beam weapon's
-        /// Hitscan.ChargedRange recomputes its reach from the weapon asset directly rather than
-        /// reading MaxRange, so it takes this multiplier as its own parameter instead of a second,
-        /// independently-tuned formula. Always 1 for an ability shot.
+        /// What MaxRange was multiplied by at fire time (OverPower's range buff, GDD p.20) - 1 for a shot nothing has boosted, always 1 for an ability
+        /// shot. A beam's Hitscan.ChargedRange recomputes its reach from the weapon asset instead of reading MaxRange, so it takes this as a parameter
+        /// rather than a second, independently-tuned formula.
         /// </summary>
         public float RangeMultiplier { get; }
 
         /// <summary>
-        /// Set only when this exact context was built for the CASTER's own local copy of an ability
-        /// projectile - see ZipGunAbility.ExecuteCast. Every client spawns the same local projectile
-        /// (so a remote player's shot is still visible on your screen), but only the shooter's own
-        /// machine should ACT on the hit (a zip pull moves the shooter's own body). Null for a
-        /// weapon shot and for every other client's copy of an ability shot; AbilityHitRelay is the
-        /// IProjectileBehaviour that calls it.
+        /// Set only on the CASTER's own local copy of an ability projectile (ZipGunAbility.ExecuteCast). Every client spawns the same local projectile so
+        /// a remote player's shot is visible on your screen, but only the shooter's machine should ACT on the hit (a zip pull moves the shooter's own body).
+        /// Null for a weapon shot and for every other client's copy; AbilityHitRelay is the IProjectileBehaviour that calls it.
         /// </summary>
         public Action<ProjectileHitInfo> OnAbilityHit { get; }
 
@@ -99,17 +68,13 @@ namespace Overpower.Weapons
         /// and its roll from the shared aim cone.</summary>
         public Vector3 Direction { get; }
 
-        /// <summary>0..1 for a charge weapon, 0 for everything else. Plumbed end to end so charge
-        /// weapons need no new RPC later; nothing scales off it yet.</summary>
+        /// <summary>0..1 for a charge weapon, 0 for everything else.</summary>
         public float ChargeFraction { get; }
 
         /// <summary>
-        /// Where the shooter's cursor was resting on the ground when the trigger went down.
-        ///
-        /// It travels with the shot because Camera.main and Input.mousePosition inside the fire
-        /// RPC would resolve on the RECEIVER - the same class of bug WeaponFiring was written to
-        /// fix. Only a weapon that aims at a point rather than a direction reads it (the cursor
-        /// rocket); for everything else it is carried and ignored.
+        /// Where the shooter's cursor was resting on the ground when the trigger went down. It travels with the shot because Camera.main and
+        /// Input.mousePosition inside the fire RPC would resolve on the RECEIVER (the bug WeaponFiring exists to avoid). Only a weapon that aims at a
+        /// point rather than a direction reads it (the cursor rocket); for everything else it is carried and ignored.
         /// </summary>
         public Vector3 TargetPoint { get; }
 
@@ -125,28 +90,18 @@ namespace Overpower.Weapons
         public float DamageMultiplier { get; private set; } = 1f;
 
         /// <summary>
-        /// Task 2.6 review fix: a SEPARATE damage multiplier, decided once at fire time and never
-        /// touched again - unlike DamageMultiplier above, which BounceOffWalls/ScaleDamageWithDistance
-        /// overwrite mid-flight for their own purpose. OverPower's own +10% used to be folded
-        /// straight into baseDamage (WeaponFiring.BuildShots), which worked for a direct hit but left
-        /// ExplodeOnImpact.SplashDamageAt with nothing to read - splash has its own separate damage
-        /// figure that never passes through baseDamage/Damage at all, so it read only
-        /// DamageMultiplier and silently missed the buff. Reusing DamageMultiplier for OverPower
-        /// instead would have the opposite problem: a bounce or a distance-scaling rocket calling
-        /// SetDamageMultiplier mid-flight would overwrite (not compose with) OverPower's bonus.
-        /// This field is read by both Damage below and SplashDamageAt, each applying it exactly
-        /// once. 1 = unchanged; always 1 for an ability shot (see that constructor).
+        /// A SEPARATE damage multiplier, decided once at fire time and never touched again, unlike DamageMultiplier, which BounceOffWalls and
+        /// ScaleDamageWithDistance overwrite mid-flight. OverPower's damage buff lives here: folded into baseDamage it would miss
+        /// ExplodeOnImpact.SplashDamageAt (splash has its own damage figure that never passes through baseDamage), and stored in DamageMultiplier a
+        /// bounce would overwrite it rather than compose with it. Damage and SplashDamageAt each apply it exactly once.
+        /// 1 = unchanged; always 1 for an ability shot.
         /// </summary>
         public float FireTimeDamageMultiplier { get; }
 
         /// <summary>
-        /// Damage this one projectile deals before armor, vulnerability or reduction - the figure
-        /// resolved at fire time, scaled by whatever DamageMultiplier currently is and by
-        /// FireTimeDamageMultiplier (fixed for this shot's whole life).
-        ///
-        /// The base figure is resolved once at fire time rather than read off the weapon at
-        /// impact, so a shot in flight cannot be retuned mid-air by a weapon swap. Only an
-        /// IProjectileBehaviour riding along on this same projectile may move DamageMultiplier.
+        /// Damage this one projectile deals before armor, vulnerability or reduction: the base figure resolved at fire time, scaled by DamageMultiplier
+        /// and FireTimeDamageMultiplier. Resolved once rather than read off the weapon at impact, so a shot in flight cannot be retuned mid-air by a
+        /// weapon swap. Only an IProjectileBehaviour riding along on this same projectile may move DamageMultiplier.
         /// </summary>
         public float Damage => baseDamage * DamageMultiplier * FireTimeDamageMultiplier;
 
@@ -187,16 +142,10 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// An ability shot (Task 1.7b) - the zip gun today, the stun gun later. Weapon stays null;
-        /// speed/radius/range/damage come from the ability module's own Inspector fields instead of
-        /// a WeaponDefinition, and AbilityId stands in for Weapon.Id wherever a weapon shot would use
-        /// it (see SourceId). ChargeFraction is always 0 - no ability charges a projectile today.
-        ///
-        /// onHit is how the CASTER's own local copy of the projectile reacts to a hit (a zip pull) -
-        /// pass it only when building the context for the caster's own client; every other client's
-        /// copy of the same shot passes null, so AbilityHitRelay quietly does nothing there. This is
-        /// what makes "only the caster's copy acts on a hit" true without ProjectileMotor or
-        /// AbilityHitRelay ever asking "am I the caster" themselves.
+        /// An ability shot: Weapon stays null; speed/radius/range/damage come from the ability module's own Inspector fields, and AbilityId stands in
+        /// for Weapon.Id wherever a weapon shot would use it (see SourceId). ChargeFraction is always 0.
+        /// onHit is how the CASTER's own copy reacts to a hit (a zip pull): pass it only when building the context for the caster's client; every other
+        /// client passes null, so AbilityHitRelay quietly does nothing there and neither it nor ProjectileMotor ever asks "am I the caster".
         /// </summary>
         public ProjectileContext(int abilityId, float projectileSpeed, float projectileRadius,
                                  float maxRange, float damage, int shooterActorNumber,
@@ -207,7 +156,7 @@ namespace Overpower.Weapons
             AbilityId = abilityId;
             ProjectileSpeed = projectileSpeed;
             ProjectileRadius = projectileRadius;
-            RangeMultiplier = 1f; // No ability reads OverPower's buff - see the property's own comment.
+            RangeMultiplier = 1f; // No ability reads OverPower's buff.
             FireTimeDamageMultiplier = 1f; // Same reason.
             MaxRange = maxRange;
             ShooterActorNumber = shooterActorNumber;
@@ -256,16 +205,9 @@ namespace Overpower.Weapons
     }
 
     /// <summary>
-    /// The extension seam the whole weapon plan rests on. Pierce, explode-on-impact and bounce are
-    /// three more weapons in the upgrade tree, and none of them may require an edit to
-    /// ProjectileMotor - they are components dropped onto their own projectile prefab, which the
-    /// motor finds with GetComponents and consults at each decision point.
-    ///
-    /// Composition rather than subclassing on purpose: a weapon that both pierces AND explodes is
-    /// two components on one prefab, where a subclass hierarchy would need a fourth class for the
-    /// combination.
-    ///
-    /// Nothing implements this yet, and nothing should until those weapons are actually built.
+    /// The extension seam the weapon plan rests on: pierce, explode-on-impact and bounce are components dropped onto their own projectile prefab,
+    /// which ProjectileMotor finds with GetComponents and consults at each decision point, so none of them requires an edit to the motor.
+    /// Composition rather than subclassing: a weapon that both pierces AND explodes is two components on one prefab, not a fourth class.
     /// </summary>
     public interface IProjectileBehaviour
     {
@@ -273,14 +215,10 @@ namespace Overpower.Weapons
         void OnSpawned(ProjectileMotor motor, ProjectileContext context);
 
         /// <summary>
-        /// Called for every hit the sweep stops on, after damage has already been applied. Use
-        /// motor.Ignore(hit.collider) then return KeepFlying to pierce; motor.Redirect(newDirection,
-        /// hitNormal, hitCollider) then KeepFlying to bounce (the one-argument overload was deleted,
-        /// 2026-09-21 review follow-up - it had no callers, and using it to bounce would bring back
-        /// the wall-rattle bug ProjectileMotor's class comment describes, since it never lifts the
-        /// projectile off the surface or arms the resting-overlap guard); spawn an explosion and
-        /// return Despawn to detonate. When several behaviours are attached, any single KeepFlying
-        /// wins.
+        /// Called for every hit the sweep stops on, after damage has been applied. motor.Ignore(hit.collider) then KeepFlying to pierce;
+        /// motor.Redirect(newDirection, hitNormal, hitCollider) then KeepFlying to bounce (Redirect also lifts the projectile off the surface and arms
+        /// the resting-overlap guard, or it rattles on the wall); spawn an explosion and return Despawn to detonate.
+        /// When several behaviours are attached, any single KeepFlying wins.
         /// </summary>
         /// <param name="victim">The thing that took the damage, or null when the shot hit level
         /// geometry.</param>

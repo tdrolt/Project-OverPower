@@ -4,11 +4,10 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A flat ring on the floor that flashes where something blew up and fades away (ability visuals step 2): a mine's
-    /// blast (A6, Tudor 2026-09-17 evening: a rocket's own blast no longer uses this - see SplashShell instead, since
-    /// rockets stay at their real, off-the-floor height now). Local and cosmetic - each client spawns its own from the
-    /// blast it already simulates, no network traffic - and it never touches damage. The caller passes the radius from
-    /// the gameplay component itself.
+    /// A flat ring on the floor that flashes where something blew up and fades away: a mine's blast (a rocket's blast uses
+    /// SplashShell instead, since rockets stay at their real, off-the-floor height). Local and cosmetic - each client spawns
+    /// its own from the blast it already simulates, no network traffic - and it never touches damage. The caller passes
+    /// the radius from the gameplay component itself.
     /// </summary>
     public sealed class BlastMarker : MonoBehaviour
     {

@@ -7,12 +7,10 @@ using Overpower.Match;
 
 namespace Overpower.UI
 {
-    /// <summary>Task 5b-2 (D5), reworked in Task 13: the shop's hover pop-up. Rest the pointer on a weapon node, an
-    /// ability card or an armor row for Loadout Tooltip Delay Seconds (0.5 s) and a small box appears right beside the
-    /// cursor, kept fully on screen: the item's name, one line on what it does, and its numbers. Move off and it goes
-    /// at once; move to another item and the wait starts over. It replaced the description strip at the bottom of the
-    /// screen. The timing rule is Overpower.Match.HoverTooltipTimer, the placement rule Overpower.Match.
-    /// ShopPopupPlacement, the text ShopPopupText (all unit tested); this file is the small view around them.</summary>
+    /// <summary>The shop's hover pop-up: rest the pointer on a weapon node, ability card or armor row for the UiTheme
+    /// delay (Loadout Tooltip Delay Seconds) and a box with name, one line and numbers appears beside the cursor, kept
+    /// on screen; moving off hides it at once, moving to another item restarts the wait. Timing, placement and text
+    /// are HoverTooltipTimer, ShopPopupPlacement and ShopPopupText (unit tested); this file is the view around them. (D5)</summary>
     public partial class LoadoutScreen
     {
         private readonly HoverTooltipTimer tooltipTimer = new HoverTooltipTimer();

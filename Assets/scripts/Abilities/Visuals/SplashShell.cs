@@ -4,11 +4,10 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A6 (Tudor 2026-09-17 evening): what a rocket blast shows now instead of a floor BlastMarker. Rockets stay at
-    /// their real height, so this is a short, see-through SPHERE shell at the real burst point - never snapped to the
-    /// ground (no SnapVisualToGround, no GroundSnap read) - sized to the blast's own Splash Radius, in the shooter's
-    /// team colour at low alpha. It grows from about 60% to 100% of that radius while it fades out, then removes
-    /// itself: one pooled-cheap object per blast, no lingering ring. Local and cosmetic, the same contract BlastMarker
+    /// What a rocket blast shows instead of a floor BlastMarker. Rockets stay at their real height, so this is a short,
+    /// see-through SPHERE shell at the real burst point - never snapped to the ground (no SnapVisualToGround, no GroundSnap
+    /// read) - sized to the blast's Splash Radius, in the shooter's team colour at low alpha. It grows from about 60% to
+    /// 100% of that radius while it fades out, then removes itself. Local and cosmetic, the same contract BlastMarker
     /// has - each client spawns its own from the blast it already simulates, never touches damage.
     /// </summary>
     public sealed class SplashShell : MonoBehaviour

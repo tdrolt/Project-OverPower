@@ -13,14 +13,12 @@ using UnityEngine.InputSystem;
 namespace Overpower.Lobby
 {
     /// <summary>
-    /// What a player on a spectator seat sees (lobby Task 6, spec section 7): no body, no gold, no shop, no fog. The scene's follow camera
-    /// (CameraTracking) is reused as the rig: it follows a player's body, or the whole map framed on the arena outline. Q / E go to the
-    /// previous / next player (actor order, wrapping), Space toggles the whole map, the mouse wheel zooms as it always did (CameraTracking
-    /// reads it). The keys are read here through the Input System and call the public methods (Previous, Next, ToggleWholeMap), which
-    /// are what checks call. The bar at the bottom (SpectatorBar) shows who is watched and the keys, with Leave.
-    ///
-    /// Sits on the RoomManager's GameObject (added by RoomManager.Awake, so the scene file does not change) and does nothing until
-    /// LobbyStart calls Begin on the spec = true edge; End (leaving the room) gives the camera back.
+    /// What a player on a spectator seat sees (spec section 7): no body, no gold, no shop, no fog. The scene's follow camera
+    /// (CameraTracking, which also reads the mouse wheel) is reused as the rig: it follows a player's body, or the whole map framed on
+    /// the arena outline. Q / E go to the previous / next player (actor order, wrapping), Space toggles the whole map; the keys are read
+    /// here through the Input System and call the public Previous, Next, ToggleWholeMap, which are what checks call. SpectatorBar shows
+    /// who is watched, with Leave. Sits on the RoomManager's GameObject (added by RoomManager.Awake, so the scene file does not change)
+    /// and does nothing until LobbyStart calls Begin on the spec = true edge; End (leaving the room) gives the camera back.
     /// </summary>
     public sealed class SpectatorSeatView : MonoBehaviour
     {
@@ -30,7 +28,7 @@ namespace Overpower.Lobby
         private Transform mapAnchor;
         private SpectatorBar bar;
         private SpectatorResultCard resultCard;
-        private bool dominionResultUp;   // Dominion Task 9: the result card is DominionHud's, not a SpectatorResultCard
+        private bool dominionResultUp;   // the result card is DominionHud's, not a SpectatorResultCard
         private int resultWinner = SpectateRules.None; // the winner the room named, kept until the card can go up (Begin may come after it)
         private readonly object zoomKey = new object();
         private readonly List<SpectateCandidate> watchable = new List<SpectateCandidate>(16);
@@ -110,9 +108,9 @@ namespace Overpower.Lobby
             TryShowResult(); // the match may already be decided
         }
 
-        /// <summary>Lobby Task 15b (spec section 11): the room named a winner. A spectator has no body and so no MatchUI panel; they get the
-        /// result card instead - the winner and the same Back to the lobby list button. (The zip run here raises the saved-log box only for a
-        /// spectator who is the room's host; an ordinary spectator writes no log, by design.) Called by MatchDirector for a client with no body; a no-op for anyone not watching.</summary>
+        /// <summary>The room named a winner (spec section 11). A spectator has no body and so no MatchUI panel; they get the
+        /// result card instead - the winner and the same Back to the lobby list button. Called by MatchDirector for a client with no body;
+        /// a no-op for anyone not watching.</summary>
         public void ShowMatchResult(int winningTeam)
         {
             resultWinner = winningTeam;
@@ -129,7 +127,7 @@ namespace Overpower.Lobby
                 Debug.LogError("[SPECTATOR] the RoomManager has no UiTheme - the result card cannot be built");
                 return;
             }
-            // Dominion Task 9: a spectator gets the same result card as the players (the table of points per round), not the plain winner card.
+            // A spectator gets the same result card as the players (the table of points per round), not the plain winner card.
             if (Overpower.Dominion.DominionMode.IsActive() && Overpower.UI.DominionHud.Instance != null
                 && Overpower.UI.DominionHud.Instance.ShowResult(resultWinner, Leave))
             {

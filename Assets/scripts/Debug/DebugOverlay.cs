@@ -12,10 +12,8 @@ using Overpower.UI;
 /// Self-installing: no scene setup, no prefab, nothing to remember before making a build.
 /// Captures anything containing <see cref="Filter"/>, plus every error and exception.
 ///
-/// The log draws on the RIGHT, under the corner minimap, so it and the F1 test range panel (top-left) never
-/// overlap (HUD step 6, Tudor 2026-09-17: "you can keep the dummy and console log opening next to each other
-/// in the right side or the easy fix is to just bind them to different things" - moving the log is the better
-/// half of that offer, since one key for "show me the tools" is fewer things for a playtester to remember).
+/// The log draws on the RIGHT, under the corner minimap, so it and the F1 test range panel (top-left)
+/// never overlap.
 /// </summary>
 public class DebugOverlay : MonoBehaviour
 {
@@ -127,14 +125,10 @@ public class DebugOverlay : MonoBehaviour
     }
 
     /// <summary>Where the log (and its hint) draw: the right-hand side, below the corner minimap, clamped to the
-    /// screen (Tudor, 2026-09-17 - it used to open in the top-left corner, straight on top of the F1 test range
-    /// panel, which is why he offered to rebind one of them; moving it is the better half of that offer, since
-    /// one key for "show me the tools" is fewer things for a playtester to remember).
+    /// screen, so it never lands on the F1 test range panel (top-left).
     ///
-    /// The numbers come from UiTheme, reached through the local player's minimap - which is also the thing being
-    /// cleared. This component installs itself at runtime (see Install) and has nothing serialized, so there is
-    /// no Inspector slot to put a theme in; borrowing the minimap's is honest rather than inventing a static
-    /// somewhere for one caller.</summary>
+    /// The numbers come from UiTheme, reached through the local player's minimap: this component installs itself
+    /// at runtime (see Install) and has nothing serialized, so there is no Inspector slot to put a theme in.</summary>
     Rect LogRect()
     {
         MinimapView minimap = MinimapView.Local;
@@ -158,8 +152,7 @@ public class DebugOverlay : MonoBehaviour
 
         if (!visible)
         {
-            // Always show the hint, so a tester who has never been told still finds it - in the log's own
-            // column, so it can no longer land on the F1 test range panel in the top-left corner.
+            // Always show the hint, so a tester who has never been told still finds it, in the log's own column.
             GUI.Label(new Rect(area.x, area.y, area.width, HintHeightPixels), $"{ToggleKey}: debug log");
             return;
         }

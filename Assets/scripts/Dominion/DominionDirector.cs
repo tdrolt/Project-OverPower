@@ -11,19 +11,14 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 2: the round flow in the room. The lobby's End warm-up, the countdown and going live stay exactly as Conquest has them
-    /// (MatchDirector); once the room is live this component, in a Dominion room only, runs the match on the room's own values (DominionKeys):
-    /// round 1, its end, a break, the next round, best of three, and the match winner. Added at runtime by BuildingManager.Awake next to
-    /// MatchDirector (no scene footprint, no PhotonView: it only reads and writes Room Properties, like MatchDirector).
-    ///
-    /// The master decides each stage edge from what the ROOM says, never from state of its own (A1): DominionRoomWrites.Next gives the one
-    /// check-and-set to send, so a new master just carries on, and two clients that both think they are master cannot both advance a stage. A
-    /// write is never repeated until the room has echoed (or a second has passed): the next decision is made on the echo, not the send.
-    /// Every client reacts to the stage edge it SEES in the room: a break resets everyone's game, the next round puts everyone back at their
-    /// spawn keeping their picks (A9: players may move in the break; the zones reset at the break's start and again at the round's start, so
-    /// nothing done in the break counts).
-    ///
-    /// Nothing is drawn here (the round HUD, break card and result are DominionHud, Task 9); points, the centre and bounties are Task 3.
+    /// The round flow in the room. The lobby's End warm-up, the countdown and going live stay as Conquest has them (MatchDirector); once the room
+    /// is live this component, in a Dominion room only, runs the match on the room's own values (DominionKeys): rounds, breaks, best of three and
+    /// the match winner. Added at runtime by BuildingManager.Awake next to MatchDirector (no scene footprint, no PhotonView: it only reads and
+    /// writes Room Properties). The master decides each stage edge from what the ROOM says, never from state of its own (A1):
+    /// DominionRoomWrites.Next gives the one check-and-set, so a new master just carries on and two would-be masters cannot both advance a stage.
+    /// A write is never repeated until the room has echoed (or a second has passed): act on the echo, not the send. Every client reacts to the
+    /// stage edge it SEES: a break resets everyone's game, the next round puts everyone back at their spawn keeping their picks (A9: players may
+    /// move in the break; the zones reset at the break's start and again at the round's start, so nothing done in the break counts).
     /// </summary>
     public sealed partial class DominionDirector : MonoBehaviourPunCallbacks
     {
@@ -73,7 +68,7 @@ namespace Overpower.Dominion
         private int[] suddenDeathTeamsForStored;
 
         /// <summary>The teams that play the current sudden death: the room's dSdT (written with sudden death's start and narrowed by every replay,
-        /// Tudor A33), or for a room without it the teams level on round wins. Kept per source array, so asking every frame allocates nothing.</summary>
+        /// A33), or for a room without it the teams level on round wins. Kept per source array, so asking every frame allocates nothing.</summary>
         public int[] SuddenDeathTeams
         {
             get
@@ -114,7 +109,7 @@ namespace Overpower.Dominion
             if (Instance == null) Instance = this;
             else { Destroy(this); return; } // BuildingManager.Awake adds exactly one.
             if (GetComponent<SuddenDeathZone>() == null) gameObject.AddComponent<SuddenDeathZone>(); // the circle: no scene footprint, like this component
-            if (GetComponent<Overpower.UI.DominionHud>() == null) gameObject.AddComponent<Overpower.UI.DominionHud>(); // the round HUD, break card and result (Task 9): drawn on every client, spectators included
+            if (GetComponent<Overpower.UI.DominionHud>() == null) gameObject.AddComponent<Overpower.UI.DominionHud>(); // the round HUD, break card and result: drawn on every client, spectators included
         }
 
         // The mode's scene loads after the room was joined, so no joined-room callback comes to this component: it takes the room as it stands here,
@@ -372,7 +367,7 @@ namespace Overpower.Dominion
 
         /// <summary>Master: while the room's stage (a Round or a Break) has not had its zone reset (dRz differs from dEnd), reset the zones and
         /// write dRz. Asked of the room every frame, so any master finishes a reset the previous one never did. Not repeated until the dRz
-        /// write has had a second to echo (a second reset would wipe a capture made in between). Known and accepted (Task 3 review): a NEW master
+        /// write has had a second to echo (a second reset would wipe a capture made in between). Known and accepted: a NEW master
         /// that takes over while the old master's dRz write is still in flight may redo the reset once; the zones are neutral either way and the
         /// chance of a capture in that instant is negligible.</summary>
         private void RunZoneReset(MatchDirector match)

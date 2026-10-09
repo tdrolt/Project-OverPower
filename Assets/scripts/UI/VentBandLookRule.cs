@@ -15,23 +15,17 @@ namespace Overpower.UI
     }
 
     /// <summary>
-    /// Pulled out of PlayerHud.UpdateOverheat so the vent band's look is a pure function of state -
-    /// testable without a scene, unlike the MonoBehaviour that draws it (OverheatStateTests/
-    /// VentBandLookRuleTests exercise every branch that Play Mode alone could never conveniently
-    /// hit on demand).
+    /// The vent band's look as a pure function of state, tested without a scene (VentBandLookRuleTests,
+    /// OverheatStateTests).
     /// </summary>
     public static class VentBandLookRule
     {
-        /// <summary>Hidden whenever not silenced (which also covers death - OverheatState.Clear
-        /// drops IsSilenced along with everything else) OR whenever ventEnabled is false (review fix:
-        /// ventWindow &lt;= 0 means Vent is off - GameplayConfig's own "0 = off" tooltip - so the band
-        /// must never appear at all, not even a Missed one; OverheatState.Outcome already reads None
-        /// throughout in this case, but windowOpen alone can't be told apart from an ordinary
-        /// "silenced, window hasn't opened yet" - hence the explicit flag). While silenced and
-        /// enabled: the outcome, once there is one, always wins over the window being open or closed
-        /// (a hit or a miss is a settled fact for the rest of this silence, per PlayerHud's own "miss
-        /// stays until the silence ends" rule); with no outcome yet, Bright exactly while the window
-        /// is open, Dim the rest of the silence.</summary>
+        /// <summary>Hidden whenever not silenced (which also covers death - OverheatState.Clear drops IsSilenced)
+        /// or whenever ventEnabled is false: ventWindow &lt;= 0 means Vent is off (GameplayConfig's "0 = off"), so
+        /// not even a Missed band may appear. OverheatState.Outcome reads None throughout then, but windowOpen alone
+        /// can't be told from "silenced, window not open yet", hence the flag. While silenced and enabled the
+        /// outcome, once there is one, wins over the window (a hit or miss is settled for the rest of the silence;
+        /// a miss stays until it ends); with no outcome, Bright exactly while the window is open, else Dim.</summary>
         public static VentBandLook Determine(bool isSilenced, bool windowOpen, VentOutcome outcome, bool ventEnabled = true)
         {
             if (!isSilenced || !ventEnabled)

@@ -15,9 +15,9 @@ namespace Overpower.Arena
     }
 
     /// <summary>
-    /// The out-of-arena safety net's decision (movement step 4), kept pure so it is tested without a scene. Movement
-    /// steps 2 and 3 close every way out anyone has found; this catches the ones nobody has found yet, on the owner's
-    /// own client, next to the kill-height check. It is not a respawn key: nothing the player presses reaches it.
+    /// The out-of-arena safety net's decision, kept pure so it is tested without a scene. Movement steps 2 and 3 close
+    /// every way out anyone has found; this catches the ones nobody has found yet, on the owner's own client, next to
+    /// the kill-height check. It is not a respawn key: nothing the player presses reaches it.
     ///
     /// Two thresholds on purpose:
     ///  - a spot is REMEMBERED only with a whole player's width to spare, so the spot you are put back on never

@@ -5,27 +5,15 @@ using Overpower.Combat;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Turns a projectile into a rocket: when it stops, it detonates and everything standing near
-    /// the blast takes a share of the splash damage.
-    ///
-    /// This is the first real test of the IProjectileBehaviour seam, and the point of the test is
-    /// what is NOT here - ProjectileMotor was not touched to make rockets exist. This is a
-    /// component dropped onto a projectile prefab, the motor finds it with GetComponents, and the
-    /// difference between the baseline bullet and a rocket is one component and one asset.
-    ///
-    /// SPLASH IS APPLIED ON EVERY CLIENT, ON PURPOSE. Every machine simulates every projectile, so
-    /// nine clients each run this OverlapSphere for the same rocket. That is safe, and it is safe
-    /// for exactly one reason: PlayerHealth.ApplyDamage returns immediately unless
-    /// photonView.IsMine, so each client can only ever damage its own player. Nine calls land as
-    /// one hit on the one machine that owns the victim. Do NOT "fix" this by having only the
-    /// shooter apply splash - the victim is the authority on its own health everywhere else in
-    /// this project (see ProjectileMotor's note on victim-side detection) and a second rule here
-    /// would be the divergence that costs an afternoon later.
-    ///
-    /// What every client must NOT do is spawn or destroy networked objects. That mistake is
-    /// already in this codebase's history: an area-of-effect coroutine ran on all nine clients and
-    /// every one of them called PhotonNetwork.Destroy, producing eight errors per cast. Nothing in
-    /// this file creates a networked object; DetonateAtCursor does, and it guards accordingly.
+    /// Turns a projectile into a rocket: when it stops, it detonates and everything standing near the blast takes a share of the splash damage.
+    /// A component dropped onto a projectile prefab, which the motor finds with GetComponents - ProjectileMotor was not touched to make rockets exist.
+    /// SPLASH IS APPLIED ON EVERY CLIENT, ON PURPOSE. Every machine simulates every projectile, so nine clients each run this OverlapSphere for the
+    /// same rocket. That is safe for exactly one reason: PlayerHealth.ApplyDamage returns immediately unless photonView.IsMine, so each client can
+    /// only ever damage its own player, and nine calls land as one hit on the machine that owns the victim. Do NOT "fix" this by having only the
+    /// shooter apply splash - the victim is the authority on its own health everywhere (see ProjectileMotor's note on victim-side detection), and a
+    /// second rule here would be the divergence that costs an afternoon later.
+    /// What every client must NOT do is spawn or destroy networked objects (an earlier area-of-effect coroutine ran on all nine clients and each
+    /// called PhotonNetwork.Destroy: eight errors per cast). Nothing in this file creates one; DetonateAtCursor does, and guards accordingly.
     /// </summary>
     [DisallowMultipleComponent]
     public class ExplodeOnImpact : MonoBehaviour, IProjectileBehaviour
@@ -93,25 +81,17 @@ namespace Overpower.Weapons
         /// once from the despawn that followed it.
         private bool detonated;
 
-        /// <summary>Splash Radius, read-only - RocketBlastView (ability visuals step 6) sizes the splash shell from
-        /// this one number.</summary>
+        /// <summary>Splash Radius, read-only - RocketBlastView sizes the splash shell from this one number.</summary>
         public float SplashRadius => splashRadius;
 
-        /// <summary>Splash Damage, read-only - the shop's pop-up shows it (Task 13).</summary>
+        /// <summary>Splash Damage, read-only - the shop's pop-up shows it.</summary>
         public float SplashDamage => splashDamage;
 
-        /// <summary>Raised once per rocket, on every client, right after the splash has been applied, with the blast
-        /// centre and the rocket's own Splash Radius - ALWAYS the full radius, whatever the blast actually caught.
-        /// 2026-09-17 (A6): first raised, so the blast could be drawn at the real burst point instead of a floor
-        /// ring. 2026-09-20 (Tudor: "show what actually got hit"): this briefly carried 0 whenever nothing took
-        /// splash damage, so a wall hit or a range-end airburst still detonated (splash still applied) but drew
-        /// nothing - which read, to a player, as "the rocket only explodes on or near someone." 2026-09-21 (Tudor:
-        /// "it should always explode on contact/projectile end"): reversed back to the full radius every time - the
-        /// damage numbers on whoever actually got hurt already show what the blast caught, so the ring doesn't need
-        /// to say it again. Visual only: RocketBlastView reads this to decide where and how big to draw the shell.
-        /// No new networked state - every client already computes this identically, the same "SPLASH IS APPLIED ON
-        /// EVERY CLIENT" reasoning this class's own comment gives for the damage itself. Nothing that affects
-        /// damage listens.</summary>
+        /// <summary>Raised once per rocket, on every client, right after the splash has been applied, with the blast centre and the rocket's own Splash
+        /// Radius - ALWAYS the full radius, whatever the blast actually caught, so a wall hit or a range-end airburst still draws its blast (the damage
+        /// numbers on whoever got hurt already show what it caught). Visual only: RocketBlastView reads this to decide where and how big to draw the
+        /// shell. No new networked state - every client computes this identically, per "SPLASH IS APPLIED ON EVERY CLIENT". Nothing that affects damage
+        /// listens.</summary>
         public event System.Action<Vector3, float> Detonated;
 
         private void Awake()
@@ -154,16 +134,13 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// One blast at one point. Everything with health inside Splash Radius takes
-        /// Splash Damage scaled by Falloff, except the shooter, the shooter's team, and - Task 1.8b review finding - anything with a wall (Building layer,
-        /// cover included) standing between it and the blast: walls stop blasts, or a wall (cover
-        /// especially) would be pointless against a rocket lobbed just past it. FireField's own
-        /// ground AoE is deliberately NOT given this check - it has no impact surface to occlude
-        /// from, only a radius on the ground.
+        /// One blast at one point. Everything with health inside Splash Radius takes Splash Damage scaled by Falloff, except the shooter, the shooter's
+        /// team, and anything with a wall (Building layer, cover included) standing between it and the blast: walls stop blasts, or cover would be
+        /// pointless against a rocket lobbed just past it. FireField's own ground AoE is deliberately NOT given this check - it has no impact surface to
+        /// occlude from, only a radius on the ground.
         /// </summary>
-        /// <param name="directVictim">What the projectile physically struck, or null for an
-        /// airburst. Since 2026-09-26 (Tudor) it takes the blast like everyone else, on top of the
-        /// weapon's small impact Damage: the blast is the main damage, the impact rewards precision.</param>
+        /// <param name="directVictim">What the projectile physically struck, or null for an airburst. It takes the blast like everyone else, on top of
+        /// the weapon's small impact Damage: the blast is the main damage, the impact rewards precision.</param>
         /// <param name="directHitCollider">The collider actually struck, or null for an airburst -
         /// used only to know whether there IS a struck surface to nudge away from (see
         /// occlusionOrigin below); it is deliberately NOT what gets excluded from the occlusion
@@ -195,8 +172,6 @@ namespace Overpower.Weapons
                     continue;
 
                 IDamageable target = collider.GetComponentInParent<IDamageable>();
-                // Tudor, 2026-09-26: the blast is the rocket's main damage, so the thing it struck takes it too
-                // (the weapon's own Damage is now a small bonus for a precise hit, on top) - it used to be skipped.
                 if (target == null)
                     continue;
 
@@ -223,29 +198,19 @@ namespace Overpower.Weapons
                                                    DamageSource.Splash, false, at, -1));
             }
 
-            // Ability visuals step 6: after every splash hit above, so a visual listener can't affect one. Runs for
-            // an airburst too - OnExpired calls this same method, so a rocket that reaches its range end (or the
-            // cursor rocket reaching the cursor) raises Detonated exactly like a direct hit does. 2026-09-21 (Tudor:
-            // "it should always explode on contact/projectile end"): always the full Splash Radius, never gated on
-            // whether anything actually took damage - see Detonated's own comment for the full history of why.
+            // Raised after every splash hit above, so a visual listener cannot affect one. Also for an airburst (OnExpired calls this same method, so a
+            // rocket reaching its range end or the cursor raises Detonated like a direct hit), and always with the full Splash Radius, never gated on
+            // whether anything took damage - see Detonated's own comment.
             Detonated?.Invoke(at, splashRadius);
         }
 
         /// <summary>
-        /// True when a Building-layer collider stands between the blast and "to" - walls (cover
-        /// included) block splash, the whole point of this check (Task 1.8b review finding).
-        ///
-        /// "ownCollider" excludes only the CANDIDATE'S OWN collider, not whatever the rocket
-        /// directly struck. Getting this backwards was the first version of this fix's own bug: "to"
-        /// is a candidate's centre, which for anything with real thickness sits INSIDE that
-        /// candidate's own collider - a linecast run all the way to it will always find that
-        /// collider in its own way, at the very end, and without excluding it a Building-layer
-        /// candidate (another wall) would read as occluded by ITSELF and could never take incidental
-        /// splash. But when the STRUCK wall is what stands between the blast and some OTHER
-        /// candidate further back, that is the wall genuinely doing its job - it must still count as
-        /// a blocker there, which is exactly why excluding it (the earlier, wrong version of this
-        /// method) let a rocket's splash leak straight through the wall it had just hit to whoever
-        /// was standing behind it.
+        /// True when a Building-layer collider stands between the blast and "to" - walls (cover included) block splash.
+        /// "ownCollider" excludes only the CANDIDATE'S OWN collider, NOT whatever the rocket directly struck. "to" is a candidate's centre, which for
+        /// anything with real thickness sits INSIDE that candidate's own collider, so a linecast to it always finds that collider at the very end;
+        /// without excluding it a Building-layer candidate (another wall) would read as occluded by ITSELF and could never take incidental splash. But
+        /// when the STRUCK wall stands between the blast and some OTHER candidate further back, that wall is doing its job and must still count as a
+        /// blocker - excluding it would let the splash leak straight through the wall to whoever stands behind it.
         /// </summary>
         private bool IsOccludedByAWall(Vector3 from, Vector3 to, Collider ownCollider)
         {
@@ -267,14 +232,10 @@ namespace Overpower.Weapons
             return false;
         }
 
-        /// <summary>Splash at a point, after Falloff and after whatever the shot's damage
-        /// multiplier currently is - so a rocket that gains damage over distance gains it on the
-        /// blast too, not just on the thing it hit. See ProjectileContext.DamageMultiplier.
-        ///
-        /// Task 2.6 review fix: also multiplied by FireTimeDamageMultiplier - OverPower's comeback
-        /// buff, decided once at fire time and never overwritten by DamageMultiplier's own
-        /// mid-flight rescaling (Bounce/Distance) - which splash used to miss entirely, since this
-        /// method never reads baseDamage (where the bonus used to be folded in) at all.</summary>
+        /// <summary>Splash at a point, after Falloff and the shot's damage multiplier, so a rocket that gains damage over distance gains it on the blast
+        /// too (ProjectileContext.DamageMultiplier). Also multiplied by FireTimeDamageMultiplier - OverPower's buff, fixed at fire time and not
+        /// overwritten by DamageMultiplier's mid-flight rescaling (Bounce/Distance): this method never reads baseDamage, so the buff has to be applied
+        /// here.</summary>
         private float SplashDamageAt(Vector3 blastCentre, Vector3 targetPosition)
         {
             // A zero radius would divide by zero, and reads as "no blast at all" rather than "an

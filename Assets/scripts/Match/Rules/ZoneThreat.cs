@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Overpower.Match
 {
     /// <summary>
-    /// Whether a zone is "under attack" (Tudor, 2026-09-16): a living player of any team other than the owner stands in
+    /// Whether a zone is "under attack": a living player of any team other than the owner stands in
     /// it, or left it less than the linger time ago. The linger stops the state flickering while someone steps on and
     /// off the edge. A neutral zone is never under attack; there is nothing to defend.
     ///
@@ -14,7 +14,7 @@ namespace Overpower.Match
     {
         public const int MaxTeams = 3;
 
-        /// <summary>Dominion Task 6: does "under attack" close the link to the zones next to this one? A Dominion capital cannot
+        /// <summary>Does "under attack" close the link to the zones next to this one? A Dominion capital cannot
         /// be captured, so an enemy standing in it still warns the team but never closes the link.</summary>
         public static bool ClosesLink(bool zoneIsCapturable, bool underAttack) => zoneIsCapturable && underAttack;
 
@@ -91,9 +91,8 @@ namespace Overpower.Match
 
         /// <summary>Stamps lastSeenMs[zone × MaxTeams + team] with nowMs for every player who walked out of a zone:
         /// still in the room and alive, measured in that zone last time and outside it now. A player who died or left
-        /// the room stamps nothing, so their team's bit just clears and the attack ends at once (controller decision,
-        /// 2026-09-16): the linger is there to stop the state flickering while someone steps on and off the edge, and a
-        /// death can't flicker. A walk-out is stamped even while a teammate is still inside, so the linger still runs if
+        /// the room stamps nothing, so their team's bit just clears and the attack ends at once: the linger is there
+        /// to stop the state flickering while someone steps on and off the edge, and a death can't flicker. A walk-out is stamped even while a teammate is still inside, so the linger still runs if
         /// that teammate then dies there. Returns true if it stamped anything.</summary>
         public static bool StampDepartures(IReadOnlyList<PlayerMove> moves, int[] lastSeenMs, int nowMs)
         {

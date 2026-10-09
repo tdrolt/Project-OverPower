@@ -4,26 +4,16 @@ using Overpower.Combat;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Applies one status effect to whatever this projectile hits - the stun gun's whole reason for
-    /// existing (Task 1.9: Stun, 2.5s, on the first enemy hit), and reusable as-is for any later
-    /// ability projectile that should land a status instead of, or alongside, damage: the kind,
-    /// duration and magnitude are Inspector fields on the PROJECTILE PREFAB, not hardcoded here, so a
+    /// Applies one status effect to whatever this projectile hits - the stun gun's whole job, and reusable as-is for any ability projectile that
+    /// should land a status instead of, or alongside, damage: kind, duration and magnitude are Inspector fields on the PROJECTILE PREFAB, so a
     /// second projectile carrying a Slow or a Vulnerability needs no new script.
-    ///
-    /// STATUS APPLICATION IS VICTIM-SIDE, EXACTLY LIKE DAMAGE (IStatusReceiver's own class comment).
-    /// Every client simulates every projectile and calls ApplyStatus on whatever it hit;
-    /// PlayerStatusEffects.Apply and DummyTarget.ApplyStatus already guard on "is this my own copy"
-    /// the same way PlayerHealth.ApplyDamage does, so calling this on every client is correct, not a
-    /// race - nothing here checks IsMine because nothing here needs to.
-    ///
-    /// LOOKED UP SEPARATELY FROM IDamageable, on purpose: a real player's IDamageable (PlayerHealth)
-    /// and its IStatusReceiver (PlayerStatusEffects) are two different components on the same root -
-    /// only DummyTarget happens to be both at once. GetComponentInParent finds whichever one the
-    /// struck collider actually has; a wall or a structure with none simply takes no status, the same
-    /// silent no-op Mine.cs's own `(target as IStatusReceiver)?.ApplyStatus(...)` falls back to.
-    ///
-    /// Always stops the shot (Despawn), matching AbilityHitRelay - neither ability projectile built
-    /// so far pierces.
+    /// STATUS APPLICATION IS VICTIM-SIDE, EXACTLY LIKE DAMAGE (IStatusReceiver's own class comment). Every client simulates every projectile and calls
+    /// ApplyStatus on whatever it hit; PlayerStatusEffects.Apply and DummyTarget.ApplyStatus already guard on "is this my own copy" the way
+    /// PlayerHealth.ApplyDamage does, so nothing here checks IsMine because nothing here needs to.
+    /// LOOKED UP SEPARATELY FROM IDamageable, on purpose: a real player's IDamageable (PlayerHealth) and its IStatusReceiver (PlayerStatusEffects)
+    /// are two different components on the same root - only DummyTarget is both. GetComponentInParent finds whichever the struck collider has; a wall
+    /// or structure with none takes no status, the same silent no-op Mine.cs's `(target as IStatusReceiver)?.ApplyStatus(...)` falls back to.
+    /// Always stops the shot (Despawn), matching AbilityHitRelay.
     /// </summary>
     public sealed class ApplyStatusOnHit : MonoBehaviour, IProjectileBehaviour
     {
@@ -33,7 +23,7 @@ namespace Overpower.Weapons
         [SerializeField, Tooltip("How many seconds the status lasts. The stun gun's spec: 2.5s.")]
         private float duration = 2.5f;
 
-        /// <summary>Duration in seconds, read-only - the shop's pop-up shows it (Task 13).</summary>
+        /// <summary>Duration in seconds, read-only - the shop's pop-up shows it.</summary>
         public float Duration => duration;
 
         [SerializeField, Tooltip("The status's strength: ignored for Stun, 0..1 speed loss for Slow, " +
@@ -52,11 +42,8 @@ namespace Overpower.Weapons
             if (victim != null)
             {
                 IStatusReceiver receiver = hit.collider.GetComponentInParent<IStatusReceiver>();
-                // T3 review correction: this projectile is not always a weapon's - the stun gun
-                // (the only user of this behaviour today) is StunGunAbility (ability id 22)'s own
-                // ability shot, built with ProjectileContext(Definition.Id, ...), so context.AbilityId
-                // is the real id to report here (-1 for a genuine weapon projectile, same as any
-                // other ability shot - see ProjectileContext.AbilityId's own comment).
+                // Reports context.AbilityId: this projectile is not always a weapon's - the stun gun (the only user today) is StunGunAbility's own ability
+                // shot, built with ProjectileContext(Definition.Id, ...) - so that is the real id (-1 for a genuine weapon projectile).
                 receiver?.ApplyStatus(new StatusEffectSpec { kind = kind, duration = duration, magnitude = magnitude, abilityId = context.AbilityId },
                                        context.ShooterActorNumber);
             }

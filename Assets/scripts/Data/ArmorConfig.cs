@@ -3,21 +3,11 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// The two armor upgrade paths a player can buy into independently - more absorption, or a
-    /// shorter recharge wait - plus the one shared number that controls how fast a refill climbs
-    /// once it starts. Absorb Levels and Recharge Seconds are two SEPARATE arrays, not paired
-    /// tiers: a player's absorb level and recharge level are two independent counters (see
-    /// Combat/ArmorUpgradePath), each indexing into its own array here. A player who has bought two
-    /// absorb upgrades and zero recharge upgrades reads AbsorbLevels[2] and RechargeSeconds[0], not
-    /// the same index into both. Level 0 in each array is what everyone starts the match with, not
-    /// "no armor".
-    ///
-    /// Arrays mean that adding a level to either path is a data change a designer makes in the
-    /// Inspector, not a code change - which is the entire point of this asset.
-    ///
-    /// Fields are [SerializeField] private with read-only properties for the same reason as the
-    /// rest of the Data folder: a ScriptableObject is one shared instance per process, so
-    /// mutating one at runtime edits the asset in the Editor and does nothing in a build.
+    /// The two armor upgrade paths (absorption, recharge wait) plus the one shared refill speed. Absorb Levels
+    /// and Recharge Seconds are two SEPARATE arrays, not paired tiers: a player's two level counters (see
+    /// Combat/ArmorUpgradePath) each index their own array, so two absorb upgrades and none in recharge read
+    /// AbsorbLevels[2] and RechargeSeconds[0]. Level 0 is the starting armor, not "no armor". Adding a level
+    /// is a data change. Read-only properties, never written at runtime (see GameplayConfig).
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Armor Config")]
     public sealed class ArmorConfig : ScriptableObject
@@ -70,11 +60,8 @@ namespace Overpower.Data
         public bool RespawnWithFullArmor => respawnWithFullArmor;
 
         /// <summary>
-        /// How much the given absorb level holds. The index is clamped into range instead of
-        /// throwing, because a level number can arrive from the network, and a malformed packet
-        /// from another client must never be able to take down this one with an
-        /// IndexOutOfRangeException. Returns 0 when the array is empty, which is the safe reading
-        /// of "no armor configured".
+        /// The index is clamped, not thrown on: a level can arrive from the network and a malformed packet
+        /// must never raise an IndexOutOfRangeException here. 0 when the array is empty ("no armor configured").
         /// </summary>
         public float AbsorbFor(int level)
         {
@@ -97,10 +84,7 @@ namespace Overpower.Data
             }
         }
 
-        /// <summary>
-        /// How long the given recharge level waits out of combat before refilling. Clamped rather
-        /// than throwing, for the same reason as AbsorbFor.
-        /// </summary>
+        /// <summary>Clamped rather than thrown on, as AbsorbFor.</summary>
         public float RechargeSecondsFor(int level)
         {
             if (rechargeSeconds == null || rechargeSeconds.Length == 0)
@@ -109,15 +93,12 @@ namespace Overpower.Data
             return rechargeSeconds[Mathf.Clamp(level, 0, rechargeSeconds.Length - 1)];
         }
 
-        /// <summary>How many levels the absorb path has, top level included. ArmorUpgradePath reads
-        /// this to know when that path is maxed out, without reaching into the array directly.</summary>
+        /// <summary>ArmorUpgradePath reads this to know when the path is maxed out.</summary>
         public int AbsorbLevelCount => absorbLevels != null ? absorbLevels.Length : 0;
 
-        /// <summary>How many levels the recharge path has - see AbsorbLevelCount.</summary>
         public int RechargeLevelCount => rechargeSeconds != null ? rechargeSeconds.Length : 0;
 
-        /// <summary>Gold cost of the given purchase number (0 = the first upgrade bought this match,
-        /// regardless of path). Clamped rather than throwing, for the same reason as AbsorbFor.</summary>
+        /// <summary>purchaseIndex 0 is the first upgrade bought this match, whichever path. Clamped, as AbsorbFor.</summary>
         public int CostFor(int purchaseIndex)
         {
             if (upgradeCosts == null || upgradeCosts.Length == 0)

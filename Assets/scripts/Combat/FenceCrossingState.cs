@@ -3,29 +3,20 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// Whether THIS moment should land an electric fence hit on ONE target - pulled out of
-    /// ElectricFence's per-client FixedUpdate (Task 1.11b) so the rule is provable without a scene.
-    /// One instance per target, owned by the fence itself (the fence is victim-side and every-client,
-    /// so each client's own copy of this state only ever matters for the targets that client can
-    /// actually damage - see ElectricFence's own class comment).
+    /// Whether THIS moment should land an electric fence hit on ONE target, as plain C# provable
+    /// without a scene. One instance per target, owned by ElectricFence (victim-side and every-client:
+    /// each client's copy only matters for the targets that client can actually damage).
     ///
     /// TWO WAYS TO GET HIT: standing in the band (within Ring Thickness / 2 of Radius), or CROSSING
-    /// it - the target's distance from the ring's centre was on one side of Radius last sample and is
-    /// on the other side now. The crossing check exists because a flat "are you in the band right
-    /// now" sample alone misses a fast mover: the Task 1.11 addendum's own example is an 18 m/s dash
-    /// crossing a 1m band in about three physics frames, which a per-frame band check can straddle
-    /// entirely if the sample points happen to land just inside and just outside it. Recording which
-    /// side the target was on catches that pass even when no single sample ever fell inside the band.
+    /// it: the distance from the ring's centre was on one side of Radius last sample and is on the
+    /// other now. A flat in-band sample misses a fast mover (a dash crosses the band in a few physics
+    /// frames, and samples can straddle it entirely); remembering the side catches that pass.
     ///
-    /// ONE COOLDOWN, SHARED BY BOTH TRIGGERS: a hit - by either rule - starts the same cooldown, so
-    /// standing and vibrating right on the ring's edge cannot be hit every frame, and a crossing that
-    /// happens to also linger in the band afterwards is not hit a second time for it.
+    /// ONE COOLDOWN SHARED BY BOTH: standing on the ring's edge cannot be hit every frame, and a
+    /// crossing that lingers in the band is not hit twice.
     ///
-    /// NO CROSSING ON THE FIRST SAMPLE: there is no "last side" to compare against yet, so the first
-    /// call can only ever hit through the in-band rule - exactly right, since a target already
-    /// standing in the band the moment the fence appears should be hit, but a target merely existing
-    /// somewhere in the world when the fence spawns must not read as having "crossed" into whatever
-    /// side it already happened to be on.
+    /// NO CROSSING ON THE FIRST SAMPLE: there is no last side yet, so a target merely existing
+    /// somewhere when the fence spawns must not read as having crossed; only the in-band rule applies.
     /// </summary>
     public sealed class FenceCrossingState
     {
@@ -45,10 +36,9 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Call once per tick with the target's current flat distance from the fence's own centre and
-        /// the current time (the caller's own Time.time - a per-target cooldown is measured in real
-        /// seconds on whichever client is asking, never a networked clock). Returns true exactly when
-        /// this tick should apply a hit.
+        /// Call once per tick with the target's flat distance from the fence centre and the caller's
+        /// Time.time (a per-target cooldown is real seconds on whichever client asks, never a
+        /// networked clock). True when this tick should apply a hit.
         /// </summary>
         public bool ShouldHit(float distance, float now)
         {
@@ -70,14 +60,10 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Forgets whatever side was last recorded - review fix (respawn false-crossing): a target
-        /// that died while tracked and comes back somewhere else entirely (a respawn point, not
-        /// wherever it happened to fall relative to the ring) must not read as having "crossed" the
-        /// distance between its last living position and its new one. Only hasSample/wasOutside are
-        /// cleared, matching the "no sample yet" state before ShouldHit was ever called - the very
-        /// next call can only hit through the in-band rule, never the crossing one, exactly like the
-        /// class comment's own first-sample case. The per-target cooldown is left untouched: this is
-        /// about forgetting a stale POSITION, not granting a free hit by also clearing the cooldown.
+        /// Forgets the recorded side, so a target that died while tracked and respawns elsewhere does
+        /// not read as having crossed between its last living position and the new one; the next call
+        /// can only hit through the in-band rule. The cooldown is untouched: this forgets a stale
+        /// POSITION, it must not grant a free hit.
         /// </summary>
         public void Reset()
         {

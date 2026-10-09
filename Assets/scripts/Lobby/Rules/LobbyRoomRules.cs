@@ -1,7 +1,7 @@
 namespace Overpower.Lobby
 {
     /// <summary>
-    /// Pure rules behind the lobby room screen and the warm-up bar (lobby Task 10): what a taken seat reads, and what a team is called in a
+    /// Pure rules behind the lobby room screen and the warm-up bar: what a taken seat reads, and what a team is called in a
     /// sentence. No Unity UI here: the panels read these and draw.
     /// </summary>
     public static class LobbyRoomRules

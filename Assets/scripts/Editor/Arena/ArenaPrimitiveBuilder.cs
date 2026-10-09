@@ -10,18 +10,14 @@ using UnityEngine.SceneManagement;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// The arena rebuild's Editor tool. Step 3 built BuildTowerLooks (stamps Tower Look.prefab onto every
-    /// BuildingCapture and hides that tower's old house and flag carpet - never removes them, base plan Decision 5).
-    /// Step 4 added the rest as separate phases, not yet run on Game Scene: MoveOldArtAside (moves everything old
-    /// under Source and the generated thirds into an inactive Old Arena (off), keeping world positions, base plan
-    /// Decision 13), BuildSource (the boundary walls fresh from Arena Symmetry's Source Outline, plus every Block and
-    /// Barrier row from ArenaLayout, base plan Decision 4 and Amendment 1's D3/D11/D24/D25), and BuildFloor (one flat
-    /// slab). Step 5's BuildAll runs every phase in order, then Rebuild thirds and the minimap bake, so the menu
-    /// applies the whole primitive arena in one call ("OverPower > Arena > Build primitive arena"). Step 9 (only
-    /// after Tudor says so) adds DeleteOldArt, which permanently removes the "Old Arena (off)" group MoveOldArtAside
-    /// made. None of these ever run in Play Mode (a live, networked tower or a live boundary wall would change on
-    /// this client only and desync the match), and none of them save the scene themselves - the caller looks at the
-    /// report first, then saves.
+    /// The arena rebuild's Editor tool, run as separate phases: BuildTowerLooks (stamps Tower Look.prefab onto every
+    /// BuildingCapture and hides that tower's old house and flag carpet, never removes them: Decision 5), MoveOldArtAside
+    /// (everything old under Source and the generated thirds goes into an inactive "Old Arena (off)", keeping world
+    /// positions: Decision 13), BuildSource (the boundary walls fresh from Source Outline, plus every Block and Barrier
+    /// row from ArenaLayout: Decision 4), BuildFloor (one flat slab) and DeleteOldArt (permanently removes "Old Arena
+    /// (off)"; only when Tudor says so). BuildAll runs every phase in order, then Rebuild thirds and the minimap bake
+    /// ("OverPower > Arena > Build primitive arena"). None run in Play Mode (a live networked tower or boundary wall
+    /// would change on this client only and desync the match) and none save the scene: the caller looks at the report first.
     /// </summary>
     public static class ArenaPrimitiveBuilder
     {
@@ -95,8 +91,8 @@ namespace Overpower.EditorTools
                 }
             }
 
-            // Hide the carpet (flag), never remove it: BuildingManager.ApplyOwnerVisual and the symmetry test both
-            // still need flagRenderer assigned and its PhotonView untouched (Decision 10).
+            // Hide the carpet (flag), never remove it: BuildingManager.ApplyOwnerVisual and the symmetry test both still
+            // need flagRenderer assigned and its PhotonView untouched (Decision 10).
             if (tower.flagRenderer != null && tower.flagRenderer.enabled)
             {
                 tower.flagRenderer.enabled = false;
@@ -136,13 +132,12 @@ namespace Overpower.EditorTools
                 PrefabUtility.RecordPrefabInstancePropertyModifications(target);
         }
 
-        // ---- arena step 4: move the old art aside, build Source from the layout, lay the floor -------------------
+        // ---- move the old art aside, build Source from the layout, lay the floor -------------------------------
 
         /// <summary>
-        /// Moves everything old aside into an inactive "Old Arena (off)" under <paramref name="environment"/>,
-        /// keeping every object's world position (base plan Decision 13). Never deletes anything. Idempotent: once
-        /// an object has been moved, it is no longer a child of Source/a generated third/environment, so a second
-        /// run finds nothing left to move there and reports nothing for it.
+        /// Moves everything old aside into an inactive "Old Arena (off)" under <paramref name="environment"/>, keeping every
+        /// object's world position (Decision 13). Never deletes anything. Idempotent: a moved object is no longer a child of
+        /// Source/a generated third/environment, so a second run finds nothing left to move.
         /// </summary>
         public static List<string> MoveOldArtAside(ArenaSymmetry arena, Transform environment)
         {
@@ -215,11 +210,9 @@ namespace Overpower.EditorTools
         }
 
         /// <summary>
-        /// Arena step 9 (only after Tudor says so, base plan Decision 13's rollback note): permanently destroys the
-        /// "Old Arena (off)" group made by <see cref="MoveOldArtAside"/>, and nothing else. The towers' own disabled
-        /// house components and the hidden carpets are never part of that group - they stay on the tower objects
-        /// themselves (Decision 5/10) - so they are untouched. A no-op (not a refusal) if the group doesn't exist:
-        /// nothing to delete. Never runs in Play Mode; never saves the scene itself.
+        /// Permanently destroys the "Old Arena (off)" group made by <see cref="MoveOldArtAside"/>, and nothing else (Decision 13's
+        /// rollback note). The towers' disabled house components and hidden carpets stay on the tower objects (Decision 5/10).
+        /// A no-op if the group doesn't exist. Never runs in Play Mode; never saves the scene.
         /// </summary>
         public static List<string> DeleteOldArt(Transform environment)
         {
@@ -242,12 +235,10 @@ namespace Overpower.EditorTools
         }
 
         /// <summary>
-        /// Rebuilds Source from <paramref name="layout"/>: the boundary walls fresh from
-        /// <paramref name="arena"/>.sourceOutline (ArenaWallPlan - never captured, so "no gaps at the corners" can
-        /// never go stale against a moved outline), then every Block and Barrier row from the layout, box for box
-        /// (base plan Decision 3, Amendment 1 D24). Refuses outright while Source holds anything that isn't the
-        /// builder's own (call MoveOldArtAside first) - the builder must never delete a hand-placed piece or old art
-        /// that hasn't been moved aside yet (base plan Decision 4).
+        /// Rebuilds Source from <paramref name="layout"/>: the boundary walls fresh from <paramref name="arena"/>.sourceOutline
+        /// (ArenaWallPlan; never captured, so "no gaps at the corners" can't go stale against a moved outline), then every Block
+        /// and Barrier row, box for box (Decision 3). Refuses while Source holds anything that isn't the builder's own (call
+        /// MoveOldArtAside first): it must never delete a hand-placed piece or old art not yet moved aside (Decision 4).
         /// </summary>
         public static List<string> BuildSource(ArenaSymmetry arena, ArenaLayout layout)
         {
@@ -321,11 +312,10 @@ namespace Overpower.EditorTools
                 else
                 {
                     GameObject barrier = NewPrimitiveChild(barriers, piece.name, layout.BarrierMaterial, ArenaLayers.BarrierLayerName);
-                    // The built-in cube is centred on its own origin, so sitting it AT y 0 would bury half its look
-                    // below the floor (0.5 m would show: the knee-high option Tudor rejected). Lifting the origin by
-                    // half the look height puts the RENDERED mesh at y 0..size.y, i.e. waist-high as chosen (review,
-                    // 2026-09-19). The blocking-band math below already subtracts position.y, so the collider's
-                    // world −1..3 band is unaffected by this.
+                    // The built-in cube is centred on its own origin, so sitting it AT y 0 would bury half its look below the
+                    // floor. Lifting the origin by half the look height puts the RENDERED mesh at y 0..size.y (waist-high as
+                    // chosen). The blocking-band math below already subtracts position.y, so the collider's world -1..3 band
+                    // is unaffected.
                     Vector3 position = new Vector3(piece.centre.x, piece.size.y * 0.5f, piece.centre.z);
                     barrier.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, piece.yawDegrees, 0f));
                     barrier.transform.localScale = piece.size; // x = length, y = look height, z = thickness
@@ -364,9 +354,8 @@ namespace Overpower.EditorTools
             return go;
         }
 
-        /// <summary>Replaces the single marked floor slab under <paramref name="environment"/> (a sibling of Source,
-        /// never inside it - Rebuild thirds would otherwise copy it three times, base plan Decision 12). One flat
-        /// Default-layer cube, its top at world Y 0.</summary>
+        /// <summary>Replaces the single marked floor slab under <paramref name="environment"/> (a sibling of Source, never
+        /// inside it: Rebuild thirds would copy it three times; Decision 12). One flat Default-layer cube, its top at world Y 0.</summary>
         public static void BuildFloor(Transform environment, ArenaLayout layout, Vector3 centre)
         {
             Transform existing = environment.Find(FloorObjectName);
@@ -398,16 +387,14 @@ namespace Overpower.EditorTools
             floor.transform.localScale = new Vector3(layout.FloorSize.x, layout.FloorThickness, layout.FloorSize.y);
         }
 
-        // ---- arena step 5: everything, in one call, applied to the real scene -------------------------------------
+        // ---- everything, in one call, applied to the real scene ------------------------------------------------
 
         /// <summary>
-        /// Arena step 5: runs every phase, in order, on the one ArenaSymmetry found in <paramref name="scene"/> -
-        /// 1) BuildTowerLooks, 2) MoveOldArtAside, 3) BuildSource, 4) BuildFloor, 5) ArenaSymmetryBuilder.Rebuild,
-        /// 6) MinimapBaker.Bake, 7) the report and a final Validate. NOT an atomic all-or-nothing build (corrected
-        /// 2026-09-19 review): phases 1 and 2 have already run, and stay run, by the time BuildSource can refuse
-        /// (Source held something it doesn't own) - only the floor and the generated-thirds copies are skipped from
-        /// there, to stop the damage compounding rather than prevent it. Never runs in Play Mode; never saves the
-        /// scene itself.
+        /// Runs every phase, in order, on the one ArenaSymmetry found in <paramref name="scene"/>: BuildTowerLooks,
+        /// MoveOldArtAside, BuildSource, BuildFloor, ArenaSymmetryBuilder.Rebuild, MinimapBaker.Bake, then the report and a
+        /// final Validate. NOT atomic: the first two phases have already run, and stay run, by the time BuildSource can refuse
+        /// (Source held something it doesn't own); only the floor and the generated-thirds copies are skipped from there, to
+        /// stop the damage compounding. Never runs in Play Mode; never saves the scene.
         /// </summary>
         public static List<string> BuildAll(Scene scene)
         {

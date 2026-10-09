@@ -3,18 +3,12 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Test content, not a real ability: the smallest module that exercises every part of the
-    /// ability framework, so the framework can be proven before any real ability depends on it.
-    /// It drops a sphere where the cursor was when the key went down, on every client.
-    ///
-    /// With Channel Seconds above 0 it becomes a HOLD: the sphere stays up while the key is held and
-    /// completes after that long; letting go early, dying, being stunned or overheating cancels it.
-    /// That variant (the "Debug Ping Channel" prefab) exists to prove holds and interrupts reach
-    /// every client, which a real channel (the teleport) will rely on.
-    ///
-    /// Read it as the template for a real module: TryBuildCast (owner) only packs what the caster
-    /// knew; ExecuteCast (every client) does the visible part from the payload alone; OwnerTick and
-    /// Interrupt (owner) decide when a hold ends and announce it with SendPhase.
+    /// Test content, not a real ability: the smallest module that exercises the ability framework. It drops a sphere
+    /// where the cursor was when the key went down, on every client. With Channel Seconds above 0 it becomes a HOLD (the
+    /// "Debug Ping Channel" prefab): the sphere stays up while the key is held and completes after that long; letting go,
+    /// dying, being stunned or overheating cancels it, proving holds and interrupts reach every client. Template for a real
+    /// module: TryBuildCast (owner) packs what the caster knew; ExecuteCast (every client) does the visible part from the
+    /// payload alone; OwnerTick and Interrupt (owner) decide when a hold ends and announce it with SendPhase.
     /// </summary>
     public sealed class DebugPingAbility : AbilityModule
     {
@@ -110,9 +104,8 @@ namespace Overpower.Abilities
 
         public override void Interrupt(InterruptReason reason)
         {
-            // The owner announces the cancel so other screens stop drawing it - they cannot see a
-            // stun or an overheat on their own. Death is also handled locally on every client below,
-            // so the sphere vanishes there without waiting for the message.
+            // The owner announces the cancel so other screens stop drawing it - they cannot see a stun or an overheat on
+            // their own. Death is also handled locally on every client, so the sphere vanishes without waiting for the message.
             if (channelling)
                 EndChannel(PhaseCancel);
 

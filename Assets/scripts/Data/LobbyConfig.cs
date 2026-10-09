@@ -4,7 +4,7 @@ namespace Overpower.Data
 {
     /// <summary>
     /// The small numbers and wordings behind the lobby screens: how long a lobby or player name may be and how often
-    /// the lobby list redraws. It exists so Tudor can tune them in the Inspector without touching code.
+    /// the lobby list redraws. Tunable in the Inspector without code.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Lobby Config", fileName = "LobbyConfig")]
     public sealed class LobbyConfig : ScriptableObject

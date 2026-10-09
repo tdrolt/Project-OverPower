@@ -11,34 +11,26 @@ using UnityEngine;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// The centre scan in the game (Tudor 2026-10-01, Vision Tasks 11 and 16). A wave (yellow since 8 Oct, Scan Wave Colour) rolls out from the centre on a
-    /// fixed clock, every Scan Interval Seconds, whoever holds the centre (the first one an interval after the match goes
-    /// live; in the warm-up on whole multiples of the interval on the server clock); everyone sees it on the ground and
-    /// everyone sees the countdown to the next one above the tower. The team that holds the centre at the moment a wave
-    /// STARTS gets a red dot where each enemy was when the front passed over them, and a refresh of the zones the front
-    /// passes, for that whole wave (a capture mid-wave changes nothing until the next wave). A neutral centre at the start
-    /// means nobody learns anything from that wave. Once the map has shrunk there is no wave and no countdown.
-    ///
-    /// WHERE IT LIVES: on the BuildingManager's GameObject (added at runtime, next to ZoneKnowledge and MatchDirector), not on
-    /// the player prefab: the wave and the dots must survive a respawn and exist for a spectator, and the centre's owner is
-    /// read from the territory this object already hosts. Nothing is sent: the wave is a function of the server clock and
-    /// the room's go-live time mLiveAt (CentreScanRules), so every client agrees on where it is. Each client remembers the
-    /// owner it held at the wave's start, read from the zone's held-since stamp so every client agrees (ScanBandTracker); a client that joins after a mid-wave capture gives that wave to nobody.
-    ///
-    /// CATCHES ARE JUDGED ON THE HOLDER'S GAME against the enemy's remote copy (the interpolated position this client draws):
-    /// a Blink of 3 m or more snaps there, so the enemy cannot be caught part-way; a shorter Blink glides for about 0.2 s and
-    /// may be caught on the way. Two holders can therefore see slightly different dots (lag). Not fixed.
-    ///
-    /// Runs before ZoneKnowledge (order -110 against its -100) so the zones the front passed are known to it the same frame.
+    /// A wave (Scan Wave Colour) rolls out from the centre every Scan Interval Seconds on a fixed clock, whoever holds the
+    /// centre (the first one an interval after go-live; in the warm-up on whole multiples of the interval on the server clock);
+    /// everyone sees it and the countdown above the tower. The team holding the centre when a wave STARTS gets a red dot where
+    /// each enemy was when the front passed, and a refresh of the zones it passes, for that whole wave (a capture mid-wave
+    /// changes nothing until the next; a neutral centre means nobody learns anything). No wave or countdown once the map shrinks.
+    /// Lives on the BuildingManager's GameObject (next to ZoneKnowledge and MatchDirector), not the player prefab: the wave and
+    /// dots must survive a respawn and exist for a spectator. Nothing is sent: the wave is a function of the server clock and the
+    /// room's go-live time mLiveAt (CentreScanRules); the owner at the wave's start is read from the zone's held-since stamp
+    /// (ScanBandTracker), so a client that joins after a mid-wave capture gives that wave to nobody.
+    /// Catches are judged on the HOLDER's game against the enemy's interpolated remote copy: a Blink of 3 m or more snaps there,
+    /// a shorter one glides ~0.2 s and may be caught on the way, so two holders can see slightly different dots (lag). Not fixed.
+    /// Runs before ZoneKnowledge (order -110 against -100) so the zones the front passed are known to it the same frame.
     /// </summary>
     [DefaultExecutionOrder(-110)]
     public sealed class CentreScan : MonoBehaviour
     {
         public static CentreScan Instance { get; private set; }
 
-        /// <summary>A seat spectator has no body, so no TeamSight and no player prefab to read the vision numbers and the theme from:
-        /// the spectator view (SpectatorSeatView) gives them here so the wave and the countdown show for it like for everyone. Both null
-        /// when nobody spectates.</summary>
+        /// <summary>A seat spectator has no body, so no TeamSight or player prefab to read the vision numbers and theme from:
+        /// SpectatorSeatView hands them in here. Both null when nobody spectates.</summary>
         public static VisionConfig SpectatorVision { get; private set; }
         public static UiTheme SpectatorTheme { get; private set; }
 
@@ -64,8 +56,7 @@ namespace Overpower.Vision
         private float maxRadius;
         private VisionConfig config;
 
-        /// <summary>This frame's scan: Active (a wave is on the clock and the map is not cut), Travelling (the front is still
-        /// inside the arena), the team the wave belongs to, and the band it swept.</summary>
+        /// <summary>Active: a wave is on the clock and the map is not cut; Travelling: the front is still inside the arena.</summary>
         public ScanFrame Frame { get; private set; }
 
         /// <summary>The team this wave belongs to (the owner of the centre when it started), or -1 (no wave, or neutral then).</summary>
@@ -75,19 +66,16 @@ namespace Overpower.Vision
         /// centre read yet, not in a room, fog off, or the map has shrunk). It keeps counting while a wave travels.</summary>
         public int CountdownSeconds { get; private set; } = -1;
 
-        /// <summary>Where the countdown label floats: the centre tower's top plus the configured height.</summary>
         public Vector3 CountdownPosition => new Vector3(centrePosition.x, centreTopY + (config != null ? config.ScanCountdownHeight : 0f), centrePosition.z);
 
-        /// <summary>The centre tower's position (the wave's centre).</summary>
         public Vector3 CentrePosition => centrePosition;
 
-        /// <summary>The farthest the wave goes, from the arena outline.</summary>
         public float MaxRadius => maxRadius;
 
         /// <summary>The vision numbers the scan reads (null before the owner's player exists).</summary>
         public VisionConfig Config => config;
 
-        /// <summary>The wave is on the ground now: a wave is running and its front is inside the arena. Everyone sees it.</summary>
+        /// <summary>A wave is running and its front is inside the arena. Everyone sees it.</summary>
         public bool WaveVisible => Frame.Active && Frame.Travelling;
 
         /// <summary>The current wave belongs to my team (the watched team while spectating): the maps show the ring and the dots.</summary>
@@ -119,7 +107,7 @@ namespace Overpower.Vision
             config = sight != null ? sight.Config : SpectatorVision;
 
             // Not in a room, or the territory is not read: nothing is judged, and nothing is remembered as "last frame".
-            // Dominion has no scan: the centre pays points in lumps instead (Dominion Task 3), so no wave and no countdown.
+            // Dominion has no scan: the centre pays points in lumps instead, so no wave and no countdown.
             if (buildings == null || buildings.Current == null || !PhotonNetwork.InRoom || config == null
                 || !config.FogEnabled || Overpower.Dominion.DominionMode.IsActive())
             {

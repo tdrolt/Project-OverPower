@@ -5,7 +5,7 @@ using Overpower.Match;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// What the Dominion shop opens each round (Task 1 rules; the shop changes are Task 5). The tables come from DominionConfig and are
+    /// What the Dominion shop opens each round. The tables come from DominionConfig and are
     /// passed in. Weapon depth counts steps up the weapon tree: the Baseline pistol (the root) is 0, a weapon family 1, a family's upgrade 2.
     /// </summary>
     public static class DominionShopRules
@@ -68,7 +68,6 @@ namespace Overpower.Dominion
             return -1;
         }
 
-        /// <summary>May a weapon of this depth be bought in this round?</summary>
         public static bool WeaponAllowed(int weaponDepth, int round, int[] table) =>
             weaponDepth >= 0 && weaponDepth <= MaxWeaponDepth(round, table);
 

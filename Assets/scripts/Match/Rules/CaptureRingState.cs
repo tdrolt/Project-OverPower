@@ -11,14 +11,14 @@ namespace Overpower.Match
         Draining,
         /// <summary>A capture or drain on hold (contested, its link under attack, a paused drain): the band stays and blinks.</summary>
         Paused,
-        /// <summary>captureFadeSpeed (2026-09-24): unfinished progress sliding back (neutral, the fading team's
+        /// <summary>captureFadeSpeed: unfinished progress sliding back (neutral, the fading team's
         /// colour, shrinking) or refilling (owned, the owner's colour, growing) with nobody actually capturing or
         /// draining it right now. Always moving, so unlike Paused it never blinks.</summary>
         Fading,
     }
 
     /// <summary>
-    /// The capture ring's state (spec 2026-09-16, "Capture ring"), worked out from what every client already has: the
+    /// The capture ring's state, worked out from what every client already has: the
     /// zone's replicated CaptureProgress, its owner and whether it is under attack. Pure, so the ground ring and the
     /// minimap can't disagree, and every case is tested.
     /// </summary>
@@ -35,8 +35,8 @@ namespace Overpower.Match
         public readonly int DrainerTeam;
         /// <summary>An owned zone with a living enemy inside or just gone (ZonePresenceTracker).</summary>
         public readonly bool UnderAttack;
-        /// <summary>2.7b Decision 8: a capital nobody is playing for - the third capital when the host starts a
-        /// two-team match. Checked before every other branch of From, so an out-of-play zone always shows Idle
+        /// <summary>A capital nobody is playing for - the third capital when the host starts a
+        /// two-team match (Decision 8). Checked before every other branch of From, so an out-of-play zone always shows Idle
         /// with a neutral edge and no arc, whatever capture progress or attack state the room still carries for it.</summary>
         public readonly bool OutOfPlay;
 
@@ -56,7 +56,7 @@ namespace Overpower.Match
         /// <param name="owner">The zone's owner, or -1 for neutral.</param>
         /// <param name="underAttack">ZonePresenceTracker.IsUnderAttack(zone). Ignored for a neutral zone.</param>
         /// <param name="nowMs">PhotonNetwork.ServerTimestamp; 0 = not synced yet.</param>
-        /// <param name="outOfPlay">MatchDirector.IsOutOfPlay(zone) (2.7b Decision 8). Wins over every other branch.</param>
+        /// <param name="outOfPlay">MatchDirector.IsOutOfPlay(zone). Wins over every other branch.</param>
         public static CaptureRingState From(CaptureProgress progress, int owner, bool underAttack, int nowMs, bool outOfPlay = false)
         {
             if (outOfPlay)
@@ -66,23 +66,20 @@ namespace Overpower.Match
             int outlineTeam = owner >= 0 ? owner : TerritoryMap.Neutral;
             bool attacked = owner >= 0 && underAttack;
 
-            // captureFadeSpeed (2026-09-24): checked before every guard below, on purpose. Those guards
-            // (progress.Team < 0 || progress.Team == owner just below; the owner < 0 check inside the
-            // RatePerSecond01 < 0 branch further down) exist for a real capture/drain's OWN two-update echo race,
-            // and were never written to recognise a fade/refill's shape at all: a neutral fade (negative rate,
-            // neutral owner) happens to land on the owner < 0 check and reads Idle, but an owned refill (positive
-            // rate, Team = the last drainer, not the owner) matches NEITHER guard and falls through to Capturing,
-            // in the drainer's own colour, not Idle. Checking Fading first sidesteps both mismatches so a genuine
-            // fade/refill always animates correctly.
+            // Fading is checked before every guard below, on purpose. Those guards (progress.Team < 0 ||
+            // progress.Team == owner just below; the owner < 0 check inside the RatePerSecond01 < 0 branch further
+            // down) exist for a real capture/drain's OWN two-update echo race and do not recognise a fade/refill's
+            // shape: a neutral fade (negative rate, neutral owner) happens to land on the owner < 0 check and reads
+            // Idle, but an owned refill (positive rate, Team = the last drainer, not the owner) matches NEITHER guard
+            // and falls through to Capturing in the drainer's colour. Checking Fading first sidesteps both.
             if (progress.Fading)
             {
-                // Review fix, 2026-09-24: the two shapes that can never be a genuine fade/refill
-                // (CaptureProgressPublishRule.Decide only ever fades a NEUTRAL zone's claim - negative rate - or
-                // refills an OWNED one - positive rate; never the other way round). Seeing one here means this
-                // progress snapshot and a separate owner write haven't both landed yet - the exact one-round-trip
-                // race the brief describes: a team knocked out mid-refill (MatchDirector.cs:427 resets the zone
-                // neutral) shows a growing band in the old drainer's colour on every OTHER client until the
-                // master's neutral reset echoes back. Idle for that one frame instead of the phantom band.
+                // The two shapes that can never be a genuine fade/refill (CaptureProgressPublishRule.Decide only
+                // ever fades a NEUTRAL zone's claim - negative rate - or refills an OWNED one - positive rate).
+                // Seeing one here means this progress snapshot and a separate owner write haven't both landed
+                // yet: a team knocked out mid-refill (MatchDirector resets the zone neutral) would show a growing
+                // band in the old drainer's colour on every OTHER client until the master's neutral reset echoes
+                // back. Idle for that one frame instead of the phantom band.
                 if (progress.RatePerSecond01 > 0f && owner < 0)
                     return Idle(outlineTeam, attacked);
                 if (progress.RatePerSecond01 < 0f && owner >= 0)
@@ -91,8 +88,8 @@ namespace Overpower.Match
                 float fadeFill = nowMs == 0 || progress.StampMs == 0 ? Clamp01(progress.Progress01) : progress.Evaluate(nowMs);
                 if (fadeFill <= 0f)
                     return Idle(outlineTeam, attacked);
-                // Owned zone refilling: the owner's own colour (progress.Team is only the last drainer, now gone -
-                // see CaptureProgressPublishRule's own comment). Neutral zone fading: the fading team's colour.
+                // Owned zone refilling: the owner's own colour (progress.Team is only the last drainer, now gone).
+                // Neutral zone fading: the fading team's colour.
                 int arcTeam = owner >= 0 ? owner : progress.Team;
                 return new CaptureRingState(CaptureRingPhase.Fading, fadeFill, arcTeam, outlineTeam, TerritoryMap.Neutral, attacked);
             }
@@ -103,7 +100,7 @@ namespace Overpower.Match
                 return Idle(outlineTeam, attacked);
 
             // Without a synced clock, extrapolating from "now = 0" would flash the band full or empty; show the
-            // published value instead (the old bar skipped the frame for the same reason).
+            // published value instead.
             float fill = nowMs == 0 || progress.StampMs == 0 ? Clamp01(progress.Progress01) : progress.Evaluate(nowMs);
 
             if (progress.RatePerSecond01 > 0f)

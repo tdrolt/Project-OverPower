@@ -3,11 +3,9 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// The only place in the project where damage maths happens. Before this existed there were
-    /// two copies of the sequence and they had already diverged: the dash damage-reduction buff
-    /// was applied on the bullet path and missing from the AoE path.
-    ///
-    /// Order of operations, fixed and tested:
+    /// The only place damage maths happens: the bullet path and the AoE path must both go through it
+    /// (the dash damage-reduction buff was once applied on one path only).
+    /// Order, fixed and tested:
     ///   1. multiply by (1 + vulnerability)
     ///   2. multiply by (1 - reduction)
     ///   3. armor absorbs what it can, unless the hit ignores armor

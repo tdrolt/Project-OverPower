@@ -14,19 +14,17 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 /// AbilityRunner.Equip only apply a change to this machine, and this class is what makes every other
 /// machine agree.
 ///
-/// A loadout is state, not an event (CODING-STANDARDS section 5, rule 2): a player joining in five
-/// minutes needs to know what everyone is holding, and an unbuffered RPC cannot tell them. So it
-/// lives in four Photon Custom Properties (keys in LoadoutProperties), the same way PlayerLifecycle
-/// keeps alive state.
+/// A loadout is state, not an event (CODING-STANDARDS section 5, rule 2): a late joiner needs what
+/// everyone holds, which an unbuffered RPC cannot tell them. So it lives in four Photon Custom
+/// Properties (keys in LoadoutProperties), like PlayerLifecycle's alive state.
 ///
 /// The flow, mirroring PlayerLifecycle.SetAlive:
 ///  - the OWNER applies a change locally first, so it feels instant, then publishes it;
 ///  - every OTHER client applies it in OnPlayerPropertiesUpdate;
 ///  - a LATE JOINER reads the current values in Start.
 ///
-/// Before this existed the weapon id was never replicated at all - RPC_FireWeapon carries it per
-/// shot, so firing worked, but every remote copy's WeaponFiring.Weapon stayed on the starting weapon
-/// forever. Anything that shows another player's weapon (a scoreboard, a kill feed) now reads true.
+/// RPC_FireWeapon carries the weapon id per shot, but that alone leaves every remote copy's
+/// WeaponFiring.Weapon on the starting weapon; the property is what scoreboards and kill feeds read.
 ///
 /// Deliberately NOT IPunObservable - PlayerNetSync is the player's only observable.
 /// </summary>
@@ -46,8 +44,8 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
     private AbilityRunner abilityRunner;
     private PlayerHealth playerHealth;
 
-    // The prefab's own starting weapon id, captured before anything can change it - a remote copy
-    // falls back to this when a property is missing or unreadable.
+    // Captured before anything can change it; a remote copy falls back to this when a property is
+    // missing or unreadable.
     private int startingWeaponId = LoadoutProperties.Empty;
 
     private void Awake()
@@ -62,9 +60,8 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             Debug.LogError($"[PlayerLoadout] {name}: no AbilityRunner on the player root - abilities cannot be equipped.");
         if (playerHealth == null)
             Debug.LogError($"[PlayerLoadout] {name}: no PlayerHealth on the player root - armor upgrade levels cannot be replicated.");
-        // Not a hard error like the three above: a missing config fails OPEN to the old always-
-        // free starting kit (see Start()) rather than silently locking every player out of their
-        // ultimate for the whole match, so a warning is enough.
+        // Only a warning: a missing config fails OPEN to the always-free starting kit (see Start())
+        // rather than locking every player out of their ultimate for the whole match.
         if (gameplayConfig == null)
             Debug.LogWarning($"[PlayerLoadout] {name}: GameplayConfig is not assigned - the ultimate slot will always start with the prefab's default, even with Free Loadout off.");
     }
@@ -80,9 +77,8 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
 
         if (photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined)
         {
-            // Task 9e (Tudor D21): a REJOINED player keeps their loadout - the room kept their Player Properties, so this is
-            // the same read a late joiner does (falling back to the prefab's default only for a key that was never set),
-            // never the starting-kit publish below, which would overwrite what they had bought.
+            // A REJOINED player keeps their loadout (D21): the room kept their Player Properties, so this is
+            // the late joiner's read, never the starting-kit publish below, which would overwrite what they bought.
             ApplyFromProperties(PhotonNetwork.LocalPlayer.CustomProperties, onlyKeysPresent: false);
         }
         else if (photonView.IsMine)
@@ -93,11 +89,9 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             if (startingWeaponId != LoadoutProperties.Empty)
                 props[LoadoutProperties.WeaponKey] = startingWeaponId;
 
-            // Task 2.5a: with the real economy on (Free Loadout off), the ultimate slot starts
-            // EMPTY and must be bought through the shop (GDD p.18) - every other slot still
-            // starts at the prefab's free default. A late joiner reads whichever id this publish
-            // ends up writing below, and a respawn never re-runs Start() (this component lives on
-            // the same player object for the whole match), so a bought ultimate is never lost.
+            // With the real economy on (Free Loadout off) the ultimate slot starts EMPTY and must be
+            // bought (GDD p.18); every other slot starts at the prefab's default. A respawn never
+            // re-runs Start() (same player object all match), so a bought ultimate is never lost.
             foreach (AbilitySlot slot in AbilitySlots)
             {
                 int startingId = StartingAbilityId(slot);
@@ -105,9 +99,8 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
                 props[LoadoutProperties.KeyFor(slot)] = EquippedAbilityId(slot);
             }
 
-            // PlayerHealth already starts at level 0/0 in its own Awake - published explicitly so
-            // the room's Custom Properties are self-describing rather than relying on a missing
-            // key silently meaning the same thing.
+            // Published explicitly even though PlayerHealth starts at 0/0, so the Custom Properties
+            // are self-describing rather than relying on a missing key.
             props[LoadoutProperties.ArmorAbsorbLevelKey] = playerHealth != null ? playerHealth.AbsorbLevel : 0;
             props[LoadoutProperties.ArmorRechargeLevelKey] = playerHealth != null ? playerHealth.RechargeLevel : 0;
 
@@ -116,21 +109,18 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         }
         else if (photonView.Owner != null)
         {
-            // A late joiner, or a copy spawned after the owner already chose something: read the
-            // current values, falling back to the prefab's defaults for anything missing.
+            // A late joiner, or a copy spawned after the owner chose: read the current values, with
+            // prefab defaults for anything missing.
             ApplyFromProperties(photonView.Owner.CustomProperties, onlyKeysPresent: false);
         }
     }
 
-    /// <summary>The starting kit's own id for one ability slot - Start (above) publishes this at spawn, and
-    /// ResetForMatchStart (2.7b step 4) puts it back at the fresh start, so there is exactly ONE definition of
-    /// "what the starting kit looks like" for both callers to share. Task 2.5a: the ultimate is the one
-    /// exception - it starts EMPTY under the real economy and only carries the prefab's own assigned starting
-    /// ultimate (if any) while the shop is free (ShopPricing.StartingUltimateHandedOut, 2.7b step 5b: Free Loadout OR the
-    /// pre-live warm-up sandbox, and never a live Dominion match, whose shop is free but whose ultimate is a break pick), a testing convenience; every other slot always starts at the prefab's default.
-    /// At spawn in the warm-up the prefab's starting ultimate is handed out, as a free shop would; the live reset
-    /// (ResetForMatchStart) calls this again once the shop is no longer free, so it starts empty from there on -
-    /// the prefab ships it empty either way today, so this only matters once a starting ultimate is ever set.</summary>
+    /// <summary>The starting kit's id for one ability slot: the ONE definition Start and ResetForMatchStart
+    /// share. The ultimate is the exception: it starts EMPTY unless the shop is free
+    /// (ShopPricing.StartingUltimateHandedOut: Free Loadout or the pre-live warm-up sandbox, never a live
+    /// Dominion match, whose ultimate is a break pick), when it carries the prefab's assigned starting
+    /// ultimate. Every other slot starts at the prefab's default. The live reset calls this again once the
+    /// shop is no longer free, so the ultimate starts empty from there on.</summary>
     private int StartingAbilityId(AbilitySlot slot)
     {
         bool ultimateStartsEmpty = !ShopPricing.StartingUltimateHandedOut(gameplayConfig);
@@ -140,14 +130,12 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         return abilityRunner != null ? abilityRunner.StartingId(slot) : LoadoutProperties.Empty;
     }
 
-    /// <summary>2.7b Decision 6 (Tudor answer 2, amended): the fresh start at match-live puts EVERY slot back
-    /// to the starter kit - the weapon, AND all three ability slots (Mobility, Attachment, Ultimate) to
-    /// StartingAbilityId, not weapon+armour only as the pre-amendment plan text said. The prefab ships every
-    /// ability slot empty, so this is "back to empty" for Mobility and Attachment too: the first pick into
-    /// either is free again, exactly like a brand new player (ShopRules.AbilityPrice). Armour drops to level
-    /// 0/0 here too - PlayerLifecycle.ResetForMatchStart calls this BEFORE PlayerHealth.ResetForRespawn, so the
-    /// capacity is already at 0 when that refill decides what "full" means. One Hashtable publish, the same
-    /// apply-then-publish shape as every other write in this class. Owner only.</summary>
+    /// <summary>The fresh start at match-live puts EVERY slot back to the starter kit: the weapon and all
+    /// three ability slots (to StartingAbilityId). The prefab ships every ability slot empty, so the first
+    /// pick into Mobility or Attachment is free again, like a brand new player (ShopRules.AbilityPrice).
+    /// Armour drops to level 0/0 too: PlayerLifecycle.ResetForMatchStart calls this BEFORE
+    /// PlayerHealth.ResetForRespawn, so the capacity is already 0 when that refill decides what "full"
+    /// means. One Hashtable publish, apply-then-publish like every write here. Owner only.</summary>
     public void ResetForMatchStart()
     {
         if (!photonView.IsMine)
@@ -209,13 +197,10 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         LogLoadout();
     }
 
-    /// <summary>Owner only. Applies new armor upgrade levels on this machine, then tells everyone -
-    /// same apply-locally-then-publish pattern as SetWeapon/SetAbility. Called by the F1 panel's
-    /// upgrade buttons today (a future shop calls it once gold is spent), never with a decision of
-    /// its own: the caller already ran the levels through Combat.ArmorUpgradePath and is only
-    /// asking to make the result official. Required for correctness, not only for late joiners - a
-    /// remote copy clamps synced armor to its OWN capacity (ArmorState.SetFromNetwork), which stays
-    /// at level 0 until this replicates.</summary>
+    /// <summary>Owner only. Applies new armor levels here, then tells everyone. Makes no decision of its
+    /// own: the caller already ran the levels through Combat.ArmorUpgradePath. Required for correctness,
+    /// not only for late joiners: a remote copy clamps synced armor to its OWN capacity
+    /// (ArmorState.SetFromNetwork), which stays at level 0 until this replicates.</summary>
     public void SetArmorLevels(int absorbLevel, int rechargeLevel)
     {
         if (!photonView.IsMine || playerHealth == null)
@@ -238,9 +223,9 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
         if (photonView.Owner == null || targetPlayer != photonView.Owner)
             return;
 
-        // The owner already applied this before publishing it. Photon echoes your own property
-        // writes back to you, and reacting to the echo would repeat the swap - and interrupt the
-        // freshly equipped ability - for nothing. Same guard as PlayerLifecycle.
+        // The owner already applied this before publishing. Photon echoes your own property writes
+        // back, and reacting to the echo would repeat the swap and interrupt the freshly equipped
+        // ability. Same guard as PlayerLifecycle.
         if (photonView.IsMine)
             return;
 
@@ -275,10 +260,9 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
             touched = true;
         }
 
-        // Both armor keys are always published together (SetArmorLevels writes them in one
-        // Hashtable), so either one present means both are - but each still falls back to
-        // playerHealth's OWN current level rather than 0, so an update carrying only, say, a
-        // property refresh for another key can never silently reset the other path.
+        // Both armor keys are published together, so either present means both are; each still falls
+        // back to playerHealth's OWN current level rather than 0, so an update can never silently
+        // reset the other path.
         if (playerHealth != null && (!onlyKeysPresent ||
             props.ContainsKey(LoadoutProperties.ArmorAbsorbLevelKey) ||
             props.ContainsKey(LoadoutProperties.ArmorRechargeLevelKey)))
@@ -302,8 +286,8 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
     private int EquippedAbilityId(AbilitySlot slot) =>
         abilityRunner != null ? abilityRunner.EquippedId(slot) : LoadoutProperties.Empty;
 
-    /// <summary>One line per applied change, on every client, so a two-client test can compare what
-    /// each machine believes a player is holding.</summary>
+    /// <summary>One line per applied change on every client, so a two-client test can compare what each
+    /// machine believes a player holds.</summary>
     private void LogLoadout()
     {
         int weaponId = weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : LoadoutProperties.Empty;

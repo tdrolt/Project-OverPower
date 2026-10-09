@@ -9,40 +9,16 @@ using Overpower.Vision;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The zone itself - Tudor's ultimate spec (2026-09-13): "self-cast radius lasting 6 seconds,
-    /// dealing damage every second. Follows the caster." AoeZoneAbility only decides WHEN it goes
-    /// down (at the caster's own feet, spending the ultimate meter); everything about what the zone
-    /// does once it exists lives here, on the prefab.
-    ///
-    /// TICK ON EVERY CLIENT, DESTROY ON THE OWNER ONLY - exactly the FireField pattern
-    /// (Weapons/FireField.cs), and for the identical reason: the plan's "tick on the owner only"
-    /// would deal zero damage to everyone else, because ApplyDamage on a remote copy of THEIR
-    /// PlayerHealth returns default() the instant it is called from a machine that is not theirs.
-    /// Every client runs its own ZoneTickSchedule (Combat/ZoneTickSchedule.cs) against the SAME
-    /// clock - seconds since this object was actually placed (Age, growing by real time elapsed on
-    /// THIS client - the identical secondsSincePlaced pattern Mine.cs uses for its own arm delay) -
-    /// so a late joiner's client, however many ticks already passed by the time it hears about this
-    /// zone, pays out exactly the ticks it is owed and never one early or one extra. NO PER-TICK
-    /// LOGGING (Task 1.11 plan): the AoE ability this replaces logged every tick and froze a 9-player
-    /// playtest doing it.
-    ///
-    /// NOT USING NetworkedDeployable's OWN Lifetime Seconds. That field means "destroy on a fixed
-    /// wall-clock timer, unrelated to anything else" (Portal leaves it at 0 for the same reason: its
-    /// own logic decides when it goes away). Here, DURATION AND TICK COUNT ARE THE SAME NUMBER SEEN
-    /// TWO WAYS - 6 seconds at 1 tick/second IS 6 ticks - so Duration Seconds and Tick Seconds below
-    /// are the zone's only real duration; the schedule finishing is what ends its life, and this
-    /// class calls RequestDestroy itself once it does. A second, always-0, "Lifetime Seconds" field
-    /// sitting in the Inspector unused would be the exact "one number, two homes" mistake this
-    /// project's own coding standards call out.
-    ///
-    /// FOLLOWING THE CASTER'S NETWORK-LERPED TRANSFORM (comments-only note, review): on a client that
-    /// is not the caster, CasterFollower.Tick reads the caster's PhotonView transform, which
-    /// PlayerNetSync is smoothing toward the caster's last RECEIVED position, not their true
-    /// instantaneous one. A victim can therefore already be standing inside this zone on their own
-    /// client's copy of it while the caster's own screen still shows them clear of it, and ApplyTick
-    /// below (victim-side damage) will hit them anyway. Not a bug: the same accepted
-    /// victim-favours-the-defender latency tradeoff every projectile in this project already makes -
-    /// see CasterFollower.Tick's own comment.
+    /// The AoE ultimate's zone: a disc that ticks damage (Radius, Damage Per Tick, Duration Seconds, Tick Seconds below) and
+    /// follows its caster. AoeZoneAbility only decides WHEN it goes down; everything it does once placed lives here.
+    /// TICK ON EVERY CLIENT, DESTROY ON THE OWNER ONLY (the FireField pattern): ApplyDamage on a remote copy of THEIR
+    /// PlayerHealth returns default(), so owner-only ticking would hurt nobody else. Every client runs its own
+    /// ZoneTickSchedule on the same clock (Age + real time on this client, as Mine.cs does), so a late joiner pays exactly
+    /// the ticks it is owed. No per-tick logging: the old AoE froze a 9-player playtest doing it. NetworkedDeployable's
+    /// Lifetime Seconds is unused: duration and tick count are one number seen two ways, so the finished schedule ends the
+    /// zone (RequestDestroy). Following reads the caster's PhotonView transform, which PlayerNetSync lerps toward the last
+    /// received position, so a victim can be inside the zone on their own client while the caster's screen shows them
+    /// clear, and ApplyTick (victim-side) hits anyway: the accepted victim-favours-the-defender trade-off, as projectiles.
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
     public sealed class AoeZone : NetworkedDeployable, IInRoomCallbacks
@@ -84,40 +60,34 @@ namespace Overpower.Abilities
                  "skips resizing anything.")]
         private Transform visual;
 
-        // Not a design tunable: how many colliders one tick considers - matches FireField's own
-        // MaxBurningColliders reasoning for a similarly small arena radius.
+        // Not a design tunable: how many colliders one tick considers (FireField's MaxBurningColliders reasoning).
         private const int MaxOverlapColliders = 32;
         private readonly Collider[] overlapBuffer = new Collider[MaxOverlapColliders];
 
-        // Scratch set for one tick's overlap pass, so a target made of several colliders (a
-        // player's own body) is only counted once - the same trick FireField.burning uses.
+        // Scratch set for one tick's overlap pass, so a target of several colliders is only counted once (as FireField).
         private readonly HashSet<IDamageable> seenThisTick = new HashSet<IDamageable>();
         private readonly List<IDamageable> candidateBuffer = new List<IDamageable>();
 
         private ZoneTickSchedule schedule;
         private CasterFollower follower;
 
-        /// <summary>Task T3 (telemetry): the id of the AoeZoneAbility that placed this, threaded
-        /// through instantiationData (that ability's own ExecuteCast now passes Definition.Id
-        /// instead of null) since this deployable is a separate prefab with no AbilityDefinition of
-        /// its own. -1 if the data is missing.</summary>
+        /// <summary>Telemetry: the id of the AoeZoneAbility that placed this, threaded through instantiationData because
+        /// this deployable is a separate prefab with no AbilityDefinition. -1 if the data is missing.</summary>
         public int AbilityId { get; private set; } = -1;
 
-        /// <summary>Radius, Damage Per Tick, Duration Seconds and Tick Seconds, read-only - the shop's pop-up shows them (Task 13).</summary>
+        /// <summary>Radius, Damage Per Tick, Duration Seconds and Tick Seconds, read-only - the shop's pop-up shows them.</summary>
         public float Radius => radius;
         public float DamagePerTick => damagePerTick;
         public float DurationSeconds => durationSeconds;
         public float TickSeconds => tickSeconds;
 
-        // The real Time.time this zone's OnPlaced ran on THIS client, turning Age (a one-time
-        // snapshot) into a number that keeps growing - the identical secondsSincePlaced pattern
-        // Mine.cs documents on its own localPlacedRealTime field.
+        // The real Time.time OnPlaced ran on THIS client, turning Age (a one-time snapshot) into a number that keeps
+        // growing - the secondsSincePlaced pattern Mine.cs documents.
         private float localPlacedRealTime;
 
-        /// <summary>True once the zone has been thrown to a spot (Tudor's D11): from then on it stays
-        /// there and no longer follows the caster. Set on every client - by the thrower's own call, or
-        /// by the thrower's Player Property (AoeZoneRecast.PropertyKey) arriving, which is also how a
-        /// client that joins after the throw finds the zone at the thrown spot.</summary>
+        /// <summary>True once the zone has been thrown to a spot (D11): it then stays there and no longer follows the
+        /// caster. Set on every client by the thrower's own call or by the thrower's Player Property
+        /// (AoeZoneRecast.PropertyKey) arriving, which is also how a late joiner finds the zone at the thrown spot.</summary>
         public bool Thrown { get; private set; }
 
         /// <summary>True while the zone still follows its caster: not thrown, and the caster has not
@@ -169,15 +139,10 @@ namespace Overpower.Abilities
 
             int totalTicks = Mathf.Max(1, Mathf.RoundToInt(durationSeconds / tickSeconds));
 
-            // Review fix (Task 1.11b): Age here already reflects how old this zone really is on THIS
-            // client (NetworkedDeployable's own class comment - the placer's PhotonNetwork.ServerTimestamp
-            // travels explicitly in instantiationData and DeployableAge.SecondsSince turns it and this
-            // client's own current ServerTimestamp into Age, so a late joiner's replay is never "since I
-            // joined" - see NetworkedDeployable's FAIL #15 fix for why that is no longer read from
-            // info.SentServerTime). Seeding the schedule with it means a late joiner's ticks whose moment
-            // already passed before this client existed are skipped outright instead of all firing
-            // together the first time this client evaluates - see ZoneTickSchedule's own class comment
-            // for the hitch-vs-late-start distinction.
+            // Age already reflects how old this zone really is on THIS client (NetworkedDeployable derives it from the
+            // placer's ServerTimestamp in instantiationData, never info.SentServerTime, so a late joiner's replay is not
+            // "since I joined"). Seeding the schedule with it skips ticks that passed before this client existed instead of
+            // firing them all at once - see ZoneTickSchedule for the hitch-vs-late-start distinction.
             schedule = new ZoneTickSchedule(tickSeconds, totalTicks, (float)Age);
             follower = new CasterFollower(followsCaster, OwnerActor);
             localPlacedRealTime = Time.time;
@@ -215,8 +180,7 @@ namespace Overpower.Abilities
             for (int i = 0; i < dueTicks; i++)
                 ApplyTick();
 
-            // Every client stops ticking the instant its own schedule completes; only the owner
-            // ever deletes the object - the same split FireField.Burn ends on.
+            // Every client stops ticking when its own schedule completes; only the owner deletes the object (as FireField.Burn).
             if (schedule.IsComplete && IsOwnerClient)
                 RequestDestroy();
         }
@@ -244,8 +208,7 @@ namespace Overpower.Abilities
                 candidateBuffer.Add(candidate);
             }
 
-            // Not a teammate, not the caster, not a structure, and locally authoritative - the same
-            // rule Mine.cs's own trigger uses (MineTargeting.SelectTargets' own class comment).
+            // Not a teammate, not the caster, not a structure, and locally authoritative - Mine.cs's rule (MineTargeting).
             List<IDamageable> targets = MineTargeting.SelectTargets(candidateBuffer, OwnerActor, OwnerTeam);
             foreach (IDamageable target in targets)
             {

@@ -16,28 +16,27 @@ namespace Overpower.Combat
                                   // Burn: damage per second. Stun/Invulnerability: ignored.
 
         /// <summary>
-        /// Task T3 (telemetry): the ability that applied this status, or -1 for a weapon-based
-        /// status (the stun gun's ApplyStatusOnHit) or a path that cannot carry one across the wire
-        /// (PlayerStatusEffects.RPC_ApplyStatusFromPeer - see its own comment). A struct field, not
-        /// defaulted by the language: every call site sets it explicitly rather than relying on the
-        /// default(int) of 0, which could collide with a real ability id.
+        /// The ability that applied this status, or -1 for a weapon-based status (the stun gun's
+        /// ApplyStatusOnHit) or a path that cannot carry one across the wire
+        /// (PlayerStatusEffects.RPC_ApplyStatusFromPeer). Every call site sets it explicitly: relying on
+        /// default(int) 0 could collide with a real ability id.
         /// </summary>
         public int abilityId;
 
-        /// <summary>Dominion Task 7b review (A26): the server time in ms when the lasting thing behind this status (a mine, an electric fence)
-        /// was set up. The attacker's own copy of the victim compares it with the attacker's respawn shield, so an old mine's slow does not end
-        /// the new bubble. 0 = a direct effect with nothing set up earlier. Zero by default, so every existing call site is unchanged.</summary>
+        /// <summary>The server time in ms when the lasting thing behind this status (a mine, an electric fence) was set up. The attacker's own copy
+        /// of the victim compares it with the attacker's respawn shield, so an old mine's slow does not end the new bubble (A26). 0 = a direct
+        /// effect with nothing set up earlier.</summary>
         public int effectPlacedMs;
     }
 
     /// <summary>
     /// Tracks every timed status one actor is carrying and enforces each kind's stacking rule.
     /// Plain C# on purpose, same reason as DamageResolver: it is unit tested without touching
-    /// the Unity engine. A MonoBehaviour wrapper calls Tick from Update in a later task.
+    /// the Unity engine.
     ///
-    /// Six attachment abilities do nothing but apply one of these kinds for a duration. Without
-    /// this shared machinery they would each become their own copy of a timer, the same
-    /// divergence problem the damage funnel was built to avoid.
+    /// The attachment abilities do nothing but apply one of these kinds for a duration; without this
+    /// shared machinery they would each become their own copy of a timer, the divergence the damage
+    /// funnel was built to avoid.
     ///
     /// Stacking rule per kind (fixed, see the design table):
     ///   Burn            - Refresh: a fresh application replaces the remaining duration outright.

@@ -4,14 +4,10 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// Every ability in the game, and the only sanctioned way to turn an ability id into an
-    /// AbilityDefinition.
-    ///
-    /// Lookup goes through a dictionary keyed by each ability's hand-assigned id, and never through
-    /// the list index - same correctness requirement as WeaponCatalogue, and for the same reason.
-    /// What crosses the network is a bare int that every client resolves against its own local
-    /// copy of this catalogue, so if resolution depended on list order, reordering this list in the
-    /// Inspector would silently re-map every player's abilities mid-match.
+    /// Every ability in the game; the only sanctioned way to turn an ability id into an AbilityDefinition.
+    /// Lookup is by each ability's hand-assigned id, never by list index (same as WeaponCatalogue): only a
+    /// bare int crosses the network and each client resolves it against its own copy, so list order must
+    /// never matter or reordering in the Inspector would re-map every player's abilities mid-match.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Ability Catalogue")]
     public sealed class AbilityCatalogue : ScriptableObject
@@ -33,28 +29,20 @@ namespace Overpower.Data
         }
 
         /// <summary>
-        /// Turns an ability id into its definition, or null if no ability claims that id. Returning
-        /// null rather than throwing is deliberate: ids arrive from other clients over the network,
-        /// where they can be stale, malformed or hostile, and a bad packet from someone else must
-        /// never be able to throw an exception on this machine. Callers check for null.
+        /// Null when no ability claims the id, deliberately not a throw: ids arrive over the network
+        /// and can be stale, malformed or hostile. Callers check for null.
         /// </summary>
         public AbilityDefinition Resolve(int id)
         {
-            // Normally built in OnEnable, which covers asset load and every domain reload. This
-            // guard covers an instance created at runtime with CreateInstance, whose list is
-            // populated after OnEnable has already run.
+            // OnEnable covers asset load and domain reload; this covers a CreateInstance whose list is
+            // filled after OnEnable already ran.
             if (byId == null)
                 BuildLookup();
 
             return byId.TryGetValue(id, out var definition) ? definition : null;
         }
 
-        /// <summary>
-        /// The abilities that fill one slot, which is what both the loadout screen and the shop
-        /// need in order to show a player their options for left mouse, right mouse, Space or
-        /// Left Shift. Returns a fresh list, so a caller sorting or filtering it for display
-        /// cannot disturb the catalogue.
-        /// </summary>
+        /// <summary>A fresh list, so a caller sorting or filtering it cannot disturb the catalogue.</summary>
         public List<AbilityDefinition> ForSlot(AbilitySlot slot)
         {
             var matches = new List<AbilityDefinition>();
@@ -69,11 +57,8 @@ namespace Overpower.Data
         }
 
         /// <summary>
-        /// Reports every problem that would make this catalogue resolve ids wrongly, as one
-        /// human-readable line per problem. An empty list means the catalogue is sound.
-        ///
-        /// Returning the messages rather than logging them keeps this usable from a test, and lets
-        /// OnValidate decide how loudly to complain.
+        /// One human-readable line per problem that would make ids resolve wrongly; empty means sound.
+        /// Returns messages rather than logging so a test can use it and OnValidate picks the volume.
         /// </summary>
         public List<string> Validate()
         {
@@ -94,9 +79,8 @@ namespace Overpower.Data
 
                 if (seen.TryGetValue(ability.Id, out var existing))
                 {
-                    // Resolve keeps the first match, so the later ability is simply unreachable -
-                    // silently, which is why this has to be reported rather than left to resolve
-                    // itself quietly.
+                    // Resolve keeps the first match, so the later ability is unreachable - silently,
+                    // which is why it must be reported.
                     problems.Add($"Ability Catalogue: '{ability.name}' and '{existing.name}' both " +
                                  $"use Id {ability.Id}. Ids must be unique - right now only " +
                                  $"'{existing.name}' can ever be found, and '{ability.name}' is " +
@@ -119,26 +103,20 @@ namespace Overpower.Data
 
             foreach (var ability in abilities)
             {
-                // Empty slots are normal while a designer is mid-edit, and a null here would throw
-                // inside OnEnable, which is a miserable place to debug from. Validate reports them.
+                // Empty slots are normal mid-edit; a null here would throw inside OnEnable.
+                // Validate reports them.
                 if (ability == null)
                     continue;
 
-                // First id wins. Overwriting instead would make which ability you get depend on
-                // list order, which is the exact thing this class exists to prevent.
+                // First id wins: overwriting would make the result depend on list order.
                 if (!byId.ContainsKey(ability.Id))
                     byId.Add(ability.Id, ability);
             }
         }
 
 #if UNITY_EDITOR
-        /// <summary>
-        /// Rebuilds the lookup and surfaces any duplicate ids the moment the designer edits the
-        /// list, so a clash shows up in the Editor rather than as a player holding the wrong
-        /// ability in a playtest. The rebuild matters on its own: OnEnable does not fire again
-        /// after an Inspector edit, so without this the lookup would serve stale entries for the
-        /// rest of the session.
-        /// </summary>
+        // OnEnable does not fire after an Inspector edit, so without the rebuild the lookup serves stale
+        // entries for the rest of the session.
         private void OnValidate()
         {
             BuildLookup();

@@ -6,9 +6,7 @@ namespace Overpower.Abilities
 {
     /// <summary>How high a standing player's root is above the floor, read once from the local player's own
     /// CapsuleCollider - the derivation TestRangeSpawner.Grounded uses. Visual only: for any visual that must match
-    /// where a standing player's body really reaches (A6, Tudor 2026-09-17 evening: rockets stay at their real
-    /// height now, so this no longer sizes a floor ring - kept for whatever else needs "how tall is a player" without
-    /// retyping the number).</summary>
+    /// where a standing player's body really reaches, without retyping the number.</summary>
     public static class StandingBody
     {
         private static float cached = -1f;

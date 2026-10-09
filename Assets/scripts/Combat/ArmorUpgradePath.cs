@@ -4,21 +4,20 @@ using Overpower.Data;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// Decides whether the next armor upgrade purchase is allowed and what it results in - a small
+    /// Decides whether the next armor upgrade purchase is allowed and what it results in: a small
     /// calculator, not stored state. PlayerHealth keeps the two levels this class computes from
-    /// (AbsorbLevel, RechargeLevel); a caller that wants to spend a purchase (the F1 panel today, a
-    /// shop later) builds one of these from the player's CURRENT levels, calls TryUpgradeAbsorb or
-    /// TryUpgradeRecharge, and - if it returned true - publishes the resulting levels through
-    /// PlayerLoadout.SetArmorLevels so every client agrees.
+    /// (AbsorbLevel, RechargeLevel); a caller that spends a purchase (the F1 panel, the shop) builds
+    /// one from the player's CURRENT levels, calls TryUpgradeAbsorb or TryUpgradeRecharge and, if it
+    /// returned true, publishes the resulting levels through PlayerLoadout.SetArmorLevels so every
+    /// client agrees.
     ///
-    /// Pure logic, no MonoBehaviour and no reference to ArmorState: it only ever reads ArmorConfig,
-    /// so an edit-mode test can exercise the whole upgrade rule with nothing but a ScriptableObject.
+    /// Pure logic: no MonoBehaviour and no ArmorState, it only reads ArmorConfig, so an edit-mode test
+    /// needs nothing but a ScriptableObject.
     ///
-    /// The GDD says armor is "upgradeable up to three times, with a choice each time between the
-    /// absorption path and the recharge path" - the two paths therefore share ONE combined purchase
-    /// cap (ArmorConfig.MaxArmorUpgrades), not two separate budgets. Each path is additionally
-    /// capped by its own array length in ArmorConfig, so a path cannot be upgraded past the last
-    /// level configured for it even if the combined cap has room left.
+    /// The GDD's "upgradeable up to three times, with a choice each time between the absorption path
+    /// and the recharge path" means the two paths share ONE combined purchase cap
+    /// (ArmorConfig.MaxArmorUpgrades), not two budgets. Each path is also capped by its own array
+    /// length in ArmorConfig, so it cannot pass its last configured level even with combined cap left.
     /// </summary>
     public sealed class ArmorUpgradePath
     {

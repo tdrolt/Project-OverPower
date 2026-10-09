@@ -1,7 +1,7 @@
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// The respawn shield (Task 1 rules; the component is Task 7). A player who respawns is shielded for a few seconds so a spawn camper
+    /// The respawn shield's rules. A player who respawns is shielded for a few seconds so a spawn camper
     /// cannot kill them the instant they appear. The shield ends at a server-clock time (an int in ms that wraps, so it is only compared as
     /// unchecked(now - end)); 0 means no shield is up. While it is up the player neither captures a zone nor blocks an enemy capture, so the
     /// shield cannot be used to hold a zone for free.
@@ -35,7 +35,6 @@ namespace Overpower.Dominion
         /// property can still read as nothing while the room holds the end time), or the property still holds something other than the cleared value.</summary>
         public static bool MustWriteClear(bool startedHere, int propertyEndMs) => startedHere || propertyEndMs != EndAfterDamageDealt();
 
-        /// <summary>An up shield blocks incoming damage (and shows BLOCKED).</summary>
         public static bool BlocksDamage(bool up) => up;
 
         /// <summary>A shielded player neither captures nor blocks a capture; once the shield is down they count as anyone.</summary>
@@ -78,8 +77,8 @@ namespace Overpower.Dominion
             public HitDecision(bool blocked, bool writeStamp) { Blocked = blocked; WriteStamp = writeStamp; }
         }
 
-        /// <summary>An enemy's damage on a shielded victim is stopped and shows BLOCKED. A teammate's is left to the friendly-fire rule (ignored
-        /// as before, no BLOCKED). The victim's own is stopped too, silently: no stamp, so nobody sees BLOCKED for a self-hit. With no shield up
+        /// <summary>An enemy's damage on a shielded victim is stopped and shows BLOCKED. A teammate's is left to the friendly-fire rule (ignored,
+        /// no BLOCKED). The victim's own is stopped too, silently: no stamp, so nobody sees BLOCKED for a self-hit. With no shield up
         /// the hit is none of the shield's business.</summary>
         public static HitDecision OnIncomingHit(bool shieldUp, Origin origin, int lastStampMs, int nowMs, int popupMs)
         {
@@ -89,7 +88,7 @@ namespace Overpower.Dominion
         }
 
         /// <summary>A24: a shielded victim is also untouchable by an enemy's stun, slow or push (any status or displacement), and BLOCKED shows
-        /// for it. Own and teammate effects land as today (a shielded player can still be helped, and can still push or boost themselves).</summary>
+        /// for it. Own and teammate effects land (a shielded player can still be helped, and can still push or boost themselves).</summary>
         public static HitDecision OnIncomingEffect(bool shieldUp, Origin origin, int lastStampMs, int nowMs, int popupMs)
         {
             if (!shieldUp || origin != Origin.Enemy) return new HitDecision(false, false);

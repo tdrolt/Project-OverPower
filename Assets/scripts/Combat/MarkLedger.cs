@@ -14,7 +14,7 @@ namespace Overpower.Combat
     }
 
     /// <summary>
-    /// The Mark laser's rule (Tudor, 2026-09-18). One TARGET's marks, kept on that target's own client, because
+    /// The Mark laser's rule. One TARGET's marks, kept on that target's own client, because
     /// damage is victim-side: the client that applies the damage is the one that decides the bonus, with no message.
     /// PlayerHealth.ApplyDamage asks it only for a hit that LANDS (HitVerdict.Lands), so self, teammate, shield-blocked
     /// hits and hits on the dead neither mark nor cash. Keyed per attacker: at most one mark per attacker, cashable only
@@ -46,13 +46,11 @@ namespace Overpower.Combat
         public float SecondsLeft(int attackerActor, float now) =>
             expiresAtByAttacker.TryGetValue(attackerActor, out float expiresAt) && now <= expiresAt ? expiresAt - now : 0f;
 
-        /// <summary>The most time left on ANY live mark on this target, regardless of attacker - Tudor's
-        /// answer 1: the marked player also sees a diamond, at most one whoever marked them, so the
-        /// longest live mark is enough (step 5 reads this through PlayerHealth.LongestMarkSecondsLeft).
-        /// An expired entry that was never cashed still sits in the dictionary (SecondsLeft's own
-        /// comment - bounded by the players in the room) but is filtered out here the same way
-        /// SecondsLeft filters it for a single attacker. No allocation: foreach over Dictionary uses
-        /// its own struct enumerator.</summary>
+        /// <summary>The most time left on ANY live mark on this target, regardless of attacker: the
+        /// marked player also sees one diamond whoever marked them, so the longest is enough (read
+        /// through PlayerHealth.LongestMarkSecondsLeft). An expired entry that was never cashed still
+        /// sits in the dictionary (bounded by the players in the room) but is filtered out here, as
+        /// SecondsLeft does. No allocation: foreach over Dictionary uses its struct enumerator.</summary>
         public float LongestSecondsLeft(float now)
         {
             float longest = 0f;

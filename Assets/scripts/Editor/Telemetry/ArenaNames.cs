@@ -1,16 +1,13 @@
 namespace Overpower.EditorTools.Telemetry
 {
-    /// <summary>2026-09-27 designer change: "he can't read team/zone NUMBERS" - one pure mapping from a
-    /// team or zone id to the name Tudor actually reads by (a colour, or a colour-relative zone
-    /// description), used everywhere the report shows one: every table, chart label and legend, the
-    /// CSVs (as an added name column, never replacing the id), the bug cards' "Where:" line and the
-    /// capture list. No IO, no live scene lookup - the arena's own layout is fixed (one map), read
-    /// once from the live scene (BuildingManager.TowerDictionary/CathedralBuildingIDs, 2026-09-27) and
-    /// hard-coded here so the report can build this mapping OFFLINE from a log alone:
+    /// <summary>One pure mapping from a team or zone id to the name Tudor reads by (a colour, or a colour-relative zone
+    /// description), used everywhere the report shows one: tables, chart labels, legends, CSVs (as an added name column, never
+    /// replacing the id), the bug cards' "Where:" line, the capture list. No IO, no live scene lookup: the arena (one map) was read
+    /// once from BuildingManager.TowerDictionary/CathedralBuildingIDs and is hard-coded here so the report builds OFFLINE from a log.
     ///
-    /// zone 6/7/8 are the White/Purple/Cyan capitals (Tier I); 0/1/2 are each team's own Tier II
-    /// (adjacent to its own capital); 3/4/5 are the Tier III zones, each sitting between exactly two
-    /// teams' Tier IIs (3: White-Purple, 4: Purple-Cyan, 5: White-Cyan); 9 is the centre (Tier IV).</summary>
+    /// Zone 6/7/8 are the White/Purple/Cyan capitals (Tier I); 0/1/2 are each team's own Tier II (adjacent to its capital); 3/4/5 are
+    /// the Tier III zones, each between exactly two teams' Tier IIs (3: White-Purple, 4: Purple-Cyan, 5: White-Cyan); 9 is the
+    /// centre (Tier IV).</summary>
     public static class ArenaNames
     {
         /// <summary>Team 0 = White, 1 = Purple, 2 = Cyan - UiTheme.teamShotColors' own comment names

@@ -7,23 +7,17 @@ using UnityEngine.UI;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// The countdown to the next centre scan, above the centre tower for everyone (Tudor 2026-10-01: "display the timer until
-    /// the next scan above the tower"). A HUD label, not a world-space one: it is projected from a point above the tower
-    /// onto its own screen-overlay canvas (the same pattern as DamageNumberView and MarkIndicatorView), so it keeps one
-    /// size on screen however far the camera is zoomed out. The canvas has no GraphicRaycaster, so it can never swallow a
-    /// click (HANDOFF trap 20), sits behind the main HUD (order -21) and is not fogged. The font is UiTheme.font, the size
-    /// UiTheme > Scan Countdown Font Size, the colour the scan wave's red.
-    ///
-    /// SECOND LABEL (Tudor 2026-10-01, pick C): the same text in the same colour sits under the corner minimap, fixed on the
-    /// screen, so the countdown is always readable even when the tower is off screen. It is shown under the same conditions
-    /// as the one above the tower, minus the camera test, and it stays under the CORNER map when M opens the large one: the
-    /// large map is centred and leaves the corner free, so the label never moves or hides behind the map. Its size and
-    /// offset are UiTheme > Scan Minimap Countdown Font Size / Offset.
-    ///
-    /// LOOK CHOICE: it reads "Scan 12", whole seconds counting down, and keeps counting while a wave is travelling (so it
-    /// is simply the time to the next wave: the full interval right as a wave starts). Hidden when CentreScan has no
-    /// countdown (the map has shrunk, fog is off, not in a room), Scan Countdown Visible is off, or the anchor is behind
-    /// the camera. The wording and size are on the UiTheme; the height and on/off are on the Vision Config.
+    /// The countdown to the next centre scan, above the centre tower for everyone. A HUD label projected from a point above
+    /// the tower onto its own screen-overlay canvas (like DamageNumberView and MarkIndicatorView), so it keeps one size on
+    /// screen however far the camera is zoomed out. The canvas has no GraphicRaycaster, so it can never swallow a click
+    /// (HANDOFF trap 20), sits behind the main HUD (order -21) and is not fogged. Font UiTheme.font, size UiTheme > Scan
+    /// Countdown Font Size, colour Scan Wave Colour.
+    /// A second label with the same text sits under the corner minimap, fixed on screen, so the countdown is readable when the
+    /// tower is off screen: same conditions minus the camera test. It stays under the CORNER map when M opens the large one
+    /// (the large map is centred and leaves the corner free). Size and offset: UiTheme > Scan Minimap Countdown Font Size / Offset.
+    /// Reads "Scan 12", whole seconds, and keeps counting while a wave travels (the full interval as a wave starts). Hidden when
+    /// CentreScan has no countdown, Scan Countdown Visible is off, or the anchor is behind the camera. Wording and size are on
+    /// the UiTheme; height and on/off on the Vision Config.
     /// </summary>
     [DefaultExecutionOrder(1000)] // after the camera has moved this frame
     public sealed class CentreScanCountdownView : MonoBehaviour
@@ -39,10 +33,10 @@ namespace Overpower.Vision
         private int shownSeconds = -1;
         private string format;
 
-        /// <summary>What the label shows now, or empty while it is hidden (recorders read it).</summary>
+        /// <summary>What the label shows now, or empty while it is hidden.</summary>
         public string ShownText => label != null && label.gameObject.activeSelf ? label.text : string.Empty;
 
-        /// <summary>What the label under the corner minimap shows now, or empty while it is hidden (recorders read it).</summary>
+        /// <summary>What the label under the corner minimap shows now, or empty while it is hidden.</summary>
         public string MinimapShownText => minimapLabel != null && minimapLabel.gameObject.activeSelf ? minimapLabel.text : string.Empty;
 
         private void OnDestroy()

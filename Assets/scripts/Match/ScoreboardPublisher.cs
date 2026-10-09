@@ -7,7 +7,7 @@ using Overpower.Data;
 namespace Overpower.Match
 {
     /// <summary>
-    /// Tudor's D12 (hold Tab for the scoreboard): counts THIS player's own kills, deaths, assists, damage dealt and
+    /// The scoreboard's numbers (D12, hold Tab): counts THIS player's own kills, deaths, assists, damage dealt and
     /// zones captured, and publishes them as one Player Property, "sb" = int[] { kills, deaths, assists, damage,
     /// captures } (ScoreboardRules.Key and its index constants). Owner only - every remote copy is dormant, and it
     /// is the only writer of this player's "sb", so nobody can overwrite it and no RPC is needed. A late joiner
@@ -66,7 +66,7 @@ namespace Overpower.Match
             tally = new ScoreTally();
             throttle = new ScorePublishThrottle(FallbackPublishesPerSecond);
 
-            // Task 9e: a rejoined player continues their own numbers - the room kept their "sb" Player Property.
+            // A rejoined player continues their own numbers - the room kept their "sb" Player Property.
             if (photonView != null && photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined
                 && PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(ScoreboardRules.Key, out object kept))
                 tally.Restore(kept as int[]);

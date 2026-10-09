@@ -6,29 +6,13 @@ using Overpower.Combat;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The ring itself - Tudor's ultimate spec (2026-09-13): "a ring around the caster that damages
-    /// and slows enemies passing through it. Stays where it is cast." ElectricFenceAbility only
-    /// decides WHEN it goes down (at the caster's own feet, spending the ultimate meter); everything
-    /// about what the ring does once it exists lives here, on the prefab - the same split Mine.cs and
-    /// MineAbility already use.
-    ///
-    /// VICTIM-SIDE, EVERY CLIENT, PER-TARGET STATE. FixedUpdate below runs on every machine, the
-    /// owner's own included. It DISCOVERS enemies of OwnerTeam with an OverlapSphere sized to the
-    /// ring itself (so anything already inside, or just outside the band, is found), then - once a
-    /// target is discovered - keeps tracking it by its own live Transform every frame from then on,
-    /// never re-relying on the overlap query for a target it already knows about. That second part
-    /// matters for the "teleported across the ring in one step" case the Task 1.11b addendum's
-    /// verify steps call out: a target already inside the ring is guaranteed to have been discovered
-    /// (the overlap radius covers the whole interior), so when it jumps outside in a single frame,
-    /// this fence is still reading its real position that frame and catches the crossing - even
-    /// though the jump may have landed the target outside the discovery radius itself.
-    ///
-    /// ApplyDamage/ApplyStatus already no-op on every machine but the target's own owner
-    /// (PlayerHealth.ApplyDamage, PlayerStatusEffects.Apply) - the same trust model FireField and
-    /// Mine use - so every client is free to call them on every enemy it can see; only the real
-    /// owner of that target ever does anything with the call. One FenceCrossingState per target (see
-    /// its own class comment for the in-band/side-flip/cooldown rule) is what lets each victim's own
-    /// client keep its own independent cooldown, exactly as the addendum requires.
+    /// The ring ultimate's networked object: damages and slows enemies passing through it, stays where cast unless Follows
+    /// Caster. ElectricFenceAbility only decides WHEN it goes down; what the ring does lives here (as Mine / MineAbility).
+    /// VICTIM-SIDE, EVERY CLIENT, PER-TARGET STATE: FixedUpdate runs on every machine, the owner's included. An OverlapSphere
+    /// sized to the ring DISCOVERS enemies of OwnerTeam once; after that each is tracked by its live Transform every frame,
+    /// never re-relying on the overlap, so a target that teleports across the ring in one step (and lands outside the
+    /// discovery radius) is still read and its crossing caught. ApplyDamage/ApplyStatus no-op on every machine but the
+    /// target's owner (the FireField/Mine trust model), so each victim's client keeps its own FenceCrossingState and cooldown.
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
     public sealed class ElectricFence : NetworkedDeployable
@@ -78,36 +62,31 @@ namespace Overpower.Abilities
                  "skips resizing anything.")]
         private Transform visual;
 
-        // Not a design tunable: how many colliders one discovery pass considers - matches
-        // FireField.MaxBurningColliders' identical reasoning for a similarly small arena radius.
+        // Not a design tunable: how many colliders one discovery pass considers (FireField.MaxBurningColliders' reasoning).
         private const int MaxOverlapColliders = 32;
         private readonly Collider[] overlapBuffer = new Collider[MaxOverlapColliders];
 
-        // Scratch set for one discovery pass, so a target made of several colliders (a player's own
-        // body) is only considered once per pass - the same trick FireField.burning and Mine.caught use.
+        // Scratch set for one discovery pass, so a target of several colliders is only considered once (as FireField, Mine).
         private readonly HashSet<IDamageable> seenThisPass = new HashSet<IDamageable>();
 
-        // Every discovered enemy's own crossing/cooldown state, kept for as long as this fence lives -
-        // see the class comment for why discovery only needs to happen once per target.
+        // Every discovered enemy's crossing/cooldown state, kept for as long as this fence lives (discovery is once per target).
         private readonly Dictionary<IDamageable, FenceCrossingState> tracked =
             new Dictionary<IDamageable, FenceCrossingState>();
 
-        // Scratch list for one evaluation pass: entries whose target turned out to be destroyed get
-        // removed from `tracked` after the foreach below finishes, never during it (mutating a
-        // Dictionary mid-enumeration throws) - reused every frame instead of allocated fresh.
+        // Scratch list: destroyed targets are removed from `tracked` after the foreach, never during it (mutating a
+        // Dictionary mid-enumeration throws).
         private readonly List<IDamageable> pruneBuffer = new List<IDamageable>();
 
         private CasterFollower follower;
 
-        /// <summary>Task T3 (telemetry): the id of the ElectricFenceAbility that placed this,
-        /// threaded through instantiationData the same way AoeZone.AbilityId is - see that
-        /// property's own comment. -1 if the data is missing.</summary>
+        /// <summary>Telemetry: the id of the ElectricFenceAbility that placed this, threaded through instantiationData
+        /// like AoeZone.AbilityId. -1 if the data is missing.</summary>
         public int AbilityId { get; private set; } = -1;
 
-        /// <summary>Radius, read-only - FenceCageView (ability visuals step 4) builds the cage on this one number.</summary>
+        /// <summary>Radius, read-only - FenceCageView builds the cage on this one number.</summary>
         public float Radius => radius;
 
-        /// <summary>Damage Per Pass, Slow Magnitude and Slow Seconds, read-only - the shop's pop-up shows them (Task 13).</summary>
+        /// <summary>Damage Per Pass, Slow Magnitude and Slow Seconds, read-only - the shop's pop-up shows them.</summary>
         public float DamagePerPass => damagePerPass;
         public float SlowMagnitude => slowMagnitude;
         public float SlowSeconds => slowSeconds;
@@ -138,20 +117,14 @@ namespace Overpower.Abilities
 
         private void FixedUpdate()
         {
-            // Defensive backstop (NetworkedDeployable's own class comment, FAIL #15): a copy that
-            // arrived already past Lifetime Seconds - the narrow cache-removal/destroy race, not the
-            // normal path - must never discover or hit anyone. IsExpired already hid this fence's own
-            // visual (it has no collider of its own to disable - see the class comment), but that does
-            // not stop the OverlapSphere query below, which looks at OTHER colliders - hence the
-            // explicit check here.
+            // Defensive backstop (see NetworkedDeployable): a copy that arrived already past Lifetime Seconds (the narrow
+            // cache-removal/destroy race) must never discover or hit anyone. IsExpired hides the visual but does not stop
+            // the OverlapSphere query below, which looks at OTHER colliders - hence the explicit check.
             if (IsExpired)
                 return;
 
-            // If Follows Caster is on, the ring itself moves here before targets are evaluated below
-            // - a perfectly STATIONARY enemy the moving ring sweeps past still reads as a crossing
-            // (their distance from the ring's new centre passes through Radius) exactly as if they
-            // had walked through a fixed ring. Intended, not a bug: the ring passed through them
-            // either way, and FenceCrossingState only ever sees relative distance, never who moved.
+            // If Follows Caster is on, the ring moves here before targets are evaluated: a STATIONARY enemy the moving ring
+            // sweeps past still reads as a crossing. Intended: FenceCrossingState only sees relative distance, never who moved.
             follower?.Tick(transform);
 
             DiscoverNewTargets();
@@ -159,10 +132,9 @@ namespace Overpower.Abilities
         }
 
         /// <summary>
-        /// Finds enemies of OwnerTeam within reach of the ring and starts tracking any not already
-        /// known. The search radius covers the whole interior plus a little past the outer band edge
-        /// - generous enough that an enemy approaching at normal speed is discovered a frame or two
-        /// before it could reach the band, so its "outside" side is on record before any crossing.
+        /// Finds enemies of OwnerTeam within reach of the ring and starts tracking any not already known. The radius
+        /// covers the whole interior plus a little past the outer band edge, so an approaching enemy is discovered a frame
+        /// or two before it reaches the band and its "outside" side is on record before any crossing.
         /// </summary>
         private void DiscoverNewTargets()
         {
@@ -201,10 +173,8 @@ namespace Overpower.Abilities
                 IDamageable target = pair.Key;
                 Component targetComponent = target as Component;
 
-                // Unity's fake-null: true for a destroyed dummy/player object even though the C#
-                // reference itself is not null - the same check MineTargeting already relies on.
-                // Review fix (minor): a destroyed target is never coming back, so its entry is
-                // forgotten entirely instead of being skipped forever on every future frame.
+                // Unity's fake-null: true for a destroyed object though the C# reference is not null (as MineTargeting).
+                // A destroyed target never comes back, so its entry is forgotten rather than skipped forever.
                 if (targetComponent == null || target == null)
                 {
                     pruneBuffer.Add(target);
@@ -213,16 +183,10 @@ namespace Overpower.Abilities
 
                 if (!target.IsAlive)
                 {
-                    // Review fix (respawn false-crossing): forget which side this target was last
-                    // seen on while it is dead. PlayerLifecycle.RespawnPlayer teleports a revived
-                    // player straight to a spawn point with no regard for where the fence is - without
-                    // this, the very next alive sample would read that teleport as a "crossing" and
-                    // land a free hit + slow on someone who just respawned, possibly nowhere near this
-                    // fence. Resetting every frame the target reads as dead (rather than only once, on
-                    // the dead-to-alive edge) needs no extra "was it already dead last frame" bit to
-                    // keep in sync - re-resetting an already-reset state is a no-op. Side-flip damage
-                    // for a target that blinks/teleports across the ring WHILE ALIVE is untouched: this
-                    // branch only ever runs for a target that is currently dead.
+                    // Forget which side this target was last seen on while it is dead: RespawnPlayer teleports a revived
+                    // player to a spawn point regardless of the fence, and the next alive sample would read that as a
+                    // "crossing" (a free hit + slow, possibly nowhere near this fence). Resetting every dead frame needs no
+                    // "was dead last frame" bit; re-resetting is a no-op. A teleport across the ring WHILE ALIVE still counts.
                     pair.Value.Reset();
                     continue;
                 }
@@ -245,10 +209,8 @@ namespace Overpower.Abilities
                 tracked.Remove(destroyed);
         }
 
-        /// <summary>Not a teammate, not the caster, not a structure, and locally authoritative -
-        /// the same three rules MineTargeting.SelectTargets enforces for a mine's own trigger, reused
-        /// individually here since discovery walks colliders one at a time rather than building a
-        /// list to filter in bulk.</summary>
+        /// <summary>Not a teammate, not the caster, not a structure, and locally authoritative - MineTargeting.SelectTargets'
+        /// rules, applied one collider at a time.</summary>
         private bool IsEnemy(IDamageable candidate)
         {
             if (!candidate.HasLocalAuthority)

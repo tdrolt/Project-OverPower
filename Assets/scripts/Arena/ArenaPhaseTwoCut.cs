@@ -8,31 +8,25 @@ using Overpower.Match;
 namespace Overpower.Arena
 {
     /// <summary>
-    /// Builds and removes the phase-two wall (GDD p.20-21 and p.27; Tudor, 2026-09-25) on every client from
-    /// MatchDirector.CutTeam - derived from the room's own mTeams and mElim (two replicated numbers, not one Room
-    /// Property of its own - centre-circle-and-cut-rule, 2026-09-26) - so a late joiner and a new master get the
-    /// same wall with no message of their own. Added at play by ArenaSymmetry.OnEnable: no scene object.
+    /// Builds and removes the phase-two wall (GDD p.20-21 and p.27) on every client from MatchDirector.CutTeam -
+    /// derived from the room's own mTeams and mElim (two replicated numbers, not a Room Property of its own) - so a late
+    /// joiner and a new master get the same wall with no message of their own. Added at play by ArenaSymmetry.OnEnable:
+    /// no scene object.
     ///
-    /// On a cut: builds the wall boxes and the recess barrier (and its two planks, Tudor 2026-09-26: "the zone is too
-    /// empty") as primitives with the outer walls' own material, thickness, height and layers (under Source/Boundry,
-    /// so a portal's path check sees the wall); publishes the smaller outline (ArenaSymmetry.UsePlayableBounds) for
-    /// blink, portals and the safety net; hides every block, barrier and scenery piece with ANY corner of its
-    /// footprint behind the wall (Tudor 2026-09-26: a piece can stand with its centre in front of the wall and still
-    /// reach behind it - the two new centre-to-Tier-III walls facing a closed corner do exactly that; footprint from
-    /// the piece's position, rotation and lossy X/Z scale, ArenaPieceShapes.FootprintCorners, since every piece is a
-    /// unit cube scaled); and destroys what this client placed there. Towers behind the wall hide themselves
-    /// (BuildingCapture, from MatchDirector.IsOutOfPlay). On "no cut" (a new room), everything is
-    /// put back exactly as it was.
+    /// On a cut: builds the wall boxes and the recess barrier with its two planks as primitives with the outer walls'
+    /// own material, thickness, height and layers (under Source/Boundry, so a portal's path check sees the wall);
+    /// publishes the smaller outline (ArenaSymmetry.UsePlayableBounds) for blink, portals and the safety net; hides
+    /// every block, barrier and scenery piece with ANY corner of its footprint behind the wall (see
+    /// AnyFootprintCornerBehindWall); and destroys what this client placed there. Towers behind the wall hide
+    /// themselves (BuildingCapture, from MatchDirector.IsOutOfPlay). On "no cut" (a new room), everything is put back
+    /// exactly as it was.
     ///
     /// Polls once a frame instead of subscribing: the cut can appear on a join, a knockout or a host start and go away
     /// on leaving the room, and MatchDirector, BuildingManager and the towers start in no fixed order - one integer
     /// compare a frame catches every case.
     ///
-    /// Review fix F5, 2026-09-25: while a cut stands, also checks THIS client's own player - once the frame it lands,
-    /// then every half second - and sends them home if they are alive and behind the wall (a reconnect, a body
-    /// already standing where a corner closes at going live - not a late join: MayJoin already refuses the team
-    /// missing from mTeams, so nobody spawns there - or a living player the phase-change trip home missed). Own
-    /// client only; see ReturnOwnPlayerIfBehindWall.
+    /// While a cut stands, also checks THIS client's own player and sends them home if they are alive and behind the
+    /// wall. Own client only; see ReturnOwnPlayerIfBehindWall and OwnPlayerCheckIntervalSeconds.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ArenaPhaseTwoCut : MonoBehaviour
@@ -56,30 +50,28 @@ namespace Overpower.Arena
         private readonly List<Collider> hiddenColliders = new List<Collider>();
         private int failedCutTeam = PhaseTwoCutRules.NoCut; // logs a refused build once, not every frame
 
-        // Extra step E2 (Task 4 review, 2026-09-25): a REAL refusal (failedCutTeam == the cut team - the capital's
-        // tower IS registered, but the layout/geometry itself doesn't fit) can't fix itself between one frame and the
-        // next, so recomputing every frame just burns CPU on the same answer. The TRANSIENT case (towers not
-        // registered yet, so BuildGeometryFor returns null without ever calling LogRefusalOnce) is unaffected and
-        // keeps retrying every frame - it resolves itself within a frame or two of scene load.
+        // A REAL refusal (failedCutTeam == the cut team - the capital's tower IS registered, but the layout/geometry
+        // itself doesn't fit) can't fix itself between one frame and the next, so recomputing every frame just burns
+        // CPU on the same answer. The TRANSIENT case (towers not registered yet, so BuildGeometryFor returns null
+        // without ever calling LogRefusalOnce) is unaffected and keeps retrying every frame - it resolves itself within
+        // a frame or two of scene load.
         private const float RefusedRetryIntervalSeconds = 1f;
         private float nextRetryTime;
 
-        // Review fix F5, 2026-09-25 (the review's plan gap): a player can end up behind the wall in ways the
-        // phase-change trip home (PlayerLifecycle.ReturnToSpawnForPhaseChange, fired once off MatchDirector's own
-        // ThreeTeams -> TwoTeams edge) never touches - a reconnect, or a body already standing in a host start's
-        // left-out corner when it closes at going live (cut-rule-followups review, 2026-09-26: not a late join - a
-        // joiner can't pick the team missing from mTeams, MayJoin already refuses it; the real case is a player who
-        // was already standing on that ground before the host clicked start), or a living player that trip home
-        // simply missed. The out-of-arena safety net alone would only catch this once it next
-        // remembers a "safe" spot, which can itself be behind the wall - so this checks THIS client's own player
-        // directly: once the frame a cut lands, then every half second while one still stands.
+        // A player can end up behind the wall in ways the phase-change trip home (PlayerLifecycle.
+        // ReturnToSpawnForPhaseChange, fired once off MatchDirector's own ThreeTeams -> TwoTeams edge) never touches - a
+        // reconnect, or a body already standing in a host start's left-out corner when it closes at going live (not a
+        // late join: a joiner can't pick the team missing from mTeams, MayJoin already refuses it), or a living player
+        // that trip home simply missed. The out-of-arena safety net alone would only catch this once it next remembers
+        // a "safe" spot, which can itself be behind the wall - so this checks THIS client's own player directly: once
+        // the frame a cut lands, then every half second while one still stands.
         private const float OwnPlayerCheckIntervalSeconds = 0.5f;
         private float nextOwnPlayerCheck;
 
-        // Opus re-check, 2026-09-25: the one way a send-home can land behind the wall again is MoveToSpawnPoint's
-        // own-spawn fallback, for a player whose own corner was the one cut and whose team holds no capital (that match
-        // is about to end anyway). Sending them there every half second would be a loop with two log lines a go, so
-        // after one send-home that didn't get them out this gives up, once, until they are found in front again.
+        // The one way a send-home can land behind the wall again is MoveToSpawnPoint's own-spawn fallback, for a player
+        // whose own corner was the one cut and whose team holds no capital (that match is about to end anyway). Sending
+        // them there every half second would be a loop with two log lines a go, so after one send-home that didn't get
+        // them out this gives up, once, until they are found in front again.
         private bool sentOwnPlayerHome;
         private bool gaveUpOnOwnPlayer;
 
@@ -103,7 +95,7 @@ namespace Overpower.Arena
             if (cut != AppliedCutTeam)
                 ApplyCutChange(cut);
 
-            // F5: own client only - never move another player, which this component has no authority to do.
+            // Own client only - never move another player, which this component has no authority to do.
             if (AppliedCutTeam >= 0 && Geometry != null && Time.unscaledTime >= nextOwnPlayerCheck)
             {
                 nextOwnPlayerCheck = Time.unscaledTime + OwnPlayerCheckIntervalSeconds;
@@ -120,8 +112,8 @@ namespace Overpower.Arena
                 return;
             }
 
-            // E2: a real refusal for this same team waits out its cooldown instead of recomputing every frame - see
-            // the field comments above.
+            // A real refusal for this same team waits out its cooldown instead of recomputing every frame - see the
+            // field comments above.
             if (cut == failedCutTeam && Time.unscaledTime < nextRetryTime)
                 return;
 
@@ -136,17 +128,17 @@ namespace Overpower.Arena
             Restore();
             Apply(geometry);
             AppliedCutTeam = cut;
-            nextOwnPlayerCheck = Time.unscaledTime; // F5: check the own player this same frame, not 0.5s later
+            nextOwnPlayerCheck = Time.unscaledTime; // check the own player this same frame, not 0.5s later
             sentOwnPlayerHome = false;
             gaveUpOnOwnPlayer = false;
             Debug.Log($"[Arena] phase two: team {cut}'s corner closed ({geometry.WallRuns.Count} wall boxes, " +
                       $"{hiddenRenderers.Count} renderers hidden).");
         }
 
-        /// <summary>F5: this client's own player only, found the way MatchDirector.ReactToRoomState finds it. Moves
-        /// them the same way the phase-change trip home does (SpawnCapitalFor, in-play only since review fix F1) if
-        /// they are alive and standing behind the wall - the safety net alone could loop a player back to a spot it
-        /// remembers as safe that is now behind it.</summary>
+        /// <summary>This client's own player only, found the way MatchDirector.ReactToRoomState finds it. Moves them
+        /// the same way the phase-change trip home does (SpawnCapitalFor, in-play only) if they are alive and standing
+        /// behind the wall - the safety net alone could loop a player back to a spot it remembers as safe that is now
+        /// behind it.</summary>
         private void ReturnOwnPlayerIfBehindWall()
         {
             PhotonView localView = PhotonNetwork.LocalPlayer != null
@@ -157,7 +149,7 @@ namespace Overpower.Arena
 
             // The body's own physics position, like PlayerMotor reads: the transform trails an interpolated Rigidbody
             // (and TeleportTo sets rb.position), so it can still show a spot the player has already left - e.g. a
-            // corpse behind the wall on the frame its respawn moved the body home (opus re-check, 2026-09-25).
+            // corpse behind the wall on the frame its respawn moved the body home.
             Rigidbody body = localView.GetComponent<Rigidbody>();
             Vector3 position = body != null ? body.position : localView.transform.position;
             if (!Geometry.IsBehindWall(position))
@@ -312,10 +304,11 @@ namespace Overpower.Arena
             }
         }
 
-        /// <summary>Tudor 2026-09-26: a piece hides when ANY corner of its footprint is behind the wall, not just its
-        /// centre - a piece can stand with its centre in front and still reach behind (the two new centre-to-Tier-III
-        /// walls facing a closed corner do exactly that, by about 1.2 m). Height doesn't matter to IsBehindWall (it
-        /// reads X/Z only), so the corners are tested at the piece's own Y.</summary>
+        /// <summary>A piece hides when ANY corner of its footprint is behind the wall, not just its centre - a piece
+        /// can stand with its centre in front and still reach behind (the centre-to-Tier-III walls facing a closed
+        /// corner do exactly that). The footprint comes from the piece's position, rotation and lossy X/Z scale
+        /// (ArenaPieceShapes.FootprintCorners), since every piece is a scaled unit cube. Height doesn't matter to
+        /// IsBehindWall (it reads X/Z only), so the corners are tested at the piece's own Y.</summary>
         private static bool AnyFootprintCornerBehindWall(PhaseTwoCutGeometry geometry, Transform piece)
         {
             Vector2[] corners = ArenaPieceShapes.FootprintCorners(piece.position, piece.rotation, piece.lossyScale);
@@ -342,11 +335,10 @@ namespace Overpower.Arena
                 arena.UsePlayableBounds(null);
             Geometry = null;
 
-            // M6 (final review, 2026-09-25): a refusal's cooldown is per team, but this component is per running
-            // arena - without this, a REAL refusal from a past room (bad layout/geometry, not "towers not registered
-            // yet") would leave failedCutTeam/nextRetryTime standing into a new room, so a genuine refusal there
-            // would silently wait out an old cooldown instead of logging its own (LogRefusalOnce, "once, not every
-            // frame") right away.
+            // A refusal's cooldown is per team, but this component is per running arena - without this, a REAL refusal
+            // from a past room (bad layout/geometry, not "towers not registered yet") would leave
+            // failedCutTeam/nextRetryTime standing into a new room, so a genuine refusal there would silently wait out
+            // an old cooldown instead of logging its own (LogRefusalOnce, "once, not every frame") right away.
             failedCutTeam = PhaseTwoCutRules.NoCut;
             nextRetryTime = 0f;
         }

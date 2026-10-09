@@ -5,11 +5,7 @@ using Overpower.Abilities;
 
 namespace Overpower.Data
 {
-    /// <summary>
-    /// The four slots a player fills, and the key each one is bound to. The slot an ability
-    /// occupies is fixed data rather than something chosen at runtime, so the loadout UI and the
-    /// shop can both filter by it without either of them owning the mapping.
-    /// </summary>
+    /// <summary>The four slots a player fills, and the key each is bound to. Fixed data, so loadout UI and shop both filter by it.</summary>
     public enum AbilitySlot
     {
         /// <summary>Left mouse button.</summary>
@@ -26,16 +22,10 @@ namespace Overpower.Data
     }
 
     /// <summary>
-    /// A catalogue entry for one ability - deliberately thin, and deliberately not a stat block
-    /// like WeaponDefinition.
-    ///
-    /// Weapons all share one set of numbers, which is why a single stat block drives all thirteen
-    /// of them. Abilities do not: a dash, a mine and a healing field have almost nothing numeric
-    /// in common, so a shared stat block would be mostly empty fields that mean nothing for most
-    /// abilities - and empty fields that sometimes matter are worse for a designer than no fields
-    /// at all. Each ability's numbers therefore live on its own module prefab, where they are the
-    /// only numbers in sight. This asset carries only what the shop and the network need in order
-    /// to talk about the ability without loading it.
+    /// A catalogue entry for one ability - deliberately thin, not a stat block like WeaponDefinition:
+    /// a dash, a mine and a healing field share almost nothing numeric, and a shared block of mostly
+    /// empty fields is worse for a designer than none. Each ability's numbers live on its own module
+    /// prefab; this asset carries only what the shop and the network need to talk about it unloaded.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Ability")]
     public sealed class AbilityDefinition : ScriptableObject
@@ -79,9 +69,7 @@ namespace Overpower.Data
         public GameObject ModulePrefab => modulePrefab;
 
         /// <summary>
-        /// Every reason this ability could not work in a match, one readable line each; empty means
-        /// sound. Returned rather than logged, like AbilityCatalogue.Validate, so a test can call it.
-        ///
+        /// One readable line per reason this ability could not work in a match; empty means sound.
         /// Each check is a trap that fails silently in play rather than loudly here:
         ///  - no AbilityModule: the runner has nothing to equip, and the key just does nothing;
         ///  - a PhotonView: every client creates its own copy of the module locally, so a view on it
@@ -126,8 +114,6 @@ namespace Overpower.Data
         }
 
 #if UNITY_EDITOR
-        /// <summary>Surfaces the problems above the moment the asset is edited or loaded, naming the
-        /// asset, instead of as a key that silently does nothing in a playtest.</summary>
         private void OnValidate()
         {
             foreach (string problem in Validate())

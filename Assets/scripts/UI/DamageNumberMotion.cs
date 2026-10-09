@@ -2,9 +2,8 @@ using UnityEngine;
 
 namespace Overpower.UI
 {
-    /// <summary>One damage number's pose at a given moment - scale, how far it has risen, and its
-    /// alpha - so DamageNumberView only ever has to apply numbers to a RectTransform/Graphic, never
-    /// compute them. Immutable, same reasoning as DamageInfo (Combat/DamageInfo.cs).</summary>
+    /// <summary>One damage number's pose at a given moment (scale, rise, alpha), so DamageNumberView only applies
+    /// numbers to a RectTransform/Graphic, never computes them. Immutable, as DamageInfo is.</summary>
     public readonly struct DamageNumberPose
     {
         public readonly float Scale;
@@ -20,19 +19,11 @@ namespace Overpower.UI
     }
 
     /// <summary>
-    /// Pure pop/rise/fade/rounding rules for a damage number - unit tested without touching the engine
-    /// beyond Mathf (same convention as DamageResolver). No UnityEngine.UI or TMPro reference here;
-    /// DamageNumberView is the only adapter that ever touches a Graphic.
-    ///
-    /// Mark plan step 2, Tudor's override (top-of-plan table, answer 4): "one for each enemy that you
-    /// are hitting" - ONE live number per enemy that ADDS each hit, re-pops (see ThePopStartsBig...)
-    /// and restarts its own life, rather than the plan's original per-hit-with-merge-window design.
-    /// That override drops damageNumberMergeSeconds/damageNumberSpread and ShouldMerge/Side entirely
-    /// and adds one field instead, damageNumberHoldSeconds: how long the number stays fully solid (no
-    /// rise, no fade) after the LAST hit that touched it, before it starts rising and fading over
-    /// damageNumberLifetimeSeconds. DamageNumberView is what restarts the "age since last hit" and
-    /// "pop age" clocks on every added hit - this class only ever answers "given these two ages, what
-    /// does the number look like right now".
+    /// Pure pop/rise/fade/rounding rules for a damage number, unit tested without the engine beyond Mathf;
+    /// DamageNumberView is the only adapter that touches a Graphic. ONE live number per enemy that ADDS each hit,
+    /// re-pops and restarts its own life; damageNumberHoldSeconds is how long it stays fully solid after the LAST
+    /// hit, before rising and fading over damageNumberLifetimeSeconds. DamageNumberView restarts the "age since
+    /// last hit" and "pop age" clocks on every added hit; this class only turns the two ages into a pose.
     /// </summary>
     public static class DamageNumberMotion
     {
@@ -72,9 +63,8 @@ namespace Overpower.UI
             return new DamageNumberPose(scale, actualRise, alpha);
         }
 
-        /// <summary>The integer a damage number actually shows: rounded half up (never banker's
-        /// rounding), and never zero for a hit that landed at all - a 0.3 splash tick still reads "1",
-        /// not nothing.</summary>
+        /// <summary>The integer a damage number shows: rounded half up (never banker's rounding), never zero for a
+        /// hit that landed - a 0.3 splash tick still reads "1".</summary>
         public static int Shown(float amount) => amount > 0f ? Mathf.Max(1, (int)System.Math.Floor(amount + 0.5)) : 0;
     }
 }

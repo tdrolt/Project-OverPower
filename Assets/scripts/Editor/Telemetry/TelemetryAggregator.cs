@@ -6,80 +6,26 @@ using Overpower.Telemetry;
 
 namespace Overpower.EditorTools.Telemetry
 {
-    /// <summary>Task T5 step 3: pure log -> tables. No IO of its own - TelemetryLog already did the
-    /// reading, CsvReportWriter (and later HtmlReportWriter) only format what this produces. Edit-mode
-    /// tested against a hand-written fixture with hand-computed totals (TelemetryAggregatorTests) plus
-    /// a set of focused fixtures for the opus review fixes below (TelemetryAggregatorReviewFixesTests).
+    /// <summary>Pure log -> tables. No IO (TelemetryLog already read the files); CsvReportWriter and HtmlReportWriter only
+    /// format what this produces, so the two outputs never disagree. Tested against a hand-written fixture with hand-computed
+    /// totals (TelemetryAggregatorTests, TelemetryAggregatorReviewFixesTests).
     ///
-    /// Task T7 (3-team / 2-team phase split): <see cref="Build(TelemetryLog, TimeWindow)"/> is the same
-    /// single pipeline as always - it is called up to three times (see <see cref="BuildSet"/>), once
-    /// per scope (whole match, Phase 1, Phase 2), each time with a different <see cref="TimeWindow"/>.
-    /// No table builder below is duplicated for phases: a DISCRETE event (a hit, a purchase, a death...)
-    /// is simply skipped when its own t falls outside the requested window; a CONTINUOUS integral (a
-    /// sample interval, an ownership stint, a capture attempt, the alive-time tail) is CLIPPED to the
-    /// window's own bounds instead, via TimeWindow.Clip. Several row types (ownership, captures, gold
-    /// timeline, economy-by-minute, hits, deaths, purchases, shop-blocked) also carry a `Phase` field,
-    /// tagged against the match's own phase-2 transition instant (from PhaseTimeline) REGARDLESS of
-    /// which window this particular build is scoped to - so even the whole-match tables show which
-    /// phase each row happened in, and a stint/attempt that straddles the transition is split into two
-    /// rows in every scope that can see both halves (see ClipAndTagPhase).
+    /// Build(log, window) is one pipeline, called up to three times (see BuildSet), once per scope (whole match, Phase 1, Phase
+    /// 2). No table builder is duplicated for phases: a DISCRETE event (hit, purchase, death...) is skipped when its t falls
+    /// outside the window; a CONTINUOUS integral (sample interval, ownership stint, capture attempt, alive-time tail) is
+    /// CLIPPED to it via TimeWindow.Clip. Row types that can straddle the phase-2 transition (ownership, captures, hits,
+    /// deaths, purchases, gold/economy buckets) carry a `Phase` tagged against it REGARDLESS of the build's window, and a
+    /// stint/attempt crossing it is split in every scope that sees both halves (ClipAndTagPhase).
     ///
-    /// T4-review corrections (first pass, kept):
-    /// 2. `bounty` (master, per-player-per-payout) is NOT added into any team/player income total -
-    ///    the owner's own `goldEarned.bounty` field already reflects the credit that event describes.
-    /// 3. A `goldEarned` line that is entirely zero (every source 0 and `zones` empty or all-zero) is
-    ///    junk from a remote copy's teardown or the owner's own closing flush - skipped everywhere
-    ///    (kept for old logs; new clients no longer write these at all per the T4 fix).
-    /// 4. `underAttack` isn't consumed by any T5 table (none of the 12 CSVs need it) - left for a
-    ///    later task.
-    /// 5. An armor `purchase`'s `item` id (100+level absorb, 200+level recharge as of the T4 fix) is
-    ///    treated as a plain opaque int, never decoded.
-    ///
-    /// Opus T5 review (second pass), by item number:
-    /// 1. Captures are rebuilt as ONE time-ordered pass over `capture` lines and deduped `ownership`
-    ///    changes together - see BuildCaptures. An `ownership` change is what closes an attempt
-    ///    (completed/neutralised); a fresh `started`/`drainStarted` while one is still open abandons
-    ///    it; anything still open at match end is abandoned. A `capture` line's own state is read
-    ///    defensively (unrecognised states counted, never fatal) but never trusted for the outcome -
-    ///    the T4 fix made `capture` stateless (a "paused" at progress 1 looks identical whether it
-    ///    completed or was merely interrupted; only `ownership` tells them apart).
-    /// 2. A player's team comes from their own first `sample` with tm >= 0, falling back to the
-    ///    session line - see EffectiveTeamByActor. A late joiner's session can carry tm:-1 before the
-    ///    room's player-properties echo arrives, which used to drop their whole income/spend/zone
-    ///    slice from every team-keyed table.
-    /// 3. Time alive and every sample-derived integral (equipped time, zone time) are bounded by the
-    ///    PLAYER'S OWN covered range (their file's first/last real event), not the whole match length -
-    ///    a joiner at t=600 no longer shows 1200s alive in a 1200s match. Dead samples (alive:false)
-    ///    no longer accrue equipped/zone time for the interval they start.
-    /// 4. A `goldEarned` line's `zones` array is rounded to whole gold per zone at the source, so
-    ///    summing many already-rounded lines drifts from the authoritative `terr` total. Each line is
-    ///    rescaled to sum to its own `terr` before accumulating (ScaledZones), keeping the fraction.
-    /// 5. An out-of-range tier (an `ownership` line can carry tier 0 for an unregistered zone) no
-    ///    longer indexes IncomeByTier/ZonesHeldByTier out of range - skipped and counted
-    ///    (Header.InvalidTierCount).
-    /// 6. Accuracy is Projectile-hits / projectiles only; Splash hits (a rocket's own splash falloff
-    ///    landing on several targets from one projectile) are counted separately (WeaponRow.SplashHits)
-    ///    instead of inflating both the numerator and looking like more than 100% accuracy.
-    /// 7. The gold gap ignores a balance sample older than (bucket end - 60s) - a leaver's stale last
-    ///    balance no longer keeps counting for their team forever.
-    /// 8. A lethal Burn tick is logged as BOTH a `dot` (flushed just before) and a `hit` (so every kill
-    ///    keeps a row) - `hit` rows with src:"Burn" are excluded from every damage sum (already counted
-    ///    via the `dot`), but kept in hits.csv and for kill attribution (kills come from `death`, never
-    ///    from a hit row, so this was never at risk).
-    /// 9. Header.FreeLoadoutUsed is the tuning snapshot's flag OR'd with any `purchase.free:true` -
-    ///    a mid-match toggle (or a per-purchase free flag with no matching tuning flag) is no longer missed.
-    /// 10. Robustness: a non-numeric `t`, a null inside `assists`, and an unreadable file no longer
-    ///     throw or vanish silently (see TelemetryLog); a newer `schema` is counted, not ignored.
-    /// 11. Integral edges: the last sample's own trailing interval (capped at the sample interval) is
-    ///     now included; t == -1 samples are ignored; any gap between two samples is capped at 2x the
-    ///     sample interval (a disconnected client doesn't keep accruing).
-    /// 13. CsvReportWriter now writes UTF-8 WITH a BOM (see its own comment).</summary>
+    /// Traps: a `capture` line's own state is NEVER trusted for the outcome (it is stateless: a "paused" at progress 1 looks
+    /// the same whether completed or interrupted) - only `ownership` changes close an attempt (BuildCaptures). An out-of-range
+    /// tier (an `ownership` line can carry tier 0 for an unregistered zone) is skipped and counted (Header.InvalidTierCount).
+    /// `underAttack` feeds no table.</summary>
     public static class TelemetryAggregator
     {
         private const int Neutral = -1; // TerritoryMap.Neutral's own value - a zone with no owner.
-        // T5 re-review item 9: same sentinel value as Neutral (both mean "no real zone id"), under
-        // its own name so a reader of zone_income.csv/economy_by_minute.csv isn't confused about
-        // which concept a -1 zone/tier means in that context.
+        // Same sentinel value as Neutral (both mean "no real zone id"), under its own name so a reader of
+        // zone_income.csv/economy_by_minute.csv isn't confused about which concept a -1 zone/tier means there.
         private const int UnattributedZone = -1;
         private const double DefaultSampleIntervalSeconds = 5.0;
 
@@ -87,9 +33,8 @@ namespace Overpower.EditorTools.Telemetry
             new HashSet<string> { "started", "resumed", "drainStarted", "drainResumed" };
         private static readonly HashSet<string> CaptureFreshStartStates = new HashSet<string> { "started", "drainStarted" };
         private static readonly HashSet<string> CapturePauseStates = new HashSet<string> { "paused", "drainPaused" };
-        // "completed"/"neutralised" are known (older, pre-T4-fix logs may still carry them) but never
-        // drive the state machine - see the class comment's item 1. Anything outside this whole set
-        // is unknown (counted, not fatal).
+        // "completed"/"neutralised" are known (older logs may still carry them) but never drive the state machine - see
+        // BuildCaptures. Anything outside this whole set is unknown (counted, not fatal).
         private static readonly HashSet<string> CaptureKnownStates = new HashSet<string>
             { "started", "resumed", "drainStarted", "drainResumed", "paused", "drainPaused", "completed", "neutralised" };
 
@@ -101,21 +46,16 @@ namespace Overpower.EditorTools.Telemetry
             public int LastPlayers;
         }
 
-        /// <summary>The original, pre-T7 entry point - the whole match, exactly as before. Equivalent
-        /// to <c>Build(log, PhaseTimeline.From(log).WholeMatch)</c>.</summary>
+        /// <summary>The whole match. Equivalent to <c>Build(log, PhaseTimeline.From(log).WholeMatch)</c>.</summary>
         public static ReportTables Build(TelemetryLog log) => Build(log, null);
 
-        /// <summary>Task T7: builds one scope. <paramref name="window"/> null means the whole match
-        /// (every event, every integral in full) - the same result <c>Build(log)</c> always produced.
-        /// A real window (Phase 1 or Phase 2, from PhaseTimeline) filters every discrete event to it
-        /// and clips every continuous integral to it - see the class comment.
+        /// <summary>Builds one scope. A null window means the whole match (every event, every integral in full). A real window
+        /// (Phase 1 or Phase 2, from PhaseTimeline) filters every discrete event to it and clips every continuous integral to
+        /// it - see the class comment.
         ///
-        /// 2026-09-27 designer change: <paramref name="includeWarmupMarkers"/> - Markers, like Bug
-        /// reports and Console, are meant to stay visible over the FULL log (warm-up included), but
-        /// unlike those two they are naturally scoped per phase tab (a marker dropped in Phase 2 has
-        /// no business on the Phase 1 tab) - so this only widens the marker window's own START back to
-        /// 0 for the whole-match build (BuildSet is the only caller that passes true), not for a
-        /// Phase-1/Phase-2-scoped one.</summary>
+        /// includeWarmupMarkers: Markers, like Bug reports and Console, stay visible over the FULL log (warm-up included) but
+        /// are scoped per phase tab (a marker dropped in Phase 2 has no business on the Phase 1 tab); so this only widens the
+        /// marker window's START back to 0 for the whole-match build (BuildSet is the only caller that passes true).</summary>
         public static ReportTables Build(TelemetryLog log, TimeWindow window, bool includeWarmupMarkers = false)
         {
             var tables = new ReportTables();
@@ -130,20 +70,16 @@ namespace Overpower.EditorTools.Telemetry
                     sessionByActor[s.Actor] = s;
             }
 
-            // Task T7: the phase timeline gives both this build's own default (whole-match) window
-            // AND the phase-2 transition instant - every phase-taggable row below is split/tagged
-            // against the transition regardless of which window THIS call is scoped to (see
-            // ClipAndTagPhase's own comment on why the whole-match build also splits at it).
+            // The phase timeline gives both this build's default (whole-match) window AND the phase-2 transition instant; every
+            // phase-taggable row is split/tagged against the transition regardless of this call's window (see ClipAndTagPhase).
             PhaseTimeline timeline = PhaseTimeline.From(log);
             double matchLength = timeline.MatchLength;
             double? tPhase2 = timeline.TransitionSeconds;
             TimeWindow effectiveWindow = window ?? timeline.WholeMatch;
 
-            // Review fix: when this build's own window lies entirely within ONE phase (a Phase
-            // 1- or Phase 2-scoped build), every surviving row belongs to that phase - null when
-            // the window spans both (the whole-match build), which is the only case where a
-            // straddling minute bucket's own absolute start time is still the right way to tag it
-            // (see BuildGoldTimelineAndEconomy's own comment).
+            // When this build's window lies entirely within ONE phase (a Phase 1- or Phase 2-scoped build) every surviving row
+            // belongs to that phase; null when it spans both (the whole-match build), the only case where a straddling minute
+            // bucket's absolute start is still the right tag (see BuildGoldTimelineAndEconomy).
             int? forcedPhase = null;
             if (tPhase2.HasValue)
             {
@@ -151,32 +87,30 @@ namespace Overpower.EditorTools.Telemetry
                 else if (effectiveWindow.Start >= tPhase2.Value) forcedPhase = 2;
             }
 
-            // Opus review item 2: team from the actor's own first sample with tm >= 0, falling back
-            // to the session - see the method's own comment.
+            // Team from the actor's first sample with tm >= 0, falling back to the session - see EffectiveTeamByActor.
             Dictionary<int, int> effectiveTeam = BuildEffectiveTeam(log, fileActor, sessionByActor);
 
-            // Opus review item 3: every player's own covered range (their file's first/last real
-            // event) - time-alive and every sample integral are bounded by THIS, not matchLength.
+            // Every player's covered range (their file's first/last real event): time-alive and every sample integral are
+            // bounded by THIS, not matchLength.
             Dictionary<int, (double First, double Last)> coverageByActor = BuildCoverageByActor(log, fileActor);
 
             double sampleInterval = ResolveSampleIntervalSeconds(log);
 
             var zoneTier = new Dictionary<int, int>();
-            // Every raw ownership change per zone, IN TIME ORDER, including transitions to neutral -
-            // built from the WHOLE log regardless of window (Task T7): a sample inside a phase-scoped
-            // window still needs the true owner-at-time, even when the change that established it
-            // happened before this window started. The ownership.csv STINT ROWS (below) are what
-            // actually gets clipped/filtered to the window - this raw history never is.
+            // Every raw ownership change per zone, IN TIME ORDER, including transitions to neutral - built from the WHOLE log
+            // regardless of window: a sample inside a phase-scoped window still needs the true owner-at-time, even when the
+            // change that established it happened before the window. The ownership.csv STINT ROWS (below) are what gets
+            // clipped/filtered; this raw history never is.
             var rawChangesByZone = new Dictionary<int, List<(double T, int New)>>();
             BuildOwnership(log, tables.Ownership, zoneTier, rawChangesByZone, matchLength, effectiveWindow, tPhase2);
 
             TimeWindow markerWindow = includeWarmupMarkers ? new TimeWindow(0, effectiveWindow.End, effectiveWindow.EndInclusive) : effectiveWindow;
             BuildHeader(tables.Header, log, sessionByActor, coverageByActor, effectiveWindow, sampleInterval, markerWindow);
-            tables.Header.EliminationFallbackUsed = timeline.UsedEliminationFallback; // review fix item 9
-            tables.Header.WarmupSeconds = timeline.LiveSeconds; // 2.7b step 9
-            tables.Header.NeverWentLive = timeline.HasWarmup && !timeline.WentLive; // 2.7b step 9
-            // Playtest extras Task 2 (P4): unwindowed, like LogCoverage above - the Bug reports and
-            // Console sections only ever render on the whole-match tab (see BugRow's own comment).
+            tables.Header.EliminationFallbackUsed = timeline.UsedEliminationFallback;
+            tables.Header.WarmupSeconds = timeline.LiveSeconds;
+            tables.Header.NeverWentLive = timeline.HasWarmup && !timeline.WentLive;
+            // Unwindowed, like LogCoverage above: the Bug reports and Console sections only render on the whole-match tab (see
+            // BugRow).
             BuildBugsAndConsole(log, fileActor, sessionByActor, tPhase2, tables.Header.Bugs, tables.Header.ConsoleByPlayer);
             BuildCaptures(log, rawChangesByZone, zoneTier, matchLength, tables.Header, tables.Captures, effectiveWindow, tPhase2);
             BuildPurchasesAndBlocked(log, fileActor, sessionByActor, effectiveTeam, tables, effectiveWindow, tPhase2);
@@ -191,9 +125,8 @@ namespace Overpower.EditorTools.Telemetry
             return tables;
         }
 
-        /// <summary>Task T7: builds all three scopes from one log - see ReportSet's own comment. This
-        /// IS the "no second copy of the table logic" design in one call: the same Build(log, window)
-        /// runs up to three times, parameterized only by which window to clip/filter against.</summary>
+        /// <summary>Builds all three scopes from one log (see ReportSet). The same Build(log, window) runs up to three times,
+        /// parameterized only by which window to clip/filter against - no second copy of the table logic.</summary>
         public static ReportSet BuildSet(TelemetryLog log)
         {
             PhaseTimeline timeline = PhaseTimeline.From(log);
@@ -202,31 +135,26 @@ namespace Overpower.EditorTools.Telemetry
                 WholeMatch = Build(log, timeline.WholeMatch, includeWarmupMarkers: true),
                 Phase1 = Build(log, timeline.Phase1),
                 Phase2 = timeline.HasPhase2 ? Build(log, timeline.Phase2) : null,
-                LiveSeconds = timeline.LiveSeconds, // 2.7b step 9
+                LiveSeconds = timeline.LiveSeconds,
                 WentLive = timeline.WentLive,
                 TransitionSeconds = timeline.TransitionSeconds,
             };
         }
 
-        // ==================================================================== phase helpers (Task T7)
+        // ==================================================================== phase helpers
 
-        /// <summary>1 or 2, from a discrete event's own t vs the match's phase-2 transition (null when
-        /// the match never had one - everything is Phase 1).</summary>
+        /// <summary>1 or 2, from a discrete event's t vs the match's phase-2 transition (null transition: everything is Phase
+        /// 1).</summary>
         private static int PhaseOf(double t, double? tPhase2) => (tPhase2.HasValue && t >= tPhase2.Value) ? 2 : 1;
 
-        /// <summary>Clips a real [realFrom, realTo) span to the requested window, AND splits it at the
-        /// phase-2 transition when the (already window-clipped) span straddles it. Used by both
-        /// ownership stints and capture attempts - the two tables whose rows can genuinely span more
-        /// than one phase.
+        /// <summary>Clips a real [realFrom, realTo) span to the requested window, AND splits it at the phase-2 transition when
+        /// the (window-clipped) span straddles it. Used by ownership stints and capture attempts, the two tables whose rows can
+        /// span more than one phase. Yields nothing with no overlap, ONE piece when it doesn't straddle tPhase2, TWO when it
+        /// does (Phase 1's [from, tPhase2) and Phase 2's [tPhase2, to)).
         ///
-        /// Yields nothing when the span has no overlap with the window at all; yields ONE piece when
-        /// it doesn't straddle tPhase2; yields TWO when it does (Phase 1's [from, tPhase2) and Phase
-        /// 2's [tPhase2, to)). This single mechanism is what makes "the whole-match build's rows are
-        /// ALSO phase-split" and "a Phase-1/Phase-2-scoped build only ever sees its own half" the same
-        /// code path: a phase-scoped window's own End IS tPhase2 (Phase 1) or Start IS tPhase2 (Phase
-        /// 2), so the window-clip alone already produces exactly one correctly-bounded piece for
-        /// those; only the whole-match window (whose End is well past tPhase2) ever needs the second
-        /// yield.</summary>
+        /// One mechanism makes "the whole-match build's rows are ALSO phase-split" and "a phase-scoped build only sees its own
+        /// half" the same code path: a phase-scoped window's End IS tPhase2 (Phase 1) or Start IS tPhase2 (Phase 2), so the
+        /// window-clip alone yields one correctly-bounded piece; only the whole-match window needs the second yield.</summary>
         private static IEnumerable<(double From, double To, bool ReachedRealEnd, int Phase)> ClipAndTagPhase(
             double realFrom, double realTo, TimeWindow window, double? tPhase2)
         {
@@ -252,9 +180,8 @@ namespace Overpower.EditorTools.Telemetry
         {
             markerWindow ??= window;
             header.MatchId = log.MatchId;
-            // Task T7: THIS window's own duration - the whole match's length when window is the
-            // whole-match window (unchanged from before T7), or a phase's own duration on a
-            // phase-scoped build, which is what lets the HTML compare it against BalanceTargets'
+            // THIS window's duration: the whole match's length for the whole-match window, or a phase's own duration on a
+            // phase-scoped build, which lets the HTML compare it against BalanceTargets'
             // Phase1DurationSeconds/Phase2DurationSeconds.
             header.MatchLengthSeconds = window.End - window.Start;
             header.MalformedLineCount = log.MalformedLineCount;
@@ -282,15 +209,14 @@ namespace Overpower.EditorTools.Telemetry
 
             foreach (TelemetryEvent e in log.Events)
             {
-                // Task T7: the free-loadout/debug-gold warnings are scoped to THIS window. 2026-09-27
-                // designer change: a Marker uses markerWindow instead - on the whole-match build that
-                // is [0, End] (the full log, warm-up included - Markers stay visible over the full log
-                // like Bug reports/Console), but still scoped per phase tab on a Phase 1/Phase 2 build
-                // (a marker dropped in Phase 2 has no business on the Phase 1 tab).
+                // The free-loadout/debug-gold warnings are scoped to THIS window. A Marker uses markerWindow instead: on the
+                // whole-match build that is [0, End] (full log, warm-up included - Markers stay visible over the full log like
+                // Bug reports/Console), but still scoped per phase tab on a Phase 1/Phase 2 build (a marker dropped in Phase 2
+                // has no business on the Phase 1 tab).
                 if (e.Name == TelemetryKeys.Marker)
                 {
                     if (!markerWindow.Contains(e.T)) continue;
-                    // Lobby Task 13: "spectator joined: actor N" is bookkeeping for the log-coverage table, not a moment somebody flagged.
+                    // "spectator joined: actor N" is bookkeeping for the log-coverage table, not a moment somebody flagged.
                     if (LobbyMarkerNotes.TryReadSpectator(e.Data[TelemetryKeys.Note]?.ToString(), out _)) continue;
                     header.Markers.Add(new MarkerRow
                     {
@@ -308,18 +234,16 @@ namespace Overpower.EditorTools.Telemetry
                     if (ReadInt(e.Data, TelemetryKeys.Debug, 0) > 0)
                         header.DebugGoldUsed = true;
                 }
-                // Opus review item 9: OR the tuning flag with any purchase actually marked free -
-                // a mid-match Free Loadout toggle (or a free purchase with no matching tuning read)
-                // must still surface the warning.
+                // OR the tuning flag with any purchase marked free: a mid-match Free Loadout toggle (or a free purchase with no
+                // matching tuning read) must still surface the warning.
                 else if (e.Name == TelemetryKeys.Purchase && (e.Data[TelemetryKeys.Free]?.ToObject<bool?>() ?? false))
                 {
                     header.FreeLoadoutUsed = true;
                 }
             }
 
-            // Player coverage: each FILE's own first/last real event - a fact about the file, not
-            // about any one phase window, so this stays unwindowed even on a Phase 1/Phase
-            // 2-scoped build (Task T7).
+            // Player coverage: each FILE's first/last real event - a fact about the file, not about any one phase window, so it
+            // stays unwindowed even on a phase-scoped build.
             var firstT = new Dictionary<string, double>();
             var lastT = new Dictionary<string, double>();
             foreach (TelemetryEvent e in log.Events)
@@ -340,29 +264,26 @@ namespace Overpower.EditorTools.Telemetry
                 });
             }
 
-            // Task T7: log coverage - every actor seen ANYWHERE (not just those with their own
-            // file), always whole-match regardless of this build's own window - see
-            // LogCoverageRow's own comment.
+            // Log coverage: every actor seen ANYWHERE (not just those with their own file), always whole-match regardless of
+            // this build's window - see LogCoverageRow.
             BuildLogCoverage(log, sessionByActor, coverageByActor, header.LogCoverage, sampleInterval);
         }
 
-        /// <summary>Task T7: every actor seen anywhere in the match - joins, sessions, `hit`
-        /// attackers/victims, `death` killers/assists - against which files are actually present, so
-        /// the report can say "no log from actor N" instead of silently under-counting their damage,
-        /// gold and purchases.</summary>
+        /// <summary>Every actor seen anywhere in the match (joins, sessions, `hit` attackers/victims, `death` killers/assists)
+        /// against which files are present, so the report can say "no log from actor N" instead of silently under-counting
+        /// their damage, gold and purchases.</summary>
         private static void BuildLogCoverage(TelemetryLog log, Dictionary<int, TelemetrySession> sessionByActor,
             Dictionary<int, (double First, double Last)> coverageByActor, List<LogCoverageRow> outRows, double sampleInterval)
         {
             var seen = new HashSet<int>(sessionByActor.Keys);
-            // Lobby Task 13 (Task 8 review): a spectator has no match log of their own (only a spectator HOST writes one, and that file is no player
-            // row), so "no log from actor N" would be a false alarm. A spectator host's session says so (spec flag); any other spectator is named by
-            // the master's "spectator joined" marker (MatchTelemetry writes one when it sees their spec flag).
+            // A spectator has no match log of their own (only a spectator HOST writes one, and that file is no player row), so
+            // "no log from actor N" would be a false alarm. A spectator host's session says so (spec flag); any other spectator
+            // is named by the master's "spectator joined" marker (MatchTelemetry writes one when it sees their spec flag).
             var spectators = new HashSet<int>();
             foreach (TelemetrySession s in sessionByActor.Values)
                 if (s.Spectator) spectators.Add(s.Actor);
-            // Review fix (item 10): a MISSING actor's own nick/first-seen/last-seen now come from
-            // whoever else logged their `join`/`leave` (every client logs every OTHER player's join
-            // and leave, even one whose own file never opened).
+            // A MISSING actor's nick/first-seen/last-seen come from whoever else logged their `join`/`leave` (every client logs
+            // every OTHER player's join and leave, even one whose own file never opened).
             var nickByActor = new Dictionary<int, string>();
             var earliestJoinByActor = new Dictionary<int, double>();
             var latestLeaveByActor = new Dictionary<int, double>();
@@ -438,12 +359,10 @@ namespace Overpower.EditorTools.Telemetry
                     bool hasLeave = latestLeaveByActor.TryGetValue(actor, out double leaveT);
                     firstT = hasJoin ? joinT : (double?)null;
                     lastT = hasLeave ? leaveT : (double?)null;
-                    // Round-2 review fix (item E): the span itself must be genuinely short, not
-                    // just present - a join->leave gap of minutes still means real, uncounted
-                    // gameplay happened (damage, gold, purchases nobody's file recorded), which
-                    // deserves the harsh warning, not the soft "gone before logging started" one.
-                    // Chosen threshold: shorter than one sample interval - long enough that even a
-                    // single `sample` line never had a chance to flush before they left.
+                    // The span must be genuinely short, not just present: a join->leave gap of minutes still means real,
+                    // uncounted gameplay happened (damage, gold, purchases nobody's file recorded), which deserves the harsh
+                    // warning, not the soft "gone before logging started" one. Threshold: shorter than one sample interval -
+                    // long enough that even a single `sample` line never had a chance to flush before they left.
                     joinedAndLeft = hasJoin && hasLeave && leaveT >= joinT && (leaveT - joinT) < sampleInterval;
                 }
 
@@ -459,21 +378,17 @@ namespace Overpower.EditorTools.Telemetry
             }
         }
 
-        /// <summary>Playtest extras Task 2 (P4): the "Bug reports" and per-player "Console" sections'
-        /// own data, in one pass. A console line carries no actor field of its own - the FILE it came
-        /// from is the player (see TelemetryKeys.Console's own doc comment and ActorOf) - so both a
-        /// bug card's own console window and the per-player grouping below read it through fileActor.
+        /// <summary>The "Bug reports" and per-player "Console" sections' data, in one pass. A console line carries no actor
+        /// field - the FILE it came from is the player (see TelemetryKeys.Console and ActorOf) - so both a bug card's console
+        /// window and the per-player grouping read it through fileActor.
         ///
-        /// Bug cards: the reporter's OWN chat (never another player's) in [t, t+60], and every
-        /// client's console lines (any level, including plain "log" - the one place they're kept) in
-        /// [t-20, t+5], merged across every file and sorted by time. A "dropped" summary line (State
-        /// "dropped", no Message of its own) is never a real console line and is skipped everywhere
-        /// in this method.
+        /// Bug cards: the reporter's OWN chat (never another player's) in [t, t+60], and every client's console lines (any
+        /// level, including plain "log" - the one place they're kept) in [t-20, t+5], merged across files and sorted by time. A
+        /// "dropped" summary line (State "dropped", no Message) is never a real console line and is skipped everywhere here.
         ///
-        /// Per-player Console: every non-"log" line (warning/error/exception/assert), grouped by
-        /// (actor, level, message) - the count SUMS each matching line's own fold count (n), since one
-        /// already-folded line can itself represent several real repeats, and First/Last t spans every
-        /// matching line's own first/last-touched time, not just its own single `t`.</summary>
+        /// Per-player Console: every non-"log" line (warning/error/exception/assert), grouped by (actor, level, message) - the
+        /// count SUMS each matching line's fold count (n), since one folded line can represent several real repeats, and
+        /// First/Last t spans every matching line's first/last-touched time, not just its single `t`.</summary>
         private static void BuildBugsAndConsole(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, TelemetrySession> sessionByActor, double? tPhase2, List<BugRow> outBugs,
             List<ConsolePlayerGroupRow> outConsoleByPlayer)
@@ -528,14 +443,14 @@ namespace Overpower.EditorTools.Telemetry
                     Phase = PhaseOf(e.T, tPhase2),
                 };
 
-                // The reporter's OWN chat, 0-60s after the mark (P4) - never another player's.
+                // The reporter's OWN chat, 0-60s after the mark - never another player's.
                 if (chatByActor.TryGetValue(actor, out var chats))
                     foreach (var (t, text) in chats)
                         if (t >= e.T && t <= e.T + 60.0)
                             bug.ChatNotes.Add(text);
 
-                // Every client's console lines, 20s before to 5s after (P4) - merged across files,
-                // sorted by time below, labelled by whichever player's file each one came from.
+                // Every client's console lines, 20s before to 5s after - merged across files, sorted by time below, labelled by
+                // whichever player's file each came from.
                 foreach (var (t, lineActor, level, message, n, _, _) in consoleLines)
                 {
                     if (t < e.T - 20.0 || t > e.T + 5.0) continue;
@@ -554,9 +469,8 @@ namespace Overpower.EditorTools.Telemetry
                 outBugs.Add(bug);
             }
 
-            // Console section, per player - every level except plain "log" (P4's own wording: "plain
-            // log lines only appear inside bug windows" - see BugRow.ConsoleWindow, the one place they
-            // do), grouped by (actor, level, message), with the summed count and the first/last time.
+            // Console section, per player: every level except plain "log" (which only appears inside bug windows - see
+            // BugRow.ConsoleWindow), grouped by (actor, level, message), with the summed count and the first/last time.
             var groups = new Dictionary<(int Actor, string Level, string Message), ConsolePlayerGroupRow>();
             foreach (var (t, actor, level, message, n, firstT, lastT) in consoleLines)
             {
@@ -582,12 +496,11 @@ namespace Overpower.EditorTools.Telemetry
             outConsoleByPlayer.AddRange(groups.Values.OrderBy(r => r.Actor).ThenBy(r => r.FirstT));
         }
 
-        /// <summary>Opus review item 2: a late joiner's `session` line can be written before the room's
-        /// player-properties echo carries their team (tm:-1), which used to drop their whole slice from
-        /// every team-keyed table (economy, zone income, gold gap, players.csv). Each actor's team is
-        /// instead read from their own first `sample` that reports tm >= 0 - `sample` is written by the
-        /// owner every interval for the rest of the match, so it catches up moments later - falling back
-        /// to the session's own team only if no sample ever does.</summary>
+        /// <summary>A late joiner's `session` line can be written before the room's player-properties echo carries their team
+        /// (tm:-1), which would drop their whole slice from every team-keyed table (economy, zone income, gold gap,
+        /// players.csv). Each actor's team is instead read from their first `sample` that reports tm >= 0 - `sample` is written
+        /// by the owner every interval, so it catches up moments later - falling back to the session's team only if no sample
+        /// ever does.</summary>
         private static Dictionary<int, int> BuildEffectiveTeam(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, TelemetrySession> sessionByActor)
         {
@@ -612,7 +525,7 @@ namespace Overpower.EditorTools.Telemetry
             var lastT = new Dictionary<int, double>();
             foreach (TelemetryEvent e in log.Events)
             {
-                if (e.T < 0) continue; // Opus review item 11: t == -1 never counts as covered time.
+                if (e.T < 0) continue; // t == -1 never counts as covered time.
                 int actor = ActorOf(e, fileActor);
                 if (!firstT.TryGetValue(actor, out double f) || e.T < f) firstT[actor] = e.T;
                 if (!lastT.TryGetValue(actor, out double l) || e.T > l) lastT[actor] = e.T;
@@ -623,11 +536,9 @@ namespace Overpower.EditorTools.Telemetry
             return result;
         }
 
-        /// <summary>The sample interval used to bound the trailing interval and cap gaps (opus review
-        /// item 11). Step 0b added TelemetryConfig to the tuning snapshot (TuningSnapshot.Json), so a
-        /// session line from a real match now carries `telemetry.sampleIntervalSeconds`; older logs
-        /// captured before that change don't, so this still falls back to the shipped default (5s)
-        /// when the field is absent.</summary>
+        /// <summary>The sample interval used to bound the trailing interval and cap gaps. A session line from a real match
+        /// carries `telemetry.sampleIntervalSeconds` (in the tuning snapshot); older logs don't, so this falls back to the
+        /// shipped default (5s) when the field is absent.</summary>
         private static double ResolveSampleIntervalSeconds(TelemetryLog log)
         {
             foreach (TelemetrySession s in log.Sessions)
@@ -685,9 +596,8 @@ namespace Overpower.EditorTools.Telemetry
                         ? (changes[i + 1].New == Neutral ? "decayed" : "captured")
                         : "matchEnd";
 
-                    // Task T7: clip this stint to the requested window, splitting it at the phase
-                    // boundary too when it straddles one (even on a whole-match build - see
-                    // ClipAndTagPhase's own comment).
+                    // Clip this stint to the requested window, splitting it at the phase boundary too when it straddles one
+                    // (even on a whole-match build - see ClipAndTagPhase).
                     foreach (var piece in ClipAndTagPhase(t, to, window, tPhase2))
                     {
                         outStints.Add(new OwnershipRow
@@ -720,18 +630,13 @@ namespace Overpower.EditorTools.Telemetry
 
         // ==================================================================== captures
 
-        /// <summary>Opus review item 1 (HIGH): rebuilt as ONE time-ordered pass over `capture` lines and
-        /// deduped `ownership` changes together - the old two-pass version consumed every capture line
-        /// first (collapsing every start/pause/resume cycle for a zone into a single mutable attempt
-        /// object) and only then walked ownership changes to close whatever was still open, so a zone
-        /// re-captured, drained, and captured again within one match produced at most one row instead
-        /// of several. Ownership items sort BEFORE a same-instant capture item (see the merge below),
-        /// so a completion recorded in the same instant as a stray same-tick capture line always closes
-        /// the right attempt first.
+        /// <summary>ONE time-ordered pass over `capture` lines and deduped `ownership` changes together, so a zone re-captured,
+        /// drained and captured again in one match yields several rows (a two-pass version collapsed every start/pause/resume
+        /// cycle for a zone into one mutable attempt). Ownership items sort BEFORE a same-instant capture item, so a completion
+        /// recorded in the same instant as a stray same-tick capture line closes the right attempt first.
         ///
-        /// Task T7: the state machine below builds the RAW (unwindowed) attempts exactly as before,
-        /// into a local list; only the final clip-and-tag pass (mirroring BuildOwnership's own) scopes
-        /// them to the requested window and phase-splits a straddling attempt.</summary>
+        /// The state machine builds the RAW (unwindowed) attempts into a local list; the final clip-and-tag pass (like
+        /// BuildOwnership's) scopes them to the window and phase-splits a straddling attempt.</summary>
         private static void BuildCaptures(TelemetryLog log, Dictionary<int, List<(double T, int New)>> rawChangesByZone,
                                            Dictionary<int, int> zoneTier, double matchLength, ReportHeader header,
                                            List<CaptureRow> outCaptures, TimeWindow window, double? tPhase2)
@@ -831,8 +736,8 @@ namespace Overpower.EditorTools.Telemetry
                     if (open.TryGetValue(item.Zone, out CaptureAttempt attempt))
                         attempt.LastPlayers = item.Players;
                 }
-                // "completed"/"neutralised" (pre-T4-fix logs only) - known, but never drives the state
-                // machine; the matching ownership item (in this same merged pass) is what actually closes it.
+                // "completed"/"neutralised" (older logs only) are known but never drive the state machine; the matching
+                // ownership item in this merged pass is what closes the attempt.
             }
 
             foreach (var kv in open.OrderBy(kv => kv.Key))
@@ -851,8 +756,7 @@ namespace Overpower.EditorTools.Telemetry
                 });
             }
 
-            // Task T7: clip + phase-tag every raw attempt against the requested window - same
-            // mechanism as BuildOwnership's own stints (see ClipAndTagPhase).
+            // Clip + phase-tag every raw attempt against the requested window, like BuildOwnership's stints (ClipAndTagPhase).
             foreach (CaptureRow raw in rawCaptures)
             {
                 foreach (var piece in ClipAndTagPhase(raw.Start, raw.End, window, tPhase2))
@@ -895,9 +799,8 @@ namespace Overpower.EditorTools.Telemetry
                     {
                         T = e.T, Actor = actor, Nick = nick, Team = team, Kind = "purchase",
                         Category = CategoryName(e.Data[TelemetryKeys.Category]?.ToString()),
-                        // Opus review item 5 (armor encoding): item stays a plain opaque int here -
-                        // 100+level (absorb) / 200+level (recharge) as of the T4 fix, a real weapon/
-                        // ability id otherwise. Never decoded - see TelemetryKeys.ItemId's own comment.
+                        // Item stays an opaque int: 100+level (absorb) / 200+level (recharge) for armor, a real weapon/ability
+                        // id otherwise. Never decoded - see TelemetryKeys.ItemId.
                         ItemId = ReadInt(e.Data, TelemetryKeys.ItemId, -1),
                         Amount = ReadInt(e.Data, TelemetryKeys.Price, 0),
                         BalanceAfter = ReadInt(e.Data, TelemetryKeys.BalanceAfter, 0),
@@ -935,12 +838,10 @@ namespace Overpower.EditorTools.Telemetry
             }
         }
 
-        /// <summary>Opus review item 7 (T5 re-review): hits.csv/deaths.csv used to read the raw
-        /// `at`/`vt`/`at` (killer) team field straight off the event line, bypassing the same
-        /// late-joiner fallback every other team-keyed table already gets via effectiveTeam (a late
-        /// joiner's own early lines can carry tm:-1 before the room's player-properties echo
-        /// arrives). A raw value of -1 now falls back to the actor's resolved effective team; a
-        /// genuinely unresolvable actor (id -1, e.g. a dummy) still reads -1.</summary>
+        /// <summary>hits.csv/deaths.csv take the `at`/`vt`/`at` (killer) team field from the event line, but a late joiner's
+        /// early lines can carry tm:-1 before the room's player-properties echo arrives; a raw -1 falls back to the actor's
+        /// effectiveTeam (as every other team-keyed table does). A genuinely unresolvable actor (id -1, e.g. a dummy) still
+        /// reads -1.</summary>
         private static int ResolveTeam(int rawTeam, int actor, Dictionary<int, int> effectiveTeam)
         {
             if (rawTeam >= 0) return rawTeam;
@@ -973,43 +874,34 @@ namespace Overpower.EditorTools.Telemetry
                     Source = e.Data[TelemetryKeys.Source]?.ToString() ?? "",
                     Raw = ReadFloat(e.Data, TelemetryKeys.Raw),
                     Armor = ReadFloat(e.Data, TelemetryKeys.ArmorAbsorbed),
-                    // T3 review: new logs use "hpLost"; older ones (pre-review) wrote the same value as "hp".
+                    // New logs use "hpLost"; older ones wrote the same value as "hp".
                     HealthLost = ReadFloat(e.Data, TelemetryKeys.HealthLost, "hp"),
                     Lethal = e.Data[TelemetryKeys.Lethal]?.ToObject<bool?>() ?? false,
                     Distance = distance,
                     Vulnerable = ReadFloat(e.Data, TelemetryKeys.Vulnerable),
                     Overpower = e.Data[TelemetryKeys.OverpowerActive]?.ToObject<bool?>() ?? false,
-                    // Mark plan step 6: absent key (a non-marking hit, or any hit logged before this
-                    // step existed) reads 0, same convention as every other "only when non-zero" field.
+                    // Absent key (a non-marking hit, or a hit logged before the field existed) reads 0, like every other "only
+                    // when non-zero" field.
                     Mark = ReadInt(e.Data, TelemetryKeys.Mark, 0),
                     Phase = PhaseOf(e.T, tPhase2),
                 });
             }
         }
 
-        /// <summary>Opus review item 8: a lethal Burn tick is logged as both a flushed `dot` (its
-        /// accumulated bucket) AND a `hit` (so every kill keeps a row - see PlayerTelemetry.RouteHit).
-        /// That `hit` row's own damage is already counted via the `dot`; summing it again here would
-        /// double it. Kept in hits.csv itself, and kills never read a hit row at all (they come from
-        /// `death`), so only damage sums need this guard.</summary>
+        /// <summary>A lethal Burn tick is logged as both a flushed `dot` (its accumulated bucket) AND a `hit` (so every kill
+        /// keeps a row - see PlayerTelemetry.RouteHit). That hit's damage is already counted via the `dot`, so damage sums must
+        /// skip it. It stays in hits.csv, and kills never read a hit row (they come from `death`).</summary>
         private static bool CountsTowardDamageSums(HitRow h) => h.Source != "Burn";
 
         // ==================================================================== gold timeline / economy by minute
 
-        /// <summary>Task T7: the one table this feature does NOT window as cleanly as the other
-        /// eleven. `gold_timeline.csv`'s own EarnedSoFar/SpentSoFar stay whole-match running totals on
-        /// PURPOSE even on a phase-scoped build (they keep their literal meaning, "earned/spent so far
-        /// in the match" - a Phase 2 row showing a Phase-1-inclusive running total is more useful than
-        /// a confusing reset-to-zero); only which SAMPLE ROWS are emitted is scoped to the window.
-        /// `economy_by_minute.csv` goes further: each event's own contribution to a minute bucket IS
-        /// scoped to the window (so a Phase 1/Phase 2 build's numbers are correct), and only buckets
-        /// that overlap the window survive into the output - but the minute INDEX itself stays the
-        /// absolute match minute rather than being renumbered relative to the phase's own start,
-        /// because the "zones held per tier" and "gold gap to richest" passes below both already
-        /// depend on absolute minute math (matchLength, OwnerAtTime at an absolute midpoint, a stale-
-        /// sample cutoff measured from an absolute bucket end) that would need its own separate
-        /// re-derivation to renumber cleanly. Reported to Tudor as a known simplification rather than
-        /// silently pretending it's exactly as clean as the rest.</summary>
+        /// <summary>The one table not windowed as cleanly as the rest. gold_timeline.csv's EarnedSoFar/SpentSoFar stay
+        /// whole-match running totals ON PURPOSE even on a phase-scoped build (a Phase 2 row showing a Phase-1-inclusive
+        /// running total beats a reset to zero); only which SAMPLE ROWS are emitted is scoped. economy_by_minute.csv scopes
+        /// each event's contribution to the window, and only buckets overlapping the window survive, but the minute INDEX stays
+        /// the absolute match minute: the "zones held per tier" and "gold gap to richest" passes below depend on absolute
+        /// minute math (matchLength, OwnerAtTime at an absolute midpoint, a stale-sample cutoff from an absolute bucket end). A
+        /// known simplification.</summary>
         private static void BuildGoldTimelineAndEconomy(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, TelemetrySession> sessionByActor, Dictionary<int, int> effectiveTeam, Dictionary<int, int> zoneTier,
             Dictionary<int, List<(double T, int New)>> rawChangesByZone, double matchLength, ReportTables tables,
@@ -1038,7 +930,7 @@ namespace Overpower.EditorTools.Telemetry
                     if (IsJunkGoldEarned(e.Data)) continue;
 
                     int total = SumGoldEarnedTotal(e.Data);
-                    // Task T7: unwindowed on purpose - see this method's own class comment.
+                    // Unwindowed on purpose - see this method's summary.
                     earnedRunning[actor] = earnedRunning.GetValueOrDefault(actor) + total;
 
                     if (window.Contains(e.T))
@@ -1047,20 +939,20 @@ namespace Overpower.EditorTools.Telemetry
                         if (minute < 0) minute = 0;
                         if (team >= 0 && economyRows.TryGetValue((minute, team), out EconomyByMinuteRow row))
                         {
-                            // Opus review item 4: rescale this line's own zones[] to sum to its own terr
-                            // (authoritative) before accumulating - see ScaledZones.
+                            // Rescale this line's zones[] to sum to its terr (authoritative) before accumulating - see
+                            // ScaledZones.
                             double[] scaledZones = ScaledZones(e.Data);
                             for (int z = 0; z < scaledZones.Length; z++)
                             {
                                 if (!zoneTier.TryGetValue(z, out int tier)) continue;
-                                if (tier < 1 || tier > row.IncomeByTier.Length) { tables.Header.InvalidTierCount++; continue; } // item 5
+                                if (tier < 1 || tier > row.IncomeByTier.Length) { tables.Header.InvalidTierCount++; continue; }
                                 row.IncomeByTier[tier - 1] += scaledZones[z];
                             }
-                            // T5 re-review item 9: terr > 0 with no zones[] to rescale by (empty or all
-                            // zero) - kept here rather than silently dropped, see UnattributedIncome.
+                            // terr > 0 with no zones[] to rescale by (empty or all zero): kept, not dropped - see
+                            // UnattributedIncome.
                             row.UnattributedIncome += UnattributedTerritoryGold(e.Data, scaledZones);
-                            // Point 2 (first-pass review): goldEarned.bounty is the OWNER's own credited
-                            // total, not the master's per-payout `bounty` line - safe to sum without double counting.
+                            // goldEarned.bounty is the OWNER's credited total, not the master's per-payout `bounty` line - safe
+                            // to sum without double counting.
                             row.Bounty += ReadInt(e.Data, TelemetryKeys.Bounty, 0);
                             row.Refund += ReadInt(e.Data, TelemetryKeys.Refund, 0);
                         }
@@ -1069,7 +961,7 @@ namespace Overpower.EditorTools.Telemetry
                 else if (e.Name == TelemetryKeys.Purchase)
                 {
                     int price = ReadInt(e.Data, TelemetryKeys.Price, 0);
-                    // Task T7: unwindowed on purpose - see this method's own class comment.
+                    // Unwindowed on purpose - see this method's summary.
                     spentRunning[actor] = spentRunning.GetValueOrDefault(actor) + price;
 
                     if (window.Contains(e.T))
@@ -1082,7 +974,7 @@ namespace Overpower.EditorTools.Telemetry
                 }
                 else if (e.Name == TelemetryKeys.Sample)
                 {
-                    if (!window.Contains(e.T)) continue; // Task T7: only this window's own samples.
+                    if (!window.Contains(e.T)) continue; // only this window's own samples.
                     tables.GoldTimeline.Add(new GoldTimelineRow
                     {
                         T = e.T,
@@ -1097,11 +989,9 @@ namespace Overpower.EditorTools.Telemetry
                 }
             }
 
-            // T5 re-review item 10: a zone's own tier (from zoneTier, set once per zone by
-            // BuildOwnership) never changes across this sweep - only its OWNER does per minute - so
-            // checking validity inside the "for each minute" loop counted the SAME bad zone once per
-            // minute (a 20-minute match inflated one bad zone to 20). Computed once, outside the
-            // minute loop, so Header.InvalidTierCount counts distinct bad zones, not zone-minutes.
+            // A zone's tier (from zoneTier, set once per zone by BuildOwnership) never changes across this sweep, only its
+            // OWNER does; checking validity inside the per-minute loop counted the same bad zone once per minute. Computed
+            // once, outside, so Header.InvalidTierCount counts distinct bad zones, not zone-minutes.
             var invalidTierZones = new HashSet<int>();
             foreach (var kv in zoneTier)
                 if (kv.Value < 1 || kv.Value > 4)
@@ -1123,9 +1013,8 @@ namespace Overpower.EditorTools.Telemetry
                 }
             }
 
-            // Gold gap to the richest team, from each actor's last sample at or before the minute's
-            // end - opus review item 7: a sample older than (bucket end - 60s) is stale (the player
-            // likely left) and is ignored rather than keeping their last known balance forever.
+            // Gold gap to the richest team, from each actor's last sample at or before the minute's end; a sample older than
+            // (bucket end - 60s) is stale (the player likely left) and ignored rather than keeping their last balance forever.
             var samplesByActor = new Dictionary<int, List<(double T, int Balance)>>();
             foreach (TelemetryEvent e in log.Events)
             {
@@ -1162,14 +1051,11 @@ namespace Overpower.EditorTools.Telemetry
                         row.GoldGapToRichest = richest - teamBalance.GetValueOrDefault(team);
             }
 
-            // Task T7: keep only the minute buckets that actually overlap this window (see this
-            // method's own class comment on why the minute INDEX itself stays absolute). Review
-            // fix: a Phase 1- or Phase 2-SCOPED build (forcedPhase set) tags every surviving row
-            // with that one phase - a bucket straddling the transition can otherwise overlap a
-            // single-phase window while its own START time still reads as the OTHER phase (minute
-            // 1, 60->120, overlaps the Phase 2 window [90,180] but starts at 60). Only the
-            // whole-match build (forcedPhase null) still tags a straddling bucket by its own
-            // absolute start - documented above as this table's one simplification.
+            // Keep only the minute buckets overlapping this window (the INDEX stays absolute, see this method's summary). A
+            // Phase 1- or Phase 2-SCOPED build (forcedPhase set) tags every surviving row with that one phase: a bucket
+            // straddling the transition can overlap a single-phase window while its START reads as the other phase (minute 1,
+            // 60->120, overlaps Phase 2 [90,180] but starts at 60). Only the whole-match build (forcedPhase null) tags a
+            // straddling bucket by its absolute start - the table's one simplification.
             tables.EconomyByMinute = economyRows.Values
                 .Where(r => BucketOverlapsWindow(r.Minute, matchLength, window))
                 .OrderBy(r => r.Minute).ThenBy(r => r.Team)
@@ -1192,8 +1078,7 @@ namespace Overpower.EditorTools.Telemetry
             Dictionary<int, int> effectiveTeam, Dictionary<int, int> zoneTier,
             List<OwnershipRow> stints, List<ZoneIncomeRow> outRows, TimeWindow window)
         {
-            // Task T7: `stints` is ALREADY window-clipped (BuildOwnership ran first) - summing its
-            // Duration here needs no extra work at all to be correctly scoped.
+            // `stints` is ALREADY window-clipped (BuildOwnership ran first), so summing its Duration is correctly scoped.
             var secondsHeld = new Dictionary<(int Zone, int Team), double>();
             foreach (OwnershipRow stint in stints)
                 secondsHeld[(stint.Zone, stint.Team)] = secondsHeld.GetValueOrDefault((stint.Zone, stint.Team)) + stint.Duration;
@@ -1202,23 +1087,22 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.GoldEarned || IsJunkGoldEarned(e.Data)) continue;
-                if (!window.Contains(e.T)) continue; // Task T7
+                if (!window.Contains(e.T)) continue;
 
                 int actor = ActorOf(e, fileActor);
                 int team = effectiveTeam.GetValueOrDefault(actor, -1);
                 if (team < 0) continue;
 
-                double[] scaledZones = ScaledZones(e.Data); // opus review item 4
+                double[] scaledZones = ScaledZones(e.Data);
                 for (int z = 0; z < scaledZones.Length; z++)
                 {
                     if (scaledZones[z] == 0) continue;
                     goldGenerated[(z, team)] = goldGenerated.GetValueOrDefault((z, team)) + scaledZones[z];
                 }
 
-                // T5 re-review item 9: terr > 0 with no zones[] to rescale by - a synthetic
-                // "Unattributed" zone (id UnattributedZone) keeps this gold visible per team instead
-                // of vanishing from zone_income.csv while players.csv's own running total still
-                // includes it.
+                // terr > 0 with no zones[] to rescale by: a synthetic "Unattributed" zone (UnattributedZone) keeps this gold
+                // visible per team instead of vanishing from zone_income.csv while players.csv's running total still includes
+                // it.
                 double unattributed = UnattributedTerritoryGold(e.Data, scaledZones);
                 if (unattributed > 0)
                     goldGenerated[(UnattributedZone, team)] = goldGenerated.GetValueOrDefault((UnattributedZone, team)) + unattributed;
@@ -1238,13 +1122,11 @@ namespace Overpower.EditorTools.Telemetry
             }
         }
 
-        /// <summary>Opus review item 4: `goldEarned.zones[]` is rounded to whole gold PER ZONE at the
-        /// source (PlayerTelemetry.RoundedZoneArray), so summing many already-rounded lines drifts
-        /// noticeably from the line's own authoritative `terr` total (a real log measured Sigma-terr 254
-        /// vs Sigma-zones 244, a 4% loss). Rescaling each line's own zones to sum to its own terr before
-        /// accumulating removes that drift; the fraction is kept (callers accumulate into a double),
-        /// only rounded for display far downstream if at all. A line with terr == 0 or zones summing to
-        /// 0 is left as-is (no ratio to scale by).</summary>
+        /// <summary>`goldEarned.zones[]` is rounded to whole gold PER ZONE at the source (PlayerTelemetry.RoundedZoneArray), so
+        /// summing many lines drifts from the line's authoritative `terr` (a real log: Sigma-terr 254 vs Sigma-zones 244, 4%
+        /// loss). Rescaling each line's zones to sum to its terr before accumulating removes that; the fraction is kept
+        /// (callers accumulate into a double). A line with terr == 0 or zones summing to 0 is left as-is (no ratio to scale
+        /// by).</summary>
         private static double[] ScaledZones(JObject data)
         {
             var zones = data[TelemetryKeys.Zones] as JArray;
@@ -1268,13 +1150,10 @@ namespace Overpower.EditorTools.Telemetry
             return raw;
         }
 
-        /// <summary>T5 re-review item 9: ScaledZones has no ratio to rescale a line's `zones[]` by
-        /// when they sum to ~0 (empty array, or every entry 0) - if that same line's own `terr` is
-        /// still > 0, that gold has nowhere to go in a zone-keyed table and used to just vanish from
-        /// zone_income.csv/economy_by_minute.csv while players.csv's running total (summed straight
-        /// from `terr`, never from `zones`) stayed correct. Returns the leftover amount to bucket
-        /// into an "Unattributed" row instead, or 0 when the zones already accounted for it (or
-        /// there was no territory income on this line at all).</summary>
+        /// <summary>ScaledZones has no ratio to rescale by when a line's `zones[]` sums to ~0 (empty, or every entry 0); if its
+        /// `terr` is still > 0 that gold has nowhere to go in a zone-keyed table (players.csv sums `terr` directly, so it stays
+        /// correct). Returns the leftover to bucket into an "Unattributed" row, or 0 when the zones already accounted for
+        /// it.</summary>
         private static double UnattributedTerritoryGold(JObject data, double[] scaledZones)
         {
             int terr = ReadInt(data, TelemetryKeys.Territory, 0);
@@ -1295,25 +1174,19 @@ namespace Overpower.EditorTools.Telemetry
             public readonly Dictionary<int, double> NeutralZoneSecondsByActor = new Dictionary<int, double>();
         }
 
-        /// <summary>One sweep over every `sample` event (already t-sorted) computing two things at
-        /// once from the same consecutive-sample intervals: how long each weapon was equipped
-        /// (globally, for weapons.csv) and how long each player stood in their own/an enemy's/a
-        /// neutral zone (for players.csv). Each interval is attributed using the state read at the
-        /// START of that interval - the same convention used throughout (e.g. ownership's own "from").
+        /// <summary>One sweep over every `sample` event (already t-sorted) computing, from the same consecutive-sample
+        /// intervals, how long each weapon was equipped (globally, weapons.csv) and how long each player stood in their own/an
+        /// enemy's/a neutral zone (players.csv). Each interval is attributed using the state at its START (the convention used
+        /// throughout, e.g. ownership's "from").
         ///
-        /// Opus review items 3 and 11:
-        /// - a sample with t == -1 is ignored entirely (never a real state to start or end an interval);
-        /// - an interval starting on a DEAD sample (alive:false) contributes no equipped/zone time -
-        ///   a corpse doesn't hold a weapon or stand in anyone's territory;
-        /// - a gap between two consecutive samples is capped at 2x the sample interval - a disconnected
-        ///   client's silent gap doesn't keep accruing whatever it was doing when it dropped;
-        /// - the LAST sample of each actor's own stream gets one trailing interval too (capped at the
-        ///   sample interval, and never past that actor's own last covered instant), so the tail of the
-        ///   match isn't simply uncounted.
-        ///
-        /// Task T7: every interval (the main sweep's and the trailing one) is CLIPPED to the requested
-        /// window via TimeWindow.Clip before being accumulated - so a sample interval crossing a phase
-        /// boundary contributes its correct partial share to each phase's own build.</summary>
+        /// - a sample with t == -1 is ignored (never a real state to start or end an interval);
+        /// - an interval starting on a DEAD sample (alive:false) contributes no equipped/zone time;
+        /// - a gap between consecutive samples is capped at 2x the sample interval, so a disconnected client's silent gap
+        ///   doesn't keep accruing;
+        /// - the LAST sample of each actor's stream gets one trailing interval (capped at the sample interval, never past that
+        ///   actor's last covered instant);
+        /// - every interval is CLIPPED to the window via TimeWindow.Clip, so one crossing a phase boundary contributes its
+        ///   partial share to each phase's build.</summary>
         private static SampleDerivedStats BuildSampleDerivedStats(TelemetryLog log, Dictionary<string, int> fileActor,
             Dictionary<int, int> effectiveTeam, Dictionary<int, List<(double T, int New)>> rawChangesByZone,
             Dictionary<int, (double First, double Last)> coverageByActor, double sampleInterval, TimeWindow window)
@@ -1344,7 +1217,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Sample) continue;
-                if (e.T < 0) continue; // item 11
+                if (e.T < 0) continue; // t == -1 sample is ignored
 
                 int actor = ActorOf(e, fileActor);
                 double t = e.T;
@@ -1356,10 +1229,10 @@ namespace Overpower.EditorTools.Telemetry
                 if (lastT.TryGetValue(actor, out double prevT) && t > prevT)
                 {
                     bool prevAlive = lastAlive.GetValueOrDefault(actor, true);
-                    if (prevAlive) // item 3: a dead sample starts no counted interval
+                    if (prevAlive) // a dead sample starts no counted interval
                     {
-                        double intervalEnd = prevT + Math.Min(t - prevT, gapCap); // item 11: cap a disconnect gap
-                        // Task T7: clip [prevT, intervalEnd) to the requested window.
+                        double intervalEnd = prevT + Math.Min(t - prevT, gapCap); // cap a disconnect gap
+                        // Clip [prevT, intervalEnd) to the requested window.
                         if (window.Clip(prevT, intervalEnd, out double clipFrom, out double clipTo))
                             Accumulate(actor, clipTo - clipFrom, lastWeapon[actor], lastZone[actor], lastTeam[actor]);
                     }
@@ -1372,9 +1245,8 @@ namespace Overpower.EditorTools.Telemetry
                 lastAlive[actor] = alive;
             }
 
-            // Trailing interval for each actor's own LAST sample (item 11), bounded by that actor's own
-            // covered range (item 3) - never invented time past what we actually have for them. Task
-            // T7: clipped to the window the same way as every other interval above.
+            // Trailing interval for each actor's LAST sample, bounded by that actor's covered range - never invented time past
+            // what we have for them; clipped to the window like every other interval.
             foreach (int actor in lastT.Keys)
             {
                 if (!lastAlive.GetValueOrDefault(actor, true)) continue;
@@ -1418,12 +1290,10 @@ namespace Overpower.EditorTools.Telemetry
                 if (ab >= 0) killsByAbility[ab] = killsByAbility.GetValueOrDefault(ab) + 1;
             }
 
-            // Opus review item 6: accuracy is Projectile-hits / projectiles ONLY - Splash hits (one
-            // rocket's own splash falloff landing on several targets from one projectile) are counted
-            // separately so they can no longer push accuracy over 100%. Distance stays Projectile-only
-            // too, for the same "matches what Hits counts" reason. Damage sums exclude any Burn-source
-            // hit row (item 8 - already counted via its `dot`), from BOTH weapon and ability totals.
-            // `hits` (tables.Hits) is already window-filtered by BuildHits - nothing extra to do here.
+            // Accuracy is Projectile hits / projectiles ONLY: Splash hits (one rocket's splash landing on several targets) are
+            // counted separately so they can't push accuracy over 100%. Distance stays Projectile-only for the same reason.
+            // Damage sums exclude any Burn-source hit row (already counted via its `dot`), from BOTH weapon and ability totals.
+            // `hits` (tables.Hits) is already window-filtered by BuildHits.
             var hitCountByWeapon = new Dictionary<int, int>();
             var splashCountByWeapon = new Dictionary<int, int>();
             var distancesByWeapon = new Dictionary<int, List<double>>();
@@ -1431,9 +1301,8 @@ namespace Overpower.EditorTools.Telemetry
             var armorByWeapon = new Dictionary<int, float>();
             var healthByWeapon = new Dictionary<int, float>();
             var damageRawByAbility = new Dictionary<int, float>();
-            // Mark plan step 6: counted regardless of Source (Projectile/Splash both apply as long as
-            // the firing weapon marks - Decision 6 keys the mark on the WEAPON's own stat block, not on
-            // how the damage arrived), unlike Hits/SplashHits above which are split by Source.
+            // Counted regardless of Source (Projectile/Splash both apply as long as the firing weapon marks): Decision 6 keys
+            // the mark on the WEAPON's stat block, not on how the damage arrived.
             var marksPlacedByWeapon = new Dictionary<int, int>();
             var marksCashedByWeapon = new Dictionary<int, int>();
 
@@ -1463,8 +1332,8 @@ namespace Overpower.EditorTools.Telemetry
                         healthByWeapon[h.Weapon] = healthByWeapon.GetValueOrDefault(h.Weapon) + h.HealthLost;
                     }
 
-                    // Mark plan step 6: 1 == MarkOutcome.Applied, 2 == MarkOutcome.Cashed (HitRow.Mark's
-                    // own comment) - 0 (no key on the line) is neither and is simply never counted.
+                    // 1 == MarkOutcome.Applied, 2 == MarkOutcome.Cashed (HitRow.Mark); 0 (no key on the line) is neither and is
+                    // never counted.
                     if (h.Mark == 1)
                         marksPlacedByWeapon[h.Weapon] = marksPlacedByWeapon.GetValueOrDefault(h.Weapon) + 1;
                     else if (h.Mark == 2)
@@ -1602,13 +1471,13 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Death) continue;
-                if (!window.Contains(e.T)) continue; // Task T7: this death didn't happen in this window.
+                if (!window.Contains(e.T)) continue; // this death didn't happen in this window.
 
                 int victim = ActorOf(e, fileActor);
                 TelemetrySession victimSession = sessionByActor.GetValueOrDefault(victim);
 
-                // Opus review item 10: a null inside `assists` (a malformed line, or a future schema
-                // that can write one) used to throw on ToObject<int>() - skipped instead.
+                // A null inside `assists` (a malformed line, or a future schema) would throw on ToObject<int>(): skipped
+                // instead.
                 var assists = (e.Data[TelemetryKeys.Assists] as JArray)
                     ?.Where(t => t.Type != JTokenType.Null)
                     .Select(t => t.ToObject<int>())
@@ -1647,9 +1516,8 @@ namespace Overpower.EditorTools.Telemetry
                 foreach (int assister in d.Assists)
                     assistsByActor[assister] = assistsByActor.GetValueOrDefault(assister) + 1;
             }
-            // Task T7: respawns stay UNWINDOWED - the time-alive tail below needs the TRUE respawn
-            // history to find "the first respawn after the true last death", even when that respawn
-            // (or the death before it) falls outside this window.
+            // Respawns stay UNWINDOWED: the time-alive tail below needs the TRUE respawn history to find the first respawn
+            // after the true last death, even when that respawn (or the death before it) falls outside this window.
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Respawn) continue;
@@ -1659,7 +1527,7 @@ namespace Overpower.EditorTools.Telemetry
                 list.Add(e.T);
             }
 
-            // Opus review item 8: Burn-source hit rows are excluded (already counted via their `dot`).
+            // Burn-source hit rows are excluded (already counted via their `dot`).
             var damageDealtByActor = new Dictionary<int, float>();
             var damageTakenByActor = new Dictionary<int, float>();
             foreach (HitRow h in tables.Hits) // already window-filtered
@@ -1719,15 +1587,10 @@ namespace Overpower.EditorTools.Telemetry
                 var gold = goldByActor.GetValueOrDefault(actor);
                 (double First, double Last) coverage = coverageByActor.TryGetValue(actor, out var c) ? c : (0, 0);
 
-                // Opus review item 3 (Task T7), CORRECTED by the T7 review: a completed life is a
-                // continuous span [deathT - timeAlive, deathT), not an instant - CLIPPED to the
-                // window like every other integral here, rather than crediting the WHOLE life to
-                // whichever phase the death instant itself falls in. Crediting the whole life to the
-                // death's phase could report more alive time in a phase than the phase itself lasted
-                // (a life of 125s dying at t=125, entirely credited to a 90s-long Phase 2). Clipping
-                // the life's own span the same way the still-alive tail already is keeps Phase 1 +
-                // Phase 2 summing to exactly the whole match, this time without ever exceeding either
-                // phase's own length.
+                // A completed life is a continuous span [deathT - timeAlive, deathT), not an instant: CLIPPED to the window
+                // like every other integral, rather than crediting the WHOLE life to the phase the death instant falls in
+                // (which could report more alive time in a phase than the phase lasted - a 125s life dying at t=125 credited to
+                // a 90s Phase 2). Clipping keeps Phase 1 + Phase 2 summing to exactly the whole match.
                 double timeAlive = 0;
                 double? lastDeathT = null;
                 foreach (TelemetryEvent e in log.Events)
@@ -1736,15 +1599,11 @@ namespace Overpower.EditorTools.Telemetry
                     if (ActorOf(e, fileActor) != actor) continue;
                     if (!lastDeathT.HasValue || e.T > lastDeathT.Value) lastDeathT = e.T; // unwindowed - the TRUE last death
 
-                    // Round-2 review fix (item B): plain window.Clip treats 0/matchLength as hard
-                    // walls, which truncated a life that started before the match clock (timeAlive
-                    // > deathT) at 0, and dropped a death logged at the t == -1 sentinel outright
-                    // (window.Clip(-1-timeAlive, -1, ...) never overlaps a window whose own Start is
-                    // 0). OverlapWithUnboundedEdges treats the very first/last window's own edge as
-                    // unbounded instead, matching how Contains(-1) always counted a t == -1 death
-                    // before this whole life-span-clipping mechanism existed. The death's OWN t maps
-                    // negative-to-0 first, consistently with item 9's own convention, before being
-                    // used as the span's upper end.
+                    // Plain window.Clip treats 0/matchLength as hard walls, which truncated a life that started before the
+                    // match clock (timeAlive > deathT) at 0 and dropped a death logged at the t == -1 sentinel
+                    // (window.Clip(-1-timeAlive, -1, ...) never overlaps a window starting at 0). OverlapWithUnboundedEdges
+                    // treats the first/last window's edge as unbounded, matching how Contains(-1) counts a t == -1 death. The
+                    // death's own t maps negative-to-0 first before being the span's upper end.
                     float lifeTimeAlive = ReadFloat(e.Data, TelemetryKeys.TimeAlive);
                     double deathTForSpan = e.T < 0 ? 0 : e.T;
                     timeAlive += window.OverlapWithUnboundedEdges(deathTForSpan - lifeTimeAlive, deathTForSpan);
@@ -1818,10 +1677,9 @@ namespace Overpower.EditorTools.Telemetry
             + ReadInt(data, TelemetryKeys.Debug, 0)
             + ReadInt(data, TelemetryKeys.Other, 0);
 
-        /// <summary>Point 3 (first-pass review): a `goldEarned` line where every source is 0 and
-        /// `zones` is empty or all-zero is junk from a remote copy's teardown (or the owner's own
-        /// closing flush) - skipped everywhere this aggregator reads goldEarned. Kept for old logs;
-        /// the T4 fix stopped writing these at the source, but a log recorded before it still can.</summary>
+        /// <summary>A `goldEarned` line where every source is 0 and `zones` is empty or all-zero is junk from a remote copy's
+        /// teardown (or the owner's closing flush): skipped everywhere this aggregator reads goldEarned. Kept for old logs; new
+        /// clients no longer write these.</summary>
         private static bool IsJunkGoldEarned(JObject data)
         {
             if (SumGoldEarnedTotal(data) != 0) return false;
@@ -1832,10 +1690,8 @@ namespace Overpower.EditorTools.Telemetry
             return true;
         }
 
-        /// <summary>Playtest extras Task 2 (P4): a `console` line's own FirstT/LastT are only written
-        /// when its fold count is greater than 1 (TelemetryKeys.RepeatCount's own comment) - absent
-        /// otherwise, in which case the line's own single `t` already IS both its first and last
-        /// touch, hence the fallback being that line's own T rather than a fixed constant.</summary>
+        /// <summary>A `console` line's FirstT/LastT are only written when its fold count is > 1 (TelemetryKeys.RepeatCount);
+        /// otherwise the line's own `t` IS both, hence the fallback being that line's T rather than a constant.</summary>
         private static double ReadDoubleOrDefault(JObject data, string key, double fallback)
         {
             JToken token = data[key];

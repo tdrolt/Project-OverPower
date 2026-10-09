@@ -4,20 +4,12 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A flat speed buff that pays for itself out of the same heat pool the primary weapon spends -
-    /// Tudor called this the most interesting interaction in the mobility list: sprinting costs you
-    /// the ability to shoot, and it turns itself off the moment overheat silences you, without any
-    /// timer of its own. No cooldown gate at all (MaxCharges 0 on this module, per the framework's
-    /// convention) - self-limiting through heat instead.
-    ///
-    /// Two activation modes, chosen with the Toggle checkbox below rather than two separate scripts:
-    /// hold behaves like every shooter's sprint key, toggle lets a long straight run continue after
-    /// letting go. Both read the SAME active/inactive logic in OwnerTick - only which input decides
-    /// "should this be on right now" differs.
-    ///
-    /// Never writes PlayerMotor's speed directly (see AddSpeedMultiplier's own class comment for the
-    /// old respawn bug that direct writes caused) - the keyed multiplier is added and removed here,
-    /// and only here, so a stale multiplier can never survive past the moment this ability stops.
+    /// A flat speed buff paid for out of the same heat pool the primary weapon spends: sprinting costs you the ability to
+    /// shoot, and turns itself off the moment overheat silences you, with no timer of its own. No cooldown gate
+    /// (MaxCharges 0) - self-limiting through heat. Hold and toggle share the SAME active logic in OwnerTick; only the
+    /// input deciding "should this be on" differs. Never writes PlayerMotor's speed directly (a direct write caused a
+    /// respawn bug, see AddSpeedMultiplier): the keyed multiplier is added and removed here only, so a stale one can never
+    /// survive past the moment this ability stops.
     /// </summary>
     public sealed class SprintAbility : AbilityModule
     {
@@ -97,9 +89,8 @@ namespace Overpower.Abilities
         {
             if (reason == InterruptReason.Silenced)
             {
-                // A toggled sprint must not resume by surprise the instant heat decays back down -
-                // Tudor's clarification. Hold mode needs nothing here: `held` already reads false
-                // the moment silence makes canAct false, by the same OwnerTick check above.
+                // A toggled sprint must not resume by surprise the instant heat decays back down. Hold mode needs
+                // nothing here: `held` already reads false the moment silence makes canAct false (OwnerTick).
                 toggledOn = false;
                 LogSilenced();
             }
@@ -110,10 +101,8 @@ namespace Overpower.Abilities
             StopSprinting();
         }
 
-        /// <summary>Belt and braces: OwnerTick already drops the multiplier and toggledOn is reset
-        /// above on Silenced, but a stray "on" from the life just ended must never carry into the
-        /// next one - the exact shape of bug 2.10's respawn speed bug, just for toggle state instead
-        /// of a raw speed value.</summary>
+        /// <summary>Belt and braces: a stray "on" from the life just ended must never carry into the next one (the
+        /// respawn speed bug's shape, for toggle state instead of a raw speed value).</summary>
         public override void OnRespawned()
         {
             toggledOn = false;

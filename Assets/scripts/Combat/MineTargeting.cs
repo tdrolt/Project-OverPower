@@ -3,27 +3,19 @@ using System.Collections.Generic;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// Which of a mine's nearby IDamageables it should actually treat as a target - used for both
-    /// halves of Mine.cs (deciding whether to trigger at all, and who the blast hits once it does).
+    /// Which of a mine's nearby IDamageables it treats as a target, for both halves of Mine.cs
+    /// (whether to trigger, and who the blast hits). Plain C#, testable with fake targets and no scene.
     ///
-    /// TWO RULES, BOTH ALREADY BUILT ELSEWHERE. Not a teammate or the owner themselves - the exact
-    /// same FriendlyFire.IsSelfOrTeammate check a shot uses, so a mine cannot be tripped by its own
-    /// placer or their team any more than a bullet can hit them. And HasLocalAuthority - IDamageable's
-    /// own "is this the machine that actually owns this target" flag - because a mine's trigger runs
-    /// on EVERY client (see Mine.cs class comment): without this a remote enemy player would look
-    /// like a valid target on a machine that cannot damage them anyway (ApplyDamage's own IsMine
-    /// guard would silently no-op), which would needlessly fire an RPC. A local practice dummy
-    /// always passes - DummyTarget.HasLocalAuthority is always true, and its unmatched team id (99)
-    /// already fails FriendlyFire's team check open, so a dummy is an enemy of every real team.
+    /// Not self or teammate: the same FriendlyFire.IsSelfOrTeammate a shot uses. A practice dummy's
+    /// unmatched team fails that check open, so a dummy is an enemy of every real team.
     ///
-    /// A THIRD RULE, added by the Task 1.8b review: never IStructure. Cover's own -1/-1 identity
-    /// fails FriendlyFire open exactly like an unrecognised team does, which is exactly what let a
-    /// mine detonate against a player's own cover before this fix - IStructure is the explicit
-    /// marker that tells a structure apart from a real combatant with no known team (see that
-    /// interface's own class comment for why identity alone cannot do this).
+    /// HasLocalAuthority: the trigger runs on EVERY client (see Mine.cs), and without this a remote
+    /// enemy would look like a valid target on a machine whose ApplyDamage IsMine guard would no-op,
+    /// firing a needless RPC. A local dummy always passes.
     ///
-    /// Plain C#, no UnityEngine dependency beyond IDamageable's own types, so this is testable with
-    /// fake targets and no scene - the same shape as FriendlyFire and DeployablePruning.
+    /// Never IStructure: cover's -1/-1 identity fails FriendlyFire open like an unrecognised team,
+    /// which let a mine detonate against its own player's cover; IStructure is the explicit marker
+    /// (see that interface for why identity alone cannot tell them apart).
     /// </summary>
     public static class MineTargeting
     {

@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Overpower.Net
 {
     /// <summary>
-    /// Task 9e (Tudor D21): getting a dropped player back into the same match as the same player.
+    /// Getting a dropped player back into the same match as the same player (D21).
     ///
     /// The room keeps a dropped player's slot for the rejoin window (RoomOptions.PlayerTtl, from GameplayConfig), so their
     /// team, gold and loadout (Player Properties) and their networked body are all still there. This class is the client
@@ -279,7 +279,7 @@ namespace Overpower.Net
                 Fail("RejoinRoom refused");
         }
 
-        /// <summary>Task 9e-2: a normal join was refused (a random join that found nothing, or Photon's "your old place here is held").
+        /// <summary>A normal join was refused (a random join that found nothing, or Photon's "your old place here is held").
         /// If a saved match is still on offer it is OUR place that is being held - go back to it. If Photon says a place is held
         /// but there is no saved room to go to, say so and go back to the name screen. Otherwise false: nothing to do with a rejoin.</summary>
         public bool TryRejoinHeldPlace(int returnCode)

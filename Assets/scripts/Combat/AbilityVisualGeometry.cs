@@ -3,12 +3,12 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// The small maths behind the ability visuals (Tudor, 2026-09-17: "make the abilities a bit clearer"), kept pure so
-    /// it is tested, and so every visual is drawn from the SAME number the gameplay reads - a mine's Trigger Radius, the
-    /// flamethrower's Cone Angle - never a second copy typed into a visual.
+    /// The small maths behind the ability visuals, kept pure so it is tested, and so every visual is
+    /// drawn from the SAME number the gameplay reads (a mine's Trigger Radius, the flamethrower's Cone
+    /// Angle), never a second copy typed into a visual.
     ///
-    /// Angles are Unity yaw: degrees clockwise seen from above, 0 = +Z. Points are in the visual's own local space, flat
-    /// on the floor (y = 0).
+    /// Angles are Unity yaw: degrees clockwise seen from above, 0 = +Z. Points are in the visual's own
+    /// local space, flat on the floor (y = 0).
     /// </summary>
     public static class AbilityVisualGeometry
     {
@@ -20,8 +20,7 @@ namespace Overpower.Combat
         }
 
         /// <summary>Vertices in a flat cone ("fan") of arcSegments slices and <paramref name="rings"/> concentric arcs
-        /// beyond the tip (default 1, the plain triangle fan every other view's fan-shaped piece still uses): the tip
-        /// plus rings * (arcSegments + 1) arc points.</summary>
+        /// beyond the tip: the tip plus rings * (arcSegments + 1) arc points.</summary>
         public static int FanVertexCount(int arcSegments, int rings = 1) =>
             1 + Mathf.Max(1, rings) * (Mathf.Max(1, arcSegments) + 1);
 
@@ -29,8 +28,7 @@ namespace Overpower.Combat
         /// Fan vertex <paramref name="index"/>, opening along +Z: 0 is the tip (the caster); every other index falls on
         /// one of <paramref name="rings"/> concentric arcs (ring 1 nearest the tip, ring <paramref name="rings"/> at the
         /// full <paramref name="range"/>), each running arcSegments + 1 points from the left edge (-half angle) to the
-        /// right edge (+half angle). rings = 1 (the default) is the plain single-arc fan every prior view uses: every
-        /// non-tip vertex sits at the full range, exactly as before this parameter existed. The same shape
+        /// right edge (+half angle). rings = 1 puts every non-tip vertex at the full range. The same shape
         /// ConeFilter.IsWithinCone tests: range and half-angle measured flat from the tip.
         /// </summary>
         public static Vector3 FanVertex(int index, float range, float fullAngleDegrees, int arcSegments, int rings = 1)
@@ -51,7 +49,7 @@ namespace Overpower.Combat
         /// <summary>Triangles for a fan of arcSegments slices and <paramref name="rings"/> concentric arcs: a tip fan
         /// onto ring 1, then a quad strip (two triangles per slice) between every pair of neighbouring rings, all
         /// clockwise seen from above so the fan faces up. <paramref name="triangles"/> must hold
-        /// 3 * arcSegments * (2 * rings - 1) entries (3 * arcSegments when rings = 1, the pre-existing single-arc case).</summary>
+        /// 3 * arcSegments * (2 * rings - 1) entries (3 * arcSegments when rings = 1).</summary>
         public static void FillFanTriangles(int arcSegments, int[] triangles, int rings = 1)
         {
             int slices = Mathf.Max(1, arcSegments);
@@ -96,8 +94,8 @@ namespace Overpower.Combat
             return squared > 0f ? Mathf.Sqrt(squared) : 0f;
         }
 
-        /// <summary>How far a capsule's root sits above its feet - the same derivation TestRangeSpawner.Grounded uses
-        /// (0.5 m for the player, measured 2026-09-13).</summary>
+        /// <summary>How far a capsule's root sits above its feet - the same derivation TestRangeSpawner.Grounded
+        /// uses.</summary>
         public static float RootAboveFeet(float capsuleCentreY, float capsuleHeight, float scaleY) =>
             -(capsuleCentreY - capsuleHeight * 0.5f) * scaleY;
 
@@ -110,17 +108,14 @@ namespace Overpower.Combat
             seconds > 0f ? Mathf.Clamp01(1f - ageSeconds / seconds) : 0f;
 
         /// <summary>
-        /// A3 (Tudor 2026-09-17 evening): 0 at the fan's tip, 1 on the outermost arc (ring <paramref name="rings"/>) -
-        /// the RADIAL position a soft cone's per-vertex colour/alpha fades along, warm at the tip to clear at the far
-        /// edge. Same fan topology as FanVertex, so this is just another reading of the same vertex index, not a
-        /// second mesh shape.
+        /// A3: 0 at the fan's tip, 1 on the outermost arc (ring <paramref name="rings"/>) - the RADIAL position a soft
+        /// cone's per-vertex colour/alpha fades along, warm at the tip to clear at the far edge. Same fan topology as
+        /// FanVertex: another reading of the same vertex index, not a second mesh shape.
         ///
-        /// CORRECTION (review, 2026-09-18): with the pre-existing default rings = 1 (a single tip and one outer
-        /// arc, no vertex in between), this was a STEP function - exactly 0 at the tip and exactly 1 at every other
-        /// vertex, whatever ring count a caller claimed to use - so a caller building its radial fade from this
-        /// alone got a straight line from the tip to zero, never a held middle. Callers that want that middle need
-        /// <paramref name="rings"/> greater than 1, which is what makes this genuinely continuous (ring / rings for
-        /// ring 1..rings).
+        /// Trap: with the default rings = 1 (a single tip and one outer arc, no vertex in between) this is a STEP
+        /// function, exactly 0 at the tip and exactly 1 everywhere else, so a radial fade built from it alone is a
+        /// straight line to zero, never a held middle. Callers that want a middle need <paramref name="rings"/>
+        /// greater than 1, which makes it continuous (ring / rings for ring 1..rings).
         /// </summary>
         public static float FanVertexRangeFraction(int index, int arcSegments, int rings = 1)
         {

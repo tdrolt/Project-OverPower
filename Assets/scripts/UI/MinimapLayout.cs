@@ -82,19 +82,12 @@ namespace Overpower.UI
             return to - delta / length * Mathf.Min(distanceFromEnd, length);
         }
 
-        /// <summary>The triangular mask's circumradius (Tudor, 2026-09-17: the mask becomes a triangle, one vertex
-        /// toward each capital): the smallest R such that every given point is inside the triangle, plus a margin.
-        /// A point is inside when p . (-d_i) &lt;= R/2 for every vertex direction d_i: the edge OPPOSITE vertex i has
-        /// OUTWARD normal -d_i (true for an equilateral triangle, guaranteed by ArenaSymmetry's 3-fold layout), and
-        /// sits at the inradius R/2. R = 2 x (the worst-case reach + margin) - the margin is added to the INRADIUS,
-        /// so every side (not just whichever is nearest a vertex) gets the full margin of clearance - and the
-        /// factor of 2 is the equilateral triangle's fixed circumradius/inradius ratio.
-        ///
-        /// Review fix, 2026-09-17 (two rounds): the first version used +d_i (an INWARD-facing test), which let a
-        /// point near a vertex force R to roughly double what the triangle actually needed, since +d_i is the
-        /// normal of the edge ADJACENT to (not opposite) that vertex direction - fixed to -d_i. The second version
-        /// then added the margin to R directly (2 x worstReach + margin) instead of to the inradius before doubling
-        /// it, so the flat sides only ever got margin/2 of real clearance - fixed to 2 x (worstReach + margin).</summary>
+        /// <summary>The triangular mask's circumradius (one vertex toward each capital): the smallest R such that every
+        /// given point is inside the triangle, plus a margin. A point is inside when p . (-d_i) &lt;= R/2 for every
+        /// vertex direction d_i: the edge OPPOSITE vertex i has OUTWARD normal -d_i (equilateral, guaranteed by
+        /// ArenaSymmetry's 3-fold layout) and sits at the inradius R/2. Use -d_i, not +d_i (the normal of an ADJACENT
+        /// edge, which roughly doubles R). R = 2 x (worst reach + margin): the margin goes onto the INRADIUS before
+        /// doubling, so every side gets the full margin (not margin/2); 2 is the circumradius/inradius ratio.</summary>
         public static float TriangleCircumradius(IReadOnlyList<Vector2> points, IReadOnlyList<Vector2> vertexDirections, float marginMetres)
         {
             float worstReach = 0f;

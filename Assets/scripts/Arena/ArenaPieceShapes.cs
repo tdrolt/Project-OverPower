@@ -31,8 +31,8 @@ namespace Overpower.Arena
             FootprintCorners(new Vector3(centreXZ.x, 0f, centreXZ.y), Quaternion.Euler(0f, yawDegrees, 0f),
                 new Vector3(sizeXZ.x, 0f, sizeXZ.y));
 
-        /// <summary>True when two footprints (each the four corners <see cref="FootprintCorners"/> returns, in that
-        /// winding) overlap at all, by the separating axis theorem: for two rectangles, only their own four edge
+        /// <summary>Overlap by the separating axis theorem; each footprint is the four corners
+        /// <see cref="FootprintCorners"/> returns, in that winding. For two rectangles only their own four edge
         /// directions (two each, since opposite edges are parallel) can ever separate them, so testing those four is
         /// enough - no axis among them with a gap means the rectangles intersect.</summary>
         public static bool FootprintsOverlap(Vector2[] a, Vector2[] b)
@@ -66,8 +66,8 @@ namespace Overpower.Arena
 
         /// <summary>A barrier's BoxCollider, in its own (scaled) space, that blocks from world bottomY to world topY
         /// whatever its look: the barrier's origin sits at world positionY and its look is lookHeight tall (its Y
-        /// scale). Amendment 1: only a living player's body collides with the Barrier layer, so a tall band costs
-        /// nothing and nobody can be knocked up onto the barrier.</summary>
+        /// scale). Only a living player's body collides with the Barrier layer, so a tall band costs nothing and
+        /// nobody can be knocked up onto the barrier.</summary>
         public static void BarrierBlockingBox(float bottomY, float topY, float positionY, float lookHeight,
                                               out Vector3 centre, out Vector3 size)
         {

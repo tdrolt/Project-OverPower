@@ -6,13 +6,10 @@ using Overpower.Weapons;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The player an ability belongs to, with every component a module might need looked up exactly
-    /// once, when the player spawns. Modules read Owner.Motor instead of calling GetComponent: a
-    /// flamethrower ticking every frame for nine players would otherwise search the player's
-    /// components nine times a frame for something that never changes.
-    ///
-    /// One instance per player, shared by all three of that player's modules (AbilityRunner builds
-    /// it). A class, not a struct, so every module sees the same cached references.
+    /// The player an ability belongs to, every component a module needs looked up once at spawn, so a per-frame
+    /// module (the flamethrower) reads Owner.Motor instead of calling GetComponent nine times a frame.
+    /// One instance per player, shared by all three of that player's modules (AbilityRunner builds it); a class,
+    /// not a struct, so every module sees the same cached references.
     /// </summary>
     public sealed class AbilityOwner
     {
@@ -31,7 +28,7 @@ namespace Overpower.Abilities
         public readonly IDisplaceable Displacement;
 
         /// <summary>The Space-bar meter every ultimate reads through IsReady and spends through
-        /// TryBuildCast (Task 1.11) - see UltimateCharge's own class comment for why it is owner-only.</summary>
+        /// TryBuildCast - see UltimateCharge's own class comment for why it is owner-only.</summary>
         public readonly UltimateCharge UltimateCharge;
 
         /// <summary>The owning player's actor number - fixed for the life of this player object.</summary>

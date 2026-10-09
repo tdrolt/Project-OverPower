@@ -7,18 +7,17 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 namespace Overpower.Match
 {
-    /// <summary>Task T4: where a credit to this wallet came from, so telemetry (PlayerTelemetry's
+    /// <summary>Where a credit to this wallet came from, so telemetry (PlayerTelemetry's
     /// `goldEarned`) can split a player's income by source instead of only seeing one growing
     /// balance. Territory is the passive per-frame trickle GoldMath pays every owned zone;
     /// everything else is a discrete credit from one call to Add.</summary>
     public enum GoldSource { Territory, Bounty, Refund, Debug, Other }
 
     /// <summary>
-    /// One player's gold (Task 2.2). OWNER-AUTHORITATIVE: the owner's own client is the only one
+    /// One player's gold. OWNER-AUTHORITATIVE: the owner's own client is the only one
     /// that accrues and spends gold, publishing the result as a Player Custom Property ("gold") so
-    /// every other client - and a late joiner - can read it. This deviates from the 2026-09-12
-    /// plan's master-ticked design [C, assumptions-for-tudor.md "Gold authority"]: a master-ticked
-    /// wallet needs a new RPC per player per tick (up to nine players, every frame), races
+    /// every other client - and a late joiner - can read it. Deliberately not master-ticked
+    /// [C, assumptions-for-tudor.md "Gold authority"]: a master-ticked wallet needs a new RPC per player per tick (up to nine players, every frame), races
     /// TrySpend against the next income tick landing from the master, and freezes every wallet
     /// until a newly promoted master rebuilds all of them from scratch. Letting each player own
     /// its own number sidesteps all three for free, and a prototype has no anti-cheat requirement
@@ -33,11 +32,11 @@ namespace Overpower.Match
         public const string GoldKey = "gold";
 
         // How long the owner waits between two publishes that are ONLY driven by passive income -
-        // gold trickles in a fraction of a point per frame (Task 2.2: as low as 1.667/s), and a
+        // gold trickles in a fraction of a point per frame (as low as 1.667/s), and a
         // Custom Property write every single frame for every player in the room would be room
         // traffic nobody needs, for a number nobody needs to see move within a frame. TrySpend/Add
         // bypass this timer entirely (see their own calls to PublishBalance) - a shop purchase or a
-        // bounty payout (Task 2.4) has to feel instant, income does not.
+        // bounty payout has to feel instant, income does not.
         private const float MinPassivePublishIntervalSeconds = 1f;
 
         [SerializeField, Tooltip("Shared per-tier numbers: starting gold and each tier's team " +
@@ -58,9 +57,8 @@ namespace Overpower.Match
         private int[] teamGoldByTierScratch;
 
         // Same idea as teamGoldByTierScratch above, for the owners array GoldMath.TeamIncomePerSecond
-        // also wants: Update used to allocate a fresh int[ZoneCount] every single frame for every
-        // player's wallet. ZoneCount does not change mid-match, so one buffer, resized only if it
-        // ever does, replaces that per-frame allocation.
+        // also wants: ZoneCount does not change mid-match, so one buffer, resized only if it ever
+        // does, avoids a fresh int[ZoneCount] per frame for every player's wallet.
         private int[] ownersScratch;
 
         /// Owner: the accrual's live balance. Remote copy: the owner's last-published "gold"
@@ -71,7 +69,7 @@ namespace Overpower.Match
             : LoadoutProperties.ReadInt(photonView.Owner?.CustomProperties, GoldKey, 0);
 
         /// Owner only - always 0 on a remote copy, which has no local income simulation to report
-        /// an instantaneous rate from (only its balance is Task 2.2's requirement).
+        /// an instantaneous rate from.
         public double IncomePerSecond { get; private set; }
 
         /// Raised on every client whenever the balance THIS client reports changes: on the owner,
@@ -79,13 +77,13 @@ namespace Overpower.Match
         /// every time the owner's "gold" property arrives with a new value.
         public event System.Action<int> BalanceChanged;
 
-        /// Owner only (Task 2.4): raised exactly when THIS wallet is credited a capture bounty - a
+        /// Owner only: raised exactly when THIS wallet is credited a capture bounty - a
         /// narrower signal than BalanceChanged/Add, which also fire for passive income and the F1
         /// "+1000 Gold" test button. Only the HUD toast ("Bounty +900") listens to this; the balance
         /// itself is credited through the ordinary Add(amount) call below, same as any other credit.
         public event System.Action<int> BountyReceived;
 
-        /// <summary>Task T4: owner only - raised every time this wallet's own balance goes UP,
+        /// <summary>Owner only - raised every time this wallet's own balance goes UP,
         /// whatever the reason (passive territory income crossing a whole gold, a bounty, a shop
         /// refund, the F1 debug credit, or any other Add call). PlayerTelemetry sums these by
         /// GoldSource into `goldEarned`'s per-source totals every sample interval. A remote copy
@@ -93,7 +91,7 @@ namespace Overpower.Match
         /// on rather than duplicating.</summary>
         public event System.Action<int, GoldSource> Credited;
 
-        /// <summary>Task T4: owner only - raised every time TrySpend actually spends gold (a shop
+        /// <summary>Owner only - raised every time TrySpend actually spends gold (a shop
         /// purchase). PlayerTelemetry's `purchase`/`refund` events already carry the amount
         /// themselves; this exists for anything else that wants "gold left this wallet" without
         /// caring why.</summary>
@@ -140,7 +138,7 @@ namespace Overpower.Match
                 PublishBalance();
             }
 
-            // Task 2.4: only the owner's own wallet ever pays itself a bounty - a remote copy has no
+            // Only the owner's own wallet ever pays itself a bounty - a remote copy has no
             // accrual to credit anyway (see Balance's own comment). BuildingManager raises this event
             // on EVERY client whose applied snapshot changed a zone's owner, including a zone this
             // player's team did not just take, so HandleOwnershipChanged below is what filters that
@@ -157,7 +155,7 @@ namespace Overpower.Match
                 BuildingManager.Instance.OwnershipChanged -= HandleOwnershipChanged;
         }
 
-        /// <summary>Task 2.4: pays this wallet's owner a capture bounty the moment their team takes a
+        /// <summary>Pays this wallet's owner a capture bounty the moment their team takes a
         /// zone that had one. Not raised for a late joiner's first read of the room's snapshot (see
         /// BuildingManager.OwnershipChanged's own doc), so nobody is ever paid twice for a capture
         /// that already happened before they connected. bountyPaid is read off the snapshot ITSELF
@@ -172,7 +170,7 @@ namespace Overpower.Match
             if (!Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out int myTeam) || newOwner != myTeam)
                 return;
 
-            // Dominion has no gold: the capture still scores its bounty points (Task 3, paid on the master), only the gold is silenced.
+            // Dominion has no gold: the capture still scores its bounty points (paid on the master), only the gold is silenced.
             int bounty = Overpower.Dominion.DominionTerritoryRules.BountyGoldFor(
                 Overpower.Dominion.DominionMode.IsActive(), snapshot.BountyPaidOnLastCapture(zone));
             if (bounty <= 0)
@@ -213,7 +211,7 @@ namespace Overpower.Match
                 // speed up or freeze the economy.
                 int balanceBeforeAccrual = accrual.Balance;
                 accrual.Accrue(playerIncome, Time.unscaledDeltaTime);
-                // Task T4: GoldAccrual only ever shows WHOLE gold (its own class comment) - the
+                // GoldAccrual only ever shows WHOLE gold (its own class comment) - the
                 // fractional carry between frames means most frames credit nothing at all, and
                 // this fires only the frame a whole gold point is actually crossed, exactly
                 // matching what PublishIfDue below would (eventually) tell the room.
@@ -257,12 +255,9 @@ namespace Overpower.Match
             return true;
         }
 
-        /// Owner only - see TrySpend's comment. Used by the bounty payout (Task 2.4), shop
-        /// refunds and purchases (Task 2.5b/T4) and the F1 "+1000 Gold" test button below
-        /// (Task 2.2 Step 7), so shop testing never waits on income. Task T4: source defaults to
-        /// Other rather than being required, so every pre-existing call site (the bounty payout
-        /// above already passes its own, the F1 button and LoadoutScreen's refunds are updated
-        /// too) keeps compiling unchanged.
+        /// Owner only - see TrySpend's comment. Used by the bounty payout, shop refunds and
+        /// purchases and the F1 "+1000 Gold" test button below, so shop testing never waits on
+        /// income. source defaults to Other rather than being required.
         public void Add(int amount, GoldSource source = GoldSource.Other)
         {
             if (!photonView.IsMine)
@@ -278,7 +273,7 @@ namespace Overpower.Match
             Credited?.Invoke(amount, source);
         }
 
-        /// <summary>2.7b Decision 6: the fresh start at match-live - gold back to TerritoryConfig.StartingGold
+        /// <summary>The fresh start at match-live (Decision 6) - gold back to TerritoryConfig.StartingGold
         /// (a brand new GoldAccrual, so the fractional carry drops with it, same as a genuinely new player's
         /// first Start), no income rate carried over, and published at once rather than waiting for
         /// PublishIfDue's own throttle. Owner only, like every other mutator on this class.</summary>

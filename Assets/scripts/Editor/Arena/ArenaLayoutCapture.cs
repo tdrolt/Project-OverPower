@@ -7,12 +7,10 @@ using UnityEngine;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// Reads today's Source hierarchy (a group per kind, a placement unit per direct child) into ArenaLayout rows -
-    /// one Piece per unit's own collider, box for box (base plan Decision 3). The Boundry group is skipped outright:
-    /// arena step 4 amended the boundary to be built fresh from Arena Symmetry's Source Outline every time
-    /// (ArenaWallPlan), so a captured wall row would only go stale the moment somebody moved the outline. A group
-    /// literally named "Barriers" becomes Barrier rows (Amendment 1's jersey barriers); every other group becomes
-    /// plain Block rows.
+    /// Reads the Source hierarchy (a group per kind, a placement unit per direct child) into ArenaLayout rows, one Piece
+    /// per unit's own collider (Decision 3). The Boundry group is skipped: the boundary is always built fresh from Arena
+    /// Symmetry's Source Outline (ArenaWallPlan), so a captured wall row would go stale the moment the outline moves.
+    /// A group named "Barriers" becomes Barrier rows; every other group becomes plain Block rows.
     /// </summary>
     public static class ArenaLayoutCapture
     {
@@ -20,11 +18,10 @@ namespace Overpower.EditorTools
         private const float TowerKeepClearMarginMetres = 0.5f;
 
         /// <summary>
-        /// Walks every group directly under <paramref name="root"/> and every unit directly under each group. Skips
-        /// (and reports) the Boundry group entirely, a unit inside a tower's keep-clear circle, and a unit with no
-        /// box to read. Reports a pitch or roll over 0.5 degrees as a PROBLEM (it would be lost - a captured box is
-        /// always upright). Colliders on a unit's own children are counted and ignored: only the unit's own first
-        /// enabled non-trigger BoxCollider (or, failing that, its own MeshCollider) is read.
+        /// Walks every unit directly under each group of <paramref name="root"/>. Skips (and reports) the Boundry group, a unit
+        /// inside a tower's keep-clear circle, and a unit with no box. A pitch or roll over 0.5 degrees is a PROBLEM (a captured
+        /// box is always upright, so the tilt would be lost). Only a unit's own first enabled non-trigger BoxCollider (else its
+        /// own MeshCollider) is read; colliders on children are counted and ignored.
         /// </summary>
         public static List<ArenaLayout.Piece> Capture(Transform root, IReadOnlyList<(Vector3 centre, float radius)> keepClear,
                                                         List<string> report)
@@ -111,12 +108,11 @@ namespace Overpower.EditorTools
 
             if (kind == ArenaLayout.PieceKind.Barrier)
             {
-                // A built barrier's own BoxCollider spans the BLOCKING band (e.g. world y -1..3), not the look - it
-                // is set from ArenaLayout's separate barrierBlockingBottomY/TopY, not from the row's own size.
-                // Reading it back as the row's size would inflate a 1 m look into a multi-metre one, and the next
-                // Build would show a wall shots pass through where a barrier should be (review, 2026-09-19). The
-                // look IS exactly the unit's own scale (x=length, y=look height, z=thickness); the centre's Y is
-                // ignored because Build always re-derives a barrier's vertical position from size.y itself.
+                // A built barrier's own BoxCollider spans the BLOCKING band (e.g. world y -1..3), not the look; it is set
+                // from ArenaLayout's barrierBlockingBottomY/TopY. Reading it back as the row's size would inflate a 1 m
+                // look into a multi-metre one and the next Build would show a wall shots pass through. The look IS the
+                // unit's own scale (x=length, y=look height, z=thickness); centre Y is ignored because Build re-derives a
+                // barrier's vertical position from size.y.
                 Vector3 barrierLossy = unit.lossyScale;
                 size = new Vector3(Mathf.Abs(barrierLossy.x), Mathf.Abs(barrierLossy.y), Mathf.Abs(barrierLossy.z));
                 centre = new Vector3(unit.position.x, 0f, unit.position.z);
@@ -127,9 +123,8 @@ namespace Overpower.EditorTools
                 return true;
             }
 
-            // No "break" on finding the unit's own box: every OTHER collider found while scanning (on a child, or a
-            // second one on the unit itself) must still be counted as ignored, not left uncounted just because the
-            // loop stopped early the moment a usable one turned up.
+            // No "break" on finding the unit's own box: every OTHER collider (on a child, or a second one on the unit)
+            // must still be counted as ignored.
             BoxCollider[] allBoxes = unit.GetComponentsInChildren<BoxCollider>(true);
             BoxCollider ownBox = null;
             foreach (BoxCollider box in allBoxes)
@@ -201,9 +196,8 @@ namespace Overpower.EditorTools
                 return;
             }
 
-            // Every tower in the scene, not just ones nested under Source: a snapped triplet's own "Source" member
-            // (the one a designer places by hand) lives wherever the scene puts towers (under Houses/Cathedral
-            // groups), never as a child of ArenaSymmetry.source itself - that transform only ever holds the
+            // Every tower in the scene, not just ones under Source: a snapped triplet's own "Source" member lives wherever
+            // the scene puts towers (Houses/Cathedral groups), never under ArenaSymmetry.source, which only holds the
             // environment art Rebuild copies.
             var keepClear = new List<(Vector3 centre, float radius)>();
             const float TowerLookCapsuleRadius = 2.6f; // Tower Look.prefab's own collider radius (base plan Decision 6).
@@ -218,10 +212,8 @@ namespace Overpower.EditorTools
             Debug.Log("[ArenaLayoutCapture] " + string.Join("\n", report));
         }
 
-        /// <summary>Writes <paramref name="pieces"/> into <paramref name="layout"/>'s serialized field through a
-        /// SerializedObject, the same way every hand-saved asset in this project is written (CODING-STANDARDS #6) -
-        /// shared by the real "Capture layout from Source" menu and by tests that need a layout with known rows
-        /// without going through a whole scene capture. Does not itself save the asset.</summary>
+        /// <summary>Writes <paramref name="pieces"/> into <paramref name="layout"/> through a SerializedObject (CODING-STANDARDS #6);
+        /// shared by the menu and by tests that need known rows. Does not save the asset.</summary>
         public static void WritePieces(ArenaLayout layout, IReadOnlyList<ArenaLayout.Piece> pieces)
         {
             var so = new SerializedObject(layout);
@@ -239,9 +231,7 @@ namespace Overpower.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        /// <summary>Writes every material reference through a SerializedObject, the same reasoning as WritePieces -
-        /// shared by whatever creates ArenaLayout.asset for real and by tests that need a layout with known
-        /// materials. Does not itself save the asset.</summary>
+        /// <summary>Writes every material reference through a SerializedObject, as WritePieces does. Does not save the asset.</summary>
         public static void WriteMaterials(ArenaLayout layout, Material wall, float wallThickness, float wallBottomY, float wallTopY,
                                            Material block, Material barrier, float barrierBlockingBottomY, float barrierBlockingTopY,
                                            Material floor, Vector2 floorSize, float floorThickness)

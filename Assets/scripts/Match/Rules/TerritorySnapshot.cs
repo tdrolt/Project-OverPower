@@ -7,7 +7,7 @@ namespace Overpower.Match
     /// stored in the room's Custom Properties. Immutable: every change returns a new snapshot, so the
     /// master can compare "before" and "after" and every client can tell what changed.
     ///
-    /// Why Room Properties instead of the old buffered RPC: a late joiner reads one value instead of
+    /// Why Room Properties rather than a buffered RPC: a late joiner reads one value instead of
     /// replaying every capture of the match, and hold timers are stamped with the server clock, so a
     /// new master after a disconnect reads the same timers the old one wrote.
     /// </summary>
@@ -45,13 +45,11 @@ namespace Overpower.Match
             this.bountyPaid = bountyPaid;
         }
 
-        /// <summary>2.7b Decision 5/8: the live reset's starting snapshot - every team in the match gets its own
+        /// <summary>The live reset's starting snapshot (Decisions 5, 8) - every team in the match gets its own
         /// capital and nothing else; a team NOT in the match (a host start's third team) gets none, so its capital
-        /// starts (and, since nothing else ever captures it once TerritoryMap.MayCapture's out-of-play check is wired
-        /// in, stays) neutral with no history. A fresh start pays no bounty and leaves no hold to pay one later - it is
-        /// a loop of WithCapture(..., bountyPaid: 0), never touching lastOwner/lastHeldMs.
-        /// teamsInMatch null means every team - used for the ordinary match-start write until the countdown/live
-        /// system (step 5) has a real list to pass.</summary>
+        /// starts (and, since TerritoryMap.MayCapture's out-of-play check stops anything capturing it, stays) neutral
+        /// with no history. A fresh start pays no bounty and leaves no hold to pay one later - it is a loop of
+        /// WithCapture(..., bountyPaid: 0), never touching lastOwner/lastHeldMs. teamsInMatch null means every team.</summary>
         public static TerritorySnapshot Starting(int zoneCount, IEnumerable<(int zone, int team)> capitals,
                                                   IReadOnlyList<int> teamsInMatch, int nowMs)
         {
@@ -104,7 +102,7 @@ namespace Overpower.Match
         }
 
         /// <summary>Same effect as WithNeutral, but WIPES the zone's bounty-eligible history (lastOwner/
-        /// lastHeldMs) instead of recording it (Task 2.7 review). The GDD's bounty is for taking a zone
+        /// lastHeldMs) instead of recording it. The GDD's bounty is for taking a zone
         /// FROM the team that held it (p.20); the Tier-3 reset at the three-to-two team transition
         /// takes a zone from nobody, so the next team to capture it must not be paid for a hold that
         /// was reset out from under its owner, not fought for.</summary>
@@ -120,7 +118,7 @@ namespace Overpower.Match
             return next;
         }
 
-        /// <summary>2.7b step 2: true when the zone still has something a neutral reset would change - either it is
+        /// <summary>True when the zone still has something a neutral reset would change - either it is
         /// currently owned, or it is already neutral but still carries bounty-eligible history (lastOwner/
         /// lastHeldMs) from a hold that drained away naturally (WithNeutral) rather than being wiped by an earlier
         /// reset (WithNeutralReset, which leaves no history at all). False only for a zone that is neutral with no
@@ -146,8 +144,8 @@ namespace Overpower.Match
 
         /// <summary>Writes into a Photon Hashtable (or any dictionary). Arrays are int[] because
         /// Photon serialises those natively. Photon's Hashtable derives from
-        /// Dictionary&lt;object, object&gt;, so it can be passed here directly - checked in the Editor
-        /// (Task 2.1b) - which keeps this class free of Photon and testable without a network.</summary>
+        /// Dictionary&lt;object, object&gt;, so it can be passed here directly - checked in the Editor -
+        /// which keeps this class free of Photon and testable without a network.</summary>
         public void WriteTo(IDictionary<object, object> props)
         {
             props[OwnersKey] = (int[])owners.Clone();

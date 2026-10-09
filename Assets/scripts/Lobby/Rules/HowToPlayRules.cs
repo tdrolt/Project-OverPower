@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Overpower.Lobby
 {
     /// <summary>
-    /// Pure rules of the How to play wiki (lobby Task 12): which page comes before and after, that the ends do not wrap round, the "4 / 6" counter
+    /// Pure rules of the How to play wiki: which page comes before and after, that the ends do not wrap round, the "4 / 6" counter
     /// and the neighbouring pages' titles the buttons name. Pages are numbered from 0 here and from 1 in the counter.
     /// </summary>
     public static class HowToPlayRules

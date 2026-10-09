@@ -5,8 +5,8 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// "Does a player fit here, and can I reach it" for every ability that puts the caster, or something the caster
-    /// places, on a chosen spot (movement step 3): Blink's landing, a portal's placement and arrival, and (ability
-    /// visuals step 3) a mine's placement. One copy, so those abilities cannot disagree about what blocked means.
+    /// places, on a chosen spot: Blink's landing, a portal's placement and arrival, a mine's placement. One copy, so
+    /// those abilities cannot disagree about what blocked means.
     /// GroundProbe answers the other half, "is there floor here".
     /// </summary>
     public static class PlayerSpaceProbe
@@ -23,8 +23,7 @@ namespace Overpower.Abilities
         private static readonly Collider[] overlapBuffer = new Collider[16];
 
         /// <summary>The root height that stands a capsule on <paramref name="groundY"/>: its bottom (centre.y minus
-        /// half its height, below the root) sits exactly on the floor. The derivation Blink has always used, in one
-        /// place now that portal arrival needs it too.</summary>
+        /// half its height, below the root) sits exactly on the floor.</summary>
         public static float RootHeightOnGround(float groundY, float capsuleCentreY, float capsuleHeight) =>
             groundY - (capsuleCentreY - capsuleHeight * 0.5f);
 
@@ -41,7 +40,7 @@ namespace Overpower.Abilities
         /// <summary>
         /// True when a player-sized capsule rooted at <paramref name="rootPosition"/> would overlap anything on
         /// <paramref name="mask"/> other than <paramref name="self"/>'s own colliders. Assumes the player prefab is not
-        /// scaled and the capsule stands upright, the same simplification Blink has always made for this capsule.
+        /// scaled and the capsule stands upright.
         /// </summary>
         public static bool IsCapsuleBlocked(CapsuleCollider capsule, Vector3 rootPosition, int mask, Transform self)
         {
@@ -61,10 +60,9 @@ namespace Overpower.Abilities
             return false;
         }
 
-        /// <summary>Amendment 1 (arena step 4a): true when a player-sized capsule rooted here overlaps a jersey
-        /// barrier. One name for the one check every barrier-aware caller needs (PlayerMotor's grounded check,
-        /// PlayerDisplacement's Finish/Settle), so "is this player inside a barrier" is never re-spelled as its own
-        /// IsCapsuleBlocked call with the mask typed out by hand.</summary>
+        /// <summary>True when a player-sized capsule rooted here overlaps a jersey barrier. One name for the check every
+        /// barrier-aware caller needs (PlayerMotor's grounded check, PlayerDisplacement's Finish/Settle), so the mask is
+        /// never typed out by hand.</summary>
         public static bool IsInsideBarrier(CapsuleCollider capsule, Vector3 rootPosition, Transform self) =>
             IsCapsuleBlocked(capsule, rootPosition, ArenaLayers.Barrier, self);
 

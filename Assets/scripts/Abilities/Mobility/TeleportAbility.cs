@@ -9,35 +9,14 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Places a teleport gate on the ground, usable by you and your teammates; standing in it channels you to its pair. Tudor's spec:
-    /// a 2.0m circle within 5m of the player, at most two down at once, a 3-second channel, a 10-
-    /// second cooldown before the gate can be used again.
-    ///
-    /// FIT WITH THE FRAMEWORK. Pressing Shift PLACES a portal - it does not travel. The base pool
-    /// (cooldownSeconds/charges, on AbilityModule) is the GATE cooldown: 1 charge, 10s, and
-    /// SpendsChargeOnCast is overridden false so PLACING never touches it. The charge is spent only
-    /// when a channel actually completes (SpendCharge() in OwnerTick) - which is also what starts the
-    /// 10s gate cooldown counting. One side effect, not a special case: while that charge is on
-    /// cooldown, AbilityRunner's own CastGate already refuses a new placement before TryBuildCast
-    /// ever runs (module.HasChargeGate &amp;&amp; !module.HasCharge) - "placing is blocked during the
-    /// gate cooldown" needed no extra code here.
-    ///
-    /// A portal is a REAL networked object (NetworkedDeployable/Portal), not something this module
-    /// draws locally - a player joining mid-match has to see a gate that has been standing there for
-    /// two minutes. Placing therefore happens in ExecuteCast's IsCasterClient branch, exactly where
-    /// FireField's own spawn happens, not in TryBuildCast: TryBuildCast only decides WHERE (clamped
-    /// to Placement Range, then GROUNDED and validated exactly like Blink's own destination check -
-    /// see GroundProbe.TryFindGround - refused if there is no ground within reach, it sits below the
-    /// kill plane, or the grounded spot is blocked) and hands the built-once placement counter along
-    /// as the payload's IntArg.
-    ///
-    /// THE CHANNEL ITSELF is pure logic in PortalChannelState (Assets/scripts/Combat) - this class
-    /// only supplies, every OwnerTick, "which of my own portals (if any) am I standing in" and
-    /// "can I channel right now" (a pair exists AND the gate has a charge AND canAct), and reacts to
-    /// whatever PortalChannelState reports by sending the matching phase: 1 when a channel starts, 3
-    /// when it cancels (both purely visual - see ExecuteCast), and the actual travel at Completed,
-    /// which spends the charge and hands the moment to ExecuteCast's IsCasterClient branch exactly
-    /// like Blink hands its jump to Owner.Displacement.TeleportTo.
+    /// Places a teleport gate on the ground, usable by you and your teammates; standing in it channels you to its pair
+    /// (Placement Range, Max Portals, Channel Seconds and the gate cooldown are on this module). Pressing Shift PLACES, it
+    /// does not travel: SpendsChargeOnCast is false, the gate charge is spent only when a channel completes (which starts
+    /// the cooldown), and AbilityRunner's CastGate already refuses placing while that charge is on cooldown. A portal is a
+    /// REAL networked object (NetworkedDeployable/Portal) so a late joiner sees it: placing happens in ExecuteCast's
+    /// IsCasterClient branch, TryBuildCast only decides WHERE (grounded and validated like Blink, via GroundProbe) and
+    /// carries the placement counter as IntArg. The channel is pure logic in PortalChannelState; this class feeds it each
+    /// OwnerTick and sends phases: 1 channel start, 3 cancel (visual only), 2 travelled (the jump, in ExecuteCast).
     /// </summary>
     public sealed class TeleportAbility : AbilityModule
     {
@@ -94,10 +73,8 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("Seconds the arrival marker stays up before it disappears on its own.")]
         private float arrivalVfxSeconds = 0.3f;
 
-        // Not a design tunable, like BlinkAbility's own blockMask: Default|Building is both what
-        // counts as ground (the arena floor sits on Default, same as every living player; roofs and
-        // walls are Building) and what a placement may not overlap once grounded - see IsBlocked.
-        // Fixed here rather than exposed, the same reasoning PlayerDisplacement gives for its mask.
+        // Not a design tunable (like BlinkAbility's blockMask): Default|Building is both what counts as ground (the arena
+        // floor sits on Default, roofs and walls are Building) and what a placement may not overlap - see IsBlocked.
         private int blockMask;
 
         // The caster's own capsule, read in OnEquip like Blink's: a portal is placed for a player to arrive on, so it
@@ -107,16 +84,13 @@ namespace Overpower.Abilities
         // The owner's Rigidbody, read in OnEquip: FindStandingPortal reads its position, which is up to date right after TeleportTo.
         private Rigidbody body;
 
-        // Owner only: the portal template's own numbers (diameter), read once so TryBuildCast's
-        // validity check and ExecuteCast's spawn agree on the same radius without a second
-        // GetComponent every cast. Also doubles as the "is Portal Prefab actually usable" check.
+        // Owner only: the prefab's Portal, read once so TryBuildCast and ExecuteCast agree on the radius; null means
+        // Portal Prefab is not usable.
         private Portal portalTemplate;
 
-        // Owner only: increments once per successful placement, travels as CastPayload.IntArg so
-        // every client's Portal.Seq (and this owner's own pruning) agree on placement order. Safe to
-        // restart at 0 on every fresh equip (a new module instance) ONLY because Interrupt(Unequipped)
-        // destroys every portal this owner had before the old instance goes away - there is never a
-        // live portal left whose Seq could collide with a restarted counter.
+        // Owner only: once per placement, travels as CastPayload.IntArg so every client's Portal.Seq (and the pruning)
+        // agree on order. Restarting at 0 on a fresh equip is safe ONLY because Interrupt(Unequipped) destroys every
+        // portal first, so no live Seq can collide.
         private int nextSeq;
 
         // Owner only: the pure channel timer this module drives every OwnerTick.
@@ -125,12 +99,10 @@ namespace Overpower.Abilities
         // Owner only: the last "has a portal charge" answer sent to teammates, null until the first publish.
         private bool? lastPublishedReady;
 
-        // Owner only: which of the owner's own portals is currently mid-channel, or null - kept only
-        // so IsActive (the HUD glow) can answer without asking PortalChannelState for its private state.
+        // Owner only: the portal currently mid-channel, or null - so IsActive (the HUD glow) needn't ask PortalChannelState.
         private Portal channelingPortal;
 
-        // Every client: the cosmetic marker for a channel in progress on THIS screen, and the count-
-        // down that turns the brief arrival marker off without a second network message.
+        // Every client: the cosmetic marker for a channel in progress on THIS screen.
         private GameObject channelVfx;
 
         public override bool IsActive => channelingPortal != null;
@@ -181,33 +153,30 @@ namespace Overpower.Abilities
 
             Vector3 flatXZ = ClampToRange(ctx.Origin, ctx.TargetPoint, placementRange);
 
-            // GroundPointUnderCursor (ctx.TargetPoint) is only a flat math plane at the player's own
-            // Y - PlayerAim never asks Physics what is actually there - so without this the clamped
-            // point could sit over a void, off the map edge, or buried/floating on a slope, and
-            // TeleportTo would happily put the player there later. Same rule as Blink's own
-            // destination check (GroundProbe's class comment), refused with nothing spent if it fails.
+            // ctx.TargetPoint is only a flat math plane at the player's own Y (PlayerAim never asks Physics), so the clamped
+            // point could sit over a void, off the map edge, or buried/floating on a slope and TeleportTo would put the
+            // player there later. Same rule as Blink's destination check (GroundProbe); refused with nothing spent.
             if (!GroundProbe.TryFindGround(ctx.Origin.y, flatXZ, maxStepUp, groundProbeDistance,
                     Owner.Motor.KillHeight, blockMask, Owner.Root.transform, out Vector3 ground))
                 return false;
 
             if (IsBlocked(ground))
-                return false; // refuse, nothing spent - see the class comment on why placing never spends the gate charge anyway.
+                return false; // refuse, nothing spent.
 
-            // Movement step 3: inside the arena with room for the player who arrives on it. The terrain carries on
-            // past the boundary walls, so the ground probe alone happily placed a gate outside the arena.
+            // Inside the arena with room for the player who arrives on it. The terrain carries on past the boundary
+            // walls, so the ground probe alone would place a gate outside the arena.
             if (!Overpower.Arena.ArenaSymmetry.IsInsideArena(ground, capsule.radius))
                 return false;
 
-            // Controller decision R1 (2026-09-17): a portal's path is blocked by the arena's own boundary walls only -
-            // never by a crate, a house or deployable cover, which stays exactly as placeable behind as it is today.
-            // PlayerSpaceProbe.IsPathClear checks the whole Building layer (right for a mine, ability visuals step 3),
-            // so this asks ArenaSymmetry's boundary-only sweep instead, at the same knee height and probe radius.
+            // A portal's path is blocked by the arena's own boundary walls only, never by a crate, a house or deployable
+            // cover. PlayerSpaceProbe.IsPathClear checks the whole Building layer (right for a mine), so this asks
+            // ArenaSymmetry's boundary-only sweep instead, at the same knee height and probe radius.
             Vector3 feetKnee = PlayerSpaceProbe.FeetOf(capsule, ctx.Origin) + Vector3.up * PlayerSpaceProbe.KneeHeightMetres;
             Vector3 groundKnee = ground + Vector3.up * PlayerSpaceProbe.KneeHeightMetres;
             if (Overpower.Arena.ArenaSymmetry.PathCrossesBoundary(feetKnee, groundKnee, PlayerSpaceProbe.PathProbeRadiusMetres))
                 return false;
 
-            // Task 9e-2: after a rejoin the portals PUN kept have higher Seqs than this fresh module's counter - continue above them.
+            // After a rejoin the portals PUN kept have higher Seqs than this fresh module's counter: continue above them.
             IReadOnlyList<Portal> standing = Portal.ForOwner(Owner.ActorNumber);
             var standingSeqs = new List<int>(standing.Count);
             foreach (Portal p in standing)
@@ -227,9 +196,8 @@ namespace Overpower.Abilities
             Portal current = FindStandingPortal(mine);
             Portal other = current != null ? FindOther(mine, current) : null;
 
-            // Movement step 3: the exit is re-checked every tick, so a wall, crate or cover built on it later - or a
-            // portal placed before this check existed - can't channel anyone into geometry or out of the arena. It is
-            // part of the gate rather than a refusal at travel time, because by then the charge is already spent.
+            // The exit is re-checked every tick, so a wall, crate or cover built on it later can't channel anyone into
+            // geometry or out of the arena. Part of the gate, not a refusal at travel time: by then the charge is spent.
             bool canChannel = canAct && other != null && HasCharge && IsExitClear(other);
             PortalChannelState.Result result = channelState.Tick(deltaTime, current, canChannel);
 
@@ -253,28 +221,23 @@ namespace Overpower.Abilities
 
         public override void Interrupt(InterruptReason reason)
         {
-            // Portals are persistent, owner-only state - like an armor upgrade, not like a dash mid-
-            // flight - so only Unequipped removes them. A death or a stun must not touch them at all;
-            // Tudor's decision.
+            // Portals are persistent, owner-only state (like an armor upgrade, not a dash mid-flight): only Unequipped
+            // removes them. A death or a stun must not touch them.
             if (reason == InterruptReason.Unequipped)
             {
                 DestroyOwnPortals();
                 PublishReadyIfChanged(false);
             }
 
-            // The channel marker is purely cosmetic and per-client, so it must stop on every client
-            // regardless of why this was called - mirrors DebugPingAbility.Interrupt.
+            // The channel marker is cosmetic and per-client, so it stops on every client whatever the reason.
             ClearChannelVfx();
 
             if (channelingPortal != null)
             {
                 channelingPortal = null;
                 channelState.Reset();
-                // No SendPhase(Cancel) here: Died/Stunned/Silenced are followed almost immediately by
-                // OwnerTick's own canAct==false path on the owner, which already sends it - sending it
-                // twice would only be a harmless, noisy duplicate RPC. Unequipped has no OwnerTick left
-                // to follow it, but also nobody left to show a cancel to: the module (and its portals,
-                // just destroyed above) is about to be gone.
+                // No SendPhase(Cancel) here: Died/Stunned/Silenced are followed at once by OwnerTick's canAct==false
+                // path, which sends it. Unequipped has no OwnerTick left, but nobody left to show a cancel to either.
             }
         }
 
@@ -306,10 +269,8 @@ namespace Overpower.Abilities
         private void CompleteTravel(Portal from, Portal to)
         {
             channelingPortal = null;
-            // Spent here, before SendPhase/ExecuteCast actually calls TeleportTo - so a Forced
-            // displacement (a knockback) that sneaks in during the one frame before ExecuteCast runs
-            // can still win the race and the charge is already gone, unrefundable - the same accepted
-            // race BlinkAbility.ExecuteCast's own comment documents for its jump.
+            // Spent here, before ExecuteCast calls TeleportTo: a knockback landing in the frame between still wins and
+            // the charge is gone, unrefundable - the accepted race BlinkAbility documents for its jump.
             SpendCharge();
             channelState.LatchArrival(to);
             SendPhase(PhaseTravelled, new CastPayload { Origin = from.transform.position, Point = ArrivalRoot(to) });
@@ -340,8 +301,7 @@ namespace Overpower.Abilities
             if (!Owner.IsMine)
                 return; // Only the owner may PhotonNetwork.Destroy these - see FireField.Burn's "eight errors" lesson.
 
-            // Copied first: PhotonNetwork.Destroy leads to Portal.OnDestroy unregistering itself from
-            // the very list this loop would otherwise be mutating while iterating it.
+            // Copied first: PhotonNetwork.Destroy leads to Portal.OnDestroy unregistering from the list being iterated.
             var mine = new List<Portal>(Portal.ForOwner(Owner.ActorNumber));
             foreach (Portal p in mine)
             {
@@ -379,7 +339,7 @@ namespace Overpower.Abilities
                 delta.y = 0f;
                 float distanceSqr = delta.sqrMagnitude;
 
-                // The body touching the circle counts (Tudor D15), not only the body's middle.
+                // The body touching the circle counts (D15), not only the body's middle.
                 if (PortalUseRules.IsOnPortal(p.transform.position, position, p.Radius, bodyRadius) && distanceSqr < bestDistanceSqr)
                 {
                     best = p;
@@ -390,10 +350,8 @@ namespace Overpower.Abilities
             return best;
         }
 
-        /// <summary>The paired portal to travel to - the most recently placed of the owner's OTHER
-        /// portals. With the normal cap of two this is simply "the other one"; picking the newest
-        /// among more than one (only possible for the one frame before a same-frame prune finishes)
-        /// keeps the answer deterministic without waiting on that prune.</summary>
+        /// <summary>The paired portal: the most recently placed of the owner's OTHER portals. Normally simply "the other
+        /// one"; picking the newest keeps the answer deterministic for the frame before a prune finishes.</summary>
         public static Portal FindOther(IReadOnlyList<Portal> mine, Portal current)
         {
             Portal best = null;
@@ -432,24 +390,21 @@ namespace Overpower.Abilities
                         var displacement = Owner.Displacement as PlayerDisplacement;
                         if (displacement == null || !displacement.TeleportTo(cast.Payload.Point))
                         {
-                            // Only possible if a knockback started in the single frame between the
-                            // channel completing and here - the same race BlinkAbility's own class
-                            // comment documents. The charge is already spent and cannot be refunded.
+                            // Only possible if a knockback started between the channel completing and here (the race
+                            // BlinkAbility documents); the charge is already spent and cannot be refunded.
                             Debug.LogWarning($"[TeleportAbility] {name}: teleport refused at execute " +
                                               "time - a knockback must have started after the channel completed.");
                         }
                     }
                     else
                     {
-                        // Both rings at floor level (review fix, movement step 3): Point now carries the ARRIVAL ROOT
-                        // height (0.5 m above the floor, so the caster's own TeleportTo above lands standing), but
-                        // these two markers are cosmetic ground rings, not standing heights - PlayerSpaceProbe.FeetOf
-                        // derives the floor back out of it so it still matches Origin's own floor-level point.
+                        // Both rings at floor level: Point carries the ARRIVAL ROOT height (so the caster's TeleportTo lands
+                        // standing), but these cosmetic rings are ground rings - FeetOf derives the floor back out of it.
                         PlayArrivalVfx(cast.Payload.Origin, cast.CasterTeam); // departure: only if its spot is seen
                         PlayArrivalVfx(capsule != null ? PlayerSpaceProbe.FeetOf(capsule, cast.Payload.Point) : cast.Payload.Point, cast.CasterTeam); // arrival: only if its spot is seen
 
-                        // Task 15: a trip just completed here - teammates standing on the departure portal travel with it.
-                        // Each client moves only its own player (AllyPortalTraveller.Local), no new message is needed.
+                        // A trip just completed here: teammates standing on the departure portal travel with it. Each
+                        // client moves only its own player (AllyPortalTraveller.Local); no new message.
                         if (PortalUseRules.IsFreshGroupSignal(cast.SecondsLate))
                             AllyPortalTraveller.Local?.JoinGroupTrip(Owner.ActorNumber, FindPortalAt(Owner.ActorNumber, cast.Payload.Origin), cast.CasterActor);
                     }
@@ -487,24 +442,21 @@ namespace Overpower.Abilities
             return new Vector3(clampedXZ.x, requested.y, clampedXZ.z);
         }
 
-        /// <summary>Where a traveller's root lands on a portal: standing on its floor point, the same height Blink
-        /// uses. Travelling to the raw ground point sank the capsule half a metre into the floor, and physics popped
-        /// it out in whatever direction it could.</summary>
+        /// <summary>Where a traveller's root lands on a portal: standing on its floor point, the same height Blink uses.
+        /// The raw ground point would sink the capsule half a metre into the floor and physics would pop it out sideways.</summary>
         private Vector3 ArrivalRoot(Portal to) => ArrivalRoot(capsule, to);
 
-        /// <summary>Same as the instance ArrivalRoot, for a traveller that is not this ability's owner (a teammate
-        /// using the owner's portal - AllyPortalTraveller) and brings its own capsule.</summary>
+        /// <summary>For a traveller that is not this ability's owner (a teammate, AllyPortalTraveller): brings its own capsule.</summary>
         public static Vector3 ArrivalRoot(CapsuleCollider travellerCapsule, Portal to) =>
             PlayerSpaceProbe.RootOnGround(travellerCapsule, to.transform.position);
 
-        /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare,
-        /// and not inside a wall, house, crate, cover or (Amendment 1) a barrier - crossing by portal is allowed, so
-        /// arriving fused into one is refused the same way arriving inside a wall already was. Other players don't
-        /// count (Building | Barrier, not a body layer).</summary>
+        /// <summary>True when a player can arrive on this portal: inside the arena with a player's width to spare, and not
+        /// inside a wall, house, crate, cover or barrier (crossing by portal is allowed, arriving fused into one is not).
+        /// Other players don't count (Building | Barrier, not a body layer).</summary>
         private bool IsExitClear(Portal to) => IsExitClear(capsule, to, Owner.Root.transform);
 
-        /// <summary>The exit check for any traveller - the owner here, or a teammate through AllyPortalTraveller
-        /// with their own capsule and root (so their own body is not what blocks the exit).</summary>
+        /// <summary>The exit check for any traveller; a teammate passes their own capsule and root so their own body
+        /// is not what blocks the exit.</summary>
         public static bool IsExitClear(CapsuleCollider travellerCapsule, Portal to, Transform travellerRoot)
         {
             if (travellerCapsule == null)
@@ -513,8 +465,7 @@ namespace Overpower.Abilities
             return IsRootClear(travellerCapsule, ArrivalRoot(travellerCapsule, to), travellerRoot);
         }
 
-        /// <summary>The same exit check for an arbitrary arrival root - a group member landing beside the centre rather
-        /// than on it (Task 15).</summary>
+        /// <summary>The same exit check for an arbitrary arrival root - a group member landing beside the centre.</summary>
         public static bool IsRootClear(CapsuleCollider travellerCapsule, Vector3 root, Transform travellerRoot)
         {
             if (travellerCapsule == null)
@@ -524,9 +475,8 @@ namespace Overpower.Abilities
                    && !PlayerSpaceProbe.IsCapsuleBlocked(travellerCapsule, root, ArenaLayers.WallsAndBarriers, travellerRoot);
         }
 
-        /// <summary>The owner as a group member (a teammate's trip through my portal pulled me along): I was moved by
-        /// AllyPortalTraveller, so my own channel stops and the arrival portal is latched exactly as after my own trip.
-        /// No charge - the trip's one charge was spent by whoever triggered it.</summary>
+        /// <summary>The owner as a group member (a teammate's trip through my portal pulled me along): my own channel
+        /// stops and the arrival portal is latched as after my own trip. No charge - whoever triggered it paid.</summary>
         public bool IsLatchedOn(Portal portal) => channelState.IsLatchedOn(portal);
 
         public void NoteArrivedWithGroup(Portal arrival)
@@ -540,27 +490,18 @@ namespace Overpower.Abilities
             channelState.LatchArrival(arrival);
         }
 
-        // The check volume's vertical band above the grounded point - not a design tunable, the
-        // same reasoning as blockMask: an arbitrary human-height band, not something a designer
-        // should be able to mis-set into checking the wrong height entirely.
+        // The check volume's vertical band above the grounded point: a human-height band, not a design tunable (as blockMask).
         private const float BlockCheckBottom = 0.1f;
         private const float BlockCheckTop = 1.8f;
 
         /// <summary>
-        /// True if a portal-sized volume at this already-grounded point would overlap a wall or
-        /// another player's body - the same Default|Building mask and self-exclusion rule
-        /// BlinkAbility.IsCapsuleBlocked uses, so a portal is refused by the same "something solid
-        /// occupies this spot" idea as any other destination check.
+        /// True if a portal-sized volume at this already-grounded point would overlap a wall or another player's body (the
+        /// Default|Building mask and self-exclusion BlinkAbility's check uses).
         ///
-        /// A BOX, not a capsule like Blink's own check: Physics.OverlapCapsule's two hemispherical
-        /// end caps extend a FURTHER radius beyond the two points passed to it. That is invisible for
-        /// Blink's player capsule, whose radius is well under half its height, but not for a 1.0m
-        /// portal radius against a band only 1.7m tall - built the same way, the bottom cap would dip
-        /// (radius - halfBandHeight) below the intended floor, back down into the ground itself. Once
-        /// Default (the floor's own layer) is in the mask, as it now is, every placement on ordinary
-        /// flat ground would read as "blocked" by the floor no candidate could ever clear. A box's
-        /// flat faces have no such overshoot - found by a live placement test refusing a portal on
-        /// perfectly open ground once this mask changed to match Blink's.
+        /// A BOX, not a capsule: Physics.OverlapCapsule's hemispherical end caps extend a FURTHER radius beyond the two
+        /// points. Invisible for Blink's player capsule, but a 1.0m portal radius against a 1.7m band would dip the bottom
+        /// cap below the floor, into the ground itself, so with Default in the mask every placement on open ground would
+        /// read as blocked. A box's flat faces have no overshoot.
         /// </summary>
         private bool IsBlocked(Vector3 groundPoint)
         {
@@ -568,12 +509,10 @@ namespace Overpower.Abilities
             Vector3 center = groundPoint + Vector3.up * ((BlockCheckBottom + BlockCheckTop) * 0.5f);
             Vector3 halfExtents = new Vector3(radius, (BlockCheckTop - BlockCheckBottom) * 0.5f, radius);
 
-            // Default|Building only, as before Amendment 1 - NOT BodiesWallsAndBarriers here (arena step 5 review
-            // fix, R-3): this box is wide (a 2.0 m portal diameter), and a Tier III recess is only ~3 m deep, so
-            // checking the whole box against a barrier too refused almost every spot in the recess - a barrier
-            // anywhere near its mouth falls within 2.0 m of nearly the whole pocket behind it. That silently undid
-            // "a portal crosses a barrier" (GDD p.29) at the one place a barrier actually stands. A barrier is
-            // instead refused below, at the tighter, player-sized capsule a traveller will really arrive in.
+            // Default|Building only, NOT BodiesWallsAndBarriers: this box is wide (2.0 m portal diameter) and a Tier III
+            // recess is only ~3 m deep, so checking it against a barrier too refused almost every spot in the recess,
+            // silently undoing "a portal crosses a barrier" (GDD p.29). A barrier is refused below instead, at the
+            // tighter, player-sized capsule a traveller will really arrive in.
             Collider[] overlaps = Physics.OverlapBox(center, halfExtents, Quaternion.identity, blockMask, QueryTriggerInteraction.Ignore);
             foreach (Collider overlap in overlaps)
             {
@@ -582,9 +521,8 @@ namespace Overpower.Abilities
                 return true;
             }
 
-            // Still refuse a portal placed square on a barrier: a traveller arriving on it would land fused into
-            // the barrier's own collider, exactly like arriving inside a wall - but this check is only the player's
-            // own capsule width, not the whole wide placement box, so it never refuses the rest of a recess.
+            // Still refuse a portal placed square on a barrier (a traveller would land fused into its collider); this
+            // check is only the player's capsule width, so it never refuses the rest of a recess.
             if (capsule != null && PlayerSpaceProbe.IsInsideBarrier(capsule, PlayerSpaceProbe.RootOnGround(capsule, groundPoint), Owner.Root.transform))
                 return true;
 
@@ -612,9 +550,8 @@ namespace Overpower.Abilities
 
             GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marker.name = "Teleport VFX (cheap, cosmetic only)";
-            // Removed immediately, not with Destroy, which waits for the end of the frame - see
-            // BlinkAbility.PlayRemoteVfx's identical trick: for that one frame the sphere would
-            // otherwise be a solid object sitting in the world.
+            // Removed immediately, not with Destroy (end of frame): for that frame the sphere would be a solid object in
+            // the world. Same trick as BlinkAbility.PlayRemoteVfx.
             DestroyImmediate(marker.GetComponent<Collider>());
             marker.transform.position = point;
             marker.transform.localScale = Vector3.one * radius * 2f;

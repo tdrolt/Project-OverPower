@@ -4,13 +4,9 @@ using UnityEngine.InputSystem;
 namespace Overpower.Data
 {
     /// <summary>
-    /// The whole tuning surface for match telemetry (Task T2). One asset, one home, same reasoning
-    /// as every other Data config: fields are [SerializeField] private with read-only properties, so
-    /// nothing at runtime can quietly edit the shared asset instance instead of a per-player copy.
-    ///
-    /// Turning Enabled off (or deleting Assets/scripts/Telemetry entirely - see the design doc's
-    /// Principle 1) is the whole kill switch: no other system reads or writes anything under this
-    /// asset's control.
+    /// The whole tuning surface for match telemetry. Turning Enabled off (or deleting Assets/scripts/Telemetry
+    /// entirely - the design doc's Principle 1) is the whole kill switch: no other system reads or writes anything
+    /// under this asset's control.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Telemetry Config", fileName = "TelemetryConfig")]
     public sealed class TelemetryConfig : ScriptableObject

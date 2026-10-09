@@ -14,17 +14,17 @@ using UnityEngine.SceneManagement;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// Dominion Task 11: builds the 2v2 lane map into the open Dominion 2v2 scene from DominionLaneLayout.asset, replacing Task 10's stand-in triangle arena.
-    /// It uses the triangle arena's own pieces (the boundary wall, block and jersey-barrier boxes, their materials and layers), the scene's four existing
-    /// towers (two Tier 3 zones, two Tier 1 spawn towers - the others are removed), and sets the per-scene map data: the capital list, the tower
-    /// links, the spawn points, the healing areas, the arena outline and the lane's own minimap picture.
+    /// Builds the 2v2 lane map into the open Dominion 2v2 scene from DominionLaneLayout.asset. It uses the triangle arena's own
+    /// pieces (boundary wall, block and jersey-barrier boxes, their materials and layers), the scene's four existing towers (two
+    /// Tier 3 zones, two Tier 1 spawn towers; the others are removed), and sets the per-scene map data: capital list, tower
+    /// links, spawn points, healing areas, arena outline and the lane's own minimap picture.
     ///
-    /// Everything it makes sits under ONE object it owns ("Dominion Lane" under Arena), which a re-run destroys and builds again; the towers, spawn
-    /// points and the scene's data are updated in place. It only ever edits a scene called Dominion 2v2 (never Game Scene), never in Play Mode, and never
-    /// saves: the caller looks at the report, then saves.
-    /// Zone numbering: 0 = the top zone, 1 = the bottom zone, 2 = White's spawn tower, 3 = Purple's spawn tower (contiguous from 0, so the zone count is 4).
-    /// Links: each spawn tower links to both zones and the two zones link to each other, so either team can take either zone from the start
-    /// (a capital counts as held for "capture next to a zone you hold").
+    /// Everything it makes sits under ONE object it owns ("Dominion Lane" under Arena), which a re-run destroys and builds again;
+    /// towers, spawn points and scene data are updated in place. It only edits a scene called Dominion 2v2 (never Game Scene),
+    /// never in Play Mode, and never saves: the caller looks at the report, then saves.
+    /// Zone numbering: 0 = top zone, 1 = bottom zone, 2 = White's spawn tower, 3 = Purple's spawn tower (contiguous from 0, so the
+    /// zone count is 4). Links: each spawn tower links to both zones and the zones link to each other, so either team can take
+    /// either zone from the start (a capital counts as held for "capture next to a zone you hold").
     /// </summary>
     public static class DominionLaneBuilder
     {
@@ -215,11 +215,12 @@ namespace Overpower.EditorTools
             return report;
         }
 
-        /// <summary>
-        /// The tower's body ("Tower Look": the plinth, drum, crown and columns, with the capsule that is its cover) is the triangle's, 5.2 m across; the lane's board
-        /// draws a 2 m zone tower and a 3.8 m spawn tower. Scales the body sideways (never its height) so its capsule is <paramref name="widthMetres"/> across.
-        /// Re-running changes nothing once the width is right. The capture trigger and ring are not part of the body and keep the Territory Config's radius.
-        /// </summary>
+    /// <summary>
+    /// The tower body ("Tower Look": plinth, drum, crown, columns, with the capsule that is its cover) is the triangle's, 5.2 m
+    /// across; the board draws a 2 m zone tower and a 3.8 m spawn tower. Scales the body sideways (never its height) so its capsule
+    /// is <paramref name="widthMetres"/> across. Re-running changes nothing once the width is right. The capture trigger and ring
+    /// are not part of the body and keep the Territory Config's radius.
+    /// </summary>
         private static void ScaleBody(BuildingCapture tower, float widthMetres, List<string> report)
         {
             Transform look = tower.transform.Find("Tower Look");

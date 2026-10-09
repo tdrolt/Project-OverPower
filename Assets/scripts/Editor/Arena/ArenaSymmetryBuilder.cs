@@ -24,8 +24,8 @@ namespace Overpower.EditorTools
         public const float OutlineToleranceMetres = 0.15f;
 
         /// <summary>The child of Source (and of each generated third) holding the boundary walls. Kept on ArenaSymmetry
-        /// itself (a runtime class) rather than defined here, because the portal path check (movement step 3) needs
-        /// the same name from gameplay code, which cannot reference this Editor-only class.</summary>
+        /// (a runtime class) because the portal path check needs the same name from gameplay code, which cannot reference
+        /// this Editor-only class.</summary>
         public const string BoundaryGroupName = ArenaSymmetry.BoundaryGroupName;
 
         private const string UndoName = "Rebuild arena thirds";
@@ -155,8 +155,8 @@ namespace Overpower.EditorTools
             return problems;
         }
 
-        /// <summary>Every boundary wall must sit on Source Outline (movement step 3). A designer who moves a wall and
-        /// forgets the outline would otherwise leave blink, portals and the safety net working off the old edge.</summary>
+        /// <summary>Every boundary wall must sit on Source Outline. A designer who moves a wall and forgets the outline would
+        /// otherwise leave blink, portals and the safety net working off the old edge.</summary>
         private static void CheckOutline(ArenaSymmetry arena, List<string> problems)
         {
             // A tiny arena with no boundary walls (the builder's own tests) has nothing to check.

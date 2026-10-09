@@ -8,20 +8,18 @@ namespace Overpower.Arena
     /// <summary>
     /// Makes the arena three identical thirds, turned 120° apart about Centre.
     ///
-    /// HOW TO EDIT THE ARENA (arena step 5, corrected 2026-09-19 review): boundary walls come from Source Outline
-    /// (below), corner to corner - NOT from ArenaLayout.asset, which only holds their thickness and height. To move
-    /// a wall, move its outline points, then run "Build primitive arena" (a hand-moved wall is thrown away by the
-    /// next build, since walls are always rebuilt fresh from the outline). Blocks and barriers ARE built from
-    /// Assets/Gameplay/Config/ArenaLayout.asset, never hand-placed for real - edit a row there, or move a block or
-    /// barrier in the Scene view and use the OverPower > Arena > "Capture layout from Source" MENU ITEM (not a
-    /// button on this Inspector) to write its new row back, then run "Build primitive arena" (OverPower > Arena or
-    /// the button below), which rebuilds Source's walls, blocks and barriers, copies Source into both generated
-    /// thirds and re-bakes the minimap, all in one step. A new block placed directly under Source must go inside one
-    /// of its existing groups (e.g. Blocks) before Capture, or the next Build treats it as foreign art and moves it
-    /// into Old Arena (off) instead of reading it. "Rebuild thirds" alone still works for a quick look after moving
-    /// a tower or a spawn point, without touching Source's own walls/blocks/barriers. The two generated thirds are
-    /// deleted and copied again from Source on every rebuild, so an edit made directly to them is thrown away. The
-    /// Inspector greys them out to make that obvious.
+    /// HOW TO EDIT THE ARENA: boundary walls come from Source Outline (below), corner to corner - NOT from
+    /// ArenaLayout.asset, which only holds their thickness and height. To move a wall, move its outline points, then run
+    /// "Build primitive arena" (OverPower > Arena or the button below): walls are always rebuilt fresh from the outline,
+    /// so a hand-moved wall is thrown away. Blocks and barriers ARE built from Assets/Gameplay/Config/ArenaLayout.asset,
+    /// never hand-placed for real - edit a row there, or move a block or barrier in the Scene view and use the
+    /// OverPower > Arena > "Capture layout from Source" MENU ITEM (not a button on this Inspector) to write its new row
+    /// back, then run Build. A new block placed directly under Source must go inside one of its existing groups (e.g.
+    /// Blocks) before Capture, or the next Build treats it as foreign art and moves it into Old Arena (off) instead of
+    /// reading it. Build rebuilds Source's walls, blocks and barriers, copies Source into both generated thirds and
+    /// re-bakes the minimap in one step; "Rebuild thirds" alone is a quick look after moving a tower or a spawn point.
+    /// The two generated thirds are deleted and copied again from Source on every rebuild, so an edit made directly to
+    /// them is thrown away (the Inspector greys them out).
     ///
     /// Towers, their flag carpets and spawn points are NOT copied: they are networked or carry ids that must stay
     /// unique. They are listed in Snapped Triplets instead. You place the Source one, and the rebuild moves its two
@@ -37,15 +35,15 @@ namespace Overpower.Arena
     {
         /// <summary>The child of Source (and of each generated third) holding the boundary walls. The spelling is the
         /// scene's own. Lives here, not on the Editor-only ArenaSymmetryBuilder, because a portal's path check
-        /// (movement step 3, controller decision R1) needs it from runtime code too - only the arena's own boundary
-        /// walls block a portal's path, never a crate or a house.</summary>
+        /// (R1) needs it from runtime code too - only the arena's own boundary walls block a portal's
+        /// path, never a crate or a house.</summary>
         public const string BoundaryGroupName = "Boundry";
 
         /// <summary>The child of Source (and of each generated third) holding captured blocks (a house, crate, rock
         /// or bush footprint) - hidden behind the phase-two wall by ArenaPhaseTwoCut.</summary>
         public const string BlocksGroupName = "Blocks";
 
-        /// <summary>The child of Source (and of each generated third) holding Amendment 1's jersey barriers - hidden
+        /// <summary>The child of Source (and of each generated third) holding the jersey barriers - hidden
         /// behind the phase-two wall by ArenaPhaseTwoCut.</summary>
         public const string BarriersGroupName = "Barriers";
 
@@ -130,7 +128,7 @@ namespace Overpower.Arena
         }
 
         // Reused every call: a portal's path check runs on the caster's own client, one at a time, on the main thread.
-        // Sized generously (review fix): SphereCastNonAlloc's hits are not sorted or prioritised by relevance, so a
+        // Sized generously: SphereCastNonAlloc's hits are not sorted or prioritised by relevance, so a
         // full buffer over a placement range this small (up to Placement Range + a player's width) risks dropping the
         // one boundary-wall hit that mattered behind unrelated clutter (crates, houses, cover) rather than a farther,
         // less important one.
@@ -139,11 +137,10 @@ namespace Overpower.Arena
 
         /// <summary>
         /// True when a sphere of <paramref name="radius"/> swept from <paramref name="from"/> to <paramref name="to"/>
-        /// would touch a boundary wall in any of the three thirds (movement step 3, controller decision R1: a
-        /// portal's path is blocked by the arena's own boundary walls only - a crate, a house or deployable cover
-        /// stays exactly as placeable behind as it is today, since none of those ever reach this check). Checks the
-        /// Building layer, then keeps only hits under a Boundry child of Source or a generated third. With no arena
-        /// known, nothing can be crossed.
+        /// would touch a boundary wall in any of the three thirds (R1: a portal's path is blocked by the arena's
+        /// own boundary walls only - a crate, a house or deployable cover stays placeable behind, since none of those
+        /// ever reach this check). Checks the Building layer, then keeps only hits under a Boundry child of Source or a
+        /// generated third. With no arena known, nothing can be crossed.
         /// </summary>
         public static bool PathCrossesBoundary(Vector3 from, Vector3 to, float radius)
         {

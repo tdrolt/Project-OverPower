@@ -5,30 +5,18 @@ using Overpower.Data;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The base class every ability derives from - dash, mine, flamethrower, ultimate. One subclass
-    /// per ability, sitting alone on its own prefab, holding every number that ability has.
-    ///
-    /// HOW ONE CAST HAPPENS
-    /// 1. The player presses a key. AbilityRunner, on the OWNER's machine only, checks the gate
-    ///    (dead, stunned, silenced, out of charges, IsReady) and calls TryBuildCast with what the
-    ///    owner's machine knows (CastContext).
-    /// 2. If the module agrees, the runner spends a charge and sends one RPC carrying the payload.
-    /// 3. EVERY client - the caster's own included - receives it and calls ExecuteCast. That is
-    ///    where the ability actually happens: a sphere appears, a dash starts, a mine is placed.
-    ///
-    /// So a module has two halves. The owner-only half (TryBuildCast, OwnerTick) may read input and
-    /// local state. The every-client half (ExecuteCast, Interrupt, OnRespawned) must only use what
-    /// the CastEvent gives it, because on every other machine "local" means someone else.
-    ///
-    /// Deliberately NOT MonoBehaviourPun, and a module prefab must have no PhotonView and no
-    /// Collider: PUN only delivers an RPC to components on the PhotonView's own GameObject, so an
-    /// RPC on a module would never arrive (use SendPhase instead), and a Collider would be swept
-    /// onto the DeadPlayer layer with the rest of the player on death. AbilityDefinition's
-    /// OnValidate refuses both.
-    ///
-    /// TRUST MODEL: cooldowns, charges and casts are decided by the caster's own client and
-    /// believed by everyone else. There is no anti-cheat - this is a prototype on a Photon relay
-    /// with no server to check anything, and checks written here would only look like security.
+    /// The base class every ability derives from: one subclass per ability, alone on its own prefab, holding every
+    /// number that ability has.
+    /// One cast: the OWNER's AbilityRunner checks the gate (dead, stunned, silenced, out of charges, IsReady), calls
+    /// TryBuildCast with what that machine knows (CastContext), spends a charge and sends one RPC; EVERY client, the
+    /// caster included, then calls ExecuteCast, where the ability actually happens.
+    /// Two halves: the owner-only half (TryBuildCast, OwnerTick) may read input and local state; the every-client half
+    /// (ExecuteCast, Interrupt, OnRespawned) must only use the CastEvent, because elsewhere "local" means someone else.
+    /// NOT MonoBehaviourPun, and a module prefab has no PhotonView and no Collider (AbilityDefinition.OnValidate
+    /// refuses both): PUN delivers an RPC only to the PhotonView's own GameObject (use SendPhase instead), and a
+    /// Collider would be swept onto the DeadPlayer layer with the player on death.
+    /// TRUST MODEL: the caster's client decides cooldowns, charges and casts and everyone believes it. No anti-cheat
+    /// on a Photon relay with no server; a check here would only look like security.
     /// </summary>
     public abstract class AbilityModule : MonoBehaviour, IAbilityStatus
     {
@@ -132,25 +120,17 @@ namespace Overpower.Abilities
         public float RechargeProgress => pool != null ? pool.RechargeProgress : 0f;
         public virtual bool IsActive => false;
 
-        /// <summary>The serialized cooldown this module was authored with - the DESIGN number, not
-        /// a live remaining cooldown. Named Configured, not just CooldownSeconds (Task 9b quality
-        /// review), so it reads unmistakably differently from MaxCharges/ChargesAvailable above -
-        /// those are live runtime numbers, this is not. Added for the loadout screen's hover text,
-        /// which reads a MODULE PREFAB ASSET: ChargesAvailable/RechargeProgress above answer "how
-        /// charged up is THIS player's live pool right now" and are 0 on a prefab, which has no pool
-        /// at all (Bind never ran on it) - this and ConfiguredCharges below are the two numbers that
-        /// exist either way.</summary>
+        /// <summary>The serialized cooldown this module was authored with: the DESIGN number, not a live remaining
+        /// cooldown. The loadout screen's hover text reads a MODULE PREFAB ASSET, where ChargesAvailable and
+        /// RechargeProgress are 0 (no pool: Bind never ran); this and ConfiguredCharges exist either way.</summary>
         public float ConfiguredCooldownSeconds => cooldownSeconds;
 
-        /// <summary>The serialized charge count this module was authored with - same "a prefab
-        /// asset has no live pool to read instead" reasoning as ConfiguredCooldownSeconds above, and
-        /// the same Configured naming to keep it distinct from the live MaxCharges/ChargesAvailable.</summary>
+        /// <summary>The serialized charge count this module was authored with; see ConfiguredCooldownSeconds.</summary>
         public int ConfiguredCharges => charges;
 
-        /// <summary>Task 13: the ability's own numbers for the shop's hover pop-up (range, damage, duration, radius...),
-        /// one line each, beyond the cooldown and charges every module has. Read off this module's serialized fields
-        /// (and, for a deployed thing, off its prefab), so it works on a module PREFAB that was never bound to a player.
-        /// Empty by default; each module that has numbers to show overrides it.</summary>
+        /// <summary>The ability's own numbers for the shop's hover pop-up (range, damage, duration, radius...), one line
+        /// each, beyond the cooldown and charges. Read off serialized fields (and, for a deployed thing, its prefab), so
+        /// it works on a module PREFAB never bound to a player. Empty by default.</summary>
         public virtual string ShopStatsText() => "";
 
         internal bool HasChargeGate => pool != null;
@@ -159,13 +139,10 @@ namespace Overpower.Abilities
         internal bool TrySpendChargeForCast() => SpendCharge();
 
         /// <summary>
-        /// Review fix (movement step 2): true if a TryBuildCast refusal should leave the buffered press pending
-        /// instead of consuming it, so the SAME press retries every remaining frame of the buffer window rather than
-        /// being spent on one failed attempt. False (the default) for almost every module: a target that will not
-        /// exist next frame either is not worth re-asking about for the rest of the window - see AbilityRunner's own
-        /// comment on why a refusal is normally consumed. Dash overrides this true: the wall you are touching, or a
-        /// knockback that is running, can stop applying a few frames later within the same buffered press, without
-        /// the player pressing the key again.
+        /// True if a TryBuildCast refusal should leave the buffered press pending, so the SAME press retries every
+        /// remaining frame of the buffer window instead of being spent on one failed attempt. False for almost every
+        /// module (see AbilityRunner on why a refusal is normally consumed). Dash overrides it true: the wall you are
+        /// touching, or a running knockback, can stop applying a few frames later within the same press.
         /// </summary>
         internal virtual bool RetriesRefusalWithinBuffer => false;
 

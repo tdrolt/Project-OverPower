@@ -3,21 +3,11 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// One weapon's complete stat block. Thirteen of these assets exist, one per weapon state in
-    /// the upgrade tree, and every one of them is driven by this same list of numbers - there is
-    /// no per-weapon code anywhere. A shotgun is "simultaneous, with spread". A rocket is "big max
-    /// cone, slow recovery", which reads in play as "accurate only from a standstill". A charge
-    /// rifle is "canCharge, with steps". If some weapon ever needs behaviour that cannot be
-    /// expressed here, that is a sign this stat block is missing a field, not that the weapon
-    /// needs a script of its own.
-    ///
-    /// Fields are [SerializeField] private with read-only properties on purpose. A
-    /// ScriptableObject is a single shared instance for the whole process, so writing to one at
-    /// runtime quietly edits the asset in the Editor and does nothing at all in a build - it
-    /// appears to work for exactly as long as you are testing in the Editor. Read-only access
-    /// makes that mistake impossible to make by accident; anything that needs to vary per player,
-    /// such as a charged-up damage value, copies what it needs into a per-player runtime struct
-    /// on spawn.
+    /// One weapon's complete stat block: one asset per weapon state in the upgrade tree, all driven by this same
+    /// list of numbers, no per-weapon code. A weapon needing behaviour that cannot be expressed here means this block
+    /// is missing a field, not that the weapon needs a script.
+    /// Read-only properties on purpose (see GameplayConfig): a runtime write works in the Editor and does nothing in a
+    /// build. Per-player variation (a charged-up damage value) is copied into a per-player runtime struct on spawn.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Weapon")]
     public sealed class WeaponDefinition : ScriptableObject
@@ -257,14 +247,9 @@ namespace Overpower.Data
 
 #if UNITY_EDITOR
         /// <summary>
-        /// Catches the one accuracy misconfiguration that is invisible in play. If the cone closes
-        /// faster than sustained fire can open it, the cone never leaves Min Cone Angle, so every
-        /// other accuracy number on the weapon stops doing anything - and the weapon simply feels
-        /// fine, which is why nobody notices.
-        ///
-        /// Five of the first seven weapons in the design were wrong in exactly this way, and it
-        /// only came to light when the aim cone got unit tested. A warning in the Console is how
-        /// the designer catches the sixth one without writing a test for it.
+        /// Catches the accuracy misconfiguration that is invisible in play: if the cone closes faster than sustained
+        /// fire opens it, it never leaves Min Cone Angle, every other accuracy number stops mattering, and the weapon
+        /// feels fine. The Console warning lets the designer catch it without a test.
         /// </summary>
         private void OnValidate()
         {
@@ -284,9 +269,8 @@ namespace Overpower.Data
                 }
             }
 
-            // Same shape of trap as above, but for the moving bloom added in the playtest polish
-            // pass: if it doesn't outpace recovery, moving never widens the cone past the flat
-            // moving spread, and Moving Bloom Per Second is a decorative number.
+            // Same trap for the moving bloom: if it doesn't outpace recovery, moving never widens the cone
+            // past the flat moving spread, and Moving Bloom Per Second is a decorative number.
             if (movingBloomPerSecond > 0f && movingBloomPerSecond <= recoveryPerSecond)
             {
                 Debug.LogWarning(
@@ -295,10 +279,8 @@ namespace Overpower.Data
                     $"Bloom Per Second above {recoveryPerSecond}, or set it to 0 on purpose.", this);
             }
 
-            // Task 11b (playtest polish, designer request [T]): a wind-up that lasts as long as - or
-            // longer than - the weapon's own cooldown lets a second trigger pull land its RPC, and
-            // therefore start showing ITS OWN warning line, before the first beam has fired. Two
-            // overlapping warning lines from the same shooter read as a glitch, not a weapon.
+            // A wind-up as long as or longer than the cooldown lets a second trigger pull land its RPC, and so
+            // show ITS OWN warning line, before the first beam has fired; two overlapping lines read as a glitch.
             if (windupSeconds > 0f && windupSeconds >= fireInterval)
             {
                 Debug.LogWarning(
@@ -308,9 +290,8 @@ namespace Overpower.Data
                     $"below {fireInterval}, or raise Fire Interval above {windupSeconds}.", this);
             }
 
-            // Mark plan step 4: the two ways a marking weapon can be misconfigured into doing
-            // nothing useful - the same "warn in the Console, pin no number" spirit as every other
-            // check here (WeaponConfigRuleTests pins the SHAPE of these rules, never a tuning value).
+            // The two ways a marking weapon can be misconfigured into doing nothing. Warn, pin no number:
+            // WeaponConfigRuleTests pins the SHAPE of these rules, never a tuning value.
             if (markWindowSeconds > 0f && markedDamageMultiplier <= 1f)
             {
                 Debug.LogWarning(

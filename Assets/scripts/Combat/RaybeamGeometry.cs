@@ -3,30 +3,24 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// The pure geometry behind the raybeam's three converging shots - where each beam starts and
-    /// which way it aims, and whether a given beam actually passes close enough to strike a point.
-    /// Pulled out of RaybeamAbility (a MonoBehaviour, untestable in edit mode without a scene)
-    /// exactly the way BeamResolver sits apart from Hitscan: "three beams converge at a fixed range
-    /// along the shooter's own aim direction" (2026-09-20 rework - see RaybeamAbility's own class
-    /// comment, "THE SPREAD") is the one claim in this ability that a test can pin down instead of
-    /// eyeballing in Play mode. Before that rework the two outer beams chased the cursor's own exact
-    /// depth instead; that worked at any range for a pixel-perfect click, but a real player cannot
-    /// place a ground cursor pixel-perfectly at distance, so the old ~3m working range was the
-    /// cursor's own depth precision running out, not a limit of this geometry.
+    /// The pure geometry behind the raybeam's three converging shots: where each beam starts and which
+    /// way it aims, and whether a beam passes close enough to strike a point. Pulled out of
+    /// RaybeamAbility the way BeamResolver sits apart from Hitscan, so "three beams converge at a fixed
+    /// range along the shooter's own aim direction" (RaybeamAbility, "THE SPREAD") is pinned by a test
+    /// instead of eyeballed in Play mode. The cursor's own depth is not used: a player cannot place a
+    /// ground cursor pixel-perfectly at distance.
     ///
-    /// Every method here is a plain function of its arguments - no Physics call, no MonoBehaviour
-    /// state - so every client that runs it against the same synced Origin/Direction/Point agrees,
-    /// which matters because raybeam damage is victim-side (see RaybeamAbility's class comment).
+    /// Every method is a plain function of its arguments (no Physics, no MonoBehaviour state), so
+    /// every client running it against the same synced Origin/Direction/Point agrees, which matters
+    /// because raybeam damage is victim-side.
     /// </summary>
     public static class RaybeamGeometry
     {
         /// <summary>
-        /// The three beam origins, addendum wording exactly: "Origin ± right x beamOriginSpacing,
-        /// plus the centre". Right is derived from Direction rather than read off the caster's own
-        /// transform.right, because Direction is the one value that actually crosses the wire in the
-        /// cast payload - every client must compute the identical perpendicular from the identical
-        /// input, and a player's transform can be a frame stale or (for a dead/respawning caster)
-        /// meaningless by the time a remote client processes the cast.
+        /// The three beam origins: Origin +/- right x beamOriginSpacing, plus the centre. Right is
+        /// derived from Direction, not the caster's transform.right: Direction is the one value that
+        /// crosses the wire in the cast payload, and a player's transform can be a frame stale or
+        /// meaningless (dead or respawning caster) when a remote client processes the cast.
         /// </summary>
         public static void BeamOrigins(Vector3 origin, Vector3 direction, float spacing,
                                        out Vector3 left, out Vector3 centre, out Vector3 right)
@@ -52,11 +46,10 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// True when a beam of the given radius, travelling from beamOrigin along beamDirection for
-        /// up to range metres, passes close enough to strike targetPosition - the same "distance from
-        /// a point to a bounded ray" test a SphereCast performs, done here without Physics so the
-        /// convergence claim (every beam lands at Point; only the near beam lands elsewhere) can be
-        /// checked with a test instead of a play-mode measurement.
+        /// True when a beam of the given radius, travelling from beamOrigin along beamDirection for up
+        /// to range metres, passes close enough to strike targetPosition - the distance-from-a-point-to-
+        /// a-bounded-ray test a SphereCast performs, done without Physics so the convergence claim can
+        /// be checked by a test instead of a play-mode measurement.
         /// </summary>
         public static bool BeamCrosses(Vector3 beamOrigin, Vector3 beamDirection, float range,
                                        float beamRadius, Vector3 targetPosition)
@@ -75,12 +68,10 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Where the two outer beams are aimed to cross the centre beam's line: a fixed distance
-        /// along the shooter's own aim direction, clamped to beamRange so a beam is never asked to
-        /// converge past where it stops existing (RaybeamAbility's beamConvergenceRange tooltip
-        /// explains why this is fixed rather than the cursor's own depth). Pulled out of
-        /// RaybeamAbility.ExecuteCast, which used to inline this one formula, so the convergence
-        /// point itself has a test independent of the three-beams-cross-it cases above.
+        /// Where the two outer beams are aimed to cross the centre beam's line: a fixed distance along
+        /// the shooter's own aim direction, clamped to beamRange so a beam is never asked to converge
+        /// past where it stops existing (see RaybeamAbility's beamConvergenceRange tooltip for why it
+        /// is fixed rather than the cursor's own depth).
         /// </summary>
         public static Vector3 ConvergencePoint(Vector3 origin, Vector3 aimDirection, float convergenceRange, float beamRange)
         {

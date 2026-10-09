@@ -4,12 +4,8 @@ using Overpower.Combat;
 
 /// <summary>
 /// Faces the player at the mouse cursor and owns the active weapon's aim cone (bloom on fire,
-/// tighter while standing still, recovers over time). Split out of Multiplayer.cs (Task 0.10).
-///
-/// The cone below is seeded from the assault rifle's own numbers as a fallback, for the moment
-/// before the active weapon's first ConfigureCone call. WeaponFiring calls ConfigureCone whenever
-/// the active weapon changes, repointing the cone at that weapon's own numbers instead of editing
-/// this file.
+/// tighter while standing still, recovers over time). The serialized cone is only a fallback seeded
+/// from the assault rifle, until WeaponFiring's ConfigureCone repoints it at the active weapon.
 /// </summary>
 public class PlayerAim : MonoBehaviour
 {
@@ -48,18 +44,16 @@ public class PlayerAim : MonoBehaviour
     private Vector3 aimDirection = Vector3.forward;
     private Vector3 groundPointUnderCursor;
 
-    // Task 2.6 review, Tudor's own report: a test/harness hook, not gameplay - see SetAimOverride.
+    // Test/harness hook, not gameplay - see SetAimOverride.
     private Vector3? aimOverride;
 
     /// <summary>Flat, normalised, toward the cursor.</summary>
     public Vector3 AimDirection => aimDirection;
 
-    /// <summary>Where the cursor ray meets the player's own ground plane - abilities that target
-    /// a location on the ground need this rather than a direction.</summary>
+    /// <summary>Where the cursor ray meets the player's own ground plane, for abilities that target a location.</summary>
     public Vector3 GroundPointUnderCursor => groundPointUnderCursor;
 
-    /// <summary>The spread actually in effect right now, after the standing-still bonus. For a
-    /// future HUD crosshair.</summary>
+    /// <summary>The spread in effect right now, after the standing-still bonus.</summary>
     public float EffectiveConeAngle => coneState.EffectiveAngle;
 
     private void Awake()
@@ -77,8 +71,6 @@ public class PlayerAim : MonoBehaviour
                                      movingSpreadDegrees, movingBloomPerSecond);
     }
 
-    /// <summary>Lets a later weapon task repoint the cone to the active weapon's own numbers
-    /// without editing this file.</summary>
     public void ConfigureCone(float min, float max, float bloom, float recovery, float standingStill,
                               float movingSpread, float movingBloom)
     {
@@ -94,8 +86,7 @@ public class PlayerAim : MonoBehaviour
 
     private void Update()
     {
-        // Only the local player controls their own rotation - every other client learns it
-        // through OnPhotonSerializeView instead.
+        // Only the local player controls their own rotation; the rest learn it from PlayerNetSync.
         if (!photonView.IsMine)
             return;
 
@@ -107,22 +98,17 @@ public class PlayerAim : MonoBehaviour
         {
             UpdateRotationFromMouse();
         }
-        // Tudor, Task 2.6 review: Input.mousePosition keeps reading the real OS cursor even while
-        // this window is UNFOCUSED (alt-tabbed, or a background Editor an automated script is
-        // driving) - an idle player kept turning to follow wherever the mouse happened to be on
-        // the rest of the desktop, a real gameplay bug and not merely a testing inconvenience.
-        // Skipping the read entirely while unfocused (and no override is set) leaves the last aim
-        // in place instead of chasing a cursor this window is not receiving on purpose. The cone
-        // still recovers either way - only the rotation/aim read is gated, not the whole method.
-        // See SetAimOverride for the deterministic alternative a test/harness script should reach
-        // for instead of fighting this gate.
+        // Input.mousePosition keeps reading the real OS cursor while this window is UNFOCUSED
+        // (alt-tabbed, or a background Editor a script is driving), so an idle player would keep
+        // turning toward wherever the mouse is on the desktop. Hence the isFocused gate: unfocused
+        // with no override keeps the last aim. Only the aim read is gated, the cone still recovers.
+        // Test scripts use SetAimOverride instead of fighting this gate.
 
         coneState.Tick(Time.deltaTime, motor != null && motor.IsMoving);
     }
 
     private void UpdateRotationFromMouse()
     {
-        // Cast a ray from the mouse position to the game world.
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         Plane groundPlane = new Plane(Vector3.up, new Vector3(0, transform.position.y, 0));
 
@@ -130,15 +116,14 @@ public class PlayerAim : MonoBehaviour
             AimAt(ray.GetPoint(rayDistance));
     }
 
-    /// <summary>Faces worldPoint on the flat ground plane - the one place both the real mouse path
-    /// (UpdateRotationFromMouse) and the SetAimOverride test path actually turn the body, so the
-    /// two can never disagree about what "aiming at a point" does.</summary>
+    /// <summary>The one place both the mouse path and the SetAimOverride path turn the body, so they
+    /// can never disagree about what "aiming at a point" does.</summary>
     private void AimAt(Vector3 worldPoint)
     {
         groundPointUnderCursor = worldPoint;
 
         Vector3 direction = worldPoint - transform.position;
-        direction.y = 0f; // Keep rotation horizontal.
+        direction.y = 0f;
 
         if (direction != Vector3.zero)
         {
@@ -148,24 +133,19 @@ public class PlayerAim : MonoBehaviour
     }
 
     /// <summary>
-    /// TEST/HARNESS HOOK - not a gameplay feature (Task 2.6 review, following Tudor's own OS-cursor
-    /// report). While set, this player aims at worldPoint every frame regardless of
-    /// Application.isFocused or the real mouse cursor, so an automated script can aim
-    /// deterministically without fighting whatever the OS cursor happens to be doing, or without
-    /// needing this window focused at all. Pass null to release the override and resume the normal
-    /// mouse/focus-gated aim. Prefer this over reflecting into aimDirection/groundPointUnderCursor
-    /// directly (two-client-harness.md §11) - it also turns the body, which those two fields alone
-    /// do not.
+    /// TEST/HARNESS HOOK, not a gameplay feature. While set, this player aims at worldPoint every
+    /// frame regardless of Application.isFocused or the OS cursor. Null releases it. Prefer this over
+    /// reflecting into aimDirection/groundPointUnderCursor (two-client-harness.md §11): it also turns
+    /// the body, which those fields alone do not.
     /// </summary>
     public void SetAimOverride(Vector3? worldPoint) => aimOverride = worldPoint;
 
     public void RegisterShot() => coneState.RegisterShot();
 
     /// <summary>
-    /// AimDirection rotated by a random offset sampled from the current cone. Takes the RNG as a
-    /// parameter rather than owning one, since AimConeState was deliberately built to be
-    /// deterministic under test - random spread was the designer's explicit choice over
-    /// deterministic twin-ray spread, so this must not grow a hidden deterministic mode.
+    /// AimDirection rotated by a random offset sampled from the current cone. The RNG is a parameter
+    /// so AimConeState stays deterministic under test. Random spread is the designer's explicit choice
+    /// over deterministic twin-ray spread: do not add a hidden deterministic mode.
     /// </summary>
     public Vector3 GetShotDirection(System.Random rng)
     {

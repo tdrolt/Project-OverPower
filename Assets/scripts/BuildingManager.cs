@@ -41,7 +41,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     private Dictionary<int, int> cathedralBuildingIDs;
 
-    /// <summary>Zone id to team id for this scene's capitals (the Capital Zones list, read once). Read everywhere exactly as before.</summary>
+    /// <summary>Zone id to team id for this scene's capitals (the Capital Zones list, read once).</summary>
     public Dictionary<int, int> CathedralBuildingIDs
     {
         get
@@ -57,9 +57,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         }
     }
 
-    // Towers register themselves here so ownership changes can drive their flag colour.
-    // TowerData.Building exists for this but is null on all nine towers in the scene, and a new
-    // tower (the planned Tier-4 centre) would need remembering to wire up by hand. Registering
+    // Towers register themselves here so ownership changes can drive their flag colour. TowerData.Building was
+    // meant for this but is null on every tower in the scene, and a new tower would need wiring by hand; registering
     // is one line in BuildingCapture.Start and cannot be forgotten.
     private readonly Dictionary<int, BuildingCapture> captures = new Dictionary<int, BuildingCapture>();
 
@@ -77,19 +76,17 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     private TerritorySnapshot lastWritten;
     private int writesAwaitingEcho;
 
-    // Every client's picture of each zone's capture progress (Task 2.1d), decoded from the room's
-    // four int[] arrays. Null until this client has read them at least once; CaptureProgressOf
-    // reads that as Idle, same convention as Current above for territory. Indices beyond what the
-    // room currently holds - a zone nobody has ever tried to capture, or a room from before this
-    // feature shipped - also read as Idle (see ApplyCaptureProgress/CaptureProgressOf).
+    // Every client's picture of each zone's capture progress, decoded from the room's int[] arrays. Null until this
+    // client has read them at least once; CaptureProgressOf reads that as Idle, same convention as Current above.
+    // Indices beyond what the room holds (a zone nobody has tried to capture) also read as Idle (ApplyCaptureProgress,
+    // CaptureProgressOf).
     private CaptureProgress[] currentProgress;
 
-    // Master only, exactly the same purpose as lastWritten/writesAwaitingEcho above, kept as a
-    // SEPARATE echo-window because a territory write and a capture-progress write are separate
-    // SetCustomProperties calls with disjoint keys (see PublishCaptureProgress) and so echo back
-    // independently. A fresh master's own copy of this starts null (see OnMasterClientSwitched) -
-    // PublishCaptureProgress falls back to currentProgress (this client's last-read echo, which is
-    // still correct) rather than assuming an empty room.
+    // Master only, the same purpose as lastWritten/writesAwaitingEcho above but a SEPARATE echo window: a territory
+    // write and a capture-progress write are separate SetCustomProperties calls with disjoint keys
+    // (PublishCaptureProgress), so they echo back independently. A fresh master's copy starts null
+    // (OnMasterClientSwitched); PublishCaptureProgress then falls back to currentProgress (this client's last-read
+    // echo, still correct) rather than assuming an empty room.
     private CaptureProgress[] progressLastWritten;
     private int progressWritesAwaitingEcho;
 
@@ -130,10 +127,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     private float playerBodyRadius = -1f; // -1 = not read yet
 
-    // Public: also called directly by CaptureRadiusSceneTests (EveryZonesTriggerStaysPositive), which needs
-    // the body radius in edit mode - this method has no Play Mode dependency (FindFirstObjectByType works
-    // on the loaded scene either way), unlike the PlayerBodyRadius property's cache, which only exists on
-    // a live BuildingManager.Instance (set in Awake, Play Mode only).
+    // Public: also called directly by CaptureRadiusSceneTests (EveryZonesTriggerStaysPositive), which needs the body
+    // radius in edit mode. This method has no Play Mode dependency, unlike the PlayerBodyRadius property's cache,
+    // which only exists on a live BuildingManager.Instance (set in Awake).
     public static float ReadPlayerBodyRadius()
     {
         RoomManager roomManager = FindFirstObjectByType<RoomManager>();
@@ -167,26 +163,21 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// example, pay a late joiner bounties that were settled before they arrived.
     public event Action<int, int, int, TerritorySnapshot> OwnershipChanged;
 
-    /// <summary>Task T4: raised on EVERY client (master included) whenever a decoded capture-progress
-    /// publish changes a zone's team or rate - see ApplyCaptureProgressIfPresent, which raises this
-    /// using CaptureProgress.NeedsRepublishComparedTo, the exact same "did this actually change"
-    /// predicate a tower already uses to decide whether to publish in the first place. MatchTelemetry
-    /// is the only listener today, and only logs while PhotonNetwork.IsMasterClient at the moment the
-    /// event fires - see its own comment for why a master-only LOG guard, not a master-only RAISE,
-    /// is what survives a master switch cleanly.</summary>
+    /// <summary>Raised on EVERY client (master included) whenever a decoded capture-progress publish changes a zone's
+    /// team or rate (ApplyCaptureProgressIfPresent, via CaptureProgress.NeedsRepublishComparedTo, the predicate a tower
+    /// uses to decide whether to publish). MatchTelemetry is the only listener and logs only while
+    /// PhotonNetwork.IsMasterClient when the event fires: a master-only LOG guard, not a master-only RAISE, is what
+    /// survives a master switch cleanly.</summary>
     public event Action<int, CaptureProgress, CaptureProgress> CaptureProgressChanged;
 
-    /// <summary>Task T4 (opus review fix: added the paying team, and only raised once the write that
-    /// carries it actually reaches Photon): raised on the master only, from inside SetCaptured, the
-    /// moment a capture actually pays out a bounty (bountyPaid > 0) - (zone, paidTeam, payingTeam,
-    /// amount, heldMs). paidTeam is who just captured the zone and received the bounty; payingTeam
-    /// is whoever held it too long before losing it (the team the bounty is conceptually paid BY -
-    /// nothing physically leaves their wallet, but they are why this one is non-zero). See
-    /// SetCaptured's own comment for why the payout is computed there rather than passed in. Not
-    /// raised for a zero-bounty capture, or if the room never actually got the write.</summary>
+    /// <summary>Raised on the master only, from inside SetCaptured, once the write that carries it actually reaches
+    /// Photon, the moment a capture pays out a bounty (bountyPaid > 0): (zone, paidTeam, payingTeam, amount, heldMs).
+    /// paidTeam just captured the zone and received the bounty; payingTeam held it too long before losing it (the team
+    /// the bounty is conceptually paid BY). The payout is computed in SetCaptured, not passed in (see its comment).
+    /// Not raised for a zero-bounty capture, or if the room never got the write.</summary>
     public event Action<int, int, int, int, int> BountyPaid;
 
-    /// <summary>Dominion Task 3: raised on the master only, from inside SetCaptured, once the capture write has reached Photon:
+    /// <summary>Raised on the master only, from inside SetCaptured, once the capture write has reached Photon:
     /// (zone, newOwner, previousOwner, previousHeldMs). The previous owner and the length of the hold it ended are read from the write
     /// basis BEFORE the capture clears them (WithCapture forgets them), so a mode with its own bounty (Dominion pays points) can judge the
     /// hold against its own number. OwnershipChanged cannot say it: it only carries the new snapshot, where they are already cleared.</summary>
@@ -196,14 +187,13 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     /// from outside that a late joiner's first read raised none.
     public int OwnershipChangedRaisedCount { get; private set; }
 
-    /// How many times THIS client has published capture progress (master only - stays 0 on every
-    /// other client). Diagnostic only, same idea as OwnershipChangedRaisedCount: lets Task 2.1d's
-    /// own verification step count publishes during a clean solo capture from outside, instead of
-    /// grepping the console log.
+    /// How many times THIS client has published capture progress (master only - stays 0 on every other client).
+    /// Diagnostic only, like OwnershipChangedRaisedCount: lets a test count publishes during a clean solo capture
+    /// from outside, instead of grepping the console log.
     public int CaptureProgressPublishCount { get; private set; }
 
     /// <summary>Whether this zone can be captured or drained in this room: a capital cannot in Dominion (DominionTerritoryRules). The capital
-    /// still counts as held for adjacency; this only stops its own capture and drain. Its ring and its "under attack" warning are back (Task 6) - an enemy
+    /// still counts as held for adjacency; this only stops its own capture and drain. Its ring and its "under attack" warning still show: an enemy
     /// standing in it warns the team but never closes the link to the zones next to it (ZoneThreat.ZoneClosesLink).</summary>
     public bool IsCapturableZone(int zone)
     {
@@ -211,45 +201,36 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return Overpower.Dominion.DominionTerritoryRules.IsCapturable(Overpower.Dominion.DominionMode.IsActive(), isCapital);
     }
 
-    /// <summary>Map shrink T3, 2026-09-25: the tower's own tier as set in the scene - PhaseTwoCutRules finds the cut
-    /// from this, never from the phase-two stand-in (TierOf below), or a cut corner's Tier III towers would
-    /// stop reading as Tier III to the very rule that is supposed to find them. Review fix F6: 0 while the tower
-    /// with that id hasn't registered itself yet (RegisterCapture runs in BuildingCapture.Start) - the same "not
-    /// tiered yet" reading TierOf/GoldMath.TeamIncomePerSecond already rely on, and PhaseTwoCutRules.IsZoneCut
-    /// relies on it too: an unregistered Tier II or III can never match its tier test, so it simply isn't cut for
-    /// the one frame that can happen in, rather than matching by accident (the cut capital itself is matched by its
-    /// id, not its tier).</summary>
+    /// <summary>The tower's own tier as set in the scene: PhaseTwoCutRules finds the cut from this, never from the
+    /// phase-two stand-in (TierOf below), or a cut corner's Tier III towers would stop reading as Tier III to the very
+    /// rule that finds them. 0 while the tower with that id hasn't registered yet (RegisterCapture runs in
+    /// BuildingCapture.Start): the same "not tiered yet" reading TierOf/GoldMath.TeamIncomePerSecond rely on, so an
+    /// unregistered Tier II or III never matches a tier test and is simply not cut for that one frame (the cut capital
+    /// itself is matched by its id, not its tier).</summary>
     public int BaseTierOf(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.tier : 0;
 
-    // Map shrink T3: IsCutActive on its own line so both TierOf and TierByZone's cache-invalidation check
-    // (tierCacheCutActive) ask the exact same question.
+    // IsCutActive on its own line so both TierOf and TierByZone's cache-invalidation check (tierCacheCutActive) ask
+    // the exact same question.
     private static bool IsCutActive => MatchDirector.Instance != null && MatchDirector.Instance.CutTeam >= 0;
 
-    /// The tier a zone plays as right now (1..4): BaseTierOf's own tier, except the centre plays as Tier III
-    /// while a corner is cut (PhaseTwoCutRules.EffectiveTier, map shrink T3) - EffectiveTier only ever touches
-    /// tier 4, so a not-yet-registered tower's BaseTierOf 0 passes through unchanged and still reads as "not a
-    /// tiered zone" to GoldMath.TeamIncomePerSecond, same as before this class had two tier methods.
+    /// The tier a zone plays as right now (1..4): BaseTierOf's tier, except the centre plays as Tier III while a
+    /// corner is cut (PhaseTwoCutRules.EffectiveTier). EffectiveTier only touches tier 4, so a not-yet-registered
+    /// tower's BaseTierOf 0 passes through unchanged and still reads as "not a tiered zone" to GoldMath.TeamIncomePerSecond.
     public int TierOf(int zone) => PhaseTwoCutRules.EffectiveTier(BaseTierOf(zone), IsCutActive);
 
-    // Backing store for TierByZone below. Allocated ONCE (ZoneCount is fixed for the whole match)
-    // and filled IN PLACE by RebuildTierByZoneCache - on every RegisterCapture, and on the first TierByZone() call
-    // after IsCutActive flips; those are the only two things that can make a zone's tier change (a tower going from
-    // "not registered yet" (tier 0) to its real tier, or a corner being cut) - never reassigned to a new array. GoldWallet used to pay for a fresh allocation here on every player's every
-    // Update; a future caller that keeps the reference TierByZone() hands back (the shop gate, OverPower -
-    // Tasks 2.5/2.6) needs the SAME array to pick up either kind of change too, which reassigning here would
-    // break (code review fix, Task 2.4).
+    // Backing store for TierByZone. Allocated ONCE (ZoneCount is fixed for the whole match) and filled IN PLACE by
+    // RebuildTierByZoneCache, on every RegisterCapture and on the first TierByZone() call after IsCutActive flips (the
+    // only two things that change a zone's tier). Never reassigned: a caller that keeps the reference (the shop gate)
+    // needs the SAME array to pick up either kind of change, and a fresh array per call would cost GoldWallet an
+    // allocation on every player's every Update.
     private int[] tierByZoneCache;
     private bool tierCacheCutActive;
 
-    /// Tier 1..4 per zone id, index = zone id, length ZoneCount - the array shape GoldMath.
-    /// TeamIncomePerSecond's tierByZone parameter wants. Read-only by convention: this is the same
-    /// array every caller gets back, not a copy, so nobody may write into it - and it stays the
-    /// SAME array instance for the whole match (see tierByZoneCache's own comment), so a caller that
-    /// holds onto the reference sees a late tower's tier the moment it registers (RegisterCapture rebuilds the
-    /// cache directly). Review fix F6: a corner being cut is different - this method only checks IsCutActive
-    /// when IT is called, so that flip is picked up on the NEXT TierByZone() call, not the moment the cut itself
-    /// happens.
+    /// Tier 1..4 per zone id, index = zone id, length ZoneCount - the array shape GoldMath.TeamIncomePerSecond's
+    /// tierByZone parameter wants. Read-only by convention: every caller gets the same array instance for the whole
+    /// match (tierByZoneCache), so a caller that holds the reference sees a late tower's tier the moment it registers.
+    /// A corner being cut is picked up on the NEXT call, since this checks IsCutActive only when it is called.
     public int[] TierByZone()
     {
         if (tierByZoneCache == null || tierCacheCutActive != IsCutActive)
@@ -266,17 +247,15 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             tierByZoneCache[zone] = TierOf(zone);
     }
 
-    /// <summary>Task T4: how many players BuildingCapture currently counts inside this zone (its own
-    /// PlayersInZoneCount) - the `capture` telemetry event's own "players" field. 0 for a zone id
-    /// with no registered tower (not yet started, or a bad id), same convention as TierOf.</summary>
+    /// <summary>How many players BuildingCapture counts inside this zone (its PlayersInZoneCount): the `capture`
+    /// telemetry event's "players" field. 0 for a zone id with no registered tower, same convention as TierOf.</summary>
     public int PlayersInZone(int zone) =>
         captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.PlayersInZoneCount : 0;
 
-    /// <summary>Finds which registered zone position stands inside (flat XZ distance to the tower ≤
-    /// its own CaptureRadius) - the "which zone am I in" question health regen (Task 2.3), the shop
-    /// gate and OverPower's "near a zone" check (Tasks 2.5/2.6) all ask the same way. Capture rings
-    /// are not meant to overlap, but if two ever do the nearest centre wins rather than an arbitrary
-    /// dictionary order. No allocation: a plain foreach over the existing captures dictionary.</summary>
+    /// <summary>Finds which registered zone position stands inside (flat XZ distance to the tower within its own
+    /// CaptureRadius) - the "which zone am I in" question health regen, the shop gate and OverPower's "near a zone"
+    /// check all ask. Capture rings are not meant to overlap, but if two ever do the nearest centre wins rather than
+    /// an arbitrary dictionary order. No allocation: a plain foreach over the existing captures dictionary.</summary>
     public bool TryGetZoneAt(Vector3 position, out int zoneId)
     {
         zoneId = -1;
@@ -289,11 +268,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             float distance = FlatDistance(position, capture.transform.position);
             if (distance > capture.CaptureRadius) continue;
 
-            // Map shrink T3: a cut Tier III's capture area pokes through the new wall - standing near the
-            // wall, on the far side, must not count as being in a zone that is out of play. Review fix F4: this
-            // check moved here, AFTER the radius test - it only has to run for a position already inside a
-            // zone's own ring instead of once per registered zone every call (~10x fewer IsOutOfPlay calls);
-            // same result either way, since IsOutOfPlay's answer for a zone doesn't depend on distance.
+            // A cut Tier III's capture area pokes through the new wall: standing near the wall, on the far side, must
+            // not count as being in a zone that is out of play. Checked AFTER the radius test so it only runs for a
+            // position already inside a zone's own ring (IsOutOfPlay's answer doesn't depend on distance).
             if (MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(pair.Key)) continue;
 
             if (distance < bestDistance)
@@ -363,11 +340,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public float DistanceToOwnedZoneEdge(Vector3 position, int teamId)
     {
         float best = float.PositiveInfinity;
-        // Task 2.6 review fix: a team below 0 means "unknown" (e.g. the spawn frame, before this
-        // player's own team Custom Property has arrived) - never "owns nothing", which
-        // current.OwnerOf(zone) also reports as -1 for every NEUTRAL zone. Without this guard,
-        // teamId=-1 read as owning every neutral zone on the map, and a real distance to one would
-        // come back instead of the infinity an unknown team should always report.
+        // A team below 0 means "unknown" (e.g. the spawn frame, before this player's own team Custom Property has
+        // arrived), never "owns nothing", which current.OwnerOf(zone) also reports as -1 for every NEUTRAL zone:
+        // without this guard teamId=-1 read as owning every neutral zone, and a real distance to one would come
+        // back instead of the infinity an unknown team should always report.
         if (current == null || teamId < 0)
             return best;
 
@@ -428,26 +404,23 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
         BuildMap();
 
-        // Task 2.7: MatchDirector needs no scene footprint and no PhotonView - it only ever reads
-        // and writes Room Properties, the same authority model this class's own territory state
-        // uses. Added here, at runtime, on this same GameObject (which already hosts MatchTelemetry
-        // and ZonePresenceTracker) rather than placed in Game Scene.unity: the arena rebuild from
-        // primitives is done (arena step 5), but MatchDirector still has nothing scene-specific to
-        // read or write, so there is no reason to move it into the scene now either
-        // [C, controller decision, 2026-09-18; arena step 5, 2026-09-19].
+        // MatchDirector needs no scene footprint and no PhotonView: it only reads and writes Room Properties, the
+        // same authority model this class's own territory state uses. Added here at runtime on this same GameObject
+        // (which already hosts MatchTelemetry and ZonePresenceTracker) rather than placed in the scene, since it has
+        // nothing scene-specific to read or write.
         if (GetComponent<MatchDirector>() == null)
             gameObject.AddComponent<MatchDirector>();
 
-        // Vision Task 9b: what this client's team knows about each zone, for the displays only. Same reasoning as
+        // What this client's team knows about each zone, for the displays only. Same reasoning as
         // MatchDirector above: no scene footprint, so it is added here on the same GameObject.
         if (GetComponent<Overpower.Vision.ZoneKnowledge>() == null)
             gameObject.AddComponent<Overpower.Vision.ZoneKnowledge>();
 
-        // Vision Task 11: the centre scan (wave on the ground, dots and zone refresh for the team that held the centre when the wave started; the countdown above the tower is for everyone). Same reasoning.
+        // The centre scan (wave on the ground, dots and zone refresh for the team that held the centre when the wave started; the countdown above the tower is for everyone). Same reasoning.
         if (GetComponent<Overpower.Vision.CentreScan>() == null)
             gameObject.AddComponent<Overpower.Vision.CentreScan>();
 
-        // Dominion Task 2: the round flow (rounds, breaks, the match winner). Same reasoning as MatchDirector: no scene footprint; it does nothing
+        // The round flow (rounds, breaks, the match winner). Same reasoning as MatchDirector: no scene footprint; it does nothing
         // unless the room is a Dominion room.
         if (GetComponent<Overpower.Dominion.DominionDirector>() == null)
             gameObject.AddComponent<Overpower.Dominion.DominionDirector>();
@@ -500,7 +473,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         currentProgress = null;
         progressLastWritten = null;
         progressWritesAwaitingEcho = 0;
-        territoryWinAnnounced = false; // Review round 2: a latch from the match just left must not block the next one's own territory win.
+        territoryWinAnnounced = false; // A latch from the match just left must not block the next one's own territory win.
         if (initialWrite != null)
         {
             StopCoroutine(initialWrite);
@@ -563,7 +536,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // Who is standing in which zone, capture progress, decay and cooldown lived only on the
         // old master's machine. Every client resets its towers from the replicated owners, and
         // re-reports its own player if it is standing in one, so the new master can carry on.
-        // A capture that was part-way through starts again from zero (accepted in the plan).
+        // A capture that was part-way through starts again from zero.
         if (current != null)
         {
             foreach (KeyValuePair<int, BuildingCapture> pair in captures)
@@ -575,16 +548,11 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.IsMasterClient && current == null)
             ReadOrCreateRoomSnapshot();
 
-        // The room may still be showing a capture rate the OLD master last published - a capture
-        // in progress when it left, say. This new master's own "have I told the room this already"
-        // memory (progressLastWritten, just cleared above) is empty, and every tower's own
-        // per-frame republish gate (BuildingCapture.lastPublishedProgress) only ever compares
-        // against ITS OWN prior publishes - on a client that has never been master before, that is
-        // still CaptureProgress.Idle, so a tower whose real state is ALSO idle after the reset
-        // above would never think it needs to say so. Force one publish per zone here instead of
-        // trusting that gate on the new master's first frame - a new master's own per-tower publish
-        // cache (lastPublishedProgress) starts empty/Idle, so it cannot tell "genuinely idle" from
-        // "never told the room yet" the way an established master's cache can.
+        // The room may still show a capture rate the OLD master last published (a capture in progress when it left).
+        // This new master's progressLastWritten (cleared above) is empty, and every tower's per-frame republish gate
+        // (BuildingCapture.lastPublishedProgress) only compares against ITS OWN prior publishes, which on a client that
+        // has never been master is still CaptureProgress.Idle: a tower whose real state is also idle after the reset
+        // above would never think it needs to say so. Force one publish per zone here instead of trusting that gate.
         if (PhotonNetwork.IsMasterClient)
         {
             foreach (KeyValuePair<int, BuildingCapture> pair in captures)
@@ -676,15 +644,13 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     // ---------------------------------------------------------------- writing (master only)
 
     /// Master only: the zone now belongs to this team. tierBounty/holdMs are this zone's tier
-    /// numbers (TerritoryConfig.ForTier(tier).captureBounty, BountyHoldSeconds*1000) - the actual
-    /// payout (Task 2.4, BountyRule.PayoutOnCapture) is worked out IN HERE, from the same basis
-    /// snapshot this write builds on, rather than handed in pre-computed from the caller's own copy
-    /// of Current. Current can lag one echo behind: a zone neutralised and then recaptured before
-    /// that neutralise's echo has come back must pay from the hold IT just settled, and only the
-    /// basis (see WriteBasis - lastWritten while an echo is outstanding, Current otherwise) carries
-    /// that yet-to-be-confirmed history. Computing from Current here would silently read the OLDER
-    /// hold (or none at all) for exactly the capture that most needs the fresh one. Takes effect on
-    /// every client, this one included, when the room sends it back - not immediately.
+    /// numbers (TerritoryConfig.ForTier(tier).captureBounty, BountyHoldSeconds*1000). The payout
+    /// (BountyRule.PayoutOnCapture) is worked out IN HERE, from the same basis snapshot this write
+    /// builds on, rather than handed in from the caller's own copy of Current. Current can lag one
+    /// echo behind: a zone neutralised and then recaptured before that neutralise's echo has come
+    /// back must pay from the hold IT just settled, and only the basis (see WriteBasis - lastWritten
+    /// while an echo is outstanding, Current otherwise) carries that yet-to-be-confirmed history.
+    /// Takes effect on every client, this one included, when the room sends it back - not immediately.
     public void SetCaptured(int zone, int team, int tierBounty, int holdMs)
     {
         TerritorySnapshot basis = WriteBasis(nameof(SetCaptured), zone);
@@ -695,19 +661,17 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         int payingTeam = basis.LastOwnerOf(zone);
         bool written = Write(basis.WithCapture(zone, team, ServerNowMs(), bountyPaid));
 
-        // Task T4 (opus review fix: only once the write actually reached Photon - Write returning
-        // false means nothing was sent, so there is nothing real to tell telemetry about) - raised
-        // here, not off the replicated snapshot's own BountyPaidOnLastCapture (which
-        // GoldWallet.HandleOwnershipChanged reads on every client to actually pay each player) -
-        // this is the single MASTER-side "a bounty was paid" fact for telemetry, independent of
-        // when any one client's echo of the write above lands.
+        // Raised only once the write actually reached Photon (Write returning false means nothing was sent), and here
+        // rather than off the replicated snapshot's BountyPaidOnLastCapture (which GoldWallet.HandleOwnershipChanged
+        // reads on every client to pay each player): this is the single MASTER-side "a bounty was paid" fact for
+        // telemetry, independent of when any one client's echo of the write above lands.
         if (written && bountyPaid > 0)
             RaiseBountyPaid(zone, team, payingTeam, bountyPaid, basis.LastHeldMs(zone));
         if (written)
             RaiseCaptureWritten(zone, team, payingTeam, basis.LastHeldMs(zone));
     }
 
-    /// <summary>Dominion Task 3 review fix: like every sibling event here, one listener that throws must not stop the others (or the capture's caller).</summary>
+    /// <summary>Like every sibling event here, one listener that throws must not stop the others (or the capture's caller).</summary>
     private void RaiseCaptureWritten(int zone, int newOwner, int previousOwner, int previousHeldMs)
     {
         if (CaptureWritten == null)
@@ -753,20 +717,19 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     }
 
     /// <summary>Master only: same effect as SetNeutral, but wipes the zone's bounty-eligible history
-    /// instead of recording it (Task 2.7 review) - for MatchDirector's reset at the three-to-two team
-    /// transition, which takes every Tier III, the centre and the newly cut corner (map shrink T3) from
-    /// nobody, not from whoever held it - and (review fix F3) for a new master finishing a knockout's
-    /// neutralise an old master may not have.</summary>
+    /// instead of recording it - for MatchDirector's reset at the three-to-two team transition, which
+    /// takes every Tier III, the centre and the newly cut corner from nobody, not from whoever held
+    /// it - and for a new master finishing a knockout's neutralise an old master may not have.</summary>
     public void SetNeutralWithoutBountyHistory(int zone)
     {
         TerritorySnapshot basis = WriteBasis(nameof(SetNeutralWithoutBountyHistory), zone);
         if (basis == null)
             return;
 
-        // Unlike SetNeutral (a real no-op once a zone is already neutral), this must still fire for
-        // an already-neutral zone that still carries bounty-eligible history - a flank drained to
-        // neutral naturally, just before this reset runs, kept its lastOwner/lastHeldMs otherwise
-        // (review round 2). Only a zone with genuinely nothing to wipe is skipped.
+        // Unlike SetNeutral (a real no-op once a zone is already neutral), this must still fire for an
+        // already-neutral zone that still carries bounty-eligible history: a flank drained to neutral naturally just
+        // before this reset runs would otherwise keep its lastOwner/lastHeldMs. Only a zone with genuinely nothing
+        // to wipe is skipped.
         if (!basis.NeedsNeutralReset(zone))
             return;
 
@@ -781,11 +744,10 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             capture.ResetForMatchStart(owner);
     }
 
-    /// <summary>Review fix F2, 2026-09-25: master only - the territory this client last wrote while that write is
-    /// still echoing, else the room's own copy. This is the same basis every master-side write already builds on
-    /// (WriteBasis below), instead of Current, which lags one echo behind - a capture still echoing when a
-    /// knockout's last-stand Player Property arrives must not be read as its OLDER owner by anything else the
-    /// master decides in that same instant.</summary>
+    /// <summary>Master only: the territory this client last wrote while that write is still echoing, else the room's own
+    /// copy. The same basis every master-side write builds on (WriteBasis), instead of Current, which lags one echo
+    /// behind: a capture still echoing when a knockout's last-stand Player Property arrives must not be read as its
+    /// OLDER owner by anything else the master decides in that same instant.</summary>
     public TerritorySnapshot LatestForMaster => writesAwaitingEcho > 0 && lastWritten != null ? lastWritten : current;
 
     private TerritorySnapshot WriteBasis(string caller, int zone)
@@ -808,8 +770,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return basis;
     }
 
-    /// <summary>Returns whether the write actually reached Photon (opus review fix - SetCaptured
-    /// needs this to know whether a bounty it just computed is real or was never sent).</summary>
+    /// <summary>Returns whether the write actually reached Photon: SetCaptured needs it to know whether a bounty it
+    /// just computed is real or was never sent.</summary>
     private bool Write(TerritorySnapshot next)
     {
         var props = new Hashtable();
@@ -836,8 +798,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     /// The first master of a room writes the starting state: every capital owned by its team.
     /// Waits for the server clock first. ServerTimestamp is fetched once, asynchronously, after
-    /// connecting and reads 0 until then (that caught the deployables out once, FAIL #15); a
-    /// capital stamped with 0 would later read as held for weeks, and would pay a bounty early.
+    /// connecting and reads 0 until then (FAIL #15); a capital stamped with 0 would later read as
+    /// held for weeks, and would pay a bounty early.
     private IEnumerator WriteInitialSnapshotWhenClockIsReady()
     {
         float waited = 0f;
@@ -864,21 +826,19 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         var capitals = new List<(int zone, int team)>(CathedralBuildingIDs.Count);
         foreach (KeyValuePair<int, int> capital in CathedralBuildingIDs)
             capitals.Add((capital.Key, capital.Value));
-        // 2.7b step 3: teamsInMatch null means every team - the real list arrives with the countdown/live
-        // system in step 5. Until then this is exactly the old "every capital owned" starting write.
+        // teamsInMatch null means every team: the starting write is every capital owned.
         TerritorySnapshot start = TerritorySnapshot.Starting(ZoneCount, capitals, null, now);
 
         Debug.Log($"[TOWER] master wrote the starting territory snapshot ({ZoneCount} zones, capitals owned).");
         Write(start);
     }
 
-    /// <summary>2.7b Decision 5: the live reset's territory half, master only - MatchDirector.Live.cs's GoLive
-    /// calls this BEFORE writing mPhase, in the SAME frame, so Photon delivers this write to every client before
-    /// it sees the match go live (the ordering MatchDirector.ReactToRoomState's live edge and every knockout
-    /// check, MasterRecompute, rely on). Builds a WHOLE NEW starting snapshot from scratch - not from WriteBasis
-    /// - so a warm-up capture still echoing when live arrives is deliberately thrown away and no warm-up progress
-    /// can complete after this. Returns false while the room's snapshot has never been read or the server clock
-    /// has not synced yet; GoLive's own comment says the next frame tries again.</summary>
+    /// <summary>The live reset's territory half, master only - MatchDirector.Live.cs's GoLive calls this BEFORE writing
+    /// mPhase, in the SAME frame, so Photon delivers this write to every client before it sees the match go live (the
+    /// ordering MatchDirector.ReactToRoomState's live edge and every knockout check, MasterRecompute, rely on). Builds a
+    /// WHOLE NEW starting snapshot from scratch - not from WriteBasis - so a warm-up capture still echoing when live
+    /// arrives is deliberately thrown away and no warm-up progress can complete after this. Returns false while the
+    /// room's snapshot has never been read or the server clock has not synced yet; GoLive tries again next frame.</summary>
     public bool ResetForMatchStart(IReadOnlyList<int> teamsInMatch)
     {
         if (!PhotonNetwork.IsMasterClient || current == null || PhotonNetwork.ServerTimestamp == 0)
@@ -900,7 +860,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return true;
     }
 
-    // ---------------------------------------------------------------- capture progress (Task 2.1d)
+    // ---------------------------------------------------------------- capture progress
 
     /// Master only: publishes zone's new CaptureProgress to the room, in its OWN SetCustomProperties
     /// call carrying only the five cTeam/cProg/cRate/cStamp/cFade keys - a separate call from Write above
@@ -977,10 +937,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         // CaptureProgress.FadingKey's own comment on what that means for a mixed-build room.
         int[] fading = ReadIntArray(props, CaptureProgress.FadingKey);
 
-        // Task T4: kept so the loop below can compare each zone's fresh value against what this
-        // client believed a moment ago - currentProgress itself is overwritten with `next` right
-        // after, so the comparison has to happen against this snapshot of the OLD array, not the
-        // field (which by then would just be comparing `next` against itself).
+        // Kept so the loop below can compare each zone's fresh value against what this client believed a moment ago:
+        // currentProgress is overwritten with `next` right after, so the comparison has to use this snapshot of the
+        // OLD array, not the field.
         CaptureProgress[] previous = currentProgress;
 
         var next = new CaptureProgress[ZoneCount];
@@ -1001,10 +960,9 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             {
                 CaptureProgress before = previous != null && i < previous.Length ? previous[i] : CaptureProgress.Idle;
                 CaptureProgress after = next[i];
-                // Same predicate a tower already uses to decide whether ITS OWN new value is worth
-                // publishing at all (CaptureProgress.NeedsRepublishComparedTo) - reused here rather
-                // than re-deriving "did this change" a second way, so this event and the room's own
-                // wire traffic can never disagree about what counts as a change.
+                // The predicate a tower uses to decide whether ITS OWN new value is worth publishing
+                // (CaptureProgress.NeedsRepublishComparedTo), reused so this event and the room's own wire
+                // traffic can never disagree about what counts as a change.
                 if (after.NeedsRepublishComparedTo(before))
                     RaiseCaptureProgressChanged(i, before, after);
             }
@@ -1039,7 +997,7 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     // ---------------------------------------------------------------- retired
 
     // Kept only because RpcList dispatches by index - nothing calls it since territory moved to
-    // Room Properties (Task 2.1b). Renaming or deleting it would shift every RPC listed after it.
+    // Room Properties. Renaming or deleting it would shift every RPC listed after it.
     [PunRPC]
     private void RPC_UpdateTowerDictionary(bool value, int controllingTeam, int buildingID)
     {
@@ -1047,22 +1005,20 @@ public class BuildingManager : MonoBehaviourPunCallbacks
 
     // ---------------------------------------------------------------- territory win
 
-    /// The match previously ended only when every player of every other team was dead at the same
-    /// instant, which almost never happens once people are respawning. Holding all three capitals
-    /// now also wins. Both conditions are live: whichever happens first ends the match.
+    /// The match ends on whichever happens first: every player of every other team dead at the same instant, or
+    /// holding all the capitals in play.
     ///
-    /// 2.7b step 5: "live" is MatchDirector.IsLive (the room's own echoed mPhase) - before the match is live
-    /// nothing counts (Decision 3), and once live at least two teams were in it by construction (Decision 4), so
-    /// the old CountTeamsWithPlayers ">= 2" guard - which only ever approximated that before mTeams existed - is
-    /// gone. A capital out of play (Decision 8: a host start's cut third capital) is left out of the owners list
-    /// entirely, not just excluded from counting as a win: TerritoryWinner reads Neutral as "not everyone agrees",
-    /// which an out-of-play capital's real (neutral) owner already is, but leaving it out is the clearer intent.
+    /// "Live" is MatchDirector.IsLive (the room's own echoed mPhase): before the match is live nothing counts
+    /// (Decision 3), and once live at least two teams were in it by construction (Decision 4). A capital out of
+    /// play (Decision 8: a host start's cut third capital) is left out of the owners list entirely, not just
+    /// excluded from counting as a win: TerritoryWinner reads Neutral as "not everyone agrees", which an
+    /// out-of-play capital's real (neutral) owner already is, but leaving it out is the clearer intent.
     void CheckTerritoryWin()
     {
         if (!PhotonNetwork.IsMasterClient || territoryWinAnnounced)
             return;
         if (Overpower.Dominion.DominionMode.IsActive())
-            return; // Dominion is decided by its rounds, never by holding every capital (Task 2)
+            return; // Dominion is decided by its rounds, never by holding every capital
 
         MatchDirector director = MatchDirector.Instance;
         if (director == null)
@@ -1079,21 +1035,20 @@ public class BuildingManager : MonoBehaviourPunCallbacks
             owners.Add(current != null ? current.OwnerOf(capital.Key) : TerritoryMap.Neutral);
         }
 
-        // Task 9b-2: holding every base in play no longer pre-empts the last stand - the win counts only once every other
+        // Holding every base in play does not pre-empt the last stand: the win counts only once every other
         // team in the match has nobody alive (a base-less team with a living member still gets its last stand).
         int winner = MatchPhaseRules.TerritoryWinner(director.IsLive, owners, director.CurrentTeamStatuses());
         if (winner < 0)
             return;
 
         territoryWinAnnounced = true;
-        // Task 2.7: MatchDirector owns mWin/mPhase now, and every client reacts to a win (win/lose
-        // panels) through that one replicated-state path - RPC_TerritoryWin below is retired.
+        // MatchDirector owns mWin/mPhase, and every client reacts to a win (win/lose panels) through that one
+        // replicated-state path; RPC_TerritoryWin below is retired.
         director.AnnounceTerritoryWin(winner);
     }
 
-    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, CheckTerritoryWin above,
-    /// which now calls MatchDirector.AnnounceTerritoryWin instead) - an older client could still send
-    /// it, same "kept only for the RpcList" reasoning as RPC_UpdateTowerDictionary above.
+    /// Kept only for the committed RpcList (it has no caller; an older client could still send it), the same
+    /// "kept only for the RpcList" reasoning as RPC_UpdateTowerDictionary above.
     [PunRPC]
     private void RPC_TerritoryWin(int winningTeam)
     {

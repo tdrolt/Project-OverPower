@@ -3,38 +3,30 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// Works out where a blink actually lands. Blink is instantaneous - it never travels the space
-    /// between the caster and the destination, so nothing along that path matters, only the
-    /// destination itself. The rule (Tudor's clarification, Task 1.6b): clamp the requested point to
-    /// a maximum range from the caster, then walk the straight line back toward the caster in fixed
-    /// steps until a candidate spot is clear, first valid wins. If even the caster's own spot fails
-    /// the search gives up rather than picking something arbitrary.
-    ///
-    /// The physics part (is the ground there, is it below the kill plane, is a wall in the way) is
-    /// injected as a delegate so this class stays free of Physics/Collider, the same reason
-    /// DisplacementPriority and OverheatState are plain C# - "does a blink reach past a thin wall"
-    /// should be provable without a scene, a Rigidbody or a physics step.
+    /// Works out where a blink lands. Blink never travels the space between caster and destination,
+    /// so only the destination matters: clamp the requested point to a maximum range from the
+    /// caster, then walk the straight line back toward the caster in fixed steps; the first valid
+    /// candidate wins, and if even the caster's own spot fails the search gives up. The physics
+    /// (ground, kill plane, wall) is an injected delegate so this stays plain C# and provable
+    /// without a scene.
     /// </summary>
     public static class BlinkDestinationSearch
     {
         /// <summary>
-        /// Checks one candidate horizontal position (Y is always 0 here - the caller resolves the
-        /// real landing height from the ground itself, which this class never touches). Returns true
-        /// and the resolved landing point (ground height already applied, ready to teleport to) if a
-        /// player could stand there.
+        /// Checks one candidate horizontal position (Y is always 0 here; the caller resolves the real
+        /// landing height from the ground). Returns true and the landing point, ground height
+        /// already applied, if a player could stand there.
         /// </summary>
         public delegate bool ValidityProbe(Vector3 candidateXZ, out Vector3 landingPoint);
 
-        /// <summary>What the search found, or didn't.</summary>
         public readonly struct Result
         {
             public readonly bool Found;
             public readonly Vector3 Destination;
 
-            /// <summary>True when the destination actually used sits closer to the caster than the
-            /// raw requested point - either the request was beyond range, or the requested (or
-            /// clamped) spot was blocked and the search had to step back to find one that wasn't.
-            /// False only when the blink landed exactly where the cursor pointed.</summary>
+            /// <summary>True when the destination sits closer to the caster than the raw requested
+            /// point (beyond range, or blocked so the search stepped back). False only when the blink
+            /// landed exactly where the cursor pointed.</summary>
             public readonly bool Adjusted;
 
             public Result(bool found, Vector3 destination, bool adjusted)
@@ -47,15 +39,11 @@ namespace Overpower.Combat
             public static readonly Result None = new Result(false, default, false);
         }
 
-        // Not a tuning value: below this the requested point is close enough to the caster that
-        // "the direction toward it" stops meaning anything (dividing by ~0 to normalise it would
-        // blow up). Below it the search simply treats the request as "blink nowhere" and probes
-        // only the caster's own spot.
+        // Not a tuning value: below this the direction toward the request is meaningless (normalising
+        // would divide by ~0), so the search probes only the caster's own spot.
         private const float MinDirectionSqrMagnitude = 0.0001f;
 
-        // How much closer the used distance must be than the requested one before it counts as
-        // "adjusted" for the log line - guards against a float rounding error on an exact-range
-        // request reading as adjusted when nothing was actually moved back.
+        // A float rounding error on an exact-range request must not read as "adjusted" in the log line.
         private const float AdjustedEpsilon = 0.0001f;
 
         public static Result Find(Vector3 origin, Vector3 requestedPoint, float range, float searchStep,
@@ -85,7 +73,7 @@ namespace Overpower.Combat
                 }
 
                 if (distance <= 0f)
-                    return Result.None; // even the caster's own spot failed - nothing to land on.
+                    return Result.None;
 
                 distance = Mathf.Max(0f, distance - step);
             }

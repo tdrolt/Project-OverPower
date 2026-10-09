@@ -3,12 +3,9 @@ using UnityEngine.Serialization;
 
 namespace Overpower.Data
 {
-    /// <summary>Gold-per-second reference lines for the four GDD "economy scenario" bands in the
-    /// 3-team phase (p.37) - the HTML report's Phase 1 tab (and the whole-match tab, up to the
-    /// transition) draws these as horizontal lines on the team-income chart so Tudor can see which
-    /// band a team is tracking in, at a glance. Task T7: renamed from the pre-phase-split
-    /// ScenarioIncomeTargets - same four bands, now explicitly Phase 1's own set now that Phase 2 has
-    /// a different one (see ScenarioIncomeTargetsPhase2).</summary>
+    /// <summary>Gold-per-second reference lines for the four GDD "economy scenario" bands in the 3-team
+    /// phase (p.37), drawn on the HTML report's Phase 1 tab (and the whole-match tab, up to the transition).
+    /// Phase 2 has a different set (ScenarioIncomeTargetsPhase2).</summary>
     [System.Serializable]
     public struct ScenarioIncomeTargetsPhase1
     {
@@ -18,10 +15,8 @@ namespace Overpower.Data
         public float Dominant;
     }
 
-    /// <summary>Task T7: the GDD's own, DIFFERENT 2-team-phase economy scenario bands (p.38) - three
-    /// bands, not four, and none of them share Phase 1's names ("Even"/"Winning" replace "Struggling"/
-    /// "Dominant" - the GDD's own wording for the 2-team phase). Drawn on the Phase 2 tab (and the
-    /// whole-match tab, after the transition).</summary>
+    /// <summary>The GDD's different 2-team-phase bands (p.38): three, not four, and "Even"/"Winning" replace
+    /// "Struggling"/"Dominant". Drawn on the Phase 2 tab (and the whole-match tab, after the transition).</summary>
     [System.Serializable]
     public struct ScenarioIncomeTargetsPhase2
     {
@@ -42,10 +37,8 @@ namespace Overpower.Data
         public float Armor2Minutes;
     }
 
-    /// <summary>Plain data copy of <see cref="BalanceTargets"/> - Task T6's HTML writer takes this
-    /// directly (no ScriptableObject reference needed), so tests can hand it hand-written numbers
-    /// without loading the asset. These are reference lines ONLY: nothing in the game reads them,
-    /// they exist purely so the report can show Tudor how a match compares to the GDD's own numbers.</summary>
+    /// <summary>Plain data copy of <see cref="BalanceTargets"/>: the HTML writer takes it directly, so tests can
+    /// hand it hand-written numbers without loading the asset. Reference lines ONLY: nothing in the game reads them.</summary>
     [System.Serializable]
     public sealed class BalanceTargetsData
     {
@@ -57,7 +50,6 @@ namespace Overpower.Data
             Dominant = 33f,
         };
 
-        /// <summary>Task T7 (GDD p.38).</summary>
         public ScenarioIncomeTargetsPhase2 Phase2ScenarioIncomePerTeam = new ScenarioIncomeTargetsPhase2
         {
             Losing = 5f,
@@ -74,30 +66,22 @@ namespace Overpower.Data
             Armor2Minutes = 20f,
         };
 
-        /// <summary>Task T7 (GDD p.36): the 3-team phase's own expected duration.</summary>
         public float Phase1DurationSeconds = 900f;
 
-        /// <summary>Task T7 (GDD p.36): the 2-team phase's own expected duration.</summary>
         public float Phase2DurationSeconds = 450f;
 
         public float TargetMatchSeconds = 1350f;
     }
 
     /// <summary>
-    /// The GDD's own balance numbers (Task T6), one asset with a tooltip on every field citing the
-    /// page it came from - same shape as every other Data config in this project. These are reference
-    /// lines drawn on the HTML report only; nothing in the game reads this asset at runtime (unlike
-    /// GameplayConfig/TerritoryConfig/ArmorConfig, which the match itself simulates against).
+    /// The GDD's balance numbers, each tooltip citing its page. Reference lines on the HTML report only;
+    /// nothing in the game reads this asset at runtime (unlike GameplayConfig/TerritoryConfig/ArmorConfig).
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Balance Targets")]
     public sealed class BalanceTargets : ScriptableObject
     {
-        // Task T7: renamed to Phase1* (the 3-team phase's own scenarios - Phase 2 has a different
-        // set, below) via FormerlySerializedAs, so the existing asset's serialized values
-        // (losingIncomePerSecond: 5, strugglingIncomePerSecond: 15, averageIncomePerSecond: 23,
-        // dominantIncomePerSecond: 33) keep loading into these renamed fields with no YAML edit
-        // needed at all - a missing/renamed key just falls back to Unity's own FormerlySerializedAs
-        // migration on load. Confirmed via eval: git diff on BalanceTargets.asset stays empty.
+        // FormerlySerializedAs keeps the existing asset's values loading into the Phase1* fields with no
+        // YAML edit; removing it would silently reset them.
         [Header("Phase 1 (3-team) gold-flow scenarios (GDD p.37)")]
         [FormerlySerializedAs("losingIncomePerSecond")]
         [Tooltip("Gold/s per team the GDD calls 'Losing' in the 3-team phase (p.37). Reference line only.")]
@@ -167,8 +151,7 @@ namespace Overpower.Data
         [SerializeField] private float targetMatchSeconds = 1350f;
         public float TargetMatchSeconds => targetMatchSeconds;
 
-        /// <summary>A plain, asset-free copy for the aggregator/HTML writer - see BalanceTargetsData's
-        /// own comment on why this exists.</summary>
+        /// <summary>Asset-free copy for the aggregator/HTML writer (see BalanceTargetsData).</summary>
         public BalanceTargetsData ToData()
         {
             return new BalanceTargetsData

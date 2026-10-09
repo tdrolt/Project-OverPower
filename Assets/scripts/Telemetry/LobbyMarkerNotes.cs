@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Lobby Task 13: the notes of the lobby's own markers (the same `marker` line as the F1 marker): a lobby created, a seat taken or left, Start
+    /// The notes of the lobby's own markers (the same `marker` line as the F1 marker): a lobby created, a seat taken or left, Start
     /// game, End warm-up, a new host, and a spectator the host has seen. The report lists them with the other markers; the spectator note is
     /// bookkeeping only - the aggregator reads it back (<see cref="TryReadSpectator"/>) so a spectator is not reported as "a player with no log".
     /// </summary>

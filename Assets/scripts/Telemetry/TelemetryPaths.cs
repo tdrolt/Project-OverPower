@@ -4,25 +4,18 @@ using UnityEngine;
 
 namespace Overpower.Telemetry
 {
-    /// <summary>Shared by the game (MatchTelemetry, MatchLogZip) and the Editor's TelemetryMenu, so
-    /// both agree on where match logs live - the one designer-facing complaint this answers ("people
-    /// complained the logs were stored in AppData").
-    ///
-    /// Root order (TelemetryPathRules.Choose decides between the probed results): the game/project
-    /// folder's own "Match logs" subfolder (a build's own folder - the parent of Application.dataPath
-    /// - or the Unity project folder in the Editor, same parent-of-dataPath relationship); then
-    /// Documents\OverPower\Match logs (e.g. the game sits in Program Files and can't be written to);
-    /// then the old persistentDataPath location (AppData on Windows), so telemetry is never simply
-    /// lost. Each probe is exception-safe and logs exactly one warning on failure before trying the
-    /// next candidate.</summary>
+    /// <summary>Shared by the game (MatchTelemetry, MatchLogZip) and the Editor's TelemetryMenu, so both agree on where match logs live.
+    /// Root order (TelemetryPathRules.Choose decides between the probed results): the game/project folder's "Match logs" subfolder
+    /// (the parent of Application.dataPath: a build's folder, or the Unity project folder in the Editor); then
+    /// Documents\OverPower\Match logs (e.g. the game sits in Program Files); then the persistentDataPath location (AppData on
+    /// Windows), so telemetry is never lost. Each probe is exception-safe and logs one warning on failure before the next.</summary>
     public static class TelemetryPaths
     {
         public const string MatchLogsFolderName = "Match logs";
         private const string DocumentsAppFolderName = "OverPower";
 
-        /// <summary>Resolves and returns the "Match logs" root to use right now. legacyFolderName is
-        /// TelemetryConfig.FolderName, used only by the last-resort fallback (the pre-2026-09-27
-        /// location) to keep old logs and new ones from mixing under a different name.</summary>
+        /// <summary>legacyFolderName is TelemetryConfig.FolderName, used only by the last-resort fallback to keep old logs and new
+        /// ones from mixing under a different name.</summary>
         public static string ResolveMatchLogsRoot(string legacyFolderName)
         {
             string gameFolder = SafeParentOf(Application.dataPath);
@@ -49,8 +42,8 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>The pre-2026-09-27 location (Application.persistentDataPath - AppData on Windows),
-        /// used only when neither the game folder nor Documents could be created/written to.</summary>
+        /// <summary>The persistentDataPath location (AppData on Windows), used only when neither the game folder nor Documents
+        /// can be written to.</summary>
         public static string LegacyRoot(string legacyFolderName)
         {
             string root = Path.Combine(Application.persistentDataPath, string.IsNullOrEmpty(legacyFolderName) ? "Telemetry" : legacyFolderName);
@@ -89,11 +82,8 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>Tries to create baseFolder/subFolderName and write a throwaway probe file into it -
-        /// Directory.CreateDirectory alone can succeed on a read-only mount and still fail every actual
-        /// write later, so this checks the thing testers actually need (writing the log file), not just
-        /// the folder's existence. Exception-safe: any failure logs one warning and returns false so the
-        /// caller moves to the next candidate.</summary>
+        /// <summary>Creates baseFolder/subFolderName and writes a throwaway probe file into it: Directory.CreateDirectory alone can
+        /// succeed on a read-only mount and still fail every later write. Any failure logs one warning and returns false.</summary>
         private static bool TryUseFolder(string baseFolder, string subFolderName, out string result)
         {
             result = null;

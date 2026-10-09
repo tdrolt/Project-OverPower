@@ -10,10 +10,8 @@ namespace Overpower.Telemetry
     {
         private readonly StringBuilder sb = new StringBuilder(256);
 
-        // Starts true so a stray End() before any Begin() is a no-op rather than a bare "}". Begin
-        // resets it to false; End sets it back to true the first time it runs, so a caller that calls
-        // End() twice (or logs the same built line twice) gets the identical string back instead of a
-        // second closing brace corrupting the JSON.
+        // Starts true so a stray End() before Begin() is a no-op. End sets it back to true, so calling End() twice (or logging the
+        // same built line twice) returns the same string instead of a second closing brace corrupting the JSON.
         private bool ended = true;
 
         public TelemetryLine Begin(string eventName, double matchSeconds)
@@ -23,9 +21,8 @@ namespace Overpower.Telemetry
             sb.Append("{\"e\":");
             AppendString(eventName);
             sb.Append(",\"t\":");
-            // NaN/Infinity would otherwise be written as the bare word "NaN"/"Infinity" - not valid
-            // JSON - so a non-finite match time falls back to the same -1 "unknown" sentinel MatchClock
-            // itself returns for "the clock isn't known yet", rather than producing an unparseable line.
+            // NaN/Infinity would be written as a bare word, which is not valid JSON, so a non-finite time falls back to the -1
+            // "unknown" sentinel MatchClock returns.
             double t = double.IsNaN(matchSeconds) || double.IsInfinity(matchSeconds) ? -1.0 : matchSeconds;
             sb.Append(System.Math.Round(t, 3).ToString("0.###", CultureInfo.InvariantCulture));
             return this;

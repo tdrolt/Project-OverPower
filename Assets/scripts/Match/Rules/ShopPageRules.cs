@@ -4,10 +4,10 @@ using Overpower.Data;
 
 namespace Overpower.Match
 {
-    /// <summary>Task 13: the shop's two pages, switched by the two tabs at the top.</summary>
+    /// <summary>The shop's two pages, switched by the two tabs at the top.</summary>
     public enum ShopPage { Weapons, AbilitiesAndArmor }
 
-    /// <summary>Task 13: which page the shop reopens on. Kept for the whole session (a static field on the screen
+    /// <summary>Which page the shop reopens on. Kept for the whole session (a static field on the screen
     /// holds one of these), so P, close, P lands where the player last was. An impossible value falls back to the
     /// weapons page.</summary>
     public sealed class ShopPageMemory
@@ -20,7 +20,7 @@ namespace Overpower.Match
         }
     }
 
-    /// <summary>Task 13: where the hover pop-up's top-left corner goes, in canvas units (origin in the middle of the
+    /// <summary>Where the hover pop-up's top-left corner goes, in canvas units (origin in the middle of the
     /// screen, y up). Just below and right of the cursor; flipped to the other side of the cursor when that would leave
     /// the screen; finally clamped, so a pop-up that fits is always fully on screen.</summary>
     public static class ShopPopupPlacement
@@ -39,7 +39,7 @@ namespace Overpower.Match
         }
     }
 
-    /// <summary>Task 13 review: the shop panel is wider than a 4:3 or 5:4 canvas (the canvas is 1920 units wide at 16:9
+    /// <summary>The shop panel is wider than a 4:3 or 5:4 canvas (the canvas is 1920 units wide at 16:9
     /// and narrower on squarer screens), so its X button and outer nodes would clip. The panel is scaled down evenly
     /// until it fits, and never scaled up.</summary>
     public static class ShopPanelScale
@@ -52,7 +52,7 @@ namespace Overpower.Match
         }
     }
 
-    /// <summary>Task 13: the pop-up's text, from the three parts every shop item has: its name, one line on what it
+    /// <summary>The pop-up's text, from the three parts every shop item has: its name, one line on what it
     /// does, and its numbers. Empty parts are left out; nothing at all gives an empty string (no pop-up).</summary>
     public static class ShopPopupText
     {
@@ -69,7 +69,7 @@ namespace Overpower.Match
         }
     }
 
-    /// <summary>Task 13: number formatting the shop's pop-ups share (weapon stats, ability stats, armour rows).</summary>
+    /// <summary>Number formatting the shop's pop-ups share (weapon stats, ability stats, armour rows).</summary>
     public static class ShopNumberFormat
     {
         /// <summary>At most two decimals, no trailing zeros, always a dot (never a culture's comma).</summary>
@@ -89,7 +89,7 @@ namespace Overpower.Match
         }
     }
 
-    /// <summary>Task 13: the numbers block of an armour row's pop-up: the level you have now and what it gives, then
+    /// <summary>The numbers block of an armour row's pop-up: the level you have now and what it gives, then
     /// what the next upgrade gives and its price (or that there is none left). The wording comes from UiTheme
     /// (formats: {0} = level, {1} = the value, {2} = the price line).</summary>
     public static class ArmorPopupText

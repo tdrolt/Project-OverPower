@@ -6,20 +6,13 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The AoE zone ultimate: drops a damage zone at the caster's own feet that follows them and
-    /// ticks for its whole duration - Tudor's spec (2026-09-13), "self-cast radius lasting 6 seconds,
-    /// dealing damage every second. Follows the caster." This module only decides WHEN and WHERE the
-    /// zone goes down; everything about what it does once it exists lives on AoeZone.cs, the
-    /// networked object it places - the same split ElectricFenceAbility/ElectricFence use.
+    /// The AoE zone ultimate: drops a damage zone at the caster's feet that follows them and ticks for its duration. This
+    /// module only decides WHEN and WHERE; what the zone does lives on the networked AoeZone (as ElectricFenceAbility /
+    /// ElectricFence). Shared by all three ultimates: cooldownSeconds 0 / charges 1 on the prefab, readiness comes entirely
+    /// from UltimateCharge (IsReady reads IsFull; TryBuildCast only casts if Spend() returns true; Point is ctx.Origin).
     ///
-    /// FIT WITH 1.0 (shared by all three ultimates): cooldownSeconds 0 / charges 1 on the base class
-    /// (set on this prefab) - readiness comes entirely from UltimateCharge. IsReady reads
-    /// Owner.UltimateCharge.IsFull; TryBuildCast only agrees to cast if Spend() actually returns
-    /// true, and Point is ctx.Origin - the caster's own current position.
-    ///
-    /// THE THROW (Tudor's D11): while the zone is up and not yet thrown, pressing again is also
-    /// "ready" and throws the zone to the cursor (at most Recast Range from the caster), where it
-    /// stays. No meter is spent. See AoeZoneRecast and AoeZone.Throw.
+    /// THE THROW (D11): while the zone is up and not yet thrown, pressing again is also "ready" and throws it to the
+    /// cursor (at most Recast Range from the caster), where it stays. No meter is spent. See AoeZoneRecast and AoeZone.Throw.
     /// </summary>
     public sealed class AoeZoneAbility : AbilityModule
     {
@@ -114,8 +107,7 @@ namespace Overpower.Abilities
 
             ClearOldThrow();
 
-            // Task T3 (telemetry): this ability's own id, so AoeZone can attribute its own damage
-            // ticks to it (DamageInfo.AbilityId) - see AoeZone.OnPlaced.
+            // This ability's id, so AoeZone can attribute its damage ticks (DamageInfo.AbilityId) for telemetry.
             GameObject placed = NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
             ownZone = placed != null ? placed.GetComponent<AoeZone>() : null;
         }

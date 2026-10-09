@@ -10,17 +10,12 @@ using Overpower.Net;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Tudor's D12: hold Tab and a scoreboard shows, grouped by team (each team's name in its own colour), one line
-    /// per player: name, kills, deaths, assists, damage dealt, zones captured. Let go and it closes.
-    ///
-    /// READS, NEVER WRITES: every player's numbers are their own "sb" Player Property (ScoreboardPublisher writes it;
-    /// ScoreboardRules documents the layout), plus the team and nickname already on the room's players. Nothing is
-    /// read while the board is closed; while open it re-reads a few times a second (UiTheme.scoreboardRefreshesPerSecond)
-    /// and only rewrites a text whose number actually changed, so a steady board allocates nothing.
-    ///
-    /// Screen-space overlay canvas with no GraphicRaycaster - nothing on it is clickable, so it never swallows a
-    /// click meant for the game. Built in code from UiTheme like the HUD (sizes, colours, texts all live there).
-    /// Owner only: PlayerHud builds it, and only for the local player.
+    /// Hold Tab for the scoreboard (D12): grouped by team, one line per player (name, kills, deaths, assists, damage,
+    /// zones captured). READS, NEVER WRITES: each player's numbers are their own "sb" Player Property
+    /// (ScoreboardPublisher writes it; ScoreboardRules documents the layout), plus the team and nickname on the room's
+    /// players. Nothing is read while closed; while open it re-reads UiTheme.scoreboardRefreshesPerSecond times a second
+    /// and rewrites only a text whose number changed. Overlay canvas with no GraphicRaycaster, so it never swallows
+    /// a click meant for the game. Owner only: PlayerHud builds it for the local player.
     /// </summary>
     public sealed class ScoreboardPanel : MonoBehaviour
     {
@@ -135,7 +130,7 @@ namespace Overpower.UI
             {
                 foreach (Player p in room.Players.Values)
                 {
-                // A seat spectator is no row (lobby Task 6). A player whose team has not arrived yet still shows, under "Joining".
+                // A seat spectator is no row. A player whose team has not arrived yet still shows, under "Joining".
                 if (Teams.IsSpectator(p))
                     continue;
                 int team = Teams.TryGetTeam(p, out int known) ? known : PlayerTeam.NoTeam;

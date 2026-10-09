@@ -38,26 +38,13 @@ namespace Overpower.TestRange
     }
 
     /// <summary>
-    /// A live loadout switcher so one person can evaluate the whole kit alone, instead of reaching
-    /// every weapon through a full match and a shop - a DESIGN instrument, not a debug menu: it is
-    /// how a weapon's numbers get measured against a dummy rather than asserted on paper.
-    ///
-    /// Populates itself from WeaponCatalogue/AbilityCatalogue rather than a hardcoded list, so a
-    /// weapon or ability asset added later appears here with no code change - see
-    /// PopulateWeaponDropdown/PopulateAbilityDropdown.
-    ///
-    /// The UI tree is built here in code, not hand-authored in the scene, and lives entirely under
-    /// one root (uiRoot): this project already lost a set of buttons to a click handler nobody
-    /// wired up, because a hand-built hierarchy hides that mistake until someone clicks. Building
-    /// in code puts each listener on the same line as the control it belongs to.
-    ///
-    /// Toggled with the raw keyboard (Keyboard.current), not an InputAction: this is a tool, not a
-    /// game control, and must never appear in a future rebinding UI next to Primary/Attachment/
-    /// Ultimate/Mobility.
-    ///
-    /// Gated entirely on GameplayConfig.TestRangeEnabled - false disables this component in Awake
-    /// before it builds anything, so a designer can turn the tool off with one checkbox and leave
-    /// no canvas, no key polling and no console spam in the shipping build.
+    /// A live loadout switcher so one person can evaluate the whole kit alone: a DESIGN instrument,
+    /// not a debug menu, for measuring a weapon against a dummy rather than asserting on paper.
+    /// Populates itself from WeaponCatalogue/AbilityCatalogue, so a new asset appears with no code
+    /// change. The UI tree is built in code under one root (uiRoot), so each listener sits on the
+    /// same line as its control (a hand-built hierarchy once lost buttons to an unwired handler).
+    /// Toggled with the raw keyboard, not an InputAction: a tool, never a rebindable game control.
+    /// Gated on GameplayConfig.TestRangeEnabled: false disables it in Awake before it builds anything.
     /// </summary>
     public class TestRangePanel : MonoBehaviour
     {
@@ -79,8 +66,7 @@ namespace Overpower.TestRange
                  "abilities reads '(none available)'.")]
         private AbilityCatalogue abilityCatalogue;
 
-        // Fixed once here and reused to build the three ability dropdowns identically, instead of
-        // three near-duplicate blocks.
+        // Reused to build the three ability dropdowns identically.
         private static readonly (string label, AbilitySlot slot)[] AbilitySlots =
         {
             ("Attachment", AbilitySlot.Attachment),
@@ -94,9 +80,8 @@ namespace Overpower.TestRange
         private TextMeshProUGUI readoutText;
         private TextMeshProUGUI telemetryStatusText;
 
-        // RefreshTelemetryStatus's own cache of the last string it actually wrote - it runs every
-        // frame the panel is open (Update, guarded on visible), and a TMP text write is not free
-        // even when the value did not change. Null so the very first call always writes.
+        // RefreshTelemetryStatus's cache of the last string written: it runs every frame the panel is
+        // open and a TMP text write is not free even when unchanged. Null so the first call writes.
         private string lastTelemetryStatusText;
         private readonly List<WeaponDefinition> weaponOptions = new List<WeaponDefinition>();
 
@@ -165,7 +150,7 @@ namespace Overpower.TestRange
         /// frame the panel is open so a mid-session player change is never left stuck either way.
         /// Focus is keyed by "this" (PlayerInputRouter.SetToolFocus's owner parameter) so closing
         /// this panel can never release a claim the loadout screen is still holding, and vice
-        /// versa - see that method's own comment.</summary>
+        /// versa.</summary>
         private void UpdateInputSuppression(bool wantSuppressed)
         {
             PlayerInputRouter router = wantSuppressed
@@ -291,12 +276,10 @@ namespace Overpower.TestRange
             GameObject go = TMP_DefaultControls.CreateDropdown(res);
             go.transform.SetParent(parent, false);
             TMP_Dropdown dropdown = go.GetComponent<TMP_Dropdown>();
-            // Fix 2 (Playtest polish review): a code-built Selectable keeps Unity's default
-            // Automatic navigation, so a click selects it and the scene's Input System UI module
-            // maps Enter to Submit on whatever is selected - Enter also opens chat
-            // (chatmanager.cs), so without this, opening chat right after picking a dropdown
-            // option quietly re-submitted that dropdown instead. Same fix as LoadoutScreen's
-            // buttons, applied here too since this panel builds its own controls.
+            // A code-built Selectable keeps Unity's default Automatic navigation, so a click selects it
+            // and the Input System UI module maps Enter to Submit on it. Enter also opens chat
+            // (chatmanager.cs), so opening chat right after picking an option would re-submit the
+            // dropdown. Same fix as LoadoutScreen's buttons.
             dropdown.navigation = new Navigation { mode = Navigation.Mode.None };
             return dropdown;
         }
@@ -327,10 +310,7 @@ namespace Overpower.TestRange
                         continue;
 
                     weaponOptions.Add(weapon);
-                    // Id prefix, matching the ability dropdown below (fix 5) - the id prefix still
-                    // separates any two weapons that share a DisplayName (weapon 6, "Burst - Charge",
-                    // was once one of two "Charge" entries that read as the same weapon listed twice
-                    // before the id was added to tell them apart; mark step 4 renamed the other one).
+                    // Id prefix: separates weapons that share a DisplayName; the ability dropdown does the same.
                     labels.Add($"{weapon.Id} {weapon.DisplayName}");
                 }
             }
@@ -454,8 +434,7 @@ namespace Overpower.TestRange
             health.SetArmorLevels(health.AbsorbLevel, health.RechargeLevel);   // Refills armor at whatever levels are already owned.
         }
 
-        /// <summary>Task 1.11's own "F1 gets a Fill Ultimate button" [C] - instantly fills
-        /// UltimateCharge so Space can be tested without farming a dummy for real.</summary>
+        /// <summary>Instantly fills UltimateCharge so Space can be tested without farming a dummy.</summary>
         private void OnFillUltimateClicked()
         {
             UltimateCharge charge = ResolveLocalPlayer()?.GetComponentInChildren<UltimateCharge>(true);
@@ -468,8 +447,7 @@ namespace Overpower.TestRange
             charge.Fill();
         }
 
-        /// <summary>Task 2.2's own "F1 gets a +1000 Gold button" [C] - so shop testing (Task 2.5)
-        /// never has to wait for territory income to trickle in first.</summary>
+        /// <summary>Gives gold so shop testing never waits for territory income to trickle in.</summary>
         private void OnAddGoldClicked()
         {
             GoldWallet wallet = ResolveLocalPlayer()?.GetComponent<GoldWallet>();
@@ -483,17 +461,16 @@ namespace Overpower.TestRange
         }
 
         /// <summary>Spends one purchase on the absorb path, if the combined cap and the path's own
-        /// top level both still allow it - see ArmorUpgradePath. Exercises the exact rule a future
-        /// shop will use, without needing gold or a shop UI to test it.</summary>
+        /// top level both still allow it (ArmorUpgradePath). Exercises the rule the shop will use,
+        /// without gold or a shop UI.</summary>
         private void OnAbsorbUpgradeClicked() => TryUpgradeArmor(upgradeAbsorb: true);
 
         /// <summary>Spends one purchase on the recharge path - see OnAbsorbUpgradeClicked.</summary>
         private void OnRechargeUpgradeClicked() => TryUpgradeArmor(upgradeAbsorb: false);
 
-        /// <summary>Spends one purchase through the shared ArmorLoadoutActions rule (Task 9a pulled
-        /// this out of here so the loadout screen calls the exact same rule) and logs a refusal -
-        /// the loadout screen instead disables its +Absorb/+Recharge buttons at the cap, so only
-        /// this designer-facing tool needs a log line for "why didn't that do anything".</summary>
+        /// <summary>Spends one purchase through the shared ArmorLoadoutActions rule (the loadout
+        /// screen calls the same one) and logs a refusal: that screen disables its buttons at the
+        /// cap, so only this tool needs a log line for "why didn't that do anything".</summary>
         private void TryUpgradeArmor(bool upgradeAbsorb)
         {
             PlayerHealth health = ResolveLocalPlayer()?.GetComponentInChildren<PlayerHealth>(true);
@@ -510,12 +487,9 @@ namespace Overpower.TestRange
             ArmorLoadoutActions.Reset(ResolveLocalPlayer()?.GetComponent<PlayerLoadout>());
 
         /// <summary>Reveals this client's current match folder in the OS file browser. In the Editor,
-        /// EditorUtility.RevealInFinder opens Explorer/Finder directly; a build has no Editor to do
-        /// that, so it falls back to Application.OpenURL on a file:// URL instead, which Unity's docs
-        /// confirm opens the OS's own file browser for a directory path. `persistentDataPath` on this
-        /// project's own PC contains a space ("...\Project OP\Telemetry\..."), which a hand-built
-        /// "file:///" + path string leaves unescaped - System.Uri.AbsoluteUri percent-encodes it (and
-        /// every backslash to a forward slash) into a well-formed URI instead.</summary>
+        /// EditorUtility.RevealInFinder; a build falls back to Application.OpenURL on a file:// URL.
+        /// persistentDataPath contains a space, which a hand-built "file:///" + path leaves
+        /// unescaped; System.Uri.AbsoluteUri percent-encodes it (and every backslash) correctly.</summary>
         private void OnOpenTelemetryFolderClicked()
         {
             string folder = MatchTelemetry.Instance != null ? MatchTelemetry.Instance.CurrentFolder : null;
@@ -532,17 +506,16 @@ namespace Overpower.TestRange
 #endif
         }
 
-        /// <summary>Task T2's own "F1 gets a Drop marker button" - logs a `marker` line with an empty
-        /// note so a designer can flag "something interesting just happened" while playing, without
-        /// typing anything. The report's Markers section (Task T6) shows the 30s of events around it.</summary>
+        /// <summary>Logs a `marker` line with an empty note so a designer can flag "something
+        /// interesting just happened" without typing. The report's Markers section shows the 30s of
+        /// events around it.</summary>
         private void OnDropMarkerClicked() => MatchTelemetry.Instance?.DropMarker("");
 
         // ---- Readout ----
 
-        /// <summary>The computed-versus-measured pair on the last two lines is the point of this
-        /// readout: computed is what the weapon's own numbers promise, measured is what a dummy
-        /// actually recorded. Disagreement past rounding means the weapon is not behaving the way
-        /// its stat block claims, worth chasing even when the arithmetic "looks right" on paper.</summary>
+        /// <summary>The computed-versus-measured pair on the last two lines is the point: computed is
+        /// what the weapon's own numbers promise, measured is what a dummy actually recorded.
+        /// Disagreement past rounding means the weapon is not behaving as its stat block claims.</summary>
         private void RefreshReadout()
         {
             GameObject player = ResolveLocalPlayer();
@@ -585,9 +558,8 @@ namespace Overpower.TestRange
                 armorLine;
         }
 
-        /// <summary>Format matches the design review's example: "Armor A1/R0: 50 cap, 6s" - A/R are
-        /// the absorb/recharge levels, so a designer can read the upgrade state at a glance without
-        /// cross-referencing ArmorConfig.</summary>
+        /// <summary>Format "Armor A1/R0: 50 cap, 6s": A/R are the absorb/recharge levels, so the
+        /// upgrade state reads at a glance without cross-referencing ArmorConfig.</summary>
         private string ArmorReadoutLine(PlayerHealth health)
         {
             if (health == null)
@@ -599,8 +571,7 @@ namespace Overpower.TestRange
         }
 
         /// <summary>"Telemetry: <lines> lines -> <folder>" while recording, or "off" before a match's
-        /// file has opened (telemetry disabled, or not in a room yet) - the plan's own wording for
-        /// this label.</summary>
+        /// file has opened (telemetry disabled, or not in a room yet).</summary>
         private void RefreshTelemetryStatus()
         {
             MatchTelemetry telemetry = MatchTelemetry.Instance;
@@ -608,8 +579,8 @@ namespace Overpower.TestRange
                 ? $"Telemetry: {telemetry.LineCount} lines -> {telemetry.CurrentFolder}"
                 : "Telemetry: off";
 
-            // Only touch .text when the value actually changed - this runs every frame the panel
-            // is open, and LineCount only changes once per telemetry line, far slower than 60Hz.
+            // Only touch .text when the value changed: this runs every frame the panel is open, and
+            // LineCount changes far slower than 60Hz.
             if (text == lastTelemetryStatusText)
                 return;
 

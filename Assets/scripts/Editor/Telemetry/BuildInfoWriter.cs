@@ -23,8 +23,7 @@ namespace Overpower.EditorTools
 
         public void OnPreprocessBuild(BuildReport report) => Write();
 
-        /// <summary>Public and static so the T2 verification step (and any future automated build
-        /// pipeline step) can call this directly without running a full Player build.</summary>
+        /// <summary>Public and static so a verification step or build pipeline can call it without a full Player build.</summary>
         public static void Write()
         {
             string hash = GitCommitReader.ReadShortHash(10);

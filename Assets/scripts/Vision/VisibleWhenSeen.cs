@@ -6,19 +6,18 @@ using Overpower.Net;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// On an enemy's shot (a bullet, rocket, Stun Gun or Zip Gun bolt, a rope anchor): every Renderer under this object
-    /// (mesh, trail, line, particles) is switched on only while my team sees the object's position, so a shot from the
-    /// fog appears as it crosses the fog's edge (vision D2). Only Renderer.enabled is touched - never the object's active
-    /// state, colliders or scripts - so the shot still flies, hits and damages exactly as before. ForceVisible keeps my
-    /// own team's shots always shown. No TeamSight yet, or the fog off, means shown.
+    /// On an enemy's shot (bullet, rocket, Stun Gun or Zip Gun bolt, rope anchor): every Renderer under this object (mesh,
+    /// trail, line, particles) is on only while my team sees the object's position, so a shot from the fog appears as it
+    /// crosses the fog's edge (D2). Only Renderer.enabled is touched - never active state, colliders or scripts - so the
+    /// shot still flies, hits and damages. ForceVisible keeps my own team's shots shown. No TeamSight yet, or fog off: shown.
     /// </summary>
     public sealed class VisibleWhenSeen : MonoBehaviour
     {
         private readonly List<Renderer> renderers = new List<Renderer>(8);
         private readonly List<bool> authoredEnabled = new List<bool>(8); // what each renderer was set to before we touched it
         private bool shown = true;
-        // For a placed thing with a PhotonView (AoE Zone, Fire Field): shown always when its owner is on my team. Set on the
-        // prefabs; not a designer field (unticking it would hide your own team's zones).
+        // A placed thing with a PhotonView (AoE Zone, Fire Field) is always shown when its owner is on my team. Set on the
+        // prefabs, not a designer field: unticking it would hide your own team's zones.
         [SerializeField, HideInInspector]
         private bool ownersTeamAlwaysSees;
         private float seenRadius; // > 0: a placed disc, shown when any part of it is seen or it reaches my team
@@ -30,11 +29,9 @@ namespace Overpower.Vision
         /// <summary>True for my team's shots: always drawn.</summary>
         public bool ForceVisible { get; set; }
 
-        /// <summary>Whether the renderers are currently on (recorders and tests read it).</summary>
         public bool Shown => shown;
 
-        /// <summary>Adds the component to a freshly spawned shot of <paramref name="shooterTeam"/>: friendly shots are
-        /// force-visible, an enemy's follow the sight. Does nothing without a TeamSight (nothing is hidden then).</summary>
+        /// <summary>Friendly shots are force-visible, an enemy's follow the sight. Null without a TeamSight (nothing is hidden then).</summary>
         public static VisibleWhenSeen Attach(GameObject shot, int shooterTeam)
         {
             TeamSight sight = TeamSight.Local;
@@ -46,9 +43,8 @@ namespace Overpower.Vision
             return gate;
         }
 
-        /// <summary>Adds (or reuses) the component on an ability visual that belongs to a player and follows them: it is
-        /// shown exactly while that player is shown (my team's always, an enemy's while seen), checked every frame. Does
-        /// nothing without a TeamSight.</summary>
+        /// <summary>For an ability visual that follows a player: shown exactly while that player is shown (my team's always,
+        /// an enemy's while seen). Reuses an existing component. Null without a TeamSight.</summary>
         public static VisibleWhenSeen AttachToCaster(GameObject visual, PhotonView casterView)
         {
             if (visual == null || TeamSight.Local == null)
@@ -63,18 +59,17 @@ namespace Overpower.Vision
         }
 
         /// <summary>For a placed disc (AoE Zone, Fire Field): with a radius above zero it is shown when its centre or any
-        /// part of its rim is seen, or when it reaches my team (not only its centre).</summary>
+        /// part of its rim is seen, or when it reaches my team.</summary>
         public void SetSeenRadius(float radius) => seenRadius = Mathf.Max(0f, radius);
 
-        /// <summary>For the Flamethrower cone: also shown while the cone reaches any of my team (its length and full angle).</summary>
+        /// <summary>For the Flamethrower cone: also shown while the cone reaches any of my team.</summary>
         public void SetCone(float range, float fullAngleDegrees)
         {
             coneRange = Mathf.Max(0f, range);
             coneAngle = fullAngleDegrees;
         }
 
-        /// <summary>The whole choice, plain values: forced or no sight = shown; an object bound to a caster follows the
-        /// caster; any other follows its own position.</summary>
+        /// <summary>Forced or no sight = shown; bound to a caster follows the caster; otherwise follows its own position.</summary>
         public static bool Decide(bool forceVisible, bool hasSight, bool followsCaster, bool casterShown, bool positionSeen)
         {
             if (forceVisible || !hasSight)
@@ -104,7 +99,6 @@ namespace Overpower.Vision
 
         private void LateUpdate() => Apply();
 
-        /// <summary>Works out whether the object is shown right now (my team's: always; else its position seen) and applies it.</summary>
         public void Apply()
         {
             TeamSight sight = TeamSight.Local;

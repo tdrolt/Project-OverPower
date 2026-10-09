@@ -12,11 +12,9 @@ namespace Overpower.Weapons
     /// or after its weapon's Windup Seconds delay; see WeaponFiring.FireAfterWindup) the shot
     /// lands that same instant, anywhere along its range. The laser path's defining trait.
     ///
-    /// Put it on the prefab in a weapon's Projectile Prefab slot. WeaponFiring checks that prefab
-    /// for this component and, if it is there, casts a ray instead of spawning a projectile. That is
-    /// the whole switch between "bullet" and "beam" - ProjectileMotor was not touched, and a beam
-    /// travels in the same fire RPC a bullet does, carrying the same origin, direction, seed and
-    /// charge. No new network message exists for lasers.
+    /// Put it on the prefab in a weapon's Projectile Prefab slot. WeaponFiring checks that prefab for this component and, if it is there, casts a
+    /// ray instead of spawning a projectile - that is the whole switch between "bullet" and "beam". A beam travels in the same fire RPC a bullet
+    /// does, carrying the same origin, direction, seed and charge; no new network message exists for lasers.
     ///
     /// THIS COMPONENT IS NEVER SPAWNED. WeaponFiring calls it straight off the prefab asset, so it
     /// keeps no memory between shots: anything written to one of its fields would be written into
@@ -72,21 +70,12 @@ namespace Overpower.Weapons
         // target the origin is merely NEAR rather than actually inside/touching.
         private const float PointBlankRadius = 0.02f;
 
-        // Reused across every beam this (never-spawned) asset draws rather than `new`-ed per shot -
-        // see ShotTeamVisuals' own propertyBlock field for why a MaterialPropertyBlock is written
-        // and applied immediately rather than held onto: SetPropertyBlock copies its contents into
-        // the renderer, so the same instance can be safely reused for the next beam - see
-        // ApplyBeamGlow (fix 4, Playtest polish review).
-        //
-        // NOT a `= new MaterialPropertyBlock()` field initializer (review fix, caught by
-        // HitscanChargedRangeTests/WeaponUpgradeTreeTests failing after the first pass): a static
-        // field initializer runs the first time ANYTHING touches this type, which in the editor
-        // can be while Unity is still constructing/deserializing a Hitscan instance off a prefab
-        // (e.g. loading the weapon catalogue for a test) - "CreateImpl is not allowed to be called
-        // from a MonoBehaviour constructor (or instance field initializer)" is Unity's own guard
-        // against exactly that. Constructed lazily in ApplyBeamGlow instead, the same rule
-        // ShotTeamVisuals follows by building its own MaterialPropertyBlock in Awake rather than a
-        // field initializer - either way, never at type-construction time.
+        // Reused across every beam this never-spawned asset draws rather than `new`-ed per shot: SetPropertyBlock copies its contents into the
+        // renderer, so one instance is safe to reuse for the next beam (see ApplyBeamGlow).
+        // NOT a `= new MaterialPropertyBlock()` field initializer: a static initializer runs the first time ANYTHING touches this type, which in the
+        // editor can be while Unity is still deserializing a Hitscan off a prefab (e.g. loading the weapon catalogue for a test), and Unity throws
+        // "CreateImpl is not allowed to be called from a MonoBehaviour constructor (or instance field initializer)". Constructed lazily in
+        // ApplyBeamGlow instead, the same rule ShotTeamVisuals follows by building its own in Awake.
         private static MaterialPropertyBlock beamPropertyBlock;
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
@@ -113,10 +102,8 @@ namespace Overpower.Weapons
 
                 IDamageable target = hit.collider.GetComponentInParent<IDamageable>();
 
-                // IStructure (CoverWall) is the fact BeamResolver needs to stop a piercing beam at
-                // it like a wall rather than carrying on through it as just another target - see
-                // BeamResolver's own class comment (Task 1.8b review fix). Resolved here, once, since
-                // this is the one place that actually has the IDamageable to check.
+                // IStructure (CoverWall) is the fact BeamResolver needs to stop a piercing beam at it like a wall rather than carrying on through it as just
+                // another target - see BeamResolver's class comment. Resolved here, once, since this is the one place that has the IDamageable to check.
                 ContactBuffer.Add(new BeamContact(hit.distance, target, hit.point, target is IStructure));
             }
 
@@ -130,33 +117,19 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// Issue 1 fix (2026-09-15): catches a target whose collider already CONTAINS the origin -
-        /// the point-blank case the raycast above structurally cannot see. Unity never reports a
-        /// collider a ray starts inside of, and the muzzle (SafeMuzzlePosition, just inside the
-        /// shooter's own body capsule) can sit inside a target's capsule when the two players are close -
-        /// measured and confirmed live: at 1.5m the muzzle (then farther out in front) sat exactly on
-        /// the dummy capsule's ClosestPoint (i.e. inside it), and the raycast above reported only the
-        /// far wall, skipping the dummy entirely.
-        ///
-        /// Deliberately an OverlapSphere AT THE ORIGIN, not a second ray cast from farther back:
-        /// a volume-overlap test at a single point can only ever find something that point is
-        /// ALREADY touching, so it can never see past a wall the raycast above did not already see -
-        /// SafeMuzzlePosition still guarantees that point sits on the shooter's own side of anything
-        /// it was hugging, which is exactly what keeps the old wall exploit closed. Uses the same
-        /// mask as the raycast (so the through-walls leaf still ignores Building here too), but only
-        /// ever turns an overlap into a contact when it is IDamageable - plain geometry overlapping
-        /// the origin would mean SafeMuzzlePosition itself failed to clear it, which is that
-        /// property's job to prevent, not this method's to second-guess.
-        ///
-        /// Distance is recorded as 0 - nothing can be closer to the muzzle than something the muzzle
-        /// is already inside of, and BeamResolver only uses Distance to ORDER and CAP contacts (see
-        /// BeamResolverTests.AContactAtZeroDistanceIsStruckFirstAndEndsTheBeamThere), so 0 sorting
-        /// first is exactly correct. A target also found by the raycast above (relevant once the
-        /// origin has cleared it but the beam still reaches it) is naturally deduplicated
-        /// by BeamResolver's own alreadyStruck set, which keeps whichever contact it meets first in
-        /// distance order - here, always this 0-distance one. Point is the origin itself
-        /// (Collider.ClosestPoint returns the query point unchanged when it is already inside),
-        /// used only for damage/impact-VFX placement.
+        /// Catches a target whose collider already CONTAINS the origin - the point-blank case the raycast above structurally cannot see. Unity never
+        /// reports a collider a ray starts inside of, and the muzzle (SafeMuzzlePosition, just inside the shooter's own body capsule) can sit inside a
+        /// target's capsule when the two players are close.
+        /// Deliberately an OverlapSphere AT THE ORIGIN, not a second ray cast from farther back: a volume test at a single point can only find something
+        /// that point is ALREADY touching, so it can never see past a wall the raycast did not see - SafeMuzzlePosition still guarantees that point sits
+        /// on the shooter's own side of anything it was hugging, which keeps the old wall exploit closed. Uses the same mask as the raycast (so the
+        /// through-walls leaf still ignores Building here too), and only turns an overlap into a contact when it is IDamageable: plain geometry
+        /// overlapping the origin would mean SafeMuzzlePosition itself failed to clear it, which is that property's job to prevent.
+        /// Distance is recorded as 0: nothing is closer to the muzzle than something the muzzle is already inside of, and BeamResolver only uses
+        /// Distance to ORDER and CAP contacts (BeamResolverTests.AContactAtZeroDistanceIsStruckFirstAndEndsTheBeamThere), so 0 sorting first is
+        /// correct. A target also found by the raycast is deduplicated by BeamResolver's alreadyStruck set, which keeps whichever contact it meets
+        /// first in distance order - here, always this one. Point is the origin itself (Collider.ClosestPoint returns the query point unchanged when it
+        /// is already inside), used only for damage/impact-VFX placement.
         /// </summary>
         private void AddPointBlankContacts(Vector3 origin, int mask)
         {
@@ -185,11 +158,9 @@ namespace Overpower.Weapons
             for (int i = 0; i < beam.Struck.Count; i++)
             {
                 BeamContact contact = beam.Struck[i];
-                // abilityId -1: a beam is always a weapon's own (shot.Weapon read directly) - see
-                // DamageInfo.AbilityId's own comment. Mark plan step 4: the mark fields come straight
-                // off the same weapon stat block, read here on the VICTIM's own copy of the asset -
-                // the identical build every client runs, so every client's Hitscan agrees on whether
-                // and how much this shot marks, with no separate message for it.
+                // abilityId -1: a beam is always a weapon's own (shot.Weapon read directly) - see DamageInfo.AbilityId. The mark fields come straight off the
+                // same weapon stat block, read here on the VICTIM's own copy of the asset - the identical build every client runs, so every client's Hitscan
+                // agrees on whether and how much this shot marks, with no separate message for it.
                 contact.Target.ApplyDamage(new DamageInfo(shot.Damage, shot.ShooterActorNumber,
                                                           shot.ShooterTeamId, shot.Weapon.Id,
                                                           DamageSource.Projectile, false, contact.Point, -1,
@@ -215,10 +186,8 @@ namespace Overpower.Weapons
         /// The charge fraction is the one that crossed the wire, so every client draws the same
         /// length and damages the same targets.
         ///
-        /// rangeMultiplier defaults to 1 (unchanged) - Task 2.6's OverPower buff is the one caller
-        /// that ever passes anything else, via the shot's own ProjectileContext.RangeMultiplier (see
-        /// that property's comment for why a beam takes this as a parameter instead of reading a
-        /// second, independently-tuned range field off MaxRange).
+        /// rangeMultiplier defaults to 1 (unchanged); OverPower's buff is the one caller that passes anything else, via the shot's own
+        /// ProjectileContext.RangeMultiplier (see its comment for why a beam takes this as a parameter instead of reading a second range field).
         /// </summary>
         public static float ChargedRange(WeaponDefinition weapon, float chargeFraction, float rangeMultiplier = 1f)
         {
@@ -233,14 +202,11 @@ namespace Overpower.Weapons
         /// Where a beam built from `shot` would visibly stop if it fired RIGHT NOW - the wall or
         /// structure within its (charged) range, or the full range if nothing stops it first.
         ///
-        /// Task 11b: WeaponFiring's wind-up warning line calls this once, the instant the trigger is
-        /// pulled, to draw its telegraph along the exact path the real beam will travel. Walls and
-        /// structures do not move, so resolving this at the START of the wind-up predicts exactly
-        /// where the beam lands once it actually fires at the END of it. Delegates to Resolve rather
-        /// than re-deriving the mask/range/pierce rules a second time, so the warning can never
-        /// disagree with what the beam actually does - including that a laser with unlimited pierce
-        /// (every laser today) never stops early just because a player is standing in the line; only
-        /// a wall or a structure shortens it.
+        /// WeaponFiring's wind-up warning line calls this once, the instant the trigger is pulled, to draw its telegraph along the exact path the real
+        /// beam will travel. Walls and structures do not move, so resolving at the START of the wind-up predicts exactly where the beam lands at the END.
+        /// Delegates to Resolve rather than re-deriving the mask/range/pierce rules, so the warning can never disagree with what the beam does -
+        /// including that a laser with unlimited pierce (every laser today) never stops early just because a player is standing in the line; only a wall
+        /// or a structure shortens it.
         /// </summary>
         public float PredictBeamLength(Vector3 origin, ProjectileContext shot) => Resolve(origin, shot).Length;
 
@@ -255,26 +221,22 @@ namespace Overpower.Weapons
             return ignoreWalls != null ? ignoreWalls.RemoveWallsFrom(mask) : mask;
         }
 
-        // Fallbacks for a Hitscan whose Theme slot was left empty (ResolveBeamColor below logs once
-        // and the beam still fires and still draws, just with these numbers instead) - roughly the
-        // old hardcoded look this file drew before Task 11b gave every laser prefab a shared theme.
+        // Fallbacks for a Hitscan whose Theme slot was left empty (ResolveBeamColor below logs once, and the beam still fires and draws with these).
         private const float FallbackBeamWidth = 0.08f;
         private const float FallbackLingerSeconds = 0.12f;
         private static readonly Color FallbackBeamColor = new Color(0.35f, 0.95f, 1f, 1f);
 
         private static bool warnedMissingTheme;
 
-        /// <summary>A local, throwaway effect on each client - never a networked object, since
-        /// every client draws its own copy from the same RPC. Task 11b: coloured by the shooter's
-        /// team (UiTheme.ShotColorFor), widened and boosted toward an emissive look, and faded to
-        /// transparent over its linger time rather than popping out of existence - see
-        /// UiTheme.laserBeamWidth/laserBeamEmission/laserBeamLingerSeconds.</summary>
+        /// <summary>A local, throwaway effect on each client - never a networked object, since every client draws its own copy from the same RPC.
+        /// Coloured by the shooter's team (UiTheme.ShotColorFor), widened and boosted toward an emissive look, and faded to transparent over its
+        /// linger time rather than popping out of existence - see UiTheme.laserBeamWidth/laserBeamEmission/laserBeamLingerSeconds.</summary>
         private void DrawBeam(Vector3 from, Vector3 to, int shooterTeamId)
         {
             if (beamVfx == null)
                 return;
 
-            // D2: a beam from the fog is drawn only while the line crosses my team's sight (own team's always).
+            // A beam from the fog is drawn only while the line crosses my team's sight (own team's always). (D2)
             if (!TeamSight.ShotShownAlong(shooterTeamId, from, to))
                 return;
 
@@ -291,15 +253,13 @@ namespace Overpower.Weapons
             line.SetPosition(0, from);
             line.SetPosition(1, to);
 
-            // Overwrites whatever start/end width the beam VFX prefab's own Line Renderer was
-            // baked with (see the Beam Vfx field's own tooltip) - Laser Beam Width on UiTheme is
-            // the one real home for this number now.
+            // Overwrites the start/end width the beam VFX prefab's own Line Renderer was baked with (see the Beam Vfx tooltip) - Laser Beam Width on
+            // UiTheme is the one real home for this number.
             float width = theme != null ? theme.laserBeamWidth : FallbackBeamWidth;
             line.startWidth = width;
             line.endWidth = width;
 
-            // The TRUE team colour, never boosted - see ApplyBeamGlow below for why the brightness
-            // multiply moved off this value (fix 4, Playtest polish review).
+            // The TRUE team colour, never boosted - see ApplyBeamGlow for why the brightness multiply lives elsewhere.
             Color color = ResolveBeamColor(shooterTeamId);
             line.startColor = color;
             line.endColor = color;
@@ -309,10 +269,9 @@ namespace Overpower.Weapons
             beam.AddComponent<BeamFade>().Begin(line, color, linger);
         }
 
-        /// <summary>The shooter's team colour, unmodified - see ApplyBeamGlow for where the
-        /// brightness boost happens instead. Falls back to the old hardcoded cyan (FallbackBeamColor)
-        /// and logs once, the same ShotTeamVisuals/AimConeView pattern for a component whose Theme
-        /// slot was never assigned - the beam still fires and still draws either way, just untinted.</summary>
+        /// <summary>The shooter's team colour, unmodified - see ApplyBeamGlow for where the brightness boost happens instead. Falls back to
+        /// FallbackBeamColor and logs once (the ShotTeamVisuals/AimConeView pattern) for a component whose Theme slot was never assigned - the beam
+        /// still fires and draws either way, just untinted.</summary>
         private Color ResolveBeamColor(int shooterTeamId)
         {
             if (theme == null)
@@ -330,29 +289,16 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// Fix 4 (Playtest polish review, quality finding): Laser Beam Emission used to multiply
-        /// straight into the vertex colour returned by ResolveBeamColor (baseColor.rgb * glow), but
-        /// a LineRenderer's start/end colour is written into the mesh's 8-bit-per-channel vertex
-        /// colour buffer, so any channel that crossed 1.0 silently clamped there instead of getting
-        /// brighter - team 1's violet (0.68, 0.32, 1) x the old 1.6 rendered as (1, 0.51, 1), a
-        /// visibly pinker colour, not a brighter violet one (confirmed with a before/after capture,
-        /// see the task's verification notes).
-        ///
-        /// Fixed the same way ShotTeamVisuals brightens a bullet's core: the vertex colour
-        /// (line.startColor/endColor, set by the caller just above) stays the plain team colour,
-        /// and the brightness multiply happens in the shader instead, via a MaterialPropertyBlock
-        /// on _BaseColor - a full-precision float4 shader uniform that is never quantised the way a
-        /// vertex colour is, so (glow, glow, glow, 1) scales every channel by the identical factor
-        /// with no clamp and therefore no hue shift.
-        ///
-        /// This only works because Laser Beam.mat's shader (checked with get_material_properties/
-        /// get_shader_properties rather than assumed: Universal Render Pipeline/Particles/Unlit,
-        /// _ColorMode 0 = Multiply) already multiplies its vertex colour by _BaseColor - the same
-        /// property every particle using this shader reads for its own base tint, HDR or not. Its
-        /// _EmissionColor IS HDR-tagged, which looked like the obvious property to use, but the
-        /// material never enables the shader's _EMISSION keyword, so writing that channel from a
-        /// property block would have done nothing without also flipping a keyword on the shared
-        /// asset - _BaseColor needs no such toggle.
+        /// The brightness boost lives here, not in the vertex colour: a LineRenderer's start/end colour is written into an 8-bit-per-channel vertex
+        /// buffer, so a channel that crosses 1.0 clamps instead of brightening (team 1's violet (0.68, 0.32, 1) x 1.6 rendered (1, 0.51, 1), visibly
+        /// pinker rather than a brighter violet).
+        /// So the vertex colour (set by the caller) stays the plain team colour and the multiply happens in the shader, via a MaterialPropertyBlock on
+        /// _BaseColor - a full-precision float4 uniform that is never quantised, so (glow, glow, glow, 1) scales every channel by the identical factor
+        /// with no clamp and no hue shift.
+        /// This works only because Laser Beam.mat's shader (Universal Render Pipeline/Particles/Unlit, _ColorMode 0 = Multiply; checked with
+        /// get_material_properties/get_shader_properties rather than assumed) already multiplies its vertex colour by _BaseColor. Its _EmissionColor
+        /// IS HDR-tagged and looks like the obvious property, but the material never enables the shader's _EMISSION keyword, so writing it would do
+        /// nothing without flipping a keyword on the shared asset - _BaseColor needs no such toggle.
         /// </summary>
         private static void ApplyBeamGlow(LineRenderer line, float glow)
         {
@@ -366,7 +312,7 @@ namespace Overpower.Weapons
 
         private static void PlayImpact(WeaponDefinition weapon, Vector3 at, int shooterTeamId)
         {
-            // D2: an enemy beam's impact flash in the fog is not shown (own team's always).
+            // An enemy beam's impact flash in the fog is not shown (own team's always). (D2)
             if (weapon.ImpactVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeamId, at))
                 VFXManager.Instance.PlayVFX(weapon.ImpactVfx, at);
         }

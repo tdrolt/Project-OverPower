@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// The AoE Zone ultimate's "throw" (Tudor's D11): while your zone is up, pressing the ultimate once
+    /// The AoE Zone ultimate's "throw" (D11): while your zone is up, pressing the ultimate once
     /// more throws it to your cursor, at most a set range from you, and it stays there. These are the
     /// pure rules: whether a throw is allowed, where it lands, and how the throw is written down as a
     /// Player Property (so a client that arrives after the throw still finds the zone at the thrown spot).

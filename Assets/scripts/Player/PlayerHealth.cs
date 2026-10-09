@@ -9,11 +9,7 @@ using Overpower.Net;
 using Overpower.UI;
 
 /// <summary>
-/// One player's health, armor and damage funnel. Replaces two copies that used to live in
-/// Multiplayer.cs (TakeDamage for bullets, ApplyAoEDamage for area damage) and had already
-/// diverged - only the bullet path applied the dash damage-reduction buff. ApplyDamage below is
-/// now the only place damage maths happens.
-///
+/// One player's health, armor and damage funnel: ApplyDamage is the only place damage maths happens.
 /// Deliberately NOT IPunObservable: the PhotonView auto-finds observables on children too, so a
 /// second one here would silently add a second serialization block. PlayerNetSync is the sole
 /// observable and reads/writes through the members below.
@@ -62,22 +58,17 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     // visible over a corpse. See SetOverheadBarVisible.
     private GameObject overheadBarRoot;
 
-    // Carry-over C: the yellow "shield immunity" look is a FRAME (four thin edge Images) round the
-    // shared health/shield rect, not a recolour of either fill and not a translucent whole-bar overlay
-    // either - "so it doesn't mess with the shield" (Tudor); a wash over the blue shield fill read
-    // grey (see UiTheme.immuneBarColor's tooltip and captures/immune-overlay-alpha-montage.png). Built
-    // lazily (EnsureImmuneFrame) the first time it is actually needed, as the LAST child of
-    // overheadBarRoot, copying healthFillImage's own rect: the shield fill already draws in that
-    // identical rect (Task 6 [T], full armour over full health), so one frame covers both. No prefab
-    // change - every Image here exists only at runtime.
+    // The yellow "shield immunity" look is a FRAME (four thin edge Images) round the shared health/shield rect: not a
+    // recolour of either fill and not a translucent whole-bar overlay, which read grey over the blue shield fill (see
+    // UiTheme.immuneBarColor's tooltip). Built lazily (EnsureImmuneFrame) as the LAST child of overheadBarRoot, copying
+    // healthFillImage's rect; the shield fill draws in that identical rect, so one frame covers both. Runtime-only: no
+    // prefab change.
     private ImmuneFrame overheadImmuneFrame;
 
-    /// <summary>Carry-over C: the overhead bar's own immune-look frame - four thin edge Images round
-    /// the shared health/shield rect (the same "four strips round a rect" shape PlayerHud.ImmuneFrame
-    /// uses for the HUD bars, kept as a SEPARATE small class here rather than shared: the two build in
-    /// different coordinate spaces - HUD canvas units there, THIS bar's own local RectTransform units
-    /// here, see UiTheme.immuneOverheadFrameThickness) plus an optional faint wash under them. One
-    /// root GameObject so ApplyImmuneLook can show/hide the whole look with a single SetActive.</summary>
+    /// <summary>The overhead bar's immune-look frame: four thin edge Images round the shared health/shield rect plus
+    /// an optional faint wash. Like PlayerHud.ImmuneFrame but separate, since the two build in different coordinate
+    /// spaces (HUD canvas units there, THIS bar's local RectTransform units here, UiTheme.immuneOverheadFrameThickness).
+    /// One root so ApplyImmuneLook shows/hides the whole look with a single SetActive.</summary>
     private sealed class ImmuneFrame
     {
         public readonly GameObject root;
@@ -93,8 +84,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             this.wash = wash;
         }
 
-        /// <summary>frameColor is applied at ITS OWN alpha (now 1 by default - Immune Bar Colour);
-        /// washAlpha overrides the wash's own alpha independently.</summary>
+        /// <summary>frameColor is applied at its own alpha; washAlpha overrides the wash's alpha independently.</summary>
         public void Apply(Color frameColor, float washAlpha)
         {
             top.color = bottom.color = left.color = right.color = frameColor;
@@ -114,7 +104,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// owner's own screen-space bars (the overhead bar above needs no such read: it drives itself).</summary>
     public bool ShowsImmuneLook => immuneLookApplied;
 
-    /// <summary>The shared theme, so the STUNNED / SLOWED label built over this player's head (Tudor D18) reads its
+    /// <summary>The shared theme, so the STUNNED / SLOWED label built over this player's head (D18) reads its
     /// colours and sizes from the same asset as the bar under it.</summary>
     public UiTheme Theme => theme;
 
@@ -130,9 +120,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     private PlayerStatusEffects statusEffects; // A status is not health - see PlayerStatusEffects.cs.
     private Overpower.Dominion.RespawnShield respawnShield; // Dominion: stops every hit while the respawn shield is up
 
-    // Mark plan step 4: this VICTIM's own marks, keyed by attacker - see MarkLedger's own class
-    // comment for why it lives here rather than anywhere network-visible (damage is victim-side, so
-    // this is the one client that can ever decide the +50% with no message).
+    // This VICTIM's own marks, keyed by attacker. Damage is victim-side, so this is the one client that can decide
+    // the +50% with no message (MarkLedger's class comment).
     private readonly MarkLedger marks = new MarkLedger();
 
     // The two independent armor upgrade paths (Combat/ArmorUpgradePath), each an index into
@@ -152,22 +141,21 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     public float Health => health;
     /// <summary>The most health this player can have, from GameplayConfig (100 if that is missing, as elsewhere here).</summary>
     public float MaxHealth => gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
-    // A single ArmorState per client now, owner and remote alike - a remote client's copy is
-    // written by SetHealthFromNetwork below through ArmorState.SetFromNetwork instead of a
-    // separately mirrored field, so Armor means the same thing regardless of whose client reads it.
+    // One ArmorState per client, owner and remote alike: a remote copy's is written by SetHealthFromNetwork through
+    // ArmorState.SetFromNetwork, so Armor means the same thing whoever reads it.
     public float Armor => armor.Current;
     public float ArmorCapacity => armor.Capacity;
     public int AbsorbLevel => absorbLevel;
     public int RechargeLevel => rechargeLevel;
     public float SecondsSinceCombat => secondsSinceCombat;
     public bool IsOutOfCombat => gameplayConfig != null && secondsSinceCombat >= gameplayConfig.OutOfCombatSeconds;
-    /// <summary>Alive on EVERY client (Task 16): the owner's own death latch and the replicated alive state, see PlayerAliveRule.</summary>
+    /// <summary>Alive on EVERY client: the owner's own death latch and the replicated alive state, see PlayerAliveRule.</summary>
     public bool IsAlive => PlayerAliveRule.IsAlive(isDead, lifecycle != null, lifecycle != null && lifecycle.IsAlive);
     public int TeamId => Teams.TryGetTeam(photonView.Owner, out int teamId) ? teamId : -1;
     public int ActorNumber => photonView.OwnerActorNr;
 
     /// <summary>True only on the machine this player belongs to - the same guard ApplyDamage
-    /// already enforces, exposed so a mine (Task 1.8) can ask before it decides to trigger.</summary>
+    /// already enforces, exposed so a mine can ask before it decides to trigger.</summary>
     public bool HasLocalAuthority => photonView.IsMine;
     public event System.Action<DamageResult, DamageInfo> Damaged;
     public event System.Action<DamageInfo> Died;
@@ -193,10 +181,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // theme asset exists to prevent.
         if (theme == null)
             Debug.LogError($"[PlayerHealth] {name}: UiTheme is not assigned - overhead bar will not be themed.");
-        // Mirrors PlayerHud's own guard: a theme with no bar sprite is the exact Task 3 bug (a
-        // Filled Image with no sprite ignores fillAmount and draws full), and unlike a missing
-        // theme entirely this would say nothing in the console while every overhead bar quietly
-        // lies about health and armor.
+        // Mirrors PlayerHud's guard: a Filled Image with no sprite ignores fillAmount and draws full, and unlike a
+        // missing theme this would say nothing in the console while every overhead bar quietly lies about health and armor.
         else if (theme.barSprite == null)
             Debug.LogError($"[PlayerHealth] {name}: UiTheme has no Bar Sprite - overhead bar will draw full width regardless of health/armor.");
 
@@ -211,39 +197,29 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         UpdateOverheadBar();
     }
 
-    /// <summary>Hides (or shows) the whole overhead bar - called from PlayerLifecycle.ApplyAliveState,
-    /// which runs on every client for every player, not just the owner (see that method's own class
-    /// comment). Deliberately keyed off the caller's own alive value rather than this class's IsAlive:
-    /// PlayerHealth.isDead is only ever written on the owner's machine (ApplyDamage's IsMine guard),
-    /// so a remote copy's latch used to read alive for the whole time that player was actually
-    /// dead (Task 16: IsAlive now also follows PlayerLifecycle.IsAlive, but this caller IS that change, so it keeps
-    /// passing PlayerLifecycle's own value).</summary>
+    /// <summary>Hides (or shows) the whole overhead bar; called from PlayerLifecycle.ApplyAliveState, which runs on
+    /// every client for every player. Keyed off the caller's own alive value rather than IsAlive: isDead is only
+    /// written on the owner's machine (ApplyDamage's IsMine guard), and this caller is what updates
+    /// PlayerLifecycle.IsAlive, so it passes PlayerLifecycle's own value.</summary>
     public void SetOverheadBarVisible(bool visible)
     {
         if (overheadBarRoot != null)
             overheadBarRoot.SetActive(visible);
 
-        // 2026-09-20 (Tudor: the bar over a dead player hides with the body - the immune frame must
-        // not survive either). REVIEW 2026-09-21 (opus): the race this comment used to describe
-        // cannot actually happen in play. On death, on EVERY client, PlayerLifecycle.ApplyAliveState
-        // (false) raises AliveChanged, and AbilityRunner.HandleAliveChanged -> Interrupt(Died) ->
-        // InvulnerabilityAbility.ClearShield() -> PlayerHealth.ClearImmuneLook() already clears the
-        // frame before this method is even reached - the look is only ever switched ON by that same
-        // module, and the shortest respawn (5s) outlasts the longest immune look (4s), so there is no
-        // window where a stale "on" frame could reappear. This call is a harmless SECOND GUARD that
-        // makes PlayerHealth independent of the ultimate module rather than a fix for a real bug -
-        // don't remove it (it costs nothing), but don't mistake it for the load-bearing path either.
+        // The bar over a dead player hides with the body, so the immune frame must not survive either. On death, on
+        // EVERY client, PlayerLifecycle.ApplyAliveState(false) raises AliveChanged, and AbilityRunner.HandleAliveChanged
+        // -> Interrupt(Died) -> InvulnerabilityAbility.ClearShield() -> ClearImmuneLook() already clears the frame
+        // before this is reached; only that module switches the look on, and the shortest respawn outlasts the longest
+        // immune look, so no stale "on" frame can reappear. This is a harmless SECOND GUARD that keeps PlayerHealth
+        // independent of the ultimate module: don't remove it, but it is not the load-bearing path.
         if (!visible)
             ClearImmuneLook();
     }
 
-    /// <summary>Builds the immunity frame the first time ApplyImmuneLook actually needs one - never
-    /// eagerly in Awake, since most lives never trigger the shield at all. Copies healthFillImage's
-    /// own RectTransform exactly (anchors, offsets, pivot) rather than stretching to fill
-    /// overheadBarRoot, so it lines up with the fills pixel-for-pixel even if a future prefab edit
-    /// insets them. Starts inactive; ApplyImmuneLook is the only thing that ever shows it. Replaces
-    /// EnsureImmuneOverlay (a single translucent Image covering the whole bar) - carry-over C, see
-    /// UiTheme.immuneBarColor's tooltip for why that read grey over the blue shield fill.</summary>
+    /// <summary>Builds the immunity frame the first time ApplyImmuneLook needs one, never eagerly in Awake (most
+    /// lives never trigger the shield). Copies healthFillImage's RectTransform exactly (anchors, offsets, pivot)
+    /// rather than stretching to fill overheadBarRoot, so it lines up with the fills pixel-for-pixel even if a prefab
+    /// edit insets them. Starts inactive; ApplyImmuneLook is the only thing that shows it.</summary>
     private void EnsureImmuneFrame()
     {
         if (overheadImmuneFrame != null || overheadBarRoot == null || healthFillImage == null)
@@ -292,11 +268,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         return img;
     }
 
-    /// <summary>One thin edge strip of the overhead frame - the same shape PlayerHud.BuildFrameStrip
-    /// builds for a HUD bar/slot border, kept separate here since this class has no PlayerHud instance
-    /// to call it on. anchorMin/anchorMax stretch the strip along the edge it sits on (equal min/max on
-    /// one axis pins it to that edge with zero size, which sizeDelta on that axis then supplies); the
-    /// other axis's anchors already span the full rect, so its sizeDelta stays 0.</summary>
+    /// <summary>One thin edge strip of the overhead frame (the shape PlayerHud.BuildFrameStrip builds, kept separate
+    /// since this class has no PlayerHud instance). Equal min/max anchors on one axis pin the strip to that edge with
+    /// zero size, which sizeDelta on that axis supplies; the other axis's anchors span the full rect, so its
+    /// sizeDelta stays 0.</summary>
     private static Image BuildFrameEdge(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 sizeDelta)
     {
         var go = new GameObject(name, typeof(RectTransform));
@@ -312,33 +287,27 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         return img;
     }
 
-    /// <summary>The one source for "immune right now" on the overhead bar - driven by
-    /// InvulnerabilityAbility's ShowShield/ClearShield, which run on every client (What exists D: a
-    /// remote copy's own IsInvulnerable is always false, so the shield's replicated phase message is
-    /// the only signal that reaches every screen). Starts (or restarts) the clock from Time.time.</summary>
+    /// <summary>The one source for "immune right now" on the overhead bar, driven by InvulnerabilityAbility's
+    /// ShowShield/ClearShield, which run on every client: a remote copy's own IsInvulnerable is always false, so the
+    /// shield's replicated phase message is the only signal that reaches every screen.</summary>
     public void ShowImmuneLook(float seconds)
     {
         immuneLook.Show(Time.time, seconds);
         ApplyImmuneLook(immuneLook.IsOn(Time.time));
     }
 
-    /// <summary>Ends the look at once - called from InvulnerabilityAbility.ClearShield (the real path
-    /// off a death: AbilityRunner.HandleAliveChanged -> Interrupt(Died) -> ClearShield -> here), from
-    /// ResetForRespawn (a fresh spawn, or the 2.7b match-start fresh start, must never carry a stale
-    /// yellow bar into the next life - PlayerLifecycle.ResetForMatchStart already calls
-    /// ResetForRespawn, so nothing extra was needed there), and from SetOverheadBarVisible(false) (a
-    /// harmless second guard - see that method's own comment for why it is never the load-bearing
-    /// path).</summary>
+    /// <summary>Ends the look at once. Called from InvulnerabilityAbility.ClearShield (the real path off a death),
+    /// from ResetForRespawn (a fresh life, including ResetForMatchStart, must never carry a stale yellow bar), and
+    /// from SetOverheadBarVisible(false) (a second guard, see that method).</summary>
     public void ClearImmuneLook()
     {
         immuneLook.Clear();
         ApplyImmuneLook(false);
     }
 
-    /// <summary>Tudor's override on the Mark plan (top-of-plan table, #6), now a FRAME (carry-over C) -
-    /// toggles the FRAME only. healthFillImage/shieldFillImage are never touched here, so they always
-    /// keep whatever ApplyTheme set them to. Guarded on the latched value so a remote copy's per-frame
-    /// Update check (below) and repeated ShowImmuneLook calls while already on do no redundant work.</summary>
+    /// <summary>Toggles the FRAME only: healthFillImage/shieldFillImage are never touched here, so they keep
+    /// whatever ApplyTheme set. Guarded on the latched value so a remote copy's per-frame Update check and repeated
+    /// ShowImmuneLook calls while already on do no redundant work.</summary>
     private void ApplyImmuneLook(bool on)
     {
         if (on == immuneLookApplied)
@@ -356,19 +325,14 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         overheadImmuneFrame.SetShown(on);
     }
 
-    /// <summary>Applies the theme's bar sprite and colours to the three overhead-bar Images once,
-    /// at spawn - the prefab holds only structure (hierarchy, rect sizes, Filled/Horizontal/Left
-    /// set up on the two fill Images), so the theme asset stays the ONE place a retune happens.
-    /// Without theme.barSprite a Filled Image ignores fillAmount and draws full - see UiTheme's
-    /// own comment on barSprite, the exact bug Task 3 fixed on the screen-space HUD.
+    /// <summary>Applies the theme's bar sprite and colours to the three overhead-bar Images once, at spawn: the
+    /// prefab holds only structure, so the theme asset is the ONE place a retune happens. Without theme.barSprite a
+    /// Filled Image ignores fillAmount and draws full (UiTheme.barSprite).
     ///
-    /// Re-review fix: also forces raycastTarget false on all three. This is a second guard, not
-    /// the real fix - HealthBarCanvas (world-space, every player) should carry no
-    /// GraphicRaycaster at all, since nothing on an overhead bar is clickable and a world-space
-    /// raycaster falls back to Camera.main, making PlayerInputRouter.pointerOverUi true (and so
-    /// swallowing a shot) the instant the cursor crossed ANY player's head, including an enemy's,
-    /// which is exactly what a crosshair does mid-fight. Belt-and-braces in case a prefab variant
-    /// or a future edit re-adds a raycaster here without noticing what it would break.</summary>
+    /// Also forces raycastTarget false on all three, as a second guard: HealthBarCanvas (world-space, every player)
+    /// should carry no GraphicRaycaster at all, since a world-space raycaster falls back to Camera.main and makes
+    /// PlayerInputRouter.pointerOverUi true (swallowing a shot) whenever the cursor crosses ANY player's head. This
+    /// covers a prefab variant or edit re-adding one.</summary>
     private void ApplyTheme()
     {
         if (theme == null)
@@ -394,13 +358,10 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         }
     }
 
-    /// <summary>The one place both overhead fills are written - option C, Task 6 [T]: shield drawn
-    /// OVER health, each fill against its OWN max (health/maxHealth, armor/ArmorCapacity), so a
-    /// full shield hides max HP by design. Called from every place that used to set healthBar.value
-    /// or call UpdateArmorBar: Awake, ApplyDamage, SetArmorLevels, ResetForRespawn, the armor
-    /// recharge tick in Update, and SetHealthFromNetwork (the remote-client path). Guards against
-    /// rewriting an unchanged fillAmount - the recharge tick calls this every frame armor is not
-    /// already full, and a filled Image write is not free.</summary>
+    /// <summary>The one place both overhead fills are written: shield drawn OVER health, each fill against its OWN max
+    /// (health/maxHealth, armor/ArmorCapacity), so a full shield hides max HP by design. Skips an unchanged
+    /// fillAmount: the recharge tick calls this every frame armor is not full, and a filled Image write is not
+    /// free.</summary>
     private void UpdateOverheadBar()
     {
         float maxHealth = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
@@ -426,36 +387,31 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     private void Update()
     {
-        // Mark plan step 1: a REMOTE copy's look must expire on its own clock too, which is why this
-        // sits ABOVE the owner-only return below. ShowImmuneLook/ClearImmuneLook already run on every
-        // client (InvulnerabilityAbility's RpcTarget.All), so the only thing a remote copy cannot do
-        // for itself is notice time passing without ticking anything - this one line is that tick.
+        // A REMOTE copy's look must expire on its own clock too, which is why this sits ABOVE the owner-only return.
+        // ShowImmuneLook/ClearImmuneLook already run on every client (InvulnerabilityAbility's RpcTarget.All); the only
+        // thing a remote copy cannot do for itself is notice time passing, and this is that tick.
         if (immuneLookApplied && !immuneLook.IsOn(Time.time))
             ApplyImmuneLook(false);
 
-        // No other client should simulate your health or tick your armor recharge. isDead is
-        // checked too: without it, armor kept climbing on a corpse (Update never used to look at
-        // isDead), so how much armor you respawned with silently depended on how long the respawn
-        // timer happened to take. ResetForRespawn resets this clock and decides the respawn armor
-        // outright (ArmorConfig.RespawnWithFullArmor), so there is nothing useful to tick while dead.
+        // No other client should simulate your health or tick your armor recharge. isDead is checked too: without
+        // it, armor kept climbing on a corpse, so the armor you respawned with silently depended on how long the
+        // respawn timer took. ResetForRespawn resets this clock and decides the respawn armor outright
+        // (ArmorConfig.RespawnWithFullArmor), so there is nothing useful to tick while dead.
         if (!photonView.IsMine || isDead)
             return;
 
         secondsSinceCombat += Time.deltaTime;
 
-        // Burn is ticked by PlayerStatusEffects now, which routes it back through ApplyDamage below.
+        // Burn ticks in PlayerStatusEffects, which routes it back through ApplyDamage below.
         armor.Tick(Time.deltaTime, secondsSinceCombat);
         TickHealthRegen(Time.deltaTime);
         UpdateOverheadBar(); // So the shield fill visibly refills as the pool recharges, not just on the next hit.
     }
 
-    /// <summary>Task 2.3: health regen by tier. Owner only (guarded by Update's own IsMine check),
-    /// after the armor tick above - armor and health recharge on the same out-of-combat clock, armor
-    /// first, same order the class always had for the two pools. Finds which zone (if any) this
-    /// player is standing in via BuildingManager.TryGetZoneAt, checks it against the replicated
-    /// owner, and asks HealthRegenRule for the rate - see that class's own comment for the gate.
-    /// The resulting health change reaches other clients through the existing PlayerNetSync
-    /// serialize tick (it reads playerHealth.Health live); no new RPC or property.</summary>
+    /// <summary>Health regen by tier. Owner only (Update's IsMine check), after the armor tick: both recharge on the
+    /// same out-of-combat clock, armor first. Finds the zone this player stands in via BuildingManager.TryGetZoneAt,
+    /// checks it against the replicated owner, and asks HealthRegenRule for the rate. Other clients see the change
+    /// through PlayerNetSync's serialize tick reading Health live; no new RPC or property.</summary>
     private void TickHealthRegen(float deltaTime)
     {
         if (gameplayConfig == null || territoryConfig == null)
@@ -483,9 +439,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         float rate = HealthRegenRule.RegenPerSecond(standingInOwnZone, tierRegenPerSecond,
                                                       secondsSinceCombat, gameplayConfig.OutOfCombatSeconds);
 
-        // Dominion Task 6: the player's own spawn heals at its own rates, also mid-fight (default A14: owned Tier 2/3 zones elsewhere keep the
-        // Conquest regen above). Only once the match is live (A22): the warm-up keeps today's sandbox. The rate is DominionHealRules.HealRate's
-        // answer, not a copy of its branching here.
+        // The player's own spawn heals at its own rates, also mid-fight (A14: owned Tier 2/3 zones elsewhere keep the
+        // Conquest regen above). Only once the match is live (A22); the warm-up is a sandbox. The rate is
+        // DominionHealRules.HealRate's answer, not a copy of its branching here.
         if (Overpower.Dominion.DominionMode.IsLive())
         {
             Overpower.Data.DominionConfig dominion = Overpower.Dominion.DominionMode.Config();
@@ -494,7 +450,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
                     secondsSinceCombat, dominion.SpawnHealOutOfCombatPerSecond, dominion.SpawnHealInCombatPerSecond,
                     dominion.SpawnHealOutOfCombatDelaySeconds, rate);
         }
-        // Dominion sudden death (Tudor A29): no healing at all - neither the spawn's nor an owned zone's. Health packs (Heal below) still work.
+        // Dominion sudden death (A29): no healing at all - neither the spawn's nor an owned zone's. Health packs (Heal below) still work.
         Overpower.Dominion.DominionDirector dominionDirector = Overpower.Dominion.DominionDirector.Instance;
         rate = Overpower.Dominion.DominionHealRules.RateInStage(dominionDirector != null ? dominionDirector.Stage : Overpower.Dominion.DominionStage.None, rate);
         if (rate <= 0f)
@@ -523,54 +479,42 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     /// The one funnel every damage source goes through - see the class comment.
     public DamageResult ApplyDamage(in DamageInfo info)
     {
-        // Mark plan step 2 (Tudor's override, answer 2): every client simulates every shot fired at
-        // every player, including its own shots against an enemy it does NOT own - this is the one
-        // moment the SHOOTER's own client can learn where its shot actually landed, since the real
-        // damage math below (and PlayerHealth.Damaged/the credit RPC that follows it) only ever runs
-        // on the victim's own machine. Raised BEFORE the IsMine/isDead return on purpose: it must fire
-        // on a copy the shooter does not own. A self-hit (IsMine true here) raises nothing - the
-        // shooter already knows exactly where it is standing.
+        // Every client simulates every shot fired at every player, including its own shots against an enemy it does
+        // NOT own: this is the one moment the SHOOTER's client can learn where its shot landed, since the real damage
+        // math below (and Damaged / the credit RPC) only runs on the victim's machine. Raised BEFORE the IsMine/isDead
+        // return on purpose, so it fires on a copy the shooter does not own. A self-hit raises nothing.
         //
-        // Review fix (steps 1-2): only for a source whose HitPoint is a genuine point of impact
-        // (Projectile, Splash, Contact). Burn and Zone carry the FIELD's or ZONE's own position as
-        // HitPoint (FireField.cs, AoeZone.cs, ElectricFence.cs all pass their own centre, not where
-        // damage actually touched the victim) - raising for those anchored the next number at that
-        // stationary point instead of falling back to the victim's own centre like any other
-        // not-simulated-here hit (a burn tick, anything older than DamageNumberView's freshness
-        // window already falls back correctly; this keeps a field/zone hit falling back the same way).
+        // Only for a source whose HitPoint is a genuine point of impact (Projectile, Splash, Contact). Burn and Zone
+        // carry the field's or zone's own centre (FireField, AoeZone, ElectricFence), which would anchor the next
+        // number at that stationary point instead of falling back to the victim's centre.
         if (!photonView.IsMine && PhotonNetwork.LocalPlayer != null
             && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
             && info.Source != DamageSource.Burn && info.Source != DamageSource.Zone)
         {
-            // Review fix (opus review, mark steps 3-4): ImpactSeen used to be raised ONLY in the
-            // else branch below, so a Blocked hit never refreshed this victim's latest-impact record -
-            // once the last REAL impact aged out (DamageNumberView.ImpactFreshnessSeconds, ~1s), every
-            // later "Blocked" pop fell back to the victim's own centre instead of the actual impact
-            // point, even though "Blocked" is drawn "at the impact" the same as every other number
-            // (DamageNumberView.HandleBlockedSeen). Raised unconditionally now, before the Blocked
-            // decision, so a Blocked pop always has a fresh anchor to read from.
+            // Raised unconditionally, before the Blocked decision: otherwise a Blocked hit never refreshes this
+            // victim's latest-impact record, and once the last real impact ages out
+            // (DamageNumberView.ImpactFreshnessSeconds) every later "Blocked" pop falls back to the victim's centre
+            // instead of the impact point (DamageNumberView.HandleBlockedSeen).
             CombatEvents.RaiseImpactSeen(transform, info.HitPoint);
 
-            // Mark plan step 4, Tudor's answer 7 ("Blocked"), option (b) - no network: a shooter-side
-            // guess, not the victim's truth (see CombatEvents.LocalBlockedSeen's own comment for the
-            // accuracy trade-off this accepts). ShowsImmuneLook already replicates to every client
-            // (step 1's bubble), so the shooter's own copy of the victim knows this without a message.
-            // Guarded off a teammate hit the same way the real funnel is below (AreSameTeam fails the
-            // identical direction on an unknown team): friendly fire already shows nothing regardless
-            // of whether the "victim" happens to be shielded, so it must never read as "Blocked" here.
+            // "Blocked" is a shooter-side guess with no network, not the victim's truth (CombatEvents.LocalBlockedSeen
+            // has the accuracy trade-off). ShowsImmuneLook already replicates to every client, so the shooter's copy of
+            // the victim knows it without a message. Guarded off a teammate hit like the real funnel below
+            // (AreSameTeam fails the same direction on an unknown team): friendly fire shows nothing even on a
+            // shielded "victim", so it must never read as "Blocked".
             Photon.Realtime.Player shooterSidePlayer = PhotonNetwork.CurrentRoom?.GetPlayer(info.SourceActorNumber);
             if (ShowsImmuneLook && !Teams.AreSameTeam(shooterSidePlayer, photonView.Owner))
                 CombatEvents.RaiseBlockedSeen(transform);
         }
 
-        // Bug 1.1: the victim is the sole authority on its own health, or every client would
-        // subtract from its own copy and the owner's next serialization would fight it back.
+        // The victim is the sole authority on its own health, or every client would subtract from its own copy and
+        // the owner's next serialization would fight it back.
         if (!photonView.IsMine || isDead)
             return default;
 
-        // Shield combat order (2.7b, Tudor 2026-09-18): self, then teammate, then an immunity already running,
-        // then the armed trap, then the hit lands - HitVerdictRule.Classify is the one home for this order, so
-        // a self or teammate hit can never spring the trap or touch the combat clock below.
+        // Combat order: self, then teammate, then an immunity already running, then the armed trap, then the hit
+        // lands. HitVerdictRule.Classify is the one home for it, so a self or teammate hit can never spring the trap
+        // or touch the combat clock below.
         Photon.Realtime.Player sourcePlayer = PhotonNetwork.CurrentRoom?.GetPlayer(info.SourceActorNumber);
         bool fromSelf = sourcePlayer != null && sourcePlayer == photonView.Owner;
         // AreSameTeam deliberately fails OPEN: an unknown team must never silently make someone invulnerable.
@@ -587,9 +531,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             statusEffects != null && statusEffects.IsInvulnerable, statusEffects, info.Amount,
             HitVerdictRule.IgnoresInvulnerability(info.Source)); // the sudden-death circle goes through Invulnerability (A30)
 
-        // Tudor, 2026-09-18: being shot while the shield is up IS combat (no armour recharge, no shop, no
-        // regen while being shot). Self and teammate hits are classified above, but CountsAsCombat is false
-        // for them, so they never touch the clock.
+        // Being shot while the shield is up IS combat (no armour recharge, shop or regen). Self and teammate hits are
+        // classified above and CountsAsCombat is false for them, so they never touch the clock.
         if (HitVerdictRule.CountsAsCombat(verdict))
             secondsSinceCombat = 0f;
 
@@ -616,12 +559,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (verdict == HitVerdict.Shielded)
             return default;
 
-        // Mark plan step 4 (Tudor, 2026-09-18): the mark is decided ONLY for a hit that reaches this
-        // point - HitVerdict.Lands, on the VICTIM's own client, which is the one machine that can
-        // decide the +50% with no extra message (Decision 1). Self, teammate, shield-blocked and
-        // dead-player hits all returned above already (Decision 2), so none of them ever mark or cash
-        // in - a live mark simply survives a blocked hit and expires on its own. info.MarkWindowSeconds
-        // is 0 for every non-marking source, which OnLandedHit already treats as "touch nothing".
+        // The mark is decided ONLY for a hit that reaches this point (HitVerdict.Lands), on the VICTIM's own client,
+        // the one machine that can decide the +50% with no extra message. Self, teammate, shield-blocked and
+        // dead-player hits returned above, so none of them marks or cashes in; a live mark survives a blocked hit and
+        // expires on its own. info.MarkWindowSeconds is 0 for every non-marking source, which OnLandedHit treats as
+        // "touch nothing".
         MarkOutcome mark = marks.OnLandedHit(info.SourceActorNumber, Time.time, info.MarkWindowSeconds);
         DamageInfo landed = mark == MarkOutcome.Cashed
             ? info.WithAmount(MarkLedger.ScaledAmount(info.Amount, mark, info.MarkedDamageMultiplier))
@@ -642,11 +584,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         {
             isDead = true;   // Latched before raising Died so a re-entrant hit cannot double-kill.
             armor.Clear();   // A corpse has no armor; ResetForRespawn decides what comes back.
-            secondsSinceCombat = CombatClockRule.AfterDeath(RegenGate, ShopGate, LongestArmourDelay); // Tudor 2026-09-29: dying takes you out of combat.
+            secondsSinceCombat = CombatClockRule.AfterDeath(RegenGate, ShopGate, LongestArmourDelay); // dying takes you out of combat
             sourcePlayer?.AddScore(1);
-            // Death clears the victim's marks (Decision 8) BEFORE Died fires, so the death credit
-            // flush (PlayerCombatCredit.HandleDied, which reads MarkSecondsLeftFor per attacker while
-            // building each message) reports 0 for everyone and every diamond hides on the kill.
+            // Death clears the victim's marks BEFORE Died fires, so the death credit flush
+            // (PlayerCombatCredit.HandleDied reads MarkSecondsLeftFor per attacker while building each message)
+            // reports 0 for everyone and every diamond hides on the kill.
             marks.Clear();
             Died?.Invoke(landed);
         }
@@ -654,38 +596,28 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         return result;
     }
 
-    /// <summary>Mark plan step 4: seconds left on THIS attacker's own mark on me, 0 if they have none
-    /// live (never marked, expired, or already cashed) - read by PlayerCombatCredit.SendCredit so the
-    /// attacker's own diamond (mark step 5) always rides on the same credit message as the damage or
-    /// takedown it goes with.</summary>
+    /// <summary>Seconds left on THIS attacker's own mark on me, 0 if none live (never marked, expired, or already
+    /// cashed); read by PlayerCombatCredit.SendCredit so the attacker's diamond rides on the same credit message as
+    /// the damage or takedown it goes with.</summary>
     public float MarkSecondsLeftFor(int attackerActor) => marks.SecondsLeft(attackerActor, Time.time);
 
-    /// <summary>Tudor's answer 1: the marked player also sees it, over their own head - at most one
-    /// diamond regardless of how many attackers currently have me marked, so the LONGEST live mark
-    /// (whoever placed it) is enough. Read by mark step 5's victim-side view.</summary>
+    /// <summary>The marked player also sees it over their own head: at most one diamond however many attackers have
+    /// me marked, so the LONGEST live mark (whoever placed it) is enough. Read by the victim-side view.</summary>
     public float LongestMarkSecondsLeft => marks.LongestSecondsLeft(Time.time);
 
-    /// The one place damage reduction is read, as a 0..1 fraction for DamageResolver. That single
-    /// location is the point of the damage funnel: the reduction used to be applied on the bullet
-    /// path only and was silently absent from AoE, so the same buff did two different things
-    /// depending on what hit you.
-    ///
-    /// Reads PlayerStatusEffects.CurrentDamageReduction (Task 1.0a), which combines every source -
-    /// a dash buff, an armor upgrade - the same way Vulnerability above already does. Do not
-    /// inline this away - every future source of damage reduction reports through here.
+    /// The one place damage reduction is read, as a 0..1 fraction for DamageResolver, so the same buff cannot do
+    /// two different things depending on what hit you. Reads PlayerStatusEffects.CurrentDamageReduction, which
+    /// combines every source (a dash buff, an armor upgrade) the way Vulnerability does. Do not inline this away:
+    /// every future source of damage reduction reports through here.
     private float CurrentDamageReduction() => statusEffects != null ? statusEffects.CurrentDamageReduction : 0f;
 
-    // The OnCollisionEnter that used to sit here read damage off a Rigidbody bullet that had
-    // collided with this player. Task 0.13 deleted it along with those bullets: projectiles are now
-    // swept spherecasts that build a DamageInfo and call ApplyDamage above directly, so there is no
-    // longer a physics collision to react to. Nothing replaced it, which is the point - there is
-    // one way in.
+    // Deliberately no OnCollisionEnter: projectiles are swept spherecasts that call ApplyDamage directly, so there
+    // is one way in.
 
     /// <summary>
-    /// Applies a new pair of armor upgrade levels - the sink every client calls when
-    /// PlayerLoadout replicates a purchase (or a late joiner reads one for the first time). Refills
-    /// the pool to the new capacity immediately: this is a purchase, not a recharge, the same
-    /// distinction ArmorState.SetTier documents.
+    /// Applies a new pair of armor upgrade levels: the sink every client calls when PlayerLoadout replicates a
+    /// purchase (or a late joiner reads one). Refills the pool to the new capacity immediately: a purchase, not a
+    /// recharge (ArmorState.SetTier).
     /// </summary>
     public void SetArmorLevels(int newAbsorbLevel, int newRechargeLevel)
     {
@@ -707,10 +639,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     }
 
     /// <summary>
-    /// OverPowerBuff's hook (Task 2.6, GDD p.20): "regenerate their shield instantly" the moment
-    /// the comeback buff triggers. Goes through ArmorState.RefillToFull, the same instant-fill path
-    /// ResetForRespawn already uses when RespawnWithFullArmor is on - a comeback moment deserves the
-    /// same immediacy as a bought upgrade or a fresh spawn, not the ordinary gradual recharge.
+    /// OverPowerBuff's hook (GDD p.20): regenerate the shield instantly the moment the comeback buff triggers, through
+    /// ArmorState.RefillToFull (the instant path ResetForRespawn uses), not the gradual recharge.
     /// </summary>
     public void RefillArmor()
     {
@@ -722,26 +652,22 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
         statusEffects?.ClearAll();
-        secondsSinceCombat = CombatClockRule.AfterRespawn(RegenGate, ShopGate, LongestArmourDelay); // Tudor 2026-09-29: you respawn out of combat.
+        secondsSinceCombat = CombatClockRule.AfterRespawn(RegenGate, ShopGate, LongestArmourDelay); // you respawn out of combat
         isDead = false;
 
-        // Controller decision [C]: respawn with full armor by default. RespawnWithFullArmor off
-        // means a respawning player earns their armor back through the out-of-combat timer like
-        // anyone else, the original design before this setting existed. A missing config fails
-        // toward Clear() rather than assuming the field's true default, same as every other
-        // missing-config fallback in this class.
+        // Respawn with full armor by default. RespawnWithFullArmor off means a respawning player earns their armor
+        // back through the out-of-combat timer like anyone else. A missing config fails toward Clear() rather than
+        // assuming the field's default, like every other missing-config fallback in this class.
         if (armorConfig != null && armorConfig.RespawnWithFullArmor)
             armor.RefillToFull();
         else
             armor.Clear();
 
         UpdateOverheadBar();
-        // Mark plan step 1: a fresh spawn must never carry a stale yellow bar into the next life -
-        // and PlayerLifecycle.ResetForMatchStart (the 2.7b fresh start) already calls this same method
-        // (PlayerLifecycle.cs:446), so the match-start case is covered for free, with no extra call.
+        // A fresh spawn must never carry a stale yellow bar into the next life; PlayerLifecycle.ResetForMatchStart
+        // calls this same method, so the match-start case is covered.
         ClearImmuneLook();
-        // Mark plan step 4 (Decision 8): a fresh life must not carry marks from the last one either -
-        // the same ResetForRespawn call the 2.7b fresh start already goes through covers this for free.
+        // A fresh life must not carry marks from the last one either.
         marks.Clear();
     }
 

@@ -7,11 +7,11 @@ using Overpower.Dominion;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Dominion Task 17 (Tudor A52), the score bars in the bottom-right corner during a round and its overtime: one bar per team (two in 2v2, three in
-    /// 3v3v3) in the team's colour, the leading team's full and the others filled by their share of the leader's points, with the points as a small
-    /// number in a box in front of each bar. Spectators see the same bars. The bars stand just above the gold readout over the "Loadout (P)" button
-    /// (DominionScoreBarRules.GoldReadoutTop), right-aligned with it, so nothing else in that corner is covered. Sizes, colours and gaps are UiTheme
-    /// fields (Dominion HUD: score bars); DominionScoreBarRules decides every fill. A fill or a number is only rewritten when its value moved.
+    /// The score bars in the bottom-right corner during a round and its overtime (A52): one bar per team in the team's colour, the leader's full and
+    /// the others filled by their share of the leader's points, with the points as a small number in a box in front of each bar. Spectators see the
+    /// same bars. They stand just above the gold readout over the "Loadout (P)" button (DominionScoreBarRules.GoldReadoutTop), right-aligned with
+    /// it, so nothing else in that corner is covered. Sizes, colours and gaps are UiTheme fields (Dominion HUD: score bars); DominionScoreBarRules
+    /// decides every fill. A fill or a number is only rewritten when its value moved.
     /// </summary>
     public sealed class ScoreBars
     {
@@ -60,7 +60,7 @@ namespace Overpower.UI
             if (root != null && root.gameObject.activeSelf != visible) root.gameObject.SetActive(visible);
         }
 
-        /// <summary>One frame. teams are the match's team ids in order; points are the room's points per team id.</summary>
+        /// <summary>teams are the match's team ids in order; points are the room's points per team id.</summary>
         public void Refresh(int[] teams, int[] points)
         {
             if (teams == null || teams.Length < 2) { SetVisible(false); return; }
@@ -118,7 +118,7 @@ namespace Overpower.UI
             float bottom = DominionScoreBarRules.GoldReadoutTop(theme.loadoutToggleButtonMargin, theme.loadoutToggleButtonHeight, theme.goldShopGap,
                 theme.bodyTextSize, theme.hudScale) + theme.dominionScoreBarsAboveGold * theme.hudScale;
             root.anchoredPosition = new Vector2(-theme.loadoutToggleButtonMargin * theme.hudScale, bottom);
-            root.localScale = Vector3.one * theme.hudScale; // scaled like the Gold Corner it sits on, so the bars grow and shrink with the rest of that corner
+            root.localScale = Vector3.one * theme.hudScale; // scaled like the Gold Corner it sits on
 
             for (int i = 0; i < teams.Length; i++)
                 rows.Add(BuildRow(teams[i], i * (rowHeight + theme.dominionScoreBarGap), rowHeight));

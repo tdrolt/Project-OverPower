@@ -10,18 +10,12 @@ using Overpower.UI;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 8, the sudden-death circle, on every client. Added at runtime next to DominionDirector (no scene footprint). While the room is in
-    /// sudden death it works out the circle from the room alone - the start (dSd), the server clock and the config - so it is the same size on every
-    /// screen at the same moment, and does three things with it:
-    ///  1. a red ring on the ground and a red tint over everything OUTSIDE it (a flat mesh from the radius out past the map, over the floor, with no
-    ///     collider: it hides no player and blocks no shot or sight);
-    ///  2. the answers other things ask - IsSuddenDeath, CurrentRadius, SecondsUntilStopped, Centre - the minimap draws its own red outside from them, and the
-    ///     sudden-death banner and shrink timer (Task 9) read them;
-    ///  3. the damage: this client's own living player on a tied team loses Damage Per Second Outside while outside the circle. Victim-side, through
-    ///     PlayerHealth's one damage funnel, as a SuddenDeath hit with no attacker (like a burn with no owner): armour and damage reduction behave as for any damage, but Invulnerability (running or armed) does not stop it (A30). The cost is
-    ///     added up every frame and applied every DamageTickSeconds (half a second), so the rate is exact whatever the frame rate.
-    ///
-    /// The circle's centre is the Tier 4 zone's tower (3v3v3) or halfway between the scoring zones (2v2); SuddenDeathRules.TryCentre decides.
+    /// The sudden-death circle, on every client; added at runtime next to DominionDirector. It works the circle out from the room alone (the start
+    /// dSd, the server clock and the config), so it is the same size on every screen at the same moment. It draws a red ring and a red tint outside
+    /// it (flat meshes with no collider: they hide no player and block no shot or sight), answers IsSuddenDeath / CurrentRadius /
+    /// SecondsUntilStopped / Centre for the minimap, banner and shrink timer, and costs this client's own living player on a playing team Damage
+    /// Per Second Outside. That cost is victim-side through PlayerHealth's one funnel, as a SuddenDeath hit with no attacker; Invulnerability does
+    /// not stop it (A30). It is added up every frame and applied every DamageTickSeconds, so the rate is exact whatever the frame rate.
     /// </summary>
     public sealed class SuddenDeathZone : MonoBehaviour
     {

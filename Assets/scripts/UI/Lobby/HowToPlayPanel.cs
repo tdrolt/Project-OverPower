@@ -8,11 +8,11 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The How to play wiki (board 5A, lobby Task 12), opened by the cyan How to play buttons of the lobby list and the lobby room only: a page
-    /// list on the left (the open page marked with a cyan bar), the page's title, its picture beside its text, a previous and a next button that
-    /// name the neighbouring pages, the page counter ("4 / 6") and the cross at the top right on every page. The pages (title, text, picture) are
-    /// the HowToPlayPages asset the UiTheme points to; which page comes next is HowToPlayRules. It is the LobbyOverlayPanel card, so it also
-    /// closes on Escape and when a match starts, and refuses to open during one. Built in code from UiTheme (LobbyUiKit).
+    /// The How to play wiki (board 5A), opened by the cyan How to play buttons of the lobby list and the lobby room only: a page list on the left
+    /// (the open page marked with a cyan bar), the page's title, its picture beside its text, previous and next buttons that name the neighbouring
+    /// pages, the counter ("4 / 6") and the cross at the top right. The pages (title, text, picture) are the HowToPlayPages asset the UiTheme
+    /// points to; HowToPlayRules decides which page comes next. A LobbyOverlayPanel card: it closes on Escape and when a match starts, and
+    /// refuses to open during one. Built in code from UiTheme (LobbyUiKit).
     /// </summary>
     public sealed class HowToPlayPanel : LobbyOverlayPanel
     {
@@ -50,7 +50,6 @@ namespace Overpower.UI
         public float TextSizeUsed => textSize;
         public bool AllPagesFit => allFit;
 
-        /// <summary>The page list's entry titles, top to bottom.</summary>
         public IReadOnlyList<string> EntryTitles
         {
             get

@@ -8,9 +8,9 @@ using Overpower.Weapons;
 
 namespace Overpower.UI
 {
-    /// <summary>Task 13: the numbers block of the shop pop-up for a weapon or an ability, read live off the asset
-    /// (and, for the extras, off the projectile / module prefab) when the pop-up opens - never typed text, so retuning
-    /// an asset retunes the pop-up. Moved here from LoadoutScreen when the description strip became a pop-up.</summary>
+    /// <summary>The numbers block of the shop pop-up for a weapon or an ability, read live off the asset (and, for
+    /// the extras, off the projectile / module prefab) when the pop-up opens - never typed text, so retuning an
+    /// asset retunes the pop-up.</summary>
     public static class ShopItemNumbers
     {
         private static string N(float value) => ShopNumberFormat.Compact(value);
@@ -32,7 +32,7 @@ namespace Overpower.UI
             sb.Append($"\nOverheat {N(def.OverheatPerShot)}/shot");
             if (def.CanCharge)
                 sb.Append(" · hold to charge");
-            // Task 11b: the three lasers wind up before they fire - worth a player reading this before they equip one.
+            // The three lasers wind up before they fire - worth a player reading this before they equip one.
             if (def.WindupSeconds > 0f)
                 sb.Append($" · {N(def.WindupSeconds)}s wind-up");
             if (def.MarkWindowSeconds > 0f)

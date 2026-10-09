@@ -35,9 +35,9 @@ namespace Overpower.Telemetry
         public void ForgetAll() => written.Clear();
     }
     /// <summary>
-    /// This player's own "join" line and when it counts as written. Marking "join" written whenever the file opens lost the line of a rejoiner and
-    /// of a lane-scene joiner: the file opened BEFORE the join check, marked a join nobody had logged, and the check then skipped it. Now the mark is
-    /// made only for a line that was queued while the file was closed, and the flag is spent by the open that writes it.
+    /// This player's own "join" line and when it counts as written. The mark is made only for a line that was queued while the file
+    /// was closed, and the flag is spent by the open that writes it: marking on every open lost a rejoiner's and a lane-scene joiner's
+    /// line, because the file opened BEFORE the join check, marked a join nobody had logged, and the check then skipped it.
     /// </summary>
     public sealed class LocalJoinLine
     {

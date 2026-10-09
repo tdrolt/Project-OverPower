@@ -6,18 +6,12 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The zip gun's hook in flight (ability visuals step 7; Tudor: "too small and round - at least a square"): a cube
-    /// head facing its flight, and a rope back to the shooter's muzzle. Every client already spawns this projectile
-    /// locally from the cast RPC, so every client draws the same.
-    ///
-    /// A4 (Tudor 2026-09-17 evening, gameplay change): the hook's hit size grows by 50% - Zip Gun.prefab's own
-    /// Projectile Radius goes from 0.15 to 0.225 m - and the head below is sized to match the new 0.45 m hit
-    /// diameter exactly, so the look finally tells the truth about the hit instead of being a purely cosmetic
-    /// oversize. The hit itself is still ProjectileMotor's own `radius` field (set from
-    /// ProjectileContext.ProjectileRadius in Initialize, read by TrySweep's SphereCast) - this class never reads
-    /// or touches it.
-    ///
-    /// Visual only beyond that: an IProjectileBehaviour that never keeps a shot flying and never touches the sweep.
+    /// The zip gun's hook in flight: a cube head facing its flight, and a rope back to the shooter's muzzle. Every client
+    /// already spawns this projectile locally from the cast RPC, so every client draws the same. The head is sized to
+    /// match the real hit diameter exactly (Zip Gun.prefab's Projectile Radius x2) so the look tells the truth about the
+    /// hit. The hit itself is ProjectileMotor's `radius` (set from ProjectileContext.ProjectileRadius, read by TrySweep's
+    /// SphereCast); this class never reads or touches it. Visual only beyond that: an IProjectileBehaviour that never
+    /// keeps a shot flying and never touches the sweep.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ZipBoltView : MonoBehaviour, IProjectileBehaviour

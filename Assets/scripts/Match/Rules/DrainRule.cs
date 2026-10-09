@@ -7,12 +7,11 @@ namespace Overpower.Match
     /// What happens to an owned zone's drain each frame: an enemy standing in the zone alone drains it towards neutral.
     ///
     /// - A defender standing in the zone, or every attacker of the draining team leaving, stops the drain. The zone
-    ///   then refills toward full at captureFadeSpeed (Building capture.cs's HandleCapturedState) instead of
-    ///   snapping back to it, and the next drain starts from wherever that refill has gotten to, not necessarily
-    ///   full (captureFadeSpeed, [C], 2026-09-24).
+    ///   then refills toward full at captureFadeSpeed (Building capture.cs's HandleCapturedState), and the next
+    ///   drain starts from wherever that refill has gotten to, not necessarily full.
     /// - An attacker whose team may not capture the zone right now (its only way in is a zone of its own that is under
-    ///   attack, Tudor 2026-09-16) doesn't drain. A drain already running pauses and carries on from where it was
-    ///   once the way in is safe, like a blocked neutral capture (controller decision, 2026-09-16).
+    ///   attack) doesn't drain. A drain already running pauses and carries on from where it was once the way in is
+    ///   safe, like a blocked neutral capture.
     ///
     /// Pure, so the master's per-frame tick in BuildingCapture stays short and every case here is tested.
     /// </summary>
@@ -23,9 +22,7 @@ namespace Overpower.Match
             /// <summary>No drain running and none starting.</summary>
             None,
             /// <summary>An enemy team starts draining, from wherever the zone's progress currently sits - full if
-            /// it was never drained since capture, or wherever captureFadeSpeed's refill had gotten to otherwise
-            /// (captureFadeSpeed, [C], 2026-09-24 - Building capture.cs's HandleCapturedState no longer resets
-            /// captureProgress to full here).</summary>
+            /// it was never drained since capture, or wherever captureFadeSpeed's refill had gotten to otherwise.</summary>
             Start,
             /// <summary>The drain goes on, or resumes from where it paused.</summary>
             Continue,
@@ -92,7 +89,7 @@ namespace Overpower.Match
                     return new Decision(draining ? Step.Continue : Step.Start, drainer);
                 // Only the draining team's own drain can pause. If that team has gone and only a blocked team is left,
                 // the drain is over: that team's drain, once it may, starts from wherever the zone's progress has
-                // refilled to by then (captureFadeSpeed, [C], 2026-09-24), not necessarily full.
+                // refilled to by then, not necessarily full.
                 if (draining && blockedEnemy && Contains(teamsInZone, drainingTeam))
                     return new Decision(Step.Pause, drainingTeam);
             }

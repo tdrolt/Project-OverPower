@@ -5,14 +5,12 @@ using UnityEngine.SceneManagement;
 
 namespace Overpower.EditorTools.Telemetry
 {
-    /// <summary>Task T6 step 2: a top-down PNG of the arena for the report's death/position heatmaps,
-    /// plus the world-to-pixel mapping the HTML needs to place dots on it. Same approach as the
-    /// arena-symmetry design's own ArenaRender (docs/superpowers/plans/2026-09-16-arena-symmetry.md,
-    /// Task A3 step 1): a HideAndDontSave orthographic camera renders once and is destroyed
-    /// immediately after, so Game Scene is never dirtied by building a report.
+    /// <summary>A top-down PNG of the arena for the report's death/position heatmaps, plus the world-to-pixel mapping the HTML
+    /// needs to place dots on it. A HideAndDontSave orthographic camera renders once and is destroyed immediately after, so
+    /// Game Scene is never dirtied by building a report.
     ///
-    /// Framed on x -7..137, z -7..137 (144m square: the arena including its capital pockets) at 1024
-    /// px, i.e. 1024/144 px per metre.</summary>
+    /// Framed on x -7..137, z -7..137 (144m square: the arena including its capital pockets) at 1024 px, i.e. 1024/144 px per
+    /// metre.</summary>
     public static class ArenaReportRender
     {
         private const float MinX = -7f;
@@ -34,10 +32,8 @@ namespace Overpower.EditorTools.Telemetry
             public int PixelSize;
         }
 
-        /// <summary>Review fix (T6 item 6): the same world-to-pixel mapping the HTML's own toPixel()
-        /// JS function implements (HtmlReportWriter), exposed here as a pure function so the mapping
-        /// itself - including the Y-FLIP ("image up is +Z", per the arena-symmetry design doc's own
-        /// ArenaRender comment) - can be unit tested without Game Scene open or a real render.</summary>
+        /// <summary>The same world-to-pixel mapping the HTML's own toPixel() JS implements (HtmlReportWriter), as a pure function so
+        /// it - including the Y-FLIP (image up is +Z) - can be unit tested without Game Scene open or a real render.</summary>
         public static (float Px, float Py) WorldToPixel(float x, float z)
         {
             float metresPerPixel = SpanMetres / PixelSize;
@@ -61,9 +57,8 @@ namespace Overpower.EditorTools.Telemetry
                 };
             }
 
-            // Captured before the try so `finally` can always restore it - even if ReadPixels/Apply/EncodeToPNG
-            // throws while rt is still the active RenderTexture, leaving RenderTexture.active pointing at rt right
-            // as it's about to be destroyed below.
+            // Captured before the try so `finally` can always restore it, even if ReadPixels/Apply/EncodeToPNG throws while rt is
+            // still the active RenderTexture.
             RenderTexture prevActive = RenderTexture.active;
             GameObject go = null;
             RenderTexture rt = null;

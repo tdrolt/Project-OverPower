@@ -6,7 +6,7 @@ namespace Overpower.Dominion
     /// </summary>
     public static class DominionKeys
     {
-        /// <summary>int: the round now in play, or (during a break) the round the break leads to, 1..3. Written at go-live together with the break before round 1 (Task 6), so it is absent only before the match is live.</summary>
+        /// <summary>int: the round now in play, or (during a break) the round the break leads to, 1..3. Written at go-live together with the break before round 1, so it is absent only before the match is live.</summary>
         public const string Round = "dRnd";
         /// <summary>int: the stage (DominionStage).</summary>
         public const string Stage = "dStg";
@@ -20,7 +20,7 @@ namespace Overpower.Dominion
         public const string Winner = "dWin";
 
         /// <summary>int: the dEnd of the stage (a round or a break) whose start the master has reset the zones for. A master that sees the
-        /// stage's dEnd differ from dRz resets the zones and writes it, so a new master finishes a reset the old one never did (Task 2 review).</summary>
+        /// stage's dEnd differ from dRz resets the zones and writes it, so a new master finishes a reset the old one never did.</summary>
         public const string ZonesResetFor = "dRz";
 
         /// <summary>int: the server ms of the centre's next payout (3v3v3 on a map with a Tier 4 zone only). Written with each round start.</summary>
@@ -34,12 +34,12 @@ namespace Overpower.Dominion
         /// countdown), and written again with a new value when everyone fell at once and sudden death starts over. Absent before sudden death.</summary>
         public const string SuddenDeathStart = "dSd";
 
-        /// <summary>int[]: the team ids playing the current sudden death (Tudor A33). Written with sudden death's start (the teams level on round wins) and
+        /// <summary>int[]: the team ids playing the current sudden death (A33). Written with sudden death's start (the teams level on round wins) and
         /// again with every replay (only the teams whose last players fell together); everyone else waits dead. Absent before sudden death.</summary>
         public const string SuddenDeathTeams = "dSdT";
 
         /// <summary>int[]: each finished round's final points, rounds x TeamSlots flattened (round 1's three teams, then round 2's, ...). The master appends one
-        /// round in the same write that scores it (Task 9), because dPts is cleared at the next round's start and the result table needs every round.
+        /// round in the same write that scores it, because dPts is cleared at the next round's start and the result table needs every round.
         /// Absent until round 1 is over.</summary>
         public const string History = "dHist";
 
@@ -48,7 +48,7 @@ namespace Overpower.Dominion
         /// wins counted, not the points leader. Absent in a room from before it existed: the table then falls back to the points leader.</summary>
         public const string HistoryWinners = "dHistW";
 
-        /// <summary>int[]: the teams playing the current overtime (Tudor A50): the ones within the lead of the top at the buzzer. Written with the Overtime stage,
+        /// <summary>int[]: the teams playing the current overtime (A50): the ones within the lead of the top at the buzzer. Written with the Overtime stage,
         /// removed again by the write that ends the round. Absent outside overtime.</summary>
         public const string OvertimeTeams = "dOtT";
 

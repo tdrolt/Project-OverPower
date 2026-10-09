@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Overpower.Match
 {
-    /// <summary>Task 5b-2 (D5): the shop tooltip's timing. Hover an item and, after the delay, its description
+    /// <summary>The shop tooltip's timing (D5). Hover an item and, after the delay, its description
     /// appears next to the cursor; move off and it goes at once; move to another item and the wait starts over.
     /// Pure so the timing is unit tested; LoadoutScreen feeds it the pointer enter/exit and the frame time.</summary>
     public sealed class HoverTooltipTimer
@@ -46,7 +46,7 @@ namespace Overpower.Match
         public bool IsShown(float delaySeconds) => target != null && hoveredSeconds >= delaySeconds;
     }
 
-    /// <summary>Task 5b-2 (D5): the wording of the armour rows. The limit is ONE combined budget across the Absorb and
+    /// <summary>The wording of the armour rows (D5). The limit is ONE combined budget across the Absorb and
     /// Recharge rows (ArmorConfig.MaxArmorUpgrades, checked by ArmorUpgradePath), so both rows say the same
     /// thing: which upgrade the next click would be, or that the budget is spent. The wording itself lives in
     /// UiTheme as format strings ({0} = number, {1} = limit).</summary>
@@ -67,7 +67,7 @@ namespace Overpower.Match
         }
     }
 
-    /// <summary>Task 5b-2 (Tudor, 2026-09-29, question 9): you are out of combat when you die and when you respawn.
+    /// <summary>You are out of combat when you die and when you respawn.
     /// Every reader of the combat clock (the shop's gate, the armour recharge delay, health regen) asks "has the
     /// clock reached my threshold?", so "out of combat" is a clock value that clears all of them. PlayerHealth
     /// asks this class what the clock should become; nothing else decides it.</summary>
@@ -105,7 +105,7 @@ namespace Overpower.Match
 
     public enum TreeArrowShape { SCurve, Straight, SideLane }
 
-    /// <summary>Task 5b-2 review: which line the shop draws from a weapon to an upgrade, decided by where the
+    /// <summary>Which line the shop draws from a weapon to an upgrade, decided by where the
     /// nodes really are (not by sibling order): another column = an S-curve; directly below with nothing in
     /// between = straight; below with another node in between = a curve down the gap beside the column.</summary>
     public static class TreeArrowShapeRule

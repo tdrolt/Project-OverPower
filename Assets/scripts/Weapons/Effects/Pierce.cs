@@ -4,17 +4,11 @@ using Overpower.Combat;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Lets a beam carry on through the people it hits, damaging each of them, instead of stopping
-    /// on the first one. Every laser in the upgrade tree has one - a line of enemies is the target
-    /// the laser is built to punish.
-    ///
-    /// A setting, not a script with its own logic. Hitscan reads Max Targets off the same prefab
-    /// and hands it to BeamResolver, which is where "stop after this many" is actually decided and
-    /// unit tested. A beam prefab without this component stops on the first target it strikes,
-    /// exactly like a bullet.
-    ///
-    /// Pierce never lets a beam through a WALL. That is a separate decision with its own component,
-    /// IgnoreWalls, so a designer can have either one without the other.
+    /// Lets a beam carry on through the people it hits, damaging each of them, instead of stopping on the first. Every laser in the upgrade tree has
+    /// one - a line of enemies is the target the laser is built to punish.
+    /// A setting, not a script with logic: Hitscan reads Max Targets off the same prefab and hands it to BeamResolver, which decides (and unit
+    /// tests) "stop after this many". A beam prefab without this component stops on the first target, like a bullet.
+    /// Never lets a beam through a WALL - that is IgnoreWalls, so a designer can have either one without the other.
     /// </summary>
     [DisallowMultipleComponent]
     public class Pierce : MonoBehaviour

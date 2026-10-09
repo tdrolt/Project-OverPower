@@ -9,18 +9,12 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 3, the master's side of the points: once a second of server time every team earns for the zones it holds, a bounty is
-    /// added when a zone is taken after a long hold, and in 3v3v3 the centre pays a lump at dCtr. All of the deciding is DominionPointsRules.Plan
-    /// (pure); this file only gathers its inputs from the room and the territory and sends the one check-and-set it answers with.
-    ///
-    /// Reads the room every look, so a new master carries on from the room's own dPts / dCtr (it starts its own one-second beat, no burst).
-    /// Builds each write on the last value it wrote while that write's echo is pending (DominionPointsLedger), and every write expects the
-    /// stage, round and end time it was computed from, so a late one is refused once the stage has moved. Nothing accrues until the zones
-    /// have been reset for this round (dRz = dEnd).
-    ///
-    /// The bounty is judged in BuildingManager.CaptureWritten (raised inside SetCaptured on the master): it is the only place that still sees
-    /// the previous owner and the length of the hold, because the capture itself clears them from the snapshot and OwnershipChanged only
-    /// carries the new one.
+    /// The master's side of the points: once a second of server time every team earns for the zones it holds, a bounty is added when a zone is
+    /// taken after a long hold, and in 3v3v3 the centre pays a lump at dCtr. The deciding is DominionPointsRules.Plan (pure); this file gathers
+    /// its inputs and sends the one check-and-set it answers with. Each write builds on the last value written while its echo is pending
+    /// (DominionPointsLedger) and expects the stage, round and end time it was computed from, so a late one is refused. A new master carries on
+    /// from the room's dPts / dCtr. The bounty is judged in BuildingManager.CaptureWritten, the only place that still sees the previous owner and
+    /// the hold length (the capture clears them from the snapshot; OwnershipChanged carries only the new owner).
     /// </summary>
     public sealed partial class DominionDirector
     {

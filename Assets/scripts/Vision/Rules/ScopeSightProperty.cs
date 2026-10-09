@@ -15,7 +15,6 @@ namespace Overpower.Vision
         /// A drop while scoped keeps vScp=true for the rejoin, so a module that assumed "false" would never overwrite it.</summary>
         public static bool SeedPublished(object roomValue) => Read(roomValue);
 
-        /// <summary>Write only on change.</summary>
         public static bool ShouldPublish(bool lastPublished, bool now) => lastPublished != now;
     }
 }

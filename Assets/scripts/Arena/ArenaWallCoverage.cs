@@ -4,11 +4,10 @@ using UnityEngine;
 namespace Overpower.Arena
 {
     /// <summary>
-    /// Two coverage checks shared by arena step 4's red tests and its BEFORE record: does the wall line have a hole
-    /// (an exterior point near the outline that no wall footprint covers, so a ray, a view or a body could slip
-    /// through), and does any wall poke into the arena instead of standing outside the outline. Both work on plain
-    /// BoxFootprints, so the same code checks a synthetic test outline, today's captured walls (the BEFORE record)
-    /// and the new outline-built walls (the red-then-green check).
+    /// Two coverage checks: does the wall line have a hole (an exterior point near the outline that no wall footprint
+    /// covers, so a ray, a view or a body could slip through), and does any wall poke into the arena instead of
+    /// standing outside the outline. Both work on plain BoxFootprints, so the same code checks a synthetic test
+    /// outline, captured walls and the outline-built walls.
     /// </summary>
     public static class ArenaWallCoverage
     {
@@ -18,17 +17,17 @@ namespace Overpower.Arena
         private const int CornerFanRadiusSteps = 6;
 
         // A dead zone straddling the outline itself: a fan angle can land EXACTLY along a polygon edge's own line
-        // (found at a real corner, arena step 4 review: a 3-degree step landed within float noise of running right
-        // along the adjoining edge), where SignedDistance reads as approximately zero and tips either way on
-        // rounding alone. Neither side of that razor's edge is a meaningful hole or intrusion - a real gap always
-        // shows up clearly negative (or positive) at the very next sample a few millimetres further round.
+        // (a 3-degree step landed within float noise of running right along the adjoining edge), where SignedDistance
+        // reads as approximately zero and tips either way on rounding alone. Neither side of that razor's edge is a
+        // meaningful hole or intrusion - a real gap always shows up clearly negative (or positive) at the very next
+        // sample a few millimetres further round.
         private const float BoundaryDeadZoneMetres = 0.001f;
 
         /// <summary>Every exterior point within <paramref name="band"/> metres of the outline that no footprint
-        /// covers: sampled every 5 cm along each edge at outward offsets 0.02, band/2 and band-0.02, plus a fan of
-        /// radii (0.03 m to band) and angles (every 3 degrees) around every corner, so a notch tucked right against
-        /// a corner is found even when no single edge sample lands on it. Covering the whole band at every sampled
-        /// point means nothing exterior can reach the play space through the wall line at that point.</summary>
+        /// covers: sampled along each edge at three outward offsets, plus a fan of radii and angles around every
+        /// corner, so a notch tucked right against a corner is found even when no single edge sample lands on it.
+        /// Covering the whole band at every sampled point means nothing exterior can reach the play space through the
+        /// wall line at that point.</summary>
         public static List<string> FindHoles(ArenaBounds bounds, IReadOnlyList<BoxFootprint> footprints, float band)
         {
             var holes = new List<string>();
@@ -95,9 +94,8 @@ namespace Overpower.Arena
             return holes;
         }
 
-        /// <summary>Every interior point within 0.02, 0.1 or 0.3 m of the outline that a footprint covers: a wall
-        /// must stand entirely outside the outline (Decision D3), so any footprint reaching this far in is an
-        /// intrusion into the play space.</summary>
+        /// <summary>Every interior point near the outline that a footprint covers: a wall must stand entirely outside
+        /// the outline (D3), so any footprint reaching this far in is an intrusion into the play space.</summary>
         public static List<string> FindIntrusions(ArenaBounds bounds, IReadOnlyList<BoxFootprint> footprints)
         {
             var intrusions = new List<string>();

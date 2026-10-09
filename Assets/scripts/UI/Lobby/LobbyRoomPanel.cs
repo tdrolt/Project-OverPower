@@ -13,7 +13,7 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The lobby room (board 3A, lobby Task 10): the lobby's name, the mode as a cyan button that opens the game mode info, the host, one column per
+    /// The lobby room (board 3A): the lobby's name, the mode as a cyan button that opens the game mode info, the host, one column per
     /// team of the mode with a button per seat (an empty seat is dashed, a taken one shows the name, yours is outlined, the host is marked), a row of
     /// spectator seats, the No role list with Leave my seat, and along the bottom Leave lobby, How to play and (host only) Start game. It draws what
     /// LobbySeats holds and sends what the player presses (TryTake, LeaveSeat, StartGame): it never decides who sits where. It is shown while this
@@ -69,7 +69,6 @@ namespace Overpower.UI
         /// <summary>The mode button was pressed (the game mode info page opens; the NameScreen shows it).</summary>
         public event Action<GameModeDefinition> ModeInfoRequested;
 
-        /// <summary>How to play was pressed.</summary>
         public event Action HowToPlayRequested;
 
         /// <summary>Whether the screen is up on the screen: asked for by the NameScreen, in a room, its mode read and the lobby stage still 0.</summary>
@@ -100,7 +99,6 @@ namespace Overpower.UI
         /// <summary>What one seat button shows (Empty / Taken / Mine); null for a key with no button.</summary>
         public SeatState? SeatStateOf(string seatKey) => seatViews.TryGetValue(seatKey, out SeatView view) ? view.State : (SeatState?)null;
 
-        /// <summary>The names in the No role box as drawn, top to bottom.</summary>
         public IReadOnlyList<string> NoRoleNames
         {
             get
@@ -347,7 +345,6 @@ namespace Overpower.UI
             dashImage.color = theme.lobbyBorderColor;
             dashImage.raycastTarget = false;
 
-            // The label sits in the box's padding, left aligned.
             button.Label.alignment = TextAlignmentOptions.MidlineLeft;
             RectTransform labelRect = (RectTransform)button.Label.transform;
             labelRect.offsetMin = new Vector2(theme.lobbyRoomSeatPadding, 0f);

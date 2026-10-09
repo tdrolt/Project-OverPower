@@ -9,46 +9,22 @@ using Overpower.Match;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Task 2.5b review, fix 7 (split): the pure UI-CONSTRUCTION half of LoadoutScreen - every method
-    /// that only builds GameObjects/components and wires their listeners to methods that live on the
-    /// other half, with no purchase/refresh/hover-content logic of its own. Pulled out of
-    /// LoadoutScreen.cs once that file passed 1400 lines, so a designer looking for "how is this
-    /// screen laid out" and one looking for "what does clicking this actually do" each have a
-    /// shorter file to read. Since Task 13 it also builds the two pages and their tabs (the weapon tree's family-and-two-upgrades rows, the
-    /// armor rows and the ability columns); every field/
-    /// method it touches (theme, weaponNodes, abilityCards, OnWeaponNodeClicked,
-    /// RefreshHeader's own labels, etc.) still lives on the other partial, LoadoutScreen.cs - partial
-    /// classes share one field list, so there is nothing to pass between the two files.
-    ///
-    /// What lives HERE: the weapon tree's node/column builders (BuildWeaponTreeUi,
-    /// BuildDescendantColumn, BuildNodeButton), the armor section's builders (BuildArmorSection,
-    /// BuildArmorRow), the ability column's builders (BuildAbilitiesUi, SlotHeading,
-    /// BuildAbilityCard), and the screen's own top-level construction (BuildUi, BuildScreenCanvas -
-    /// including the two pages and their tabs (Task 13), BuildColumn, BuildTitleRow, BuildHeaderRow,
-    /// BuildTabRow, BuildToggleButtonCanvas) plus their shared low-level helpers (AddSectionHeader, AddButton,
-    /// AddLabel, ApplyOutline, EnsureEventSystem).
-    ///
-    /// What stays on LoadoutScreen.cs: Awake/Update/Open/Close/Refresh and every click handler
-    /// (OnWeaponNodeClicked, TryBuyArmorUpgrade, OnAbilityCardClicked, ...), every Refresh* method
-    /// that repaints already-built UI from live state, and the pop-up's content and timing (LoadoutScreen.Tooltip.cs,
-    /// ShopItemNumbers) - those read live asset/module data into the hover pop-up's text, a world away from building
-    /// the screen's GameObjects in the first place.
+    /// The UI-CONSTRUCTION half of LoadoutScreen: builds the GameObjects (the two pages and tabs, weapon tree, armor rows,
+    /// ability columns, header, toggle button, low-level helpers) and wires listeners to methods on the other partial, with
+    /// no purchase, refresh or hover-content logic of its own. Awake/Update/Open/Close, the click handlers, the Refresh*
+    /// repaints and the pop-up live in LoadoutScreen.cs and LoadoutScreen.Tooltip.cs; partial classes share one field list.
     /// </summary>
     public partial class LoadoutScreen
     {
         // ============================================================================================
-        // Weapon tree UI (rules from Overpower.Combat.WeaponUpgradeTree, Task 8) - construction only;
-        // OnWeaponNodeClicked/RefreshWeaponTree/StyleNode (the click/repaint side) stay on the other
-        // partial.
+        // Weapon tree UI (rules from Overpower.Combat.WeaponUpgradeTree) - construction only; the click/repaint
+        // side (OnWeaponNodeClicked, RefreshWeaponTree, StyleNode) is on the other partial.
         // ============================================================================================
 
-        /// <summary>Root centred on its own row; its direct children in a row beneath it (id order); each of THOSE
-        /// children's own children in a row beneath it, side by side (Tudor, Task 13: the two upgrades of a family sit next
-        /// to each other, not stacked), recursively - see BuildDescendantColumn. Today's data is exactly three tiers with two
-        /// children per branch (Baseline -> {Rocket, Burst, SMG, Laser} -> two upgrades each), but nothing here assumes
-        /// that shape: a branch with one child gets a row one node wide, a branch with three gets one three wide, and a
-        /// fourth tier (an upgrade gaining its own child) simply adds one row further down - a designer adding weapon
-        /// assets never needs a layout change here, only a new asset with the right Parent.</summary>
+        /// <summary>Root centred on its own row; its direct children in a row beneath it (id order); each child's own
+        /// children in a row beneath it, side by side (the two upgrades of a family sit next to each other, not stacked),
+        /// recursively (BuildDescendantColumn). Nothing assumes today's three tiers of two: a branch of one gets a row one
+        /// node wide, a fourth tier adds a row, so a new weapon asset with the right Parent needs no layout change.</summary>
         private void BuildWeaponTreeUi(Transform page)
         {
             weaponNodes.Clear();
@@ -67,7 +43,7 @@ namespace Overpower.UI
             rootLayout.childForceExpandWidth = rootLayout.childForceExpandHeight = false;
             weaponNodes[rootDef.Id] = BuildNodeButton(rootRow.transform, rootDef);
 
-            // Room between the root and the four weapons for the arrows to read (Task 5b-2, loadoutTreeRowGap).
+            // Room between the root and the four weapons for the arrows to read (loadoutTreeRowGap).
             GameObject rootGap = new GameObject("Weapon Tree Root Gap", typeof(RectTransform));
             rootGap.transform.SetParent(page, false);
             LayoutElement rootGapLe = rootGap.AddComponent<LayoutElement>();
@@ -87,9 +63,9 @@ namespace Overpower.UI
             BuildTreeArrows(page);
         }
 
-        /// <summary>Task 5b-2 (D6): one arrow per parent -> child pair of the tree data (WeaponUpgradeTree.Edges),
-        /// drawn behind the nodes by a single graphic that reads the built nodes' positions - so a new weapon asset
-        /// with a Parent gets its arrow with no hand placement. Never a raycast target: it must not block a node.</summary>
+        /// <summary>One arrow per parent -> child pair (WeaponUpgradeTree.Edges), drawn behind the nodes by a single graphic
+        /// that reads the built nodes' positions, so a new weapon asset gets its arrow with no hand placement (D6).
+        /// Never a raycast target: it must not block a node.</summary>
         private void BuildTreeArrows(Transform page)
         {
             GameObject go = new GameObject("Weapon Tree Arrows", typeof(RectTransform), typeof(CanvasRenderer));
@@ -116,9 +92,8 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>One branch: a vertical column holding its node and, beneath it, ONE row with a nested column per child
-        /// side by side, recursively - see BuildWeaponTreeUi's comment for why this copes with any child count at any
-        /// depth with no code change. The node sits centred above its row of children.</summary>
+        /// <summary>One branch: a vertical column holding its node and, beneath it, ONE row with a nested column per child,
+        /// recursively (any child count at any depth, see BuildWeaponTreeUi). The node sits centred above its children.</summary>
         private void BuildDescendantColumn(Transform parent, int weaponId)
         {
             WeaponDefinition def = weapons.Resolve(weaponId);
@@ -153,12 +128,9 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>One weapon node: an outer Image (transparent except when Equipped, where it
-        /// becomes the highlight border), an inner Image inset by Loadout Equipped Border Width
-        /// holding the real state colour, and the weapon's short display name on top. Two Images
-        /// rather than a UI Outline effect component - a solid Image duplicated at a shadow-style
-        /// offset does not read cleanly as a border on a filled rectangle, while an inset inner
-        /// Image always reads as a clean frame regardless of node size.</summary>
+        /// <summary>One weapon node: an outer Image (transparent except when Equipped, where it is the highlight border), an
+        /// inner Image inset by Loadout Equipped Border Width holding the state colour, and the display name on top. Two
+        /// Images rather than a UI Outline effect: an offset duplicate does not read as a border on a filled rectangle.</summary>
         private WeaponNodeUi BuildNodeButton(Transform parent, WeaponDefinition def)
         {
             GameObject go = new GameObject($"Weapon Node {def.Id}", typeof(RectTransform));
@@ -172,15 +144,12 @@ namespace Overpower.UI
             outer.raycastTarget = true;
 
             Button button = go.AddComponent<Button>();
-            // Refresh drives every colour on this node by hand from the tree's own rules - Unity's
-            // built-in transition tint would fight that on every hover/click.
+            // Refresh drives every colour by hand; Unity's transition tint would fight that on every hover/click.
             button.transition = Selectable.Transition.None;
             button.targetGraphic = outer;
-            // Fix 2 (Playtest polish review): a code-built button keeps Unity's default Automatic
-            // navigation, so clicking it SELECTS it, and the scene's Input System UI module maps
-            // Enter to Submit on whatever is selected. Chat also opens on Enter (chatmanager.cs) -
-            // without this, pressing Enter to open chat right after clicking a node quietly
-            // re-clicked that node instead. None on every button this screen builds.
+            // A code-built button keeps the default Automatic navigation, so a click SELECTS it and the Input System UI
+            // module maps Enter to Submit on it. Chat also opens on Enter (chatmanager.cs): without this, Enter right
+            // after clicking a node re-clicked the node. None on every button this screen builds.
             button.navigation = new Navigation { mode = Navigation.Mode.None };
 
             GameObject innerGo = new GameObject("Fill", typeof(RectTransform));
@@ -201,7 +170,7 @@ namespace Overpower.UI
             labelRt.offsetMin = Vector2.zero;
             labelRt.offsetMax = Vector2.zero;
 
-            int weaponId = def.Id; // Captured per node - the field itself would be the last weapon iterated by click time.
+            int weaponId = def.Id; // Captured per node: a loop variable would be the last weapon by click time.
             button.onClick.AddListener(() => OnWeaponNodeClicked(weaponId));
 
             AddPopUp(go, "w:" + def.Id, () => WeaponPopUpText(def));
@@ -210,13 +179,12 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Armor UI - construction only; the click handlers, TryBuyArmorUpgrade and RefreshArmor stay
-        // on the other partial (see its own "Armor" section banner).
+        // Armor UI - construction only; the click handlers and RefreshArmor are on the other partial.
         // ============================================================================================
 
-        /// <summary>The armor rows (Absorb, Recharge) and Reset Armor side by side, under an "Armor" heading, at the top
-        /// of the Abilities &amp; Armor page. Each row is its label with its own "+" right after it; a wide gap separates
-        /// the two rows so a "+" never reads as belonging to the other upgrade (Task 14b). Reset Armor sits at the right edge.</summary>
+        /// <summary>The armor rows (Absorb, Recharge) and Reset Armor side by side under an "Armor" heading, at the top of
+        /// the Abilities &amp; Armor page. Each row is its label with its own "+" right after it; a wide gap separates the
+        /// rows so a "+" never reads as belonging to the other upgrade. Reset Armor sits at the right edge.</summary>
         private void BuildArmorSection(Transform page)
         {
             AddSectionHeader(page, "Armor");
@@ -268,8 +236,7 @@ namespace Overpower.UI
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
-            // Invisible, but it is what the pointer lands on between the text and the + button - so the pop-up opens
-            // on the whole row, not only on the button (Task 13).
+            // Invisible, but it is what the pointer lands on between the text and the + button, so the pop-up opens on the whole row.
             Image hit = row.AddComponent<Image>();
             hit.color = Color.clear;
             hit.raycastTarget = true;
@@ -285,8 +252,7 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Abilities UI (right column) - construction only; OnAbilityCardClicked/RefreshAbilities (the
-        // click/repaint side) stay on the other partial (see its own "Abilities" section banner).
+        // Abilities UI - construction only; OnAbilityCardClicked/RefreshAbilities are on the other partial.
         // ============================================================================================
 
         private void BuildAbilitiesUi(Transform page)
@@ -311,9 +277,8 @@ namespace Overpower.UI
                 Transform column = BuildColumn(columns.transform, columnWidth).transform;
                 AddSectionHeader(column, SlotHeading(slot));
 
-                // Task 2.5b: the Ultimate slot is the one slot that can read Equipped on NO card at
-                // all (starts empty when the economy is on - Task 2.5a) - without this, an empty
-                // ultimate column would say nothing at all about why nothing is highlighted.
+                // Ultimate is the one slot that can read Equipped on NO card (it starts empty when the economy is on);
+                // without this label that column would not say why nothing is highlighted.
                 if (slot == AbilitySlot.Ultimate)
                 {
                     ultimateEmptyLabel = AddLabel(column, "", theme.smallTextSize, FontStyles.Normal);
@@ -328,8 +293,7 @@ namespace Overpower.UI
 
                 GameObject grid = new GameObject($"{slot} Ability Grid", typeof(RectTransform));
                 grid.transform.SetParent(column, false);
-                // Pin the width and let the group compute its own height - a GridLayoutGroup needs its own
-                // rect width resolved before it can place its cards (see BuildColumn).
+                // Pin the width and let the group compute its height: a GridLayoutGroup needs its rect width resolved before placing cards (BuildColumn).
                 LayoutElement gridLe = grid.AddComponent<LayoutElement>();
                 gridLe.preferredWidth = columnWidth;
                 GridLayoutGroup gridLayout = grid.AddComponent<GridLayoutGroup>();
@@ -344,9 +308,8 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>"Mobility — Shift" etc - the brief's own wording, RMB/Space/Shift rather than
-        /// AbilitySlot's own doc-comment phrasing ("Right mouse button") so the heading stays one
-        /// short line at Small Text Size.</summary>
+        /// <summary>"Mobility — Shift" etc: RMB/Space/Shift rather than AbilitySlot's phrasing ("Right mouse button") so the
+        /// heading stays one short line at Small Text Size.</summary>
         private static string SlotHeading(AbilitySlot slot)
         {
             switch (slot)
@@ -358,11 +321,8 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>One ability card - same three-Image recipe as BuildNodeButton (outer border,
-        /// inset inner fill, label on top), sized to GridLayoutGroup's own cell rather than a
-        /// LayoutElement: the grid sets every child's size directly and ignores a child's own
-        /// layout element entirely, unlike the Horizontal/VerticalLayoutGroups the weapon tree
-        /// uses.</summary>
+        /// <summary>One ability card, same recipe as BuildNodeButton, sized by GridLayoutGroup's cell rather than a
+        /// LayoutElement: the grid sets every child's size and ignores its layout element, unlike the weapon tree's groups.</summary>
         private AbilityCardUi BuildAbilityCard(Transform parent, AbilityDefinition def)
         {
             GameObject go = new GameObject($"Ability Card {def.Id}", typeof(RectTransform));
@@ -373,9 +333,9 @@ namespace Overpower.UI
             outer.raycastTarget = true;
 
             Button button = go.AddComponent<Button>();
-            button.transition = Selectable.Transition.None; // Refresh drives every colour by hand - see StyleNode's own comment.
+            button.transition = Selectable.Transition.None; // Refresh drives every colour by hand.
             button.targetGraphic = outer;
-            button.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton's comment (fix 2).
+            button.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton (Enter must not re-click).
 
             GameObject innerGo = new GameObject("Fill", typeof(RectTransform));
             innerGo.transform.SetParent(go.transform, false);
@@ -405,15 +365,12 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // UI construction - the screen's own top-level assembly, plus the shared low-level helpers
-        // every builder method above (and here) uses.
+        // UI construction - the top-level assembly, plus the shared low-level helpers every builder uses.
         // ============================================================================================
 
         private void BuildUi()
         {
-            // Once for both canvases below (Task 9a review, finding 4) - each used to call this
-            // itself, which was harmless (EnsureEventSystem no-ops once one exists) but redundant.
-            EnsureEventSystem();
+            EnsureEventSystem(); // Once for both canvases below.
             BuildScreenCanvas();
             BuildToggleButtonCanvas();
         }
@@ -425,7 +382,7 @@ namespace Overpower.UI
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = -5; // See the class comment's SORT ORDER paragraph.
+            canvas.sortingOrder = -5; // See LoadoutScreen.cs's class comment (SORT ORDER).
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;
@@ -447,17 +404,14 @@ namespace Overpower.UI
             GameObject panel = new GameObject("Panel", typeof(RectTransform));
             panel.transform.SetParent(canvasGo.transform, false);
             RectTransform panelRt = panel.GetComponent<RectTransform>();
-            // Anchored to the TOP, not dead-centre: the panel's height grows with the weapon tree
-            // and (Task 9b) the ability column, and a centred panel grew down far enough at
-            // 1920x1080 to overlap the HUD sitting at the bottom of the screen. Top-anchoring keeps
-            // that clearance regardless of how tall the content gets.
+            // Anchored to the TOP, not dead-centre: the panel grows with its content, and a centred one overlapped the
+            // HUD at the bottom at 1920x1080. Top-anchoring keeps that clearance however tall the content gets.
             panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 1f);
             panelRt.pivot = new Vector2(0.5f, 1f);
             panelRt.anchoredPosition = new Vector2(0f, -theme.loadoutPanelTopMargin);
             panelRect = panelRt;
             Image panelBackground = panel.AddComponent<Image>();
-            // Its OWN colour - see Loadout Panel Colour's tooltip. The HUD has no panel behind it at all any more
-            // (HUD step 2); this modal still does, because it deliberately hides the world behind it.
+            // Its OWN colour (Loadout Panel Colour): unlike the HUD, this modal deliberately hides the world behind it.
             panelBackground.color = theme.loadoutPanelColor;
             panelBackground.raycastTarget = true;
 
@@ -469,9 +423,7 @@ namespace Overpower.UI
             panelLayout.childControlWidth = panelLayout.childControlHeight = true;
             panelLayout.childForceExpandWidth = panelLayout.childForceExpandHeight = false;
 
-            // Sized by its content, same as PlayerHud's own panel - one less pair of numbers
-            // (panel width/height) that would otherwise have to be hand-kept in sync with the two
-            // fixed column widths and the tree's own size below.
+            // Sized by its content, as PlayerHud's panel: no panel width/height to hand-keep in sync with the columns and tree.
             ContentSizeFitter panelFitter = panel.AddComponent<ContentSizeFitter>();
             panelFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -567,11 +519,9 @@ namespace Overpower.UI
             AddButton(row.transform, "X", Toggle, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
         }
 
-        /// <summary>"Gold 1234" on the left, the shop's status line on the right (a block reason,
-        /// the Free Loadout note, or nothing) - a row of its own under the title rather than folded
-        /// into it, so the title row's own X-button-pushing flexibleWidth trick does not have to be
-        /// redone around two more labels. Text is filled in by RefreshHeader, called from Refresh
-        /// and every frame from Update() while open - see their own comments.</summary>
+        /// <summary>Gold on the left, the shop's status line on the right (a block reason, the Free Loadout note, or
+        /// nothing), a row of its own so the title row's X-button flexibleWidth trick is not redone around two more
+        /// labels. RefreshHeader fills the text.</summary>
         private void BuildHeaderRow(Transform parent)
         {
             GameObject row = new GameObject("Header Row", typeof(RectTransform));
@@ -591,10 +541,8 @@ namespace Overpower.UI
             statusLe.flexibleWidth = 1f; // Takes the rest of the row, pushing the gold label to the left edge.
         }
 
-        /// <summary>The always-visible "Loadout (P)" button, bottom-right - clear of the HUD panel
-        /// (bottom-CENTRE) and chat (bottom-left). Its own canvas at HUD depth (-10): see the class
-        /// comment's SORT ORDER paragraph for why this sits with the HUD rather than the modal
-        /// screen it opens.</summary>
+        /// <summary>The always-visible "Loadout (P)" button, bottom-right, clear of the HUD panel (bottom-centre) and chat
+        /// (bottom-left). Its own canvas at HUD depth (-10), not modal depth (LoadoutScreen.cs, SORT ORDER).</summary>
         private void BuildToggleButtonCanvas()
         {
             GameObject canvasGo = new GameObject("Loadout Toggle Canvas", typeof(RectTransform));
@@ -609,11 +557,9 @@ namespace Overpower.UI
             scaler.matchWidthOrHeight = theme.matchWidthOrHeight;
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            // The bottom-right corner group, scaled by the same Hud Scale as the HUD panel (Tudor, 2026-09-17).
-            // A wrapper rather than a scale on the button itself, because HUD step 4 hangs the gold readout above
-            // this button from PlayerHud's own canvas with an identical wrapper: two roots with the same anchor,
-            // the same pivot and the same scale stay aligned at any screen size, where two independently scaled
-            // children would drift apart the moment either size changed.
+            // The bottom-right corner group, scaled by the same Hud Scale as the HUD panel. A wrapper rather than a scale
+            // on the button, because PlayerHud hangs the gold readout above this button on its own canvas with an
+            // identical wrapper: same anchor, pivot and scale stay aligned at any screen size, independently scaled children drift.
             GameObject corner = new GameObject("Shop Corner", typeof(RectTransform));
             corner.transform.SetParent(canvasGo.transform, false);
             RectTransform cornerRt = corner.GetComponent<RectTransform>();
@@ -641,7 +587,7 @@ namespace Overpower.UI
 
             loadoutToggleButton = buttonGo.GetComponent<Button>();
             loadoutToggleButton.onClick.AddListener(Toggle);
-            loadoutToggleButton.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton's comment (fix 2) - this is the button fix 1/2 were both found from.
+            loadoutToggleButton.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton (Enter must not re-click).
         }
 
         private void AddSectionHeader(Transform parent, string text)
@@ -649,16 +595,13 @@ namespace Overpower.UI
             TextMeshProUGUI header = AddLabel(parent, text, theme.smallTextSize, FontStyles.Bold);
             header.alignment = TextAlignmentOptions.MidlineLeft;
             header.color = theme.mutedTextColor;
-            // Stretch to the width of what it heads, so the left-aligned text starts at that section's own left edge
-            // (unstretched, a layout group centres a label narrower than its column - Task 13 capture).
+            // Stretch to the width of what it heads, so the text starts at the section's left edge (unstretched, a layout
+            // group centres a label narrower than its column).
             header.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
         }
 
-        /// <summary>width/height of 0 (the default) leaves that axis to the layout group instead of
-        /// pinning it - used for the title and section headers, which should stretch to their row's
-        /// own width rather than carry a fixed one. fontSize of 0 (the default) uses Body Text Size;
-        /// the close X and the armor steppers pass Loadout Stepper Font Size instead, a bigger glyph
-        /// sized to Loadout Stepper Button Size - see that field's own tooltip for why.</summary>
+        /// <summary>width/height of 0 leaves that axis to the layout group. fontSize of 0 uses Body Text Size; the close X
+        /// and the armor steppers pass Loadout Stepper Font Size, a bigger glyph sized to Loadout Stepper Button Size.</summary>
         private Button AddButton(Transform parent, string label, UnityEngine.Events.UnityAction onClick, float width = 0f, float height = 0f, float fontSize = 0f)
         {
             GameObject go = TMP_DefaultControls.CreateButton(new TMP_DefaultControls.Resources());
@@ -675,7 +618,7 @@ namespace Overpower.UI
 
             Button button = go.GetComponent<Button>();
             button.onClick.AddListener(onClick);
-            button.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton's comment (fix 2).
+            button.navigation = new Navigation { mode = Navigation.Mode.None }; // See BuildNodeButton (Enter must not re-click).
 
             if (width > 0f || height > 0f)
             {
@@ -687,8 +630,7 @@ namespace Overpower.UI
             return button;
         }
 
-        /// <summary>Same recipe as PlayerHud.AddLabel - kept private to this file rather than shared
-        /// for the same reason PlayerHud gives: the two have no other coupling.</summary>
+        /// <summary>Same recipe as PlayerHud.AddLabel, kept separate because the two have no other coupling.</summary>
         private TextMeshProUGUI AddLabel(Transform parent, string text, float fontSize, FontStyles style)
         {
             GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
@@ -707,9 +649,8 @@ namespace Overpower.UI
             return tmp;
         }
 
-        /// <summary>See PlayerHud.ApplyOutline's class comment for why every text this screen builds
-        /// shares ONE Material instance instead of letting TMP auto-clone one per label. The outline,
-        /// weight and shadow numbers live on UiTheme.ApplyHudTextStyle (HUD step 2).</summary>
+        /// <summary>Every text this screen builds shares ONE Material instance instead of TMP cloning one per label
+        /// (PlayerHud.ApplyOutline). The outline, weight and shadow numbers live on UiTheme.ApplyHudTextStyle.</summary>
         private void ApplyOutline(TextMeshProUGUI tmp)
         {
             if (loadoutTextMaterial == null)
@@ -720,10 +661,8 @@ namespace Overpower.UI
             tmp.fontSharedMaterial = loadoutTextMaterial;
         }
 
-        /// <summary>The scene already carries one EventSystem (used by TestRangePanel's dropdowns
-        /// and buttons today), so this is a safety net rather than the normal path - but a screen
-        /// with clickable buttons and no EventSystem in the scene would silently accept no clicks at
-        /// all, which is a miserable thing to debug, so it is checked for rather than assumed.</summary>
+        /// <summary>The scene already carries an EventSystem (TestRangePanel uses it), so this is a safety net: without one
+        /// the buttons would silently accept no clicks.</summary>
         private static void EnsureEventSystem()
         {
             if (EventSystem.current != null)

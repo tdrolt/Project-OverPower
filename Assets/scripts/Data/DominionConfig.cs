@@ -4,14 +4,9 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// Every Dominion number in one asset, so Tudor tunes the mode in one place: how long rounds and breaks last, what a held zone and the
-    /// centre pay, when a bounty is due, how long respawns take, what the respawn shield does, how the sudden-death circle shrinks and what
-    /// the shop opens each round. The rules that use these numbers live in Overpower.Dominion (DominionRules and friends) and take them as
-    /// arguments, so the rules are tested with made-up numbers and never with these.
-    ///
-    /// Fields are [SerializeField] private with read-only properties, like the rest of the Data folder (a ScriptableObject is one shared
-    /// instance; writing to it at runtime would quietly edit the asset in the Editor). Nothing reads this asset yet: the Dominion stage flow
-    /// (Task 2) is the first reader.
+    /// Every Dominion number in one asset, so the mode is tuned in one place. The rules that use these numbers live in
+    /// Overpower.Dominion (DominionRules and friends) and take them as arguments, so they are tested with made-up numbers,
+    /// never with these. Read-only properties, never written at runtime (see GameplayConfig).
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Dominion Config", fileName = "DominionConfig")]
     public sealed class DominionConfig : ScriptableObject

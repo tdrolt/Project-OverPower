@@ -1,56 +1,43 @@
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Playtest extras P1 (2026-09-26): the pure rolling state behind ConsoleTelemetry - what a
-    /// caller should write for the next raw `Application.logMessageReceived` message. Plain C#, no
-    /// Unity engine dependency (an enum stands in for LogType, so this class - and its tests - never
-    /// touch UnityEngine; ConsoleTelemetry maps the real LogType at the boundary), same reasoning as
-    /// DotAccumulator/MarkLedger.
+    /// The rolling state behind ConsoleTelemetry: what a caller should write for the next raw `Application.logMessageReceived`
+    /// message. Plain C#: an enum stands in for LogType (ConsoleTelemetry maps the real one), so it and its tests never touch UnityEngine.
     ///
-    /// Three things happen to every message the file is already open for, in this order:
-    ///  1. SCRUB - every configured Photon App ID is replaced by "&lt;app id&gt;" in both the message
-    ///     and the stack, BEFORE anything is cut - so a truncated id can never leak a bare prefix.
-    ///  2. FOLD - the same (level, scrubbed) message landing within one second of the last time this
-    ///     bucket was touched is folded into it (its count goes up, no new line); a different message
-    ///     flushes whatever was pending as one finished Line and starts a fresh bucket.
-    ///  3. CAP - starting a FRESH bucket (a fold is free - see above) spends one of this second's
-    ///     admission budget (consoleMaxLinesPerSecond); past it, the message is only counted, and
-    ///     that count comes back as one dropped-summary integer the moment the next second's message
-    ///     arrives (or Flush/TakeDroppedSummary is called at close - see ConsoleTelemetry).
+    /// Every message the file is already open for goes through, in this order:
+    ///  1. SCRUB - every configured Photon App ID is replaced by "&lt;app id&gt;" in message and stack BEFORE anything is cut, so a
+    ///     truncated id can never leak a bare prefix.
+    ///  2. FOLD - the same (level, scrubbed) message within one second of the bucket's last touch is folded into it (count goes up,
+    ///     no new line); a different message flushes the pending one as a finished Line and starts a fresh bucket.
+    ///  3. CAP - a FRESH bucket (a fold is free) spends one of this second's admission budget (consoleMaxLinesPerSecond); past it
+    ///     the message is only counted, and the count comes back as one dropped-summary integer when the next second's message
+    ///     arrives (or at close, via Flush/TakeDroppedSummary).
     ///
-    /// Before the match's own file has opened, ConsoleTelemetry uses AdmitBeforeOpen/FormatSingle
-    /// instead (the controller's own addendum, 2026-09-26): console lines must never crowd real
-    /// gameplay lines out of MatchTelemetry's shared pending-lines queue, so only warnings, errors,
-    /// exceptions and asserts are even offered a slot pre-open, capped at PreOpenQueueCap of them -
-    /// everything else refused (a plain Log, or the 51st warning) is counted into the SAME
-    /// dropped-count mechanism the per-second cap already uses (TakePreOpenDroppedSummary), per the
-    /// controller's "fold it into the existing dropped-count mechanism if one exists".
+    /// Before the file has opened ConsoleTelemetry uses AdmitBeforeOpen/FormatSingle instead: console lines must never crowd real
+    /// gameplay lines out of MatchTelemetry's shared pending-lines queue, so only warnings, errors, exceptions and asserts are
+    /// offered a slot, capped at PreOpenQueueCap; everything else refused is counted into the same dropped-count mechanism
+    /// (TakePreOpenDroppedSummary).
     /// </summary>
     public sealed class ConsoleLineRule
     {
         public enum ConsoleLevel { Log, Warning, Error, Exception, Assert }
 
-        /// <summary>How long a fold bucket keeps accepting repeats of the same message, measured from
-        /// the LAST time it was touched (a rolling window, not a fixed one from the first occurrence).
-        /// Also how stale a pending bucket must be before ConsoleTelemetry.Update proactively flushes
-        /// it with no new message to trigger that - see HasPending/PendingLastT below: a lone error in
-        /// an otherwise quiet log must reach disk within about a second, not sit in memory until the
-        /// next unrelated log line (or the match's end) happens to flush it.</summary>
+        /// <summary>How long a fold bucket keeps accepting repeats, measured from the LAST time it was touched (a rolling window).
+        /// Also how stale a pending bucket must be before ConsoleTelemetry.Update flushes it with no new message: a lone error in a
+        /// quiet log must reach disk within about a second.</summary>
         public const double FoldWindowSeconds = 1.0;
 
-        /// <summary>Pre-open queue budget - its own number, separate from consoleMaxLinesPerSecond: a
-        /// designer retuning the in-match per-second cap for a noisy build must not also change how
-        /// many startup warnings/errors survive the few frames before the file opens.</summary>
+        /// <summary>Pre-open queue budget - its own number, separate from consoleMaxLinesPerSecond: retuning the in-match cap must
+        /// not change how many startup warnings/errors survive before the file opens.</summary>
         private const int PreOpenQueueCap = 50;
 
-        /// <summary>One finished console line, ready for a caller to write through MatchTelemetry.Log -
-        /// already scrubbed and cut. Count/FirstT/LastT only differ from 1/t/t when Submit folded two
-        /// or more repeats of the same message together.</summary>
+        /// <summary>One finished console line for MatchTelemetry.Log, already scrubbed and cut. Count/FirstT/LastT differ from
+        /// 1/t/t only when Submit folded repeats.</summary>
         public readonly struct Line
         {
             public readonly ConsoleLevel Level;
             public readonly string Message;
-            public readonly string Stack; // null for Log/Warning - see the class comment.
+            public readonly string Stack; // null for Log/Warning.
             public readonly int Count;
             public readonly double FirstT;
             public readonly double LastT;
@@ -90,18 +77,14 @@ namespace Overpower.Telemetry
         private int preOpenAdmitted;
         private int preOpenDropped;
 
-        /// <summary>True while a fold bucket is waiting for either a different message or a call to
-        /// Flush()/Submit() to finish it - see PendingLastT.</summary>
         public bool HasPending => hasPending;
 
-        /// <summary>The pending bucket's own last-touched time (only meaningful while HasPending is
-        /// true) - ConsoleTelemetry.Update compares this against `now` and flushes early once
-        /// FoldWindowSeconds has passed with nothing new to fold in, so a lone message reaches disk
-        /// promptly instead of waiting on an unrelated later message or the match's end.</summary>
+        /// <summary>Only meaningful while HasPending: ConsoleTelemetry.Update flushes early once FoldWindowSeconds has passed with
+        /// nothing new to fold in.</summary>
         public double PendingLastT => pendingLastT;
 
-        /// <param name="scrubTargets">Every Photon App ID to scrub - read once by the caller (never
-        /// logged, never stored anywhere else). Null or empty scrubs nothing.</param>
+        /// <param name="scrubTargets">Every Photon App ID to scrub - read once by the caller, never logged or stored elsewhere.
+        /// Null or empty scrubs nothing.</param>
         public ConsoleLineRule(int messageMaxChars, int stackMaxChars, int maxLinesPerSecond, string[] scrubTargets = null)
         {
             this.messageMaxChars = System.Math.Max(1, messageMaxChars);
@@ -112,11 +95,8 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- after the file is open
 
-        /// <summary>Feeds one raw console message in. Sets the two out params to whatever this call
-        /// made ready to write - 0, 1 or both of: a finished fold line (the PREVIOUS bucket, flushed
-        /// because this message differs or the fold window passed) and a dropped-count summary (the
-        /// PREVIOUS second, flushed because this message's `now` moved into a new one). Never writes
-        /// anything itself, and never throws on a null message/stack.</summary>
+        /// <summary>Sets the two out params to what this call made ready to write (0, 1 or both): a finished fold line (the PREVIOUS
+        /// bucket) and a dropped-count summary (the PREVIOUS second). Writes nothing itself; never throws on a null message/stack.</summary>
         public void Submit(ConsoleLevel level, string rawMessage, string rawStack, double now,
             out Line? finishedLine, out int? droppedSummaryForPreviousSecond)
         {
@@ -166,8 +146,8 @@ namespace Overpower.Telemetry
             pendingLastT = now;
         }
 
-        /// <summary>Finalises whatever fold bucket is still pending (e.g. the match's very last log
-        /// line, which nothing ever arrived to flush) - call from MatchTelemetry.BeforeClose.</summary>
+        /// <summary>Finalises the pending fold bucket (the match's last log line, which nothing arrives to flush) - call from
+        /// MatchTelemetry.BeforeClose.</summary>
         public Line? Flush()
         {
             if (!hasPending)
@@ -178,9 +158,8 @@ namespace Overpower.Telemetry
             return line;
         }
 
-        /// <summary>Forces the current second's dropped count out (0 without writing anything if
-        /// there were none) - call alongside Flush() at close, so a drop in the final partial second
-        /// is never silently lost.</summary>
+        /// <summary>Forces the current second's dropped count out - call alongside Flush() at close, so a drop in the final partial
+        /// second is not lost.</summary>
         public int TakeDroppedSummary()
         {
             int n = droppedThisSecond;
@@ -192,15 +171,12 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- before the file is open
 
-        /// <summary>True for the four levels the pre-open queue accepts at all - a plain Log is
-        /// never one of them, so a busy console can never crowd a real join/leave/marker line out of
-        /// MatchTelemetry's own pending-lines cap before the file opens.</summary>
+        /// <summary>The levels the pre-open queue accepts; a plain Log never, so a busy console cannot crowd a real
+        /// join/leave/marker line out of MatchTelemetry's pending-lines cap before the file opens.</summary>
         public static bool ShouldQueueBeforeOpen(ConsoleLevel level) => level != ConsoleLevel.Log;
 
-        /// <summary>Whether the NEXT pre-open message should be queued (and formatted with
-        /// FormatSingle) - false either because its level is never queued pre-open, or because the
-        /// PreOpenQueueCap is already spent; either way it is counted, ready for
-        /// TakePreOpenDroppedSummary once the file opens.</summary>
+        /// <summary>Whether the NEXT pre-open message is queued (and formatted with FormatSingle); a refusal is counted for
+        /// TakePreOpenDroppedSummary.</summary>
         public bool AdmitBeforeOpen(ConsoleLevel level)
         {
             if (!ShouldQueueBeforeOpen(level) || preOpenAdmitted >= PreOpenQueueCap)
@@ -213,8 +189,7 @@ namespace Overpower.Telemetry
             return true;
         }
 
-        /// <summary>The dropped total from before the file opened - read once, right after the file
-        /// opens, and written as one summary console line (0 means nothing was dropped).</summary>
+        /// <summary>Read once right after the file opens, written as one summary console line (0 = nothing was dropped).</summary>
         public int TakePreOpenDroppedSummary()
         {
             int n = preOpenDropped;
@@ -222,20 +197,16 @@ namespace Overpower.Telemetry
             return n;
         }
 
-        /// <summary>Step 0 review fix (a), 2026-09-26: call once per match (ConsoleTelemetry.
-        /// HandleBeforeClose, alongside its existing Flush()/TakeDroppedSummary() calls) so the NEXT
-        /// match starts with its own full PreOpenQueueCap rather than whatever this match already
-        /// spent - ConsoleTelemetry's rule instance lives for the whole session (no scene reload
-        /// between matches), so without this the budget was gone by the 2nd/3rd match and every
-        /// early warning/error before that match's file opened was silently dropped.</summary>
+        /// <summary>Call once per match (ConsoleTelemetry.HandleBeforeClose): the rule instance lives for the whole session (no scene
+        /// reload between matches), so without this the budget was gone by the 2nd/3rd match and early warnings/errors before that
+        /// match's file opened were silently dropped.</summary>
         public void ResetPreOpenBudget()
         {
             preOpenAdmitted = 0;
             preOpenDropped = 0;
         }
 
-        /// <summary>Scrub + cut, with no fold/cap bookkeeping at all - every pre-open line (there is
-        /// never more than a handful) is written as its own Line with Count 1.</summary>
+        /// <summary>Scrub + cut with no fold/cap bookkeeping: every pre-open line is its own Line with Count 1.</summary>
         public Line FormatSingle(ConsoleLevel level, string rawMessage, string rawStack, double now)
         {
             string message = Cut(Scrub(rawMessage ?? ""), messageMaxChars);
@@ -246,9 +217,8 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- shared
 
-        // Step 0 review fix (b): the actual replace loop now lives in TelemetryScrub, shared with
-        // MatchTelemetry.LogChat's chat lines - this is just the console-specific "which targets"
-        // plumbing (scrubTargets, read once by ConsoleTelemetry at construction time).
+        // The replace loop lives in TelemetryScrub (shared with MatchTelemetry.LogChat); this is the console-specific "which targets"
+        // plumbing.
         private string Scrub(string text) => TelemetryScrub.Apply(text, scrubTargets);
 
         private static string Cut(string text, int maxChars) =>

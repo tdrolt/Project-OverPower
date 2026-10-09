@@ -3,9 +3,8 @@ using UnityEngine;
 
 namespace Overpower.Abilities
 {
-    /// <summary>Colours and shapes the primitive parts of the ability visuals without touching their shared materials
-    /// (ability visuals step 2): a MaterialPropertyBlock for meshes, start/end colour for lines. One material asset
-    /// serves every team.</summary>
+    /// <summary>Colours and shapes the primitive parts of the ability visuals without touching their shared materials:
+    /// a MaterialPropertyBlock for meshes, start/end colour for lines. One material asset serves every team.</summary>
     public static class VisualTint
     {
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");

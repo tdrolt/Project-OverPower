@@ -4,16 +4,15 @@ using UnityEngine;
 namespace Overpower.Arena
 {
     /// <summary>
-    /// The phase-two wall's shape (GDD p.27; Tudor, 2026-09-25: "the wall is below the tier 3 zones and make a new
-    /// recess for the tier 3 zone that replaces the tier 4 zone"). A straight wall across the arena, its face Wall
-    /// Distance past the centre toward the cut capital, from outer wall to outer wall, with a recess (Recess Width x
-    /// Recess Depth) centred behind the centre tower. From that one line come: the smaller outline blink, portals and the
-    /// out-of-arena safety net ask while the cut stands (Playable), the closed part (the minimap's dark area, and "is
-    /// this behind the wall"), one wall box per segment (through ArenaWallPlan, so its corners close exactly like the
-    /// outer walls'), and where the recess's barrier stands.
+    /// The phase-two wall's shape (GDD p.27): a straight wall across the arena, its face Wall Distance past the centre
+    /// toward the cut capital, outer wall to outer wall, with a recess (Recess Width x Recess Depth) centred behind the
+    /// centre tower. From that one line come Playable (the smaller outline blink, portals and the out-of-arena safety
+    /// net ask while the cut stands), Closed (the minimap's dark area, and "is this behind the wall"), one wall box per
+    /// segment (through ArenaWallPlan, so its corners close exactly like the outer walls'), and where the recess's
+    /// barrier stands.
     ///
-    /// Plain C#, like ArenaBounds and ArenaWallPlan: every client builds the identical wall from the same outline and
-    /// numbers, so no position ever travels over the network. Vector2 = (world X, world Z).
+    /// Plain C#: every client builds the identical wall from the same outline and numbers, so no position ever travels
+    /// over the network. Vector2 = (world X, world Z).
     /// </summary>
     public sealed class PhaseTwoCutGeometry
     {
@@ -66,10 +65,9 @@ namespace Overpower.Arena
         /// as behind it.</summary>
         public bool IsBehindWall(Vector3 world) => Closed.SignedDistance(world) >= 0f;
 
-        /// <summary>The two "planks" standing out from the recess mouth at each end of its barrier (Tudor 2026-09-26:
-        /// "the zone is too empty"), mirrored across the cut axis: BarrierCentre offset <paramref name="spacing"/>
-        /// metres either way along the wall, and <paramref name="inFront"/> metres off the wall line toward the open
-        /// side. Pure geometry - makes sense with or without HasRecess; the caller decides whether to build them.</summary>
+        /// <summary>The two "planks" standing out from the recess mouth at each end of its barrier, mirrored across the
+        /// cut axis: BarrierCentre offset <paramref name="spacing"/> metres either way along the wall, and
+        /// <paramref name="inFront"/> metres off the wall line toward the open side. Pure geometry - makes sense with or without HasRecess; the caller decides whether to build them.</summary>
         public (Vector2 First, Vector2 Second) PlankCentres(float spacing, float inFront)
         {
             Vector2 lateral = AlongWall * spacing;

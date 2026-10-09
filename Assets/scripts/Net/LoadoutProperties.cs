@@ -5,15 +5,9 @@ namespace Overpower.Net
 {
     /// <summary>
     /// The four Custom Property keys a player's loadout lives in, and the one reader every caller
-    /// should go through - mirrors Teams.cs: team membership has exactly one home key and one
-    /// lookup, and a loadout deserves the same treatment rather than four scripts each guessing at
-    /// a string and a cast.
-    ///
-    /// Custom Properties travel as a plain object dictionary (Photon's own Hashtable derives from
-    /// Dictionary&lt;object, object&gt;), so a value can arrive missing, or present but of the wrong
-    /// type - a late joiner reading a property before it has ever been written, or a stale build on
-    /// the other end writing something unexpected. ReadInt below is the only place that has to
-    /// think about that; everything downstream just gets a fallback instead of an exception.
+    /// should go through (mirrors Teams.cs). Custom Properties travel as a plain object dictionary,
+    /// so a value can arrive missing or of the wrong type (a late joiner, a stale build); ReadInt is
+    /// the only place that has to think about that, everything downstream gets a fallback.
     /// </summary>
     public static class LoadoutProperties
     {
@@ -22,21 +16,20 @@ namespace Overpower.Net
         public const string UltimateKey = "ultimateId";
         public const string MobilityKey = "mobilityId";
 
-        /// <summary>Armor upgrade levels (Task 1.5) - two independent counters, not one tier, so
-        /// they live under two keys. A missing key means level 0, the level everyone starts on,
-        /// which is why PlayerLoadout reads these with a fallback rather than LoadoutProperties.Empty.</summary>
+        /// <summary>Armor upgrade levels: two independent counters, not one tier, so two keys. A
+        /// missing key means level 0, which is why PlayerLoadout reads these with a fallback rather
+        /// than LoadoutProperties.Empty.</summary>
         public const string ArmorAbsorbLevelKey = "armorAbsorbLvl";
         public const string ArmorRechargeLevelKey = "armorRechargeLvl";
 
-        /// <summary>Means "no ability equipped in this slot". Never 0 - id 0 on an AbilityDefinition
-        /// means "not set" on the asset itself, a different kind of empty, so this needs its own
-        /// value that can never collide with a real id.</summary>
+        /// <summary>Means "no ability equipped in this slot". Never 0: id 0 on an AbilityDefinition
+        /// means "not set" on the asset, a different kind of empty, so this needs a value that can
+        /// never collide with a real id.</summary>
         public const int Empty = -1;
 
         /// <summary>
-        /// Reads one int-valued Custom Property, never throwing. A missing key or a value that is
-        /// not an int (a stale property, or one that has not been written yet) both fall back
-        /// silently rather than bringing down whatever loop is applying a loadout to nine players.
+        /// Reads one int-valued Custom Property, never throwing. A missing key or a non-int value
+        /// falls back silently rather than bringing down the loop applying a loadout to nine players.
         /// </summary>
         public static int ReadInt(IDictionary<object, object> props, string key, int fallback)
         {
@@ -49,10 +42,9 @@ namespace Overpower.Net
         }
 
         /// <summary>
-        /// The Custom Property key an ability slot's id lives under. Primary has none of its own -
-        /// it is a weapon id, resolved through WeaponCatalogue and carried under WeaponKey instead
-        /// of the ability catalogue - so this returns null for it rather than guessing at a key
-        /// that would resolve to nothing.
+        /// The Custom Property key an ability slot's id lives under. Primary has none: it is a weapon
+        /// id carried under WeaponKey, so this returns null for it rather than a key that resolves
+        /// to nothing.
         /// </summary>
         public static string KeyFor(AbilitySlot slot)
         {

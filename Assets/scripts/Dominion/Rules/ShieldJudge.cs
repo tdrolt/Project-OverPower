@@ -3,7 +3,7 @@ using System;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 7b: what a player's own client asks before an enemy's status or push lands on them (PlayerStatusEffects.Apply,
+    /// What a player's own client asks before an enemy's status or push lands on them (PlayerStatusEffects.Apply,
     /// PlayerDisplacement.Displace). RespawnShield implements it; the callers hold only this interface, so a test can stand a fake in. True =
     /// the respawn shield stops it: do nothing, and BLOCKED has already been stamped.
     /// </summary>

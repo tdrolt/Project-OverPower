@@ -13,28 +13,24 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Match
 {
     /// <summary>
-    /// Task 2.7: who is still in the match and which phase it is in. MatchPhaseRules.cs holds the
-    /// actual rule as pure, tested C#; this class is only the Photon wiring around it - reading
-    /// PhotonNetwork.PlayerList and BuildingManager.Current into one TeamStatus per team, letting the
-    /// master write the result into Room Properties (and, master-only, neutralising every Tier III, the
-    /// centre and the newly cut corner - map shrink T3 - on the first elimination and closing a finished
-    /// room), and reacting to whatever the room says on
-    /// every client (the lost panel, the "two teams left" banner and trip home, the match-result
-    /// panel). Room Properties, not an RPC, for the same reason BuildingManager's territory is: a
-    /// player who joins mid-match reads one value instead of replaying the match, and the state
-    /// survives the master leaving.
+    /// Who is still in the match and which phase it is in. MatchPhaseRules.cs holds the rule as pure, tested C#;
+    /// this class is the Photon wiring around it - reading PhotonNetwork.PlayerList and BuildingManager.Current into
+    /// one TeamStatus per team, letting the master write the result into Room Properties (and, master-only,
+    /// neutralising every Tier III, the centre and the newly cut corner on the first elimination and closing a
+    /// finished room), and reacting to whatever the room says on every client (the lost panel, the "two teams left"
+    /// banner and trip home, the match-result panel). Room Properties, not an RPC, for the same reason
+    /// BuildingManager's territory is: a player who joins mid-match reads one value instead of replaying the match,
+    /// and the state survives the master leaving.
     ///
-    /// 2.7b step 7: capital adoption is BUILT, not cut - TeamHasACapital/RespawnCapitalOf/SpawnCapitalFor answer
-    /// "any capital in play", not just each team's own static one (the deleted CapitalOf's old "adoption hook"
-    /// comment is gone with it). PlayerLifecycle asks these three, never TerritoryMap.CapitalOf directly, for
+    /// Capital adoption: TeamHasACapital/RespawnCapitalOf/SpawnCapitalFor answer "any capital in play", not just
+    /// each team's own static one. PlayerLifecycle asks these three, never TerritoryMap.CapitalOf directly, for
     /// anything that must honour an adopted capital.
     ///
-    /// NOT a scene object: the arena is being rebuilt from primitives in a separate session, so
-    /// anything placed in Game Scene.unity right now could be lost or conflict with that rebuild.
-    /// BuildingManager.Awake adds this component at runtime instead, onto the same GameObject that
-    /// already hosts BuildingManager/ZonePresenceTracker/MatchTelemetry - zero scene footprint, and no
-    /// PhotonView is needed because this only ever reads and writes Room Properties, the same
-    /// authority model BuildingManager's own territory state uses (CODING-STANDARDS.md section 5).
+    /// NOT a scene object: BuildingManager.Awake adds this component at runtime onto the GameObject that already
+    /// hosts BuildingManager/ZonePresenceTracker/MatchTelemetry - zero scene footprint (the arena is rebuilt from
+    /// primitives, so a scene-placed copy could be lost), and no PhotonView is needed because this only reads and
+    /// writes Room Properties, the same authority model BuildingManager's territory state uses (CODING-STANDARDS.md
+    /// section 5).
     /// </summary>
     public partial class MatchDirector : MonoBehaviourPunCallbacks
     {
@@ -67,11 +63,11 @@ namespace Overpower.Match
         private List<int> lastAppliedEliminated = new List<int>();
         private MatchPhase lastAppliedPhase = MatchPhase.Warmup;
         private int lastAppliedWinner = -1;
-        // 2.7b step 5: the countdown/live edges ReactToRoomState reacts to - see that method's own comment.
+        // The countdown/live edges ReactToRoomState reacts to - see that method's own comment.
         private bool lastAppliedTeamsFixed;
         private bool lastAppliedLive;
         private int lastAppliedLiveAtMs;
-        // Map shrink T3: the cut edge ReactToRoomState reacts to (raises LiveStateChanged - the minimap listens).
+        // The cut edge ReactToRoomState reacts to (raises LiveStateChanged - the minimap listens).
         private int lastAppliedCutTeam = PhaseTwoCutRules.NoCut;
         // Two-team lobby: the mode edge ReactToRoomState reacts to (the MaxPlayers idempotent apply, the
         // telemetry marker, RoomManager's re-seat, and LiveStateChanged - see that method's own comment).
@@ -82,7 +78,7 @@ namespace Overpower.Match
         /// <summary>The winning team once the match is over, else -1. Tracks the room, not this client's own team.</summary>
         public int Winner => lastAppliedWinner;
         /// <summary>Whether team is on the room's own eliminated list. Reads PhotonNetwork.CurrentRoom.
-        /// CustomProperties directly rather than the cached lastAppliedEliminated (review round 2):
+        /// CustomProperties directly rather than the cached lastAppliedEliminated:
         /// RoomManager's rejoin branch calls this from ITS OWN OnJoinedRoom, which Photon dispatches
         /// BEFORE this class's OnJoinedRoom runs ReactToRoomState - the room's own properties are
         /// already filled in by then (they arrive as part of the join itself), but the cached field
@@ -90,18 +86,17 @@ namespace Overpower.Match
         public bool IsEliminated(int team) =>
             PhotonNetwork.InRoom && ReadEliminated(PhotonNetwork.CurrentRoom.CustomProperties).Contains(team);
 
-        /// <summary>Review fix F1, 2026-09-25: a capital counts as "in play" while its team was fixed into the match
-        /// (a host start's third capital never is) and it isn't behind the phase-two wall. The cut is derived straight
-        /// from mElim (PhaseTwoCutRules.CutTeam), which arrives in the same room update as the knockout's mPhase - both
-        /// written in the one Hashtable below - so this is already right on the frame every client sends its
-        /// players home - before the master's neutralise writes (sent after the phase write) have even arrived.
-        /// Every place below that used to test IsInMatch(capital.Value) alone now asks this instead, so a closed
-        /// capital can never again count as one still in play.</summary>
+        /// <summary>A capital counts as "in play" while its team was fixed into the match (a host start's third
+        /// capital never is) and it isn't behind the phase-two wall. The cut is derived straight from mElim
+        /// (PhaseTwoCutRules.CutTeam), which arrives in the same room update as the knockout's mPhase - both written
+        /// in the one Hashtable below - so this is already right on the frame every client sends its players home,
+        /// before the master's neutralise writes (sent after the phase write) have even arrived. Ask this, not
+        /// IsInMatch(capital) alone, so a closed capital can never count as one still in play.</summary>
         private bool IsCapitalInPlay(int capitalZone, int capitalTeam) => IsInMatch(capitalTeam) && !IsOutOfPlay(capitalZone);
 
-        /// <summary>2.7b step 7 (Decision 10): does this team have a capital right now - its own, an enemy's, or a
+        /// <summary>Does this team have a capital right now (Decision 10) - its own, an enemy's, or a
         /// knocked-out team's, as long as it is still in play (IsCapitalInPlay: a capital behind the phase-two wall
-        /// never counts)? Tudor answer 1: adoption counts in both phases, so this is just
+        /// never counts)? Adoption counts in both phases, so this is just
         /// MatchPhaseRules.CountsAsHavingACapital fed from the replicated snapshot. A missing map or snapshot reads
         /// as false rather than throwing.</summary>
         public bool TeamHasACapital(int team)
@@ -120,20 +115,20 @@ namespace Overpower.Match
             return MatchPhaseRules.CountsAsHavingACapital(Phase, holdsOwn, holdsAny);
         }
 
-        // Review fix (step 7 review): reused across every RespawnCapitalOf call instead of a fresh List every
+        // Reused across every RespawnCapitalOf call instead of a fresh List every
         // time - this runs every FixedUpdate per waiting player (PlayerLifecycle.CheckForCathedralCapture) and
         // every frame per player on a respawn countdown (UpdateRespawnNote -> SpawnCapitalFor), the same
         // allocation reasoning as GoldWallet's own ownersScratch. Cleared and refilled at the top of every call;
         // nothing holds a reference to it past that same call.
         private readonly List<MatchPhaseRules.CapitalHold> respawnCapitalScratch = new List<MatchPhaseRules.CapitalHold>();
 
-        /// <summary>2.7b step 7 (Decision 11): where this team respawns - its own capital while it holds it, else
+        /// <summary>Where this team respawns (Decision 11) - its own capital while it holds it, else
         /// the in-play capital it has held longest (the one it adopted first, by MatchPhaseRules.RespawnCapital's
         /// wrap-safe HeldSinceMs comparison). TerritoryMap.Neutral if it holds none. Derived from the replicated
         /// snapshot alone, so a new master and a late joiner compute the same answer with no extra state.
-        /// Review fix F1: "in-play" is IsCapitalInPlay now, not just IsInMatch - a knocked-out team's own capital is
-        /// still in mTeams for the rest of the match, but once it is behind the phase-two wall a survivor must
-        /// never be handed it as a respawn point, closing corner and all.</summary>
+        /// "In-play" is IsCapitalInPlay, not just IsInMatch - a knocked-out team's own capital is still in mTeams
+        /// for the rest of the match, but once it is behind the phase-two wall a survivor must never be handed it
+        /// as a respawn point, closing corner and all.</summary>
         public int RespawnCapitalOf(int team)
         {
             BuildingManager buildings = BuildingManager.Instance;
@@ -158,8 +153,8 @@ namespace Overpower.Match
             return MatchPhaseRules.RespawnCapital(team, buildings.Map.CapitalOf(team), respawnCapitalScratch);
         }
 
-        /// <summary>2.7b step 7: where an ended respawn countdown puts this team's player, as a capital zone -
-        /// TerritoryMap.Neutral means don't respawn, wait (Decision 12 + Tudor D17: a live team with no capital in
+        /// <summary>Where an ended respawn countdown puts this team's player, as a capital zone -
+        /// TerritoryMap.Neutral means don't respawn, wait (Decision 12, D17: a live team with no capital in
         /// play is in its last stand in both phases, the dead can't respawn; a knocked-out team never respawns).</summary>
         public int SpawnCapitalFor(int team)
         {
@@ -171,9 +166,6 @@ namespace Overpower.Match
             return MatchPhaseRules.SpawnCapitalFor(Phase, IsEliminated(team), ownCapital, RespawnCapitalOf(team));
         }
 
-        /// <summary>Task 9b-2: a player joining or rejoining this team right now spawns dead into the wait - the team is
-        /// in its last stand (live, no base in play) - and comes back only when it retakes or adopts a base. False until
-        /// the territory is known, so a joiner never waits on a half-loaded map.</summary>
         /// <summary>True when the join-into-a-last-stand question can be answered now: the match is not live (the answer
         /// is no) or the territory is loaded. PlayerLifecycle keeps asking each physics step until this is true, once.</summary>
         public bool JoinCheckReady
@@ -187,6 +179,9 @@ namespace Overpower.Match
             }
         }
 
+        /// <summary>A player joining or rejoining this team right now spawns dead into the wait - the team is
+        /// in its last stand (live, no base in play) - and comes back only when it retakes or adopts a base. False until
+        /// the territory is known, so a joiner never waits on a half-loaded map.</summary>
         public bool SpawnsIntoLastStand(int team)
         {
             if (DominionMode.IsActive())
@@ -223,18 +218,17 @@ namespace Overpower.Match
         {
             MasterRecompute();
 
-            // 2.7b step 9: the telemetry `adopt` line. OwnershipChanged fires on every client (T4's own
-            // comment on this class), so this is master-only like every other territory logger; live-only,
-            // since an ownership change during the warm-up sandbox (or the countdown, still warm-up - Decision
-            // 3) means nothing yet.
+            // The telemetry `adopt` line. OwnershipChanged fires on every client, so this is master-only like
+            // every other territory logger; live-only, since an ownership change during the warm-up sandbox (or
+            // the countdown, still warm-up - Decision 3) means nothing yet.
             if (PhotonNetwork.IsMasterClient && IsLive)
                 LogAdoptionIfAny(zone, newOwner);
         }
 
         /// <summary>MatchPhaseRules.IsAdoption reads whether newOwner held NO other in-play capital already
         /// (this zone excluded, since buildings.Current already reflects the change that just happened) - the
-        /// per-capital-count version of TeamHasACapital's own "any capital in play" loop above. Review fix F1:
-        /// "in play" is IsCapitalInPlay, so a capital behind the phase-two wall is never counted as one of
+        /// per-capital-count version of TeamHasACapital's own "any capital in play" loop above.
+        /// "In play" is IsCapitalInPlay, so a capital behind the phase-two wall is never counted as one of
         /// newOwner's other capitals here either.</summary>
         private void LogAdoptionIfAny(int zone, int newOwner)
         {
@@ -261,14 +255,14 @@ namespace Overpower.Match
 
         public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
         {
-            // Task 9b-2: a death whose countdown is still running (alive false) counts once the team has no base, so the
+            // A death whose countdown is still running (alive false) counts once the team has no base, so the
             // alive flag and the death moment recompute too, not only the waiting flag.
             if (changedProps.ContainsKey(PlayerLifecycle.LastStandKey) || changedProps.ContainsKey(PlayerLifecycle.AliveKey)
                 || changedProps.ContainsKey(PlayerLifecycle.LastStandAtKey) || changedProps.ContainsKey(Teams.TeamKey))
                 MasterRecompute();
         }
 
-        // Task 9e-2 (Tudor D-a): when this client learned each dropped player went inactive, so the team status can hold off
+        // When this client learned each dropped player went inactive (D-a), so the team status can hold off
         // counting them as dead for the grace (GameplayConfig.DroppedGraceSeconds). Every client keeps it (any can become master).
         private readonly Dictionary<int, float> inactiveSince = new Dictionary<int, float>();
         private readonly HashSet<int> graceEndedHandled = new HashSet<int>();
@@ -284,7 +278,7 @@ namespace Overpower.Match
             MasterRecompute();
         }
 
-        /// <summary>Task 9e: a dropped member coming back is a change in who counts as dead, with no Player Property
+        /// <summary>A dropped member coming back is a change in who counts as dead, with no Player Property
         /// change of its own to trigger the recompute.</summary>
         public override void OnPlayerEnteredRoom(Player newPlayer)
         {
@@ -352,8 +346,8 @@ namespace Overpower.Match
             lastWrittenEliminated = null;
             writesAwaitingEcho = 0;
 
-            // 2.7b step 5 (Decision 22, R2): the countdown/live echo wait was this client's own, as master - the
-            // new master needs nothing else. Its own Update() poll sees mTeams/mLiveAt/mPhase fresh from the room
+            // The countdown/live echo wait was this client's own, as master - the new master needs nothing else
+            // (Decision 22, R2). Its own Update() poll sees mTeams/mLiveAt/mPhase fresh from the room
             // on its very next frame and carries on (a countdown continues; a moment already passed goes live at
             // once).
             waitForEchoUntil = -1f;
@@ -364,10 +358,10 @@ namespace Overpower.Match
             if (PhotonNetwork.IsMasterClient)
                 MasterRecompute();
 
-            // Review fix F3, 2026-09-25: if the old master dropped after its phase write reached the server but
+            // If the old master dropped after its phase write reached the server but
             // before all its neutralise writes did, a cut zone can stay owned (and keep paying income from behind
             // the wall) - the room already reads TwoTeams, so nothing else would ever re-run the neutralise.
-            // Deferred to Update (opus re-check): this component registered with Photon before BuildingManager (it is
+            // Deferred to Update: this component registered with Photon before BuildingManager (it is
             // added in BuildingManager.Awake), so this callback runs FIRST, and BuildingManager's own
             // OnMasterClientSwitched would then clear the write bookkeeping of the neutralise writes sent from here.
             if (PhotonNetwork.IsMasterClient)
@@ -377,7 +371,7 @@ namespace Overpower.Match
         // Set by OnMasterClientSwitched, consumed at the top of Update (MatchDirector.Live.cs).
         private bool finishCutNeutralisePending;
 
-        /// <summary>Review fix F3: a new master finishes a knockout's neutralise the old master may not have. Idempotent -
+        /// <summary>A new master finishes a knockout's neutralise the old master may not have. Idempotent -
         /// SetNeutralWithoutBountyHistory skips a zone already neutral with no history, and nobody can legitimately own
         /// a zone behind the wall, so it costs nothing when there was nothing left to finish. Only the cut zones: a
         /// Tier III or the centre the old master missed is in play and can be fought for as it stands.</summary>
@@ -398,12 +392,12 @@ namespace Overpower.Match
 
             bool touchesElimination = propertiesThatChanged.ContainsKey(PhaseKey)
                 || propertiesThatChanged.ContainsKey(EliminatedKey) || propertiesThatChanged.ContainsKey(WinnerKey);
-            // 2.7b step 5: mTeams/mLiveAt (Decision 1) are the countdown's own two keys - a separate write from
+            // mTeams/mLiveAt (Decision 1) are the countdown's own two keys - a separate write from
             // the elimination triad above, so they get their own check rather than folding into touchesElimination
             // and mis-decrementing writesAwaitingEcho, which only ever counts THIS client's own
             // MasterRecompute/GoLive writes of Phase/Eliminated/Winner.
             bool touchesCountdown = propertiesThatChanged.ContainsKey(TeamsInMatchKey) || propertiesThatChanged.ContainsKey(LiveAtKey);
-            // Two-team lobby: mMode is its own write, not the master's elimination triad above nor the
+            // mMode is its own write, not the master's elimination triad above nor the
             // countdown's two keys - reacted to (ReactToRoomState) but never counted against writesAwaitingEcho,
             // which only ever tracks THIS client's own MasterRecompute/GoLive writes of Phase/Eliminated/Winner.
             bool touchesMode = propertiesThatChanged.ContainsKey(LobbyModeKey);
@@ -414,7 +408,7 @@ namespace Overpower.Match
                 writesAwaitingEcho--;
 
             // R1: MasterRecompute must NEVER be triggered from here - only from HandleOwnershipChanged,
-            // OnPlayerPropertiesUpdate and OnPlayerLeftRoom (its three wired triggers, unchanged) and the
+            // OnPlayerPropertiesUpdate and OnPlayerLeftRoom (its three wired triggers) and the
             // countdown's own Update() poll going live (MatchDirector.Live.cs). This callback only ever reacts
             // (ReactToRoomState) or clears the countdown/live echo wait below - it never recomputes.
             if (touchesCountdown || propertiesThatChanged.ContainsKey(PhaseKey))
@@ -426,8 +420,7 @@ namespace Overpower.Match
         public override void OnJoinedRoom() => ReactToRoomState(firstRead: true);
 
         /// <summary>The next room is a different match; nothing from this one may leak into it - same
-        /// reasoning as BuildingManager.OnLeftRoom. Found missing live (Task 2.7 review re-
-        /// verification): without this, a client that leaves a finished match and joins another
+        /// reasoning as BuildingManager.OnLeftRoom. Without this, a client that leaves a finished match and joins another
         /// inside the same running process keeps this object's stale lastWrittenPhase/lastApplied*
         /// from the match it just left - the rejoin branch's IsEliminated then reads a stale
         /// IsEliminated for a team that was never even in the new room, and a promoted master's own
@@ -442,15 +435,14 @@ namespace Overpower.Match
             lastAppliedEliminated = new List<int>();
             lastAppliedPhase = MatchPhase.Warmup;
             lastAppliedWinner = -1;
-            // 2.7b step 5: the countdown/live edges, and this client's own master-side countdown bookkeeping if it
-            // was master - the next room starts its own from scratch (Decision 22).
+            // The countdown/live edges, and this client's own master-side countdown bookkeeping if it was master -
+            // the next room starts its own from scratch (Decision 22).
             lastAppliedTeamsFixed = false;
             lastAppliedLive = false;
             lastAppliedLiveAtMs = 0;
-            // Map shrink T3: the next room starts with no corner cut either, whatever this one ended with.
+            // The next room starts with no corner cut either, whatever this one ended with.
             lastAppliedCutTeam = PhaseTwoCutRules.NoCut;
-            // Two-team lobby: the next room starts in three-team mode until its own host switches it, whatever
-            // this one ended with.
+            // The next room starts in three-team mode, whatever this one ended with.
             lastAppliedLobbyMode = MatchStartRules.ThreeTeams;
             finishCutNeutralisePending = false;
             waitForEchoUntil = -1f;
@@ -458,8 +450,7 @@ namespace Overpower.Match
         }
 
         /// <summary>Called by BuildingManager.CheckTerritoryWin when one team holds every capital -
-        /// the second, GDD-external win condition alongside elimination (an earlier project decision,
-        /// kept as an extra win condition per this plan's own "Decisions taken" table). Master only:
+        /// the second, GDD-external win condition alongside elimination. Master only:
         /// writes mWin/mPhase so every client's reaction is the same one path (ReactToRoomState)
         /// whichever way the match actually ended, instead of a separate RPC. Eliminated is left
         /// exactly as MatchPhaseRules last computed it - a territory win does not necessarily mean
@@ -513,7 +504,7 @@ namespace Overpower.Match
             AnnounceResultToLocalClient(winner);
         }
 
-        /// <summary>Lobby Task 15b: this client's own result screen. A player's is the MatchUI panel on their body; a spectator has no
+        /// <summary>This client's own result screen. A player's is the MatchUI panel on their body; a spectator has no
         /// body (spec section 11: they see the same result), so theirs is the result card their view builds
         /// (SpectatorSeatView.ShowMatchResult). A client with neither yet is caught up when its body spawns (CatchUpLocalPlayer) or its
         /// spectator view begins.</summary>
@@ -539,7 +530,7 @@ namespace Overpower.Match
             if (!PhotonNetwork.IsMasterClient || !PhotonNetwork.InRoom)
                 return;
 
-            // 2.7b step 5 (Decision 3): nothing counts before the match is live - gated on IsLive, the room's own
+            // Nothing counts before the match is live (Decision 3) - gated on IsLive, the room's own
             // ECHOED mPhase (MatchDirector.Live.cs), never on liveWritten (set the instant THIS client's own live
             // write is SENT, before the round trip) and never on any client's own countdown clock. The countdown
             // is still warm-up. R1: this method must never be called from OnRoomPropertiesUpdate itself - only
@@ -549,7 +540,7 @@ namespace Overpower.Match
             if (!IsLive)
                 return;
 
-            // Dominion (Task 2): no knockouts, last stand or phase two - the rounds decide it (DominionDirector).
+            // Dominion: no knockouts, last stand or phase two - the rounds decide it (DominionDirector).
             if (DominionMode.IsActive())
                 return;
 
@@ -574,9 +565,8 @@ namespace Overpower.Match
             // Recompute always starts from previousEliminated's own items (Recompute's first line is
             // AddRange(alreadyEliminated)), so anything after that prefix is newly found this call -
             // possibly more than one team at once (a knockout can leave another base-less team with nobody alive,
-            // and it goes out in that same call, not next tick - MatchPhaseRules.Recompute's own fixpoint, restored
-            // in the review round-2 fix). Tudor D17: a team is knocked out only when it holds no base AND every
-            // member is dead; the two-team "out at once" rule no longer exists.
+            // and it goes out in that same call, not next tick - MatchPhaseRules.Recompute's own fixpoint). A team
+            // is knocked out only when it holds no base AND every member is dead (D17).
             List<int> newlyEliminated = result.Eliminated.Skip(previousEliminated.Count).ToList();
             bool changed = newlyEliminated.Count > 0 || result.Phase != previousPhase || result.Winner != previousWinner;
             if (!changed)
@@ -598,9 +588,8 @@ namespace Overpower.Match
             lastWrittenWinner = result.Winner;
             writesAwaitingEcho++;
 
-            // Centre-circle-and-cut-rule, 2026-09-26 (Tudor: "eliminate the spawn of the team that also got
-            // eliminated"): the corner that closes is always the FIRST team knocked out, so there is nothing left to
-            // decide or write here - mElim (just sent above, in the very same Hashtable) already tells every client
+            // The corner that closes is always the FIRST team knocked out, so there is nothing to decide or write
+            // here - mElim (just sent above, in the very same Hashtable) already tells every client
             // which corner that is (PhaseTwoCutRules.CutTeam). newlyEliminated.Count is always > 0 whenever
             // phaseTwoStarts is true (the ThreeTeams -> TwoTeams edge can only be crossed by a fresh elimination -
             // MatchPhaseRules.PhaseFor), but this stays defensive rather than assuming that ordering.
@@ -620,12 +609,12 @@ namespace Overpower.Match
         /// to loop every zone even if this runs more than once, for the TERRITORY half only (SetNeutralWithoutBountyHistory):
         /// a zone already neutral with no hold history is skipped (TerritorySnapshot.NeedsNeutralReset), and one
         /// that drained to neutral naturally but still carries history is wiped - which is the whole point of this
-        /// method. Review fix F6, 2026-09-25: ResetCaptureOf below is NOT safe on a second run - it forces a zone's
-        /// in-progress capture back to owner/0 unconditionally, so a second call would wipe a capture that started
-        /// AFTER the first run already reset it. This method itself still only ever runs once per knockout
-        /// (phaseTwoStarts, MasterRecompute's own guard); F3's new-master catch-up calls SetNeutralWithoutBountyHistory
-        /// directly instead of this method, for exactly that reason.
-        /// Map shrink T3: now also the centre (a Tier III in all but name once a corner is cut) and every
+        /// method. ResetCaptureOf below is NOT safe on a second run - it forces a zone's in-progress capture back to
+        /// owner/0 unconditionally, so a second call would wipe a capture that started AFTER the first run already
+        /// reset it. This method itself only ever runs once per knockout (phaseTwoStarts, MasterRecompute's own
+        /// guard); the new-master catch-up (FinishCutNeutralise) calls SetNeutralWithoutBountyHistory directly
+        /// instead of this method, for exactly that reason.
+        /// It also covers the centre (a Tier III in all but name once a corner is cut) and every
         /// cut zone (PhaseTwoCutRules.ZonesToNeutralise), plus - for every zone this reaches, cut or not -
         /// the in-progress capture reset (ResetCaptureOf), so nobody keeps an income or a way in from
         /// behind the wall and no capture already under way can complete into a zone that just went dark.
@@ -674,15 +663,7 @@ namespace Overpower.Match
                 MatchTelemetry.Instance.LogPhase((int)result.Phase, teamsRemaining);
         }
 
-        /// <summary>2.7b step 5: InMatch now comes from mTeams (IsInMatch) - the interim "every team reads true"
-        /// stand-in from step 3 is gone. HoldsAnyCapitalInPlay only counts a capital whose OWN team is in mTeams
-        /// (Decision 4: the third capital of a host start is never in play, so owning it - which cannot actually
-        /// happen once TerritoryMap's out-of-play check is wired in step 6, but this reads correct even before
-        /// that lands) must not count as "having a capital"), and (review fix F1) whose zone isn't itself behind
-        /// the phase-two wall - IsCapitalInPlay, not just IsInMatch. LastOutAtMs is the latest lastStandAt Player Property
-        /// (Decision 23) among the team's members currently out for the last stand, compared wrap-safe like every
-        /// other server-clock stamp in this codebase - read only by MatchPhaseRules' no-draw rule.</summary>
-        /// <summary>The same per-team facts MasterRecompute reads, for BuildingManager's territory win (Task 9b-2). Null
+        /// <summary>The same per-team facts MasterRecompute reads, for BuildingManager's territory win. Null
         /// while the territory is not known.</summary>
         public TeamStatus[] CurrentTeamStatuses()
         {
@@ -692,6 +673,12 @@ namespace Overpower.Match
             return BuildTeamStatuses(buildings);
         }
 
+        /// <summary>InMatch comes from mTeams (IsInMatch). HoldsAnyCapitalInPlay only counts a capital whose OWN team
+        /// is in mTeams (Decision 4: the third capital of a host start is never in play, so owning it must not count
+        /// as "having a capital") and whose zone isn't itself behind the phase-two wall - IsCapitalInPlay, not just
+        /// IsInMatch. LastOutAtMs is the latest lastStandAt Player Property (Decision 23) among the team's members
+        /// currently out for the last stand, compared wrap-safe like every other server-clock stamp - read only by
+        /// MatchPhaseRules' no-draw rule.</summary>
         private TeamStatus[] BuildTeamStatuses(BuildingManager buildings)
         {
             var statuses = new TeamStatus[TeamCount];
@@ -704,17 +691,17 @@ namespace Overpower.Match
                 int? lastOutAtMs = null;
                 foreach (Player p in PhotonNetwork.PlayerList)
                 {
-                    // A seat spectator is no member of any team (lobby Task 6), whatever team property a stale value left on them.
+                    // A seat spectator is no member of any team, whatever team property a stale value left on them.
                     if (!Teams.TryGetPlayingTeam(p, out int t) || t != team)
                         continue;
                     members++;
 
-                    // Task 9b-2: "dead" is alive == false OR waiting (lastStand) - a member on a respawn countdown counts
+                    // "dead" is alive == false OR waiting (lastStand) - a member on a respawn countdown counts
                     // (with no base that countdown is no way back). A missing alive key means alive; a missing lastStand
                     // key means not waiting.
                     bool waiting = p.CustomProperties.TryGetValue(PlayerLifecycle.LastStandKey, out object raw) && raw is bool b && b;
                     bool? aliveFlag = p.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object aliveRaw) && aliveRaw is bool a ? a : (bool?)null;
-                    // Task 9e: a member whose connection dropped (inactive, kept for the rejoin window) is dead here whatever
+                    // A member whose connection dropped (inactive, kept for the rejoin window) is dead here whatever
                     // "alive" they last wrote - PresenceRules.CountsAsDead. With no base the team is out once all its members are.
                     if (!PresenceRules.CountsAsDead(p.IsInactive, waiting, aliveFlag, p.IsInactive ? SecondsInactive(p) : 0f, DroppedGraceSeconds))
                         continue;
@@ -762,7 +749,7 @@ namespace Overpower.Match
         /// already happened before they connected; MatchUI.ShowMatchResult alone already answers a
         /// late joiner reading Over and the winner, whether they were eliminated earlier or not.
         ///
-        /// 2.7b step 5 adds two more edges, both !firstRead only (a joiner mid-countdown or mid-match gets the
+        /// Two more edges, both !firstRead only (a joiner mid-countdown or mid-match gets the
         /// SAME effect through the ordinary spawn path, not by replaying an edge that already happened):
         /// - the teams-fixed edge (Decision 4/17, R3): the countdown write arrives - a player the server placed on
         ///   the left-out team before it saw the teams fixed re-picks onto a real team at once.
@@ -772,22 +759,20 @@ namespace Overpower.Match
         ///   (lastAppliedPhase starts at Warmup), so a host start - which goes live directly from Warmup - never
         ///   also fires the ThreeTeams -> TwoTeams branch below.
         ///
-        /// Review fix: every lastApplied* field is written BEFORE any reaction below runs, from locals holding
-        /// the PREVIOUS values (prev*) - not at the end, from the fresh room values, as this used to do. If a
-        /// reaction throws (ResetForMatchStart, a LiveStateChanged subscriber, a themed string.Format...) with
-        /// the old end-of-method order, lastAppliedLive would stay false forever: the next echo (e.g. the first
+        /// Every lastApplied* field is written BEFORE any reaction below runs, from locals holding the PREVIOUS
+        /// values (prev*), not at the end from the fresh room values. If a reaction throws (ResetForMatchStart, a
+        /// LiveStateChanged subscriber, a themed string.Format...) with the end-of-method order,
+        /// lastAppliedLive would stay false forever: the next echo (e.g. the first
         /// knockout's mPhase, which also touches this same Hashtable) would then see live && !lastAppliedLive
         /// all over again and re-run the WHOLE fresh start mid-match (gold to 0, kit emptied, sent home) while
         /// skipping the three-to-two banner it should have shown instead. Recording the state first and reacting
-        /// against the untouched prev* locals afterward makes that impossible - there is no behaviour change on
-        /// the normal (non-throwing) path.
+        /// against the untouched prev* locals afterward makes that impossible.
         ///
-        /// Map shrink T3: the cut changing (derived from mElim, written in the same Hashtable as the knockout's
-        /// mPhase) also raises LiveStateChanged, which the minimap already listens to.
+        /// The cut changing (derived from mElim, written in the same Hashtable as the knockout's mPhase) also
+        /// raises LiveStateChanged, which the minimap listens to.
         ///
-        /// Two-team lobby (Decision L1/L6): the mode changing also raises LiveStateChanged (the warm-up panel
-        /// redraws) and - !firstRead only, same reasoning as the two edges above - drops the telemetry marker (master
-        /// only). The host's two/three-team switch, MaxPlayers writes and the re-seat are gone (lobby Task 4).
+        /// The lobby mode changing (L1, L6) also raises LiveStateChanged (the warm-up panel redraws) and - !firstRead
+        /// only, same reasoning as the two edges above - drops the telemetry marker (master only).
         private void ReactToRoomState(bool firstRead)
         {
             if (!PhotonNetwork.InRoom)
@@ -835,14 +820,13 @@ namespace Overpower.Match
                 if (teamsFixed && !prevTeamsFixed)
                     FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch();
 
-                // Two-team lobby (Decision L5/L8): the telemetry marker for the mode edge, guarded to the master only (the
-                // report merges every client's own file, so only one of them may log it). The mode is written once at
-                // creation now (lobby Task 4), so this fires only when a client first reads it; the re-seat that used to
-                // follow a host's switch is gone with the switch.
+                // The telemetry marker for the mode edge (L5, L8), guarded to the master only (the report merges every
+                // client's own file, so only one of them may log it). The mode is written once at creation, so this
+                // fires only when a client first reads it.
                 if (modeChanged && PhotonNetwork.IsMasterClient)
                     MatchTelemetry.Instance?.DropMarker(mode == MatchStartRules.TwoTeams ? "two-team lobby on" : "two-team lobby off");
 
-                // Vision Task 9b: the live reset threw the warm-up captures away; what the team knows starts again from it.
+                // The live reset threw the warm-up captures away; what the team knows starts again from it.
                 if (live && !prevLive)
                     Overpower.Vision.ZoneKnowledge.ResetKnowledge();
 
@@ -850,7 +834,7 @@ namespace Overpower.Match
                 {
                     int team = FindFirstObjectByType<RoomManager>()?.EnsureLocalTeamInMatch() ?? myTeam;
                     lifecycle.ResetForMatchStart(team);
-                    // 2.7b step 8: the live toast, right after the fresh start - two-team text for a host start,
+                    // The live toast, right after the fresh start - two-team text for a host start,
                     // the ordinary text for the automatic three-team start.
                     localView?.GetComponent<PlayerHud>()?.ShowMatchLiveToast(phase == MatchPhase.TwoTeams);
                 }
@@ -883,7 +867,7 @@ namespace Overpower.Match
         private static int ReadWinner(Hashtable props) =>
             props.TryGetValue(WinnerKey, out object raw) && raw is int w ? w : -1;
 
-        // Centre-circle-and-cut-rule, 2026-09-26: CutTeam (MatchDirector.Live.cs) runs every frame for every tower
+        // CutTeam (MatchDirector.Live.cs) runs every frame for every tower
         // and minimap bubble (through IsOutOfPlay), so it reads mElim straight off the Hashtable - the raw int[]
         // Photon already stores, an IReadOnlyList<int> as it stands - instead of going through ReadEliminated,
         // which allocates a fresh List on every call for OnRoomPropertiesUpdate's own, much rarer, event-driven reads.

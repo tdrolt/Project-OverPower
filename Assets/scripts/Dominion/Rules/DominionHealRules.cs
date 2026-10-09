@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// How fast a player's own spawn heals them in Dominion (Task 6). In Conquest health only comes back out of combat in an owned zone; a
+    /// How fast a player's own spawn heals them in Dominion. In Conquest health only comes back out of combat in an owned zone; a
     /// Dominion spawn heals even mid-fight, slowly, and quickly once the player has been out of combat for a while. All numbers come in as
     /// arguments (DominionConfig holds them), so the tests use made-up ones.
     /// </summary>
@@ -28,7 +28,7 @@ namespace Overpower.Dominion
             inOwnSpawn ? RatePerSecond(true, secondsSinceCombat, outOfCombatPerSecond, inCombatPerSecond, outOfCombatDelaySeconds)
                        : ordinaryZoneRate;
 
-        /// <summary>The rate a player actually heals at in this stage (Tudor A29): none at all in sudden death - neither the spawn's healing nor an owned
+        /// <summary>The rate a player actually heals at in this stage (A29): none at all in sudden death - neither the spawn's healing nor an owned
         /// zone's regen - and the given rate in every other stage (a Conquest room reads as stage None). Health packs do not come through here.</summary>
         public static float RateInStage(DominionStage stage, float rate) => stage == DominionStage.SuddenDeath ? 0f : rate;
 

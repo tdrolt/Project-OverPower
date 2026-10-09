@@ -6,15 +6,12 @@ using UnityEngine.Rendering.Universal;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// Draws the fog over the game camera's picture: one full-screen pass (Fog.shader) that darkens whatever my team's
-    /// sight picture says is unseen. The project runs URP's Render Graph (not Compatibility Mode), so this is a
-    /// RecordRenderGraph raster pass.
-    /// The pass sits BEFORE transparents (after opaques and the sky). World-space canvases (the names and bars over
-    /// players) are drawn in the transparent queue, so they come out on top of the fog and are never darkened; the HUD and
-    /// minimap are screen-space overlay UI, drawn after the camera, so they are never touched either. Ground rings and
-    /// aim lines are transparent too, so they stay bright where they are drawn (the controller allowed either).
-    /// It needs the camera depth texture (the render pipeline asset has Depth Texture on; the pass also asks for it).
-    /// It does nothing when the fog flag is 0 (menus, name screen, fog switched off) or no TeamSight owner exists.
+    /// One full-screen pass (Fog.shader) that darkens whatever my team's sight picture says is unseen. A RecordRenderGraph
+    /// raster pass, because the project runs URP's Render Graph (not Compatibility Mode).
+    /// It sits BEFORE transparents: world-space canvases (names, bars), ground rings and aim lines are transparent, so they
+    /// stay bright on top of the fog; the HUD and minimap are screen-space overlay, drawn after the camera.
+    /// Needs the camera depth texture (the pipeline asset has it on; the pass also asks for it).
+    /// Does nothing when the fog flag is 0 (menus, name screen, fog off) or no TeamSight owner exists.
     /// </summary>
     public sealed class FogRenderFeature : ScriptableRendererFeature
     {

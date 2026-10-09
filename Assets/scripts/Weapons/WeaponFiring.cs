@@ -10,24 +10,12 @@ using Overpower.Vision;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// One player's trigger. Replaces PlayerShooting, which had three problems this class exists to
-    /// fix: it read input with Input.GetMouseButton instead of the input router, it hardcoded its
-    /// fire rate and damage instead of reading a weapon asset, and - the live bug - its Fire RPC
-    /// took no parameters and computed its direction from `transform.rotation` INSIDE the RPC body.
-    /// Inside an RPC, transform resolves on the RECEIVING machine, so every remote client fired
-    /// along its own interpolated copy of the shooter's rotation rather than where the shooter
-    /// actually aimed, and shots visibly diverged between clients.
-    ///
-    /// The rule that replaces it: anything the sender meant travels as an RPC PARAMETER or comes
-    /// from PhotonMessageInfo.Sender. Never read transform, Camera.main, Input.mousePosition or
-    /// PhotonNetwork.LocalPlayer inside an RPC body and expect the sender's values.
-    ///
-    /// Projectiles are simulated locally on every client and are NOT networked objects.
-    /// PhotonNetwork.Instantiate per bullet would create dozens of networked objects a second for
-    /// nine players. The fire RPC carries everything a receiver needs to build the identical shot.
-    ///
-    /// Deliberately NOT IPunObservable: the player's PhotonView uses AutoFindAll and would silently
-    /// absorb a second observable. PlayerNetSync is the only one.
+    /// One player's trigger. THE RULE: anything the sender meant travels as an RPC PARAMETER or comes from PhotonMessageInfo.Sender. Never read
+    /// transform, Camera.main, Input.mousePosition or PhotonNetwork.LocalPlayer inside an RPC body and expect the sender's values - they resolve
+    /// on the RECEIVING machine, so shots visibly diverge between clients.
+    /// Projectiles are simulated locally on every client and are NOT networked objects (PhotonNetwork.Instantiate per bullet would be dozens of
+    /// networked objects a second for nine players); the fire RPC carries everything a receiver needs to build the identical shot.
+    /// Deliberately NOT IPunObservable: the player's PhotonView uses AutoFindAll and would silently absorb a second observable. PlayerNetSync is the only one.
     /// </summary>
     public class WeaponFiring : MonoBehaviourPun
     {
@@ -70,10 +58,8 @@ namespace Overpower.Weapons
                  "wall immediately instead of spawning inside or beyond it.")]
         private float muzzleClearanceSkin = 0.05f;
 
-        // Not a design tunable: whatever layer every wall and every piece of cover already stands
-        // on (CoverWall.cs's own class comment) is what a wall-hugging shot must be pulled back
-        // from - the same layer FlamethrowerAbility's own occlusion check and ExplodeOnImpact's
-        // splash check already use. Computed once since NameToLayer never changes at runtime.
+        // Not a design tunable: the layer every wall and piece of cover stands on (CoverWall.cs), which a wall-hugging shot is pulled back from - the
+        // same layer FlamethrowerAbility's occlusion check and ExplodeOnImpact's splash check use. Computed once since NameToLayer never changes at runtime.
         private int buildingMask;
 
         private PlayerAim aim;
@@ -86,36 +72,24 @@ namespace Overpower.Weapons
         private float nextFireTime;
         private float triggerHeldSince;
 
-        /// <summary>Bug fix (546ad44, 2026-09-17): true only when input.PrimaryHeld was ALSO true
-        /// on the immediately preceding Update tick - never on the tick a press or a re-click
-        /// starts a hold. Update's held-fire path is the only reader; it feeds this into
-        /// FireScheduleRule.IsContinuingHold so a fresh click can never be mistaken for a
-        /// continuing hold the way "!weapon.CanCharge" alone used to (see that method's own
-        /// comment for the full bug story - Tudor: "the laser was firing way too fast").</summary>
+        /// <summary>True only when input.PrimaryHeld was ALSO true on the immediately preceding Update tick, never on the tick a press or re-click starts
+        /// a hold. Update's held-fire path feeds it into FireScheduleRule.IsContinuingHold so a fresh click is never mistaken for a continuing hold.</summary>
         private bool heldLastFrame;
 
-        // Task 2.6 (GDD p.20): OverPower's comeback buff scales this player's own damage, fire
-        // rate and range while active. Owner state only, set through SetStatMultipliers below - a
-        // shot's damage and range must still be IDENTICAL on every client, so they cross the wire
-        // as RPC_FireWeapon parameters rather than being read locally by a receiver (see that RPC's
-        // own comment). Default 1 = unchanged, exactly OverPowerBuff's "off" state.
+        // OverPower's comeback buff (GDD p.20) scales this player's own damage, fire rate and range while active. Owner state only, set through
+        // SetStatMultipliers: a shot's damage and range must still be IDENTICAL on every client, so they cross the wire as RPC_FireWeapon parameters
+        // rather than being read locally by a receiver. 1 = unchanged, the buff's "off" state.
         private float damageMultiplier = 1f;
         private float fireRateMultiplier = 1f;
         private float rangeMultiplier = 1f;
 
         public WeaponDefinition Weapon => weapon;
 
-        /// <summary>Task T3 (telemetry): raised on the shooter's own client the moment a shot is
-        /// actually committed - once for a simultaneous (shotgun-style) pull with its full pellet
-        /// count, or once per round for a burst/sequential weapon, so an interrupted burst only
-        /// counts the rounds that actually left the gun. See DispatchShots/SpawnSequentially.
-        ///
-        /// newPull (T3 review fix) is true exactly once per TRIGGER PULL - always true for a
-        /// Simultaneous weapon (one Fired call already covers the whole pull), true only for round 0
-        /// of a burst/Sequential weapon's several Fired calls. Without this, PlayerTelemetry's own
-        /// "pulls" counter treated every burst round as its own pull, inflating a 3-round burst
-        /// weapon's pull count 3x against what was actually pressed. PlayerTelemetry is the only
-        /// subscriber today.</summary>
+        /// <summary>Raised on the shooter's own client the moment a shot is actually committed: once for a simultaneous (shotgun-style) pull with its full
+        /// pellet count, or once per round for a burst/sequential weapon, so an interrupted burst only counts the rounds that left the gun (see
+        /// DispatchShots/SpawnSequentially).
+        /// newPull is true exactly once per TRIGGER PULL: always for a Simultaneous weapon, only for round 0 of a burst. Without it PlayerTelemetry's
+        /// "pulls" counter counted every burst round as its own pull. PlayerTelemetry is the only subscriber today.</summary>
         public event System.Action<int, int, bool> Fired;
 
         /// <summary>Guarded on IsMine so this never fires with no possible correct listener - every
@@ -133,49 +107,32 @@ namespace Overpower.Weapons
         public float CurrentRangeMultiplier => rangeMultiplier;
 
         /// <summary>
-        /// OverPowerBuff's hook (Task 2.6, GDD p.20): while the comeback buff is active, this
-        /// player's primary fires 10% harder, 10% faster and 10% further; when it ends every
-        /// multiplier goes back to 1. 1 = unchanged for all three - the plan's own shorthand.
-        ///
-        /// Owner-only state, exactly like triggerHeldSince above - nothing here is read on a
-        /// remote copy, which never runs TryFire (photonView.IsMine guards it) and has no
-        /// OverPowerBuff of its own driving this player's stats.
+        /// OverPowerBuff's hook (GDD p.20): while the comeback buff is active this player's primary fires harder, faster and further; when it ends every
+        /// multiplier goes back to 1 (= unchanged for all three). Owner-only state, like triggerHeldSince: a remote copy never runs TryFire
+        /// (photonView.IsMine guards it) and has no OverPowerBuff of its own driving this player's stats.
         /// </summary>
         public void SetStatMultipliers(float damage, float fireRate, float range)
         {
-            // Clamped the same defensive way ArmorState guards a zero refillSeconds, even though
-            // nothing today ever calls this with a negative value: a negative damage or range
-            // multiplier would read as healing or a shot that travels backwards, and a zero or
-            // negative fire-rate multiplier would divide nextFireTime's interval by zero or flip
-            // the cooldown negative.
+            // Clamped the same defensive way ArmorState guards a zero refillSeconds, though nothing calls this with a negative today: a negative damage or
+            // range multiplier would read as healing or a shot travelling backwards, and a zero or negative fire-rate multiplier would divide nextFireTime's
+            // interval by zero or flip the cooldown negative.
             damageMultiplier = Mathf.Max(0f, damage);
             fireRateMultiplier = Mathf.Max(0.0001f, fireRate);
             rangeMultiplier = Mathf.Max(0f, range);
         }
 
-        /// <summary>Where the muzzle currently sits in world space, unclamped - the Transform's own
-        /// point, used for cosmetics (muzzle flash placement point before the clearance pull-back)
-        /// and by SafeMuzzlePosition below. Never the origin a shot or a cast should actually use by
-        /// itself - see SafeMuzzlePosition's own comment. Does not change the muzzle's own height or
-        /// its open-ground position - the shotgun spread was tuned from this exact point.</summary>
+        /// <summary>Where the muzzle currently sits in world space, unclamped: for cosmetics and as SafeMuzzlePosition's input. Never the origin a shot or
+        /// cast should use by itself - see SafeMuzzlePosition. Muzzle height and open-ground position are unchanged; the shotgun spread was tuned from
+        /// this exact point.</summary>
         public Vector3 MuzzlePosition => muzzle != null ? muzzle.position : transform.position;
 
         /// <summary>
-        /// THE origin every shot and every ability cast should use - AbilityRunner.CastContext.Muzzle
-        /// and TryFire's own origin below both read this, never MuzzlePosition directly (Task 1.9
-        /// follow-up review finding).
-        ///
-        /// Sweeps a small sphere from the player's own root, raised to muzzle HEIGHT, out to the raw
-        /// muzzle point, against Building only (triggers ignored). In the open this hits nothing and
-        /// returns the raw muzzle unchanged - the normal case, and the one the shotgun's spread and
-        /// every other weapon number was tuned against. Hugging a wall or a piece of cover puts that
-        /// short hop through it, so the origin is pulled back to the sweep's contact point, minus
-        /// Muzzle Clearance Skin toward the body - on the NEAR side of the wall, exactly where a
-        /// gun barrel actually stops when its owner is pressed up against something solid.
-        ///
-        /// Deliberately does not touch the muzzle's HEIGHT or its position over open ground - only
-        /// the wall-hugging case is affected, so the earlier measured TTK, shotgun spread and laser
-        /// range all stay valid.
+        /// THE origin every shot and every ability cast should use - AbilityRunner.CastContext.Muzzle and TryFire both read this, never MuzzlePosition directly.
+        /// Sweeps a small sphere from the player's own root, raised to muzzle HEIGHT, out to the raw muzzle point, against Building only (triggers
+        /// ignored). In the open it hits nothing and returns the raw muzzle unchanged - the case the shotgun's spread and every other weapon number were
+        /// tuned against. Hugging a wall or cover puts that hop through it, so the origin is pulled back to the sweep's contact point minus Muzzle
+        /// Clearance Skin toward the body: the NEAR side of the wall, where a gun barrel actually stops when its owner is pressed against something solid.
+        /// Muzzle height and open-ground position are never touched, so the measured TTK, shotgun spread and laser range stay valid.
         /// </summary>
         public Vector3 SafeMuzzlePosition
         {
@@ -230,13 +187,10 @@ namespace Overpower.Weapons
 
         private void OnDisable()
         {
-            // Re-review fix: PlayerLifecycle disables this component on death
-            // (weaponFiring.enabled = alive). Without this, a charge weapon held right up to a
-            // death kept triggerHeldSince set, and respawn re-enables this same component with
-            // that stale value still in it - AimConeView's range arc (CurrentChargeFraction) would
-            // read a leftover, possibly full, charge the player never actually held on the new
-            // life. Cleared unconditionally, before the null-check below, since it must happen
-            // regardless of whether input ever resolved.
+            // PlayerLifecycle disables this component on death (weaponFiring.enabled = alive). Without this reset, a charge weapon held right up to a
+            // death kept triggerHeldSince set and respawn re-enabled the component with that stale value, so AimConeView's range arc
+            // (CurrentChargeFraction) read a leftover, possibly full, charge the player never held on the new life. Cleared before the null-check
+            // since it must happen whether or not input ever resolved.
             triggerHeldSince = 0f;
 
             // Same reasoning as triggerHeldSince above: a stale true here would let re-enabling
@@ -259,25 +213,16 @@ namespace Overpower.Weapons
         /// is trying to hold the trigger down to charge one.
         private void Update()
         {
-            // Fix 10 (Playtest polish review, cosmetic): opening a tool (P for the loadout screen,
-            // F1 for the test range) while holding a charge weapon's trigger sets InputSuppressed
-            // true, which swallows PrimaryReleased the same way it swallows every other router
-            // event - HandlePrimaryReleased, the only other place triggerHeldSince is cleared,
-            // never runs. Left alone, triggerHeldSince stayed set for as long as the tool was open,
-            // so ChargeFraction() (and CurrentChargeFraction, which AimConeView reads for the range
-            // arc) kept reporting a growing charge the player was no longer actually holding, and
-            // still read close to full for an instant after the tool closed. Cleared here instead,
-            // every frame input stays suppressed, WITHOUT calling TryFire - a real release fires a
-            // charge weapon (HandlePrimaryReleased), a suppressed one must not.
+            // Opening a tool (P for the loadout screen, F1 for the test range) while holding a charge weapon's trigger sets InputSuppressed, which
+            // swallows PrimaryReleased like every other router event, so HandlePrimaryReleased - the only other place triggerHeldSince is cleared -
+            // never runs. Left alone, ChargeFraction() (and CurrentChargeFraction, which AimConeView reads for the range arc) kept reporting a growing
+            // charge the player no longer held. Cleared here every frame input stays suppressed, WITHOUT calling TryFire: a real release fires a
+            // charge weapon, a suppressed one must not.
             if (photonView.IsMine && input != null && input.InputSuppressed && triggerHeldSince != 0f)
                 triggerHeldSince = 0f;
 
-            // Bug fix (546ad44): heldNow captures whether THIS tick's automatic-fire poll should
-            // run at all - unchanged from before. What changed is that the call below now tells
-            // TryFire whether the trigger was ALSO held on the PREVIOUS tick (heldLastFrame, read
-            // before it is overwritten just below) rather than just "this weapon can't charge", so
-            // a fresh click's own first held-fire tick is never mistaken for a continuing hold - see
-            // FireScheduleRule.IsContinuingHold's own comment.
+            // heldLastFrame is read here before it is overwritten below: TryFire is told whether the trigger was ALSO held on the PREVIOUS tick, not just
+            // "this weapon can't charge", so a fresh click's own first held-fire tick is never mistaken for a continuing hold (FireScheduleRule.IsContinuingHold).
             bool heldNow = photonView.IsMine && input != null && input.PrimaryHeld &&
                           (weapon == null || !weapon.CanCharge);
             if (heldNow)
@@ -298,21 +243,13 @@ namespace Overpower.Weapons
             TryFire();
         }
 
-        /// <summary>Where a charging weapon actually fires - with whatever charge the hold reached.
-        /// TryFire must run BEFORE triggerHeldSince is cleared, since ChargeFraction() below reads
-        /// it to work out how long the trigger was held.
-        ///
-        /// Re-review fix: PlayerInputRouter deliberately does NOT pointer-gate the release event
-        /// the way it gates the press (see EmitPointerGated's own comment - gating release risked
-        /// a stuck-held weapon) - so releasing the mouse over the "Loadout (P)" button still reaches
-        /// here even though the matching PRESS was blocked and never ran HandlePrimaryPressed.
-        /// Without the triggerHeldSince > 0f guard below, that blocked-press-but-unblocked-release
-        /// pair fired an uncharged shot through the button on every click (weapon 6 - the only one
-        /// that CanCharge since the laser tree dropped charging, 2026-09-18). triggerHeldSince is 0
-        /// whenever the matching press never ran
-        /// (HandlePrimaryPressed is the only place that sets it, other than this method's own
-        /// unconditional clear below and Update's InputSuppressed clear, both of which always leave
-        /// it at 0), so this is exactly "did a real press start this hold".</summary>
+        /// <summary>Where a charging weapon actually fires - with whatever charge the hold reached. TryFire must run BEFORE triggerHeldSince is
+        /// cleared, since ChargeFraction() reads it to work out how long the trigger was held.
+        /// PlayerInputRouter deliberately does NOT pointer-gate the release event the way it gates the press (see EmitPointerGated: gating release
+        /// risked a stuck-held weapon), so releasing the mouse over the "Loadout (P)" button still reaches here though the matching PRESS was blocked
+        /// and never ran HandlePrimaryPressed. Without the triggerHeldSince > 0f guard below, that pair fired an uncharged shot through the button on
+        /// every click. triggerHeldSince is 0 whenever the matching press never ran (HandlePrimaryPressed is the only place that sets it; this method's
+        /// own clear and Update's InputSuppressed clear both leave it at 0), so the guard is exactly "did a real press start this hold".</summary>
         private void HandlePrimaryReleased()
         {
             if (weapon != null && weapon.CanCharge && triggerHeldSince > 0f)
@@ -346,20 +283,16 @@ namespace Overpower.Weapons
             if (weapon == null || aim == null)
                 return;
 
-            // Points the aim cone at this weapon's own accuracy numbers, which is what PlayerAim's
-            // serialized fallback values were always placeholders for.
+            // Points the aim cone at this weapon's own accuracy numbers (PlayerAim's serialized values are only placeholders).
             aim.ConfigureCone(weapon.MinConeAngle, weapon.MaxConeAngle, weapon.BloomPerShot,
                               weapon.RecoveryPerSecond, weapon.StandingStillMultiplier,
                               weapon.MovingSpreadDegrees, weapon.MovingBloomPerSecond);
         }
 
         /// <summary>
-        /// Fires if the weapon is ready, this player owns it, is alive and is not overheated.
-        /// Public so the test range can drive the exact same path a mouse click does - there is no
-        /// second firing route that could behave differently. Always a fresh, non-continuing call:
-        /// a click is never a continuing hold by definition, and neither is the test range's own
-        /// direct call - see the private overload below, which Update's held-fire path calls
-        /// instead with whatever heldLastFrame actually is.
+        /// Fires if the weapon is ready, this player owns it, is alive and is not overheated. Public so the test range drives the exact same path a
+        /// mouse click does - there is no second firing route. Always a fresh, non-continuing call (a click is never a continuing hold); Update's
+        /// held-fire path calls the private overload below with whatever heldLastFrame actually is.
         /// </summary>
         public bool TryFire() => TryFire(continuingHold: false);
 
@@ -382,46 +315,26 @@ namespace Overpower.Weapons
             bool silenced = overheat != null && overheat.IsSilenced;
             if (CastGate.ForActor(alive, stunned, silenced) != CastBlock.None)
             {
-                // Task 2.6 review follow-up: without this, a blocked player's stale nextFireTime
-                // sat wherever it was left when the block started, and the first tick after the
-                // block lifted could misread as "still mid-cadence" and carry over into a shot
-                // fired only a sliver of an interval later - see FireScheduleRule's own comment.
+                // Without this, a blocked player's stale nextFireTime sat wherever it was left when the block started, and the first tick after the block
+                // lifted could misread as "still mid-cadence" and fire a shot only a sliver of an interval later - see FireScheduleRule.
                 nextFireTime = FireScheduleRule.NextFireTime(nextFireTime, Time.time, interval,
                                                               triggerHeldContinuously: false, blockedThisTick: true);
                 return false;
             }
 
-            // Resolved BEFORE nextFireTime is overwritten below. ChargeFraction() reads nextFireTime
-            // as the deadline the hold had to wait out - the whole point of the c268b40 fix. Once
-            // this shot's own cooldown is written to that same field it points at the NEXT shot's
-            // deadline instead, which is always later than Time.time, which clamped the fraction to
-            // 0 on every single release. That made c268b40 inert: the formula was right, but by the
-            // time it read nextFireTime, this line had already moved the goalposts.
+            // Resolved BEFORE nextFireTime is overwritten below: ChargeFraction() reads nextFireTime as the deadline the hold had to wait out. Once this
+            // shot's own cooldown is written there it points at the NEXT shot's deadline, always later than Time.time, which clamps the fraction to 0 on
+            // every single release.
             float chargeFraction = ChargeFraction();
 
-            // Task 2.6 review fix: carries the previous shot's schedule forward instead of always
-            // re-basing off Time.time, while the trigger is genuinely held continuously (not a
-            // charge weapon's one-off release - see FireScheduleRule's own parameter comment).
-            // Re-basing quietly capped how fast a buffed fast weapon could ever fire: TryFire only
-            // ever runs once per rendered frame (Update's PrimaryHeld poll), so a weapon whose
-            // buffed interval is shorter than a frame (weapon 09, 0.08s baseline, 0.0727s at x1.1,
-            // against a 60fps ~0.0167s frame) still only fired once a frame either way - but
-            // resetting the deadline to "now" on every one of those once-a-frame shots meant the
-            // SAME once-a-frame cadence applied whether or not the multiplier was active, since
-            // "now" already carries however late THIS frame's shot landed. Carrying the deadline
-            // forward by exactly one interval means the schedule itself runs at the true buffed
-            // rate even though any one frame can only ever catch up to wherever that schedule
-            // currently sits; averaged over many shots the measured rate matches the multiplier
-            // (see fire_driver_tpl.cs, weapon 09).
-            //
-            // Bug fix (546ad44, 2026-09-17): triggerHeldContinuously used to be just
-            // "!weapon.CanCharge", true for every non-charge weapon's call including a fresh click,
-            // so a re-click less than one interval late read as "still mid-cadence" and carried the
-            // OLD deadline forward - the held-fire path then fired again almost immediately once
-            // that too-early deadline arrived (Tudor: "the laser was firing way too fast"). Routed
-            // through IsContinuingHold instead, which only reads true when continuingHold (this
-            // call's own heldLastFrame, always false for a fresh click - see the public TryFire()
-            // wrapper) says the trigger was ALSO held on the previous frame.
+            // Carries the previous shot's schedule forward instead of rebasing off Time.time while the trigger is genuinely held continuously (not a
+            // charge weapon's one-off release - see FireScheduleRule). TryFire only runs once per rendered frame, so rebasing capped a buffed fast weapon
+            // at once a frame (weapon 09's buffed interval is shorter than a frame): "now" already carries however late THIS frame's shot landed. Carrying
+            // the deadline forward by exactly one interval keeps the schedule at the true buffed rate even though any one frame only catches up to where
+            // it sits; averaged over many shots the rate matches the multiplier (fire_driver_tpl.cs, weapon 09).
+            // triggerHeldContinuously comes from IsContinuingHold, true only when continuingHold (this call's heldLastFrame, always false for a fresh
+            // click - see the public TryFire() wrapper) says the trigger was ALSO held last frame. "!weapon.CanCharge" alone read a re-click less than one
+            // interval late as mid-cadence, carried the OLD deadline forward, and the held-fire path then fired again almost at once.
             nextFireTime = FireScheduleRule.NextFireTime(nextFireTime, Time.time, interval,
                                                           triggerHeldContinuously: FireScheduleRule.IsContinuingHold(continuingHold, weapon.CanCharge),
                                                           blockedThisTick: false);
@@ -433,9 +346,8 @@ namespace Overpower.Weapons
             // The cone this shot actually fires through is the one from BEFORE it blooms: holding
             // the trigger costs you the NEXT shot's accuracy, not this one's.
             float coneAngle = aim != null ? aim.EffectiveConeAngle : 0f;
-            // SafeMuzzlePosition, not the raw muzzle - a shot fired flush against a wall must start
-            // on the near side of it, or it spawns inside/through the wall and hits whatever is on
-            // the other side for free. See that property's own comment (Task 1.9 follow-up finding).
+            // SafeMuzzlePosition, not the raw muzzle - a shot fired flush against a wall must start on the near side of it, or it spawns inside/through
+            // the wall and hits whatever is on the other side for free.
             Vector3 origin = SafeMuzzlePosition;
             Vector3 direction = aim != null ? aim.AimDirection : transform.forward;
 
@@ -452,11 +364,9 @@ namespace Overpower.Weapons
             RefundHeatIfBeamConnects(origin, direction, targetPoint, coneAngle, seed, chargeFraction,
                                       damageMultiplier, rangeMultiplier);
 
-            // Task 2.6: damageMultiplier/rangeMultiplier are appended AFTER chargeFraction and
-            // BEFORE PhotonMessageInfo - appending RPC parameters does not touch the RpcList (it
-            // indexes method NAMES, not signatures - see PhotonServerSettings.RpcList), but every
-            // client must be running this same build for the extra parameters to line up, so
-            // rebuild every Player before a two-client check that exercises this RPC.
+            // damageMultiplier/rangeMultiplier are appended AFTER chargeFraction and BEFORE PhotonMessageInfo. Appending RPC parameters does not touch the
+            // RpcList (it indexes method NAMES, not signatures - see PhotonServerSettings.RpcList), but every client must run this same build for the
+            // extra parameters to line up, so rebuild every Player before a two-client check that exercises this RPC.
             photonView.RPC(nameof(RPC_FireWeapon), RpcTarget.AllViaServer, weapon.Id, origin,
                            direction, targetPoint, coneAngle, seed, chargeFraction,
                            damageMultiplier, rangeMultiplier);
@@ -464,33 +374,17 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// The laser's overheat rule from the GDD: every shot costs double heat (already added
-        /// above), and half of it comes back if the beam connects with a target.
-        ///
-        /// The SHOOTER decides, from its own ray, the instant it fires. Heat is local state that
-        /// only its owner ever reads, so nothing about the refund crosses the network. The ray is
-        /// the same one every client will cast: BuildShots is fed the same seed and cone that are
-        /// about to go into the RPC, so the aim-cone roll lands on the identical direction.
-        ///
-        /// ACCEPTED TRADEOFF: damage is decided on the victim's client, the refund on the shooter's.
-        /// Under latency the two can disagree - the shooter sees the beam cross a target that, on
-        /// the target's own screen, had already stepped aside - and the shooter gets the refund
-        /// for a hit that dealt no damage. The alternative, waiting for the victim to confirm,
-        /// needs a reply message per hit for a few points of heat. Revisit after a real-latency test.
-        ///
-        /// TASK 11B WIND-UP NOTE: this method runs from TryFire, at the moment the trigger is
-        /// pressed - BEFORE the RPC is even sent, let alone before FireAfterWindup's wait. So for a
-        /// weapon with Windup Seconds set, the same "decided early, might not match what actually
-        /// lands" tradeoff above now also happens with ZERO latency: the refund is locked in
-        /// against the target's position at the PRESS, while the real beam only resolves once the
-        /// wind-up ends - after the target has had the whole warning line to read and step out of
-        /// it. A shooter can be refunded heat for a beam that, once it actually fires, connects
-        /// with nobody. Tudor was told and chose to leave this method exactly as it is rather than
-        /// re-deriving the refund after the wind-up (2026-09-14) - the wind-up telegraph is the
-        /// player-facing fairness fix; the shooter's own heat bookkeeping was not asked to change.
-        ///
-        /// Projectile weapons are untouched: they land later, on every client, and no projectile
-        /// weapon has a refund today.
+        /// The laser's overheat rule from the GDD: every shot costs double heat (already added above), and half of it comes back if the beam connects.
+        /// The SHOOTER decides, from its own ray, the instant it fires. Heat is local state only its owner reads, so nothing crosses the network. The
+        /// ray is the same one every client will cast: BuildShots is fed the same seed and cone that are about to go into the RPC.
+        /// ACCEPTED TRADEOFF: damage is decided on the victim's client, the refund on the shooter's. Under latency the two can disagree - the shooter
+        /// sees the beam cross a target that, on the target's own screen, had already stepped aside - and is refunded for a hit that dealt no damage.
+        /// Waiting for the victim to confirm would need a reply message per hit for a few points of heat. Revisit after a real-latency test.
+        /// WIND-UP: this runs from TryFire at the press, BEFORE the RPC is sent and before FireAfterWindup's wait, so for a Windup Seconds weapon the
+        /// refund is locked in against the target's position at the PRESS and the same mismatch happens with ZERO latency: the target has the whole
+        /// warning line to step out of it. Left as is on purpose; the telegraph is the player-facing fairness fix, the shooter's heat bookkeeping was not
+        /// asked to change.
+        /// Projectile weapons are untouched: they land later, on every client, and none has a refund today.
         /// </summary>
         private void RefundHeatIfBeamConnects(Vector3 origin, Vector3 direction, Vector3 targetPoint,
                                               float coneAngle, int seed, float chargeFraction,
@@ -518,13 +412,10 @@ namespace Overpower.Weapons
             }
         }
 
-        /// <summary>0..1 for a charge weapon, 0 for everything else.
-        ///
-        /// Charge only starts accumulating once the weapon is off cooldown. Measuring from the moment
-        /// of the press instead let a player hold straight through the Fire Interval they had to wait
-        /// anyway, so the charge time cost nothing and a full charge was strictly better than a tap:
-        /// the burst charge path measured a 1.54s kill against a 2-3s design intent. The charge time is
-        /// meant to BE the price of the payoff, so it has to come after the cooldown, not inside it.</summary>
+        /// <summary>0..1 for a charge weapon, 0 for everything else. Charge only starts accumulating once the weapon is off cooldown: measuring from
+        /// the press let a player hold straight through the Fire Interval they had to wait anyway, so charging cost nothing and a full charge was
+        /// strictly better than a tap (the burst charge path killed faster than the design intent). The charge time is meant to BE the price of the
+        /// payoff, so it comes after the cooldown, not inside it.</summary>
         private float ChargeFraction()
         {
             if (weapon == null || !weapon.CanCharge || weapon.MaxChargeSeconds <= 0f || triggerHeldSince <= 0f)
@@ -534,11 +425,8 @@ namespace Overpower.Weapons
             return Mathf.Clamp01((Time.time - chargeStart) / weapon.MaxChargeSeconds);
         }
 
-        /// <summary>Read-only mirror of ChargeFraction() for anything that only needs to DRAW the
-        /// current charge - today AimConeView, for the range arc on a charging beam weapon - without
-        /// duplicating or changing that method's own logic (its trap is documented on its own
-        /// comment above: charge must be read before nextFireTime is overwritten, which this getter
-        /// does not touch either way).</summary>
+        /// <summary>Read-only mirror of ChargeFraction() for anything that only needs to DRAW the current charge (AimConeView's range arc on a charging
+        /// beam weapon). It touches neither that method's logic nor its trap (charge must be read before nextFireTime is overwritten).</summary>
         public float CurrentChargeFraction => ChargeFraction();
 
         /// <summary>True while this player is holding a charging weapon's trigger - owner-only state, exactly like
@@ -549,17 +437,12 @@ namespace Overpower.Weapons
         public bool ChargeHeld => weapon != null && weapon.CanCharge && triggerHeldSince > 0f;
 
         /// <summary>
-        /// Builds this shot on EVERY client, including the shooter's own. Every value it needs
-        /// arrives as a parameter or from info.Sender; nothing in this body reads local state that
-        /// would differ per machine.
-        ///
-        /// coneAngleDegrees is a deviation from the six-parameter signature the task specified, and
-        /// it is load-bearing. The seed alone cannot make the spread identical everywhere:
-        /// PlayerAim ticks its cone only for its owner (Update early-returns on !IsMine) and the
-        /// standing-still bonus depends on movement no other client knows about, so receivers would
-        /// roll the same random number against a DIFFERENT cone width and the shots would diverge -
-        /// the very bug this class was written to fix. The shooter's cone width is something the
-        /// sender meant, so by this file's own rule it travels as a parameter.
+        /// Builds this shot on EVERY client, including the shooter's own. Every value it needs arrives as a parameter or from info.Sender; nothing in this
+        /// body reads local state that would differ per machine.
+        /// coneAngleDegrees is load-bearing: the seed alone cannot make the spread identical everywhere. PlayerAim ticks its cone only for its owner
+        /// (Update early-returns on !IsMine) and the standing-still bonus depends on movement no other client knows about, so receivers would roll the
+        /// same random number against a DIFFERENT cone width and the shots would diverge. The shooter's cone width is something the sender meant, so it
+        /// travels as a parameter.
         /// </summary>
         [PunRPC]
         private void RPC_FireWeapon(int weaponId, Vector3 origin, Vector3 aimDirection,
@@ -581,32 +464,27 @@ namespace Overpower.Weapons
             int shooterActor = info.Sender != null ? info.Sender.ActorNumber : -1;
             Teams.TryGetTeam(info.Sender, out int shooterTeam);
 
-            // damageMultiplier/rangeMultiplier are the SHOOTER's OverPower state (Task 2.6, GDD
-            // p.20) at the moment it fired, carried as RPC parameters so every client - including
-            // the shooter's own - builds an identical shot. Never re-read locally: a receiver has
-            // no way to know another player's OverPower state, and is not supposed to need one.
+            // damageMultiplier/rangeMultiplier are the SHOOTER's OverPower state (GDD p.20) at the moment it fired, carried as RPC parameters so every
+            // client - including the shooter's own - builds an identical shot. Never re-read locally: a receiver cannot know another player's OverPower state.
             ProjectileContext[] shots = BuildShots(fired, aimDirection, targetPoint, coneAngleDegrees,
                                                     seed, shooterActor, shooterTeam, chargeFraction,
                                                     damageMultiplier, rangeMultiplier);
 
-            // Task 11b (design [T] - Tudor reversed the earlier "no warning" call, see the comment on
-            // IgnoreWalls.cs): a weapon with a wind-up shows its warning line(s) now and only fires
-            // for real once that wait is over. Everything else fires exactly as it always has.
+            // A weapon with a wind-up shows its warning line(s) now and only fires for real once that wait is over (design [T]). Everything else fires at once.
             if (fired.WindupSeconds > 0f)
                 StartCoroutine(FireAfterWindup(fired, origin, shots, shooterTeam));
             else
                 DispatchShots(fired, origin, shots);
 
-            // D2: a hidden shooter's muzzle flash is not shown (own team's always). The fire sound below is untouched (Task 7).
+            // A hidden shooter's muzzle flash is not shown (own team's always); the fire sound below is untouched. (D2)
             if (fired.MuzzleVfx != null && VFXManager.Instance != null && TeamSight.ShotShownAt(shooterTeam, origin))
                 VFXManager.Instance.PlayVFX(fired.MuzzleVfx, origin);
             if (fired.FireSfx != null && AudioManager.Instance != null)
                 AudioManager.Instance.Play3D(fired.FireSfx, origin);
         }
 
-        /// <summary>What RPC_FireWeapon always did before Task 11b added the wind-up - fire every
-        /// shot now, simultaneously or spaced by Sequential Delay. Pulled out on its own so a
-        /// wind-up weapon and an instant one both end up calling exactly this, rather than the two
+        /// <summary>Fires every shot now, simultaneously or spaced by Sequential Delay - what RPC_FireWeapon does for a weapon without a wind-up. Its own
+        /// method so a wind-up weapon and an instant one both end up calling exactly this instead of the two paths drifting apart.</summary>
         /// paths drifting apart.</summary>
         private void DispatchShots(WeaponDefinition weapon, Vector3 origin, ProjectileContext[] shots)
         {
@@ -615,10 +493,8 @@ namespace Overpower.Weapons
                 for (int i = 0; i < shots.Length; i++)
                     Spawn(weapon, origin, shots[i]);
 
-                // Shotgun case (Task T3): "one pull, N projectiles" - a Simultaneous weapon spawns
-                // every pellet in this same synchronous loop, so there is no partial-completion case
-                // to account for the way a burst's coroutine has. newPull true: this one call is the
-                // whole pull.
+                // Shotgun case: "one pull, N projectiles". Every pellet spawns in this same synchronous loop, so unlike a burst's coroutine there is no
+                // partial-completion case. newPull true: this one call is the whole pull.
                 RaiseFired(weapon.Id, shots.Length, newPull: true);
             }
             else
@@ -628,23 +504,15 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// Task 11b: shows a warning line along each shot's already-locked path, waits Windup
-        /// Seconds, then fires exactly as DispatchShots always has. Runs on EVERY client, including
-        /// the shooter's own - each machine counts its own wind-up from the moment IT received this
-        /// RPC, so a target who steps out of the line during the wait takes no damage on ITS OWN
-        /// client the instant the beam actually resolves (damage is victim-side - see Hitscan's
-        /// class comment) even though the shooter's own screen already shows the beam connecting.
-        ///
-        /// Origin and every shot's direction are already locked - they arrived as RPC parameters,
-        /// same as any other shot this class fires - so nothing here can change what the beam does;
-        /// only whether the player caught in it had a chance to move first.
-        ///
-        /// ACCEPTED [C]: if this WeaponFiring is destroyed mid-wind-up (its player despawns), this
-        /// coroutine dies with it and the beam never fires on THIS client - the same way any other
-        /// coroutine on a destroyed MonoBehaviour stops. A shooter who merely dies or is stunned
-        /// (without despawning) still gets their beam off once the wait ends, the same way a bullet
-        /// already in flight keeps flying - this class has no hook that would stop it, and design
-        /// [C] says it should not gain one.
+        /// Shows a warning line along each shot's already-locked path, waits Windup Seconds, then fires exactly as DispatchShots always has. Runs on
+        /// EVERY client, including the shooter's own - each machine counts its own wind-up from when IT received the RPC, so a target who steps out of
+        /// the line during the wait takes no damage on ITS OWN client when the beam resolves (damage is victim-side - see Hitscan) even though the
+        /// shooter's own screen shows the beam connecting.
+        /// Origin and every shot's direction are already locked (RPC parameters), so nothing here can change what the beam does, only whether the
+        /// player caught in it had a chance to move first.
+        /// ACCEPTED [C]: if this WeaponFiring is destroyed mid-wind-up (its player despawns) the coroutine dies with it and the beam never fires on THIS
+        /// client. A shooter who merely dies or is stunned still gets their beam off once the wait ends, like a bullet already in flight; this class has
+        /// no hook that would stop it, and design [C] says it should not gain one.
         /// </summary>
         private IEnumerator FireAfterWindup(WeaponDefinition weapon, Vector3 origin,
                                             ProjectileContext[] shots, int shooterTeam)
@@ -662,11 +530,9 @@ namespace Overpower.Weapons
             DispatchShots(weapon, origin, shots);
         }
 
-        /// <summary>One warning line per shot, along the exact path that shot will travel - drawn
-        /// only for a beam weapon (Hitscan on its Projectile Prefab); a projectile weapon given a
-        /// wind-up for some future design would otherwise have nothing sensible to draw a line
-        /// toward, since a bullet's path is not a straight ray to a fixed stop point the way a beam's
-        /// is. Nothing gives a projectile weapon a wind-up today, so this never actually happens.</summary>
+        /// <summary>One warning line per shot, along the exact path that shot will travel - drawn only for a beam weapon (Hitscan on its Projectile
+        /// Prefab): a bullet's path is not a straight ray to a fixed stop point, so a projectile weapon given a wind-up would have nothing sensible to
+        /// draw a line toward. Nothing gives a projectile weapon a wind-up today.</summary>
         private LaserWarningLine[] ShowWarnings(WeaponDefinition weapon, Vector3 origin,
                                                 ProjectileContext[] shots, int shooterTeam)
         {
@@ -684,18 +550,13 @@ namespace Overpower.Weapons
                 float length = beam.PredictBeamLength(origin, shots[i]);
                 warnings[i] = LaserWarningLine.Create(origin, shots[i].Direction, length, color,
                                                       weapon.WindupSeconds, theme);
-                // D2: the warning line of a shot from the fog is drawn only while it crosses my team's sight.
+                // The warning line of a shot from the fog is drawn only while it crosses my team's sight. (D2)
                 if (!TeamSight.ShotShownAlong(shooterTeam, origin, origin + shots[i].Direction.normalized * length))
                     warnings[i].GetComponent<LineRenderer>().enabled = false;
 
-                // Quality review finding: parented to the SHOOTER, not left as a loose root object.
-                // FireAfterWindup only destroys this line after its own WaitForSeconds finishes, and
-                // that coroutine dies silently (never reaching the Destroy call) if this WeaponFiring
-                // is destroyed first - a player despawning (leaving the room; PUN cleans it up) mid
-                // wind-up. Parenting means the warning line dies WITH the shooter's object instead of
-                // being orphaned on screen at full width forever. worldPositionStays: true because
-                // the line is drawn in world space (LaserWarningLine.Initialize) - reparenting must
-                // not move it.
+                // Parented to the SHOOTER, not left as a loose root object: FireAfterWindup only destroys this line after its WaitForSeconds, and that
+                // coroutine dies silently if this WeaponFiring is destroyed first (a player despawning mid wind-up; PUN cleans it up), which would orphan the
+                // line on screen at full width forever. worldPositionStays: true because the line is drawn in world space (LaserWarningLine.Initialize).
                 warnings[i].transform.SetParent(transform, true);
             }
 
@@ -721,22 +582,14 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// The directions for one trigger pull, worked out up front so a burst cannot have its
-        /// random sequence disturbed by anything happening between its shots.
-        ///
-        /// Two separate angles combine here. Spread Degrees is the weapon's FIXED shotgun fan and
-        /// is the same on every client by construction. The aim cone is the player's accuracy and
-        /// is rolled from a System.Random seeded by a number that crossed the wire, so every client
-        /// rolls the identical spread - random spread was the designer's explicit choice, and the
-        /// shared seed is what makes it fair rather than chaotic.
-        ///
-        /// Charge scales two things here, both derived from the one chargeFraction parameter that
-        /// already crosses the wire - no second RPC value was needed for either.
-        ///
-        /// damageMultiplier/rangeMultiplier (Task 2.6) are the shooter's OverPower state, 1 when
-        /// nothing has boosted it - damage is scaled once here, on top of any charge scaling;
-        /// range is handed to ProjectileContext's own constructor (see its RangeMultiplier
-        /// property) rather than applied a second time in this method.
+        /// The directions for one trigger pull, worked out up front so a burst cannot have its random sequence disturbed by anything between its shots.
+        /// Two angles combine: Spread Degrees is the weapon's FIXED shotgun fan, the same on every client by construction; the aim cone is the player's
+        /// accuracy, rolled from a System.Random seeded by a number that crossed the wire, so every client rolls the identical spread (random spread was
+        /// the designer's explicit choice, and the shared seed is what makes it fair rather than chaotic).
+        /// Charge scales two things here, both from the one chargeFraction parameter that already crosses the wire.
+        /// damageMultiplier/rangeMultiplier are the shooter's OverPower state, 1 when nothing has boosted it: damage reaches the projectile through
+        /// ProjectileContext.FireTimeDamageMultiplier, on top of any charge scaling; range goes to ProjectileContext's constructor (RangeMultiplier)
+        /// rather than being applied a second time here.
         /// </summary>
         private static ProjectileContext[] BuildShots(WeaponDefinition weapon, Vector3 aimDirection,
                                                        Vector3 targetPoint, float coneAngleDegrees,
@@ -745,12 +598,9 @@ namespace Overpower.Weapons
                                                        float rangeMultiplier)
         {
             int count = ChargedProjectileCount(weapon, chargeFraction);
-            // Task 2.6 review fix: NOT pre-multiplied by damageMultiplier here any more - that used
-            // to fold OverPower's bonus straight into baseDamage, which a direct hit read fine but
-            // a rocket's splash (its own separate damage figure, never derived from baseDamage)
-            // never saw at all. damageMultiplier now travels into ProjectileContext's own
-            // FireTimeDamageMultiplier instead, which both Damage and ExplodeOnImpact.SplashDamageAt
-            // read - see that property's own comment.
+            // NOT pre-multiplied by damageMultiplier: folding OverPower's bonus into baseDamage worked for a direct hit, but a rocket's splash (its own
+            // damage figure, never derived from baseDamage) never saw it. damageMultiplier travels into ProjectileContext's FireTimeDamageMultiplier
+            // instead, which both Damage and ExplodeOnImpact.SplashDamageAt read.
             float damage = ChargedDamage(weapon, chargeFraction);
             var rng = new System.Random(seed);
 
@@ -775,13 +625,10 @@ namespace Overpower.Weapons
         }
 
         /// <summary>
-        /// How many projectiles this trigger pull sends out. Weapons that cannot charge, or that charge something
-        /// other than their projectile count (Charge Max Projectiles left at 0), are untouched - they always send
-        /// Projectiles Per Shot.
-        ///
-        /// The arithmetic lives in ChargeCountRule so the charge ring on the ground marks the same steps (charge
-        /// step 1). Runs on every client from the chargeFraction RPC parameter, so every client must be on the same
-        /// build to agree on the count - see RPC_FireWeapon.
+        /// How many projectiles this trigger pull sends out. Weapons that cannot charge, or that charge something other than their projectile count
+        /// (Charge Max Projectiles left at 0), are untouched - they always send Projectiles Per Shot.
+        /// The arithmetic lives in ChargeCountRule so the charge ring on the ground marks the same steps. Runs on every client from the chargeFraction
+        /// RPC parameter, so every client must be on the same build to agree on the count - see RPC_FireWeapon.
         /// </summary>
         private static int ChargedProjectileCount(WeaponDefinition weapon, float chargeFraction)
         {
@@ -819,16 +666,9 @@ namespace Overpower.Weapons
             for (int i = 0; i < shots.Length; i++)
             {
                 Spawn(weapon, origin, shots[i]);
-                // Burst case (Task T3): raised per round ACTUALLY spawned, not once for the whole
-                // burst up front. newPull is true only for round 0 - see Fired's own comment for why
-                // (a burst's later rounds must not each count as their own trigger pull).
-                //
-                // T3 review correction: a stun or death does NOT stop this coroutine - only this
-                // WeaponFiring being destroyed (its player despawning) does, matching
-                // FireAfterWindup's own documented behaviour ("a shooter who merely dies or is
-                // stunned... still gets their beam off"). So every round here really does fire and
-                // get counted, including any fired after this player has since died or been stunned -
-                // that is correct, not a gap: the shot was already committed before either happened.
+                // Raised per round ACTUALLY spawned, not once for the whole burst up front. newPull is true only for round 0 - see Fired.
+                // A stun or death does NOT stop this coroutine, only this WeaponFiring being destroyed (its player despawning) does, matching FireAfterWindup.
+                // So every round fires and is counted, including any fired after this player has since died or been stunned: the shot was already committed.
                 RaiseFired(weapon.Id, 1, newPull: i == 0);
                 if (i + 1 < shots.Length)
                     yield return new WaitForSeconds(weapon.SequentialDelay);
@@ -867,8 +707,8 @@ namespace Overpower.Weapons
             }
 
             motor.Initialize(shot);
-            // D2: an enemy's shot is drawn only while it is inside my team's sight, so one from the fog appears as it
-            // crosses the fog's edge (own team's always). Visuals only: the shot flies and hits as before.
+            // An enemy's shot is drawn only while it is inside my team's sight, so one from the fog appears as it crosses the fog's edge (own team's
+            // always). Visuals only: the shot flies and hits as before. (D2)
             VisibleWhenSeen.Attach(projectile, shot.ShooterTeamId);
         }
     }

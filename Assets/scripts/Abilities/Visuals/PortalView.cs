@@ -7,14 +7,12 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// What a portal looks like (ability visuals step 3). A see-through disc at the real diameter with a bright rim, in
-    /// the owner's team colour: wide and light, where a mine is small and dark (A8, Tudor 2026-09-17 evening: the
-    /// colour reads on the OUTER EDGE of a portal - MineView's own class comment is the opposite rule; the rim is the
-    /// dominant colour, the centre stays see-through and darker). Only the player who placed it also sees a floating
-    /// diamond on a stem - "this one is yours to use" - because nobody else, teammates included, can use it (Portal's
-    /// class comment). Enemies still see the disc and rim, as they always saw the portal.
+    /// What a portal looks like: a see-through disc at the real diameter with a bright rim, in the owner's team colour -
+    /// wide and light, where a mine is small and dark; the colour reads on the OUTER EDGE (A8, the opposite of MineView),
+    /// the centre stays see-through and darker. Only the player who placed it also sees a floating diamond on a stem
+    /// ("this one is yours"); enemies still see the disc and rim.
     ///
-    /// COOLING DOWN (Tudor D23): while the owner has no portal charge - after anyone's trip, until it recharges - the
+    /// COOLING DOWN (D23): while the owner has no portal charge - after anyone's trip, until it recharges - the
     /// whole glow turns grey, on every player's screen. The rule is the owner's published "has a charge" Player Property
     /// (AllyPortalTraveller.ReadyKey), the same one for the owner's own client as for everyone else.
     ///

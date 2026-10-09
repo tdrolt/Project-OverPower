@@ -16,43 +16,32 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 /// One player's whole alive/dead/respawn cycle: reacting to a lethal hit, deciding whether that
 /// death is temporary or permanent, timing the respawn wait, putting the player back on their
 /// spawn point, and replicating "is this player alive" to every other client.
-///
-/// Split out of Multiplayer.cs (Task 0.11b) along with MatchUI (the win/lose/waiting panels) and
-/// PlayerNameTag (the floating name and its team colour). Those three were the last third of a
-/// 982-line class that owned everything about a player; Multiplayer.cs no longer exists.
-///
-/// Alive state lives in a Photon Custom Property rather than being announced by an RPC, because it
-/// is state, not an event: a player joining mid-match needs to know who is currently dead, and an
-/// unbuffered RPC cannot tell them. See CODING-STANDARDS.md section 5, rule 2.
-///
-/// Deliberately NOT IPunObservable. The player's PhotonView uses AutoFindAll, which searches
-/// children too, so a second observable anywhere on this object would silently start sending an
-/// extra serialization block every network tick. PlayerNetSync is the sole observable - see its
-/// class comment.
+/// Alive state lives in a Photon Custom Property, not an RPC: it is state, not an event, and a player
+/// joining mid-match needs to know who is dead (an unbuffered RPC cannot tell them; CODING-STANDARDS.md
+/// section 5, rule 2). Deliberately NOT IPunObservable: the PhotonView uses AutoFindAll, which searches
+/// children too, so a second observable here would silently add a serialization block every tick.
+/// PlayerNetSync is the sole observable.
 /// </summary>
 public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 {
-    /// The Custom Property key holding alive state - see the class comment for why it is a
-    /// property and not an RPC.
+    /// The Custom Property key holding alive state (a property, not an RPC: see the class comment).
     public const string AliveKey = "alive";
 
-    /// <summary>The Custom Property key marking this player "out for the last stand" (Task 2.7
-    /// review) - dead and waiting, no respawn countdown running, for a teammate to retake or adopt a base
-    /// (a last-stand death, an ended countdown, or a join into a last stand). Distinct from AliveKey: a
-    /// player on a respawn countdown is dead too but not yet waiting. Since Task 9b-2 MatchDirector also counts a
-    /// dead member on a countdown toward the last stand once the team has no base (it reads AliveKey for that);
-    /// this key stays the "waiting" fact.</summary>
+    /// <summary>The Custom Property key marking this player "out for the last stand": dead and waiting, no respawn
+    /// countdown running, for a teammate to retake or adopt a base (a last-stand death, an ended countdown, or a join
+    /// into a last stand). Distinct from AliveKey: a player on a respawn countdown is dead too but not yet waiting.
+    /// MatchDirector also counts a dead member on a countdown toward the last stand once the team has no base (it
+    /// reads AliveKey for that); this key stays the "waiting" fact.</summary>
     public const string LastStandKey = "lastStand";
 
-    /// <summary>2.7b Decision 23: the server ms of this player's last last-stand death, written by the owner in the
-    /// SAME call as LastStandKey (SetLastStandOut) so the two can never disagree - a sibling key rather than a
-    /// retyped LastStandKey, so every existing LastStandKey reader keeps working unchanged. Read only by
-    /// MatchDirector.BuildTeamStatuses into TeamStatus.LastOutAtMs, for the no-draw rule: in a same-instant wipe the
-    /// team whose last player died LATEST stays in and wins.</summary>
+    /// <summary>The server ms of this player's last last-stand death, written by the owner in the SAME call as
+    /// LastStandKey (SetLastStandOut) so the two can never disagree - a sibling key, so every LastStandKey reader keeps
+    /// working. Read only by MatchDirector.BuildTeamStatuses into TeamStatus.LastOutAtMs, for the no-draw rule: in a
+    /// same-instant wipe the team whose last player died LATEST stays in and wins.</summary>
     public const string LastStandAtKey = "lastStandAt";
-    // Task 9b-2: LastStandAtKey holds the server ms of this player's latest DEATH while they are dead, written at the
-    // moment of death - also for a death that starts a respawn countdown (alive false, lastStand false) - and kept
-    // through the countdown's end into the wait. Cleared when they are back in the match.
+    // While dead, LastStandAtKey holds the server ms of this player's latest DEATH, written at the moment of death (also
+    // for a death that starts a respawn countdown: alive false, lastStand false) and kept through the countdown's end
+    // into the wait. Cleared when they are back in the match.
 
     [Header("Respawn")]
     [SerializeField, Tooltip("Match tuning asset. The base respawn wait, the per-death increase " +
@@ -60,10 +49,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
              "everything else a designer tunes.")]
     private GameplayConfig gameplayConfig;
 
-    /// <summary>2.7b step 5: MatchDirector has no serialized fields of its own (BuildingManager.Awake adds it at
-    /// runtime), so it reads the countdown length through the master's own player - this getter over the
-    /// reference this class already holds, rather than a second GameplayConfig reference living on the
-    /// director.</summary>
+    /// <summary>MatchDirector has no serialized fields of its own (BuildingManager.Awake adds it at runtime), so it
+    /// reads the countdown length through the master's own player: this getter over the reference this class holds,
+    /// rather than a second GameplayConfig on the director.</summary>
     public GameplayConfig Config => gameplayConfig;
 
     [SerializeField, Tooltip("The character model, hidden while this player is dead and shown " +
@@ -71,7 +59,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
              "disabling the root would switch this whole component off with it.")]
     private GameObject playerMesh;
 
-    /// <summary>The character model root (vision Task 2: EnemyVisibility collects the body renderers under it).</summary>
+    /// <summary>The character model root (EnemyVisibility collects the body renderers under it).</summary>
     public GameObject PlayerMesh => playerMesh;
 
     [SerializeField, Tooltip("Colours and text for the capital-under-attack respawn note/toast (Tudor, " +
@@ -94,10 +82,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // why a bare transform.position write is not safe here.
     private PlayerDisplacement playerDisplacement;
 
-    // Shooting keeps its own Update, so ApplyAliveState switches the component itself off rather
-    // than relying on gated input alone. Searched for in children as well as on the root: the
-    // component this replaced (PlayerShooting) lived on a child, and a GetComponent on the root
-    // returning null is how its reference sat broken for a long time.
+    // Shooting keeps its own Update, so ApplyAliveState switches the component itself off rather than relying on
+    // gated input alone. Searched for in children as well as on the root: it lives on a child, and a GetComponent on
+    // the root returns null.
     private WeaponFiring weaponFiring;
 
     // The death and respawn panels belong to MatchUI; this class tells it what happened rather
@@ -108,19 +95,19 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // same way matchUI is - a sibling component on this same player root.
     private PlayerHud playerHud;
 
-    /// <summary>Task 9g: the team behind this player's last lethal hit (DamageInfo.SourceTeamId), -1 before any death and for a rejoined
+    /// <summary>The team behind this player's last lethal hit (DamageInfo.SourceTeamId), -1 before any death and for a rejoined
     /// process. Owner side only - the victim's client is the one that decides damage. SpectateView reads it.</summary>
     public int LastKillerTeam { get; private set; } = -1;
 
     private bool death = false;
     private bool respawnStarted = false;
     private int deathCount = 0;
-    /// <summary>Task 9g (Tudor D28): set when this body is a rejoiner's. Its first respawn wait (either path) is the flat
+    /// <summary>Set when this body is a rejoiner's (D28). Its first respawn wait (either path) is the flat
     /// GameplayConfig.RejoinRespawnSeconds and charges no death (a drop is not a death): deathCount was restored at Start to exactly what the room's
     /// "sb" deaths held, and the rejoin respawn adds nothing to it. Cleared once that wait has been computed, and at go-live.</summary>
     private bool rejoinRespawnPending = false;
 
-    /// <summary>Dominion Task 7b: true while the respawn now under way is a rejoiner's first one (set when its wait is worked out, cleared once the
+    /// <summary>True while the respawn now under way is a rejoiner's first one (set when its wait is worked out, cleared once the
     /// body is back). The respawn shield reads it from AliveChanged(true): a player who left while dead gets the shield on coming back, like
     /// after a death, though this body never saw the death.</summary>
     public bool RespawnIsAfterRejoin { get; private set; }
@@ -133,10 +120,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// no-draw rule reads the moment of death, not when a countdown ended.</summary>
     private int deathStampMs;
 
-    /// <summary>2.7b step 4: the running RespawnPlayer coroutine, or null when nothing is waiting - both
-    /// StartCoroutine sites below assign it, and RespawnPlayer itself nulls it at the end. Without a handle
-    /// nothing could stop it; ResetForMatchStart needs to, so a countdown that was already running when the
-    /// match went live cannot teleport the player a second time once it finishes.</summary>
+    /// <summary>The running RespawnPlayer coroutine, or null when nothing is waiting (both StartCoroutine sites
+    /// assign it, RespawnPlayer nulls it at the end). ResetForMatchStart needs the handle to stop it, so a countdown
+    /// already running when the match went live cannot teleport the player a second time once it finishes.</summary>
     private Coroutine respawnRoutine;
 
     // Caches the last value shown on the respawn note so UpdateRespawnNote only touches MatchUI's
@@ -156,22 +142,17 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// false - see the note in ApplyAliveState.</summary>
     public event System.Action<bool> AliveChanged;
 
-    /// <summary>Task T3 (telemetry): whether the respawn that most recently ran (RespawnPlayer)
-    /// landed this player at the capital-under-attack spawn instead of the normal one - the same
-    /// bool ChooseSpawnPoint already decides, just remembered past that method's own return so
-    /// PlayerTelemetry's `respawn` line (raised from AliveChanged(true), after this field is set)
-    /// can read it. Meaningless before the first respawn; false until then.</summary>
+    /// <summary>Whether the most recent respawn (RespawnPlayer) landed this player at the capital-under-attack spawn
+    /// instead of the normal one: ChooseSpawnPoint's bool, remembered so PlayerTelemetry's `respawn` line (raised from
+    /// AliveChanged(true), after this field is set) can read it. False until the first respawn.</summary>
     public bool LastRespawnWasUnderAttackSpawn { get; private set; }
 
-    /// <summary>2.7b step 9 fold-in: true when the most recent AliveChanged(true) came from
-    /// ResetForMatchStart reviving a player who was dead the instant the match went live, not from an
-    /// ordinary respawn. PlayerTelemetry's `respawn` line (raised from that same AliveChanged event)
-    /// reads this to mark itself `fresh:true` instead of reading like an ordinary - possibly
-    /// under-attack - respawn at the exact live instant: LastRespawnWasUnderAttackSpawn is never
-    /// touched by ResetForMatchStart, so it would otherwise carry over whatever this player's last
-    /// REAL respawn happened to be. Set true immediately before ResetForMatchStart's own SetAlive(true);
-    /// set back false before RespawnPlayer's own SetAlive(true) (the one real-respawn path, ordinary or
-    /// capital-recapture), so it always reflects the truth for whichever call raised the event.</summary>
+    /// <summary>True when the most recent AliveChanged(true) came from ResetForMatchStart reviving a player who was
+    /// dead the instant the match went live, not from an ordinary respawn. PlayerTelemetry's `respawn` line (raised
+    /// from that same event) reads it to mark itself `fresh:true`: LastRespawnWasUnderAttackSpawn is never touched by
+    /// ResetForMatchStart, so it would otherwise carry over this player's last REAL respawn. Set true immediately
+    /// before ResetForMatchStart's SetAlive(true); set false before RespawnPlayer's SetAlive(true) (the one
+    /// real-respawn path), so it reflects whichever call raised the event.</summary>
     public bool LastAliveChangeWasFreshStart { get; private set; }
 
     void Start()
@@ -202,17 +183,14 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         playerMotor.LeftArena += HandleLeftArena;
         playerDisplacement = GetComponent<PlayerDisplacement>();
 
-        // How an actor number is turned back into a PhotonView across the codebase - MatchDirector
-        // (Task 2.7) uses this to find each client's own player and react locally to a phase or
-        // elimination change, the same lookup ZipBoltView/MinimapView/PlayerTelemetry and others
-        // already rely on for their own actor number.
+        // How an actor number is turned back into a PhotonView across the codebase: MatchDirector finds each client's
+        // own player through it, as ZipBoltView, MinimapView and PlayerTelemetry do.
         PlayerLookup.Register(photonView.OwnerActorNr, photonView);
 
-        // Task 2.7, found live verifying this task: MatchDirector.OnJoinedRoom is a room-level Photon
-        // callback that can run BEFORE this network-instantiated player object exists - reliably so
-        // for a late joiner - so its very first attempt to show an already-decided match result can
-        // find no local view yet and silently skip it. Catching up here, once this player object
-        // (and the PlayerLookup registration just above) definitely exists, closes that gap.
+        // MatchDirector.OnJoinedRoom is a room-level Photon callback that can run BEFORE this network-instantiated
+        // player exists (reliably so for a late joiner), so its first attempt to show an already-decided match result
+        // can find no local view and silently skip it. Catching up here, once this player (and the PlayerLookup
+        // registration above) exists, closes that gap.
         if (photonView.IsMine)
             MatchDirector.Instance?.CatchUpLocalPlayer();
 
@@ -223,8 +201,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         ApplyAliveStateFromProperties();
 
-        // Task 9e (Tudor D21): a REJOINED actor (its connection dropped, or the game was closed, and it came back inside the
-        // room's rejoin window) is not a new joiner. The room kept its Player Properties (team, gold, loadout) and this is its
+        // A REJOINED actor (its connection dropped, or the game was closed, and it came back inside the room's rejoin
+        // window) is not a new joiner (D21). The room kept its Player Properties (team, gold, loadout) and this is its
         // new body (RoomManager.WatchOwnBodyAfterRejoin; or the old one, if the room still had it). It respawns as after a
         // death (TryRespawnAfterRejoin below); the join-into-a-last-stand check would only judge the same thing a second time.
         bool rejoined = photonView.IsMine && photonView.Owner != null && photonView.Owner.HasRejoined;
@@ -234,7 +212,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (rejoined)
         {
             rejoinPending = true;
-            // Task 9g: keep the death penalty - the next death counts on from where it was (the "sb" deaths the room kept; see
+            // Keep the death penalty - the next death counts on from where it was (the "sb" deaths the room kept; see
             // RespawnDelayRules.DeathCountOnRejoin) - and wait the flat rejoin time instead of the scaled one.
             // KNOWN LIMIT (accepted, rare): a drop that spans go-live restores the WARM-UP's sb deaths - the go-live reset of sb and of
             // deathCount happened on a client that was away, and the new process has only what the room still holds.
@@ -246,7 +224,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             // respawn path below waits for the team and the territory.
             arrivedDeadInSuddenDeath = DominionStageNow() == Overpower.Dominion.DominionStage.SuddenDeath; // only a sudden-death arrival is stamped specially
             SetAlive(false, ArrivalStampMs()); // in sudden death: the real stamp of a player who was already dead, else the earliest moment (never "now" - that could win the verdict)
-            // Dominion sudden death (Tudor A32): someone who drops and rejoins while it is on comes back DEAD. TryRespawnAfterRejoin below takes the
+            // Dominion sudden death (A32): someone who drops and rejoins while it is on comes back DEAD. TryRespawnAfterRejoin below takes the
             // ordinary death path, which refuses a respawn there (RespawnAllowedNow) - so the rejoiner waits dead like anyone who fell, and the master
             // counts them dead (their flag and stamp were just written above). Deliberate: a drop is no way back into a fight nobody can re-enter.
             Debug.LogWarning($"[REJOIN] actor {photonView.OwnerActorNr} has a body again - respawning as after a death");
@@ -255,10 +233,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         if (photonView.IsMine)
         {
-            // Transitional home: pointing the camera at the local player is spawn-time wiring
-            // rather than lifecycle, but of the three components this file was split into it is
-            // the only one that runs for the owner at spawn. A future camera-rig component should
-            // claim it.
+            // Transitional home: pointing the camera at the local player is spawn-time wiring rather than lifecycle;
+            // a future camera-rig component should claim it.
             Camera mainCamera = Camera.main;
             if (mainCamera != null)
             {
@@ -275,15 +251,15 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         }
     }
 
-    /// <summary>Task 9b-2 (Tudor's default): joining or rejoining a team already in its last stand spawns you dead into the
-    /// wait - the same wait an ended countdown starts - and you come back only if the team retakes or adopts a base
-    /// (CheckForCathedralCapture). The death was never counted, so that respawn charges it once. Owner only.</summary>
-    /// <summary>The team RoomManager picked, carried in the Instantiate data (Task 9b-3), or null for a player spawned without it.</summary>
+    /// <summary>The team RoomManager picked, carried in the Instantiate data, or null for a player spawned without it.</summary>
     int? InstantiatedTeam =>
         photonView.InstantiationData != null && photonView.InstantiationData.Length > 0 && photonView.InstantiationData[0] is int t ? t : (int?)null;
 
-    /// <summary>Asks once, as soon as it can be answered (Start, else each physics step until the team and the territory
-    /// are known - a fresh process joining a live match has neither at Start), and never again.</summary>
+    /// <summary>Joining or rejoining a team already in its last stand spawns you dead into the wait (the same wait an
+    /// ended countdown starts); you come back only if the team retakes or adopts a base (CheckForCathedralCapture).
+    /// The death was never counted, so that respawn charges it once. Owner only. Asks once, as soon as it can be
+    /// answered (Start, else each physics step until the team and the territory are known - a fresh process joining a
+    /// live match has neither at Start), and never again.</summary>
     void TryEnterTheWaitIfJoiningALastStand()
     {
         MatchDirector director = MatchDirector.Instance;
@@ -320,7 +296,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     private bool joinCheckPending;
     private bool rejoinPending;
 
-    /// <summary>Task 9e: a rejoined player comes back exactly as after a death - PlayerDied decides between the respawn
+    /// <summary>A rejoined player comes back exactly as after a death - PlayerDied decides between the respawn
     /// countdown (a base to respawn at, or the warm-up) and the last-stand wait (the team has no base in a live match:
     /// the rejoiner waits like everyone else on that team, consistent with the join-into-a-last-stand rule). Asked once,
     /// as soon as the team and the territory are known (a fresh process has neither at Start).</summary>
@@ -330,7 +306,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (director == null || !director.JoinCheckReady || !Teams.TryGetTeam(photonView.Owner, out _))
             return;
         rejoinPending = false;
-        // Task 9g (Tudor): a rejoiner onto a KNOCKED-OUT team is a spectator of it - the "You lost" panel with the Spectate button,
+        // A rejoiner onto a KNOCKED-OUT team is a spectator of it - the "You lost" panel with the Spectate button,
         // not the last-stand wait (which would read as if a teammate could still win the base back).
         if (Teams.TryGetTeam(photonView.Owner, out int rejoinTeam) && RejoinRules.LandsOnLosePanel(director.IsEliminated(rejoinTeam), director.Phase))
         {
@@ -341,7 +317,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             matchUI?.ShowYouLost();
             return;
         }
-        // KNOWN LIMIT (Tudor, 9e-3: accepted for now): this takes the ordinary death path, so the last living member of a team with no base
+        // KNOWN LIMIT (accepted for now): this takes the ordinary death path, so the last living member of a team with no base
         // who returns inside the grace (GameplayConfig.DroppedGraceSeconds) still lands in the last-stand wait, counts dead, and the team
         // is out - the grace only protects the team WHILE the player is away. A rejoiner on a knocked-out team stays dead (spectator).
         PlayerDied();
@@ -354,7 +330,6 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (rejoinPending)
             TryRespawnAfterRejoin();
 
-        // Continuously check for cathedral capture status
         CheckForCathedralCapture();
     }
 
@@ -377,23 +352,22 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// flag (read by the respawn coroutine and CheckForCathedralCapture) in step with it.
     private void HandlePlayerHealthDied(DamageInfo info)
     {
-        LastKillerTeam = info.SourceTeamId; // Task 9g: who a knocked-out player may spectate first (SpectateRules.KnockerTeam)
+        LastKillerTeam = info.SourceTeamId; // who a knocked-out player may spectate first (SpectateRules.KnockerTeam)
         if (!death)
             PlayerDied();
 
         death = true;
     }
 
-    /// PlayerMotor only detects falling below the kill height and raises this - it does not know
-    /// about isAlive, so this preserves the guard the inline check used to have (a dead player's
-    /// Rigidbody is kinematic and should not normally be moving at all, but this costs nothing).
+    /// PlayerMotor only detects falling below the kill height and raises this; it does not know about isAlive, so
+    /// the guard lives here (a dead player's Rigidbody is kinematic and should not be moving, but this costs nothing).
     private void HandleFellBelowKillHeight()
     {
         if (isAlive)
             ReturnToSpawn();
     }
 
-    /// Movement step 4: PlayerMotor found this player's centre outside the arena outline - through a boundary wall, or
+    /// PlayerMotor found this player's centre outside the arena outline - through a boundary wall, or
     /// by some way out nobody has found yet - and hands over the last spot they stood safely inside. Deliberately NOT a
     /// death, exactly like falling out of the world: leaving the arena is a level problem, not a play outcome. Whatever
     /// move is running is cancelled first, so it can't carry the body on from outside and so a knockback can't make
@@ -426,26 +400,25 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         MatchDirector director = MatchDirector.Instance;
 
-        // 2.7b step 7 (Decision 10): TeamHasACapital already reads "any capital in play" - this team's own, an
-        // enemy's, or a knocked-out team's (adoption), never one behind the phase-two wall - in both phases, so IsLastStandDeath's own capital-less
-        // check below covers adoption for free; nothing here has to special-case it.
-        // Dominion has no last stand: a death there is always an ordinary respawn (Dominion Task 2).
+        // TeamHasACapital reads "any capital in play" - this team's own, an enemy's, or a knocked-out team's (adoption),
+        // never one behind the phase-two wall - in both phases, so IsLastStandDeath's capital-less check below covers
+        // adoption; nothing here special-cases it.
+        // Dominion has no last stand: a death there is always an ordinary respawn.
         bool live = director != null && director.IsLive && !Overpower.Dominion.DominionMode.IsActive();
         bool hasCapital = director != null && director.TeamHasACapital(teamID);
 
-        // 2.7b step 5 (Decision 3): live comes from MatchDirector.IsLive, the room's own echoed mPhase - a
-        // countdown death is still a warm-up death (mPhase is not written until GoLive), whatever the capital
-        // situation, so IsLastStandDeath can never fire during it.
+        // live comes from MatchDirector.IsLive, the room's own echoed mPhase: a countdown death is still a warm-up death
+        // (mPhase is not written until GoLive), whatever the capital situation, so IsLastStandDeath can never fire
+        // during it.
         if (MatchPhaseRules.IsLastStandDeath(live, teamHasACapital: hasCapital))
         {
-            // DELIBERATE: dying with your team holding no capital in play is a last-stand death - no
-            // respawn countdown, a wait for a teammate to retake or adopt one instead (GDD p.20). This
-            // branch was once misdiagnosed as a networking bug ("players sometimes go invisible") and
-            // nearly removed. It is the design. TeamHasACapital reads BuildingManager's in-memory
-            // mirror of the room's replicated TerritorySnapshot (BuildingManager.Apply; see that
-            // class's own comment), updated the moment this client's own copy of the snapshot changes.
-            // A client whose copy of the snapshot is still stale could take this branch early - that
-            // staleness is the thing to fix if this ever fires when it should not, not the branch itself.
+            // DELIBERATE: dying with your team holding no capital in play is a last-stand death - no respawn
+            // countdown, a wait for a teammate to retake or adopt one instead (GDD p.20). This branch was once
+            // misdiagnosed as a networking bug ("players sometimes go invisible") and nearly removed; it is the
+            // design. TeamHasACapital reads BuildingManager's in-memory mirror of the room's replicated
+            // TerritorySnapshot (BuildingManager.Apply), updated the moment this client's copy changes. A client
+            // whose copy is still stale could take this branch early - that staleness is the thing to fix if this
+            // ever fires when it should not, not the branch itself.
             int respawnCapital = director != null ? director.RespawnCapitalOf(teamID) : TerritoryMap.Neutral;
             Debug.LogWarning($"[VIS] LAST-STAND DEATH  team={teamID} respawnCapital={respawnCapital}");
 
@@ -457,15 +430,15 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             return;
         }
 
-        // 2.7b step 5: a warm-up death (countdown included) is always an ordinary respawn, capital lost or not -
-        // IsLastStandDeath above already sent every LIVE capital-less death down the other branch, so reaching
-        // here means either the warm-up (any capital state) or a live death with the capital still held.
+        // A warm-up death (countdown included) is always an ordinary respawn, capital lost or not: IsLastStandDeath
+        // above already sent every LIVE capital-less death down the other branch, so reaching here means the warm-up
+        // (any capital state) or a live death with the capital still held.
         if (!respawnStarted)
         {
             respawnStarted = true;
 
             // The moment of death goes out WITH the alive flag (one write): with no base a countdown still running counts
-            // as out (Task 9b-2), and the no-draw rule must read this instant.
+            // as out, and the no-draw rule must read this instant.
             deathStampMs = PhotonNetwork.ServerTimestamp;
             SetAlive(false, deathStampMs);
             Debug.Log("[PlayerDied] Player Respawn Entered");
@@ -487,13 +460,11 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// could disagree with what the player can see on screen.
     void CheckForCathedralCapture()
     {
-        // Only care if we're local and waiting to be respawned.
         if (!photonView.IsMine || matchUI == null || !matchUI.IsWaitingForRespawn || !death)
             return;
 
         int actorNumber = PhotonNetwork.LocalPlayer.ActorNumber;
 
-        // Get team info
         object teamIDObj;
         int teamID = -1;
         if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(PlayerTeam.TeamKey, out teamIDObj) && teamIDObj != null)
@@ -510,9 +481,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (director == null)
             return;
 
-        // 2.7b step 7 (Decision 9/10): ANY capital in play (never one behind the phase-two wall), not just this team's
-        // own - a last-stand team that adopts an enemy's (or a knocked-out team's) capital comes back the same way a recapture of its own
-        // used to. A knocked-out team never respawns, whatever it captures.
+        // ANY capital in play (never one behind the phase-two wall), not just this team's own: a last-stand team that
+        // adopts an enemy's (or a knocked-out team's) capital comes back the same way a recapture of its own does.
+        // A knocked-out team never respawns, whatever it captures.
         if (director.RespawnCapitalOf(teamID) != TerritoryMap.Neutral && !director.IsEliminated(teamID) && !respawnStarted)
         {
             Debug.Log("[PlayerDied] Player Respawn Entered");
@@ -520,48 +491,37 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             matchUI?.HideWaitingPanel();
             respawnStarted = true;
 
-            // Used to hardcode 5f here and never touch deathCount, so a capital-recapture respawn
-            // never scaled with repeated deaths the way a normal death does (Task 0.11a defect 3).
-            // NextRespawnDelay is the one place both paths compute this now. Task 9b-2: a player whose
-            // countdown already ended in the wait was charged that death when it started - not twice.
+            // NextRespawnDelay is the one place both paths compute this, so a capital-recapture respawn scales with
+            // repeated deaths like a normal one. A player whose countdown already ended in the wait was charged that
+            // death when it started: not twice.
             float delay = NextRespawnDelay(chargeDeath: !deathCounted);
             deathCounted = true;
             Debug.Log($"[VIS] cathedral-recapture death {deathCount}, respawning in {delay}s");
             respawnRoutine = StartCoroutine(RespawnPlayer(delay, teamID, actorNumber));
         }
-        // else: still waiting - the waiting panel itself already shows that, every FixedUpdate this
-        // runs (Task 2.7 review: this used to log "Player NOT Respawn Entered" here every physics
-        // step while waiting - a build's stack trace on every line made two minutes of a genuine
-        // last stand into about 6,000 log lines).
+        // else: still waiting - the waiting panel already shows that. Do not log here: this runs every FixedUpdate, and
+        // a build's stack trace per line turned two minutes of a genuine last stand into about 6,000 log lines.
     }
 
     /// <summary>
-    /// 2.7b Decision 5/6: the owner-side "fresh start" that runs on this client the instant it sees the match
-    /// go live. Nothing calls this yet (step 4) - MatchDirector's own live write is what will trigger it,
-    /// wired in step 5, after the master's territory reset (BuildingManager.ResetForMatchStart) has already
-    /// been applied on every client (Decision 5's "territory first, then live" ordering).
+    /// The owner-side "fresh start" that runs on this client the instant it sees the match go live, after the
+    /// master's territory reset (BuildingManager.ResetForMatchStart) has been applied on every client (territory
+    /// first, then live).
     ///
-    /// THE ONE HOME for Decision 6's reset/kept lists:
-    ///
-    /// RESET here, in this order: any respawn wait or countdown (stopped before anything moves the player);
-    /// every ability's interrupt/cooldown/respawn cleanup and this player's own deployables (destroyed); the
-    /// loadout - weapon, and all three ability slots (Mobility, Attachment, Ultimate) back to the starter kit,
-    /// "back to empty" per Tudor's amended answer 2 - and armour to level 0/0; gold to TerritoryConfig.
-    /// StartingGold; the ultimate meter; overheat; the purchase ledger and the loadout screen (closed); full
-    /// health and armour, every status effect cleared (an armed shield included), the combat clock; deathCount;
-    /// position (this player's own team spawn); alive with lastStand false.
-    ///
-    /// RESET ELSEWHERE, not by this method: territory, towers and capture progress (the master, before the
-    /// live write lands here - Decision 5) and the Photon score (nothing reads it, so nothing clears it).
-    ///
-    /// KEPT: the team and the name (this method does not touch either). Fire fields/projectiles already in
-    /// flight (Decision 6) - they last only a few seconds regardless.
+    /// THE ONE HOME for the reset/kept lists. RESET here, in this order: any respawn wait or countdown (stopped before
+    /// anything moves the player); every ability's interrupt/cooldown/respawn cleanup and this player's own
+    /// deployables (destroyed); the loadout - weapon, and all three ability slots (Mobility, Attachment, Ultimate)
+    /// back to empty - and armour to level 0/0; gold to TerritoryConfig.StartingGold; the ultimate meter; overheat;
+    /// the purchase ledger and the loadout screen (closed); full health and armour, every status effect cleared (an
+    /// armed shield included), the combat clock; deathCount; position (this player's own team spawn); alive with
+    /// lastStand false. RESET ELSEWHERE: territory, towers and capture progress (the master, before the live write
+    /// lands here) and the Photon score (nothing reads it, so nothing clears it). KEPT: the team and the name; fire
+    /// fields/projectiles already in flight last only a few seconds regardless.
     ///
     /// ORDER MATTERS. The respawn routine is stopped and every panel hidden BEFORE anything below can move the
     /// player, or a coroutine still counting down past this point could teleport the player again once its own
-    /// wait ends (the "no second teleport" case the Play Mode check verifies). The loadout resets BEFORE
-    /// playerHealth.ResetForRespawn(), because armour capacity must already be at level 0 when that refill
-    /// decides what "full" means.
+    /// wait ends. The loadout resets BEFORE playerHealth.ResetForRespawn(), because armour capacity must already be
+    /// at level 0 when that refill decides what "full" means.
     /// </summary>
     public void ResetForMatchStart(int team, bool keepScoreboard = false)
     {
@@ -593,13 +553,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         NetworkedDeployable.DestroyAllPlacedByLocalPlayer();
 
         // 3. The economy and loadout, back to the starter kit - loadout BEFORE health, so armour capacity is
-        // already at level 0 when ResetForRespawn decides what "full armour" means (Decision 6).
+        // already at level 0 when ResetForRespawn decides what "full armour" means.
         GetComponent<PlayerLoadout>()?.ResetForMatchStart();
         GoldWallet goldWallet = GetComponent<GoldWallet>();
         goldWallet?.ResetForMatchStart();
         GetComponent<UltimateCharge>()?.ResetForMatchStart();
         GetComponent<PlayerCombatCredit>()?.ResetForMatchStart(); // Warm-up hits must not become live assists.
-        // Tudor D12: the scoreboard starts from zero at go-live. A Dominion break's fresh start keeps it (default A15: it counts the whole match).
+        // D12: the scoreboard starts from zero at go-live. A Dominion break's fresh start keeps it (A15: it counts the whole match).
         if (!keepScoreboard)
             GetComponent<ScoreboardPublisher>()?.ResetForMatchStart();
         GetComponentInChildren<PlayerOverheat>(true)?.Clear();
@@ -614,8 +574,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
         // 5. Alive with no last stand. An already-alive player gets no AliveChanged here (SetAlive is only
         // called when isAlive was false), which avoids a telemetry `respawn` line firing for everyone at once
-        // just because the match went live. A player who WAS dead does get one - marked fresh (step 9 fold-in,
-        // see LastAliveChangeWasFreshStart's own comment) so the report never reads it as an ordinary respawn.
+        // just because the match went live. A player who WAS dead does get one - marked fresh
+        // (LastAliveChangeWasFreshStart) so the report never reads it as an ordinary respawn.
         if (!isAlive)
         {
             LastAliveChangeWasFreshStart = true;
@@ -692,7 +652,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
     /// <summary>A team that is not tied sits sudden death out dead. Everything a round start would stop is stopped (a respawn countdown still
     /// running must not bring the body back), then the body is dead on every client. respawnStarted stays true so no death path starts a respawn.
-    /// No waiting panel: its words are the last stand's ("capture a base"), which would be wrong here; the sudden-death banner is Task 9.</summary>
+    /// No waiting panel: its words are the last stand's ("capture a base"), which would be wrong here.</summary>
     private void WaitDeadForSuddenDeath()
     {
         if (respawnRoutine != null)
@@ -752,11 +712,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         Debug.Log("[DOMINION] died in sudden death: no respawn");
     }
 
-    /// The one place the respawn wait is computed, called from both death paths (a normal death in
-    /// PlayerDied and the capital-recapture death in CheckForCathedralCapture) so they cannot
-    /// quietly diverge again the way they had before Task 0.11a: the recapture path used to
-    /// hardcode 5f and skip deathCount entirely. Each death costs a bit more than the last, up to
-    /// a cap, so repeated deaths carry a growing price without benching anyone for an unreasonable
+    /// The one place the respawn wait is computed, called from both death paths (PlayerDied and the
+    /// capital-recapture death in CheckForCathedralCapture) so they cannot diverge. Each death costs a bit more than
+    /// the last, up to a cap, so repeated deaths carry a growing price without benching anyone for an unreasonable
     /// stretch - all three numbers live on GameplayConfig, not here.
     // Only used when the scene has no DominionConfig (a setup error, logged once): not a design number.
     private const float MissingDominionConfigRespawnSeconds = 6f;
@@ -767,8 +725,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         bool rejoinRespawn = rejoinRespawnPending;
         deathCount = RespawnDelayRules.DeathCountForRetake(deathCount, countdownAlreadyCounted: !chargeDeath, rejoinRespawn: rejoinRespawn);
 
-        // Dominion Task 6: in a LIVE Dominion match every death waits the same fixed time for the match size (the count above still feeds the
-        // scoreboard), a rejoiner included (default A13). The warm-up keeps the Conquest wait (default A22). RespawnDelayRules.WaitFor is the one
+        // In a LIVE Dominion match every death waits the same fixed time for the match size (the count above still feeds the
+        // scoreboard), a rejoiner included (A13). The warm-up keeps the Conquest wait (A22). RespawnDelayRules.WaitFor is the one
         // decision; this only gathers its inputs.
         bool dominion = Overpower.Dominion.DominionMode.IsLive();
         float dominionSeconds = 0f;
@@ -806,9 +764,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
 
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)
     {
-        // A per-frame wait rather than a single WaitForSeconds(delay), so the capital-under-attack
-        // note (Tudor, 2026-09-16) can update live on the respawn panel while this wait runs. See
-        // UpdateRespawnNote.
+        // A per-frame wait rather than a single WaitForSeconds(delay), so the capital-under-attack note can update
+        // live on the respawn panel while this wait runs (UpdateRespawnNote).
         float elapsed = 0f;
         while (elapsed < delay)
         {
@@ -829,18 +786,15 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             yield break;
         }
 
-        // Review fix 4 (2026-09-26): a team change while dead in the warm-up (the old two-team switch moved players
-        // off the closed team; seats are locked at Start now, so this is a safety net) used to keep whichever team
-        // PlayerDied captured when the wait STARTED, stale by the time it ends -
-        // SpawnCapitalFor below then answered for the old team's own corner instead of the team this player
-        // actually landed on. Re-read now, at the same moment Decision 12 below already re-decides everything
-        // else - Teams.TryGetTeam, the one place team membership is read and compared. Leaves teamID as PlayerDied
-        // captured it if the property is (impossibly) still missing.
+        // A team change while dead in the warm-up (seats are locked at Start, so this is a safety net) would leave the
+        // team PlayerDied captured when the wait STARTED stale by the time it ends, and SpawnCapitalFor below would
+        // answer for the old team's corner. Re-read now, when everything else is re-decided - Teams.TryGetTeam, the one
+        // place team membership is read and compared. Leaves teamID as PlayerDied captured it if the property is
+        // (impossibly) still missing.
         if (Teams.TryGetTeam(photonView.Owner, out int currentTeam))
             teamID = currentTeam;
 
-        // 2.7b step 7 (Decision 12) + Tudor D17: the decision is made now, when the timer ends, not when the player
-        // died. Warm-up: home. Live with a base in play (own or adopted): respawn there. Live with no base, in either
+        // The decision is made now, when the timer ends, not when the player died (D17). Warm-up: home. Live with a base in play (own or adopted): respawn there. Live with no base, in either
         // phase: the countdown becomes the same wait a last-stand death starts (SetLastStandOut below counts this
         // player as out, so the team is knocked out once every member is). A knocked-out team never respawns either
         // (SpawnCapitalFor's own Eliminated check).
@@ -872,9 +826,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (spawn != null)
             TeleportToSpawnPoint(spawn.position, spawn.rotation);
 
-        // Set before SetAlive(true) below raises AliveChanged - PlayerTelemetry's `respawn` line
-        // reads this from that same event. This is the one real-respawn path (ordinary or capital
-        // recapture - Decision 12), so LastAliveChangeWasFreshStart is always false here (step 9 fold-in).
+        // Set before SetAlive(true) below raises AliveChanged: PlayerTelemetry's `respawn` line reads this from that
+        // same event. This is the one real-respawn path (ordinary or capital recapture), so
+        // LastAliveChangeWasFreshStart is always false here.
         LastRespawnWasUnderAttackSpawn = atUnderAttackSpawn;
         LastAliveChangeWasFreshStart = false;
 
@@ -897,11 +851,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (atUnderAttackSpawn && theme != null)
             playerHud?.ShowToast(theme.capitalUnderAttackRespawnToast);
 
-        // Logged because "respawning where you died" is a fix that cannot be verified from the
-        // editor. Reads rigidbody.position, not transform.position: this class used to log
-        // transform.position immediately after writing it, which always "looked" right even on the
-        // ~1-in-10 runs where PlayerMotor.Move()'s rb.MovePosition silently reverted the write a
-        // tick later (see TeleportToSpawnPoint below) - the log could never have caught its own bug.
+        // Logged because "respawning where you died" cannot be verified from the editor. Reads rigidbody.position, not
+        // transform.position: logging transform.position right after writing it always "looks" right, even on the
+        // ~1-in-10 runs where PlayerMotor.Move()'s rb.MovePosition silently reverts the write a tick later (see
+        // TeleportToSpawnPoint) - the log could never catch its own bug.
         Debug.Log($"[VIS] respawned at {rigidbody.position} (team {teamID} " +
                   $"{(atUnderAttackSpawn ? "T2 (capital under attack)" : "capital")})");
         photonView.RPC("RPC_HandleRespawnMaster", RpcTarget.MasterClient, teamID, actorNumber);
@@ -921,10 +874,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     public void ReturnToSpawn() =>
         MoveToSpawnPoint($"fell below y={playerMotor.KillHeight}");
 
-    /// <summary>MatchDirector's own second caller (Task 2.7 review): on the three-to-two team
-    /// transition, every living player's own client sends them home to their team's spawn point -
-    /// which today is also where "return to your capital" lands (RoomManager.teamSpawnPoints) - the
-    /// same move ReturnToSpawn makes, just with a log line that does not claim they fell.</summary>
+    /// <summary>MatchDirector's caller: on the three-to-two team transition, every living player's own client sends
+    /// them home to their team's spawn point (which today is also where "return to your capital" lands,
+    /// RoomManager.teamSpawnPoints) - the same move as ReturnToSpawn, with a log line that does not claim they
+    /// fell.</summary>
     public void ReturnToSpawnForPhaseChange() =>
         MoveToSpawnPoint("sent home for the two-team phase change");
 
@@ -936,14 +889,12 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (pt == null || !pt.HasTeam || roomManager == null || roomManager.teamSpawnPoints == null)
             return;
 
-        // 2.7b step 7 (Decision 11): a fall or the three-to-two trip home goes to the RESPAWN capital's own spawn
-        // point - this team's own while it holds it, else the in-play capital it adopted - falling back to the
-        // team's own spawn index (unchanged 2.7 behaviour) when it holds no capital at all.
-        // Review fix: SpawnCapitalFor, not RespawnCapitalOf - matching the plan's own CapitalTeamOf(SpawnCapitalFor
-        // (team)) (step 7). The difference is the warm-up and the countdown: SpawnCapitalFor pins the team's own
-        // capital there ("nothing counts yet"), where RespawnCapitalOf already honours a warm-up capture of
-        // another capital. Without this, a player who falls off the arena during the countdown, after a warm-up
-        // capture of another capital, was sent to that capital instead of home.
+        // A fall or the three-to-two trip home goes to the RESPAWN capital's own spawn point - this team's own while
+        // it holds it, else the in-play capital it adopted - falling back to the team's own spawn index when it holds
+        // no capital at all. SpawnCapitalFor, not RespawnCapitalOf: the difference is the warm-up and the countdown.
+        // SpawnCapitalFor pins the team's own capital there ("nothing counts yet"), where RespawnCapitalOf honours a
+        // warm-up capture of another capital; with that, a player falling off the arena during the countdown would be
+        // sent to that capital instead of home.
         int spawnIndex = pt.teamID;
         MatchDirector director = MatchDirector.Instance;
         BuildingManager buildings = BuildingManager.Instance;
@@ -963,16 +914,13 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         Debug.Log($"[VIS] {logReason}, returned to spawn at {rigidbody.position}");
     }
 
-    /// Tudor, 2026-09-16: while your capital is under attack (an enemy standing in it, or who just left - see
-    /// ZonePresenceTracker) you come back at your capital's Tier 2 zone instead, whoever owns it, rather than
-    /// straight into the fight. Decided when the timer ends, not when you died, because the attack may be over by
-    /// then.
-    ///
-    /// 2.7b step 7 (Decision 11): "capital" is now whichever zone the caller (RespawnPlayer, from
-    /// MatchDirector.SpawnCapitalFor) decided this player respawns at - this team's own, or an in-play capital it
-    /// adopted. The spawn point used is the one belonging to THAT capital's own team (Map.CapitalTeamOf), not
-    /// necessarily teamID's own - respawning at an adopted capital puts you where that capital's team spawns,
-    /// physically next to the zone you actually hold.
+    /// While your capital is under attack (an enemy standing in it, or who just left - see ZonePresenceTracker) you
+    /// come back at your capital's Tier 2 zone instead, whoever owns it, rather than straight into the fight.
+    /// Decided when the timer ends, not when you died, because the attack may be over by then. "capital" is
+    /// whichever zone the caller (RespawnPlayer, from MatchDirector.SpawnCapitalFor) decided this player respawns
+    /// at - this team's own, or an in-play capital it adopted. The spawn point used belongs to THAT capital's team
+    /// (Map.CapitalTeamOf), not necessarily teamID's: respawning at an adopted capital puts you where that capital's
+    /// team spawns, next to the zone you actually hold.
     private Transform ChooseSpawnPoint(RoomManager roomManager, int teamID, int capital, out bool atUnderAttackSpawn)
     {
         atUnderAttackSpawn = false;
@@ -987,9 +935,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (presence == null)
             return normal;
 
-        // IsUnderAttack judges the CURRENT owner of the capital; a respawn capital already read as "this team
-        // holds it" a moment ago (SpawnCapitalFor), but the attack/capture race is the same one B3 review
-        // (2026-09-16) found for the static case: trust the presence check only while this team STILL owns it.
+        // IsUnderAttack judges the CURRENT owner of the capital; a respawn capital read as "this team holds it" a
+        // moment ago (SpawnCapitalFor), but an attack/capture race can flip that: trust the presence check only while
+        // this team STILL owns it.
         bool underAttackNow = manager.Current != null && manager.Current.OwnerOf(capital) == teamID && presence.IsUnderAttack(capital);
 
         // Dominion (A21): always the team's normal spawn. The under-attack points sit 28.6 m from each capital, outside its healing circle,
@@ -1008,22 +956,20 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         return underAttack[spawnIndex];
     }
 
-    /// <summary>Refreshes the "your capital is under attack" line on the respawn panel (Tudor, 2026-09-16),
-    /// polled every frame of RespawnPlayer's own wait (respawnPanel is up: an ordinary death, capital still
-    /// owned but possibly under attack). NOT also called from CheckForCathedralCapture's waitingPanel poll
-    /// (B3 review, 2026-09-16, fix 1): MatchUI parents the note under respawnPanel, which is inactive during
-    /// that lost-capital wait, so writing it there was invisible and only cost a stale comment. Only writes
-    /// MatchUI's text when the bool actually flips, and only trusts IsUnderAttack while this team still owns
-    /// the capital (see ChooseSpawnPoint's own comment on the same race).</summary>
+    /// <summary>Refreshes the "your capital is under attack" line on the respawn panel, polled every frame of
+    /// RespawnPlayer's wait (the respawn panel is up: an ordinary death, capital still owned but possibly under
+    /// attack). NOT also called from CheckForCathedralCapture's waitingPanel poll: MatchUI parents the note under
+    /// respawnPanel, which is inactive during that lost-capital wait, so writing it there would be invisible. Only
+    /// writes MatchUI's text when the bool flips, and only trusts IsUnderAttack while this team still owns the
+    /// capital (the race in ChooseSpawnPoint).</summary>
     private void UpdateRespawnNote(int teamID)
     {
         if (matchUI == null || theme == null)
             return;
 
-        // 2.7b step 7: the same capital ChooseSpawnPoint will use if the wait ends right now - this team's own,
-        // or an adopted one - not just teamID's static capital, so the live preview during the wait matches what
-        // actually happens at the end of it (SpawnCapitalFor's own Decision 12 rules already cover "wait instead"
-        // by reading Neutral here, which never matches any owner below).
+        // The same capital ChooseSpawnPoint will use if the wait ends right now - this team's own, or an adopted one -
+        // so the live preview matches what happens at the end of the wait. SpawnCapitalFor reads Neutral for "wait
+        // instead", which never matches any owner below.
         MatchDirector director = MatchDirector.Instance;
         BuildingManager manager = BuildingManager.Instance;
         ZonePresenceTracker presence = ZonePresenceTracker.Instance;
@@ -1039,22 +985,18 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     }
 
     /// <summary>
-    /// The only way either respawn path (a normal respawn or falling below the kill height) is
-    /// allowed to move this player. A bare transform.position write here is not safe: PlayerMotor
-    /// .Move() calls rb.MovePosition(rb.position + ...) every FixedUpdate the player owns
-    /// themselves, and rb.position is the physics engine's own cached position, not a mirror of
-    /// transform.position - Unity only syncs the two on its own schedule. Writing transform.position
-    /// directly leaves rb.position stale until that sync catches up, and if Move() reads rb.position
-    /// before it does, it re-asserts the STALE (pre-teleport) position as the Rigidbody's new target
-    /// for that physics step, permanently overwriting the intended move. Measured: 1 of 10 single-
-    /// client respawns reproduced this exact way (deathCount 1, HEAD 88cc260) - the player stayed at
-    /// the death spot at +0.5s and +2.0s despite the "[VIS] respawned at spawn" log line. See
-    /// two-client-harness.md item 15, which found the identical mechanism on an already-alive player.
+    /// The only way either respawn path (a normal respawn or falling below the kill height) may move this player.
+    /// A bare transform.position write is not safe: PlayerMotor.Move() calls rb.MovePosition(rb.position + ...)
+    /// every FixedUpdate the owner has, and rb.position is the physics engine's cached position, not a mirror of
+    /// transform.position - Unity syncs the two on its own schedule. Writing transform.position leaves rb.position
+    /// stale until that sync, and if Move() reads rb.position first it re-asserts the STALE pre-teleport position as
+    /// the Rigidbody's target, permanently overwriting the teleport (measured: 1 of 10 single-client respawns left
+    /// the player at the death spot despite the "[VIS] respawned at spawn" log line). See two-client-harness.md item
+    /// 15 for the same mechanism on an already-alive player.
     ///
-    /// PlayerDisplacement.TeleportTo writes rb.position directly (no transform-sync race possible)
-    /// and zeroes residual velocity - it is documented as the one mover that actually sticks. Works
-    /// regardless of whether the Rigidbody is currently kinematic (mid-death) or dynamic (mid-fall):
-    /// the position setter does not care about the kinematic flag.
+    /// PlayerDisplacement.TeleportTo writes rb.position directly (no transform-sync race possible) and zeroes
+    /// residual velocity. Works whether the Rigidbody is kinematic (mid-death) or dynamic (mid-fall): the position
+    /// setter does not care about the kinematic flag.
     /// </summary>
     void TeleportToSpawnPoint(Vector3 position, Quaternion rotation)
     {
@@ -1099,17 +1041,15 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         ApplyAliveState(alive);
         var props = new Hashtable { { AliveKey, alive } };
         if (deathStamp.HasValue)
-            props[LastStandAtKey] = deathStamp.Value; // Task 9b-2: one write, so no reader sees dead without its moment
+            props[LastStandAtKey] = deathStamp.Value; // one write, so no reader sees dead without its moment
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
     }
 
-    /// Owner-only, published the same way SetAlive is just above (Task 2.7 review) - the "out for the
-    /// last stand" fact MatchDirector's own team recompute reads, set true exactly on a last-stand
-    /// death and cleared the moment this player is on their way back into the match (RespawnPlayer),
-    /// whichever path got them there.
-    ///
-    /// 2.7b Decision 23: writes LastStandAtKey in the SAME call - the moment of death (diedAtMs; the server clock now
-    /// when none is given), cleared (null) alongside LastStandKey going false - so a reader can never see one without the other.
+    /// Owner-only, published the same way as SetAlive: the "out for the last stand" fact MatchDirector's team
+    /// recompute reads, set true exactly on a last-stand death and cleared the moment this player is on their way
+    /// back into the match (RespawnPlayer), whichever path got them there. Writes LastStandAtKey in the SAME call -
+    /// the moment of death (diedAtMs; the server clock now when none is given), null alongside LastStandKey going
+    /// false - so a reader can never see one without the other.
     void SetLastStandOut(bool outForLastStand, int? diedAtMs = null)
     {
         if (!photonView.IsMine)
@@ -1122,9 +1062,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         });
     }
 
-    /// Everything that used to live in RPC_HandleDeath and RPC_ShowPlayer, in one place so hide
-    /// and show cannot drift apart. The old pair did not: RPC_HandleDeath moved the hierarchy to
-    /// the DeadPlayer layer on every client, but only the owner ever moved it back.
+    /// Hide and show in one place so they cannot drift apart (a hide that moves the hierarchy to the DeadPlayer layer
+    /// on every client needs a show that moves it back on every client, not just the owner). Runs on every client for
+    /// every player.
     void ApplyAliveState(bool alive)
     {
         isAlive = alive;
@@ -1134,9 +1074,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (playerMesh != null)
             playerMesh.SetActive(alive);
 
-        // A corpse used to keep its collider, so it still blocked shots and bodies until respawn.
-        // Kinematic while dead as well, otherwise removing the collider just drops it through the
-        // floor for the length of the respawn wait.
+        // Collider off while dead, so a corpse blocks no shots or bodies. Kinematic as well, otherwise removing the
+        // collider just drops it through the floor for the length of the respawn wait.
         if (capsuleCollider != null)
             capsuleCollider.enabled = alive;
 
@@ -1146,11 +1085,9 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
             rigidbody.isKinematic = !alive;
             if (photonView.IsMine)
             {
-                // Keyed so this can never step on some other system's own multiplier (a sprint
-                // ability, a slow debuff), and removed rather than overwritten on respawn. Used to
-                // assign a raw speed field directly, which PlayerMotor stopped reading once it
-                // moved to this stack - that silently turned "freeze on death" into a no-op and a
-                // corpse could still slide around (Task 0.11a defect 1).
+                // Keyed so this can never step on some other system's own multiplier (a sprint ability, a slow
+                // debuff), and removed rather than overwritten on respawn. Assigning a raw speed field would be a
+                // silent no-op, since PlayerMotor reads this stack: a corpse could still slide around.
                 if (alive)
                     playerMotor.RemoveSpeedMultiplier(this);
                 else
@@ -1162,19 +1099,15 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         if (weaponFiring != null)
             weaponFiring.enabled = alive;
 
-        // Cleanup batch item 7: the overhead bar's own fills already read 0/0 correctly while dead
-        // (PlayerHealth.UpdateOverheadBar), but the bar itself never hid - a correct-but-empty bar
-        // floated visibly over a corpse for the whole respawn wait on every OTHER client's screen.
-        // This method runs on every client (see the class comment above), so this is the one place
-        // that fixes it for a remote copy, not just the owner's own screen.
+        // The overhead bar's fills already read 0/0 while dead (PlayerHealth.UpdateOverheadBar), but a
+        // correct-but-empty bar would float over a corpse for the whole respawn wait on every OTHER client's screen.
+        // This method runs on every client, so this is the one place that hides it for a remote copy.
         if (playerHealth != null)
             playerHealth.SetOverheadBarVisible(alive);
 
-        // A dash already in flight kept moving the body after death and could land it somewhere
-        // other than the spawn point, so the running coroutine was cancelled here. The four
-        // Space-bound dash/AoE scripts were deleted in Task 0.11b and their replacement does not
-        // exist yet: AliveChanged is the hook the new abilities must use to cancel anything in
-        // flight, and IsAlive is the gate that stops one starting while dead.
+        // A dash already in flight would keep moving the body after death and could land it away from the spawn
+        // point. AliveChanged is the hook abilities and movers must use to cancel anything in flight; IsAlive is the
+        // gate that stops one starting while dead.
         AliveChanged?.Invoke(alive);
 
         Debug.Log($"[VIS] alive={alive}  owner={photonView.Owner?.NickName}  isMine={photonView.IsMine}");
@@ -1212,7 +1145,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     // Unused IInRoomCallbacks members.
     public void OnPlayerEnteredRoom(Player newPlayer) { }
 
-    /// <summary>Task 9e: an actor whose connection dropped stays in the room as "inactive" for the rejoin window, and
+    /// <summary>An actor whose connection dropped stays in the room as "inactive" for the rejoin window, and
     /// PUN keeps its body. Nobody is left to write its "alive" flag, so every other client hides it and counts it as
     /// not alive right here (PresenceRules). It comes back through the rejoiner's own respawn, which publishes the flag
     /// again. A real leave (not inactive) still destroys the body.</summary>
@@ -1231,16 +1164,12 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     public void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged) { }
     public void OnMasterClientSwitched(Player newMasterClient) { }
 
-    // ---- master-client elimination bookkeeping (retired, Task 2.7) -------------------------
-    // Both RPCs below used to run ONLY on the master client, which kept the one authoritative tally
-    // of who was dead, in the three static fields this task deleted (teamDeadCount, processedDeaths,
-    // deadTeams) - a tally that lived on one machine's heap did not survive that machine losing
-    // master, or a second match starting in the same session. Elimination and the match phase are
-    // recomputed instead by MatchDirector, from replicated state (team rosters, the "alive" Player
-    // Property SetAlive already publishes, and capital ownership) - see MatchDirector.MasterRecompute.
-    // Both methods are kept only because PUN dispatches an RPC by its index into the committed RpcList
-    // in PhotonServerSettings.asset: removing or renaming either one would mis-dispatch every RPC
-    // listed after it, on any client that already shipped.
+    // ---- retired master-client elimination bookkeeping -------------------------
+    // Elimination and the match phase are recomputed by MatchDirector from replicated state (team rosters, the "alive"
+    // Player Property SetAlive publishes, and capital ownership - MatchDirector.MasterRecompute), not tallied on the
+    // master's heap, which did not survive a master switch or a second match in the same session. Both RPCs below are
+    // kept only because PUN dispatches an RPC by its index into the committed RpcList in PhotonServerSettings.asset:
+    // removing or renaming either would mis-dispatch every RPC listed after it, on any client that already shipped.
 
     [PunRPC]
     public void RPC_HandleRespawnMaster(int teamID, int actorNumber)

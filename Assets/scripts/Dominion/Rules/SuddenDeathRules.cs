@@ -13,7 +13,7 @@ namespace Overpower.Dominion
     }
 
     /// <summary>The verdict of SuddenDeathRules.Evaluate. Team is the winner when State is Won, else -1. ReplayTeams (Judge only) names, when State is Replay,
-    /// the teams whose last players fell together and so play again (Tudor A33); null when it does not say (Evaluate: the caller keeps its own list).</summary>
+    /// the teams whose last players fell together and so play again (A33); null when it does not say (Evaluate: the caller keeps its own list).</summary>
     public struct SuddenDeathResult
     {
         public SuddenDeathState State;
@@ -22,7 +22,7 @@ namespace Overpower.Dominion
     }
 
     /// <summary>
-    /// Sudden death (Task 1 rules; the circle and its damage are Task 8): a circle that shrinks over time, and the last team with anyone
+    /// Sudden death: a circle that shrinks over time, and the last team with anyone
     /// alive wins. Times are the room's server clock (int ms that wraps; compared as unchecked(a - b)).
     /// </summary>
     public static class SuddenDeathRules
@@ -54,7 +54,7 @@ namespace Overpower.Dominion
 
         /// <summary>The verdict. One team with anyone alive: Won. Two or more: Ongoing. Nobody left (the last players of the sudden-death
         /// teams fall in the same instant): Replay - sudden death starts over, everyone back at their spawn and the circle full size again
-        /// (Tudor A8; there is no points tie-break). Missing arrays decide nothing (Ongoing).</summary>
+        /// (A8; there is no points tie-break). Missing arrays decide nothing (Ongoing).</summary>
         public static SuddenDeathResult Evaluate(int[] aliveCountPerTeam, int[] teamsInSuddenDeath)
         {
             if (aliveCountPerTeam == null || teamsInSuddenDeath == null || teamsInSuddenDeath.Length == 0)
@@ -109,12 +109,12 @@ namespace Overpower.Dominion
 
         /// <summary>How long a verdict must hold before the master writes it (SuddenDeathVerdictSettle): a network wait, NOT a design number, so that the death
         /// reports of every player have reached the master before it judges. WHICH deaths count as the same moment is decided by the server stamps and
-        /// DominionConfig Same Instant Tolerance Seconds (Tudor A31), never by this wait. A code constant, like the judging beat below.</summary>
+        /// DominionConfig Same Instant Tolerance Seconds (A31), never by this wait. A code constant, like the judging beat below.</summary>
         public const float VerdictSettleSeconds = 0.5f;
 
         /// <summary>Is a player alive, from their alive flag in the room? A player who has never died has no flag at all (it is only written when it
-        /// changes), so a missing flag means alive; only an explicit false is dead. Found in the first 3-client check: counting only an explicit true
-        /// ended sudden death at once, with the one team that had died earlier as its winner.</summary>
+        /// changes), so a missing flag means alive; only an explicit false is dead. Counting only an explicit true
+        /// would end sudden death at once, with the one team that had died earlier as its winner.</summary>
         public static bool CountsAsAlive(bool hasFlag, bool flag) => !hasFlag || flag;
 
         /// <summary>Does this team play sudden death (is it among the tied teams)? A team not tied waits dead.</summary>
@@ -197,7 +197,7 @@ namespace Overpower.Dominion
         }
 
         /// <summary>
-        /// The verdict from the whole picture (Tudor A31). While anyone of the sudden-death teams lives it is Evaluate's: one team left wins, two or more
+        /// The verdict from the whole picture (A31). While anyone of the sudden-death teams lives it is Evaluate's: one team left wins, two or more
         /// go on. When nobody lives, the stamps decide: the team whose last player fell LATEST wins (it lasted longer); only if the last players of
         /// every team that fell last went down at the same server moment (within the tolerance, one network frame) does sudden death start over. A dead
         /// player's stamp that has not arrived yet means wait (Ongoing): the master never judges on a guess.
@@ -217,7 +217,7 @@ namespace Overpower.Dominion
                 if (!tally.HasDeath[team]) continue; // nobody of this team was ever there: it fell at no moment
                 if (latest < 0 || unchecked(tally.LastDeathMs[team] - tally.LastDeathMs[latest]) > 0) latest = team;
             }
-            if (latest < 0) return new SuddenDeathResult { State = SuddenDeathState.Replay, Team = -1, ReplayTeams = (int[])teamsInSuddenDeath.Clone() }; // nobody anywhere: the old replay, all of them
+            if (latest < 0) return new SuddenDeathResult { State = SuddenDeathState.Replay, Team = -1, ReplayTeams = (int[])teamsInSuddenDeath.Clone() }; // nobody anywhere: replay with all of them
 
             // A33: only the teams whose last players fell together play again; a team that fell earlier stays out.
             var together = new List<int>();

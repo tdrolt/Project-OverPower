@@ -5,18 +5,15 @@ using Overpower.Combat;
 using Overpower.Data;
 
 /// <summary>
-/// Thin MonoBehaviour wrapper around one player's OverheatState - the resource the primary
-/// weapon and every ability spend, and which locks out both once it hits max. Split out of
-/// Multiplayer.cs (Task 0.10).
+/// Thin MonoBehaviour wrapper around one player's OverheatState - the resource the primary weapon
+/// and every ability spend, and which locks out both once it hits max.
 ///
-/// Heat is local to whoever generated it and nothing reads another player's heat, so this is
-/// deliberately owner-only with no replication of its own.
+/// Heat is local to whoever generated it and nothing reads another player's heat: owner-only, no
+/// replication.
 ///
-/// Full overheat silences the primary weapon AND every ability - a harsher rule than a
-/// weapon-only lockout, taken deliberately by the designer and accepted up to four seconds of
-/// helplessness on the explicit condition that IsWarning exists at 80 heat, so the silence reads
-/// as the player's own mistake rather than an arbitrary wall. See OverheatState's own doc and
-/// 00-master-plan.md.
+/// Full overheat silences the primary weapon AND every ability, a deliberate designer rule accepted
+/// on the condition that IsWarning exists (see OverheatState and 00-master-plan.md), so the
+/// silence reads as the player's own mistake.
 /// </summary>
 public class PlayerOverheat : MonoBehaviour
 {
@@ -28,11 +25,9 @@ public class PlayerOverheat : MonoBehaviour
     private OverheatState overheat;
     private PlayerInputRouter input;
 
-    // Task 2.6 (GDD p.20): OverPower "nullif[ies] the overheat mechanic" while active. Keyed the
-    // same way PlayerMotor's speedMultipliers stack is (see its class comment) rather than a
-    // single bool, so a second future system wanting the same lockout can add its own key without
-    // needing to know whether OverPower (or anything else) already holds one - whichever key
-    // clears last is the one that actually lifts the suppression.
+    // OverPower "nullif[ies] the overheat mechanic" while active (GDD p.20). Keyed like PlayerMotor's
+    // speedMultipliers rather than a bool, so another system can add its own key without knowing who
+    // else holds one; the last key to clear lifts the suppression.
     private readonly HashSet<object> suppressionKeys = new HashSet<object>();
 
     /// <summary>True while any key suppresses - Add becomes a no-op, existing heat is untouched.</summary>
@@ -46,29 +41,23 @@ public class PlayerOverheat : MonoBehaviour
     /// <summary>True from the instant heat maxes out until it decays all the way back to zero.</summary>
     public bool IsSilenced => overheat.IsSilenced;
 
-    /// <summary>True once heat crosses the warning threshold, but only before the silence hits -
-    /// never true at the same time as IsSilenced.</summary>
+    /// <summary>True once heat crosses the warning threshold, before the silence hits; never together with IsSilenced.</summary>
     public bool IsWarning => overheat.IsWarning;
 
     public bool CanAct => overheat.CanAct;
 
-    /// <summary>False when ventWindow &lt;= 0 (Vent turned off) - for the HUD band, so it can hide
-    /// itself entirely instead of reading a stale Missed for the rest of every silence (review
-    /// fix, see OverheatState.VentEnabled/VentBandLookRule).</summary>
+    /// <summary>False when ventWindow &lt;= 0 (Vent off), so the HUD band hides instead of reading a
+    /// stale Missed (OverheatState.VentEnabled/VentBandLookRule).</summary>
     public bool VentEnabled => overheat.VentEnabled;
 
-    /// <summary>True exactly while the vent window is open right now - for the HUD band.</summary>
     public bool IsVentWindowOpen => overheat.IsVentWindowOpen;
 
-    /// <summary>This silence's vent attempt outcome so far (none/hit/missed) - for the HUD band.</summary>
     public VentOutcome VentOutcome => overheat.Outcome;
 
-    /// <summary>Heat fraction (0..1) the fill sits at when the vent window opens - the band's upper
-    /// edge, for the HUD.</summary>
+    /// <summary>Heat fraction the fill sits at when the vent window opens: the band's upper edge.</summary>
     public float VentBandHighFraction => overheat.VentBandHighFraction;
 
-    /// <summary>Heat fraction (0..1) the fill sits at when the vent window closes - the band's
-    /// lower edge, for the HUD.</summary>
+    /// <summary>Heat fraction the fill sits at when the vent window closes: the band's lower edge.</summary>
     public float VentBandLowFraction => overheat.VentBandLowFraction;
 
     private void Awake()
@@ -76,8 +65,7 @@ public class PlayerOverheat : MonoBehaviour
         photonView = GetComponent<PhotonView>();
         input = GetComponent<PlayerInputRouter>();
 
-        // A silent null here would make this player's weapon and abilities never overheat -
-        // effectively free, permanent access to everything. Loud on purpose, matching PlayerHealth.
+        // Loud on purpose: a silent null would make weapon and abilities never overheat.
         if (gameplayConfig == null)
             Debug.LogError($"[PlayerOverheat] {name}: GameplayConfig is not assigned - falling back to hardcoded overheat numbers.");
 
@@ -91,26 +79,23 @@ public class PlayerOverheat : MonoBehaviour
             gameplayConfig != null && gameplayConfig.VentRandomTiming,
             gameplayConfig != null ? gameplayConfig.VentRandomDelayMin : 1.5f,
             gameplayConfig != null ? gameplayConfig.VentRandomDelayMax : 3f,
-            // Heat is owner-only and never replicated (see the class comment), so reading
-            // UnityEngine.Random here is exactly as local as everything else this class does -
-            // no network change. OverheatState never calls UnityEngine directly itself (see its
-            // own class comment); this is the one real source it gets injected with.
+            // Heat is owner-only, so UnityEngine.Random is as local as everything else here.
+            // OverheatState never calls UnityEngine itself; this is the source injected into it.
             () => UnityEngine.Random.value);
     }
 
     private void Update()
     {
         if (!photonView.IsMine)
-            return; // Heat is local to whoever generated it - no other client ticks it.
+            return; // no other client ticks it
 
         overheat.Tick(Time.deltaTime);
     }
 
     private void OnEnable()
     {
-        // Same reasoning as AbilityRunner's own MobilityPressed subscription: safe to subscribe
-        // unconditionally, since a remote copy's PlayerInputRouter has its gameplayMap disabled and
-        // never raises VentPressed at all.
+        // Safe unconditionally: a remote copy's PlayerInputRouter has its gameplayMap disabled and
+        // never raises VentPressed.
         if (input != null)
             input.VentPressed += HandleVentPressed;
     }
@@ -123,8 +108,8 @@ public class PlayerOverheat : MonoBehaviour
 
     private void HandleVentPressed() => TryVent();
 
-    /// <summary>Does nothing while IsSuppressed (Task 2.6) - a shot fired during OverPower must
-    /// cost no heat at all, not merely decay faster.</summary>
+    /// <summary>Does nothing while IsSuppressed: a shot fired during OverPower must cost no heat at
+    /// all, not merely decay faster.</summary>
     public void Add(float amount)
     {
         if (IsSuppressed)
@@ -139,16 +124,13 @@ public class PlayerOverheat : MonoBehaviour
     /// <summary>On death: zero the bar and lift any silence with it.</summary>
     public void Clear() => overheat.Clear();
 
-    /// <summary>Vent's own button (R): forwards straight to OverheatState.TryVent(), whether it was
-    /// called from the real VentPressed event or (Play Mode verification, trap 11 - the Input
-    /// System does not update while the Editor is unfocused) directly by a script.</summary>
+    /// <summary>Vent's button (R). Public so Play Mode verification can call it directly: the Input
+    /// System does not update while the Editor is unfocused.</summary>
     public VentResult TryVent() => overheat.TryVent();
 
     /// <summary>
-    /// OverPowerBuff's hook (Task 2.6, GDD p.20): keyed exactly like PlayerMotor.AddSpeedMultiplier/
-    /// RemoveSpeedMultiplier (see the suppressionKeys field comment) - true adds key, false removes
-    /// it. Existing heat and any silence already in progress are left alone; only future Add calls
-    /// are gated. Idempotent either way (HashSet.Add/Remove no-op on a value already in/out).
+    /// OverPowerBuff's hook, keyed like PlayerMotor.AddSpeedMultiplier/RemoveSpeedMultiplier. Existing
+    /// heat and any silence in progress are left alone; only future Add calls are gated. Idempotent.
     /// </summary>
     public void SetSuppressed(object key, bool suppressed)
     {

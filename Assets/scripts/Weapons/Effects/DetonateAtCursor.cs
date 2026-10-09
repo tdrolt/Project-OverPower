@@ -6,27 +6,14 @@ using Overpower.Combat;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Makes a rocket detonate where the shooter's CURSOR was rather than on whatever it runs
-    /// into, and leaves a patch of fire on the ground where it goes off - the "Cursor Fire" leaf
-    /// of the rocket path.
-    ///
-    /// The rocket still stops on anything solid it meets first. Without that a rocket aimed past
-    /// somebody would sail straight through them, and a weapon that ignores the enemy standing in
-    /// front of you is not a weapon anybody would use. That rule needs no code here at all: the
-    /// sibling ExplodeOnImpact already detonates on contact, so an early hit is simply the normal
-    /// case and this behaviour never gets to say "arrived".
-    ///
-    /// This component's whole job is therefore the OTHER case - reaching the cursor with nothing
-    /// in the way - plus spawning the fire. It works out how far away the cursor is when the
-    /// rocket is born, watches the distance flown, and retires the rocket on arrival by spending
-    /// the rest of its range budget. The motor then ends the shot on its next step down exactly
-    /// the same path a shot that ran out of range takes, and ExplodeOnImpact's OnExpired supplies
-    /// the airburst. ProjectileMotor is not touched and does not know this weapon exists.
-    ///
-    /// THE CURSOR POINT CANNOT BE READ HERE. Camera.main and Input.mousePosition inside the fire
-    /// RPC answer for whoever RECEIVED it, so every client would detonate the rocket at its own
-    /// player's mouse. It travels as an RPC parameter into ProjectileContext.TargetPoint instead -
-    /// the same rule, and the same original bug, as WeaponFiring's class comment describes.
+    /// Makes a rocket detonate where the shooter's CURSOR was rather than on whatever it runs into, and leaves a patch of fire on the ground where it
+    /// goes off - the "Cursor Fire" leaf of the rocket path.
+    /// The rocket still stops on anything solid it meets first: that needs no code here, since the sibling ExplodeOnImpact detonates on contact and
+    /// this behaviour never gets to say "arrived". Its whole job is the OTHER case - reaching the cursor with nothing in the way: it works out the
+    /// cursor distance when the rocket is born, watches the distance flown, and on arrival spends the rest of the range budget, so the motor ends
+    /// the shot down the same path as one that ran out of range and ExplodeOnImpact's OnExpired supplies the airburst. ProjectileMotor is untouched.
+    /// THE CURSOR POINT CANNOT BE READ HERE. Camera.main and Input.mousePosition inside the fire RPC answer for whoever RECEIVED it, so every client
+    /// would detonate at its own player's mouse. It travels as an RPC parameter into ProjectileContext.TargetPoint (WeaponFiring's class comment).
     /// </summary>
     [DisallowMultipleComponent]
     public class DetonateAtCursor : MonoBehaviour, IProjectileBehaviour
@@ -54,16 +41,10 @@ namespace Overpower.Weapons
             targetDistance = DistanceToCursorPoint();
         }
 
-        /// <summary>How far this rocket has to fly to reach the cursor - see the static helper
-        /// below for the actual maths and why. AimConeView (Task 7) draws exactly this same
-        /// distance for this weapon's aim lines/arc, through that helper, so the two can never
-        /// disagree about how far a cursor rocket actually reaches.
-        ///
-        /// context.MaxRange, not context.Weapon.MaxRange (Task 2.6): the former already carries
-        /// OverPower's range multiplier (see ProjectileContext.MaxRange), the latter is the bare
-        /// weapon asset value - reading the wrong one would let the buff extend how far this rocket
-        /// FLIES without extending how far it is allowed to detonate at the cursor, which is exactly
-        /// the kind of second, disagreeing range this class's own comment warns against.</summary>
+        /// <summary>How far this rocket has to fly to reach the cursor - AimConeView draws the same distance for this weapon's aim lines/arc through
+        /// the static helper below, so the two can never disagree about how far a cursor rocket reaches.
+        /// context.MaxRange, not context.Weapon.MaxRange: the former already carries OverPower's range multiplier (see ProjectileContext.MaxRange), so
+        /// the buff cannot extend how far this rocket FLIES without extending how far it may detonate at the cursor - a second, disagreeing range.</summary>
         private float DistanceToCursorPoint() =>
             ClampedDistanceToTarget(transform.position, context.TargetPoint, context.MaxRange);
 
@@ -97,16 +78,11 @@ namespace Overpower.Weapons
 
             arrived = true;
 
-            // Arrived. Spend whatever range is left so the motor retires the rocket on its next
-            // step, through the same expiry path a shot that simply ran out of range takes -
-            // which is what fires ExplodeOnImpact.OnExpired and produces the airburst. Consume
-            // clamps to what remains, so asking for the whole range drains exactly the remainder
-            // and moves the rocket nowhere.
-            //
-            // The cost of doing it this way rather than adding a "stop now" call to the motor is
-            // that the rocket can overshoot the cursor by up to one frame of travel - at 18 m/s
-            // that is about 0.3m against a 3m blast radius, far inside the width of the
-            // explosion. Worth it to leave the motor alone.
+            // Arrived. Spend whatever range is left so the motor retires the rocket on its next step, through the same expiry path a shot that simply ran
+            // out of range takes - which fires ExplodeOnImpact.OnExpired and produces the airburst. Consume clamps to what remains, so asking for the whole
+            // range drains exactly the remainder and moves the rocket nowhere.
+            // The cost of not adding a "stop now" call to the motor is that the rocket can overshoot the cursor by up to one frame of travel (about 0.3m at
+            // 18 m/s, against a 3m blast radius). Worth it to leave the motor alone.
             motor.Range.Consume(motor.Range.MaxRange);
         }
 
@@ -136,20 +112,16 @@ namespace Overpower.Weapons
                 PhotonNetwork.LocalPlayer.ActorNumber != context.ShooterActorNumber)
                 return;
 
-            // A2 (Tudor 2026-09-17 evening, gameplay change): the field goes on the FLOOR below the burst, not at
-            // the rocket's own muzzle-height position - found here, on the shooter's own client, with the same
-            // floor finder every other ability visual uses (GroundSnap). PhotonNetwork.Instantiate's own position
-            // argument below replicates whatever this client decided to every other machine exactly as it does
-            // today, so no new RPC is needed for every client to agree on where the field sits. Falls back to the
-            // rocket's own position over a void, the same fallback every other GroundSnap caller uses.
+            // The field goes on the FLOOR below the burst, not at the rocket's own muzzle-height position - found here, on the shooter's own client, with
+            // the floor finder every ability visual uses (GroundSnap). PhotonNetwork.Instantiate's position argument replicates whatever this client
+            // decided to every other machine, so no new RPC is needed for every client to agree on where the field sits. Falls back to the rocket's own
+            // position over a void, like every other GroundSnap caller.
             Vector3 spawnPosition = transform.position;
             if (GroundSnap.TryFindGroundY(transform.position, out float groundY))
                 spawnPosition = new Vector3(transform.position.x, groundY, transform.position.z);
 
-            // Task 2.6 review: the combined multiplier (behaviour-scaling * OverPower's fire-time
-            // bonus) - the same product Damage and SplashDamageAt already apply, so the burning
-            // ground this rocket leaves scales with the shot exactly like its direct hit and its
-            // splash do, instead of always burning at the prefab's bare damagePerSecond.
+            // The combined multiplier (behaviour-scaling * OverPower's fire-time bonus), the same product Damage and SplashDamageAt apply, so the burning
+            // ground this rocket leaves scales with the shot exactly like its direct hit and its splash do.
             FireField.Spawn(fireFieldPrefab, spawnPosition, context.Weapon.Id,
                              context.DamageMultiplier * context.FireTimeDamageMultiplier);
         }

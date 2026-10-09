@@ -10,11 +10,11 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The first screen of the game and the owner of the lobby screens (lobby Task 9; it replaces JoinGameUI): a centred name screen (PROJECT over
-    /// OVERPOWER, the name box, Find a lobby, and Rejoin your match while a match still holds this player's place), then the lobby list and the
-    /// create screen, all built in code from UiTheme (LobbyUiKit). Find a lobby needs a valid name (PlayerNameRules with the LobbyConfig
-    /// lengths); the typed name is what Photon calls the player for the session. After a match (or a spectator's Leave) RoomManager sets
-    /// LobbyReturn and the rebuilt scene opens straight on the list. Joining or creating a room hides the screens; the lobby room screen (Task 10) takes over there. The scene's old name panel and its tips are switched off at start (they stay in the scene, hidden).
+    /// The first screen of the game and the owner of the lobby screens: a centred name screen (PROJECT over OVERPOWER, the name box, Find a lobby,
+    /// and Rejoin your match while a match still holds this player's place), then the lobby list and the create screen, all built in code from
+    /// UiTheme (LobbyUiKit). Find a lobby needs a valid name (PlayerNameRules with the LobbyConfig lengths); the typed name is what Photon calls
+    /// the player for the session. After a match (or a spectator's Leave) RoomManager sets LobbyReturn and the rebuilt scene opens straight on
+    /// the list. Joining or creating a room hides the screens; the lobby room screen takes over there.
     /// </summary>
     public sealed class NameScreen : MonoBehaviourPunCallbacks
     {
@@ -55,7 +55,6 @@ namespace Overpower.UI
         private float nextOfferCheckAt;
         private const float OfferCheckSeconds = 1f;
 
-        /// <summary>The screen that is up.</summary>
         public Screen Current => current;
         public TMP_InputField NameInput => nameInput;
         public LobbyButton FindButton => findButton;
@@ -110,7 +109,7 @@ namespace Overpower.UI
                 nameInput.text = PhotonNetwork.NickName;
             ApplyNameValidity();
 
-            // Lobby Task 8: coming back from a match (or a spectator's Leave) skips the name step.
+            // Coming back from a match (or a spectator's Leave) skips the name step.
             if (LobbyReturn.Consume())
             {
                 Debug.Log("[LOBBY] back on the list");
@@ -119,7 +118,7 @@ namespace Overpower.UI
             }
             else if (PhotonNetwork.InRoom)
             {
-                // This scene was loaded for the whole room (the mode's map, Dominion Task 10): the player is already in their lobby, which is
+                // This scene was loaded for the whole room (the mode's map): the player is already in their lobby, which is
                 // now a running game - the room screen draws nothing once the game has started, and the chat is switched on as on joining.
                 Debug.Log("[LOBBY] scene loaded inside the room - no name screen");
                 ShowOnly(Screen.InRoom);

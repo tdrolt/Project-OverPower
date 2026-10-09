@@ -4,9 +4,9 @@ using UnityEngine;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// Renders the open scene straight down onto a square PNG: the same approach as ArenaReportRender (telemetry
-    /// heatmaps), for any centre and size. The camera is HideAndDontSave and destroyed straight after, so the scene
-    /// is never marked dirty. Image up = world +Z, right = world +X.
+    /// Renders the open scene straight down onto a square PNG, like ArenaReportRender (telemetry heatmaps), for any
+    /// centre and size. The camera is HideAndDontSave and destroyed straight after, so the scene is never marked dirty.
+    /// Image up = world +Z, right = world +X.
     /// </summary>
     public static class TopDownRender
     {
@@ -18,9 +18,8 @@ namespace Overpower.EditorTools
             int pixels = pixelsAcross;
             int pixelsUp = Mathf.Max(1, Mathf.RoundToInt(pixelsAcross * depthMetres / widthMetres));
             float spanMetres = depthMetres;
-            // Captured before the try so `finally` can always restore it - even if ReadPixels/Apply/EncodeToPNG
-            // throws while rt is still the active RenderTexture, leaving RenderTexture.active pointing at rt right
-            // as it's about to be destroyed below.
+            // Captured before the try so `finally` can always restore it, even if ReadPixels/Apply/EncodeToPNG throws
+            // while rt is still the active RenderTexture.
             RenderTexture previous = RenderTexture.active;
             GameObject go = null;
             RenderTexture rt = null;

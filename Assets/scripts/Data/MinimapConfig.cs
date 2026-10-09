@@ -9,8 +9,6 @@ namespace Overpower.Data
     /// other change you can see from above (terrain paint, lighting, props outside Source), use
     /// OverPower > Arena > Bake minimap image. The bake writes the image and the three "written by the bake" values;
     /// don't type those by hand, or the map's bubbles won't line up with the picture.
-    ///
-    /// Fields are [SerializeField] private with read-only properties, like the rest of the Data folder.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Minimap Config", fileName = "MinimapConfig")]
     public sealed class MinimapConfig : ScriptableObject

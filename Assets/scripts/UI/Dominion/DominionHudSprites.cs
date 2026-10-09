@@ -36,7 +36,6 @@ namespace Overpower.UI
             return ring;
         }
 
-        /// <summary>The ring of an empty round-win dot at the theme's sizes.</summary>
         public static Sprite EmptyDot(UiTheme theme) => Ring(theme.dominionDotRing / Mathf.Max(1f, theme.dominionDotSize * 0.5f));
     }
 }

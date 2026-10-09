@@ -6,7 +6,7 @@ using System.Text;
 namespace Overpower.Lobby
 {
     /// <summary>
-    /// Lobby Task 13 (D13): the name of a match's log folder. It says when the match was, which mode and size and which lobby, for example
+    /// The name of a match's log folder (D13). It says when the match was, which mode and size and which lobby, for example
     /// "2026-10-02_2130_Conquest-3v3v3_Tudors-lobby", instead of a random code. Pure text work: <see cref="For"/> builds a name that is not taken,
     /// <see cref="Resolve"/> picks the folder of a match on this PC - the one already holding the match's id, else a new name - so every client of
     /// one match on one machine writes into the same folder and two lobbies never share one.

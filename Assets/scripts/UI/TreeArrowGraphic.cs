@@ -6,14 +6,12 @@ using Overpower.Match;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Task 5b-2 (D6): draws the arrows of the shop's weapon tree - one curved line with an arrowhead at the upgrade
-    /// end per (weapon -> upgrade) pair. It only reads where the node rectangles currently are, so it follows the
-    /// layout groups and any new weapon. Not a raycast target: the nodes under it keep their clicks and hovers.
-    ///
-    /// Shapes: to a node off to the side (the two upgrades of a family sit side by side under it, Task 13), an S-curve
-    /// from the weapon's bottom edge to the upgrade's top edge. To a node directly below, a short straight drop. To a
-    /// node further down the same column with another node in between, a C-curve down the gap beside the column,
-    /// entering it from the side. The shop's tree today only needs the S-curve; the other two keep any layout working.
+    /// Draws the arrows of the shop's weapon tree (D6): one curved line with an arrowhead at the upgrade end per
+    /// (weapon -> upgrade) pair. It only reads where the node rectangles currently are, so it follows the layout
+    /// groups and any new weapon. Not a raycast target: the nodes under it keep their clicks and hovers.
+    /// Shapes: a node off to the side (a family's two upgrades sit side by side under it) gets an S-curve from the
+    /// weapon's bottom edge to the upgrade's top edge; directly below, a short straight drop; further down the same
+    /// column with a node in between, a C-curve down the gap beside the column. Only the S-curve is used today.
     /// </summary>
     public sealed class TreeArrowGraphic : MaskableGraphic
     {

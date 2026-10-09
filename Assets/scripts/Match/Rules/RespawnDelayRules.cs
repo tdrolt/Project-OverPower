@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Overpower.Match
 {
-    /// <summary>The respawn wait and what a death costs (Task 0.11a, 9b-2). PlayerLifecycle owns the state; the numbers
+    /// <summary>The respawn wait and what a death costs. PlayerLifecycle owns the state; the numbers
     /// live here so the tests can pin them.</summary>
     public static class RespawnDelayRules
     {
@@ -10,7 +10,7 @@ namespace Overpower.Match
         public static float Delay(int deathCount, float baseSeconds, float perDeathSeconds, float maxSeconds) =>
             Mathf.Min(baseSeconds + perDeathSeconds * (deathCount - 1), maxSeconds);
 
-        /// <summary>Dominion Task 6: the wait before coming back. In Dominion it is the match size's fixed seconds however many times the player
+        /// <summary>The wait before coming back. In Dominion it is the match size's fixed seconds however many times the player
         /// has died; in Conquest it grows with each death as Delay says.</summary>
         public static float DelayFor(bool dominion, float dominionFixedSeconds, int deathCount, float baseSeconds, float perDeathSeconds, float maxSeconds) =>
             dominion ? Mathf.Max(0f, dominionFixedSeconds) : Delay(deathCount, baseSeconds, perDeathSeconds, maxSeconds);
@@ -22,7 +22,7 @@ namespace Overpower.Match
             rejoin ? RejoinDelayFor(dominionLive, dominionFixedSeconds, flatRejoinSeconds)
                    : DelayFor(dominionLive, dominionFixedSeconds, deathCount, baseSeconds, perDeathSeconds, maxSeconds);
 
-        /// <summary>Dominion Task 6 (default A13): a rejoiner in Dominion waits the same fixed time as everyone; in Conquest the flat rejoin seconds.</summary>
+        /// <summary>A rejoiner in Dominion waits the same fixed time as everyone; in Conquest the flat rejoin seconds (A13).</summary>
         public static float RejoinDelayFor(bool dominion, float dominionFixedSeconds, float flatSeconds) =>
             dominion ? Mathf.Max(0f, dominionFixedSeconds) : RejoinDelay(flatSeconds);
 
@@ -31,7 +31,7 @@ namespace Overpower.Match
         public static int DeathCountForRetake(int deathCount, bool countdownAlreadyCounted) =>
             countdownAlreadyCounted ? deathCount : deathCount + 1;
 
-        /// <summary>Task 9g (Tudor D28, answer 8): a rejoined player keeps their death penalty. The count comes back from the deaths in
+        /// <summary>A rejoined player keeps their death penalty (D28). The count comes back from the deaths in
         /// their "sb" Player Property (kills, deaths, assists, damage, captures), which the room keeps through the drop. It matches the
         /// respawn count: both start at zero at go-live and both grow once per death (a last-stand death is in "sb" at once and in the
         /// respawn count at the retake, which is why a rejoin respawn never charges a second time). Missing or short: 0.</summary>

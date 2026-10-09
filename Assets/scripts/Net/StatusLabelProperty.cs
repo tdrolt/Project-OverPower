@@ -1,11 +1,11 @@
 namespace Overpower.Net
 {
     /// <summary>
-    /// The Player Property that lets every client show STUNNED / SLOWED over a player (Tudor D18). Statuses
-    /// are victim-side: only the victim's own client applies and ticks them, so a remote copy of that player
-    /// knows nothing. The victim's client therefore publishes the label it is wearing under one key, only
-    /// when it changes: { label, endServerMs, durationMs } - end as Photon server time, so every client
-    /// reads the same seconds left whatever its own clock says.
+    /// The Player Property that lets every client show STUNNED / SLOWED over a player (D18). Statuses
+    /// are victim-side: only the victim's own client applies and ticks them, so a remote copy knows
+    /// nothing. The victim's client publishes the label it is wearing under one key, only when it
+    /// changes: { label, endServerMs, durationMs }, end as Photon server time so every client reads
+    /// the same seconds left whatever its own clock says.
     /// </summary>
     public static class StatusLabelProperty
     {

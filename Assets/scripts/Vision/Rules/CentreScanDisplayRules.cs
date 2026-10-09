@@ -18,8 +18,8 @@ namespace Overpower.Vision
         }
     }
 
-    /// <summary>The dots of the holding team's minimap (Tudor 2026-10-01: wave + zones refresh + enemy dots, no text). Every
-    /// pass of the front over an enemy adds a new dot, so crossing the wave twice makes two dots.</summary>
+    /// <summary>The dots of the holding team's minimap. Every pass of the front over an enemy adds a new dot, so crossing
+    /// the wave twice makes two dots.</summary>
     public sealed class ScanDotPool
     {
         /// <summary>Not a tuned value: a safety limit so a long session cannot grow the list without end.</summary>

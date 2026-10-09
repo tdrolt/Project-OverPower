@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// Dominion Task 11 check: walks the real player body along a list of routes by code (never the keyboard or mouse) and records its position every physics
+    /// A lane check: walks the real player body along a list of routes by code (never the keyboard or mouse) and records its position every physics
     /// frame. It moves the body the way PlayerMotor does (Rigidbody.MovePosition at the motor's speed, with the motor's own movement switched off meanwhile), so
     /// walls, boxes and jersey barriers stop it exactly as they stop a player. A walk counts as stuck when the body gained under a quarter of the distance a
     /// step should give for half a second. Results: a CSV of every frame and a summary text, both written outside the project. Added to the player by a

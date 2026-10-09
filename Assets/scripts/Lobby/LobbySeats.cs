@@ -12,12 +12,11 @@ namespace Overpower.Lobby
 {
     /// <summary>
     /// Who sits where inside a lobby, kept in the room's Custom Properties (one property per seat, holding the actor number
-    /// of whoever sits there). Players take a seat, move or leave it with TryTake / LeaveSeat; every change is a Photon
-    /// compare-and-swap, so two players clicking the same seat in the same instant get exactly one winner. The master
-    /// keeps the room tidy: before Start a player who leaves or drops frees their seat at once, and the seat fill counts
-    /// (lF) the lobby list shows are kept current. It sits next to LobbyDirectory on the RoomManager's GameObject (added by
-    /// RoomManager.Awake, so the scene file does not change). The lobby screen (lobby Task 10) reads Seats, MySeat and
-    /// NoRoleActors and listens to SeatsChanged.
+    /// of whoever sits there). Every change (TryTake / LeaveSeat) is a Photon compare-and-swap, so two players clicking the
+    /// same seat in the same instant get exactly one winner. The master keeps the room tidy: before Start a player who leaves
+    /// or drops frees their seat at once, and the seat fill counts (lF) for the lobby list are kept current. Sits next to
+    /// LobbyDirectory (added by RoomManager.Awake, so the scene file does not change). The lobby screen reads Seats, MySeat
+    /// and NoRoleActors and listens to SeatsChanged.
     /// </summary>
     public sealed class LobbySeats : MonoBehaviourPunCallbacks
     {
@@ -32,7 +31,7 @@ namespace Overpower.Lobby
 
         /// <summary>The nickname the player typed, kept while the room shows a numbered copy of it ("Tudor 2"); null when
         /// the name was not changed.</summary>
-        // Static: a scene loaded for the whole room (Dominion Task 10) builds a new LobbySeats, and the typed name must still be put back on leaving.
+        // Static: a scene loaded for the whole room builds a new LobbySeats, and the typed name must still be put back on leaving.
         private static string typedNickName;
 
         /// <summary>Seat writes we sent that have not been echoed yet (seat key -> our actor): the first update of that seat
@@ -191,7 +190,7 @@ namespace Overpower.Lobby
             bool seatChanged = false;
             foreach (string key in LobbySeatRules.AllSeatKeys(layout))
                 if (changed.ContainsKey(key)) { seatChanged = true; break; }
-            // The stage can change too (Start, lobby Task 4): the master's duties depend on it.
+            // The stage can change too (Start): the master's duties depend on it.
             bool stageChanged = changed.ContainsKey(LobbyKeys.Stage);
             if (seatChanged) Refresh(true);
             if (seatChanged || stageChanged) MasterDuties();
@@ -238,7 +237,7 @@ namespace Overpower.Lobby
 
         private string lastNotedSeat;
 
-        /// <summary>Lobby Task 13: this client's own seat taken or left goes into its match log as a marker (the log opens at Start; the markers wait
+        /// <summary>This client's own seat taken or left goes into its match log as a marker (the log opens at Start; the markers wait
         /// for it).</summary>
         private void NoteOwnSeat()
         {

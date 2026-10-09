@@ -13,27 +13,12 @@ using Overpower.Weapons;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The local player's own on-screen HUD: health, armor and overheat bars, plus the weapon slot
-    /// and the three ability slots. Built in code exactly like TestRangePanel (see its class comment
-    /// for why one root built in code beats a hand-authored hierarchy: every listener sits on the
-    /// same line as the control it belongs to, and nothing can be wired to the wrong button).
-    ///
-    /// SCREEN SPACE, OWNER ONLY - unlike HealthBarCanvas (the world-space bar over every player's
-    /// head, which everyone sees and which PlayerHealth already drives). This canvas is created only
-    /// when photonView.IsMine: a HUD is something you look at, and nobody needs to look at anyone
-    /// else's. It replaces the screen-space "ability Selector" canvas that used to ship on this
-    /// prefab from the deleted Ability UI.cs - that canvas rendered once per player instance,
-    /// stacking a copy on screen for every player in the room, and was removed from the prefab in
-    /// this same task after confirming no script referenced it any more.
-    ///
-    /// Polls every value in LateUpdate (Tudor's instruction, so the HUD always reads this frame's
-    /// final state) rather than subscribing to a "health changed"-style event per bar - there is no
-    /// such event today, and one dozen tiny events would outweigh reading a dozen numbers in a fixed
-    /// function. Most writes to a Text or Image are guarded by an explicit change check so an
-    /// unmoving bar never re-allocates a string or re-touches a Graphic 60 times a second. The one
-    /// exception is overheatFill.color, written unconditionally every frame while warning (it has to
-    /// be, to pulse) - harmless because Graphic.color itself no-ops (no dirty flag, no redraw) when
-    /// set to the value it already holds, the same guarantee the explicit checks below give by hand.
+    /// The local player's own on-screen HUD: health, armor and overheat bars, the weapon slot and the three ability
+    /// slots. Built in code like TestRangePanel (every listener sits on its control's line, so nothing is wired to the
+    /// wrong button). SCREEN SPACE, OWNER ONLY (created when photonView.IsMine), unlike HealthBarCanvas, the world-space
+    /// bar everyone sees. Polls every value in LateUpdate, so it reads this frame's final state, rather than subscribing
+    /// per bar; writes are guarded by change checks so an unmoving bar allocates nothing. The exception is
+    /// overheatFill.color, written every frame while warning (to pulse); Graphic.color no-ops when set to its own value.
     /// </summary>
     public class PlayerHud : MonoBehaviourPun
     {
@@ -48,9 +33,8 @@ namespace Overpower.UI
         [SerializeField, Tooltip("Colours, text sizes and the bar sprite for this HUD.")]
         private UiTheme theme;
 
-        // One Material instance shared by every TextMeshProUGUI this HUD builds - see AddLabel's
-        // comment for why sharing beats letting each text auto-instantiate its own the moment its
-        // outline is touched.
+        // One Material shared by every TextMeshProUGUI this HUD builds, instead of each auto-instantiating its own the
+        // moment its outline is touched (see AddLabel).
         private Material hudTextMaterial;
 
         // ---- component refs, read off this same player root --------------------------------------
@@ -68,57 +52,43 @@ namespace Overpower.UI
 
         private Image healthFill;
         private Image overheatFill;
-        private RectTransform overheatTickRect; // Repositioned live - see UpdateOverheat.
-        private Image ventBandImage; // The Vent window band - repositioned/recoloured live, see UpdateVentBand.
+        private RectTransform overheatTickRect; // Repositioned live (UpdateOverheat).
+        private Image ventBandImage; // The Vent window band, repositioned/recoloured live (UpdateVentBand).
         private Image armorFill;
         private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
 
-        // Carry-over C: the yellow immunity look is a FRAME round each bar (four thin edge Images),
-        // not a recolour of healthFill/armorFill and not a translucent overlay over the whole bar
-        // either (see UiTheme.immuneBarColor's tooltip for why the original overlay was retired - a
-        // wash over blue read grey). One frame each, since the HUD's health and armor bars are two
-        // separate tracks (unlike the overhead bar, where shield is drawn over health in the SAME
-        // rect - see PlayerHealth's single frame there). Both built in BuildUi, both start inactive.
+        // The yellow immunity look is a FRAME round each bar (four thin edge Images), not a recolour and not a translucent
+        // overlay (a wash over blue read grey, see UiTheme.immuneBarColor). One frame each: the HUD's health and armor bars
+        // are two separate tracks (the overhead bar draws shield over health in the SAME rect). Both start inactive.
         private ImmuneFrame healthImmuneFrame;
         private ImmuneFrame armorImmuneFrame;
         private bool lastImmuneLook;
 
-        // ---- built UI: damage numbers (Mark plan step 2) --------------------------------------------
+        // ---- built UI: damage numbers ---------------------------------------------------------------
 
-        // Kept for step 5 (the mark diamond, which shares this same overlay canvas/rect - see the file
-        // map): its own canvas needs no other reference held past BuildUi today.
+        // The mark diamond shares this overlay canvas/rect; no other reference to its canvas is held past BuildUi.
         private RectTransform hitFeedbackCanvasRect;
         private GameObject silencedBanner;
-        private TextMeshProUGUI goldText; // "Gold 1234" over "+7.7/s", bottom-right - see BuildGoldCorner.
+        private TextMeshProUGUI goldText; // "Gold 1234" over "+7.7/s", bottom-right (BuildGoldCorner).
 
-        // Task 2.4: the transient toast - originally just "Bounty +900", generalised (Task B3,
-        // 2026-09-16) into ShowToast(string) so "Respawned at Tier 2: capital under attack" can reuse
-        // the exact same label instead of a second one. A single pre-built label toggled on/off (see
-        // BuildToast/UpdateToast) rather than instantiated per message, so a toast never allocates UI -
-        // the same reasoning the silenced banner above already follows.
-        // toastGo is the toast's OWN root (what SetActive actually toggles) - NOT toastText.gameObject,
-        // which is a child of it: toggling the child while the parent stays inactive is a no-op (code
-        // review fix, Task 2.4 - caught by the 616x576 capture step, which showed no toast at all
-        // despite HandleBountyReceived having run).
+        // The transient toast: one pre-built label toggled on/off (BuildToast/UpdateToast), so a toast never allocates UI,
+        // used by every ShowToast(string) caller (bounty, respawn tier...).
+        // toastGo is the toast's OWN root, what SetActive toggles - NOT toastText.gameObject, its child: toggling the
+        // child while the parent is inactive is a no-op (the toast silently never showed).
         private GameObject toastGo;
         private TextMeshProUGUI toastText;
-        // Time.unscaledTime the toast should hide by; < 0 means "not currently showing".
-        // Unscaled so a debug Time.timeScale change cannot freeze a stale toast on screen forever.
+        // Time.unscaledTime the toast should hide by; < 0 means "not currently showing". Unscaled so a debug
+        // Time.timeScale change cannot freeze a stale toast on screen.
         private float toastHideAtTime = -1f;
 
-        // Task 2.6: a PERSISTENT label (unlike the toast above, which always hides itself on a
-        // timer) - shown for as long as the buff is armed or active, however long that turns out
-        // to be, not for a fixed duration.
+        // A PERSISTENT label (the toast hides on a timer): shown for as long as the buff is armed or active.
         private TextMeshProUGUI overPowerLabel;
 
         // ---- built UI: slots -----------------------------------------------------------------------
 
-        /// <summary>The tint target for one slot's border (HUD step 2 follow-up): four thin Image
-        /// strips, one per edge, instead of a single Image filling the whole slot rect. A translucent
-        /// child can never hide what is under it, so a full-rect Image at near-opaque alpha - what
-        /// this used to be - always reads as a solid box no matter how faint the wash on top of it is.
-        /// Wrapping the four strips behind one `color` property keeps every call site ("ui.background
-        /// .color = ...") the exact one-liner it was when background was a plain Image.</summary>
+        /// <summary>The tint target for one slot's border: four thin Image strips, one per edge, instead of one Image
+        /// filling the slot rect (a translucent child never hides what is under it, so a full-rect Image always reads as
+        /// a solid box). One `color` property keeps every call site a one-liner.</summary>
         private sealed class SlotFrame
         {
             private readonly Image top, bottom, left, right;
@@ -144,15 +114,10 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>Carry-over C: what carries the yellow "shield immunity" look for ONE HUD bar (the
-        /// health bar or the armour bar) - see UiTheme.immuneBarColor's own tooltip for why this
-        /// replaced a translucent whole-bar overlay (CreateImmuneOverlay, retired): a wash could never
-        /// read yellow over the blue shield fill. `edges` reuses SlotFrame - the exact same four-thin-
-        /// Images-round-a-rect recipe a slot's own border already uses (BuildFrameStrip) - and `wash`
-        /// is the optional faint reinforcement UNDER them (Immune Bar Wash Alpha, 0.15 by default: a faint wash
-        /// that reinforces the frame; 0 = frame only). Both
-        /// live under one root GameObject so UpdateHealthAndArmor can show/hide the whole look with a
-        /// single SetActive, the same shape the old single-Image overlay had.</summary>
+        /// <summary>The yellow "shield immunity" look for ONE HUD bar (a wash could never read yellow over the blue shield
+        /// fill, see UiTheme.immuneBarColor). `edges` reuses SlotFrame (BuildFrameStrip) and `wash` is the optional faint
+        /// reinforcement UNDER them (Immune Bar Wash Alpha; 0 = frame only). Both live under one root so
+        /// UpdateHealthAndArmor shows/hides the whole look with a single SetActive.</summary>
         private sealed class ImmuneFrame
         {
             public readonly GameObject root;
@@ -166,9 +131,8 @@ namespace Overpower.UI
                 this.wash = wash;
             }
 
-            /// <summary>frameColor is applied at ITS OWN alpha (now 1 by default - Immune Bar Colour);
-            /// washAlpha overrides the wash's own alpha independently, so the two can never fight over
-            /// one shared alpha the way a single Image's colour used to have to serve both jobs.</summary>
+            /// <summary>frameColor keeps ITS OWN alpha (Immune Bar Colour); washAlpha overrides the wash's alpha
+            /// independently, so the two never fight over one shared alpha.</summary>
             public void Apply(Color frameColor, float washAlpha)
             {
                 edges.color = frameColor;
@@ -180,8 +144,7 @@ namespace Overpower.UI
             public void SetShown(bool shown) => root.SetActive(shown);
         }
 
-        /// <summary>One slot's widgets. A class, not a struct, purely so BuildSlot/SetPips can mutate
-        /// it in place through the arrays below without juggling copies back and forth.</summary>
+        /// <summary>One slot's widgets. A class so BuildSlot/SetPips mutate it in place through the arrays below.</summary>
         private sealed class SlotUi
         {
             public SlotFrame background; // The border strips - doubles as the ready/blocked/active-glow tint.
@@ -189,20 +152,16 @@ namespace Overpower.UI
             public TextMeshProUGUI fallbackNameText;
             public Image cooldownCover;   // Null for the weapon slot - it has no cooldown sweep.
             public Transform pipRow;      // Null for the weapon slot.
-            // The coloured FACE of each pip - what SetPips tints. Each face is a child of its own pip root
-            // below, because a pip is two Images now (a dark rim and a face on top of it, HUD step 3).
+            // The coloured FACE of each pip, what SetPips tints; a pip is two Images (a dark rim and the face on it).
             public readonly List<Image> pips = new List<Image>();
-            // The pip roots, in the same order - what SetPips destroys when the charge count changes. Kept
-            // separately rather than walking up from a face's parent: one list that owns the lifetime is
-            // harder to get wrong than a transform.parent hop that silently orphans the rim.
+            // The pip roots, same order, what SetPips destroys when the charge count changes: one list that owns the
+            // lifetime, rather than a parent hop that would orphan the rim.
             public readonly List<GameObject> pipRoots = new List<GameObject>();
             public TextMeshProUGUI blockReasonText; // Null for the weapon slot.
 
-            // Ultimate slot only (Task 1.11) - null for every other slot. A separate overlay from
-            // cooldownCover above: the base class's own charge pool for an ultimate module is a
-            // trivial 1-charge/0-cooldown pool that recovers the instant it is spent (see the
-            // addendum's "fit with 1.0"), so its RechargeProgress never reflects the real gate -
-            // UltimateCharge.Normalised is read directly instead.
+            // Ultimate slot only. A separate overlay from cooldownCover: the module's own charge pool is a trivial
+            // 1-charge/0-cooldown pool that recovers the instant it is spent, so its RechargeProgress never reflects the
+            // real gate; UltimateCharge.Normalised is read directly instead.
             public Image ultimateChargeFill;
             public TextMeshProUGUI readyLabel;
         }
@@ -210,8 +169,7 @@ namespace Overpower.UI
         private SlotUi weaponSlotUi;
         private readonly SlotUi[] abilitySlotUi = new SlotUi[3];
 
-        // Index order for abilitySlotUi and every "lastXxx" array below. Fixed by AbilitySlot's own
-        // three ability values - Primary (the weapon) is handled separately, has no runner slot.
+        // Index order for abilitySlotUi and every "lastXxx" array below; Primary (the weapon) is separate, no runner slot.
         private static readonly (AbilitySlot slot, string keyLabel)[] AbilitySlotOrder =
         {
             (AbilitySlot.Attachment, "RMB"),
@@ -219,7 +177,7 @@ namespace Overpower.UI
             (AbilitySlot.Mobility, "SHIFT"),
         };
 
-        // ---- change-detection caches - see the class comment on why LateUpdate never allocates ----
+        // ---- change-detection caches: why LateUpdate never allocates ----
 
         private float lastHealthFraction = -1f;
         private float lastArmorFraction = -1f;
@@ -227,7 +185,7 @@ namespace Overpower.UI
         private float lastOverheatFraction = -1f;
         private float lastWarningThreshold01 = -1f;
         private bool lastSilenced;
-        private VentOutcome lastVentOutcome = VentOutcome.None; // Detects the instant a Hit lands - see UpdateVentBand.
+        private VentOutcome lastVentOutcome = VentOutcome.None; // Detects the instant a Hit lands (UpdateVentBand).
         private float ventHitFlashHideAtTime = -1f; // Time.unscaledTime the hit flash should hide by.
         private bool lastWeaponBlocked;
         private WeaponDefinition lastWeaponDef;
@@ -253,17 +211,15 @@ namespace Overpower.UI
 
         private void Awake()
         {
-            // Every remote copy of this component stays permanently dormant - see the class comment.
+            // Every remote copy stays permanently dormant.
             if (!photonView.IsMine)
             {
                 enabled = false;
                 return;
             }
 
-            // A missing theme (or a theme with no bar sprite) must not NRE its way through BuildUi -
-            // bail out the same clean way the remote-copy check above does. A theme with no sprite is
-            // exactly the Task 3 bug (every Filled Image draws full width regardless of fillAmount),
-            // so refusing to build with one is the point, not just a safety net.
+            // A missing theme or bar sprite must not NRE through BuildUi. A theme with no sprite makes every Filled Image
+            // draw full width regardless of fillAmount, so refusing to build with one is the point.
             if (theme == null)
             {
                 Debug.LogError($"[PlayerHud] {name}: UiTheme is not assigned - the HUD cannot be built.");
@@ -316,8 +272,7 @@ namespace Overpower.UI
             if (goldWallet != null)
                 goldWallet.BountyReceived -= HandleBountyReceived;
 
-            // The one Material ApplyOutline clones for every HUD text - nothing else references it,
-            // so nothing else will clean it up.
+            // The one Material ApplyOutline clones for every HUD text; nothing else references it, so nothing else frees it.
             if (hudTextMaterial != null)
                 Destroy(hudTextMaterial);
         }
@@ -344,20 +299,13 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // OverPower (Task 2.6, GDD p.20)
+        // OverPower (GDD p.20)
         // ============================================================================================
 
-        /// <summary>Shows theme.overPowerActiveText while the buff is fully active, the fainter
-        /// theme.overPowerArmedText while only armed, and hides the label the rest of the time -
-        /// both colours and both strings distinguishing the two states so a glance tells you which
-        /// one you are in, the same distinction the silenced banner's own on/off state does not
-        /// need but this one does.
-        ///
-        /// Task 2.6 review fix: the text/colour write used to be gated ONLY on "did active change
-        /// since last frame", so the very first frame the label went hidden -> armed (active never
-        /// having changed from its default false) skipped that write entirely and the label showed
-        /// visible but blank. justShown below forces the same write on the first shown frame
-        /// regardless of whether active also happens to have changed.</summary>
+        /// <summary>Shows theme.overPowerActiveText while the buff is active, the fainter overPowerArmedText while only
+        /// armed, and hides the label otherwise; text and colour both differ so a glance tells the states apart.
+        /// The text/colour write is not gated on "active changed" alone: justShown forces it on the first shown frame,
+        /// or a hidden -> armed label (active still false) would show blank.</summary>
         private void UpdateOverPower()
         {
             if (overPowerBuff == null)
@@ -385,24 +333,17 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Toast (Task 2.4; generalised beyond bounty payouts in Task B3, 2026-09-16)
+        // Toast
         // ============================================================================================
 
-        /// <summary>GoldWallet.BountyReceived handler: shows "Bounty +900" through the same transient
-        /// label every other HUD toast now uses. The text is set here, once, on the trigger frame only
-        /// - UpdateToast below never touches .text, just the GameObject's active flag, so a bounty
-        /// allocates exactly one string no matter how long the toast stays up.</summary>
+        /// <summary>GoldWallet.BountyReceived handler: shows "Bounty +900" through the shared toast label. The text is set
+        /// once, on the trigger frame; UpdateToast only toggles the active flag, so a bounty allocates one string.</summary>
         private void HandleBountyReceived(int amount) =>
             ShowToast($"Bounty +{amount.ToString(CultureInfo.InvariantCulture)}");
 
-        /// <summary>Shows <paramref name="text"/> in the HUD's one transient toast label for
-        /// bountyToastDurationSeconds (UiTheme - the name predates this generalisation, kept rather
-        /// than churned for a synonym since it was already the one home for this number), unscaled so
-        /// a debug Time.timeScale change cannot freeze a stale toast on screen forever. Same behaviour
-        /// the bounty payout always had; PlayerLifecycle's capital-under-attack respawn (Task B3,
-        /// 2026-09-16) is the second caller. There is only ONE label: calling this while a toast is
-        /// already showing replaces its text and restarts the duration, it does not queue a second one
-        /// (B3 review, 2026-09-16).</summary>
+        /// <summary>Shows <paramref name="text"/> in the HUD's one transient toast label for bountyToastDurationSeconds
+        /// (UiTheme; the name predates the toast serving other callers), unscaled. There is only ONE label: calling this
+        /// while a toast shows replaces its text and restarts the duration, it does not queue.</summary>
         public void ShowToast(string text)
         {
             toastText.text = text;
@@ -410,16 +351,13 @@ namespace Overpower.UI
             toastHideAtTime = Time.unscaledTime + theme.bountyToastDurationSeconds;
         }
 
-        /// <summary>Task 2.7: the "Two teams left" banner shown to every surviving player the instant
-        /// the match narrows from three teams to two. Same transient label ShowToast always uses -
-        /// MatchDirector calls this instead of ShowToast directly because it is added at runtime with
-        /// no Inspector of its own to hold a UiTheme reference; theme stays private and single-owned
-        /// here, the same "one source of truth" convention every other theme-driven text on this HUD
-        /// already follows.</summary>
+        /// <summary>The "Two teams left" banner for every surviving player the instant three teams narrow to two. The
+        /// same toast label; MatchDirector calls this rather than ShowToast because it is added at runtime with no
+        /// Inspector to hold a UiTheme, and the theme stays private to this HUD.</summary>
         public void ShowTwoTeamsLeftBanner() => ShowToast(theme.twoTeamsLeftBannerText);
 
-        /// <summary>2.7b step 8: the toast shown the instant MatchDirector.ReactToRoomState sees this client's own
-        /// live edge - the ordinary three-team text, or the host-start two-team text (Decision 22).</summary>
+        /// <summary>The toast shown the instant MatchDirector.ReactToRoomState sees this client's own live edge: the
+        /// ordinary three-team text, or the host-start two-team text.</summary>
         public void ShowMatchLiveToast(bool twoTeams) => ShowToast(twoTeams ? theme.matchLiveTwoTeamsToastText : theme.matchLiveToastText);
 
         private void UpdateToast()
@@ -432,19 +370,18 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Gold (Task 2.2)
+        // Gold
         // ============================================================================================
 
-        /// <summary>The bottom-right readout next to the shop button - "Gold 1234" over "+7.7/s". The formatting
-        /// (and the InvariantCulture rule behind it) lives in ShopPricing.GoldHudLabel, where a test pins it.
-        /// Still gated on the balance AND the income both being unchanged, so an idle wallet never re-allocates
-        /// a string or re-lays-out a text sixty times a second.</summary>
+        /// <summary>The bottom-right readout next to the shop button, "Gold 1234" over "+7.7/s". Formatting (and the
+        /// InvariantCulture rule) is ShopPricing.GoldHudLabel. Gated on balance AND income both unchanged, so an idle
+        /// wallet never re-allocates a string or re-lays-out a text.</summary>
         private void UpdateGold()
         {
             if (goldWallet == null)
                 return;
 
-            // Dominion has no gold: the readout is not drawn at all (the shop's own header is Task 5's).
+            // Dominion has no gold: the readout is not drawn at all.
             bool showGold = Overpower.Dominion.DominionTerritoryRules.ShowsGold(Overpower.Dominion.DominionMode.IsActive());
             if (goldText.gameObject.activeSelf != showGold)
                 goldText.gameObject.SetActive(showGold);
@@ -470,8 +407,7 @@ namespace Overpower.UI
             if (playerHealth == null)
                 return;
 
-            // Same asset PlayerHealth itself reads for this number - see the class comment on why
-            // the HUD holds its own reference instead of asking PlayerHealth for one.
+            // Read live from the same asset PlayerHealth uses, so retuning it in Play Mode moves the HUD at once.
             float maxHealth = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
 
             float healthFraction = maxHealth > 0f ? Mathf.Clamp01(playerHealth.Health / maxHealth) : 0f;
@@ -481,8 +417,7 @@ namespace Overpower.UI
                 lastHealthFraction = healthFraction;
             }
 
-            // The armor TRACK's visible width scales with capacity - see BuildArmorBar's class
-            // comment for why.
+            // The armor TRACK's visible width scales with capacity (BuildArmorBar says why).
             float capacity = playerHealth.ArmorCapacity;
             float trackWidth = theme.barWidth - 4f; // matches the 2px margin baked into BuildArmorBar on each side.
             float extentWidth = maxHealth > 0f ? Mathf.Clamp01(capacity / maxHealth) * trackWidth : 0f;
@@ -499,10 +434,8 @@ namespace Overpower.UI
                 lastArmorFraction = armorFraction;
             }
 
-            // Both bars turn yellow together, only while PlayerHealth's own clock says the immunity
-            // (not merely the armed trap) is running - see that class's ShowsImmuneLook. Guarded on
-            // change, same as every other write in this method: an unmoving frame must not re-touch
-            // its Graphics and GameObjects sixty times a second.
+            // Both bars turn yellow together, only while PlayerHealth's clock says the immunity (not merely the armed
+            // trap) is running (ShowsImmuneLook).
             bool immune = playerHealth.ShowsImmuneLook;
             if (immune != lastImmuneLook)
             {
@@ -522,18 +455,14 @@ namespace Overpower.UI
             float fraction = playerOverheat.Normalised;
             bool silenced = playerOverheat.IsSilenced;
 
-            // Deliberately NOT PlayerOverheat.IsWarning: that property is backed by OverheatState's
-            // own warningThreshold, captured once at this player's spawn. Reading GameplayConfig
-            // directly here, every frame, is what lets a designer retune the threshold in Play Mode
-            // and see this bar's colour change move immediately - the whole point of it being a
-            // config value instead of a literal.
+            // Deliberately NOT PlayerOverheat.IsWarning: that is backed by a threshold captured once at spawn. Reading
+            // GameplayConfig every frame lets a designer retune it in Play Mode and see the colour move at once.
             float warningThreshold01 = gameplayConfig != null && gameplayConfig.OverheatMax > 0f
                 ? gameplayConfig.OverheatWarningThreshold / gameplayConfig.OverheatMax
                 : 0.8f;
             bool warning = !silenced && fraction >= warningThreshold01;
 
-            // The tick mark moves with the same live threshold read above - a designer retuning it
-            // in Play Mode sees both the colour boundary AND the mark on the track move together.
+            // The tick mark moves with the same live threshold, so colour boundary and mark move together.
             if (!Mathf.Approximately(warningThreshold01, lastWarningThreshold01))
             {
                 overheatTickRect.anchorMin = new Vector2(warningThreshold01, 0f);
@@ -554,11 +483,8 @@ namespace Overpower.UI
             }
             else if (warning)
             {
-                // A genuine pulse BETWEEN the two overheat colours (not a dim/brighten of one, and
-                // not a flicker) - reads as "this is still your weapon warning you, and it is getting
-                // more urgent", not a second on/off state. theme.pulseDepth used to control a
-                // brightness dip here; it has no meaning against a two-colour lerp, so Task 5 removed
-                // it from UiTheme rather than leave a field nothing reads.
+                // A genuine pulse BETWEEN the two overheat colours (not a dim/brighten, not a flicker): it reads as the
+                // same warning getting more urgent, not a second on/off state.
                 target = theme.pulseAtWarning
                     ? Color.Lerp(theme.overheatColor, theme.overheatWarningColor, 0.5f + 0.5f * Mathf.Sin(Time.time * theme.pulseSpeed * Mathf.PI * 2f))
                     : theme.overheatWarningColor;
@@ -571,8 +497,7 @@ namespace Overpower.UI
 
             if (silenced != lastSilenced)
             {
-                // The banner is specifically the "weapon silenced by overheat, draining" cue - not
-                // the general block tint below, which also covers stun and death.
+                // The banner is specifically the "silenced by overheat, draining" cue, not the general block tint (also stun, death).
                 silencedBanner.SetActive(silenced);
                 lastSilenced = silenced;
             }
@@ -580,20 +505,16 @@ namespace Overpower.UI
             UpdateVentBand(silenced);
         }
 
-        /// <summary>The Vent band's live look and position - see VentBandLookRule for the pure
-        /// dim/bright/hit/miss decision this just draws. Read every frame (not change-guarded like
-        /// most of UpdateOverheat above): the band's own X anchors already move every frame the
-        /// window is open (the fill drains under it), so there is no unmoving case to protect.</summary>
+        /// <summary>The Vent band's live look and position; VentBandLookRule makes the dim/bright/hit/miss decision. Not
+        /// change-guarded: the band's anchors move every frame the window is open, so there is no idle case to protect.</summary>
         private void UpdateVentBand(bool silenced)
         {
             bool windowOpen = playerOverheat.IsVentWindowOpen;
             VentOutcome outcome = playerOverheat.VentOutcome;
             VentBandLook look = VentBandLookRule.Determine(silenced, windowOpen, outcome, playerOverheat.VentEnabled);
 
-            // The hit flash is the one look that expires on its own (UiTheme.ventHitFlashSeconds)
-            // rather than lasting for the rest of the silence like a miss does - arm the countdown
-            // the instant Outcome first reads Hit, unscaled so a debug Time.timeScale change can't
-            // freeze it on screen forever (same reasoning as the toast's own timer).
+            // The hit flash is the one look that expires on its own (UiTheme.ventHitFlashSeconds), unlike a miss which
+            // lasts the silence: arm the countdown the instant Outcome first reads Hit, unscaled as the toast's is.
             if (outcome == VentOutcome.Hit && lastVentOutcome != VentOutcome.Hit)
                 ventHitFlashHideAtTime = Time.unscaledTime + theme.ventHitFlashSeconds;
             lastVentOutcome = outcome;
@@ -627,8 +548,7 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Weapon slot (icon/name only - no cooldown sweep, no charges: see the addendum's "four slot
-        // icons" correction, the fourth being the weapon, not a fourth ability).
+        // Weapon slot (icon/name only - no cooldown sweep, no charges; the fourth slot is the weapon, not an ability).
         // ============================================================================================
 
         private void UpdateWeaponSlot()
@@ -640,9 +560,8 @@ namespace Overpower.UI
             if (current != lastWeaponDef)
                 RefreshWeaponSlotContent();
 
-            // Same actor-wide rule WeaponFiring.TryFire itself asks (CastGate.ForActor) - dead,
-            // stunned or silenced all block the trigger, so the weapon slot greys out for the same
-            // three reasons the ability slots do, not overheat alone.
+            // Same actor-wide rule WeaponFiring.TryFire asks (CastGate.ForActor): dead, stunned or silenced all block the
+            // trigger, so the slot greys out for the same reasons as the ability slots, not overheat alone.
             bool alive = playerHealth == null || playerHealth.IsAlive;
             bool stunned = statusEffects != null && statusEffects.IsStunned;
             bool silenced = playerOverheat != null && playerOverheat.IsSilenced;
@@ -672,15 +591,13 @@ namespace Overpower.UI
             AbilityDefinition def = status != null ? status.Definition : null;
             SlotUi ui = abilitySlotUi[index];
 
-            // Most abilities have no icon yet (the addendum's warning) - ApplyIconOrFallback is the
-            // one place that decision is made, shared with the weapon slot above.
+            // Most abilities have no icon yet: ApplyIconOrFallback is the one place that is decided (shared with the weapon slot).
             ApplyIconOrFallback(ui, def != null ? def.Icon : null, def != null ? def.DisplayName : "");
 
             int maxCharges = status != null ? status.MaxCharges : 0;
             SetPips(ui, status != null ? status.ChargesAvailable : 0, maxCharges, status != null && status.ChargesLocked);
 
-            // Force every cached value stale so the very next LateUpdate redraws this slot's sweep,
-            // tint and reason text even if the new ability's numbers happen to match the old one's.
+            // Force every cached value stale so the next LateUpdate redraws this slot even if the new ability's numbers match the old one's.
             lastCharges[index] = -1;
             lastLocked[index] = status != null && status.ChargesLocked;
             lastMaxCharges[index] = maxCharges;
@@ -713,9 +630,8 @@ namespace Overpower.UI
                 float recharge = status != null ? status.RechargeProgress : 0f;
                 bool active = status != null && status.IsActive;
 
-                // Captured before either cache is overwritten below: the cover's own gate (next
-                // block) needs to know whether CHARGES moved this frame, not just recharge - see its
-                // comment for why the two can move independently.
+                // Captured before either cache is overwritten: the cover's gate needs to know whether CHARGES moved this
+                // frame, not just recharge (the two move independently).
                 bool locked = status != null && status.ChargesLocked;
                 bool chargesChanged = charges != lastCharges[i] || maxCharges != lastMaxCharges[i];
                 // The lock can flip without the count moving (running dry locks at 0 charges, which the
@@ -730,28 +646,21 @@ namespace Overpower.UI
 
                 if (chargesChanged || !Mathf.Approximately(recharge, lastRecharge[i]))
                 {
-                    // charges >= maxCharges (full, or no pool at all - IAbilityStatus.MaxCharges' own
-                    // doc comment on the Sprint case) is its OWN condition, not just "recharge == 0":
-                    // ChargePool.RechargeProgress reports 0 both when a pool is full AND the instant a
-                    // charge is spent (pinned by RechargeProgressIsZeroOnAFullPool), so recharge alone
-                    // cannot tell "ready" from "just spent". Without this gate the Ultimate slot's
-                    // trivial 1-charge/0s-cooldown pool - whose RechargeProgress is 0 FOREVER, never
-                    // just briefly - would show its cover permanently, fully covering the READY meter.
+                    // charges >= maxCharges (full, or no pool at all, see IAbilityStatus.MaxCharges) is its OWN condition,
+                    // not "recharge == 0": ChargePool.RechargeProgress is 0 both when full AND the instant a charge is
+                    // spent (RechargeProgressIsZeroOnAFullPool), so recharge alone cannot tell "ready" from "just spent".
+                    // Without it the Ultimate's trivial pool, whose progress is 0 FOREVER, would cover the READY meter.
                     ui.cooldownCover.fillAmount = charges >= maxCharges ? 0f : Mathf.Clamp01(1f - recharge);
                     lastRecharge[i] = recharge;
                 }
 
                 if (active != lastActive[i] || block != lastBlock[i])
                 {
-                    // Active wins over blocked (invulnerability rework follow-up, 2026-09-18; Dead-wins
-                    // exception added by review the same day): several modules are deliberately still
-                    // IsActive while blocked - Flamethrower/Invulnerability through Stunned or Silenced,
-                    // Dash/ZipGun through Silenced only - and every ultimate reads NotReady the instant a
-                    // real cast spends its meter - checking block first hid the one thing "active" exists
-                    // to show. See SlotTintRule's own class comment for the per-module survey and why Dead
-                    // is the one block reason that still wins over active. The reason text is hidden while
-                    // active (Dead excepted) for the same cause: "not ready" under a glowing, running
-                    // ultimate is noise once the meter's own fill already shows it refilling.
+                    // Active wins over blocked: several modules are deliberately still IsActive while blocked (Flamethrower/
+                    // Invulnerability through Stunned or Silenced, Dash/ZipGun through Silenced) and every ultimate reads
+                    // NotReady the instant a cast spends its meter, so checking block first hid what "active" exists to
+                    // show. Dead is the one reason that still wins (SlotTintRule has the survey). The reason text is hidden
+                    // while active for the same cause ("not ready" under a glowing ultimate is noise).
                     ui.background.color = SlotTintRule.BorderColor(active, block, theme.slotActiveGlowColor,
                                                                     theme.slotBlockedColor, theme.slotReadyColor);
                     ui.blockReasonText.text = SlotTintRule.ShowsBlockReason(active, block) ? BlockReasonLabel(block) : "";
@@ -764,15 +673,13 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>The Task 1.11 hook, filled in: a translucent fill over the Ultimate slot's icon
-        /// tracking UltimateCharge.Normalised, and a READY label shown only once IsFull is true - the
-        /// same moment Space actually casts something. Independent of the slot's ordinary cooldown
-        /// cover above, which for an ultimate module reflects only the trivial always-instant
-        /// base-class pool, never the real gate.</summary>
+        /// <summary>A translucent fill over the Ultimate slot's icon tracking UltimateCharge.Normalised, and a READY label
+        /// once IsFull, the same moment Space actually casts. Independent of the slot's cooldown cover, which for an
+        /// ultimate reflects only the trivial always-instant pool, never the real gate.</summary>
         private void UpdateUltimateMeter(SlotUi ui, CastBlock block, bool equipped)
         {
             if (ui.ultimateChargeFill == null)
-                return; // Built only for the Ultimate slot - see BuildSlot's isUltimate parameter.
+                return; // Built only for the Ultimate slot (BuildSlot's isUltimate).
 
             float normalised = ultimateCharge != null ? ultimateCharge.Normalised : 0f;
             bool ready = ultimateCharge != null && ultimateCharge.IsFull;
@@ -800,9 +707,8 @@ namespace Overpower.UI
                 lastUltimateNone = noUltimate;
             }
 
-            // The ability's fallback name sits in the same spot as the label, so it hides while a label shows
-            // (the two overprinted, "Shield" under READY). Set every frame, not on change: a loadout swap
-            // re-enables the name through ApplyIconOrFallback and this puts it back the next frame.
+            // The fallback name sits where the label does, so it hides while a label shows (they overprinted). Set every
+            // frame, not on change: a loadout swap re-enables the name via ApplyIconOrFallback and this undoes it next frame.
             ui.fallbackNameText.enabled = !ui.readyLabel.gameObject.activeSelf && !ui.icon.enabled;
         }
 
@@ -850,17 +756,15 @@ namespace Overpower.UI
 
                 for (int i = 0; i < maxCharges; i++)
                 {
-                    // The pip root IS the dark rim: one Image sized Pip Size + twice the rim, with the coloured
-                    // face inset inside it. Two Images per pip instead of one, and no extra layout columns - the
-                    // rim is the thing the layout group measures, and the face is its child.
+                    // The pip root IS the dark rim (Pip Size + twice the rim) with the coloured face inset in it: the rim is
+                    // what the layout group measures, the face is its child, so no extra layout columns.
                     GameObject pip = new GameObject("Pip", typeof(RectTransform));
                     pip.transform.SetParent(ui.pipRow, false);
                     LayoutElement le = pip.AddComponent<LayoutElement>();
                     float outer = theme.pipSize + 2f * theme.pipOutlineWidth;
                     le.preferredWidth = outer;
                     le.preferredHeight = outer;
-                    // See panelLayout's comment in BuildUi: pipRow's child control is ON, so this
-                    // LayoutElement alone becomes the pip's actual rendered size.
+                    // pipRow's child control is ON (see panelLayout in BuildUi): this LayoutElement alone is the pip's size.
                     Image rim = pip.AddComponent<Image>();
                     rim.color = theme.pipOutlineColor;
                     rim.raycastTarget = false;
@@ -887,7 +791,7 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // UI construction - built in code, following TestRangePanel's pattern (see its class comment).
+        // UI construction - built in code, following TestRangePanel's pattern.
         // ============================================================================================
 
         private void BuildUi()
@@ -896,50 +800,33 @@ namespace Overpower.UI
             canvasGo.transform.SetParent(transform, false);
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // Explicit and below both the F1 test panel (TestRangePanel: order 500) and MatchUI's
-            // win/lose/respawn panels (default, unordered overlay canvas) - the HUD must never sit on
-            // top of either. overrideSorting makes this true regardless of sibling/creation order,
-            // which an un-overridden Screen Space - Overlay canvas cannot guarantee on its own.
+            // Below both the F1 test panel (order 500) and MatchUI's win/lose/respawn panels (default overlay canvas): the
+            // HUD must never cover either. overrideSorting makes that true whatever the creation order.
             canvas.overrideSorting = true;
             canvas.sortingOrder = -10;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;
-            // Match value now lives on UiTheme (shared with the loadout screen, Task 9) rather than
-            // being hardcoded per-canvas. This used to be pinned to 1 (match by HEIGHT) because this
-            // HUD is anchored to the bottom edge by a fixed reference-unit offset, and matching by
-            // height keeps that offset a predictable fraction of screen height on a narrower-than-
-            // 16:9 window. UiTheme's default is 0.5 instead - a mix of width and height - per spec,
-            // so the HUD stays readable on ultrawide AND 16:10 too, not just narrower windows; Task 3
-            // confirmed the panel is still fully on screen at 1920x1080 with this value.
+            // The match value lives on UiTheme, shared with the loadout screen. A mix of width and height (default 0.5)
+            // keeps the HUD readable on ultrawide and 16:10, where matching by height alone only suited narrow windows.
             scaler.matchWidthOrHeight = theme.matchWidthOrHeight;
-            // No GraphicRaycaster and no EventSystem: nothing on this HUD is clickable (see the class
-            // comment) - adding one would just be a second, unnecessary EventSystem warning waiting
-            // to happen.
+            // No GraphicRaycaster and no EventSystem: nothing on this HUD is clickable, and a second EventSystem would warn.
 
             GameObject panel = new GameObject("Hud Panel", typeof(RectTransform));
             panel.transform.SetParent(canvasGo.transform, false);
             RectTransform panelRt = panel.GetComponent<RectTransform>();
-            // Bottom-centre: the F1 test panel owns the top-left (TestRangePanel.BuildUi), and this
-            // keeps the two tools from ever overlapping. Task 5 shrank the chat prompt ("press Enter
-            // to chat") from a tall band down to a small corner label, so this no longer needs to
-            // clear much - Hud Bottom Offset is a small, theme-tunable gap instead.
+            // Bottom-centre: the F1 test panel owns the top-left, so the two never overlap. Hud Bottom Offset is the
+            // theme-tunable gap above the screen edge.
             panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 0f);
             panelRt.pivot = new Vector2(0.5f, 0f);
             panelRt.anchoredPosition = new Vector2(0f, theme.hudBottomOffset);
-            // Tudor, 2026-09-17: one 20% reduction of the whole HUD, applied ONCE here as a scale rather than by
-            // re-typing every size on UiTheme at 80% - a designer still tunes Bar Width, Slot Width and the text
-            // sizes in their own units, and Hud Scale is the single number that makes the group smaller or
-            // bigger. The pivot above is bottom-centre, so shrinking keeps the HUD's bottom edge exactly Hud
-            // Bottom Offset above the screen edge instead of floating up off it.
+            // Hud Scale shrinks the whole HUD ONCE here as a scale, so a designer still tunes Bar Width, Slot Width and the
+            // text sizes in their own units. The pivot is bottom-centre, so the bottom edge stays Hud Bottom Offset above
+            // the screen edge.
             panel.transform.localScale = Vector3.one * theme.hudScale;
-            // Sized by the ContentSizeFitter below, not by hand - see its comment.
 
-            // NO background image (Tudor, 2026-09-17): the near-opaque slab that used to sit behind the bars and
-            // slots was the single biggest thing between a player and the arena. What replaces it is the text
-            // treatment itself - a heavier face, a dark outline and a soft drop shadow, all from UiTheme's Text
-            // section - plus each bar's own track and each slot's own border. One fewer Graphic here also means
-            // one fewer thing in the HUD's draw batch.
+            // NO background image: a slab behind the bars and slots hid the arena. The text treatment (heavier face,
+            // outline, soft shadow from UiTheme's Text section) plus each bar's track and each slot's border replace it.
 
             VerticalLayoutGroup panelLayout = panel.AddComponent<VerticalLayoutGroup>();
             panelLayout.spacing = 6f;
@@ -947,30 +834,22 @@ namespace Overpower.UI
                 Mathf.RoundToInt(theme.hudPanelPadding), Mathf.RoundToInt(theme.hudPanelPadding),
                 Mathf.RoundToInt(theme.hudPanelPadding), Mathf.RoundToInt(theme.hudPanelPadding));
             panelLayout.childAlignment = TextAnchor.UpperCenter;
-            // ON, not off: with child control off, each child's RectTransform.sizeDelta is what
-            // actually renders while this group reads LayoutElement.preferred* only to POSITION
-            // children and size the panel for ContentSizeFitter below - two numbers that have to be
-            // hand-kept equal, and silently drift the moment someone edits one without the other.
-            // With child control ON, LayoutElement.preferred* is the only number: this group WRITES
-            // it onto each child's sizeDelta itself, so every "go.GetComponent<RectTransform>().sizeDelta
-            // = ..." line that used to shadow a LayoutElement is gone (code review fix).
+            // ON, not off: with child control off, sizeDelta is what renders while LayoutElement.preferred* only
+            // positions children and sizes the panel, two numbers that drift apart. With it ON, LayoutElement.preferred*
+            // is the only number: the group writes it onto each child's sizeDelta.
             panelLayout.childControlWidth = true;
             panelLayout.childControlHeight = true;
             panelLayout.childForceExpandWidth = false;
             panelLayout.childForceExpandHeight = false;
 
-            // The panel's own rect is driven by its content (padding + every bar/row below) instead
-            // of a hand-picked sizeDelta - one less number to keep in sync by hand whenever a bar
-            // height or slot size changes on UiTheme. childAlignment above therefore never has slack
-            // to resolve either way; it is set for clarity, not because it matters here.
+            // The panel's rect is driven by its content (padding + every bar/row), not a hand-picked sizeDelta, so a bar
+            // height or slot size change on UiTheme needs no second edit.
             ContentSizeFitter panelFitter = panel.AddComponent<ContentSizeFitter>();
             panelFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             panelFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            // Task 2.6: the OverPower label - persistent (see the field's own comment), hidden
-            // until UpdateOverPower's first armed/active frame, at the top of the HUD panel (HUD
-            // step 4 moved the gold row that used to sit above it into its own Gold Corner, bottom-
-            // right next to the shop button - see BuildGoldCorner).
+            // The OverPower label: persistent, hidden until UpdateOverPower's first armed/active frame, at the top of the
+            // panel (gold lives in its own corner, BuildGoldCorner).
             overPowerLabel = AddLabel(panel.transform, "", theme.bodyTextSize, FontStyles.Bold);
             LayoutElement overPowerLe = overPowerLabel.gameObject.AddComponent<LayoutElement>();
             overPowerLe.preferredWidth = theme.barWidth;
@@ -978,41 +857,26 @@ namespace Overpower.UI
             overPowerLabel.alignment = TextAlignmentOptions.Center;
             overPowerLabel.gameObject.SetActive(false);
 
-            // Step 1 order - slots row, then overheat, then shield/armor, then health, top to
-            // bottom - matches [T], the mocked-up layout Tudor approved after Phase 1 (the gold row
-            // above is a later addition, Task 2.2, not part of that original mockup). A
-            // VerticalLayoutGroup lays children top-to-bottom in the order they are ADDED
-            // regardless of childAlignment (alignment only decides where leftover space goes, which
-            // the ContentSizeFitter above leaves at zero anyway) - so build order here IS visual
-            // order, and this comment is the one place that fact needs recording.
+            // Top to bottom: slots row, overheat, shield/armor, health (the approved mockup). A VerticalLayoutGroup lays
+            // children out in the order they are ADDED, so build order here IS visual order.
             GameObject slotsRow = new GameObject("Slots Row", typeof(RectTransform));
             slotsRow.transform.SetParent(panel.transform, false);
             float slotsRowHeight = theme.slotIconBoxHeight + theme.slotCooldownAreaHeight;
-            // Fix 7 (Playtest polish review): this used to just read theme.barWidth, which happened
-            // to equal 4 slots' worth of content only because nothing kept the two numbers in sync -
-            // Slot Width or the slot count could change and this row's own preferred width would
-            // silently stop matching what it actually contains. Computed from the real content
-            // instead: the weapon slot plus one entry per AbilitySlotOrder, spaced by Hud Slot
-            // Spacing - see that field's tooltip (and Bar Width's) for the invariant that keeps this
-            // landing on the same number as the bars above it.
+            // Computed from the real content (the weapon slot plus one per AbilitySlotOrder, spaced by Hud Slot Spacing),
+            // not read from theme.barWidth, which only matched by luck when Slot Width or the slot count changed. Hud Slot
+            // Spacing's and Bar Width's tooltips give the invariant that keeps it equal to the bars' width.
             int slotCount = AbilitySlotOrder.Length + 1;
             float slotsRowWidth = slotCount * theme.slotWidth + (slotCount - 1) * theme.hudSlotSpacing;
             LayoutElement slotsRowLe = slotsRow.AddComponent<LayoutElement>();
             slotsRowLe.preferredWidth = slotsRowWidth;
             slotsRowLe.preferredHeight = slotsRowHeight;
-            // See panelLayout's comment above: panelLayout's own child control (ON) is what turns
-            // this LayoutElement into this row's actual rendered size - no sizeDelta line needed here.
+            // panelLayout's child control (ON) turns this LayoutElement into the row's rendered size.
             HorizontalLayoutGroup slotsLayout = slotsRow.AddComponent<HorizontalLayoutGroup>();
             slotsLayout.spacing = theme.hudSlotSpacing;
             slotsLayout.childAlignment = TextAnchor.UpperCenter;
-            // ON for the same reason as panelLayout above - this group's four slot children each
-            // carry a LayoutElement (see BuildSlot) that is now the one place their size lives.
-            // Force-expand OFF, same as panelLayout - a runtime AddComponent<HorizontalLayoutGroup>
-            // does NOT run the Editor's Reset() (that only fires from the Add Component button), so
-            // childForceExpandWidth/Height default to true, not false. Left unset here, child
-            // control ON meant every slot got cross-axis stretched to the row's full height instead
-            // of staying at its own LayoutElement size - the weapon slot visibly taller than the
-            // ability slots below it (code review fix).
+            // ON as panelLayout: each slot's LayoutElement (BuildSlot) is the one place its size lives. Force-expand OFF:
+            // a runtime AddComponent does NOT run the Editor's Reset(), so childForceExpandWidth/Height default to true
+            // and every slot got stretched to the row's full height (the weapon slot visibly taller).
             slotsLayout.childControlWidth = slotsLayout.childControlHeight = true;
             slotsLayout.childForceExpandWidth = slotsLayout.childForceExpandHeight = false;
 
@@ -1023,20 +887,16 @@ namespace Overpower.UI
                 abilitySlotUi[i] = BuildSlot(slotsRow.transform, AbilitySlotOrder[i].keyLabel, withCooldown: true, isUltimate: isUltimate);
             }
 
-            // Built LAST and parented to the row itself (not the panel): a plain child with
-            // ignoreLayout stretched over slotsRow's own rect draws literally "over the slot row"
-            // (the addendum's own words) without ever being counted by any layout group - toggling
-            // it on/off with SetActive can no longer shift the row's position the way it did when
-            // this lived as a separate, height-reserving sibling under Hud Panel (code review fix).
+            // Built LAST and parented to the row (not the panel): a child with ignoreLayout stretched over the row's rect
+            // draws over the slots without any layout group counting it, so toggling it never shifts the row.
             silencedBanner = BuildSilencedBanner(slotsRow.transform);
 
             overheatFill = BuildBar(panel.transform, "Overheat Bar", theme.barWidth, theme.overheatBarHeight, theme.overheatColor, out Image overheatTrack);
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
             ventBandImage = BuildVentBand(overheatTrack.transform);
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
-            // armorExtentRect.parent is the armor bar's own TRACK root (BuildArmorBar parents the
-            // extent, which parents Fill, under it) - the frame goes there, not on the extent
-            // itself, so it covers the WHOLE bar rather than shrinking with a part-empty capacity.
+            // armorExtentRect.parent is the armor bar's TRACK root: the frame goes there, not on the extent, so it covers
+            // the WHOLE bar rather than shrinking with a part-empty capacity.
             armorImmuneFrame = BuildImmuneFrame(armorExtentRect.parent);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
             healthImmuneFrame = BuildImmuneFrame(healthFill.transform.parent);
@@ -1045,24 +905,19 @@ namespace Overpower.UI
             BuildToast(canvasGo.transform);
             BuildStatusLabel(canvasGo.transform);
 
-            // Tudor D12: hold Tab for the scoreboard. The publisher counts this player's own numbers and writes them
-            // to their Player Properties; the panel reads everyone's. Both are owner-only, like the rest of this HUD.
+            // Hold Tab for the scoreboard (D12). The publisher counts this player's own numbers into their Player
+            // Properties; the panel reads everyone's. Both owner-only.
             ScoreboardPublisher.Create(gameObject, gameplayConfig);
             ScoreboardPanel.Create(transform, theme, GetComponent<PlayerInputRouter>());
 
             BuildHitFeedbackCanvas();
         }
 
-        /// <summary>Mark plan step 2: a SEPARATE overlay canvas for damage numbers, below the HUD
-        /// (order -20 vs the HUD's -10, so a number never draws over a slot/bar) and with no
-        /// GraphicRaycaster - same reasoning as the HUD's own canvas (BuildUi's comment): nothing here
-        /// is clickable, and a world-space raycaster trap has already bitten this project once
-        /// (ApplyTheme's comment on HealthBarCanvas). Pools DamageNumberView.PoolSize labels up front
-        /// so popping a number is never a GameObject.Instantiate - see that class's own "no allocation
-        /// per hit" comment. Mark plan step 5: also pools MarkIndicatorView.PoolSize diamonds (the
-        /// shooter's own marks on other enemies) plus ONE more for SelfMarkIndicatorView (Tudor's
-        /// answer 1: the marked player's own diamond over their own head) - same canvas, same pooling
-        /// reasoning, both built from the same theme values so a retune moves every diamond at once.</summary>
+        /// <summary>A SEPARATE overlay canvas for damage numbers and mark diamonds, below the HUD (-20 vs -10, so a number
+        /// never draws over a slot or bar), with no GraphicRaycaster (a raycaster trap has bitten before, see ApplyTheme
+        /// on HealthBarCanvas). Pools DamageNumberView.PoolSize labels, MarkIndicatorView.PoolSize diamonds and ONE for
+        /// SelfMarkIndicatorView (the marked player's own diamond) up front, so popping one never Instantiates; all
+        /// diamonds share the theme values so a retune moves every one.</summary>
         private void BuildHitFeedbackCanvas()
         {
             GameObject canvasGo = new GameObject("Hit Feedback Canvas", typeof(RectTransform));
@@ -1103,12 +958,9 @@ namespace Overpower.UI
             SelfMarkIndicatorView.Create(transform, playerHealth, theme, hitFeedbackCanvasRect, selfDiamond);
         }
 
-        /// <summary>One mark diamond: a plain Image from the theme's own bar sprite, rotated 45 degrees
-        /// (so a square Image reads as a diamond), sized Mark Indicator Size, tinted Mark Colour (the
-        /// same colour a marked hit's own damage number uses - the two teach each other). Shared recipe
-        /// for both MarkIndicatorView's pooled enemy diamonds and SelfMarkIndicatorView's own single
-        /// one - built inactive, centre-pivoted/anchored so LateUpdate can freely reposition it by
-        /// anchoredPosition alone.</summary>
+        /// <summary>One mark diamond: the theme's bar sprite rotated 45 degrees, sized Mark Indicator Size, tinted Mark
+        /// Colour (the colour a marked hit's damage number uses, so the two teach each other). Shared by the pooled
+        /// enemy diamonds and the self one; built inactive and centre-anchored so LateUpdate repositions by anchoredPosition alone.</summary>
         private Image BuildMarkDiamond(Transform parent, string name)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
@@ -1127,16 +979,10 @@ namespace Overpower.UI
             return image;
         }
 
-        /// <summary>The gold readout, bottom-right, directly above the "Loadout (P)" button (Tudor, 2026-09-17:
-        /// "display the gold generation next to the shop since these systems are tied together"). It used to be
-        /// the first row of Hud Panel, where it pushed the bars and slots down and had nothing to do with either.
-        ///
-        /// It lives on THIS canvas, not on the loadout screen's own toggle canvas, because PlayerHud is what
-        /// already holds the GoldWallet and the change caches that keep an unmoving number from re-allocating a
-        /// string sixty times a second - see UpdateGold. The two canvases line up because both put their content
-        /// inside an identical (1, 0)-anchored, (1, 0)-pivoted root scaled by Hud Scale, so the gap between the
-        /// readout and the button is Gold Shop Gap at every screen size and every scale (see
-        /// LoadoutScreen.BuildToggleButtonCanvas's Shop Corner).</summary>
+        /// <summary>The gold readout, bottom-right, directly above the "Loadout (P)" button (gold and shop are tied). It
+        /// lives on THIS canvas because PlayerHud holds the GoldWallet and the change caches (UpdateGold). The two canvases
+        /// line up because both use an identical (1, 0)-anchored, (1, 0)-pivoted root scaled by Hud Scale, so the gap is
+        /// Gold Shop Gap at every screen size (LoadoutScreen.BuildToggleButtonCanvas, Shop Corner).</summary>
         private void BuildGoldCorner(Transform canvasParent)
         {
             GameObject corner = new GameObject("Gold Corner", typeof(RectTransform));
@@ -1154,22 +1000,16 @@ namespace Overpower.UI
             goldRt.anchoredPosition = new Vector2(
                 -theme.loadoutToggleButtonMargin,
                 theme.loadoutToggleButtonMargin + theme.loadoutToggleButtonHeight + theme.goldShopGap);
-            // Two lines of Body Text Size, the second one smaller - the label writes its own <size> tag, so one
-            // TextMeshProUGUI serves both instead of a second one to keep in step.
+            // Two lines, the second smaller: the label writes its own <size> tag, so one TextMeshProUGUI serves both.
             goldRt.sizeDelta = new Vector2(theme.loadoutToggleButtonWidth, Overpower.Dominion.DominionScoreBarRules.GoldReadoutHeight(theme.bodyTextSize));
             goldText.color = theme.goldTextColor;
             goldText.alignment = TextAlignmentOptions.Right;
             goldText.enableWordWrapping = false;
         }
 
-        /// <summary>Task 2.4's transient toast (originally just "Bounty +900", generalised in Task B3,
-        /// 2026-09-16 - see ShowToast): a fixed-size label parented directly to the canvas (NOT to Hud
-        /// Panel's VerticalLayoutGroup - a toast is rare enough that it must not nudge the bars/slots
-        /// around every time it shows or hides) and anchored top-centre, clear of both the
-        /// bottom-anchored Hud Panel and TestRangePanel's own top-left corner. Built once, hidden until
-        /// the first ShowToast call. Fills the toastGo/toastText fields directly rather than returning
-        /// anything: callers must toggle the ROOT (toastGo), not the label's own gameObject, which
-        /// stays a child of an inactive parent otherwise (see toastGo's own field comment).</summary>
+        /// <summary>The transient toast (ShowToast): a fixed-size label parented to the canvas, NOT Hud Panel's layout
+        /// group (it must not nudge the bars when it shows), anchored top-centre clear of the Hud Panel and the F1
+        /// panel's top-left. Built once, hidden until the first ShowToast. Callers toggle the ROOT (toastGo), not the label.</summary>
         private void BuildToast(Transform canvasParent)
         {
             GameObject go = new GameObject("Toast", typeof(RectTransform));
@@ -1196,9 +1036,8 @@ namespace Overpower.UI
 
         private const float StatusHudGap = 8f; // Clear air between the label's letters and the bar under them.
 
-        /// <summary>Tudor D18: your own STUNNED / SLOWED label with its thin shrinking bar, a little below the middle
-        /// of the screen - parented to the canvas (not Hud Panel's layout group) like the toast, so showing and hiding
-        /// it never moves anything. Starts hidden; UpdateStatusLabel is the only thing that shows it.</summary>
+        /// <summary>Your own STUNNED / SLOWED label with its thin shrinking bar (D18), a little below the screen middle,
+        /// parented to the canvas like the toast so showing it never moves anything. UpdateStatusLabel is the only thing that shows it.</summary>
         private void BuildStatusLabel(Transform canvasParent)
         {
             GameObject go = new GameObject("Status Label", typeof(RectTransform));
@@ -1282,12 +1121,8 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>trackImage is handed back so a caller can add something on top of the track
-        /// itself - today just the overheat bar's warning tick, built by the caller right after this
-        /// returns. Reads theme.barTrackColor directly rather than taking it as a parameter: both
-        /// callers (health and overheat) pass that same colour, and BuildArmorBar builds its own
-        /// track separately rather than calling this method at all, so a parameter here would only
-        /// ever hold one value.</summary>
+        /// <summary>trackImage is handed back so a caller can add to the track (the overheat bar's warning tick).
+        /// BuildArmorBar builds its own track and does not call this.</summary>
         private Image BuildBar(Transform parent, string name, float width, float height, Color fillColor, out Image trackImage)
         {
             GameObject go = new GameObject(name, typeof(RectTransform));
@@ -1295,8 +1130,7 @@ namespace Overpower.UI
             LayoutElement le = go.AddComponent<LayoutElement>();
             le.preferredWidth = width;
             le.preferredHeight = height;
-            // See panelLayout's comment in BuildUi: its child control is ON, so this LayoutElement
-            // alone becomes the bar's actual rendered size - no sizeDelta line needed here.
+            // panelLayout's child control is ON (BuildUi): this LayoutElement alone is the bar's size.
             Image background = go.AddComponent<Image>();
             background.color = theme.barTrackColor;
             background.raycastTarget = false;
@@ -1311,9 +1145,7 @@ namespace Overpower.UI
             fillRt.offsetMax = new Vector2(-2f, -2f);
             Image fillImg = fillGo.AddComponent<Image>();
             fillImg.color = fillColor;
-            // Sprite MUST be set before Type - a Filled Image with no sprite ignores fillAmount and
-            // always draws full width. That was the Task 3 bug: every bar changed colour correctly
-            // but never visibly emptied or filled.
+            // Sprite MUST be set before Type: a Filled Image with no sprite ignores fillAmount and always draws full width.
             fillImg.sprite = theme.barSprite;
             fillImg.type = Image.Type.Filled;
             fillImg.fillMethod = Image.FillMethod.Horizontal;
@@ -1323,13 +1155,9 @@ namespace Overpower.UI
             return fillImg;
         }
 
-        /// <summary>Carry-over C: the yellow immunity FRAME for ONE bar - four thin edge Images round
-        /// the whole bar's rect (not the fill's own 2px-inset rect), reusing BuildFrameStrip (the same
-        /// recipe a slot's own border already uses), plus an optional faint wash under them. All built
-        /// under one root, added as the LAST child of barRoot so the frame always draws over whatever
-        /// fill(s) already sit there. Starts inactive; UpdateHealthAndArmor is the only thing that ever
-        /// shows it. Replaces CreateImmuneOverlay (a single translucent Image covering the whole bar) -
-        /// see UiTheme.immuneBarColor's tooltip for why that read grey over the blue shield fill.</summary>
+        /// <summary>The yellow immunity FRAME for ONE bar: four thin edge Images round the whole bar's rect (not the fill's
+        /// 2px-inset rect), via BuildFrameStrip, plus an optional faint wash under them. One root, the LAST child of
+        /// barRoot so it draws over the fills. Starts inactive; only UpdateHealthAndArmor shows it.</summary>
         private ImmuneFrame BuildImmuneFrame(Transform barRoot)
         {
             GameObject root = new GameObject("Immune Frame", typeof(RectTransform));
@@ -1340,8 +1168,7 @@ namespace Overpower.UI
             rootRect.offsetMin = Vector2.zero;
             rootRect.offsetMax = Vector2.zero;
 
-            // Built FIRST (so it sits UNDER the frame edges below in draw order) - a non-zero Immune
-            // Bar Wash Alpha must never paint over the frame's own crisp edge.
+            // Built FIRST so it sits UNDER the frame edges: a non-zero Immune Bar Wash Alpha must not paint over their crisp edge.
             GameObject washGo = new GameObject("Wash", typeof(RectTransform));
             washGo.transform.SetParent(root.transform, false);
             RectTransform washRect = washGo.GetComponent<RectTransform>();
@@ -1357,9 +1184,8 @@ namespace Overpower.UI
                 new Vector2(0.5f, 1f), new Vector2(0f, t));
             Image frameBottom = BuildFrameStrip(root.transform, "Frame Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(0.5f, 0f), new Vector2(0f, t));
-            // Left/Right inset vertically by the frame's own thickness top and bottom, same reasoning
-            // as BuildSlot's own Frame Left/Right (2026-09-18 review fix): without the inset every
-            // corner would carry two strips stacked on top of each other.
+            // Left/Right inset vertically by the thickness top and bottom, as BuildSlot's: otherwise every corner
+            // carries two stacked strips.
             Image frameLeft = BuildFrameStrip(root.transform, "Frame Left", new Vector2(0f, 0f), new Vector2(0f, 1f),
                 new Vector2(0f, 0.5f), new Vector2(t, -2f * t));
             Image frameRight = BuildFrameStrip(root.transform, "Frame Right", new Vector2(1f, 0f), new Vector2(1f, 1f),
@@ -1369,17 +1195,14 @@ namespace Overpower.UI
             return new ImmuneFrame(root, new SlotFrame(frameTop, frameBottom, frameLeft, frameRight), wash);
         }
 
-        /// <summary>A thin vertical mark on the overheat track showing exactly where the warning
-        /// threshold sits. Parented to the track (a sibling of Fill, added after it so it always
-        /// draws on top of the fill) and built at a placeholder position - UpdateOverheat repositions
-        /// it every frame the live threshold fraction changes, the same pattern the colour swap uses.</summary>
+        /// <summary>A thin vertical mark on the overheat track showing where the warning threshold sits. A sibling of Fill
+        /// added after it (draws on top), at a placeholder position; UpdateOverheat repositions it when the live threshold changes.</summary>
         private RectTransform BuildOverheatTick(Transform trackParent)
         {
             GameObject tick = new GameObject("Warning Tick", typeof(RectTransform));
             tick.transform.SetParent(trackParent, false);
             RectTransform tickRt = tick.GetComponent<RectTransform>();
-            // X is a point-anchor (min == max) so it can be slid along the track by changing just
-            // that one number; Y stretches the full track height so the mark spans the whole bar.
+            // X is a point-anchor (min == max) slid along the track by one number; Y spans the full track height.
             tickRt.anchorMin = new Vector2(0.8f, 0f);
             tickRt.anchorMax = new Vector2(0.8f, 1f);
             tickRt.pivot = new Vector2(0.5f, 0.5f);
@@ -1391,21 +1214,16 @@ namespace Overpower.UI
             return tickRt;
         }
 
-        /// <summary>The Vent band: a rectangle over the stretch of the overheat track the fill will
-        /// be draining through while the vent window is open - the same "child of the track, X
-        /// anchored 0..1" trick BuildOverheatTick uses for its single point, just spanning a RANGE
-        /// instead. Parented after the tick (drawn on top of it - the tick is a thin, mostly-static
-        /// reference mark; the band is the thing that actually needs to read clearly in the moment
-        /// that matters). Starts inactive and at zero width; UpdateVentBand is what turns it on,
-        /// positions and colours it every frame the underlying state actually changes.</summary>
+        /// <summary>The Vent band: a rectangle over the stretch of the overheat track the fill drains through while the
+        /// vent window is open, like BuildOverheatTick but spanning a RANGE. Parented after the tick so it draws on top
+        /// (the band must read clearly at the moment that matters). Starts inactive; UpdateVentBand drives it.</summary>
         private Image BuildVentBand(Transform trackParent)
         {
             GameObject band = new GameObject("Vent Band", typeof(RectTransform));
             band.transform.SetParent(trackParent, false);
             RectTransform bandRt = band.GetComponent<RectTransform>();
-            // X is a RANGE anchor (min != max, unlike the tick's point anchor) - UpdateVentBand
-            // moves min/max to the live band fractions every frame they change. Y stretches the
-            // full track height, same as the tick.
+            // X is a RANGE anchor (min != max, unlike the tick's point anchor): UpdateVentBand moves min/max to the live
+            // band fractions. Y spans the full track height.
             bandRt.anchorMin = new Vector2(0f, 0f);
             bandRt.anchorMax = new Vector2(0f, 1f);
             bandRt.sizeDelta = Vector2.zero;
@@ -1416,17 +1234,11 @@ namespace Overpower.UI
             return bandImg;
         }
 
-        /// <summary>The armor bar is a fixed-width track (like the other two) holding a "capacity
-        /// extent" rectangle whose WIDTH is set live from script (see UpdateHealthAndArmor) rather
-        /// than by any layout group - that sidesteps layout-rebuild timing entirely, since a plain
-        /// child RectTransform's sizeDelta takes effect immediately. Inside that extent, an ordinary
-        /// horizontal fill shows current armor against its own capacity, same as the other bars.
-        ///
-        /// The extent's WIDTH scales with capacity relative to max health - both are just "hit
-        /// points" on the same 0-100-ish scale, so an armor pool as big as max health fills the
-        /// whole track, and level 0's starting 25 capacity is a quarter-width sliver. This is what
-        /// makes "+Absorb twice" read as a visibly bigger segment, not merely a fuller small
-        /// one.</summary>
+        /// <summary>A fixed-width track holding a "capacity extent" rectangle whose WIDTH is set live from script
+        /// (UpdateHealthAndArmor), not by a layout group, which sidesteps layout-rebuild timing (a plain child's
+        /// sizeDelta takes effect at once). Inside it, an ordinary fill shows current armor against its capacity. The
+        /// width scales with capacity relative to max health (same hit-point scale), so an armor pool as big as max
+        /// health fills the track and "+Absorb twice" reads as a visibly bigger segment, not a fuller small one.</summary>
         private Image BuildArmorBar(Transform parent, out RectTransform extentRect)
         {
             GameObject track = new GameObject("Armor Bar", typeof(RectTransform));
@@ -1434,8 +1246,7 @@ namespace Overpower.UI
             LayoutElement le = track.AddComponent<LayoutElement>();
             le.preferredWidth = theme.barWidth;
             le.preferredHeight = theme.armorBarHeight;
-            // See panelLayout's comment in BuildUi: its child control is ON, so this LayoutElement
-            // alone becomes the track's actual rendered size - no sizeDelta line needed here.
+            // panelLayout's child control is ON (BuildUi): this LayoutElement alone is the track's size.
             Image background = track.AddComponent<Image>();
             background.color = theme.barTrackColor;
             background.raycastTarget = false;
@@ -1468,16 +1279,10 @@ namespace Overpower.UI
             return fillImg;
         }
 
-        /// <summary>Hidden until IsSilenced; a crossed-out weapon mark built from plain rectangles
-        /// (the project has no weapon-silhouette sprite yet) so full overheat silence reads as a
-        /// state with an end, not a wall - PlayerOverheat's class comment records that this was
-        /// Tudor's explicit condition for accepting the harsher "silences everything" rule.
-        ///
-        /// Parented to slotsRow and stretched over its full rect with ignoreLayout on (see the
-        /// BuildUi call site) - a translucent wash plus the icon and label draw directly over the
-        /// four slot boxes, matching the addendum's own wording ("over the slot row") instead of
-        /// the height-reserving sibling row this used to be, which shifted the slots by its own
-        /// height every time SetActive toggled it (code review fix).</summary>
+        /// <summary>Hidden until IsSilenced; a crossed-out weapon mark built from plain rectangles (no weapon-silhouette
+        /// sprite yet) so full overheat silence reads as a state with an end, not a wall (PlayerOverheat records this as
+        /// the condition for the harsher "silences everything" rule). Parented to slotsRow, stretched over its rect with
+        /// ignoreLayout on (BuildUi): the wash, icon and label draw over the slot boxes without shifting them.</summary>
         private GameObject BuildSilencedBanner(Transform parent)
         {
             GameObject row = new GameObject("Silenced Banner", typeof(RectTransform));
@@ -1490,8 +1295,7 @@ namespace Overpower.UI
             LayoutElement rowLe = row.AddComponent<LayoutElement>();
             rowLe.ignoreLayout = true; // slotsRow's own HorizontalLayoutGroup must never see this as a 5th column.
 
-            // A translucent wash across the whole row, behind the icon/label below, so "you cannot
-            // use any of this right now" reads even before the eye finds the label.
+            // A translucent wash across the row, behind the icon/label, so "you cannot use any of this" reads before the label does.
             Image wash = row.AddComponent<Image>();
             wash.color = new Color(theme.overheatSilencedColor.r, theme.overheatSilencedColor.g, theme.overheatSilencedColor.b, theme.silencedWashAlpha);
             wash.raycastTarget = false;
@@ -1506,11 +1310,8 @@ namespace Overpower.UI
             HorizontalLayoutGroup layout = content.AddComponent<HorizontalLayoutGroup>();
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.spacing = 8f;
-            // ON for the same reason as panelLayout in BuildUi - the icon and label below each carry
-            // a LayoutElement that is now the one place their size lives, not a duplicated sizeDelta.
-            // Force-expand OFF - see slotsLayout's comment in BuildUi for why a runtime
-            // AddComponent needs this said explicitly (code review fix): without it the icon and
-            // text both stretched to the row's full height.
+            // ON as panelLayout (BuildUi): the icon's and label's LayoutElements are the one place their size lives.
+            // Force-expand OFF explicitly (slotsLayout in BuildUi says why): otherwise icon and text stretch to the row's height.
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
@@ -1523,8 +1324,7 @@ namespace Overpower.UI
             iconImg.color = theme.silencedIconColor;
             iconImg.raycastTarget = false;
 
-            // Not a layout-group child (parented to the icon, not to Content) - a fixed-size rect
-            // rotated in place, so it keeps its own explicit sizeDelta regardless of child control.
+            // Not a layout-group child (parented to the icon): a fixed-size rect rotated in place, keeping its own sizeDelta.
             GameObject strike = new GameObject("Strike", typeof(RectTransform));
             strike.transform.SetParent(iconGo.transform, false);
             RectTransform strikeRt = strike.GetComponent<RectTransform>();
@@ -1535,26 +1335,22 @@ namespace Overpower.UI
             strikeImg.color = theme.overheatSilencedColor;
             strikeImg.raycastTarget = false;
 
-            // Body Text Size, not Small - this is the one HUD state that must read at a glance, the
-            // same reasoning Overheat Bar Height gets its own taller-than-the-rest treatment.
+            // Body Text Size, not Small: the one HUD state that must read at a glance.
             TextMeshProUGUI text = AddLabel(content.transform, "WEAPON SILENCED", theme.bodyTextSize, FontStyles.Bold);
             LayoutElement textLe = text.gameObject.AddComponent<LayoutElement>();
             textLe.preferredHeight = 30f;
             text.color = theme.overheatSilencedColor;
-            // Centred, and no pinned preferred WIDTH (Tudor, 2026-09-17): a left-aligned label inside a fixed
-            // 260-unit box let the layout group centre the box while the words sat against its left edge, so the
-            // banner read as off-centre over the slot row. The group now sizes the label to the words themselves.
+            // Centred, with no pinned preferred WIDTH: a left-aligned label in a fixed box let the group centre the box
+            // while the words sat at its left edge, so the banner read as off-centre. The group sizes the label to its words.
             text.alignment = TextAlignmentOptions.Center;
 
             row.SetActive(false);
             return row;
         }
 
-        /// <summary>One edge strip of a slot's border frame (HUD step 2 follow-up) - see SlotFrame's
-        /// class comment for why the frame is four thin Images instead of one filling the whole rect.
-        /// anchorMin/anchorMax stretch the strip along the edge it sits on (equal min/max on one axis
-        /// pins it to that edge with zero size, which sizeDelta on that same axis then supplies); the
-        /// other axis's anchors already span the full slot, so its sizeDelta stays 0.</summary>
+        /// <summary>One edge strip of a border frame (SlotFrame says why four Images). Equal min/max anchors on one axis pin
+        /// the strip to that edge with zero size, which sizeDelta on that axis supplies; the other axis spans the rect, so
+        /// its sizeDelta stays 0.</summary>
         private Image BuildFrameStrip(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax,
                                       Vector2 pivot, Vector2 sizeDelta)
         {
@@ -1571,11 +1367,9 @@ namespace Overpower.UI
             return img;
         }
 
-        /// <summary>One weapon or ability box: a tinted background (ready/blocked/active), an icon
-        /// that falls back to the ability's display name when it has none, and - for the three
-        /// ability slots only - a charge pip row and a recharge cover sweep. isUltimate additionally
-        /// builds the Task 1.11 charge meter (a fill plus a READY label), true for exactly one of
-        /// the three ability slots.</summary>
+        /// <summary>One weapon or ability box: a tinted background (ready/blocked/active), an icon that falls back to the
+        /// display name, and (ability slots only) a charge pip row and a recharge cover sweep. isUltimate (exactly one slot)
+        /// adds the charge meter: a fill plus a READY label.</summary>
         private SlotUi BuildSlot(Transform parent, string keyLabel, bool withCooldown, bool isUltimate)
         {
             var ui = new SlotUi();
@@ -1587,27 +1381,20 @@ namespace Overpower.UI
             LayoutElement le = go.AddComponent<LayoutElement>();
             le.preferredWidth = theme.slotWidth;
             le.preferredHeight = slotHeight;
-            // See panelLayout's comment in BuildUi: slotsLayout's child control is ON, so this
-            // LayoutElement alone becomes the slot's actual rendered size - everything inside it
-            // (Icon Box, pips, text) then stretches or anchors relative to that rect as normal.
+            // slotsLayout's child control is ON (BuildUi): this LayoutElement alone is the slot's size; everything inside
+            // anchors relative to it.
 
-            // The slot's border (HUD step 2 follow-up): four thin strips, one per edge, each Slot Border
-            // Width thick, carrying the ready / blocked / active tint that UpdateAbilitySlots writes. NOT
-            // a single Image filling the whole rect - a translucent child (Slot Fill, below) can never hide
-            // what's under it, so a full-rect Image at 0.9-0.95 alpha always read as a near-opaque box no
-            // matter how faint the wash on top of it was, which is the opposite of what Tudor asked for
-            // ("no dark opaque background... it takes away from the visibility"). raycastTarget off on all
-            // four like every other HUD Graphic - this canvas has no GraphicRaycaster, but a stray raycast
-            // target here is exactly the kind of thing that later blocks a shot when someone adds one.
+            // The slot's border: four thin strips, each Slot Border Width thick, carrying the ready / blocked / active
+            // tint UpdateAbilitySlots writes. NOT one Image filling the rect: a translucent child (Slot Fill) never hides
+            // what is under it, so a full-rect Image read as a near-opaque box (the designer wants no dark opaque
+            // background). raycastTarget off on all four like every HUD Graphic: a stray raycast target would block a
+            // shot the day a GraphicRaycaster is added.
             Image frameTop = BuildFrameStrip(go.transform, "Frame Top", new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(0.5f, 1f), new Vector2(0f, theme.slotBorderWidth));
             Image frameBottom = BuildFrameStrip(go.transform, "Frame Bottom", new Vector2(0f, 0f), new Vector2(1f, 0f),
                 new Vector2(0.5f, 0f), new Vector2(0f, theme.slotBorderWidth));
-            // Left/Right are inset vertically by Slot Border Width top and bottom (review fix, 2026-09-18) so
-            // they sit BETWEEN Frame Top/Bottom instead of running corner to corner - all four strips used to
-            // span the full rect on their long axis, so every corner had two strips stacked. Invisible at
-            // today's thin width, but the tooltip on Slot Border Width invites raising it, and a raised width
-            // would turn every corner into a visibly darker square without this.
+            // Left/Right are inset vertically by Slot Border Width so they sit BETWEEN Frame Top/Bottom: otherwise every
+            // corner has two stacked strips, invisible when thin but a visibly darker square once the width is raised.
             Image frameLeft = BuildFrameStrip(go.transform, "Frame Left", new Vector2(0f, 0f), new Vector2(0f, 1f),
                 new Vector2(0f, 0.5f), new Vector2(theme.slotBorderWidth, -2f * theme.slotBorderWidth));
             Image frameRight = BuildFrameStrip(go.transform, "Frame Right", new Vector2(1f, 0f), new Vector2(1f, 1f),
@@ -1615,8 +1402,7 @@ namespace Overpower.UI
             ui.background = new SlotFrame(frameTop, frameBottom, frameLeft, frameRight);
             ui.background.color = theme.slotReadyColor;
 
-            // The only fill a slot has left: a faint wash inset by the border width, so an icon or an ability
-            // name still has something to sit on without hiding the arena behind it.
+            // The slot's only fill: a faint wash inset by the border width, so an icon or name has something to sit on.
             GameObject slotFillGo = new GameObject("Slot Fill", typeof(RectTransform));
             slotFillGo.transform.SetParent(go.transform, false);
             RectTransform slotFillRt = slotFillGo.GetComponent<RectTransform>();
@@ -1628,8 +1414,7 @@ namespace Overpower.UI
             slotFill.color = theme.slotFillColor;
             slotFill.raycastTarget = false;
 
-            // The icon box occupies the top Slot Icon Box Height units - the only part that exists
-            // at all on the weapon slot, which has no pip row or recharge sweep below it.
+            // The icon box is the top Slot Icon Box Height units, the only part the weapon slot has (no pips or sweep below).
             GameObject iconBox = new GameObject("Icon Box", typeof(RectTransform));
             iconBox.transform.SetParent(go.transform, false);
             RectTransform iconBoxRt = iconBox.GetComponent<RectTransform>();
@@ -1639,10 +1424,8 @@ namespace Overpower.UI
             iconBoxRt.anchoredPosition = Vector2.zero;
             iconBoxRt.sizeDelta = new Vector2(0f, theme.slotIconBoxHeight);
 
-            // Everything the eye reads as "the ability" lives here, under the key strip: the icon, the fallback
-            // name, and (for the ultimate) its READY label. Its own rect - rather than the whole icon box - is
-            // what makes them centred in the SQUARE a player sees, instead of centred in a box whose top strip
-            // is the key label (Tudor, 2026-09-17: "the text should be in the middle of the ability square").
+            // The icon, fallback name and (ultimate) READY label live here, under the key strip. Its own rect, not the
+            // whole icon box, centres them in the SQUARE a player sees rather than in a box whose top strip is the key label.
             GameObject contentBox = new GameObject("Content Box", typeof(RectTransform));
             contentBox.transform.SetParent(iconBox.transform, false);
             RectTransform contentRt = contentBox.GetComponent<RectTransform>();
@@ -1663,8 +1446,7 @@ namespace Overpower.UI
             ui.icon.raycastTarget = false;
             ui.icon.enabled = false;
 
-            // Body Text Size - Step 2's explicit call: the icon box is sized (Slot Width/Slot Icon
-            // Box Height) so the longest short names (Raybeam, Shotgun, Baseline) fit at this size.
+            // Body Text Size: the icon box (Slot Width/Slot Icon Box Height) is sized so the longest short names fit at it.
             ui.fallbackNameText = AddLabel(contentBox.transform, "", theme.bodyTextSize, FontStyles.Normal);
             RectTransform nameRt = ui.fallbackNameText.rectTransform;
             nameRt.anchorMin = Vector2.zero;
@@ -1676,14 +1458,11 @@ namespace Overpower.UI
 
             if (withCooldown)
             {
-                // The WHOLE icon box, not Content Box: a recharge sweep that stopped short of the key strip
-                // would read as a drawing bug, not as a cooldown. It is built after Content Box (so it covers the
-                // icon and name) and before the key strip below (so the key stays readable while recharging).
-                // Inset by Slot Border Width on all four sides (review fix, 2026-09-18), the same as Slot Fill:
-                // the cover used to run edge to edge, painting straight over the frame strips built above for
-                // most of every cooldown - the dark box Tudor asked to lose came right back, and the frame's
-                // own ready/blocked/active tint disappeared exactly while an ability recharged. The Ultimate
-                // Charge Fill below stays full-square on purpose (D5) - only this cover is inset.
+                // The WHOLE icon box, not Content Box: a sweep that stopped short of the key strip would read as a drawing
+                // bug. Built after Content Box (covers icon and name) and before the key strip (key stays readable).
+                // Inset by Slot Border Width on all sides like Slot Fill: edge to edge it painted over the frame strips for
+                // most of every cooldown, losing the frame's tint exactly while an ability recharged. The Ultimate Charge
+                // Fill below stays full-square on purpose (D5).
                 GameObject coverGo = new GameObject("Cooldown Cover", typeof(RectTransform));
                 coverGo.transform.SetParent(iconBox.transform, false);
                 RectTransform coverRt = coverGo.GetComponent<RectTransform>();
@@ -1701,14 +1480,10 @@ namespace Overpower.UI
                 ui.cooldownCover.fillAmount = 0f;
                 ui.cooldownCover.raycastTarget = false;
 
-                // Pip row and block-reason text sit BELOW the icon box, in the Slot Cooldown Area Height band
-                // reserved for them - positions derive from Slot Icon Box Height so they never drift out of sync
-                // with it. Both heights moved onto UiTheme in HUD step 1/3: they were the last two sizes in this
-                // file a designer could not reach.
-                // 2 + Pip Row Height + 2 + Slot Reason Text Height has to stay inside Slot Cooldown Area Height
-                // (58 today: 2 + 20 + 2 + 26 = 50). If a designer raises the pips past that, the reason line
-                // starts overhanging the bottom of the slot - which is why all four numbers are on UiTheme, and
-                // why each of their tooltips names this sum.
+                // Pip row and block-reason text sit BELOW the icon box, in the Slot Cooldown Area Height band; positions
+                // derive from Slot Icon Box Height so they never drift from it.
+                // 2 + Pip Row Height + 2 + Slot Reason Text Height has to stay inside Slot Cooldown Area Height, or the
+                // reason line overhangs the bottom of the slot; each of those tooltips names this sum.
                 float pipRowY = -(theme.slotIconBoxHeight + 2f);
                 float reasonY = pipRowY - theme.pipRowHeight - 2f;
 
@@ -1723,11 +1498,8 @@ namespace Overpower.UI
                 HorizontalLayoutGroup pipLayout = pipRow.AddComponent<HorizontalLayoutGroup>();
                 pipLayout.spacing = theme.pipSpacing;
                 pipLayout.childAlignment = TextAnchor.MiddleCenter;
-                // ON for the same reason as panelLayout in BuildUi - SetPips's own LayoutElement per
-                // pip is now the one place their size lives, not a duplicated sizeDelta.
-                // Force-expand OFF - see slotsLayout's comment in BuildUi for why a runtime
-                // AddComponent needs this said explicitly (code review fix): without it every pip
-                // stretched to fill the row, so two 8x8 pips rendered as one wide bar.
+                // ON as panelLayout (BuildUi): SetPips's LayoutElement per pip is the one place its size lives. Force-expand
+                // OFF explicitly (slotsLayout in BuildUi says why): otherwise every pip stretched to fill the row.
                 pipLayout.childControlWidth = pipLayout.childControlHeight = true;
                 pipLayout.childForceExpandWidth = pipLayout.childForceExpandHeight = false;
                 ui.pipRow = pipRow.transform;
@@ -1742,11 +1514,8 @@ namespace Overpower.UI
                 ui.blockReasonText.alignment = TextAlignmentOptions.Center;
                 ui.blockReasonText.color = theme.overheatWarningColor;
 
-                // TASK 1.11: the Ultimate slot's own charge meter - a translucent fill drawn OVER the
-                // cooldown cover above (built after it, so it draws on top) plus a READY label shown
-                // only at full charge. Bound in UpdateUltimateMeter from UltimateCharge.Normalised/
-                // IsFull, never the base class's own RechargeProgress - see the SlotUi field comment
-                // for why that number means nothing for an ultimate.
+                // The Ultimate slot's charge meter: a translucent fill OVER the cooldown cover (built after it) plus a READY
+                // label at full charge. Bound in UpdateUltimateMeter from UltimateCharge, never RechargeProgress (SlotUi).
                 if (isUltimate)
                 {
                     GameObject fillGo = new GameObject("Ultimate Charge Fill", typeof(RectTransform));
@@ -1771,18 +1540,16 @@ namespace Overpower.UI
                     readyRt.anchorMin = Vector2.zero;
                     readyRt.anchorMax = Vector2.one;
                     readyRt.offsetMin = Vector2.zero;
-                    // The same inset Content Box uses, so READY lands in the middle of the square a player sees
-                    // rather than in the middle of a box whose top strip is the key label (HUD step 1).
+                    // The same inset Content Box uses, so READY lands in the middle of the visible square.
                     readyRt.offsetMax = new Vector2(0f, -theme.slotKeyRowHeight);
                     ui.readyLabel.color = theme.ultimateReadyTextColor;
                     ui.readyLabel.gameObject.SetActive(false); // UpdateUltimateMeter turns this on once IsFull.
                 }
             }
 
-            // Tudor, 2026-09-17: centred, not tucked in a corner. A full-width strip across the TOP of the icon
-            // box, so the icon/name below it stay centred in the rest of the square (Content Box above). Built
-            // last inside the icon box, so it draws over the recharge sweep and the ultimate meter and the key
-            // stays readable in every state. Body Text Size, as before: the longest label (SPACE) must fit.
+            // Centred, not tucked in a corner: a full-width strip across the TOP of the icon box, so the icon/name stay
+            // centred in the rest of the square. Built last so it draws over the sweep and meter. Body Text Size: the
+            // longest label (SPACE) must fit.
             TextMeshProUGUI keyText = AddLabel(iconBox.transform, keyLabel, theme.bodyTextSize, FontStyles.Bold);
             RectTransform keyRt = keyText.rectTransform;
             keyRt.anchorMin = new Vector2(0f, 1f);
@@ -1796,20 +1563,16 @@ namespace Overpower.UI
             return ui;
         }
 
-        /// <summary>Same recipe as TestRangePanel.AddLabel (see its class comment) - kept private to
-        /// this file rather than shared, since the two panels have no other coupling and a shared
-        /// utility class would be the only reason to introduce one. An instance method (not static,
-        /// unlike before Task 5) because it now needs theme for the font/colour/outline every HUD
-        /// text is built with.</summary>
+        /// <summary>Same recipe as TestRangePanel.AddLabel, kept separate because the two panels have no other coupling.
+        /// An instance method because it needs theme for the font, colour and outline.</summary>
         private TextMeshProUGUI AddLabel(Transform parent, string text, float fontSize, FontStyles style)
         {
             GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
             go.transform.SetParent(parent, false);
             TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
             tmp.text = text;
-            // Font must be assigned BEFORE fontSharedMaterial is touched below - assigning .font
-            // switches fontSharedMaterial to that font asset's own default material, which is
-            // exactly the template ApplyOutline clones from the first time it runs.
+            // Assign the font BEFORE touching fontSharedMaterial: .font switches it to that font asset's default
+            // material, the template ApplyOutline clones from.
             if (theme.font != null)
                 tmp.font = theme.font;
             tmp.fontSize = fontSize;
@@ -1822,17 +1585,11 @@ namespace Overpower.UI
             return tmp;
         }
 
-        /// <summary>Gives a text an outline via ONE Material instance shared by every text this HUD
-        /// builds, instead of the dozen-plus near-identical instances TMP_Text would create on its
-        /// own - TMP_Text.outlineWidth/outlineColor each auto-clone fontSharedMaterial into a fresh
-        /// per-object instance (fontMaterial) the first time either is touched, so setting them
-        /// directly on every label would mean one material per label, all with the same two numbers.
-        /// Setting the shared material's shader properties once up front and handing every label the
-        /// SAME instance avoids that, and lets every HUD text batch into fewer draw calls besides.
-        /// Built lazily from the first label's font (all HUD labels share theme.font, so the shader
-        /// this material's cloned from is the same for every text this method is ever called for).
-        /// The outline, weight and shadow numbers themselves live on UiTheme.ApplyHudTextStyle (HUD
-        /// step 2) - one home, shared with the loadout screen and the minimap.</summary>
+        /// <summary>Gives a text an outline via ONE Material shared by every HUD text. TMP_Text.outlineWidth/outlineColor
+        /// each auto-clone fontSharedMaterial into a per-object instance the first time either is touched, so setting them
+        /// per label would mean a material per label; one shared instance also batches into fewer draw calls. Built lazily
+        /// from the first label's font (all share theme.font). The numbers live on UiTheme.ApplyHudTextStyle, shared with
+        /// the loadout screen and the minimap.</summary>
         private void ApplyOutline(TextMeshProUGUI tmp)
         {
             if (hudTextMaterial == null)

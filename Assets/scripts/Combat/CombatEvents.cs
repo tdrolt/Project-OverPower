@@ -4,22 +4,21 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// Pure static events - no Photon, no MonoBehaviour - that fire ONLY on the machine of the
-    /// player who actually earned the damage or the takedown, never on a victim's or a bystander's
-    /// client. That is what makes this safe to be static: unlike PlayerHealth.Damaged (which fires
-    /// on the victim, once per victim per client), there is exactly one machine per hit that should
-    /// ever raise these, so there is no cross-player ambiguity a singleton would normally risk.
-    /// UnityEngine is used only for Transform/Vector3 below - still no Photon and no MonoBehaviour.
+    /// Pure static events (no Photon, no MonoBehaviour) that fire ONLY on the machine of the player who
+    /// earned the damage or the takedown, never on a victim's or a bystander's client. That is what
+    /// makes static safe: unlike PlayerHealth.Damaged (fires on the victim, once per victim per
+    /// client), exactly one machine per hit raises these, so there is no cross-player ambiguity.
+    /// UnityEngine is used only for Transform/Vector3.
     ///
-    /// Two paths raise these today:
-    ///  - PlayerCombatCredit.RPC_DamageCredit, on the attacker's own machine, once the victim's
-    ///    client has told it (over the network) how much it actually dealt - see that file for why
-    ///    the attacker cannot know this any other way (PlayerHealth.ApplyDamage is victim-side).
-    ///  - DummyTarget, single-client only: the local player's own hits on a test-range dummy need
-    ///    no network round trip at all, so it raises these directly.
+    /// Two paths raise these:
+    ///  - PlayerCombatCredit.RPC_DamageCredit, on the attacker's own machine, once the victim's client
+    ///    has told it how much it actually dealt (the attacker cannot know this any other way:
+    ///    PlayerHealth.ApplyDamage is victim-side).
+    ///  - DummyTarget, single-client only: the local player's hits on a test-range dummy need no
+    ///    network round trip, so it raises these directly.
     ///
-    /// Task 1.5 (armor recharge is already wired through NoteDealtDamage, not these events), 1.7
-    /// (zip gun cooldown reset on takedown) and 1.11 (ultimate charge) are the intended subscribers.
+    /// Intended subscribers: the zip gun cooldown reset (takedown) and the ultimate charge. Armor
+    /// recharge is wired through NoteDealtDamage, not these events.
     /// </summary>
     public static class CombatEvents
     {
@@ -32,43 +31,37 @@ namespace Overpower.Combat
         /// else landed the killing blow).</summary>
         public static event Action<bool> LocalTakedown;
 
-        /// <summary>Mark plan step 2: raised on the attacker's machine with the damage that actually
-        /// LANDED on `victim` (the victim's own truth). `cashedMark` is true exactly when this hit used
-        /// up the attacker's own mark (mark step 4 wires this through both raisers below as
-        /// MarkOutcome.Cashed). Two raisers: PlayerCombatCredit.RPC_DamageCredit (a real, networked
-        /// victim, `transform` being that victim as THIS attacker sees it - the RPC runs on the
-        /// victim's own object) and DummyTarget (single-client, its own transform). DamageNumberView is
-        /// the one subscriber: this is "how much", paired with LocalImpactSeen below for "where".</summary>
+        /// <summary>Raised on the attacker's machine with the damage that actually LANDED on victim (the
+        /// victim's own truth). cashedMark is true exactly when this hit used up the attacker's own mark
+        /// (MarkOutcome.Cashed). Two raisers: PlayerCombatCredit.RPC_DamageCredit (a networked victim;
+        /// transform is that victim as THIS attacker sees it, since the RPC runs on the victim's own
+        /// object) and DummyTarget (single-client, its own transform). DamageNumberView is the one
+        /// subscriber: this is "how much", paired with LocalImpactSeen for "where".</summary>
         public static event Action<Transform, float, bool> LocalHitReported;
 
-        /// <summary>Mark plan step 2 (Tudor's override, answer 2): raised on the SHOOTER's own machine
-        /// the instant its own shot is simulated landing on `victim` - before any credit message could
-        /// possibly have arrived, since that's a separate round trip. A real player's PlayerHealth
-        /// raises this on a copy it does NOT own, from inside ApplyDamage, BEFORE that method's
-        /// IsMine/isDead return - the one place the shooter's own client ever sees where its shot hit.
-        /// Review fix (opus review, mark steps 3-4): raised even when the hit is about to read as
-        /// "Blocked" (LocalBlockedSeen below fires separately, right after this one) - a Blocked pop is
-        /// drawn "at the impact" too, so it needs the same fresh anchor a real number gets. A
-        /// DummyTarget raises this too, guarded the same way (its own local-actor-and-point-source
-        /// check, added by the steps 1-2 review) - not "unconditionally" as an earlier version of this
-        /// comment claimed, since a dummy still must not re-anchor from a shot fired by someone else's
-        /// simulated copy. Not the same information as LocalHitReported: this carries no damage amount,
-        /// only a point, and can arrive on its own with nothing to report yet (a shot that gets
-        /// blocked, or against a target no local weapon actually damaged).</summary>
+        /// <summary>Raised on the SHOOTER's own machine the instant its own shot is simulated landing on
+        /// victim, before any credit message could have arrived (that is a separate round trip). A real
+        /// player's PlayerHealth raises it on a copy it does NOT own, from inside ApplyDamage BEFORE the
+        /// IsMine/isDead return: the one place the shooter's client ever sees where its shot hit. Raised
+        /// even when the hit is about to read as Blocked (LocalBlockedSeen fires right after), since a
+        /// Blocked pop is drawn at the impact too and needs the same fresh anchor. A DummyTarget raises it
+        /// too, guarded by its own local-actor-and-point-source check, so a dummy does not re-anchor from
+        /// a shot fired by someone else's simulated copy. Not the same information as LocalHitReported:
+        /// it carries no damage amount, only a point, and can arrive alone (a blocked shot, or a target
+        /// no local weapon actually damaged).</summary>
         public static event Action<Transform, Vector3> LocalImpactSeen;
 
-        /// <summary>Mark plan step 4: seconds YOUR mark on `victim` has left, from the victim's own
-        /// truth (every credit message carries this, always, after the sender check) - 0 means none
-        /// (cashed, expired, or the victim died). Nothing subscribes until mark step 5's diamond.</summary>
+        /// <summary>Seconds YOUR mark on victim has left, from the victim's own truth (every credit
+        /// message carries this, always, after the sender check); 0 means none (cashed, expired, or the
+        /// victim died). Nothing subscribes yet; it waits on the mark diamond.</summary>
         public static event Action<Transform, float> LocalMarkReported;
 
-        /// <summary>Mark step 4, Tudor's answer 7 (a "Blocked" hit, option (b) - no network): raised on
-        /// the SHOOTER's own machine, from the exact same spot LocalImpactSeen fires from, when this
-        /// shot's target already shows the yellow immune look. A shooter-side guess, not the victim's
-        /// truth: the hit that actually SPRINGS the trap shows nothing (the yellow look's own bubble
-        /// arrives a round trip later), and the edges of the window lag by that same round trip. Never
-        /// raised for a teammate (friendly fire already shows nothing, whether or not they happen to
-        /// be shielded) - see PlayerHealth.ApplyDamage's own guard.</summary>
+        /// <summary>Raised on the SHOOTER's own machine, from the same spot LocalImpactSeen fires from,
+        /// when this shot's target already shows the yellow immune look. A shooter-side guess with no
+        /// network, not the victim's truth: the hit that SPRINGS the trap shows nothing (the yellow
+        /// bubble arrives a round trip later), and the window's edges lag by that same round trip. Never
+        /// raised for a teammate (friendly fire shows nothing, shielded or not); see
+        /// PlayerHealth.ApplyDamage's guard.</summary>
         public static event Action<Transform> LocalBlockedSeen;
 
         /// <summary>Raised ONLY by PlayerCombatCredit.RPC_DamageCredit - credit for hitting a real player, never a
@@ -100,7 +93,7 @@ namespace Overpower.Combat
 
         public static void RaiseShieldBlockedSeen(Transform victim, float popupSeconds) => LocalShieldBlockedSeen?.Invoke(victim, popupSeconds);
 
-        /// <summary>Dominion Task 7b (A25): something THIS client's own player did reached an enemy - damage (read from the victim's credit
+        /// <summary>Something THIS client's own player did reached an enemy (A25) - damage (read from the victim's credit
         /// message), a stun, slow, burn or vulnerability (this client's own simulation of the effect, on its copy of the victim) or a push (the
         /// same, from the pulse). Raised only on the machine of the player who did it, so no RPC carries it. victimShielded = the enemy's own
         /// respawn shield was up (the effect was stopped, so nothing was hit); fromBeforeRespawn = the effect was set up before the attacker's

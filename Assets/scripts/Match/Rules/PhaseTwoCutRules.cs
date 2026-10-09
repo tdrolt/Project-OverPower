@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Overpower.Match
 {
     /// <summary>
-    /// GDD p.20-21 and its p.27 drawing (Tudor, 2026-09-25): when the first team is knocked out, its corner of the
+    /// GDD p.20-21 and its p.27 drawing: when the first team is knocked out, its corner of the
     /// triangle closes - its capital, its Tier II and the two Tier III next to that Tier II leave play - and the centre
     /// plays as a Tier III. A host-started two-team match plays on that cut map from going live (the left-out team's
     /// corner). Pure C#: every client derives the same answer from the room's facts (MatchDirector.CutTeam), and the
@@ -15,15 +15,12 @@ namespace Overpower.Match
         public const int NoCut = -1;
         private const int TeamCount = 3;
 
-        /// <summary>The team whose corner is closed - centre-circle-and-cut-rule, 2026-09-26 (Tudor: "for choosing
-        /// which corner to eliminate you can take the original spawn of each team and eliminate the spawn of the
-        /// team that also got eliminated"): the corner is always the FIRST team knocked out, so this is a pure
-        /// function of facts the room already has, no Room Property of its own needed. None before live; in a
-        /// two-team match (a host start), the team left out of it (unchanged - there was never an elimination to
-        /// read there); with three teams in the match, the first team eliminated (eliminated[0]) once there is one,
-        /// else none yet.
+        /// <summary>The team whose corner is closed: always the FIRST team knocked out (its original spawn corner), so
+        /// this is a pure function of facts the room already has, no Room Property of its own needed. None before live;
+        /// in a two-team match (a host start), the team left out of it (there was never an elimination to read there);
+        /// with three teams in the match, the first team eliminated (eliminated[0]) once there is one, else none yet.
         ///
-        /// One cosmetic edge, cut-rule-followups review, 2026-09-26: the phase rules' fixpoint can in principle knock
+        /// One cosmetic edge: the phase rules' fixpoint can in principle knock
         /// out two teams in the very same write, going straight from three teams to Over. Room state then looks
         /// identical to the normal three -> two -> over path (teamsInMatch never drops to two; eliminated simply
         /// arrives with both teams already in it), so this still answers eliminated[0] and the FIRST team's corner
@@ -103,8 +100,8 @@ namespace Overpower.Match
             return false;
         }
 
-        /// <summary>Tier IV (the centre) plays as Tier III while a corner is cut - GDD p.27 draws a III where the IV was;
-        /// Tudor: "no tier 4, only 2 tier 3 in the middle". Every other tier is unchanged.</summary>
+        /// <summary>Tier IV (the centre) plays as Tier III while a corner is cut - GDD p.27 draws a III where the IV was
+        /// (no tier 4, only 2 tier 3 in the middle). Every other tier is unchanged.</summary>
         public static int EffectiveTier(int baseTier, bool cutActive) => cutActive && baseTier == 4 ? 3 : baseTier;
 
         /// <summary>What the master sets neutral (without bounty history) at the knockout, ascending: every Tier III and

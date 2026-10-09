@@ -3,29 +3,21 @@ using UnityEngine;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Pure fade/pulse rule for the mark diamond (mark plan step 5) - unit tested without touching the
-    /// engine beyond Mathf, same convention as DamageNumberMotion. No Image/RectTransform reference
-    /// here; MarkIndicatorView (the shooter's pooled diamonds, one per marked enemy) and
-    /// SelfMarkIndicatorView (Tudor's answer 1: the marked player's own diamond over their own head)
-    /// are the only two adapters that ever touch a Graphic, and both call this same rule.
+    /// Pure fade/pulse rule for the mark diamond, unit tested without the engine beyond Mathf. MarkIndicatorView
+    /// (the shooter's pooled diamonds) and SelfMarkIndicatorView (the marked player's own diamond) are the only
+    /// adapters that touch a Graphic, and both call this rule.
     /// </summary>
     public static class MarkIndicatorRule
     {
         /// <summary>
-        /// secondsLeft/totalSeconds: how much of the mark's own window is left, and how long that
-        /// window was when the diamond most recently started (or restarted) fading from full. 0 or
-        /// negative secondsLeft is a hard cut to fully hidden (0), not a fade to invisible - the
-        /// caller's own LateUpdate additionally hides the GameObject at that point (belt and braces,
-        /// same pattern DamageNumberView's own hold/fade split uses).
+        /// secondsLeft/totalSeconds: how much of the mark's window is left, and how long that window was when the
+        /// diamond last started fading from full. 0 or negative secondsLeft is a hard cut to hidden (0), not a
+        /// fade; the caller's LateUpdate also hides the GameObject then.
         ///
-        /// Otherwise: a base ramp from 1 (secondsLeft == totalSeconds, freshly marked) down toward
-        /// minAlpha (secondsLeft near 0, about to run out), multiplied by a pulse that oscillates
-        /// between minAlpha and 1. The pulse uses COS, not a raw sine, specifically so it always reads
-        /// 1 (no attenuation at all) the instant time*2π*pulseSpeed is 0 - which is EVERY instant when
-        /// pulseSpeed is 0 (the argument is 0 regardless of time), matching pulseSpeed's own tooltip:
-        /// "0 = steady". The final Clamp is what actually guarantees the floor/ceiling promise (the raw
-        /// product of two [minAlpha,1] terms can dip under minAlpha at their shared trough - e.g. both
-        /// terms at minAlpha 0.35 multiply to about 0.12), not the two Lerps on their own.
+        /// Otherwise: a base ramp from 1 (freshly marked) toward minAlpha (about to run out), times a pulse between
+        /// minAlpha and 1. The pulse uses COS so it reads 1 when time*2π*pulseSpeed is 0 - every instant when
+        /// pulseSpeed is 0 ("0 = steady"). The final Clamp is what guarantees the floor: the product of two
+        /// [minAlpha,1] terms can dip under minAlpha at their shared trough (0.35 x 0.35 is about 0.12).
         /// </summary>
         public static float Alpha(float secondsLeft, float totalSeconds, float minAlpha, float pulseSpeed, float time)
         {
@@ -42,20 +34,13 @@ namespace Overpower.UI
         }
 
         /// <summary>
-        /// Tudor's answer 1 (mark plan, top-of-plan table): the marked player's own diamond has no
-        /// message to learn its mark's ORIGINAL window from - PlayerHealth.LongestMarkSecondsLeft only
-        /// ever reports how much time is LEFT (a plain per-frame poll of the victim's own MarkLedger,
-        /// no network message at all - Decision 1, the ledger already lives on the victim), never how
-        /// long the live mark's own window WAS when it started. Alpha above still needs a "total" to
-        /// fade the ramp against, so SelfMarkIndicatorView keeps whatever the LARGEST secondsLeft it has
-        /// polled since the diamond was last fully hidden, and this is the one decision that says when
-        /// to bump that running total back up: whenever the freshly polled value is BIGGER than what is
-        /// already tracked - a mark just landed (secondsLeft jumps from 0 to a fresh window), or a
-        /// second attacker's own longer-lived mark just became the longest one on this target (see
-        /// MarkLedger.LongestSecondsLeft's own comment on why "longest, not per-attacker" is enough).
-        /// Otherwise the total holds steady while secondsLeft counts down under it - which is exactly
-        /// what makes Alpha's ramp read as "empties toward the floor" instead of silently recomputing a
-        /// shorter window every single frame and never actually fading.
+        /// The marked player's own diamond can only poll how much time is LEFT on its mark (PlayerHealth.
+        /// LongestMarkSecondsLeft, a per-frame read of the victim's own MarkLedger, no network message), never the
+        /// window's original length, yet Alpha needs a total to fade against. SelfMarkIndicatorView keeps the
+        /// LARGEST secondsLeft polled since the diamond was last hidden; this bumps it whenever a fresh value is
+        /// bigger (a new mark, or a second attacker's longer one; "longest, not per-attacker" is enough, see
+        /// MarkLedger.LongestSecondsLeft). Otherwise the total holds while secondsLeft counts down, so the ramp
+        /// empties instead of recomputing a shorter window every frame and never fading.
         /// </summary>
         public static float TrackedTotal(float previousTotal, float secondsLeft) =>
             secondsLeft > previousTotal ? secondsLeft : previousTotal;

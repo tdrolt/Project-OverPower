@@ -3,21 +3,11 @@ using UnityEngine;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Plain white shapes the minimap draws with - a disc, an upward triangle, and the triangular Mask plus its
-    /// edge shape - generated once in code, so there's no sprite asset to keep in sync, and each is tinted by
-    /// its Image's colour.
-    ///
-    /// A sprite is required, not decoration: a Filled Image without one ignores its fill amount and draws full (a
-    /// bug this project has hit before). The capture progress ring is a Filled disc. Every shape now carries a mip
-    /// chain (review fix, 2026-09-17): without one, a bubble or dot shrinking as the large map scales back to the
-    /// corner size shimmered, because a texture with no mips has nothing but its full-resolution level to sample
-    /// when minified.
-    ///
-    /// Textures and sprites are HideAndDontSave, not plain DontSave (review fix, 2026-09-17): DontSave alone let a
-    /// small leak (each shape's native texture memory) survive every Play Mode session, since nothing ever called
-    /// Destroy on them. The disc != null pattern below already re-creates the cache correctly either way - Unity
-    /// overloads == for a destroyed Object to compare equal to null even though the C# reference itself isn't -
-    /// this only needed the flag to change, not the caching pattern.
+    /// Plain white shapes the minimap draws with (disc, upward triangle, the triangular Mask and its edge shape),
+    /// generated once in code and tinted by each Image's colour. A sprite is required: a Filled Image without one
+    /// ignores its fill amount and draws full (the capture ring is a Filled disc). Every shape carries a mip chain,
+    /// or a bubble shrinking with the map shimmers. Textures and sprites are HideAndDontSave, not DontSave, which
+    /// leaked their native memory across Play Mode sessions; the `disc != null` cache re-creates correctly either way.
     /// </summary>
     public static class GeneratedSprites
     {
@@ -32,18 +22,12 @@ namespace Overpower.UI
         public static Sprite Disc => disc != null ? disc : (disc = Build("Generated Disc", Size, (x, y) => DiscAlpha(x, y, Size)));
         public static Sprite Triangle => triangle != null ? triangle : (triangle = Build("Generated Triangle", Size, (x, y) => TriangleAlpha(x, y, Size)));
 
-        /// <summary>A 512 px equilateral triangle, apex up, used for the minimap's Mask (Tudor, 2026-09-17: the mask
-        /// becomes a triangle, one vertex toward each capital). Unlike Triangle above, its 3 vertices sit at equal
-        /// distance from the sprite's own pixel centre - its centroid, incentre and circumcentre all coincide for
-        /// an equilateral triangle, so rotating the Image (about its pivot, the sprite's centre) turns the triangle
-        /// rigidly in place instead of swinging it off-centre.
-        ///
-        /// Not cached (review fix, 2026-09-17): bandFraction now comes from UiTheme.minimapFrameWidth (so the frame
-        /// is actually controlled by that field, not a hard-coded constant), and MinimapView only calls this once
-        /// per session anyway - same cost as every other build-once minimap shape. Shrunk inward by half the frame
-        /// band (see EdgeTriangle) so the Mask's own 1-bit stencil cut sits under solid frame colour instead of
-        /// right at its outer, visible edge - otherwise the frame only ever covered an already-jagged seam from one
-        /// side, and a faint step still showed just outside it.</summary>
+        /// <summary>A 512 px equilateral triangle, apex up, for the minimap's Mask. Unlike Triangle above its 3
+        /// vertices sit at equal distance from the sprite's pixel centre, so rotating the Image about its pivot turns
+        /// the triangle rigidly in place instead of swinging it off-centre. Not cached: bandFraction comes from
+        /// UiTheme.minimapFrameWidth and MinimapView calls this once per session. Shrunk inward by half the frame
+        /// band (see EdgeTriangle) so the Mask's 1-bit stencil cut sits under solid frame colour, not at its
+        /// outer visible edge where a faint jagged step would show.</summary>
         public static Sprite BuildTriangleMask(float bandFraction)
         {
             float band = LargeSize * Mathf.Max(0f, bandFraction);
@@ -51,11 +35,10 @@ namespace Overpower.UI
         }
 
         /// <summary>A thin triangular ring following the TRUE (unshrunk) triangle edge, drawn UNMASKED on top: covers
-        /// the Mask's 1-bit stencil seam with a normally anti-aliased edge instead. bandFraction x this sprite's own
-        /// LargeSize, then scaled back down by the Image's displayed size / LargeSize when drawn, gives a band whose
-        /// width in canvas units is independent of LargeSize - pass minimapFrameWidth / minimapCornerSize so the
-        /// visible band is exactly minimapFrameWidth canvas units at the corner size (and scales up with everything
-        /// else on the large map, same as bubbles and links already do). Not cached, same reason as BuildTriangleMask.</summary>
+        /// the Mask's 1-bit stencil seam with a normally anti-aliased edge. The band is bandFraction x LargeSize and
+        /// is scaled back down by the Image's displayed size / LargeSize, so pass minimapFrameWidth /
+        /// minimapCornerSize to get exactly minimapFrameWidth canvas units at the corner size (it scales up with
+        /// the large map like bubbles and links). Not cached, same reason as BuildTriangleMask.</summary>
         public static Sprite BuildTriangleEdge(float bandFraction)
         {
             float band = LargeSize * Mathf.Max(0f, bandFraction);
@@ -102,11 +85,9 @@ namespace Overpower.UI
             return inside + 0.5f;
         }
 
-        // The 3 vertices of an apex-up equilateral triangle centred on the sprite's own pixel centre (unlike
-        // TriangleAlpha's left/right/apex, whose centroid sits off the sprite's centre - fine for a static marker,
-        // wrong for a mask that has to rotate in place). v0 top, v1 bottom-left, v2 bottom-right - that order is
-        // counter-clockwise (same winding EdgeDistance already assumes). shrink pulls every vertex in toward the
-        // centre by that many pixels (0 for the true edge; half the frame band for the Mask - see BuildTriangleMask).
+        // Apex-up equilateral triangle centred on the sprite's pixel centre (TriangleAlpha's centroid is off-centre,
+        // wrong for a mask that rotates in place). Counter-clockwise order, the winding EdgeDistance assumes.
+        // shrink pulls every vertex in toward the centre by that many pixels (0 = the true edge).
         private static void CentredTriangleVertices(int size, float shrink, out Vector2 v0, out Vector2 v1, out Vector2 v2)
         {
             float half = size / 2f;
@@ -123,8 +104,7 @@ namespace Overpower.UI
             return Mathf.Min(EdgeDistance(p, v0, v1), Mathf.Min(EdgeDistance(p, v1, v2), EdgeDistance(p, v2, v0))) + 0.5f;
         }
 
-        // Measured as a straight perpendicular distance to the nearest TRUE (unshrunk) edge rather than a radius -
-        // the natural measure for a polygon, and gives a uniform-width band on every side.
+        // Perpendicular distance to the nearest TRUE (unshrunk) edge, not a radius: a uniform-width band on every side.
         private static float TriangleEdgeAlpha(float x, float y, int size, float bandWidth)
         {
             CentredTriangleVertices(size, 0f, out Vector2 v0, out Vector2 v1, out Vector2 v2);

@@ -9,9 +9,8 @@ namespace Overpower.Data
 
     /// <summary>
     /// Everything the lobby needs to know about one game mode: its name, how many team and spectator seats it has,
-    /// which scene it plays on and the info cards players can read. It exists as one asset per game mode so a new
-    /// mode is new data, not new lobby code. Fields are [SerializeField] private with read-only properties, like the
-    /// rest of the Data folder.
+    /// which scene it plays on and the info cards players can read. One asset per game mode, so a new mode is
+    /// new data, not new lobby code.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Game Mode", fileName = "GameMode")]
     public sealed class GameModeDefinition : ScriptableObject

@@ -12,24 +12,16 @@ using Overpower.TestRange;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Player prefab, owner only: logs everything this player's own client is the sole authority on
-    /// (Principle 2 of the design doc - "a hit" is logged by the victim, "shots"/"casts" by the
-    /// shooter/caster, all of which are always THIS player when this component is enabled at all).
-    /// Every T3 event goes through MatchTelemetry.Instance.Log, which no-ops when telemetry is off
-    /// or the session's file never opened - this class never checks that itself.
+    /// Player prefab, owner only: logs everything this player's own client is the sole authority on (design doc Principle 2: "a hit"
+    /// is logged by the victim, "shots"/"casts" by the shooter/caster, always THIS player). Every event goes through
+    /// MatchTelemetry.Instance.Log, which no-ops when telemetry is off or the file never opened - this class never checks that itself.
     ///
-    /// REMOTE COPIES DO NOTHING: Awake disables this component outright when photonView.IsMine is
-    /// false, before any GetComponent call or subscription runs - the same shape OverPowerBuff's own
-    /// Awake already uses. Deleting Assets/scripts/Telemetry still leaves the game running (design
-    /// doc, Principle 1): nothing outside this folder depends on this class existing.
+    /// REMOTE COPIES DO NOTHING: Awake disables the component when photonView.IsMine is false, before any GetComponent call or
+    /// subscription runs. Deleting Assets/scripts/Telemetry leaves the game running (design doc, Principle 1).
     ///
-    /// ALLOCATION: one TelemetryLine is built once and reused for every event this component ever
-    /// raises (Begin/.../End is safe to call again immediately - see TelemetryLine's own class
-    /// comment); the shots/dots accumulators are reset in place rather than reallocated on every
-    /// flush (T3 review item 11); event-name strings come from static arrays instead of
-    /// Enum.ToString(). The only heap traffic per frame is the two cheap bool reads in Update's
-    /// polling (IsSilenced, IsFull), not a single line built or logged unless something actually
-    /// happened or the sample interval elapsed.
+    /// ALLOCATION: one TelemetryLine is reused for every event; the shots/dots accumulators are reset in place on every flush; event-name
+    /// strings come from static arrays instead of Enum.ToString(). The only per-frame work is two cheap bool reads in Update's polling
+    /// (IsSilenced, IsFull).
     /// </summary>
     [DisallowMultipleComponent]
     public class PlayerTelemetry : MonoBehaviourPun
@@ -57,14 +49,9 @@ namespace Overpower.Telemetry
         private GoldWallet goldWallet;
         private LoadoutScreen loadoutScreen;
 
-        /// <summary>T3 review fix (item 2): PlayerDisplacement.TeleportTo writes rb.position
-        /// directly; Unity does not sync transform.position from it until the next physics step, so
-        /// a position read in the SAME frame as a teleport (respawn's own AliveChanged(true), fired
-        /// synchronously right after TeleportToSpawnPoint) read the OLD position through transform
-        /// while rb.position was already correct - measured live: a respawn logged the corpse's own
-        /// x/z instead of the spawn point. MyPosition below is used for every "this player's own
-        /// position" field, not just respawn's, since reading through the Rigidbody is never wrong
-        /// and is sometimes measurably right where transform.position is not.</summary>
+        /// <summary>PlayerDisplacement.TeleportTo writes rb.position directly and transform.position lags until the next physics step, so
+        /// a same-frame read (respawn's AliveChanged(true), fired right after TeleportToSpawnPoint) saw the corpse's x/z through the
+        /// transform. MyPosition is used for every "this player's own position" field.</summary>
         private Rigidbody body;
         private Vector3 MyPosition => body != null ? body.position : transform.position;
 
@@ -72,8 +59,7 @@ namespace Overpower.Telemetry
 
         private float sampleTimer;
 
-        // Polled state transitions (Update), never events of their own - see the design doc's
-        // "Changes from the spec" note.
+        // Polled state transitions (Update), never events of their own (design doc, "Changes from the spec").
         private bool wasSilenced;
         private bool wasUltimateFull;
 
@@ -85,13 +71,12 @@ namespace Overpower.Telemetry
         // every respawn after. death's own "time alive".
         private float aliveSinceTime;
 
-        // Time.time the most recent death happened - respawn's own "time dead", and the freshness
-        // stamp AssistArray checks against PlayerCombatCredit.LastDeathTime (T3 review item 9).
+        // Time.time the most recent death happened - respawn's "time dead", and the freshness stamp AssistArray checks against
+        // PlayerCombatCredit.LastDeathTime.
         private float deathTime;
 
-        // Index-matched to their enums (Combat/DamageInfo.cs, Combat/StatusEffectState.cs) - T3
-        // review item 11: avoids a ToString()/ToLowerInvariant() allocation on every hit/dot/status
-        // line. NameFor falls back to ToString() only if an enum ever grows past these arrays.
+        // Index-matched to their enums (Combat/DamageInfo.cs, Combat/StatusEffectState.cs): avoids a ToString()/ToLowerInvariant()
+        // allocation on every hit/dot/status line. NameFor falls back to ToString() only if an enum grows past these arrays.
         private static readonly string[] DamageSourceNames = { "Projectile", "Splash", "Burn", "Zone", "Contact", "SuddenDeath" };
         private static readonly string[] StatusKindNames = { "burn", "slow", "stun", "vulnerability", "invulnerability" };
 
@@ -114,34 +99,23 @@ namespace Overpower.Telemetry
             public void Reset() { Pulls = 0; Projectiles = 0; }
         }
 
-        // Entries persist for the whole match and are Reset() in place on every flush (sample
-        // interval, death/leave, BeforeClose) rather than removed - T3 review item 11: the dictionary
-        // itself only ever grows to "how many distinct weapons this player fired", and reusing the
-        // same ShotAccumulator instances avoids reallocating one every flush.
+        // Entries persist for the whole match and are Reset() in place on every flush (sample interval, death/leave, BeforeClose)
+        // rather than removed, so no ShotAccumulator is reallocated per flush.
         private readonly Dictionary<int, ShotAccumulator> shotsByWeapon = new Dictionary<int, ShotAccumulator>();
 
-        /// <summary>T3 review item 1 (VOLUME): continuous damage (DamageSource.Burn - status burn
-        /// and FireField's DoT both use it) is bucketed here instead of logging one `hit` line per
-        /// tick - measured at ~129 lines/second for a single burning victim at Editor framerate.
-        /// Keyed exactly as the review specified: victim, attacker actor/team, weapon, ability,
-        /// source. Same reset-in-place reasoning as shotsByWeapon above.</summary>
-        // Source is stored as int, not DamageSource - re-review (T3): a DamageSource-valued tuple
-        // field boxes the enum on every Equals/GetHashCode call a Dictionary lookup makes (an enum's
-        // default GetHashCode goes through object.GetHashCode unless the underlying value type
-        // itself is used), which is exactly the kind of per-frame allocation this class otherwise
-        // goes out of its way to avoid (see the class comment's ALLOCATION paragraph). Cast back to
-        // DamageSource only where a name is needed (NameFor) - see WriteDotLine.
+        /// <summary>Continuous damage (DamageSource.Burn) is bucketed here instead of one `hit` line per tick (see DotAccumulator);
+        /// keyed by victim, attacker actor/team, weapon, ability, source. Reset in place like shotsByWeapon.</summary>
+        // Source is stored as int, not DamageSource: a DamageSource-valued tuple field boxes the enum on every Equals/GetHashCode a
+        // Dictionary lookup makes, the per-frame allocation this class avoids. Cast back only where a name is needed (NameFor, WriteDotLine).
         private readonly Dictionary<(int Victim, int AttackerActor, int AttackerTeam, int WeaponId, int AbilityId, int Source), DotAccumulator> dotsByKey =
             new Dictionary<(int, int, int, int, int, int), DotAccumulator>();
 
-        // ---------------------------------------------------------------- goldEarned (Task T4)
+        // ---------------------------------------------------------------- goldEarned
         //
-        // Territory/bounty/refund/debug/other totals, summed from GoldWallet.Credited every time it
-        // fires (not once per interval) and flushed to a `goldEarned` line every sample interval -
-        // see FlushGoldEarned. Per-zone attribution is separate: it accumulates every Update, one
-        // frame's delta at a time, against the LIVE owners/tiers (see AccumulateZoneIncome) - the
-        // corrected plan step 3, so a zone that changes hands mid-interval is split correctly instead
-        // of attributed wholesale to whoever owns it at the end of the interval.
+        // Territory/bounty/refund/debug/other totals, summed from GoldWallet.Credited every time it fires and flushed to a `goldEarned`
+        // line every sample interval (FlushGoldEarned). Per-zone attribution accumulates every Update, one frame's delta at a time,
+        // against the LIVE owners/tiers (AccumulateZoneIncome), so a zone that changes hands mid-interval is split correctly instead of
+        // attributed wholesale to whoever owns it at the end.
 
         private int territoryCreditedThisInterval;
         private int bountyCreditedThisInterval;
@@ -149,20 +123,17 @@ namespace Overpower.Telemetry
         private int debugCreditedThisInterval;
         private int otherCreditedThisInterval;
 
-        // Reused every frame/flush - never reallocated once ZoneCount is known (same reasoning as
-        // GoldWallet's own ownersScratch/teamGoldByTierScratch, which this mirrors exactly so the two
-        // can never disagree about what a frame's income was).
+        // Reused every frame/flush, never reallocated once ZoneCount is known (mirrors GoldWallet's ownersScratch/teamGoldByTierScratch
+        // so the two cannot disagree about a frame's income).
         private int[] zoneOwnersScratch;
         private int[] teamGoldByTierScratch;
         private double[] perZoneGoldScratch;
         private int[] perZoneGoldWholeScratch;
 
-        // ---------------------------------------------------------------- heal (Task T4)
+        // ---------------------------------------------------------------- heal
         //
-        // Health regenerated while alive and not hit this frame, bucketed by the tier of the zone
-        // stood in at the moment it happened (index 0 = not standing in any zone - not one of the
-        // plan's own tiers, kept so a heal outside any zone is still counted rather than silently
-        // dropped) and flushed per sample interval - see PollHeal/FlushHeal.
+        // Health regenerated while alive and not hit this frame, bucketed by the tier of the zone stood in (index 0 = not in any zone,
+        // so a heal outside any zone is still counted) and flushed per sample interval (PollHeal/FlushHeal).
 
         private double[] healByTierScratch;
         private int[] healByTierWholeScratch;
@@ -172,9 +143,8 @@ namespace Overpower.Telemetry
 
         private void Awake()
         {
-            // Nobody but the owner should log their own combat/economy facts - see the class
-            // comment. Every field below stays null on a remote copy, which is what Start's
-            // subscriptions and Update's polling both rely on never running.
+            // Nobody but the owner logs their own combat/economy facts (class comment); every field below stays null on a remote copy,
+            // which Start's subscriptions and Update's polling rely on never running.
             if (!photonView.IsMine)
             {
                 enabled = false;
@@ -197,8 +167,7 @@ namespace Overpower.Telemetry
             goldWallet = GetComponent<GoldWallet>();
             loadoutScreen = GetComponent<LoadoutScreen>();
             body = GetComponent<Rigidbody>();
-            // Not on the root - see WeaponFiring's own siblings (OverPowerBuff, PlayerLifecycle)
-            // for the identical GetComponentInChildren lookup.
+            // Not on the root: a child lookup, as in OverPowerBuff and PlayerLifecycle.
             weaponFiring = GetComponentInChildren<WeaponFiring>(true);
 
             if (playerHealth == null || statusEffects == null || lifecycle == null || weaponFiring == null)
@@ -238,27 +207,21 @@ namespace Overpower.Telemetry
                 loadoutScreen.Refunded += HandleRefunded;
                 loadoutScreen.PurchaseRefused += HandlePurchaseRefused;
             }
-            // T3 review item 10: flush shots/dots before the writer actually closes, regardless of
-            // whether this object's own OnDestroy happens to run before or after MatchTelemetry's -
-            // see BeforeClose's own comment.
+            // Flush shots/dots before the writer closes, whether this object's OnDestroy runs before or after MatchTelemetry's (see BeforeClose).
             if (MatchTelemetry.Instance != null)
                 MatchTelemetry.Instance.BeforeClose += HandleBeforeClose;
 
-            // Static event (Task T3): a dummy is not networked and lives in exactly one client's
-            // scene, so the only listener that could ever be right is that same client's own local
-            // player - see DummyTarget.AnyDamaged's own comment.
+            // Static event: a dummy is not networked and lives in exactly one client's scene, so the only right listener is that client's
+            // own local player (see DummyTarget.AnyDamaged).
             DummyTarget.AnyDamaged += HandleDummyDamaged;
         }
 
         private void OnDestroy()
         {
-            // Opus review fix: Unity calls OnDestroy on every component being torn down, even one
-            // Awake left permanently disabled - a remote copy's own fields below are all still null
-            // (Start never ran to populate them), so every unsubscribe here was already a harmless
-            // no-op, but the unconditional HandleBeforeClose() call at the end was not: it reached
-            // MatchTelemetry.Instance (the scene singleton, shared by every player including remote
-            // ones) and wrote an all-zero `goldEarned` line into THIS client's own file every time
-            // any OTHER player's object was destroyed (left the room, or disconnected).
+            // Unity calls OnDestroy on every component being torn down, even one Awake left disabled. A remote copy's fields are all still
+            // null, so the unsubscribes are harmless no-ops, but the unconditional HandleBeforeClose() at the end would reach
+            // MatchTelemetry.Instance (shared by every player) and write an all-zero `goldEarned` line into THIS client's file whenever any
+            // OTHER player's object was destroyed.
             if (!photonView.IsMine)
                 return;
 
@@ -295,11 +258,8 @@ namespace Overpower.Telemetry
                 MatchTelemetry.Instance.BeforeClose -= HandleBeforeClose;
             DummyTarget.AnyDamaged -= HandleDummyDamaged;
 
-            // "On death/leave" - see the plan's own `shots` bullet. This player object is about to
-            // stop existing (this client leaving the room, or the player itself being destroyed),
-            // so anything accumulated since the last sample must not be lost. BeforeClose (above)
-            // additionally covers the case where MatchTelemetry closes the writer before this
-            // OnDestroy would otherwise run.
+            // On death/leave: this player object is about to stop existing, so anything accumulated since the last sample must not be
+            // lost. BeforeClose additionally covers MatchTelemetry closing the writer before this OnDestroy would run.
             HandleBeforeClose();
         }
 
@@ -318,9 +278,8 @@ namespace Overpower.Telemetry
 
             PollOverheat();
             PollUltimateCharge();
-            // Every frame, not gated by the sample interval below - see AccumulateZoneIncome's own
-            // comment (T4 corrected plan step 3) and PollHeal's (health can be hit and healed several
-            // times inside one sample interval; only a per-frame poll sees every one of those).
+            // Every frame, not gated by the sample interval: health can be hit and healed several times inside one interval, and a zone
+            // can change hands, so only a per-frame poll sees each (AccumulateZoneIncome, PollHeal).
             AccumulateZoneIncome();
             PollHeal();
 
@@ -375,7 +334,7 @@ namespace Overpower.Telemetry
             MatchTelemetry.Instance.Log(line);
         }
 
-        // ---------------------------------------------------------------- economy (Task T4)
+        // ---------------------------------------------------------------- economy
 
         private void HandleCredited(int amount, GoldSource source)
         {
@@ -463,12 +422,9 @@ namespace Overpower.Telemetry
             return zone;
         }
 
-        /// <summary>Task T4 corrected plan step 3: called every Update (not once per sample interval)
-        /// with THIS FRAME's delta time against the LIVE owners/tiers, exactly as GoldWallet.Update
-        /// accrues its own balance from the same two arrays - so a zone that changes hands mid-
-        /// interval is split correctly between the team that held it before and the team that holds
-        /// it after, instead of the whole interval being misattributed to whichever team happens to
-        /// own it at the moment the interval is flushed.</summary>
+        /// <summary>Called every Update (not once per sample interval) with THIS FRAME's delta against the LIVE owners/tiers, as
+        /// GoldWallet.Update accrues its balance from the same two arrays, so a zone that changes hands mid-interval is split between
+        /// the teams that held it before and after.</summary>
         private void AccumulateZoneIncome()
         {
             if (territoryConfig == null || playerHealth == null)
@@ -509,15 +465,10 @@ namespace Overpower.Telemetry
             return teamGoldByTierScratch;
         }
 
-        /// <summary>Every sample interval (and once more at BeforeClose, for a trailing partial
-        /// interval): the Territory/bounty/refund/debug/other totals summed since the last flush,
-        /// plus the per-zone split accumulated frame-by-frame above. `zones` is rounded to whole
-        /// gold per zone; the `terr` total (from GoldWallet.Credited(Territory), the same whole-gold
-        /// crossings the wallet itself publishes) stays the authoritative total - see the T4 step 3
-        /// check this is verified against. Writes nothing when every total is zero (opus review fix)
-        /// - an all-zero line was previously written every interval regardless, including one extra
-        /// redundant time whenever BeforeClose ran right after an interval had already flushed
-        /// everything back to zero.</summary>
+        /// <summary>Every sample interval (and once more at BeforeClose for a trailing partial interval): the totals summed since the
+        /// last flush plus the per-zone split accumulated frame by frame. `zones` is rounded to whole gold per zone; the `terr` total
+        /// (GoldWallet.Credited(Territory), the same whole-gold crossings the wallet publishes) stays the authoritative total. Writes
+        /// nothing when every total is zero, so no redundant all-zero line follows an interval that already flushed.</summary>
         private void FlushGoldEarned()
         {
             if (MatchTelemetry.Instance == null)
@@ -569,16 +520,13 @@ namespace Overpower.Telemetry
             return perZoneGoldWholeScratch;
         }
 
-        // ---------------------------------------------------------------- heal (Task T4)
+        // ---------------------------------------------------------------- heal
 
-        /// <summary>Polled every Update: a health increase while alive, not hit this frame (see
-        /// HandleDamaged's own tookDamageThisFrame flag), not the instantaneous jump a respawn's
-        /// full heal produces (guarded by wasAliveLastFrameForHealPoll - respawn's own `respawn` event
-        /// already records the fact of coming back to life; counting that jump again here as "healing"
-        /// would hugely overstate the zone regen this event exists to measure), and not a jump bigger
-        /// than any real zone regen could produce in one frame (opus review fix - see
-        /// MaxPlausibleHealThisFrame: the F1 "Heal" button's own instant full heal was otherwise
-        /// counted as regen from whichever zone tier the player happened to be standing in).</summary>
+        /// <summary>Polled every Update: a health increase while alive and not hit this frame (tookDamageThisFrame, set in
+        /// HandleDamaged), not a respawn's full heal (wasAliveLastFrameForHealPoll: the `respawn` event already records coming back to
+        /// life, and counting that jump as healing would hugely overstate zone regen), and not a jump bigger than any real zone regen
+        /// could produce in one frame (MaxPlausibleHealThisFrame: the F1 "Heal" button's instant full heal was otherwise counted as
+        /// regen).</summary>
         private void PollHeal()
         {
             if (playerHealth == null || lifecycle == null)
@@ -613,17 +561,14 @@ namespace Overpower.Telemetry
             tookDamageThisFrame = false;
         }
 
-        // -1 = not yet computed. TerritoryConfig's tier rates are fixed for the whole match (a
-        // designer retuning them in Play Mode is the one exception nobody has ever asked this poll
-        // to react to live), so this is worked out once rather than re-scanning up to 4 tiers every
-        // single frame.
+        // -1 = not yet computed. TerritoryConfig's tier rates are fixed for the match (a retune in Play Mode is the one exception this
+        // poll does not follow), so this is worked out once instead of scanning every tier each frame.
         private float cachedMaxTierRegenPerSecond = -1f;
 
-        /// <summary>Opus review fix: the most health any REAL zone regen could plausibly add in one
-        /// frame - the fastest tier's healthRegenPerSecond times this frame's delta time, doubled for
-        /// slack against a slow frame or two coalescing. A jump bigger than this (the F1 "Heal"
-        /// button's instant full heal, or ResetForRespawn's own full-health snap outside the
-        /// justRespawned guard's own window) is not regen and must not be counted as any zone's.</summary>
+        /// <summary>The most health any REAL zone regen could add in one frame: the fastest tier's healthRegenPerSecond times this
+        /// frame's delta time, doubled for slack against a slow frame or two coalescing. A bigger jump (the F1 "Heal" button's instant
+        /// full heal, or ResetForRespawn's full-health snap outside the justRespawned window) is not regen and must not be counted as
+        /// any zone's.</summary>
         private float MaxPlausibleHealThisFrame()
         {
             if (cachedMaxTierRegenPerSecond < 0f)
@@ -651,9 +596,8 @@ namespace Overpower.Telemetry
             healByTierScratch[index] += amount;
         }
 
-        /// <summary>Every sample interval (and at BeforeClose): tier -> whole health points
-        /// regenerated, skipped entirely when nothing healed this interval (same "don't write an
-        /// empty line" convention FlushShots already uses).</summary>
+        /// <summary>Every sample interval (and at BeforeClose): tier -> whole health points regenerated; skipped when nothing healed
+        /// (the "don't write an empty line" convention FlushShots uses).</summary>
         private void FlushHeal()
         {
             if (MatchTelemetry.Instance == null || healByTierScratch == null)
@@ -686,10 +630,9 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- shots
 
-        /// <summary>T3 review item 3: newPull is true once per trigger pull (always true for a
-        /// Simultaneous/shotgun weapon's single call, true only for round 0 of a burst/Sequential
-        /// weapon's several calls) - only that edge increments Pulls, so a 3-round burst weapon
-        /// reports pulls=1 per press instead of 3.</summary>
+        /// <summary>newPull is true once per trigger pull (always true for a Simultaneous/shotgun weapon's single call, true only for
+        /// round 0 of a burst/Sequential weapon's several calls): only that edge increments Pulls, so a 3-round burst reports pulls=1
+        /// per press.</summary>
         private void HandleFired(int weaponId, int projectileCount, bool newPull)
         {
             if (!shotsByWeapon.TryGetValue(weaponId, out ShotAccumulator acc))
@@ -758,24 +701,16 @@ namespace Overpower.Telemetry
             float sinceReady = ultimateReadyTime >= 0f ? Time.time - ultimateReadyTime : -1f;
             ultimateReadyTime = -1f; // Spent - the next `ultimateReady` starts a fresh wait.
 
-            // Rework step 4 (2026-09-18): for Invulnerability (id 25) specifically, this `ultimateUsed`
-            // line now means "committed at this instant", not "was protected at this instant" - the
-            // rework arms a trap for armedSeconds instead of shielding right away, and the commit may
-            // end up protecting nobody at all (an unanswered cast is wasted, no refund). Whether it DID
-            // protect anyone is answered by the `status` line that follows (or doesn't):
-            // TryConsumeReactiveInvulnerability applies StatusKind.Invulnerability with abilityId 25 the
-            // moment a hit triggers it, so `ultimateUsed(ab=25)` count minus `status(ab=25, effect=
-            // invulnerability)` count over a match IS the wasted-cast rate, for free, with no new key
-            // here.
+            // For Invulnerability (id 25) this `ultimateUsed` line means "committed at this instant", not "was protected": the ultimate
+            // arms a trap for armedSeconds, and the commit may protect nobody (an unanswered cast is wasted, no refund). Whether it DID
+            // is answered by the `status` line that follows (or doesn't): TryConsumeReactiveInvulnerability applies
+            // StatusKind.Invulnerability with abilityId 25 the moment a hit triggers it, so the `ultimateUsed(ab=25)` count minus the
+            // `status(ab=25, effect=invulnerability)` count over a match IS the wasted-cast rate, with no new key.
             //
-            // Review fix (2026-09-18): count only the status line whose `effect` field - the same field
-            // HandleStatusApplied below always names a status line's kind with, via NameFor(kind) - reads
-            // "invulnerability". If cachedStunSeconds is ever dialled up from its 0 default, the SAME
-            // trigger also writes a SECOND status line, for StatusKind.Stun, with the SAME abilityId 25
-            // (TryConsumeReactiveInvulnerability applies both from one trigger) - counting every
-            // `status(ab=25)` line regardless of effect would then double-count each trigger and could
-            // push the wasted-cast rate negative. Every other ultimate's line is unaffected - this one
-            // only changed because the ability's own timing did.
+            // Count only the status line whose `effect` reads "invulnerability" (HandleStatusApplied names every status line's kind via
+            // NameFor(kind)): if cachedStunSeconds is ever dialled up from its 0 default, the SAME trigger also writes a second status
+            // line, StatusKind.Stun with the same abilityId 25, and counting every `status(ab=25)` line would double-count each trigger
+            // and could push the wasted-cast rate negative.
             line.Begin(TelemetryKeys.UltimateUsed, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.AbilityId, abilityId);
             line.Float(TelemetryKeys.SecondsSinceReady, sinceReady);
@@ -838,9 +773,7 @@ namespace Overpower.Telemetry
         /// <summary>PlayerHealth.Damaged, on this player's own (victim's) client.</summary>
         private void HandleDamaged(DamageResult result, DamageInfo info)
         {
-            // Task T4: PollHeal's own "not taking damage that frame" guard - see its comment. Set
-            // here rather than read from PlayerHealth directly because nothing else already exposes
-            // "was hit this frame" as a public flag.
+            // PollHeal's "not taking damage that frame" guard, set here because nothing else exposes "was hit this frame" as a public flag.
             tookDamageThisFrame = true;
 
             int victimTeam = playerHealth != null ? playerHealth.TeamId : -1;
@@ -851,19 +784,16 @@ namespace Overpower.Telemetry
             RouteHit(photonView.OwnerActorNr, victimTeam, info, result, distance, vulnerability, overpowerActive);
         }
 
-        /// <summary>DummyTarget.AnyDamaged: a dummy has no owner of its own (it is not networked -
-        /// see its class comment), so the only client that can ever see this event is the one whose
-        /// local player actually fired the shot - the test range is where Tudor tunes weapons, so
-        /// these hits matter as much as a real player's. Victim actor/team are -1: a dummy has no
-        /// Photon identity to report (DummyTarget.ActorNumber is already -1 by the same convention).</summary>
+        /// <summary>DummyTarget.AnyDamaged: a dummy is not networked, so the only client that sees this event is the one whose local
+        /// player fired the shot (the test range is where Tudor tunes weapons, so these hits matter as much as a real player's). Victim
+        /// actor/team are -1: a dummy has no Photon identity (DummyTarget.ActorNumber is -1 by the same convention).</summary>
         private void HandleDummyDamaged(DummyTarget dummy, DamageResult result, DamageInfo info)
         {
             if (PhotonNetwork.LocalPlayer == null)
                 return;
 
-            // Only this player's own shots landing on a dummy are this client's to log - see the
-            // class comment. A dummy is plain scenery with no owner guard of its own, so this is
-            // the one place that check has to happen.
+            // Only this player's own shots landing on a dummy are this client's to log; a dummy is plain scenery with no owner guard,
+            // so this is the one place that check happens.
             if (info.SourceActorNumber != PhotonNetwork.LocalPlayer.ActorNumber)
                 return;
 
@@ -871,12 +801,9 @@ namespace Overpower.Telemetry
             RouteHit(-1, -1, info, result, distance, dummy.Vulnerability, overpowerActive: false);
         }
 
-        /// <summary>T3 review item 1 (VOLUME): routes one landed hit to an immediate `hit` line for
-        /// Projectile/Splash/Zone/Contact, or into a per-key DotAccumulator bucket for
-        /// DamageSource.Burn (status burn and FireField's DoT both tick every frame - logging one
-        /// `hit` per tick measured ~129 lines/second for a single burning victim). A lethal Burn tick
-        /// flushes its own bucket as a `dot` line first, so the sums leading up to a kill are not
-        /// lost, then still logs the normal `hit` line so every kill keeps a row.</summary>
+        /// <summary>Routes one landed hit to an immediate `hit` line for Projectile/Splash/Zone/Contact, or into a per-key
+        /// DotAccumulator bucket for DamageSource.Burn. A lethal Burn tick flushes its own bucket as a `dot` line first, so the sums
+        /// leading up to a kill are not lost, then still logs the normal `hit` line so every kill keeps a row.</summary>
         private void RouteHit(int victim, int victimTeam, DamageInfo info, DamageResult result,
                               float distance, float vulnerability, bool overpowerActive)
         {
@@ -924,14 +851,10 @@ namespace Overpower.Telemetry
             line.Bool(TelemetryKeys.Lethal, result.Lethal);
             line.Float(TelemetryKeys.Distance, distance);
             line.Float(TelemetryKeys.Vulnerable, vulnerability);
-            // Invulnerable dropped (T3 review item 6): PlayerHealth.ApplyDamage returns BEFORE
-            // Damaged fires when the victim is already invulnerable, so a real player's `hit` line
-            // could never read true; a dummy never checks invulnerability at all, so its own reading
-            // would not mean "this hit was blocked" either. See TelemetryKeys.Invulnerable's comment.
+            // Invulnerable is not written: PlayerHealth.ApplyDamage returns BEFORE Damaged fires when the victim is invulnerable, and a
+            // dummy never checks (see TelemetryKeys.Invulnerable).
             line.Bool(TelemetryKeys.OverpowerActive, overpowerActive);
-            // Mark plan step 6 (Decision 18): appended LAST, and only when this hit actually touched a
-            // mark, so every hit line from a non-marking weapon (or predating mark step 4) is written
-            // byte-identical to before this line existed.
+            // Appended LAST, and only when this hit touched a mark, so hit lines from non-marking weapons stay byte-identical.
             if (result.Mark != MarkOutcome.None)
                 line.Int(TelemetryKeys.Mark, (int)result.Mark);
             MatchTelemetry.Instance.Log(line);
@@ -978,11 +901,9 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>Distance from the attacker's own replicated position to this player (the
-        /// victim) - PlayerNetSync.NetworkPosition once it has received anything from its owner,
-        /// falling back to the attacker's raw transform otherwise (see HasReceivedFromOwner's own
-        /// comment). PositiveInfinity - which TelemetryLine.Float writes as JSON null - when the
-        /// attacker's PhotonView cannot be found at all (already left the room).</summary>
+        /// <summary>Distance from the attacker's replicated position to this player (the victim): PlayerNetSync.NetworkPosition once it
+        /// has received anything from its owner (HasReceivedFromOwner), else the attacker's raw transform. PositiveInfinity - which
+        /// TelemetryLine.Float writes as JSON null - when the attacker's PhotonView cannot be found (already left the room).</summary>
         private float DistanceToAttacker(int attackerActor)
         {
             PhotonView attackerView = PlayerLookup.GetPhotonViewFor(attackerActor);
@@ -1004,10 +925,9 @@ namespace Overpower.Telemetry
         {
             deathTime = Time.time;
 
-            // Continuous damage leading up to this kill (if any) belongs in the report as its own
-            // `dot` row, flushed BEFORE `death` - see FlushDots and the plan's own `shots` bullet for
-            // the identical "flush before death" rule. A lethal Burn tick already flushed its own
-            // bucket in RouteHit; this catches every OTHER bucket that was still accumulating.
+            // Continuous damage leading up to this kill belongs in the report as its own `dot` row, flushed BEFORE `death` (as shots
+            // flush on death). A lethal Burn tick already flushed its own bucket in RouteHit; this catches every OTHER bucket still
+            // accumulating.
             FlushDots();
 
             if (MatchTelemetry.Instance == null)
@@ -1015,9 +935,8 @@ namespace Overpower.Telemetry
 
             line.Begin(TelemetryKeys.Death, MatchTelemetry.Instance.Now);
             line.Int(TelemetryKeys.Killer, info.SourceActorNumber);
-            // T3 review item 8: info.SourceTeamId, not Teams.TryGetTeam(info.SourceActorNumber, ...) -
-            // the latter reads -1 if the killer has since left the room, disagreeing with `hit`'s own
-            // AttackerTeam (which always uses SourceTeamId, the value recorded AT the hit).
+            // info.SourceTeamId, not Teams.TryGetTeam(info.SourceActorNumber, ...): the latter reads -1 if the killer has left the room,
+            // disagreeing with `hit`'s AttackerTeam (the value recorded AT the hit).
             line.Int(TelemetryKeys.KillerTeam, info.SourceTeamId);
             line.Int(TelemetryKeys.Weapon, info.WeaponId);
             line.Int(TelemetryKeys.AbilityId, info.AbilityId);
@@ -1029,16 +948,15 @@ namespace Overpower.Telemetry
             WriteLoadout(useDeathKeys: true);
             MatchTelemetry.Instance.Log(line);
 
-            // "on death/leave" - see FlushShots's own callers.
+            // Shots flush on death (and on leave, in OnDestroy).
             FlushShots();
         }
 
         private int[] AssistArray()
         {
-            // T3 review item 9: a freshness guard, not blind trust in subscriber ordering.
-            // PlayerCombatCredit.LastDeathAssisters is only meaningful for THIS death if its own
-            // LastDeathTime stamp (set in the same synchronous PlayerHealth.Died chain, the same
-            // Time.time) matches - otherwise it is empty or a previous life's list.
+            // A freshness guard, not blind trust in subscriber ordering: PlayerCombatCredit.LastDeathAssisters is only meaningful for
+            // THIS death if its LastDeathTime stamp (set in the same synchronous PlayerHealth.Died chain) matches - otherwise it is
+            // empty or a previous life's list.
             if (combatCredit == null || combatCredit.LastDeathTime != deathTime)
                 return System.Array.Empty<int>();
 
@@ -1054,7 +972,7 @@ namespace Overpower.Telemetry
             if (!alive)
                 return; // Death itself is logged from HandleDied above, off PlayerHealth.Died.
 
-            // Task 9e: a rejoined player's fresh body never saw the death (no Died event on this instance), so deathTime is
+            // A rejoined player's fresh body never saw the death (no Died event on this instance), so deathTime is
             // still 0 and the subtraction would read "dead since the process started". No known death = no time dead.
             float timeDead = deathTime > 0f ? Time.time - deathTime : 0f;
             aliveSinceTime = Time.time;
@@ -1062,13 +980,11 @@ namespace Overpower.Telemetry
             if (MatchTelemetry.Instance == null)
                 return;
 
-            // 2.7b step 9 fold-in: a fresh start (ResetForMatchStart reviving a player who was dead when the
-            // match went live) fires this same AliveChanged(true) - see PlayerLifecycle.
-            // LastAliveChangeWasFreshStart's own comment. Its own LastRespawnWasUnderAttackSpawn is never
-            // touched by a fresh start, so it would otherwise read as whatever this player's last REAL
-            // respawn happened to be - written false here instead (a fresh start always lands at the plain
-            // team spawn, never the under-attack one), and the line itself is marked `fresh:true` so the
-            // report reads it as "brought back by going live", not an ordinary respawn at that exact instant.
+            // A fresh start (ResetForMatchStart reviving a player who was dead when the match went live) fires this same
+            // AliveChanged(true) (PlayerLifecycle.LastAliveChangeWasFreshStart). Its LastRespawnWasUnderAttackSpawn is never touched by a
+            // fresh start and would read as the last REAL respawn's, so false is written instead (a fresh start always lands at the
+            // plain team spawn), and the line is marked `fresh:true` so the report reads it as "brought back by going live", not an
+            // ordinary respawn.
             bool freshStart = lifecycle != null && lifecycle.LastAliveChangeWasFreshStart;
 
             line.Begin(TelemetryKeys.Respawn, MatchTelemetry.Instance.Now);
@@ -1111,12 +1027,9 @@ namespace Overpower.Telemetry
             MatchTelemetry.Instance.Log(line);
         }
 
-        /// <summary>Weapon/attachment/mobility/ultimate ids and both armor levels - this player's own
-        /// loadout, written into whichever event is currently being built (callers Begin first).
-        /// `sample` has no other use for Weapon/Attachment/Mobility/Ultimate, so it writes them
-        /// directly; `death` already uses those same keys for the KILLING weapon/ability (matching
-        /// `hit`'s convention), so it needs the separate Loadout* keys instead - see their own
-        /// comment on TelemetryKeys.</summary>
+        /// <summary>This player's own loadout ids and both armor levels, written into whichever event is being built (callers Begin
+        /// first). `sample` writes Weapon/Attachment/Mobility/Ultimate directly; `death` already uses those keys for the KILLING
+        /// weapon/ability, so it uses the Loadout* keys (see TelemetryKeys).</summary>
         private void WriteLoadout(bool useDeathKeys)
         {
             int weaponId = weaponFiring != null && weaponFiring.Weapon != null ? weaponFiring.Weapon.Id : LoadoutProperties.Empty;

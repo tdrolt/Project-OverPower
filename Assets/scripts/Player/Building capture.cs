@@ -10,8 +10,8 @@ using Overpower.Dominion;
 using Overpower.Match;
 using Overpower.UI;
 
-// Cut-rule-followups, 2026-09-26: lets BuildingCaptureRadiusTests call CaptureRadiusFor directly (internal, not
-// public - it is the pure rule CaptureRadius is built on, not something outside the capture system should call).
+// Lets BuildingCaptureRadiusTests call CaptureRadiusFor directly (internal, not public: it is the pure rule
+// CaptureRadius is built on, not something outside the capture system should call).
 [assembly: InternalsVisibleTo("Overpower.Tests")]
 
 public class BuildingCapture : MonoBehaviourPun
@@ -32,21 +32,17 @@ public class BuildingCapture : MonoBehaviourPun
     public TerritoryConfig territoryConfig;
 
     /// <summary>This tower's capture circle, from the Territory Config row of the tier it plays as RIGHT NOW
-    /// (EffectiveTier) - Tudor, 2026-09-26 ("i think the zone should shrink to a normal tier III"): the centre's
-    /// circle now shrinks to the Tier III radius while it plays as one, matching the other Tier IIIs, instead of
-    /// keeping its own Tier IV circle throughout as it used to (the phase-two wall's recess was sized around that
-    /// old, larger radius - see RefreshRingView, which re-sizes the ring (CaptureRingView.Resize) and the trigger
-    /// (ConfigureCollider) to follow this at runtime). Only Tier IV's radius can ever change with the cut, so a
-    /// non-centre tower skips asking MatchDirector.CutTeam every call - cheap, but it runs every frame per tower.
+    /// (EffectiveTier): the centre's circle shrinks to the Tier III radius while it plays as one. The phase-two wall's
+    /// recess was sized around the larger Tier IV radius; RefreshRingView re-sizes the ring (CaptureRingView.Resize)
+    /// and the trigger (ConfigureCollider) to follow this at runtime. Only Tier IV's radius can change with the cut,
+    /// so a non-centre tower skips asking MatchDirector.CutTeam: this runs every frame per tower.
     /// </summary>
     public float CaptureRadius => territoryConfig != null
         ? CaptureRadiusFor(territoryConfig, tier, tier == 4 && MatchDirector.Instance != null && MatchDirector.Instance.CutTeam >= 0)
         : FallbackCaptureRadius;
 
-    /// <summary>Cut-rule-followups, 2026-09-26 (review of the centre-circle-and-cut-rule task: the old edit-mode test
-    /// for this passed on the code before it too - see BuildingCaptureRadiusTests): the actual rule CaptureRadius is
-    /// built on, factored out so a test can guard it directly with no MatchDirector to fake - config's row of
-    /// PhaseTwoCutRules.EffectiveTier(baseTier, cutActive), nothing else.</summary>
+    /// <summary>The rule CaptureRadius is built on, factored out so a test can guard it directly with no
+    /// MatchDirector to fake: config's row of PhaseTwoCutRules.EffectiveTier(baseTier, cutActive), nothing else.</summary>
     internal static float CaptureRadiusFor(TerritoryConfig config, int baseTier, bool cutActive) =>
         config.ForTier(PhaseTwoCutRules.EffectiveTier(baseTier, cutActive)).captureRadius;
 
@@ -55,8 +51,7 @@ public class BuildingCapture : MonoBehaviourPun
     public UiTheme theme;
 
     // Used only if territoryConfig is missing (logged as an error in Start), so a misconfigured
-    // tower keeps working instead of throwing every frame. Reproduces the numbers every tower had
-    // before Territory Config existed.
+    // tower keeps working instead of throwing every frame.
     private const float FallbackCaptureSeconds = 5f;
     private const float FallbackDecaySeconds = 5f;
     private const float FallbackRecaptureCooldownSeconds = 5f;
@@ -70,25 +65,25 @@ public class BuildingCapture : MonoBehaviourPun
         territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureSeconds : FallbackCaptureSeconds;
 
     // Progress per player per second of capture time: ONE player's speed. N players capture faster by the
-    // TerritoryConfig's captureSpeedByPlayers list (1 / 1.5 / 1.75 for 1 / 2 / 3, lobby Task 14), read through
-    // CaptureSpeedRule - the capture step, the neutral push-down and the published rate all use it.
+    // TerritoryConfig's captureSpeedByPlayers list, read through CaptureSpeedRule - the capture step, the neutral
+    // push-down and the published rate all use it.
     private const float ProgressPerPlayerPerSecond = 1f;
 
     private System.Collections.Generic.IReadOnlyList<float> CaptureSpeeds =>
         territoryConfig != null ? territoryConfig.CaptureSpeedByPlayers : null;
 
-    // captureFadeSpeed (Tudor, 2026-09-24): how fast unfinished progress slides back (neutral) or refills (owned)
-    // once nobody is capturing/draining it, in the same one-player-seconds-per-real-second unit as
-    // ProgressPerPlayerPerSecond - so a fade speed of 1 slides back exactly as fast as one player would have built
-    // it. See CaptureFadeRule (Match/Rules) for the actual per-tick maths.
+    // captureFadeSpeed: how fast unfinished progress slides back (neutral) or refills (owned) once nobody is
+    // capturing/draining it, in the same one-player-seconds-per-real-second unit as ProgressPerPlayerPerSecond, so a
+    // fade speed of 1 slides back exactly as fast as one player would have built it. CaptureFadeRule (Match/Rules)
+    // has the per-tick maths.
     private float FadeRatePerSecond =>
         (territoryConfig != null ? territoryConfig.CaptureFadeSpeed : 1f) * ProgressPerPlayerPerSecond;
 
-    // Per tier since Tudor, 2026-09-26 (was one number for every zone): the row of the tier this tower plays as.
+    // The row of the tier this tower plays as.
     private float DecaySeconds =>
         territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).decaySeconds : FallbackDecaySeconds;
 
-    // Tudor, 2026-09-26: both capture sounds can be switched off in the Territory Config (off by default now).
+    // Both capture sounds can be switched off in the Territory Config.
     private bool ProgressSoundOn => territoryConfig == null || territoryConfig.PlayCaptureProgressSound;
     private bool CapturedSoundOn => territoryConfig == null || territoryConfig.PlayCapturedSound;
 
@@ -128,30 +123,27 @@ public class BuildingCapture : MonoBehaviourPun
     // them from the roster would lose them for good.
     private readonly List<PlayerTeam> shieldedInZone = new List<PlayerTeam>();
 
-    // The ring on the ground marking this zone and its capture progress (2026-09-16; it replaced the bar that floated
-    // over the tower). Built in Start so every tower gets one - see CaptureRingView. Null if the theme is unassigned.
+    // The ring on the ground marking this zone and its capture progress. Built in Start so every tower gets one - see
+    // CaptureRingView. Null if the theme is unassigned.
     private CaptureRingView ringView;
 
-    // The tower's owner-coloured crown and column caps (arena step 2) - found once in Start; painted every frame
-    // from the ring's own state (RefreshRingView), never rebuilt here. Null on a tower with no Tower Look child
-    // (e.g. before arena step 3 stamps one), which simply skips it.
+    // The tower's owner-coloured crown and column caps - found once in Start; painted every frame from the ring's own
+    // state (RefreshRingView), never rebuilt here. Null on a tower with no Tower Look child, which simply skips it.
     private TowerLook towerLook;
 
-    // Tudor, 2026-09-25: a zone behind the phase-two wall (or the left-out corner of a host start) disappears - its
-    // tower, ring and capture area - rather than showing grey. Toggled only when IsOutOfPlay changes; exactly what was
-    // hidden is remembered, so showing it again (a new room) puts the tower back as it was.
+    // A zone behind the phase-two wall (or the left-out corner of a host start) disappears - its tower, ring and
+    // capture area - rather than showing grey. Toggled only when IsOutOfPlay changes; exactly what was hidden is
+    // remembered, so showing it again (a new room) puts the tower back as it was.
     private bool hiddenAsCut;
     private readonly List<GameObject> hiddenChildren = new List<GameObject>();
     private readonly List<Renderer> hiddenOwnRenderers = new List<Renderer>();
     private readonly List<Collider> hiddenOwnColliders = new List<Collider>();
     private int shownColumnsTier; // set to tier in Start: the prefab was built with tier's columns
 
-    // Centre-circle-and-cut-rule, 2026-09-26: the CaptureRadius the ring and trigger were last (re)sized to - set in
-    // Start, and kept current by RefreshRingView. In the normal game this only ever moves for the centre
-    // (EffectiveTier only differs from tier there), when a cut starts or ends - but a Territory Config row edited
-    // live in Play Mode changes ANY tower's CaptureRadius too, and this same comparison just as harmlessly resizes
-    // that tower's ring and trigger to match; every tower not being live-edited compares against this every frame
-    // for nothing but a float equality check.
+    // The CaptureRadius the ring and trigger were last (re)sized to - set in Start, kept current by RefreshRingView.
+    // Normally only the centre moves it (EffectiveTier differs from tier only there, when a cut starts or ends), but a
+    // Territory Config row edited live in Play Mode changes ANY tower's CaptureRadius too, and the same comparison
+    // resizes that tower's ring and trigger to match; every other tower just compares a float each frame.
     private float builtCaptureRadius;
 
     // The last CaptureProgress THIS client told BuildingManager to publish for this zone - only
@@ -181,8 +173,7 @@ public class BuildingCapture : MonoBehaviourPun
         else
             ringView = CaptureRingView.Create(transform, CaptureRadius, theme);
 
-        // Arena rebuild step 2: found once here, painted every frame from the ring's own state
-        // (RefreshRingView) - null on a tower without a Tower Look child, which just skips it.
+        // Painted every frame from the ring's own state (RefreshRingView); a tower without a Tower Look child skips it.
         towerLook = GetComponentInChildren<TowerLook>(true);
         shownColumnsTier = tier; // the prefab was built with this tier's columns already showing
         if (towerLook != null && theme != null)
@@ -223,12 +214,11 @@ public class BuildingCapture : MonoBehaviourPun
         var collider = GetComponent<SphereCollider>();
         if (collider)
         {
-            // CaptureRadius (refactor 2026-09-26: this tower's tier's own row in Territory Config, not a field on
-            // the tower any more) is in world metres from the zone centre to the player's centre, the distance zone
-            // presence, health regen and the shop measure (BuildingManager.TryGetZoneAt). A trigger fires as soon as
-            // it touches the edge of the player's body, so it is one body radius smaller: without that, capturing
-            // reached about half a metre further than the rest (measured 2026-09-16: captured at 10.5 m, not 10.7 m).
-            // Its radius is also in the tower's own units, which scale with the tower (0.8 on these towers).
+            // CaptureRadius (this tower's tier's row in Territory Config) is in world metres from the zone centre to
+            // the player's centre, the distance zone presence, health regen and the shop measure
+            // (BuildingManager.TryGetZoneAt). A trigger fires as soon as it touches the edge of the player's body, so
+            // it is one body radius smaller: without that, capturing reached about half a metre further than the
+            // rest. Its radius is also in the tower's own units, which scale with the tower.
             float bodyRadius = BuildingManager.Instance != null ? BuildingManager.Instance.PlayerBodyRadius : 0f;
             collider.radius = Mathf.Max(0f, CaptureRadius - bodyRadius) / Mathf.Max(0.0001f, transform.lossyScale.x);
         }
@@ -259,20 +249,20 @@ public class BuildingCapture : MonoBehaviourPun
 
     void Update()
     {
-        // Runs on EVERY client, master or not - the ring is something everyone watches, not
-        // something only the master simulates. Reads whatever BuildingManager last decoded from
-        // the room (possibly still this client's own write, echoing back a moment later - see
-        // BuildingManager's class comment on the echo window), same as the flag/ownership visuals.
+        // Runs on EVERY client, master or not: the ring is something everyone watches, not something only the master
+        // simulates. Reads whatever BuildingManager last decoded from the room (possibly this client's own write,
+        // echoing back a moment later - BuildingManager's class comment on the echo window), like the flag/ownership
+        // visuals.
         RefreshRingView();
 
         if (!PhotonNetwork.IsMasterClient) return;
 
-        // Map shrink (review of the tower task, 2026-09-25): a zone behind the phase-two wall has its trigger switched
-        // off (SetHiddenAsCut), and a switched-off trigger fires no OnTriggerExit - the same trap as a death or a
-        // disconnect below - so its roster would keep whoever stood in it when the wall went up, for the rest of the
-        // match. Nobody can capture it anyway (MayCapture refuses an out-of-play zone), so the master just empties the
-        // roster and skips the simulation; SetHiddenAsCut's hide edge (I1/M1) already reset this zone to neutral and
-        // republished it idle, and stopped its sound, the moment it hid - there is no round trip left to wait out here.
+        // A zone behind the phase-two wall has its trigger switched off (SetHiddenAsCut), and a switched-off trigger
+        // fires no OnTriggerExit - the same trap as a death or a disconnect below - so its roster would keep whoever
+        // stood in it when the wall went up, for the rest of the match. Nobody can capture it anyway (MayCapture
+        // refuses an out-of-play zone), so the master empties the roster and skips the simulation; SetHiddenAsCut's
+        // hide edge already reset this zone to neutral, republished it idle and stopped its sound, so there is no
+        // round trip left to wait out here.
         if (hiddenAsCut)
         {
             if (playersInZone.Count > 0)
@@ -281,7 +271,7 @@ public class BuildingCapture : MonoBehaviourPun
             return;
         }
 
-        // Dominion Task 4: a capital cannot be captured or drained there. Nobody is listed (OnTriggerEnter refuses too, this
+        // Dominion: a capital cannot be captured or drained there. Nobody is listed (OnTriggerEnter refuses too, this
         // clears a roster an RPC could still fill), nothing is simulated and no progress is published - the owner stays the team
         // whose capital it is, which is what keeps it "held" for the capture-next-to-a-zone-you-hold rule.
         if (!BuildingManager.Instance.IsCapturableZone(buildingID))
@@ -292,22 +282,19 @@ public class BuildingCapture : MonoBehaviourPun
             return;
         }
 
-        // A player who disconnected while standing in the ring leaves a destroyed reference
-        // behind: OnTriggerExit cannot fire for an object that no longer exists. Every consumer
-        // below reads p.teamID, so one stale entry throws a MissingReferenceException every frame
-        // and the capture system stops working for the rest of the match. Unity's == treats a
-        // destroyed object as null, so this catches both the destroyed and the disconnected case.
-        // It is a leave like any other: CalculateCaptureProgress re-reads playersInZone fresh below
-        // this same frame, so removing it here is all a disconnect needs (captureFadeSpeed, [C],
-        // 2026-09-24 - a neutral claim now fades rather than resetting, see that method's comment).
+        // A player who disconnected while standing in the ring leaves a destroyed reference behind: OnTriggerExit
+        // cannot fire for an object that no longer exists. Every consumer below reads p.teamID, so one stale entry
+        // throws a MissingReferenceException every frame and capture stops for the rest of the match. Unity's ==
+        // treats a destroyed object as null, so this catches both the destroyed and the disconnected case. It is a
+        // leave like any other: CalculateCaptureProgress re-reads playersInZone below this same frame, so removing it
+        // here is all a disconnect needs (a neutral claim then fades rather than resetting).
         playersInZone.RemoveAll(p => p == null);
         shieldedInZone.RemoveAll(p => p == null);
 
-        // A player who dies in the ring never leaves it either: death switches their collider off,
-        // which fires no OnTriggerExit. Measured 2026-09-16, two clients: a killed attacker stayed
-        // listed, drained the zone to neutral while dead, then captured it while standing in their
-        // own capital after respawning. So dying counts as leaving. A player who respawns inside a
-        // zone is listed again, because switching their collider back on fires OnTriggerEnter.
+        // A player who dies in the ring never leaves it either: death switches their collider off, which fires no
+        // OnTriggerExit. Seen on two clients: a killed attacker stayed listed, drained the zone to neutral while dead,
+        // then captured it while standing in their own capital after respawning. So dying counts as leaving. A player
+        // who respawns inside a zone is listed again, because switching their collider back on fires OnTriggerEnter.
         for (int i = playersInZone.Count - 1; i >= 0; i--)
         {
             PlayerTeam player = playersInZone[i];
@@ -325,10 +312,9 @@ public class BuildingCapture : MonoBehaviourPun
         else if (!isOnCooldown)
             CalculateCaptureProgress();
 
-        // Runs after the state above settles for this frame, so it always publishes THIS frame's
-        // real state - including the "just neutralised, now on cooldown" and "just completed, now
-        // idle" transitions, which the old early-returns above would otherwise skip on the very
-        // frame that matters.
+        // Runs after the state above settles for this frame, so it always publishes THIS frame's real state -
+        // including the "just neutralised, now on cooldown" and "just completed, now idle" transitions, which an early
+        // return would skip on the very frame that matters.
         PublishProgressIfNeeded();
     }
 
@@ -339,11 +325,10 @@ public class BuildingCapture : MonoBehaviourPun
             player => RespawnShield.IsUpFor(player.photonView.Owner),
             player => player.TryGetComponent(out PlayerLifecycle lifecycle) && !lifecycle.IsAlive); // died while held out: re-enters through OnTriggerEnter
 
-    /// <summary>2.7b/phase-two: hides (or restores) everything this zone shows once IsOutOfPlay flips - its tower,
-    /// ring and capture area disappear behind the wall rather than showing grey (Decision 9). Only acts on a real
-    /// change, and remembers exactly what it touched (children that were active, renderers/colliders that were
-    /// enabled), so restoring puts the tower back exactly as it was, whether that was after arena build (edit time)
-    /// or however a later change left it.</summary>
+    /// <summary>Hides (or restores) everything this zone shows once IsOutOfPlay flips - its tower, ring and capture
+    /// area disappear behind the wall rather than showing grey. Only acts on a real change, and remembers exactly
+    /// what it touched (children that were active, renderers/colliders that were enabled), so restoring puts the
+    /// tower back exactly as it was.</summary>
     private void SetHiddenAsCut(bool hide)
     {
         if (hide == hiddenAsCut)
@@ -351,10 +336,10 @@ public class BuildingCapture : MonoBehaviourPun
         hiddenAsCut = hide;
         if (hide)
         {
-            // I1 (final review, 2026-09-25): the AudioSource is on the tower root, so hiding the children/renderers/
-            // colliders below never touches it, and every tower's source is 2D - a loop left running here would be
-            // heard map-wide for the rest of the match. Every client reaches this (RefreshRingView runs on all of
-            // them), so every client's own source stops, not just the master's.
+            // The AudioSource is on the tower root, so hiding the children/renderers/colliders below never touches
+            // it, and every tower's source is 2D - a loop left running here would be heard map-wide for the rest of
+            // the match. Every client reaches this (RefreshRingView runs on all of them), so every client's own
+            // source stops, not just the master's.
             if (audioSource != null)
                 audioSource.Stop();
             foreach (Transform child in transform)
@@ -366,12 +351,12 @@ public class BuildingCapture : MonoBehaviourPun
                 if (c.enabled) { c.enabled = false; hiddenOwnColliders.Add(c); }
             if (PhotonNetwork.IsMasterClient)
             {
-                // M1: without this, the master would keep simulating this zone for one more round trip (until its
-                // own knockout write echoes back - mElim/mPhase, which CutTeam derives the cut from - and Update's
-                // hiddenAsCut branch takes over) - if a player was still listed it
-                // would republish a non-idle progress and then go silent once hidden, so telemetry logs a capture
-                // that never ends. Resetting right here, on the hide edge, means the very same frame the zone
-                // disappears it also goes idle. ResetToOwner also clears the claim/drain/cooldown state.
+                // Without this, the master would keep simulating this zone for one more round trip (until its own
+                // knockout write echoes back - mElim/mPhase, which CutTeam derives the cut from - and Update's
+                // hiddenAsCut branch takes over): a player still listed would make it republish a non-idle progress
+                // and then go silent once hidden, so telemetry logs a capture that never ends. Resetting here, on the
+                // hide edge, makes the zone go idle the same frame it disappears. ResetToOwner also clears the
+                // claim/drain/cooldown state.
                 ResetToOwner(TerritoryMap.Neutral);
                 RepublishProgressNow();
             }
@@ -385,9 +370,9 @@ public class BuildingCapture : MonoBehaviourPun
         hiddenOwnColliders.Clear();
     }
 
-    /// <summary>Every client, every frame: draws this zone's ring and its tower's owner-coloured crown/caps (arena
-    /// step 2) from replicated state only (capture progress, the owner, under attack), so a late joiner sees exactly
-    /// what everyone else does. Both read the very same CaptureRingState, so they can never disagree.</summary>
+    /// <summary>Every client, every frame: draws this zone's ring and its tower's owner-coloured crown/caps from
+    /// replicated state only (capture progress, the owner, under attack), so a late joiner sees exactly what everyone
+    /// else does. Both read the same CaptureRingState, so they can never disagree.</summary>
     private void RefreshRingView()
     {
         BuildingManager manager = BuildingManager.Instance;
@@ -399,10 +384,9 @@ public class BuildingCapture : MonoBehaviourPun
         if (outOfPlay)
             return;
 
-        // Centre-circle-and-cut-rule, 2026-09-26: follows CaptureRadius at runtime instead of only reading it once
-        // in Start - today that only ever fires for the centre, when a cut starts or ends. Re-sizes the trigger the
-        // same way Start did (ConfigureCollider) and asks the ring to re-size in place (CaptureRingView.Resize)
-        // rather than tearing it down and rebuilding it, so its own state (theme, current fill/colour) survives.
+        // Follows CaptureRadius at runtime instead of reading it once in Start (normally only the centre changes, when
+        // a cut starts or ends). Re-sizes the trigger as Start did (ConfigureCollider) and asks the ring to re-size in
+        // place (CaptureRingView.Resize) rather than rebuild, so its theme and current fill/colour survive.
         float captureRadius = CaptureRadius;
         if (captureRadius != builtCaptureRadius)
         {
@@ -418,15 +402,15 @@ public class BuildingCapture : MonoBehaviourPun
             shownColumnsTier = effectiveTier;
         }
 
-        // Vision Task 9b, the one place this tower chooses: with Zone Owners Visible Without Sight off, the ring, the
-        // crown/caps and the carpet all show what the team knows of this zone, not the live state.
+        // The one place this tower chooses: with Zone Owners Visible Without Sight off, the ring, the crown/caps and
+        // the carpet all show what the team knows of this zone, not the live state.
         bool filtered = Overpower.Vision.ZoneKnowledge.TryGetDisplayed(buildingID, out Overpower.Vision.ZoneView known);
         int owner = filtered ? known.OwnerTeam
             : manager.Current != null ? manager.Current.OwnerOf(buildingID) : TerritoryMap.Neutral;
         PaintKnownCarpet(owner, filtered);
 
-        // Dominion Task 4/6: a capital cannot be captured there, so its capture progress band and track are never shown;
-        // the outline stays, because it marks where the spawn's healing ends (Task 6).
+        // Dominion: a capital cannot be captured there, so its capture progress band and track are never shown;
+        // the outline stays, because it marks where the spawn's healing ends.
         bool capturable = manager.IsCapturableZone(buildingID);
         if (ringView != null && !ringView.gameObject.activeSelf)
             ringView.gameObject.SetActive(true);
@@ -472,13 +456,10 @@ public class BuildingCapture : MonoBehaviourPun
         int nowMs = PhotonNetwork.ServerTimestamp;
         if (nowMs == 0)
             return; // Server clock not synced yet (fetched once, asynchronously, right after
-                     // connecting - PhotonNetwork.ServerTimestamp's own doc). Publishing a progress
-                     // stamped at 0 here would make every client's later CaptureProgress.Evaluate()
-                     // extrapolate from the wrong "since" instant for as long as that stamp stands -
-                     // the same failure mode FAIL #15 found for a deployable's Age (see
-                     // two-client-harness.md §12), just for a capture bar instead of a mine timer.
-                     // Skip this one frame; the very next frame (the clock lands within about a
-                     // frame of connecting) publishes normally.
+                     // connecting). A progress stamped at 0 would make every client's later
+                     // CaptureProgress.Evaluate() extrapolate from the wrong "since" instant for as long as
+                     // that stamp stands (the failure mode of a deployable's Age, two-client-harness.md §12).
+                     // Skip this one frame; the next one publishes normally.
 
         CaptureProgress current = ComputeCurrentProgress(nowMs);
         if (!current.NeedsRepublishComparedTo(lastPublishedProgress))
@@ -488,13 +469,10 @@ public class BuildingCapture : MonoBehaviourPun
         BuildingManager.Instance.PublishCaptureProgress(buildingID, current);
     }
 
-    /// <summary>Gathers this frame's inputs and asks the pure CaptureProgressPublishRule what to publish (review
-    /// fix, 2026-09-17: the decision used to live here inline, untestable - reverting either Held branch to Idle
-    /// still passed every test in the project). eligibleCount/enemyPresent/mayCaptureNow are only worth computing
-    /// in the same case the old inline version did: a neutral capture in progress, not on cooldown and not
-    /// already abandoned (capturingID reads -1 once CalculateCaptureProgress's own captureFadeSpeed fade reaches
-    /// 0 and resolves fresh with nobody listed, so this exactly mirrors the guard the inline version used to
-    /// early-return Idle on).</summary>
+    /// <summary>Gathers this frame's inputs and asks the pure CaptureProgressPublishRule what to publish.
+    /// eligibleCount/enemyPresent/mayCaptureNow are only worth computing for a neutral capture in progress, not on
+    /// cooldown and not already abandoned (capturingID reads -1 once CalculateCaptureProgress's captureFadeSpeed fade
+    /// reaches 0 and resolves fresh with nobody listed).</summary>
     internal CaptureProgress ComputeCurrentProgress(int nowMs)
     {
         int eligibleCount = 0;
@@ -513,23 +491,20 @@ public class BuildingCapture : MonoBehaviourPun
 
             if (eligibleCount > 0)
             {
-                // Only asked here when eligibleCount > 0: Decide ignores mayCaptureNow entirely once
-                // eligibleCount is 0 (see its own eligibleCount <= 0 branch), and asking it anyway used to
-                // overwrite TeamMayCaptureNow's once-per-frame cache with capturingID's answer right before
-                // CurrentNeutralFadeRate below asks it again about the pushing team - a different team, so the
-                // cache missed and computed a THIRD answer this same frame (review fix, 2026-09-24, second
-                // pass). Gated like this, whenever it IS asked, it is always capturingID - the same team
-                // CalculateCaptureProgress itself asked this frame - so the cache always hits.
+                // Only asked when eligibleCount > 0: Decide ignores mayCaptureNow once eligibleCount is 0, and asking
+                // anyway would overwrite TeamMayCaptureNow's once-per-frame cache with capturingID's answer right
+                // before CurrentNeutralFadeRate below asks it again about the pushing team - a different team, so the
+                // cache would miss and compute a THIRD answer this frame. Gated like this, whenever it IS asked it is
+                // capturingID - the team CalculateCaptureProgress asked this frame - so the cache hits.
                 mayCaptureNow = TeamMayCaptureNow(capturingID);
             }
             else
             {
-                // Opus re-review, 2026-09-24: the claim team is absent this frame (empty zone, or only another
-                // team) - CalculateCaptureProgress already ran earlier in this same Update() and is fading/
-                // pushing the claim down; teamsInZone is its own reusable buffer, already fresh for this frame
-                // (populated at the top of that method regardless of which branch it then takes).
-                // CurrentNeutralFadeRate is the one place both this method and CalculateCaptureProgress reach
-                // CaptureFadeRule.NeutralFadeRate, so the published rate cannot drift from the master's own step.
+                // The claim team is absent this frame (empty zone, or only another team): CalculateCaptureProgress
+                // already ran earlier in this Update() and is fading/pushing the claim down; teamsInZone is its
+                // reusable buffer, already fresh for this frame (populated at the top of that method whichever branch
+                // it takes). CurrentNeutralFadeRate is the one place both this method and CalculateCaptureProgress
+                // reach CaptureFadeRule.NeutralFadeRate, so the published rate cannot drift from the master's step.
                 fadeRate = CurrentNeutralFadeRate();
             }
         }
@@ -559,7 +534,7 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
     // Cached so the per-frame capture check below doesn't allocate a new delegate for every tower every frame.
-    // Dominion Task 6: an enemy standing in a capital (not capturable there) still counts as "under attack" for the warnings,
+    // Dominion: an enemy standing in a capital (not capturable there) still counts as "under attack" for the warnings,
     // but never closes the link to the zones next to it - ZoneThreat.ClosesLink holds that rule.
     // The two answers are cached delegates too (a method group would allocate on every call); ZoneThreat.ZoneClosesLink is the one rule the test covers.
     private static readonly System.Func<int, bool> ZoneCapturable =
@@ -569,11 +544,11 @@ public class BuildingCapture : MonoBehaviourPun
     private static readonly System.Func<int, bool> ZoneUnderAttack =
         zone => ZoneThreat.ZoneClosesLink(zone, ZoneCapturable, ZoneTrackedUnderAttack);
 
-    // 2.7b Decision 8/9: a zone out of play - not only the host-start left-out capital, but since the phase-two cut
-    // also any zone behind the wall - is never capturable, not even by its own team - checked before the own-capital
-    // exception, in every MayCapture call site (TeamMayCaptureNow, so a drain in progress is covered too;
-    // OnTriggerEnter) plus the ring itself (RefreshRingView), which also uses it to hide the tower entirely
-    // (SetHiddenAsCut) rather than greying it out. Cached for the same allocation reason as ZoneUnderAttack above.
+    // A zone out of play - the host-start left-out capital, and any zone behind the phase-two wall - is never
+    // capturable, not even by its own team: checked before the own-capital exception, in every MayCapture call site
+    // (TeamMayCaptureNow, so a drain in progress is covered too; OnTriggerEnter) plus the ring itself
+    // (RefreshRingView), which also uses it to hide the tower entirely (SetHiddenAsCut) rather than greying it out.
+    // Cached for the same allocation reason as ZoneUnderAttack above.
     private static readonly System.Func<int, bool> ZoneOutOfPlay =
         zone => MatchDirector.Instance != null && MatchDirector.Instance.IsOutOfPlay(zone);
 
@@ -591,8 +566,8 @@ public class BuildingCapture : MonoBehaviourPun
     /// <summary>Master, every frame a team is actually capturing or draining this zone: may that team still capture
     /// it right now? OnTriggerEnter checks the plain adjacency rule once, on entry - deliberately not the threat-aware
     /// one, or a player who walked in while the link was under attack would never be counted and would have to step
-    /// out and back in. This re-asks the threat-aware rule (Tudor, 2026-09-16: no capturing through an owned zone
-    /// that is under attack), so a capture already in progress holds the moment its link comes under attack and
+    /// out and back in. This re-asks the threat-aware rule (no capturing through an owned zone that is under
+    /// attack), so a capture already in progress holds the moment its link comes under attack and
     /// carries on by itself once the link is safe again.</summary>
     private bool TeamMayCaptureNow(int team)
     {
@@ -611,14 +586,11 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
     /// <summary>Master only: this zone's current neutral-claim fade rate (CaptureFadeRule.NeutralFadeRate), from
-    /// teamsInZone (the caller's own reusable buffer, already fresh for this frame) and TeamMayCaptureNow itself
-    /// as the delegate - the pure rule picks the pushing team and asks TeamMayCaptureNow about THAT team, never
-    /// capturingID (see CaptureFadeRuleTests' recording-delegate test). CalculateCaptureProgress (the master's
-    /// per-frame step) and ComputeCurrentProgress (the value it publishes) both call this ONE method instead of
-    /// each computing the pushing team and its answer themselves, so the two cannot drift onto different
-    /// formulas - review fix, 2026-09-24 (second pass, "the wiring still isn't tested"): the two copied call
-    /// sites this replaces were never actually exercised by a test; reverting either one to the plain fadeRate,
-    /// or asking TeamMayCaptureNow(capturingID) instead of the pushing team, passed every test in the project.</summary>
+    /// teamsInZone (the caller's reusable buffer, already fresh for this frame) and TeamMayCaptureNow as the
+    /// delegate - the pure rule picks the pushing team and asks TeamMayCaptureNow about THAT team, never capturingID
+    /// (CaptureFadeRuleTests' recording-delegate test). CalculateCaptureProgress (the master's step) and
+    /// ComputeCurrentProgress (the value it publishes) both call this ONE method instead of each computing the
+    /// pushing team and its answer, so the two cannot drift onto different formulas.</summary>
     private float CurrentNeutralFadeRate() =>
         CaptureFadeRule.NeutralFadeRate(FadeRatePerSecond, capturingID, teamsInZone, ProgressPerPlayerPerSecond, TeamMayCaptureNow, CaptureSpeeds);
 
@@ -640,9 +612,9 @@ public class BuildingCapture : MonoBehaviourPun
         ApplyDrain(drain, Time.deltaTime);
     }
 
-    // Master: how many players drain this zone this frame, counted ONCE in ApplyDrain (lobby Task 15b). The step (UpdateDecay) and the
-    // published rate (ComputeCurrentProgress) both read this one number, so they cannot count differently - they used to count
-    // separately (DrainerCount for the step, CountPlayersOfTeam for the publish). 1 whenever no drain is running.
+    // Master: how many players drain this zone this frame, counted ONCE in ApplyDrain. The step (UpdateDecay) and the
+    // published rate (ComputeCurrentProgress) both read this one number, so they cannot count differently. 1 whenever
+    // no drain is running.
     private int drainersThisFrame = 1;
 
     /// <summary>Carries out this frame's DrainRule decision: the state change, the drain step (or the refill once it stopped) and the
@@ -650,7 +622,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// roster (BuildingCaptureDrainWiringTests) - the wiring between the count, the step and the published rate is what it guards.</summary>
     internal void ApplyDrain(DrainRule.Decision drain, float deltaTime)
     {
-        // Only the draining team's players speed the drain; a second enemy team in the zone doesn't help (Tudor, 4 Oct).
+        // Only the draining team's players speed the drain; a second enemy team in the zone doesn't help .
         drainersThisFrame = drain.Step == DrainRule.Step.Start || drain.Step == DrainRule.Step.Continue
             ? CaptureFadeRule.DrainerCount(drain.Team, teamsInZone) : 1;
         isDrainPaused = drain.Step == DrainRule.Step.Pause;
@@ -659,16 +631,14 @@ public class BuildingCapture : MonoBehaviourPun
         {
             case DrainRule.Step.Start:
                 isDecaying = true;
-                // captureProgress is NOT reset to CaptureSeconds here any more (captureFadeSpeed, [C],
-                // 2026-09-24): a fresh capture already sits at CaptureSeconds from CompleteCapture, and a drain
-                // that restarts while the zone is still mid-refill now continues from wherever the refill got
-                // to, instead of snapping back to full first.
+                // captureProgress is NOT reset to CaptureSeconds here: a fresh capture already sits at CaptureSeconds
+                // from CompleteCapture, and a drain that restarts while the zone is still mid-refill continues from
+                // wherever the refill got to, instead of snapping back to full first.
                 capturingID = drain.Team;
                 photonView.RPC("RPC_UpdateCapturingID", RpcTarget.MasterClient, capturingID);
                 Debug.Log("[HandleCapturedState] Enemy detected. Starting recapture decay.");
 
-                // Play recapture sound when an enemy starts recapturing
-                PlayRecaptureSound();  // This was missing from your decay logic
+                PlayRecaptureSound();
                 break;
 
             case DrainRule.Step.Continue:
@@ -685,30 +655,27 @@ public class BuildingCapture : MonoBehaviourPun
 
         if (drain.Step == DrainRule.Step.Start || drain.Step == DrainRule.Step.Continue)
         {
-            // Stop the capturing sound if decaying
             StopCapturingSound();
             UpdateDecay(drainersThisFrame, deltaTime);
 
             if (captureProgress <= 0)
             {
-                StopCapturingSound(); // Ensure sound stops if neutralized
+                StopCapturingSound();
                 NeutralizeBuilding();
             }
         }
         else if (drain.Step != DrainRule.Step.Pause && captureProgress < CaptureSeconds)
         {
             // The drain stopped because the drainers left (not a Pause, which holds where it is): refills toward
-            // full at the fade speed instead of snapping to full (captureFadeSpeed, [C], 2026-09-24).
-            // CaptureProgressPublishRule.Decide mirrors this exact step so every client's own
-            // CaptureProgress.Evaluate extrapolates the same climb.
+            // full at the fade speed instead of snapping to full. CaptureProgressPublishRule.Decide mirrors this exact
+            // step so every client's own CaptureProgress.Evaluate extrapolates the same climb.
             captureProgress = CaptureFadeRule.Refill(captureProgress, CaptureSeconds, FadeRatePerSecond, deltaTime);
         }
     }
 
     /// <summary>Master: is a player of the owner's team standing in this zone? playersInZone only lists players the
     /// territory rule let in on entry, and it refuses a zone your team already owns, so a defender who walked in after
-    /// the capture was never listed and an enemy drained the zone right past them (measured 2026-09-16: drain rate
-    /// unchanged with a defender inside, zone neutral 3.9 s later). Presence is tracked for every living player, so
+    /// the capture was never listed and an enemy drained the zone right past them. Presence is tracked for every living player, so
     /// ask it too. The list still counts players who captured this zone and never left.</summary>
     private bool DefenderPresent()
     {
@@ -720,7 +687,7 @@ public class BuildingCapture : MonoBehaviourPun
     }
 
 
-    /// <summary>Tudor, 4 Oct: the drain scales with the enemies draining it, by the same capture-speed list as a capture
+    /// <summary>The drain scales with the enemies draining it, by the same capture-speed list as a capture
     /// (CaptureFadeRule.DrainProgressPerSecond); drainers = the draining team's players in the zone (CaptureFadeRule.DrainerCount).</summary>
     internal void UpdateDecay(int drainers, float deltaTime)
     {
@@ -762,30 +729,25 @@ public class BuildingCapture : MonoBehaviourPun
 
     void CalculateCaptureProgress()
     {
-        // Re-decided from the listed players every tick (bug fix, 2026-09-17), not just when unset: a
-        // trigger event used to be able to set capturingID to a team with nobody listed at all, which
-        // then locked out a lone real capturer until they stepped out and back in - see CaptureClaimRule's
-        // own comment. teamsInZone is the same reusable buffer HandleCapturedState uses for DrainRule;
-        // the two never run in the same frame (Update calls one or the other), so reusing it here adds
-        // no per-frame allocation.
+        // Re-decided from the listed players every tick, not just when unset: a trigger event could set capturingID
+        // to a team with nobody listed at all, which then locked out a lone real capturer until they stepped out and
+        // back in (CaptureClaimRule's comment). teamsInZone is the same reusable buffer HandleCapturedState uses for
+        // DrainRule; the two never run in the same frame (Update calls one or the other), so no per-frame allocation.
         teamsInZone.Clear();
         foreach (PlayerTeam p in playersInZone)
             teamsInZone.Add(p.teamID);
 
-        // The capturing team has nobody in the zone right now (empty, or only another team) - fades toward 0
-        // instead of resetting straight away (captureFadeSpeed, [C], 2026-09-24). Contested (both teams inside)
-        // is excluded on purpose: CapturingTeamAbsent reads false there, so it falls through to the ordinary
-        // Resolve/build-or-hold path below, unchanged. Once it reaches 0, resolves fresh (capturingID -1) from
-        // whoever is actually listed now - nobody, or the team that pushed it down.
+        // The capturing team has nobody in the zone right now (empty, or only another team): fades toward 0 instead
+        // of resetting straight away. Contested (both teams inside) is excluded on purpose: CapturingTeamAbsent reads
+        // false there, so it falls through to the ordinary Resolve/build-or-hold path below. Once it reaches 0,
+        // resolves fresh (capturingID -1) from whoever is actually listed now - nobody, or the team that pushed it
+        // down.
         if (CaptureFadeRule.CapturingTeamAbsent(capturingID, teamsInZone))
         {
-            // Opus re-review, 2026-09-24: replaces this same day's first fix (EffectiveFadeRate, which counted
-            // every non-claim player and ignored TeamMayCaptureNow - see CaptureFadeRule.NeutralFadeRate's own
-            // comment for both bugs). CurrentNeutralFadeRate is the one place this step and
-            // PublishProgressIfNeeded's ComputeCurrentProgress both reach CaptureFadeRule.NeutralFadeRate, so the
-            // rate a client extrapolates from cannot drift from what this step actually does to captureProgress
-            // (review fix, 2026-09-24, second pass: the two used to reach it through their own copied
-            // SinglePushingTeam/TeamMayCaptureNow lines, which no test actually exercised).
+            // CurrentNeutralFadeRate is the one place this step and PublishProgressIfNeeded's ComputeCurrentProgress
+            // both reach CaptureFadeRule.NeutralFadeRate, so the rate a client extrapolates from cannot drift from
+            // what this step does to captureProgress (CaptureFadeRule.NeutralFadeRate's comment has the two bugs a
+            // naive per-player count had).
             float rate = CurrentNeutralFadeRate();
             captureProgress = CaptureFadeRule.Step(captureProgress, rate, Time.deltaTime);
             if (captureProgress <= 0f)
@@ -795,12 +757,10 @@ public class BuildingCapture : MonoBehaviourPun
             return;
         }
 
-        // Nothing left to advance or fade: an empty, unclaimed zone (capturingID is always -1 here - the branch
-        // above already caught and returned on a claimed-but-empty zone). Restored (review fix, 2026-09-24) after
-        // the fade block above, not before it, so an empty zone WITH progress still fades to 0 first instead of
-        // skipping straight past it: this early return only ever fires once there is truly nothing left to do,
-        // same as the old pre-captureFadeSpeed early return - avoids Where(...).ToList()/Any() below allocating
-        // every master frame for every idle empty neutral tower.
+        // Nothing left to advance or fade: an empty, unclaimed zone (capturingID is always -1 here - the branch above
+        // returned on a claimed-but-empty zone). Placed after the fade block, not before it, so an empty zone WITH
+        // progress still fades to 0 first; this early return only fires once there is truly nothing left to do, and
+        // avoids Where(...).ToList()/Any() below allocating every master frame for every idle empty neutral tower.
         if (playersInZone.Count == 0)
         {
             capturingID = -1;
@@ -825,13 +785,11 @@ public class BuildingCapture : MonoBehaviourPun
             captureProgress += contribution;
             captureProgress = Mathf.Clamp(captureProgress, 0, CaptureSeconds);
 
-            // Start the capturing sound only if progress is increasing
             if (!audioSource.isPlaying && captureProgress > 0 && captureProgress < CaptureSeconds)
             {
                 PlayCapturingSound();
             }
 
-            // Stop capturing sound and complete capture if progress reaches the threshold
             if (captureProgress >= CaptureSeconds)
             {
                 StopCapturingSound();
@@ -842,7 +800,6 @@ public class BuildingCapture : MonoBehaviourPun
         {
 
 
-            // Stop the capturing sound if no eligible players are capturing
             if (audioSource.isPlaying)
             {
                 StopCapturingSound();
@@ -852,7 +809,6 @@ public class BuildingCapture : MonoBehaviourPun
 
     void PlayCapturingSound()
     {
-        // Play sound if it's not already playing, and only if the capture is in progress
         if (audioSource && capturingSound && !audioSource.isPlaying && captureProgress > 0 && captureProgress < CaptureSeconds)
         {
             photonView.RPC("RPC_PlayCaptureSound", RpcTarget.All);
@@ -861,7 +817,6 @@ public class BuildingCapture : MonoBehaviourPun
 
     void StopCapturingSound()
     {
-        // Stop the sound if it is currently playing and matches the capturing sound
         if (audioSource && audioSource.isPlaying && audioSource.clip == capturingSound)
         {
             photonView.RPC("RPC_StopCapturingSound", RpcTarget.All);
@@ -873,7 +828,7 @@ public class BuildingCapture : MonoBehaviourPun
     }
     void PlayNeutralizationSound()
     {
-        if (audioSource && capturedSound)  // You can use a unique neutralization sound if needed
+        if (audioSource && capturedSound)
         {
             photonView.RPC("RPC_PlayNeutralizationSound", RpcTarget.All);
             Debug.Log("[PlayNeutralizationSound] Played neutralization sound.");
@@ -881,7 +836,7 @@ public class BuildingCapture : MonoBehaviourPun
     }
     void PlayRecaptureSound()
     {
-        if (audioSource && capturedSound)  // You can use a unique neutralization sound if needed
+        if (audioSource && capturedSound)
         {
             photonView.RPC("RPC_PlayRecaptureSound", RpcTarget.All);
             Debug.Log("[playRecaptureSound] Played Recapture sound.");
@@ -894,11 +849,10 @@ public class BuildingCapture : MonoBehaviourPun
         controllingTeam = capturingTeam;
         isCaptured = true;
 
-        // The master's own fields above keep its capture logic going at once; everyone else
-        // (and this client's TowerDictionary and flag) follows when the room sends the snapshot
-        // back. The bounty PAYOUT (Task 2.4, BountyRule.PayoutOnCapture) is computed inside
-        // SetCaptured itself, from the same write basis that write builds on - see its own comment
-        // for why. Only this zone's tier numbers need passing in here.
+        // The master's own fields above keep its capture logic going at once; everyone else (and this client's
+        // TowerDictionary and flag) follows when the room sends the snapshot back. The bounty PAYOUT
+        // (BountyRule.PayoutOnCapture) is computed inside SetCaptured itself, from the same write basis that write
+        // builds on; only this zone's tier numbers are passed in here.
         int tierBounty = territoryConfig != null ? territoryConfig.ForTier(EffectiveTier).captureBounty : 0;
         int holdMs = territoryConfig != null ? (int)(territoryConfig.BountyHoldSeconds * 1000f) : 0;
         BuildingManager.Instance.SetCaptured(buildingID, capturingTeam, tierBounty, holdMs);
@@ -906,7 +860,6 @@ public class BuildingCapture : MonoBehaviourPun
         Debug.Log($"[BuildingCapture] Building captured by team {capturingTeam}!");
         photonView.RPC("RPC_CompleteCapture", RpcTarget.All, controllingTeam);
 
-        // Stop capturing sound and play captured sound
         StopCapturingSound();
         PlayCapturedSound();
     }
@@ -930,7 +883,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// capture progress, decay and cooldown were only ever tracked on the old master, so start
     /// again from the replicated owner and report this client's own player again if it is still
     /// standing here - otherwise the new master would not count it until it stepped out and back.
-    /// A capture that was part-way through restarts from zero (accepted: plan Task 2.1b).
+    /// A capture that was part-way through restarts from zero (accepted).
     public void OnMasterClientChanged(int owner)
     {
         playersInZone.Clear();
@@ -950,8 +903,8 @@ public class BuildingCapture : MonoBehaviourPun
             return;
         }
 
-        // Same report as a normal entry in OnTriggerEnter - the claim itself is no longer set from
-        // here either (bug fix, 2026-09-17): CalculateCaptureProgress re-decides it every tick.
+        // Same report as a normal entry in OnTriggerEnter; the claim is not set from here either
+        // (CalculateCaptureProgress re-decides it every tick).
         photonView.RPC("RPC_AddToZone", RpcTarget.MasterClient, localPlayerViewIdInZone);
     }
 
@@ -966,10 +919,10 @@ public class BuildingCapture : MonoBehaviourPun
                                           body, body.transform.position, body.transform.rotation, out _, out _);
     }
 
-    /// <summary>2.7b Decision 5: master only, called once per zone by BuildingManager.ResetForMatchStart at going
-    /// live. Resets this tower's master-side capture state straight to the live snapshot's owner (ResetToOwner -
-    /// the same reset a master switch already runs) and republishes progress at once, so no warm-up capture in
-    /// flight - even one whose own write is still echoing - can complete after this line.</summary>
+    /// <summary>Master only, called once per zone by BuildingManager.ResetForMatchStart at going live. Resets this
+    /// tower's master-side capture state straight to the live snapshot's owner (ResetToOwner, the reset a master
+    /// switch also runs) and republishes progress at once, so no warm-up capture in flight - even one whose own
+    /// write is still echoing - can complete after this line.</summary>
     public void ResetForMatchStart(int owner)
     {
         if (!PhotonNetwork.IsMasterClient)
@@ -996,13 +949,13 @@ public class BuildingCapture : MonoBehaviourPun
     /// subscriber; the RPC itself is unchanged.</summary>
     public static event System.Action<int, int> ZoneFlipped;
 
-    // Sound only (plus the ZoneFlipped notice below). The flag is no longer set here: it follows replicated
-    // ownership via BuildingManager, so a late joiner gets the right colour without needing this call.
+    // Sound only (plus the ZoneFlipped notice below). The flag follows replicated ownership via BuildingManager, so a
+    // late joiner gets the right colour without needing this call.
     [PunRPC]
     void RPC_CompleteCapture(int teamID)
     {
         // Runs on every client: each one's own scoreboard tally decides whether ITS player was standing here
-        // (Tudor D12). Raised before the sound gate below, which only decides whether a sound plays.
+        // (D12). Raised before the sound gate below, which only decides whether a sound plays.
         ZoneFlipped?.Invoke(buildingID, teamID);
 
         if (!CapturedSoundOn)
@@ -1036,23 +989,21 @@ public class BuildingCapture : MonoBehaviourPun
 
         // The one territory rule (TerritoryMap, tested in edit mode): not a zone you already own,
         // and next to one you do - except your own capital, which is always capturable - and never a zone
-        // that is out of play (2.7b Decision 8, checked before that own-capital exception). Reads the
-        // replicated owners rather than controllingTeam, which is only correct on the master.
-        // CurrentOwners is the cached dictionary (BuildingManager.cs ~77-80) - OwnersByZone() builds
-        // a fresh one on every call, and every player's collider fires this on every zone entry.
+        // that is out of play (checked before that own-capital exception). Reads the replicated owners rather than
+        // controllingTeam, which is only correct on the master. CurrentOwners is the cached dictionary: OwnersByZone()
+        // builds a fresh one on every call, and every player's collider fires this on every zone entry.
         if (!manager.Map.MayCapture(player.teamID, buildingID, manager.CurrentOwners, null, ZoneOutOfPlay))
             return;
 
-        // Dominion Task 4: nobody joins the roster of a capital - there is nothing to capture or drain there.
+        // Dominion: nobody joins the roster of a capital - there is nothing to capture or drain there.
         if (!manager.IsCapturableZone(buildingID))
             return;
 
-        // capturingID is no longer set from here (bug fix, 2026-09-17): this runs on EVERY client for
-        // EVERY player's collider, remote copies included, with no IsMine check - on the master, that
-        // used to write the real claim from a player nobody had actually listed yet (or ever would,
-        // for a remote copy grazing the trigger on lag/teleport/dash), which could lock out a lone
-        // real capturer until they stepped out and back in. CalculateCaptureProgress now re-decides
-        // the claim every tick from who is actually listed (CaptureClaimRule) instead.
+        // capturingID is not set from here: this runs on EVERY client for EVERY player's collider, remote copies
+        // included, with no IsMine check - on the master, setting it would write the real claim from a player nobody
+        // had actually listed yet (or ever would, for a remote copy grazing the trigger on lag/teleport/dash), which
+        // could lock out a lone real capturer until they stepped out and back in. CalculateCaptureProgress re-decides
+        // the claim every tick from who is actually listed (CaptureClaimRule).
         if (player.photonView.IsMine)
         {
             Debug.Log($"[BuildingCapture] Team {player.teamID} entered tower {buildingID}.");
@@ -1069,26 +1020,15 @@ public class BuildingCapture : MonoBehaviourPun
             if (localPlayerViewIdInZone == player.photonView.ViewID)
                 localPlayerViewIdInZone = 0;
             photonView.RPC("RPC_RemoveFromZone", RpcTarget.MasterClient, player.photonView.ViewID);
-            /*if (player.teamID == capturingID)
-            {
-                Debug.Log($"[OnTriggerExit] Player from team {player.teamID} left zone (matched capturingID).");
-            }
-            else
-            {
-                Debug.Log($"[OnTriggerExit] Player from team {player.teamID} left zone (ignored, as capturingID is {capturingID}).");
-            }*/
         }
     }
 
-    // Kept only for RpcList index stability (Photon's RPC list is index-based; never rename or remove
-    // an RPC), even though the neutral-capture bug fix (2026-09-17) removed its OnTriggerEnter and
-    // OnMasterClientChanged sends - CalculateCaptureProgress re-decides a neutral claim every tick
-    // instead (CaptureClaimRule). The one remaining send, from HandleCapturedState's drain-start case,
-    // is redundant but harmless: HandleCapturedState only runs on the master client (guarded above),
-    // which sets capturingID itself the line before this RPC fires, and PUN runs a master's own
-    // RpcTarget.MasterClient call locally rather than over the network (PhotonNetworkPart.cs ~1292) -
-    // so by the time this body runs, capturingID is never -1 and the "if unset" guard below never has
-    // anything left to do.
+    // Kept only for RpcList index stability (Photon's RPC list is index-based; never rename or remove an RPC).
+    // CalculateCaptureProgress re-decides a neutral claim every tick (CaptureClaimRule). The one send, from
+    // HandleCapturedState's drain-start case, is redundant but harmless: HandleCapturedState only runs on the master
+    // client, which sets capturingID itself the line before this RPC fires, and PUN runs a master's own
+    // RpcTarget.MasterClient call locally rather than over the network (PhotonNetworkPart.cs), so by the time this
+    // body runs capturingID is never -1 and the "if unset" guard never has anything left to do.
     [PunRPC]
     void RPC_UpdateCapturingID(int teamID)
     {
@@ -1102,11 +1042,11 @@ public class BuildingCapture : MonoBehaviourPun
     [PunRPC]
     void RPC_AddToZone(int viewID)
     {
-        // I1: an entry sent before the hide can still arrive after it (the master's own knockout write echoing -
-        // mElim/mPhase, which CutTeam derives the cut from - or this RPC itself, whichever lands second) - without
-        // this, a stale entry would relist a player in a zone Update's
-        // hiddenAsCut branch is otherwise emptying every frame, and the "not already playing" check below would let
-        // it restart the capture sound on every client, right after SetHiddenAsCut just stopped it.
+        // An entry sent before the hide can still arrive after it (the master's own knockout write echoing -
+        // mElim/mPhase, which CutTeam derives the cut from - or this RPC itself, whichever lands second). Without
+        // this, a stale entry would relist a player in a zone Update's hiddenAsCut branch is emptying every frame,
+        // and the "not already playing" check below would restart the capture sound on every client, right after
+        // SetHiddenAsCut stopped it.
         if (hiddenAsCut)
             return;
         Debug.Log($"[RPC_AddToZone] Inside Function");
@@ -1154,11 +1094,9 @@ public class BuildingCapture : MonoBehaviourPun
         // the zone" is the normal case for them, not a fault.
     }
 
-    /// Master: a listed player has left the zone - walked out (RPC_RemoveFromZone) or died (Update). Used to also
-    /// end a neutral capture at once (EndCaptureIfCapturersLeft, DrainRule.LeavingEndsCapture) - removed
-    /// (captureFadeSpeed, [C], 2026-09-24): CalculateCaptureProgress re-reads playersInZone fresh every tick
-    /// (including this same frame, since Update calls it after every RemoveFromZone above), so it already notices
-    /// the capturing team is gone and fades instead, with nothing extra needed here.
+    /// Master: a listed player has left the zone - walked out (RPC_RemoveFromZone) or died (Update). Nothing else is
+    /// needed here: CalculateCaptureProgress re-reads playersInZone every tick (this same frame too, since Update
+    /// calls it after every RemoveFromZone above), so it notices the capturing team is gone and fades.
     private void RemoveFromZone(PlayerTeam pt)
     {
         playersInZone.Remove(pt);
@@ -1170,9 +1108,9 @@ public class BuildingCapture : MonoBehaviourPun
     {
         if (!ProgressSoundOn)
             return;
-        // I1: a send in flight when the zone hides (this call, or the master's own RPC_AddToZone re-triggering it)
-        // must not start a loop nothing will ever stop again on a hidden tower - SetHiddenAsCut already stopped the
-        // source on this same client; starting it back up here would undo that.
+        // A send in flight when the zone hides (this call, or the master's RPC_AddToZone re-triggering it) must not
+        // start a loop nothing will ever stop again on a hidden tower: SetHiddenAsCut already stopped the source on
+        // this client; starting it back up here would undo that.
         if (hiddenAsCut)
             return;
         if (audioSource && capturingSound && !audioSource.isPlaying)
@@ -1190,7 +1128,7 @@ public class BuildingCapture : MonoBehaviourPun
         if (audioSource && audioSource.isPlaying && audioSource.clip == capturingSound)
         {
             audioSource.Stop();
-            audioSource.loop = false; // Ensure the loop is disabled
+            audioSource.loop = false;
             Debug.Log("[RPC_StopCapturingSound] Stopped capturing sound.");
         }
     }
@@ -1200,7 +1138,6 @@ public class BuildingCapture : MonoBehaviourPun
     {
         if (!CapturedSoundOn)
             return;
-        // Play the captured sound on all clients
         if (audioSource && capturedSound)
         {
             audioSource.PlayOneShot(capturedSound);
@@ -1213,8 +1150,8 @@ public class BuildingCapture : MonoBehaviourPun
     {
         if (!ProgressSoundOn)
             return;
-        // I1: same in-flight-send guard as RPC_PlayCaptureSound - a drain-start sent just before the hide must not
-        // start a loop on a tower that has already fallen silent.
+        // Same in-flight-send guard as RPC_PlayCaptureSound: a drain-start sent just before the hide must not start a
+        // loop on a tower that has already fallen silent.
         if (hiddenAsCut)
             return;
         if (audioSource && capturingSound)
@@ -1245,7 +1182,7 @@ public class BuildingCapture : MonoBehaviourPun
     /// after a neutralise.
     public void ApplyOwnerVisual(bool captured, int teamID)
     {
-        // Vision Task 9b: while the team's knowledge is filtering, RefreshRingView paints the carpet from it instead.
+        // While the team's knowledge is filtering, RefreshRingView paints the carpet from it instead.
         if (!flagRenderer || Overpower.Vision.ZoneKnowledge.IsFiltering)
             return;
 
@@ -1289,18 +1226,16 @@ public class BuildingCapture : MonoBehaviourPun
         return isCaptured && controllingTeam == teamID;
     }
 
-    /// This tower's own ground-truth fraction (captureProgress / CaptureSeconds) - only meaningful
-    /// on whichever client is currently master, the only one that simulates it. Diagnostic only,
-    /// for Task 2.1d's own verification: lets a two-client check compare a remote client's
-    /// extrapolated capture ring fill directly against the number it is supposed to track,
-    /// instead of reading the private captureProgress field through reflection.
+    /// This tower's own ground-truth fraction (captureProgress / CaptureSeconds) - only meaningful on whichever
+    /// client is currently master, the only one that simulates it. Diagnostic only: lets a two-client check compare a
+    /// remote client's extrapolated capture ring fill against the number it should track, without reflection on the
+    /// private captureProgress field.
     public float CaptureProgressFraction => CaptureSeconds > 0f ? Mathf.Clamp01(captureProgress / CaptureSeconds) : 0f;
 
-    /// <summary>Task T4: how many players are currently listed inside this zone (any team) - the
-    /// `capture` telemetry event's own "players" field, read through BuildingManager.PlayersInZone.
-    /// Meaningful on the master only (playersInZone is only ever populated there); reads as
-    /// whatever count a remote copy's own never-updated list happens to hold otherwise (always 0,
-    /// since only RPC_AddToZone/RemoveFromZone touch it and those run master-side).</summary>
+    /// <summary>How many players are currently listed inside this zone (any team) - the `capture` telemetry event's
+    /// "players" field, read through BuildingManager.PlayersInZone. Meaningful on the master only (only
+    /// RPC_AddToZone/RemoveFromZone touch playersInZone and those run master-side); a remote copy's list is never
+    /// updated, so it reads 0.</summary>
     public int PlayersInZoneCount => playersInZone.Count;
 
 }

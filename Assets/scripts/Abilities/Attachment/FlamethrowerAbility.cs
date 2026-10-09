@@ -8,61 +8,27 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Sprays a short forward cone that ignites every enemy it touches - Tudor's Attachment spec: 5
-    /// damage per second for 5 seconds, 13s cooldown. Contact starts the burn; the burn then ticks on
-    /// its own through StatusEffectState/PlayerStatusEffects (the Refresh stack rule) and does NOT
-    /// need the target to stay inside the cone - Tudor's own clarification, and the difference between
-    /// a usable ability and an unusable one in a top-down game (Task 1.9 addendum).
-    ///
-    /// RUNS ON EVERY CLIENT, INCLUDING THE CASTER'S OWN. ExecuteCast starts a Spray Seconds coroutine
-    /// on every machine that receives the cast; each FixedUpdate it re-reads the CASTER's CURRENT
-    /// position and facing from Owner.Root.transform, never the payload's Origin/Direction, which are
-    /// only a snapshot of the instant the trigger was pulled - a spray is meant to track wherever the
-    /// caster is aiming as it plays out, not freeze at the press. This is safe to read from Owner
-    /// rather than looking the caster up by actor number: this exact module instance was Equipped onto
-    /// the caster's own "Abilities" child transform (AbilityRunner.Equip), on every client, so Owner
-    /// already IS the caster here, on whichever machine this is running. Facing comes from the
-    /// caster's own Transform, which PlayerAim keeps rotated toward its aim and PlayerNetSync
-    /// replicates - see PlayerAim.cs's own class comment.
-    ///
-    /// RANGE/ANGLE USE THE ROOT; OCCLUSION USES THE MUZZLE - the addendum's own wording draws this
-    /// distinction ("around the caster's current position" for the cone, "between the MUZZLE and the
-    /// target" for the wall check), and it is not cosmetic: the muzzle sits ~2m forward of the root, so
-    /// measuring range from it instead let an 8m target (outside a 7m cone) still read as roughly 6m
-    /// away and keep burning - caught by measurement, not by reasoning about the code on paper.
-    ///
-    /// ONCE PER TARGET PER CAST, VIA A HASHSET (the addendum's own warning). Without it, a FixedUpdate
-    /// re-application roughly every 0.02s would re-Refresh the same 5s burn on the same standing
-    /// target every physics step for the whole 1s spray, so it would take damage for close to 6s (5s
-    /// tail plus ~1s of continuous refreshing) instead of 5 - the addendum's own worked example puts
-    /// this at up to 30 instead of 25. The set lives on the coroutine's own stack, so it is naturally
-    /// fresh for every new cast and never leaks between them. ConeFilter.SelectCandidates only READS
-    /// the set (see its own class comment); this class is the one that decides which of the survivors
-    /// actually get marked hit, AFTER the occlusion check below, so a target standing behind cover
-    /// this tick can still catch fire the moment it steps into the open, rather than being written off
-    /// for the rest of the spray.
-    ///
-    /// WALLS AND COVER BOTH BLOCK IT. "No Building between the muzzle and the target" is one raycast
-    /// against the Building layer - the same layer every wall in the arena sits on AND the layer
-    /// Deployable Cover's own collider sits on (CoverWall.cs's class comment), so a player hiding
-    /// behind either is safe without this file knowing cover exists. IStructure candidates (cover
-    /// itself) are excluded before that check even runs - ConeFilter's own rule, the same reason
-    /// MineTargeting excludes it: cover's fails-open -1/-1 identity would otherwise read as "an enemy
-    /// with no known team", and it has no IStatusReceiver to burn anyway.
-    ///
-    /// INTERRUPT(DIED) STOPS THE SPRAY ON EVERY CLIENT. AbilityRunner.HandleAliveChanged already calls
-    /// Interrupt for every module on every client once alive state replicates (see its own class
-    /// comment), so this override only has to stop ITS OWN coroutine - nothing here needs to know how
-    /// that reached this machine. Stunned/Silenced are deliberately NOT handled: AbilityModule's own
-    /// contract only delivers those on the OWNER's machine, and stopping the spray there alone while
-    /// every other client kept ticking it would make a stun landing on the caster look different on
-    /// their own screen than on everyone else's - worse than not reacting at all. A cast already
-    /// committed the instant the trigger RPC went out, matching Mine and Cover's own "once cast,
-    /// nothing but death (or, for those two, nothing at all) calls it back" precedent.
-    ///
-    /// THE CASTER CAN STILL FIRE THEIR WEAPON WHILE SPRAYING - Tudor's spec. This occupies only the
-    /// Attachment slot and its own cooldown, exactly like every other attachment item; nothing here
-    /// touches WeaponFiring or the other ability slots.
+    /// Sprays a short forward cone that ignites every enemy it touches. Contact starts the burn; the burn then ticks on
+    /// its own through StatusEffectState/PlayerStatusEffects (Refresh stack rule) and does NOT need the target to stay in
+    /// the cone, the difference between a usable ability and an unusable one in a top-down game.
+    /// RUNS ON EVERY CLIENT, THE CASTER'S INCLUDED: ExecuteCast starts a Spray Seconds coroutine on every machine; each
+    /// FixedUpdate it re-reads the CASTER's CURRENT position and facing from Owner.Root.transform, never the payload's
+    /// Origin/Direction (a snapshot of the press), so the spray tracks the aim. Owner already IS the caster on every
+    /// client (this module was Equipped onto the caster's Abilities child, AbilityRunner.Equip); facing is kept by
+    /// PlayerAim and replicated by PlayerNetSync.
+    /// RANGE/ANGLE USE THE ROOT; OCCLUSION USES THE MUZZLE: the muzzle sits ~2 m forward of the root, so measuring range
+    /// from it let a target outside the cone still read as in range and keep burning (found by measurement).
+    /// ONCE PER TARGET PER CAST, VIA A HASHSET: without it, re-applying every physics step would re-Refresh the burn on a
+    /// standing target for the whole spray, so it would burn well past Burn Seconds. The set lives on the coroutine's
+    /// stack, fresh per cast. ConeFilter.SelectCandidates only READS it; this class marks a target hit AFTER the occlusion
+    /// check, so a target behind cover can still catch fire the moment it steps into the open.
+    /// WALLS AND COVER BOTH BLOCK IT: one raycast against the Building layer, which every arena wall and Deployable Cover's
+    /// collider sit on. IStructure candidates (cover) are excluded before that check (ConeFilter, like MineTargeting): its
+    /// fails-open -1/-1 identity would read as "an enemy with no known team", and it has no IStatusReceiver to burn.
+    /// INTERRUPT(DIED) STOPS THE SPRAY ON EVERY CLIENT (AbilityRunner.HandleAliveChanged calls Interrupt on all of them).
+    /// Stunned/Silenced are deliberately NOT handled: AbilityModule delivers those on the OWNER only, and stopping the
+    /// spray there alone would make a stun look different on the caster's screen than on everyone else's.
+    /// The caster can still fire their weapon while spraying: only the Attachment slot and its own cooldown are used.
     /// </summary>
     public sealed class FlamethrowerAbility : AbilityModule
     {
@@ -111,8 +77,7 @@ namespace Overpower.Abilities
         private FlameConeVisual sprayVfxPrefab;
 
         // Not a design tunable: how many overlapping colliders one cone check considers - matches
-        // Mine.MaxOverlapColliders' own reasoning, comfortably covering every player plus every
-        // practice dummy within a 7m sphere at once.
+        // Mine.MaxOverlapColliders' reasoning, comfortably every player plus every practice dummy within Cone Range.
         private const int MaxOverlapColliders = 16;
         private readonly Collider[] overlapBuffer = new Collider[MaxOverlapColliders];
 
@@ -207,27 +172,18 @@ namespace Overpower.Abilities
 
         private void TickCone(int casterActor, int casterTeam, in StatusEffectSpec burn, HashSet<IDamageable> alreadyHit)
         {
-            // Range and angle are measured from the caster's own ROOT position, per the addendum's
-            // exact wording ("around the caster's current position and facing") - the occlusion check
-            // below is the one place that specifically says "muzzle" instead. Using the muzzle for
-            // BOTH was tried first and measured wrong: the muzzle sits ~2m forward of the root, so an
-            // 8m dummy (outside the 7m cone) still read as ~6m from the muzzle and kept burning.
+            // Range and angle are measured from the caster's ROOT; only the occlusion check uses the muzzle. Using the
+            // muzzle for both measured wrong: it sits ~2 m forward of the root, so a target outside the cone read in range.
             //
-            // On a NON-OWNER client this reads the caster's own network-lerped Transform - PlayerAim
-            // rotates and PlayerNetSync replicates it, but a remote copy is always a little behind
-            // and a little smoothed relative to what the caster's own client sees. That is the same
-            // accepted victim-favouring latency tradeoff every projectile already lives with (see
-            // ProjectileMotor's own class comment): each client's cone is judged against its own
-            // best copy of the world, and the VICTIM's client is still the one that decides whether
-            // the burn actually lands (IStatusReceiver is owner-guarded) - a caster cannot use a
-            // laggy remote copy of themselves to burn someone their own client would have missed.
+            // On a NON-OWNER client this reads the caster's network-lerped Transform (PlayerAim rotates, PlayerNetSync
+            // replicates), a little behind the caster's own view: the accepted victim-favouring latency tradeoff every
+            // projectile lives with (ProjectileMotor). The VICTIM's client still decides whether the burn lands
+            // (IStatusReceiver is owner-guarded), so a laggy copy of the caster cannot burn someone their own client missed.
             Vector3 apex = Owner.Root.transform.position;
             Vector3 forward = Owner.Root.transform.forward;
-            // SafeMuzzlePosition, not MuzzlePosition - hugging a wall pushes the raw muzzle inside or
-            // through it, and a Physics.Raycast started inside a collider never reports it, so the
-            // occlusion check below would read the wall as clear (Task 1.9 follow-up review finding:
-            // measured leaking through both a real Wall_01 and a Deployable Cover). The clearance
-            // check pulls the point back to the near side of whatever wall the caster is touching.
+            // SafeMuzzlePosition, not MuzzlePosition: hugging a wall pushes the raw muzzle inside it, and a Raycast started
+            // inside a collider never reports it, so the occlusion check would read the wall as clear (it leaked through a
+            // wall and a Deployable Cover). The clearance check pulls the point back to the near side of the wall.
             Vector3 muzzle = Owner.Weapon != null ? Owner.Weapon.SafeMuzzlePosition : apex;
 
             PositionVfx(apex, forward);
@@ -269,11 +225,8 @@ namespace Overpower.Abilities
             }
         }
 
-        /// <summary>True when a Building-layer collider (a wall, or cover - CoverWall.cs's own class
-        /// comment) stands between the muzzle and the target - the addendum's own occlusion rule, the
-        /// same idea as ExplodeOnImpact.IsOccludedByAWall but without needing to exclude a struck
-        /// collider, since nothing here has one - a cone check has no impact point to nudge away
-        /// from.</summary>
+        /// <summary>True when a Building-layer collider (a wall, or cover) stands between the muzzle and the target. Like
+        /// ExplodeOnImpact.IsOccludedByAWall, minus the struck-collider exclusion: a cone check has no impact point.</summary>
         private bool IsOccludedByWall(Vector3 muzzle, Vector3 targetPosition)
         {
             Vector3 delta = targetPosition - muzzle;
@@ -303,7 +256,7 @@ namespace Overpower.Abilities
                 if (sprayVfxPrefab == null)
                     return; // Nothing to draw; the burn works the same without it.
 
-                // Unparented, as before: the module sits under the player, whose hierarchy moves to the
+                // Unparented: the module sits under the player, whose hierarchy moves to the
                 // DeadPlayer layer on death. OnDestroy removes it.
                 vfx = Instantiate(sprayVfxPrefab);
                 vfx.name = "Flamethrower Cone VFX (cheap, cosmetic only)";

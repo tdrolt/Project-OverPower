@@ -14,9 +14,9 @@ namespace Overpower.EditorTools
     /// and records the world square it covers on Assets/Gameplay/Config/MinimapConfig.asset (created if missing).
     ///
     /// Framing: a square centred on ArenaSymmetry's centre, whose side clears the farthest mesh under Source and both
-    /// generated thirds by the config's margin on every side of the triangular mask (Tudor, 2026-09-17; see
-    /// MinimapLayout.TriangleCircumradius). Centring on the symmetry centre (not the bounding box) means turning the
-    /// map to any team's camera yaw keeps the arena inside the triangular minimap, and all three teams see the same map.
+    /// generated thirds by the config's margin on every side of the triangular mask (MinimapLayout.TriangleCircumradius).
+    /// Centring on the symmetry centre (not the bounding box) means turning the map to any team's camera yaw keeps the
+    /// arena inside the triangular minimap, and all three teams see the same map.
     ///
     /// Rebuild thirds calls this too (ArenaSymmetryInspector), so the image can't go stale after an arena edit. It
     /// never touches the scene. It saves only the config asset, never SaveAssets(), which would also write any other
@@ -30,9 +30,8 @@ namespace Overpower.EditorTools
         [MenuItem("OverPower/Arena/Bake minimap image")]
         private static void BakeFromMenu() => LogResult(BakeOpenScene());
 
-        /// <summary>Logs a Bake/BakeOpenScene result at the right severity, so ArenaSymmetryInspector's two call
-        /// sites (the Rebuild thirds button and its menu item) share it too: a warning for a "not baked: ..."
-        /// outcome (nothing changed - worth the designer's attention), a plain log once it actually baked.</summary>
+        /// <summary>Logs a Bake/BakeOpenScene result: a warning for a "not baked: ..." outcome (nothing changed), a plain log
+        /// once it baked. Shared by ArenaSymmetryInspector's button and menu item.</summary>
         public static void LogResult(string result)
         {
             if (result != null && result.StartsWith("not baked"))
@@ -66,10 +65,9 @@ namespace Overpower.EditorTools
             if (radius <= 0f)
                 return "not baked: there are no meshes under Source or the generated thirds.";
 
-            // Triangular framing (Tudor, 2026-09-17: the minimap mask becomes a triangle, one vertex toward each
-            // capital) - see MinimapLayout.TriangleCircumradius for the maths. vertexDirections come from a real
-            // Tier 1 tower when one exists (never hard-coded to +Z); ArenaSymmetry's 3-fold layout means the other
-            // two sit 120 degrees from it either way, so deriving them by rotation is exact, not an approximation.
+            // Triangular framing, one mask vertex toward each capital (maths in MinimapLayout.TriangleCircumradius).
+            // vertexDirections come from a real Tier 1 tower when one exists (never hard-coded to +Z); the 3-fold
+            // layout puts the other two 120 degrees from it, so deriving them by rotation is exact.
             Vector2[] vertexDirections = CapitalDirections(arena, out string towerUsed);
             List<Vector2> points = ArenaPoints(arena);
             float circumradius = MinimapLayout.TriangleCircumradius(points, vertexDirections, config.MarginMetres);
@@ -94,13 +92,11 @@ namespace Overpower.EditorTools
                    $"centred on ({centre.x:0.00}, {centre.y:0.00}); farthest mesh corner {radius:0.00} m, set by '{farthest}'.";
         }
 
-        /// <summary>The three vertex directions the triangular mask points its corners along (Tudor, 2026-09-17),
-        /// unit vectors relative to the arena centre in (world X, world Z) - MinimapLayout's own map-space
-        /// convention. Reads a real Tier 1 BuildingCapture when one exists in the open scenes (never hard-codes
-        /// +Z); the other two directions are then exactly 120 degrees from it either way, since ArenaSymmetry's
-        /// generated120/generated240 thirds guarantee the arena - and so its towers - repeat with that symmetry.
-        /// Falls back to a plain "up" (0,1) reference (and logs a warning) only when no Tier 1 tower exists yet to
-        /// read (e.g. a bare preview scene in a test) so baking never throws.</summary>
+        /// <summary>The three directions the triangular mask points its corners along: unit vectors relative to the arena
+        /// centre in (world X, world Z), MinimapLayout's map-space convention. Reads a real Tier 1 BuildingCapture when one
+        /// exists (never hard-codes +Z); the other two are exactly 120 degrees from it because the thirds repeat with that
+        /// symmetry. Falls back to "up" (0,1) with a warning when no Tier 1 tower exists (e.g. a bare test scene), so
+        /// baking never throws.</summary>
         public static Vector2[] CapitalDirections(ArenaSymmetry arena, out string towerUsed)
         {
             Vector2 reference = new Vector2(0f, 1f);
@@ -157,9 +153,8 @@ namespace Overpower.EditorTools
             return best;
         }
 
-        /// <summary>Shared by ArenaPoints and ArenaRadius (review fix, 2026-09-17: they used to repeat the same
-        /// mesh-corner loop): every MeshRenderer bounds corner under Source or a generated third, relative to the
-        /// arena centre, paired with that renderer's name.</summary>
+        /// <summary>Shared by ArenaPoints and ArenaRadius: every MeshRenderer bounds corner under Source or a generated
+        /// third, relative to the arena centre, paired with that renderer's name.</summary>
         private static IEnumerable<(Vector2 Point, string RendererName)> WalkMeshCorners(ArenaSymmetry arena)
         {
             foreach (Transform third in new[] { arena.source, arena.generated120, arena.generated240 })

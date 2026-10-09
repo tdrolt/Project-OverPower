@@ -7,23 +7,13 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Playtest extras P6 (2026-09-26): Escape asks "Close the game?" - a runtime, scene-level
-    /// component (one instance, like TestRangePanel and ConnectionLostPanel, not per-player), built the same
-    /// way: a clickable overlay canvas with a GraphicRaycaster, controls built in code so every
-    /// listener sits on the same line as the button it belongs to.
-    ///
-    /// A raw Keyboard.current poll, not an InputAction - a tool key, matching every other Escape
-    /// consumer in this project (LoadoutScreen.cs:390-394, chatmanager.cs's own Escape block, F1).
-    ///
-    /// OWNERSHIP: LoadoutScreen and the chat panel both close THEMSELVES on Escape, in the same
-    /// frame - Update() order between components is not fixed, so this checks EscapeOwnershipRule
-    /// (this frame OR the frame before) rather than just "is the shop/chat open right now". See that
-    /// rule's own class comment.
-    ///
-    /// While open this claims general tool focus on the local player's own PlayerInputRouter (no
-    /// moving or shooting while deciding - the match keeps running, it's multiplayer), the same
-    /// "resolve the local player, claim/release keyed by this" recipe TestRangePanel already uses for
-    /// exactly this reason.
+    /// Escape asks "Close the game?": a scene-level runtime component (one instance, like TestRangePanel and
+    /// ConnectionLostPanel), a clickable overlay canvas with a GraphicRaycaster built in code. A raw Keyboard.current
+    /// poll, not an InputAction (a tool key, like every other Escape consumer here).
+    /// OWNERSHIP: LoadoutScreen and the chat panel close THEMSELVES on Escape in the same frame and Update() order
+    /// is not fixed, so this asks EscapeOwnershipRule (this frame OR the last). While open it claims tool focus on the
+    /// local player's PlayerInputRouter (no moving or shooting while deciding; the match keeps running), the
+    /// "resolve the local player, claim/release keyed by this" recipe TestRangePanel uses.
     /// </summary>
     [DisallowMultipleComponent]
     public class QuitConfirmPanel : MonoBehaviour
@@ -35,9 +25,8 @@ namespace Overpower.UI
         private TextMeshProUGUI promptLabel;
         private bool visible;
 
-        // One shared TMP material for both button labels (playtest extras P6 follow-up, item 1) - same
-        // reasoning as ConnectionLostPanel.ApplyOutline/PlayerHud.AddLabel: without it TMP clones a new
-        // material the moment a label's outline is touched, one per button, for no reason.
+        // One shared TMP material for both button labels (as ConnectionLostPanel.ApplyOutline/PlayerHud.AddLabel):
+        // otherwise TMP clones one per label the moment its outline is touched.
         private Material textMaterial;
 
         private bool shopOpenLastFrame;
@@ -159,9 +148,7 @@ namespace Overpower.UI
             panel.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.95f);
             RectTransform panelRt = panel.GetComponent<RectTransform>();
             panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
-            // Widened from an original 480 (playtest extras P6 follow-up, item 1): two Start-button-sized
-            // buttons (theme.matchStartButtonSize.x = 260 each) plus the row's own 12 spacing need 532
-            // just for the buttons - 480 used to work only because the old buttons shrank to share it.
+            // Wide enough for two matchStartButtonSize buttons plus the row's own spacing.
             panelRt.sizeDelta = new Vector2(600f, 0f);
 
             VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
@@ -181,24 +168,17 @@ namespace Overpower.UI
             HorizontalLayoutGroup rowLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
             rowLayout.spacing = 12f;
             rowLayout.childAlignment = TextAnchor.MiddleCenter;
-            // All four off (playtest extras P6 follow-up, item 1): a freshly-added HorizontalLayoutGroup
-            // defaults childForceExpandHeight to true, which - even with width left alone - stretched
-            // both buttons to the ROW's own height, and the row's own height comes from its children in
-            // the first place, so it collapsed to 0 (measured live: rect height 0 - the popup's real
-            // symptom was zero-height buttons, not just a bad colour). Each button keeps its own fixed
-            // size (theme.matchStartButtonSize) via a LayoutElement - see AddButton below.
+            // All four off: a freshly-added HorizontalLayoutGroup defaults childForceExpandHeight to true, which
+            // stretches the buttons to the ROW's height, and the row's height comes from its children, so it
+            // collapsed to 0 (zero-height buttons). Each button keeps its own fixed size via a LayoutElement
+            // (see AddButton).
             rowLayout.childControlWidth = rowLayout.childControlHeight = false;
             rowLayout.childForceExpandWidth = rowLayout.childForceExpandHeight = false;
 
-            // Real buttons, not the bare default sprite these used to render with - tiny dark labels,
-            // no fill at all against the dark panel (the brief's own capture, escape_popup.png). Same
-            // size/font/outline recipe as WarmupBar's End warm-up button (WarmupBar replaced MatchStartPanel), duplicated
-            // rather than shared - that builder is private to its own canvas/layout, and every other
-            // control on this panel is already built the same "copy the recipe" way (see the class
-            // comment). Yes takes the Start button's own green (an affirmative action, like starting
-            // the match); No takes Bar Track Colour, the same neutral/grey fill Loadout's own buttons
-            // already reuse for exactly this reason (see UiTheme.matchStartButtonColor's tooltip) - no
-            // new UiTheme token needed for either.
+            // Real buttons (filled, not the bare default sprite): the size/font/outline recipe of WarmupBar's End
+            // warm-up button, copied rather than shared because that builder is private to its canvas. Yes takes the
+            // Start button's green (an affirmative action); No takes Bar Track Colour, the neutral fill Loadout's
+            // buttons reuse (see UiTheme.matchStartButtonColor's tooltip); no new UiTheme token.
             AddButton(buttonRow.transform, res, theme != null ? theme.quitYesText : "Yes",
                 theme != null ? theme.matchStartButtonColor : new Color(0.16f, 0.45f, 0.25f, 0.95f), OnYesClicked);
             AddButton(buttonRow.transform, res, theme != null ? theme.quitNoText : "No",
@@ -219,10 +199,8 @@ namespace Overpower.UI
             return tmp;
         }
 
-        /// <summary>Playtest extras P6 follow-up (item 1): a real button - filled background, sized and
-        /// coloured from the Start button's own UiTheme tokens - not just a label sitting on the bare
-        /// default sprite. Instance method now (was static): the fill colour still comes from the
-        /// caller, but the label's font/size/outline come from this panel's own `theme`/`textMaterial`.</summary>
+        /// <summary>A real button: filled background sized from the Start button's UiTheme tokens; the label's
+        /// font/size/outline come from this panel's theme and textMaterial.</summary>
         private void AddButton(Transform parent, TMP_DefaultControls.Resources res, string label, Color fillColor,
                                 UnityEngine.Events.UnityAction onClick)
         {
@@ -230,11 +208,9 @@ namespace Overpower.UI
             go.transform.SetParent(parent, false);
             Vector2 size = theme != null ? theme.matchStartButtonSize : new Vector2(260f, 52f);
             go.GetComponent<RectTransform>().sizeDelta = size;
-            // The row's own HorizontalLayoutGroup has every control/expand flag off (see BuildUi), so it
-            // never resizes children - but it still needs a LayoutElement to report a size for ITS OWN
-            // preferred-height calculation (the sizeDelta above alone measured as 0 there - Unity reads
-            // preferred size from an ILayoutElement, not the raw RectTransform, once a LayoutGroup is
-            // involved at all).
+            // The row's HorizontalLayoutGroup never resizes children (all flags off, see BuildUi), but it still needs
+            // a LayoutElement for ITS OWN preferred height: sizeDelta alone measured 0, since Unity reads preferred
+            // size from an ILayoutElement, not the RectTransform, once a LayoutGroup is involved.
             LayoutElement layoutElement = go.AddComponent<LayoutElement>();
             layoutElement.preferredWidth = size.x;
             layoutElement.preferredHeight = size.y;

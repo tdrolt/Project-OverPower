@@ -3,11 +3,9 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// How the game expresses weapon accuracy, shared by every weapon instead of being
-    /// special-cased per weapon. A rocket reads as "accurate only from a standstill" purely by
-    /// being configured with a large maxAngle, a big bloomPerShot and slow recoveryPerSecond -
-    /// no weapon-specific code needed. Plain C# for the same reason as the rest of Combat: it is
-    /// unit tested without touching the Unity engine.
+    /// How the game expresses weapon accuracy, shared by every weapon: a rocket reads as accurate
+    /// only from a standstill purely through a large maxAngle, a big bloomPerShot and a slow
+    /// recoveryPerSecond. Plain C#, unit tested without the Unity engine.
     /// </summary>
     public sealed class AimConeState
     {
@@ -29,16 +27,14 @@ namespace Overpower.Combat
         private bool isMoving;
 
         /// <summary>
-        /// The spread actually used to fire, after the standing-still bonus. 1.5x tighter the
-        /// instant the movement vector hits zero, so that strafing versus planting your feet is
-        /// a real decision rather than something players discover by accident. While moving, a
-        /// flat moving spread is added on top of CurrentAngle instead - a second, separate cost
-        /// for moving, on top of the bloom that movement lets build up via Tick.
+        /// The spread actually used to fire, after the standing-still bonus: tighter the instant the
+        /// movement vector hits zero, so strafing versus planting is a real decision. While moving, a
+        /// flat moving spread is added to CurrentAngle instead, a second cost on top of the bloom that
+        /// movement lets build via Tick.
         ///
-        /// Computed on read, never cached: caching it meant RegisterShot could grow CurrentAngle
-        /// while EffectiveAngle still reported the pre-shot spread until the next Tick, and Reset
-        /// left it at the moving value even for a standing player. Both are the kind of silent
-        /// wrongness that gets blamed on the random spread instead of on the bookkeeping.
+        /// Computed on read, never cached: a cache let RegisterShot grow CurrentAngle while this still
+        /// reported the pre-shot spread until the next Tick, and Reset left the moving value for a
+        /// standing player; both get blamed on the random spread instead of the bookkeeping.
         /// </summary>
         public float EffectiveAngle =>
             isMoving ? CurrentAngle + movingSpreadDegrees : CurrentAngle / standingStillMultiplier;
@@ -74,12 +70,10 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Recovers CurrentAngle toward minAngle regardless of movement - isMoving only decides
-        /// how EffectiveAngle is derived from the (already recovered) CurrentAngle for this
-        /// frame. Recovery pausing while moving would make strafing a way to bank bloom for
-        /// later, which is not the intended tradeoff. While moving, movingBloomPerSecond widens
-        /// the cone on top of that same recovery - it only grows CurrentAngle if it outpaces
-        /// recoveryPerSecond, same rule as RegisterShot's bloom versus recovery.
+        /// Recovers CurrentAngle toward minAngle regardless of movement; isMoving only decides how
+        /// EffectiveAngle is derived. Pausing recovery while moving would let strafing bank bloom for
+        /// later. While moving, movingBloomPerSecond widens the cone on top of that recovery, so it
+        /// only grows CurrentAngle if it outpaces recoveryPerSecond.
         /// </summary>
         public void Tick(float deltaTime, bool isMoving)
         {
@@ -89,9 +83,9 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// A uniformly random offset within the current cone. Takes an injected System.Random,
-        /// never UnityEngine.Random, so tests are deterministic - random spread was the
-        /// designer's explicit choice over deterministic twin-ray spread.
+        /// A uniformly random offset within the current cone. Takes an injected System.Random, never
+        /// UnityEngine.Random, so tests are deterministic (random spread was the designer's explicit
+        /// choice over deterministic twin-ray spread).
         /// </summary>
         public float SampleOffsetDegrees(System.Random rng)
         {

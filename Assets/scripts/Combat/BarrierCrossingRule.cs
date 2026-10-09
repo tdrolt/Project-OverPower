@@ -4,18 +4,17 @@ using Overpower.Arena;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// GDD p.29: a jersey barrier blocks walking but lets a dash, a zip pull, a blink or a portal cross it. A
-    /// crossing move sweeps with the Barrier layer excluded (PlayerDisplacement.StartMove), so it can end up
-    /// overlapping the barrier's own footprint when it stops mid-crossing; this rule says which way to nudge the
-    /// body clear.
+    /// GDD p.29: a jersey barrier blocks walking but lets a dash, a zip pull, a blink or a portal cross
+    /// it. A crossing move sweeps with the Barrier layer excluded (PlayerDisplacement.StartMove), so it
+    /// can stop mid-crossing overlapping the barrier's own footprint; this rule says which way to nudge
+    /// the body clear.
     ///
-    /// "The side you're already on" (Amendment 1, Decision 23): the exit is picked by which side of the barrier's
-    /// own middle line the body's centre already sits on when it stopped - not which way the move started, or which
-    /// end is nearer along the barrier's length. That is the smallest correction there is: a body already past the
-    /// middle finishes the crossing it was mostly through, and a body still short of the middle is nudged back the
-    /// way it came - never a surprise sideways step along the barrier's own run. Exactly on the middle line (within
-    /// 1 mm), the direction the move itself was heading decides it, so a dead-centre stop still resolves the same
-    /// way a moment earlier or later would have.
+    /// The exit is the side the body's centre already sits on, relative to the barrier's middle line
+    /// (Decision 23) - not which way the move started, or which end is nearer along the barrier. That
+    /// is the smallest correction: a body past the middle finishes the crossing, one short of it goes
+    /// back the way it came, never a sideways step along the barrier. Exactly on the middle line
+    /// (within the tolerance below) the move's own heading decides, so a dead-centre stop resolves the
+    /// same way a moment earlier or later would have.
     /// </summary>
     public static class BarrierCrossingRule
     {

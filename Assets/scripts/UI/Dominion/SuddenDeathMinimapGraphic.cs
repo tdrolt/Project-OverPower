@@ -4,7 +4,7 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Dominion Task 8: the sudden-death circle on the minimap. One UI graphic that draws, in the map's own space, a red band all the way from the
+    /// The sudden-death circle on the minimap. One UI graphic that draws, in the map's own space, a red band all the way from the
     /// circle's edge out beyond the map (everything OUTSIDE the circle is tinted) and a solid red ring on the edge. A mesh instead of 64 line
     /// segments plus a picture, so the tint hugs the circle exactly while it shrinks; it sits under the Viewport mask like the rest of the map, so
     /// the triangle's window clips it. Never takes clicks (raycastTarget off), so it can never swallow a shot.
@@ -24,7 +24,7 @@ namespace Overpower.UI
         public override Texture mainTexture => Texture2D.whiteTexture;
 
         /// <summary>Where the circle is in this graphic's own space (the map's canvas units), how wide its edge line is, how far the tint reaches
-        /// past the edge, and the two colours. Only redraws when something changed.</summary>
+        /// past the edge, and the two colours.</summary>
         public void Set(Vector2 circleCentre, float circleRadius, float edgeWidth, float tintReach, Color edgeColour, Color outsideColour)
         {
             if (centre == circleCentre && Mathf.Approximately(radius, circleRadius) && Mathf.Approximately(ringWidth, edgeWidth)

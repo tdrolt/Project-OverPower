@@ -12,7 +12,7 @@ namespace Overpower.Lobby
         public const string Stage = "lS";
         /// <summary>The host's nickname (the master client).</summary>
         public const string Host = "lH";
-        /// <summary>The seat fill counts, written by the seat code (lobby Task 3).</summary>
+        /// <summary>The seat fill counts, written by the seat code.</summary>
         public const string Fill = "lF";
 
         /// <summary>When the lobby was created: the server clock in milliseconds (PhotonNetwork.ServerTimestamp), so the list

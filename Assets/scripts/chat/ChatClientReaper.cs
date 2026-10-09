@@ -2,11 +2,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Chat;
 
-/// <summary>Lobby Task 11: a chat connection that is being closed. A ChatClient only sends its disconnect (and the server only drops the session)
+/// <summary>A chat connection that is being closed. A ChatClient only sends its disconnect (and the server only drops the session)
 /// while its Service runs, and the PhotonChat that owned it is switched off (or destroyed) at that moment. This object, kept across scenes,
 /// keeps calling Service until the client is really disconnected. Without it the old session lingers on the Photon Chat server while the same
-/// user id connects again for the next lobby, and the lingering session's timeout later takes the new session's subscriptions with it
-/// (seen in the first run of the Task 11 check: after leaving a lobby and joining another, nothing arrived either way).</summary>
+/// user id connects again for the next lobby, and the lingering session's timeout later takes the new session's subscriptions with it.</summary>
 public sealed class ChatClientReaper : MonoBehaviour
 {
     private const float GiveUpSeconds = 8f;

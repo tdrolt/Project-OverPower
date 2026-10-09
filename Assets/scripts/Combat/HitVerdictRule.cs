@@ -16,21 +16,21 @@ namespace Overpower.Combat
         /// <summary>A teammate's: no damage, not combat.</summary>
         IgnoredTeammate,
         /// <summary>A real enemy hit the shield stopped (the armed trap, or the immunity after it): no damage, but it IS
-        /// combat - Tudor, 2026-09-18: no armour recharge, no shop, no regen while being shot.</summary>
+        /// combat - no armour recharge, no shop, no regen while being shot.</summary>
         Shielded,
         /// <summary>A real enemy hit that goes on to DamageResolver.</summary>
         Lands,
     }
 
     /// <summary>
-    /// The order of PlayerHealth.ApplyDamage's early exits, pulled out so it is tested (2.7b). Self first, then
+    /// The order of PlayerHealth.ApplyDamage's early exits, pulled out so it is tested. Self first, then
     /// teammate, then the shield - so a friendly or self hit can neither burn an armed trap nor keep anyone "in
     /// combat". An immunity already running is checked before the trap, so a hit during it never consumes a second arm.
     /// </summary>
     public static class HitVerdictRule
     {
         /// <summary>Does this kind of damage go straight through Invulnerability (a running one and an armed trap alike)? Only the Dominion sudden-death
-        /// circle does (Tudor A30): it is not an enemy's hit, so it neither meets a running immunity nor springs an armed trap. Armour and damage
+        /// circle does (A30): it is not an enemy's hit, so it neither meets a running immunity nor springs an armed trap. Armour and damage
         /// reduction or vulnerability still apply to it afterwards, as to any damage.</summary>
         public static bool IgnoresInvulnerability(DamageSource source) => source == DamageSource.SuddenDeath;
 

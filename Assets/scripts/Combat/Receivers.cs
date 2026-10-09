@@ -25,7 +25,7 @@ namespace Overpower.Combat
     /// lookup: a mine's trigger and a beam's pierce both ask "is this thing I already have a
     /// structure", not "go find something else".
     ///
-    /// WHY A MARKER, NOT A TeamId/ActorNumber RULE (Task 1.8b review finding). CoverWall reports
+    /// WHY A MARKER, NOT A TeamId/ActorNumber RULE. CoverWall reports
     /// ActorNumber/TeamId as -1/-1 so FriendlyFire fails open and every shot treats it as a wall -
     /// but DummyTarget's ActorNumber is ALSO -1 (it owns no Photon actor) and its TeamId is 99, a
     /// second value outside every real team for the identical fail-open reason. Neither field can

@@ -15,7 +15,7 @@ namespace Overpower.Lobby
     /// <summary>
     /// Lobbies as Photon rooms: keeps the live list of rooms from Photon's lobby, creates a lobby (a room carrying its name,
     /// mode, stage and host as Room Properties) and joins one by name. It sits on the RoomManager's GameObject and is added
-    /// by RoomManager.Awake, so the scene file does not change. The list screen (lobby Task 9) reads Entries and ListChanged.
+    /// by RoomManager.Awake, so the scene file does not change. The list screen reads Entries and ListChanged.
     /// </summary>
     public sealed class LobbyDirectory : MonoBehaviourPunCallbacks
     {
@@ -75,7 +75,6 @@ namespace Overpower.Lobby
             PhotonNetwork.JoinLobby(TypedLobby.Default);
         }
 
-        /// <summary>Creates a lobby: a new room, visible and open, carrying its name, mode, stage and host.</summary>
         public bool Create(string displayName, GameModeDefinition mode)
         {
             pendingName = displayName;
@@ -88,7 +87,6 @@ namespace Overpower.Lobby
 
         internal bool HasPendingCreate => pendingMode != null; // a test hook
 
-        /// <summary>Joins the lobby with this room name.</summary>
         public void Join(string roomName)
         {
             pendingJoin = PhotonNetwork.JoinRoom(roomName); // a refused call leaves no flag behind
@@ -115,7 +113,7 @@ namespace Overpower.Lobby
             var options = new RoomOptions
             {
                 MaxPlayers = (byte)LobbySeatRules.TotalSeats(SeatLayoutFactory.From(pendingMode)),
-                // Same rejoin window as every room (Task 9e): part of the room's options, so every build in a room must match.
+                // Same rejoin window as every room: part of the room's options, so every build in a room must match.
                 PlayerTtl = RejoinRules.PlayerTtlMs(roomManager != null ? roomManager.RejoinWindowSeconds : 0f),
                 IsVisible = true,
                 IsOpen = true,
@@ -166,7 +164,7 @@ namespace Overpower.Lobby
             JoinFailed?.Invoke(JoinFailureText(returnCode, roomManager != null ? roomManager.Theme : null));
         }
 
-        /// <summary>A join that went through but then had to be undone (a running lobby with no free seat, lobby Task 7): reported to the
+        /// <summary>A join that went through but then had to be undone (a running lobby with no free seat): reported to the
         /// list like a refused join.</summary>
         public void ReportJoinRefused(string reason) => JoinFailed?.Invoke(reason);
 

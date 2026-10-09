@@ -4,23 +4,17 @@ using Overpower.Data;
 
 namespace Overpower.Telemetry
 {
-    /// <summary>Builds the session header's "tuning" JSON object: every match-wide config, plus every
-    /// weapon's and ability's own stat block, so a report built from an old match still reads
-    /// correctly after Tudor retunes the game (the design doc's Principle 3).
-    ///
-    /// Uses JsonUtility.ToJson directly on the ScriptableObjects - it works the same in the Editor and
-    /// in a build, unlike a reflection-heavy serializer such as Newtonsoft, which is why the runtime
-    /// writes these strings as-is (TelemetryLine.Raw) rather than re-encoding them. Only the Editor's
-    /// report builder (T5) re-parses this JSON, with Newtonsoft, to build its tables. If JsonUtility's
-    /// output for some field (an object reference that doesn't serialize usefully, say) is not
-    /// perfectly informative, that is still what gets written - see the T2 plan's own note.</summary>
+    /// <summary>Builds the session header's "tuning" JSON object: every match-wide config plus every weapon's and ability's stat
+    /// block, so a report built from an old match still reads correctly after a retune (design doc Principle 3). JsonUtility.ToJson
+    /// works the same in the Editor and a build (unlike reflection-heavy Newtonsoft), so the runtime writes these strings as-is
+    /// (TelemetryLine.Raw); only the Editor's report builder re-parses the JSON, with Newtonsoft. Whatever JsonUtility writes for a
+    /// field (an object reference that doesn't serialize usefully, say) is what gets written.</summary>
     public static class TuningSnapshot
     {
         /// <summary>One flat JSON object: {"territory":{...},"gameplay":{...},"armor":{...},
         /// "telemetry":{...},"weapons":[{"id":..,"name":..,"goldCost":..,"json":{...}}, ...],
-        /// "abilities":[...]}. A null config/catalogue writes `null` (or `[]` for a catalogue) rather
-        /// than throwing - a half-wired MatchTelemetry should still produce a parseable, if
-        /// incomplete, session line.</summary>
+        /// "abilities":[...]}. A null config/catalogue writes `null` (or `[]` for a catalogue) rather than throwing, so a half-wired
+        /// MatchTelemetry still produces a parseable session line.</summary>
         public static string Json(TerritoryConfig territoryConfig, GameplayConfig gameplayConfig,
                                    ArmorConfig armorConfig, TelemetryConfig telemetryConfig,
                                    WeaponCatalogue weapons, AbilityCatalogue abilities)
@@ -30,16 +24,12 @@ namespace Overpower.Telemetry
 
             AppendRawField(sb, "territory", territoryConfig != null ? JsonUtility.ToJson(territoryConfig) : "null");
             sb.Append(',');
-            // GameplayConfig also carries the OverPower fields (Task 2.6) - they live on this asset,
-            // not a separate one, so one JsonUtility.ToJson call already captures them (see the plan's
-            // T2 step 4 note).
+            // GameplayConfig also carries the OverPower fields, so this one ToJson call captures them.
             AppendRawField(sb, "gameplay", gameplayConfig != null ? JsonUtility.ToJson(gameplayConfig) : "null");
             sb.Append(',');
             AppendRawField(sb, "armor", armorConfig != null ? JsonUtility.ToJson(armorConfig) : "null");
             sb.Append(',');
-            // Step 0b: the T5 aggregator's ResolveSampleIntervalSeconds already looks for
-            // tuning.telemetry.sampleIntervalSeconds and falls back to 5s when it's absent - this is
-            // what makes that field present instead of always falling back.
+            // The report aggregator's ResolveSampleIntervalSeconds reads tuning.telemetry.sampleIntervalSeconds (5s when absent).
             AppendRawField(sb, "telemetry", telemetryConfig != null ? JsonUtility.ToJson(telemetryConfig) : "null");
             sb.Append(',');
             AppendWeapons(sb, weapons);
@@ -89,9 +79,7 @@ namespace Overpower.Telemetry
             sb.Append(']');
         }
 
-        // definitionJson is JsonUtility's own output for the definition - already valid JSON, so it is
-        // embedded as a raw nested value ("the runtime writes the raw JsonUtility strings as JSON
-        // values" - the plan's own wording), not re-escaped into a string.
+        // definitionJson is already valid JSON, so it is embedded as a raw nested value, not re-escaped into a string.
         private static void AppendDefinitionEntry(StringBuilder sb, int id, string name, int goldCost, string definitionJson)
         {
             sb.Append("{\"id\":").Append(id)
@@ -101,8 +89,7 @@ namespace Overpower.Telemetry
               .Append('}');
         }
 
-        // Only ever used for the two plain display-name strings above - everything else in this file
-        // either comes from JsonUtility (already valid JSON) or is a plain integer.
+        // Only for the two display-name strings; everything else is JsonUtility output or an integer.
         private static string EscapeJsonString(string value)
         {
             if (value == null) return "null";

@@ -7,23 +7,11 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// An instant reposition toward the cursor - Tudor's decision (2026-09-13): blink lands EXACTLY
-    /// on the cursor point when the cursor is within range, and the point `range` metres toward it
-    /// otherwise [C]. Unlike a dash it never travels the space in between, so a wall between the
-    /// caster and a valid spot on the far side does not stop it - only the destination itself has to
-    /// be somewhere a player could actually stand, and inside the arena outline (movement step 3).
-    ///
-    /// The destination search (clamp to range, then walk back toward the caster in fixed steps until
-    /// a spot is clear) is pure logic in BlinkDestinationSearch (Assets/scripts/Combat), unit tested
-    /// without a scene. This class only supplies the physics half of that search - the ValidityProbe
-    /// - and the caster's own capsule to check it with, so the pure class never has to know what a
-    /// Collider or a Physics call even is. The "is there real ground here" half of that probe is
-    /// GroundProbe.TryFindGround (Abilities/Core), shared with Teleport's portal placement so the
-    /// same void/off-map/kill-height logic exists in exactly one place.
-    ///
-    /// Like Dash, the instant jump itself belongs to PlayerDisplacement (Owner.Displacement cast down
-    /// to the concrete type, same reasoning as DashAbility's class comment): this module only decides
-    /// WHERE the jump goes and whether it may happen at all.
+    /// An instant reposition toward the cursor: lands EXACTLY on the cursor point when within range, otherwise `range` metres
+    /// toward it [C]. It never travels the space in between, so only the destination has to be standable and inside the
+    /// arena outline. The destination search is pure logic in BlinkDestinationSearch; this class supplies the physics half
+    /// (the probe, using the caster's own capsule; ground via GroundProbe.TryFindGround, shared with Teleport's placement).
+    /// The jump itself belongs to PlayerDisplacement: this module only decides WHERE it goes and whether it may happen.
     /// </summary>
     public sealed class BlinkAbility : AbilityModule
     {
@@ -65,11 +53,8 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("Seconds the remote marker stays up before it disappears on its own.")]
         private float remoteVfxSeconds = 0.3f;
 
-        // Not a design tunable, like PlayerDisplacement's own blockMask: which layers a blink can
-        // land on or be stopped by is fixed here rather than exposed for a designer to mis-set into
-        // something that blinks through the arena floor. Computed in Awake, not a static field
-        // initializer - the same LayerMask.GetMask crash-on-spawn PlayerDisplacement's class comment
-        // documents.
+        // Not a design tunable (like PlayerDisplacement's blockMask): a designer could mis-set it into a blink through the
+        // arena floor. Computed in Awake, not a static initializer: LayerMask.GetMask there crashes on spawn.
         private int blockMask;
 
         // The player's own capsule, read once in OnEquip (Owner is not bound yet in Awake). Blink
@@ -94,10 +79,8 @@ namespace Overpower.Abilities
         {
             payload = default;
 
-            // Checked here, not at ExecuteCast time: a charge is already spent by the time
-            // ExecuteCast runs (AbilityRunner.TryCast spends before sending), and a blink cannot be
-            // un-spent after the fact. Refusing up front, while nothing has been spent yet, is the
-            // only point this can safely be checked - see PlayerDisplacement.CanTeleport.
+            // Checked here, not in ExecuteCast: the charge is already spent by then (AbilityRunner.TryCast spends before
+            // sending) and cannot be refunded, so this is the only safe point to refuse - see PlayerDisplacement.CanTeleport.
             var displacement = Owner.Displacement as PlayerDisplacement;
             if (displacement == null || !displacement.CanTeleport)
                 return false;
@@ -112,9 +95,9 @@ namespace Overpower.Abilities
             {
                 landingPoint = default;
 
-                // Movement step 3: never outside the arena. The terrain carries on past the boundary walls, so the
-                // ground probe alone can't tell; the search's own walk back toward the caster then finds the last spot
-                // inside. Blinking PAST a crate or a house inside the arena is unchanged (Task 1.6b).
+                // Never outside the arena. The terrain carries on past the boundary walls, so the ground probe alone can't
+                // tell; the search's own walk back toward the caster then finds the last spot inside. Blinking PAST a crate
+                // or a house inside the arena is allowed.
                 if (!Overpower.Arena.ArenaSymmetry.IsInsideArena(candidateXZ, capsule.radius))
                     return false;
 
@@ -125,12 +108,11 @@ namespace Overpower.Abilities
                     return false; // no ground within reach, or it sits at/below the kill plane.
 
                 // Root position such that the capsule's OWN bottom sits exactly on the ground found above - shared with
-                // portal arrival since movement step 3, so the two can't drift apart.
+                // portal arrival, so the two can't drift apart.
                 Vector3 rootPosition = PlayerSpaceProbe.RootOnGround(capsule, new Vector3(candidateXZ.x, ground.y, candidateXZ.z));
 
-                // Amendment 1: the fit check sees barriers (BodiesWallsAndBarriers) even though the ground probe
-                // just above keeps blockMask (a barrier's top is never floor) - a blink aimed into one lands on the
-                // near side instead, the same walk-back BlinkDestinationSearch already does for a wall.
+                // The fit check sees barriers (BodiesWallsAndBarriers) even though the ground probe above keeps blockMask
+                // (a barrier's top is never floor): a blink aimed into one lands on the near side, as it does for a wall.
                 if (PlayerSpaceProbe.IsCapsuleBlocked(capsule, rootPosition, ArenaLayers.BodiesWallsAndBarriers, Owner.Root.transform))
                     return false;
 
@@ -156,9 +138,8 @@ namespace Overpower.Abilities
                 var displacement = Owner.Displacement as PlayerDisplacement;
                 if (displacement == null || !displacement.TeleportTo(cast.Payload.Point))
                 {
-                    // Only possible if a knockback started in the single frame between
-                    // TryBuildCast's CanTeleport check and here (see DashAbility's own comment on
-                    // the same race) - the charge is already spent and cannot be refunded.
+                    // Only possible if a knockback started between TryBuildCast's CanTeleport check and here (same race
+                    // as DashAbility's); the charge is already spent and cannot be refunded.
                     Debug.LogWarning($"[BlinkAbility] {name}: teleport refused at execute time - " +
                                       "a knockback must have started after the cast was already sent.");
                 }
@@ -178,9 +159,8 @@ namespace Overpower.Abilities
 
             GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             marker.name = "Blink VFX (cheap, remote only)";
-            // Removed immediately, not with Destroy, which waits for end of frame - see
-            // DebugPingAbility's identical trick: for that one frame the sphere would otherwise be a
-            // solid object sitting in the world.
+            // Removed immediately, not with Destroy (end of frame): for that frame the sphere would be a solid object
+            // in the world. Same trick as DebugPingAbility.
             DestroyImmediate(marker.GetComponent<Collider>());
             marker.transform.position = point;
             marker.transform.localScale = Vector3.one * remoteVfxRadius * 2f;

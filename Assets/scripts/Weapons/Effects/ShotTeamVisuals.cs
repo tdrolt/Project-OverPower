@@ -5,30 +5,15 @@ using Overpower.UI;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Task 11a (playtest polish, designer request): tints a weapon shot's core toward its shooter's team
-    /// colour and gives it a short fading trail in that same colour, so a player caught in the open can
-    /// tell who is shooting at them without reading a name tag.
-    ///
-    /// WEAPON SHOTS ONLY. Lasers spawn no projectile at all (Hitscan.Fire resolves instantly - see
-    /// WeaponFiring.Spawn) and get their own wind-up + beam treatment in Task 11b instead. Ability
-    /// projectiles (Zip Gun Bullet, Stun Gun Bullet) keep their existing look on the designer's
-    /// instruction, so this component only ever sits on a WEAPON'S own projectile prefab - never on an
-    /// ability's.
-    ///
-    /// NOTHING HERE IS NETWORKED. ProjectileContext.ShooterTeamId already comes from
-    /// Teams.TryGetTeam(info.Sender) inside WeaponFiring.RPC_FireWeapon, so it is identical on every
-    /// client before this component ever sees it - see ProjectileContext's own class comment on why a
-    /// locally-Instantiated projectile needs no RPC of its own.
-    ///
-    /// ALLOCATION-FREE PER SHOT (Task 11a review finding). Every client simulates every projectile - a
-    /// nine-player SMG burst is a lot of bullets a second - so this must not allocate per shot. The trail
-    /// is a CHILD BAKED ONTO EACH WEAPON PROJECTILE PREFAB (named Trail Child Name below, pre-configured
-    /// with shared settings, emitting off), found once in Awake rather than created here; its colour
-    /// comes from UiTheme.GradientFor, which builds one Gradient per team once and reuses it.
-    ///
-    /// VISUAL ONLY. This class never reads or writes anything ProjectileMotor uses for hit detection,
-    /// damage, speed or range - it only ever touches its own TrailRenderer and a MaterialPropertyBlock on
-    /// the bullet's renderer.
+    /// Tints a weapon shot's core toward its shooter's team colour and gives it a short fading trail in that colour, so a player caught in the open
+    /// can tell who is shooting at them without reading a name tag.
+    /// WEAPON SHOTS ONLY, on a weapon's own projectile prefab: lasers spawn no projectile (Hitscan resolves instantly) and ability projectiles
+    /// (Zip Gun Bullet, Stun Gun Bullet) keep their own look.
+    /// NOTHING HERE IS NETWORKED: ProjectileContext.ShooterTeamId is already identical on every client. VISUAL ONLY: never reads or writes anything
+    /// ProjectileMotor uses for hit detection, damage, speed or range.
+    /// ALLOCATION-FREE PER SHOT (every client simulates every projectile, so a nine-player SMG burst is a lot of bullets a second): the trail is a
+    /// CHILD BAKED ONTO EACH WEAPON PROJECTILE PREFAB (Trail Child Name, pre-configured with shared settings, emitting off), found once in Awake;
+    /// its colour comes from UiTheme.GradientFor, which builds one Gradient per team once and reuses it.
     /// </summary>
     [DisallowMultipleComponent]
     public class ShotTeamVisuals : MonoBehaviour, IProjectileBehaviour
@@ -79,9 +64,7 @@ namespace Overpower.Weapons
             }
         }
 
-        /// <summary>IProjectileBehaviour.OnSpawned - ProjectileMotor.Initialize calls this on every
-        /// attached behaviour right after the motor itself is configured and before the projectile's first
-        /// step, so the trail and the core tint are both set before anyone sees an untinted frame.</summary>
+        /// <summary>Runs before the projectile's first step, so the trail and the core tint are set before anyone sees an untinted frame.</summary>
         public void OnSpawned(ProjectileMotor motor, ProjectileContext context)
         {
             if (theme == null)
@@ -103,11 +86,8 @@ namespace Overpower.Weapons
             if (trail == null)
                 return;
 
-            // Overwrites whatever time/width the "Shot Trail" child was baked with on this
-            // projectile prefab (fix 6, Playtest polish review) - Trail Time/Trail Start Width/
-            // Trail End Width on UiTheme are the one real home for these numbers across all seven
-            // weapon projectile prefabs; the prefab's own baked values are only a design-time
-            // preview in the Scene view, never what actually renders in play.
+            // Overwrites whatever time/width the baked "Shot Trail" child carries: Trail Time/Trail Start Width/Trail End Width on UiTheme are the one
+            // real home for these numbers across every weapon projectile prefab; the prefab's own baked values are only a design-time Scene-view preview.
             trail.time = theme.trailTime;
             trail.startWidth = theme.trailStartWidth;
             trail.endWidth = theme.trailEndWidth;
@@ -132,11 +112,9 @@ namespace Overpower.Weapons
             Color baseColor = Color.Lerp(bulletRenderer.sharedMaterial.color, teamColor, theme.bulletTintStrength);
             propertyBlock.SetColor(BaseColorId, baseColor);
 
-            // teamColor.a scales the glow too, not just the trail's fade - without this the unknown-team
-            // fallback's lower alpha (meant to read as a fainter, washed-out "not a real team" colour)
-            // only showed up in its trail; its emissive CORE still came out just as bright as a real
-            // team's, and side-by-side captures showed it reading as an extra near-white team instead of
-            // a washed-out non-team (Task 11a follow-up review, 616x576 capture).
+            // teamColor.a scales the glow too, not just the trail's fade: otherwise the unknown-team fallback's lower alpha (meant to read as a faint,
+            // washed-out "not a real team" colour) showed only in its trail, and its emissive CORE came out as bright as a real team's and read as an
+            // extra near-white team.
             float glow = theme.bulletEmission * teamColor.a;
             propertyBlock.SetColor(EmissionColorId, new Color(
                 teamColor.r * glow,
@@ -147,24 +125,18 @@ namespace Overpower.Weapons
             bulletRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        /// <summary>IProjectileBehaviour.OnHit - this component has no opinion on whether the shot keeps
-        /// flying; that is ExplodeOnImpact/BounceOffWalls/Pierce's call. Despawn is the neutral answer - the
-        /// same one a projectile with no behaviours at all gives - since "any single KeepFlying wins" over
-        /// every behaviour attached (see IProjectileBehaviour's own comment), so this can never cut a
-        /// bounce or a pierce short.</summary>
+        /// <summary>This component has no opinion on whether the shot keeps flying; that is ExplodeOnImpact/BounceOffWalls/Pierce's call. Despawn is the
+        /// neutral answer, and since any single KeepFlying wins (IProjectileBehaviour), this can never cut a bounce or a pierce short.</summary>
         public ProjectileHitResponse OnHit(ProjectileMotor motor, ProjectileContext context,
                                             RaycastHit hit, IDamageable victim)
         {
             return ProjectileHitResponse.Despawn;
         }
 
-        /// <summary>IProjectileBehaviour.OnExpired - the bullet is gone, however it went (impact, range or
-        /// the lifetime backstop all funnel through ProjectileMotor.Despawn, which calls this on every
-        /// behaviour and then destroys the bullet's own GameObject immediately after). The trail is BAKED
-        /// onto this prefab (not created here), so it must be detached rather than left to die with its
-        /// parent: reparenting it to the scene root and destroying it on its own timer is what stops its
-        /// still-visible tail from popping out of existence the instant the bullet that drew it
-        /// disappears.</summary>
+        /// <summary>The bullet is gone, however it went (impact, range or the lifetime backstop all funnel through ProjectileMotor.Despawn, which
+        /// destroys the bullet's GameObject right after this). The trail is BAKED onto this prefab, so it must be detached rather than left to die with
+        /// its parent: reparented to the scene root and destroyed on its own timer, its still-visible tail does not pop out of existence the instant
+        /// the bullet disappears.</summary>
         public void OnExpired(ProjectileMotor motor, ProjectileContext context)
         {
             if (trail == null)

@@ -4,7 +4,7 @@ using Overpower.Data;
 namespace Overpower.Lobby
 {
     /// <summary>
-    /// Pure rules behind the name screen, the lobby list and the create screen (lobby Task 9): how a row writes its players, which game modes
+    /// Pure rules behind the name screen, the lobby list and the create screen: how a row writes its players, which game modes
     /// the create screen lets you pick, and what the lobby name box starts with. No Unity UI here: the panels read these and draw.
     /// </summary>
     public static class LobbyScreenRules

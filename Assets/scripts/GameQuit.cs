@@ -2,26 +2,16 @@ using Photon.Pun;
 using UnityEngine;
 
 /// <summary>
-/// Playtest extras P6 (2026-09-26): the one real "close the game" path, extracted out of
-/// QuitButton.Quit so the Escape pop-up's Yes (QuitConfirmPanel) uses exactly the same order instead
-/// of a second copy of the same three lines.
+/// The one real "close the game" path, shared by QuitButton.Quit and the Escape pop-up's Yes (QuitConfirmPanel).
 ///
-/// Order matters here (the brief's own "mind the order on quit" note): this zips THIS client's own
-/// match log BEFORE disconnecting or quitting, rather than relying on MatchTelemetry's own
-/// BeforeClose/OnApplicationQuit sequence to somehow still contain time to zip. MatchTelemetry.
-/// FlushNow() (called inside MatchLogZip's own zip step) writes this client's buffered lines to disk
-/// synchronously, so the zip this method builds is guaranteed to contain them - zipping AFTER the
-/// writer's own Close() would work too (Close() flushes first), but doing it explicitly, first, here,
-/// needs no assumption about how much of OnApplicationQuit's shutdown sequence Unity still lets user
-/// code run in.
+/// Order matters: it zips THIS client's own match log BEFORE disconnecting or quitting, instead of relying on
+/// MatchTelemetry's BeforeClose/OnApplicationQuit sequence still having time to zip. MatchLogZip's zip step calls
+/// MatchTelemetry.FlushNow(), which writes the buffered lines synchronously, so the zip is guaranteed to contain them.
 ///
-/// 2026-09-26 fix: always calls ZipNow(), not a "skip if the result panel already zipped this match"
-/// variant - a real two-client check found that Disconnect() below can raise MatchTelemetry.OnLeftRoom
-/// (clearing CurrentFolder) before this client's OWN OnApplicationQuit re-zip runs, and the OLD zip
-/// name (a clock read, cached per match) then came out different between the two calls, leaving two
-/// files. MatchLogZipRule.ZipFileName now names the zip after the match folder itself, which never
-/// changes for the match, so calling ZipNow() twice just overwrites the same file - see MatchLogZip's
-/// own comments (ZipNow, HandleBeforeClose, MatchLogZipRule.ResolveZipFolder) for the rest of the fix.
+/// Always calls ZipNow(), never a "skip if already zipped" variant: Disconnect() below can raise
+/// MatchTelemetry.OnLeftRoom (clearing CurrentFolder) before this client's own OnApplicationQuit re-zip runs.
+/// MatchLogZipRule.ZipFileName names the zip after the match folder, which never changes for the match, so a second
+/// ZipNow() overwrites the same file (see MatchLogZip: ZipNow, HandleBeforeClose, MatchLogZipRule.ResolveZipFolder).
 /// </summary>
 public static class GameQuit
 {
@@ -29,9 +19,9 @@ public static class GameQuit
     {
         Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
 
-        // Tudor D-b (Task 9e-2): quitting through the menu gives the seat up at once - LeaveRoom(false) is a real leave, not the
-        // "inactive, may come back" a bare Disconnect leaves for the rejoin window (that is for crashes and lost connections) - and
-        // forgets the saved match so the next start offers no rejoin. Leave first and flush it, then disconnect.
+        // Quitting through the menu gives the seat up at once (D-b): LeaveRoom(false) is a real leave, not the
+        // "inactive, may come back" a bare Disconnect leaves for the rejoin window (that is for crashes and lost
+        // connections), and it forgets the saved match so the next start offers no rejoin. Leave first and flush it, then disconnect.
         Overpower.Net.PlayerIdentity.ClearLastMatch();
         if (PhotonNetwork.InRoom)
         {

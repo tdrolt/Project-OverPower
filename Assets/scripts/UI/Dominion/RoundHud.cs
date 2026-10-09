@@ -7,10 +7,10 @@ using Overpower.Dominion;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Dominion Task 9, the round bar at the top centre during a round (board DomHud A, and "3v3v3 version of A"). A 2v2 match shows both teams'
-    /// points on either side of the round clock, round wins as dots under each score; a 3v3v3 match shows three team blocks and the clock at the
-    /// end. "+200 CYAN" flashes under the holder's block when the centre pays out. Everything it says comes from DominionHudText; sizes, colours and
-    /// words are UiTheme fields (Dominion HUD). It only draws what DominionHud hands it each frame, and rewrites a text only when its value changed.
+    /// The round bar at the top centre during a round (board DomHud A, and "3v3v3 version of A"). 2v2: both teams' points either side of the round
+    /// clock, round wins as dots under each score; 3v3v3: three team blocks and the clock at the end. "+200 CYAN" flashes under the holder's block
+    /// when the centre pays out. DominionHudText builds the words; sizes, colours and words are UiTheme fields (Dominion HUD). It draws only what
+    /// DominionHud hands it each frame and rewrites a text only when its value changed.
     /// </summary>
     public sealed class RoundHud
     {
@@ -33,7 +33,7 @@ namespace Overpower.UI
         private TextMeshProUGUI roundLabel, clockLabel, flashLabel;
         private int builtTeamCount;
         private float flashUntil;
-        // The whole numbers the labels were last built from: compared every frame, so a label's words are only formatted when one moved.
+        // The whole numbers the labels were last built from: a label's words are formatted only when one moved.
         private bool roundDrawn, clockDrawn;
         private int drawnRoundNumber, drawnMaxRounds, drawnClockSeconds;
         private bool shownSudden, shownOvertime;
@@ -63,8 +63,8 @@ namespace Overpower.UI
             if (root != null && root.gameObject.activeSelf != visible) root.gameObject.SetActive(visible);
         }
 
-        /// <summary>One frame of the bar. teams are the match's team ids in order (2 or 3); clockSeconds is the round clock (ignored in sudden death), or the
-        /// overtime's own clock when overtime is on: the small heading then says OVERTIME instead of the round.</summary>
+        /// <summary>teams are the match's team ids in order (2 or 3); clockSeconds is the round clock (ignored in sudden death), or the overtime's own
+        /// clock when overtime is on: the small heading then says OVERTIME instead of the round.</summary>
         public void Refresh(int[] teams, int round, int maxRounds, int clockSeconds, bool suddenDeath, bool overtime, int[] points, int[] wins, int winsToWin, string[] teamNames)
         {
             if (teams == null || teams.Length < 2) { SetVisible(false); return; }
@@ -105,7 +105,7 @@ namespace Overpower.UI
             {
                 float left = flashUntil - Time.unscaledTime;
                 if (left <= 0f) flashLabel.gameObject.SetActive(false);
-                else flashLabel.alpha = Mathf.Clamp01(left / theme.dominionFlashFadeSeconds); // fades out over its last moments
+                else flashLabel.alpha = Mathf.Clamp01(left / theme.dominionFlashFadeSeconds);
             }
         }
 
@@ -217,7 +217,7 @@ namespace Overpower.UI
             scoreRect.sizeDelta = new Vector2(-2f * inset, scoreSize * 1.2f);
             scoreRect.anchoredPosition = new Vector2(0f, -theme.dominionScoreTop);
 
-            // Round-win dots under the score, as many as it takes to win the match, lined up with the score.
+            // One dot per round win needed to win the match, lined up with the score.
             int dotCount = Mathf.Max(1, DotCount());
             block.Dots = new Image[dotCount];
             float dotsWidth = dotCount * theme.dominionDotSize + (dotCount - 1) * theme.dominionDotGap;

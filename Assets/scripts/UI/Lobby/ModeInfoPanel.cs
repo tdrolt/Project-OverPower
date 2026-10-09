@@ -7,7 +7,7 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The game mode info page (board 9, lobby Task 12), opened by the mode button of the lobby room: the mode's name as the heading under a small
+    /// The game mode info page (board 9), opened by the mode button of the lobby room: the mode's name as the heading under a small
     /// GAME MODE caption, and the mode's info cards (GameModeDefinition.InfoCards) as a grid, three side by side: each card has its title, its text
     /// and its accent colour as a thick edge across its top. The cross at the top right closes it (so do Escape and a match starting). All the
     /// cards share one text size: the largest at which every row of cards fits the page, so a mode with more to say gets smaller text instead of

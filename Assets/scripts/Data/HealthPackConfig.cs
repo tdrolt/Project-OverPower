@@ -5,9 +5,6 @@ namespace Overpower.Data
     /// <summary>
     /// The three Tier III health packs: how much they heal, how long they stay gone, how close you have to
     /// stand (where each pack stands is in ArenaLayout), and what they look like. One asset, shared by every pack.
-    ///
-    /// Fields are [SerializeField] private with read-only properties, like the rest of the Data folder
-    /// (see GameplayConfig).
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Health Pack Config", fileName = "HealthPackConfig")]
     public sealed class HealthPackConfig : ScriptableObject

@@ -4,12 +4,11 @@ using UnityEngine;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// The wave on the ground (Tudor 2026-10-01: "everyone sees the red wave roll out from the centre"; yellow since 8 Oct, so it never reads as an
-    /// enemy - Scan Wave Colour; the enemy dots it leaves on the minimap keep Minimap Enemy Colour): a flat ring
-    /// that grows from the centre tower at the wave speed, the same size on every screen at the same moment because
-    /// CentreScan works it out from the server clock. A LineRenderer lying flat just above the floor, in a material from the
-    /// transparent queue: the fog pass runs before the transparents, so the ring is drawn over the fog and stays bright
-    /// in it. Hidden when no scan is travelling. Everyone gets it, not only the holding team.
+    /// The wave on the ground: a flat ring that grows from the centre tower at the wave speed, the same size on every screen
+    /// at the same moment because CentreScan works it out from the server clock. Scan Wave Colour is not red so it never reads
+    /// as an enemy (the enemy dots it leaves on the minimap keep Minimap Enemy Colour). A LineRenderer lying flat just above
+    /// the floor, in a transparent-queue material: the fog pass runs before the transparents, so the ring is drawn over the
+    /// fog and stays bright in it. Hidden when no scan is travelling. Everyone gets it, not only the holding team.
     /// </summary>
     public sealed class CentreScanWaveView : MonoBehaviour
     {

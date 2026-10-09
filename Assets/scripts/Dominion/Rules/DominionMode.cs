@@ -14,7 +14,6 @@ namespace Overpower.Dominion
     /// </summary>
     public static class DominionMode
     {
-        /// <summary>True when the room's mode id names a mode of the Dominion family.</summary>
         public static bool IsDominion(Hashtable roomProps, Func<int, GameModeDefinition> modeOf)
         {
             GameModeDefinition mode = ModeOf(roomProps, modeOf);
@@ -95,7 +94,6 @@ namespace Overpower.Dominion
             return rooms != null ? rooms.Dominion : null;
         }
 
-        /// <summary>The team ids of the current room's mode (Dominion size), or empty.</summary>
         public static int[] TeamsOfCurrentRoom()
         {
             Photon.Realtime.Room room = PhotonNetwork.CurrentRoom;

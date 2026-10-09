@@ -1,13 +1,10 @@
 namespace Overpower.UI
 {
     /// <summary>
-    /// How long the yellow "shield immunity" look lasts, on its own - the bar follows the
-    /// Invulnerability shield's bubble for exactly invincibleSeconds (Mark plan step 1, Decision 15),
-    /// so the timing is pulled out into this pure class and unit tested instead of being buried in
-    /// PlayerHealth's own Time.time bookkeeping. Sealed and stateless beyond the one field: every
-    /// client (owner and remote alike) runs the identical clock off the identical trigger, the phase
-    /// message every client receives (What exists D) - there is nothing here that only the owner
-    /// could know.
+    /// How long the yellow "shield immunity" look lasts: the bar follows the Invulnerability bubble for exactly
+    /// invincibleSeconds. Pure and unit tested rather than buried in PlayerHealth's Time.time bookkeeping. Every
+    /// client (owner and remote alike) runs the identical clock off the identical trigger, the phase message every
+    /// client receives; nothing here is owner-only knowledge.
     /// </summary>
     public sealed class ImmuneLookClock
     {

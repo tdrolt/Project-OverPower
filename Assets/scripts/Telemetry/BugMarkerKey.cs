@@ -10,12 +10,9 @@ using Overpower.Weapons;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Playtest extras P2 (2026-09-26): Ctrl+B marks "a bug just happened" - owner-only, on every
-    /// player prefab and always on (unlike the F1 test range panel, which GameplayConfig.
-    /// TestRangeEnabled can switch off entirely - the survey's own reason this cannot live there: a
-    /// tester who switched F1 off must still be able to report a bug). A raw keyboard poll, like F1/
-    /// Escape (PlayerInputRouter's own class comment on tool keys), not an InputAction: this is a
-    /// tool key, never a rebindable gameplay control.
+    /// Ctrl+B marks "a bug just happened" - owner-only, on every player prefab and always on: unlike the F1 test range panel
+    /// (which GameplayConfig.TestRangeEnabled can switch off) a tester who switched F1 off must still be able to report a bug. A raw
+    /// keyboard poll, like F1/Escape, not an InputAction: a tool key, never a rebindable gameplay control.
     ///
     /// EDITOR NOTE: Unity's own Editor binds Ctrl+B to File > Build And Run (ShortcutManagement).
     /// That binding only fires from the Editor's OWN window having focus, never from a Player build,
@@ -32,9 +29,7 @@ namespace Overpower.Telemetry
         [Tooltip("Read only for Bug Marked Text - the toast shown on a successful mark.")]
         [SerializeField] private UiTheme theme;
 
-        // How long a player must wait before another mark is accepted - see BugMarkRule. Not a
-        // TelemetryConfig field (the brief names only the key/modifier as owner-tunable); matches
-        // MatchTelemetry's own "a plain constant, not an asset field" treatment of MaxPendingLines.
+        // Wait between accepted marks (BugMarkRule). A plain constant, not a TelemetryConfig field.
         private const float MarkCooldownSeconds = 2f;
 
         private PlayerHealth playerHealth;
@@ -43,9 +38,8 @@ namespace Overpower.Telemetry
         private AbilityRunner abilityRunner;
         private PlayerHud hud;
 
-        // Same reasoning as PlayerTelemetry.MyPosition: TeleportTo writes rb.position directly, and
-        // transform.position lags until the next physics step - reading through the Rigidbody is
-        // never wrong and is sometimes measurably right where transform.position is not.
+        // TeleportTo writes rb.position directly and transform.position lags until the next physics step (as in
+        // PlayerTelemetry.MyPosition), so read through the Rigidbody.
         private Rigidbody body;
         private Vector3 MyPosition => body != null ? body.position : transform.position;
 
@@ -53,8 +47,6 @@ namespace Overpower.Telemetry
 
         private void Awake()
         {
-            // Nobody but the owner should mark a bug on themselves through this component - a
-            // remote copy stays fully inert (same shape as PlayerTelemetry/OverPowerBuff's Awake).
             if (!photonView.IsMine)
             {
                 enabled = false;
@@ -66,7 +58,7 @@ namespace Overpower.Telemetry
             abilityRunner = GetComponent<AbilityRunner>();
             hud = GetComponent<PlayerHud>();
             body = GetComponent<Rigidbody>();
-            // Not on the root - see PlayerTelemetry's identical GetComponentInChildren lookup.
+            // Not on the root.
             weaponFiring = GetComponentInChildren<WeaponFiring>(true);
 
             if (playerHealth == null || lifecycle == null || weaponFiring == null || abilityRunner == null || hud == null)
@@ -95,7 +87,7 @@ namespace Overpower.Telemetry
         private void TryMark()
         {
             if (MatchTelemetry.Instance == null || string.IsNullOrEmpty(MatchTelemetry.Instance.CurrentFolder))
-                return; // No open file yet to save the screenshot next to - see the class's own CurrentFolder note.
+                return; // No open file yet to save the screenshot next to.
 
             double now = MatchTelemetry.Instance.Now;
             if (!BugMarkRule.CanMark(PlayerInputRouter.IsTypingInChat(), now, lastMarkMatchTime, MarkCooldownSeconds))
@@ -119,7 +111,7 @@ namespace Overpower.Telemetry
 
             try
             {
-                ScreenCapture.CaptureScreenshot(path); // Absolute path - a relative one lands next to the exe (survey).
+                ScreenCapture.CaptureScreenshot(path); // Absolute path: a relative one lands next to the exe.
             }
             catch (System.Exception e)
             {

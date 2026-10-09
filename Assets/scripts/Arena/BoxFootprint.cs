@@ -4,8 +4,8 @@ namespace Overpower.Arena
 {
     /// <summary>
     /// An upright box seen from above - the footprint a wall or barrier run leaves on the floor. Pure geometry,
-    /// shared by the wall-coverage hole finder (arena step 4) and the barrier crossing rule (step 4a), so both agree
-    /// on what "the box's long face" and "the box's short face" mean.
+    /// shared by the wall-coverage hole finder and the barrier crossing rule, so both agree on what "the box's long
+    /// face" and "the box's short face" mean.
     /// </summary>
     public readonly struct BoxFootprint
     {
@@ -30,7 +30,6 @@ namespace Overpower.Arena
             HalfWidth = halfWidth;
         }
 
-        /// <summary>True when the point sits inside the box, in its own plane.</summary>
         public bool Contains(Vector2 point)
         {
             Vector2 d = point - Centre;
@@ -39,7 +38,6 @@ namespace Overpower.Arena
             return Mathf.Abs(along) <= HalfLength && Mathf.Abs(across) <= HalfWidth;
         }
 
-        /// <summary>True when a circle of this radius, centred on point, touches or overlaps the box.</summary>
         public bool OverlapsCircle(Vector2 point, float radius)
         {
             Vector2 d = point - Centre;
@@ -53,10 +51,10 @@ namespace Overpower.Arena
         }
 
         /// <summary>
-        /// Builds a footprint from a box's world transform. worldSize is the box's TRUE world-space size (its local
-        /// size already multiplied by lossyScale - a BoxCollider's own `size` never is, on its own). Local +X is the
-        /// long axis (Along), local +Z is the thickness (Across), matching every wall and barrier row this project
-        /// builds (ArenaWallPlan, ArenaLayout's Barrier rows).
+        /// worldSize is the box's TRUE world-space size (its local size already multiplied by lossyScale - a
+        /// BoxCollider's own `size` never is, on its own). Local +X is the long axis (Along), local +Z is the
+        /// thickness (Across), matching every wall and barrier row this project builds (ArenaWallPlan, ArenaLayout's
+        /// Barrier rows).
         /// </summary>
         public static BoxFootprint FromBox(Vector3 worldCentre, Quaternion rotation, Vector3 worldSize)
         {

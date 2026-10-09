@@ -6,29 +6,19 @@ using Overpower.Vision;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Fires a large, slow, 8m bolt that stuns the first enemy it touches for 2.5s - Tudor's
-    /// Attachment spec. Pure utility, exactly like the zip gun (Task 1.7b): zero damage, and this
-    /// module owns none of the flight or the status itself. ProjectileMotor already "flies through
-    /// teammates, stops at the first enemy or a wall" for free (FriendlyFire.IsSelfOrTeammate, the
-    /// same rule every weapon's bullet uses), so "stuns the FIRST enemy hit" needs no code here at
-    /// all - it falls out of the motor's own sweep. ApplyStatusOnHit (new, Weapons/Effects) is the one
-    /// behaviour that turns that stop into a stun, carried on this ability's own projectile prefab.
-    ///
-    /// EVERY CLIENT SPAWNS THE SAME LOCAL PROJECTILE AND REACTS TO ITS OWN HIT - unlike the zip gun,
-    /// nothing here is caster-only. A stun must land on the VICTIM's own machine (status effects are
-    /// owner-only - see IStatusReceiver's class comment), so there is no "only the caster's copy acts"
-    /// split, no ProjectileContext.OnAbilityHit callback and no AbilityHitRelay: every client's copy
-    /// of this shot independently finds the same victim and calls ApplyStatus on it, and that
-    /// victim's own owner-guard is what makes exactly one of those calls actually do anything.
-    ///
-    /// No aim-cone spread - Controller's call, matching the addendum: this fires straight down
-    /// ctx.AimDirection, the same "no accuracy penalty on a utility shot" choice the zip gun already
-    /// made.
+    /// Fires a large, slow bolt that stuns the first enemy it touches. Pure utility like the zip gun: zero damage, and
+    /// this module owns neither the flight nor the status. ProjectileMotor already flies through teammates and stops at
+    /// the first enemy or wall (FriendlyFire.IsSelfOrTeammate); ApplyStatusOnHit on the projectile prefab turns that
+    /// stop into a stun.
+    /// EVERY CLIENT SPAWNS THE SAME LOCAL PROJECTILE AND REACTS TO ITS OWN HIT, unlike the zip gun: a stun must land on
+    /// the VICTIM's machine (status effects are owner-only, see IStatusReceiver), so there is no caster-only copy, no
+    /// ProjectileContext.OnAbilityHit and no AbilityHitRelay. Every client's copy finds the same victim and calls
+    /// ApplyStatus, and the victim's owner-guard makes exactly one call count.
+    /// No aim-cone spread: it fires straight down ctx.AimDirection, like the zip gun.
     /// </summary>
     public sealed class StunGunAbility : AbilityModule
     {
-        // Not a design tunable: Tudor's spec is explicit that the stun gun deals no direct damage at
-        // all - it is pure utility, the identical reasoning behind ZipGunAbility's own NoDamage.
+        // Not a design tunable: the stun gun is pure utility, like ZipGunAbility's NoDamage.
         private const float NoDamage = 0f;
 
         [Header("Projectile")]

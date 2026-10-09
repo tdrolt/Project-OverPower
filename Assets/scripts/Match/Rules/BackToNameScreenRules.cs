@@ -3,13 +3,13 @@ using Photon.Realtime;
 
 namespace Overpower.Match
 {
-    /// <summary>What the result panel's button does (Task 9f, Tudor D22; lobby Task 8: it leads back to the lobby list).</summary>
+    /// <summary>What the result panel's button does: close the game, or lead back to the lobby list.</summary>
     public enum ResultButtonAction { CloseGame, BackToLobbyList }
 
     /// <summary>What the return-to-the-lobby-list sequence does next while it waits for the connection.</summary>
     public enum ReturnStep { Wait, ReloadScene, Reconnect }
 
-    /// <summary>Task 9f (Tudor D22): after a match the result screen's button starts a fresh game on the name screen instead of
+    /// <summary>After a match (D22) the result screen's button starts a fresh game on the name screen instead of
     /// closing the game. The pieces that are pure: which action a panel button takes, when the leave has finished far enough to
     /// rebuild the scene, and which of two own bodies a rejoining player keeps.</summary>
     public static class BackToNameScreenRules

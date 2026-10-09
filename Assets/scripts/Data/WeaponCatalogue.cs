@@ -4,17 +4,10 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// Every weapon in the game, and the only sanctioned way to turn a weapon id into a
-    /// WeaponDefinition.
-    ///
-    /// Lookup goes through a dictionary keyed by each weapon's hand-assigned id, and never through
-    /// the list index. That is a correctness requirement, not a style preference. What actually
-    /// crosses the network is a bare int, which every client resolves against its own local copy
-    /// of this catalogue. If resolution depended on list order, then reordering this list in the
-    /// Inspector - a harmless-looking tidy-up - would silently re-map every player's weapon in the
-    /// middle of a match, and it would only ever reproduce for whoever had a stale build. This
-    /// project already has a live bug of exactly that shape elsewhere, so it is a demonstrated
-    /// failure mode rather than a hypothetical one.
+    /// Every weapon in the game; the only sanctioned way to turn a weapon id into a WeaponDefinition.
+    /// Lookup is by each weapon's hand-assigned id, never by list index: only a bare int crosses the network and
+    /// each client resolves it against its own copy, so if list order mattered, a harmless-looking reorder in the
+    /// Inspector would silently re-map every player's weapon mid-match (and reproduce only for a stale build).
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Weapon Catalogue")]
     public sealed class WeaponCatalogue : ScriptableObject
@@ -36,16 +29,13 @@ namespace Overpower.Data
         }
 
         /// <summary>
-        /// Turns a weapon id into its definition, or null if no weapon claims that id. Returning
-        /// null rather than throwing is deliberate: ids arrive from other clients over the network,
-        /// where they can be stale, malformed or hostile, and a bad packet from someone else must
-        /// never be able to throw an exception on this machine. Callers check for null.
+        /// Null when no weapon claims the id, deliberately not a throw: ids arrive over the network
+        /// and can be stale, malformed or hostile. Callers check for null.
         /// </summary>
         public WeaponDefinition Resolve(int id)
         {
-            // The lookup is normally built in OnEnable, which covers asset load and every domain
-            // reload. This guard covers the remaining case: an instance created at runtime with
-            // CreateInstance, whose list is populated after OnEnable has already run.
+            // OnEnable covers asset load and domain reload; this covers a CreateInstance whose list is
+            // filled after OnEnable already ran.
             if (byId == null)
                 BuildLookup();
 
@@ -53,11 +43,8 @@ namespace Overpower.Data
         }
 
         /// <summary>
-        /// Reports every problem that would make this catalogue resolve ids wrongly, as one
-        /// human-readable line per problem. An empty list means the catalogue is sound.
-        ///
-        /// Returning the messages rather than logging them keeps this usable from a test, and lets
-        /// OnValidate decide how loudly to complain.
+        /// One human-readable line per problem that would make ids resolve wrongly; empty means sound.
+        /// Returns messages rather than logging so a test can use it and OnValidate picks the volume.
         /// </summary>
         public List<string> Validate()
         {
@@ -78,9 +65,8 @@ namespace Overpower.Data
 
                 if (seen.TryGetValue(weapon.Id, out var existing))
                 {
-                    // Resolve keeps the first match, so the later weapon is simply unreachable -
-                    // silently, which is why this has to be reported rather than left to resolve
-                    // itself quietly.
+                    // Resolve keeps the first match, so the later weapon is unreachable - silently,
+                    // which is why it must be reported.
                     problems.Add($"Weapon Catalogue: '{weapon.name}' and '{existing.name}' both " +
                                  $"use Id {weapon.Id}. Ids must be unique - right now only " +
                                  $"'{existing.name}' can ever be found, and '{weapon.name}' is " +
@@ -103,27 +89,20 @@ namespace Overpower.Data
 
             foreach (var weapon in weapons)
             {
-                // Empty slots are normal while a designer is mid-edit, and a null here would
-                // throw inside OnEnable, which is a miserable place to debug from. Validate is
-                // what reports them.
+                // Empty slots are normal mid-edit; a null here would throw inside OnEnable.
+                // Validate reports them.
                 if (weapon == null)
                     continue;
 
-                // First id wins. Overwriting instead would make which weapon you get depend on
-                // list order, which is the exact thing this class exists to prevent.
+                // First id wins: overwriting would make the result depend on list order.
                 if (!byId.ContainsKey(weapon.Id))
                     byId.Add(weapon.Id, weapon);
             }
         }
 
 #if UNITY_EDITOR
-        /// <summary>
-        /// Rebuilds the lookup and surfaces any duplicate ids the moment the designer edits the
-        /// list, so a clash shows up in the Editor rather than as a player holding the wrong
-        /// weapon in a playtest. The rebuild matters on its own: OnEnable does not fire again
-        /// after an Inspector edit, so without this the lookup would serve stale entries for the
-        /// rest of the session.
-        /// </summary>
+        // OnEnable does not fire after an Inspector edit, so without the rebuild the lookup serves stale
+        // entries for the rest of the session.
         private void OnValidate()
         {
             BuildLookup();

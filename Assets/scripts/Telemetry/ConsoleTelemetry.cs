@@ -4,17 +4,13 @@ using Overpower.Data;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Playtest extras P1 (2026-09-26): every player's own console output goes into their own match
-    /// log, through the pure <see cref="ConsoleLineRule"/> (cut, fold, per-second cap, scrub). Lives
-    /// next to MatchTelemetry (same GameObject - the BuildingManager object) and follows its exact
-    /// enable/disable shape: subscribes to Application.logMessageReceived in OnEnable, unsubscribes
-    /// in OnDisable (which also covers OnApplicationQuit/OnDestroy - Unity calls OnDisable before
-    /// either), and asks MatchTelemetry.BeforeClose for one last chance to flush a still-pending fold
-    /// bucket before the writer closes, the same hook PlayerTelemetry's own accumulators use.
+    /// Every player's own console output goes into their own match log, through the pure <see cref="ConsoleLineRule"/> (cut, fold,
+    /// per-second cap, scrub). Lives on MatchTelemetry's GameObject (the BuildingManager object): subscribes to
+    /// Application.logMessageReceived in OnEnable, unsubscribes in OnDisable (Unity calls it before OnApplicationQuit/OnDestroy), and
+    /// uses MatchTelemetry.BeforeClose for one last flush of a pending fold bucket before the writer closes.
     ///
-    /// Every player already has DebugOverlay's OWN Application.logMessageReceived subscription (an
-    /// on-screen viewer, F1/F2) - the two are independent listeners on the same Unity event, which
-    /// Unity supports with no ordering guarantee between them and no interference either way.
+    /// DebugOverlay has its own independent logMessageReceived subscription (the on-screen viewer); Unity gives no ordering
+    /// between the two and neither interferes.
     /// </summary>
     [DisallowMultipleComponent]
     public class ConsoleTelemetry : MonoBehaviour
@@ -23,24 +19,19 @@ namespace Overpower.Telemetry
                  "switch (on top of Enabled), and the per-second cap/message length live here too.")]
         [SerializeField] private TelemetryConfig config;
 
-        // The stack ConsoleLineRule needs a hard cap on too, even though it is not designer tuning
-        // (the brief lists only the message length and the per-second cap as TelemetryConfig fields) -
-        // matching MaxPendingLines' own "a constant, not an asset field" treatment on MatchTelemetry.
+        // Not a TelemetryConfig field (the designer tunes only the message length and the per-second cap); a constant like
+        // MatchTelemetry.MaxPendingLines.
         private const int StackMaxChars = 1000;
 
         private ConsoleLineRule rule;
         private bool subscribed;
 
-        // Reentrancy guard (the brief's own P1 wording: "a guard stops the listener reacting to
-        // anything it logs itself") - this component never calls Debug.Log/LogWarning/LogError from
-        // inside OnLog today, but a future edit easily could, and Application.logMessageReceived is
-        // re-entrant if a handler logs anything at all: without this, that log would recurse back
-        // into OnLog while it is still running.
+        // Reentrancy guard: Application.logMessageReceived is re-entrant if a handler logs anything. This component logs nothing in
+        // OnLog today, but without the guard a future edit's log would recurse into OnLog while it is still running.
         private bool inLog;
 
-        // Tracks the file-open transition (Application.logMessageReceived is event-driven and may
-        // not fire again for a long time after the file actually opens - see FlushPreOpenDroppedSummary's
-        // own comment) so the pre-open dropped-count summary gets exactly one chance to be written.
+        // Tracks the file-open transition: logMessageReceived is event-driven and may not fire for a long time after the file opens,
+        // so the pre-open dropped-count summary needs its own one chance to be written.
         private bool wasOpen;
 
         private void OnEnable()
@@ -78,10 +69,8 @@ namespace Overpower.Telemetry
                 FlushPreOpenDroppedSummary();
             wasOpen = isOpen;
 
-            // A lone message with nothing after it to fold into, or to differ from, would otherwise
-            // sit in the pending bucket until BeforeClose - reaching disk only when the match ends.
-            // Application.logMessageReceived only fires on a NEW message, so nothing but a poll can
-            // notice "the fold window has simply run out" - see ConsoleLineRule.FoldWindowSeconds.
+            // A lone message would otherwise sit in the pending bucket until BeforeClose. logMessageReceived only fires on a NEW
+            // message, so only a poll notices the fold window has run out (ConsoleLineRule.FoldWindowSeconds).
             if (isOpen && rule.HasPending)
             {
                 double now = MatchTelemetry.Instance.Now;
@@ -94,9 +83,8 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>Step 0 review fix (b): now the shared TelemetryScrub.AppIdTargets() - MatchTelemetry.
-        /// LogChat reads the exact same targets for chat text. Never stored anywhere else, never
-        /// logged, never printed.</summary>
+        /// <summary>The shared TelemetryScrub.AppIdTargets(), the same targets MatchTelemetry.LogChat reads. Never stored elsewhere,
+        /// logged or printed.</summary>
         private static string[] ScrubTargets() => TelemetryScrub.AppIdTargets();
 
         private void OnLog(string message, string stackTrace, LogType type)
@@ -126,13 +114,9 @@ namespace Overpower.Telemetry
             }
             catch
             {
-                // Step 0 review fix (c): swallowed on purpose, and nothing here may log anything -
-                // this runs INSIDE Application.logMessageReceived, so a Debug.Log*/LogError call
-                // would immediately re-enter this same event (the inLog guard would only stop it
-                // from doing anything, not stop the recursive dispatch itself). Turns console
-                // recording off for the rest of the session - a listener that throws once has no
-                // reason to believe it won't throw on every following line, and disabling beats
-                // repeating the same silent failure (and cost) on every message from here on.
+                // Swallowed on purpose, and nothing here may log: this runs INSIDE Application.logMessageReceived, so a Debug.Log*
+                // call would re-enter the event (the inLog guard stops the handling, not the recursive dispatch). Turns console
+                // recording off for the rest of the session: a listener that threw once is not trusted to stop throwing.
                 rule = null;
                 Application.logMessageReceived -= OnLog;
                 if (MatchTelemetry.Instance != null)
@@ -152,9 +136,8 @@ namespace Overpower.Telemetry
                 MatchTelemetry.Instance.LogConsoleDropped(dropped);
         }
 
-        /// <summary>MatchTelemetry.BeforeClose: the fold bucket still pending (if any - the match's
-        /// very last console line, which nothing ever arrived to flush) and this second's own dropped
-        /// count both get one last chance to be written before the writer closes.</summary>
+        /// <summary>MatchTelemetry.BeforeClose: the pending fold bucket (the match's last console line) and this second's dropped
+        /// count get one last write before the writer closes.</summary>
         private void HandleBeforeClose()
         {
             if (rule == null || MatchTelemetry.Instance == null)
@@ -168,11 +151,8 @@ namespace Overpower.Telemetry
             if (dropped > 0)
                 MatchTelemetry.Instance.LogConsoleDropped(dropped);
 
-            // Step 0 review fix (a): this component (and its ConsoleLineRule) lives for the whole
-            // session, not just one match - BeforeClose fires at every match's end (OnLeftRoom) as
-            // well as at real shutdown, so resetting here always leaves the NEXT match (if there is
-            // one) with its own fresh PreOpenQueueCap rather than whatever this match had already
-            // spent by the time its file opened.
+            // This component and its rule live for the whole session, and BeforeClose fires at every match's end (OnLeftRoom) as
+            // well as at shutdown, so resetting here gives the NEXT match its own fresh PreOpenQueueCap.
             rule.ResetPreOpenBudget();
         }
 

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Overpower.Lobby
 {
     /// <summary>
-    /// Which scene a lobby plays on (Dominion Task 10). Every lobby is made and filled in Game Scene (the name screen, the list, the seats and
+    /// Which scene a lobby plays on. Every lobby is made and filled in Game Scene (the name screen, the list, the seats and
     /// the chat live there); a game mode that plays on another map names that scene (GameModeDefinition.SceneName). When the host presses Start
     /// game the master loads that scene for everyone, and from then on nobody spawns a body or reacts to the start until the active scene is the
     /// room's. These are the pure decisions; LobbyStart and RoomManager ask them.
@@ -25,8 +25,8 @@ namespace Overpower.Lobby
         /// acted on. False while the room's scene is still to be loaded.</summary>
         public static bool RoomIsHere(string modeScene, string activeScene) => SceneToLoadOnStart(modeScene, activeScene) == null;
 
-        /// <summary>The scene Back to the lobby list loads: always the lobby scene, whatever scene the match was played on (the active scene
-        /// is no longer used for this).</summary>
+        /// <summary>The scene Back to the lobby list loads: always the lobby scene, whatever scene the match was played on (activeScene is
+        /// ignored).</summary>
         public static string SceneForLobbyList(string activeScene) => LobbyListScene;
 
         /// <summary>Whether a starting RoomManager sets Photon's AuthenticationValues: only when the client is not connected yet. A live connection's values
@@ -35,8 +35,8 @@ namespace Overpower.Lobby
 
         /// <summary>Which of the already-created components get the room-joined notice again when a scene arrives in a room that is already
         /// running (a scene load for everyone, or a joiner whose scene was synced). The room-joined callbacks of these only READ the room, so
-        /// repeating them in the new scene is safe. BuildingManager and ZonePresenceTracker are left out: their Start already reads a room that is there. The others (RoomManager clears the team of a new player, the lobby list clears itself) must
-        /// not be repeated.</summary>
+        /// repeating them in the new scene is safe. BuildingManager and ZonePresenceTracker are left out: their Start already reads a room
+        /// that is there. The others (RoomManager clears the team of a new player, the lobby list clears itself) must not be repeated.</summary>
         private static readonly string[] ResumedAfterSceneLoad =
         {
             nameof(LobbySeats), nameof(LobbyStart), nameof(Overpower.Match.MatchDirector), nameof(Overpower.Telemetry.MatchTelemetry),

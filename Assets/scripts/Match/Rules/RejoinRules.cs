@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Overpower.Match
 {
-    /// <summary>Task 9e (Tudor D21): what a player saves so a crash or a quit does not lose their place - the room they
+    /// <summary>What a player saves (D21) so a crash or a quit does not lose their place - the room they
     /// were in, the id they were using, their name, and when they were last seen in it. Written next to the game
     /// (RejoinStore), read back on the name screen.</summary>
     [Serializable]
@@ -129,13 +129,13 @@ namespace Overpower.Match
         /// not about a held place.</summary>
         public static bool IsHeldPlaceRefusal(int code) => code == InactiveJoinerErrorCode || code == NoRandomMatchFoundCode;
 
-        /// <summary>Tudor (9e-3): a player rejoining a team that was KNOCKED OUT comes back as a spectator of it - dead, no respawn, the
+        /// <summary>A player rejoining a team that was KNOCKED OUT comes back as a spectator of it - dead, no respawn, the
         /// waiting state the rest of the team has (the ordinary death path already answers that for an eliminated team) - and is not
         /// moved. Only a team that was never in the match (left out at go-live) is re-picked, as for a new joiner.</summary>
         public static RejoinTeamAction TeamOnRejoin(bool teamsFixed, bool teamEliminated, bool teamInMatch) =>
             teamsFixed && !teamEliminated && !teamInMatch ? RejoinTeamAction.Repick : RejoinTeamAction.Keep;
 
-        /// <summary>Task 9g (Tudor): the rejoiner onto a knocked-out team lands on the "You lost" panel (with Spectate) while the match
+        /// <summary>The rejoiner onto a knocked-out team lands on the "You lost" panel (with Spectate) while the match
         /// still runs. Once the match is over the result screen decides win or lose instead (MatchDirector's winner reaction).</summary>
         public static bool LandsOnLosePanel(bool teamEliminated, MatchPhase phase) =>
             teamEliminated && phase != MatchPhase.Over;
@@ -186,7 +186,7 @@ namespace Overpower.Match
         public static bool ShouldRetryRejoin(int returnCode, int retriesSoFar, int maxRetries) =>
             returnCode == ActiveJoinerErrorCode && retriesSoFar < maxRetries;
 
-        /// <summary>The seconds on the config to Photon's milliseconds. Zero means "no slot is kept" (the old behaviour).</summary>
+        /// <summary>The seconds on the config to Photon's milliseconds. Zero means "no slot is kept".</summary>
         public static int PlayerTtlMs(float seconds) => seconds <= 0f ? 0 : Mathf.RoundToInt(seconds * 1000f);
 
         /// <summary>The "Connection lost - Rejoin" panel shows for a disconnect nobody asked for, from inside a room.
@@ -211,14 +211,14 @@ namespace Overpower.Match
             !hasBody && secondsWaited >= limitSeconds;
     }
 
-    /// <summary>Task 9e: how a player whose connection dropped (a Photon "inactive" actor, kept for the rejoin window) counts
+    /// <summary>How a player whose connection dropped (a Photon "inactive" actor, kept for the rejoin window) counts
     /// in the match. The rule is the same everywhere: absent, not alive, not a lobby member - and never a reason for the
     /// match to wait.</summary>
     public static class PresenceRules
     {
         public static bool IsPresent(bool inactive) => !inactive;
 
-        /// <summary>Tudor D-a: as <see cref="CountsAsDead(bool,bool,bool?)"/>, but a dropped player only counts as dead once they have
+        /// <summary>As <see cref="CountsAsDead(bool,bool,bool?)"/> (D-a), but a dropped player only counts as dead once they have
         /// been gone <paramref name="graceSeconds"/> - a quick reconnect inside the grace changes nothing for the team. A real
         /// death (alive false, or waiting in the last stand) is never hidden by the grace.</summary>
         public static bool CountsAsDead(bool inactive, bool waiting, bool? aliveProperty, float inactiveSeconds, float graceSeconds) =>

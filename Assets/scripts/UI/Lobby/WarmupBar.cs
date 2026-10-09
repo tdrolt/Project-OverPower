@@ -8,12 +8,12 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The warm-up bar (board 4, lobby Task 10): at the top of the arena while the lobby is in its warm-up. "WARM-UP" and "Free shop · nothing counts ·
+    /// The warm-up bar (board 4): at the top of the arena while the lobby is in its warm-up. "WARM-UP" and "Free shop · nothing counts ·
     /// N players", and for the host an END WARM-UP button (greyed, with the team that has nobody, while a team of the mode has no player present);
     /// everyone else reads "&lt;host&gt; ends the warm-up". During the countdown it reads "MATCH STARTS IN 3" in yellow with "Everything resets when it
-    /// goes live"; once the match is live, or before Start game, it is not there. It replaces the old warm-up line and Start button of the HUD. It is
-    /// not part of a player's body, so a spectator seat (and a host on one) has it too. What it says comes from MatchStartRules.WarmupMessageFor; the
-    /// button calls MatchDirector.HostStartMatch. Built in code from UiTheme (LobbyUiKit).
+    /// goes live"; once the match is live, or before Start game, it is not there. It is not part of a player's body, so a spectator seat (and a
+    /// host on one) has it too. What it says comes from MatchStartRules.WarmupMessageFor; the button calls MatchDirector.HostStartMatch.
+    /// Built in code from UiTheme (LobbyUiKit).
     /// </summary>
     public sealed class WarmupBar : MonoBehaviour
     {

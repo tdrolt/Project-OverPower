@@ -9,34 +9,23 @@ using Overpower.Telemetry;
 
 namespace Overpower.EditorTools.Telemetry
 {
-    /// <summary>Task T6 step 3 / Task T7: one self-contained report.html per match folder. Every
-    /// number comes straight from a ReportSet's three ReportTables (T5/T7) - CsvReportWriter and this
-    /// class format the exact same data, so the CSVs and the HTML page can never disagree, only
-    /// present differently (design doc, Outputs). The only inputs this class reads that ReportTables
-    /// doesn't carry are:
-    /// - raw `sample` x/z positions (never one of the 12/13 CSVs - see TelemetryLog directly) for the
-    ///   position heatmap, and
-    /// - BalanceTargets and the arena PNG, both reference material with no place in a CSV either.
+    /// <summary>One self-contained report.html per match folder. Every number comes straight from a ReportSet's three
+    /// ReportTables - CsvReportWriter and this class format the same data, so the CSVs and the page can never disagree. The only
+    /// inputs not in ReportTables: raw `sample` x/z positions (for the position heatmap) and BalanceTargets plus the arena PNG.
     ///
-    /// Task T7: the page has three tabs - Phase 1, Phase 2, Whole match - each rendering its OWN
-    /// ReportTables through the same render functions, parameterized by (scope, suffix): `scope`
-    /// picks which of DATA.phase1/phase2/wholeMatch a table read goes through (rowsFor), `suffix`
-    /// picks which tab's own copy of every element id to write into (every id in the static template
-    /// below carries a suffix, filled in by TabPanel/TabPanelTemplate.Replace). A missing Phase 2 (no
-    /// elimination in this match) hides that tab's content behind a single note instead of rendering
-    /// three empty sections.
+    /// The page has three tabs - Phase 1, Phase 2, Whole match - each rendering its OWN ReportTables through the same render
+    /// functions, parameterized by (scope, suffix): `scope` picks which of DATA.phase1/phase2/wholeMatch a read goes through
+    /// (rowsFor), `suffix` picks which tab's copy of every element id to write into (every id in the template carries one, filled
+    /// in by TabPanel/TabPanelTemplate.Replace). A missing Phase 2 hides that tab's content behind a single note.
     ///
-    /// All data is embedded as one JSON blob (Newtonsoft, StringEscapeHandling.EscapeHtml) so a
-    /// player-provided string (nickname, marker note) can never break out of the embedding
-    /// &lt;script&gt; tag - every '&lt;', '&gt;', '&amp;' and quote becomes a \uXXXX escape, so the
-    /// literal text "&lt;/script&gt;" can never appear in the emitted HTML at all. The page's own JS
-    /// then writes every player-provided string via .textContent (never innerHTML) as a second,
-    /// independent layer of the same protection.</summary>
+    /// All data is embedded as one JSON blob (Newtonsoft, StringEscapeHandling.EscapeHtml) so a player-provided string (nickname,
+    /// marker note) can never break out of the embedding &lt;script&gt; tag: every '&lt;', '&gt;', '&amp;' and quote becomes a \uXXXX
+    /// escape. The page's JS also writes every player-provided string via .textContent (never innerHTML), a second independent
+    /// layer of the same protection.</summary>
     public static class HtmlReportWriter
     {
-        /// <summary>Review fix (T6 item 5): a 9-player, 25-minute match at the shipped 5s sample
-        /// interval would embed ~2700 samples PER PLAYER (24300 total) as raw JSON otherwise - capped
-        /// so the report stays a reasonable size regardless of match length or player count.</summary>
+        /// <summary>A 9-player, 25-minute match at the shipped 5s sample interval would embed ~2700 samples PER PLAYER (24300 total)
+        /// as raw JSON otherwise; capped so the report stays a reasonable size.</summary>
         private const int MaxPositionSamples = 3000;
 
         public static string Write(ReportSet reportSet, TelemetryLog log, BalanceTargetsData targets, ArenaReportRender.Result arena, string folder)
@@ -57,21 +46,17 @@ namespace Overpower.EditorTools.Telemetry
             public float X;
             public float Z;
             public bool Alive;
-            /// <summary>Task T7: 1 or 2, from this sample's own t - positions are a single shared list
-            /// in the payload (not tripled per scope, to keep the report's size down); the page's own
-            /// rowsFor('positions', scope) filters this client-side instead.</summary>
+            /// <summary>1 or 2, from this sample's t. Positions are a single shared list in the payload (not tripled per scope, to keep the
+            /// report small); the page's rowsFor('positions', scope) filters client-side.</summary>
             public int Phase = 1;
         }
 
-        /// <summary>Positions are only ever in the raw `sample` lines (design choice: not one of the
-        /// CSVs - see the spec's own CSV table list), so this reads the log directly rather than
-        /// going through TelemetryAggregator, which stays untouched by this whole task.
+        /// <summary>Positions are only in the raw `sample` lines (not one of the CSVs), so this reads the log directly rather than
+        /// going through TelemetryAggregator.
         ///
-        /// Review fix (T6 item 5): down-sampled to at most <see cref="MaxPositionSamples"/> kept
-        /// points - grouped per actor (own file) first, so a long match doesn't quietly lose an
-        /// entire short-lived joiner's coverage to a global "keep every Nth line read" cut; keeping
-        /// every Nth sample WITHIN each player's own sequence keeps their spatial coverage roughly
-        /// even instead of just truncating to their earliest N samples.</summary>
+        /// Down-sampled to at most <see cref="MaxPositionSamples"/> kept points - grouped per actor (own file) first, so a long match
+        /// doesn't lose a short-lived joiner's coverage to a global "keep every Nth line" cut; keeping every Nth sample WITHIN each
+        /// player's sequence keeps spatial coverage roughly even instead of truncating to their earliest N samples.</summary>
         private static List<PositionSample> ExtractPositions(TelemetryLog log, out int keepEveryN)
         {
             keepEveryN = 1;
@@ -90,8 +75,7 @@ namespace Overpower.EditorTools.Telemetry
             foreach (TelemetryEvent e in log.Events)
             {
                 if (e.Name != TelemetryKeys.Sample) continue;
-                // 2.7b step 9: the report's windows start at going live - a warm-up position has no
-                // business on any tab's heatmap (nothing counts before live - Decision 3).
+                // The report's windows start at going live: a warm-up position has no business on any tab's heatmap (Decision 3).
                 if (timeline.WentLive && e.T < timeline.LiveSeconds) continue;
 
                 var xToken = e.Data[TelemetryKeys.X];
@@ -125,10 +109,8 @@ namespace Overpower.EditorTools.Telemetry
 
         private static string Build(ReportSet reportSet, List<PositionSample> positions, int positionsKeptEveryN, BalanceTargetsData targets, ArenaReportRender.Result arena)
         {
-            // 2.7b step 9: Phase 1 no longer starts at 0 once the match has a warm-up - it starts at
-            // LiveSeconds instead (PhaseTimeline), so its own MatchLengthSeconds (End - Start) is no
-            // longer the transition instant on its own. Read straight from ReportSet.TransitionSeconds
-            // (carried from PhaseTimeline.From) instead of re-deriving it from Phase1's window here.
+            // Phase 1 starts at LiveSeconds once the match has a warm-up (PhaseTimeline), so its MatchLengthSeconds (End - Start) is no
+            // longer the transition instant. Read ReportSet.TransitionSeconds instead of re-deriving it from Phase1's window.
             double? transitionSeconds = reportSet.TransitionSeconds;
 
             var payload = new
@@ -141,9 +123,8 @@ namespace Overpower.EditorTools.Telemetry
                 positionsKeptEveryN,
                 targets,
                 arena,
-                // 2026-09-27 designer change: names Tudor can read, not team/zone numbers - one pure
-                // mapping (ArenaNames), embedded once and read by every render function's own
-                // teamName()/zoneLabel() helper below, so the page never repeats "Team N".
+                // Names Tudor can read, not team/zone numbers: one pure mapping (ArenaNames), embedded once and read by the page's
+                // teamName()/zoneLabel() helpers, so the page never repeats "Team N".
                 teamNames = System.Linq.Enumerable.Range(0, 3).Select(ArenaNames.TeamName).ToArray(),
                 zoneNames = System.Linq.Enumerable.Range(0, 10).Select(ArenaNames.ZoneName).ToArray(),
             };
@@ -191,9 +172,8 @@ namespace Overpower.EditorTools.Telemetry
             };
         }
 
-        /// <summary>Task T7: one tab's full section markup, with every element id suffixed by
-        /// <paramref name="scope"/> (via TabPanelTemplate's %SCOPE% token) so the same render code can
-        /// target three independent copies of the DOM, one per tab.</summary>
+        /// <summary>One tab's full section markup, with every element id suffixed by <paramref name="scope"/> (via TabPanelTemplate's
+        /// %SCOPE% token) so the same render code can target three independent copies of the DOM.</summary>
         private static string TabPanel(string tabKey, string scope, bool visibleByDefault)
         {
             string content = TabPanelTemplate.Replace("%SCOPE%", scope);
@@ -201,23 +181,18 @@ namespace Overpower.EditorTools.Telemetry
             return "<div id='tab-" + tabKey + "' class='tab-panel'" + style + ">\n" + content + "\n</div>\n";
         }
 
-        /// <summary>Review fix (T6 item 6): U+2028/U+2029 (LINE/PARAGRAPH SEPARATOR) are valid inside
-        /// a JSON string but were - for a long time, and still in plenty of non-browser JS engines -
-        /// NOT valid inside a JS string literal at all (only fixed for literals by ES2019). A
-        /// nickname or marker note containing one, embedded raw, could corrupt the surrounding
-        /// `const DATA = {...};` statement. Newtonsoft's StringEscapeHandling.EscapeHtml only
-        /// escapes '&lt;'/'&gt;'/'&amp;'/quotes, not these, so this is a final pass over the whole
-        /// serialized JSON text - safe as a blind replace because these two characters can only ever
-        /// appear INSIDE a JSON string value's content, never as JSON's own (all-ASCII) structural
-        /// syntax.</summary>
+        /// <summary>U+2028/U+2029 (LINE/PARAGRAPH SEPARATOR) are valid inside a JSON string but NOT inside a JS string literal before
+        /// ES2019 (still true in plenty of non-browser JS engines). A nickname or marker note containing one, embedded raw, could
+        /// corrupt the surrounding `const DATA = {...};` statement. EscapeHtml doesn't escape them, so this is a final pass over the
+        /// serialized JSON text - a safe blind replace because these characters can only appear INSIDE a JSON string value, never as
+        /// JSON's own (all-ASCII) structural syntax.</summary>
         private static string EscapeLineTerminators(string json)
         {
             return json.Replace("\u2028", "\\u2028").Replace("\u2029", "\\u2029");
         }
 
-        // Single-quoted HTML attributes and JS strings throughout, on purpose: a C# verbatim string
-        // only ends at an unescaped double quote, so keeping every quote in this template single
-        // avoids a large block of "" escaping.
+        // Single-quoted HTML attributes and JS strings throughout, on purpose: a C# verbatim string only ends at an unescaped double
+        // quote, so keeping every quote in this template single avoids a large block of "" escaping.
         private const string HtmlHead = @"<!doctype html>
 <html lang='en'>
 <head>
@@ -314,9 +289,8 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
 </div>
 ";
 
-        /// <summary>Task T7: one tab's inner markup - every id carries a %SCOPE% token, replaced with
-        /// 'whole-match' / 'phase-1' / 'phase-2' by TabPanel. Structurally identical for every scope;
-        /// only the DATA each scope's render calls read (via rowsFor) differs.</summary>
+        /// <summary>One tab's inner markup - every id carries a %SCOPE% token, replaced with 'whole-match' / 'phase-1' / 'phase-2' by
+        /// TabPanel. Identical for every scope; only the DATA each scope's render calls read (via rowsFor) differs.</summary>
         private const string TabPanelTemplate = @"
 <p class='phase-duration' id='phase-duration-%SCOPE%'></p>
 <div id='phase2-empty-note-%SCOPE%' class='warn' style='display:none'>No team was eliminated in this match: everything is Phase 1.</div>

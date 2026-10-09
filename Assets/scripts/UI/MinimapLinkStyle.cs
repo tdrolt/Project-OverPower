@@ -9,14 +9,12 @@ namespace Overpower.UI
         /// <summary>A line with an arrowhead in the team's colour, from its zone toward the neutral one: a way in (GDD p.27).</summary>
         WayIn,
         /// <summary>A line split at its midpoint, each half in its own end's owner colour, no arrowhead: a border
-        /// between two different teams' zones (controller amendment 2, 2026-09-17). A way in for both teams, so grey
-        /// would hide the front line.</summary>
+        /// between two different teams' zones. A way in for both teams, so grey would hide the front line.</summary>
         Border,
     }
 
-    /// <summary>How the minimap draws the link between two adjacent zones, from their owners only (spec 2026-09-16,
-    /// "Links", amended by controller amendment 2, 2026-09-17: a border between two different teams' zones is
-    /// <see cref="MinimapLinkKind.Border"/>, not the spec's thin grey line). Pure, so the rule is tested.</summary>
+    /// <summary>How the minimap draws the link between two adjacent zones, from their owners only. Pure, so the
+    /// rule is tested.</summary>
     public readonly struct MinimapLinkStyle
     {
         public readonly MinimapLinkKind Kind;

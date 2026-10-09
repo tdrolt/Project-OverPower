@@ -4,51 +4,19 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The flamethrower's cone (ability visuals step 5; Tudor: "just a cylinder instead of a cone that starts from the
-    /// player"). A3 (Tudor 2026-09-17 evening) replaced the originally planned flat fan-plus-outline with a SOFT cone:
-    /// a flat fan on the floor, tip under the caster's root, opening to the ability's own Cone Range and Cone Angle -
-    /// exactly the shape ConeFilter.IsWithinCone tests (flat, measured from the caster's root) - warm at the tip,
-    /// fading to fully transparent at the far edge and toward the side edges, with a subtle flicker, so a player can
-    /// tell where the flames reach without the screen filling with a flat orange wash. The hard outline from the
-    /// original plan started caster-only (A3: "no hard outline for other players"); ability visuals step 7 (Tudor:
-    /// "you can turn it on") turned it back on for everyone at a lower opacity than the caster's own line - see Non
-    /// Caster Edge Opacity's own tooltip for the value and why. FlamethrowerAbility.ShowVfx reads Owner.IsMine once
-    /// per cast and passes it in; this class has no network state of its own.
-    ///
-    /// VERTEX-COLOUR TRAP (found while building this): the shared Ability Visual Glass.mat is URP/Unlit, and that
-    /// shader's Attributes struct (Packages/com.unity.render-pipelines.universal/Shaders/UnlitForwardPass.hlsl) has no
-    /// COLOR semantic at all - it never reads a mesh's vertex colours, so the tip-to-edge gradient below would render
-    /// as a flat wash if drawn with it. This is the exact bug Laser Beam.mat hit on 2026-09-15 ("the previous plain
-    /// URP/Unlit shader does not read a LineRenderer's vertex colours at all"), fixed there by switching to URP
-    /// Particles/Unlit (ParticlesUnlitInput.hlsl's SampleAlbedo multiplies the material colour by the mesh's own
-    /// vertex colour - verified by reading both shaders' source, not assumed). The fan below uses a DIFFERENT, NEW
-    /// material - Flame Cone.mat, also Particles/Unlit - rather than editing Ability Visual Glass.mat, which the
-    /// mine, portal and fence already ship with; changing its shader would have silently altered three finished steps.
-    ///
-    /// GROUND-HUE TRAP (found 2026-09-18, after the first open-ground capture): a flat orange fill barely blends
-    /// away from this arena's own tan/orange floor (measured ~RGB 172,102,60 vs. the flame's ~RGB 255,115,26 - the
-    /// same family of warm hue), so raising alpha alone cannot make it read: alpha-blending two similar colours
-    /// stays close to both of them regardless of the mix ratio. Same root cause as team 0's near-white being
-    /// invisible against this arena's railings (steps 3-4). Fixed the same way real fire actually looks: Core Colour
-    /// pushes the TIP toward a hot, pale yellow-white - a hue far enough from tan/orange that even a modest alpha
-    /// blend visibly separates - fading toward the ability's own Colour (and to fully transparent) by the far edge,
-    /// so A3's "doesn't fill the screen with orange" still holds.
-    ///
-    /// RADIAL-FADE DEFECT (review finding, 2026-09-18): the fan is built from AbilityVisualGeometry.FanVertex, whose
-    /// pre-existing shape was one tip plus a SINGLE ring of arc points at the full range - so FanVertexRangeFraction
-    /// was a step function (0 at the tip, 1 everywhere else), and the alpha this class computed from it,
-    /// tipAlpha * rangeFade * sideFade, came out as tipAlpha at the single tip vertex and exactly 0 at every other
-    /// vertex, whatever Side Fraction said. The mesh's own interpolation then drew a straight line from that one
-    /// bright point to zero across the WHOLE 7 m, so almost the entire visible area sat near zero regardless of Tip
-    /// Alpha - the real reason the fill read as invisible, more than the colour choice above did. Fixed by giving
-    /// AbilityVisualGeometry.FanVertex an explicit Radial Rings parameter: real vertices partway along the range let
-    /// Radial Hold Fraction below hold a readable alpha through the near/middle of the cone and only fall off over
-    /// the last stretch, and let the side fade (which was always mathematically inert on a single ring - every
-    /// non-tip vertex read the same alpha of 0 no matter its angle) finally do something visible too.
-    ///
-    /// Visual only. The mesh is rebuilt only when Cone Range/Cone Angle/Colour change; Place runs every physics step
-    /// while spraying and allocates nothing, and the flicker recolours the SAME cached arrays at a capped rate rather
-    /// than building new ones every frame.
+    /// The flamethrower's cone: a SOFT flat fan on the floor, tip under the caster's root, opening to the ability's Cone
+    /// Range and Cone Angle (exactly ConeFilter.IsWithinCone's shape), warm at the tip and fading to transparent toward the
+    /// far and side edges with a subtle flicker, plus an aiming outline (Edge Opacity for the caster, Non Caster Edge
+    /// Opacity for others). FlamethrowerAbility.ShowVfx passes Owner.IsMine in; no network state here.
+    /// VERTEX-COLOUR TRAP: the shared Ability Visual Glass.mat is URP/Unlit, which never reads a mesh's vertex colours, so
+    /// the tip-to-edge gradient would render as a flat wash. The fan uses Flame Cone.mat (Particles/Unlit, which multiplies
+    /// the material colour by the vertex colour); don't edit Glass.mat, the mine, portal and fence ship with it.
+    /// GROUND-HUE TRAP: a flat orange fill barely separates from this arena's tan/orange floor and alpha alone cannot fix
+    /// it, so Core Colour pushes the TIP to pale yellow-white, fading to the ability's Colour and to clear by the far edge.
+    /// RADIAL-FADE TRAP: with a single outer vertex ring the range fraction is a step (0 or 1), so alpha was a straight line
+    /// from one bright point to zero and Radial Hold Fraction and the side fade did nothing; Radial Rings gives real vertices.
+    /// Visual only. The mesh rebuilds only when Cone Range/Angle/Colour change; Place runs every physics step and allocates
+    /// nothing; the flicker recolours the SAME cached arrays at a capped rate.
     /// </summary>
     public sealed class FlameConeVisual : MonoBehaviour
     {
@@ -139,8 +107,7 @@ namespace Overpower.Abilities
         }
 
         /// <summary>Sizes the cone to the ability's real numbers and colours it. Cheap when nothing changed.
-        /// <paramref name="isCasterView"/> (A3) picks Edge Opacity vs. Non-Caster Edge Opacity for the aiming
-        /// outline - everyone runs the exact same code, only the opacity they get differs.</summary>
+        /// <paramref name="isCasterView"/> picks Edge Opacity vs. Non-Caster Edge Opacity for the aiming outline.</summary>
         public void Configure(float range, float fullAngleDegrees, Color color, bool isCasterView)
         {
             if (range != builtRange || fullAngleDegrees != builtAngle || color != builtColor)
@@ -148,9 +115,8 @@ namespace Overpower.Abilities
 
             if (block == null)
                 block = new MaterialPropertyBlock();
-            // Opaque white here on purpose: Core Colour-to-Colour and every fade now live entirely in the mesh's own
-            // vertex colours below (the one channel Particles/Unlit actually multiplies per vertex) - _BaseColor
-            // would otherwise re-tint the vertex-computed hue a second time and wash out Core Colour's pale tip.
+            // Opaque white on purpose: Core Colour-to-Colour and every fade live entirely in the mesh's vertex colours
+            // (the channel Particles/Unlit multiplies per vertex); _BaseColor would re-tint the hue and wash out the pale tip.
             VisualTint.SetMeshColor(fan != null ? fan.GetComponent<Renderer>() : null, block, Color.white);
             ApplyFlicker(); // immediate recolour for this cast, rather than waiting up to 1 / Flicker Updates Per Second
 
@@ -183,18 +149,15 @@ namespace Overpower.Abilities
             ApplyFlicker();
         }
 
-        /// <summary>A3's "subtle alpha flicker": recolours the SAME cached Color32[] (never a new array) and pushes it
-        /// to the mesh. Only alpha flickers - RGB is the fixed Core-Colour-to-Colour gradient baked in Rebuild, so the
-        /// flame's hue itself never strobes, only its brightness. PerlinNoise, not Random.value, so it is
-        /// deterministic and allocation-free, and its smooth curve reads as a living flame rather than a per-frame
-        /// strobe.</summary>
+        /// <summary>Recolours the SAME cached Color32[] (never a new array) and pushes it to the mesh. Only alpha flickers;
+        /// RGB is the gradient baked in Rebuild, so the hue never strobes. PerlinNoise, not Random.value: deterministic,
+        /// allocation-free, and its smooth curve reads as a living flame rather than a strobe.</summary>
         private void ApplyFlicker()
         {
             if (mesh == null || colors == null)
                 return;
 
-            // Clamped defensively here too, not just in OnValidate (which never runs on a built Player) - see Flicker
-            // Updates Per Second's own tooltip for why 0 must never reach this division.
+            // Clamped here too, not just in OnValidate (which never runs in a built Player): 0 must never reach this division.
             float interval = 1f / Mathf.Max(1f, flickerUpdatesPerSecond);
             nextFlickerTime = Time.time + interval;
 
@@ -227,17 +190,16 @@ namespace Overpower.Abilities
             {
                 vertices[i] = AbilityVisualGeometry.FanVertex(i, range, fullAngleDegrees, slices, rings);
 
-                // A3, fixed per the 2026-09-18 review: warm and full-strength through Radial Hold Fraction of the
-                // range, then fading to clear by the far edge, and also fading toward the side edges - all three
-                // readings of the SAME fan-vertex index AbilityVisualGeometry exposes, not hand-rolled fade maths.
-                float radial = AbilityVisualGeometry.FanVertexRangeFraction(i, slices, rings); // 0 at the tip, 1 on the outer arc - now a real ramp, not a step
+                // Full-strength through Radial Hold Fraction of the range, then fading to clear by the far edge, and also
+                // fading toward the side edges - all readings of the SAME fan-vertex index AbilityVisualGeometry exposes.
+                float radial = AbilityVisualGeometry.FanVertexRangeFraction(i, slices, rings); // 0 at the tip, 1 on the outer arc
                 float holdT = Mathf.InverseLerp(radialHoldFraction, 1f, radial); // 0 while radial <= Radial Hold Fraction, ramps to 1 by the outer arc
                 float rangeFade = 1f - Mathf.Clamp01(holdT);
                 float sideFade = 1f - AbilityVisualGeometry.FanVertexSideFraction(i, slices);
                 baseAlpha[i] = tipAlpha * rangeFade * sideFade;
 
-                // Ground-hue fix: the colour fades from the hot, pale Core Colour at the tip to the ability's own
-                // Colour on the outer arc - radial only (not angular), matching how a real flame's base runs hottest.
+                // Fades from the hot, pale Core Colour at the tip to the ability's Colour on the outer arc - radial only,
+                // as a real flame's base runs hottest.
                 Color rgb = Color.Lerp(coreColor, color, radial);
                 baseRgb[i] = new Color32((byte)(rgb.r * 255f), (byte)(rgb.g * 255f), (byte)(rgb.b * 255f), 255);
             }
@@ -257,9 +219,8 @@ namespace Overpower.Abilities
 
             if (edge != null)
             {
-                // The true boundary regardless of how many fill rings exist: the tip plus the OUTERMOST ring, in the
-                // same tip-then-left-to-right order the fill's own outer ring already sits in - not a second
-                // computation, just picking those vertices back out of the array above.
+                // The true boundary regardless of how many fill rings exist: the tip plus the OUTERMOST ring, picked back
+                // out of the vertex array above.
                 int edgeCount = slices + 2;
                 int outerStart = 1 + (rings - 1) * (slices + 1);
                 edge.useWorldSpace = false;

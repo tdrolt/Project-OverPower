@@ -7,27 +7,17 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Drops a proximity mine - Tudor's Attachment spec: 2 charges, 10 seconds each. WHERE changed
-    /// (A9, Tudor 2026-09-17 evening): a mine used to always land at the caster's own feet, with no
-    /// aiming at all; it now lands at the player's aim point on the floor, clamped to Placement Range
-    /// metres from the player - see TryBuildCast and MinePlacementRule (Assets/scripts/Combat).
-    ///
-    /// A MINE IS A REAL NETWORKED OBJECT, placed in ExecuteCast's IsCasterClient branch exactly like
-    /// TeleportAbility places a Portal - a player joining mid-match has to see mines that have been
-    /// sitting there for two minutes, which only PhotonNetwork.Instantiate gives.
-    ///
-    /// PRUNING MIRRORS TELEPORTABILITY EXACTLY: Seq travels as instantiationData so every client's
-    /// Mine.Seq agrees on placement order, and placing a fifth mine destroys the OLDEST of this
-    /// owner's own mines - DeployablePruning.OverflowBySeq is the same pure logic Portal's own
-    /// pruning already uses, just against Mine's static per-owner registry instead of Portal's.
-    ///
-    /// INTERRUPT IS NOT OVERRIDDEN. Tudor's decision: mines survive the placer's own death, exactly
-    /// like a portal survives - so Died must do nothing here, and the base no-op already gives that
-    /// for free. Nothing in this task specifies what should happen to a player's mines if the
-    /// Attachment slot is later swapped to something else (there is no shop yet to do that with) - so
-    /// unlike Portal, which explicitly destroys its own gates on Unequipped, this module leaves that
-    /// decision unmade rather than guessing: an untriggered mine still expires on its own Persist
-    /// Seconds (NetworkedDeployable's Lifetime Seconds field) regardless.
+    /// Drops a proximity mine at the player's aim point on the floor, clamped to Placement Range from the player (see
+    /// TryBuildCast and MinePlacementRule).
+    /// A MINE IS A REAL NETWORKED OBJECT, placed in ExecuteCast's IsCasterClient branch like TeleportAbility places a
+    /// Portal: a player joining mid-match must see mines that have sat there for minutes, which only
+    /// PhotonNetwork.Instantiate gives.
+    /// PRUNING MIRRORS TELEPORTABILITY: Seq travels as instantiationData so every client's Mine.Seq agrees on placement
+    /// order, and placing past Max Active Mines destroys the OLDEST of this owner's mines (DeployablePruning.OverflowBySeq,
+    /// against Mine's per-owner registry).
+    /// INTERRUPT IS NOT OVERRIDDEN: mines survive the placer's death, like a portal, so Died must do nothing and the base
+    /// no-op gives that. What happens to a player's mines when the Attachment slot is swapped is left undecided (unlike
+    /// Portal, which destroys its gates on Unequipped); an untriggered mine still expires on its Lifetime Seconds.
     /// </summary>
     public sealed class MineAbility : AbilityModule
     {
@@ -77,8 +67,8 @@ namespace Overpower.Abilities
         // LayerMask.GetMask crash-on-spawn PlayerDisplacement's class comment documents.
         private int blockMask;
 
-        // Amendment 1: the sphere FindSafePlacement checks a candidate's feet with, so a mine is never hidden
-        // inside a barrier's own concrete - not a design tunable, the same reasoning as blockMask.
+        // The sphere FindSafePlacement checks a candidate's feet with, so a mine is never hidden inside a barrier's own
+        // concrete - not a design tunable, the same reasoning as blockMask.
         private const float BarrierCheckUpMetres = 0.3f;
         private const float BarrierCheckRadiusMetres = 0.3f;
 
@@ -87,13 +77,9 @@ namespace Overpower.Abilities
             blockMask = LayerMask.GetMask("Default", "Building");
         }
 
-        // Owner only: increments once per successful placement, travels as CastPayload.IntArg so
-        // every client's Mine.Seq (and this owner's own pruning) agree on placement order - same
-        // counter shape as TeleportAbility.nextSeq, and safe to restart at 0 on every fresh equip
-        // for the identical reason: nothing here destroys this owner's mines on Unequipped, so a
-        // restarted counter WOULD collide with live Seqs from a previous instance of this module -
-        // unlike Portal, this is only safe because Unequipping and re-equipping the mines ability
-        // mid-match is not a reachable path yet (no shop). Revisit if that changes.
+        // Owner only: increments once per placement, travels as CastPayload.IntArg so every client's Mine.Seq and this
+        // owner's pruning agree on order. It restarts at 0 on a fresh equip, so TryBuildCast first moves it above the
+        // Seqs of mines already standing (DeployablePruning.NextSeq).
         private int nextSeq;
 
         public override void OnEquip()
@@ -128,13 +114,12 @@ namespace Overpower.Abilities
             if (minePrefab == null)
                 return false; // OnEquip already logged why.
 
-            // A9: the aim point on the floor (ctx.TargetPoint - PlayerAim.GroundPointUnderCursor, the same point
-            // weapons and TeleportAbility already use), clamped to Placement Range - not the caster's own feet any
-            // more (see the class comment for why that changed).
+            // The aim point on the floor (ctx.TargetPoint, PlayerAim.GroundPointUnderCursor, as weapons and TeleportAbility
+            // use), clamped to Placement Range.
             Vector3 requested = MinePlacementRule.ClampToRange(ctx.Origin, ctx.TargetPoint, placementRange);
             Vector3 point = FindSafePlacement(ctx.Origin, requested);
 
-            // Task 9e-2: after a rejoin the mines PUN kept have higher Seqs than this fresh module's counter - continue above them.
+            // After a rejoin the mines PUN kept have higher Seqs than this fresh module's counter - continue above them.
             IReadOnlyList<Mine> standing = Mine.ForOwner(Owner.ActorNumber);
             var standingSeqs = new List<int>(standing.Count);
             foreach (Mine m in standing)
@@ -147,18 +132,13 @@ namespace Overpower.Abilities
         }
 
         /// <summary>
-        /// Walks the clamped point back toward the player, in Placement Search Step increments, until one is on real
-        /// floor with nothing on the Building layer between the caster and it - the same "clamp, then walk back
-        /// toward the caster until something works" idea BlinkDestinationSearch already proves pure, just against a
-        /// different pair of checks (a straight-line path and a floor point, not an arena-bounded capsule check). No
-        /// new path/ground primitives: GroundProbe.TryFindGround is the SAME gameplay floor finder Blink's and
-        /// Teleport's own destination checks already use - not GroundSnap, which is visual-only (its own class
-        /// comment says so) and probes an ABSOLUTE world-Y band, not one relative to the caster's actual height; a
-        /// caster on a ledge, ramp, crate or roof would have every candidate fail and silently fall back to their own
-        /// feet (found in review, before the first playtest). GroundProbe's own refHeight parameter is exactly the
-        /// caster's current height, which is what fixes that. PlayerSpaceProbe.IsPathClear is the same knee-height
-        /// sphere cast Blink's and Teleport's own destination checks are built from. Falls back to the caster's own
-        /// position - today's placement - if even that fails.
+        /// Walks the clamped point back toward the player, in Placement Search Step increments, until one is on real floor
+        /// with nothing on the Building layer between the caster and it (the clamp-then-walk-back idea
+        /// BlinkDestinationSearch proves pure). GroundProbe.TryFindGround is the SAME gameplay floor finder Blink and
+        /// Teleport use, not GroundSnap: that is visual-only and probes an ABSOLUTE world-Y band, so a caster on a ledge,
+        /// ramp, crate or roof would have every candidate fail and fall back to their feet; GroundProbe's refHeight is
+        /// the caster's current height. PlayerSpaceProbe.IsPathClear is the same knee-height sphere cast Blink's and
+        /// Teleport's checks use. Falls back to the caster's own position if even that fails.
         /// </summary>
         private Vector3 FindSafePlacement(Vector3 origin, Vector3 requestedPoint)
         {
@@ -182,10 +162,9 @@ namespace Overpower.Abilities
                 {
                     Vector3 candidateFeet = ground;
 
-                    // Amendment 1: rejected the same as a blocked path - neither the ground probe (blockMask) nor
-                    // IsPathClear (Building only) sees a barrier, so without this a mine could land hidden inside
-                    // one. The walk-back this loop already does then lands it in front of the barrier instead; a
-                    // mine deliberately thrown OVER one (a candidate beyond it, with a clear path) still lands there.
+                    // Rejected like a blocked path: neither the ground probe (blockMask) nor IsPathClear (Building only)
+                    // sees a barrier, so a mine could land hidden inside one. The walk-back then lands it in front of the
+                    // barrier; a mine deliberately thrown OVER one (a candidate beyond it, with a clear path) still lands there.
                     bool insideBarrier = Physics.CheckSphere(candidateFeet + Vector3.up * BarrierCheckUpMetres,
                         BarrierCheckRadiusMetres, ArenaLayers.Barrier, QueryTriggerInteraction.Ignore);
 
@@ -194,7 +173,7 @@ namespace Overpower.Abilities
                 }
 
                 if (distance <= 0f)
-                    return origin; // even the caster's own spot failed - fall back to today's placement.
+                    return origin; // even the caster's own spot failed - fall back to the caster's own position.
 
                 distance = Mathf.Max(0f, distance - placementSearchStep);
             }
@@ -212,8 +191,8 @@ namespace Overpower.Abilities
 
         private void PlaceMine(CastPayload payload)
         {
-            // Seq, then this ability's own id (Task T3, telemetry) - Mine.OnPlaced reads both at
-            // their fixed indices; appending keeps Seq's own index unchanged for anyone else reading it.
+            // Seq, then this ability's own id - Mine.OnPlaced reads both at their fixed indices; appending keeps Seq's
+            // own index unchanged for anyone else reading it.
             object[] data = { payload.IntArg, Definition.Id };
             GameObject spawned = NetworkedDeployable.Spawn(minePrefab.name, payload.Point, data);
             if (spawned == null)

@@ -5,21 +5,12 @@ using Overpower.UI;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Task 11b (playtest polish, designer request [T]): the wind-up telegraph for a laser shot - a
-    /// LineRenderer drawn from the muzzle to wherever Hitscan.PredictBeamLength says the beam will
-    /// stop, in the shooter's own team colour, that visibly thickens and brightens over the wind-up
-    /// so a player watching it reads "about to fire" and has time to step out of the line before the
-    /// real beam lands.
-    ///
-    /// Reverses the earlier call that the through-walls laser gets no warning at all - see the
-    /// comment on IgnoreWalls.cs, which records why and when that changed.
-    ///
-    /// Created and destroyed by WeaponFiring.RPC_FireWeapon: one of these is built for every shot the
-    /// instant a laser with a wind-up fires, and destroyed the moment the real beam replaces it - see
-    /// WeaponFiring.FireAfterWindup. PRESENTATION ONLY - this component never touches damage, physics
-    /// or network state, and the beam it is warning about pierces every player in its path (every
-    /// laser today has unlimited Pierce), so this line never shortens just because someone is
-    /// standing in it - only PredictBeamLength's own wall/structure check does that.
+    /// The wind-up telegraph for a laser shot: a LineRenderer from the muzzle to wherever Hitscan.PredictBeamLength says the beam will stop, in the
+    /// shooter's team colour, thickening and brightening over the wind-up so a player has time to step out of the line before the real beam lands
+    /// (design [T]).
+    /// Created by WeaponFiring.ShowWarnings for every shot of a laser with a wind-up, and destroyed by FireAfterWindup the moment the real beam
+    /// replaces it. PRESENTATION ONLY: never touches damage, physics or network state. The beam pierces every player in its path (every laser has
+    /// unlimited Pierce), so the line never shortens because someone is standing in it - only PredictBeamLength's wall/structure check does.
     /// </summary>
     [DisallowMultipleComponent]
     public class LaserWarningLine : MonoBehaviour
@@ -42,17 +33,11 @@ namespace Overpower.Weapons
         /// created. A plain LineRenderer needs its positions, material and starting colour set before
         /// the first frame renders, so AddComponent alone would show one garbage frame first.
         /// </summary>
-        /// <param name="origin">Where the beam will start - the same origin the real beam fires from.</param>
-        /// <param name="direction">The shot's locked direction - already normalised, or close enough
-        /// that LineRenderer does not care.</param>
-        /// <param name="length">How far along that direction the beam will visibly stop - from
-        /// Hitscan.PredictBeamLength.</param>
-        /// <param name="teamColor">The shooter's team colour (UiTheme.ShotColorFor) the line tints
-        /// itself with.</param>
-        /// <param name="windupSeconds">How long the line takes to grow from its Start to its End
-        /// width/alpha - the same Windup Seconds the beam itself waits out.</param>
-        /// <param name="theme">Where the width/alpha numbers and the shared material come from. May
-        /// be null - the line still draws, using this class's own fallback numbers.</param>
+        /// <param name="direction">The shot's locked direction - already normalised, or close enough that LineRenderer does not care.</param>
+        /// <param name="length">How far along that direction the beam will visibly stop - from Hitscan.PredictBeamLength.</param>
+        /// <param name="windupSeconds">How long the line takes to grow from its Start to its End width/alpha - the same Windup Seconds the beam waits out.</param>
+        /// <param name="theme">Where the width/alpha numbers and the shared material come from. May be null - the line still draws, using this class's
+        /// own fallback numbers.</param>
         public static LaserWarningLine Create(Vector3 origin, Vector3 direction, float length,
                                               Color teamColor, float windupSeconds, UiTheme theme)
         {

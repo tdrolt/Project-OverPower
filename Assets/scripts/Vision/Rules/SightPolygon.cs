@@ -15,7 +15,7 @@ namespace Overpower.Vision
         /// Clears <paramref name="into"/> and fills it with the fan: the eye position first, then the outline points
         /// in order around the eye. The cone (GDD: a cone toward the cursor) is rayCount rays spread evenly across the
         /// cone angle; the circle (GDD: a circle around the player) is the rest of the full turn. Each ray stops where a
-        /// wall stops it, because sight stops where bullets stop (Tudor), plus wallRevealDepth so the wall face and top
+        /// wall stops it, because sight stops where bullets stop, plus wallRevealDepth so the wall face and top
         /// you look at stay lit (A3), but never past the shape's own reach. The circle's rays are as far apart, in
         /// metres along the arc, as the cone's (spacing = coneLength * coneAngle / rayCount), so both look equally smooth;
         /// they are capped at rayCount so a narrow cone does not multiply them. A cone-less eye gets four times rayCount

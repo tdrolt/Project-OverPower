@@ -11,24 +11,18 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Dominion Task 9, the round HUD's host. Added at runtime by DominionDirector (no scene footprint), one per client including a spectator seat
-    /// (a spectator has no body, so none of this can live on the player prefab). It owns one overlay canvas and draws, from the ROOM alone
-    /// (DominionRoomState and the server clock), so every screen shows the same numbers:
-    ///  - RoundHud: the round bar at the top centre during a round and sudden death;
-    ///  - BreakCard: the card between rounds, plus the big last-seconds countdown;
-    ///  - CentrePayoutLabel: the centre countdown under the minimap (3v3v3);
-    ///  - ScoreBars: one bar per team in the bottom-right corner during a round and overtime (Task 17), spectators included;
-    ///  - SuddenDeathOverlay: the banner and the circle countdown under the minimap;
-    ///  - DominionResultPanel: the match result, built on request from MatchUI (players) or SpectatorSeatView (spectators).
-    /// Nothing here is drawn in Conquest, in the warm-up or on the lobby screens: the whole HUD is hidden until the match is live in a Dominion room.
-    /// No new networking: it only reads Room Properties. The canvas sorts under the shop (-5) and over the player HUD and minimap, so the shop opens
-    /// on top of the break card.
+    /// The round HUD's host. Added at runtime by DominionDirector, one per client including a spectator seat (a spectator has no body, so none of
+    /// this can live on the player prefab). Owns one overlay canvas and draws RoundHud, BreakCard, CentrePayoutLabel (3v3v3), ScoreBars (spectators
+    /// too), SuddenDeathOverlay and, built on request from MatchUI (players) or SpectatorSeatView (spectators), DominionResultPanel. It reads the ROOM
+    /// alone (DominionRoomState and the server clock), so every screen shows the same numbers, and only Room Properties (no networking of its own).
+    /// Hidden until the match is live in a Dominion room: nothing in Conquest, the warm-up or the lobby screens. The canvas sorts under the shop (-5)
+    /// and over the player HUD and minimap, so the shop opens on top of the break card.
     /// </summary>
     public sealed class DominionHud : MonoBehaviourPunCallbacks
     {
         public static DominionHud Instance { get; private set; }
 
-        /// <summary>Where the HUD canvas sorts: under the shop (-5) so the shop draws over the break card, over the player HUD (-10) and the minimap (-9).</summary>
+        /// <summary>Under the shop (-5), over the player HUD (-10) and the minimap (-9).</summary>
         public const int SortingOrder = -6;
 
         private RoomManager rooms;
@@ -217,9 +211,8 @@ namespace Overpower.UI
         /// <summary>Takes the result card down (a spectator who leaves the room: the card is DominionHud's, so the spectator view cannot destroy it itself).</summary>
         public void HideResult() => result?.Destroy();
 
-        /// <summary>The match is over and this client has to show the result: the Dominion result card, with the table of points per round. Called by
-        /// MatchUI (a player) and SpectatorSeatView (a spectator) in a Dominion room. False when the HUD cannot be built (no theme yet), so the caller
-        /// falls back to its own panel. Safe to call twice.</summary>
+        /// <summary>Shows the Dominion result card. Called by MatchUI (a player) and SpectatorSeatView (a spectator). False when the HUD cannot be built
+        /// (no theme yet), so the caller falls back to its own panel. Safe to call twice.</summary>
         public bool ShowResult(int winner, Action onBack)
         {
             if (!EnsureBuilt()) return false;

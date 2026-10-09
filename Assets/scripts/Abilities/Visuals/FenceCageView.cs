@@ -5,13 +5,12 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The Electric Fence as a cage (ability visuals step 4; Tudor: "walls instead of zones that have horizontal bars").
-    /// Thin posts stand round the fence's real Radius with see-through horizontal bar circles between them, plus a faint
-    /// band on the floor exactly as wide as Ring Thickness - where a hit really lands (an enemy whose centre is in the
-    /// band, or crosses the ring). Owner's team colour.
+    /// The Electric Fence as a cage: thin posts round the fence's real Radius with see-through horizontal bar circles
+    /// between them, plus a faint floor band exactly as wide as Ring Thickness - where a hit really lands (an enemy whose
+    /// centre is in the band, or crosses the ring). Owner's team colour.
     ///
     /// VISUAL ONLY, NO COLLIDERS. The fence damages and slows on crossing; it doesn't block. Posts or bars with colliders
-    /// would stop players and shots, which is a gameplay change for Tudor to decide.
+    /// would stop players and shots, which is a gameplay change.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class FenceCageView : MonoBehaviour, IDeployableView

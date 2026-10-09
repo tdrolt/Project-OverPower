@@ -42,24 +42,18 @@ namespace Overpower.Combat
     }
 
     /// <summary>
-    /// Where a displacement (a dash, a zip pull, a knockback) has to stop. One rule for all three, because they all
-    /// travel through PlayerDisplacement - see IDisplaceable's class comment for why one mover exists.
+    /// Where a displacement (a dash, a zip pull, a knockback) has to stop; one rule for all three
+    /// because they all travel through PlayerDisplacement (see IDisplaceable for why one mover exists).
     ///
-    /// Three parts, each for a way a player used to end up somewhere they shouldn't:
-    ///  - a wall ahead stops the move a SKIN width short, instead of exactly on contact, so the next step doesn't start
-    ///    from inside the wall's contact;
-    ///  - a wall the capsule ALREADY overlaps blocks only a move that goes deeper into it, judged by the direction
-    ///    physics would push the capsule out (a dash along a wall you are pressed against still works);
-    ///  - the floor underfoot is never a wall (its normal points roughly up).
+    /// Three parts: a wall ahead stops the move a SKIN width short, so the next step does not start
+    /// from inside the wall's contact; a wall the capsule ALREADY overlaps blocks only a move that goes
+    /// deeper into it, judged by the direction physics would push the capsule out (a dash along a wall
+    /// you are pressed against still works); the floor underfoot is never a wall (normal roughly up).
     ///
-    /// Plain C#, tested in edit mode (DisplacementSweepRuleTests): "can a second dash pass through a thin wall" is
-    /// provable without a scene, a Rigidbody or a physics step.
-    ///
-    /// Movement step 1 measured why this is needed: Rigidbody.SweepTestAll (the old check) never reports a collider
-    /// the capsule already overlaps or merely touches - at 0.70 m from a wall's inner face (touching, depth 0.008)
-    /// and at 0.60 m (0.108 m overlap) it returned no hit at all, while Physics.OverlapCapsule and a zero-distance
-    /// CapsuleCastAll both saw the wall. A player pressed into a thin wall by walking was therefore invisible to the
-    /// old check, so a second dash from there sailed straight through it (measured: ends up BEYOND the far face).
+    /// Why: Rigidbody.SweepTestAll never reports a collider the capsule already overlaps or merely
+    /// touches (measured: no hit while touching or overlapping, where Physics.OverlapCapsule and a
+    /// zero-distance CapsuleCastAll both saw the wall), so a second dash from a player pressed into a
+    /// thin wall sailed through it. Plain C#, tested in edit mode (DisplacementSweepRuleTests).
     /// </summary>
     public static class DisplacementSweepRule
     {
@@ -71,8 +65,8 @@ namespace Overpower.Combat
         /// hit. Not a tuning value.</summary>
         public const float LiftMetres = 0.05f;
 
-        /// <summary>Above this, a hit's normal points up enough to be the ground rather than a wall. Kept from the
-        /// original IsBlocker, where it was already not a tuning value.</summary>
+        /// <summary>Above this, a hit's normal points up enough to be the ground rather than a wall. Not a
+        /// tuning value.</summary>
         public const float FloorNormalY = 0.5f;
 
         /// <summary>How much of the move must point against a touching wall's push-out before it counts as going INTO
@@ -126,12 +120,11 @@ namespace Overpower.Combat
         public static bool IsUsefulTravel(float allowed) => allowed >= MinUsefulTravelMetres;
 
         /// <summary>
-        /// [C] Controller decision (movement step 2 opus review): only static geometry may refuse a dash outright by
-        /// being a "start already inside" blocker. A collider attached to a Rigidbody - a living player, or anything
-        /// else physics-driven - never counts, so standing flush against an enemy cannot refuse a dash the way
-        /// standing flush against a wall does; walls and non-convex meshes have no Rigidbody and are unaffected. A
-        /// dash travelling TOWARD a player from a distance still stops at their body - this only guards the
-        /// "touching, so the whole move is refused before it starts" case.
+        /// Only static geometry may refuse a dash outright as a "start already inside" blocker. A
+        /// collider attached to a Rigidbody (a living player, anything physics-driven) never counts, so
+        /// standing flush against an enemy cannot refuse a dash the way standing flush against a wall
+        /// does. A dash travelling TOWARD a player from a distance still stops at their body; this only
+        /// guards the "touching, so the whole move is refused before it starts" case.
         /// </summary>
         public static bool CanBlockAsStartInside(bool colliderHasAttachedRigidbody) => !colliderHasAttachedRigidbody;
     }

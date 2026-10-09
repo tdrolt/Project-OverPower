@@ -6,12 +6,10 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Task 9e (Tudor D21): the "Connection lost - Rejoin" panel. A dimmed overlay with a title, one line saying what Rejoin
-    /// does, and two buttons (Rejoin / Leave); the same panel shows "Reconnecting..." while the rejoin runs, and a message
-    /// with one OK button when the match cannot be returned to (over, or the two minutes ran out). Built in code from
-    /// UiTheme like QuitConfirmPanel, so there is nothing to place in the scene; every text is a UiTheme field.
-    ///
-    /// Only draws and reports clicks. What Rejoin and Leave DO belongs to RejoinController.
+    /// The "Connection lost - Rejoin" panel (D21): a dimmed overlay with a title, a line saying what Rejoin does and
+    /// Rejoin / Leave buttons; it also shows "Reconnecting..." while the rejoin runs, and a message with one OK button
+    /// when the match cannot be returned to. Built in code from UiTheme like QuitConfirmPanel (every text is a UiTheme
+    /// field). Only draws and reports clicks; what Rejoin and Leave DO belongs to RejoinController.
     /// </summary>
     public sealed class ConnectionLostPanel : MonoBehaviour
     {

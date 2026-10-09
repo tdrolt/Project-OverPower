@@ -1,14 +1,12 @@
 namespace Overpower.EditorTools.Telemetry
 {
-    /// <summary>Task T7: a half-open (or, for the last window in a timeline, closed) span of match
-    /// seconds - the unit TelemetryAggregator.Build(log, window) filters discrete events against and
-    /// clips every continuous integral (sample intervals, ownership stints, alive time...) to. Pure,
-    /// no IO, edit-mode tested through PhaseTimeline.
+    /// <summary>A half-open (or, for the last window in a timeline, closed) span of match seconds - the unit
+    /// TelemetryAggregator.Build(log, window) filters discrete events against and clips every continuous integral (sample
+    /// intervals, ownership stints, alive time...) to. Pure, no IO, edit-mode tested through PhaseTimeline.
     ///
-    /// A single instance is reused for three different scopes: the whole match ([0, matchLength],
-    /// EndInclusive), Phase 1 ([0, tPhase2), not inclusive - the phase-2 transition instant belongs to
-    /// Phase 2, not Phase 1), and Phase 2 ([tPhase2, matchLength], EndInclusive - it is always the last
-    /// window when it exists).</summary>
+    /// One type serves three scopes: the whole match ([0, matchLength], EndInclusive), Phase 1 ([0, tPhase2), not inclusive: the
+    /// phase-2 transition instant belongs to Phase 2) and Phase 2 ([tPhase2, matchLength], EndInclusive: always the last window
+    /// when it exists).</summary>
     public sealed class TimeWindow
     {
         public readonly double Start;
@@ -28,18 +26,13 @@ namespace Overpower.EditorTools.Telemetry
             EndInclusive = endInclusive;
         }
 
-        /// <summary>Whether a discrete event's own timestamp falls inside this window. A t == -1
-        /// ("match clock not known yet" - MatchClock's own sentinel, e.g. a `join` logged before the
-        /// room's mStart arrives) is treated as the very first instant of the match: it belongs to
-        /// whichever window starts at 0 (the whole match, and Phase 1 when there is one), never to a
-        /// later phase window whose own Start is > 0.
+        /// <summary>Whether a discrete event's timestamp falls inside this window. A t == -1 ("match clock not known yet", MatchClock's
+        /// sentinel, e.g. a `join` logged before the room's mStart arrives) is treated as the very first instant of the match: it
+        /// belongs to whichever window starts at 0 (the whole match, and Phase 1 when there is one), never to a later phase window.
         ///
-        /// Review fix (item 9): also requires Start &lt; End - an elimination (or a `phase` >= 2
-        /// event) logged at t == 0 makes Phase 1's own window `[0, 0)`, empty by construction, AND
-        /// Phase 2's window start at 0 too - without this check BOTH windows would read Start &lt;= 0
-        /// and double-count every t == -1 event into both phases. An empty window can never
-        /// meaningfully "start" the match, so it now correctly claims nothing at all, including t ==
-        /// -1; whichever window actually has positive length claims it instead.</summary>
+        /// Also requires Start &lt; End: an elimination (or `phase` >= 2 event) at t == 0 makes Phase 1's window [0, 0), empty, AND
+        /// Phase 2's start at 0 too; without the check BOTH would read Start &lt;= 0 and double-count every t == -1 event. An empty
+        /// window claims nothing, including t == -1; whichever window has positive length claims it.</summary>
         public bool Contains(double t)
         {
             if (t < 0) return Start <= 0 && Start < End;
@@ -47,27 +40,15 @@ namespace Overpower.EditorTools.Telemetry
             return EndInclusive ? t <= End : t < End;
         }
 
-        /// <summary>Clips a continuous [from, to) span to this window's own bounds - the shared
-        /// mechanism behind every integral this task clips (a sample interval, an ownership stint, a
-        /// capture attempt, an alive-time tail). Returns false (and leaves the out params at 0) when
-        /// the span has no overlap with this window at all.
+        /// <summary>Clips a continuous [from, to) span to this window's bounds - the shared mechanism behind every integral (a sample
+        /// interval, ownership stint, capture attempt, alive-time tail). Returns false (out params 0) when the span has no overlap.
         ///
-        /// Review fix (item 8): a ZERO-LENGTH span (from == to) that lies inside the window is kept,
-        /// not rejected - a capture completing and immediately being lost again at the exact same
-        /// instant (or any other same-tick stint) produced a real, Duration == 0 row in every
-        /// pre-T7, unwindowed table; rejecting on `>=` made that row silently vanish the moment ANY
-        /// window (including the whole-match one) was applied.
-        ///
-        /// Round-2 review fix (regression in the above): using a bare `>` let a REAL, non-zero-length
-        /// span that only TOUCHES this window's boundary from outside (e.g. a stint [10, 90) against
-        /// a Phase 2 window starting at 90) produce a spurious zero-length row too - Max/Min clamping
-        /// has no notion that the span's own `to` is exclusive, so clamping [10, 90) against Start=90
-        /// gives clippedFrom == clippedTo == 90 even though the span never actually reaches 90. Now:
-        /// a genuine positive-length overlap (clippedFrom &lt; clippedTo) is always kept; a touching
-        /// result (clippedFrom == clippedTo) is kept ONLY when the ORIGINAL span was itself
-        /// zero-length (from == to) AND this window's own Contains says it owns that exact instant
-        /// (the half-open tie-break, so exactly one window ever claims it) - never for a real span
-        /// that merely grazes the edge.</summary>
+        /// A ZERO-LENGTH span (from == to) inside the window is kept, not rejected: a capture completing and being lost again at the
+        /// same instant is a real Duration == 0 row, and rejecting on `>=` would make it vanish once any window was applied. But a
+        /// REAL span that only TOUCHES the boundary from outside (stint [10, 90) against a window starting at 90) must not produce
+        /// a spurious zero-length row: Max/Min clamping gives clippedFrom == clippedTo == 90 though the span never reaches 90. So a
+        /// positive-length overlap (clippedFrom &lt; clippedTo) is always kept; a touching result is kept ONLY when the ORIGINAL span
+        /// was zero-length AND this window's Contains owns that instant (the half-open tie-break: exactly one window claims it).</summary>
         public bool Clip(double from, double to, out double clippedFrom, out double clippedTo)
         {
             double candidateFrom = System.Math.Max(from, Start);
@@ -92,24 +73,17 @@ namespace Overpower.EditorTools.Telemetry
             return false;
         }
 
-        /// <summary>Round-2 review fix (item B): like Clip, but for a continuous span whose own
-        /// ends can legitimately fall OUTSIDE the timeline altogether - a player's life, which can
-        /// start before the match clock was known (timeAlive &gt; deathT) or (via the t == -1
-        /// sentinel) end there too. Clip's plain Start/End would truncate such a span at the
-        /// literal 0/matchLength wall, which is wrong: everything before t=0 and after the log's own
-        /// last instant still legitimately belongs to whichever window actually covers that edge of
-        /// the timeline - the window starting at 0 (the whole match, and Phase 1 when there is one)
-        /// therefore treats its own lower bound as -infinity, and the LAST window in the timeline
-        /// (whichever one is EndInclusive) treats its own upper bound as +infinity. Returns 0 (never
-        /// negative) when the span doesn't reach this window at all.</summary>
+        /// <summary>Like Clip, but for a continuous span whose ends can legitimately fall OUTSIDE the timeline - a player's life, which
+        /// can start before the match clock was known (timeAlive &gt; deathT) or, via the t == -1 sentinel, end there. Clip would truncate
+        /// it at the literal 0/matchLength wall; instead the window starting at 0 (the whole match, and Phase 1 when there is one)
+        /// treats its lower bound as -infinity, and the LAST window (the EndInclusive one) its upper bound as +infinity. Returns 0
+        /// (never negative) when the span doesn't reach this window.</summary>
         public double OverlapWithUnboundedEdges(double spanStart, double spanEnd)
         {
-            // Round-3 review fix: `Start <= 0` alone gave the SAME -infinity lower bound to both
-            // Phase 1 and Phase 2 when the transition lands at exactly t == 0 - Phase 1 becomes
-            // the empty [0, 0) window in that case, and an empty window must not claim a life
-            // that only exists via the unbounded edge either. Mirrors Contains' own item-9 guard
-            // (Start < End), plus EndInclusive for the degenerate case where the last window is
-            // ALSO zero-length (Start == End) but is still the only window there is.
+            // `Start <= 0` alone gave the SAME -infinity lower bound to both Phase 1 and Phase 2 when the transition lands at exactly
+            // t == 0: Phase 1 is then the empty [0, 0) window, and an empty window must not claim a life that only exists via the
+            // unbounded edge. Mirrors Contains' Start < End guard, plus EndInclusive for the degenerate case where the last window is
+            // ALSO zero-length (Start == End) but is the only window there is.
             double lo = (Start <= 0 && (Start < End || EndInclusive)) ? double.NegativeInfinity : Start;
             double hi = EndInclusive ? double.PositiveInfinity : End;
             return System.Math.Max(0.0, System.Math.Min(spanEnd, hi) - System.Math.Max(spanStart, lo));

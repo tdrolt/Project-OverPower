@@ -43,14 +43,12 @@ namespace Overpower.UI
     }
 
     /// <summary>
-    /// The shared builders of the lobby screens (lobby Task 9): the name screen, the lobby list and the create screen are code-built
-    /// uGUI + TextMeshPro like QuitConfirmPanel (and like MatchStartPanel before WarmupBar and LobbyRoomPanel replaced it), so the scene needs no objects for them. One kit per screen set, made from the
-    /// UiTheme: it makes the screen canvas, rounded boxes with an outline, text in the lobby fonts, buttons, the name box, the
-    /// outlined title. Sizes are in reference pixels (the boards' pixels x 1.5 at 1920 x 1080).
-    ///
-    /// The canvas is a ScreenSpaceOverlay with a GraphicRaycaster: a screen you click needs one (a world-space canvas must not have one,
-    /// trap 20). Its scaler takes the reference resolution and match value straight from the theme (the ThemedCanvasScaler component
-    /// is for scene-built canvases whose theme is assigned in the Inspector; a canvas built here has no Inspector to assign it in).
+    /// The shared builders of the lobby screens: the name screen, the lobby list and the create screen are code-built uGUI + TextMeshPro like
+    /// QuitConfirmPanel, so the scene needs no objects for them. One kit per screen set, made from the UiTheme: the screen canvas, rounded boxes
+    /// with an outline, text in the lobby fonts, buttons, the name box, the outlined title. Sizes are in reference pixels (the boards' pixels x 1.5
+    /// at 1920 x 1080). The canvas is a ScreenSpaceOverlay with a GraphicRaycaster (a screen you click needs one; a world-space canvas must not
+    /// have one, trap 20); its scaler takes the reference resolution and match value straight from the theme, because ThemedCanvasScaler is for
+    /// scene-built canvases whose theme is assigned in the Inspector and a canvas built here has no Inspector.
     /// </summary>
     public sealed class LobbyUiKit
     {
@@ -455,11 +453,10 @@ namespace Overpower.UI
 
         // ---- the result card ----
 
-        /// <summary>The look of a result card (Dominion Task 1 Part 0): a rounded dark card holding a big Oswald title in the winner's colour and
-        /// one purple button under it, the same button as Create on the create screen. Built here so the spectator's match result and Dominion's
-        /// own result screen (Task 9) look the same. The card sizes itself to its contents; the caller places it. Dominion adds a small heading
-        /// above the title and its own contents (the table of points per round) between the title and the button; the spectator card passes
-        /// none of those and is unchanged.</summary>
+        /// <summary>The look of a result card: a rounded dark card holding a big Oswald title in the winner's colour and one purple button under it,
+        /// the same button as Create on the create screen. Shared by the spectator's match result and Dominion's result screen so they look the same.
+        /// The card sizes itself to its contents; the caller places it. Dominion adds a small heading above the title and its own contents (the
+        /// table of points per round) between the title and the button; the spectator card passes none of those.</summary>
         /// <param name="card">The card's rect (anchor and position are the caller's to set).</param>
         /// <param name="heading">A small line above the title, or null for none.</param>
         /// <param name="body">Builds the card's contents between the title and the button (given the card to put them in), or null for none.</param>

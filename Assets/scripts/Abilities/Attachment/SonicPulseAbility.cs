@@ -6,41 +6,23 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Knocks every enemy standing in a short forward cone straight away from the caster - Tudor's
-    /// Attachment spec: 5m of knockback in a 4m cone, 8s cooldown. An enemy whose flight ends against
-    /// a wall or another player is stunned for 2s, and so is whichever player it landed on - but
-    /// only if that second player is ALSO an enemy of the caster (Task 1.10 addendum's own "Holes"
-    /// section: the brief wins over the plan's "wall or enemy" wording, and there is no "both" for a
-    /// plain wall). Zero damage - this is pure crowd control, the identical "utility, not a weapon"
-    /// shape as the stun gun and the zip gun.
-    ///
-    /// RUNS ON EVERY CLIENT, INCLUDING THE CASTER'S OWN, exactly once per cast (Phase 0) - unlike the
-    /// flamethrower's spray, a pulse is instantaneous, so there is no coroutine ticking a cone over
-    /// several frames, just one OverlapSphere/cone-filter/push pass.
-    ///
-    /// ORIGIN IS THE BODY, NOT THE MUZZLE (the addendum's own wording: "the cone's apex, not the
-    /// muzzle"). Both the cone check and the occlusion check below use ctx.Origin - unlike the
-    /// flamethrower, which deliberately splits root (range/angle) from muzzle (occlusion), the
-    /// addendum gives sonic pulse only one point to work from, so both use it.
-    ///
-    /// THE PUSH ITSELF IS OWNER-AUTHORITATIVE, LIKE EVERY DISPLACEMENT. This module never moves
-    /// anyone directly - it calls IDisplaceable.Displace on every eligible target, on every client,
-    /// and PlayerDisplacement/DummyTarget's own guards (IsMine, or "always my own authority" for a
-    /// dummy) make sure only the victim's own machine actually starts moving. That is also why the
-    /// push direction below is safe to compute identically everywhere: KnockbackResolver.
-    /// ComputePushDirection reads the CANDIDATE'S OWN POSITION AS SEEN BY THIS CLIENT, which only
-    /// matters on the one client where Displace is not a no-op - the victim's owner, where "as seen
-    /// by this client" and "the victim's true position" are the same thing. Every other client
-    /// computes a direction from a synced (and therefore slightly stale) position too, but throws it
-    /// away the moment Displace no-ops, so that staleness never reaches anyone.
-    ///
-    /// THE COLLISION DECISION RUNS ONLY ON THE VICTIM'S OWNER (the addendum's own wording) - because
-    /// onEnd only ever fires on the machine that actually started the move, for the identical reason
-    /// the push itself only actually happens there. Self-stun is free (IStatusReceiver.ApplyStatus is
-    /// itself owner-guarded, or unconditional for a dummy); stunning a PLAYER blocker who is on a
-    /// DIFFERENT machine needs the one peer RPC Task 1.0's S4 built for exactly this
-    /// (PlayerStatusEffects.RequestOnOwner) - a dummy blocker is always "this machine's own", per
-    /// IDamageable.HasLocalAuthority, so it never needs that trip.
+    /// Knocks every enemy in a short forward cone straight away from the caster. An enemy whose flight ends against a
+    /// wall or another player is stunned, and so is the player it landed on, but only if that second player is ALSO an
+    /// enemy of the caster (the brief wins over the plan's "wall or enemy" wording; a plain wall has no "both"). Zero
+    /// damage: pure crowd control, like the stun gun and the zip gun.
+    /// RUNS ON EVERY CLIENT, THE CASTER'S INCLUDED, once per cast (Phase 0); instantaneous, so one OverlapSphere/
+    /// cone-filter/push pass and no coroutine.
+    /// ORIGIN IS THE BODY, NOT THE MUZZLE: both the cone and the occlusion check use ctx.Origin, unlike the flamethrower's
+    /// root/muzzle split, because the spec gives the pulse one point ("the cone's apex, not the muzzle").
+    /// THE PUSH IS OWNER-AUTHORITATIVE, LIKE EVERY DISPLACEMENT: this calls IDisplaceable.Displace on every eligible target
+    /// on every client, and PlayerDisplacement/DummyTarget's guards (IsMine, or "always my own authority" for a dummy)
+    /// make only the victim's machine move. So the push direction is safe to compute identically everywhere:
+    /// KnockbackResolver.ComputePushDirection reads the candidate's position as seen by this client, which matters only on
+    /// the victim's owner; other clients compute from a slightly stale position and discard it when Displace no-ops.
+    /// THE COLLISION DECISION RUNS ONLY ON THE VICTIM'S OWNER, because onEnd fires only on the machine that started the
+    /// move. Self-stun is free (ApplyStatus is owner-guarded, unconditional for a dummy); stunning a PLAYER blocker on
+    /// ANOTHER machine needs the peer RPC PlayerStatusEffects.RequestOnOwner; a dummy blocker is always local
+    /// (IDamageable.HasLocalAuthority).
     /// </summary>
     public sealed class SonicPulseAbility : AbilityModule
     {
@@ -163,7 +145,7 @@ namespace Overpower.Abilities
             foreach (ConeCandidate candidate in eligible)
             {
                 if (IsOccludedByWall(origin, candidate.Position))
-                    continue; // Behind a wall or cover - the addendum's own occlusion rule.
+                    continue; // Behind a wall or cover.
 
                 IDisplaceable displaceable = (candidate.Target as Component)?.GetComponentInParent<IDisplaceable>();
                 if (displaceable == null)
@@ -172,9 +154,7 @@ namespace Overpower.Abilities
                 Vector3 pushDirection = KnockbackResolver.ComputePushDirection(origin, candidate.Position, forward);
                 IDamageable victim = candidate.Target;
 
-                // The victim reference is captured by this specific closure, not shared across
-                // iterations - C#'s per-iteration foreach variable makes that safe without an extra
-                // local copy.
+                // The victim is captured per iteration (C#'s per-iteration foreach variable), so no local copy is needed.
                 // A player knows who pushed them (the Dominion respawn bubble refuses an enemy's push, and the pusher's own bubble ends on a push
                 // that lands); a dummy has neither.
                 System.Action<DisplaceEnd> onEnd = end => HandlePushEnd(end, victim, casterActor, casterTeam);
@@ -204,12 +184,12 @@ namespace Overpower.Abilities
             Owner.Displacement.Displace(direction, selfPushDistance, knockbackSpeed, SelfPushEnded);
         }
 
-        // The user is never stunned by their own push (Tudor's rule D9), so unlike HandlePushEnd this does nothing.
+        // The user is never stunned by their own push (D9), so unlike HandlePushEnd this does nothing.
         private static void SelfPushEnded(DisplaceEnd end) { }
 
         /// <summary>True when a Building-layer collider (a wall, or cover) stands between origin and
-        /// the target - same idea as FlamethrowerAbility.IsOccludedByWall, but from the caster's body
-        /// rather than the muzzle, per the addendum's single-point wording for this ability.</summary>
+        /// the target - same idea as FlamethrowerAbility.IsOccludedByWall, but from the caster's body rather than the
+        /// muzzle (this ability has the one point).</summary>
         private bool IsOccludedByWall(Vector3 origin, Vector3 targetPosition)
         {
             Vector3 delta = targetPosition - origin;

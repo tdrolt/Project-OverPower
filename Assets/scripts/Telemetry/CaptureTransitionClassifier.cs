@@ -3,22 +3,12 @@ using System;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Classifies a capture-progress transition (Task T4, opus review fix) using ONLY the rate,
-    /// team and progress the two <see cref="Overpower.Match.CaptureProgress"/> values themselves
-    /// carry - no per-zone memory, no read of BuildingManager's live ownership. A first version of
-    /// this tried to recover "completed"/"neutralised" by comparing against the live owner, which
-    /// raced the ownership snapshot's own separate echo (a different SetCustomProperties call from
-    /// the capture-progress one) and genuinely mislabelled transitions - a master-switch reset read
-    /// as "paused", a restart-from-zero after the capturers left and came back read as "resumed" at
-    /// progress 0, and a stopping drain could read as "drainPaused" when it had actually finished.
-    ///
-    /// This version does not try to tell a completed capture apart from an interrupted one, or a
-    /// neutralised zone from a merely-paused drain: BOTH read as the same "paused"/"drainPaused" a
-    /// capture/drain bar going idle always means, whatever caused it. `ownership` is a separate
-    /// event, already logged with a real held-since stamp the moment BuildingManager applies the
-    /// change - T5's aggregator (or a human reading the file) tells "paused because it completed"
-    /// apart from "paused because it was interrupted" by looking for a same-timestamp `ownership`
-    /// line, not by asking this classifier to guess from data it cannot see reliably.
+    /// Classifies a capture-progress transition using ONLY the rate, team and progress the two
+    /// <see cref="Overpower.Match.CaptureProgress"/> values carry - no per-zone memory, no read of BuildingManager's live ownership:
+    /// comparing against the live owner raced the ownership snapshot's separate echo (a different SetCustomProperties call) and
+    /// mislabelled transitions. So it cannot tell a completed capture from an interrupted one, or a neutralised zone from a
+    /// paused drain: both read as "paused"/"drainPaused". The separate `ownership` event, logged the moment BuildingManager applies
+    /// the change, tells them apart: the aggregator looks for a same-timestamp `ownership` line.
     /// </summary>
     public static class CaptureTransitionClassifier
     {
@@ -29,50 +19,28 @@ namespace Overpower.Telemetry
         public const string DrainResumed = "drainResumed";
         public const string DrainPaused = "drainPaused";
 
-        /// <summary>The floor of the margin Classify uses to tell a fresh start from a resume: a
-        /// capture bar starting already above this much fill reads as resuming progress already
-        /// banked, not a fresh start from zero (a drain bar mirrors this around 1.0 instead of 0 -
-        /// see Classify's own comment). This floor alone is comfortably above one frame's own
-        /// contribution for a SLOW transition - a solo Tier 2 capture (15s for one player) fills
-        /// about 0.0011 in one frame at 60 Hz, two orders of magnitude below this - but it is NOT
-        /// enough headroom for a fast one: Tier 3 (10s, the fastest tier TerritoryConfig ships by
-        /// default) with several capturers multiplies the rate (rate = CaptureSpeedRule.For(eligibleCount, list) / captureSeconds
-        /// - see BuildingCapture.ComputeCurrentProgress), and a drain's DecaySeconds can be short
-        /// too. A slow or lagged master frame (well under 60 Hz) multiplies whichever rate further.
-        /// Classify scales this floor by the transition's own rate (review fix, 2026-09-17: the old
-        /// static floor alone misread a fast fresh drain or capture as a resume whenever a master
-        /// frame ran long enough - see FirstFrameAllowanceSeconds and this file's own tests for the
-        /// real-world values that hid the bug).</summary>
+        /// <summary>The floor of the margin Classify uses to tell a fresh start from a resume: a capture bar starting above this
+        /// fill reads as resuming banked progress (a drain mirrors this around 1.0). The floor alone is too small for a fast
+        /// transition (the fastest TerritoryConfig tier with several capturers, or a short DecaySeconds, on a slow master frame;
+        /// rate = CaptureSpeedRule.For(eligibleCount, list) / captureSeconds, see BuildingCapture.ComputeCurrentProgress), so
+        /// Classify scales it by the transition's own rate (see FirstFrameAllowanceSeconds).</summary>
         public const float ResumeThreshold01 = 0.01f;
 
-        /// <summary>How long a single master frame is assumed to ever realistically run, in seconds,
-        /// for ResumeThreshold01's rate-aware margin: Classify never treats a first publish within
-        /// this many seconds' worth of the transition's own rate as a resume. Deliberately generous -
-        /// far longer than any single frame at any master tick rate this project targets - so a
-        /// genuinely fresh start is never mistaken for a resume, while a real resume (which starts
-        /// well past what one frame could have contributed) is still told apart correctly.</summary>
+        /// <summary>How long one master frame is assumed to ever run, for ResumeThreshold01's rate-aware margin: a first publish
+        /// within this many seconds' worth of the transition's rate is never a resume. Deliberately generous, so a fresh start is
+        /// never mistaken for a resume.</summary>
         public const float FirstFrameAllowanceSeconds = 0.25f;
 
-        /// <summary>The `capture` event this transition should log - Started/Resumed/Paused or
-        /// their Drain* equivalents - with the team it is about and the progress to report, or null
-        /// if neither side is "active" (both old and new read rate 0; not expected from a real
-        /// publish, since nothing would have changed to trigger one, but guarded rather than
-        /// assumed). "Active" is judged purely by RatePerSecond01 being non-zero, not by comparing
-        /// against <c>CaptureProgress.Idle</c> - a held capture or drain (CaptureProgress.Held,
-        /// published since the capture ring change, 2026-09-17) is handled the same way: it reads as
-        /// "not active" here exactly as Idle does, so a stop into that hold still logs
-        /// Paused/DrainPaused with the fill it stopped at, and a resume out of it is told apart from
-        /// a fresh start by the same rate-aware margin (see ResumeThreshold01), mirrored below 1.0 for
-        /// a drain since its fill counts down from 1.0, not up from 0.</summary>
+        /// <summary>The `capture` event this transition should log (Started/Resumed/Paused or the Drain* equivalents) with its team
+        /// and the progress to report, or null if neither side is active (guarded, though a real publish never does this). "Active"
+        /// is RatePerSecond01 non-zero, not a comparison with CaptureProgress.Idle: a held capture or drain (CaptureProgress.Held)
+        /// reads as not active exactly as Idle does, so a stop into the hold logs Paused/DrainPaused with the fill it stopped at.</summary>
         public static string Classify(Overpower.Match.CaptureProgress oldProgress, Overpower.Match.CaptureProgress newProgress,
                                       int nowMs, out int team, out float progress)
         {
-            // captureFadeSpeed (2026-09-24): a fade/refill has a real nonzero rate too (that is the whole point -
-            // it extrapolates smoothly like a live capture/drain), so without excluding it here it would fall
-            // through to the very same branch below and misreport as Started/Resumed/DrainStarted/DrainResumed.
-            // Nobody is actually capturing or draining during a fade/refill, so it is never "active" for telemetry
-            // purposes - it is treated the same as a Held/Paused state instead (see the wasActive branch below,
-            // which already logs the real stop fill whichever ends a segment: an Idle, a Held, or now a fade).
+            // A fade/refill (captureFadeSpeed) has a real nonzero rate (it extrapolates like a live capture/drain), but nobody is
+            // capturing or draining during it, so it is never "active" for telemetry: it is treated like Held/Paused, and the
+            // wasActive branch below logs the real stop fill.
             bool isActive = newProgress.RatePerSecond01 != 0f && !newProgress.Fading;
 
             if (isActive)
@@ -80,27 +48,21 @@ namespace Overpower.Telemetry
                 team = newProgress.Team;
                 progress = newProgress.Progress01;
                 bool draining = newProgress.RatePerSecond01 < 0f;
-                // Rate-aware margin (see ResumeThreshold01) - the plain floor alone isn't enough
-                // headroom for a fast capture (several capturers, a short tier) or a short-DecaySeconds
-                // drain on a slow master frame.
+                // Rate-aware margin (see ResumeThreshold01).
                 float margin = Math.Max(ResumeThreshold01, Math.Abs(newProgress.RatePerSecond01) * FirstFrameAllowanceSeconds);
                 // A capture resumes when it starts already banked (progress counts UP from 0); a
                 // drain resumes when it starts already partly drained (its progress is the owner's
                 // remaining hold, counting DOWN from 1.0).
                 bool resuming = draining ? newProgress.Progress01 < 1f - margin : newProgress.Progress01 > margin;
-                // Review fix, 2026-09-24: a fade/refill was never THIS team's own capture/drain to resume (see
-                // CaptureFadeRule.CapturingTeamAbsent - it only ever fades/refills a claim nobody of its own team
-                // is standing in). A different team taking the claim over from a fade/refill inherits its
-                // progress fraction (captureFadeSpeed's whole point), which used to read as "resuming" purely by
-                // that fraction and credit the OLD team (TelemetryAggregator ~640-666 only swaps the credited team
-                // on a fresh start, never on a resume - "resumed/drainResumed: continues the SAME open attempt").
-                // The SAME team resuming its own interrupted fade/refill is untouched: only a team change forces
-                // a fresh start here.
+                // A fade/refill was never THIS team's own capture/drain to resume (CaptureFadeRule.CapturingTeamAbsent). A different
+                // team taking the claim over inherits its progress fraction, which would read as "resuming" and credit the OLD team
+                // (TelemetryAggregator only swaps the credited team on a fresh start). The SAME team resuming its own fade/refill is
+                // untouched: only a team change forces a fresh start.
                 if (oldProgress.Fading && newProgress.Team != oldProgress.Team)
                     resuming = false;
-                // Lobby Task 15b: a rate change while the same team keeps going the same way (a second capturer or drainer walking
-                // in) is the same attempt carrying on. The rate-aware margin above only sees "a high rate, little progress", so a
-                // quick second arrival used to close the first attempt as abandoned and open a new one.
+                // A rate change while the same team keeps going the same way (a second capturer or drainer walking in) is the same
+                // attempt carrying on; the rate-aware margin only sees "a high rate, little progress" and would close the first
+                // attempt as abandoned.
                 if (oldProgress.RatePerSecond01 != 0f && !oldProgress.Fading && oldProgress.Team == newProgress.Team
                     && (oldProgress.RatePerSecond01 < 0f) == draining)
                     resuming = true;

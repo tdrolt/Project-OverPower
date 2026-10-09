@@ -17,9 +17,9 @@ namespace Overpower.Combat
         AlreadyUsed
     }
 
-    /// <summary>The Vent attempt's outcome so far, collapsed for the HUD (Early and Late both just
-    /// read as "missed" - see BuildUi's band). None until either a press has been made or the
-    /// window has closed unused.</summary>
+    /// <summary>The Vent attempt's outcome so far, collapsed for the HUD (Early and Late both read as
+    /// "missed", see BuildUi's band). None until a press has been made or the window has closed
+    /// unused.</summary>
     public enum VentOutcome
     {
         None,
@@ -28,23 +28,19 @@ namespace Overpower.Combat
     }
 
     /// <summary>
-    /// The firing resource every weapon spends, and the one the Sprint ability spends too - that
-    /// shared pool is the point: sprinting costs you the ability to shoot, without either system
-    /// needing to know about the other. Plain C# for the same reason as DamageResolver and
-    /// StatusEffectState: it is unit tested without touching the Unity engine, and a
-    /// MonoBehaviour wrapper calls Tick from Update in a later task.
+    /// The firing resource every weapon spends, and Sprint too: that shared pool is the point,
+    /// sprinting costs you the ability to shoot with neither system knowing the other. Plain C#, unit
+    /// tested without the Unity engine; a MonoBehaviour wrapper calls Tick from Update.
     ///
-    /// The rule that makes this more than a health bar in reverse: hitting max does not just
-    /// block further Add calls, it silences the primary weapon and every ability until the bar
-    /// empties back to zero. With the real numbers (max 100, 25/s decay) that is up to 4 seconds
-    /// of being unable to act. That was accepted deliberately over a gentler weapon-only lockout,
-    /// on the condition that IsWarning exists at 80 heat so the silence reads as the player's own
-    /// mistake rather than an arbitrary wall - see 00-master-plan.md.
+    /// Hitting max silences the primary weapon and every ability until the bar empties back to zero (a
+    /// deliberate choice over a gentler weapon-only lockout, on the condition that IsWarning exists so
+    /// the silence reads as the player's own mistake; see 00-master-plan.md). How long that lasts comes
+    /// from GameplayConfig's max and decay values.
     ///
-    /// "Vent": a couple of seconds into a silence, a window opens for a short while. Press R
-    /// (TryVent) inside it and the rest of the silence is cut in half - implemented as HALVING
-    /// HEAT, not a second timer, because heat already IS the clock once decay has started (see
-    /// TryVent's own comment for the exact condition that makes that exact).
+    /// "Vent": a short window opens a while into a silence; pressing R (TryVent) inside it cuts the
+    /// rest of the silence in half, implemented as HALVING HEAT rather than a second timer, because
+    /// heat already IS the clock once decay has started (see TryVent for the condition that makes that
+    /// exact).
     /// </summary>
     public sealed class OverheatState
     {
@@ -59,12 +55,10 @@ namespace Overpower.Combat
         private readonly float ventRandomDelayMax;
         private readonly System.Func<float> randomSource;
 
-        // THIS silence's own vent delay - ventDelay in fixed mode, or a value picked from
-        // [ventRandomDelayMin, ventRandomDelayMax] the instant the silence started (see
-        // PickVentDelay). Everything that used to read ventDelay directly (WindowCloseEdge,
-        // WindowOpenAt, the band fractions, TryVent's Early/Late split) reads this instead, so a
-        // silence keeps the same window for its whole duration even though the next one may pick
-        // a different one.
+        // THIS silence's own vent delay: ventDelay in fixed mode, or a value picked from
+        // [ventRandomDelayMin, ventRandomDelayMax] when the silence started (see PickVentDelay).
+        // Everything that times the window reads this, so a silence keeps one window for its whole
+        // duration even though the next may pick another.
         private float currentVentDelay;
 
         // Counts down from decayDelay every time heat is added, and only once it reaches zero
@@ -72,30 +66,22 @@ namespace Overpower.Combat
         // "holds" the bar up rather than bleeding off between shots.
         private float timeSinceLastAdd;
 
-        // How long the CURRENT silence has been running - starts at 0 the instant IsSilenced
-        // flips false -> true, advances alongside timeSinceLastAdd in Tick, and resets to 0 both
-        // in Clear and the moment the silence ends. Kept as its own field (rather than reusing
-        // timeSinceLastAdd directly) so the vent window's timing reads as its own concept, even
-        // though the two happen to move in lockstep for the whole silence in practice - nothing
-        // may add heat while silenced (WeaponFiring/AbilityRunner gate on CastGate before either
-        // ever runs), so timeSinceLastAdd is never reset mid-silence.
+        // How long the CURRENT silence has run: 0 the instant IsSilenced flips false -> true, advanced
+        // in Tick, reset in Clear and when the silence ends. Its own field so the vent timing reads as
+        // its own concept, though it moves in lockstep with timeSinceLastAdd (nothing may add heat
+        // while silenced: WeaponFiring/AbilityRunner gate on CastGate before either ever runs).
         private float silenceClock;
 
-        // This silence's single Vent attempt - set the moment the first TryVent() call lands,
-        // whatever it returns, and cleared with everything else in Clear/when the silence ends.
+        // This silence's single Vent attempt: set when the first TryVent() lands, whatever it returns;
+        // cleared in Clear and when the silence ends.
         private bool ventAttempted;
         private bool ventHit;
 
-        // Tiny slack on the window's closing edge only, so silenceClock reaching "2.8" through
-        // several small Tick calls (e.g. 2.0 + 0.4 + 0.4) reads as inside the window exactly like
-        // reaching it through one Tick(2.8) call does, even though the two paths can land a float
-        // ULP or two apart. Nowhere near large enough to matter at real, sub-millisecond frame
-        // deltas - it exists only to make "inclusive" actually mean inclusive regardless of how
-        // the caller chose to split their Tick calls. The OPEN edge needs no matching slack: a
-        // clock that lands a ULP short of ventDelay just opens the window one frame later than it
-        // ideally would - no hit is lost, only delayed by a frame nobody can perceive. The close
-        // edge is the one where the same ULP would silently turn a genuine, on-time hit into a
-        // Late miss, which is what this slack actually guards against.
+        // Slack on the window's closing edge only, so silenceClock reaching the closing time through
+        // several small Tick calls reads as inside the window exactly like reaching it in one Tick,
+        // though the two paths can land a float ULP apart. The OPEN edge needs none (a clock a ULP
+        // short just opens the window one frame later, no hit lost); at the close edge the same ULP
+        // would turn a genuine on-time hit into a Late miss.
         private const float WindowCloseSlack = 0.0001f;
 
         public float Heat { get; private set; }
@@ -118,35 +104,30 @@ namespace Overpower.Combat
 
         public bool CanAct => !IsSilenced;
 
-        /// <summary>False when ventWindow &lt;= 0 - Vent off entirely (GameplayConfig's own tooltip:
-        /// "0 turns Vent off entirely"). PlayerHud reads this (through PlayerOverheat) so the band
-        /// never appears at all rather than reading a stale Missed for the rest of every silence -
-        /// see Outcome and VentBandLookRule.</summary>
+        /// <summary>False when ventWindow &lt;= 0: Vent is off entirely (GameplayConfig tooltip).
+        /// PlayerHud reads this (through PlayerOverheat) so the band never appears, rather than
+        /// showing a stale Missed for the rest of every silence; see Outcome and VentBandLookRule.</summary>
         public bool VentEnabled => ventWindow > 0f;
 
-        /// <summary>True exactly while the vent window is open right now: the silence clock is
-        /// inside [ventDelay, ventDelay + ventWindow], both ends inclusive. A 0 window can never
-        /// open (see the class comment on ventWindow).</summary>
+        /// <summary>True exactly while the vent window is open: the silence clock is inside
+        /// [ventDelay, ventDelay + ventWindow], both ends inclusive. A 0 window never opens.</summary>
         public bool IsVentWindowOpen => IsSilenced && WindowOpenAt(silenceClock);
 
-        /// <summary>currentVentDelay + ventWindow + WindowCloseSlack - the window's closing instant, with
-        /// its hair of float tolerance. WindowOpenAt and Outcome both used to spell this out separately;
-        /// one shared property means they can never drift apart on where the window actually ends.</summary>
+        /// <summary>currentVentDelay + ventWindow + WindowCloseSlack: the window's closing instant. One
+        /// shared property so WindowOpenAt and Outcome cannot drift apart on where the window ends.</summary>
         private float WindowCloseEdge => currentVentDelay + ventWindow + WindowCloseSlack;
 
-        /// <summary>The shared inclusive-both-ends range check TryVent, IsVentWindowOpen and Outcome
-        /// all use, so they can never disagree about where the window sits (see WindowCloseSlack's
-        /// own comment for why the close edge alone carries a hair of tolerance).</summary>
+        /// <summary>The shared inclusive-both-ends check TryVent, IsVentWindowOpen and Outcome all use,
+        /// so they cannot disagree about where the window sits (see WindowCloseSlack for why only the
+        /// close edge carries tolerance).</summary>
         private bool WindowOpenAt(float clock) =>
             ventWindow > 0f && clock >= currentVentDelay && clock <= WindowCloseEdge;
 
         /// <summary>The current attempt's outcome, for the HUD band: None for the whole silence when
-        /// VentEnabled is false (review fix - Vent turned off, GameplayConfig's "0 = off" tooltip,
-        /// must never paint a band at all, not even a Missed one, once the disabled window's close
-        /// edge has passed); otherwise Hit once TryVent has landed one, Missed once either an
-        /// Early/Late press has spent the attempt OR the window has closed with nothing pressed at
-        /// all (the older groundwork's "light up and pass unused" - the HUD shows the miss
-        /// immediately either way, see PlayerHud), None otherwise.</summary>
+        /// VentEnabled is false (a disabled Vent must never paint a band, not even a Missed one once
+        /// its window edge has passed); otherwise Hit once TryVent has landed one, Missed once an
+        /// Early/Late press has spent the attempt OR the window closed with nothing pressed (the HUD
+        /// shows the miss immediately either way, see PlayerHud), None otherwise.</summary>
         public VentOutcome Outcome
         {
             get
@@ -158,51 +139,41 @@ namespace Overpower.Combat
                 if (ventAttempted)
                     return VentOutcome.Missed;
                 if (silenceClock > WindowCloseEdge)
-                    return VentOutcome.Missed; // the window passed with nothing pressed at all
+                    return VentOutcome.Missed;
                 return VentOutcome.None;
             }
         }
 
-        /// <summary>Heat fraction (0..1 of max) the fill sits at the instant the vent window opens -
-        /// the band's brighter/upper edge, since heat only ever falls while silenced. Projected from
-        /// bandOriginHeat (see its own comment), how much of the decay delay is left, the decay rate
-        /// and how long this silence has run - not a fixed pair of numbers - so the band still lines
-        /// up with the fill even if a future change ever silenced a player below max heat, or a
-        /// laser's refund lowers heat before the window opens (review fix, see Refund). Uses THIS
-        /// silence's own currentVentDelay, so the band tracks wherever the window actually opened
-        /// this time in random mode, not the fixed ventDelay.</summary>
+        /// <summary>Heat fraction (0..1 of max) the fill sits at when the vent window opens: the band's
+        /// upper edge, since heat only falls while silenced. Projected from bandOriginHeat, the decay
+        /// delay left, the decay rate and this silence's run time, not fixed numbers, so the band lines
+        /// up with the fill even when a laser's refund lowers heat before the window opens (see
+        /// Refund). Uses THIS silence's currentVentDelay, so in random mode it tracks where the window
+        /// actually opened.</summary>
         public float VentBandHighFraction => max > 0f ? HeatAtSilenceTime(currentVentDelay) / max : 0f;
 
         /// <summary>Heat fraction (0..1 of max) the fill sits at the instant the vent window closes -
         /// the band's lower edge. See VentBandHighFraction.</summary>
         public float VentBandLowFraction => max > 0f ? HeatAtSilenceTime(currentVentDelay + ventWindow) / max : 0f;
 
-        /// <summary>THIS silence's own vent delay - ventDelay in fixed mode, or the value random
-        /// mode picked when the silence started (see PickVentDelay). Exposed read-only for the HUD
-        /// and for tests; nothing external ever sets it directly.</summary>
+        /// <summary>THIS silence's own vent delay: ventDelay in fixed mode, or what random mode picked
+        /// when the silence started (see PickVentDelay). Read-only, for the HUD and tests.</summary>
         public float CurrentVentDelay => currentVentDelay;
 
-        /// <summary>What the band is projected FROM (see HeatAtSilenceTime) - set to Heat (i.e. max,
-        /// since IsSilenced only ever goes false-&gt;true inside Add() the moment Heat reaches max) the
-        /// instant a fresh silence starts, and lowered by Refund while silenced and before a hit (see
-        /// that method's own comment). Review fix: a laser's Refund(OverheatRefundOnHit) can land in
-        /// the very trigger pull that caused the overheat (WeaponFiring.RefundHeatIfBeamConnects runs
-        /// right after the Add that silenced the player) - the band used to always project from max
-        /// regardless, so a refunded fill was already partway through a band drawn as if nothing had
-        /// been refunded at all. A hit deliberately does not touch this field: the band (and its hit
-        /// flash) stays exactly where the window was, not wherever TryVent's own Heat *= 0.5f left
-        /// Heat afterwards.</summary>
+        /// <summary>What the band is projected FROM (see HeatAtSilenceTime): set to Heat (max, since
+        /// IsSilenced only goes false-&gt;true inside Add() when Heat reaches max) when a silence
+        /// starts, and lowered by Refund while silenced and before a hit. Trap: a laser's Refund can
+        /// land in the very trigger pull that caused the overheat (WeaponFiring.RefundHeatIfBeamConnects
+        /// runs right after the Add that silenced the player), so a band always projected from max
+        /// would be drawn as if nothing was refunded. A hit deliberately does not touch it: the band
+        /// (and its hit flash) stays where the window was, not where TryVent's Heat *= 0.5f left Heat.</summary>
         private float bandOriginHeat;
 
-        /// <summary>Heat at a given point in time within THIS silence (t measured in seconds since
-        /// IsSilenced went true) - the same decay math Tick uses (nothing decays until decayDelay
-        /// has elapsed since the last Add), just solved for an arbitrary instant instead of stepped
-        /// by a frame. Starts from bandOriginHeat, not the current Heat: heat cannot rise again while
-        /// silenced (WeaponFiring/AbilityRunner gate on CastGate before Add ever runs), but a laser's
-        /// Refund CAN lower it mid-silence, before the window opens - which is exactly what
-        /// bandOriginHeat tracks (see its own comment) so this formula keeps matching the fill it
-        /// projects, whether asked before, during or after "now" (silenceClock), refund or no
-        /// refund.</summary>
+        /// <summary>Heat at a point in time within THIS silence (t in seconds since IsSilenced went
+        /// true): the decay math Tick uses (nothing decays until decayDelay has elapsed since the last
+        /// Add), solved for an arbitrary instant. Starts from bandOriginHeat, not the current Heat,
+        /// because a laser's Refund CAN lower heat mid-silence before the window opens (heat cannot
+        /// rise while silenced: WeaponFiring/AbilityRunner gate on CastGate before Add runs).</summary>
         private float HeatAtSilenceTime(float t)
         {
             float decayingTime = Mathf.Max(0f, t - decayDelay);
@@ -210,11 +181,9 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// ventRandomTiming/ventRandomDelayMin/ventRandomDelayMax/randomSource are all optional so
-        /// every existing call site (fixed mode) compiles and behaves unchanged. randomSource
-        /// returns 0..1 (e.g. () =&gt; UnityEngine.Random.value, or a System.Random's NextDouble) -
-        /// injected rather than read from UnityEngine.Random directly, so this stays plain,
-        /// deterministically testable C# like the rest of the class (see the class comment).
+        /// ventRandomTiming/ventRandomDelayMin/ventRandomDelayMax/randomSource are optional, so fixed
+        /// mode needs none of them. randomSource returns 0..1 (e.g. () =&gt; UnityEngine.Random.value);
+        /// injected rather than read directly so this stays deterministically testable plain C#.
         /// </summary>
         public OverheatState(float max, float decayDelay, float decayPerSecond, float warningThreshold,
             float ventDelay, float ventWindow, bool ventRandomTiming = false, float ventRandomDelayMin = 0f,
@@ -233,12 +202,10 @@ namespace Overpower.Combat
             currentVentDelay = ventDelay;
         }
 
-        /// <summary>THIS silence's vent delay: ventDelay in fixed mode (or if random mode has no
-        /// source to draw from - a safe fallback, never a null-reference), otherwise randomSource's
-        /// next 0..1 value mapped onto [min(ventRandomDelayMin, ventRandomDelayMax),
-        /// max(ventRandomDelayMin, ventRandomDelayMax)] - the smaller of the two is always the
-        /// minimum, so a designer swapping them in the Inspector still gets a sane range rather than
-        /// an empty/reversed one.</summary>
+        /// <summary>THIS silence's vent delay: ventDelay in fixed mode (or if random mode has no source:
+        /// a safe fallback, never a null reference), otherwise randomSource's next 0..1 value mapped onto
+        /// [min, max] of the two random bounds; the smaller is always the minimum, so a designer
+        /// swapping them in the Inspector still gets a sane range.</summary>
         private float PickVentDelay()
         {
             if (!ventRandomTiming || randomSource == null)
@@ -262,10 +229,9 @@ namespace Overpower.Combat
 
             if (IsSilenced && !wasSilenced)
             {
-                // A fresh silence just started - the vent clock and this silence's one attempt
-                // begin fresh, in lockstep with timeSinceLastAdd's own reset above (see the class
-                // comment on why Heat can stand in for a separate silence timer). bandOriginHeat
-                // starts at Heat, which IS max here (Heat was just clamped up to it above).
+                // A fresh silence just started: the vent clock and this silence's one attempt begin
+                // fresh, in lockstep with timeSinceLastAdd's reset above. bandOriginHeat starts at
+                // Heat, which IS max here (Heat was just clamped up to it).
                 silenceClock = 0f;
                 ventAttempted = false;
                 ventHit = false;
@@ -274,12 +240,10 @@ namespace Overpower.Combat
             }
         }
 
-        /// <summary>The laser's half-cost refund when a shot connects. Never goes below zero. While
-        /// silenced and before a hit, also lowers bandOriginHeat by the amount actually applied to
-        /// Heat (the same floor-at-zero clamp), so the projected Vent band moves down with the fill
-        /// instead of staying pinned to max (review fix - see bandOriginHeat's own comment). Once a
-        /// hit has landed, ventHit is true and this stops touching the band: the hit flash must stay
-        /// exactly where the window was, not follow whatever a later refund does to Heat.</summary>
+        /// <summary>The laser's half-cost refund when a shot connects; never below zero. While silenced
+        /// and before a hit it also lowers bandOriginHeat by the amount actually applied to Heat, so the
+        /// projected Vent band moves down with the fill instead of staying pinned to max. After a hit it
+        /// stops touching the band: the hit flash must stay where the window was.</summary>
         public void Refund(float amount)
         {
             float before = Heat;
@@ -301,7 +265,7 @@ namespace Overpower.Combat
             timeSinceLastAdd += deltaTime;
 
             if (timeSinceLastAdd <= decayDelay)
-                return; // still inside the delay window - no decay yet
+                return;
 
             // Only the slice of this step that falls after the delay has elapsed actually
             // decays heat. Without this split, a single large Tick that straddles the delay
@@ -341,12 +305,11 @@ namespace Overpower.Combat
             {
                 ventHit = true;
 
-                // The halving IS the "cut the remaining silence in half" - not a parallel timer.
-                // Heat decays linearly once past decayDelay (Tick), so remaining time-to-zero is
-                // Heat / decayPerSecond; halving Heat exactly halves that quotient. This is only
-                // exact once decay has actually started, i.e. once silenceClock has passed
-                // decayDelay - true by the time the window can even open whenever ventDelay >=
-                // decayDelay (GameplayConfig's own tooltip says so; the defaults are 2.0 >= 1.5).
+                // The halving IS the "cut the remaining silence in half", not a parallel timer. Heat
+                // decays linearly once past decayDelay (Tick), so time-to-zero is Heat / decayPerSecond
+                // and halving Heat exactly halves it. Exact only once decay has started (silenceClock
+                // past decayDelay): true by the time the window can open whenever ventDelay >=
+                // decayDelay (GameplayConfig's tooltip says so).
                 Heat *= 0.5f;
                 return VentResult.Hit;
             }

@@ -9,30 +9,27 @@ using Overpower.TestRange;
 
 /// <summary>
 /// One player's three ability slots - Attachment (right mouse), Ultimate (Space), Mobility (Left
-/// Shift). Primary (left mouse) stays WeaponFiring's. This class owns the parts every ability
-/// shares, so no ability has to write them again: reading the keys, the "can you act" gate, the
-/// press buffer, the one network message, and what happens on death and respawn. Everything that
-/// makes a dash a dash lives in its own AbilityModule prefab instead - see AbilityModule.
+/// Shift); Primary stays WeaponFiring's. Owns what every ability shares: reading the keys, the "can
+/// you act" gate, the press buffer, the one network message, and death and respawn. What makes a
+/// dash a dash lives in its own AbilityModule prefab.
 ///
 /// WHY ONE RPC HERE, AND NONE ON THE MODULES. PUN only delivers an RPC to components on the
-/// PhotonView's own GameObject, which is the player root - so a module (a child object) can never
-/// receive one. The alternative, a PhotonView per module, means allocating network ids at runtime
-/// for every ability equipped. Instead every ability's every cast travels through RPC_CastAbility
-/// below with the slot and the ability id beside it, and adding an ability never touches the RPC
+/// PhotonView's own GameObject (the player root), so a child module can never receive one, and a
+/// PhotonView per module would allocate network ids at runtime. Every cast travels through
+/// RPC_CastAbility with the slot and ability id beside it, so adding an ability never touches the RPC
 /// list in PhotonServerSettings, the most fragile file in the project.
 ///
-/// WHO DECIDES. Only the owner's copy of this component reads keys and checks the gate. Every copy,
-/// the owner's included, runs the cast when the RPC arrives - and never gates it again: overheat,
-/// stun and cooldowns are not replicated, so a receiver checking them would be checking the wrong
-/// player's numbers and silently dropping real casts.
+/// WHO DECIDES. Only the owner's copy reads keys and checks the gate. Every copy, the owner's
+/// included, runs the cast when the RPC arrives and never gates it again: overheat, stun and
+/// cooldowns are not replicated, so a receiver would check the wrong player's numbers and silently
+/// drop real casts.
 ///
-/// TRUST MODEL: cooldowns, charges and casts are client-authoritative - the caster's own machine
-/// decides and everyone else believes it. No anti-cheat; this is a prototype on a relay with no
-/// server that could check anything.
+/// TRUST MODEL: client-authoritative; the caster's machine decides and everyone else believes it.
+/// No anti-cheat (a relay with no server that could check anything).
 ///
-/// Deliberately NOT IPunObservable - PlayerNetSync is the player's only observable (see its class
-/// comment). And deliberately not switched off by PlayerLifecycle while dead: this component must
-/// stay awake to hear AliveChanged and to keep receiving casts sent just before a death.
+/// Deliberately NOT IPunObservable - PlayerNetSync is the only observable. And deliberately not
+/// switched off by PlayerLifecycle while dead: it must stay awake to hear AliveChanged and to keep
+/// receiving casts sent just before a death.
 /// </summary>
 public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
 {
@@ -79,19 +76,17 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     private bool wasStunned;
     private bool wasSilenced;
 
-    // A bad cast RPC (wrong slot for its id, unknown id) is reported once per session, not once per
-    // packet - a stale build on the other end would otherwise fill the log every cast.
+    // A bad cast RPC (wrong slot for its id, unknown id) is reported once per session, not per packet;
+    // a stale build on the other end would otherwise fill the log every cast.
     private static bool loggedRejectedCast;
 
-    /// <summary>Raised on this client whenever a slot's module is created, replaced or removed - for
-    /// the HUD to redraw that slot's icon.</summary>
+    /// <summary>Raised on this client whenever a slot's module is created, replaced or removed, for the
+    /// HUD to redraw that slot's icon.</summary>
     public event System.Action<AbilitySlot> SlotChanged;
 
-    /// <summary>Task T3 (telemetry): raised on the caster's own client right after a successful
-    /// cast's RPC is sent - TryCast only, never SendPhase's later phases (a channel completing or
-    /// being cancelled is not a fresh cast). PlayerTelemetry reads its own transform.position for
-    /// the `cast` line's x/z, so this carries only what a "cast" event actually needs to identify
-    /// which one happened.</summary>
+    /// <summary>Raised on the caster's own client right after a successful cast's RPC is sent: TryCast
+    /// only, never SendPhase's later phases (a channel completing or being cancelled is not a fresh
+    /// cast). PlayerTelemetry logs its `cast` line from it.</summary>
     public event System.Action<AbilitySlot, int> Cast;
 
     /// <summary>Raised instead of Cast for a follow-up to an earlier cast (the AoE Zone's throw): the
@@ -103,8 +98,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         owner = new AbilityOwner(gameObject);
         input = GetComponent<PlayerInputRouter>();
 
-        // Loud, matching WeaponFiring: a silent null here would leave a player with abilities that
-        // either never equip or cannot be resolved on anyone else's machine.
+        // Loud: a silent null would leave abilities that never equip or cannot be resolved on anyone
+        // else's machine.
         if (catalogue == null)
             Debug.LogError($"[AbilityRunner] {name}: Ability Catalogue is not assigned - abilities cannot be equipped or received.");
         if (gameplayConfig == null)
@@ -112,9 +107,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         if (moduleParent == null)
             Debug.LogError($"[AbilityRunner] {name}: Module Parent is not assigned - modules will be created on the player root instead.");
 
-        // Subscribed in Awake, not Start: PlayerLifecycle's own Start can already raise AliveChanged
-        // (a late joiner learning this player is dead), and Start order between components is not
-        // guaranteed.
+        // Awake, not Start: PlayerLifecycle's Start can already raise AliveChanged (a late joiner
+        // learning this player is dead), and Start order between components is not guaranteed.
         if (owner.Lifecycle != null)
             owner.Lifecycle.AliveChanged += HandleAliveChanged;
     }
@@ -160,13 +154,12 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     private void Update()
     {
         if (!photonView.IsMine)
-            return; // Nobody else's machine decides anything about this player's casts.
+            return; // nobody else's machine decides anything about this player's casts
 
         float deltaTime = Time.deltaTime;
         float now = Time.time;
-        // No literal duplicating GameplayConfig's own default here: the missing-config error is
-        // already logged in Awake, so a missing config degrades honestly to no buffering at all
-        // rather than silently guessing at the tuning value.
+        // No literal duplicating GameplayConfig's default: a missing config (logged in Awake) degrades
+        // to no buffering rather than silently guessing the tuning value.
         float window = gameplayConfig != null ? gameplayConfig.AbilityPressBufferSeconds : 0f;
 
         InterruptOnStunOrSilence();
@@ -180,8 +173,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             if (module == null)
                 continue;
 
-            // Cooldown first, so a charge returning this very frame is already spendable by a
-            // press buffered a moment ago - the whole point of the buffer.
+            // Cooldown first, so a charge returning this very frame is spendable by an already
+            // buffered press.
             module.TickCooldown(deltaTime);
 
             if (pressBuffers[i].IsPending(now, window) &&
@@ -189,26 +182,24 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             {
                 bool cast = TryCast(module);
 
-                // Consumed on an actual cast, or on a refusal from a module that does not ask to retry: a module
-                // refusing (no valid target) is normally an answer, and retrying it every frame for the rest of the
-                // window would just ask the same question again. A module that opts into
-                // RetriesRefusalWithinBuffer (Dash: review fix) keeps the press alive instead, so the SAME press
-                // still fires the moment the refusal's own reason clears within the window.
+                // Consumed on a cast, or on a refusal from a module that does not ask to retry: a refusal
+                // (no valid target) is normally an answer, and retrying every frame would ask the same
+                // question again. A module with RetriesRefusalWithinBuffer (Dash) keeps the press alive,
+                // so the SAME press fires once the refusal's reason clears within the window.
                 if (cast || !module.RetriesRefusalWithinBuffer)
                     pressBuffers[i].TryConsume(now, window);
             }
 
-            // held is only ever true while the player can act, so a channel or sprint ends the
-            // instant a stun, silence or death lands - see AbilityModule.OwnerTick.
+            // held is true only while the player can act, so a channel or sprint ends the instant a
+            // stun, silence or death lands (AbilityModule.OwnerTick).
             bool held = canAct && IsHeld(SlotFromIndex(i));
             module.OwnerTick(deltaTime, held, canAct);
         }
     }
 
     /// <summary>
-    /// Owner only. Presses one slot's key as far as abilities are concerned - buffered, then gated
-    /// and cast on this frame's Update. Public so the test range and editor tooling drive the exact
-    /// path a key press does; there is no second casting route that could behave differently.
+    /// Owner only. Presses one slot's key: buffered, then gated and cast in Update. Public so the test
+    /// range and editor tooling drive the exact path a key press does; there is no second casting route.
     /// </summary>
     public void PressSlot(AbilitySlot slot)
     {
@@ -220,12 +211,10 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     }
 
     /// <summary>
-    /// Owner only. Holds one slot's key down, as far as abilities are concerned, for the given
-    /// number of seconds - PressSlot's partner for testing channels and sprints from editor tooling,
-    /// where the real keyboard does not reach the game. Deliberately time-limited rather than an
-    /// on/off switch, so a tool that forgets to let go can never leave a key stuck down; 0 lets go
-    /// at once. Still subject to the gate: a stun or death ends the hold exactly as it would a
-    /// real key.
+    /// Owner only. Holds one slot's key down for the given seconds - PressSlot's partner for testing
+    /// channels and sprints from editor tooling, where the real keyboard does not reach the game.
+    /// Time-limited, not an on/off switch, so a tool that forgets to let go never leaves a key stuck;
+    /// 0 lets go at once. Still subject to the gate: a stun or death ends the hold like a real key.
     /// </summary>
     public void HoldSlot(AbilitySlot slot, float seconds)
     {
@@ -236,16 +225,16 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         toolHoldUntil[index] = Time.time + Mathf.Max(0f, seconds);
     }
 
-    /// <summary>True when the cast actually happened - the buffered press consumption above reads this.</summary>
+    /// <summary>True when the cast actually happened.</summary>
     private bool TryCast(AbilityModule module)
     {
         CastContext ctx = BuildContext();
         if (!module.TryBuildCast(ctx, out CastPayload payload))
             return false;
 
-        // Spent BEFORE the RPC goes out. With RpcTarget.All the caster's own copy of the RPC runs
-        // synchronously inside photonView.RPC, so ExecuteCast must already see the charge gone -
-        // a module reading ChargesAvailable there would otherwise count a charge it just used.
+        // Spent BEFORE the RPC goes out. With RpcTarget.All the caster's own copy runs synchronously
+        // inside photonView.RPC, so ExecuteCast must already see the charge gone, or a module reading
+        // ChargesAvailable there would count a charge it just used.
         if (module.SpendsChargeWhenCast && !module.TrySpendChargeForCast())
             return false;
 
@@ -257,14 +246,13 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         return true;
     }
 
-    /// <summary>What the caster's machine knows at the press, gathered in one place so no module
-    /// ever reads the mouse or the camera itself.</summary>
+    /// <summary>What the caster's machine knows at the press, gathered in one place so no module reads
+    /// the mouse or the camera itself.</summary>
     private CastContext BuildContext()
     {
         Vector3 origin = transform.position;
-        // SafeMuzzlePosition, not MuzzlePosition - a cast fired flush against a wall (the stun gun,
-        // the zip gun) must start on the near side of it, exactly like a weapon shot now does. See
-        // WeaponFiring.SafeMuzzlePosition's own comment (Task 1.9 follow-up review finding).
+        // SafeMuzzlePosition, not MuzzlePosition: a cast fired flush against a wall (stun gun, zip
+        // gun) must start on the near side of it, like a weapon shot (WeaponFiring.SafeMuzzlePosition).
         Vector3 muzzle = owner.Weapon != null ? owner.Weapon.SafeMuzzlePosition : origin;
         Vector3 aim = owner.Aim != null ? owner.Aim.AimDirection : transform.forward;
         Vector3 point = owner.Aim != null ? owner.Aim.GroundPointUnderCursor : origin;
@@ -278,9 +266,9 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         if (!photonView.IsMine || module == null || module.Definition == null)
             return;
 
-        // All, not AllViaServer (unlike WeaponFiring): an ability usually moves the caster's own
-        // body, and waiting for the server round trip before your own dash starts reads as input
-        // lag. Other clients still receive one sender's RPCs in the order they were sent.
+        // All, not AllViaServer (unlike WeaponFiring): an ability usually moves the caster's own body,
+        // and waiting for the server round trip before your own dash reads as input lag. Other clients
+        // still receive one sender's RPCs in send order.
         photonView.RPC(nameof(RPC_CastAbility), RpcTarget.All, (byte)module.Definition.Slot,
                        module.Definition.Id, phase, payload.Origin, payload.Direction, payload.Point,
                        payload.Seed, payload.IntArg, payload.FloatArg);
@@ -289,12 +277,12 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     // ---- every client -------------------------------------------------------------------------
 
     /// <summary>
-    /// Runs one cast on this machine, for whoever sent it. Appended to the RpcList in
-    /// PhotonServerSettings: NEVER rename it and never change its parameters - PUN sends an index
-    /// into that list, and every machine in a room must agree on it.
+    /// Runs one cast on this machine, for whoever sent it. In the RpcList in PhotonServerSettings:
+    /// NEVER rename it and never change its parameters - PUN sends an index into that list, and every
+    /// machine in a room must agree on it.
     ///
-    /// No gate here, on purpose (see the class comment). Everything about the caster comes from the
-    /// parameters or info.Sender; inside this body PhotonNetwork.LocalPlayer is the receiver.
+    /// No gate here, on purpose (class comment). Everything about the caster comes from the parameters
+    /// or info.Sender; inside this body PhotonNetwork.LocalPlayer is the receiver.
     /// </summary>
     [PunRPC]
     private void RPC_CastAbility(byte slot, int abilityId, byte phase, Vector3 origin, Vector3 direction,
@@ -311,15 +299,15 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         AbilityModule module = modules[index];
         if (module == null || module.Definition.Id != abilityId)
         {
-            // A later phase for a module this client no longer holds is simply over: the
-            // Unequipped interrupt already stopped it here. Re-equipping the old module just to
-            // show it being cancelled would throw away the newer loadout.
+            // A later phase for a module this client no longer holds is over: the Unequipped interrupt
+            // already stopped it. Re-equipping the old module to show it cancelled would throw away
+            // the newer loadout.
             if (phase != 0)
                 return;
 
-            // The cast beat the loadout property here - Custom Properties and RPCs are separate
-            // messages. The id travels beside the slot precisely so this can be fixed on the spot
-            // instead of running whichever module happened to be in the slot.
+            // The cast beat the loadout property: Custom Properties and RPCs are separate messages.
+            // The id travels beside the slot so this is fixed on the spot instead of running
+            // whichever module is in the slot.
             AbilityDefinition definition = catalogue != null ? catalogue.Resolve(abilityId) : null;
             if (definition == null || definition.Slot != abilitySlot)
             {
@@ -361,9 +349,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
 
     /// <summary>
     /// Puts an ability in a slot, or empties it with LoadoutProperties.Empty. APPLY-ONLY: it changes
-    /// this machine and nothing else. PlayerLoadout is the only thing that should call it - it is
-    /// what tells the other clients. Equipping the id already there does nothing, so a loadout
-    /// echo or a repeated property update is harmless.
+    /// this machine and nothing else; PlayerLoadout is the only caller and tells the other clients.
+    /// Equipping the id already there does nothing, so a loadout echo is harmless.
     /// </summary>
     public void Equip(AbilitySlot slot, int abilityId)
     {
@@ -404,8 +391,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
 
         if (current != null)
         {
-            // Told BEFORE it is destroyed, while it is still in the slot, so a channel it cancels can
-            // still send its "cancelled" phase under its own id.
+            // Told BEFORE it is destroyed, while still in the slot, so a channel it cancels can still
+            // send its "cancelled" phase under its own id.
             current.Interrupt(InterruptReason.Unequipped);
             modules[index] = null;
             Destroy(current.gameObject);
@@ -421,28 +408,26 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
             module.OnEquip();
         }
 
-        pressBuffers[index] = new CastGate.PressBuffer(); // A press meant for the old ability is not for this one.
+        pressBuffers[index] = new CastGate.PressBuffer(); // a press meant for the old ability is not for this one
         SlotChanged?.Invoke(slot);
     }
 
     // ---- reads, for PlayerLoadout, the HUD and the test range ----------------------------------
 
-    /// <summary>The slot's status for the HUD, or null when the slot is empty.</summary>
+    /// <summary>Null when the slot is empty.</summary>
     public IAbilityStatus StatusFor(AbilitySlot slot)
     {
         int index = SlotIndex(slot);
         return index >= 0 ? modules[index] : null;
     }
 
-    /// <summary>The id in the slot, or LoadoutProperties.Empty.</summary>
     public int EquippedId(AbilitySlot slot)
     {
         int index = SlotIndex(slot);
         return index >= 0 && modules[index] != null ? modules[index].Definition.Id : LoadoutProperties.Empty;
     }
 
-    /// <summary>The prefab's starting ability for a slot, as an id - what PlayerLoadout equips at
-    /// spawn when nothing else has been chosen.</summary>
+    /// <summary>What PlayerLoadout equips at spawn when nothing else has been chosen.</summary>
     public int StartingId(AbilitySlot slot)
     {
         AbilityDefinition definition = slot == AbilitySlot.Attachment ? startingAttachment
@@ -453,9 +438,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     }
 
     /// <summary>
-    /// Why this slot cannot cast right now, live - for the HUD to grey out an icon and say why.
-    /// NotReady for an empty slot. Meaningful on the owner's machine only: stun, overheat and
-    /// cooldowns are not replicated, so a remote copy would read its own defaults.
+    /// Why this slot cannot cast right now, for the HUD. NotReady for an empty slot. Owner's machine
+    /// only: stun, overheat and cooldowns are not replicated, so a remote copy reads defaults.
     /// </summary>
     public CastBlock BlockFor(AbilitySlot slot)
     {
@@ -470,11 +454,9 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     /// <summary>F1's "Reset Cooldowns". Registered for the owner only.</summary>
     public void ResetForTestRange() => ResetCooldowns();
 
-    /// <summary>2.7b Decision 6: the same cleanup a death-then-respawn already runs through
-    /// HandleAliveChanged, without ever publishing a death - interrupt every module (there is no
-    /// InterruptReason for "the match reset", so this reuses Died, exactly as the plan specifies),
-    /// reset every cooldown, then let each module react to "respawned" so it rearms whatever OnRespawned
-    /// means to it. Owner only: only the owner ever ticks or resets these modules.</summary>
+    /// <summary>The cleanup a death-then-respawn runs through HandleAliveChanged, without publishing a
+    /// death: interrupt every module (no InterruptReason exists for "the match reset", so this reuses
+    /// Died), reset every cooldown, then let each module rearm in OnRespawned. Owner only.</summary>
     public void ResetForMatchStart()
     {
         if (!photonView.IsMine)
@@ -490,8 +472,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
     /// <summary>
     /// Fires on every client (PlayerLifecycle replicates alive state). Dying interrupts everything
     /// everywhere, so a channel stops on every screen without waiting for a message. Coming back
-    /// refills cooldowns - on the owner, the only machine that counts them - and then lets each
-    /// module tidy up. Ultimate charge (Task 1.11) is separate and must not reset here.
+    /// refills cooldowns (on the owner, the only machine that counts them) and lets each module tidy
+    /// up. Ultimate charge is separate and must not reset here.
     /// </summary>
     private void HandleAliveChanged(bool alive)
     {
@@ -522,8 +504,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         wasSilenced = silenced;
     }
 
-    /// <summary>The same actor-wide rule WeaponFiring.TryFire asks, so the weapon and the abilities
-    /// can never disagree about whether this player may act.</summary>
+    /// <summary>The same actor-wide rule as WeaponFiring.TryFire, so weapon and abilities cannot
+    /// disagree about whether this player may act.</summary>
     private CastBlock ActorBlock()
     {
         bool alive = owner.Lifecycle == null || owner.Lifecycle.IsAlive;
@@ -562,8 +544,8 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         }
     }
 
-    /// <summary>-1 for Primary or anything out of range, which every caller treats as "not an
-    /// ability slot" - including a malformed slot byte arriving over the network.</summary>
+    /// <summary>-1 for Primary or anything out of range, including a malformed slot byte from the
+    /// network; every caller treats it as "not an ability slot".</summary>
     private static int SlotIndex(AbilitySlot slot)
     {
         switch (slot)

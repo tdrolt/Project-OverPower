@@ -5,10 +5,10 @@ using Overpower.Dominion;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Dominion Task 9, the sudden-death words (board DomSudden). When sudden death starts a banner shows under the round bar: "SUDDEN DEATH" and
+    /// The sudden-death words (board DomSudden). When sudden death starts a banner shows under the round bar: "SUDDEN DEATH" and
     /// "No respawns · stay inside the circle · last team standing wins", in full for Banner Seconds after the circle's start was written (a
     /// restarted sudden death shows it again), then it shrinks to a small red "SUDDEN DEATH" line in the same place for the rest of the match.
-    /// "CIRCLE SHRINKS · 0:41" sits under the minimap until the circle stops. The circle's numbers come from SuddenDeathZone (Task 8), so every
+    /// "CIRCLE SHRINKS · 0:41" sits under the minimap until the circle stops. The circle's numbers come from SuddenDeathZone, so every
     /// screen counts the same. Words, sizes and colours are UiTheme fields.
     /// </summary>
     public sealed class SuddenDeathOverlay
@@ -41,7 +41,7 @@ namespace Overpower.UI
             if (shrinkRoot != null) shrinkRoot.gameObject.SetActive(false);
         }
 
-        /// <summary>One frame during sudden death. sinceStartMs is how long ago the circle's start (dSd) was written; secondsUntilStopped is the circle's own count.</summary>
+        /// <summary>sinceStartMs is how long ago the circle's start (dSd) was written; secondsUntilStopped is the circle's own count.</summary>
         public void Refresh(int sinceStartMs, float secondsUntilStopped)
         {
             if (banner == null) Build();
@@ -65,7 +65,6 @@ namespace Overpower.UI
 
         private void Build()
         {
-            // The full banner: a dark box with the big red words and the rules under them.
             LobbyBox box = kit.Box(parent, "Sudden Death Banner", theme.dominionCardFill, theme.dominionCardRadius, Color.clear, 0f);
             box.Fill.raycastTarget = false;
             banner = box.Outer;
@@ -92,7 +91,6 @@ namespace Overpower.UI
             chipText.overflowMode = TextOverflowModes.Overflow;
             LobbyUiKit.Stretch(chipText.rectTransform);
 
-            // The circle countdown under the minimap.
             var go = new GameObject("Circle Countdown", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             shrinkRoot = (RectTransform)go.transform;

@@ -18,25 +18,19 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     string privateReceiver = "";
 
     [SerializeField] GameObject chatPanel;
-    // 2026-09-27 bug fix: this used to be wired (in "chat manager.prefab") to the SAME GameObject as
-    // chatField's own TMP_InputField text component ("chat input/Text Area/Text") - a scene wiring
-    // mistake, not a deliberate double-use. Update() below calls text.SetActive(false) the instant
-    // chat opens, which disabled the exact object TMP_InputField renders typed characters into: you
-    // could open chat, type, and never see a single character, because the one thing on screen that
-    // would have shown it had just been turned off. There is no other "closed-chat hint" object in
-    // the prefab to point this at, so the reference is now null in the prefab and every use below is
-    // null-guarded - safe today, and safe again if a real hint object is wired in later.
+    // Null in "chat manager.prefab" on purpose: it was once wired to the same GameObject as chatField's
+    // own text component, and Update() calls text.SetActive(false) the moment chat opens, which hid every
+    // typed character. No other "closed-chat hint" object exists to point it at, so every use is null-guarded.
     [SerializeField] GameObject text;
     [SerializeField] TMP_InputField chatField;
     [SerializeField] TextMeshProUGUI chatDisplay;
 
-    /// <summary>Playtest extras P6 (2026-09-26): whether the chat panel is open, kept in step with
-    /// chatPanel.activeSelf below (both places that change it also set this) rather than read live
-    /// off the GameObject, so QuitConfirmPanel can check it with no scene reference of its own - same
-    /// static-bool pattern as LoadoutScreen.IsOpen. There is only ever one PhotonChat in the scene.</summary>
+    /// <summary>Whether the chat panel is open, kept in step with chatPanel.activeSelf (both places that
+    /// change it also set this) rather than read live, so QuitConfirmPanel can check it with no scene
+    /// reference of its own - same static-bool pattern as LoadoutScreen.IsOpen. Only one PhotonChat exists.</summary>
     public static bool IsOpen { get; private set; }
 
-    // ---- lobby Task 11 (D10): one channel per lobby ----
+    // ---- one channel per lobby (D10) ----
     // The chat manager object is switched on by the name screen when a room is joined and off when it is left (NameScreen.OnJoinedRoom /
     // OnLeftRoom), so the chat connects when it is enabled and disconnects when it is disabled. While connected, Update keeps the subscription
     // equal to the channel of the room this client is in (ChatChannelRule): nothing on the lobby list, the room's own channel inside a lobby.
@@ -91,7 +85,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         ClearLines();
     }
 
-    /// <summary>Task 9f: the scene is rebuilt when a player goes back to the name screen. The old chat connection and the open flag must
+    /// <summary>The scene is rebuilt when a player goes back to the name screen. The old chat connection and the open flag must
     /// not outlive it (the next join connects again under the new name).</summary>
     void OnDestroy()
     {
@@ -108,7 +102,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         chatClient = new ChatClient(this);
         subscribedChannel = null;
 
-        // Lobby Task 11: the chat user id is the stable player id, not the nickname (two players may share a name; the name travels in the message).
+        // The chat user id is the stable player id, not the nickname (two players may share a name; the name travels in the message).
         chatClient.Connect(PhotonNetwork.PhotonServerSettings.AppSettings.AppIdChat, PhotonNetwork.AppVersion,
             new AuthenticationValues(PlayerIdentity.UserId));
 
@@ -162,7 +156,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
             if (text != null) text.SetActive(false);
             chatPanel.SetActive(true);
             IsOpen = true;
-            chatField.Select();            // focus on the chat input field
+            chatField.Select();
             chatField.ActivateInputField();
         }
         else
@@ -170,7 +164,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
             if (chatPanel.activeSelf)
             {
                 chatPanel.SetActive(false);
-                if (text != null) text.SetActive(true);  // show the hint when chat is closed
+                if (text != null) text.SetActive(true);
                 chatField.DeactivateInputField();
             }
             IsOpen = false;
@@ -196,8 +190,8 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
             published = chatClient.PublishMessage(subscribedChannel, message.Encode());
         }
         ChatSendOutcome outcome = ChatSendRule.Outcome(typed, canPublish, published);
-        // Playtest extras P3 (2026-09-26): the SENDER's own text, never OnGetMessages' receive callback. Logged only once the line really went
-        // out (Dominion Task 1 Part 0): a line refused during a chat reconnect stays in the box and would otherwise be logged on every retry.
+        // The SENDER's own text, never OnGetMessages' receive callback. Logged only once the line really went
+        // out: a line refused during a chat reconnect stays in the box and would otherwise be logged on every retry.
         if (ChatSendRule.IsLogged(outcome))
             Overpower.Telemetry.MatchTelemetry.Instance?.LogChat(typed);
         return outcome;
@@ -403,13 +397,13 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         int keep = theme != null ? theme.chatMaxLines : UiTheme.DefaultChatMaxLines;
         ChatLine.Trim(lines, keep);
         ChatLine.Trim(plainLines, keep);
-        chatDisplay.text = string.Join("\n", lines); // display the received public message
+        chatDisplay.text = string.Join("\n", lines);
     }
 
     public void OnPrivateMessage(string sender, object message, string channelName)
     {
         string privateMsg = string.Format("{0} (private to {1}): {2}", sender, privateReceiver, message);
-        chatDisplay.text += "\n" + privateMsg; // Display the private message
+        chatDisplay.text += "\n" + privateMsg;
     }
 
     public void OnStatusUpdate(string user, int status, bool gotMessage, object message)
@@ -441,7 +435,7 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     {
         if (!string.IsNullOrEmpty(chatField.text))
         {
-            // To the current lobby's channel only. The field clears only when the line really went out (Lobby Task 15b): a line typed
+            // To the current lobby's channel only. The field clears only when the line really went out: a line typed
             // during a chat reconnect (Send returns false while the client cannot chat) stays in the field to be sent again.
             ChatSendOutcome outcome = SendWithOutcome(chatField.text);
             if (ChatSendRule.ClearsTheBox(outcome)) chatField.text = "";
@@ -491,8 +485,8 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
     {
         if (!string.IsNullOrEmpty(privateReceiver) && !string.IsNullOrEmpty(chatField.text))
         {
-            chatClient.SendPrivateMessage(privateReceiver, chatField.text); // Send private message
-            chatField.text = ""; // Clear input field after sending
+            chatClient.SendPrivateMessage(privateReceiver, chatField.text);
+            chatField.text = "";
         }
         else
         {
@@ -522,11 +516,10 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
         if (ChatPanelRule.MustClose(chatPanel.activeSelf, PhotonNetwork.InRoom, LobbyOverlayPanel.AnyPageOpen))
             SetOpen(false);
 
-        // Toggle chat panel visibility on Enter key press
         if (Input.GetKeyDown(KeyCode.Return))
         {
-            // If the chat is closed, open it and focus on the input field (only while it has a channel: on the name, list and Create
-            // screens Enter does nothing); if it is open, send the message
+            // A closed chat opens only while it has a channel (on the name, list and Create screens Enter does
+            // nothing); an open one sends the message.
             if (!chatPanel.activeSelf)
             {
                 if (ChatPanelRule.MayOpen(subscribedChannel)) SetOpen(true);
@@ -535,18 +528,16 @@ public class PhotonChat : MonoBehaviour, IChatClientListener
                 SubmitPublicChatOnClick();
         }
 
-        // Close the chat panel on Escape key press
         if (Input.GetKeyDown(KeyCode.Escape) && chatPanel.activeSelf)
             SetOpen(false);
     }
 
     public void TypeChatOnValueChange(string valueIn)
     {
-        // This function can be used if you need to do something with the input change
     }
 
     public void ReceiverOnValueChange(string valueIn)
     {
-        privateReceiver = valueIn; // Update the private receiver
+        privateReceiver = valueIn;
     }
 }

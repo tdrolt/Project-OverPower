@@ -3,10 +3,9 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Puts this visual on the floor the moment it spawns (ability visuals step 2) - for things placed at the caster's
-    /// root (mine, electric fence) or at a rocket's airburst height (the cursor rocket's fire field), whose flat visuals
-    /// otherwise float. Moves only this visual transform: the gameplay object, and every radius measured from it, stays
-    /// exactly where the game put it.
+    /// Puts this visual on the floor the moment it spawns - for things placed at the caster's root (mine, electric fence)
+    /// or at a rocket's airburst height (the cursor rocket's fire field), whose flat visuals otherwise float. Moves only
+    /// this visual transform: the gameplay object, and every radius measured from it, stays where the game put it.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class SnapVisualToGround : MonoBehaviour

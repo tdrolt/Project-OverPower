@@ -20,7 +20,6 @@ namespace Overpower.Dominion
             lastSentAt = nowSeconds;
         }
 
-        /// <summary>An echo of one of our writes came back.</summary>
         public void Echoed() { if (pending > 0) pending--; }
 
         /// <summary>Forget everything: a new stage, a new master, a new room.</summary>

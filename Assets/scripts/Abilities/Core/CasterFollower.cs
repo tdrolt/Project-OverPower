@@ -4,26 +4,13 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Shared "follow the caster, but stop and freeze the moment they die or leave" behaviour for
-    /// the two Task 1.11b ultimates whose prefab keeps a followsCaster checkbox (Electric Fence
-    /// default OFF, AoE Zone default ON - Tudor's 2026-09-13 spec: the fence stays where it is cast,
-    /// the zone follows the caster).
-    ///
-    /// NOT A LITERAL Transform.SetParent. Unity destroys every child the instant its parent is
-    /// destroyed, and a player who leaves the room is exactly that on this project (OnPlayerLeftRoom
-    /// is an empty no-op in PlayerLifecycle/PlayerLoadout - it is PUN's own room auto-cleanup that
-    /// actually removes a departed player's networked objects). A hard parent would silently delete a
-    /// zone still owed ticks the moment its caster disconnected. A plain per-frame position copy has
-    /// no such failure mode: it just stops copying once there is nothing left to read from, wherever
-    /// that leaves the object - which is exactly the addendum's own decision for a caster who dies or
-    /// leaves mid-cast: "the zone stays where the caster was and finishes its ticks" [C].
-    ///
-    /// PERMANENT ONCE STOPPED. A caster who dies and later respawns must not drag a zone that is
-    /// still finishing its ticks all the way across the map to the new spawn point - so the moment
-    /// following stops (death or disconnect), it never resumes, even if IsAlive later flips back on.
-    ///
-    /// Resolved once, at placement time, via PlayerLookup - read, never modified, per the Task 1.11b
-    /// brief.
+    /// "Follow the caster, but freeze the moment they die or leave", for the ultimates whose prefab keeps a
+    /// followsCaster checkbox (Electric Fence default off, AoE Zone default on).
+    /// NOT a Transform.SetParent: Unity destroys a child with its parent, and a player leaving the room is exactly that
+    /// here (PUN's room auto-cleanup removes their objects), which would delete a zone still owed ticks. A per-frame
+    /// position copy just stops copying: "the zone stays where the caster was and finishes its ticks" [C].
+    /// PERMANENT ONCE STOPPED: a respawned caster must not drag a finishing zone across the map to the new spawn.
+    /// The caster is resolved once at placement via PlayerLookup (read only).
     /// </summary>
     public sealed class CasterFollower
     {
@@ -50,7 +37,7 @@ namespace Overpower.Abilities
             active = true;
         }
 
-        /// <summary>Stops following for good - the AoE Zone's throw (Tudor's D11) leaves it where it landed.</summary>
+        /// <summary>Stops following for good - the AoE Zone's throw (D11) leaves it where it landed.</summary>
         public void Stop() => active = false;
 
         /// <summary>True while this still follows the caster (not stopped, dead or gone).</summary>
@@ -60,13 +47,10 @@ namespace Overpower.Abilities
         /// position while the caster still exists and is alive; the first frame that stops being true
         /// switches this off for good, leaving target exactly where it last was.
         ///
-        /// ON A NON-CASTER CLIENT, casterView.transform.position IS THE NETWORK-LERPED COPY
-        /// (comments-only note, review) - PlayerNetSync smooths a remote player toward their last
-        /// RECEIVED position, never their true instantaneous one. So a follower object (AoeZone) can
-        /// already be a little ahead of or behind where the caster's OWN screen currently shows them,
-        /// and a victim's client ticks damage against this copy regardless. Same accepted
-        /// victim-favours-the-defender latency tradeoff every projectile in this project already makes
-        /// - not something this class needs to correct for.</summary>
+        /// ON A NON-CASTER CLIENT, casterView.transform.position IS THE NETWORK-LERPED COPY: PlayerNetSync smooths
+        /// a remote player toward their last RECEIVED position, so a follower (AoeZone) can sit a little off where the
+        /// caster's own screen shows them, and a victim's client ticks damage against this copy. The same accepted
+        /// victim-favours-the-defender latency tradeoff every projectile makes; not corrected here.</summary>
         public void Tick(Transform target)
         {
             if (!active)

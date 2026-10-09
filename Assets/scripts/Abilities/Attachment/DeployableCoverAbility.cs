@@ -5,31 +5,16 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Places a wall of cover in front of the caster - Tudor's Attachment spec: 10s or 100 damage
-    /// absorbed (whichever comes first), 20s cooldown, blocking projectiles - and movement - in BOTH
-    /// directions, including the caster's own. This module only decides WHEN and WHERE; everything
-    /// about what the wall itself does once it exists lives on CoverWall.cs - see its own class
-    /// comment for the full mechanism (why friendly shots still stop, why the through-walls laser
-    /// does not, why HP is owner-authoritative and not synced).
-    ///
-    /// PLACEMENT IS A FLAT AIM PROJECTION, NOT A GROUND PROBE. Unlike Portal/Blink, which validate a
-    /// destination against real ground height (GroundProbe), a wall is placed Placement Distance in
-    /// front of the caster along their own flat aim direction, at the caster's own current height -
-    /// the Task 1.8 addendum gives no ground-probe step for cover, and placing it at the caster's own
-    /// height is the correct behaviour on the flat arena floor this prototype ships with.
-    ///
-    /// THE PLACEMENT CHECK IS A SINGLE Physics.CheckBox, not an OverlapBox-and-filter like
-    /// TeleportAbility.IsBlocked: the check box's own THICKNESS (not its Width - the box is built
-    /// facing the aim direction, so Thickness is the axis toward the caster) is all that separates
-    /// its near face from Placement Distance, and with the default numbers that is still 2.8m of
-    /// clearance from a caster's own body - so no explicit self-exclusion is needed on top of the
-    /// geometry.
-    ///
-    /// NO CAP, NO PRUNING. Tudor's decision: with a 20s cooldown and a 10s lifetime there can only
-    /// ever be one of this player's own walls alive at once anyway, so this module needs none of
-    /// MineAbility/TeleportAbility's oldest-first pruning machinery, and no per-instance placement
-    /// data (Seq, a networked diameter) travels with the cast either - every number the wall needs
-    /// lives on its own prefab already.
+    /// Places a wall of cover in front of the caster that blocks projectiles and movement in BOTH directions, the
+    /// caster's own included. This module only decides WHEN and WHERE; what the wall does once it exists lives on
+    /// CoverWall (why friendly shots still stop, why the through-walls laser does not, why HP is owner-authoritative).
+    /// PLACEMENT IS A FLAT AIM PROJECTION, NOT A GROUND PROBE (unlike Portal/Blink's GroundProbe): the wall goes
+    /// Placement Distance ahead along the flat aim, at the caster's own height, which is right on the flat arena floor.
+    /// THE PLACEMENT CHECK IS A SINGLE Physics.CheckBox, not TeleportAbility.IsBlocked's OverlapBox-and-filter: the box
+    /// faces the aim direction, so its Thickness is the axis toward the caster, and at the default numbers its near
+    /// face leaves clear space before the caster's body, so no self-exclusion is needed.
+    /// NO CAP, NO PRUNING: with the cooldown longer than the lifetime only one of a player's walls lives at once, so
+    /// no MineAbility-style pruning, and no per-instance placement data travels with the cast.
     /// </summary>
     public sealed class DeployableCoverAbility : AbilityModule
     {
@@ -77,7 +62,7 @@ namespace Overpower.Abilities
             Vector3 point = ctx.Origin + direction * placementDistance;
 
             if (IsBlocked(point, direction))
-                return false; // Refused, nothing spent - Tudor's addendum.
+                return false; // Refused, nothing spent.
 
             payload = new CastPayload { Origin = ctx.Origin, Direction = direction, Point = point };
             return true;
@@ -95,11 +80,9 @@ namespace Overpower.Abilities
         }
 
         /// <summary>
-        /// True if a wall-sized box at this point, facing direction, would overlap a wall, a barrier or a player's
-        /// body (Amendment 1: BodiesWallsAndBarriers, not just Default|Building - placing cover overlapping a
-        /// barrier would leave part of the wall fused into it). Uses CoverWall.GroundLift - the exact lift the real
-        /// collider is built with (CoverWall.ApplyDimensions) - so the check volume and the real one agree on the
-        /// same geometry; see the class comment for why no explicit self-exclusion is needed on top of it.
+        /// True if a wall-sized box at this point, facing direction, would overlap a wall, a barrier or a player's body
+        /// (BodiesWallsAndBarriers: cover overlapping a barrier would leave part of the wall fused into it). Uses
+        /// CoverWall.GroundLift, the exact lift the real collider is built with, so check volume and collider agree.
         /// </summary>
         private bool IsBlocked(Vector3 point, Vector3 direction)
         {

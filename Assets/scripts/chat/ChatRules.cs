@@ -4,7 +4,7 @@ using ExitGames.Client.Photon;
 
 namespace Overpower.Chat
 {
-    /// <summary>Lobby Task 11 (D10): which chat channel a client listens to. One channel per lobby, named after the Photon room; none while no
+    /// <summary>Which chat channel a client listens to (D10). One channel per lobby, named after the Photon room; none while no
     /// room is joined (the lobby list has no chat).</summary>
     public static class ChatChannelRule
     {
@@ -17,7 +17,7 @@ namespace Overpower.Chat
             subscribedChannel != null && channel != null && subscribedChannel == channel;
     }
 
-    /// <summary>What pressing Enter in the typing box does with the typed line (Dominion Task 1 Part 0). A line the client cannot send right now
+    /// <summary>What pressing Enter in the typing box does with the typed line. A line the client cannot send right now
     /// (chat reconnecting, no channel yet) is Refused: it stays in the box for another try, the player is told, and it is NOT written to the
     /// match telemetry - only a line that really went out is logged, so a retried line is never logged twice.</summary>
     public enum ChatSendOutcome
@@ -45,7 +45,7 @@ namespace Overpower.Chat
         public static bool IsLogged(ChatSendOutcome outcome) => outcome == ChatSendOutcome.Sent;
     }
 
-    /// <summary>Lobby Task 13 (Task 11 review): when the chat panel may be open, and how high its canvas draws. The chat only opens while it has a
+    /// <summary>When the chat panel may be open, and how high its canvas draws. The chat only opens while it has a
     /// channel (a lobby it is in) - on the name, list and create screens Enter does nothing - and it closes itself the moment the channel goes (room
     /// left) or a How to play / mode info page opens over it. Its canvas draws over the lobby screens only while the lobby room shows; in the match
     /// it sits under the scoreboard and the result / match-log panels.</summary>

@@ -12,39 +12,35 @@ namespace Overpower.Match
     public enum WarmupMessage { None, Countdown, HostMayEnd, HostBlocked, WaitingForHost }
 
     /// <summary>
-    /// Pure C# rules for 2.7b's match start (Tudor, 2026-09-18, "Going live" and answer 3): a 5-second countdown
-    /// that the host starts (lobby Task 5: End warm-up, once every team of the mode has a player); "Match
-    /// starts in N" shows on every screen, then the match goes live. No UnityEngine here - MatchDirector.Live.cs (step
-    /// 5) is the only Photon wiring around it, reading PhotonNetwork.PlayerList/ServerTimestamp into the plain values
-    /// these methods take, so a new master and every client reach the same answer with no extra state.
+    /// Pure C# rules for the match start: a countdown that the host starts (End warm-up, once every team of the mode
+    /// has a player); "Match starts in N" shows on every screen, then the match goes live. No UnityEngine here -
+    /// MatchDirector.Live.cs is the only Photon wiring around it, reading PhotonNetwork.PlayerList/ServerTimestamp
+    /// into the plain values these methods take, so a new master and every client reach the same answer with no extra state.
     /// </summary>
     public static class MatchStartRules
     {
         /// <summary>The fixed team count (CathedralBuildingIDs, TerritoryConfig.PlayersPerTeam already assume it).</summary>
         public const int TeamCount = 3;
 
-        /// <summary>The two-team lobby mode (Tudor, 2026-09-26): the host can set the room to this before the
-        /// countdown so joiners fill two teams instead of three - see LobbyModeOf. Written once when the lobby is created
-        /// (the host's later switch is gone, lobby Task 4).</summary>
+        /// <summary>The two-team lobby mode: joiners fill two teams instead of three - see LobbyModeOf. Written once
+        /// when the lobby is created.</summary>
         public const int TwoTeams = 2;
 
-        /// <summary>The default lobby mode - every room the host hasn't switched, spelled out for callers that read
-        /// better naming the mode than TeamCount.</summary>
+        /// <summary>The default lobby mode, spelled out for callers that read better naming the mode than TeamCount.</summary>
         public const int ThreeTeams = TeamCount;
 
-        /// <summary>The room's lobby mode, from the raw Room Property value (Decision L1): only a boxed int 2 reads
+        /// <summary>The room's lobby mode, from the raw Room Property value (L1): only a boxed int 2 reads
         /// as two-team mode; anything else - absent (null), the wrong type, or any other number - reads as three,
-        /// the same as a room the host never switched.</summary>
+        /// the default.</summary>
         public static int LobbyModeOf(object raw) => raw is int mode && mode == TwoTeams ? TwoTeams : ThreeTeams;
 
-        /// <summary>Warmup/CountingDown/Live, from the two Room Property facts (Decision 1-2): mTeams present means
+        /// <summary>Warmup/CountingDown/Live, from the two Room Property facts: mTeams present means
         /// counting down, mPhase present means live - MatchPhase.Warmup is never stored.</summary>
         public static StartState StartStateFor(bool teamsFixed, bool phaseWritten) =>
             phaseWritten ? StartState.Live : teamsFixed ? StartState.CountingDown : StartState.Warmup;
 
-        /// <summary>The host may end the warm-up (lobby Task 5): the teams are not fixed yet, the lobby is in the
-        /// warm-up (lS = 1) and every team of the lobby's mode has at least one player present - three teams for a
-        /// 3v3v3 lobby, two for a 3v3. Replaces the old "two or three teams with a player" start.</summary>
+        /// <summary>The host may end the warm-up: the teams are not fixed yet, the lobby is in the warm-up (lS = 1)
+        /// and every team of the lobby's mode has at least one player present - three teams for a 3v3v3 lobby, two for a 3v3.</summary>
         public static bool HostMayEndWarmup(bool teamsFixed, int lobbyStage, SeatLayout layout, IReadOnlyDictionary<int, int> presentPlayersPerTeam) =>
             !teamsFixed && lobbyStage == LobbySeatRules.LobbyWarmup && LobbySeatRules.MayEndWarmup(layout, presentPlayersPerTeam);
 
@@ -60,7 +56,7 @@ namespace Overpower.Match
             return teams;
         }
 
-        /// <summary>Decision 1: mLiveAt = now + the countdown length, computed wrap-safe. 0 (or a negative length,
+        /// <summary>mLiveAt = now + the countdown length, computed wrap-safe. 0 (or a negative length,
         /// treated as 0) means live on the master's very next frame.</summary>
         public static int CountdownEndsAt(int nowMs, float countdownSeconds) =>
             unchecked(nowMs + (int)Math.Round(Math.Max(0, countdownSeconds) * 1000));
@@ -69,19 +65,17 @@ namespace Overpower.Match
         /// TerritorySnapshot's hold timers.</summary>
         public static bool HasReached(int nowMs, int momentMs) => unchecked(nowMs - momentMs) >= 0;
 
-        /// <summary>"Match starts in N" (Decision 22): whole seconds, rounded up, and never 0 - it holds at 1 until the
-        /// master's live write actually arrives, even a little past the moment.
-        /// Review fix: nowMs reads 0 for a joiner's first few frames, before PhotonNetwork.ServerTimestamp has synced
-        /// (BuildingManager's own "FAIL #15" comment already records this elsewhere) - liveAtMs - 0 would read as a
-        /// nonsense huge number of seconds, so while the clock hasn't synced this shows countdownSecondsIfUnsynced
-        /// instead (MatchDirector.Live.cs's getter passes the local player's own configured countdown length),
-        /// rounded up and floored at 1 the same way as the normal path.</summary>
+        /// <summary>"Match starts in N": whole seconds, rounded up, and never 0 - it holds at 1 until the master's live
+        /// write actually arrives, even a little past the moment. nowMs reads 0 for a joiner's first few frames, before
+        /// PhotonNetwork.ServerTimestamp has synced - liveAtMs - 0 would read as a nonsense huge number of seconds, so
+        /// while the clock hasn't synced this shows countdownSecondsIfUnsynced instead (MatchDirector.Live.cs's getter
+        /// passes the local player's own configured countdown length), rounded up and floored at 1 the same way.</summary>
         public static int CountdownSecondsShown(int nowMs, int liveAtMs, float countdownSecondsIfUnsynced = 0f) =>
             nowMs == 0
                 ? Math.Max(1, (int)Math.Ceiling(Math.Max(0, countdownSecondsIfUnsynced)))
                 : Math.Max(1, (int)Math.Ceiling(unchecked(liveAtMs - nowMs) / 1000.0));
 
-        /// <summary>Decision 22: a team fixed into the countdown emptying cancels it - back to the warm-up.</summary>
+        /// <summary>A team fixed into the countdown emptying cancels it - back to the warm-up (Decision 22).</summary>
         public static bool CountdownShouldCancel(IReadOnlyList<int> teamsInMatch, IReadOnlyList<int> membersPerTeam)
         {
             foreach (int team in teamsInMatch)
@@ -90,13 +84,13 @@ namespace Overpower.Match
             return false;
         }
 
-        /// <summary>Decision 8: the cut capital is out of play from LIVE, not from the countdown - the countdown is
-        /// still warm-up (Decision 3), and the cut capital only goes neutral in the live reset.</summary>
+        /// <summary>The cut capital is out of play from LIVE, not from the countdown - the countdown is still
+        /// warm-up, and the cut capital only goes neutral in the live reset (Decisions 3, 8).</summary>
         public static bool IsCapitalOutOfPlay(bool live, int capitalTeam, IReadOnlyList<int> teamsInMatch) =>
             live && capitalTeam >= 0 && teamsInMatch != null && !Contains(teamsInMatch, capitalTeam);
 
-        /// <summary>Decision 4/17: before the teams are fixed, any team; from the countdown on, only a team in the
-        /// match and not knocked out.</summary>
+        /// <summary>Before the teams are fixed, any team; from the countdown on, only a team in the
+        /// match and not knocked out (Decisions 4, 17).</summary>
         public static bool MayJoin(bool teamsFixed, bool inMatch, bool eliminated) =>
             !teamsFixed || (inMatch && !eliminated);
 

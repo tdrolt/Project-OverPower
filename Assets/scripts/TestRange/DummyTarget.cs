@@ -10,27 +10,12 @@ using Overpower.Net;
 namespace Overpower.TestRange
 {
     /// <summary>
-    /// A stationary stand-in for a player, so weapon damage can be MEASURED rather than asserted.
-    ///
-    /// Every balance number in the design derives from one figure: how long the baseline weapon
-    /// takes to kill a full-health player. Working that out on paper gives an answer that quietly
-    /// assumes the fire interval, the armor rule and the damage order are all what you think they
-    /// are. This target prints the real number, and every later weapon is tuned against it.
-    ///
-    /// It takes damage through the same DamageResolver and the same ArmorState a real player does,
-    /// with health and armor read from the same two config assets - so a change to either config
-    /// moves the dummy and the player together, and the measurement stays honest.
-    ///
-    /// IT ALSO CARRIES A REAL StatusEffectState (Task 1.8), the same class PlayerStatusEffects wraps
-    /// for a real player - built with the same GameplayConfig caps, so a slow or a vulnerability
-    /// stacks and expires identically whichever kind of target it landed on. There is no owner guard
-    /// here the way PlayerStatusEffects.Apply has one: HasLocalAuthority is always true for a dummy
-    /// (see below), so every caller of ApplyStatus is already "the owner" by definition. Burn ticks
-    /// itself in Update, through this class's own ApplyDamage, exactly like PlayerStatusEffects
-    /// routes a real player's burn back through PlayerHealth.ApplyDamage - one funnel, whichever
-    /// target is burning.
-    ///
-    /// Not networked, and deliberately so: it exists to be shot at in a single Editor session.
+    /// A stationary stand-in for a player so weapon damage can be MEASURED: the baseline weapon's
+    /// time-to-kill on a full-health player is the figure every balance number derives from.
+    /// Takes damage through the same DamageResolver, ArmorState and GameplayConfig-capped
+    /// StatusEffectState as a player, health and armor from the same configs, so a config change
+    /// moves dummy and player together. No owner guard: HasLocalAuthority is always true, and Burn
+    /// ticks in Update through this class's ApplyDamage. Not networked: one Editor session only.
     /// </summary>
     [RequireComponent(typeof(Collider))]
     public class DummyTarget : MonoBehaviour, IDamageable, IStatusReceiver, IDisplaceable
@@ -44,8 +29,7 @@ namespace Overpower.TestRange
         private ArmorConfig armorConfig;
 
         // Deliberately ONE index into both AbsorbLevels and RechargeSeconds, unlike a player's two
-        // independent upgrade paths (see ArmorConfig's class comment) - a dummy never buys
-        // upgrades, so it only ever needs "the tier everyone starts on" from both arrays at once.
+        // independent upgrade paths (ArmorConfig): a dummy never buys upgrades.
         [SerializeField, Tooltip("Which armor tier this dummy wears. 0 is the tier everyone starts " +
                  "a match on, which is what the baseline time-to-kill is measured against.")]
         private int armorTier = 0;
@@ -63,24 +47,20 @@ namespace Overpower.TestRange
         private ArmorState armor;
         private bool isDead;
 
-        // Mark plan step 4: this dummy's own marks, keyed by attacker actor - the same ledger a real
-        // player's PlayerHealth keeps, since a dummy is a real, single victim for this purpose even
-        // though it is unnetworked (What exists B: no owner, but still one target with its own state).
+        // This dummy's own marks, keyed by attacker actor: the same ledger a real player's
+        // PlayerHealth keeps, since it is a real single victim even though unnetworked.
         private readonly MarkLedger marks = new MarkLedger();
 
-        // The dummy's own status timers - Slow, Stun, Vulnerability, Burn - built with the same
-        // caps a real player's PlayerStatusEffects uses, so a designer testing a slow or a
-        // vulnerability debuff against a dummy sees exactly the number a player would take.
+        // Slow, Stun, Vulnerability, Burn timers, built with the same caps as PlayerStatusEffects so
+        // a debuff measures the same on a dummy as on a player.
         private StatusEffectState statusState;
 
-        // StatusEffectSpec carries no source actor (see PlayerStatusEffects.burnSourceActorNumber's
-        // identical comment) - kill/damage credit for a burn tick needs it separately, and "most
-        // recent burn owns credit for all of its damage" is exactly correct because Burn stacks
-        // with StackRule.Refresh, so at most one is ever live.
+        // StatusEffectSpec carries no source actor, so burn kill/damage credit needs it separately;
+        // the most recent burn owns all its credit because Burn stacks with StackRule.Refresh (at
+        // most one live).
         private int burnSourceActorNumber = -1;
 
-        // Task T3 (telemetry): tracked alongside burnSourceActorNumber, same "most recent burn owns
-        // credit" reasoning (Burn stacks with StackRule.Refresh, so at most one is ever live).
+        // Burn source for telemetry; same "most recent burn owns credit" reasoning.
         private int burnAbilityId = -1;
 
         public bool IsStunned => statusState.IsActive(StatusKind.Stun);
@@ -90,28 +70,22 @@ namespace Overpower.TestRange
         /// player's PlayerMotor does.</summary>
         public float Slow => statusState.Magnitude(StatusKind.Slow);
 
-        /// <summary>0..1 extra damage taken - Task T3 (telemetry), the same figure PlayerHealth's own
-        /// Vulnerability property reports for a real player, exposed here so PlayerTelemetry's `hit`
-        /// line can read it for a dummy too. Read-only: ApplyDamage below already uses
-        /// statusState.Magnitude(StatusKind.Vulnerability) directly, so this adds no new behaviour.</summary>
+        /// <summary>0..1 extra damage taken, the same figure as PlayerHealth's Vulnerability, exposed
+        /// so PlayerTelemetry's `hit` line can read it for a dummy.</summary>
         public float Vulnerability => statusState.Magnitude(StatusKind.Vulnerability);
 
-        /// <summary>Task T3 (telemetry): a dummy can be made Invulnerable the same way a player can
-        /// (ApplyStatus takes any StatusKind), even though ApplyDamage below does not check it - see
-        /// that method's own comment. Exposed read-only for the `hit` line's `inv` field.</summary>
+        /// <summary>A dummy can be made Invulnerable (ApplyStatus takes any StatusKind) though
+        /// ApplyDamage does not check it. Exposed for the `hit` line's `inv` field.</summary>
         public bool IsInvulnerable => statusState.IsActive(StatusKind.Invulnerability);
 
-        /// <summary>Task T3 (telemetry): every hit any dummy in the scene takes, so PlayerTelemetry
-        /// (which has no reference to any particular DummyTarget) can log a `hit` line for the test
-        /// range without a per-dummy subscription. A dummy is not networked and lives in exactly one
-        /// client's scene (the class comment), so the only listener that could ever see this is that
-        /// same client's own local player - see PlayerTelemetry.HandleDummyDamaged.</summary>
+        /// <summary>Every hit any dummy takes, so PlayerTelemetry can log a `hit` line for the test
+        /// range without a per-dummy subscription. A dummy lives in one client's scene, so the only
+        /// listener is that client's local player (PlayerTelemetry.HandleDummyDamaged).</summary>
         public static event Action<DummyTarget, DamageResult, DamageInfo> AnyDamaged;
 
-        // The delayed reset scheduled on death. Held onto so an early reset (ResetToFull called by
-        // an external caller - the F1 panel, a test harness, or a future respawn button) can cancel
-        // it. Without this, a dummy reused inside the delay window would take the stale coroutine's
-        // ResetToFull a few seconds later, quietly wiping mid-test state back to full health/armor.
+        // The delayed reset scheduled on death. Held so an early ResetToFull (F1 panel, test harness)
+        // can cancel it; otherwise a dummy reused inside the delay is wiped back to full by the stale
+        // coroutine.
         private Coroutine resetCoroutine;
 
         // Measurement state, running from the FIRST hit rather than from spawn - the clock should
@@ -119,21 +93,18 @@ namespace Overpower.TestRange
         private float firstHitTime;
         private int hits;
 
-        // A static bulletin board of the most recent kill from ANY dummy in the scene, so the test
-        // range panel's readout can show it without polling logs or holding a reference to whichever
-        // dummy happens to die. -1 means nothing has died yet this session.
+        // A static bulletin board of the most recent kill from ANY dummy, so the panel readout needs
+        // no reference to whichever dummy died. -1 means nothing has died yet.
         public static float LastMeasuredTtkSeconds { get; private set; } = -1f;
         public static int LastMeasuredHits { get; private set; }
 
-        // ---- IDisplaceable (Task 1.10a): sonic pulse knockback ---------------------------------
-        //
-        // A dummy has no Rigidbody the way a player does (PlayerDisplacement sweeps the player's own
-        // capsule and judges it with DisplacementSweepRule) - it is plain scenery with a Collider - so this drives the same
-        // "travel N metres, stop at the first wall or body" contract with a bare Physics.CapsuleCast
-        // against this dummy's own CapsuleCollider instead, resolved a step at a time in Update.
-        // Same mask as PlayerDisplacement's own forcedBlockMask (Default | Building | Barrier, Amendment 1) for the
-        // same reason: Default carries every living player AND every other dummy, Building carries the walls and
-        // deployable cover, and a sonic pulse's shove stops a dummy at a barrier exactly like it stops a real player.
+        // ---- IDisplaceable: sonic pulse knockback ----
+        // A dummy has no Rigidbody (PlayerDisplacement sweeps the player's capsule and judges it with
+        // DisplacementSweepRule), so this drives the same "travel N metres, stop at the first wall or
+        // body" contract with a bare Physics.CapsuleCast against its own CapsuleCollider, a step at a
+        // time in Update. Same mask as PlayerDisplacement's forcedBlockMask (Default | Building |
+        // Barrier): Default carries every living player AND every other dummy, Building the walls and
+        // deployable cover.
         private CapsuleCollider capsule;
         private int displaceBlockMask;
         private Coroutine displaceCoroutine;
@@ -155,17 +126,14 @@ namespace Overpower.TestRange
         /// continues from wherever the dummy ended up instead of snapping back to the old line.</summary>
         public event Action<Vector3> Displaced;
 
-        // Captured once, in Awake, before anything can move this dummy - the exact spot
-        // TestRangeSpawner placed it at. ResetToFull restores transform.position here (review
-        // finding on Task 1.10a: it already restored health/armor/status but left position
-        // untouched, so a dummy pushed by a sonic pulse and then reset stayed drifted forever).
+        // Captured once in Awake, before anything can move this dummy: the spot TestRangeSpawner
+        // placed it at. ResetToFull restores it, or a dummy pushed by a sonic pulse stays drifted.
         private Vector3 spawnPosition;
 
         /// <summary>Fired at the end of every ResetToFull, after position/health/armor/status are
-        /// all back to their spawn values - so a component that shifted its OWN idea of where this
-        /// dummy belongs (TestRangeSpawner.Strafer's patrol centre, nudged by Displaced whenever a
-        /// pulse pushes the dummy) can snap that back too. Not the same event as Displaced: that one
-        /// fires on every push, this one only on a reset.</summary>
+        /// back, so a component holding its own idea of where the dummy belongs (Strafer's patrol
+        /// centre, nudged by Displaced) can snap back too. Displaced fires on every push, this only
+        /// on a reset.</summary>
         public event Action ResetOccurred;
 
         public bool IsAlive => !isDead;
@@ -222,11 +190,10 @@ namespace Overpower.TestRange
         }
 
         /// <summary>
-        /// Ticks every status effect currently on this dummy and pays out its burn damage, exactly
-        /// the way PlayerStatusEffects.Update does for a real player - see that class's own comment
-        /// for why ConsumeBurnDamage must run BEFORE Tick ages the same burn down. Not gated on
-        /// isDead: a dummy killed by the tail end of a burn still needs this to run once more so the
-        /// kill is reported, and ApplyDamage below already refuses a dead dummy on its own.
+        /// Ticks every status effect and pays out burn damage as PlayerStatusEffects.Update does:
+        /// ConsumeBurnDamage must run BEFORE Tick ages the same burn down. Not gated on isDead: a
+        /// dummy killed by the tail of a burn needs one more run so the kill is reported (ApplyDamage
+        /// already refuses a dead dummy).
         /// </summary>
         private void Update()
         {
@@ -245,9 +212,9 @@ namespace Overpower.TestRange
             ApplyDamage(info);
         }
 
-        /// <summary>IStatusReceiver's entry point. No IsMine-style guard, unlike
-        /// PlayerStatusEffects.Apply: HasLocalAuthority is always true for a dummy (see below), so
-        /// there is no "someone else's copy" for this call to have come from.</summary>
+        /// <summary>IStatusReceiver's entry point. No IsMine-style guard (unlike
+        /// PlayerStatusEffects.Apply): HasLocalAuthority is always true, so there is no "someone
+        /// else's copy" for this call to have come from.</summary>
         public void ApplyStatus(in StatusEffectSpec spec, int sourceActor)
         {
             if (spec.kind == StatusKind.Burn)
@@ -267,11 +234,9 @@ namespace Overpower.TestRange
         }
 
         /// <summary>
-        /// IDisplaceable's entry point - Forced only, the same shape PlayerDisplacement.Displace
-        /// exposes. No IsMine-style guard here either, for the identical reason ApplyStatus above has
-        /// none: HasLocalAuthority is always true for a dummy, so there is no "someone else's copy"
-        /// this call could have come from. A push already running is cancelled outright rather than
-        /// queued - Forced always wins, matching DisplacementPriority's own rule for a real player.
+        /// IDisplaceable's entry point, Forced only. No IsMine-style guard, for the same reason as
+        /// ApplyStatus. A push already running is cancelled, not queued: Forced always wins
+        /// (DisplacementPriority).
         /// </summary>
         public void Displace(Vector3 direction, float distance, float speed, Action<DisplaceEnd> onEnd)
         {
@@ -402,8 +367,6 @@ namespace Overpower.TestRange
         {
             CancelPendingReset();
 
-            // Review finding, Task 1.10a: this used to restore health/armor/status but never
-            // position, so a strafer pushed off its row by a sonic pulse stayed drifted forever.
             transform.position = spawnPosition;
 
             health = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
@@ -416,7 +379,7 @@ namespace Overpower.TestRange
             statusState.ClearAll(); // Awake builds statusState before ever calling this, so it is never null here.
             burnSourceActorNumber = -1;
             burnAbilityId = -1;
-            marks.Clear(); // Mark plan step 4 (Decision 8): a reset dummy starts owing nobody a mark.
+            marks.Clear(); // A reset dummy owes nobody a mark.
 
             // After everything above is back to spawn values, not before - a listener (the
             // Strafer's own centre) should see a fully-reset dummy, not one mid-restore.
@@ -434,10 +397,8 @@ namespace Overpower.TestRange
 
         /// <summary>
         /// The same order of operations a player takes damage in, because it is literally the same
-        /// resolver: vulnerability, then reduction, then armor, then health. Vulnerability now comes
-        /// from this dummy's own StatusEffectState (Task 1.8) instead of a hardcoded 0, so a raybeam
-        /// or a mine's own debuff measures the same extra damage on a dummy as it would on a real
-        /// player. Reduction stays 0 - a dummy has no dash buff or armor upgrade to grant one.
+        /// resolver: vulnerability (from this dummy's own StatusEffectState), reduction, armor, then
+        /// health. Reduction stays 0 - a dummy has no dash buff or armor upgrade to grant one.
         /// </summary>
         public DamageResult ApplyDamage(in DamageInfo info)
         {
@@ -448,9 +409,8 @@ namespace Overpower.TestRange
                 firstHitTime = Time.time;
             hits++;
 
-            // Mark plan step 4: the same rule PlayerHealth.ApplyDamage applies after its verdict, minus
-            // the verdict machinery itself - this class's own funnel has none (What exists B: no self/
-            // teammate/shield concept for a dummy), so every hit that reaches here already "lands".
+            // The same rule PlayerHealth.ApplyDamage applies after its verdict, minus the verdict
+            // machinery: this funnel has no self/teammate/shield concept, so every hit "lands".
             MarkOutcome mark = marks.OnLandedHit(info.SourceActorNumber, Time.time, info.MarkWindowSeconds);
             DamageInfo landed = mark == MarkOutcome.Cashed
                 ? info.WithAmount(MarkLedger.ScaledAmount(info.Amount, mark, info.MarkedDamageMultiplier))
@@ -462,33 +422,20 @@ namespace Overpower.TestRange
             armor.Absorb(result.ArmorAbsorbed);
             health -= result.HealthLost;
 
-            // Mark plan step 2: a dummy has no owner/IsMine concept at all (HasLocalAuthority is
-            // always true - the class comment). DamageNumberView anchors this dummy's next number
-            // here, the same as it does for a real victim's impact.
-            //
-            // Review fix (steps 1-2): the original comment here claimed "every hit on a dummy IS the
-            // local player's own shot", which is NOT true in a live match - a dummy is unnetworked, but
-            // "every client simulates every shot" (PlayerHealth.ApplyDamage's own comment) applies just
-            // as much to a dummy standing in the test range as to a real player: Hitscan/ProjectileMotor
-            // filter on nothing but overlap, so a REMOTE player's weapon fire, simulated locally on
-            // every client, can hit a dummy sitting in MY copy of the scene with info.SourceActorNumber
-            // being THEIR actor, not mine. Guarded here the same way NotifyLocalCombatCredit below
-            // already is, so a shot I did not fire cannot re-anchor MY next number at someone else's
-            // impact point. Also, as with PlayerHealth.ApplyDamage's equivalent raise, only for a source
-            // whose HitPoint is a genuine point of impact (Projectile, Splash, Contact) - a burn tick's
-            // HitPoint is this dummy's own transform.position (ApplyBurnDamage above), which would
-            // anchor the number at the body's centre instead of falling back to it the same way a
-            // stale/no impact already does.
+            // DamageNumberView anchors this dummy's next number at the impact. Only for the LOCAL
+            // player's own shots: every client simulates every shot (PlayerHealth.ApplyDamage), so a
+            // remote player's fire can hit a dummy in MY copy of the scene with THEIR actor number, and
+            // must not re-anchor MY next number. Only for a source whose HitPoint is a genuine impact
+            // (Projectile, Splash, Contact): a burn tick's HitPoint is this dummy's own position.
             if (PhotonNetwork.LocalPlayer != null && landed.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber
                 && landed.Source != DamageSource.Burn && landed.Source != DamageSource.Zone)
             {
                 CombatEvents.RaiseImpactSeen(transform, landed.HitPoint);
             }
 
-            // Mark plan step 4 (Decision 8): clear BEFORE notifying, on the killing blow, so this same
-            // hit's own credit report (NotifyLocalCombatCredit, below) already reads an empty ledger
-            // and correctly carries markSecondsLeft 0 - the same ordering PlayerHealth's lethal block
-            // uses ahead of its own Died event.
+            // Clear BEFORE notifying, on the killing blow, so this hit's credit report
+            // (NotifyLocalCombatCredit) reads an empty ledger and carries markSecondsLeft 0: the same
+            // ordering as PlayerHealth's lethal block ahead of its own Died event.
             if (result.Lethal)
                 marks.Clear();
 
@@ -511,13 +458,10 @@ namespace Overpower.TestRange
         }
 
         /// <summary>
-        /// A dummy has no owner and sends no RPC - it lives in exactly one client's scene, so it
-        /// needs none of PlayerCombatCredit's networked round trip to tell the shooter what they
-        /// dealt. A hit from the LOCAL player's own actor number feeds CombatEvents and
-        /// NoteDealtDamage directly instead, the same information a real target's
-        /// RPC_DamageCredit would eventually deliver - which is what lets armor recharge, the zip
-        /// gun's cooldown reset and ultimate charge all be exercised single-client against the test
-        /// range, with no second Editor session required.
+        /// A dummy has no owner and sends no RPC, so a hit from the LOCAL player's actor number feeds
+        /// CombatEvents and NoteDealtDamage directly instead of PlayerCombatCredit's round trip. That
+        /// lets armor recharge, the zip gun's cooldown reset and ultimate charge be exercised
+        /// single-client against the test range.
         /// </summary>
         private void NotifyLocalCombatCredit(in DamageInfo info, DamageResult result)
         {
@@ -526,13 +470,11 @@ namespace Overpower.TestRange
                 return;
 
             CombatEvents.RaiseDamageDealt(result.Total);
-            // The same "how much" event PlayerCombatCredit.RPC_DamageCredit raises for a real victim -
-            // DamageNumberView doesn't need to know whether transform belongs to a player or a dummy.
-            // Mark plan step 4: result.Mark is already this hit's own outcome, decided above.
+            // The same "how much" event PlayerCombatCredit.RPC_DamageCredit raises for a real victim,
+            // so DamageNumberView need not know whether transform is a player or a dummy.
             CombatEvents.RaiseHitReported(transform, result.Total, result.Mark == MarkOutcome.Cashed);
-            // The local player's OWN mark on this dummy, if any - the same "how long" a real credit
-            // RPC now always carries (PlayerCombatCredit.RPC_DamageCredit), so mark step 5's diamond
-            // works identically against a dummy and a real player.
+            // The local player's OWN mark on this dummy, the same "how long" a real credit RPC
+            // carries, so the mark diamond works identically against a dummy and a player.
             CombatEvents.RaiseMarkReported(transform, marks.SecondsLeft(PhotonNetwork.LocalPlayer.ActorNumber, Time.time));
 
             PhotonView localView = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
@@ -548,8 +490,8 @@ namespace Overpower.TestRange
             yield return new WaitForSeconds(resetDelaySeconds);
 
             // Clear the handle before resetting rather than let ResetToFull's own cancel do it, so
-            // this coroutine - which is, at this point, still "pending" as far as the field is
-            // concerned - never asks Unity to stop itself.
+            // this coroutine, still "pending" as far as the field is concerned, never asks Unity to
+            // stop itself.
             resetCoroutine = null;
             ResetToFull();
         }

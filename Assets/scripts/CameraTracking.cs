@@ -3,90 +3,19 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/*
-public class CameraTracking : MonoBehaviour
-{
-    public Transform target; // The player to follow
-    public Vector3 offset; // Offset to keep the camera at a good distance
-    public float followSpeed = 5f; // Speed at which the camera follows
-
-    private Vector3 velocity = Vector3.zero;
-
-void FixedUpdate()
-{
-    if (target != null)
-    {
-        Vector3 desiredPosition = target.position + offset;
-        transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref velocity, 0.1f); // 0.1f is smooth time
-        transform.LookAt(target);
-    }
-}
-
-}
-*/
-
-
-/*public class CameraTracking : MonoBehaviour
-{
-    public Transform target; // The player to follow
-    public Vector3 offset = new Vector3(0f, 10f, -5f); // Camera offset from player
-
-    // Camera follow settings
-    public bool fixedHeight = true; // Keep constant height regardless of player Y position
-    public float height = 10f; // Fixed height value (if fixedHeight is true)
-
-    private Vector3 currentOffset;
-
-    void Start()
-    {
-        if (target != null)
-        {
-            // Initialize offset
-            currentOffset = offset;
-            if (fixedHeight)
-            {
-                currentOffset.y = height - target.position.y;
-            }
-
-            // Set initial camera position
-            transform.position = target.position + currentOffset;
-            transform.LookAt(target);
-        }
-    }
-
-    void LateUpdate()
-    {
-        if (target != null)
-        {
-            // Update offset if using fixed height
-            if (fixedHeight)
-            {
-                currentOffset.y = height - target.position.y;
-            }
-
-            // Move camera exactly with player
-            transform.position = target.position + currentOffset;
-
-            // Keep looking at player
-            transform.LookAt(target);
-        }
-    }
-}*/
-
-
 public class CameraTracking : MonoBehaviour
 {
     public Transform target;
-    /// <summary>Task 9g: whose team decides the view angle. Null means the followed target (the normal case). A knocked-out
-    /// player watching someone else (SpectateView) sets their own body here, so the arena does not turn round to that player's
-    /// team angle and the minimap's "up" stays where it was.</summary>
+    /// <summary>Whose team decides the view angle. Null means the followed target (the normal case). A knocked-out
+    /// player watching someone else (SpectateView) sets their own body here, so the arena does not turn round to that
+    /// player's team angle and the minimap's "up" stays where it was.</summary>
     [System.NonSerialized] public Transform yawSource;
-    /// <summary>Lobby Task 6: a spectator seat has no body of its own, so no team decides the view angle; the camera turns this many
-    /// degrees (Unity yaw) whoever it follows, so the arena never swings round between one team's player and the next. Null (the normal
-    /// case) leaves the team-based angle in charge.</summary>
+    /// <summary>A spectator seat has no body, so no team decides the view angle; the camera turns this many degrees
+    /// (Unity yaw) whoever it follows, so the arena never swings round between one team's player and the next. Null
+    /// (the normal case) leaves the team-based angle in charge.</summary>
     [System.NonSerialized] public float? fixedYaw;
-    public Vector3 baseOffset = new Vector3(0f, 10f, -5f); // Base offset
-    public float zoomSpeed = 2f; // How fast zoom adjusts
+    public Vector3 baseOffset = new Vector3(0f, 10f, -5f);
+    public float zoomSpeed = 2f;
     [Tooltip("Closest the camera can zoom in with the scroll wheel, as a multiple of Base Offset. " +
              "0.5 = half the normal distance.")]
     public float minZoomMultiplier = 0.5f;
@@ -109,17 +38,13 @@ public class CameraTracking : MonoBehaviour
     private float currentZoom = 1f; // Default zoom level (1 = baseOffset)
     private float yaw = 0f;         // degrees rotated around the player
     private bool teamYawResolved = false;
-    // Review fix 6 (2026-09-26): which team teamYawResolved was resolved FOR - so ResolveTeamYaw can tell a
-    // body that moved onto another team (the old two-team switch did this; seats are locked at Start now, so it is a
-    // safety net) apart from "already resolved, nothing to do". PlayerTeam.NoTeam until the first resolve.
+    // Which team teamYawResolved was resolved FOR, so ResolveTeamYaw can tell a body that moved onto another team
+    // (a safety net: seats are locked at Start) from "already resolved". PlayerTeam.NoTeam until the first resolve.
     private int teamYawResolvedForTeam = PlayerTeam.NoTeam;
 
-    // Scope ability (Tudor, 2026-09-18): a SEPARATE keyed stack from currentZoom above, on purpose - see
-    // CameraZoomStack's class comment for why an extra-zoom multiplier must never be folded into currentZoom
-    // itself. Mirrors PlayerMotor.speedMultipliers exactly (PlayerMotor.cs:57, 252-254): a dictionary indexer, so
-    // a duplicate key overwrites rather than stacking, and removing an absent key is a no-op. Keyed so two
-    // independent systems could each own one entry without knowing about each other, the same reason
-    // PlayerMotor's stack is keyed rather than a single float.
+    // Scope ability: a SEPARATE keyed stack from currentZoom, on purpose (see CameraZoomStack's class comment).
+    // Mirrors PlayerMotor.speedMultipliers: a duplicate key overwrites rather than stacking, removing an absent key
+    // is a no-op, and keying lets independent systems each own an entry without knowing about each other.
     private readonly Dictionary<object, float> zoomMultipliers = new Dictionary<object, float>();
 
     /// <summary>The camera following the local player (there is one, on the scene's main camera). The capture rings and
@@ -140,29 +65,26 @@ public class CameraTracking : MonoBehaviour
 
     public bool YawResolved => teamYawResolved;
 
-    /// <summary>Diagnostic only, like RemoteSnapCount above - the product of every active extra-zoom multiplier
-    /// (1 when nothing is scoping). Tests read this instead of reflecting into the private stack.</summary>
+    /// <summary>Diagnostic only: the product of every active extra-zoom multiplier (1 when nothing is scoping).
+    /// Tests read this instead of reflecting into the private stack.</summary>
     public float ZoomMultiplierProduct => CameraZoomStack.Product(zoomMultipliers.Values);
 
-    /// <summary>Diagnostic only - how many keyed extra-zoom multipliers are active right now. 0 means the stack is
-    /// genuinely empty, not merely "at 1x" - a snap-back test checks this, not just the product.</summary>
+    /// <summary>Diagnostic only: how many keyed extra-zoom multipliers are active. 0 means the stack is genuinely
+    /// empty, not merely "at 1x"; a snap-back test checks this, not just the product.</summary>
     public int ActiveZoomMultiplierCount => zoomMultipliers.Count;
 
     /// <summary>
-    /// Lets another component (the Scope ability) add an extra zoom-out on top of the scroll wheel's own clamp,
-    /// without that component needing to know about anyone else doing the same. A duplicate key overwrites its
-    /// previous value rather than stacking - same semantics as PlayerMotor.AddSpeedMultiplier. Composes with the
-    /// scroll zoom AFTER its clamp (CameraZoomStack.ApplyZoom, called from LateUpdate below), and is NEVER folded
-    /// into currentZoom - see CameraZoomStack's class comment for why that ordering is the whole point.
+    /// Lets another component (the Scope ability) add an extra zoom-out on top of the scroll wheel's clamp. A
+    /// duplicate key overwrites its previous value rather than stacking (as PlayerMotor.AddSpeedMultiplier). Composes
+    /// AFTER the clamp (CameraZoomStack.ApplyZoom, called from LateUpdate) and is NEVER folded into currentZoom.
     /// </summary>
     public void AddZoomMultiplier(object key, float multiplier) => zoomMultipliers[key] = multiplier;
 
-    /// <summary>Removing a key that was never added (or already removed) is a no-op - same semantics as
-    /// PlayerMotor.RemoveSpeedMultiplier, so a module can always call this defensively (e.g. on every Interrupt
-    /// reason) without first checking whether it had actually added anything.</summary>
+    /// <summary>Removing a key that was never added is a no-op (as PlayerMotor.RemoveSpeedMultiplier), so a module
+    /// can call this defensively, e.g. on every Interrupt reason.</summary>
     public void RemoveZoomMultiplier(object key) => zoomMultipliers.Remove(key);
 
-    // Vision Task 7: where gun sounds are heard from - the followed player, not this camera (see ListenerRig).
+    // Where gun sounds are heard from: the followed player, not this camera (see ListenerRig).
     private Transform listener;
 
     void Awake()
@@ -196,27 +118,23 @@ public class CameraTracking : MonoBehaviour
             return;
         }
 
-        // Zoom in/out with Mouse Scroll
         float scroll = Input.GetAxis("Mouse ScrollWheel");
         currentZoom = Mathf.Clamp(currentZoom - scroll * zoomSpeed, minZoomMultiplier, maxZoomMultiplier);
 
         ResolveTeamYaw();
 
-        // Apply zoom (scroll clamp, then every active extra-zoom multiplier - CameraZoomStack's class comment has
-        // the full reasoning), then rotation.
+        // Scroll clamp, then every active extra-zoom multiplier (CameraZoomStack), then rotation.
         Vector3 zoomedOffset = CameraZoomStack.ApplyZoom(baseOffset, currentZoom, CameraZoomStack.Product(zoomMultipliers.Values));
         currentOffset = Quaternion.AngleAxis(yaw, Vector3.up) * zoomedOffset;
 
-        // Update camera position
         transform.position = target.position + currentOffset;
         transform.LookAt(target);
         ListenerRig.Follow(listener, target);
     }
 
-    /// Works out this player's camera rotation from where their team actually spawns, so all three
-    /// teams get the same view of the arena relative to their own base rather than three different
-    /// ones. Runs until it succeeds, because the team arrives as a network property and is not
-    /// known on the first frame.
+    /// Works out this player's camera rotation from where their team spawns, so all three teams get the same view
+    /// of the arena relative to their own base. Runs until it succeeds: the team arrives as a network property
+    /// and is not known on the first frame.
     void ResolveTeamYaw()
     {
         if (fixedYaw.HasValue)
@@ -235,11 +153,10 @@ public class CameraTracking : MonoBehaviour
         if (team == null || !team.HasTeam)
             return;
 
-        // Review fix 6 (2026-09-26): if the LOCAL player's body ever ends up on a different team after this camera already
-        // resolved once (the old two-team switch moved players; seats are locked at Start now, so this is a safety net) -
-        // keeping the first team's angle for the rest of the match otherwise. Re-resolved below the same way as the very first time;
-        // CaptureRingView already self-corrects off Yaw's own value changing (Building capture.cs), not off this
-        // flag, so a moment unresolved here breaks nothing.
+        // If the LOCAL player's body ends up on a different team after this camera already resolved (a safety net:
+        // seats are locked at Start), re-resolve the same way as the first time, or the first team's angle sticks for
+        // the match. CaptureRingView self-corrects off Yaw changing (Building capture.cs), not off this flag, so a
+        // moment unresolved here breaks nothing.
         if (teamYawResolved)
         {
             if (team.teamID == teamYawResolvedForTeam)

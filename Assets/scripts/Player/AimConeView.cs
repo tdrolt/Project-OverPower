@@ -7,17 +7,14 @@ using Overpower.Weapons;
 
 /// <summary>
 /// Draws where this player's shots can actually go: two edge lines from the muzzle out to the
-/// weapon's range, plus an arc joining them at that range - Tudor could not SEE the aim cone
-/// widening while moving (Task 1/2), so this makes it visible instead of asking him to read
-/// PlayerAim.EffectiveConeAngle off a debugger.
+/// weapon's range, plus an arc joining them at that range.
 ///
-/// OWNER ONLY. Nobody needs to see another player's aim - see PlayerHud's class comment for the
-/// same reasoning applied to the screen-space HUD. Built as plain child GameObjects in Awake, not
-/// prefab children, so nothing on the prefab has to be kept in sync with this file by hand.
+/// OWNER ONLY (as PlayerHud). Built as plain child GameObjects in Awake, not prefab children, so
+/// nothing on the prefab has to be kept in sync by hand.
 ///
-/// Reads PlayerAim.EffectiveConeAngle directly, the SAME value WeaponFiring hands the shot
-/// sampler this frame (see WeaponFiring.TryFire and AimConeState.SampleOffsetDegrees) - never
-/// recomputed here, so the lines can never disagree with where a shot actually lands.
+/// Reads PlayerAim.EffectiveConeAngle, the SAME value WeaponFiring hands the shot sampler this frame
+/// (WeaponFiring.TryFire, AimConeState.SampleOffsetDegrees), never recomputed, so the lines cannot
+/// disagree with where a shot lands.
 /// </summary>
 public class AimConeView : MonoBehaviourPun
 {
@@ -29,13 +26,9 @@ public class AimConeView : MonoBehaviourPun
     private PlayerLifecycle lifecycle;
     private PlayerInputRouter input;
 
-    // Same layer every wall and every piece of deployable cover stands on (see WeaponFiring's own
-    // comment on SafeMuzzlePosition and CoverWall's class comment) - computed once since
-    // LayerMask.NameToLayer never changes at runtime. Assumes every weapon's own hit mask
-    // includes Building, the same assumption WeaponFiring's own buildingMask field (used by its
-    // SafeMuzzlePosition property) makes for the same reason - if some future weapon's Hitscan hit
-    // mask ever excludes Building on purpose, its lines here would still clip on a wall its shots
-    // actually pass through.
+    // The layer every wall and deployable cover stands on, computed once. Assumes every weapon's hit
+    // mask includes Building, as WeaponFiring's buildingMask does: a future Hitscan that excludes
+    // Building on purpose would still have its lines clip on a wall its shots pass through.
     private int buildingMask;
 
     private LineRenderer leftEdgeLine;
@@ -44,17 +37,13 @@ public class AimConeView : MonoBehaviourPun
     private LineRenderer fanLeftLine;
     private LineRenderer fanRightLine;
 
-    // Reused every frame instead of re-allocated, since LateUpdate runs it once per player per
-    // frame for as long as the match lasts.
+    // Reused every frame, not re-allocated.
     private Vector3[] arcPoints;
 
-    // ---- per-weapon lookups, cached and refreshed only when the equipped weapon changes --------
+    // ---- per-weapon lookups, refreshed only when the equipped weapon changes --------
     //
-    // GetComponent on a prefab asset is cheap but not free, and LateUpdate runs it every player
-    // every frame for as long as the match lasts. cachedWeapon is the guard: RefreshWeaponCache
-    // below is a no-op whenever the equipped weapon has not changed since the last frame, and
-    // every field below it is only ever written from inside that method, so there is exactly one
-    // place that can go stale.
+    // cachedWeapon is the guard: RefreshWeaponCache is a no-op while the weapon is unchanged, and
+    // every field below is written only inside it, so there is exactly one place that can go stale.
     private WeaponDefinition cachedWeapon;
     private Hitscan cachedBeam;
     private bool cachedIgnoresWalls;
@@ -67,8 +56,7 @@ public class AimConeView : MonoBehaviourPun
         lifecycle = GetComponent<PlayerLifecycle>();
         input = GetComponent<PlayerInputRouter>();
 
-        // Nobody but the owner should see this player's own accuracy - and every downstream
-        // read here (aim, weaponFiring, PhotonView.IsMine) is meaningless for a remote copy.
+        // Owner only: every read here is meaningless for a remote copy.
         if (!photonView.IsMine)
         {
             enabled = false;
@@ -77,8 +65,7 @@ public class AimConeView : MonoBehaviourPun
 
         buildingMask = LayerMask.GetMask("Building");
 
-        // Loud, matching WeaponFiring/PlayerHealth: a silent null here would leave the cone
-        // invisible with no clue why, which for a visual-only component is easy to miss for days.
+        // Loud: a silent null would leave the cone invisible with no clue why.
         bool missingDependency = false;
         if (theme == null)
         {
@@ -125,10 +112,9 @@ public class AimConeView : MonoBehaviourPun
         go.transform.SetParent(transform, worldPositionStays: false);
 
         var line = go.AddComponent<LineRenderer>();
-        // sharedMaterial, not material - the latter silently clones the asset the first time it
-        // is READ, not just written, so five LineRenderers under one .material assignment meant
-        // five clones per player for a material nothing here ever varies per instance (colour
-        // comes from each LineRenderer's own start/end colour instead, see SetLine).
+        // sharedMaterial, not material: .material clones the asset the first time it is READ, not just
+        // written, which would mean five clones per player. Colour comes from each line's own
+        // start/end colour (SetLine).
         line.sharedMaterial = theme.coneLineMaterial;
         line.useWorldSpace = true;
         line.textureMode = LineTextureMode.Stretch;
@@ -139,26 +125,21 @@ public class AimConeView : MonoBehaviourPun
         line.endWidth = theme.coneLineWidth;
         line.positionCount = 2;
 
-        // A purely informational overlay for the local player only - it must never cast a shadow,
-        // sample a light probe or a reflection probe, all of which cost a little and mean nothing
-        // for a flat, unlit line only its own owner can see.
+        // A flat informational overlay: no shadows, light probes or reflection probes.
         line.shadowCastingMode = ShadowCastingMode.Off;
         line.receiveShadows = false;
         line.lightProbeUsage = LightProbeUsage.Off;
         line.reflectionProbeUsage = ReflectionProbeUsage.Off;
         line.allowOcclusionWhenDynamic = false;
 
-        line.enabled = false; // LateUpdate decides visibility every frame; start hidden.
+        line.enabled = false; // LateUpdate decides visibility every frame
         return line;
     }
 
     private void LateUpdate()
     {
-        // Dead: nothing to aim. Suppressed: chatting, or a tool (F1) has claimed focus. Loadout
-        // screen open: checked explicitly via LoadoutScreen.IsOpen rather than relying only on
-        // InputSuppressed - the loadout screen's own tool-focus claim already makes InputSuppressed
-        // true while it is open, but reading IsOpen directly means this line does not silently stop
-        // working if the loadout screen's focus semantics ever change. No weapon: nothing to draw.
+        // LoadoutScreen.IsOpen is checked explicitly even though its tool-focus claim already makes
+        // InputSuppressed true, so this does not silently break if that focus semantics change.
         bool hide = (lifecycle != null && !lifecycle.IsAlive) ||
                     (input != null && input.InputSuppressed) ||
                     LoadoutScreen.IsOpen ||
@@ -172,9 +153,8 @@ public class AimConeView : MonoBehaviourPun
 
         WeaponDefinition weapon = weaponFiring.Weapon;
 
-        // SafeMuzzlePosition, not the raw muzzle - see its own comment on WeaponFiring: a shot
-        // fired flush against a wall starts on the near side of it, and the lines must start from
-        // the exact point a shot actually would.
+        // SafeMuzzlePosition, not the raw muzzle: a shot fired flush against a wall starts on the near
+        // side of it, and the lines must start where a shot would.
         Vector3 origin = weaponFiring.SafeMuzzlePosition;
         Vector3 forward = aim.AimDirection;
         forward.y = 0f;
@@ -183,47 +163,37 @@ public class AimConeView : MonoBehaviourPun
         else
             forward = transform.forward;
 
-        // The same value WeaponFiring hands the shot sampler THIS frame - never recomputed here.
         float half = aim.EffectiveConeAngle / 2f;
 
         RefreshWeaponCache(weapon);
 
-        // Task 2.6 (GDD p.20): OverPower's +10% range must show up here too, or the aim lines
-        // would promise a shorter reach than the buffed shot actually has.
+        // OverPower's range buff (GDD p.20) must show here too, or the lines promise a shorter reach
+        // than the shot has.
         float rangeMultiplier = weaponFiring.CurrentRangeMultiplier;
 
-        // Only a BEAM weapon's shots actually reach further when charged - ProjectileContext
-        // always copies weapon.MaxRange verbatim for a spawned projectile (see its Initialize),
-        // so a charging burst/rocket path flies exactly MaxRange no matter how long the trigger
-        // was held. Hitscan.ChargedRange already returns MaxRange unchanged for a non-charging
-        // weapon, so it is always safe to call once a beam is confirmed - reused, not re-derived,
-        // per the task brief.
+        // Only a BEAM weapon reaches further when charged: ProjectileContext copies weapon.MaxRange
+        // verbatim for a spawned projectile, so a charging burst/rocket flies exactly MaxRange.
+        // Hitscan.ChargedRange returns MaxRange unchanged for a non-charging weapon, so it is safe
+        // once a beam is confirmed.
         float range = cachedBeam != null
             ? Hitscan.ChargedRange(weapon, weaponFiring.CurrentChargeFraction, rangeMultiplier)
             : weapon.MaxRange * rangeMultiplier;
 
-        // Weapon 4 (Rocket -> Cursor) detonates at the player's cursor rather than flying out to
-        // MaxRange - DetonateAtCursor clamps its own travel distance to whichever is closer, the
-        // cursor or the weapon's range (see its ClampedDistanceToTarget). Drawing the bare
-        // MaxRange here would overstate this weapon's reach whenever the cursor sits closer than
-        // that, so the lines and arc track the cursor instead, from the SAME origin and target
-        // point (SafeMuzzlePosition / GroundPointUnderCursor) the real shot resolves at fire time
-        // - the one helper both call, so this can never drift from what the rocket actually does.
-        // weapon.MaxRange * rangeMultiplier here, not the bare asset value, for the same Task 2.6
-        // reason DetonateAtCursor.DistanceToCursorPoint reads context.MaxRange rather than
-        // context.Weapon.MaxRange - the real shot's own cap is the buffed one.
+        // Weapon 4 (Rocket -> Cursor) detonates at the cursor, clamped to the weapon's range
+        // (DetonateAtCursor.ClampedDistanceToTarget). The bare MaxRange would overstate its reach
+        // whenever the cursor is closer, so the lines track the cursor from the SAME origin and
+        // target (SafeMuzzlePosition / GroundPointUnderCursor) via the one helper the real shot calls.
+        // MaxRange * rangeMultiplier, not the bare asset value: the real shot's cap is the buffed one.
         if (cachedCursorDetonator != null)
             range = DetonateAtCursor.ClampedDistanceToTarget(origin, aim.GroundPointUnderCursor, weapon.MaxRange * rangeMultiplier);
 
         bool ignoresWalls = cachedIgnoresWalls;
 
-        // A shotgun's fixed pellet fan (SpreadDegrees) is centred on the aim, and every pellet
-        // then gets its own random jitter from the SAME aim cone every other weapon uses (see
-        // WeaponFiring.BuildShots -> FanOffset + AimConeState.SampleOffsetDegrees). The farthest a
-        // pellet can actually land is the outermost fan slot PLUS the full jitter half-width in the
-        // same direction - fan half + cone half - so that is what the outer lines and the arc need
-        // to represent, not the bare cone. The fan's own two lines (dimmer, coneFanLineColor) mark
-        // the fixed pattern underneath, with no jitter added, so Tudor can tell the two apart.
+        // A shotgun's fixed pellet fan (SpreadDegrees) is centred on the aim, and every pellet gets its
+        // own jitter from the SAME aim cone (WeaponFiring.BuildShots -> FanOffset +
+        // AimConeState.SampleOffsetDegrees). The farthest a pellet can land is fan half + cone half, so
+        // the outer lines and arc show that, not the bare cone. The fan's own dimmer lines
+        // (coneFanLineColor) mark the fixed pattern without jitter.
         bool isShotgun = weapon.Simultaneous && weapon.SpreadDegrees > 0f;
         float outerHalf = isShotgun ? weapon.SpreadDegrees / 2f + half : half;
 
@@ -263,13 +233,10 @@ public class AimConeView : MonoBehaviourPun
     }
 
     /// <summary>
-    /// Re-reads the equipped weapon's projectile prefab for the handful of components that decide
-    /// how this file draws it - a Hitscan (is it a beam, and if so does charge grow its range), an
-    /// IgnoreWalls (does it clip on Building), a DetonateAtCursor (does it track the cursor
-    /// instead of MaxRange) - and skips the work entirely once the weapon has not changed since
-    /// the last frame. GetComponent on a prefab asset is cheap, but LateUpdate calls this once per
-    /// player every frame for as long as the match lasts, and every one of these answers only
-    /// changes on a weapon switch, which is rare by comparison.
+    /// Re-reads the equipped weapon's projectile prefab for the components that decide how it is drawn
+    /// (Hitscan: beam and charged range; IgnoreWalls: clips on Building; DetonateAtCursor: tracks the
+    /// cursor), and skips the work while the weapon is unchanged. Every answer changes only on a
+    /// weapon switch, while LateUpdate calls this per player every frame.
     /// </summary>
     private void RefreshWeaponCache(WeaponDefinition weapon)
     {
@@ -281,20 +248,17 @@ public class AimConeView : MonoBehaviourPun
         GameObject prefab = weapon != null ? weapon.ProjectilePrefab : null;
         cachedBeam = prefab != null ? prefab.GetComponent<Hitscan>() : null;
 
-        // Only Hitscan's own ray query (BuildMask) actually honours IgnoreWalls - ProjectileMotor's
-        // sweep never checks for it, so a projectile weapon can never truly pass through a wall no
-        // matter what sits on its prefab. Gating on cachedBeam here keeps this cache from drawing a
-        // wall-piercing line for a weapon whose real shots would not behave that way.
+        // Only Hitscan's ray query (BuildMask) honours IgnoreWalls; ProjectileMotor's sweep never
+        // checks it. Gating on cachedBeam avoids a wall-piercing line for a weapon whose real shots
+        // would not pierce.
         cachedIgnoresWalls = cachedBeam != null && prefab.GetComponent<IgnoreWalls>() != null;
 
         cachedCursorDetonator = prefab != null ? prefab.GetComponent<DetonateAtCursor>() : null;
     }
 
-    /// <summary>Where one edge of the cone (or the arc) actually ends: the wall it hits within
-    /// range, or the bare range if nothing is in the way or this weapon ignores walls entirely
-    /// (the through-walls laser leaf, Weapon 13 - see IgnoreWalls's own class comment). Ignores
-    /// triggers, matching every other shot/cast origin check in this file's neighbourhood
-    /// (SafeMuzzlePosition, Hitscan.BuildMask).</summary>
+    /// <summary>Where one edge of the cone (or the arc) ends: the wall it hits within range, or the
+    /// bare range if nothing is in the way or the weapon ignores walls (Weapon 13). Ignores triggers,
+    /// like SafeMuzzlePosition and Hitscan.BuildMask.</summary>
     private Vector3 RayEnd(Vector3 origin, Vector3 forward, float angleDegrees, float range, bool ignoresWalls)
     {
         Vector3 direction = Quaternion.AngleAxis(angleDegrees, Vector3.up) * forward;
@@ -304,11 +268,9 @@ public class AimConeView : MonoBehaviourPun
         return origin + direction * range;
     }
 
-    /// <summary>The range arc: coneArcSegments+1 points from -outerHalf to +outerHalf at radius
-    /// range, clipped at walls exactly like the edge lines. The first and last points are handed
-    /// in rather than recomputed, so they are the SAME Vector3 the edge lines just drew - not
-    /// merely equal, but the identical value - which is what makes the arc meet the lines exactly
-    /// rather than by coincidence of two separate raycasts landing on the same point.</summary>
+    /// <summary>The range arc, clipped at walls like the edge lines. The first and last points are
+    /// handed in, not recomputed, so they are the identical value the edge lines drew and the arc
+    /// meets them exactly rather than by two raycasts coinciding.</summary>
     private void UpdateArc(Vector3 origin, Vector3 forward, float outerHalf, float range,
                            bool ignoresWalls, Vector3 leftEnd, Vector3 rightEnd)
     {

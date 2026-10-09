@@ -16,8 +16,8 @@ namespace Overpower.Combat
     }
 
     /// <summary>
-    /// The rules of the weapon upgrade tree, kept apart from any UI so the loadout screen now and the shop later ask
-    /// the same questions. Built from weapon ids and their parent ids (WeaponDefinition.Parent), so the tree grows
+    /// The rules of the weapon upgrade tree, kept apart from any UI so the loadout screen and the shop ask the
+    /// same questions. Built from weapon ids and their parent ids (WeaponDefinition.Parent), so the tree grows
     /// automatically when a designer adds a weapon asset with a parent. Pure C# so it is unit tested.
     /// </summary>
     public sealed class WeaponUpgradeTree
@@ -36,10 +36,9 @@ namespace Overpower.Combat
 
         public WeaponUpgradeTree(IEnumerable<(int id, int parentId)> nodes)
         {
-            // Last one wins on a repeated id, same as a plain Dictionary write would - but a
-            // second WeaponDefinition claiming an id already in the catalogue is a data mistake
-            // (mirrors WeaponCatalogue.Validate's own duplicate-id check), so it goes in Problems
-            // rather than being silently swallowed.
+            // Last one wins on a repeated id, as a plain Dictionary write would, but a duplicate id is
+            // a data mistake (mirrors WeaponCatalogue.Validate's duplicate-id check), so it goes in
+            // Problems rather than being silently swallowed.
             var seenIds = new HashSet<int>();
             foreach (var (id, parentId) in nodes)
             {
@@ -91,7 +90,7 @@ namespace Overpower.Combat
         public IReadOnlyList<int> ChildrenOf(int id) =>
             childrenOf.TryGetValue(id, out var list) ? list : None;
 
-        /// <summary>Task 5b-2 (D6): one (parent, child) pair per upgrade step - what the shop draws an arrow for.
+        /// <summary>One (parent, child) pair per upgrade step - what the shop draws an arrow for (D6).
         /// The starting weapon has no parent, so it is never a child here.</summary>
         public IReadOnlyList<(int parent, int child)> Edges()
         {

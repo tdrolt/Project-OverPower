@@ -7,18 +7,14 @@ using Overpower.Match;
 using Overpower.Net;
 
 /// <summary>
-/// Task 9g (Tudor D28): the Spectate / Next button on a knocked-out player's "You lost" panel. Pressed, the camera snaps to a
-/// living player of the team that knocked this player out and follows them; pressed again it moves to the next living player of
-/// that team (SpectateRules.NextTarget - when that team has no one alive, any living player of a team still in). Watching only:
-/// nothing here touches input. A knocked-out player is dead and frozen, so the HUD actions, the shop and shooting are already
-/// closed to them (alive gate, LoadoutScreen's MatchOver check); this component adds no way back in.
-///
-/// Built by MatchUI when the lose panel is first shown to its own player (owner only), as a copy of the panel's own button so it
-/// looks the same; the panel's existing button stays what it was (BackToNameScreenRules decides that one). When the match is over
-/// the button goes and the camera returns to this player's own body: the normal result screen takes over.
-///
-/// "The team that knocked you out": the room does not record it, so it is the team behind this player's own last lethal hit
-/// (PlayerLifecycle.LastKillerTeam), else the team holding their base (SpectateRules.KnockerTeam). If the followed player dies or leaves, the view moves on by itself.
+/// The Spectate / Next button on a knocked-out player's "You lost" panel: the camera follows a living
+/// player of the team that knocked this player out; each press moves to the next (SpectateRules.NextTarget).
+/// Watching only, nothing here touches input: a knocked-out player is dead and frozen, so the HUD actions,
+/// shop and shooting are already closed (alive gate, LoadoutScreen's MatchOver check).
+/// Built by MatchUI (owner only) as a copy of the panel's own button; the panel's existing button is
+/// BackToNameScreenRules' business. When the match is over the button goes and the camera returns to this body.
+/// "The team that knocked you out" is not recorded by the room: it is the team behind this player's last lethal
+/// hit (PlayerLifecycle.LastKillerTeam), else the team holding their base (SpectateRules.KnockerTeam).
 /// </summary>
 public sealed class SpectateView : MonoBehaviour
 {
@@ -39,10 +35,9 @@ public sealed class SpectateView : MonoBehaviour
     private Vector2 savedAnchorMin, savedAnchorMax, savedPivot, savedPos, savedSize, savedQuitPos, savedSpectatePos;
     private readonly List<SpectateCandidate> living = new List<SpectateCandidate>();
 
-    /// <summary>The actor number being watched, or SpectateRules.None.</summary>
     public int CurrentActor => currentActor;
     public bool IsSpectating => currentActor != SpectateRules.None;
-    /// <summary>The button, once built (tests and captures read it).</summary>
+    /// <summary>Tests and captures read it.</summary>
     public Button Button => button;
 
     public void Init(MatchUI matchUi, GameObject losePanel)
@@ -76,8 +71,8 @@ public sealed class SpectateView : MonoBehaviour
         titleObject = title != null ? title.gameObject : null;
     }
 
-    /// <summary>While watching, the full-screen lose panel hides the game: it shrinks to a strip at the bottom holding Next and Quit
-    /// (big title and grey backdrop hidden), and comes back exactly as it was when watching stops or the match ends.</summary>
+    /// <summary>While watching, the full-screen lose panel would hide the game, so it shrinks to a bottom strip
+    /// (title and backdrop hidden) and comes back exactly as it was when watching stops.</summary>
     private void SetCompact(bool on)
     {
         if (on == compact || panelRect == null || ui == null || ui.Theme == null)
@@ -131,7 +126,7 @@ public sealed class SpectateView : MonoBehaviour
         {
             nextRefresh = Time.unscaledTime + RefreshSeconds;
             if (!StillWatchable(currentActor))
-                Advance(); // the followed player died or left: on to the next one (or stays put when nobody is left, until someone is alive again)
+                Advance(); // the followed player died or left; stays put when nobody is left
         }
     }
 
@@ -146,7 +141,7 @@ public sealed class SpectateView : MonoBehaviour
 
     private void OnDisable() => StopSpectating();
 
-    /// <summary>First press starts watching; each next press moves on. Public for the Play Mode checks.</summary>
+    /// <summary>Public for the Play Mode checks.</summary>
     public void Advance()
     {
         if (cam == null)
@@ -158,7 +153,7 @@ public sealed class SpectateView : MonoBehaviour
         int actor = SpectateRules.NextTarget(living, PreferredTeam(), currentActor);
         PhotonView view = actor != SpectateRules.None ? PlayerLookup.GetPhotonViewFor(actor) : null;
         if (view == null)
-            return; // nobody watchable now: keep the target and the camera; the refresh tries again (SpectateRules.PickOrKeep)
+            return; // nobody watchable: keep target and camera, the refresh tries again (SpectateRules.PickOrKeep)
 
         currentActor = SpectateRules.PickOrKeep(actor, currentActor);
         cam.yawSource = transform; // the arena keeps this player's own angle whichever team is watched
@@ -205,7 +200,6 @@ public sealed class SpectateView : MonoBehaviour
         return SpectateRules.KnockerTeam(killer, baseOwner, myTeam);
     }
 
-    /// <summary>Everyone alive and present, with a body, on a team still in the match - not this player.</summary>
     private void CollectLiving()
     {
         living.Clear();

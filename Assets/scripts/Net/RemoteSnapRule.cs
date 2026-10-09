@@ -3,8 +3,8 @@ using UnityEngine;
 namespace Overpower.Net
 {
     /// <summary>
-    /// Whether a remote copy of a player jumps straight to the owner's newest position instead of gliding there
-    /// (movement step 5). Pure, tested in edit mode (RemoteSnapRuleTests).
+    /// Whether a remote copy of a player jumps straight to the owner's newest position instead of gliding there.
+    /// Pure, tested in edit mode (RemoteSnapRuleTests).
     ///
     /// Decided on the jump between two updates the owner actually sent, not on how far the smoothed copy trails: a zip
     /// pull at 25 m/s leaves that copy metres behind, and judging the trail snapped ordinary fast movement. Ordinary

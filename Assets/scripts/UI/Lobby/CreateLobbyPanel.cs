@@ -10,10 +10,10 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The create screen (board 2B, lobby Task 9): a card with the lobby name (prefilled "&lt;name&gt;'s lobby", at most the LobbyConfig length),
-    /// the mode family (Conquest / Dominion), the team sizes of that family, Cancel and Create. Only modes marked available can be picked; the
-    /// others are greyed with "coming soon". Create asks the LobbyDirectory for the lobby; Photon's room join then hands over to the lobby room
-    /// (lobby Task 10). The choices are made by LobbyScreenRules; this class draws them.
+    /// The create screen (board 2B): a card with the lobby name (prefilled "&lt;name&gt;'s lobby", at most the LobbyConfig length), the mode family
+    /// (Conquest / Dominion), the team sizes of that family, Cancel and Create. Only modes marked available can be picked; the others are greyed
+    /// with "coming soon". Create asks the LobbyDirectory for the lobby; Photon's room join then hands over to the lobby room. LobbyScreenRules
+    /// makes the choices; this class draws them.
     /// </summary>
     public sealed class CreateLobbyPanel : MonoBehaviour
     {
@@ -80,14 +80,12 @@ namespace Overpower.UI
             Refresh();
         }
 
-        /// <summary>Presses a mode family button (Conquest / Dominion).</summary>
         public void PressFamily(GameModeFamily family)
         {
             foreach (var entry in familyButtons)
                 if (entry.family == family) { entry.button.Press(); return; }
         }
 
-        /// <summary>Presses a team size button.</summary>
         public void PressSize(GameModeDefinition mode)
         {
             foreach (var entry in sizeButtons)
@@ -138,7 +136,6 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>Redraws the buttons from the current choice.</summary>
         private void Refresh()
         {
             foreach (var entry in familyButtons)
@@ -156,7 +153,6 @@ namespace Overpower.UI
 
             familyNote.text = selected != null ? FamilyNote(selected.Family) : "";
 
-            // the sizes of the chosen family
             foreach (var entry in sizeButtons)
             {
                 entry.box.Outer.gameObject.SetActive(false); // gone from the layout now, destroyed at the end of the frame
@@ -294,7 +290,6 @@ namespace Overpower.UI
                 GameModeFamily captured = family;
                 button.Button.onClick.AddListener(() => ChooseFamily(captured));
 
-                // "coming soon" under the name, in the same button
                 TextMeshProUGUI soon = kit.Text(button.Rect, "Coming soon", theme.createComingSoonText, kit.Body, theme.createComingSoonSize,
                     theme.lobbyDimColor, TextAlignmentOptions.Midline);
                 RectTransform soonRect = (RectTransform)soon.transform;
@@ -324,7 +319,7 @@ namespace Overpower.UI
             return (mode, button, new LobbyBox { Outer = button.Rect });
         }
 
-        /// <summary>A see-through colour laid over a background (the chosen team size's fill is purple at a quarter strength over the card).</summary>
+        /// <summary>A see-through colour laid over a background (the chosen team size's fill, Lobby Create Selected Fill, over the card).</summary>
         private static Color Blend(Color background, Color overlay) =>
             new Color(Mathf.Lerp(background.r, overlay.r, overlay.a), Mathf.Lerp(background.g, overlay.g, overlay.a), Mathf.Lerp(background.b, overlay.b, overlay.a), 1f);
     }

@@ -1,6 +1,6 @@
 namespace Overpower.Lobby
 {
-    /// <summary>Lobby Task 8: survives the scene rebuild after a match (or a spectator's Leave). RoomManager.ReturnToLobbyList sets it before
+    /// <summary>Survives the scene rebuild after a match (or a spectator's Leave). RoomManager.ReturnToLobbyList sets it before
     /// the rebuild; the rebuilt name screen consumes it once and goes straight to the lobby list instead of asking for the name again.</summary>
     public static class LobbyReturn
     {

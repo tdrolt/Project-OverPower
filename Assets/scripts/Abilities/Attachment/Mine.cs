@@ -7,43 +7,23 @@ using Overpower.Combat;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A proximity mine dropped at the caster's feet - Tudor's Attachment spec: 20 damage plus a
-    /// slow, 2 charges, 10s per charge (the charges live on MineAbility, the module that places
-    /// these). This class is only the networked object and its own trigger/blast; MineAbility
-    /// decides when one gets placed and prunes the oldest once Max Active Mines is exceeded.
-    ///
-    /// EVERY BLAST NUMBER LIVES HERE, ON THE PREFAB - unlike Portal's diameter, which only matters
-    /// to the placer's own channel check, a mine's damage/slow/radii/arm-delay are read by EVERY
-    /// client's trigger and detonation logic, and this prefab is the same committed asset on every
-    /// machine (see NetworkedDeployable's own class comment on why Portal duplicates its diameter
-    /// into instantiationData - that reason does not apply here, because nothing here needs to
-    /// survive a same-session retune without every machine rebuilding). Persistence is
-    /// NetworkedDeployable's own Lifetime Seconds field - Tudor's Persist Seconds is that field
-    /// under a different name, not a second copy. The only thing that genuinely varies per
-    /// placement is Seq (this owner's Nth mine, for the oldest-first prune - see
-    /// DeployablePruning), so Seq is the only value that travels through instantiationData.
-    ///
-    /// TRIGGER IS VICTIM-SIDE, EVERY CLIENT. FixedUpdate below runs on every machine, the owner's
-    /// own included, once this mine is armed (Age plus real time elapsed on THIS client - see
-    /// secondsSincePlaced - is at least Arm Delay Seconds). It looks for an IDamageable this client
-    /// actually has authority over and that is an enemy of OwnerTeam (MineTargeting.SelectTargets):
-    /// its own player, or its own local practice dummies - never a remote player, whose ApplyDamage
-    /// would silently no-op on this machine anyway. The FIRST client to see a valid target sends
-    /// RPC_Detonate AllViaServer, so every client - including one whose own local target never
-    /// walked close enough - agrees on the same blast at the same point in the same relative order.
-    /// MineDetonationState.TryDetonate is what makes sure a client that sees both its own trigger
-    /// fire AND the resulting RPC only ever runs the explosion once.
-    ///
-    /// THE OWNER DOES NOT DESTROY THIS THE INSTANT IT DETONATES (code review finding). PUN silently
-    /// drops any RPC addressed to a PhotonView that no longer exists (see PhotonNetworkPart.ExecuteRpc's
-    /// own "Maybe GO was destroyed but RPC not cleaned up" case), and relay delivery order is not a
-    /// guarantee - a bystander's own RPC_Detonate could still be in flight when the owner's
-    /// PhotonNetwork.Destroy call reaches the room, and that bystander would silently take no damage
-    /// at all. RPC_Detonate therefore only hides the visual and relies on the 'detonated' flag
-    /// (already set by TryDetonate) to stop the trigger - on EVERY client, immediately - and the
-    /// OWNER alone schedules the real PhotonNetwork.Destroy (through the shared NetworkedDeployable.
-    /// RequestDestroy guard) Destroy Delay Seconds later, giving every other client's own copy of
-    /// this same RPC time to arrive first.
+    /// A proximity mine dropped at the caster's feet. This class is the networked object and its own trigger/blast;
+    /// MineAbility (which holds the charges) decides when one gets placed and prunes the oldest past Max Active Mines.
+    /// EVERY BLAST NUMBER LIVES HERE, ON THE PREFAB: damage, slow, radii and arm delay are read by EVERY client's trigger
+    /// and detonation, and the prefab is the same committed asset on every machine, so unlike Portal's diameter nothing
+    /// is duplicated into instantiationData. Persistence is NetworkedDeployable's Lifetime Seconds (Persist Seconds is
+    /// that field under another name). Only Seq (this owner's Nth mine, for the oldest-first prune, see
+    /// DeployablePruning) and the ability id travel through instantiationData.
+    /// TRIGGER IS VICTIM-SIDE, EVERY CLIENT. FixedUpdate runs on every machine once armed (Age plus real time on THIS
+    /// client, see SecondsSincePlaced, is at least Arm Delay Seconds) and looks for an IDamageable this client has
+    /// authority over that is an enemy of OwnerTeam (MineTargeting.SelectTargets): its own player or local practice
+    /// dummies, never a remote player, whose ApplyDamage would no-op here. The FIRST client to see a target sends
+    /// RPC_Detonate AllViaServer so everyone agrees on one blast; MineDetonationState.TryDetonate makes it run once even
+    /// if a client sees both its own trigger and the RPC.
+    /// THE OWNER DOES NOT DESTROY THIS THE INSTANT IT DETONATES: PUN silently drops an RPC addressed to a PhotonView that
+    /// no longer exists and relay order is not guaranteed, so a bystander's in-flight RPC_Detonate would be lost and they
+    /// would take no damage. RPC_Detonate only hides the visual (the 'detonated' flag stops the trigger on every client
+    /// at once); the OWNER alone schedules the PhotonNetwork.Destroy (via RequestDestroy) Destroy Delay Seconds later.
     /// </summary>
     public sealed class Mine : NetworkedDeployable
     {
@@ -110,9 +90,8 @@ namespace Overpower.Abilities
                  "a little longer than that. Left empty just skips hiding anything.")]
         private Transform visual;
 
-        // Not a design tunable: how many colliders one overlap considers. A mine's blast is small
-        // enough that this comfortably covers every player plus every practice dummy at once - see
-        // ExplodeOnImpact.MaxSplashColliders for the same reasoning at a larger radius.
+        // Not a design tunable: colliders one overlap considers; comfortably every player plus every practice dummy
+        // (see ExplodeOnImpact.MaxSplashColliders).
         private const int MaxOverlapColliders = 16;
         private readonly Collider[] overlapBuffer = new Collider[MaxOverlapColliders];
 
@@ -124,12 +103,9 @@ namespace Overpower.Abilities
         // copy of this state - see the class comment.
         private MineDetonationState detonation;
 
-        // The real Time.time this mine's OnPlaced ran on THIS client, so FixedUpdate can turn Age
-        // (a one-time snapshot taken at OnPhotonInstantiate - see NetworkedDeployable's own class
-        // comment) into a number that keeps growing: secondsSincePlaced = Age + (Time.time - this).
-        // Without this, a mine's Age would read as "however old it already was the instant this
-        // client learned about it" forever, and IsArmed would never become true for a normal
-        // (non-late-joining) placer, whose Age is already ~0 the moment it is set.
+        // The real Time.time OnPlaced ran on THIS client: Age is a one-time snapshot from OnPhotonInstantiate, so
+        // SecondsSincePlaced = Age + (Time.time - this) keeps growing. Without it IsArmed would never become true for a
+        // normal placer, whose Age is ~0 when set.
         private float localPlacedRealTime;
 
         // Set once the trigger RPC has actually been sent, so a target still standing in range on
@@ -138,14 +114,13 @@ namespace Overpower.Abilities
 
         public int Seq { get; private set; }
 
-        /// <summary>Trigger Radius, read-only - MineView (ability visuals step 3) draws the owner team's trigger ring
-        /// from this one number.</summary>
+        /// <summary>Trigger Radius, read-only - MineView draws the owner team's trigger ring from this one number.</summary>
         public float TriggerRadius => triggerRadius;
 
         /// <summary>Explosion Radius, read-only - MineView flashes the blast ring at this size.</summary>
         public float ExplosionRadius => explosionRadius;
 
-        /// <summary>Damage, Slow Magnitude and Slow Seconds, read-only - the shop's pop-up shows them (Task 13).</summary>
+        /// <summary>Damage, Slow Magnitude and Slow Seconds, read-only - the shop's pop-up shows them.</summary>
         public float Damage => damage;
         public float SlowMagnitude => slowMagnitude;
         public float SlowSeconds => slowSeconds;
@@ -154,17 +129,14 @@ namespace Overpower.Abilities
         /// this age.</summary>
         public float InvisibleAfterSeconds => invisibleAfterSeconds;
 
-        /// <summary>Seconds since this mine was ACTUALLY placed, continuously updated on THIS client - Age (a
-        /// one-time network-agreed snapshot) plus real time elapsed since OnPlaced ran here. FixedUpdate's own arm-
-        /// delay check and MineView's own visibility check (A5) are two readers of the exact same number, so they
-        /// can never disagree about "how old is this mine right now" - see localPlacedRealTime's own comment.</summary>
+        /// <summary>Seconds since this mine was ACTUALLY placed, continuously updated on THIS client: Age plus real time
+        /// since OnPlaced ran here. FixedUpdate's arm-delay check and MineView's visibility check (A5) read this one
+        /// number, so they can never disagree about how old the mine is (see localPlacedRealTime).</summary>
         public float SecondsSincePlaced => (float)Age + (Time.time - localPlacedRealTime);
 
-        /// <summary>True once RPC_Detonate has actually run on THIS client - read-only mirror of
-        /// MineDetonationState.Detonated, the single source of truth for "has this mine already gone off" (review
-        /// finding: MineView used to infer this from the Visual's own GameObject.activeSelf, which is also what
-        /// Lifetime Seconds' expiry backstop touches - a real detonation and an unrelated hide were indistinguishable
-        /// from outside this class). False before OnPlaced has run at all, same as MineDetonationState's own default.</summary>
+        /// <summary>True once RPC_Detonate has run on THIS client: read-only mirror of MineDetonationState.Detonated, the
+        /// single source of truth (the Visual's activeSelf cannot tell a detonation from the IsExpired hide). False
+        /// before OnPlaced.</summary>
         public bool Detonated => detonation != null && detonation.Detonated;
 
         /// <summary>True once this copy has read itself as already past Lifetime Seconds (NetworkedDeployable's own
@@ -173,10 +145,9 @@ namespace Overpower.Abilities
         /// NetworkedDeployable has already hidden its renderers.</summary>
         public bool HasExpired => IsExpired;
 
-        /// <summary>Task T3 (telemetry): the id of the MineAbility that placed this, threaded through
-        /// instantiationData (MineAbility.PlaceMine appends Definition.Id right after Seq) since this
-        /// deployable is a separate prefab with no AbilityDefinition of its own to read. -1 if the
-        /// data is missing (see the same defensive fallback as Seq, just below).</summary>
+        /// <summary>The id of the MineAbility that placed this, threaded through instantiationData (MineAbility.PlaceMine
+        /// appends Definition.Id right after Seq) since this deployable is a separate prefab with no AbilityDefinition
+        /// of its own. -1 if the data is missing (same defensive fallback as Seq).</summary>
         public int AbilityId { get; private set; } = -1;
 
         protected override void OnPlaced(object[] data, PhotonMessageInfo info)
@@ -217,11 +188,8 @@ namespace Overpower.Abilities
 
         private void FixedUpdate()
         {
-            // Defensive backstop (NetworkedDeployable's own class comment, FAIL #15): a copy that
-            // arrived already past Lifetime Seconds - the narrow cache-removal/destroy race, not the
-            // normal path - must never trigger. IsExpired already hid this mine's own visual and
-            // disabled its own collider, but neither of those stops FixedUpdate's OverlapSphere query
-            // below, which looks at OTHER colliders, not this mine's - hence the explicit check here.
+            // Backstop (FAIL #15): a copy that arrived already past Lifetime Seconds must never trigger. IsExpired hid the
+            // visual and collider, but not the OverlapSphere below, which looks at OTHER colliders - hence the check.
             if (IsExpired)
                 return;
 
@@ -241,24 +209,18 @@ namespace Overpower.Abilities
         [PunRPC]
         private void RPC_Detonate(Vector3 at)
         {
-            // Guards the one real explosion: the first RPC_Detonate any client receives, whether
-            // that is this client's own trigger echoing back or another client's copy of this same
-            // mine having triggered first - see MineDetonationState's own class comment. The same
-            // flag is also what stops FixedUpdate's own trigger check from now on - nothing extra to
-            // add there.
+            // The one real explosion: the first RPC_Detonate any client receives (its own trigger echoing back, or another
+            // client's) - see MineDetonationState. The same flag stops FixedUpdate's trigger from now on.
             if (detonation == null || !detonation.TryDetonate())
                 return;
 
             int hitCount = ApplyBlast(at);
             LogDetonation(at, hitCount);
 
-            // Every client hides the visual right away - a detonated mine must not keep looking
-            // armed just because its object is still alive for a little longer. See the class
-            // comment for why the object itself outlives this by Destroy Delay Seconds.
+            // Every client hides the visual at once; the object outlives this by Destroy Delay Seconds (class comment).
             HideVisual();
 
-            // Only the owner ends this object's life, and only after the delay - see RequestDestroy
-            // and the class comment for why an immediate destroy here is the actual bug being fixed.
+            // Only the owner ends this object's life, after the delay: an immediate destroy drops bystanders' in-flight RPCs.
             if (IsOwnerClient)
                 StartCoroutine(DestroyAfterDetonation());
         }

@@ -6,33 +6,18 @@ using Overpower.Combat;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Draws a diamond over every enemy the LOCAL player currently has marked - shooter-only by
-    /// construction: it subscribes to CombatEvents.LocalMarkReported, which only ever fires on the
-    /// machine that actually holds the mark (PlayerCombatCredit.RPC_DamageCredit is a TARGETED RPC,
-    /// delivered only to the one attacker it names - see that method's own class comment - and
-    /// DummyTarget's single-client raise needs no such guard at all). A teammate or a bystander never
-    /// receives that RPC in the first place, so their own copy of this view (on their own PlayerHud,
-    /// since PlayerHud disables itself entirely for a non-owner - PlayerHud.Awake's very first check)
-    /// never even hears about the mark, regardless of what it shows on screen: there is nothing to see
-    /// here except your own marks.
-    ///
-    /// Comes from the victim's own truth (every credit message carries markSecondsLeft for the sending
-    /// attacker - PlayerHealth.MarkSecondsLeftFor), never a guess from the shooter's own beam: the
-    /// diamond appears the frame the credit message reports a fresh mark and disappears the frame a
-    /// cash-in, an expiry, or a death report (markSecondsLeft 0, sent "always" after the sender check)
-    /// arrives - see CombatEvents.LocalMarkReported's own comment.
-    ///
-    /// One slot per target, keyed by Transform (mirrors DamageNumberView's own activeByTarget), and a
-    /// pool of PoolSize covers "every enemy you personally have marked at once" the same way that
-    /// class's own pool covers "every enemy you're currently damaging".
+    /// Draws a diamond over every enemy the LOCAL player has marked. Shooter-only by construction: it subscribes to
+    /// CombatEvents.LocalMarkReported, which fires only on the machine holding the mark (PlayerCombatCredit.
+    /// RPC_DamageCredit is a TARGETED RPC), and PlayerHud disables itself on a non-owner. The state is the victim's
+    /// truth (markSecondsLeft in every credit message), never a guess from the beam: it appears with a fresh mark and
+    /// hides on a cash-in, expiry or death report (markSecondsLeft 0). One slot per target keyed by Transform, from
+    /// a pool of PoolSize.
     /// </summary>
     [DefaultExecutionOrder(1000)]
     public class MarkIndicatorView : MonoBehaviour
     {
-        /// <summary>One slot per possible enemy with a live mark from YOU - a designer never tunes this
-        /// (Rule 10: pool sizes are code constants, not look values). 8 covers a full room's worth of
-        /// enemies (this project's rooms cap well under that) with no reasonable way to have more than
-        /// one live mark per enemy anyway (Decision 1: at most one mark per attacker per target).</summary>
+        /// <summary>One slot per possible enemy with a live mark from YOU; a code constant, not a look value
+        /// (Rule 10). 8 covers a room (at most one live mark per attacker per target).</summary>
         public const int PoolSize = 8;
 
         private struct Slot
@@ -49,11 +34,8 @@ namespace Overpower.UI
         private RectTransform canvasRect;
         private Slot[] slots;
 
-        // Keyed by victim: which slot (if any) currently shows YOUR mark on them. At most one entry per
-        // target always exists here (HandleMarkReported below never claims a second slot for a target
-        // that already has one), so - unlike DamageNumberView's Blocked-vs-real split - every active
-        // slot's own target is always the one activeByTarget itself points at; there is no aliasing case
-        // to guard against on eviction here.
+        // Keyed by victim. HandleMarkReported never claims a second slot for a target that has one, so every
+        // active slot's target is the one activeByTarget points at: no aliasing to guard against on eviction.
         private readonly Dictionary<Transform, int> activeByTarget = new Dictionary<Transform, int>();
 
         public static MarkIndicatorView Create(Transform owner, UiTheme theme, RectTransform canvasRect, Image[] diamonds)
@@ -81,9 +63,8 @@ namespace Overpower.UI
             if (victim == null)
                 return;
 
-            // 0 covers a cash-in, an expiry the victim's own client already knows about, and a death
-            // report (Decision 8: marks clear before the death flush) - all three simply hide the
-            // diamond if this target happened to have one showing.
+            // 0 covers a cash-in, an expiry the victim's client already knows about, and a death report
+            // (marks clear before the death flush): all three hide the diamond if one is showing.
             if (secondsLeft <= 0f)
             {
                 if (activeByTarget.TryGetValue(victim, out int existing))
@@ -100,10 +81,8 @@ namespace Overpower.UI
             activeByTarget[victim] = slot;
         }
 
-        /// <summary>A free slot if one exists, otherwise the one closest to its own expiry - the same
-        /// "steal the least valuable" fallback DamageNumberView's own ClaimSlot uses, just keyed by
-        /// time-to-live instead of last-hit-time (there is no "how recently was this touched" here,
-        /// only "how much longer does it have").</summary>
+        /// <summary>A free slot, else the one closest to its own expiry (DamageNumberView's "steal the least
+        /// valuable", keyed by time-to-live).</summary>
         private int ClaimSlot(Transform newTarget)
         {
             for (int i = 0; i < slots.Length; i++)
@@ -143,10 +122,9 @@ namespace Overpower.UI
                 if (!slots[i].active)
                     continue;
 
-                // Unity's == overload reads a destroyed-but-not-yet-collected Transform as null (a
-                // victim who left the room) - see DamageNumberView.Slot.active's own comment for why
-                // Slot.active, not this check, is what tells "already free" apart from "just went
-                // stale", and FreeSlot is what actually frees a slot either way.
+                // Unity's == reads a destroyed-but-not-yet-collected Transform (a victim who left the room) as
+                // null; Slot.active, not this check, tells "already free" from "just went stale" (see
+                // DamageNumberView.Slot.active).
                 if (slots[i].target == null || Time.time >= slots[i].expiresAt)
                 {
                     FreeSlot(i);

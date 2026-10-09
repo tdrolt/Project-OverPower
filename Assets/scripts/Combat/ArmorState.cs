@@ -3,23 +3,16 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// One player's armor pool: a buffer in front of health that damage eats through first and
-    /// that comes back on its own once the player disengages. Plain C# for the same reason as the
-    /// rest of Combat - it is unit tested without touching the Unity engine, and a MonoBehaviour
-    /// wrapper feeds it Time.deltaTime and the out-of-combat timer in a later task.
+    /// One player's armor pool: a buffer in front of health that damage eats first and that refills
+    /// on its own once the player disengages. Plain C#, unit tested without the Unity engine;
+    /// PlayerHealth feeds it Time.deltaTime and the out-of-combat timer. Capacity, the recharge
+    /// delay and the refill duration are passed in, never read from ArmorConfig, so tiers can swap
+    /// at runtime via SetTier.
     ///
-    /// The refill is GRADUAL, not instant - Tudor's 2026-09-13 revision of the original design.
-    /// Once secondsSinceCombat clears the recharge delay, the pool climbs toward Capacity at a
-    /// constant rate of Capacity / refillSeconds per second, rather than snapping to full the
-    /// instant the delay is up. That means a pool that was only partly drained finishes refilling
-    /// sooner than one that broke completely, and re-engaging mid-refill keeps whatever has ticked
-    /// back in rather than losing it. refillSeconds is one value shared by every armor tier - only
-    /// the WAIT before a refill starts (the recharge delay) differs per tier, not the speed of the
-    /// climb once it does.
-    ///
-    /// Capacity, the recharge delay and the refill duration are passed in rather than read from
-    /// ArmorConfig, so this class never depends on the asset layer and tiers can be swapped at
-    /// runtime via SetTier.
+    /// The refill is GRADUAL: once secondsSinceCombat clears the recharge delay, the pool climbs at a
+    /// constant Capacity / refillSeconds per second, so a part-drained pool finishes sooner and
+    /// re-engaging mid-refill keeps what has ticked back. refillSeconds is shared by every tier; only
+    /// the WAIT before a refill starts differs per tier.
     /// </summary>
     public sealed class ArmorState
     {
@@ -32,10 +25,8 @@ namespace Overpower.Combat
         public float Capacity => capacity;
 
         /// <summary>
-        /// Broken means the pool cannot absorb anything right now - Current is exactly 0, so the
-        /// next hit reaches health unfiltered. A refill in progress clears this the moment Current
-        /// ticks above 0, even though the pool may still be far from full: Broken describes whether
-        /// there is currently anything to absorb with, not whether the refill has finished.
+        /// Broken means Current is exactly 0 and the next hit reaches health unfiltered. It clears the
+        /// moment a refill ticks Current above 0, even if the pool is far from full.
         /// </summary>
         public bool IsBroken => Current <= 0f;
 
@@ -45,16 +36,13 @@ namespace Overpower.Combat
             this.rechargeDelaySeconds = rechargeDelaySeconds;
             this.refillSeconds = refillSeconds;
 
-            // A fresh pool starts full: a player who has just bought armor should have it.
             Current = capacity;
         }
 
         /// <summary>
-        /// Switches to a different tier and fills the pool to the new capacity. Filling is the
-        /// point: buying an upgrade mid-match must not leave the player sitting on the old, lower
-        /// armor amount, waiting through a gradual refill for armor they already paid for. This is
-        /// a purchase, not a recharge, so it is still instant. Downgrading fills to the new,
-        /// smaller capacity, which also guarantees Current can never exceed Capacity.
+        /// Switches tier and fills the pool to the new capacity: buying an upgrade mid-match must not
+        /// leave the player on the old armor amount waiting through a gradual refill. A purchase, not
+        /// a recharge, so it is instant. Downgrading also guarantees Current never exceeds Capacity.
         /// </summary>
         public void SetTier(float capacity, float rechargeDelaySeconds)
         {
@@ -64,9 +52,8 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Eats what it can of an incoming hit and reports how much it actually took, so the
-        /// caller can pass the remainder on to health. It can only ever take what it currently
-        /// holds, not what its capacity is, so a part-drained pool absorbs proportionally less.
+        /// Eats what it can of a hit and returns how much it took, for the caller to pass the
+        /// remainder to health. Only takes what it currently holds, not its capacity.
         /// </summary>
         public float Absorb(float amount)
         {
@@ -81,13 +68,10 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Waits out rechargeDelaySeconds, then climbs Current toward Capacity at a constant rate
-        /// of Capacity / refillSeconds per second. secondsSinceCombat is owned by the caller
-        /// (PlayerHealth) and is reset to 0 the instant this player deals OR takes damage, so a hit
-        /// landing mid-refill needs no special handling here: the caller's next Tick call simply
-        /// arrives with secondsSinceCombat back below the delay, which halts progress until the
-        /// delay elapses again. deltaTime is only consulted once the delay has passed - before
-        /// that there is nothing to integrate.
+        /// Waits out rechargeDelaySeconds, then climbs toward Capacity. secondsSinceCombat is owned by
+        /// PlayerHealth and reset to 0 the instant this player deals OR takes damage, so a hit
+        /// mid-refill needs no special handling here: the next Tick arrives below the delay and
+        /// progress halts.
         /// </summary>
         public void Tick(float deltaTime, float secondsSinceCombat)
         {
@@ -96,8 +80,7 @@ namespace Overpower.Combat
 
             if (refillSeconds <= 0f)
             {
-                // A designer-facing safety net, not a supported tuning value: 0 would otherwise
-                // divide by zero below. Treat it as "as fast as possible" rather than throwing.
+                // Safety net, not a supported tuning value: 0 would divide by zero below.
                 Current = capacity;
                 return;
             }
@@ -107,13 +90,10 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Empties the pool. Called unconditionally the instant a player dies
-        /// (PlayerHealth.ApplyDamage) - a corpse has no armor. What happens NEXT, at respawn, is
-        /// ArmorConfig.RespawnWithFullArmor's call: PlayerHealth.ResetForRespawn calls this again
-        /// (off) so the armor is earned back through the out-of-combat timer like anyone else, or
-        /// calls RefillToFull instead (on, the default) so the player respawns geared. Upgrade
-        /// levels are a separate, longer-lived thing PlayerHealth keeps through death; only the
-        /// current fill of the pool clears here.
+        /// Empties the pool; called the instant a player dies (PlayerHealth.ApplyDamage). At respawn
+        /// ArmorConfig.RespawnWithFullArmor decides: off keeps it empty so armor is earned back
+        /// through the out-of-combat timer, on calls RefillToFull. Upgrade levels live on
+        /// PlayerHealth and survive death; only the fill clears here.
         /// </summary>
         public void Clear()
         {
@@ -121,11 +101,9 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Fills the pool to its current Capacity without touching tier - the "respawn with full
-        /// armor" path (ArmorConfig.RespawnWithFullArmor), called from PlayerHealth.ResetForRespawn.
-        /// Deliberately separate from SetTier: a respawn does not change which tier a player owns,
-        /// it just decides how much of that tier's capacity they start with, so this never touches
-        /// capacity or rechargeDelaySeconds.
+        /// Fills the pool to its current Capacity without touching the tier (the "respawn with full
+        /// armor" path, ArmorConfig.RespawnWithFullArmor). Separate from SetTier because a respawn
+        /// never changes which tier a player owns.
         /// </summary>
         public void RefillToFull()
         {
@@ -133,23 +111,14 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Adopts a value replicated from the owning client, clamped to this pool's current
-        /// capacity. This exists for one purpose - a remote client's copy of this player never
-        /// runs Absorb or Tick (Update on PlayerHealth skips both when the player is not mine), so
-        /// PlayerNetSync's receive side needs some way to make a non-owner's ArmorState agree with
-        /// what the owner actually has.
+        /// Adopts a value replicated from the owning client, clamped to the current capacity. A remote
+        /// client's copy never runs Absorb or Tick (PlayerHealth.Update skips both for non-owners),
+        /// so PlayerNetSync's receive side uses this. Not a general setter: a capacity change (buying
+        /// a tier) must go through SetTier.
         ///
-        /// Do not reach for this as a general setter: a capacity change (buying an armor tier)
-        /// must still go through SetTier, which fills to the new capacity rather than clamping an
-        /// old value into it.
-        ///
-        /// A transient clamp here is expected, not a bug: continuous position/health/armor sync
-        /// (PlayerNetSync) runs every network tick, while the armor LEVELS that change Capacity
-        /// travel separately, as Custom Properties. If a sync packet lands on a remote client the
-        /// same frame a level bump is still in flight, this clamps the new Current down to the
-        /// remote's still-stale (lower) Capacity for one frame. It self-heals on the very next sync
-        /// tick, because the stream is continuous - nothing needs to remember or replay the
-        /// clamped-off amount.
+        /// A transient clamp is expected: armor LEVELS (which change Capacity) travel separately as
+        /// Custom Properties, so a sync packet can land while a level bump is still in flight and
+        /// clamp to the stale lower Capacity for one frame. It self-heals on the next sync tick.
         /// </summary>
         public void SetFromNetwork(float current)
         {

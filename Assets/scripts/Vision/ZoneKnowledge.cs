@@ -8,16 +8,13 @@ using Photon.Pun;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// What this client's team knows about every zone (Tudor 2026-09-30, Vision Task 9b). Runs on the BuildingManager's
-    /// GameObject (added at runtime, like MatchDirector): the zone displays - the ring on the ground, the tower's owner
-    /// colour, the carpet and the minimap - exist from the scene start, before and after any one player object, and a
-    /// respawn must not make the team forget or relearn; and it lives wherever the territory Room Properties are read.
-    ///
-    /// Each frame it builds the live ZoneViews from the territory snapshot and the capture progress that BuildingManager
-    /// already decoded (no second parser), hands them to ZoneKnowledgeStore with "is the tower in my team's sight", and
-    /// answers Displayed. With VisionConfig › Zone Owners Visible Without Sight on (the default), TryGetDisplayed says
-    /// "not filtering" and every display keeps drawing the live state exactly as before. Only the displays read this:
-    /// gold, income, capture rules, respawns, the scoreboard and the result screen always use the live state.
+    /// What this client's team knows about every zone. Runs on the BuildingManager's GameObject (added at runtime, like
+    /// MatchDirector), not on a player object: the zone displays (ground ring, tower colour, carpet, minimap) exist from the
+    /// scene start and a respawn must not make the team forget or relearn. Each frame it builds the live ZoneViews from the
+    /// territory snapshot and capture progress BuildingManager already decoded (no second parser), feeds ZoneKnowledgeStore
+    /// "is the tower in my team's sight", and answers Displayed. With VisionConfig › Zone Owners Visible Without Sight on
+    /// (default), TryGetDisplayed says "not filtering" and displays draw the live state. Only displays read this: gold,
+    /// income, capture rules, respawns, scoreboard and result screen always use the live state.
     /// Runs before the displays (BuildingCapture.Update, MinimapView.LateUpdate).
     /// </summary>
     [DefaultExecutionOrder(-100)]
@@ -33,7 +30,6 @@ namespace Overpower.Vision
         private int knownForTeam = int.MinValue;
         private readonly Dictionary<int, float> sightRadius = new Dictionary<int, float>();
 
-        // The centre scan (Task 11) will hand in the zones its wave is passing over; empty until then.
         private IReadOnlyCollection<int> scannedNow = Array.Empty<int>();
 
         private Func<int, CaptureProgress> progressOf;
@@ -42,7 +38,7 @@ namespace Overpower.Vision
         private TeamSight sight;
         private BuildingManager buildings;
 
-        /// <summary>The zones the centre scan wave is passing over right now (Task 11 sets this each frame).</summary>
+        /// <summary>The zones the centre scan wave is passing over right now (CentreScan sets it each frame).</summary>
         public IReadOnlyCollection<int> ScannedNow
         {
             get => scannedNow;

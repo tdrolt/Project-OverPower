@@ -4,14 +4,11 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The STUNNED / SLOWED label and its thin shrinking bar over ONE player's head (Tudor D18), built at
-    /// runtime onto the overhead canvas the health bar and name already sit on, so it is seen by everyone.
-    /// Owned and ticked by that player's PlayerStatusEffects, on every client's copy; what it shows comes
-    /// from PlayerStatusEffects.TryGetStatusLabel (the real status on the owner's copy, the published
-    /// Player Property on everyone else's).
-    ///
-    /// Text and colour are written only when the label changes and the bar only when its fill moves, so an
-    /// idle player costs one call and a comparison per frame and nothing is allocated.
+    /// The STUNNED / SLOWED label and its thin shrinking bar over ONE player's head (D18), built onto the overhead
+    /// canvas the health bar and name sit on, so everyone sees it. Owned and ticked by that player's
+    /// PlayerStatusEffects on every client's copy; it reads PlayerStatusEffects.TryGetStatusLabel (the real status
+    /// on the owner's copy, the published Player Property on everyone else's). Text and colour are written only
+    /// when the label changes and the bar only when its fill moves, so an idle player allocates nothing.
     /// </summary>
     public sealed class StatusLabelOverhead
     {

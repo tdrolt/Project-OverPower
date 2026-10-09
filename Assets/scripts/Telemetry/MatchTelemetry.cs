@@ -15,22 +15,17 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Telemetry
 {
     /// <summary>
-    /// Scene singleton (lives on the BuildingManager GameObject, next to ZonePresenceTracker) that
-    /// owns this client's telemetry file: the match id, the writer, the session header, periodic
-    /// flushing, join/leave/masterChanged, and F1 markers. T3/T4 log through <see cref="Log"/>;
-    /// T4 also adds the master-only territory listeners here (ownership/capture/bounty/underAttack) -
-    /// see the "master-only territory events" region below.
+    /// Scene singleton (on the BuildingManager GameObject, next to ZonePresenceTracker) that owns this client's telemetry file: the
+    /// match id, the writer, the session header, periodic flushing, join/leave/masterChanged, F1 markers, and the master-only
+    /// territory listeners (ownership/capture/bounty/underAttack, see the region below). Others log through <see cref="Log"/>.
     ///
-    /// Match identity (Room Properties `mId`/`mStart`) follows the exact pattern
-    /// BuildingManager.WriteInitialSnapshotWhenClockIsReady already uses for the starting territory
-    /// snapshot: wait for the server clock, re-check nobody else already wrote it, then write. The one
-    /// difference is the write itself uses Photon's check-and-set (`expectedProperties`) on the ABSENT
-    /// key, so two masters racing during a migration can't both win even inside that re-check's own
-    /// race window - see TryClaimMatchIdentity's comment. A plain, unchecked write is the fallback if
-    /// mId never echoes back within a few seconds of that write (see ClaimMatchIdentityWhenClockIsReady).
+    /// Match identity (Room Properties `mId`/`mStart`) follows BuildingManager.WriteInitialSnapshotWhenClockIsReady: wait for the
+    /// server clock, re-check nobody else wrote it, then write - with Photon's check-and-set (`expectedProperties`) on the ABSENT
+    /// key, so two masters racing during a migration cannot both win even inside the re-check's race window
+    /// (TryClaimMatchIdentity). A plain write is the fallback if mId never echoes back (ClaimMatchIdentityWhenClockIsReady).
     ///
-    /// Deleting Assets/scripts/Telemetry (design doc, Principle 1) removes this whole component and
-    /// the game still runs: nothing outside this folder depends on it existing.
+    /// Deleting Assets/scripts/Telemetry removes this whole component and the game still runs (design doc, Principle 1): nothing
+    /// outside this folder depends on it existing.
     /// </summary>
     [DisallowMultipleComponent]
     public class MatchTelemetry : MonoBehaviourPunCallbacks
@@ -60,21 +55,15 @@ namespace Overpower.Telemetry
         [Tooltip("Every ability in the game - same treatment as Weapons above.")]
         [SerializeField] private AbilityCatalogue abilities;
 
-        // How long the master waits for the server clock before writing the match identity anyway -
-        // same value and same reasoning as BuildingManager.ServerClockWaitSeconds.
+        // How long the master waits for the server clock before writing the match identity anyway (as BuildingManager.ServerClockWaitSeconds).
         private const float ServerClockWaitSeconds = 5f;
 
-        // How long the master waits, after sending the check-and-set match identity write, for mId to
-        // actually show up in the room's Custom Properties before falling back to a plain write - see
-        // ClaimMatchIdentityWhenClockIsReady's own comment on why this fallback exists at all.
+        // How long the master waits, after the check-and-set identity write, for mId to show up before falling back to a plain write (see ClaimMatchIdentityWhenClockIsReady).
         private const float MatchIdentityEchoWaitSeconds = 5f;
 
-        // Cap on how many log lines are held before the file has opened (match id + this client's own
-        // actor number both known). Only ever a handful of lines in practice - join/leave/masterChanged
-        // observed in the first frame or two after connecting - but a cap keeps a client that somehow
-        // never resolves its identity from growing this list forever. Lobby Task 13: a lobby now fills
-        // this too (its markers, joins and leaves before the game starts), so when it is full the OLDEST
-        // lines go (PendingLineBuffer) and the file says how many - the newest (Start, first team lines) survive.
+        // Cap on log lines held before the file opens (match id and this client's actor number both known). A handful in practice,
+        // but a lobby fills it too (markers, joins, leaves before the game starts), so when full the OLDEST lines go
+        // (PendingLineBuffer), the file says how many, and the newest (Start, first team lines) survive.
         private const int MaxPendingLines = 200;
 
         // Not readonly: OnLeftRoom replaces this with a fresh instance for the next match, so one
@@ -84,7 +73,7 @@ namespace Overpower.Telemetry
         private readonly PendingLineBuffer pending = new PendingLineBuffer(MaxPendingLines);
         private readonly LocalJoinLine localJoin = new LocalJoinLine(); // whether this player's own join line is queued behind the file
 
-        // Lobby Task 13: spectators this master has already noted with a marker (cleared when the room is left).
+        // Spectators this master has already noted with a marker (cleared when the room is left).
         private readonly HashSet<int> spectatorsNoted = new HashSet<int>();
 
         // The game modes, to name a lobby's mode in the log folder and the lobby-created marker (read from the RoomManager once, lazily).
@@ -95,17 +84,12 @@ namespace Overpower.Telemetry
         private Coroutine claimIdentityRoutine;
         private float flushTimer;
 
-        // LogChat's own lazy cache of TelemetryScrub.AppIdTargets() - step 0 review fix (b). Read
-        // once on this client's first chat message, not every message; separate from ConsoleTelemetry's
-        // own cache (two independent readers of the same shared scrub, not one global cache - see
-        // TelemetryScrub's own class comment).
+        // LogChat's lazy cache of TelemetryScrub.AppIdTargets(), read on the first chat message; separate from ConsoleTelemetry's (two
+        // independent readers of the shared scrub, not one global cache).
         private string[] chatScrubTargets;
 
-        // Reused for every event this component ever logs (opus review fix) - Begin/.../End is
-        // safe to call again immediately once End() has returned the finished string (see
-        // TelemetryLine's own class comment), and nothing here is reentrant, so one instance is
-        // enough. PlayerTelemetry already follows this pattern; this class used to allocate a new
-        // TelemetryLine per event instead.
+        // Reused for every event this component logs: Begin/.../End is safe to call again once End() has returned the finished
+        // string, and nothing here is reentrant.
         private readonly TelemetryLine line = new TelemetryLine();
 
         /// <summary>Match seconds since mStart, wrap-safe and 0-guarded - see MatchClock. -1 until this
@@ -122,13 +106,10 @@ namespace Overpower.Telemetry
         /// <summary>True once this client's file has been opened and the session header written.</summary>
         public bool IsRecording => writer.IsOpen;
 
-        /// <summary>T3 review (item 10): raised right before the writer closes in every path that can
-        /// end it - quitting, leaving the room, or this object being destroyed - so a recorder with
-        /// its own buffered totals (PlayerTelemetry's `shots`/`dot` accumulators) gets one last chance
-        /// to flush through Log before it would otherwise be silently dropped. Fixes a real loss:
-        /// OnApplicationQuit used to close the writer with no such hook, and PlayerTelemetry's own
-        /// OnDestroy (which flushes its own accumulators) is not guaranteed to run first - Unity does
-        /// not order OnDestroy between two different GameObjects during teardown.</summary>
+        /// <summary>Raised right before the writer closes in every path that can end it (quit, leaving the room, destroy), so a
+        /// recorder with buffered totals (PlayerTelemetry's `shots`/`dot` accumulators) gets one last chance to flush through Log.
+        /// Needed because PlayerTelemetry.OnDestroy is not guaranteed to run first: Unity does not order OnDestroy between
+        /// GameObjects during teardown.</summary>
         public event System.Action BeforeClose;
 
         private void Awake()
@@ -146,12 +127,9 @@ namespace Overpower.Telemetry
 
         private void Start()
         {
-            // Task T4: subscribed here, not Awake - this component lives on the SAME GameObject as
-            // BuildingManager (T2 step 7's own wiring), and Unity guarantees every object's Awake
-            // runs before any object's Start, so BuildingManager.Instance/ZonePresenceTracker.Instance
-            // are already set by the time this runs, whichever component's Awake happened to run
-            // first. Every one of these is a plain C# event, not a Photon callback, so subscribing
-            // does not depend on PhotonNetwork.InRoom the way the match-identity calls below do.
+            // Subscribed here, not Awake: this component shares a GameObject with BuildingManager, and every Awake runs before any
+            // Start, so BuildingManager.Instance/ZonePresenceTracker.Instance are set whichever Awake ran first. These are plain C#
+            // events, not Photon callbacks, so subscribing does not depend on PhotonNetwork.InRoom.
             if (BuildingManager.Instance != null)
             {
                 BuildingManager.Instance.OwnershipChanged += HandleOwnershipChanged;
@@ -229,7 +207,7 @@ namespace Overpower.Telemetry
         {
             BeforeClose?.Invoke();
             writer.Close();
-            writer = new TelemetryWriter(); // Fresh writer for whatever match comes next - see the field's own comment.
+            writer = new TelemetryWriter(); // Fresh writer for the next match (see the field's comment).
             CurrentFolder = null;
             matchId = null;
             matchStartMs = 0;
@@ -244,7 +222,7 @@ namespace Overpower.Telemetry
             }
         }
 
-        /// <summary>Lobby Task 13: the creator (and only the creator - Photon raises this on the client that made the room) notes the new lobby.</summary>
+        /// <summary>The creator (and only the creator - Photon raises this on the client that made the room) notes the new lobby.</summary>
         public override void OnCreatedRoom()
         {
             if (PhotonNetwork.CurrentRoom == null) return;
@@ -269,7 +247,7 @@ namespace Overpower.Telemetry
             if (newMasterClient != null && newMasterClient.IsLocal)
             {
                 TryOpenFile();
-                // Lobby Task 13: the new host notes the change, and every spectator it can already see (the old host may have left before it did).
+                // The new host notes the change, and every spectator it can already see (the old host may have left before it did).
                 DropMarker(LobbyMarkerNotes.HostChanged(newMasterClient.ActorNumber, newMasterClient.NickName ?? ""));
                 foreach (Player player in PhotonNetwork.PlayerList)
                     NoteSpectator(player);
@@ -293,8 +271,8 @@ namespace Overpower.Telemetry
         public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
         {
             if (targetPlayer == null || changedProps == null) return;
-            // Lobby Task 13 (Task 8 review): a spectator HOST's file opens when its spec flag arrives - that comes after the stage edge, so
-            // listening to the team key alone left it opening at go-live.
+            // A spectator HOST's file opens when its spec flag arrives, which comes after the stage edge; listening to the team key
+            // alone left it opening at go-live.
             if (TelemetryRoleRule.RetriesOpenOnChange(targetPlayer.IsLocal, changedProps.ContainsKey(Teams.TeamKey), changedProps.ContainsKey(Teams.SpectatorKey)))
                 TryOpenFile();
             if (changedProps.ContainsKey(Teams.SpectatorKey))
@@ -316,27 +294,21 @@ namespace Overpower.Telemetry
             line.Begin(eventName, Now);
             line.Int(TelemetryKeys.Actor, player.ActorNumber);
             line.Int(TelemetryKeys.Team, Teams.TryGetTeam(player, out int team) ? team : -1);
-            // Review fix (item 10): `join` also carries the player's own nickname - appending a
-            // field is safe for an old log without it (a missing key just reads back as null/absent).
-            // This is what lets the report's log coverage name a MISSING actor (no file of their
-            // own - TelemetryAggregator.BuildLogCoverage) instead of just "actor N". `leave` doesn't
-            // need it: by the time anyone leaves, whichever client logged their join already has it.
+            // `join` also carries the nickname (appending a field is safe for old logs: a missing key reads back as absent), so the
+            // report's log coverage can name a MISSING actor (no file of their own - TelemetryAggregator.BuildLogCoverage). `leave`
+            // doesn't need it: whichever client logged the join has it.
             if (eventName == TelemetryKeys.Join)
                 line.String(TelemetryKeys.Nick, player.NickName ?? "");
             Log(line);
         }
 
-        // ---------------------------------------------------------------- master-only territory events (Task T4)
+        // ---------------------------------------------------------------- master-only territory events
         //
-        // Every handler below is subscribed on every client (Start, above) but only ever LOGS while
-        // PhotonNetwork.IsMasterClient is true AT THE MOMENT the event fires - not gated at
-        // subscribe time - so a client that becomes master mid-match starts logging immediately
-        // without needing to resubscribe, and one that stops being master stops just as cleanly.
-        // BuildingManager/ZonePresenceTracker themselves already only ever raise the master-facing
-        // half of these (OwnershipChanged is raised on every client for its own state sync, but
-        // CaptureProgressChanged/BountyPaid/UnderAttackChanged only carry meaning worth recording
-        // once, from the master) - this guard is what turns "every client's copy of this event" into
-        // "logged exactly once, by whichever client currently holds mastership".
+        // Every handler below is subscribed on every client (Start) but only LOGS while PhotonNetwork.IsMasterClient is true AT THE
+        // MOMENT the event fires - not gated at subscribe time - so a client that becomes master mid-match starts logging
+        // immediately and one that stops being master stops just as cleanly. OwnershipChanged is raised on every client for its own
+        // state sync; this guard turns "every client's copy of this event" into "logged exactly once, by whichever client holds
+        // mastership".
 
         private void HandleOwnershipChanged(int zone, int oldOwner, int newOwner, TerritorySnapshot snapshot)
         {
@@ -348,16 +320,15 @@ namespace Overpower.Telemetry
             line.Int(TelemetryKeys.Tier, BuildingManager.Instance != null ? BuildingManager.Instance.TierOf(zone) : 0);
             line.Int(TelemetryKeys.OldOwner, oldOwner);
             line.Int(TelemetryKeys.NewOwner, newOwner);
-            // The aggregator's dedupe key (T5): two masters logging the same applied change around a
-            // master switch both stamp the SAME held-since, from the one snapshot they both applied.
+            // The aggregator's dedupe key: two masters logging the same applied change around a master switch both stamp the SAME
+            // held-since, from the one snapshot they both applied.
             line.Int(TelemetryKeys.HeldSince, snapshot.HeldSinceMs(zone));
             Log(line);
         }
 
-        /// <summary>opus review fix: BuildingManager.BountyPaid now also carries the PAYING team
-        /// (whoever held the zone too long before losing it) alongside the team that was paid, and
-        /// is only raised once BuildingManager's own write actually reaches Photon (Write returning
-        /// false - not connected, no room - means nothing was written, so nothing to report).</summary>
+        /// <summary>BuildingManager.BountyPaid carries the PAYING team (whoever held the zone too long before losing it) alongside the
+        /// team paid, and is only raised once BuildingManager's write actually reaches Photon (a false Write means nothing was
+        /// written, so nothing to report).</summary>
         private void HandleBountyPaid(int zone, int paidTeam, int payingTeam, int amount, int heldMs)
         {
             if (!PhotonNetwork.IsMasterClient)
@@ -366,9 +337,7 @@ namespace Overpower.Telemetry
             line.Begin(TelemetryKeys.Bounty, Now);
             line.Int(TelemetryKeys.Zone, zone);
             line.Int(TelemetryKeys.Team, paidTeam);
-            // Reusing OldOwner for "the team that paid" - the team that used to hold the zone and is
-            // now losing the bounty to whoever just captured it, the same "who owned it before" idea
-            // OldOwner already carries on `ownership`.
+            // OldOwner is reused for "the team that paid": the team that held the zone and loses the bounty to whoever captured it.
             line.Int(TelemetryKeys.OldOwner, payingTeam);
             line.Int(TelemetryKeys.Amount, amount);
             line.Float(TelemetryKeys.HoldSeconds, heldMs / 1000f);
@@ -387,16 +356,13 @@ namespace Overpower.Telemetry
             line.Begin(TelemetryKeys.UnderAttack, Now);
             line.Int(TelemetryKeys.Zone, zone);
             line.String(TelemetryKeys.State, underAttack ? "start" : "end");
-            // Reusing NewOwner as a plain "this zone's owner right now" - there is no old/new pair
-            // here, only one owner value, the same reuse-a-key reasoning TelemetryKeys' own class
-            // comment describes for Bounty/Refund/UnderAttack.
+            // NewOwner is reused as a plain "this zone's owner right now": there is no old/new pair here (the reuse-a-key reasoning
+            // in TelemetryKeys' class comment).
             line.Int(TelemetryKeys.NewOwner, owner);
             Log(line);
         }
 
-        /// <summary>opus review fix: classification itself moved to the stateless, pure
-        /// <see cref="CaptureTransitionClassifier"/> (own file, its own edit-mode tests) - this is
-        /// just the wiring: ask it what happened, and if anything did, log it with the zone's live
+        /// <summary>Wiring only: CaptureTransitionClassifier decides what happened; if anything did, log it with the zone's live
         /// player count (BuildingManager doesn't know that from a CaptureProgress alone).</summary>
         private void HandleCaptureProgressChanged(int zone, CaptureProgress oldProgress, CaptureProgress newProgress)
         {
@@ -431,22 +397,15 @@ namespace Overpower.Telemetry
             TryOpenFile();
         }
 
-        /// <summary>Master only: writes mId/mStart if they are still absent from the room. Guarded
-        /// against two masters racing during a migration:
-        /// (1) a local check that the key is absent before even trying, same shape as
-        ///     BuildingManager.WriteInitialSnapshotWhenClockIsReady re-checking after its own wait;
-        /// (2) the write itself passes `expectedProperties = { mId: null }` (Photon's check-and-set),
-        ///     so the SERVER only applies it if mId is still unset at the moment it processes the
-        ///     op - closing the window between (1)'s local check and the op actually landing, which a
-        ///     local check alone cannot close.
+        /// <summary>Master only: writes mId/mStart if still absent from the room, guarded against two masters racing during a
+        /// migration: (1) a local check that the key is absent, as BuildingManager.WriteInitialSnapshotWhenClockIsReady re-checks
+        /// after its wait; (2) the write passes `expectedProperties = { mId: null }` (Photon's check-and-set), so the SERVER only
+        /// applies it if mId is still unset when it processes the op, closing the window a local check cannot.
         ///
-        /// `Room.SetCustomProperties`'s bool return is whether the operation could be SENT (are we
-        /// connected, is there a room...), NOT whether the server's compare-and-swap accepted it -
-        /// `LoadBalancingClient.OpSetPropertiesOfRoom` returns that same "could it be sent" bool and
-        /// never surfaces the CAS outcome to the caller. So this does not branch on that return value at
-        /// all; instead ClaimMatchIdentityWhenClockIsReady waits for the real answer - mId actually
-        /// showing up in the room's Custom Properties, via the ordinary OnRoomPropertiesUpdate path,
-        /// whether it was this client's write that won or another master's.</summary>
+        /// `Room.SetCustomProperties`'s bool return is whether the operation could be SENT, NOT whether the server's compare-and-swap
+        /// accepted it (LoadBalancingClient.OpSetPropertiesOfRoom never surfaces the CAS outcome). So nothing branches on it;
+        /// ClaimMatchIdentityWhenClockIsReady waits for the real answer, mId showing up in the room's Custom Properties via
+        /// OnRoomPropertiesUpdate, whether this client's write won or another master's.</summary>
         private void TryClaimMatchIdentity()
         {
             if (!PhotonNetwork.InRoom || !PhotonNetwork.IsMasterClient) return;
@@ -492,19 +451,14 @@ namespace Overpower.Telemetry
             var expectedAbsent = new Hashtable { { TelemetryKeys.RoomMatchId, null } };
             PhotonNetwork.CurrentRoom.SetCustomProperties(props, expectedAbsent);
 
-            // Task T7 / 2.7b step 9: log the phase 0 WARM-UP anchor right here, once - this IS the master
-            // claiming the match identity (whether or not this particular write ends up being the one the CAS
-            // accepts; see the fallback branch below, which is the SAME claim attempt retried, not a second
-            // claim, so it does not log again). Queues into pendingLines like every other line logged before
-            // the file opens (Log's own doc comment) - matchId/matchStartMs may still be unset here, which is
-            // fine (Now reads -1, the same "before the match clock was known" sentinel `join` already uses).
-            // Phase 0 marks a NEW-STYLE log for PhaseTimeline.From - going live (2.7b's MatchDirector.GoLive)
-            // is what logs phase 1 (three teams) or 2 (a host start) for real; this anchor is never a live
-            // moment or a transition, just the same harmless "this log exists" marker phase 1 used to be.
+            // Log the phase 0 WARM-UP anchor here, once: this IS the master claiming the match identity (the fallback branch below
+            // retries the SAME claim, so it does not log again). Queues into pending like every line logged before the file opens (see
+            // Log); matchId/matchStartMs may still be unset (Now reads -1, the sentinel `join` already uses). Phase 0 marks a NEW-STYLE
+            // log for PhaseTimeline.From; MatchDirector.GoLive logs phase 1 or 2 for real, so this anchor is never a live moment or a
+            // transition.
             LogPhase(0, System.Array.Empty<int>());
 
-            // Wait for mId to actually show up - see TryClaimMatchIdentity's own comment on why the call
-            // above's return value is not the signal to wait for.
+            // Wait for mId to actually show up (see TryClaimMatchIdentity on why the return value above is not the signal).
             float waitedForEcho = 0f;
             while (!PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(TelemetryKeys.RoomMatchId) && waitedForEcho < MatchIdentityEchoWaitSeconds)
             {
@@ -522,14 +476,10 @@ namespace Overpower.Telemetry
                 yield break;
             }
 
-            // Safety net, not the primary path: a live single-master run confirmed the CAS write above
-            // shows up almost immediately, but Photon's client source gives no documented guarantee that
-            // an expected value of null matches a key that is ABSENT server-side (only that it matches an
-            // existing null-valued one - see TryClaimMatchIdentity's own comment on the return value not
-            // being proof either way). If mId still has not appeared after waiting, something silently
-            // dropped or rejected the write for a reason other than "another master's write won" - fall
-            // back to one plain, unchecked write rather than leaving the match with no identity at all
-            // (no session file would ever open on any client without mId).
+            // Safety net, not the primary path: Photon's client source gives no documented guarantee that an expected value of null
+            // matches a key that is ABSENT server-side (only an existing null-valued one). If mId still has not appeared, something
+            // dropped or rejected the write for a reason other than another master winning, so fall back to one plain, unchecked write
+            // rather than leave the match with no identity (no session file would open on any client without mId).
             Debug.LogWarning("[Telemetry] match identity never echoed back after the check-and-set write - falling back to a plain write.");
             var fallbackProps = new Hashtable
             {
@@ -550,7 +500,7 @@ namespace Overpower.Telemetry
             int actor = PhotonNetwork.LocalPlayer.ActorNumber;
             if (actor <= 0) return; // Not yet assigned an actor number - guards a race right after connecting.
 
-            // Lobby Task 6: the session line makes this player a row of the report. Nobody writes a file in the lobby before the game starts
+            // The session line makes this player a row of the report. Nobody writes a file in the lobby before the game starts
             // (lS 0), and nobody without a role: the file opens when this player is on a team (OnPlayerPropertiesUpdate below) - or is a
             // spectator HOST, whose master-only lines are the territory timeline (OnMasterClientSwitched and OnRoomPropertiesUpdate retry).
             if (!TelemetryRoleRule.MayOpenFile(Teams.IsSpectator(PhotonNetwork.LocalPlayer), Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _), PhotonNetwork.IsMasterClient, LobbyStageNow))
@@ -575,23 +525,19 @@ namespace Overpower.Telemetry
             writer.Flush(); // Immediate, so the file and its header exist as soon as a client joins, not just after the first flush interval.
         }
 
-        /// <summary>One folder per match on one PC. Lobby Task 13 (D13): its name says when, which mode and size and which lobby
-        /// ("2026-10-02_2130_Conquest-3v3v3_Tudors-lobby", see MatchFolderName), and it holds a small `match.id` file with the match id. A
-        /// folder is reused only when that id matches - so a second client of the same match on this machine finds the first one's folder
-        /// whatever its name, and two lobbies that happen to share a name and a minute get " (2)" and never mix their logs. The id also stays
-        /// inside every `.jsonl` line, which is what the report merges by (TelemetryLog groups by it, not by the folder name).
+        /// <summary>One folder per match on one PC. Its name says when, which mode and size and which lobby
+        /// ("2026-10-02_2130_Conquest-3v3v3_Tudors-lobby", see MatchFolderName), and it holds a small `match.id` file with the match id.
+        /// A folder is reused only when that id matches, so a second client of the same match on this machine finds the first one's
+        /// folder whatever its name, and two lobbies sharing a name and a minute get " (2)" and never mix logs. The id also stays
+        /// inside every `.jsonl` line, which is what the report merges by (TelemetryLog groups by it, not by folder name).
         ///
-        /// 2026-09-27 designer change: testers complained the old location (persistentDataPath - AppData
-        /// on Windows) was too hard to find, so the root now comes from TelemetryPaths.ResolveMatchLogsRoot
-        /// - the game/project folder's own "Match logs" subfolder first, Documents\OverPower next, the
-        /// old AppData location only as a last resort. TelemetryMenu (the Editor's "Open Telemetry
-        /// Folder"/"Build Report...") shares that same helper so both agree on where logs live.
+        /// The root comes from TelemetryPaths.ResolveMatchLogsRoot, shared with the Editor's TelemetryMenu so both agree on where
+        /// logs live.
         ///
-        /// Small same-instant race, accepted rather than fixed: two local clients opening their file for
-        /// the first time in the very same instant can both fail to see the other's folder (or its id
-        /// file, written right after the folder is made) and each create their own - the second gets " (2)". Then
-        /// TelemetryLog.Load, which reads ONE folder, needs their files copied into one before Build Report is pointed
-        /// at them - the same manual step a multi-PC playtest already requires (design doc, "Files").</summary>
+        /// Small same-instant race, accepted rather than fixed: two local clients opening their file for the first time in the very
+        /// same instant can both miss the other's folder (or its id file, written right after) and each create their own - the second
+        /// gets " (2)". TelemetryLog.Load reads ONE folder, so their files must be copied into one before Build Report - the same
+        /// manual step a multi-PC playtest already needs (design doc, "Files").</summary>
         private string ResolveMatchFolder()
         {
             string root = TelemetryPaths.ResolveMatchLogsRoot(config.FolderName);
@@ -687,9 +633,7 @@ namespace Overpower.Telemetry
 
         private static readonly char[] InvalidFileNameChars = Path.GetInvalidFileNameChars();
 
-        /// <summary>Public (playtest extras P5, 2026-09-26): MatchLogZip reuses this exact function
-        /// so the zip's own file name ends in the SAME sanitized nick as the .jsonl file it is
-        /// zipping up, rather than a second, possibly-different sanitizing of the same raw nick.</summary>
+        /// <summary>Public so MatchLogZip reuses it: the zip's file name ends in the SAME sanitized nick as the .jsonl it zips.</summary>
         public static string Sanitize(string nick)
         {
             if (string.IsNullOrWhiteSpace(nick)) return "player";
@@ -702,11 +646,9 @@ namespace Overpower.Telemetry
 
         // ---------------------------------------------------------------- recorder API
 
-        /// <summary>Every T3/T4 recorder logs through this. Writes immediately (buffered inside
-        /// TelemetryWriter) once the file is open; before that, queues up to MaxPendingLines lines so
-        /// nothing raised in the first frame or two after connecting is lost, then flushes them right
-        /// after the session header (see TryOpenFile). Does nothing at all once telemetry is disabled
-        /// (the config's own switch, or an IO failure) - callers never need to check first.</summary>
+        /// <summary>Writes immediately (buffered inside TelemetryWriter) once the file is open; before that, queues up to
+        /// MaxPendingLines lines so nothing raised in the first frame or two after connecting is lost, flushed right after the
+        /// session header (see TryOpenFile). Does nothing once telemetry is disabled, so callers never check first.</summary>
         public void Log(TelemetryLine line)
         {
             if (config == null || !config.Enabled || writer.Disabled) return;
@@ -731,18 +673,15 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        // ---------------------------------------------------------------- phase / elimination / adoption (Task T7, 2.7b)
+        // ---------------------------------------------------------------- phase / elimination / adoption
         //
-        // LogElimination/LogPhase(>=1) are 2.7's own MatchDirector's job; LogPhase(0) is this class's own
-        // warm-up anchor above. Master-only, matching every other territory event this class logs (see the
-        // "master-only territory events" region's own comment on why the guard is read live rather than at
-        // subscribe time). 2.7b step 9: phase 0 is the warm-up (never a live moment or a transition); 1
-        // (three teams) or 2 (a host start) is MatchDirector.GoLive's own live write; 2 (after a knockout) or
-        // 3 (Over) is an elimination-driven phase change, exactly as before this step.
+        // LogElimination/LogPhase(>=1) are MatchDirector's; LogPhase(0) is this class's warm-up anchor (ClaimMatchIdentityWhenClockIsReady).
+        // Master-only, like every territory event here (the guard is read live: see the "master-only territory events" region). Phase 0
+        // is the warm-up (never a live moment or a transition); 1 (three teams) or 2 (a host start) is MatchDirector.GoLive's live write;
+        // 2 (after a knockout) or 3 (Over) is an elimination-driven phase change.
 
-        /// <summary>2.7 calls this the instant a team is eliminated. <paramref name="team"/> is the
-        /// team just knocked out; <paramref name="teamsRemaining"/> is who's left. Master-only - a
-        /// non-master call is silently ignored, same as every other territory logger here.</summary>
+        /// <summary>Called by MatchDirector the instant a team is eliminated; <paramref name="teamsRemaining"/> is who's left.
+        /// Master-only: a non-master call is silently ignored.</summary>
         public void LogElimination(int team, int[] teamsRemaining)
         {
             if (!PhotonNetwork.IsMasterClient) return;
@@ -753,13 +692,11 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        /// <summary>2.7 calls this right after LogElimination, with the phase number the match just
-        /// entered (2, 3, ...) and who's still in it. 2.7b's MatchDirector.GoLive also calls this once,
-        /// right after its live write, with 1 (three teams) or 2 (a host start). This class calls it once
-        /// itself, with phaseNumber 0, the moment it claims the match identity (see
-        /// ClaimMatchIdentityWhenClockIsReady) - a harmless warm-up anchor line PhaseTimeline.From (T7's
-        /// aggregator) ignores when looking for the live moment (any phase >= 1) or the phase-2 transition
-        /// (any phase >= 2 at or after it). Master-only, same reasoning as LogElimination.</summary>
+        /// <summary>Called by MatchDirector right after LogElimination with the phase just entered (2, 3, ...) and who's still in it,
+        /// and once by MatchDirector.GoLive with 1 (three teams) or 2 (a host start). This class calls it once itself with
+        /// phaseNumber 0 when it claims the match identity (ClaimMatchIdentityWhenClockIsReady): a warm-up anchor PhaseTimeline.From
+        /// ignores when looking for the live moment (any phase >= 1) or the phase-2 transition (any phase >= 2 at or after it).
+        /// Master-only.</summary>
         public void LogPhase(int phaseNumber, int[] teamsRemaining)
         {
             if (!PhotonNetwork.IsMasterClient) return;
@@ -770,10 +707,8 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        /// <summary>2.7b step 9: the telemetry `adopt` line - MatchDirector.HandleOwnershipChanged calls
-        /// this, master-only and live only, when MatchPhaseRules.IsAdoption says the team that just took
-        /// <paramref name="zone"/> held no OTHER capital in play already. Master-only, same reasoning as
-        /// every other territory logger here.</summary>
+        /// <summary>The `adopt` line: MatchDirector.HandleOwnershipChanged calls it, master-only and live only, when
+        /// MatchPhaseRules.IsAdoption says the team that just took <paramref name="zone"/> held no OTHER capital in play.</summary>
         public void LogAdoption(int team, int zone)
         {
             if (!PhotonNetwork.IsMasterClient) return;
@@ -784,14 +719,11 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        // ---------------------------------------------------------------- playtest extras (P2/P3, 2026-09-26)
+        // ---------------------------------------------------------------- console / bug / chat
 
-        /// <summary>P1's own `console`/dropped-count lines - ConsoleTelemetry is the only caller.
-        /// level is the string ConsoleLineRule/BugMarkerKey already settled on ("log"/"warning"/
-        /// "error"/"exception"/"assert"), reused verbatim as this line's own State (see that key's
-        /// class comment on reusing a short string label across events). Message/stack are already
-        /// scrubbed and cut; count/firstT/lastT are only written when count is greater than 1 - an
-        /// ordinary, un-folded line stays exactly as lean as any other single-occurrence event.</summary>
+        /// <summary>ConsoleTelemetry is the only caller. level is the string ConsoleLineRule settled on ("log"/"warning"/"error"/
+        /// "exception"/"assert"), reused as this line's State. Message/stack are already scrubbed and cut; count/firstT/lastT are only
+        /// written when count is greater than 1, so an un-folded line stays as lean as any other.</summary>
         public void LogConsole(string level, string message, string stack, int count, double firstT, double lastT)
         {
             line.Begin(TelemetryKeys.Console, Now);
@@ -808,9 +740,8 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        /// <summary>The "N console lines dropped" summary ConsoleLineRule's per-second cap or its
-        /// pre-open queue produces - its own `console` line (State "dropped"), distinguished from an
-        /// ordinary console line by carrying Dropped instead of Message/RepeatCount.</summary>
+        /// <summary>The "N console lines dropped" summary from ConsoleLineRule's per-second cap or pre-open queue: its own `console`
+        /// line (State "dropped") carrying Dropped instead of Message/RepeatCount.</summary>
         public void LogConsoleDropped(int count)
         {
             line.Begin(TelemetryKeys.Console, Now);
@@ -819,9 +750,8 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        /// <summary>P2: Ctrl+B's own `bug` line - BugMarkerKey is the only caller. screenshotFileName
-        /// is just the file's own NAME (see TelemetryKeys.ScreenshotFile) - the report links it
-        /// relative to the match folder, which is this line's own folder.</summary>
+        /// <summary>Ctrl+B's `bug` line; BugMarkerKey is the only caller. screenshotFileName is the file's NAME (see
+        /// TelemetryKeys.ScreenshotFile); the report links it relative to the match folder.</summary>
         public void LogBug(int team, float x, float z, bool alive, int zone, int weaponId, int attachmentId,
                             int mobilityId, int ultimateId, string screenshotFileName)
         {
@@ -840,15 +770,10 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        /// <summary>P3: the sender's own public chat text - PhotonChat.SubmitPublicChatOnClick calls
-        /// this right BEFORE it publishes, so this is always the sender's own copy, never the receive
-        /// callback's (see that method's own comment). Cut to 300 characters, matching the brief.
-        ///
-        /// Step 0 review fix (b), 2026-09-26: scrubbed of the Photon App IDs (TelemetryScrub - the
-        /// SAME scrub ConsoleLineRule's console lines already use) BEFORE the cut, same reasoning as
-        /// that class's own comment: cutting first could leave a bare, truncated id prefix in the
-        /// log. chatScrubTargets is read once (this component's own lazy cache, separate from
-        /// ConsoleTelemetry's) and reused for every chat line after the first.</summary>
+        /// <summary>PhotonChat.SubmitPublicChatOnClick calls this right BEFORE it publishes, so this is always the sender's own copy,
+        /// never the receive callback's. Cut to 300 characters. Scrubbed of the Photon App IDs (TelemetryScrub, the same scrub
+        /// ConsoleLineRule uses) BEFORE the cut, since cutting first could leave a bare truncated id prefix in the log.
+        /// chatScrubTargets is read once and reused.</summary>
         public void LogChat(string text)
         {
             const int MaxChars = 300;
@@ -862,11 +787,8 @@ namespace Overpower.Telemetry
             Log(line);
         }
 
-        /// <summary>Playtest extras P5 (the zip - not this task): flushes whatever is buffered to disk
-        /// right now, regardless of FlushIntervalSeconds' own timer. Harmless and unused until P5
-        /// exists; added now since it is a one-line wrapper around the writer this class already
-        /// owns. Does nothing if the writer never opened or is disabled - same no-op shape as every
-        /// other call on this class.</summary>
+        /// <summary>Flushes whatever is buffered to disk now, regardless of FlushIntervalSeconds' timer (MatchLogZip calls it before
+        /// reading the folder). No-op if the writer never opened or is disabled.</summary>
         public void FlushNow() => writer.Flush();
     }
 }

@@ -74,7 +74,6 @@ namespace Overpower.Vision
         private Vector4 sightRect;
         private SpectateView spectate;
 
-        /// <summary>The eyes built this frame (read-only, for later tasks that draw them).</summary>
         public IReadOnlyList<Eye> Eyes
         {
             get { Refresh(); return eyes; }
@@ -86,10 +85,9 @@ namespace Overpower.Vision
         /// <summary>The world square the sight picture covers: (minX, minZ, sizeX, sizeZ).</summary>
         public Vector4 SightRect => sightRect;
 
-        /// <summary>The sight numbers and fog settings (the minimap reads the fog colour, darkness and enemy dot colour).</summary>
+        /// <summary>The minimap reads the fog colour, darkness and enemy dot colour from here.</summary>
         public VisionConfig Config => config;
 
-        /// <summary>The shader for the minimap's fog layer.</summary>
         public Shader MinimapFogShader => minimapFogShader;
 
         /// <summary>True while the fog is drawn: switched on and the sight picture exists. The minimap shows its fog layer
@@ -102,9 +100,9 @@ namespace Overpower.Vision
             get { Refresh(); return SightEyes.FriendlyTeam(mode, localTeam, watchedTeam); }
         }
 
-        // A seat spectator (lobby Task 6) sees everything: no fog, no hidden enemies, every shot and zone shown. They have no body, so
-        // this component normally does not exist on their client (and nothing is hidden then anyway); this keeps the answer the same
-        // should one ever be there. Read once a frame - it is asked many times.
+        // A seat spectator sees everything: no fog, no hidden enemies, every shot and zone shown. They have no body, so this
+        // component normally does not exist on their client; this keeps the answer the same should one ever be there. Read once
+        // a frame - it is asked many times.
         private bool FogOn => VisionRules.FogApplies(config != null && config.FogEnabled, LocalIsSeatSpectator());
 
         private int seatSpectatorFrame = -1;

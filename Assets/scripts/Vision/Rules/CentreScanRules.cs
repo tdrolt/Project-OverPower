@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// The centre scan, as plain rules (Tudor 2026-09-30, rule changed 2026-10-01): the centre sends a sonar wave 360 degrees
+    /// The centre scan, as plain rules: the centre sends a sonar wave 360 degrees
     /// at once on a fixed clock, every interval, whether or not anyone holds it. The team that holds the centre at the moment
     /// a wave starts gets the dots and the zone refresh from that wave; neutral at the start means nobody does. The wave is
     /// fast, so it cannot hit the same enemy several times by itself; Blink over it to stay hidden, or across it the other way
@@ -61,8 +61,7 @@ namespace Overpower.Vision
             return msUntilNext <= 0 ? 0 : (msUntilNext + 999) / 1000;
         }
 
-        /// <summary>The wave the centre is on right now, whoever holds the centre (Tudor 2026-10-01: the zone sends a wave on
-        /// a fixed clock, captured or not). False before the first wave, with an interval of 0 or less, or once the map has
+        /// <summary>The wave the centre is on right now, on a fixed clock whether or not anyone holds the centre. False before the first wave, with an interval of 0 or less, or once the map has
         /// shrunk (the centre then plays as a Tier III and there is no scan any more). Otherwise scanStartMs is the start of
         /// the latest wave; whether it is still travelling is WaveRadius + IsTravelling. A new wave cuts off the previous one,
         /// so an interval shorter than the wave's travel time (about 3 s at 40 m/s) means the outer arena is never scanned.
@@ -145,8 +144,7 @@ namespace Overpower.Vision
         }
     }
 
-    /// <summary>Keeps what a client must remember between frames to call CentreScanRules correctly (Task 10 review), and who
-    /// owns each wave (Task 16).</summary>
+    /// <summary>Keeps what a client must remember between frames to call CentreScanRules correctly, and who owns each wave.</summary>
     public sealed class ScanBandTracker
     {
         /// <summary>The time grace applies only to the truly first frame after Reset() (a join or rejoin): a client that first

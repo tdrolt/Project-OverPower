@@ -11,10 +11,8 @@ namespace Overpower.Telemetry
                                       int playersPerTeam, double seconds, double[] perZoneGold)
         {
             if (team < 0 || seconds <= 0) return;
-            // Mirrors GoldMath.PlayerIncomePerSecond's Math.Max(1, playersPerTeam) exactly, rather than
-            // skipping the split outright when the room hasn't reported a player count yet (0) or some
-            // future caller passes a negative one - so this split can never disagree with what the
-            // wallet actually pays over the same interval.
+            // Mirrors GoldMath.PlayerIncomePerSecond's Math.Max(1, playersPerTeam), so this split never disagrees with what the wallet
+            // pays (the room may report 0 players yet).
             int playerDivisor = System.Math.Max(1, playersPerTeam);
             int zones = System.Math.Min(System.Math.Min(ownerByZone.Length, tierByZone.Length), perZoneGold.Length);
             for (int zone = 0; zone < zones; zone++)

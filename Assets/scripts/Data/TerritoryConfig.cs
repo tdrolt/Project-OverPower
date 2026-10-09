@@ -7,13 +7,8 @@ namespace Overpower.Data
     /// <summary>
     /// Every per-tier territory number: how long a zone takes to capture, what it pays the team
     /// that owns it, what it pays out as a bounty, and how fast it heals you. One asset, shared by
-    /// every tower, is the whole tuning surface for territory - a designer changes a tier's row here
-    /// instead of hunting down nine towers that each used to carry their own copy of the same number.
-    ///
-    /// Fields are [SerializeField] private with read-only properties for the same reason as the rest
-    /// of the Data folder (see GameplayConfig): a ScriptableObject is one shared instance per
-    /// process, so writing to one at runtime quietly edits the asset in the Editor and does nothing
-    /// in a build.
+    /// every tower, so a tier's row is changed once, not on each tower. Read-only properties,
+    /// never written at runtime (see GameplayConfig).
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Territory Config", fileName = "TerritoryConfig")]
     public sealed class TerritoryConfig : ScriptableObject

@@ -5,13 +5,11 @@ using UnityEngine;
 namespace Overpower.Vision
 {
     /// <summary>
-    /// On every player's prefab, working on remote copies only: while my team does not see this player, their body
-    /// (every Renderer under the character model) and the overhead canvas (name, health/armour bar, STUNNED/SLOWED label,
-    /// immune frame) are switched off, and they come back the moment they are seen. Teammates are always shown.
-    /// Only Renderer.enabled and Canvas.enabled are touched - never a GameObject's active state, the colliders or the
-    /// networking - so PlayerLifecycle's own hide-on-death (SetActive) stays independent, and a hidden player still
-    /// moves, collides and takes damage. Effects parented to the player outside the model (rings, glows) are not covered
-    /// here; Task 5 owns them.
+    /// On every player's prefab, remote copies only: while my team does not see this player, their body (every Renderer
+    /// under the character model) and the overhead canvas (name, bar, STUNNED/SLOWED label, immune frame) are switched off.
+    /// Teammates are always shown. Only Renderer.enabled and Canvas.enabled are touched - never active state, colliders or
+    /// networking - so PlayerLifecycle's hide-on-death (SetActive) stays independent and a hidden player still moves,
+    /// collides and takes damage. Effects parented outside the model (rings, glows) are not covered here.
     /// </summary>
     public sealed class EnemyVisibility : MonoBehaviourPun
     {
@@ -21,10 +19,8 @@ namespace Overpower.Vision
         private bool applied = true;
         private bool forceRefresh = true;
 
-        /// <summary>Whether this player's body is currently shown on this client (tests and recorders read it).</summary>
         public bool Shown => applied;
 
-        /// <summary>The overhead (world-space) canvas that carries the name, bar and labels; recorders read its enabled flag.</summary>
         public Canvas OverheadCanvas => overheadCanvas;
 
         private void Awake()
@@ -38,9 +34,8 @@ namespace Overpower.Vision
             lifecycle = GetComponent<PlayerLifecycle>();
             if (lifecycle != null && lifecycle.PlayerMesh != null)
                 lifecycle.PlayerMesh.GetComponentsInChildren(true, bodyRenderers);
-            // The world-space canvas under the player root is the overhead one (the other canvas is the owner's own
-            // screen-space win/lose panel). PlayerHealth.OverheadCanvas now finds it too (it includes a switched-off
-            // canvas); this search stays so the canvas is found without needing the health bar's image.
+            // The world-space canvas is the overhead one (the other is the owner's screen-space win/lose panel); found here
+            // so it does not depend on the health bar's image.
             foreach (Canvas canvas in GetComponentsInChildren<Canvas>(true))
             {
                 if (canvas.renderMode == RenderMode.WorldSpace)

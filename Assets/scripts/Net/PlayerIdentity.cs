@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Overpower.Net
 {
     /// <summary>
-    /// Task 9e (Tudor D21): who this install is, and which match it was last in. Two small text files next to the game
+    /// Who this install is, and which match it was last in (D21). Two small text files next to the game
     /// (the parent of Application.dataPath - the build's own folder, or the project folder in the Editor; the same
     /// place the match logs go), with Application.persistentDataPath as the fallback when that folder cannot be written.
     ///

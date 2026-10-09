@@ -3,10 +3,9 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// A map's own camera rule. The follow camera turns every team's view so that the same direction is "up" on screen for everyone (CameraTracking, from where
-    /// the team's spawn sits - the angled view of the triangle arena). A scene that carries one of these with "Own Spawn On Left" on plays on a straight view
-    /// instead: the camera runs parallel to the lane, each player's own spawn is on the left of the screen and the enemy on the right, for both teams. A scene
-    /// without one keeps the angled view, so Game Scene is unchanged.
+    /// A map's own camera rule. By default the follow camera turns every team's view so the same direction is "up" on screen for everyone
+    /// (CameraTracking, from where the team's spawn sits - the triangle arena's angled view). A scene carrying this with "Own Spawn On Left" on uses
+    /// a straight view instead: camera parallel to the lane, each player's own spawn on the left of the screen, for both teams. No component, angled view.
     /// </summary>
     public sealed class SceneCameraConfig : MonoBehaviour
     {
@@ -16,7 +15,6 @@ namespace Overpower.Data
 
         public bool OwnSpawnOnLeft => ownSpawnOnLeft;
 
-        /// <summary>Whether this scene asks for the straight view (false when it carries no SceneCameraConfig, e.g. Game Scene).</summary>
         public static bool SceneWantsOwnSpawnOnLeft()
         {
             var found = FindFirstObjectByType<SceneCameraConfig>();
@@ -61,10 +59,8 @@ namespace Overpower.Data
             return -1;
         }
 
-        /// <summary>The yaw of the angled view: the team's own spawn direction, plus the one offset that nudges all teams together.</summary>
         public static float AngledYaw(float toOwnSpawnX, float toOwnSpawnZ, float teamYawOffset) => Mathf.Atan2(toOwnSpawnX, toOwnSpawnZ) * Mathf.Rad2Deg + teamYawOffset;
 
-        /// <summary>The yaw a team's camera takes: the straight view when the scene asks for it, else the angled one.</summary>
         public static float TeamYaw(bool ownSpawnOnLeft, float toOwnSpawnX, float toOwnSpawnZ, float teamYawOffset) =>
             ownSpawnOnLeft ? OwnSpawnLeftYaw(toOwnSpawnX, toOwnSpawnZ) : AngledYaw(toOwnSpawnX, toOwnSpawnZ, teamYawOffset);
 

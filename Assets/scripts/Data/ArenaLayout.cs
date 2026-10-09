@@ -5,16 +5,11 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// The one home for the primitive arena's cover and barriers (arena step 4). The boundary walls themselves are
-    /// NOT stored here: they are built fresh from ArenaSymmetry's own Source Outline every time (ArenaWallPlan), so
-    /// the wall line and the "no gaps at the corners" rule can never drift apart from what Validate already checks.
-    /// What lives here is everything else a designer might want to move: a block's box (a captured house, crate,
-    /// rock or bush) and a barrier's row (Amendment 1's jersey barriers). A designer edits rows in the Inspector, or
-    /// moves a block in the Scene view and presses "Capture layout from Source", then "Build primitive arena".
-    ///
-    /// Fields are [SerializeField] private with read-only accessors for the same reason as the rest of the Data
-    /// folder (see GameplayConfig): a ScriptableObject is one shared instance per process, so writing to one at
-    /// runtime quietly edits the asset in the Editor and does nothing in a build.
+    /// The primitive arena's cover and barriers: a block's box (house, crate, rock, bush) and a barrier's row.
+    /// The boundary walls are NOT stored here: they are built fresh from ArenaSymmetry's Source Outline
+    /// (ArenaWallPlan), so the wall line and the "no gaps at the corners" rule cannot drift from what Validate checks.
+    /// Edit rows in the Inspector, or move a block in the Scene view, "Capture layout from Source", then "Build
+    /// primitive arena". Read-only accessors, never written at runtime (see GameplayConfig).
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Arena Layout", fileName = "ArenaLayout")]
     public sealed class ArenaLayout : ScriptableObject
@@ -24,7 +19,7 @@ namespace Overpower.Data
             /// <summary>A captured house, crate, rock or bush footprint: a plain Building-layer block.</summary>
             Block,
 
-            /// <summary>Amendment 1's jersey barrier: GDD p.29, blocks walking only - every shot, dash, zip pull,
+            /// <summary>Jersey barrier (GDD p.29): blocks walking only - every shot, dash, zip pull,
             /// blink and portal crosses it. Sits on its own Barrier layer, never Building.</summary>
             Barrier
         }

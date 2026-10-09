@@ -4,11 +4,10 @@ namespace Overpower.Match
 {
     /// <summary>
     /// Who a NEUTRAL zone's capture belongs to right now, worked out fresh every tick from who is actually
-    /// listed inside it (bug fix, 2026-09-17, dates from 7ae919d 2025-03-28: a remote player's collider could
-    /// set capturingID from OnTriggerEnter on every client with no IsMine check, but only a player reported by
-    /// their OWN client - IsMine - ever gets added to the listed players; a lone real capturer could be
-    /// locked out by another team's capturingID write nobody around them could ever clear). Owned zones and
-    /// drains are untouched - DrainRule already decides those from the same listed-players list.
+    /// listed inside it. Never from a collider trigger: a remote player's collider fires OnTriggerEnter on every
+    /// client with no IsMine check, while only a player reported by their OWN client ever gets listed, so a
+    /// trigger-set claim could lock out a lone real capturer behind another team's write nobody could clear.
+    /// Owned zones and drains are not decided here - DrainRule does that from the same listed-players list.
     /// </summary>
     public static class CaptureClaimRule
     {

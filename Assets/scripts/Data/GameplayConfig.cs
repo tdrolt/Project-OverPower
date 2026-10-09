@@ -3,20 +3,11 @@ using UnityEngine;
 namespace Overpower.Data
 {
     /// <summary>
-    /// Every match-wide number that is not specific to one weapon or one ability. One asset,
-    /// edited in the Inspector, is the whole tuning surface for movement, health, respawning,
-    /// the out-of-combat timer, overheat and the status caps.
-    ///
-    /// Fields are [SerializeField] private with read-only properties on purpose. A
-    /// ScriptableObject is a single shared instance for the whole process, so writing to one at
-    /// runtime quietly edits the asset in the Editor and does nothing at all in a build - the
-    /// worst kind of bug, because it appears to work while you are testing. Read-only access
-    /// makes that mistake impossible to make by accident; anything that needs to vary per player
-    /// copies the value into a per-player runtime struct on spawn.
-    ///
-    /// Defaults live in the C# field initializers rather than being typed into the asset, so a
-    /// freshly created asset already holds the shipping numbers and there is no window in which
-    /// it silently holds zeros.
+    /// Every match-wide number that is not specific to one weapon or one ability.
+    /// Read-only properties on purpose (the rule for every Data asset): a ScriptableObject is one shared instance
+    /// per process, so a runtime write edits the asset in the Editor and does nothing in a build - it looks fine
+    /// while testing. Per-player variation is copied into a per-player runtime struct on spawn.
+    /// Defaults live in the field initializers, so a fresh asset never silently holds zeros.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Gameplay Config")]
     public sealed class GameplayConfig : ScriptableObject

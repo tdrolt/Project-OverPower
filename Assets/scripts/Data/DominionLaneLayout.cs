@@ -38,10 +38,9 @@ namespace Overpower.Data
     }
 
     /// <summary>
-    /// The 2v2 map as Tudor drew it (Dominion Task 11): every wall, jersey barrier, box, zone, spawn and healing area, in metres from the middle of the
-    /// map. The Editor tool (DominionLaneBuilder) builds the scene from these rows and the tests guard their structure; nothing else reads them.
+    /// The 2v2 map as drawn: every wall, jersey barrier, box, zone, spawn and healing area, in metres from the middle of the map.
+    /// The Editor tool (DominionLaneBuilder) builds the scene from these rows and the tests guard their structure; nothing else reads them.
     /// The drawing is 12 pixels to the metre, centred on the board's middle (550, 342): the numbers here are the board's, converted.
-    /// Fields are private with read-only accessors, like the rest of the Data folder.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Dominion Lane Layout", fileName = "DominionLaneLayout")]
     public sealed class DominionLaneLayout : ScriptableObject
@@ -140,10 +139,8 @@ namespace Overpower.Data
         public Vector2 FloorSize => floorSize;
         public float MinimapMarginMetres => minimapMarginMetres;
 
-        /// <summary>The footprint of box <paramref name="index"/>.</summary>
         public LaneRect BoxRect(int index) => new LaneRect("Box " + (index + 1), boxes[index], new Vector2(boxSizeMetres, boxSizeMetres));
 
-        /// <summary>The spawn row of a team, or false when the layout has none for it.</summary>
         public bool TryGetSpawn(int team, out LaneSpawn spawn)
         {
             foreach (LaneSpawn row in spawns)
@@ -170,7 +167,6 @@ namespace Overpower.Data
     /// <summary>The plan-view maths the lane tests and the scene measure share: gaps between footprints, and mirror images.</summary>
     public static class LaneGeometry
     {
-        /// <summary>The shortest distance between two axis-aligned footprints, in metres; 0 when they touch or overlap.</summary>
         public static float Gap(LaneRect a, LaneRect b) => Gap(a.Min, a.Max, b.Min, b.Max);
 
         public static float Gap(Vector2 aMin, Vector2 aMax, Vector2 bMin, Vector2 bMax)

@@ -18,12 +18,10 @@ namespace Overpower.Combat
         /// effects are reported at.</summary>
         public readonly Vector3 Point;
 
-        /// <summary>True when Target is a structure (IStructure - CoverWall today) rather than a
-        /// combatant. A structure blocks a beam exactly like a plain wall (Target == null) once it
-        /// has taken the hit, regardless of Pierce's own Max Targets - see BeamResolver.Resolve.
-        /// Always false for a null Target; a wall already stops the beam by that path and needs no
-        /// second one. Set by the caller (Hitscan), which is the one place that actually knows
-        /// whether Target implements IStructure - this struct stays a plain data carrier.</summary>
+        /// <summary>True when Target is a structure (IStructure, CoverWall today) rather than a
+        /// combatant: it blocks a beam like a plain wall once it has taken the hit, regardless of
+        /// Pierce's Max Targets (see BeamResolver.Resolve). Always false for a null Target. Set by
+        /// Hitscan, the one place that knows whether Target implements IStructure.</summary>
         public readonly bool IsStructure;
 
         public BeamContact(float distance, IDamageable target, Vector3 point, bool isStructure = false)
@@ -61,25 +59,17 @@ namespace Overpower.Combat
     }
 
     /// <summary>
-    /// The rules of an instant beam, in one place: given everything a ray passed through, which of
-    /// those things take damage and where the beam ends.
+    /// The rules of an instant beam in one place: given everything a ray passed through, which things
+    /// take damage and where the beam ends. A beam learns this all at once from one physics query that
+    /// reports hits in no particular order, so the ordering, the "each target once" rule and the
+    /// stopping rules are applied explicitly here; getting one wrong is invisible in play (a beam that
+    /// skips the nearer player, or double-damages a player with two hitboxes).
     ///
-    /// A projectile learns this one frame at a time as it sweeps forward. A beam learns it all at
-    /// once, from a single physics query that reports hits in no particular order - so the order,
-    /// the "each target once" rule and the stopping rules all have to be applied here explicitly.
-    /// Getting any of them wrong is invisible in play (a beam that sometimes skips the nearer
-    /// player, or double-damages a player with two hitboxes), which is why this is plain C# with
-    /// unit tests rather than code inside the Hitscan component.
-    ///
-    /// Walls are not special-cased for the through-walls laser. That leaf simply never asks
-    /// Physics about the Building layer, so no wall ever arrives here - see IgnoreWalls. A
-    /// STRUCTURE (BeamContact.IsStructure - CoverWall) IS special-cased, on purpose: it is an
-    /// IDamageable, so without the check below it would just be another pierceable target and a
-    /// laser with Pierce's Max Targets at -1 would carry straight through it to whoever stood
-    /// behind - contradicting Pierce's own "never lets a beam through a WALL" (Task 1.8b review
-    /// finding). The through-walls laser is unaffected either way, since IgnoreWalls removes the
-    /// Building layer from Hitscan's own raycast mask before Physics ever runs, so that beam never
-    /// produces a structure contact to begin with.
+    /// Walls are not special-cased for the through-walls laser: that leaf never asks Physics about
+    /// the Building layer (see IgnoreWalls), so no wall ever arrives. A STRUCTURE
+    /// (BeamContact.IsStructure, CoverWall) IS special-cased: it is an IDamageable, so without the
+    /// check below Pierce with Max Targets -1 would carry the beam through it to whoever stands
+    /// behind, contradicting Pierce's "never lets a beam through a WALL".
     /// </summary>
     public static class BeamResolver
     {
@@ -138,17 +128,13 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// The shooter, a teammate, or a corpse: the beam carries on as if they were not there.
-        /// Neither damaged nor a shield, and they do not use up a pierce.
-        ///
-        /// The self and teammate check is FriendlyFire.IsSelfOrTeammate, shared with
-        /// ProjectileMotor.FliesThrough and ExplodeOnImpact.IsFriendly, so a laser cannot do what a
-        /// bullet is forbidden to. The corpse check is BeamResolver's own addition on top of that
-        /// shared rule: a dead body blocking shots was a fixed playtest bug, and a dead player is
-        /// already off the hit layers, but a dead practice dummy keeps its collider while it waits
-        /// to reset - a case the projectile sweep does not need to handle the same way, since a
-        /// projectile that stops harmlessly on a freshly-dead dummy for a couple of seconds costs
-        /// nothing, where a beam that cannot pierce past one would.
+        /// The shooter, a teammate, or a corpse: the beam carries on as if they were not there,
+        /// neither damaged nor a shield, and without using up a pierce. Self and teammate is
+        /// FriendlyFire.IsSelfOrTeammate, shared with ProjectileMotor.FliesThrough and
+        /// ExplodeOnImpact.IsFriendly, so a laser cannot do what a bullet is forbidden to. The corpse
+        /// check is this class's own: a dead player is already off the hit layers, but a dead practice
+        /// dummy keeps its collider while it waits to reset, and a beam that could not pierce past it
+        /// would cost something where a projectile stopping on it costs nothing.
         /// </summary>
         private static bool PassesThrough(IDamageable target, int shooterActorNumber, int shooterTeamId)
         {

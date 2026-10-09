@@ -8,79 +8,23 @@ using Overpower.Vision;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Three beams converging at a fixed range along the shooter's own aim direction, not at the
-    /// cursor (2026-09-20 rework - see THE SPREAD below for why). Tudor's spec: each beam that
-    /// crosses an enemy applies +30% damage taken for 4 seconds, stacking to a cap of +60% - one
-    /// beam is +30%, two or three is +60%. THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT
-    /// EXTRA DAMAGE: closing to roughly the convergence range and firing along the target is what
-    /// lands all three, not spamming the key - but PIERCE IS ON (see FireOneBeam below), so this is
-    /// NOT the only place a beam can land. With `beamRange` doubled to 24m (rework step 6) each beam
-    /// debuffs every enemy anywhere along its own 24m line, convergence point or not; three separate
-    /// targets spread along one beam's path all take that beam's debuff, not just whichever one sits
-    /// at the convergence point. Zero damage - this is a debuff, not a weapon (addendum, [C, plan]).
-    ///
-    /// REWORK STEP 5 (Tudor, 2026-09-18): moved from Attachment to the Ultimate slot. Readiness comes
-    /// entirely from Owner.UltimateCharge - see IsReady/TryBuildCast below, the identical pattern
-    /// InvulnerabilityAbility, ElectricFenceAbility and AoeZoneAbility already use - NOT the base
-    /// class's own charge/cooldown pool (1 charge, 0s cooldown on this prefab; that recovers the
-    /// instant it is spent, so it is never itself a gate). No cooldown of its own any more.
-    ///
-    /// REWORK STEP 6 (Tudor, 2026-09-18): "increase its range 2 times and thickness of the beam 1.5
-    /// times" - beamRange 12 -> 24, beamWidth 0.35 -> 0.525. beamWidth is now the ONE home for both
-    /// the hit diameter (the SphereCast radius below, unchanged) and the drawn diameter (DrawBeam
-    /// now sets the instantiated clone's LineRenderer width from it) - before this the drawn line was
-    /// a flat 0.08m from the shared Laser Beam VFX prefab regardless of beamWidth, a 4.4x mismatch
-    /// between what a player saw and what actually hit them.
-    ///
-    /// REWORK 2026-09-20 (Tudor: "the raybeam is supposed to be a long range ultimate... make the
-    /// beams a bit thicker (30%) and give them 20% more range"): beamRange 24 -> 28.8 (+20%),
-    /// beamWidth 0.525 -> 0.6825 (+30%). The 30% thickness alone leaves only ~6.75cm of gap between
-    /// adjacent beam edges at the muzzle (spacing 0.75 - beamWidth 0.6825) - close to fusing into one
-    /// fat beam - so beamOriginSpacing also moves 0.75 -> 0.9, which puts the edge gap back to almost
-    /// exactly what it was before this rework (0.225 -> 0.2175m), i.e. the three beams read exactly
-    /// as distinguishable as they always did, just each one fatter.
-    ///
-    /// THE SPREAD (this rework's second half, a controller judgement call, not Tudor's literal
-    /// words): converging the outer beams on the CURSOR's exact depth (the pre-existing mechanic,
-    /// AimFromOriginToPoint) already lands all three beams exactly on target at ANY range for a
-    /// pixel-perfect click - RaybeamGeometryTests proves this holds unchanged from muzzle to the far
-    /// end of the range. The catch is that a real player cannot click a ground-plane cursor
-    /// pixel-perfectly on a distant target: the further out the cursor sits, the more a small
-    /// screen-space slip becomes a large world-space depth error, which is what actually produced
-    /// "only works within ~3m" in practice, not a flaw in the convergence maths itself. Making the
-    /// bonus reliable at REAL FIGHTING RANGE (10-20m) therefore means no longer trusting the cursor's
-    /// exact depth for the two outer beams: they now always converge at beamConvergenceRange metres
-    /// straight down the shooter's own aim direction, regardless of exactly where the cursor sits.
-    /// The centre beam is unaffected (its origin already sits on the aim line, so aiming it at that
-    /// same fixed point is identical to firing it straight down Direction). Tudor's own "lining up"
-    /// skill becomes about closing to roughly the right distance and firing along the target, not
-    /// about clicking a specific metre of ground - which fits an ultimate Tudor now calls "long
-    /// range" better than a mechanic that quietly punished exactly the players fighting at range.
-    ///
-    /// RUNS ON EVERY CLIENT, INCLUDING THE CASTER'S OWN, exactly once per cast - the beams are
-    /// instant, so there is no coroutine the way the flamethrower's spray needs one. DAMAGE (well,
-    /// STATUS) IS VICTIM-SIDE, EXACTLY LIKE HITSCAN: every client resolves the same three rays from
-    /// the same synced Origin/Direction/Point and calls IStatusReceiver.ApplyStatus on everything
-    /// they cross; the receiver's own guard (PlayerStatusEffects checks IsMine, a dummy is always
-    /// its own authority) makes sure only the victim's own machine actually applies it.
-    ///
-    /// GEOMETRY LIVES IN RaybeamGeometry (Combat/), NOT HERE - beam origin placement and "does this
-    /// beam's ray cross that point" are pure maths with their own edit-mode tests (see
-    /// RaybeamGeometryTests), the identical split BeamResolver keeps from Hitscan for the same
-    /// reason: eyeballing three converging rays in Play mode is not how "the beams converge
-    /// correctly" gets verified.
-    ///
-    /// PIERCE, NOT STOP-AT-FIRST: each beam calls BeamResolver.Resolve with Unlimited targets, so a
-    /// beam crossing three enemies in a line applies its debuff to all three, not just the nearest -
-    /// the addendum's own "[C: pierces]" note. A single beam still never double-applies to one
-    /// target with two colliders (BeamResolver's own "each target once" rule) and still stops dead
-    /// at the first Building or IStructure hit (deployable cover), exactly like the base laser.
-    ///
-    /// VULNERABILITY'S CAP IS GLOBAL, NOT A FIELD HERE - the addendum is explicit that the plan's
-    /// per-ability vulnerabilityCap field must not exist: GameplayConfig.VulnerabilityCap (0.60) is
-    /// what StatusEffectState's StackToCap rule actually reads, already true for every vulnerability
-    /// application in the game (DummyTarget, PlayerStatusEffects). This module only ever sends
-    /// magnitude 0.30 - the cap plays out on its own the moment two beams land.
+    /// Three beams, the outer two converging at beamConvergenceRange straight down the shooter's aim direction, each
+    /// applying Vulnerability to every enemy it crosses. Zero damage: a debuff, not a weapon.
+    /// WHY A FIXED CONVERGENCE POINT, NOT THE CURSOR: converging on the cursor's depth lands all three at any range for a
+    /// pixel-perfect click (RaybeamGeometryTests), but a ground-plane cursor cannot be clicked that precisely at range, so
+    /// the bonus only worked up close. Now catching two or three beams is about closing in and firing along the target.
+    /// THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT EXTRA DAMAGE, and PIERCE IS ON: each beam debuffs every
+    /// enemy along its whole line (BeamResolver.Unlimited), convergence point or not, but still stops at the first
+    /// Building or IStructure and applies once per target.
+    /// VULNERABILITY'S CAP IS GLOBAL (GameplayConfig > Vulnerability Cap, read by StatusEffectState's StackToCap), never a
+    /// field here: one beam is the per-beam magnitude, two or three reach the cap.
+    /// Ultimate slot: readiness comes entirely from Owner.UltimateCharge (IsReady/TryBuildCast, like the other ultimates),
+    /// not the base class's 1-charge/0 s pool, which recovers instantly and so never gates anything.
+    /// beamWidth is the ONE home for the hit diameter (SphereCast radius) and the drawn diameter (DrawBeam), so what a
+    /// player sees is what hits them; beamOriginSpacing must leave a visible gap between beam edges.
+    /// RUNS ON EVERY CLIENT, once per cast; STATUS IS VICTIM-SIDE like Hitscan: every client resolves the same three rays
+    /// from the synced Origin/Direction/Point and calls IStatusReceiver.ApplyStatus, and the receiver's IsMine guard
+    /// means only the victim's machine applies it. The maths lives in RaybeamGeometry (Combat/), tested pure.
     /// </summary>
     public sealed class RaybeamAbility : AbilityModule
     {
@@ -155,8 +99,8 @@ namespace Overpower.Abilities
                  "application already happened the instant the cast was received.")]
         private float beamVisualSeconds = 0.15f;
 
-        // Not a tuning value, matching Hitscan's own MaxContacts reasoning: nine players with a
-        // couple of colliders each plus the walls in a 12m line fit comfortably.
+        // Not a tuning value, matching Hitscan's MaxContacts: nine players with a couple of colliders each plus the
+        // walls along a beam fit comfortably.
         private const int MaxContacts = 32;
         private readonly RaycastHit[] hitBuffer = new RaycastHit[MaxContacts];
         private readonly List<BeamContact> contactBuffer = new List<BeamContact>(MaxContacts);
@@ -180,10 +124,8 @@ namespace Overpower.Abilities
 
         private void Awake() => RebuildSpec();
 
-        /// <summary>Rebuilt once more here (Task T3): Awake/OnValidate both run before Bind ever
-        /// assigns Definition (AbilityModule's own class comment - "do not read it in Awake"), so
-        /// the spec built at Awake always has abilityId -1. OnEquip is the first point Definition is
-        /// safe to read, and this module has nothing else to do on equip.</summary>
+        /// <summary>Rebuilt once more here: Awake/OnValidate run before Bind assigns Definition (AbilityModule: "do not
+        /// read it in Awake"), so the Awake spec always has abilityId -1. OnEquip is the first point Definition is safe.</summary>
         public override void OnEquip() => RebuildSpec();
 
         private void RebuildSpec()
@@ -201,27 +143,16 @@ namespace Overpower.Abilities
 
         // ---- owner only ---------------------------------------------------------------------------
 
-        /// <summary>Full meter only (rework step 5) - same reasoning and same call as the other three
-        /// ultimates (InvulnerabilityAbility, ElectricFenceAbility, AoeZoneAbility): 1 charge and a
-        /// 0s cooldown on the base class recover instantly, so without this override that pool would
-        /// never actually refuse a cast and Raybeam would be spammable regardless of the ultimate
-        /// meter, ultimate slot or not.</summary>
+        /// <summary>Full meter only, like the other ultimates: the base class's 1 charge and 0 s cooldown recover
+        /// instantly, so without this override that pool would never refuse a cast and Raybeam would be spammable.</summary>
         public override bool IsReady => Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull;
 
         /// <summary>
-        /// Origin is the MUZZLE (ctx.Muzzle, the wall-safe one - addendum, overriding the plan's
-        /// plain ctx.Origin), not the body: three beams starting from the gun read better than three
-        /// starting from the chest, and SafeMuzzlePosition already keeps this off the inside of a
-        /// wall the caster is pressed against.
-        ///
-        /// Point is the cursor's ground point with its Y overridden to muzzle height - a ground
-        /// point would send every beam angling down into the floor the instant the cursor is more
-        /// than a few metres away - then clamped to Beam Range from the muzzle so a cursor far
-        /// across the map cannot make the beams reach further than the tuned distance.
-        ///
-        /// Refuses the cast (rework step 5) unless UltimateCharge itself agrees to spend - the same
-        /// "proceed only if true" the other three ultimates use, so the runner's own base-class
-        /// SpendCharge (the 1-charge/0s pool below) never runs on a meter that was not actually full.
+        /// Origin is the MUZZLE (ctx.Muzzle, the wall-safe one), not the body: three beams from the gun read better than
+        /// from the chest, and SafeMuzzlePosition keeps it off the inside of a wall the caster is pressed against.
+        /// Point is the cursor's ground point with Y set to muzzle height (a ground point would angle every beam into the
+        /// floor), clamped to Beam Range from the muzzle.
+        /// Refuses unless UltimateCharge agrees to spend, so the base-class SpendCharge never runs on a meter that was not full.
         /// </summary>
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
@@ -234,7 +165,7 @@ namespace Overpower.Abilities
             Vector3 origin = ctx.Muzzle;
 
             Vector3 rawPoint = ctx.TargetPoint;
-            rawPoint.y = origin.y; // A ground point sends beams into the floor - addendum's own note.
+            rawPoint.y = origin.y; // A ground point sends beams into the floor.
 
             Vector3 toRaw = rawPoint - origin;
             float rawDistance = toRaw.magnitude;
@@ -261,15 +192,10 @@ namespace Overpower.Abilities
             RaybeamGeometry.BeamOrigins(origin, direction, beamOriginSpacing,
                 out Vector3 left, out Vector3 centre, out Vector3 right);
 
-            // 2026-09-20 rework (see beamConvergenceRange's own tooltip): the outer beams converge
-            // on a FIXED point straight down the shooter's own aim direction, never on the cursor's
-            // cast.Payload.Point - that field is still computed and sent (other systems may still
-            // want it), it just no longer decides where these beams cross. The centre beam's origin
-            // already sits on the aim line, so aiming it at the same fixed point is identical to
-            // firing it straight down direction - passing the same point to all three keeps this one
-            // formula instead of special-casing the centre beam. The formula itself lives in
-            // RaybeamGeometry (review follow-up, 66324c1) so it has its own test independent of the
-            // three-beams-cross-it cases.
+            // The outer beams converge on a FIXED point down the shooter's aim direction (beamConvergenceRange), never
+            // on cast.Payload.Point (still sent, but it does not decide where beams cross). The centre beam's origin sits on
+            // the aim line, so the same point is identical to firing straight down direction and keeps one formula.
+            // The formula lives in RaybeamGeometry so it has its own test.
             Vector3 convergePoint = RaybeamGeometry.ConvergencePoint(origin, direction, beamConvergenceRange, beamRange);
 
             FireOneBeam(left, convergePoint, direction, casterActor, casterTeam);
@@ -278,10 +204,8 @@ namespace Overpower.Abilities
         }
 
         /// <summary>
-        /// One beam, start to finish: resolve who it crosses, apply the debuff to each of them once,
-        /// and draw the line. Damage is never applied - Tudor's spec is 0 damage for this ability, so
-        /// there is no ApplyDamage call here at all (matching SonicPulseAbility's identical choice
-        /// to simply not carry a dead "damage" field for a 0).
+        /// One beam: resolve who it crosses, apply the debuff to each once, draw the line. No ApplyDamage at all (zero
+        /// damage; SonicPulseAbility likewise carries no dead "damage" field).
         /// </summary>
         private void FireOneBeam(Vector3 beamOrigin, Vector3 point, Vector3 fallbackDirection,
                                  int casterActor, int casterTeam)
@@ -302,10 +226,8 @@ namespace Overpower.Abilities
                 contactBuffer.Add(new BeamContact(hit.distance, target, hit.point, target is IStructure));
             }
 
-            // Unlimited: this ONE beam must apply to every enemy it crosses before the cut, not
-            // stop at the nearest - the addendum's "[C: pierces]" note. BeamResolver still keeps
-            // each target to a single hit even with two colliders, and still stops dead at the
-            // first wall or structure - see this class's own comment.
+            // Unlimited: this ONE beam applies to every enemy it crosses before the cut (pierce); BeamResolver still
+            // keeps each target to a single hit and stops dead at the first wall or structure.
             BeamResult beam = BeamResolver.Resolve(contactBuffer, beamRange, BeamResolver.Unlimited,
                                                     casterActor, casterTeam);
 
@@ -341,12 +263,8 @@ namespace Overpower.Abilities
             {
                 line.useWorldSpace = true;
 
-                // The drawn beam is exactly as wide as the beam that actually hits (rework step 6).
-                // Before this, beamWidth was a pure hit diameter and the visible line was whatever
-                // width the shared VFX prefab happened to carry - 0.08m against a 0.35m hitbox, so
-                // the thing the player aimed by was four times thinner than the thing that struck.
-                // Set on the INSTANTIATED CLONE, never on the prefab asset: Laser Beam VFX is shared
-                // with both laser weapons, and widening it there would widen those too.
+                // Exactly as wide as the beam that hits (beamWidth is the one home). Set on the INSTANTIATED CLONE, never
+                // the prefab asset: Laser Beam VFX is shared with both laser weapons, and widening it would widen those too.
                 line.startWidth = line.endWidth = beamWidth;
 
                 line.positionCount = 2;

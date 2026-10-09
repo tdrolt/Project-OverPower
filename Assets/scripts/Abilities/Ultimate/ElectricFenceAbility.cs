@@ -4,20 +4,12 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The electric fence ultimate: drops a ring at the caster's own feet that damages and slows any
-    /// enemy passing through it - Tudor's spec (2026-09-13), "stays where it is cast". This module
-    /// only decides WHEN and WHERE the ring goes down; everything about what the ring actually does
-    /// once it exists lives on ElectricFence.cs, the networked object it places - the same split
-    /// DeployableCoverAbility/CoverWall already use.
-    ///
-    /// FIT WITH 1.0 (the addendum's own wording, shared by all three ultimates): cooldownSeconds 0 /
-    /// charges 1 on the base class (set on this prefab) - readiness comes entirely from
-    /// UltimateCharge, never the base pool. IsReady reads Owner.UltimateCharge.IsFull; TryBuildCast
-    /// only agrees to cast if Owner.UltimateCharge.Spend() actually returns true, and Point is
-    /// ctx.Origin - the caster's own current position, nothing the cursor picks.
-    ///
-    /// SELF-CAST, NO TARGET TO VALIDATE - unlike Teleport or Deployable Cover there is no ground
-    /// probe or block check: the ring appears wherever the caster is standing, full stop.
+    /// The electric fence ultimate: drops a ring at the caster's feet that damages and slows enemies passing through it.
+    /// This module only decides WHEN and WHERE; what the ring does lives on the networked ElectricFence (as
+    /// DeployableCoverAbility / CoverWall). Shared by all three ultimates: cooldownSeconds 0 / charges 1 on the prefab,
+    /// readiness comes entirely from UltimateCharge, never the base pool (IsReady reads IsFull; TryBuildCast only casts
+    /// if Spend() returns true; Point is ctx.Origin, nothing the cursor picks). SELF-CAST: unlike Teleport or Deployable
+    /// Cover there is no ground probe or block check; the ring appears wherever the caster stands.
     /// </summary>
     public sealed class ElectricFenceAbility : AbilityModule
     {
@@ -39,9 +31,8 @@ namespace Overpower.Abilities
         /// cooldown, which recovers the instant it is spent precisely so this is the only real gate.</summary>
         public override bool IsReady => Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull;
 
-        /// <summary>Self-cast: the only thing this ability needs from ctx is where the caster is
-        /// standing right now. Refuses the cast (so the base class's own SpendCharge never runs
-        /// either) unless UltimateCharge itself agrees to spend.</summary>
+        /// <summary>Self-cast: only the caster's position is needed. Refuses the cast (so the base SpendCharge never runs)
+        /// unless UltimateCharge agrees to spend.</summary>
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
             payload = new CastPayload { Point = ctx.Origin };
@@ -55,8 +46,7 @@ namespace Overpower.Abilities
             if (cast.Phase != 0 || !cast.IsCasterClient || fencePrefab == null)
                 return; // Only the caster's own machine ever places the real networked object.
 
-            // Task T3 (telemetry): this ability's own id, so ElectricFence can attribute its own
-            // damage passes to it (DamageInfo.AbilityId) - see ElectricFence.OnPlaced.
+            // This ability's id, so ElectricFence can attribute its damage passes (DamageInfo.AbilityId) for telemetry.
             NetworkedDeployable.Spawn(fencePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
         }
 

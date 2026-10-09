@@ -330,7 +330,7 @@ namespace Overpower.Match
             return body != null ? body.position : player.transform.position;
         }
 
-        /// <summary>Task 9e: this player's own request counter lives on this machine and starts at 0 in a fresh process, but
+        /// <summary>This player's own request counter lives on this machine and starts at 0 in a fresh process, but
         /// the master remembers the last id it decided for this ACTOR (lastHandledByActor) and drops anything not above it.
         /// A rejoined player's "hpReq" Player Property still holds the last id it sent, so continue counting from there -
         /// otherwise its first few pack requests after a restart would look old and be ignored.</summary>

@@ -7,35 +7,21 @@ using Overpower.Vision;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Fires a bolt up to 15m; hitting a wall or a player pulls the SHOOTER toward wherever it
-    /// landed - Tudor's spec. Not a weapon and not a knockback: nothing else is ever touched by it,
-    /// and the pull always travels through PlayerDisplacement as a Voluntary move, so it automatically
-    /// loses to a real knockback in flight and automatically cancels on death the same way a dash does.
-    ///
-    /// THE FIRST ABILITY TO FIRE A PROJECTILE, which is why Task 1.7b generalised ProjectileContext
-    /// and ProjectileMotor first (see that file's class comment) rather than duplicating the sweep
-    /// here. This module owns none of the flight - it hands ProjectileMotor a context built from its
-    /// own Inspector fields instead of a WeaponDefinition, and gets told about a hit through
-    /// AbilityHitRelay, the IProjectileBehaviour on the projectile prefab.
-    ///
-    /// EVERY CLIENT SPAWNS THE SAME LOCAL PROJECTILE, exactly like a weapon's own RPC_FireWeapon -
-    /// so a bystander's screen shows the bolt leave the muzzle and stop where it hits. Only the
-    /// CASTER's own copy is built with a hit callback (see FireProjectile), which is what makes
-    /// "only the shooter gets pulled" true without this class or the motor ever asking "am I the
-    /// caster" - the answer already lives in which context each machine built.
-    ///
-    /// "Stops at walls and enemies, flies through teammates" needs no code here at all: that is
-    /// ProjectileMotor's own FliesThrough rule (FriendlyFire.IsSelfOrTeammate), the same one every
-    /// weapon already gets for free.
+    /// Fires a bolt (Range, Projectile Speed); hitting a wall or a player pulls the SHOOTER toward where it landed. Not a
+    /// weapon and not a knockback: the pull is a Voluntary PlayerDisplacement move, so it loses to a real knockback and
+    /// cancels on death like a dash. The first ability to fire a projectile: ProjectileMotor gets a context built from this
+    /// module's fields (no WeaponDefinition) and AbilityHitRelay reports the hit. EVERY CLIENT spawns the same local
+    /// projectile (as RPC_FireWeapon does); only the CASTER's copy gets a hit callback, which is what makes "only the
+    /// shooter gets pulled" true without asking "am I the caster". Stopping at walls and enemies but flying through
+    /// teammates is ProjectileMotor's FliesThrough rule, nothing here.
     /// </summary>
     public sealed class ZipGunAbility : AbilityModule
     {
         // Phase numbers this module defines. 0 is always the cast itself (firing the bolt).
         private const byte PhaseTether = 1;
 
-        // Not a design tunable: Tudor's spec is explicit that the zip gun deals no direct damage at
-        // all - it is pure utility. A field here would just be one more number a designer could
-        // accidentally un-zero and turn into a free hitscan gun.
+        // Not a design tunable: the zip gun is pure utility. A field would be a number a designer could un-zero into a
+        // free hitscan gun.
         private const float NoDamage = 0f;
 
         [Header("Projectile")]
@@ -86,15 +72,12 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("Rope thickness, in metres.")]
         private float ropeWidth = 0.05f;
 
-        // Owner only: the player's own capsule, read once so the pull can stop the requested
-        // distance short of the impact point instead of driving the player's centre straight into
-        // whatever it hit - the same field BlinkAbility caches for its own destination check.
+        // Owner only: the player's capsule, so the pull stops a radius short of the impact point instead of driving the
+        // player's centre into whatever it hit.
         private CapsuleCollider capsule;
 
-        // Owner only: which move is currently in flight, so a Stunned/Died/Unequipped interrupt
-        // cancels THIS ability's own pull and never someone else's Forced move that happens to be
-        // running at the same moment - see PlayerDisplacement's priority rules, and DashAbility's
-        // identical reasoning.
+        // Owner only: whether THIS ability's pull is in flight, so a Stunned/Died/Unequipped interrupt never cancels
+        // someone else's Forced move (PlayerDisplacement's priority rules; same as DashAbility).
         private bool pulling;
 
         // Every client: the pull rope, built once and reused. Unparented, like the flamethrower's cone, because this
@@ -119,12 +102,10 @@ namespace Overpower.Abilities
             else if (projectilePrefab.GetComponent<ProjectileMotor>() == null)
                 Debug.LogError($"[ZipGunAbility] {name}: Projectile Prefab '{projectilePrefab.name}' has no ProjectileMotor.");
 
-            // Tudor's spec: a takedown (kill OR assist) refills the charge immediately instead of
-            // waiting out the rest of the 15s cooldown. CombatEvents.LocalTakedown fires only on the
-            // machine that actually earned it (see that class's own comment) - HandleLocalTakedown
-            // still re-checks Owner.IsMine because this same module class is instantiated once per
-            // player who has the zip gun equipped, including on OTHER clients purely to visualise
-            // their loadout, and RefillCharges is documented "owner only".
+            // A takedown (kill OR assist) refills the charge immediately instead of waiting out the cooldown.
+            // CombatEvents.LocalTakedown fires only on the machine that earned it, but HandleLocalTakedown still checks
+            // Owner.IsMine: this module is also instantiated on OTHER clients to visualise their loadout, and
+            // RefillCharges is owner only.
             CombatEvents.LocalTakedown += HandleLocalTakedown;
         }
 
@@ -164,10 +145,8 @@ namespace Overpower.Abilities
             if (reason != InterruptReason.Stunned && reason != InterruptReason.Died && reason != InterruptReason.Unequipped)
                 return; // Silenced does not stop this - it is not a weapon and spends no heat, matching Dash.
 
-            // Guarded on pulling rather than cancelling unconditionally: if a Forced move
-            // (knockback) had already pre-empted this pull, or PlayerDisplacement's own death
-            // handling had already cancelled it, pulling would already be false - see
-            // PlayerDisplacement's priority rules and DashAbility's identical guard.
+            // Guarded on pulling: a Forced move (knockback) that pre-empted this pull, or PlayerDisplacement's own death
+            // handling, has already made it false (as DashAbility's identical guard).
             if (!pulling)
                 return;
 
@@ -191,16 +170,13 @@ namespace Overpower.Abilities
                     return;
 
                 case PhaseTether:
-                    // Ability visuals step 7: every client, the caster's own included, draws the square
-                    // anchor and a rope for as long as the pull takes. The caster used to see the pull
-                    // with nothing connecting them to where the hook bit.
+                    // Every client, the caster included, draws the square anchor and a rope for as long as the pull takes.
                     PlayTether(cast.Payload.Point, cast.CasterTeam);
                     return;
             }
         }
 
-        /// <summary>Runs on every client. Builds this shot's own local projectile - see the class
-        /// comment for why only the caster's copy is handed a hit callback.</summary>
+        /// <summary>Every client. Builds this shot's local projectile; only the caster's copy gets a hit callback.</summary>
         private void FireProjectile(in CastEvent cast)
         {
             System.Action<ProjectileHitInfo> onHit = null;
@@ -227,13 +203,10 @@ namespace Overpower.Abilities
             VisibleWhenSeen.Attach(projectile, cast.CasterTeam);
         }
 
-        /// <summary>Caster only, called by AbilityHitRelay through the context it was built with -
-        /// never reached on any other client's copy of this shot.</summary>
+        /// <summary>Caster only, called by AbilityHitRelay through the context it was built with.</summary>
         private void HandleZipHit(ProjectileHitInfo hit)
         {
-            // Belt-and-braces, matching PlayerDisplacement's own habit of re-checking IsMine even
-            // where a caller is already expected to be the owner - see the class comment for why
-            // this should already be guaranteed true whenever AbilityHitRelay reaches here.
+            // Belt and braces: only the caster's copy has a hit callback, so IsMine should already hold here.
             if (!Owner.IsMine || capsule == null)
                 return;
 
@@ -255,16 +228,14 @@ namespace Overpower.Abilities
             bool started = displacement.DisplaceVoluntary(direction, travelDistance, pullSpeed, HandlePullEnd);
             if (!started)
             {
-                // A knockback beat the pull to the mover in the single frame between the bolt
-                // landing and here - the charge is already spent, same accepted race as every other
-                // ability's own comment on this (see TeleportAbility.CompleteTravel).
+                // A knockback beat the pull to the mover between the bolt landing and here: the charge is already
+                // spent (accepted race, see TeleportAbility.CompleteTravel).
                 pulling = false;
                 return;
             }
 
-            // Sent from here, not from FireProjectile, so it carries where the shot ACTUALLY landed
-            // rather than where it was aimed - Tudor's addendum note on why remote clients must draw
-            // the tether at the real impact point.
+            // Sent from here, not from FireProjectile, so it carries where the shot ACTUALLY landed rather than where it
+            // was aimed: remote clients must draw the tether at the real impact point.
             SendPhase(PhaseTether, new CastPayload { Point = hit.Point });
             LogZip(hit.Point, travelDistance);
         }
@@ -286,8 +257,7 @@ namespace Overpower.Abilities
             {
                 GameObject anchor = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 anchor.name = "Zip Anchor VFX (cheap, cosmetic only)";
-                // Removed immediately, not with Destroy, so the cube is never a solid object in the world, even
-                // for one frame - the same trick the old sphere marker used.
+                // Removed immediately, not with Destroy, so the cube is never a solid object in the world, even for a frame.
                 DestroyImmediate(anchor.GetComponent<Collider>());
                 anchor.transform.SetPositionAndRotation(point,
                     toPoint.sqrMagnitude > 0.0001f ? Quaternion.LookRotation(toPoint) : Quaternion.identity);

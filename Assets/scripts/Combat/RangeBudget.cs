@@ -3,52 +3,38 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// How far one projectile is still allowed to travel. Every projectile owns one, spends it a
-    /// frame-step at a time, and dies the moment it runs out.
+    /// How far one projectile is still allowed to travel: every projectile owns one, spends it a
+    /// frame-step at a time, and dies the moment it runs out. Without a range cap and lifetime every
+    /// missed shot stayed in the scene forever on every client (a real cause of playtest freezes).
     ///
-    /// This exists because the bullets it replaces had no range cap and no lifetime at all: every
-    /// shot that missed stayed in the scene forever, on every client. In a nine-player match that
-    /// is a few hundred permanent objects a minute, and it was a real cause of freezes in playtest.
+    /// Consume returns the distance actually allowed, so the projectile stops EXACTLY at Max Range: a
+    /// later weapon scales its damage with Fraction, so overshooting would quietly deal more than its
+    /// stat block caps it at.
     ///
-    /// Consume returns the distance actually allowed rather than just reporting "spent", so the
-    /// projectile stops EXACTLY at Max Range instead of somewhere past it. That precision is not
-    /// cosmetic: a later weapon scales its damage linearly with Fraction up to +50%, so a
-    /// projectile allowed to overshoot would quietly deal more than the damage its stat block caps
-    /// it at.
-    ///
-    /// Plain C# with no Unity types in its API, for the same reason as the rest of Combat: it is
-    /// unit tested without an engine, a scene or a play-mode run.
+    /// Plain C# with no Unity types in its API, unit tested without an engine or a scene.
     /// </summary>
     public sealed class RangeBudget
     {
         /// <summary>
-        /// How close to Max Range counts as having reached it - one millimetre.
-        ///
-        /// This is a float-precision tolerance, not a tuning number, and it is deliberately not
-        /// smaller. A projectile consumes its budget in a few hundred small steps, and adding
-        /// several hundred floats together lands the total up to roughly a ten-thousandth short of
-        /// the exact sum. Without this, a projectile could reach the very end of its range and
-        /// still report IsSpent == false forever, which is exactly the never-despawning object
-        /// this class exists to prevent. A unit test caught it. DamageResolver carries the same
-        /// kind of tolerance for the same reason.
+        /// How close to Max Range counts as having reached it: a float-precision tolerance, not a
+        /// tuning number, and deliberately not smaller. Summing a few hundred small steps lands up to
+        /// ~1e-4 short of the exact sum, so without it a projectile could reach the end of its range
+        /// and report IsSpent == false forever, the never-despawning object this class exists to
+        /// prevent. DamageResolver carries the same kind of tolerance.
         /// </summary>
         private const float ReachedTolerance = 0.001f;
 
         /// <summary>Metres travelled so far. Never exceeds MaxRange.</summary>
         public float Travelled { get; private set; }
 
-        /// <summary>Metres this projectile was ever allowed. Clamped to zero or more, so a
-        /// designer typing a negative Max Range gets a projectile that expires instantly rather
-        /// than one that flies forever.</summary>
+        /// <summary>Metres this projectile was ever allowed. Clamped to zero or more, so a negative
+        /// Max Range gives a projectile that expires instantly rather than one that flies forever.</summary>
         public float MaxRange { get; }
 
         /// <summary>
-        /// How far along its flight the projectile is, 0 at the muzzle and 1 when spent. This is
-        /// the hook a distance-scaling weapon reads; nothing uses it yet.
-        ///
-        /// A zero MaxRange reports 1 rather than dividing by zero. A NaN escaping here would show
-        /// up as a projectile that never despawns, which is a miserable thing to trace back to a
-        /// division.
+        /// How far along its flight the projectile is, 0 at the muzzle and 1 when spent; the hook a
+        /// distance-scaling weapon reads (nothing uses it yet). A zero MaxRange reports 1 rather than
+        /// dividing by zero: a NaN here would show up as a projectile that never despawns.
         /// </summary>
         public float Fraction => MaxRange <= 0f ? 1f : Mathf.Clamp01(Travelled / MaxRange);
 
@@ -61,12 +47,10 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Books one step of travel and returns how much of it was actually allowed - the whole
-        /// step while there is room, only the remainder on the step that reaches Max Range, and
-        /// zero once spent. Callers move by the returned distance, never by the one they asked for.
-        ///
-        /// A negative distance is ignored rather than winding the budget back: a projectile must
-        /// not be able to buy itself extra range by travelling backwards.
+        /// Books one step of travel and returns how much was actually allowed: the whole step while
+        /// there is room, only the remainder on the step that reaches Max Range, zero once spent.
+        /// Callers move by the returned distance, never the one they asked for. A negative distance is
+        /// ignored: a projectile must not buy extra range by travelling backwards.
         /// </summary>
         public float Consume(float distance)
         {
@@ -83,9 +67,8 @@ namespace Overpower.Combat
             float allowed = Mathf.Min(distance, remaining);
             Travelled += allowed;
 
-            // Snap the last sliver away. See ReachedTolerance: without this the accumulated
-            // rounding error of hundreds of per-frame additions leaves the projectile a fraction
-            // of a millimetre short of its range and IsSpent never becomes true.
+            // Snap the last sliver away (see ReachedTolerance): accumulated rounding error would
+            // otherwise leave the projectile a hair short of its range and IsSpent never true.
             if (MaxRange - Travelled <= ReachedTolerance)
                 Travelled = MaxRange;
 
@@ -93,17 +76,12 @@ namespace Overpower.Combat
         }
 
         /// <summary>
-        /// Gives back distance that was booked by Consume but never actually travelled - the review
-        /// follow-up fix (2026-09-21, P1) for ProjectileMotor.Step: a step that ends in KeepFlying (a
-        /// bounce, a pierce) charges the WHOLE nominal step to Consume up front, then only moves the
-        /// projectile by hit.distance if a hit cut the step short. Without handing the difference
-        /// back here, that unused remainder stayed charged anyway - a bigger nominal step (a lower
-        /// frame rate) forfeits more of it per hit than a smaller one does, so the identical bounced
-        /// path used to travel a different total real distance depending on the client's frame rate.
-        ///
-        /// Clamped to zero rather than letting Travelled go negative, for the same reason Consume
-        /// clamps a negative distance to zero: a caller must not be able to buy a projectile extra
-        /// range it never had by refunding more than it ever spent.
+        /// Gives back distance Consume booked but the projectile never travelled. ProjectileMotor.Step
+        /// charges the WHOLE nominal step up front on a step that ends in KeepFlying (a bounce, a
+        /// pierce), then moves only hit.distance if a hit cut it short; without the refund a lower frame
+        /// rate (bigger nominal step) forfeits more range per hit, so the identical bounced path would
+        /// travel a different total distance per client. Clamped so Travelled never goes negative: a
+        /// refund must not buy extra range.
         /// </summary>
         public void Refund(float distance)
         {

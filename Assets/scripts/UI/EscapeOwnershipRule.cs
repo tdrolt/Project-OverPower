@@ -1,20 +1,16 @@
 namespace Overpower.UI
 {
     /// <summary>
-    /// Playtest extras P6 (2026-09-26): the pure rule behind QuitConfirmPanel's Escape handling.
-    /// Component Update() order is not fixed in Unity, and both LoadoutScreen (LoadoutScreen.cs:390-
-    /// 394) and the chat panel (chatmanager.cs's Escape block) close THEMSELVES on Escape, in the
-    /// SAME frame the key is pressed. Checking only "is the shop/chat open right now, this frame"
-    /// would miss ownership on whichever frame the other component's Update() happened to run FIRST
-    /// (it would already have closed itself before QuitConfirmPanel gets to look). Checking one
-    /// frame back too always catches it, from whichever side of that ordering race actually happened.
+    /// The pure rule behind QuitConfirmPanel's Escape handling. Component Update() order is not fixed, and both
+    /// LoadoutScreen and the chat panel (chatmanager.cs's Escape block) close THEMSELVES on Escape in the SAME frame
+    /// the key is pressed. Checking only "open this frame" misses ownership whenever the other component's Update()
+    /// ran first and already closed itself; checking one frame back too catches it from either side of that race.
     /// </summary>
     public static class EscapeOwnershipRule
     {
-        /// <summary>True if this Escape press belongs to the shop, the chat or an open How to play / mode info page (so
-        /// QuitConfirmPanel must do nothing; a page closes itself on Escape, lobby Task 12) - either one was open THIS frame (about to consume/already consuming the key
-        /// itself) or LAST frame (it just closed itself on this exact key press, and QuitConfirmPanel's
-        /// own Update() happened to run after it).</summary>
+        /// <summary>True if this Escape press belongs to the shop, the chat or an open How to play / mode info page
+        /// (a page closes itself on Escape), so QuitConfirmPanel must do nothing: it was open THIS frame (about to
+        /// consume the key) or LAST frame (it just closed itself on this key press, before QuitConfirmPanel's Update).</summary>
         public static bool BelongsToShopOrChat(bool shopOpenThisFrame, bool shopOpenLastFrame,
                                                 bool chatOpenThisFrame, bool chatOpenLastFrame,
                                                 bool pageOpenThisFrame = false, bool pageOpenLastFrame = false) =>

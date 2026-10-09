@@ -5,22 +5,14 @@ using UnityEngine;
 
 namespace Overpower.Telemetry
 {
-    /// <summary>Reads the current commit hash straight out of .git, with no `git` subprocess (slow,
-    /// and not guaranteed to be on PATH on every machine that opens this project). Used by two
-    /// callers that must never fall out of sync: MatchTelemetry's session header (Editor play mode)
-    /// and BuildInfoWriter's pre-build step (Assets/scripts/Editor/Telemetry), which bakes this same
-    /// hash into a Resources text asset so a Player build - which has no .git folder at all - can
-    /// still stamp its own session header (see MatchTelemetry.ReadCommitHash).
-    ///
-    /// Lives in the Runtime assembly, wrapped in #if UNITY_EDITOR, rather than in Overpower.Editor:
-    /// MatchTelemetry (Runtime) needs to call it too, and Runtime cannot reference the Editor-only
-    /// assembly. Guarding the whole file like this - the same pattern as QuitButton's
-    /// UnityEditor.EditorApplication.isPlaying call - compiles cleanly into a Player build, where the
-    /// class simply does not exist and nothing outside this guard ever calls it.</summary>
+    /// <summary>Reads the current commit hash straight out of .git, with no `git` subprocess (slow, and not on PATH on every machine).
+    /// Two callers must never fall out of sync: MatchTelemetry's session header (Editor play mode) and BuildInfoWriter's pre-build step
+    /// (Assets/scripts/Editor/Telemetry), which bakes the hash into a Resources text asset so a Player build, which has no .git, can
+    /// still stamp its header (MatchTelemetry.ReadCommitHash). In the Runtime assembly under #if UNITY_EDITOR because MatchTelemetry
+    /// (Runtime) cannot reference Overpower.Editor; the class does not exist in a Player build.</summary>
     public static class GitCommitReader
     {
-        /// <summary>The first `length` characters of HEAD's commit hash, or "unknown" if it can't be
-        /// read (no .git folder, a corrupt ref, or any IO error - never throws).</summary>
+        /// <summary>The first `length` characters of HEAD's commit hash, or "unknown" if it can't be read. Never throws.</summary>
         public static string ReadShortHash(int length, string projectRoot = null)
         {
             string full = ReadFullHash(projectRoot);

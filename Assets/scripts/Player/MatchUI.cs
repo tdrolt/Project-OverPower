@@ -6,18 +6,12 @@ using UnityEngine.UI;
 using Overpower.UI;
 
 /// <summary>
-/// The four full-screen panels that tell one player where they stand in the match: waiting to be
-/// revived, respawning, you won, you lost. Split out of Multiplayer.cs (Task 0.11b) alongside
-/// PlayerLifecycle (death and respawn) and PlayerNameTag (the floating name).
+/// The four full-screen panels that tell one player where they stand: waiting to be revived,
+/// respawning, you won, you lost. They live on the player prefab, not in the scene, because every
+/// message is addressed to one specific player; a scene-level HUD would have to work out who it was for.
 ///
-/// The panels live on the player prefab rather than in the scene because every message here is
-/// addressed to one specific player - "your team is out", "you are waiting" - and the master client
-/// delivers them by calling an RPC on that player's own PhotonView. A scene-level HUD would have to
-/// work out who the message was for; this does not.
-///
-/// This component only shows and hides panels. It never decides that someone died, how long a
-/// respawn takes, or who won: PlayerLifecycle owns that and calls in here, and the master client's
-/// elimination bookkeeping reaches the panels through the RPCs below.
+/// This component only shows and hides panels. It never decides that someone died, how long a respawn
+/// takes, or who won: PlayerLifecycle and MatchDirector own that and call in here.
 ///
 /// Deliberately NOT IPunObservable - see PlayerNetSync.cs for why there can only be one.
 /// </summary>
@@ -46,37 +40,31 @@ public class MatchUI : MonoBehaviour
     private Rigidbody rigidbody;
     private PlayerMotor playerMotor;
 
-    // Built lazily on the first SetRespawnNote call - see BuildRespawnNoteLabel. respawnNoteGo is the
-    // note's OWN root (backing strip + text child) - what SetActive actually toggles, the same "the
-    // root, not a child" rule PlayerHud.ShowToast follows for its own toast (toggling the text alone
-    // would leave a blank backing strip floating on the panel whenever the note has nothing to say).
+    // Built lazily on the first SetRespawnNote call. respawnNoteGo is the note's OWN root (backing strip +
+    // text child) and what SetActive toggles, the same "the root, not a child" rule as PlayerHud.ShowToast:
+    // toggling the text alone would leave a blank backing strip on the panel.
     private GameObject respawnNoteGo;
     private TextMeshProUGUI respawnNoteText;
 
-    /// <summary>True while this player is stuck on the waiting panel. PlayerLifecycle polls this as
-    /// its "am I waiting for my capital back" flag: the panel the player can actually see is the
-    /// single source of truth for that, rather than a second bool that could disagree with it.</summary>
+    /// <summary>True while this player is stuck on the waiting panel. PlayerLifecycle polls this as its
+    /// "waiting for my capital back" flag: the visible panel is the single source of truth, not a second
+    /// bool that could disagree.</summary>
     public bool IsWaitingForRespawn => waitingPanel != null && waitingPanel.activeSelf;
 
-    /// <summary>True once this player has been shown a match result panel (win or lose). Added for
-    /// LoadoutScreen (Task 9a review): FreezeForRestOfMatch only stops movement, and
-    /// PlayerInputRouter's ShopSuppressed deliberately does not gate on the match being over (it
-    /// only checks alive/typing), so without this a still-living player could open the loadout
-    /// screen and keep re-picking a loadout after the result is already decided. Same
-    /// panel-is-the-source-of-truth reasoning as IsWaitingForRespawn above.
+    /// <summary>True once this player has been shown a match result panel (win or lose). LoadoutScreen
+    /// reads it: FreezeForRestOfMatch only stops movement and PlayerInputRouter's ShopSuppressed does not
+    /// gate on the match being over, so without this a living player could keep re-picking a loadout after
+    /// the result is decided.
     ///
-    /// ONE-WAY LATCH (Task 9b quality review): nothing ever sets youWonPanel/youLostPanel back to
-    /// inactive, so once true this stays true for the rest of the match - fine today because there
-    /// is no rematch/new-match-in-place flow, a match ending is the last thing that happens on this
-    /// player object before the scene changes or the room closes. Phase 2's match loop (if it adds a
-    /// rematch or a return-to-lobby-without-reloading path) will need to reset these panels, and this
-    /// property, explicitly when that happens - it will not do so on its own.</summary>
+    /// ONE-WAY LATCH: nothing sets the panels back to inactive, so once true it stays true for the rest of
+    /// the match. A rematch or return-to-lobby-without-reloading path must reset these panels, and this
+    /// property, explicitly.</summary>
     public bool MatchOver => dominionResultShown || (youWonPanel != null && youWonPanel.activeSelf) || (youLostPanel != null && youLostPanel.activeSelf);
 
-    // Dominion Task 9: in a Dominion match the result is DominionHud's result card, not the YOU WIN / YOU LOSE prefab panels; this latch stands in for them.
+    // In a Dominion match the result is DominionHud's result card, not the YOU WIN / YOU LOSE panels;
+    // this latch stands in for them.
     private bool dominionResultShown;
 
-    /// <summary>The theme this panel set reads (Task 9f: the result button's label comes from it).</summary>
     public UiTheme Theme => theme;
 
     private const string WaitingTitleObjectName = "Waiting";
@@ -87,16 +75,14 @@ public class MatchUI : MonoBehaviour
         rigidbody = GetComponent<Rigidbody>();
         playerMotor = GetComponent<PlayerMotor>();
 
-        // A missing panel (or theme - B3 review, 2026-09-16: joins the same check rather than its own
-        // separate log line, since a missing theme is just as silent - BuildRespawnNoteLabel falls back
-        // to plain white/no backing) is silent at runtime - every call below is null-guarded so one
-        // broken Inspector reference cannot throw mid-match - so say so once at spawn instead. Three UI
-        // buttons sat broken for the life of this project because nothing ever complained.
-        // Task 9b-2: the waiting text lives on the UiTheme (one home for texts), set here rather than baked into the prefab.
+        // A missing panel or theme is silent at runtime (every call is null-guarded so one broken
+        // Inspector reference cannot throw mid-match, and BuildRespawnNoteLabel falls back to plain
+        // white), so say so once at spawn.
+        // The waiting text lives on the UiTheme (one home for texts), set here, not baked into the prefab.
         if (waitingPanel != null && theme != null)
         {
-            // The title is the panel's child GameObject named "Waiting" - the QUIT button's own TMP text is a child too,
-            // so a bare GetComponentInChildren would be order-dependent.
+            // The title is the child named "Waiting"; the QUIT button's TMP text is a child too, so a
+            // bare GetComponentInChildren would be order-dependent.
             TMP_Text waitingText = null;
             foreach (TMP_Text candidate in waitingPanel.GetComponentsInChildren<TMP_Text>(true))
                 if (candidate.gameObject.name == WaitingTitleObjectName) { waitingText = candidate; break; }
@@ -126,16 +112,13 @@ public class MatchUI : MonoBehaviour
             waitingPanel.SetActive(false);
     }
 
-    /// <summary>Tudor, 2026-09-16: the "your capital is under attack - you will respawn at your Tier 2 zone"
-    /// line PlayerLifecycle polls onto the respawn panel while a player waits to come back into the match. Built
-    /// lazily under respawnPanel, below its existing "Respawning! Please Wait!" label, the first time this is
-    /// called - hides itself (SetActive on respawnNoteGo, the note's own root, not just an empty string or the
-    /// text's own GameObject) whenever text is empty, same "the root, not a child" rule PlayerHud.ShowToast
-    /// follows for its own toast.</summary>
+    /// <summary>The "your capital is under attack - you will respawn at your Tier 2 zone" line PlayerLifecycle
+    /// polls onto the respawn panel. Built lazily under respawnPanel, below its "Respawning! Please Wait!"
+    /// label; hides itself (SetActive on respawnNoteGo, the note's root) whenever text is empty.</summary>
     public void SetRespawnNote(string text)
     {
         if (respawnPanel == null)
-            return; // Awake already logged the missing-panel error; nothing to attach the note to.
+            return; // Awake already logged it
 
         if (respawnNoteGo == null)
             BuildRespawnNoteLabel();
@@ -144,21 +127,17 @@ public class MatchUI : MonoBehaviour
         respawnNoteGo.SetActive(!string.IsNullOrEmpty(text));
     }
 
-    /// <summary>Same small recipe PlayerHud.AddLabel/ApplyOutline uses (font/colour from UiTheme, one outline
-    /// material) plus a dark backing strip behind the text - the readability trick PlayerHud's own Panel Colour
-    /// gives every HUD group, applied here because plain white text with just a thin outline read too faint
-    /// against the respawn panel's own pale salmon wash (B3 review, 2026-09-16, 616x576 capture). Kept private
-    /// and duplicated here rather than shared, the same call PlayerHud's own class comment makes for itself: the
-    /// two components have no other coupling, so a shared utility class would exist only for this one method.</summary>
+    /// <summary>PlayerHud.AddLabel/ApplyOutline's recipe (font/colour from UiTheme, one outline material) plus
+    /// a dark backing strip, because plain outlined white text read too faint against the respawn panel's pale
+    /// salmon wash. Duplicated rather than shared: the two components have no other coupling.</summary>
     private void BuildRespawnNoteLabel()
     {
         respawnNoteGo = new GameObject("Under Attack Note", typeof(RectTransform));
         respawnNoteGo.transform.SetParent(respawnPanel.transform, false);
 
         RectTransform rootRt = respawnNoteGo.GetComponent<RectTransform>();
-        // respawnPanel's own existing content ("Respawning! Please Wait!") sits at anchoredPosition
-        // (0, 150) - this sits below it rather than overlapping, still well inside the panel's own
-        // -80/-80 stretch margin at the game's tested 616x576 Game view.
+        // The panel's "Respawning! Please Wait!" sits at anchoredPosition (0, 150); this sits below it,
+        // inside the panel's -80/-80 stretch margin at the tested 616x576 Game view.
         rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
         rootRt.pivot = new Vector2(0.5f, 0.5f);
         rootRt.anchoredPosition = new Vector2(0f, 60f);
@@ -180,9 +159,8 @@ public class MatchUI : MonoBehaviour
         respawnNoteText = textGo.GetComponent<TextMeshProUGUI>();
         if (theme != null && theme.font != null)
             respawnNoteText.font = theme.font;
-        // Its own dedicated size/colour (B3 review), not Body Text Size/Text Colour: those are tuned for
-        // the HUD's own dark Panel Colour backing, and this note needed to be noticeably bigger to read
-        // clearly at a glance on the respawn panel.
+        // Its own size/colour, not Body Text Size/Text Colour: those are tuned for the HUD's dark Panel
+        // Colour backing, and this note must read at a glance on the respawn panel.
         respawnNoteText.fontSize = theme != null ? theme.capitalUnderAttackNoteFontSize : 30f;
         respawnNoteText.color = theme != null ? theme.capitalUnderAttackNoteColor : Color.white;
         respawnNoteText.alignment = TextAlignmentOptions.Center;
@@ -191,21 +169,19 @@ public class MatchUI : MonoBehaviour
 
         if (theme != null)
         {
-            // Font must be assigned before fontSharedMaterial is touched - see PlayerHud.AddLabel's
-            // own comment for why the order matters (assigning .font switches fontSharedMaterial to
-            // that font asset's own default, which is exactly the template this clones from).
+            // Font before fontSharedMaterial: assigning .font switches fontSharedMaterial to that font
+            // asset's default, which is the template cloned here (as PlayerHud.AddLabel).
             Material outlineMaterial = new Material(respawnNoteText.fontSharedMaterial);
             outlineMaterial.SetFloat(TMPro.ShaderUtilities.ID_OutlineWidth, theme.textOutlineWidth);
             outlineMaterial.SetColor(TMPro.ShaderUtilities.ID_OutlineColor, theme.textOutlineColor);
             respawnNoteText.fontSharedMaterial = outlineMaterial;
         }
 
-        respawnNoteGo.SetActive(false); // SetRespawnNote shows/hides it from here on.
+        respawnNoteGo.SetActive(false); // SetRespawnNote shows/hides it from here on
     }
 
-    /// Shows the end-of-match result to this client, win or lose. Used by the territory win
-    /// condition, which needs to tell losers as well -- the elimination path only ever announced
-    /// the winner, so everyone else was left with no screen at all.
+    /// Shows the end-of-match result to this client, win or lose. The territory win condition needs
+    /// it because the elimination path only ever announced the winner.
     public void ShowMatchResult(int winningTeam)
     {
         if (!photonView.IsMine)
@@ -221,7 +197,7 @@ public class MatchUI : MonoBehaviour
         HideWaitingPanel();
         SetRespawnPanelVisible(false);
 
-        // Dominion Task 9: the result card with the table of points per round replaces the win / lose panels (Dominion only; Conquest below is as it was).
+        // Dominion: the result card with the points-per-round table replaces the win / lose panels.
         if (Overpower.Dominion.DominionMode.IsActive() && Overpower.UI.DominionHud.Instance != null
             && Overpower.UI.DominionHud.Instance.ShowResult(winningTeam, BackToTheLobbyList))
         {
@@ -238,24 +214,19 @@ public class MatchUI : MonoBehaviour
 
         FreezeForRestOfMatch();
 
-        // Playtest extras P5 (2026-09-26): this client's own match log, zipped and shown alongside
-        // its own result panel - see MatchLogZip's own class comment for why calling this again on
-        // quit (GameQuit.Quit) is still safe.
+        // This client's own match log, zipped alongside its result panel; calling it again on quit
+        // (GameQuit.Quit) is safe, see MatchLogZip.
         Overpower.Telemetry.MatchLogZip.Instance?.ZipNow();
     }
 
-    /// <summary>The Dominion result card's button: back to the lobby list, the same place the win / lose panels' button leads in a finished match.</summary>
+    /// <summary>The Dominion result card's button: the same place the win / lose panels' button leads.</summary>
     private static void BackToTheLobbyList() => Object.FindFirstObjectByType<RoomManager>()?.ReturnToLobbyList();
 
-    /// Stops the player moving once the match is decided. Adds a zero multiplier rather than
-    /// writing a speed value: PlayerMotor's speed is a product of keyed multipliers and has no
-    /// settable field, and the previous version of this code assigned a raw speed field that
-    /// PlayerMotor had stopped reading - a dead write that let a match-over player keep sliding
-    /// around (Task 0.11a defect 1).
+    /// Stops the player moving once the match is decided, with a zero multiplier: PlayerMotor's speed
+    /// is a product of keyed multipliers with no settable field.
     ///
-    /// There is deliberately no matching RemoveSpeedMultiplier: the match is over for this player
-    /// and nothing should un-freeze them. The key is this component, so a respawn finishing late
-    /// cannot lift this freeze when it lifts its own.
+    /// Deliberately no matching RemoveSpeedMultiplier: nothing should un-freeze a match-over player.
+    /// The key is this component, so a respawn finishing late cannot lift this freeze with its own.
     private void FreezeForRestOfMatch()
     {
         if (rigidbody == null)
@@ -265,21 +236,18 @@ public class MatchUI : MonoBehaviour
         playerMotor.AddSpeedMultiplier(this, 0f);
     }
 
-    // ---- RPCs (retired, Task 2.7) -----------------------------------------------------------
-    // Used to be sent by the master client's elimination bookkeeping in PlayerLifecycle, targeted at
-    // one player's own PhotonView. Elimination and the match result are decided from replicated Room
-    // Properties now (MatchDirector), which every client - including a late joiner - already reads,
-    // so none of these four are called any more; each forwards to (or was replaced by) a plain local
-    // method MatchDirector calls directly. Inside a body that still runs, "local" means the RECEIVER:
-    // every PhotonNetwork.LocalPlayer read below is the player being told, not whoever sent it.
+    // ---- RPCs (retired) -----------------------------------------------------------
+    // Elimination and the match result are decided from replicated Room Properties (MatchDirector),
+    // which every client including a late joiner reads, so none of these four is called any more; each
+    // forwards to a plain local method MatchDirector calls directly. Inside a body that still runs,
+    // "local" means the RECEIVER: every PhotonNetwork.LocalPlayer read is the player being told.
     //
     // None of these four names may be renamed or removed. PUN sends an index into the RpcList in
-    // PhotonServerSettings.asset, which is a committed list of method NAMES, so a rename or removal
+    // PhotonServerSettings.asset, a committed list of method NAMES, so a rename or removal
     // mis-dispatches every RPC listed after it on any client that already shipped.
 
-    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, PlayerLifecycle.
-    /// RPC_HandleDeathMaster's old winner announcement) - MatchDirector now writes mWin and every
-    /// client reacts through ShowMatchResult instead.
+    /// Kept only for the committed RpcList: MatchDirector writes mWin and every client reacts through
+    /// ShowMatchResult instead.
     [PunRPC]
     public void RPC_ShowYouWonPanel(int teamID)
     {
@@ -310,16 +278,14 @@ public class MatchUI : MonoBehaviour
         }
     }
 
-    /// <summary>Shows this player their "waiting for a teammate to retake the capital" panel,
-    /// locally (Task 2.7 review). PlayerLifecycle calls this directly the instant a death becomes a
-    /// last-stand death - no RPC needed, the same local-call pattern ShowYouLost uses. The old RPC
-    /// below is kept only for the committed RpcList and now just forwards here.</summary>
+    /// <summary>Shows the "waiting for a teammate to retake the capital" panel, locally. PlayerLifecycle
+    /// calls it the instant a death becomes a last-stand death. The RPC below only forwards here.</summary>
     public void ShowWaitingPanel()
     {
         Debug.Log("[MatchUI] Show Waiting Panel Entered");
 
-        // Never over the top of "you lost" (being eliminated outranks waiting for a respawn that is no longer coming),
-        // nor of "you won" (Task 9b-2): MatchOver covers both.
+        // Never over "you lost" (elimination outranks waiting for a respawn that is not coming) nor
+        // "you won": MatchOver covers both.
         if (waitingPanel != null && !waitingPanel.activeSelf && !MatchOver)
         {
             waitingPanel.SetActive(true);
@@ -327,9 +293,8 @@ public class MatchUI : MonoBehaviour
         }
     }
 
-    /// Kept only for the committed RpcList (Task 2.7 retired its only caller, PlayerLifecycle.
-    /// RPC_HandleDeathMaster) - an older client could still send it, so the body stays, just
-    /// forwarding to the local method above instead of duplicating it.
+    /// Kept only for the committed RpcList: an older client could still send it, so the body stays,
+    /// forwarding to the local method above.
     [PunRPC]
     void RPC_ShowWaitingPanel(int teamID)
     {
@@ -337,10 +302,9 @@ public class MatchUI : MonoBehaviour
         ShowWaitingPanel();
     }
 
-    /// <summary>Shows this player their team-eliminated panel, locally. Task 2.7: MatchDirector calls
-    /// this directly, on each newly-eliminated team's own client, once elimination is decided from
-    /// replicated state - no RPC needed any more, since the state (mElim) already replicated itself.
-    /// The old RPC below is kept only for the committed RpcList and now just forwards here.</summary>
+    /// <summary>Shows the team-eliminated panel, locally. MatchDirector calls it on each newly-eliminated
+    /// team's own client once elimination is decided from replicated state (mElim). The RPC below only
+    /// forwards here.</summary>
     public void ShowYouLost()
     {
         Debug.Log("[MatchUI] ShowYouLost running");
@@ -369,7 +333,7 @@ public class MatchUI : MonoBehaviour
         EnsureSpectateView();
     }
 
-    /// <summary>Task 9g (Tudor D28): the Spectate button on this player's own lose panel, built the first time it is shown.</summary>
+    /// <summary>The Spectate button on this player's own lose panel, built the first time it is shown.</summary>
     private void EnsureSpectateView()
     {
         if (youLostPanel == null || photonView == null || !photonView.IsMine || GetComponent<SpectateView>() != null)
@@ -377,9 +341,8 @@ public class MatchUI : MonoBehaviour
         gameObject.AddComponent<SpectateView>().Init(this, youLostPanel);
     }
 
-    /// Kept only for the committed RpcList (Task 2.7 retired its caller, PlayerLifecycle.
-    /// RPC_HandleDeathMaster) - an older client could still send it, so the body stays, just
-    /// forwarding to the local method above instead of duplicating it.
+    /// Kept only for the committed RpcList: an older client could still send it, so the body stays,
+    /// forwarding to the local method above.
     [PunRPC]
     void RPC_ShowYouLostPanel(int teamID)
     {
@@ -387,11 +350,10 @@ public class MatchUI : MonoBehaviour
         ShowYouLost();
     }
 
-    /// Currently unreachable: its only call site is the commented-out line above. It exists because
-    /// the panel above sometimes lost a race with the waiting panel being hidden in the same frame,
-    /// and a frame's delay was the workaround. Kept rather than deleted so that history is visible
-    /// if "you lost" ever fails to appear again - but if it has not been needed by the next
-    /// playtest, delete both it and the commented call.
+    /// Unreachable: its only call site is the commented-out line above. The lose panel sometimes lost a
+    /// race with the waiting panel being hidden in the same frame; a short delay was the workaround.
+    /// Kept in case "you lost" ever fails to appear again; delete both it and the commented call if
+    /// it is not needed.
     IEnumerator DelayedShowLose()
     {
         yield return new WaitForSeconds(0.1f);

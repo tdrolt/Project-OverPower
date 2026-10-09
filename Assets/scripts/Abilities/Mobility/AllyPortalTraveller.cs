@@ -11,36 +11,12 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Lets a player travel through their TEAMMATES' teleport portals (Tudor D15) - stand on one for the owner's
-    /// channel time and you arrive at the owner's other portal. Lives on every player; only the local player's copy
-    /// ever acts, and it has two halves:
-    ///
-    /// TRAVELLER (this player is the teammate). Every frame, look at each teammate's portals (never enemies', never
-    /// your own - those stay with your own TeleportAbility), run the same PortalChannelState the owner's ability
-    /// runs, gated by the same "can act" rule as AbilityRunner (alive, not stunned, not silenced), the same exit
-    /// check, and the owner's published "has a charge" flag. On completion this player moves itself through
-    /// PlayerDisplacement.TeleportTo and writes a "trip finished" Player Property on itself.
-    ///
-    /// OWNER (this player owns the portals). When a teammate's "trip finished" property arrives, spend one charge
-    /// through your own TeleportAbility - the same spend your own trip makes, so the cooldown starts and the HUD
-    /// shows it.
-    ///
-    /// NO NEW RPC. Charges live only on the owner's machine (client-authoritative, like every ability), so the two
-    /// halves talk through two Player Properties: ReadyKey (owner to everyone: "I have a portal charge", published
-    /// by TeleportAbility only when it changes) and UseKey (teammate to everyone: { owner actor, counter }).
-    ///
-    /// GROUP TRAVEL (Task 15). When a trip completes, every living player of the owner's team touching that same departure
-    /// portal travels too, even if they stepped on after it started, for the one charge. No new message: the owner's own
-    /// trip reaches teammates through the ability's "travelled" phase (TeleportAbility.ExecuteCast), a teammate's trip
-    /// through a third value in UseKey (the departure portal's Seq); each client then moves only its own player
-    /// (JoinGroupTrip), landing at the same offset from the other portal's centre it had here, never on the traveller.
-    ///
-    /// ACCEPTED RACE. If the owner's own trip and a teammate's finish in the same instant with one charge left,
-    /// both trips happen and the pool simply stays at 0 - nobody is refunded. A teammate who leaves the room
-    /// mid-trip changes nothing: no message arrives, no charge is spent.
-    ///
-    /// COSMETIC. The channel marker and arrival rings the owner's ability draws through its phases are NOT shown for a
-    /// teammate's trip (they need an RPC phase from the owner's module); the teammate simply channels and arrives.
+    /// Lets a player travel through TEAMMATES' teleport portals (D15); only the local player's copy acts. Traveller half:
+    /// channel on a teammate's portal (same PortalChannelState, can-act and exit rules as the owner's TeleportAbility, gated
+    /// by the owner's ReadyKey), then move via PlayerDisplacement.TeleportTo and write UseKey on yourself. Owner half: on a
+    /// teammate's UseKey, spend one charge through your own TeleportAbility. No RPC: charges live only on the owner's machine,
+    /// so both halves talk through Player Properties. Group travel: UseKey's third value is the departure portal's Seq, and
+    /// each client moves only its own player (JoinGroupTrip). Accepted race: two trips finishing on the last charge both happen.
     /// </summary>
     public sealed class AllyPortalTraveller : MonoBehaviourPun, IInRoomCallbacks
     {
@@ -48,7 +24,7 @@ namespace Overpower.Abilities
         /// Written by TeleportAbility on change; read by teammates before they channel. Absent = false.</summary>
         public const string ReadyKey = "tpRdy";
 
-        /// <summary>Player Property, int[2]: { owner actor number whose portal was used, trip counter, Seq of the departure portal }. Written by the
+        /// <summary>Player Property, int[3]: { owner actor whose portal was used, trip counter, Seq of the departure portal }. Written by the
         /// TRAVELLER on themselves when a trip finishes; the counter makes every trip a new value.</summary>
         public const string UseKey = "tpUse";
 
@@ -84,9 +60,9 @@ namespace Overpower.Abilities
             body = GetComponent<Rigidbody>();
             runner = GetComponent<AbilityRunner>();
 
-            // Task 9e: the static counter above survives a rebuilt body but not a restarted game, while the portal owners
-            // still remember the last counter this actor wrote ("tpUse" is a Player Property the room kept). Count on
-            // from there, or the first trips after a restart would be ignored as old.
+            // The static counter survives a rebuilt body but not a restarted game, while the portal owners still remember
+            // the last counter this actor wrote ("tpUse" is a Player Property the room kept): count on from there, or the
+            // first trips after a restart would be ignored as old.
             if (photonView.IsMine && PhotonNetwork.LocalPlayer != null
                 && PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue(UseKey, out object useRaw)
                 && useRaw is int[] use && use.Length >= 2)
@@ -156,8 +132,8 @@ namespace Overpower.Abilities
 
             foreach (Player other in PhotonNetwork.PlayerListOthers)
             {
-                // Task 9e: a player whose connection dropped keeps their portals standing, but nobody is there to pay the
-                // charge (their "ready" flag would read whatever it last was) - a portal of an absent player is not usable.
+                // A player whose connection dropped keeps their portals standing, but nobody is there to pay the charge
+                // (their "ready" flag would read whatever it last was): a portal of an absent player is not usable.
                 if (!PresenceRules.IsPresent(other.IsInactive))
                     continue;
 
@@ -204,12 +180,11 @@ namespace Overpower.Abilities
             PhotonNetwork.LocalPlayer.SetCustomProperties(new Hashtable { { UseKey, new[] { portalOwner.ActorNumber, tripCounter, from.Seq } } });
         }
 
-        // ---- group travel (Task 15) -----------------------------------------------------------------
+        // ---- group travel -----------------------------------------------------------------
 
-        /// <summary>A trip through a portal of owner `ownerActor` just completed (the first traveller is already gone).
-        /// If this player is alive, on the owner's team and touching that same departure portal, it travels along to the
-        /// paired portal: same offset from the centre it had here (clamped, pushed off the centre), no charge spent. The
-        /// arrival is checked like any exit; a blocked offset falls back to the centre. Only the local player moves.</summary>
+        /// <summary>A trip through a portal of `ownerActor` just completed: if this player is alive, on the owner's team and
+        /// touching that departure portal, it follows to the paired portal at the same offset from the centre (no charge
+        /// spent); a blocked offset falls back to the centre.</summary>
         public void JoinGroupTrip(int ownerActor, Portal from, int travellerActor)
         {
             // Only stores the request: this is called from Photon's message handling (PhotonHandler.FixedUpdate), where
@@ -249,7 +224,7 @@ namespace Overpower.Abilities
             bool iAmOwner = ownerActor == PhotonNetwork.LocalPlayer.ActorNumber;
             bool sameTeam = iAmOwner || (Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && Teams.TryGetTeam(portalOwner, out _)
                                         && Teams.AreSameTeam(PhotonNetwork.LocalPlayer, portalOwner));
-            // "Alive" only, by design (Tudor has not objected): a stunned or silenced teammate standing on the portal travels along too.
+            // "Alive" only, by design: a stunned or silenced teammate standing on the portal travels along too.
             bool alive = lifecycle == null || lifecycle.IsAlive;
             bool onDeparture = PortalUseRules.IsOnPortal(from.transform.position, body.position, from.Radius, capsule.radius);
             // Just arrived on this portal (latched): a trip from it finishing now must not pull the player straight back.
@@ -305,8 +280,8 @@ namespace Overpower.Abilities
 
             lastSeenCounter[targetPlayer.ActorNumber] = PortalUseRules.NewLastSeen(lastSeen, use[1]);
 
-            // Task 15: the third value is the departure portal's Seq - a fresh trip by a teammate of the portal's owner pulls
-            // this player along if it stands on that portal. Only when the writer really is on the owner's team.
+            // The third value is the departure portal's Seq: a fresh trip by a teammate of the portal's owner pulls this
+            // player along if it stands on that portal. Only when the writer really is on the owner's team.
             if (use.Length >= 3 && use[1] > lastSeen)
             {
                 Player portalOwner = PhotonNetwork.CurrentRoom?.GetPlayer(use[0]);

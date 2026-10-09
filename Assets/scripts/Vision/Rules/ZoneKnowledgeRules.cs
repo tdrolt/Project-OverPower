@@ -69,16 +69,11 @@ namespace Overpower.Vision
     }
 
     /// <summary>
-    /// Zones in the fog (Tudor 2026-09-30: "if it is off you only update it if you have vision / own that territory /
-    /// own the t4 territory and it pings revealing the information"). With the switch off, what my team knows about a
-    /// zone updates only while my team sees it, owns it, or the centre scan is passing over it; otherwise it stays on
-    /// what the team last knew.
-    ///
-    /// Starting state: the first Update copies the live state for every zone, switch or no switch. That is the live
-    /// state at the moment the local game first reads it - the capitals owned and the rest neutral at a normal
-    /// go-live, and simply whatever is true right then for someone joining late. No separate "start" data is kept.
-    ///
-    /// Index in the lists is the zone id.
+    /// Zones in the fog. With the switch off, what my team knows about a zone updates only while my team sees it, owns it,
+    /// or the centre scan is passing over it; otherwise it stays on what the team last knew.
+    /// Starting state: the first Update copies the live state for every zone, switch or no switch - whatever is true when the
+    /// local game first reads it (capitals owned and the rest neutral at a normal go-live, anything for a late joiner). No
+    /// separate "start" data is kept. Index in the lists is the zone id.
     /// </summary>
     public sealed class ZoneKnowledgeStore
     {
@@ -108,7 +103,7 @@ namespace Overpower.Vision
 
             for (int i = 0; i < known.Length; i++)
             {
-                // A zone my team owns is live (Tudor: "I can see if it gets attacked"). A zone my team knew as its own and
+                // A zone my team owns is live (the team sees it attacked). A zone my team knew as its own and
                 // has now lost is live for that frame too: the team's income stops, so it knows. The frame after, the loss
                 // is what it last knew and the zone freezes on that like any other unseen zone.
                 // A zone my team is capturing or draining is live too: a teammate far from the tower still sees their own progress.

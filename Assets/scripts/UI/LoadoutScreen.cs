@@ -16,43 +16,13 @@ using Overpower.Weapons;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The screen Tudor asked for after his first playtest: he could not select an ability at all -
-    /// the only way in was the F1 developer panel, which is a design instrument, not something a
-    /// player is meant to see. This is the real thing: a weapon upgrade tree, armor upgrades, and
-    /// (Task 9b) ability picks, opened with P or a bottom-right "Loadout (P)" button, closed with P,
-    /// Esc or its own X. It is also the future shop's shell - Phase 2 adds gold and prices as DATA
-    /// (weapon/ability GoldCost fields already exist), not a UI rebuild.
-    ///
-    /// Built in code, in one file, exactly like PlayerHud and TestRangePanel - see PlayerHud's class
-    /// comment for why: every listener sits on the same line as the button it belongs to, so nothing
-    /// can end up wired to the wrong control the way a past hand-built hierarchy once was.
-    ///
-    /// OWNER ONLY, same as PlayerHud and AimConeView: this is a screen you look at and click for
-    /// yourself, nobody needs to see another player's. Bails out in Awake for every non-owner copy.
-    ///
-    /// SORT ORDER: the modal canvas (dim + panel) sits at -5 - above PlayerHud's HUD (-10, so the
-    /// loadout screen always reads over health/ability bars) and below both the F1 test range panel
-    /// (500 - a designer who opened that on purpose must still see it on top) and MatchUI's win/
-    /// lose/waiting panels (the nested "lose win manager" prefab's Canvas, sortingOrder 0, no
-    /// override - a match ending must still be visible over an open loadout screen). The always-
-    /// visible "Loadout (P)" button lives on its own separate canvas at -10, the same layer as the
-    /// HUD it is visually part of - Task 9's brief asked this class to own that button rather than
-    /// PlayerHud, but it belongs at HUD depth, not modal depth, so it does not itself sit above the
-    /// F1 panel.
-    ///
-    /// INPUT: reuses PlayerInputRouter's existing Shop action/ShopToggled event (bound to P) rather
-    /// than adding a new action - see PlayerInputRouter's ShopSuppressed comment for why ShopToggled
-    /// now has its own emit gate separate from every other router event. While open this claims
-    /// general tool focus the same way the F1 panel does (PlayerInputRouter.SetToolFocus), now keyed
-    /// by owner so the two tools can be open at once without one closing stealing the other's claim.
-    ///
-    /// TWO PAGES AND THE POP-UP (Task 13, Tudor): the shop is two pages behind two tabs at the top - "Weapons" (the
-    /// weapon tree and Reset Weapon) and "Abilities & Armor" (the armor rows with Reset Armor, and the Mobility,
-    /// Attachment and Ultimate card columns) - and reopens on the page last used (ShopPageMemory, kept for the session).
-    /// The gold and the status line sit above the tabs, so both pages show them. The bottom description strip is gone:
-    /// resting the pointer on a weapon node, an ability card or an armor row for Loadout Tooltip Delay Seconds opens
-    /// a pop-up beside the cursor (name, one line on what it does, the numbers) - see LoadoutScreen.Tooltip.cs. The
-    /// numbers are read live off the asset/module when the pop-up opens (ShopItemNumbers).
+    /// The shop screen (P or the bottom-right "Loadout (P)" button; closed by P, Esc or its X): weapon upgrade tree, armor
+    /// rows and ability cards on two tabs ("Weapons", "Abilities & Armor"), reopening on the page last used
+    /// (ShopPageMemory). OWNER ONLY, built in code like PlayerHud (every listener sits on its button's line), dormant on
+    /// remote copies. SORT ORDER: modal canvas at -5, above PlayerHud (-10) but below the F1 panel (500) and MatchUI's
+    /// win/lose panels (0), which must show over an open shop; the "Loadout (P)" button has its own canvas at -10, HUD depth.
+    /// INPUT: PlayerInputRouter's Shop action / ShopToggled (own emit gate, see ShopSuppressed); while open it claims tool
+    /// focus (SetToolFocus), keyed by owner so it and the F1 panel can be open together. Hover pop-up: LoadoutScreen.Tooltip.cs.
     /// </summary>
     public partial class LoadoutScreen : MonoBehaviourPun
     {
@@ -76,31 +46,22 @@ namespace Overpower.UI
         /// the only thing that ever publishes the "gold" Custom Property.</summary>
         private GoldWallet goldWallet;
 
-        /// <summary>What this player has paid per category this match, so a weapon/armor reset can
-        /// refund part of it (Task 2.5b Step 7). Lives here rather than a separate component - see
-        /// the report's "ledger home" note - because this is the only thing that ever spends
-        /// through it, and it resets exactly when a fresh LoadoutScreen does: a new player object,
-        /// same as GoldWallet's own balance starts fresh only for a genuinely new player.</summary>
+        /// <summary>What this player has paid per category this match, so a weapon/armor reset can refund part of it.
+        /// Lives here because this is the only thing that spends through it, and it resets exactly when a fresh
+        /// LoadoutScreen does (a new player object), like GoldWallet's balance.</summary>
         private readonly PurchaseLedger ledger = new PurchaseLedger();
 
-        // ---- shop telemetry events (Task T4) -----------------------------------------------------
-        // Raised at the same five sites this screen already had before telemetry existed - the
-        // three TrySpend sites (weapon, armor, ability), the two refund sites (weapon reset, armor
-        // reset), and ShowBlockedReason, which every refusal already funnelled through. Nothing here
-        // changes what a click actually does; PlayerTelemetry (Task T4) is the only listener.
+        // ---- shop telemetry events ---------------------------------------------------------------
+        // Raised at the three TrySpend sites (weapon, armor, ability), the two refund sites (weapon reset, armor reset)
+        // and ShowBlockedReason; they change nothing about a click. PlayerTelemetry is the only listener.
 
-        // Armor has no item id of its own (unlike a weapon or ability) - only a path (absorb or
-        // recharge) and a level reached on that path. TelemetryKeys.ItemId documents this same
-        // encoding for whoever reads the log: 100 + level for absorb, 200 + level for recharge, so
-        // "absorb reaches 1" and "recharge reaches 1" are never the same number (opus review fix -
-        // the level alone could not tell the two paths apart).
+        // Armor has no item id, only a path and a level reached on it. TelemetryKeys.ItemId documents the encoding
+        // (100 + level for absorb, 200 + level for recharge) so the two paths never share a number.
         private const int ArmorAbsorbItemBase = 100;
         private const int ArmorRechargeItemBase = 200;
 
-        /// <summary>owner, on a successful purchase: category, the item bought (a weapon or ability
-        /// id; for armor, ArmorAbsorbItemBase/ArmorRechargeItemBase + the level reached, see their
-        /// own comment), the price actually charged (0 under Free Loadout), the balance right after,
-        /// and whether Free Loadout paid for it.</summary>
+        /// <summary>owner, on a successful purchase: category, the item bought (for armor, the item base + level reached),
+        /// the price actually charged (0 under Free Loadout), the balance right after, and whether Free Loadout paid for it.</summary>
         public event System.Action<PurchaseCategory, int, int, int, bool> Purchased;
 
         /// <summary>owner, on a successful weapon/armor reset: category, gold refunded, balance
@@ -108,15 +69,12 @@ namespace Overpower.UI
         /// refund rounds down to 0.</summary>
         public event System.Action<PurchaseCategory, int, int> Refunded;
 
-        /// <summary>owner, on any refused click (weapon, armor, ability, or either reset) - the item
-        /// id (-1 for a reset, which buys nothing in particular), the price that was checked, why it
-        /// was refused, and the gold shortfall (0 unless the reason is CannotAfford).</summary>
+        /// <summary>owner, on any refused click: the item id (-1 for a reset), the price checked, why it was refused, and
+        /// the gold shortfall (0 unless the reason is CannotAfford).</summary>
         public event System.Action<int, int, PurchaseBlock, int> PurchaseRefused;
 
-        /// <summary>True only while the LOCAL player's own screen is open - only one instance of this
-        /// component ever builds anything (every remote copy bails in Awake), so there is only ever
-        /// one writer. Reset in OnDestroy so a player object being torn down can never leave this
-        /// stuck true for whatever spawns next.</summary>
+        /// <summary>True only while the LOCAL player's own screen is open (remote copies bail in Awake, so one writer).
+        /// Reset in OnDestroy so a torn-down player object can never leave it stuck true.</summary>
         public static bool IsOpen { get; private set; }
 
         // ---- component refs, read off this same player root -----------------------------------
@@ -147,10 +105,8 @@ namespace Overpower.UI
 
         // ---- abilities --------------------------------------------------------------------------
 
-        /// <summary>One ability card's three visual pieces - same recipe as WeaponNodeUi (an outer
-        /// border Image, an inset inner fill Image, a label), but abilities have only two states
-        /// (Equipped or not) where weapons have four, so there is no separate styling method - see
-        /// RefreshAbilities.</summary>
+        /// <summary>One ability card's pieces, same recipe as WeaponNodeUi; only two states (Equipped or not), so no
+        /// separate styling method (RefreshAbilities).</summary>
         private sealed class AbilityCardUi
         {
             public Button button;
@@ -159,42 +115,36 @@ namespace Overpower.UI
             public TextMeshProUGUI label;
         }
 
-        // Keyed by (slot, id) rather than id alone - unlike weapon ids, ability ids are not unique
-        // WITHIN one card set only by construction (AbilityCatalogue enforces global uniqueness
-        // already), but the pair is what RefreshAbilities needs to ask "is THIS slot's card THIS
-        // slot's equipped id" without a second lookup.
+        // Keyed by (slot, id): ids are already globally unique (AbilityCatalogue), but RefreshAbilities needs the pair to
+        // ask "is THIS slot's card THIS slot's equipped id" without a second lookup.
         private readonly Dictionary<(AbilitySlot slot, int id), AbilityCardUi> abilityCards =
             new Dictionary<(AbilitySlot slot, int id), AbilityCardUi>();
 
-        // Mobility (Shift), Attachment (RMB), Ultimate (Space) - the brief's own order, left to right
-        // across the movement/utility/panic-button spectrum rather than AbilitySlot's declaration
-        // order (which puts Primary - the weapon, not drawn here at all - first).
+        // Mobility (Shift), Attachment (RMB), Ultimate (Space): left to right, not AbilitySlot's declaration order
+        // (which starts with Primary, the weapon, not drawn here).
         private static readonly AbilitySlot[] LoadoutAbilitySlotOrder =
         {
             AbilitySlot.Mobility, AbilitySlot.Attachment, AbilitySlot.Ultimate
         };
 
-        // ---- hover pop-up (Task 13) ---------------------------------------------------------------
+        // ---- hover pop-up ---------------------------------------------------------------
 
-        /// <summary>Turns UI pointer enter/exit/move into plain callbacks - added to every weapon node, ability card
-        /// and armor row so hovering one can drive the pop-up (LoadoutScreen.Tooltip.cs), without every item wiring
-        /// its own EventTrigger by hand. A MonoBehaviour because IPointerEnterHandler/IPointerExitHandler only work
-        /// on one.</summary>
+        /// <summary>Turns UI pointer enter/exit/move into plain callbacks on every weapon node, ability card and armor row
+        /// to drive the pop-up (LoadoutScreen.Tooltip.cs). A MonoBehaviour because the pointer handlers only work on one.</summary>
         private sealed class HoverRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
         {
             public System.Action OnExit;
-            /// <summary>Where the pointer is (screen pixels) - fired on enter and on every move, so the pop-up
-            /// knows where to appear.</summary>
+            /// <summary>Where the pointer is (screen pixels), fired on enter and every move.</summary>
             public System.Action<Vector2> OnPointerAt;
             public void OnPointerEnter(PointerEventData eventData) => OnPointerAt?.Invoke(eventData.position);
             public void OnPointerExit(PointerEventData eventData) => OnExit?.Invoke();
             public void OnPointerMove(PointerEventData eventData) => OnPointerAt?.Invoke(eventData.position);
         }
 
-        // ---- pages (Task 13) ----------------------------------------------------------------------
+        // ---- pages ----------------------------------------------------------------------
 
-        /// <summary>The page the shop reopens on: one for the whole session, shared by every LoadoutScreen (a new
-        /// player object after a respawn or a match rebuild lands on the page the player last used).</summary>
+        /// <summary>The page the shop reopens on: one for the whole session, shared by every LoadoutScreen (a new player
+        /// object after a respawn lands on the page last used).</summary>
         private static readonly ShopPageMemory pageMemory = new ShopPageMemory();
 
         private RectTransform panelRect;
@@ -207,18 +157,14 @@ namespace Overpower.UI
         /// <summary>The page on screen right now (the one whose tab is lit).</summary>
         public ShopPage CurrentPage => shownPage;
 
-        // ---- shop header (Task 2.5b) --------------------------------------------------------------
+        // ---- shop header --------------------------------------------------------------
 
         private TextMeshProUGUI goldLabel;
         private TextMeshProUGUI statusLabel;
 
-        // Task 2.5b review fix 3: cached against the raw gold int / block enum / out-of-combat
-        // TENTH-of-a-second, not against a formatted string, so Update()'s per-frame poll (see its
-        // own comment) can call RefreshHeader every frame for cheap without building "Gold {gold}"
-        // or the status text just to throw the result away when nothing changed - most frames these
-        // comparisons are the only work done. lastStatusText still records the last string actually
-        // drawn (from either path below) purely so the two paths never redundantly rewrite the same
-        // text as one another.
+        // Cached against the raw gold int / block enum / out-of-combat TENTH-of-a-second, not a formatted string, so
+        // Update()'s per-frame RefreshHeader builds no text when nothing changed. lastStatusText records the last string
+        // drawn so the two paths never rewrite the same text.
         private bool headerInitialized;
         private int lastDisplayedGold;
         private bool lastDisplayedIsFree;
@@ -227,24 +173,19 @@ namespace Overpower.UI
         private int lastDisplayedTenths;
         private string lastStatusText;
 
-        // Task 2.5b review fix 2: a refused click's own reason, shown in the header status line in
-        // place of the ordinary gate status until Loadout Blocked Reason Duration Seconds (UiTheme)
-        // runs out - see ShowBlockedReason. Expiry <= 0 means "no override active"; Time.unscaledTime
-        // is never <= 0 once the game has been running for any length of time, so this doubles as
-        // the "not yet used" sentinel with no separate bool needed. Unscaled (re-review fix, same
-        // reasoning as PlayerHud's own bountyToastHideAtTime) so a debug Time.timeScale change
-        // cannot freeze this reason on screen forever.
+        // A refused click's reason, shown in the header status line instead of the gate status until Loadout Blocked
+        // Reason Duration Seconds (UiTheme) runs out (ShowBlockedReason). Expiry <= 0 means "no override active"
+        // (Time.unscaledTime is never <= 0 for long, so no separate bool). Unscaled so a debug Time.timeScale change
+        // cannot freeze the reason on screen.
         private string blockedReasonText = "";
         private float blockedReasonExpiryTime = -1f;
-        private bool blockedReasonIsNotice; // Task 5b-1: a "Sold ..." message rides the same status line, in the normal text colour.
+        private bool blockedReasonIsNotice; // a "Sold ..." message rides the same status line, in the normal text colour.
 
-        /// <summary>Shown under the Ultimate heading only while that slot is empty ("Buy an
-        /// ultimate") - the one ability slot with no card that can ever read Equipped at spawn, so
-        /// without this the column would otherwise say nothing about why nothing is highlighted.</summary>
+        /// <summary>Shown under the Ultimate heading only while that slot is empty ("Buy an ultimate"): the one slot with
+        /// no card that can read Equipped at spawn, so the column would otherwise not say why nothing is highlighted.</summary>
         private TextMeshProUGUI ultimateEmptyLabel;
 
-        // Reset-button labels, kept so Refresh can rewrite their refund preview in place - see
-        // RefreshResetLabels. AddButton returns the Button; GetComponentInChildren grabs its label.
+        // Reset-button labels, kept so Refresh can rewrite their refund preview in place (RefreshResetLabels).
         private TextMeshProUGUI resetWeaponLabel;
         private TextMeshProUGUI resetArmorLabel;
 
@@ -257,27 +198,22 @@ namespace Overpower.UI
 
         // ---- screen state / built UI ---------------------------------------------------------------
 
-        /// <summary>The modal canvas (dim + panel) - SetActive(false/true) is the whole show/hide.
-        /// Never destroyed once built, unlike PlayerHud's canvas which lives for the player's whole
-        /// life anyway; this one just toggles.</summary>
+        /// <summary>The modal canvas (dim + panel); SetActive(false/true) is the whole show/hide, it is never destroyed.</summary>
         private GameObject screenRoot;
 
-        /// <summary>The always-visible "Loadout (P)" button - kept so Update() can disable it once
-        /// the match is over (Task 9b quality review), matching Open()'s own refusal instead of
-        /// leaving a clickable button that silently no-ops.</summary>
+        /// <summary>The always-visible "Loadout (P)" button, kept so Update() can disable it once the match is over
+        /// (matching Open()'s refusal) instead of leaving a button that silently no-ops.</summary>
         private Button loadoutToggleButton;
 
-        /// <summary>This instance's own open/closed flag. Deliberately separate from the static
-        /// IsOpen: IsOpen is what the rest of the game reads, this is what THIS component uses to
-        /// know whether it already claimed tool focus, so Close() called twice (e.g. once from Esc
-        /// and once from OnDisable during teardown) never double-releases.</summary>
+        /// <summary>This instance's open flag, separate from the static IsOpen (what the rest of the game reads): it
+        /// records whether THIS component claimed tool focus, so Close() twice (Esc, then OnDisable) never double-releases.</summary>
         private bool isOpenLocal;
 
-        // ---- Dominion (Task 5) ---------------------------------------------------------------------
+        // ---- Dominion ---------------------------------------------------------------------
 
-        /// <summary>A player who joined a Dominion match mid-round may pick once before spawning (Tudor's default A12): the shop opens by
-        /// itself once, free, with the current round's limits, and stays pickable until they close it or the round ends. After that it is
-        /// break-only like everyone's. A local flag, set in Start for a fresh joiner (never a rejoiner, who keeps the round's picks).</summary>
+        /// <summary>A player who joined a Dominion match mid-round may pick once before spawning (A12): the shop opens by
+        /// itself once, free, with the current round's limits, and stays pickable until they close it or the round ends;
+        /// after that it is break-only. Set in Start for a fresh joiner, never a rejoiner (who keeps the round's picks).</summary>
         private bool lateJoinerPick;
         private readonly Dictionary<int, int> weaponDepth = new Dictionary<int, int>();
         private RoomManager roomManager;
@@ -293,32 +229,26 @@ namespace Overpower.UI
             }
         }
 
-        // Snapshot of what Refresh() last drew, so Update() (while open) can tell when the weapon
-        // or armor changed from OUTSIDE this screen's own clicks - the F1 panel's dropdown/buttons,
-        // or a property echo from a remote change - and catch up (Task 9a review finding 2).
-        // Abilities need no equivalent: AbilityRunner.SlotChanged already fires for every equip from
-        // every source, and Refresh is already subscribed to it.
+        // What Refresh() last drew, so Update() (while open) can tell when the weapon or armor changed from OUTSIDE this
+        // screen's clicks (the F1 panel, a property echo) and catch up. Abilities need none: AbilityRunner.SlotChanged
+        // fires for every equip and Refresh is subscribed to it.
         private int lastKnownWeaponId = int.MinValue;
         private int lastKnownAbsorbLevel = -1;
         private int lastKnownRechargeLevel = -1;
 
-        // Task 2.5b: the shop gate can flip (the out-of-combat timer running out, walking into your
-        // own territory) or the balance can rise (passive territory income) with NOTHING on this
-        // screen having been clicked - the same "something changed from OUTSIDE this screen" gap
-        // Task 9a's review already found for the weapon/armor poll above, now extended to gold and
-        // the gate. A full Refresh() only fires when one of these actually changes; otherwise
-        // Update() still calls the cheap RefreshHeader() every frame so the countdown keeps ticking.
+        // The shop gate can flip (out-of-combat timer, walking into your territory) or the balance rise (passive income)
+        // with nothing clicked. A full Refresh() fires only when one of these changes; otherwise Update() still calls the
+        // cheap RefreshHeader() every frame so the countdown keeps ticking.
         private int lastKnownGold = int.MinValue;
         private int lastKnownRound = -1; // Dominion: the round the open shop was drawn for (its weapon and armour limits change with it)
         private bool lastKnownBlocked;
 
-        // One Material instance shared by every text this screen builds - see PlayerHud.ApplyOutline
-        // for why sharing beats letting TMP auto-instantiate one per label.
+        // One Material shared by every text this screen builds (PlayerHud.ApplyOutline says why).
         private Material loadoutTextMaterial;
 
         private void Awake()
         {
-            // Every remote copy of this component stays permanently dormant - see the class comment.
+            // Every remote copy stays permanently dormant.
             if (!photonView.IsMine)
             {
                 enabled = false;
@@ -339,8 +269,7 @@ namespace Overpower.UI
             lifecycle = GetComponent<PlayerLifecycle>();
             abilityRunner = GetComponent<AbilityRunner>();
             goldWallet = GetComponent<GoldWallet>();
-            // Optional: not every rig this component might run on has one, and there is nothing
-            // this screen cannot do without it besides the match-over gate below.
+            // Optional: nothing here needs it besides the match-over gate.
             matchUI = GetComponent<MatchUI>();
             playerHud = GetComponent<PlayerHud>();
 
@@ -382,9 +311,8 @@ namespace Overpower.UI
 
         private void OnDisable()
         {
-            // Covers Esc/X/P closing the screen normally AND the GameObject being disabled out from
-            // under it (e.g. leaving play mode) - either way the tool-focus claim below must not
-            // outlive this component being able to act on it.
+            // Covers a normal close AND the GameObject being disabled under it (leaving play mode): the tool-focus claim
+            // must not outlive the component.
             if (isOpenLocal)
                 Close();
         }
@@ -396,16 +324,10 @@ namespace Overpower.UI
             if (abilityRunner != null)
                 abilityRunner.SlotChanged -= HandleAbilitySlotChanged;
 
-            // MINE ONLY (Task 9a review, critical): every remote copy of this player also runs
-            // OnDestroy - e.g. whenever any OTHER player leaves the room - and every remote copy
-            // bailed out of Awake before ever touching IsOpen or claiming focus. Without this guard,
-            // a remote player's teardown would still reach the two lines below and clear the STATIC
-            // IsOpen (and release a focus claim it never made) out from under whichever OTHER
-            // player's screen is the LOCAL one actually open right now.
-            //
-            // Belt-and-braces alongside OnDisable's own Close() for the owner's own copy - only
-            // OnDisable does not run for every teardown path, so this is what actually guarantees
-            // the focus claim and IsOpen never outlive the local player's own component.
+            // MINE ONLY: every remote copy also runs OnDestroy (whenever any OTHER player leaves) though it bailed out of
+            // Awake; without this guard its teardown would clear the STATIC IsOpen, and release a focus claim it never
+            // made, under the local player's open screen. Also the guarantee for the owner's copy, since OnDisable does
+            // not run for every teardown path.
             if (photonView != null && photonView.IsMine)
             {
                 inputRouter?.SetToolFocus(this, false);
@@ -426,11 +348,8 @@ namespace Overpower.UI
                 lateJoinerPick = false;
             bool shopShut = ShopPricing.DominionClosed(lateJoinerPick) != PurchaseBlock.None;
 
-            // The always-visible toggle button must stop offering a loadout once the match is over
-            // too (Task 9b quality review) - runs regardless of isOpenLocal below, since the button
-            // is visible and clickable whether this screen is open or closed. Previously it stayed
-            // interactable and Toggle()/Open() just silently refused. Dominion Task 5: also not offered
-            // while the shop is shut (outside the break).
+            // The always-visible toggle button stops offering a loadout once the match is over, or while the shop is shut
+            // (outside the break). Runs regardless of isOpenLocal: the button is clickable whether the screen is open or not.
             if (loadoutToggleButton != null)
                 loadoutToggleButton.interactable = !matchOver && !shopShut;
 
@@ -444,30 +363,21 @@ namespace Overpower.UI
                 return;
             }
 
-            // A raw keyboard poll, not an InputAction, matching TestRangePanel's own reasoning for
-            // F1: Esc-closes-a-tool is a tool convention, not a rebindable gameplay control.
+            // A raw keyboard poll, not an InputAction (as TestRangePanel's F1): Esc-closes-a-tool is a convention, not a rebindable control.
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
             {
                 Close();
                 return;
             }
 
-            // The match ending must close this screen even though ShopSuppressed deliberately does
-            // not gate ShopToggled on it (Task 9a review, finding 3) - MatchUI freezes movement, but
-            // nothing told this screen to stop letting a still-living player re-pick a loadout after
-            // the result is already decided.
+            // The match ending must close this screen though ShopSuppressed deliberately does not gate ShopToggled on it:
+            // MatchUI freezes movement but nothing else stops a living player re-picking after the result is decided.
             if (matchOver)
             {
                 Close();
                 return;
             }
 
-            // Refresh() otherwise only runs on Open and on this screen's OWN clicks (Task 9a review,
-            // finding 2) - an equip made elsewhere while the screen is open (the F1 panel's dropdown
-            // or armor buttons, or a property echo from a remote change) would sit stale here until
-            // something on THIS screen was clicked. Abilities do not need this: AbilityRunner's
-            // SlotChanged already fires for every equip from every source, and Refresh is already
-            // subscribed to it.
             FitPanelToCanvas();
             TickTooltip(Time.unscaledDeltaTime);
 
@@ -475,12 +385,8 @@ namespace Overpower.UI
             int absorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
             int rechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
 
-            // Task 2.5b: gold can rise from passive territory income, and the gate can flip from
-            // walking into your own zone or the combat timer running out - either changes what
-            // every node/card should look like, with nothing on THIS screen clicked (same reasoning
-            // as the weapon/armor poll above). Built ONCE here (Task 2.5b review fix 3 - this used
-            // to be built again inside RefreshHeader every frame) and passed down to whichever of
-            // Refresh/RefreshHeader below actually runs.
+            // Gold and the gate can change with nothing on THIS screen clicked, and change every node/card's look. The
+            // context is built ONCE here and passed to whichever of Refresh/RefreshHeader runs.
             int gold = goldWallet != null ? goldWallet.Balance : 0;
             ShopContext ctx = CurrentShopContext();
             bool blocked = ctx.Check(0) != PurchaseBlock.None;
@@ -489,13 +395,11 @@ namespace Overpower.UI
                 || gold != lastKnownGold || blocked != lastKnownBlocked || CurrentRound() != lastKnownRound)
                 Refresh(ctx);
             else
-                RefreshHeader(ctx); // Still cheap even when nothing else changed - see RefreshHeader's own comment.
+                RefreshHeader(ctx); // Cheap when nothing changed.
         }
 
-        /// <summary>AbilityRunner.SlotChanged fires for every equip, from any source - this
-        /// screen's own click, the F1 panel, or a remote property echo - so subscribing it straight
-        /// to Refresh (rather than polling like Update() does for the weapon and armor, Task 9a
-        /// review finding 2) keeps the ability column live with no extra bookkeeping.</summary>
+        /// <summary>AbilityRunner.SlotChanged fires for every equip from any source (this screen, the F1 panel, a remote
+        /// echo), so subscribing it to Refresh keeps the ability column live without the polling weapon and armor need.</summary>
         private void HandleAbilitySlotChanged(AbilitySlot slot) => Refresh();
 
         // ============================================================================================
@@ -506,11 +410,11 @@ namespace Overpower.UI
         {
             if (isOpenLocal)
                 return;
-            // Task 5b-1 (D4): a dead player may open the shop while waiting to respawn (and an open shop stays
-            // open through a death) - only the match ending closes it. The gates count as passed while dead
-            // (ShopRules.EffectiveInOwnTerritory, applied in ShopPricing.Build; the combat gate needs none - PlayerHealth puts the clock out of combat on death).
+            // A dead player may open the shop while waiting to respawn (and an open shop stays open through a death); only
+            // the match ending closes it (D4). The gates count as passed while dead (ShopRules.EffectiveInOwnTerritory,
+            // applied in ShopPricing.Build; the combat gate needs none, PlayerHealth puts the clock out of combat on death).
             if (matchUI != null && matchUI.MatchOver)
-                return; // The match is already decided - see Update()'s own MatchOver check (Task 9a review).
+                return; // The match is already decided.
             if (ShopPricing.DominionClosed(lateJoinerPick) != PurchaseBlock.None)
             {
                 // Dominion outside the break: stays shut, with a short word on why (the header is not on screen to say it).
@@ -523,8 +427,7 @@ namespace Overpower.UI
             IsOpen = true;
             screenRoot.SetActive(true);
             inputRouter?.SetToolFocus(this, true);
-            // No Cursor.lockState/Cursor.visible call exists anywhere in this project (checked
-            // before writing this) - the cursor is always free, so there is nothing to unlock here.
+            // The cursor is never locked in this project, so there is nothing to unlock here.
             HideTooltip(); // Reopening must not show whatever was last hovered before it closed.
             ShowPage(pageMemory.Last);
             FitPanelToCanvas();
@@ -556,14 +459,9 @@ namespace Overpower.UI
             screenRoot.SetActive(false);
             inputRouter?.SetToolFocus(this, false);
 
-            // Re-review fix: a reason shown by ShowBlockedReason must not survive being closed and
-            // reopened - closing mid-window used to leave blockedReasonText/blockedReasonExpiryTime
-            // armed, so reopening within the window (or even long after, since the underlying gate
-            // condition can have changed by then) redrew a stale, possibly now-wrong reason. Clearing
-            // headerInitialized too forces RefreshHeader's very-first-call path on the next Open(),
-            // which unconditionally rewrites both labels - the same guarantee a fresh LoadoutScreen
-            // gets, without which "the normal status hasn't changed since the reason interrupted it"
-            // would again skip the write (the exact bug justExpired fixed for the timer-expiry case).
+            // A reason from ShowBlockedReason must not survive a close and reopen: the gate may have changed by then, so it
+            // would redraw a stale reason. Clearing headerInitialized forces RefreshHeader's first-call path on the next
+            // Open(), which rewrites both labels; otherwise "the normal status hasn't changed" would skip the write.
             blockedReasonText = "";
             blockedReasonExpiryTime = -1f;
             headerInitialized = false;
@@ -577,11 +475,8 @@ namespace Overpower.UI
                 Open();
         }
 
-        /// <summary>2.7b Decision 6: the fresh start at match-live forgets everything this player spent (so
-        /// neither reset button can refund warm-up spending once the real economy starts) and closes the
-        /// screen if it happened to be open at the live instant - Close() is already a no-op when it isn't.
-        /// Owner only; this component already disables itself for every non-owner copy in Awake (see the class
-        /// comment), but the guard matches every other ResetForMatchStart on this player.</summary>
+        /// <summary>The fresh start at match-live forgets everything this player spent (so neither reset can refund
+        /// warm-up spending) and closes the screen if open. Owner only; the guard matches every other ResetForMatchStart.</summary>
         public void ResetForMatchStart()
         {
             if (!photonView.IsMine)
@@ -591,22 +486,13 @@ namespace Overpower.UI
             Close();
         }
 
-        /// <summary>Re-reads everything this screen shows from the live player state. Called on
-        /// Open and after every click that changes something on THIS screen. Also called from
-        /// Update()'s own poll (see its comment, Task 9a review finding 2) while the screen stays
-        /// open, since there is no "loadout changed" event this class could subscribe to instead
-        /// (WeaponFiring has none) - a weapon or armor change from OUTSIDE this screen (the F1
-        /// panel's dropdown/buttons, or a property echo from a remote change) would otherwise sit
-        /// stale here until something on THIS screen happened to be clicked. Abilities need no
-        /// such poll: AbilityRunner.SlotChanged already fires for every equip from every source,
-        /// and Refresh is already subscribed to it directly.</summary>
+        /// <summary>Re-reads everything this screen shows from the live player state: on Open, after every click here, and
+        /// from Update()'s poll. WeaponFiring has no "loadout changed" event, so a weapon or armor change from OUTSIDE
+        /// (the F1 panel, a remote echo) would sit stale until a click here. Abilities need no poll (SlotChanged).</summary>
         private void Refresh() => Refresh(CurrentShopContext());
 
-        /// <summary>Overload taking an already-built ShopContext (Task 2.5b review fix 3) for
-        /// callers that already have one this frame (Update()'s own poll) - every other caller
-        /// (Open, a click on this screen, AbilityRunner.SlotChanged) goes through the parameterless
-        /// Refresh() above, which builds the one ctx this whole pass needs exactly once instead of
-        /// each Refresh* method below building its own.</summary>
+        /// <summary>Takes a ShopContext already built this frame (Update()'s poll); the parameterless Refresh() builds the
+        /// one context this whole pass needs, so no Refresh* method builds its own.</summary>
         private void Refresh(ShopContext ctx)
         {
             RefreshHeader(ctx);
@@ -616,9 +502,7 @@ namespace Overpower.UI
             RefreshResetLabels();
             tooltipTextDirty = true; // A price, a level or the equipped item may have changed under an open pop-up.
 
-            // Snapshot what was just drawn, so Update()'s poll (Task 9a review) only calls back in
-            // here once something ACTUALLY changes since this Refresh, from any path - Open, a
-            // click on this screen, or Update() catching an external change.
+            // Snapshot what was just drawn, so Update()'s poll calls back in only when something ACTUALLY changed since.
             lastKnownWeaponId = CurrentWeaponId();
             lastKnownAbsorbLevel = playerHealth != null ? playerHealth.AbsorbLevel : -1;
             lastKnownRechargeLevel = playerHealth != null ? playerHealth.RechargeLevel : -1;
@@ -630,11 +514,8 @@ namespace Overpower.UI
         /// <summary>The Dominion round the shop's limits are for (0 outside Dominion), so an open shop redraws when the round moves on.</summary>
         private static int CurrentRound() => DominionDirector.Instance != null ? DominionDirector.Instance.Round : 0;
 
-        /// <summary>This player's shop gate and balance right now - built fresh each call (cheap:
-        /// a couple of dictionary/property reads, no allocation) rather than cached, so every caller
-        /// this frame agrees even if territory or the wallet changed mid-frame. One home for the
-        /// BuildingManager/Teams/GoldWallet reads every purchase check needs - see ShopPricing's own
-        /// class comment for why this was pulled out of LoadoutScreen itself.</summary>
+        /// <summary>This player's shop gate and balance right now, built fresh each call (cheap, no allocation) rather than
+        /// cached, so every caller this frame agrees even if territory or the wallet changed mid-frame.</summary>
         private ShopContext CurrentShopContext() =>
             ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position,
                 lifecycle == null || lifecycle.IsAlive, lateJoinerPick, DominionCfg,
@@ -654,14 +535,9 @@ namespace Overpower.UI
         private int ArmorCapFor(ShopContext ctx) =>
             armorConfig == null ? 0 : ctx.Limits != null ? ctx.Limits.ArmorCap(armorConfig.MaxArmorUpgrades) : armorConfig.MaxArmorUpgrades;
 
-        /// <summary>Header row: "Gold 1234" and the status line - a refused click's own reason
-        /// (Task 2.5b review fix 2, see ShowBlockedReason) while its timer runs, else the shop
-        /// gate's ordinary status (ShopContext.StatusText). Called every frame while open (see
-        /// Update()'s own comment) with the SAME ShopContext Update() already built for this frame
-        /// (fix 3 - this used to build a second one every frame, and always format "Gold {gold}"
-        /// before ever comparing it to what was last drawn). Every comparison below happens on the
-        /// raw gold int, the block enum, or the countdown's own tenth-of-a-second BEFORE any string
-        /// is built, so a frame where nothing actually changed does no string formatting at all.</summary>
+        /// <summary>Header row: the gold and the status line (a refused click's reason while its timer runs, else the gate's
+        /// ShopContext.StatusText). Called every frame while open with the ShopContext Update() built. Every comparison is on
+        /// the raw gold int, the block enum or the countdown tenth BEFORE any string is built, so an unchanged frame formats nothing.</summary>
         private void RefreshHeader(ShopContext ctx)
         {
             int gold = goldWallet != null ? goldWallet.Balance : 0;
@@ -682,37 +558,27 @@ namespace Overpower.UI
                     lastStatusText = blockedReasonText;
                 }
                 headerInitialized = true;
-                return; // The reason's own timer owns the status line until it expires - see below.
+                return; // The reason's own timer owns the status line until it expires.
             }
-            // The reason just expired (or there never was one) - either way the label may currently
-            // show blockedReasonText, which the raw comparisons below know nothing about (they only
-            // track the NORMAL status's own last value, and the normal status may genuinely not have
-            // changed underneath the reason). "justExpired" forces one write to replace it even when
-            // the normal status equals what it was before the reason interrupted it - without this a
-            // reason whose gate condition never changed (e.g. still out of territory) would get
-            // stuck on screen forever once its timer ran out.
+            // The label may still show blockedReasonText, which the comparisons below do not track (they follow the NORMAL
+            // status, which may not have changed underneath). "justExpired" forces one write, or a reason whose gate
+            // never changed (still out of territory) would stay on screen forever.
             bool justExpired = blockedReasonExpiryTime > 0f;
             blockedReasonExpiryTime = -1f;
 
             PurchaseBlock block = ctx.IsFree ? PurchaseBlock.None : ctx.Check(0);
             int tenths = block == PurchaseBlock.InCombat ? Mathf.RoundToInt(ctx.SecondsUntilOutOfCombat * 10f) : 0;
 
-            // 2.7b step 5b: IsWarmupSandbox joins the change check too - review fix, the reason is NOT going
-            // live. With Free Loadout ON, IsWarmupSandbox (isFree && !freeLoadout) is false throughout and never
-            // flips at going live at all - IsFree alone already covers that edge on its own (it stays true, so
-            // nothing redraws, which is correct: the header still reads "Free (test mode)"). The comparison
-            // matters only when Free Loadout is toggled DURING the warm-up (Rule 13: a ScriptableObject field
-            // flipped by reflection in Play Mode) - that leaves IsFree unchanged (free either way) but flips
-            // IsWarmupSandbox, which is the only thing telling "Free (warm-up)" and "Free (test mode)" apart.
-            // Without this comparison that toggle would leave the wrong wording on screen.
+            // IsWarmupSandbox joins the change check, but not because of going live: with Free Loadout ON it stays false
+            // throughout and IsFree alone covers that edge (the header correctly keeps "Free (test mode)"). It matters only
+            // when Free Loadout is toggled DURING the warm-up (a ScriptableObject field flipped in Play Mode): IsFree is
+            // unchanged but IsWarmupSandbox flips, and is the only thing telling "Free (warm-up)" from "Free (test mode)".
             if (justExpired || !headerInitialized || ctx.IsFree != lastDisplayedIsFree
                 || ctx.IsWarmupSandbox != lastDisplayedIsWarmupSandbox || block != lastDisplayedBlock || tenths != lastDisplayedTenths)
             {
                 string statusText = ctx.StatusText();
                 statusLabel.text = statusText;
-                // A free shop's note and "all clear" (empty string) both read as a plain aside; an
-                // actual block reason borrows the overheat-warning amber so it reads as the same
-                // kind of "something is stopping you" signal the HUD already uses elsewhere.
+                // A free shop's note and "all clear" read as a plain aside; a block reason borrows the HUD's overheat-warning amber.
                 statusLabel.color = statusText.Length == 0 || ctx.IsFree ? theme.mutedTextColor : theme.overheatWarningColor;
                 lastStatusText = statusText;
                 lastDisplayedIsFree = ctx.IsFree;
@@ -723,29 +589,24 @@ namespace Overpower.UI
             headerInitialized = true;
         }
 
-        /// <summary>Task 2.5b review fix 2: a click refused by the shop gate used to return silently
-        /// with nothing shown anywhere - this is what actually tells the player why, by taking over
-        /// the header status line for Loadout Blocked Reason Duration Seconds (UiTheme) before it
-        /// reverts to the ordinary gate status on its own. Takes the SAME ctx and price the calling
-        /// click handler already built its own gate check from, so a CannotAfford reason quotes the
-        /// real shortfall for the item that was actually clicked.</summary>
+        /// <summary>Tells the player why a click was refused by taking over the header status line for Loadout Blocked
+        /// Reason Duration Seconds (UiTheme). Takes the SAME ctx and price the click handler checked against, so a
+        /// CannotAfford reason quotes the real shortfall for the item clicked.</summary>
         private void ShowBlockedReason(ShopContext ctx, PurchaseBlock block, int price, int itemId = -1)
         {
             blockedReasonText = ctx.ReasonText(block, price);
             blockedReasonIsNotice = false;
-            // Unscaled (re-review fix, project convention - see PlayerHud.bountyToastHideAtTime's own
-            // comment): a debug Time.timeScale change must not freeze this reason on screen forever.
+            // Unscaled (project convention, see PlayerHud.bountyToastHideAtTime): a debug Time.timeScale change must not freeze it.
             blockedReasonExpiryTime = Time.unscaledTime + theme.loadoutBlockedReasonDurationSeconds;
             RefreshHeader(ctx); // Shows it from the same frame as the click, not one frame late.
 
-            // Task T4: `shopBlocked` telemetry. Shortfall only means anything for CannotAfford -
-            // every other reason already explains itself via the reason string alone.
+            // `shopBlocked` telemetry. Shortfall only means anything for CannotAfford.
             int shortfall = block == PurchaseBlock.CannotAfford ? Mathf.Max(0, price - ctx.Balance) : 0;
             PurchaseRefused?.Invoke(itemId, price, block, shortfall);
         }
 
-        /// <summary>Task 5b-1 (D19): "Sold Laser - Through Walls: +600 gold" on the header status line for a few
-        /// seconds after a sale, so a refund is never a silent change in the gold number.</summary>
+        /// <summary>"Sold Laser - Through Walls: +600 gold" on the header status line for a few seconds after a sale, so a
+        /// refund is never a silent change in the gold number (D19).</summary>
         private void ShowSoldMessage(string text)
         {
             blockedReasonText = text;
@@ -753,9 +614,8 @@ namespace Overpower.UI
             blockedReasonExpiryTime = Time.unscaledTime + theme.loadoutSoldMessageDurationSeconds;
         }
 
-        /// <summary>Rewrites the Reset Weapon/Reset Armor buttons' own labels with a refund preview
-        /// ("Reset Weapon (+600)") - read straight off the ledger, never spent, so hovering (or just
-        /// looking at) the button tells a player what undoing costs them before they click it.</summary>
+        /// <summary>Rewrites the Reset buttons' labels with a refund preview ("Reset Weapon (+600)"), read off the ledger
+        /// and never spent, so the player sees what undoing returns before clicking.</summary>
         private void RefreshResetLabels()
         {
             double rate = gameplayConfig != null ? gameplayConfig.SellRefundRate : 0.5;
@@ -772,7 +632,7 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Weapon tree - rules from Overpower.Combat.WeaponUpgradeTree (Task 8), drawn here.
+        // Weapon tree - rules from Overpower.Combat.WeaponUpgradeTree, drawn here.
         // ============================================================================================
 
         private void BuildWeaponTree()
@@ -796,8 +656,7 @@ namespace Overpower.UI
                 parentById[id] = parentId;
             foreach (var (id, _) in nodes)
                 weaponDepth[id] = DominionShopRules.WeaponDepth(id, w => parentById.TryGetValue(w, out int p) ? p : (int?)null);
-            // Logged once here in Awake, not from Refresh - Refresh runs on every open and every
-            // click, and a data problem does not change between those.
+            // Logged once at build, not from Refresh: a data problem does not change between opens and clicks.
             foreach (string problem in tree.Problems)
                 Debug.LogError($"[LoadoutScreen] {problem}");
         }
@@ -806,8 +665,8 @@ namespace Overpower.UI
         {
             int equipped = CurrentWeaponId();
             ShopContext ctx = CurrentShopContext();
-            // Guards regardless of the button's own interactable flag (only Locked nodes are set
-            // non-interactable - see StyleNode) - clicking Equipped or Owned must simply do nothing.
+            // Guards regardless of the button's interactable flag (only Locked nodes are non-interactable, see StyleNode):
+            // clicking Equipped or Owned must do nothing.
             // Dominion: every pick is free, so a weapon the round opens is pickable from anywhere (a family switch is one click).
             bool pickable = ctx.Limits != null
                 ? ctx.Limits.NodeState(tree.StateOf(weaponId, equipped), DepthOf(weaponId)) == UpgradeNodeState.Selectable
@@ -817,9 +676,7 @@ namespace Overpower.UI
             if (RefuseIfClosed(ctx, weaponId))
                 return;
 
-            // Task 2.5b review fix 2: a Selectable node stays clickable even while shop-blocked (see
-            // StyleNode) - a refused click used to return here with nothing shown anywhere.
-            // ShowBlockedReason is what actually tells the player why, in the header status line.
+            // A Selectable node stays clickable while shop-blocked (StyleNode); ShowBlockedReason tells the player why in the header.
             WeaponDefinition target = weapons.Resolve(weaponId);
             int price = target != null ? target.GoldCost : 0;
             bool free = ctx.IsFree;
@@ -849,9 +706,8 @@ namespace Overpower.UI
             if (tree.RootId < 0)
                 return;
 
-            // A reset has no price of its own - only the territory/combat gate applies (price 0
-            // never trips CannotAfford) - so the same Check(0) the header status line reads decides
-            // whether the refund is allowed here too.
+            // A reset has no price, only the territory/combat gate (price 0 never trips CannotAfford): the same Check(0)
+            // the header reads decides whether the refund is allowed.
             ShopContext ctx = CurrentShopContext();
             if (RefuseIfClosed(ctx))
                 return;
@@ -898,15 +754,11 @@ namespace Overpower.UI
                     tree.NeedsSwap(pair.Key, equipped) ? refundNow : -1);
         }
 
-        /// <summary>Task 2.5b: the label's second line now reads "Equipped"/"Owned" for a weapon
-        /// already reached, or its price otherwise (ShopPricing.PriceLine) - shown even under Free
-        /// Loadout, which only changes whether the price is actually charged, not whether it is
-        /// shown (assignment brief). A Selectable node the shop gate refuses right now (out of
-        /// territory/combat/gold) gets its OWN look (Loadout Shop Blocked Colour, Task 2.5b review
-        /// fix 1 - this used to be painted with Locked Colour, indistinguishable from a genuinely
-        /// Locked node) but STAYS interactable: OnWeaponNodeClicked re-checks the same rule and,
-        /// on a refusal, shows the specific reason in the header (ShowBlockedReason, fix 2) - a
-        /// disabled button would also stop this node being hoverable for its pop-up.</summary>
+        /// <summary>The label's second line reads "Equipped"/"Owned" for a weapon already reached, else its price
+        /// (ShopPricing.PriceLine), shown even under Free Loadout (which only changes whether it is charged). A Selectable
+        /// node the shop gate refuses right now gets its OWN look (Loadout Shop Blocked Colour, not Locked Colour) but
+        /// STAYS interactable: OnWeaponNodeClicked re-checks and shows the reason (ShowBlockedReason), and a disabled
+        /// button would also stop the node being hoverable for its pop-up.</summary>
         private void StyleNode(WeaponNodeUi ui, UpgradeNodeState state, WeaponDefinition def, ShopContext ctx, int swapRefund)
         {
             // Dominion: the round decides what is open. A weapon the round has not opened is Locked and says which round does ("Round 2");
@@ -928,10 +780,9 @@ namespace Overpower.UI
                           : state == UpgradeNodeState.Owned ? "Owned"
                           : lockedText.Length > 0 ? lockedText
                           : def != null ? ctx.PriceLine(def.GoldCost, block) : "";
-            // Loadout Price Line Size Percent (UiTheme) on the price/status line only - the node is
-            // small (Loadout Node Width x Height) and two full-size lines would not both fit.
-            // Task 5b-1 (D19): a weapon on another branch says its price AND what selling back gives now; with
-            // nothing to sell back the node keeps its normal price line.
+            // Loadout Price Line Size Percent (UiTheme) on the price/status line only: the node is small and two full-size
+            // lines would not fit. A weapon on another branch says its price AND what selling back gives now (D19);
+            // with nothing to sell back it keeps the normal price line.
             float sizePercent = theme.loadoutPriceLineSizePercent;
             if (state == UpgradeNodeState.Locked && swapRefund > 0 && def != null)
             {
@@ -980,11 +831,9 @@ namespace Overpower.UI
         private void OnAbsorbClicked() => TryBuyArmorUpgrade(upgradeAbsorb: true);
         private void OnRechargeClicked() => TryBuyArmorUpgrade(upgradeAbsorb: false);
 
-        /// <summary>Task 2.5b: spends BEFORE upgrading, from the price of the purchase about to be
-        /// made (armorConfig.UpgradeCosts[absorbLevel + rechargeLevel] - one shared "how many armor
-        /// purchases so far" index, absorb or recharge). The CanUpgrade check mirrors what
-        /// RefreshArmor already used to disable the button, kept here too as a second guard - same
-        /// belt-and-braces pattern as OnWeaponNodeClicked re-checking CanUpgrade.</summary>
+        /// <summary>Spends BEFORE upgrading, at the price of the purchase about to be made (armorConfig.UpgradeCosts
+        /// [absorbLevel + rechargeLevel]: one shared "purchases so far" index for both paths). The CanUpgrade check is
+        /// a second guard behind RefreshArmor's disabled button, like OnWeaponNodeClicked's.</summary>
         private void TryBuyArmorUpgrade(bool upgradeAbsorb)
         {
             if (playerHealth == null || armorConfig == null)
@@ -1002,10 +851,7 @@ namespace Overpower.UI
             bool free = ctx.IsFree;
             int chargedPrice = 0;
 
-            // Task T4: armor has no item id of its own (unlike a weapon or ability), only a path
-            // (absorb/recharge) and a level on that path - encoded per TelemetryKeys.ItemId's own
-            // doc comment (opus review fix: the level alone, with no path, could not tell an absorb
-            // upgrade apart from a recharge one that happened to reach the same level).
+            // Armor has no item id: path plus level, encoded per TelemetryKeys.ItemId.
             int prospectiveLevel = (upgradeAbsorb ? playerHealth.AbsorbLevel : playerHealth.RechargeLevel) + 1;
             int prospectiveItem = (upgradeAbsorb ? ArmorAbsorbItemBase : ArmorRechargeItemBase) + prospectiveLevel;
 
@@ -1025,8 +871,7 @@ namespace Overpower.UI
 
             ArmorLoadoutActions.TryUpgrade(playerHealth, playerLoadout, armorConfig, upgradeAbsorb, cap);
 
-            // Read AFTER TryUpgrade so it reflects what was actually bought, rather than trusting
-            // the prospective level computed above went through exactly as predicted.
+            // Read AFTER TryUpgrade so it reflects what was actually bought, not the prediction above.
             int newLevel = upgradeAbsorb ? playerHealth.AbsorbLevel : playerHealth.RechargeLevel;
             int purchasedItem = (upgradeAbsorb ? ArmorAbsorbItemBase : ArmorRechargeItemBase) + newLevel;
             Purchased?.Invoke(PurchaseCategory.Armor, purchasedItem, chargedPrice, goldWallet != null ? goldWallet.Balance : 0, free);
@@ -1035,7 +880,7 @@ namespace Overpower.UI
 
         private void OnResetArmorClicked()
         {
-            // Same "no price of its own, only the gate applies" reasoning as OnResetWeaponClicked.
+            // No price of its own, only the gate applies (as OnResetWeaponClicked).
             ShopContext ctx = CurrentShopContext();
             if (RefuseIfClosed(ctx))
                 return;
@@ -1063,14 +908,10 @@ namespace Overpower.UI
             Refresh();
         }
 
-        /// <summary>Refused-upgrade choice: DISABLE the + button rather than a muted note, computed
-        /// up front from the same ArmorUpgradePath rule TryUpgrade itself would apply, so a click
-        /// that would be refused is never even offered - unlike the F1 panel, whose console log is a
-        /// designer convenience this player-facing screen does not need. Task 2.5b adds the next
-        /// purchase's price (ShopPricing.PriceLine - a CannotAfford shortfall included, Task 2.5b
-        /// review fix 1) next to whichever path can still be bought, and mutes both rows' text (not
-        /// the + buttons themselves, which the CanUpgrade check above already governs) while
-        /// shop-blocked, matching the weapon tree's own "still visible, reads as unavailable" look.</summary>
+        /// <summary>A refused upgrade DISABLES the + button, computed up front from the ArmorUpgradePath rule TryUpgrade
+        /// applies, so a click that would be refused is never offered. Shows the next purchase's price (ShopPricing.
+        /// PriceLine) next to a buyable path, and mutes both rows' text (not the + buttons) while shop-blocked, like the
+        /// weapon tree's "visible but reads as unavailable".</summary>
         private void RefreshArmor(ShopContext ctx)
         {
             if (playerHealth == null || armorConfig == null)
@@ -1083,8 +924,8 @@ namespace Overpower.UI
             bool gateBlocked = block != PurchaseBlock.None;
             string priceLine = ctx.PriceLine(nextPrice, block);
 
-            // Task 5b-2 (D5): the limit is ONE budget shared by both rows (ArmorUpgradePath.TotalUpgrades against
-            // ArmorConfig.MaxArmorUpgrades), so both rows say where the next click sits in it, or that it is spent.
+            // The limit is ONE budget shared by both rows (ArmorUpgradePath.TotalUpgrades against ArmorConfig.MaxArmorUpgrades),
+            // so both rows say where the next click sits in it, or that it is spent (D5).
             bool roundLimited = cap < armorConfig.MaxArmorUpgrades;
             string limit = ArmorLimitLabel.Text(path.TotalUpgrades, cap,
                 theme.loadoutArmorUpgradeFormat, roundLimited ? theme.loadoutArmorRoundMaxFormat : theme.loadoutArmorMaxFormat);
@@ -1101,19 +942,18 @@ namespace Overpower.UI
             rechargeButton.interactable = path.CanUpgradeRecharge;
         }
 
-        /// <summary>What a row says when it cannot be bought: the shared limit's "N of N (max)" if the budget is
-        /// spent, otherwise that this row is at its own top level.</summary>
         /// <summary>One armour row's text from its UiTheme format: {0} = this row's level, {1} = the status.</summary>
         private static string ArmorRow(string format, int level, string status) =>
             string.Format(System.Globalization.CultureInfo.InvariantCulture, format, level, status);
 
+        /// <summary>What a row says when it cannot be bought: the shared limit's "N of N (max)" if the budget is
+        /// spent, otherwise that this row is at its own top level.</summary>
         private string ArmorRowFull(int bought, int max, string limit) =>
             bought >= max ? limit : theme.loadoutArmorTopLevelText;
 
         // ============================================================================================
-        // Abilities (right column) - Mobility, Attachment, Ultimate, each a heading and a wrapping
-        // grid of cards straight from the catalogue. No upgrade tree here: any non-debug ability in
-        // the right slot is pickable any time, so unlike weapons there is no Owned/Locked state.
+        // Abilities - Mobility, Attachment, Ultimate, each a heading and a wrapping grid of cards from the catalogue.
+        // No upgrade tree: any non-debug ability is pickable any time, so there is no Owned/Locked state.
         // ============================================================================================
 
         private void OnAbilityCardClicked(AbilitySlot slot, int abilityId)
@@ -1122,11 +962,10 @@ namespace Overpower.UI
                 return;
             int equippedId = abilityRunner.EquippedId(slot);
             if (equippedId == abilityId)
-                return; // Already equipped - same no-op-on-self-click guard as OnWeaponNodeClicked.
+                return; // Already equipped: no-op on self-click, as OnWeaponNodeClicked.
 
-            // Task 2.5b: ShopRules.AbilityPrice reads 0 for a first pick into an empty Mobility/
-            // Attachment slot (the free starting kit - Task 2.5a leaves those slots empty on the
-            // prefab) and the card's real GoldCost otherwise; the Ultimate slot is never free.
+            // ShopRules.AbilityPrice reads 0 for a first pick into an empty Mobility/Attachment slot (the free starting
+            // kit: the prefab leaves those slots empty) and the card's real GoldCost otherwise; Ultimate is never free.
             AbilityDefinition def = abilities != null ? abilities.Resolve(abilityId) : null;
             int goldCost = def != null ? def.GoldCost : 0;
             bool slotIsEmpty = equippedId == LoadoutProperties.Empty;
@@ -1145,8 +984,7 @@ namespace Overpower.UI
                     ShowBlockedReason(ctx, block, price, abilityId);
                     return;
                 }
-                // No ledger entry: abilities have no sell-back path (GDD silent on it), and a free
-                // first pick has nothing paid to refund anyway.
+                // No ledger entry: abilities have no sell-back path (GDD silent on it).
                 if (price > 0 && (goldWallet == null || !goldWallet.TrySpend(price)))
                     return;
                 chargedPrice = price;
@@ -1157,10 +995,8 @@ namespace Overpower.UI
             Refresh();
         }
 
-        /// <summary>Task T4: this screen's own three ability slots, as the shared PurchaseCategory
-        /// telemetry uses. Primary never reaches here (this screen never builds a card for it - see
-        /// LoadoutAbilitySlotOrder), so it has no real mapping; Attachment is an arbitrary but
-        /// harmless fallback rather than throwing.</summary>
+        /// <summary>This screen's three ability slots as the telemetry PurchaseCategory. Primary never reaches here
+        /// (LoadoutAbilitySlotOrder), so Attachment is an arbitrary but harmless fallback rather than throwing.</summary>
         private static PurchaseCategory CategoryFor(AbilitySlot slot)
         {
             switch (slot)
@@ -1171,12 +1007,9 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>Equipped gets the weapon tree's own Equipped look (highlight border) and its
-        /// label reads "Equipped"; every other card shows its price (ShopPricing.PriceLine of
-        /// ShopRules.AbilityPrice - "Free" for a first pick into an empty Mobility/Attachment slot,
-        /// or a CannotAfford shortfall) and, while shop-blocked, its OWN look (Loadout Shop Blocked
-        /// Colour, Task 2.5b review fix 1) rather than Locked Colour - see StyleNode's own comment
-        /// for why this stays interactable rather than disabled.</summary>
+        /// <summary>Equipped gets the weapon tree's Equipped look and label; every other card shows its price (ShopPricing.
+        /// PriceLine of ShopRules.AbilityPrice) and, while shop-blocked, its OWN look (Loadout Shop Blocked Colour) and
+        /// stays interactable (see StyleNode).</summary>
         private void RefreshAbilities(ShopContext ctx)
         {
             if (abilityRunner == null || abilities == null)
@@ -1208,12 +1041,11 @@ namespace Overpower.UI
         }
 
         // ============================================================================================
-        // Pages (Task 13) - the two tabs at the top switch between the weapon tree and the abilities/armor.
+        // Pages - the two tabs at the top switch between the weapon tree and the abilities/armor.
         // ============================================================================================
 
-        /// <summary>Shows one page: its content on, the other off, its tab lit, and the choice remembered for the
-        /// next time the shop opens. Any pop-up is dropped (the item under the pointer just went away). Nothing about
-        /// what is bought or priced depends on the page - both pages are refreshed together.</summary>
+        /// <summary>Shows one page, lights its tab and remembers the choice for the next open. Any pop-up is dropped (the
+        /// item under the pointer went away). Nothing bought or priced depends on the page: both are refreshed together.</summary>
         public void ShowPage(ShopPage page)
         {
             if (weaponsPageRoot == null || abilitiesPageRoot == null)

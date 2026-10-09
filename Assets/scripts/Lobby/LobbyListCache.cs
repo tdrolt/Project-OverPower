@@ -53,8 +53,7 @@ namespace Overpower.Lobby
     /// <summary>The pure part of the lobby directory: merging Photon's room list updates into a cache and ordering it.</summary>
     public static class LobbyListCache
     {
-        /// <summary>Applies one update: add or update each room, drop the removed, closed and hidden ones. An existing
-        /// entry keeps its first-seen time.</summary>
+        /// <summary>Drops the removed, closed and hidden rooms and adds or updates the rest; an existing entry keeps its first-seen time.</summary>
         public static void Merge(Dictionary<string, LobbyEntry> cache, IEnumerable<RoomSnapshot> update, long now, System.Func<int, SeatLayout?> layoutOfMode = null)
         {
             foreach (var room in update)

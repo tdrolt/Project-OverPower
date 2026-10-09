@@ -11,32 +11,16 @@ using Overpower.Vision;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// A patch of burning ground that hurts enemies standing in it, then goes out. Left behind by
-    /// the cursor rocket; nothing else spawns one yet.
-    ///
-    /// UNLIKE A PROJECTILE, THIS IS A REAL NETWORKED OBJECT. Projectiles are local objects rebuilt
-    /// from a fire RPC on each client, because they live for half a second and spawning nine
-    /// networked objects a second per player would be absurd. A fire field lives for three
-    /// seconds, and somebody joining the match in the middle of those three seconds has to see it
-    /// standing there - which is what PhotonNetwork.Instantiate gives and a local spawn does not.
-    ///
-    /// ITS NUMBERS ARRIVE AS instantiationData, NOT AS FIELD ASSIGNMENTS. PhotonNetwork.Instantiate
-    /// hands back only the CALLER's copy of the object; every other client builds its own from the
-    /// prefab and never sees anything written to the returned reference. This project already has
-    /// that bug: an ability assigned its damage to the returned object, the field was dead on
-    /// every other machine, and the damage that actually landed was whatever the victim's own copy
-    /// of the prefab happened to say. Spawn() below packs the numbers into instantiationData and
-    /// OnPhotonInstantiate unpacks them, so all nine machines burn for the same amount.
-    ///
-    /// Damage is victim-side, like every other damage path here: each client ticks its own copy of
-    /// the field, calls ApplyDamage on everything inside, and only the victim's own PlayerHealth
-    /// acts on it. Destruction is NOT victim-side - only the owner may PhotonNetwork.Destroy, or
-    /// each of nine clients tries and eight of them log an error.
-    ///
-    /// It deliberately does not log per tick. A previous area-of-effect logged every tick, which
-    /// at ten ticks a second across seven seconds was seventy console lines per cast on every
-    /// client, and froze builds outright because each console write hits the disk before
-    /// returning. One line when the field lights up is the whole budget.
+    /// A patch of burning ground that hurts enemies standing in it, then goes out. Left behind by the cursor rocket (DetonateAtCursor).
+    /// A real NETWORKED object, unlike projectiles: it lives long enough that somebody joining mid-fire must see it, which PhotonNetwork.Instantiate
+    /// gives and a local spawn does not.
+    /// Its numbers arrive as instantiationData, NOT field assignments: Instantiate returns only the CALLER's copy, so a field written to it is dead
+    /// on every other machine (an ability here once did that, and the damage that landed was the victim's own prefab value). Spawn() packs the
+    /// numbers, OnPhotonInstantiate unpacks them, so all machines burn for the same amount.
+    /// Damage is victim-side like every other path: each client ticks its own copy and calls ApplyDamage, only the victim's PlayerHealth acts.
+    /// Destruction is NOT: only the owner may PhotonNetwork.Destroy, or each of nine clients tries and eight log an error.
+    /// Never log per tick: each console write hits the disk before returning, and per-tick logging in an earlier area-of-effect froze builds.
+    /// One line when the field lights up is the whole budget.
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
     public class FireField : MonoBehaviourPun, IPunInstantiateMagicCallback
@@ -101,11 +85,8 @@ namespace Overpower.Weapons
         private const int MaxBurningColliders = 32;
         private static readonly Collider[] OverlapBuffer = new Collider[MaxBurningColliders];
 
-        // Not a design tunable: A2 (Tudor 2026-09-17 evening, gameplay change) turned the burn area into an upright
-        // cylinder standing on the field's own floor position, so "standing in the drawn circle" is exactly "being
-        // burned" whatever a player's exact height is - 2 m comfortably covers a standing player's whole body
-        // (ankles to well over head), not just one fixed altitude the way the old sphere at the field's own
-        // (previously floating) centre was.
+        // Not a design tunable: the burn area is an upright cylinder standing on the field's own floor position, so "standing in the drawn circle" is
+        // exactly "being burned" whatever a player's height. 2 m comfortably covers a standing player's whole body (ankles to well over head).
         private const float BurnHeightMetres = 2f;
 
         // One tick, one hit per victim - a player is several colliders to Physics. Same reasoning
@@ -132,15 +113,10 @@ namespace Overpower.Weapons
         /// PhotonNetwork.Instantiate resolves prefabs by name through PUN's default pool, which
         /// loads them with Resources.Load.</param>
         /// <param name="damageMultiplier">
-        /// Task 2.6 review: the shot that left this field's own combined damage multiplier
-        /// (ProjectileContext.DamageMultiplier * FireTimeDamageMultiplier - the same product
-        /// Damage and ExplodeOnImpact.SplashDamageAt already apply) - 1 for a shot nothing has
-        /// boosted. Without this, OverPower's +10% (or a distance-scaling rocket's own bonus)
-        /// landed on the direct hit and the splash but not on the burning ground the rocket left
-        /// behind. Multiplies damagePerSecond BEFORE it is packed into instantiationData, so every
-        /// client - including remote copies, which only ever read that packed value, never this
-        /// static method's own locals - burns for the same, already-scaled number. Clamped to >= 0
-        /// for the same reason WeaponFiring.SetStatMultipliers clamps its own multipliers.
+        /// The shot's combined damage multiplier (ProjectileContext.DamageMultiplier * FireTimeDamageMultiplier, the same product Damage and
+        /// ExplodeOnImpact.SplashDamageAt apply) - 1 for a shot nothing has boosted. Multiplies damagePerSecond BEFORE it is packed into
+        /// instantiationData, so every client, remote copies included (they only ever read the packed value), burns for the same already-scaled
+        /// number. Clamped to >= 0 like WeaponFiring.SetStatMultipliers.
         /// </param>
         public static void Spawn(GameObject prefab, Vector3 position, int weaponId, float damageMultiplier = 1f)
         {
@@ -198,14 +174,12 @@ namespace Overpower.Weapons
                                 "other clients.");
             }
 
-            // The owner of the object is whoever fired the shot that left it, so kill credit and
-            // the no-friendly-fire rule both come from there rather than being sent again. The same lookup
-            // also resolves the shooter's TEAM COLOUR below - no new RPC or instantiationData slot needed, this
-            // is exactly how MineView/PortalView/FenceCageView already read an owner's team for their own look.
+            // The owner of the object is whoever fired the shot that left it, so kill credit, the no-friendly-fire rule and the TEAM COLOUR below all come
+            // from there with no new RPC or instantiationData slot (MineView/PortalView/FenceCageView read an owner's team the same way).
             sourceActorNumber = info.Sender != null ? info.Sender.ActorNumber : -1;
             Teams.TryGetTeam(info.Sender, out sourceTeamId);
-            // Dominion Task 7b (A26): when this field was set up, so its burn can say whether it predates its owner's respawn. A late joiner's
-            // replay of an old field reads a later time here; fields are short-lived and the worst case is one tick counted as new.
+            // When this field was set up, so its burn can say whether it predates its owner's respawn. A late joiner's replay of an old field reads a later
+            // time here; fields are short-lived and the worst case is one tick counted as new. (A26)
             placedServerTimestampMs = info.SentServerTimestamp;
 
             Color teamColor = theme != null ? theme.ShotColorFor(sourceTeamId) : Color.white;
@@ -278,10 +252,8 @@ namespace Overpower.Weapons
 
             burning.Clear();
 
-            // A2: an upright capsule over the drawn disc, not a sphere at this field's own centre - see
-            // OverlapBurnZone's own comment. Still runs on every client, same as before: damage below is still
-            // victim-side (this class's own comment), so this only changes WHICH colliders the query considers,
-            // never who applies the result.
+            // An upright capsule over the drawn disc, not a sphere at this field's own centre - see OverlapBurnZone. Still runs on every client; damage
+            // stays victim-side, so this only changes WHICH colliders the query considers, never who applies the result.
             int count = OverlapBurnZone(Physics.defaultPhysicsScene, transform.position, radius, OverlapBuffer, burnMask);
 
             for (int i = 0; i < count; i++)
@@ -294,21 +266,16 @@ namespace Overpower.Weapons
                 if (target == null || IsFriendly(target) || !burning.Add(target))
                     continue;
 
-                // abilityId -1: FireField's DoT is always a weapon's cursor leaf (the rocket) -
-                // the weapon id stays, per Task T3's own note.
+                // abilityId -1: FireField's DoT is always a weapon's cursor leaf (the rocket), so the weapon id stays.
                 target.ApplyDamage(PlacedEffects.FireFieldBurn(amount, sourceActorNumber, sourceTeamId, weaponId, transform.position, placedServerTimestampMs));
             }
         }
 
         /// <summary>
-        /// The upright capsule a standing player's whole body sits in, over the field's own drawn disc - A2's
-        /// replacement for the old sphere at this field's floating centre. <paramref name="floorCentre"/> is this
-        /// field's own transform.position, which A2 also moved onto the floor (DetonateAtCursor.OnExpired), so the
-        /// capsule's own base already sits on the ground it burns.
-        ///
-        /// A static method taking an explicit PhysicsScene - the same seam GroundSnap.TryFindGroundY uses - purely
-        /// so FireFieldBurnZoneTests can query it against real colliders in an edit-mode preview scene rather than
-        /// the live Game Scene; BurnEveryoneInside above calls it with Physics.defaultPhysicsScene at runtime.
+        /// The upright capsule a standing player's whole body sits in, over the field's own drawn disc. <paramref name="floorCentre"/> is this field's
+        /// transform.position, which sits on the floor (DetonateAtCursor.OnExpired), so the capsule's base is on the ground it burns.
+        /// Static with an explicit PhysicsScene (the seam GroundSnap.TryFindGroundY uses) so FireFieldBurnZoneTests can query real colliders in an
+        /// edit-mode preview scene; BurnEveryoneInside calls it with Physics.defaultPhysicsScene.
         /// </summary>
         public static int OverlapBurnZone(PhysicsScene physics, Vector3 floorCentre, float radius, Collider[] results, int mask) =>
             physics.OverlapCapsule(floorCentre, floorCentre + Vector3.up * BurnHeightMetres, radius, results, mask,

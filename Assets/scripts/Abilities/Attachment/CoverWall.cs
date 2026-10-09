@@ -5,56 +5,29 @@ using Overpower.Combat;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// A wall of cover, dropped by the Attachment slot's Deployable Cover ability - Tudor's decision
-    /// of 2026-09-12: it blocks projectiles in BOTH directions, including the caster's own, because
-    /// the hit points are the point - the enemy decides whether to spend damage on the wall or on
-    /// the player standing behind it. Destroyed at 100 damage absorbed or 10 seconds old, whichever
-    /// comes first (Task 1.8 addendum); DeployableCoverAbility only decides WHEN and WHERE one gets
-    /// placed, everything about what it does once it exists lives here, on the prefab.
-    ///
-    /// THE COLLIDER DOES THE BLOCKING FOR FREE. This sits on the Building layer, no Rigidbody - the
-    /// exact layer every wall in the arena already sits on - so ProjectileMotor's sweep, Hitscan's
-    /// ray and a player's own movement all stop at it without one new line in any of those systems,
-    /// the plan's own "existing wall-blocking logic applies to it for free". That also means it
-    /// blocks player MOVEMENT, not only shots - a Building collider does not know the difference -
-    /// which Tudor can revisit after a playtest if allies should be able to walk through their own
-    /// cover.
-    ///
-    /// WHY A FRIENDLY SHOT STILL STOPS HERE, DESPITE "BOTH DIRECTIONS" SOUNDING LIKE THE OPPOSITE OF
-    /// FRIENDLY FIRE. ProjectileMotor.FliesThrough, ExplodeOnImpact.IsFriendly and
-    /// BeamResolver.PassesThrough all ask FriendlyFire.IsSelfOrTeammate against THIS OBJECT'S OWN
-    /// ActorNumber/TeamId, both -1 below - a value that can never equal a real shooter's actor number
-    /// or a real team, so every one of those checks reads "not friendly" and the shot behaves exactly
-    /// like it hit a plain wall. That is the fails-open trick that makes even the wall's own owner's
-    /// bullets stop at it. ApplyDamage then separately decides, using OwnerTeam, whether that stopped
-    /// shot actually costs the wall any HP. Identity for "do you stop here", OwnerTeam for "does it
-    /// cost HP" - two different questions, on purpose, per the Task 1.8 addendum.
-    ///
-    /// THE THROUGH-WALLS LASER (13) PASSES THROUGH COVER, ON PURPOSE - it is on the Building layer
-    /// like every other wall, and that laser leaf (IgnoreWalls) never asks Physics about the Building
-    /// layer at all, so BeamResolver never even sees this collider. The base laser (11/12) has no
-    /// such leaf, so it is blocked here exactly like a bullet, and damages the cover through the same
-    /// Hitscan.Fire -> ApplyDamage call every other Projectile-source hit already uses.
-    ///
-    /// HP IS OWNER-AUTHORITATIVE, NOT SYNCED - the same rule PlayerHealth follows. Every client's own
-    /// local projectile simulation calls ApplyDamage on its own local copy of this object (victim-
-    /// side hit detection, see ProjectileMotor's class comment), but only the copy where
-    /// photonView.IsMine is true ever spends HP or destroys anything; PhotonNetwork.Destroy then
-    /// removes it for everyone. Nobody but the owner ever reads the HP, so nothing needs to
-    /// replicate it. ACCEPTED TRADEOFF, worth stating rather than hiding: a remote client's own
-    /// collider can briefly outlive the owner's already-destroyed copy, so a shot on that machine can
-    /// be seen stopping at cover that is, a moment later, gone.
+    /// A wall of cover dropped by Deployable Cover. It blocks projectiles in BOTH directions, the caster's own included,
+    /// because the hit points are the point: the enemy chooses between spending damage on the wall or on the player behind
+    /// it. Destroyed at Hit Points absorbed or Lifetime Seconds, whichever comes first. DeployableCoverAbility decides
+    /// WHEN and WHERE; everything else lives here, on the prefab.
+    /// The Building-layer collider (no Rigidbody, like every arena wall) does the blocking for free for ProjectileMotor,
+    /// Hitscan and player movement, so it blocks MOVEMENT too; revisit after a playtest if allies should walk through.
+    /// A FRIENDLY SHOT STILL STOPS: ProjectileMotor.FliesThrough, ExplodeOnImpact.IsFriendly and BeamResolver.PassesThrough
+    /// ask FriendlyFire.IsSelfOrTeammate against THIS OBJECT'S ActorNumber/TeamId, both -1 (never a real shooter or team),
+    /// so every check reads "not friendly" and the shot acts as if it hit a plain wall. ApplyDamage then decides via
+    /// OwnerTeam whether the stop costs HP: identity for "do you stop here", OwnerTeam for "does it cost HP".
+    /// The through-walls laser (IgnoreWalls leaf) never asks Physics about the Building layer, so BeamResolver never sees
+    /// this collider and it passes through on purpose; the base laser is blocked like a bullet and damages the cover.
+    /// HP IS OWNER-AUTHORITATIVE, NOT SYNCED (like PlayerHealth): every client's local projectile calls ApplyDamage on its
+    /// own copy (victim-side hit detection), but only the copy with photonView.IsMine spends HP or destroys, and
+    /// PhotonNetwork.Destroy removes it for everyone. ACCEPTED TRADEOFF: a remote collider can briefly outlive the
+    /// owner's destroyed copy, so a shot there may stop at cover that is a moment later gone.
     /// </summary>
     [RequireComponent(typeof(BoxCollider))]
     public sealed class CoverWall : NetworkedDeployable, IDamageable, IStructure
     {
-        /// <summary>How far, in metres, this wall's own collider bottom sits above the ground point
-        /// it was placed at - shared with DeployableCoverAbility's own placement check (as
-        /// CoverWall.GroundLift), so the box that decides "is this spot free" and the box that
-        /// actually blocks things agree on the same geometry. Not a design tunable, the same
-        /// reasoning as TeleportAbility's BlockCheckBottom/Top: a few centimetres of clearance so the
-        /// collider never clips into a sloped or slightly uneven floor, nothing a designer would ever
-        /// balance gameplay against.</summary>
+        /// <summary>Metres this collider's bottom sits above the placement ground point, shared with
+        /// DeployableCoverAbility's placement check so the "is this spot free" box and the blocking box agree. Not a
+        /// design tunable (like TeleportAbility's BlockCheckBottom/Top): a few cm so it never clips an uneven floor.</summary>
         public const float GroundLift = 0.1f;
 
         [Header("Cover")]
@@ -87,7 +60,7 @@ namespace Overpower.Abilities
         public float Height => height;
         public float Thickness => thickness;
 
-        /// <summary>Hit Points, read-only - the shop's pop-up shows it (Task 13).</summary>
+        /// <summary>Hit Points, read-only - the shop's pop-up shows it.</summary>
         public float HitPoints => hitPoints;
 
         // ---- IDamageable ----------------------------------------------------------------------
@@ -101,10 +74,8 @@ namespace Overpower.Abilities
         public bool IsAlive => damageState == null || !damageState.Destroyed;
 
         // ---- IStructure (marker only, no members - see its own class comment) -----------------
-        // Task 1.8b review fix: without this, cover's fails-open -1/-1 identity (above) let a mine
-        // treat it as just another enemy to trip and blast (MineTargeting), and let a piercing laser
-        // treat it as just another target to punch through (BeamResolver) - both wrong, since cover
-        // is a structure, not a combatant.
+        // Without this, cover's fails-open -1/-1 identity let a mine trip and blast on it (MineTargeting) and a
+        // piercing laser punch through it (BeamResolver); cover is a structure, not a combatant.
 
         /// <summary>Same rule PlayerHealth exposes: only the owner's own machine is authoritative
         /// over this object's HP.</summary>
@@ -135,22 +106,15 @@ namespace Overpower.Abilities
         }
 
         /// <summary>
-        /// Victim-side, exactly like PlayerHealth.ApplyDamage - every client's own local hit calls
-        /// this, and only the owner's own copy (photonView.IsMine) does anything at all. The own-
-        /// side check runs before CoverDamageState ever sees the hit: an own-team shot has already
-        /// been stopped by the collider itself (see the class comment), so this is only deciding
-        /// whether that stop ALSO costs the wall HP, using the wall's stored OwnerTeam rather than
-        /// its own fails-open IDamageable identity above - FriendlyFire.IsSelfOrTeammate is reused
-        /// here with the shooter and the wall's owner swapped into its (shooter, target) shape.
+        /// Victim-side, like PlayerHealth.ApplyDamage: every client's local hit calls this, only the owner's copy
+        /// (photonView.IsMine) acts. An own-team shot was already stopped by the collider; this decides only whether that
+        /// stop ALSO costs HP, using the stored OwnerTeam rather than the fails-open identity above
+        /// (FriendlyFire.IsSelfOrTeammate with the shooter and the wall's owner swapped into (shooter, target)).
         /// </summary>
         public DamageResult ApplyDamage(in DamageInfo info)
         {
-            // Defensive backstop (NetworkedDeployable's own class comment, FAIL #15): a copy that
-            // arrived already past Lifetime Seconds - the narrow cache-removal/destroy race, not the
-            // normal path - must never absorb damage. IsExpired already disabled this wall's own
-            // BoxCollider, which should already keep any real shot from reaching this call at all;
-            // this is the same belt-and-suspenders check Mine.FixedUpdate and ElectricFence.FixedUpdate
-            // use for their own per-frame logic.
+            // Backstop (FAIL #15): a copy that arrived already past Lifetime Seconds must never absorb damage; IsExpired
+            // already disabled the BoxCollider, this is the same belt-and-suspenders check Mine and ElectricFence use.
             if (IsExpired)
                 return default;
 
@@ -166,11 +130,8 @@ namespace Overpower.Abilities
             if (healthLost <= 0f)
                 return default; // Wrong source (Burn/Zone) or nothing left to absorb.
 
-            // Through the shared guard, not PhotonNetwork.Destroy directly: this HP-triggered
-            // destroy and the base class's own lifetime timer (Lifetime Seconds, 10s) are two
-            // independent paths that know nothing of each other and can both decide to end this
-            // object in the same window - the exact race RequestDestroy exists to guard (see its own
-            // class comment, and Mine's identical fix).
+            // Through the shared guard, not PhotonNetwork.Destroy: this HP destroy and the base lifetime timer are
+            // independent paths that can end this object in the same window (the race RequestDestroy guards; Mine does the same).
             if (damageState.Destroyed)
                 RequestDestroy();
 

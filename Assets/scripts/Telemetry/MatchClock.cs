@@ -11,10 +11,8 @@ namespace Overpower.Telemetry
 
             double seconds = unchecked(nowMs - startMs) / 1000.0;
 
-            // A genuine wrap produces a small POSITIVE result (the subtraction above already handles
-            // that, unchecked) - this clamp only catches a small NEGATIVE one, which is clock-estimate
-            // skew (nowMs sampled a hair before startMs, no wrap involved) rather than "before the
-            // match started". Match seconds should never read negative once both stamps are known.
+            // A genuine wrap gives a small POSITIVE result (the unchecked subtraction handles it); this clamp only catches a small
+            // NEGATIVE one, which is clock-estimate skew (nowMs sampled a hair before startMs), never "before the match started".
             return seconds < 0.0 ? 0.0 : seconds;
         }
     }

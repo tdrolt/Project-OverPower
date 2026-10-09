@@ -7,14 +7,11 @@ using Overpower.Dominion;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Dominion Task 9, the card between rounds (board DomBreak A): "ROUND 1 · PURPLE WINS · 540 / 620" (a tied round: "TIED"), the round-win dots,
-    /// what the next round opens in the shop, a PICK YOUR BUILD (P) button, and "ROUND 2 STARTS IN 14". The last few seconds (Break Countdown
-    /// Seconds in the Dominion Config) read big, in the same place: "Round 2 starts in 5…". The break before round 1 has no
-    /// result: it reads GET READY and the same opens line and countdown.
-    ///
-    /// The card sits high on the screen so the arena stays in view, and it draws BELOW the shop (its canvas sorts under the shop's), so the shop
-    /// opens on top of it and nothing of the card blocks a click on the shop. Only its button takes the mouse. A spectator has no shop, so the
-    /// button is not shown for them. All words, sizes and colours are UiTheme fields (Dominion HUD).
+    /// The card between rounds (board DomBreak A): "ROUND 1 · PURPLE WINS · 540 / 620" (a tie: "TIED"), the round-win dots, what the next round
+    /// opens in the shop, a PICK YOUR BUILD (P) button and "ROUND 2 STARTS IN 14". The last seconds (Break Countdown Seconds in the Dominion Config)
+    /// read big in the same place. The break before round 1 has no result: GET READY, the same opens line and countdown.
+    /// It sits high so the arena stays in view and draws BELOW the shop (its canvas sorts under the shop's): the shop opens on top and nothing of the
+    /// card blocks a click on it. Only its button takes the mouse; a spectator has no shop, so no button. Words, sizes, colours are UiTheme fields.
     /// </summary>
     public sealed class BreakCard
     {
@@ -32,8 +29,7 @@ namespace Overpower.UI
         private readonly List<int> winDotTeam = new List<int>();
         private TextMeshProUGUI pointsLabel;
         private int builtTeamCount, builtDotCount;
-        // What the card was last drawn from. The card compares these whole numbers each frame and only builds its words when one moved
-        // (a string key built every frame would allocate 60 times a second for a card that changes a few times a break).
+        // What the card was last drawn from: compared as whole numbers each frame, words rebuilt only when one moved (a string key would allocate every frame).
         private bool drawn;
         private int drawnRound;
         private bool drawnFirstBreak, drawnCanPick;
@@ -62,9 +58,8 @@ namespace Overpower.UI
             if (card != null && card.gameObject.activeSelf != visible) card.gameObject.SetActive(visible);
         }
 
-        /// <summary>One frame of the card. round is the round the break leads to; points are the finished round's final points (the room keeps
-        /// them through the break); winners are the teams the room recorded as winning it (one, or several for a shared round, none for a tie); firstBreak is the
-        /// break before round 1; canPick is true for a player with a body (a spectator has no shop).</summary>
+        /// <summary>round is the round the break leads to; points are the finished round's final points (the room keeps them through the break);
+        /// winners are the teams the room recorded as winning it (several = shared round, none = tie); canPick is false for a spectator (no shop).</summary>
         public void Refresh(int[] teams, int round, bool firstBreak, int[] points, int[] winners, int[] wins, int secondsLeft, int bigFromSeconds,
                             int[] depthByRound, int[] armorByRound, string[] teamNames, bool canPick, System.Action onPick)
         {
@@ -109,13 +104,12 @@ namespace Overpower.UI
                 onPickAction = onPick;
             }
 
-            // The countdown line is rebuilt only when the second, the round or the big-from setting moved.
             if (!countdownDrawn || secondsLeft != drawnSeconds || round != drawnCountdownRound || bigFromSeconds != drawnBigFrom)
             {
                 countdownDrawn = true;
                 drawnSeconds = secondsLeft; drawnCountdownRound = round; drawnBigFrom = bigFromSeconds;
                 string line = DominionHudText.BreakCountdown(theme.dominionBreakStartsFormat, theme.dominionBreakBigFormat, round, secondsLeft, bigFromSeconds, out bool isBig);
-                // The last seconds read big: the same line grows (in the card, under the button) instead of a second text over the arena, so nothing is covered.
+                // The last seconds read big: the same line grows in the card instead of a second text over the arena, so nothing is covered.
                 if (isBig != countdownIsBig)
                 {
                     countdownIsBig = isBig;

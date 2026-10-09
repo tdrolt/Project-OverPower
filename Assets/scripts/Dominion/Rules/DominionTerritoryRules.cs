@@ -1,10 +1,10 @@
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// What Dominion changes about the ground and the gold (Task 4), as plain yes/no and number rules so they can be tested without a room.
+    /// What Dominion changes about the ground and the gold, as plain yes/no and number rules so they can be tested without a room.
     /// The wiring passes DominionMode.IsActive() for isDominion. A capital is a team's respawn and healing spot in Dominion: nobody captures
     /// or drains it, yet it still counts as held for "capture next to a zone you hold" (the owner never changes, so adjacency is untouched).
-    /// Nobody earns or sees gold: Dominion has no income, no capture bounty in gold (the bounty POINTS are Task 3's and stay) and no gold readout.
+    /// Nobody earns or sees gold: Dominion has no income, no capture bounty in gold (the bounty points stay) and no gold readout.
     /// </summary>
     public static class DominionTerritoryRules
     {

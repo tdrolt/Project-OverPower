@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Overpower.Match
 {
     /// <summary>
-    /// The scoreboard's pure rules (Tudor's D12), with no engine types so every one is tested.
+    /// The scoreboard's pure rules (D12), with no engine types so every one is tested.
     ///
     /// EVERY STAT IS COUNTED AND WRITTEN ONLY BY THE PLAYER'S OWN CLIENT, from the events only that client sees
     /// (the damage and takedown credit sent to it, its own death, a capture it was standing in). It publishes them
@@ -44,7 +44,7 @@ namespace Overpower.Match
         }
 
         /// <summary>A zone just flipped to zoneTeam. Counts only for a living player who was standing in that zone
-        /// and is on the team it flipped to (Tudor: every capture you were standing in counts).</summary>
+        /// and is on the team it flipped to (every capture you were standing in counts).</summary>
         public void NoteCapture(bool standingInZone, bool alive, int zoneTeam, int myTeam)
         {
             if (standingInZone && alive && myTeam >= 0 && zoneTeam == myTeam)
@@ -58,7 +58,7 @@ namespace Overpower.Match
             damage = 0f;
         }
 
-        /// <summary>Task 9e: a rejoined player's fresh body starts from the numbers the room still holds for them (their
+        /// <summary>A rejoined player's fresh body starts from the numbers the room still holds for them (their
         /// "sb" Player Property), not from zero - kills, deaths, assists, damage, captures, in ToArray's order. A missing,
         /// short or negative value leaves that number at 0.</summary>
         public void Restore(int[] values)

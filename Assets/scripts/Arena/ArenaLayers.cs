@@ -3,12 +3,11 @@ using UnityEngine;
 namespace Overpower.Arena
 {
     /// <summary>
-    /// One home for every fact about the Barrier layer (Amendment 1's jersey barriers): its name, its bit, and the
-    /// two combined masks callers actually need. Lazily cached, the same way GroundSnap.GroundMask is -
-    /// LayerMask.NameToLayer must never run from a MonoBehaviour's static initialiser (see PlayerDisplacement's own
-    /// blockMask comment: it throws TypeInitializationException the first time the type is touched), only from
-    /// Awake, Start or a lazy static like this one. Logs once and falls back to 0 (no bit at all) if the layer is
-    /// missing, rather than throwing and taking the whole match down with it.
+    /// One home for every fact about the Barrier layer: its name, its bit, and the two combined masks callers need.
+    /// Lazily cached, like GroundSnap.GroundMask: LayerMask.NameToLayer must never run from a MonoBehaviour's static
+    /// initialiser (it throws TypeInitializationException the first time the type is touched - see PlayerDisplacement's
+    /// blockMask comment), only from Awake, Start or a lazy static like this. Logs once and falls back to 0 (no bit at
+    /// all) if the layer is missing, rather than throwing and taking the whole match down with it.
     /// </summary>
     public static class ArenaLayers
     {
@@ -30,9 +29,8 @@ namespace Overpower.Arena
             }
         }
 
-        /// <summary>Building + Barrier: what a Forced shove (a knockback) stops at, like a wall. Tudor's answer,
-        /// 2026-09-19 (Q10): "no", a shoved player stops against a barrier rather than being carried over it -
-        /// being shoved isn't the player's own move.</summary>
+        /// <summary>Building + Barrier: what a Forced shove (a knockback) stops at, like a wall. Being shoved isn't
+        /// the player's own move, so a shoved player stops against a barrier rather than being carried over it (Q10).</summary>
         public static int WallsAndBarriers
         {
             get

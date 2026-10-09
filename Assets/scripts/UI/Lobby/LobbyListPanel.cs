@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The lobby list (board 1A, lobby Task 9): a table of the open lobbies from the LobbyDirectory, a Create lobby button, a How to play
+    /// The lobby list (board 1A): a table of the open lobbies from the LobbyDirectory, a Create lobby button, a How to play
     /// button and a line that says the list updates by itself. Rows are kept per lobby and updated in place (redrawn when the directory says the
     /// list changed and every LobbyConfig list-redraw interval, so a status or a player count follows the room without a row being rebuilt under
     /// the mouse). Join / Spectate join the lobby by room name (a spectator seat is given by the late-join placement once inside); a full lobby's
@@ -115,10 +115,8 @@ namespace Overpower.UI
             return true;
         }
 
-        /// <summary>Presses Create lobby.</summary>
         public void PressCreate() => createButton.Press();
 
-        /// <summary>Presses How to play.</summary>
         public void PressHowToPlay() => howToButton.Press();
 
         /// <summary>The cyan How to play button (a check reads whether it is on screen).</summary>

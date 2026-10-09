@@ -11,7 +11,7 @@ namespace Overpower.Lobby
     public enum JoinAction { Join, Spectate, Full }
 
     /// <summary>Pure C# rules for the lobby list: its labels, the button and the order. Called by the lobby list
-    /// screen (Tasks 6-7).</summary>
+    /// screen.</summary>
     public static class LobbyListRules
     {
         public static string StatusText(LobbyStage stage)

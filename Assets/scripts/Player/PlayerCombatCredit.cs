@@ -5,26 +5,21 @@ using UnityEngine;
 using Overpower.Combat;
 
 /// <summary>
-/// Turns victim-side damage back into credit for the attacker who dealt it - the piece the damage
-/// funnel is missing. PlayerHealth.ApplyDamage returns immediately unless photonView.IsMine (every
-/// client simulates every hit and only the victim's own copy keeps the result), so an attacker's
-/// own client never learns how much damage it dealt, or that it landed a kill. Three things need
-/// exactly that and have no way to get it today: armor recharge (PlayerHealth.NoteDealtDamage has
-/// no callers), the zip gun's cooldown reset on a takedown (Task 1.7), and ultimate charge
-/// (Task 1.11).
+/// Turns victim-side damage back into credit for the attacker who dealt it. PlayerHealth.ApplyDamage
+/// returns unless photonView.IsMine (every client simulates every hit, only the victim's own copy
+/// keeps the result), so an attacker's client never learns how much damage it dealt or that it
+/// killed. Armor recharge (PlayerHealth.NoteDealtDamage), the zip gun's cooldown reset on a takedown
+/// and ultimate charge all need exactly that.
 ///
-/// Runs entirely from the VICTIM's own client: it listens to its own PlayerHealth, accumulates how
-/// much each attacker actually took off in a DamageCreditLedger, and tells each attacker their share
-/// through a targeted RPC - the same frame an isolated hit lands, or immediately on death. Only the
-/// victim's owner ever runs this (OnEnable below returns for a non-owner), so credit is counted
-/// exactly once no matter how many clients simulated the hit.
+/// Runs entirely on the VICTIM's own client: it listens to its own PlayerHealth, accumulates what
+/// each attacker took off in a DamageCreditLedger, and tells each attacker their share through a
+/// targeted RPC (the same frame an isolated hit lands, or immediately on death). OnEnable returns
+/// for a non-owner, so credit is counted exactly once however many clients simulated the hit.
 ///
-/// Lives on the player ROOT, beside PlayerHealth: PUN only ever delivers an RPC to a component on
-/// the PhotonView's own GameObject, which is the root - not PBRCharacter, which has its own
-/// PhotonView for its animator.
+/// Lives on the player ROOT beside PlayerHealth: PUN delivers an RPC only to a component on the
+/// PhotonView's own GameObject, not PBRCharacter, which has its own PhotonView for its animator.
 ///
-/// Deliberately NOT IPunObservable - PlayerNetSync is the player's only observable (see its class
-/// comment); nothing here needs to serialize, only to RPC.
+/// Deliberately NOT IPunObservable - PlayerNetSync is the only observable; this only RPCs.
 /// </summary>
 public class PlayerCombatCredit : MonoBehaviourPun
 {
@@ -42,31 +37,24 @@ public class PlayerCombatCredit : MonoBehaviourPun
     private readonly DamageCreditLedger ledger = new DamageCreditLedger();
     private float nextFlushTime;
 
-    /// <summary>Task T3 (telemetry): every assist actor from the death HandleDied just resolved,
-    /// captured here before ledger.Clear() wipes the ledger's own last-hit times. PlayerHealth.Died
-    /// always reaches this component's own handler before PlayerTelemetry's (Unity runs every
-    /// OnEnable, where this subscribes, before any Start, where PlayerTelemetry subscribes - see
-    /// its own class comment), so PlayerTelemetry's `death` line reads this rather than calling
-    /// AssistersSince itself against an already-cleared ledger.
-    ///
-    /// T3 review: that ordering guarantee is real, but a reader should not have to trust it blindly -
-    /// see LastDeathTime below for the freshness guard a caller can check instead of assuming.</summary>
+    /// <summary>Every assist actor from the death HandleDied just resolved, captured before
+    /// ledger.Clear() wipes the last-hit times. PlayerHealth.Died reaches this handler before
+    /// PlayerTelemetry's (Unity runs every OnEnable, where this subscribes, before any Start, where
+    /// PlayerTelemetry subscribes), so its `death` line reads this rather than calling AssistersSince
+    /// against an already-cleared ledger. Check LastDeathTime rather than trusting that ordering.</summary>
     public IReadOnlyList<int> LastDeathAssisters { get; private set; } = System.Array.Empty<int>();
 
-    /// <summary>Task T3 review: Time.time of the death LastDeathAssisters belongs to, -1 before any
-    /// death this life. PlayerTelemetry compares this against its own captured death time before
-    /// trusting LastDeathAssisters, rather than relying purely on subscriber ordering between two
-    /// separate components - a guard against a future refactor (either component's subscription
-    /// moving from OnEnable/Start to some other lifecycle method) silently reintroducing the ordering
-    /// bug LastDeathAssisters was built to avoid in the first place.</summary>
+    /// <summary>Time.time of the death LastDeathAssisters belongs to, -1 before any death this life.
+    /// PlayerTelemetry compares it with its own captured death time before trusting the list, so a
+    /// refactor moving either subscription to another lifecycle method cannot silently bring back the
+    /// ordering bug.</summary>
     public float LastDeathTime { get; private set; } = -1f;
 
     private void Awake()
     {
         playerHealth = GetComponent<PlayerHealth>();
 
-        // Loud, matching PlayerHealth/WeaponFiring: a silent null here would mean nobody who shoots
-        // this player ever gets credit for it, with no clue in the console why.
+        // Loud: a silent null would mean nobody who shoots this player ever gets credit, with no clue why.
         if (playerHealth == null)
             Debug.LogError($"[PlayerCombatCredit] {name}: no PlayerHealth on the player root - damage credit cannot work.");
     }
@@ -76,10 +64,9 @@ public class PlayerCombatCredit : MonoBehaviourPun
         if (playerHealth == null)
             return;
 
-        // Only the victim's own client ever accumulates or sends credit - see the class comment.
-        // Every other client simulated the same hits and PlayerHealth.ApplyDamage already threw
-        // its results away at the IsMine guard, so subscribing there too would either see nothing
-        // or, worse, see a stale copy of health/armor and report the wrong amount.
+        // Only the victim's own client accumulates or sends credit. Elsewhere PlayerHealth.ApplyDamage
+        // already discarded its results at the IsMine guard, so subscribing would see nothing or a
+        // stale copy of health/armor and report the wrong amount.
         if (!photonView.IsMine)
             return;
 
@@ -96,14 +83,10 @@ public class PlayerCombatCredit : MonoBehaviourPun
         playerHealth.Died -= HandleDied;
     }
 
-    /// <summary>Mark plan step 2, Decision 11: the flush is now LEADING-EDGE, and moved to LateUpdate
-    /// so every hit this frame (a shotgun's whole pellet spread included) is already in the ledger
-    /// before this runs. `ledger.HasPending` is the change from before: an isolated hit's credit now
-    /// leaves at the END OF THE SAME FRAME it landed, where the old fixed 0.25s tick could add up to
-    /// 0.25s of pure latency for a hit that happened to land right after the tick had just fired. A
-    /// follow-up hit within creditFlushSeconds of the last SENT report still waits and merges into the
-    /// next one - same rate cap, same totals, only the isolated case got faster. Ultimate charge and
-    /// armour recharge just hear sooner; nothing about what they hear changed.</summary>
+    /// <summary>LEADING-EDGE flush, in LateUpdate so every hit this frame (a shotgun's whole pellet
+    /// spread) is already in the ledger. An isolated hit's credit leaves at the END OF THE SAME FRAME it
+    /// landed; a follow-up within creditFlushSeconds of the last SENT report waits and merges into the
+    /// next one, which is the rate cap.</summary>
     private void LateUpdate()
     {
         if (!photonView.IsMine || !ledger.HasPending || Time.time < nextFlushTime)
@@ -116,39 +99,35 @@ public class PlayerCombatCredit : MonoBehaviourPun
             SendCredit(drained[i].actor, drained[i].amount, takedown: 0, cashedMark: drained[i].cashedMark, endsShield: drained[i].endsShield);
     }
 
-    /// <summary>Go-live's fresh start (PlayerLifecycle.ResetForMatchStart): forgets every warm-up hit so none of
-    /// them can turn into a live assist or damage credit. Owner only.</summary>
+    /// <summary>Forgets every warm-up hit so none can turn into a live assist or credit. Owner only.</summary>
     public void ResetForMatchStart()
     {
         if (photonView.IsMine)
             ledger.Clear();
     }
 
-    /// <summary>Records one hit. Self-damage and an unresolved source are skipped here rather than
-    /// in the ledger - DamageCreditLedger has no notion of whose ledger it is, only PlayerHealth's
-    /// owner (this player) knows that a source actor matching its own is a self-hit.</summary>
+    /// <summary>Self-damage and an unresolved source are skipped here, not in the ledger: only this
+    /// player knows whose ledger it is.</summary>
     private void HandleDamaged(DamageResult result, DamageInfo info)
     {
         if (info.SourceActorNumber <= 0 || info.SourceActorNumber == photonView.OwnerActorNr)
             return;
 
-        // Total, not HealthLost alone: armor absorbed is still damage the attacker actually dealt,
-        // the same figure PlayerHealth's own UpdateOverheadBar and DamageResolver's callers use.
-        // Mark plan step 4: whether THIS hit cashed a mark ORs into the attacker's own ledger entry.
-        // Dominion Task 7b (A26): a hit from a mine, field or burn set up before the attacker's respawn is flagged, so it never ends the shield
-        // the attacker got on coming back. Read here, on the victim's client, from the attacker's replicated dShd - no new message needed.
+        // Total, not HealthLost alone: armor absorbed is still damage the attacker dealt. Whether THIS hit
+        // cashed a mark ORs into the attacker's ledger entry.
+        // A hit from a mine, field or burn set up before the attacker's respawn is flagged so it never ends
+        // the shield they got on coming back (A26); read on the victim's client from the attacker's
+        // replicated dShd.
         Player attacker = PhotonNetwork.CurrentRoom != null ? PhotonNetwork.CurrentRoom.GetPlayer(info.SourceActorNumber) : null;
         bool endsShield = !Overpower.Dominion.RespawnShield.IsFromBeforeRespawn(attacker, info.EffectPlacedMs);
         ledger.Record(info.SourceActorNumber, result.Total, Time.time, result.Mark == MarkOutcome.Cashed, endsShield);
     }
 
     /// <summary>
-    /// The kill/assist flush. The killer is whoever DamageInfo.SourceActorNumber names on the
-    /// LETHAL hit - the exact same value PlayerHealth.ApplyDamage already used for
-    /// sourcePlayer?.AddScore(1) a moment earlier, so kill credit here can never disagree with the
-    /// scoreboard's. Every other actor who hit this player within the assist window gets a takedown
-    /// marker too, even if their damage was already flushed out by an earlier LateUpdate flush -
-    /// AssistersSince answers from last-hit time alone, independent of what has been paid out.
+    /// The kill/assist flush. The killer is whoever DamageInfo.SourceActorNumber names on the LETHAL
+    /// hit, the value PlayerHealth.ApplyDamage used for AddScore(1), so kill credit never disagrees
+    /// with the scoreboard. Every other actor who hit within the assist window gets a takedown marker
+    /// too, even if their damage was already flushed: AssistersSince answers from last-hit time alone.
     /// </summary>
     private void HandleDied(DamageInfo info)
     {
@@ -156,7 +135,7 @@ public class PlayerCombatCredit : MonoBehaviourPun
         var drained = ledger.Drain();
         var notified = new System.Collections.Generic.HashSet<int>();
 
-        // Task T3: captured before ledger.Clear() below - see LastDeathAssisters's own comment.
+        // Captured before ledger.Clear() below (see LastDeathAssisters).
         LastDeathAssisters = new List<int>(ledger.AssistersSince(Time.time, assistWindowSeconds, killerActor));
         LastDeathTime = Time.time;
 
@@ -176,19 +155,17 @@ public class PlayerCombatCredit : MonoBehaviourPun
             SendCredit(assistActor, assistEntry.amount, takedown: 2, cashedMark: assistEntry.cashedMark, endsShield: assistEntry.endsShield);
         }
 
-        // Anyone who dealt damage this fight but neither landed the kill nor stayed within the
-        // assist window still earns the credit for the damage itself - the ordinary flush's own
-        // contract, just settled immediately rather than waiting for LateUpdate to notice it.
+        // Anyone who dealt damage but neither killed nor stayed within the assist window still earns
+        // credit for the damage, settled now rather than waiting for LateUpdate.
         foreach (var entry in drained)
         {
             if (notified.Add(entry.actor))
                 SendCredit(entry.actor, entry.amount, takedown: 0, cashedMark: entry.cashedMark, endsShield: entry.endsShield);
         }
 
-        // Mark plan step 4: every SendCredit call above already read playerHealth.MarkSecondsLeftFor,
-        // which is 0 for everyone by now - PlayerHealth's own lethal block clears its marks BEFORE
-        // raising Died (see that method's own comment), so this death flush's messages correctly
-        // carry markSecondsLeft 0, hiding every attacker's diamond, without anything special here.
+        // Every SendCredit above read playerHealth.MarkSecondsLeftFor, which is 0 by now: PlayerHealth's
+        // lethal block clears its marks BEFORE raising Died, so this flush correctly carries
+        // markSecondsLeft 0 and hides every attacker's diamond.
         ledger.Clear();
     }
 
@@ -204,11 +181,9 @@ public class PlayerCombatCredit : MonoBehaviourPun
         return (0f, false, false);
     }
 
-    /// <summary>Targets exactly one attacker, so credit is never seen by anyone but the player it
-    /// belongs to. A left-room actor number resolves to null and is simply skipped - nobody is left
-    /// to credit. Mark plan step 4: also reads this victim's own MarkLedger for how many seconds
-    /// THIS attacker's mark (if any) still has left, so the attacker's diamond (mark step 5) always
-    /// rides on the same message as the damage/takedown it goes with, never a separate RPC.</summary>
+    /// <summary>Targets exactly one attacker, so credit is seen by nobody else. A left-room actor
+    /// resolves to null and is skipped. The seconds left on THIS attacker's mark ride on the same
+    /// message as the damage/takedown, never a separate RPC.</summary>
     private void SendCredit(int actorNumber, float amount, byte takedown, bool cashedMark, bool endsShield)
     {
         Player attacker = PhotonNetwork.CurrentRoom != null ? PhotonNetwork.CurrentRoom.GetPlayer(actorNumber) : null;
@@ -220,30 +195,22 @@ public class PlayerCombatCredit : MonoBehaviourPun
     }
 
     /// <summary>
-    /// Arrives on the ATTACKER's machine, but on the VICTIM's replicated player object - this RPC
-    /// was sent through the victim's own PhotonView, merely targeted at the attacker. Inside an RPC
-    /// body "local" is the RECEIVER, and the receiver here is not this component's own object: it
-    /// must reach for the attacker's OWN PlayerHealth through PlayerLookup (the same lookup
-    /// RPC_HandleDeathMaster already uses to find a specific actor's object), never `this` or
-    /// `GetComponent` on the object the RPC body is running on.
+    /// Arrives on the ATTACKER's machine, but on the VICTIM's replicated player object: it was sent
+    /// through the victim's PhotonView, merely targeted at the attacker. Inside an RPC body "local" is
+    /// the RECEIVER, and the receiver is not this component's own object: reach for the attacker's OWN
+    /// PlayerHealth through PlayerLookup (as RPC_HandleDeathMaster does), never `this` or `GetComponent`.
     ///
-    /// info.Sender is checked against this object's owner (the victim) as a cheap anti-spoof
-    /// sanity check: only the victim who actually owns this networked object should ever be the
-    /// one crediting damage through it.
+    /// info.Sender is checked against this object's owner (the victim) as an anti-spoof sanity check:
+    /// only the owner of this networked object should credit damage through it.
     ///
-    /// Mark plan step 4 (the one RPC signature change in this whole plan): cashedMark and
-    /// markSecondsLeft are APPENDED after the existing two parameters, same name, same [PunRPC]
-    /// count - appending parameters does not touch the RpcList (it indexes method NAMES, not
-    /// signatures, same as WeaponFiring's own appended-parameters note on RPC_FireWeapon). Review fix
-    /// (opus review, mark steps 3-4): a build from before this commit and one after cannot exchange
-    /// damage credit at all - PUN type-checks an incoming RPC's arguments against the receiver's own
-    /// method signature, logs "RPC method ... not found" for the mismatch, and drops the call outright,
-    /// rather than the parameters "silently misaligning" as an earlier version of this comment claimed.
-    /// Every client build must come from this exact commit on.
-    ///
-    /// Dominion Task 7b (A26): endsShield is appended the same way (still one RPC, the RpcList untouched - the same all-builds-from-one-commit
-    /// rule applies). It is false when every hit in this report came from a mine, field or burn set up before this attacker's respawn, so such
-    /// a hit does not end the attacker's new respawn shield; the victim works that out from the attacker's dShd and DamageInfo.EffectPlacedMs.
+    /// Parameters are only ever APPENDED (cashedMark, markSecondsLeft, then endsShield); the RpcList
+    /// indexes method NAMES, so appending leaves it untouched. But PUN type-checks incoming arguments
+    /// against the receiver's signature, logs "RPC method ... not found" on a mismatch and drops the
+    /// call, so builds from before and after an append cannot exchange damage credit at all: every
+    /// client build must come from the same commit. endsShield is false when every hit in the report
+    /// came from a mine, field or burn set up before this attacker's respawn, so it does not end the
+    /// respawn shield; the victim works that out from the attacker's dShd and DamageInfo.EffectPlacedMs
+    /// (A26).
     /// </summary>
     [PunRPC]
     private void RPC_DamageCredit(float amount, byte takedown, bool cashedMark, float markSecondsLeft, bool endsShield, PhotonMessageInfo info)
@@ -258,17 +225,15 @@ public class PlayerCombatCredit : MonoBehaviourPun
         {
             localHealth?.NoteDealtDamage();
             CombatEvents.RaiseDamageDealt(amount);
-            // `transform` here is the VICTIM as this attacker sees it - this RPC runs on the victim's
-            // own replicated object, merely targeted at the attacker (the class comment above).
+            // `transform` is the VICTIM as this attacker sees it (see the RPC comment above).
             CombatEvents.RaiseHitReported(transform, amount, cashedMark);
-            // Dominion Task 7b (A25/A26): damage that landed on an enemy. A hit the victim's own shield stopped never gets here (no credit is sent),
-            // so the victim is not shielded; endsShield is false when every hit in this report came from an effect set up before the respawn.
+            // Damage that landed on an enemy (A25/A26). A hit the victim's shield stopped never gets here
+            // (no credit is sent); endsShield is false when every hit came from an effect set up before the respawn.
             CombatEvents.RaiseEnemyAffected(false, !endsShield);
         }
 
-        // Always, even when amount is 0 (a death flush that carries no fresh damage still needs to
-        // hide a live diamond) - after the sender check above, never before it, so a spoofed sender
-        // can never clear or draw a diamond on a machine it does not own the RPC's own victim on.
+        // Always, even when amount is 0 (a death flush with no fresh damage still must hide a live
+        // diamond), but after the sender check so a spoofed sender cannot clear or draw a diamond.
         CombatEvents.RaiseMarkReported(transform, markSecondsLeft);
 
         CombatEvents.RaisePlayerCredit(amount, takedown);

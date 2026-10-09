@@ -4,39 +4,17 @@ using Overpower.Combat;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// Turns a projectile into one that bounces off walls instead of stopping on them - the
-    /// "Bounce" leaf of the burst path. Every bounce adds damage, so landing a shot after it has
-    /// ricocheted round a corner is worth more than a straight hit, which is the whole point of
-    /// building for it.
-    ///
-    /// BOUNCES ARE GEOMETRY ONLY. Hitting a player still ends the shot exactly like an unmodified
-    /// projectile - see OnHit below - because "bouncing off a person" is not the mechanic the
-    /// designer asked for, and letting a shot ricochet off a body would make standing behind a
-    /// teammate a way to redirect fire instead of block it.
-    ///
-    /// The damage bonus is ADDITIVE, not multiplicative, on the designer's explicit instruction:
-    /// three bounces must land at +60% (1.6x), not +20% compounded three times (1.73x). Setting
-    /// ProjectileContext's multiplier directly from the bounce count - never reading it back and
+    /// Turns a projectile into one that bounces off walls instead of stopping on them - the "Bounce" leaf of the burst path. Every bounce adds
+    /// damage, so landing a shot after it has ricocheted round a corner is worth more than a straight hit.
+    /// BOUNCES ARE GEOMETRY ONLY. Hitting a player still ends the shot like an unmodified projectile (see OnHit): letting a shot ricochet off a
+    /// body would make standing behind a teammate a way to redirect fire instead of block it.
+    /// The damage bonus is ADDITIVE, not multiplicative, on the designer's explicit instruction: three bounces must land at +60% (1.6x), not +20%
+    /// compounded three times (1.73x). Setting ProjectileContext's multiplier directly from the bounce count - never reading it back and
     /// re-multiplying - is what keeps that true.
-    ///
-    /// A bounced shot gets NO extra range. ProjectileMotor creates one RangeBudget in Initialize
-    /// and Redirect only ever changes direction (and, since the fix below, lifts the projectile a
-    /// couple of centimetres off the wall - never touches RangeBudget), so the metres already
-    /// flown before a bounce stay spent and the total distance travelled is still capped at Max
-    /// Range. Nothing in this file has to enforce that - it falls out of not touching
-    /// ProjectileMotor's range bookkeeping at all, which is the entire point of the
-    /// IProjectileBehaviour seam.
-    ///
-    /// THE WALL-RATTLE FIX (2026-09-21). Tudor measured bounced shots dealing LESS per trigger
-    /// pull than direct ones - the opposite of this file's own "+20% per bounce" intent. The cause
-    /// lived in ProjectileMotor, not here: a bullet left resting exactly on the wall it just
-    /// bounced off was read as hitting that SAME wall again on the very next sweep (Unity's
-    /// documented "initial overlap" signature - distance 0, normal the sweep direction reversed),
-    /// so this OnHit kept reflecting about an artifact instead of a real second wall, until the
-    /// bounce budget ran out on the wall it should have flown away from. The only change here is
-    /// which Redirect overload is called - the one that also lifts the projectile off the surface
-    /// and remembers which collider to distrust on the next sweep. See ProjectileMotor's class
-    /// comment and Redirect's own comment for the mechanism.
+    /// A bounced shot gets NO extra range: Redirect only changes direction (and lifts the projectile off the wall), never the RangeBudget, so the
+    /// metres already flown stay spent and the total distance is still capped at Max Range. Nothing in this file has to enforce that.
+    /// OnHit calls the Redirect overload that lifts the projectile off the surface and remembers which collider to distrust on the next sweep -
+    /// see Redirect for the wall-rattle trap that avoids.
     /// </summary>
     [DisallowMultipleComponent]
     public class BounceOffWalls : MonoBehaviour, IProjectileBehaviour
@@ -50,10 +28,10 @@ namespace Overpower.Weapons
                  "that has bounced three times deals 1 + 0.2*3 = 1.6x, not 1.2 cubed.")]
         private float damagePerBounce = 0.20f;
 
-        /// <summary>Max Bounces, read-only - the shop's pop-up shows it (Task 13).</summary>
+        /// <summary>Max Bounces, read-only - the shop's pop-up shows it.</summary>
         public int MaxBounces => maxBounces;
 
-        /// <summary>Damage Per Bounce (a fraction of base damage), read-only - the shop's pop-up shows it (Task 13).</summary>
+        /// <summary>Damage Per Bounce (a fraction of base damage), read-only - the shop's pop-up shows it.</summary>
         public float DamagePerBounce => damagePerBounce;
 
         private int bounces;

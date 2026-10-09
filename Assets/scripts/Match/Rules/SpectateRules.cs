@@ -9,13 +9,13 @@ namespace Overpower.Match
         public SpectateCandidate(int actor, int team) { Actor = actor; Team = team; }
     }
 
-    /// <summary>Task 9g (Tudor D28): a knocked-out player's Spectate button. Pure rules; the view feeds in who is alive (present, on a
+    /// <summary>A knocked-out player's Spectate button (D28). Pure rules; the view feeds in who is alive (present, on a
     /// team still in the match, not on the spectator's own team).</summary>
     public static class SpectateRules
     {
         public const int None = -1;
 
-        /// <summary>Lobby Task 15b: the title of the result card a spectator sees at the match end - the template (UiTheme, "{0}" = the
+        /// <summary>The title of the result card a spectator sees at the match end - the template (UiTheme, "{0}" = the
         /// team's name) with the winning team's name. A winner with no name in the list reads "Team N".</summary>
         public static string ResultTitle(string template, string[] teamNames, int winner)
         {
@@ -24,7 +24,7 @@ namespace Overpower.Match
             return string.Format(template, name);
         }
 
-        /// <summary>Lobby Task 15b: a spectator has no body, so no MatchUI panel; their result card goes up once, as soon as the room names a
+        /// <summary>A spectator has no body, so no MatchUI panel; their result card goes up once, as soon as the room names a
         /// winner while they are watching.</summary>
         public static bool MustShowResult(bool watching, int winner, bool alreadyShown) => watching && winner >= 0 && !alreadyShown;
 
@@ -73,7 +73,7 @@ namespace Overpower.Match
         public static bool ButtonVisible(bool losePanelShown, MatchPhase phase) =>
             losePanelShown && phase != MatchPhase.Over;
 
-        // ---- the spectator seat (lobby Task 6): Q / E over everyone with a body, Space for the whole map
+        // ---- the spectator seat: Q / E over everyone with a body, Space for the whole map
 
         /// <summary>The players a seat spectator can watch, by actor number (whatever the team). Never null.</summary>
         public static int[] SortedActors(IList<SpectateCandidate> watchable)

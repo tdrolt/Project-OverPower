@@ -1,7 +1,7 @@
 namespace Overpower.Match
 {
     /// <summary>What the warm-up bar shows for one message: whether End warm-up is there and pressable, and whether the line naming the team that
-    /// has nobody is there (lobby Task 10 review).</summary>
+    /// has nobody is there.</summary>
     public readonly struct WarmupBarView
     {
         public readonly bool ButtonShown;
@@ -18,7 +18,7 @@ namespace Overpower.Match
         }
     }
 
-    /// <summary>Pure mapping from the bar's message to what is shown, greyed or explained (extracted from WarmupBar.Apply so it can be tested).</summary>
+    /// <summary>Pure mapping from the bar's message to what is shown, greyed or explained.</summary>
     public static class WarmupBarRules
     {
         public static WarmupBarView ViewFor(WarmupMessage message, int blockedTeam, int playersNow)

@@ -4,15 +4,14 @@ namespace Overpower.Net
 {
     /// <summary>
     /// The one place that knows how team membership is stored and compared. Team lives in
-    /// exactly one Photon Custom Property key, "teamID" - moved here (out of Multiplayer.cs)
-    /// because later abilities need the same same-team check that damage does, and a key this
-    /// important should have exactly one home rather than one per script that needs it.
+    /// exactly one Photon Custom Property key, "teamID", because later abilities need the same
+    /// same-team check that damage does and a key this important should have exactly one home.
     /// </summary>
     public static class Teams
     {
         public const string TeamKey = "teamID";
 
-        /// <summary>Set to true on a player who watches instead of playing (a spectator seat at Start, lobby Task 4); cleared on
+        /// <summary>Set to true on a player who watches instead of playing (a spectator seat at Start); cleared on
         /// joining a room and on a deliberate leave (MatchPropertyReset).</summary>
         public const string SpectatorKey = "spec";
 

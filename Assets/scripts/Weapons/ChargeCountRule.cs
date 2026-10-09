@@ -3,14 +3,9 @@ using UnityEngine;
 namespace Overpower.Weapons
 {
     /// <summary>
-    /// How many rounds one trigger pull of a charging weapon sends out, and where along the hold each extra round is
-    /// earned. Pulled out of WeaponFiring (charge step 1) for two reasons: it is the arithmetic a live bug hid in
-    /// (Tudor, 2026-09-17: "spamming the burst upgrade made the burst have more bullets than 3"), and the charge ring
-    /// on the ground has to mark the SAME step positions the gun actually uses - one home, so a tick can never promise
-    /// a round the gun does not give.
-    ///
-    /// Plain numbers, no WeaponDefinition: a ScriptableObject cannot be built in a plain edit-mode test without
-    /// reflection, and nothing here needs anything but four numbers. WeaponFiring reads them off the asset.
+    /// How many rounds one trigger pull of a charging weapon sends out, and where along the hold each extra round is earned.
+    /// One home so the charge ring on the ground marks the SAME step positions the gun uses: a tick can never promise a round the gun does not give.
+    /// Plain numbers, no WeaponDefinition (a ScriptableObject cannot be built in a plain edit-mode test without reflection); WeaponFiring reads them off the asset.
     /// </summary>
     public static class ChargeCountRule
     {
@@ -29,16 +24,12 @@ namespace Overpower.Weapons
             if (steps <= 0)
                 return clamped;
 
-            // FloorToInt, not RoundToInt (Tudor, 2026-09-17: "spamming the burst upgrade made the burst have more
-            // bullets than 3"). Rounding gave a step away at the HALFWAY point to it, so on a 0.35 s bar an ordinary
-            // 90 ms click already sat above 25% and bought the 4th round for nothing - the charge time is meant to BE
-            // the price of the payoff. Flooring means a step is only ever reached by completing it, and the charge
-            // ring's ticks mark exactly where that happens.
+            // FloorToInt, not RoundToInt: rounding gave a step away at the HALFWAY point, so an ordinary 90 ms click on a 0.35 s bar already
+            // bought the 4th round for nothing. A step is only reached by completing it, and the charge ring's ticks mark exactly where.
             return Mathf.Min(steps, Mathf.FloorToInt(clamped * steps)) / (float)steps;
         }
 
-        /// <summary>The hold fraction at which step <paramref name="index"/> is reached - where the charge ring's tick
-        /// marks go. 0 for step 0, 1 for the last step.</summary>
+        /// <summary>The hold fraction at which step <paramref name="index"/> is reached - where the charge ring's tick marks go.</summary>
         public static float StepFraction(int index, int steps) =>
             steps <= 0 ? 0f : Mathf.Clamp01(index / (float)steps);
 

@@ -47,12 +47,12 @@ namespace Overpower.Vision
     /// </summary>
     public static class VisionRules
     {
-        /// <summary>Whether the fog and the hiding of enemies apply to the local player: the config's switch, except for a seat spectator
-        /// (lobby Task 6), who sees both teams, every zone and every effect.</summary>
+        /// <summary>Whether the fog and the hiding of enemies apply to the local player: the config's switch, except for a seat
+        /// spectator, who sees both teams, every zone and every effect.</summary>
         public static bool FogApplies(bool fogSwitchedOn, bool localIsSeatSpectator) => fogSwitchedOn && !localIsSeatSpectator;
 
-        /// <summary>The shape an eye uses. Holding the Scope is Tudor's trade: a narrow, long cone in exchange for a
-        /// smaller circle (scopedCircleChange is negative to shrink). The circle never goes below 0.</summary>
+        /// <summary>The shape an eye uses. Holding the Scope trades a narrow, long cone for a smaller circle
+        /// (scopedCircleChange is negative to shrink). The circle never goes below 0.</summary>
         public static SightShape ShapeFor(float coneAngle, float coneLength, float circleRadius,
             bool scoped, float scopedConeAngle, float scopedConeLength, float scopedCircleChange)
         {

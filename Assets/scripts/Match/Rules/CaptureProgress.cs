@@ -14,15 +14,11 @@ namespace Overpower.Match
         public const string ProgressKey = "cProg";
         public const string RateKey = "cRate";
         public const string StampKey = "cStamp";
-        // captureFadeSpeed (2026-09-24): a fifth room-properties key. Old code that doesn't know this key simply
-        // never reads it - ReadIntArray/BuildingManager's decode loop default a missing array to 0 (not fading)
-        // per zone, so an old client falls back to reading a fade/refill's plain Team/rate/owner shape as if it
-        // were a live capture/drain (CaptureRingState.From, without the Fading check). The two directions land
-        // differently: a neutral zone's fade (negative rate, neutral owner) still happens to hit that file's own
-        // owner < 0 guard and shows Idle, but an owned zone's refill (positive rate, Team = the last drainer, not
-        // the owner) matches none of its guards and reads as THE DRAINER capturing the zone - a stale,
-        // wrong-coloured growing band, not a blank one - until this client updates. Every build in one match must
-        // still match, though - see the capture-fade brief's report.
+        // A client that doesn't know this key reads a missing array as 0 (not fading), so it reads a fade/refill's
+        // plain Team/rate/owner shape as a live capture/drain (CaptureRingState.From without the Fading check). A
+        // neutral zone's fade still hits that file's owner < 0 guard and shows Idle, but an owned zone's refill
+        // (positive rate, Team = the last drainer, not the owner) matches none of its guards and reads as THE DRAINER
+        // capturing: a stale, wrong-coloured growing band. Every build in one match must still match.
         public const string FadingKey = "cFade";
 
         // Ints on the wire: Photon handles int[] natively, and 1/10000 of a capture is finer than a pixel.
@@ -37,8 +33,7 @@ namespace Overpower.Match
         /// <summary>True when this progress is captureFadeSpeed sliding back (neutral) or refilling (owned) with
         /// nobody actually capturing/draining right now, rather than a live player-driven capture or drain. Lets
         /// CaptureRingState.From tell a genuine fade/refill apart from the two-update echo race its Team/rate-sign
-        /// guards exist for, and CaptureTransitionClassifier avoid logging a fade as Started/Resumed/Drain* - see
-        /// both files' own comments.</summary>
+        /// guards exist for, and CaptureTransitionClassifier avoid logging a fade as Started/Resumed/Drain*.</summary>
         public readonly bool Fading;
 
         public CaptureProgress(int team, float progress01, float ratePerSecond01, int stampMs, bool fading = false)
@@ -67,21 +62,19 @@ namespace Overpower.Match
         public int EncodeRate() => (int)Math.Round(RatePerSecond01 * Scale);
         public int EncodeFading() => Fading ? 1 : 0;
 
-        /// <param name="fading">0/1 from the cFade wire key; defaults to 0 (not fading) when a room/client has no
-        /// such key yet - see FadingKey's own comment.</param>
+        /// <param name="fading">0/1 from the cFade wire key; 0 (not fading) when there is no such key - see FadingKey.</param>
         public static CaptureProgress Decode(int team, int progress, int rate, int stampMs, int fading = 0) =>
             new CaptureProgress(team, progress / Scale, rate / Scale, stampMs, fading != 0);
 
-        /// <summary>A capture or drain on hold (Tudor, 2026-09-16 capture ring): a contested capture, one whose link is
+        /// <summary>A capture or drain on hold: a contested capture, one whose link is
         /// under attack, or a paused drain. It keeps its team and how far it got, at rate 0, so every client can draw
         /// the paused band. The same team at the same rate never republishes, and a hold never moves, so its
         /// progress can't go stale on the wire. Idle when there is no team or nothing banked.</summary>
         public static CaptureProgress Held(int team, float progress01, int stampMs) =>
             team < 0 || progress01 <= 0f ? Idle : new CaptureProgress(team, Math.Min(1f, progress01), 0f, stampMs);
 
-        /// <summary>A team with progress that isn't moving - see Held. Requires real progress banked (review fix,
-        /// 2026-09-17): a hold under 1/10000 of a capture rounds to 0 on the wire, and CaptureRingState already
-        /// reads that as Idle, not Paused - IsHeld must agree.</summary>
+        /// <summary>A team with progress that isn't moving - see Held. Requires real progress banked: a hold under
+        /// 1/10000 of a capture rounds to 0 on the wire, and CaptureRingState already reads that as Idle, not Paused - IsHeld must agree.</summary>
         public bool IsHeld => Team >= 0 && RatePerSecond01 == 0f && Progress01 > 0f;
     }
 }
