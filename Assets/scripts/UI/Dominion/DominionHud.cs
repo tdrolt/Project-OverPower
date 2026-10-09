@@ -114,13 +114,13 @@ namespace Overpower.UI
                 case DominionStage.Round:
                 case DominionStage.Overtime: // the same bar, its heading says OVERTIME and the clock is the overtime's own minute
                     round.Refresh(shownTeams, state.Round, config.MaxRounds, DominionHudText.SecondsLeft(state.EndMs, now), false, state.Stage == DominionStage.Overtime,
-                        state.Points, state.Wins, config.RoundsToWin, names);
+                        state.Wins, config.RoundsToWin, names);
                     breakCard.SetVisible(false);
                     sudden.Hide();
                     RefreshCentre(config, now, names);
                     break;
                 case DominionStage.SuddenDeath:
-                    round.Refresh(teams, state.Round, config.MaxRounds, 0, true, false, state.Points, state.Wins, config.RoundsToWin, names);
+                    round.Refresh(teams, state.Round, config.MaxRounds, 0, true, false, state.Wins, config.RoundsToWin, names);
                     breakCard.SetVisible(false);
                     centre.SetVisible(false);
                     RefreshSudden(now);

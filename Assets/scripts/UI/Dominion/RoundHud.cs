@@ -7,9 +7,9 @@ using Overpower.Dominion;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The round bar at the top centre during a round (board DomHud A, and "3v3v3 version of A"). 2v2: both teams' points either side of the round
-    /// clock, round wins as dots under each score; 3v3v3: three team blocks and the clock at the end. "+200 CYAN" flashes under the holder's block
-    /// when the centre pays out. DominionHudText builds the words; sizes, colours and words are UiTheme fields (Dominion HUD). It draws only what
+    /// The round bar at the top centre during a round (board DomHud A, and "3v3v3 version of A"). It carries no points (ScoreBars shows them):
+    /// 2v2: a team block either side of the round clock; 3v3v3: three team blocks and the clock at the end. A block is the team's colour line with
+    /// its round-win dots. "+200 CYAN" flashes under the holder's block when the centre pays out. DominionHudText builds the words; sizes, colours and words are UiTheme fields (Dominion HUD). It draws only what
     /// DominionHud hands it each frame and rewrites a text only when its value changed.
     /// </summary>
     public sealed class RoundHud
@@ -18,10 +18,8 @@ namespace Overpower.UI
         {
             public int Team;
             public RectTransform Rect;
-            public TextMeshProUGUI Score;
             public Image[] Dots;
             public float CentreX;       // the block's centre from the bar's left edge, for the flash
-            public int ShownScore = int.MinValue;
             public int ShownWins = -1;
         }
 
@@ -44,13 +42,6 @@ namespace Overpower.UI
         public string FlashTextShown => flashLabel != null && flashLabel.gameObject.activeSelf ? flashLabel.text : "";
         public bool IsShowing => root != null && root.gameObject.activeSelf;
 
-        /// <summary>The points as drawn for a team (int.MinValue before the first draw).</summary>
-        public int ShownScoreOf(int team)
-        {
-            foreach (Block block in blocks) if (block.Team == team) return block.ShownScore;
-            return int.MinValue;
-        }
-
         public RoundHud(LobbyUiKit kit, Transform parent)
         {
             this.kit = kit;
@@ -65,7 +56,7 @@ namespace Overpower.UI
 
         /// <summary>teams are the match's team ids in order (2 or 3); clockSeconds is the round clock (ignored in sudden death), or the overtime's own
         /// clock when overtime is on: the small heading then says OVERTIME instead of the round.</summary>
-        public void Refresh(int[] teams, int round, int maxRounds, int clockSeconds, bool suddenDeath, bool overtime, int[] points, int[] wins, int winsToWin, string[] teamNames)
+        public void Refresh(int[] teams, int round, int maxRounds, int clockSeconds, bool suddenDeath, bool overtime, int[] wins, int winsToWin, string[] teamNames)
         {
             if (teams == null || teams.Length < 2) { SetVisible(false); return; }
             dotCountCache = Mathf.Clamp(winsToWin, 1, 5);
@@ -91,12 +82,6 @@ namespace Overpower.UI
 
             foreach (Block block in blocks)
             {
-                int score = Cell(points, block.Team);
-                if (score != block.ShownScore)
-                {
-                    block.Score.text = score.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    block.ShownScore = score;
-                }
                 int teamWins = Cell(wins, block.Team);
                 if (teamWins != block.ShownWins) { PaintDots(block, teamWins); block.ShownWins = teamWins; }
             }
@@ -109,7 +94,7 @@ namespace Overpower.UI
             }
         }
 
-        /// <summary>The centre paid this team: "+200 CYAN" shows under its score for Flash Seconds.</summary>
+        /// <summary>The centre paid this team: "+200 CYAN" shows under its block for Flash Seconds.</summary>
         public void Flash(int team, int pointsPaid, string[] teamNames)
         {
             if (root == null) return;
@@ -143,7 +128,7 @@ namespace Overpower.UI
             Destroy();
             builtTeamCount = teams.Length;
             bool three = teams.Length >= 3;
-            float side = three ? theme.dominionBar3SideWidth : theme.dominionBarSideWidth;
+            float side = Mathf.Max(three ? theme.dominionBar3SideWidth : theme.dominionBarSideWidth, DotsWidth() + 2f * theme.dominionBarDotsMargin);
             float clockWidth = three ? theme.dominionBar3ClockWidth : theme.dominionBarClockWidth;
             float height = theme.dominionBarHeight;
             float total = three ? side * teams.Length + clockWidth : side * 2f + clockWidth;
@@ -160,18 +145,18 @@ namespace Overpower.UI
             {
                 for (int i = 0; i < teams.Length; i++)
                 {
-                    blocks.Add(BuildBlock(teams[i], x, side, height, TextAlignmentOptions.Midline, 0f));
+                    blocks.Add(BuildBlock(teams[i], x, side, height));
                     x += side;
                 }
                 BuildClock(x, clockWidth, height, rounded: true);
             }
             else
             {
-                blocks.Add(BuildBlock(teams[0], x, side, height, TextAlignmentOptions.MidlineRight, theme.dominionBarScoreInset));
+                blocks.Add(BuildBlock(teams[0], x, side, height));
                 x += side;
                 BuildClock(x, clockWidth, height, rounded: false);
                 x += clockWidth;
-                blocks.Add(BuildBlock(teams[1], x, side, height, TextAlignmentOptions.MidlineLeft, theme.dominionBarScoreInset));
+                blocks.Add(BuildBlock(teams[1], x, side, height));
             }
 
             flashLabel = kit.Text(root, "Centre Flash", "", kit.Display, theme.dominionFlashSize, theme.dominionGoldColor, TextAlignmentOptions.Midline);
@@ -183,10 +168,10 @@ namespace Overpower.UI
             flashLabel.gameObject.SetActive(false);
             roundDrawn = clockDrawn = false;
             shownOvertime = false;
-            foreach (Block block in blocks) { block.ShownScore = int.MinValue; block.ShownWins = -1; }
+            foreach (Block block in blocks) block.ShownWins = -1;
         }
 
-        private Block BuildBlock(int team, float x, float width, float height, TextAlignmentOptions align, float inset)
+        private Block BuildBlock(int team, float x, float width, float height)
         {
             var block = new Block { Team = team, CentreX = x + width * 0.5f };
             var go = new GameObject("Team " + team, typeof(RectTransform));
@@ -207,24 +192,11 @@ namespace Overpower.UI
             edgeImage.color = TeamColour(team);
             edgeImage.raycastTarget = false;
 
-            float scoreSize = builtTeamCount >= 3 ? theme.dominionScore3Size : theme.dominionScoreSize;
-            block.Score = kit.Text(block.Rect, "Score", "0", kit.Display, scoreSize, theme.lobbyOffWhiteColor, align);
-            block.Score.overflowMode = TextOverflowModes.Overflow;
-            RectTransform scoreRect = block.Score.rectTransform;
-            scoreRect.anchorMin = new Vector2(0f, 1f);
-            scoreRect.anchorMax = new Vector2(1f, 1f);
-            scoreRect.pivot = new Vector2(0.5f, 1f);
-            scoreRect.sizeDelta = new Vector2(-2f * inset, scoreSize * 1.2f);
-            scoreRect.anchoredPosition = new Vector2(0f, -theme.dominionScoreTop);
-
-            // One dot per round win needed to win the match, lined up with the score.
+            // One dot per round win needed to win the match, centred above the colour line.
             int dotCount = Mathf.Max(1, DotCount());
             block.Dots = new Image[dotCount];
-            float dotsWidth = dotCount * theme.dominionDotSize + (dotCount - 1) * theme.dominionDotGap;
-            float first = align == TextAlignmentOptions.MidlineRight ? width - inset - dotsWidth
-                        : align == TextAlignmentOptions.MidlineLeft ? inset
-                        : (width - dotsWidth) * 0.5f;
-            float top = theme.dominionScoreTop + scoreSize * 1.2f + theme.dominionDotsGap;
+            float first = (width - DotsWidth()) * 0.5f;
+            float top = (height - theme.dominionBarEdgeThickness - theme.dominionDotSize) * 0.5f;
             for (int i = 0; i < dotCount; i++)
             {
                 var dotGo = new GameObject("Dot " + (i + 1), typeof(RectTransform), typeof(Image));
@@ -240,6 +212,8 @@ namespace Overpower.UI
         private int dotCountCache = 2;
 
         private int DotCount() => dotCountCache;
+
+        private float DotsWidth() => DotCount() * theme.dominionDotSize + (DotCount() - 1) * theme.dominionDotGap;
 
         private void BuildClock(float x, float width, float height, bool rounded)
         {

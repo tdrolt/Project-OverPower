@@ -329,18 +329,16 @@ MonoBehaviour:
   dominionBarTop: 30
   dominionBarFill: {r: 0.059, g: 0.063, b: 0.078, a: 0.75}
   dominionBarRadius: 12
-  dominionBarHeight: 126
+  dominionBarHeight: 80
   dominionBarClockFill: {r: 0, g: 0, b: 0, a: 0.25}
-  dominionBarSideWidth: 270
-  dominionBarClockWidth: 255
-  dominionBar3SideWidth: 195
-  dominionBar3ClockWidth: 225
+  dominionBarSideWidth: 90
+  dominionBarClockWidth: 190
+  dominionBar3SideWidth: 90
+  dominionBar3ClockWidth: 200
   dominionBarEdgeThickness: 6
-  dominionBarScoreInset: 27
-  dominionScoreSize: 51
-  dominionScore3Size: 45
-  dominionClockSize: 54
-  dominionClock3Size: 48
+  dominionBarDotsMargin: 18
+  dominionClockSize: 36
+  dominionClock3Size: 34
   dominionRoundLabelSize: 18
   dominionLabelSpacing: 3
   dominionDotSize: 18
@@ -355,9 +353,7 @@ MonoBehaviour:
   dominionFlashSeconds: 2.5
   dominionFlashFadeSeconds: 0.5
   dominionFlashGap: 6
-  dominionScoreTop: 12
-  dominionDotsGap: 4
-  dominionRoundLabelTopShare: 0.16
+  dominionRoundLabelTopShare: 0.1
   dominionBreakTop: 168
   dominionCardFill: {r: 0.059, g: 0.063, b: 0.078, a: 0.85}
   dominionCardRadius: 15
