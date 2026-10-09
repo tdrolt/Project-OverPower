@@ -74,7 +74,7 @@ namespace Overpower.Data
 
         [Header("Respawn shield")]
         [Tooltip("How many seconds a freshly respawned player is shielded. Hitting an enemy with anything (damage, a stun, a slow or a push) ends it at once; effects they set up before dying (a mine, a fire field, a burn) do not.")]
-        [SerializeField, Min(0f)] private float shieldSeconds = 10f;
+        [SerializeField, Min(0f)] private float shieldSeconds = 5f;
 
         [Tooltip("How big the shield's bubble is, as a multiple of the Invulnerability ability's shield bubble.")]
         [SerializeField, Min(0.1f)] private float shieldBubbleScale = 1.5f;

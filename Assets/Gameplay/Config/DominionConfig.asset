@@ -30,7 +30,7 @@ MonoBehaviour:
   spawnHealOutOfCombatPerSecond: 10
   spawnHealInCombatPerSecond: 4
   spawnHealOutOfCombatDelaySeconds: 6
-  shieldSeconds: 10
+  shieldSeconds: 5
   shieldBubbleScale: 1.5
   blockedPopupSeconds: 0.8
   suddenDeathShrinkSeconds: 60
