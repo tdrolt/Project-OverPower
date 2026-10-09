@@ -73,12 +73,12 @@ namespace Overpower.Lobby
             bool timedOut = false;
             while (MayStartGame)
             {
-                if (Time.unscaledTime - began > GiveUpSeconds)
+                if (LobbySeatRules.StartGaveUp(began, Time.unscaledTime, GiveUpSeconds))
                 {
                     timedOut = true;
                     break;
                 }
-                if (sentAt < 0f || seatsChangedSinceSend || Time.unscaledTime - sentAt >= ResendSeconds)
+                if (LobbySeatRules.ShouldResendStart(sentAt, seatsChangedSinceSend, Time.unscaledTime, ResendSeconds))
                 {
                     seatsChangedSinceSend = false;
                     SeatWrite write = LobbySeatRules.StartWrite(seats.Layout, seats.Seats, seats.NoRoleActors);
@@ -137,12 +137,10 @@ namespace Overpower.Lobby
                 StartLateJoin();
                 return;
             }
-            // A player coming back to a held place (HasRejoined) with a team seat and a team is looked after by RoomManager's rejoin
-            // branch (its body comes back or is respawned by WatchOwnBodyAfterRejoin). The others still need the seat's reaction: a
-            // spectator seat starts the spectator view again, and a team seat that never spawned (the player dropped in the lobby and
-            // missed the lS 0 to 1 edge) gets its body now.
-            if (PhotonNetwork.LocalPlayer.HasRejoined
-                && Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _) && !Teams.IsSpectator(PhotonNetwork.LocalPlayer))
+            // A player coming back to a held place with a team seat and a team is looked after by RoomManager's rejoin branch (its body
+            // comes back or is respawned by WatchOwnBodyAfterRejoin); who still needs the seat's reaction is LobbySeatRules.RejoinerNeedsSeatReaction (tested).
+            bool hasTeam = Teams.TryGetTeam(PhotonNetwork.LocalPlayer, out _);
+            if (!LobbySeatRules.RejoinerNeedsSeatReaction(PhotonNetwork.LocalPlayer.HasRejoined, hasTeam, Teams.IsSpectator(PhotonNetwork.LocalPlayer)))
                 return;
             ReactToStart();
         }

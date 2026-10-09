@@ -318,6 +318,19 @@ namespace Overpower.Lobby
 
         /// <summary>The game of this lobby has started and this client holds no seat in it. Needs the layout: until the room's mode is
         /// read, nobody can say the seat is missing (it may simply not be readable yet).</summary>
+        /// <summary>Does a player who joined a started room act on their seat (a team seat spawns a body, a spectator seat starts the view)? Not when
+        /// they came back to a held place with a team seat and a team: the rejoin path brings that body back, and a second one would be a double. A
+        /// rejoiner on a spectator seat, or one who dropped in the lobby and never got a team, still needs the seat's reaction.</summary>
+        public static bool RejoinerNeedsSeatReaction(bool hasRejoined, bool hasTeam, bool isSpectator) => !(hasRejoined && hasTeam && !isSpectator);
+
+        /// <summary>Is the host's Start (a check-and-set the room may refuse while someone sits down) to be sent now: never sent yet, a seat changed since
+        /// the last send, or the resend wait has passed.</summary>
+        public static bool ShouldResendStart(float sentAtSeconds, bool seatsChangedSinceSend, float nowSeconds, float resendSeconds) =>
+            sentAtSeconds < 0f || seatsChangedSinceSend || nowSeconds - sentAtSeconds >= resendSeconds;
+
+        /// <summary>A Start that keeps being refused is given up once more than the give-up time has passed since the host pressed it.</summary>
+        public static bool StartGaveUp(float beganSeconds, float nowSeconds, float giveUpSeconds) => nowSeconds - beganSeconds > giveUpSeconds;
+
         public static bool GameRunningWithoutSeat(bool inRoom, int stage, bool hasLayout, string seat) =>
             inRoom && hasLayout && stage >= LobbyWarmup && seat == null;
 

@@ -63,6 +63,12 @@ namespace Overpower.Dominion
         /// <summary>A player joining while sudden death is on is seated as a spectator when a spectator seat is free (they could only wait dead).</summary>
         public static bool LateJoinerPrefersSpectatorSeat(DominionStage stage) => stage == DominionStage.SuddenDeath;
 
+        /// <summary>Does a player still count as in the game for the last-team rule (A3) and the overtime drop-out (A56)? A connected player always; a
+        /// dropped one until the dropped grace has run out from the moment this client first saw the drop (so a quick reconnect never costs a team the
+        /// match); a drop not timed yet counts as present (the grace starts now). Seconds are this client's clock.</summary>
+        public static bool CountsAsPresent(bool isInactive, bool hasInactiveSince, float inactiveSinceSeconds, float nowSeconds, float graceSeconds) =>
+            !(isInactive && hasInactiveSince && nowSeconds - inactiveSinceSeconds >= graceSeconds);
+
         /// <summary>The team with the single highest points, or -1 on a tie for first (or no points at all). A tied round counts for
         /// nobody (Tudor): neither team gets a round win, and 0-0 is a tie like any other.</summary>
         public static int RoundWinner(int[] points)

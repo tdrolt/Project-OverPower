@@ -26,8 +26,7 @@ namespace Overpower.Abilities
         public readonly PlayerLifecycle Lifecycle;
         public readonly WeaponFiring Weapon;
 
-        /// <summary>Null until Task 1.6 adds PlayerDisplacement to the player root. Found here
-        /// automatically once it exists, so no module or runner edit is needed then. A dash must
+        /// <summary>The player root's PlayerDisplacement, found automatically; null on a root without one (a test rig), so a dash must
         /// check for null rather than assume it.</summary>
         public readonly IDisplaceable Displacement;
 

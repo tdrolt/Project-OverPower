@@ -262,9 +262,12 @@ namespace Overpower.Dominion
             return true;
         }
 
-        /// <summary>A dropped player still counts until the dropped grace has run out (a quick reconnect never costs a team the match).</summary>
-        private bool StillCounts(int actor, Player p, float graceSeconds) =>
-            !(p.IsInactive && inactiveSince.TryGetValue(actor, out float since) && Time.unscaledTime - since >= graceSeconds);
+        /// <summary>A dropped player still counts until the dropped grace has run out: DominionRules.CountsAsPresent (tested); this only reads the room.</summary>
+        private bool StillCounts(int actor, Player p, float graceSeconds)
+        {
+            bool timed = inactiveSince.TryGetValue(actor, out float since);
+            return DominionRules.CountsAsPresent(p.IsInactive, timed, since, Time.unscaledTime, graceSeconds);
+        }
 
         /// <summary>Fills the sudden-death tally from the room's players: each player's replicated alive flag (PlayerLifecycle.AliveKey; a player who
         /// never died has none, which counts as alive) and, for the fallen, the server stamp they wrote with it (PlayerLifecycle.LastStandAtKey, one
@@ -414,14 +417,14 @@ namespace Overpower.Dominion
             }
         }
 
-        /// <summary>Once, when the match goes live: a 2v2 team with no SpawnHealArea in the scene heals nowhere (Task 11 places them). Logged, not
-        /// guessed around.</summary>
+        /// <summary>Once, when the match goes live: a 2v2 team with no SpawnHealArea in the scene heals nowhere (the lane scene places one per team).
+        /// Logged, not guessed around.</summary>
         private void WarnAboutMissingHealAreas()
         {
             if (healAreaWarned) return;
             healAreaWarned = true;
             foreach (int team in DominionHealRules.TeamsMissingHealArea(DominionMode.TeamsOfCurrentRoom(), SpawnHealArea.HasAreaFor))
-                Debug.LogWarning($"[DOMINION] team {team} has no SpawnHealArea in this scene - its players get no spawn healing until the scene places one (Task 11).");
+                Debug.LogWarning($"[DOMINION] team {team} has no SpawnHealArea in this scene - its players get no spawn healing until the scene places one.");
         }
 
         /// <summary>Sudden death starts, or starts over after everyone fell at once (every client, on the new dSd): a player of a tied team is alive at
