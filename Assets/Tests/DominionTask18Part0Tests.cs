@@ -273,7 +273,7 @@ namespace Overpower.Tests
         }
 
         // The cards' wording is Tudor's (he edits it in the mode assets), so no test pins it; what is guarded is the rule of A54: the three revised
-        // cards exist in both modes, once each, with words and no exact numbers.
+        // cards exist in both modes, once each, with words and no exact numbers (except the 3v3v3 Rounds card, which says the overtime lead).
         private static GameModeDefinition Mode(string mode)
         {
             var def = UnityEditor.AssetDatabase.LoadAssetAtPath<GameModeDefinition>("Assets/Gameplay/Config/Modes/" + mode + ".asset");
@@ -290,7 +290,8 @@ namespace Overpower.Tests
                     Assert.AreEqual(1, cards.Count, $"{mode}: one card titled {title}");
                     string text = cards[0].text;
                     Assert.IsFalse(string.IsNullOrWhiteSpace(text), $"{mode} {title}: has words");
-                    Assert.IsFalse(text.Any(char.IsDigit), $"{mode} {title}: no exact numbers on a card (A54): {text}");
+                    bool namesTheLead = mode == "Dominion 3v3v3" && title == "Rounds"; // the one card that states the overtime lead in points
+                    if (!namesTheLead) Assert.IsFalse(text.Any(char.IsDigit), $"{mode} {title}: no exact numbers on a card (A54): {text}");
                 }
         }
 

@@ -20,7 +20,7 @@ namespace Overpower.Tests
         [Test] public void WithinTheLeadAtTheBuzzerTheTopTeamsPlayOvertimeAndNobodyHasWonYet()
         {
             DominionRules.BuzzerResult r = DominionRules.AtBuzzer(new[] { 500, 400, 100 }, Three, Lead, true);
-            CollectionAssert.AreEqual(new[] { 0, 1 }, r.OvertimeTeams, "exactly the teams less than a lead behind the top");
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, r.OvertimeTeams, "the top two are within the lead, so every team of the match plays");
             Assert.IsNull(r.Winners);
         }
 
@@ -34,17 +34,17 @@ namespace Overpower.Tests
         [Test] public void OnePointShortOfTheLeadIsStillOvertime()
         {
             DominionRules.BuzzerResult r = DominionRules.AtBuzzer(new[] { 499, 300, 0 }, Three, Lead, true);
-            CollectionAssert.AreEqual(new[] { 0, 1 }, r.OvertimeTeams);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, r.OvertimeTeams);
         }
 
-        [Test] public void ATeamTheFullLeadBehindAtTheBuzzerIsNotInOvertime()
+        [Test] public void ATeamTheFullLeadBehindTheTopIsNotWithinTheLead()
         {
-            CollectionAssert.AreEqual(new[] { 0, 1 }, DominionRules.OvertimeTeams(new[] { 500, 450, 300 }, Three, Lead), "300 is 200 behind: out");
-            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, DominionRules.OvertimeTeams(new[] { 500, 450, 301 }, Three, Lead), "301 is 199 behind: in");
+            CollectionAssert.AreEqual(new[] { 0, 1 }, DominionRules.TeamsWithinLead(new[] { 500, 450, 300 }, Three, Lead), "300 is 200 behind: out");
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, DominionRules.TeamsWithinLead(new[] { 500, 450, 301 }, Three, Lead), "301 is 199 behind: in");
         }
 
         [Test] public void AnEqualTopIsOvertimeNotATiedRound() =>
-            CollectionAssert.AreEqual(new[] { 0, 1 }, DominionRules.AtBuzzer(new[] { 300, 300, 40 }, Three, Lead, true).OvertimeTeams);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, DominionRules.AtBuzzer(new[] { 300, 300, 40 }, Three, Lead, true).OvertimeTeams);
 
         [Test] public void OnlyTheTeamsOfTheMatchCountAtTheBuzzer()
         {
@@ -184,13 +184,13 @@ namespace Overpower.Tests
         private static DominionWrite Next(DominionRoomState room, int now, DominionFlowNumbers? cfg = null, int[] players = null) =>
             DominionRoomWrites.Next(true, true, now, room, cfg ?? Cfg, Three, players ?? new[] { 3, 3, 3 });
 
-        [Test] public void AClosePointsRoundAtTheBuzzerWritesOvertimeForExactlyTheCloseTeams()
+        [Test] public void AClosePointsRoundAtTheBuzzerWritesOvertimeForEveryTeamOfTheMatch()
         {
             var room = Room(DominionStage.Round, 100000, new[] { 500, 400, 100 });
             DominionWrite w = Next(room, 100000);
             Assert.AreEqual((int)DominionStage.Overtime, w.Props[DominionKeys.Stage]);
             Assert.AreEqual(160000, w.Props[DominionKeys.StageEnd], "now + the overtime minute");
-            CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])w.Props[DominionKeys.OvertimeTeams]);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, (int[])w.Props[DominionKeys.OvertimeTeams], "every team plays, the far-behind third too");
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.Wins), "nobody has won the round");
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.History), "the round is not in the history yet");
             Assert.IsFalse(w.Props.ContainsKey(DominionKeys.Round), "still the same round");
@@ -246,11 +246,11 @@ namespace Overpower.Tests
             CollectionAssert.AreEqual(new[] { 1, 1, 0 }, (int[])w.Props[DominionKeys.Wins], "team 2 has the most points now but was out at the buzzer");
         }
 
-        [Test] public void AnOvertimeRoomWithoutItsTeamListSharesBetweenTheMatchTeams()
+        [Test] public void AnOvertimeRoomWithoutItsTeamListPlaysBetweenTheMatchTeamsAndSharesToThoseWithinTheLead()
         {
             var room = Room(DominionStage.Overtime, 160000, new[] { 520, 600, 0 }, otTeams: null);
             DominionWrite w = Next(room, 160000);
-            CollectionAssert.AreEqual(new[] { 1, 1, 1 }, (int[])w.Props[DominionKeys.Wins]);
+            CollectionAssert.AreEqual(new[] { 1, 1, 0 }, (int[])w.Props[DominionKeys.Wins], "team 2 is 600 behind: no share");
         }
 
         [Test] public void TwoSharedRoundsMakeTwoTwoAndSendThoseTwoTeamsToSuddenDeath()

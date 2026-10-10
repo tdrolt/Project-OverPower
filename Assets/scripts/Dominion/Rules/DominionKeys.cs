@@ -48,7 +48,7 @@ namespace Overpower.Dominion
         /// wins counted, not the points leader. Absent in a room from before it existed: the table then falls back to the points leader.</summary>
         public const string HistoryWinners = "dHistW";
 
-        /// <summary>int[]: the teams playing the current overtime (A50): the ones within the lead of the top at the buzzer. Written with the Overtime stage,
+        /// <summary>int[]: the teams playing the current overtime: every team of the match with anyone left in it (narrowed when a team empties). Written with the Overtime stage,
         /// removed again by the write that ends the round. Absent outside overtime.</summary>
         public const string OvertimeTeams = "dOtT";
 

@@ -94,16 +94,16 @@ namespace Overpower.Dominion
         /// <summary>Does the room's stage play for points: a round, or the overtime after it (zones, bounties and the centre keep paying there).</summary>
         public static bool IsRoundPlay(DominionStage stage) => stage == DominionStage.Round || stage == DominionStage.Overtime;
 
-        /// <summary>The teams that play overtime: every team of the match less than <paramref name="leadPoints"/> behind the top at the buzzer
-        /// (a team exactly a lead behind is out). One team alone means it is a lead ahead of everyone and has simply won. Only the match's teams count (a 2v2 room keeps team 2's slot at 0).</summary>
-        public static int[] OvertimeTeams(int[] points, int[] teamsInMatch, int leadPoints)
+        /// <summary>The teams less than <paramref name="leadPoints"/> behind the best of <paramref name="teams"/> (a team exactly a lead behind is out).
+        /// Alone in the list means that team is a lead ahead of everyone. Only the given teams count (a 2v2 room keeps team 2's slot at 0).</summary>
+        public static int[] TeamsWithinLead(int[] points, int[] teams, int leadPoints)
         {
             var result = new List<int>();
-            if (teamsInMatch == null || teamsInMatch.Length == 0) return result.ToArray();
+            if (teams == null || teams.Length == 0) return result.ToArray();
             int lead = Math.Max(1, leadPoints);
             int top = int.MinValue;
-            foreach (int t in teamsInMatch) top = Math.Max(top, PointsOf(points, t));
-            foreach (int t in teamsInMatch)
+            foreach (int t in teams) top = Math.Max(top, PointsOf(points, t));
+            foreach (int t in teams)
                 if (top - PointsOf(points, t) < lead) result.Add(t);
             result.Sort();
             return result.ToArray();
@@ -122,7 +122,7 @@ namespace Overpower.Dominion
         }
 
         /// <summary>The teams the round bar and the score bars show: every team of the match, and in overtime less a team with nobody left in the game
-        /// (a team far behind at the buzzer stays up even though it is not in the overtime). A team whose presence is not known (no count, or past the end of
+        ///. A team whose presence is not known (no count, or past the end of
         /// it) is shown, and so is every team when nobody was counted at all. The match's own array is handed back when nothing is hidden, so a per-frame call allocates nothing.</summary>
         public static int[] TeamsShownIn(DominionStage stage, int[] matchTeams, int[] playersPerTeam)
         {
@@ -139,8 +139,8 @@ namespace Overpower.Dominion
         public static bool OvertimeNeedsNarrowing(int[] stored, int[] present) =>
             stored != null && present != null && present.Length >= 2 && present.Length < stored.Length;
 
-        /// <summary>The overtime team that is <paramref name="leadPoints"/> or more ahead of every OTHER overtime team, or -1. A team outside overtime
-        /// neither wins here nor stops anyone from winning: it was a lead behind at the buzzer and is out of the round.</summary>
+        /// <summary>The overtime team that is <paramref name="leadPoints"/> or more ahead of every OTHER overtime team, or -1. A team that dropped out
+        /// of the list (nobody left in the game) neither wins here nor stops anyone from winning.</summary>
         public static int OvertimeLeader(int[] points, int[] overtimeTeams, int leadPoints)
         {
             if (overtimeTeams == null || overtimeTeams.Length < 2) return -1;
@@ -164,7 +164,8 @@ namespace Overpower.Dominion
             return true;
         }
 
-        /// <summary>The clock ran out on a round: a team a lead ahead of every other team wins it; otherwise the teams within the lead play overtime.
+        /// <summary>The clock ran out on a round: a team a lead ahead of every other team wins it; otherwise, when the top teams are within the lead,
+        /// every team of the match plays overtime (the far-behind ones too: they can still score).
         /// With overtime off the old rule applies: the single top team wins, a tie for first counts for nobody (empty winners). A round in which every
         /// team of the match has 0 points counts for nobody either, overtime or not.</summary>
         public static BuzzerResult AtBuzzer(int[] points, int[] teamsInMatch, int leadPoints, bool overtimeOn)
@@ -175,19 +176,19 @@ namespace Overpower.Dominion
                 int winner = RoundWinner(points);
                 return new BuzzerResult { Winners = winner >= 0 ? new[] { winner } : new int[0] };
             }
-            int[] close = OvertimeTeams(points, teamsInMatch, leadPoints);
-            return close.Length == 1 ? new BuzzerResult { Winners = close } : new BuzzerResult { OvertimeTeams = close };
+            int[] close = TeamsWithinLead(points, teamsInMatch, leadPoints);
+            if (close.Length == 1) return new BuzzerResult { Winners = close };
+            int[] all = (int[])teamsInMatch.Clone();
+            Array.Sort(all);
+            return new BuzzerResult { OvertimeTeams = all };
         }
 
-        /// <summary>The overtime's minute ran out: a team that has the lead at the final points wins, else every team still in overtime shares the round.</summary>
+        /// <summary>The overtime's minute ran out: a team a lead ahead of every other team in the overtime wins; else every team within the lead of the
+        /// top shares the round (a team still a lead or more behind gets nothing).</summary>
         public static int[] AtOvertimeEnd(int[] points, int[] overtimeTeams, int leadPoints)
         {
             int leader = OvertimeLeader(points, overtimeTeams, leadPoints);
-            if (leader >= 0) return new[] { leader };
-            if (overtimeTeams == null) return new int[0];
-            int[] shared = (int[])overtimeTeams.Clone();
-            Array.Sort(shared);
-            return shared;
+            return leader >= 0 ? new[] { leader } : TeamsWithinLead(points, overtimeTeams, leadPoints);
         }
 
         /// <summary>The round wins after a round: a copy of <paramref name="wins"/> with one more for each round winner (a shared round has several).</summary>

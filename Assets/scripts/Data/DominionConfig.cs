@@ -28,10 +28,10 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float breakCountdownSeconds = 5f;
 
         [Header("Overtime")]
-        [Tooltip("The extra time, in seconds, a close round gets when the clock runs out. Only the teams that were close at the buzzer play it. If nobody pulls ahead by the lead before it ends, every team still in it gets a round win. 0 turns overtime off: the team with the most points simply wins the round, and a tie counts for nobody.")]
+        [Tooltip("The extra time, in seconds, a close round gets when the clock runs out. Every team plays it, even one far behind. If nobody pulls ahead of every other team by the lead before it ends, every team within the lead of the top team gets a round win. 0 turns overtime off: the team with the most points simply wins the round, and a tie counts for nobody.")]
         [SerializeField, Min(0f)] private float overtimeSeconds = 60f;
 
-        [Tooltip("How many points ahead a team must be to win a round. At the buzzer, a team this far ahead of every other team wins the round; if not, the teams less than this far behind the leader play overtime, and there the first team this far ahead of the other overtime teams wins the round at once. A team this far behind at the buzzer is out of the round. 0 turns overtime off (the team with the most points simply wins the round, and a tie counts for nobody).")]
+        [Tooltip("How many points ahead a team must be to win a round. At the buzzer, a team this far ahead of every other team wins the round; if not, and the top teams are less than this far apart, every team plays overtime, and there the first team this far ahead of every other team wins the round at once. When the overtime runs out, each team less than this far behind the top team gets a round win. 0 turns overtime off (the team with the most points simply wins the round, and a tie counts for nobody).")]
         [SerializeField, Min(0)] private int overtimeLeadPoints = 200;
 
         [Header("Points")]
