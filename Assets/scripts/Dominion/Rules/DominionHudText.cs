@@ -56,15 +56,73 @@ namespace Overpower.Dominion
         public static string BreakHeadline(int winner, string[] teamNames, string winsFormat, string tiedText) =>
             winner < 0 ? tiedText : Fmt(winsFormat, LobbyRoomRules.TeamName(teamNames, winner).ToUpperInvariant());
 
-        /// <summary>The big line of the break card after a shared round (an overtime that ran out): "SHARED · WHITE + PURPLE". Every winner's name in capitals,
-        /// joined by the separator, inside the format.</summary>
-        public static string BreakHeadlineShared(int[] winners, string[] teamNames, string sharedFormat, string namesSeparator)
+        /// <summary>Team names in capitals, each in its colour (rich text, colourHex[team] as RRGGBB; null = bare), joined by <paramref name="separator"/>
+        /// with <paramref name="lastSeparator"/> before the last: "WHITE, PURPLE and CYAN".</summary>
+        public static string TeamNameList(int[] teams, string[] teamNames, string[] colourHex, string separator, string lastSeparator)
         {
-            var names = new List<string>();
-            if (winners != null)
-                foreach (int team in winners) names.Add(LobbyRoomRules.TeamName(teamNames, team).ToUpperInvariant());
-            return Fmt(sharedFormat, string.Join(namesSeparator ?? " + ", names));
+            var sb = new StringBuilder();
+            int count = teams != null ? teams.Length : 0;
+            for (int i = 0; i < count; i++)
+            {
+                if (i > 0) sb.Append(i == count - 1 ? lastSeparator : separator);
+                sb.Append(Coloured(LobbyRoomRules.TeamName(teamNames, teams[i]).ToUpperInvariant(), colourHex, teams[i]));
+            }
+            return sb.ToString();
         }
+
+        /// <summary>The line under "SHARED ROUND": {0} in the format is the winners' names (TeamNameList).</summary>
+        public static string SharedRoundLine(string format, int[] winners, string[] teamNames, string[] colourHex, string separator, string lastSeparator) =>
+            Fmt(format, TeamNameList(winners, teamNames, colourHex, separator, lastSeparator));
+
+        /// <summary>The match score in round wins. Two teams: "WHITE 1 - 1 PURPLE" (a name on the outer side of its number); three or more: each number
+        /// keeps its own name ("WHITE 1 - PURPLE 1 - CYAN 0") so no number is left guessing. Each part is in its team's colour.</summary>
+        public static string MatchScoreLine(int[] teams, int[] wins, string[] teamNames, string[] colourHex, string dash)
+        {
+            var parts = new List<string>();
+            if (teams == null) return "";
+            for (int i = 0; i < teams.Length; i++)
+            {
+                string name = LobbyRoomRules.TeamName(teamNames, teams[i]).ToUpperInvariant();
+                string number = (teams[i] >= 0 && wins != null && teams[i] < wins.Length ? wins[teams[i]] : 0).ToString(CultureInfo.InvariantCulture);
+                bool nameAfter = teams.Length == 2 && i == 1;
+                parts.Add(Coloured(nameAfter ? number + " " + name : name + " " + number, colourHex, teams[i]));
+            }
+            return string.Join(dash, parts);
+        }
+
+        /// <summary>The teams one round win from the match (roundsToWin - 1), lowest first. A team already at the target has won, not reached match point.</summary>
+        public static int[] MatchPointTeams(int[] teams, int[] wins, int roundsToWin)
+        {
+            var result = new List<int>();
+            if (teams != null)
+                foreach (int team in teams)
+                    if (roundsToWin >= 2 && wins != null && team >= 0 && team < wins.Length && wins[team] == roundsToWin - 1) result.Add(team);
+            result.Sort();
+            return result.ToArray();
+        }
+
+        /// <summary>"MATCH POINT: WHITE, PURPLE" from a format with {0} the names; empty when no team is on match point.</summary>
+        public static string MatchPointLine(string format, int[] pointTeams, string[] teamNames, string[] colourHex, string separator) =>
+            pointTeams == null || pointTeams.Length == 0 ? "" : Fmt(format, TeamNameList(pointTeams, teamNames, colourHex, separator, separator));
+
+        /// <summary>A pop that starts and ends at 1 and peaks at <paramref name="peak"/> halfway through <paramref name="duration"/> seconds; 1 outside it.</summary>
+        public static float PulseScale(float elapsed, float duration, float peak)
+        {
+            if (duration <= 0f || elapsed <= 0f || elapsed >= duration) return 1f;
+            return 1f + (peak - 1f) * (float)Math.Sin(Math.PI * elapsed / duration);
+        }
+
+        /// <summary>Does this round-win dot pulse when the shared-round card appears: the newest win of a team that shared the round (dot number
+        /// <paramref name="slot"/>, 0-based, of a team that now has <paramref name="wins"/> wins).</summary>
+        public static bool PulsesDot(int[] winners, int team, int slot, int wins)
+        {
+            if (winners == null || slot != wins - 1) return false;
+            foreach (int w in winners) if (w == team) return true;
+            return false;
+        }
+
+        private static string Coloured(string text, string[] colourHex, int team) =>
+            colourHex != null && team >= 0 && team < colourHex.Length && !string.IsNullOrEmpty(colourHex[team]) ? "<color=#" + colourHex[team] + ">" + text + "</color>" : text;
 
         /// <summary>What the break's last line says. Until the last bigFromSeconds seconds it is the small card line ("ROUND 2 STARTS IN 14",
         /// big = false); from then on it is the big centre line ("Round 2 starts in 5…", big = true). {0} = the round, {1} = the seconds left.</summary>

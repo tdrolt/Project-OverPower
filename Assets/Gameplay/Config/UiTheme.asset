@@ -384,8 +384,17 @@ MonoBehaviour:
   dominionBreakHeaderFormat: ROUND {0}
   dominionBreakWinsFormat: '{0} WINS'
   dominionBreakTiedText: TIED
-  dominionBreakSharedFormat: "SHARED \xB7 {0}"
-  dominionBreakNamesSeparator: ' + '
+  dominionBreakSharedText: SHARED ROUND
+  dominionBreakSharedLineFormat: '{0} each get a round win'
+  dominionBreakSharedLineSize: 28
+  dominionBreakNamesSeparator: ', '
+  dominionBreakNamesLast: ' and '
+  dominionBreakScoreDash: ' - '
+  dominionBreakScoreSize: 45
+  dominionBreakMatchPointFormat: 'MATCH POINT: {0}'
+  dominionBreakMatchPointSize: 30
+  dominionBreakPulseSeconds: 0.6
+  dominionBreakPulseScale: 1.7
   dominionBreakFirstText: GET READY
   dominionBreakPointsLabel: points
   dominionBreakPointsGap: 28

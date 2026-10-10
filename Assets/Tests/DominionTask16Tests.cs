@@ -410,12 +410,6 @@ namespace Overpower.Tests
 
         private static readonly string[] Names = { "White", "Purple", "Cyan" };
 
-        [Test] public void TheBreakHeadlineOfASharedRoundNamesEveryWinner() =>
-            Assert.AreEqual("SHARED · WHITE + PURPLE", DominionHudText.BreakHeadlineShared(new[] { 0, 1 }, Names, "SHARED · {0}", " + "));
-
-        [Test] public void ABrokenSharedFormatFallsBackToTheRawTextNotAnException() =>
-            Assert.DoesNotThrow(() => DominionHudText.BreakHeadlineShared(new[] { 0, 1 }, Names, "SHARED {", " + "));
-
         [Test] public void TheResultHeadlineAfterSharedRoundsStillReadsTheWinnersWinsFirst()
         {
             // Round 1 shared by white and purple (1-1-0), round 2 won by purple: PURPLE WINS 2-1-0 in a three-team match.
@@ -451,7 +445,7 @@ namespace Overpower.Tests
         [Test] public void TheBreakCardNamesTheWinnersTheRoomRecordedThroughTheTestedRules()
         {
             Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.DominionHud), "ReadRoom", Rule(typeof(DominionHistory), nameof(DominionHistory.WinnersOfFinishedRound))));
-            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.BreakCard), Rule(typeof(DominionHudText), nameof(DominionHudText.BreakHeadlineShared))));
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.BreakCard), Rule(typeof(DominionHudText), nameof(DominionHudText.SharedRoundLine))));
         }
 
         [Test] public void TheResultTableBoldsEveryRecordedWinner() =>

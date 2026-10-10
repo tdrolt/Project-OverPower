@@ -1071,10 +1071,28 @@ namespace Overpower.UI
         public string dominionBreakWinsFormat = "{0} WINS";
         [Tooltip("The big line of the break card when the round was tied (nobody gets a round win).")]
         public string dominionBreakTiedText = "TIED";
-        [Tooltip("The big line of the break card when an overtime ran out and the round was shared. {0} = the names of the teams that share it, in capitals, joined by the Names Separator.")]
-        public string dominionBreakSharedFormat = "SHARED · {0}";
-        [Tooltip("What sits between the team names on the break card when a round is shared (WHITE + PURPLE).")]
-        public string dominionBreakNamesSeparator = " + ";
+        [Tooltip("The big line of the break card when an overtime ran out and the round was shared.")]
+        public string dominionBreakSharedText = "SHARED ROUND";
+        [Tooltip("The line under the shared-round headline. {0} = the names of the teams that share the round, each in its colour (WHITE and PURPLE, or WHITE, PURPLE and CYAN).")]
+        public string dominionBreakSharedLineFormat = "{0} each get a round win";
+        [Tooltip("Font size of the line that names the teams sharing the round.")]
+        public float dominionBreakSharedLineSize = 28f;
+        [Tooltip("What sits between team names in the break card's lists (WHITE, PURPLE) - also between the teams on match point.")]
+        public string dominionBreakNamesSeparator = ", ";
+        [Tooltip("What sits before the last team name in the shared-round line (WHITE and PURPLE).")]
+        public string dominionBreakNamesLast = " and ";
+        [Tooltip("What sits between the teams' round wins in the match score on the break card (WHITE 1 - 1 PURPLE).")]
+        public string dominionBreakScoreDash = " - ";
+        [Tooltip("Font size of the match score on the break card (shown from round 2 on).")]
+        public float dominionBreakScoreSize = 45f;
+        [Tooltip("The line for teams one round win away from the match. {0} = their names in their colours, joined by the Names Separator.")]
+        public string dominionBreakMatchPointFormat = "MATCH POINT: {0}";
+        [Tooltip("Font size of the match point line.")]
+        public float dominionBreakMatchPointSize = 30f;
+        [Tooltip("How long, in seconds, the newest round-win dot of each team that shared the round pulses when the break card appears.")]
+        public float dominionBreakPulseSeconds = 0.6f;
+        [Tooltip("How much bigger than normal that dot grows at the height of its pulse (1 = no pulse, 2 = twice the size).")]
+        public float dominionBreakPulseScale = 1.7f;
         [Tooltip("The big line of the break before round 1, when there is no result yet.")]
         public string dominionBreakFirstText = "GET READY";
         [Tooltip("The word between the two teams' points on the break card.")]

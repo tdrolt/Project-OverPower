@@ -7,8 +7,8 @@ using Overpower.Dominion;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The card between rounds (board DomBreak A): "ROUND 1 · PURPLE WINS · 540 / 620" (a tie: "TIED"), the round-win dots, what the next round
-    /// opens in the shop, a PICK YOUR BUILD (P) button and "ROUND 2 STARTS IN 14". The last seconds (Break Countdown Seconds in the Dominion Config)
+    /// The card between rounds (board DomBreak A): "ROUND 1 · PURPLE WINS · 540 / 620" (a tie: "TIED"; a shared round: "SHARED ROUND" and who gets a win), the round-win dots,
+    /// the match score and MATCH POINT from round 2 on, what the next round opens in the shop, a PICK YOUR BUILD (P) button and "ROUND 2 STARTS IN 14". The last seconds (Break Countdown Seconds in the Dominion Config)
     /// read big in the same place. The break before round 1 has no result: GET READY, the same opens line and countdown.
     /// It sits high so the arena stays in view and draws BELOW the shop (its canvas sorts under the shop's): the shop opens on top and nothing of the
     /// card blocks a click on it. Only its button takes the mouse; a spectator has no shop, so no button. Words, sizes, colours are UiTheme fields.
@@ -19,7 +19,7 @@ namespace Overpower.UI
         private readonly UiTheme theme;
         private readonly Transform parent;
         private RectTransform card;
-        private TextMeshProUGUI header, headline, opens, countdown;
+        private TextMeshProUGUI header, headline, sharedLine, scoreLine, matchPointLine, opens, countdown;
         private bool countdownIsBig;
         private LobbyButton pick;
         private GameObject pickRow;
@@ -34,12 +34,17 @@ namespace Overpower.UI
         private int drawnRound;
         private bool drawnFirstBreak, drawnCanPick;
         private int[] drawnPoints = System.Array.Empty<int>(), drawnWins = System.Array.Empty<int>(), drawnWinners = System.Array.Empty<int>();
+        private bool pulsing;
+        private float pulseStart;
         private bool countdownDrawn;
         private int drawnSeconds, drawnCountdownRound, drawnBigFrom;
 
         public bool IsShowing => card != null && card.gameObject.activeSelf;
         public string HeaderText => header != null ? header.text : "";
         public string HeadlineText => headline != null ? headline.text : "";
+        public string SharedLineText => sharedLine != null && sharedLine.gameObject.activeSelf ? sharedLine.text : "";
+        public string ScoreText => scoreLine != null && scoreLine.gameObject.activeSelf ? scoreLine.text : "";
+        public string MatchPointText => matchPointLine != null && matchPointLine.gameObject.activeSelf ? matchPointLine.text : "";
         public string OpensText => opens != null ? opens.text : "";
         public string CountdownText => countdown != null && !countdownIsBig ? countdown.text : "";
         public string BigText => countdown != null && countdownIsBig ? countdown.text : "";
@@ -83,8 +88,18 @@ namespace Overpower.UI
                 int winner = firstBreak || shared || winners == null || winners.Length == 0 ? -1 : winners[0];
                 header.text = string.Format(System.Globalization.CultureInfo.InvariantCulture, theme.dominionBreakHeaderFormat, firstBreak ? round : finished);
                 headline.text = firstBreak ? theme.dominionBreakFirstText
-                    : shared ? DominionHudText.BreakHeadlineShared(winners, teamNames, theme.dominionBreakSharedFormat, theme.dominionBreakNamesSeparator)
+                    : shared ? theme.dominionBreakSharedText
                     : DominionHudText.BreakHeadline(winner, teamNames, theme.dominionBreakWinsFormat, theme.dominionBreakTiedText);
+                string[] hex = TeamHex();
+                sharedLine.gameObject.SetActive(shared);
+                if (shared)
+                    sharedLine.text = DominionHudText.SharedRoundLine(theme.dominionBreakSharedLineFormat, winners, teamNames, hex, theme.dominionBreakNamesSeparator, theme.dominionBreakNamesLast);
+                scoreLine.gameObject.SetActive(!firstBreak);
+                scoreLine.text = firstBreak ? "" : DominionHudText.MatchScoreLine(teams, wins, teamNames, hex, theme.dominionBreakScoreDash);
+                string matchPoint = firstBreak ? "" : DominionHudText.MatchPointLine(theme.dominionBreakMatchPointFormat,
+                    DominionHudText.MatchPointTeams(teams, wins, dotsToWin), teamNames, hex, theme.dominionBreakNamesSeparator);
+                matchPointLine.gameObject.SetActive(matchPoint.Length > 0);
+                matchPointLine.text = matchPoint;
                 headline.color = firstBreak || winner < 0 ? theme.lobbyOffWhiteColor : TextColour(winner);
                 pointsRow.SetActive(!firstBreak);
                 for (int i = 0; i < teams.Length; i++)
@@ -97,12 +112,16 @@ namespace Overpower.UI
                     winDots[i].sprite = won ? GeneratedSprites.Disc : DominionHudSprites.EmptyDot(theme);
                     winDots[i].color = won ? Pick(theme.dominionTeamColors, team) : theme.dominionDimColor;
                 }
+                pulsing = shared;
+                pulseStart = Time.unscaledTime;
                 opens.text = DominionHudText.OpensLine(round, depthByRound, armorByRound,
                     new OpensTexts(theme.dominionOpensFormat, theme.dominionOpensFirstText, theme.dominionOpensWeaponFamily, theme.dominionOpensWeaponUpgrade,
                                    theme.dominionOpensArmorOne, theme.dominionOpensArmorMore, theme.dominionOpensAnd, theme.dominionOpensNothing));
                 pickRow.SetActive(canPick);
                 onPickAction = onPick;
             }
+
+            ApplyPulse();
 
             if (!countdownDrawn || secondsLeft != drawnSeconds || round != drawnCountdownRound || bigFromSeconds != drawnBigFrom)
             {
@@ -119,6 +138,31 @@ namespace Overpower.UI
                 }
                 countdown.text = line;
             }
+        }
+
+        /// <summary>The newest round-win dot of every team that shared the round pops once, then every dot is back at normal size.</summary>
+        private void ApplyPulse()
+        {
+            if (!pulsing) return;
+            float elapsed = Time.unscaledTime - pulseStart;
+            for (int i = 0; i < winDots.Count; i++)
+            {
+                int team = winDotTeam[i];
+                int slot = i % Mathf.Max(1, dotsToWin);
+                bool pulses = DominionHudText.PulsesDot(drawnWinners, team, slot, team < drawnWins.Length ? drawnWins[team] : 0);
+                float scale = pulses ? DominionHudText.PulseScale(elapsed, theme.dominionBreakPulseSeconds, theme.dominionBreakPulseScale) : 1f;
+                winDots[i].rectTransform.localScale = new Vector3(scale, scale, 1f);
+            }
+            if (elapsed >= theme.dominionBreakPulseSeconds) pulsing = false;
+        }
+
+        private string[] TeamHex()
+        {
+            Color[] colours = theme.dominionTeamTextColors;
+            int count = colours != null ? colours.Length : 0;
+            var hex = new string[count];
+            for (int i = 0; i < count; i++) hex[i] = ColorUtility.ToHtmlStringRGB(colours[i]);
+            return hex;
         }
 
         private static bool SameInts(int[] a, int[] b)
@@ -140,6 +184,7 @@ namespace Overpower.UI
             if (card != null) Object.Destroy(card.gameObject);
             card = null;
             countdownIsBig = false;
+            pulsing = false;
             pointsTexts.Clear(); winDots.Clear(); winDotTeam.Clear();
             drawn = false;
             countdownDrawn = false;
@@ -172,6 +217,7 @@ namespace Overpower.UI
 
             header = Line("Header", kit.Bold, theme.dominionBreakHeaderSize, theme.dominionMutedColor, theme.dominionBreakHeaderSize * theme.resultHeadingSpacingShare);
             headline = Line("Headline", kit.Display, theme.dominionBreakHeadlineSize, theme.lobbyOffWhiteColor, 0f);
+            sharedLine = Line("Shared Line", kit.Body, theme.dominionBreakSharedLineSize, theme.lobbyOffWhiteColor, 0f);
 
             // The two (or three) teams' points. With two teams the small word "points" sits between them like the board; with three it sits under the
             // scores (a word trailing after the third number reads as part of it).
@@ -230,6 +276,9 @@ namespace Overpower.UI
                     winDotTeam.Add(teams[t]);
                 }
             }
+
+            scoreLine = Line("Match Score", kit.Display, theme.dominionBreakScoreSize, theme.lobbyOffWhiteColor, 0f);
+            matchPointLine = Line("Match Point", kit.Bold, theme.dominionBreakMatchPointSize, theme.dominionGoldColor, 0f);
 
             var divider = new GameObject("Divider", typeof(RectTransform), typeof(Image));
             divider.transform.SetParent(card, false);
