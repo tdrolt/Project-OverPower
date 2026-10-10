@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Overpower.Match
 {
-    /// <summary>Where a bounty label or pop is drawn on its canvas: kept fully on screen, and off the corner minimap. Canvas units, origin at the canvas centre.</summary>
+    /// <summary>Where a bounty label or pop is drawn on its canvas: kept fully on screen, and off the corner minimap and the player's HUD panel. Canvas units, origin at the canvas centre.</summary>
     public static class BountyLabelPlacement
     {
         public const float HeightPerFontSize = 0.6f;
@@ -14,8 +14,8 @@ namespace Overpower.Match
             new Rect(canvas.xMax + fromTopRight.x, canvas.yMax + fromTopRight.y, fromTopRight.width, fromTopRight.height);
 
         /// <summary>The label's centre after keeping it inside the canvas by <paramref name="margin"/>; a label over the minimap rectangle is first pushed
-        /// to just below it (then kept inside again). A label wider or taller than the room left is centred on that axis.</summary>
-        public static Vector2 Place(Vector2 desired, Vector2 size, Rect canvas, float margin, bool hasAvoid, Rect avoid)
+        /// to just below it, one over the HUD panel just above it (then kept inside again). A label wider or taller than the room left is centred on that axis.</summary>
+        public static Vector2 Place(Vector2 desired, Vector2 size, Rect canvas, float margin, bool hasAvoid, Rect avoid, bool hasPanel, Rect panel)
         {
             Vector2 centre = Clamp(desired, size, canvas, margin);
             if (hasAvoid && new Rect(centre - size / 2f, size).Overlaps(avoid))
@@ -23,8 +23,17 @@ namespace Overpower.Match
                 centre.y = avoid.yMin - size.y / 2f;
                 centre = Clamp(centre, size, canvas, margin);
             }
+            if (hasPanel && new Rect(centre - size / 2f, size).Overlaps(panel))
+            {
+                centre.y = panel.yMax + size.y / 2f;
+                centre = Clamp(centre, size, canvas, margin);
+            }
             return centre;
         }
+
+        /// <summary>Whether the text and its cached size must be set again: the label is new, its amount changed, or the theme's font size changed.</summary>
+        public static bool NeedsRedo(bool hasShown, int shownAmount, float shownFontSize, int amount, float fontSize) =>
+            !hasShown || shownAmount != amount || !Mathf.Approximately(shownFontSize, fontSize);
 
         private static Vector2 Clamp(Vector2 centre, Vector2 size, Rect canvas, float margin)
         {

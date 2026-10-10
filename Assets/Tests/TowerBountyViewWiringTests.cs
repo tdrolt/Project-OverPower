@@ -45,6 +45,18 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheLabelIsKeptOffTheAbilityBarAndRedoneWhenItsTextOrSizeChanges()
+        {
+            System.Type view = typeof(TowerBountyView);
+            System.Reflection.MethodInfo barRect = typeof(Overpower.UI.PlayerHud).GetMethod(nameof(Overpower.UI.PlayerHud.TryGetScreenRect));
+            Assert.IsNotNull(barRect);
+            Assert.IsTrue(IlWiring.Uses(view, "AvoidBar", barRect));
+            Assert.IsTrue(IlWiring.Uses(view, "LateUpdate", view.GetMethod("AvoidBar", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)));
+            Assert.IsTrue(IlWiring.Uses(view, "UpdatePops", view.GetMethod("AvoidBar", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(view, "LateUpdate", Rule(typeof(BountyLabelPlacement), nameof(BountyLabelPlacement.NeedsRedo))));
+        }
+
+        [Test]
         public void TheBuildingManagerAttachesTheViewInAwake()
         {
             Assert.IsTrue(IlWiring.Uses(typeof(BuildingManager), "Awake", typeof(TowerBountyView).GetMethod(nameof(TowerBountyView.AttachTo))));

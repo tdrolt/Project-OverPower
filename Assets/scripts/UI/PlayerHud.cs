@@ -209,6 +209,22 @@ namespace Overpower.UI
         private StatusLabel lastStatusLabel = (StatusLabel)(-1);
         private float lastStatusFill = -1f;
 
+        /// <summary>The local player's HUD, or null before it is built.</summary>
+        public static PlayerHud Local { get; private set; }
+
+        private RectTransform panelRect;
+
+        /// <summary>The bars-and-slots panel in screen pixels (the HUD canvas is screen space overlay). False while the HUD is not built.</summary>
+        public bool TryGetScreenRect(out Rect screenRect)
+        {
+            screenRect = default;
+            if (panelRect == null) return false;
+            var corners = new Vector3[4];
+            panelRect.GetWorldCorners(corners);
+            screenRect = Rect.MinMaxRect(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+            return true;
+        }
+
         private void Awake()
         {
             // Every remote copy stays permanently dormant.
@@ -254,6 +270,7 @@ namespace Overpower.UI
                 Debug.LogWarning($"[PlayerHud] {name}: no OverPowerBuff on this player - the OVERPOWER HUD label will never show (Task 2.6 is cuttable, so this is a warning, not an error).");
 
             BuildUi();
+            Local = this;
 
             if (abilityRunner != null)
                 abilityRunner.SlotChanged += HandleSlotChanged;
@@ -267,6 +284,7 @@ namespace Overpower.UI
 
         private void OnDestroy()
         {
+            if (Local == this) Local = null;
             if (abilityRunner != null)
                 abilityRunner.SlotChanged -= HandleSlotChanged;
             if (goldWallet != null)
@@ -815,6 +833,7 @@ namespace Overpower.UI
             GameObject panel = new GameObject("Hud Panel", typeof(RectTransform));
             panel.transform.SetParent(canvasGo.transform, false);
             RectTransform panelRt = panel.GetComponent<RectTransform>();
+            panelRect = panelRt;
             // Bottom-centre: the F1 test panel owns the top-left, so the two never overlap. Hud Bottom Offset is the
             // theme-tunable gap above the screen edge.
             panelRt.anchorMin = panelRt.anchorMax = new Vector2(0.5f, 0f);

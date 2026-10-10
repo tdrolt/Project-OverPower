@@ -35,6 +35,7 @@ namespace Overpower.Match
         private RectTransform canvasRect;
         private readonly Dictionary<int, TextMeshProUGUI> labels = new Dictionary<int, TextMeshProUGUI>();
         private readonly Dictionary<int, int> shownAmount = new Dictionary<int, int>();
+        private readonly Dictionary<int, float> shownFontSize = new Dictionary<int, float>();
         private readonly Dictionary<int, Vector2> labelSizes = new Dictionary<int, Vector2>();
         private readonly List<Pop> pops = new List<Pop>();
         private readonly List<Material> materials = new List<Material>();
@@ -137,18 +138,21 @@ namespace Overpower.Match
                     continue;
                 }
                 TextMeshProUGUI label = LabelFor(zone, theme);
-                if (!shownAmount.TryGetValue(zone, out int shown) || shown != amount)
+                bool hasShown = shownAmount.TryGetValue(zone, out int shown);
+                shownFontSize.TryGetValue(zone, out float shownSize);
+                if (BountyLabelPlacement.NeedsRedo(hasShown, shown, shownSize, amount, theme.bountyLabelFontSize))
                 {
                     shownAmount[zone] = amount;
+                    shownFontSize[zone] = theme.bountyLabelFontSize;
                     label.fontSize = theme.bountyLabelFontSize;
                     label.text = string.Format(dominion ? theme.bountyLabelFormat : theme.bountyLabelGoldFormat, amount);
                     labelSizes[zone] = SizeOf(label);
                 }
-                label.fontSize = theme.bountyLabelFontSize;
                 label.color = theme.bountyLabelColour;
                 local.y += theme.bountyLabelLift;
                 bool hasAvoid = AvoidRect(theme, out Rect avoid);
-                label.rectTransform.anchoredPosition = BountyLabelPlacement.Place(local, labelSizes[zone], canvasRect.rect, ScreenMargin, hasAvoid, avoid);
+                bool hasBar = AvoidBar(out Rect bar);
+                label.rectTransform.anchoredPosition = BountyLabelPlacement.Place(local, labelSizes[zone], canvasRect.rect, ScreenMargin, hasAvoid, avoid, hasBar, bar);
                 if (!label.gameObject.activeSelf) label.gameObject.SetActive(true);
             }
 
@@ -215,7 +219,8 @@ namespace Overpower.Match
                 colour.a *= BountyLabelRules.PopAlpha(age, seconds);
                 pop.Label.color = colour;
                 bool hasAvoid = AvoidRect(theme, out Rect avoid);
-                pop.Label.rectTransform.anchoredPosition = BountyLabelPlacement.Place(local, pop.Size, canvasRect.rect, ScreenMargin, hasAvoid, avoid);
+                bool hasBar = AvoidBar(out Rect bar);
+                pop.Label.rectTransform.anchoredPosition = BountyLabelPlacement.Place(local, pop.Size, canvasRect.rect, ScreenMargin, hasAvoid, avoid, hasBar, bar);
                 pop.Label.gameObject.SetActive(true);
             }
         }
@@ -231,6 +236,18 @@ namespace Overpower.Match
             }
             rect = BountyLabelPlacement.CornerRectInCanvas(canvasRect.rect,
                 HudScreenLayout.CornerMinimapRect(theme.minimapCornerMargin, theme.minimapFrameWidth, theme.minimapCornerSize));
+            return true;
+        }
+
+        // The local player's HUD panel (ability slots and bars) on this canvas; nothing to avoid without one.
+        private bool AvoidBar(out Rect rect)
+        {
+            rect = default;
+            PlayerHud hud = PlayerHud.Local;
+            if (hud == null || !hud.TryGetScreenRect(out Rect screen)) return false;
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen.min, null, out Vector2 low);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen.max, null, out Vector2 high);
+            rect = Rect.MinMaxRect(low.x, low.y, high.x, high.y);
             return true;
         }
 
@@ -254,6 +271,7 @@ namespace Overpower.Match
                 if (label != null && label.gameObject.activeSelf)
                     label.gameObject.SetActive(false);
             shownAmount.Clear();
+            shownFontSize.Clear();
             foreach (Pop pop in pops) Destroy(pop.Label.gameObject);
             pops.Clear();
         }
@@ -261,6 +279,7 @@ namespace Overpower.Match
         private void HideLabel(int zone)
         {
             shownAmount.Remove(zone);
+            shownFontSize.Remove(zone);
             if (labels.TryGetValue(zone, out TextMeshProUGUI label) && label != null && label.gameObject.activeSelf)
                 label.gameObject.SetActive(false);
         }
