@@ -8,8 +8,11 @@ namespace Overpower.Dominion
     /// </summary>
     public static class DominionTerritoryRules
     {
-        /// <summary>False only for a capital in a Dominion room: it refuses capture and drain, and is never "under attack".</summary>
-        public static bool IsCapturable(bool isDominion, bool isCapital) => !(isDominion && isCapital);
+        /// <summary>A capital in a Dominion room is a team's spawn: it looks and is drawn as one, never as a zone.</summary>
+        public static bool IsSpawn(bool isDominion, bool isCapital) => isDominion && isCapital;
+
+        /// <summary>False only for a spawn: it refuses capture and drain, and is never "under attack".</summary>
+        public static bool IsCapturable(bool isDominion, bool isCapital) => !IsSpawn(isDominion, isCapital);
 
         /// <summary>The gold a team earns each second from the ground it holds: whatever Conquest would pay, or nothing in Dominion.</summary>
         public static int TeamIncomeFor(bool isDominion, int conquestTeamIncome) => isDominion ? 0 : conquestTeamIncome;

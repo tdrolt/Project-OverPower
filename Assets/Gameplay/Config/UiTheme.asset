@@ -458,6 +458,12 @@ MonoBehaviour:
   towerNeutralColor: {r: 0.42, g: 0.42, b: 0.42, a: 1}
   towerBodyShade: 0.8
   towerOwnerGlow: 1.5
+  spawnTowerBodyRadius: 2
+  spawnTowerPlinthRadius: 2.6
+  spawnTowerLidRadius: 2.35
+  spawnTowerLidHeight: 0.35
+  spawnTowerColumnCount: 6
+  spawnTowerColumnRadius: 0.35
   bugMarkedText: Bug marked - type what happened in chat
   quitPromptText: Close the game?
   quitYesText: Yes

@@ -44,6 +44,19 @@ namespace Overpower.UI
         public RectTransform MapRoot => root;
         public int ZoneBubbleCount => zones.Count;
         public int LinkCount => links.Count;
+        /// <summary>Whether the zone's bubble is on the map right now, for harness checks.</summary>
+        public bool IsZoneDrawn(int zone) => zoneById.TryGetValue(zone, out ZoneUi ui) && ui.Upright.gameObject.activeSelf;
+        /// <summary>How many links are drawn right now, for harness checks.</summary>
+        public int DrawnLinkCount
+        {
+            get
+            {
+                int drawn = 0;
+                foreach (LinkUi link in links)
+                    if (link.LineA.gameObject.activeSelf) drawn++;
+                return drawn;
+            }
+        }
         /// <summary>The opacity the map is actually drawn at this frame, for harness checks.</summary>
         public float CurrentOpacity => fade != null ? fade.alpha : 1f;
         /// <summary>The smoothed planar speed the moving/stopped test is made against, in metres per second.</summary>
@@ -66,6 +79,8 @@ namespace Overpower.UI
             public Image Fill;
             public TextMeshProUGUI Label;
             public bool Shown = true;
+            /// <summary>A Dominion capital: not drawn, and no link to it is.</summary>
+            public bool IsSpawn;
             /// <summary>MatchDirector.IsOutOfPlay(Zone), refreshed by RecolourOwnership; read by ApplyLinkStyle (no link
             /// touches it), UpdateZones (CaptureRingState.From) and RecolourOwnership (its bubble hides like its tower).</summary>
             public bool OutOfPlay;
@@ -691,7 +706,8 @@ namespace Overpower.UI
                 int tier = manager.TierOf(zone.Zone);
                 if (tier > 0 && tier != zone.Tier)
                     ApplyTier(zone, tier);
-                zone.Upright.gameObject.SetActive(zone.Shown && !zone.OutOfPlay);
+                zone.IsSpawn = manager.IsSpawnZone(zone.Zone);
+                zone.Upright.gameObject.SetActive(zone.Shown && !zone.OutOfPlay && !zone.IsSpawn);
 
                 int owner = OwnerShown(snapshot, zone.Zone);
                 zone.Fill.color = zone.OutOfPlay ? theme.outOfPlayZoneColor
@@ -733,7 +749,7 @@ namespace Overpower.UI
             ZoneUi a = zoneById[link.A];
             ZoneUi b = zoneById[link.B];
             // A link touching an out-of-play zone is hidden too: a grey line would read as a way in.
-            bool shown = a.Shown && b.Shown && !a.OutOfPlay && !b.OutOfPlay;
+            bool shown = a.Shown && b.Shown && !a.OutOfPlay && !b.OutOfPlay && !a.IsSpawn && !b.IsSpawn;
             link.LineA.gameObject.SetActive(shown);
             link.LineB.gameObject.SetActive(shown);
             bool arrow = shown && style.Kind == MinimapLinkKind.WayIn;
@@ -776,7 +792,7 @@ namespace Overpower.UI
             {
                 // A hidden out-of-play bubble is already inactive (RecolourOwnership): no ring state to compute for it.
                 UpdatePackBadge(zone);
-                if (!zone.Shown || zone.OutOfPlay)
+                if (!zone.Shown || zone.OutOfPlay || zone.IsSpawn)
                     continue;
 
                 // The known state while the zone switch is off, else the live one.

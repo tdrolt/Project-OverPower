@@ -400,6 +400,9 @@ public class BuildingCapture : MonoBehaviourPun
             builtCaptureRadius = captureRadius;
         }
 
+        if (towerLook != null)
+            towerLook.UseSpawnLook(manager.IsSpawnZone(buildingID));
+
         int effectiveTier = EffectiveTier;
         if (towerLook != null && effectiveTier != shownColumnsTier)
         {

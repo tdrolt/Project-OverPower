@@ -201,6 +201,13 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return Overpower.Dominion.DominionTerritoryRules.IsCapturable(Overpower.Dominion.DominionMode.IsActive(), isCapital);
     }
 
+    /// <summary>Whether the zone is a team's spawn in this room (a Dominion capital): its tower gets the spawn look and the minimap leaves it out.</summary>
+    public bool IsSpawnZone(int zone)
+    {
+        bool isCapital = Map != null && Map.CapitalTeamOf(zone) != TerritoryMap.Neutral;
+        return Overpower.Dominion.DominionTerritoryRules.IsSpawn(Overpower.Dominion.DominionMode.IsActive(), isCapital);
+    }
+
     /// <summary>The tower's own tier as set in the scene: PhaseTwoCutRules finds the cut from this, never from the
     /// phase-two stand-in (TierOf below), or a cut corner's Tier III towers would stop reading as Tier III to the very
     /// rule that finds them. 0 while the tower with that id hasn't registered yet (RegisterCapture runs in

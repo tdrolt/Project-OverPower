@@ -21,6 +21,10 @@ namespace Overpower.Arena
     /// the ring on the ground gets every frame (via OwnerPaint.From / OwnerPaintColours.For), so the tower and the ring
     /// can never disagree and a late joiner is right at once. The pieces are grey (the material's own colour) until the
     /// first Refresh; no collider here depends on the tier.
+    ///
+    /// UseSpawnLook(true) turns the same pieces into a Dominion spawn: a six-sided plinth, body and lid and UiTheme's
+    /// Spawn Tower columns (up to six, so slots are cloned on demand). Every piece is still painted by Refresh, and the
+    /// collider is never touched.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TowerLook : MonoBehaviour
@@ -72,6 +76,11 @@ namespace Overpower.Arena
                  "as the grandest. The cap keeps the same shaft:cap proportion as every other tier's columns.")]
         public float capitalColumnRadius = 0.6f;
 
+        private static Mesh hexMesh;
+        private bool spawnLook;
+        private bool roundShapesKept;
+        private int appliedTier = 1;
+        private Shape drumRound, plinthRound, crownRound;
         private MaterialPropertyBlock block;
         private UiTheme theme;
         private bool bound;
@@ -99,11 +108,22 @@ namespace Overpower.Arena
         /// edit time by ArenaPrimitiveBuilder; also at runtime through ApplyColumnsAtRuntime.</summary>
         public void ApplyColumns(int tier)
         {
+            appliedTier = tier;
+            if (spawnLook)
+            {
+                ApplySpawnColumns();
+                return;
+            }
+
             int count = TowerLookRules.ColumnsForTier(tier);
             float shaftRadius = TowerLookRules.ColumnRadius(tier, columnRadius, capitalColumnRadius);
-            float capRadius = shaftRadius * CapToShaftRatio;
             float ringRadius = TowerLookRules.ColumnRingRadius(shaftRadius, ColliderRadius());
+            PlaceColumns(count, ringRadius, shaftRadius);
+        }
 
+        private void PlaceColumns(int count, float ringRadius, float shaftRadius)
+        {
+            float capRadius = shaftRadius * CapToShaftRatio;
             for (int i = 0; i < columnSlots.Length; i++)
             {
                 Transform slot = columnSlots[i];
@@ -127,6 +147,104 @@ namespace Overpower.Arena
                 Transform cap = slot.Find("Cap");
                 if (cap != null)
                     cap.localScale = new Vector3(capRadius, cap.localScale.y, capRadius);
+            }
+        }
+
+        /// <summary>Dominion: the capital as a spawn, or back to the round tower. Needs Bind first; asking for the look it already has does nothing.
+        /// Re-applies the columns, since a spawn's are not the tier's.</summary>
+        public void UseSpawnLook(bool spawn)
+        {
+            if (spawn == spawnLook || !bound)
+                return;
+            if (!roundShapesKept)
+            {
+                drumRound = Shape.Of(drum);
+                plinthRound = Shape.Of(plinth);
+                crownRound = Shape.Of(crown);
+                roundShapesKept = true;
+            }
+            spawnLook = spawn;
+            if (spawn)
+                ApplySpawnShapes();
+            else
+            {
+                drumRound.Restore(drum);
+                plinthRound.Restore(plinth);
+                crownRound.Restore(crown);
+            }
+            ApplyColumns(appliedTier);
+            shownColorSet = false;
+        }
+
+        // Radii are held to the collider here, not trusted from the asset: the footprint is what players hit and stand against.
+        private void ApplySpawnShapes()
+        {
+            if (hexMesh == null)
+                hexMesh = HexPrismMesh.Create();
+            float collider = ColliderRadius();
+            SetHex(drum, SpawnTowerRules.WithinCollider(theme.spawnTowerBodyRadius, collider), drumRound.scale.y, drumRound.position);
+            SetHex(plinth, SpawnTowerRules.WithinCollider(theme.spawnTowerPlinthRadius, collider), plinthRound.scale.y, plinthRound.position);
+            float lidHalf = theme.spawnTowerLidHeight / 2f;
+            float bodyTop = drumRound.position.y + drumRound.scale.y;
+            SetHex(crown, SpawnTowerRules.WithinCollider(theme.spawnTowerLidRadius, collider), lidHalf, new Vector3(crownRound.position.x, bodyTop + lidHalf, crownRound.position.z));
+        }
+
+        private static void SetHex(Renderer piece, float radius, float halfHeight, Vector3 position)
+        {
+            if (piece == null)
+                return;
+            piece.GetComponent<MeshFilter>().sharedMesh = hexMesh;
+            piece.transform.localScale = new Vector3(radius, halfHeight, radius);
+            piece.transform.localPosition = position;
+        }
+
+        private void ApplySpawnColumns()
+        {
+            int count = SpawnTowerRules.ColumnCount(theme.spawnTowerColumnCount);
+            EnsureSlots(count);
+            float collider = ColliderRadius();
+            float shaftRadius = SpawnTowerRules.WithinCollider(theme.spawnTowerColumnRadius, collider);
+            float ringRadius = SpawnTowerRules.ColumnRingRadius(
+                SpawnTowerRules.WithinCollider(theme.spawnTowerBodyRadius, collider), shaftRadius * CapToShaftRatio, collider);
+            PlaceColumns(count, ringRadius, shaftRadius);
+        }
+
+        // The prefab has four slots; a spawn can want six. Extra ones are copies of the first, kept (hidden) if the round look returns.
+        private void EnsureSlots(int count)
+        {
+            Transform source = columnSlots.Length > 0 ? columnSlots[0] : null;
+            if (source == null)
+                return;
+            while (columnSlots.Length < count)
+            {
+                Transform clone = Instantiate(source, source.parent);
+                clone.name = "Column Slot " + columnSlots.Length;
+                int last = columnSlots.Length;
+                System.Array.Resize(ref columnSlots, last + 1);
+                System.Array.Resize(ref columnCaps, last + 1);
+                System.Array.Resize(ref columnShafts, last + 1);
+                columnSlots[last] = clone;
+                columnCaps[last] = clone.Find("Cap").GetComponent<Renderer>();
+                columnShafts[last] = clone.Find("Shaft").GetComponent<Renderer>();
+            }
+        }
+
+        private struct Shape
+        {
+            public Mesh mesh;
+            public Vector3 position, scale;
+
+            public static Shape Of(Renderer piece) => piece == null
+                ? default
+                : new Shape { mesh = piece.GetComponent<MeshFilter>().sharedMesh, position = piece.transform.localPosition, scale = piece.transform.localScale };
+
+            public void Restore(Renderer piece)
+            {
+                if (piece == null)
+                    return;
+                piece.GetComponent<MeshFilter>().sharedMesh = mesh;
+                piece.transform.localPosition = position;
+                piece.transform.localScale = scale;
             }
         }
 

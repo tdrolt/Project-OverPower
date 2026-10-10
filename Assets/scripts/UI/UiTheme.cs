@@ -1246,6 +1246,20 @@ namespace Overpower.UI
                  "lilac. Neutral and out-of-play towers never glow, so a glow means owned. The drum never glows.")]
         [Range(1f, 2.5f)] public float towerOwnerGlow = 1.5f;
 
+        [Header("Spawn towers (Dominion)")]
+        [Tooltip("Half-width of a spawn tower's six-sided body, measured to its corners, in metres. Today's round capital body is 2. It is cut down to the tower's solid footprint (2.6 m), so the body can never be wider than what players can already hit and stand against.")]
+        [Min(0.5f)] public float spawnTowerBodyRadius = 2f;
+        [Tooltip("Half-width of a spawn tower's six-sided base, measured to its corners, in metres. Today's round capital base is 2.6, the full footprint, and it is never allowed past it.")]
+        [Min(0.5f)] public float spawnTowerPlinthRadius = 2.6f;
+        [Tooltip("Half-width of a spawn tower's six-sided lid, measured to its corners, in metres. Today's round capital lid is 2.35. It is never allowed past the tower's footprint (2.6 m).")]
+        [Min(0.5f)] public float spawnTowerLidRadius = 2.35f;
+        [Tooltip("How thick a spawn tower's lid is, in metres. The lid sits on top of the body, so a thicker lid makes the tower taller (the columns stay as tall as on every other tower). Today's capital lid is 0.35.")]
+        [Min(0.05f)] public float spawnTowerLidHeight = 0.35f;
+        [Tooltip("How many columns a spawn tower has, from 1 to 6. 6 puts one on every corner of the body; fewer are spread evenly round it, starting at the front.")]
+        [Range(1, 6)] public int spawnTowerColumnCount = 6;
+        [Tooltip("Width of each spawn tower column, in metres (half-width). The column cap is drawn wider in the same proportion as on the zone towers. A column is pulled in when its cap would stick out past the tower's footprint (2.6 m).")]
+        [Min(0.05f)] public float spawnTowerColumnRadius = 0.35f;
+
         [Header("Playtest extras")]
         [Tooltip("HUD toast shown on Ctrl+B - 'a bug just happened' (BugMarkerKey): a screenshot is " +
                  "saved next to this client's own telemetry log, and its own `bug` line is written. " +
