@@ -45,6 +45,14 @@ namespace Overpower.Dominion
         /// <summary>The break that leads to <paramref name="nextRound"/> (the one before round 1 included).</summary>
         public static string BreakStart(int nextRound) => "dominion break start before round " + N(nextRound);
 
+        /// <summary>An overtime ran out shared, but a round win each would have handed out the match (A65): the sharers play sudden death for the round.</summary>
+        public static string RoundToSuddenDeath(int round, int[] sharedTeams, int[] teams, int[] points) =>
+            "dominion round " + N(round) + " end shared teams " + TeamList(sharedTeams) + " sudden death for the round points" + PerTeam(teams, points);
+
+        /// <summary>A round's own sudden death is over: its winner alone took the round win.</summary>
+        public static string RoundWonInSuddenDeath(int round, int winner, int[] teams, int[] points) =>
+            "dominion round " + N(round) + " won in sudden death by team " + N(winner) + " points" + PerTeam(teams, points);
+
         public static string SuddenDeathStart(int[] teams) => "dominion sudden death start teams " + TeamList(teams);
 
         /// <summary>Everyone fell in the same instant: the circle starts over, between these teams.</summary>
@@ -64,10 +72,12 @@ namespace Overpower.Dominion
             // A round that stopped being a round: scored (its points are still in the room through the break) or cut short by the others leaving.
             // The master's own record of the round (dHistW) says which, the same record the result table bolds from. A room without the record
             // (from before it existed) is read from the wins: whose went up won it, a scored round where nobody's did was tied, an Over where nobody's did was cut short.
-            if (DominionRules.IsRoundPlay(prevStage) && !DominionRules.IsRoundPlay(room.Stage) && prevRound >= 1)
+            if (DominionRules.IsRoundPlay(prevStage) && room.Stage == DominionStage.SuddenDeath && room.SuddenDeathRound == prevRound && prevRound >= 1)
+                notes.Add(RoundToSuddenDeath(prevRound, room.SuddenDeathTeams ?? teamsInMatch, teamsInMatch, room.Points));
+            else if (DominionRules.IsRoundPlay(prevStage) && !DominionRules.IsRoundPlay(room.Stage) && prevRound >= 1)
             {
                 int recorded = room.HistoryWinners != null && prevRound - 1 < room.HistoryWinners.Length ? room.HistoryWinners[prevRound - 1] : int.MinValue;
-                if (recorded >= DominionHistory.SharedFlag) notes.Add(RoundEndShared(prevRound, DominionHistory.DecodeWinners(recorded), teamsInMatch, room.Points));
+                if (recorded >= DominionHistory.SharedFlag && !DominionHistory.WonInSuddenDeath(recorded)) notes.Add(RoundEndShared(prevRound, DominionHistory.DecodeWinners(recorded), teamsInMatch, room.Points));
                 else if (recorded >= 0) notes.Add(RoundEnd(prevRound, recorded, teamsInMatch, room.Points));
                 else if (recorded == DominionHistory.CutShort) notes.Add(RoundCutShort(prevRound, teamsInMatch, room.Points));
                 else if (recorded == -1) notes.Add(RoundEnd(prevRound, -1, teamsInMatch, room.Points));
@@ -79,6 +89,10 @@ namespace Overpower.Dominion
                     else notes.Add(RoundEnd(prevRound, -1, teamsInMatch, room.Points));
                 }
             }
+
+            // A round's own sudden death ended: the only sudden-death verdict that raises a team's wins (unknown without the wins before it).
+            int roundSuddenDeathWinner = prevStage == DominionStage.SuddenDeath && prevWins != null ? TeamWhoseWinsWentUp(prevWins, room.Wins) : -1;
+            if (roundSuddenDeathWinner >= 0) notes.Add(RoundWonInSuddenDeath(prevRound, roundSuddenDeathWinner, teamsInMatch, room.Points));
 
             switch (room.Stage)
             {
@@ -95,7 +109,7 @@ namespace Overpower.Dominion
                     if (DominionRoomWrites.IsSuddenDeathStart(prevStage, prevSuddenDeathMs, room.Stage, room.SuddenDeathMs))
                     {
                         int[] playing = room.SuddenDeathTeams ?? teamsInMatch;
-                        notes.Add(prevStage == DominionStage.SuddenDeath ? SuddenDeathReplay(playing) : SuddenDeathStart(playing));
+                        notes.Add(prevStage == DominionStage.SuddenDeath && roundSuddenDeathWinner < 0 ? SuddenDeathReplay(playing) : SuddenDeathStart(playing));
                     }
                     break;
                 case DominionStage.Over:

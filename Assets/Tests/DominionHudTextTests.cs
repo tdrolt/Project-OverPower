@@ -170,22 +170,22 @@ namespace Overpower.Tests
 
         [Test] public void AMatchIsWonInSuddenDeathOnlyWhenTheRoomEverHadASuddenDeathStart()
         {
-            Assert.IsTrue(DominionHudText.WonInSuddenDeath(2, suddenDeathMs: 123456), "the circle was written, so the circle decided it");
-            Assert.IsFalse(DominionHudText.WonInSuddenDeath(1, suddenDeathMs: 0), "no dSd was ever written");
-            Assert.IsFalse(DominionHudText.WonInSuddenDeath(-1, suddenDeathMs: 123456), "no winner is not a sudden-death win");
+            Assert.IsTrue(DominionHudText.WonInSuddenDeath(2, 123456, new[] { 1, 1, 1 }, 2), "the circle was written, so the circle decided it");
+            Assert.IsFalse(DominionHudText.WonInSuddenDeath(1, 0, new[] { 0, 1, 0 }, 2), "no dSd was ever written");
+            Assert.IsFalse(DominionHudText.WonInSuddenDeath(-1, 123456, new[] { 1, 1, 1 }, 2), "no winner is not a sudden-death win");
         }
 
         [Test] public void AMatchEndedAfterOneRoundWithOneTeamLeftIsNotCalledSuddenDeath()
         {
             // A7: 1-0-0 after round 1, a team won by the others leaving. The old inference (fewer wins than needed) called this sudden death.
-            bool sudden = DominionHudText.WonInSuddenDeath(1, suddenDeathMs: 0);
+            bool sudden = DominionHudText.WonInSuddenDeath(1, 0, new[] { 0, 1, 0 }, 2);
             Assert.AreEqual("PURPLE WINS 1–0", DominionHudText.ResultHeadline(1, new[] { 0, 1, 0 }, new[] { 0, 1 }, Names, "{0} WINS {1}", "{0} WINS IN SUDDEN DEATH", "–", sudden));
         }
 
         [Test] public void AMatchWonByTheLastTeamStandingMidRoundIsNotCalledSuddenDeath()
         {
             // A3: the last team with anyone in the room wins at once, wins as they stand (0-0).
-            bool sudden = DominionHudText.WonInSuddenDeath(0, suddenDeathMs: 0);
+            bool sudden = DominionHudText.WonInSuddenDeath(0, 0, new[] { 0, 0, 0 }, 2);
             Assert.AreEqual("WHITE WINS 0–0", DominionHudText.ResultHeadline(0, new[] { 0, 0, 0 }, new[] { 0, 1 }, Names, "{0} WINS {1}", "{0} WINS IN SUDDEN DEATH", "–", sudden));
         }
 

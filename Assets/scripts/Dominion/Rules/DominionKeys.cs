@@ -52,6 +52,10 @@ namespace Overpower.Dominion
         /// removed again by the write that ends the round. Absent outside overtime.</summary>
         public const string OvertimeTeams = "dOtT";
 
+        /// <summary>int: the round the current sudden death decides (a shared round that would have handed out the match, A65). Absent (or 0) = the
+        /// sudden death decides the match itself (teams level after the last round). Written with that sudden death's start, removed by its verdict.</summary>
+        public const string SuddenDeathRound = "dSdR";
+
         /// <summary>How many team ids the per-team arrays hold (team ids are always 0..2).</summary>
         public const int TeamSlots = 3;
     }

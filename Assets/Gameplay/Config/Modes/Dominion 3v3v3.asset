@@ -43,6 +43,6 @@ MonoBehaviour:
     text: "You always come back after the same short wait, inside a shield that blocks all damage, stuns and pushes. It breaks when its time runs out, when you hit an enemy or when you leave your spawn, and you can't capture while it's up."
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Sudden death
-    text: "If the top teams are level on round wins after the third round, or reach two wins together, sudden death starts: no respawns, and a shrinking circle hurts anyone outside it. The last team standing wins."
+    text: "If a shared round would win a team the match, the teams that shared it play sudden death for that round instead. After the third round, teams level on round wins play it for the match. No respawns, and a shrinking circle hurts anyone outside it. The last team standing wins."
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   infoColumns: 4

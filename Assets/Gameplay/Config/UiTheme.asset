@@ -386,6 +386,7 @@ MonoBehaviour:
   dominionBreakTiedText: TIED
   dominionBreakSharedText: SHARED ROUND
   dominionBreakSharedLineFormat: '{0} each get a round win'
+  dominionBreakSuddenDeathLine: won the round in sudden death
   dominionBreakSharedLineSize: 28
   dominionBreakNamesSeparator: ', '
   dominionBreakNamesLast: ' and '

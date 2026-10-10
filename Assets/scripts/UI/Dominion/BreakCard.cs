@@ -32,7 +32,7 @@ namespace Overpower.UI
         // What the card was last drawn from: compared as whole numbers each frame, words rebuilt only when one moved (a string key would allocate every frame).
         private bool drawn;
         private int drawnRound;
-        private bool drawnFirstBreak, drawnCanPick;
+        private bool drawnFirstBreak, drawnCanPick, drawnInSuddenDeath;
         private int[] drawnPoints = System.Array.Empty<int>(), drawnWins = System.Array.Empty<int>(), drawnWinners = System.Array.Empty<int>();
         private bool pulsing;
         private int pulsedRound = -1;
@@ -65,8 +65,9 @@ namespace Overpower.UI
         }
 
         /// <summary>round is the round the break leads to; points are the finished round's final points (the room keeps them through the break);
-        /// winners are the teams the room recorded as winning it (several = shared round, none = tie); canPick is false for a spectator (no shop).</summary>
-        public void Refresh(int[] teams, int round, bool firstBreak, int[] points, int[] winners, int[] wins, int secondsLeft, int bigFromSeconds,
+        /// winners are the teams the room recorded as winning it (several = shared round, none = tie); inSuddenDeath = its own sudden death decided it;
+        /// canPick is false for a spectator (no shop).</summary>
+        public void Refresh(int[] teams, int round, bool firstBreak, int[] points, int[] winners, bool inSuddenDeath, int[] wins, int secondsLeft, int bigFromSeconds,
                             int[] depthByRound, int[] armorByRound, string[] teamNames, bool canPick, System.Action onPick)
         {
             if (teams == null || teams.Length < 2) { SetVisible(false); return; }
@@ -74,11 +75,11 @@ namespace Overpower.UI
             if (card == null || builtTeamCount != teams.Length || builtDotCount != dots) Build(teams, dots);
             SetVisible(true);
 
-            if (!drawn || round != drawnRound || firstBreak != drawnFirstBreak || canPick != drawnCanPick
+            if (!drawn || round != drawnRound || firstBreak != drawnFirstBreak || canPick != drawnCanPick || inSuddenDeath != drawnInSuddenDeath
                 || !SameInts(points, drawnPoints) || !SameInts(wins, drawnWins) || !SameInts(winners, drawnWinners))
             {
                 drawn = true;
-                drawnRound = round; drawnFirstBreak = firstBreak; drawnCanPick = canPick;
+                drawnRound = round; drawnFirstBreak = firstBreak; drawnCanPick = canPick; drawnInSuddenDeath = inSuddenDeath;
                 drawnPoints = points != null ? (int[])points.Clone() : System.Array.Empty<int>();
                 drawnWins = wins != null ? (int[])wins.Clone() : System.Array.Empty<int>();
                 drawnWinners = winners != null ? (int[])winners.Clone() : System.Array.Empty<int>();
@@ -92,9 +93,12 @@ namespace Overpower.UI
                     : shared ? theme.dominionBreakSharedText
                     : DominionHudText.BreakHeadline(winner, teamNames, theme.dominionBreakWinsFormat, theme.dominionBreakTiedText);
                 string[] hex = TeamHex();
-                sharedLine.gameObject.SetActive(shared);
+                bool suddenDeathLine = !firstBreak && !shared && inSuddenDeath && winner >= 0;
+                sharedLine.gameObject.SetActive(shared || suddenDeathLine);
                 if (shared)
                     sharedLine.text = DominionHudText.SharedRoundLine(theme.dominionBreakSharedLineFormat, winners, teamNames, hex, theme.dominionBreakNamesSeparator, theme.dominionBreakNamesLast);
+                else if (suddenDeathLine)
+                    sharedLine.text = theme.dominionBreakSuddenDeathLine;
                 scoreLine.gameObject.SetActive(!firstBreak);
                 scoreLine.text = firstBreak ? "" : DominionHudText.MatchScoreLine(teams, wins, teamNames, hex, theme.dominionBreakScoreDash);
                 string matchPoint = firstBreak ? "" : DominionHudText.MatchPointLine(theme.dominionBreakMatchPointFormat,

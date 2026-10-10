@@ -1075,7 +1075,9 @@ namespace Overpower.UI
         public string dominionBreakSharedText = "SHARED ROUND";
         [Tooltip("The line under the shared-round headline. {0} = the names of the teams that share the round, each in its colour (WHITE and PURPLE, or WHITE, PURPLE and CYAN).")]
         public string dominionBreakSharedLineFormat = "{0} each get a round win";
-        [Tooltip("Font size of the line that names the teams sharing the round.")]
+        [Tooltip("The small line under \"<TEAM> WINS\" on the break card when the round was shared at match point and its sudden death decided it.")]
+        public string dominionBreakSuddenDeathLine = "won the round in sudden death";
+        [Tooltip("Font size of the line that names the teams sharing the round (also the line that says a round was won in sudden death).")]
         public float dominionBreakSharedLineSize = 28f;
         [Tooltip("What sits between team names in the break card's lists (WHITE, PURPLE) - also between the teams on match point.")]
         public string dominionBreakNamesSeparator = ", ";

@@ -202,10 +202,26 @@ namespace Overpower.Dominion
             return result;
         }
 
+        /// <summary>A shared round never hands out the match (A65): when it would give any sharing team its match-winning round win, the sharing teams
+        /// (lowest first) play sudden death for that round instead and nobody's wins go up yet. Null when the round is won by one team, or shared
+        /// with nobody reaching the target (a win each). <paramref name="wins"/> are the wins before the round.</summary>
+        public static int[] SharedRoundGoesToSuddenDeath(int[] wins, int[] roundWinners, int roundsToWin)
+        {
+            if (roundWinners == null || roundWinners.Length < 2) return null;
+            foreach (int team in roundWinners)
+            {
+                if (WinsOf(wins, team) + 1 < roundsToWin) continue;
+                int[] sharing = (int[])roundWinners.Clone();
+                Array.Sort(sharing);
+                return sharing;
+            }
+            return null;
+        }
+
         private static int PointsOf(int[] points, int team) => points != null && team >= 0 && team < points.Length ? points[team] : 0;
 
-        /// <summary>The team with at least roundsToWin round wins, else -1. Two or more teams there together (a shared round can do it) have no single
-        /// winner: that is sudden death between them (AfterRound), so this says -1 for it too.</summary>
+        /// <summary>The team with at least roundsToWin round wins, else -1 (also for two or more there together, which a shared round can no longer make:
+        /// SharedRoundGoesToSuddenDeath sends that round to sudden death first).</summary>
         public static int MatchWinner(int[] wins, int roundsToWin)
         {
             if (wins == null) return -1;
@@ -217,15 +233,6 @@ namespace Overpower.Dominion
                 found = i;
             }
             return found;
-        }
-
-        /// <summary>True when two or more teams stand at roundsToWin round wins at once (e.g. 2-2 after two shared rounds).</summary>
-        public static bool SeveralReachedTheTarget(int[] wins, int roundsToWin)
-        {
-            if (wins == null) return false;
-            int count = 0;
-            foreach (int w in wins) if (w >= roundsToWin) count++;
-            return count >= 2;
         }
 
         /// <summary>The teams in the match tied for the most round wins, lowest first (2v2 1-1: both; 3v3v3 1-1-1: all three; 1-1-0: the two).
@@ -248,20 +255,16 @@ namespace Overpower.Dominion
         public static int[] TeamsPlayingSuddenDeath(int[] stored, int[] wins, int[] teamsInMatch) =>
             stored != null && stored.Length > 0 ? stored : SuddenDeathTeams(wins, teamsInMatch);
 
-        private static int WinsOf(int[] wins, int team) => team >= 0 && team < wins.Length ? wins[team] : 0;
+        private static int WinsOf(int[] wins, int team) => wins != null && team >= 0 && team < wins.Length ? wins[team] : 0;
 
-        /// <summary>What comes after round <paramref name="round"/> (1-based), with <paramref name="wins"/> already counting that round. Someone alone
-        /// on roundsToWin: Over, they win (round 3 is not played after 2-0); two or more there together: sudden death between them. Rounds left: a
-        /// Break. After the last round with nobody there: the teams tied for the most round wins go to sudden death, but a single leader on round
+        /// <summary>What comes after round <paramref name="round"/> (1-based), with <paramref name="wins"/> already counting that round. Someone on
+        /// roundsToWin: Over, they win (round 3 is not played after 2-0). Rounds left: a Break. After the last round with nobody there: the teams tied for the most round wins go to sudden death, but a single leader on round
         /// wins (1-0-0 after two tied rounds) simply wins the match (A7): sudden death is only for teams that are level.</summary>
         public static RoundOutcome AfterRound(int round, int[] wins, int roundsToWin, int maxRounds, int[] teamsInMatch)
         {
             int winner = MatchWinner(wins, roundsToWin);
             if (winner >= 0)
                 return new RoundOutcome { Next = DominionStage.Over, Winner = winner };
-            // Two or more at the target together (shared rounds): nobody has won the match, so those teams - level at the top - play sudden death.
-            if (SeveralReachedTheTarget(wins, roundsToWin))
-                return new RoundOutcome { Next = DominionStage.SuddenDeath, Winner = -1, SuddenDeathTeams = SuddenDeathTeams(wins, teamsInMatch) };
             if (round < maxRounds)
                 return new RoundOutcome { Next = DominionStage.Break, Winner = -1 };
             int[] level = SuddenDeathTeams(wins, teamsInMatch);

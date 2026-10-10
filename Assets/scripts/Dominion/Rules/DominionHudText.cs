@@ -245,10 +245,12 @@ namespace Overpower.Dominion
 
         private static int WinsOf(int[] wins, int team) => wins != null && team >= 0 && team < wins.Length ? wins[team] : 0;
 
-        /// <summary>True when the match was settled by sudden death: the room ever held a circle start (dSd, non-zero). Decided from the room, never inferred
-        /// from the round wins: a match that ended 1-0-0 because the others left (A7), or with the last team standing mid-round (A3), has fewer wins than
-        /// the match needs too, but no circle was ever written.</summary>
-        public static bool WonInSuddenDeath(int winner, int suddenDeathMs) => winner >= 0 && suddenDeathMs != 0;
+        /// <summary>True when the match was settled by sudden death: the room holds a circle start (dSd, non-zero) and the winner did not reach the wins
+        /// to take it. Both are needed: a match that ended 1-0-0 because the others left (A7), or with the last team standing mid-round (A3), has fewer
+        /// wins than the match needs but no circle; a round won in its own sudden death (A65) that brings the winner to the target shows the score.
+        /// A round's sudden death that leads into a break removes dSd, so a later plain win is never called sudden death.</summary>
+        public static bool WonInSuddenDeath(int winner, int suddenDeathMs, int[] wins, int roundsToWin) =>
+            winner >= 0 && suddenDeathMs != 0 && WinsOf(wins, winner) < roundsToWin;
 
         /// <summary>"DOMINION 3v3v3" / "DOMINION 2v2" from a format with {0} = the size.</summary>
         public static string ModeLine(string format, int teamCount) => Fmt(format, teamCount >= 3 ? "3v3v3" : "2v2");
@@ -301,11 +303,12 @@ namespace Overpower.Dominion
             return SharedFlag | mask;
         }
 
-        /// <summary>The teams a dHistW entry names, lowest first: a shared entry's teams, a team id's one team, nobody for a tie (-1) or a cut-short round.</summary>
+        /// <summary>The teams a dHistW entry names, lowest first: a shared entry's teams, a sudden-death entry's or a team id's one team, nobody for a tie (-1) or a cut-short round.</summary>
         public static int[] DecodeWinners(int entry)
         {
             var teams = new List<int>();
-            if (entry >= SharedFlag)
+            if (WonInSuddenDeath(entry)) teams.Add(entry - SuddenDeathFlag);
+            else if (entry >= SharedFlag)
             {
                 for (int team = 0; team < DominionKeys.TeamSlots; team++)
                     if ((entry & (1 << team)) != 0) teams.Add(team);
@@ -323,6 +326,20 @@ namespace Overpower.Dominion
             result[old] = winner;
             return result;
         }
+
+        /// <summary>A dHistW entry at or above this is a round won in its own sudden death (A65): the flag plus the winning team's id. Above every shared
+        /// entry (SharedFlag plus three team bits tops out at 15), so the two never overlap.</summary>
+        public const int SuddenDeathFlag = 16;
+
+        /// <summary>The dHistW entry for a round its sudden death decided: one winner, marked so the break card can say how it was won.</summary>
+        public static int EncodeSuddenDeathWinner(int team) => SuddenDeathFlag + team;
+
+        /// <summary>True for a dHistW entry of a round won in its own sudden death.</summary>
+        public static bool WonInSuddenDeath(int entry) => entry >= SuddenDeathFlag;
+
+        /// <summary>Was the round the break card is about (see WinnersOfFinishedRound) won in its own sudden death.</summary>
+        public static bool FinishedRoundWonInSuddenDeath(DominionRoomState state) =>
+            state.Round >= 2 && state.HistoryWinners != null && state.Round - 2 < state.HistoryWinners.Length && WonInSuddenDeath(state.HistoryWinners[state.Round - 2]);
 
         public static int RoundCount(int[] history) => history == null ? 0 : history.Length / DominionKeys.TeamSlots;
 

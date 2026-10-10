@@ -35,14 +35,14 @@ namespace Overpower.UI
             this.canvas = canvas;
         }
 
-        public void Show(int winner, int[] teams, int[] wins, int[] history, int[] historyWinners, int suddenDeathMs, string[] teamNames, Action onBack)
+        public void Show(int winner, int[] teams, int[] wins, int[] history, int[] historyWinners, int suddenDeathMs, int roundsToWin, string[] teamNames, Action onBack)
         {
             if (IsShowing) return;
             ModeText = DominionHudText.ModeLine(theme.dominionResultModeFormat, teams.Length);
-            // suddenDeathMs is the room's dSd, which nothing ever clears. That is right while a room hosts exactly one match (a finished room closes);
-            // if rooms ever host a second match, dSd must be cleared at the new match's start or this headline would claim sudden death for a plain win.
+            // suddenDeathMs is the room's dSd: only a round's sudden death that leads into a break clears it. Right while a room hosts exactly one match
+            // (a finished room closes); a second match in the room would need dSd cleared at its start.
             HeadlineText = DominionHudText.ResultHeadline(winner, wins, teams, teamNames, theme.dominionResultHeadlineFormat, theme.dominionResultSuddenFormat,
-                theme.dominionResultScoreSeparator, DominionHudText.WonInSuddenDeath(winner, suddenDeathMs));
+                theme.dominionResultScoreSeparator, DominionHudText.WonInSuddenDeath(winner, suddenDeathMs, wins, roundsToWin));
             TableRows.Clear();
 
             back = kit.ResultCard(canvas, HeadlineText, Pick(theme.dominionTeamTextColors, winner), theme.resultButtonLobbyList, out card,

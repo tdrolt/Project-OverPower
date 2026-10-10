@@ -31,6 +31,8 @@ namespace Overpower.Dominion
         public int[] HistoryWinners;
         /// <summary>dOtT: the teams playing the current overtime; null = none written (not in overtime).</summary>
         public int[] OvertimeTeams;
+        /// <summary>dSdR: the round the current sudden death decides; 0 = it decides the match (or no sudden death).</summary>
+        public int SuddenDeathRound;
 
         /// <summary>The state from the room's properties. Missing keys read as: no round, stage None, no points or wins (arrays of three zeros),
         /// no winner (-1). A wrong type reads as missing.</summary>
@@ -57,6 +59,7 @@ namespace Overpower.Dominion
             if (props.TryGetValue(DominionKeys.History, out object hist) && hist is int[] h) state.History = h;
             if (props.TryGetValue(DominionKeys.HistoryWinners, out object histW) && histW is int[] hw) state.HistoryWinners = hw;
             if (props.TryGetValue(DominionKeys.OvertimeTeams, out object ot) && ot is int[] otTeams) state.OvertimeTeams = otTeams;
+            if (props.TryGetValue(DominionKeys.SuddenDeathRound, out object sdr) && sdr is int sdRound) state.SuddenDeathRound = sdRound;
             return state;
         }
     }
@@ -88,6 +91,8 @@ namespace Overpower.Dominion
         public Hashtable Props;
         public Hashtable Expected;
         public string What;
+        /// <summary>The team a sudden-death win names (the settle beat keys on it); -1 for every other write.</summary>
+        public int VerdictTeam = -1;
     }
 
     /// <summary>What a client does once, when it sees the stage change in the room.</summary>
@@ -148,8 +153,8 @@ namespace Overpower.Dominion
                     { DominionKeys.Wins, Slots(room.Wins) },
                 };
                 // A round cut short by the others leaving is a row of the result table too (A34): its points so far go into the history in this
-                // write. In a break the round just played is already there; in sudden death every round is.
-                if (DominionRules.IsRoundPlay(room.Stage))
+                // write. In a break the round just played is already there; in the match's sudden death every round is, in a round's own not yet.
+                if (DominionRules.IsRoundPlay(room.Stage) || DecidesARound(room))
                 {
                     over[DominionKeys.History] = DominionHistory.Append(room.History, room.Points);
                     // Nobody won that round (A49): the wins above are the ones already counted, so the table must not bold the points leader.
@@ -225,30 +230,60 @@ namespace Overpower.Dominion
             if (room.Stage == DominionStage.Overtime) props[DominionKeys.OvertimeTeams] = null;
         }
 
-        /// <summary>A round is over with these winners (one, several for a shared round, or none): score it, then break, match over or sudden death.</summary>
+        /// <summary>A round is over with these winners (one, several for a shared round, or none): its own sudden death (A65), or score it, then break,
+        /// match over or sudden death.</summary>
         private static DominionWrite ScoreRound(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, int[] roundWinners)
+        {
+            // A65: a shared round that would hand a sharing team the match is decided by sudden death between the sharers. No wins and no history
+            // yet: dPts keeps the round's points through it, and the verdict scores the round (NextInSuddenDeath).
+            int[] sharing = DominionRules.SharedRoundGoesToSuddenDeath(room.Wins, roundWinners, cfg.RoundsToWin);
+            if (sharing != null)
+            {
+                DominionWrite toSuddenDeath = Stage(room, WhatRoundSuddenDeath, new Hashtable
+                {
+                    { DominionKeys.Stage, (int)DominionStage.SuddenDeath },
+                    { DominionKeys.StageEnd, 0 },
+                    { DominionKeys.SuddenDeathStart, DominionRules.StageEndMs(nowMs, cfg.SuddenDeathCountdownSeconds) },
+                    { DominionKeys.SuddenDeathTeams, sharing },
+                    { DominionKeys.SuddenDeathRound, room.Round },
+                }, scoresRound: true);
+                ClearOvertime(toSuddenDeath.Props, room);
+                return toSuddenDeath;
+            }
+            return ScoredRound(room, nowMs, cfg, teamsInMatch, roundWinners, DominionHistory.EncodeWinners(roundWinners), scoresRound: true);
+        }
+
+        /// <summary>What the write that sends a shared round to its own sudden death is called (DominionWrite.What).</summary>
+        public const string WhatRoundSuddenDeath = "sudden death for the round";
+
+        /// <summary>Does the room's sudden death decide a round (dSdR) rather than the match.</summary>
+        private static bool DecidesARound(DominionRoomState room) => room.Stage == DominionStage.SuddenDeath && room.SuddenDeathRound > 0;
+
+        /// <summary>The round's winners count: wins, history and its dHistW entry in one write, then break, match over or the match's sudden death.</summary>
+        private static DominionWrite ScoredRound(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, int[] roundWinners,
+                                                 int historyEntry, bool scoresRound, string what = null)
         {
             int[] wins = DominionRules.WinsAfterRound(room.Wins, roundWinners);
             // The round's final points go into the history in the same write (dPts is cleared at the next round's start): the result table needs them.
             int[] history = DominionHistory.Append(room.History, room.Points);
             // Its winners are kept beside the points (-1 for a tie, a shared entry for an overtime that ran out), so the table bolds who the wins counted.
-            int[] historyWinners = DominionHistory.AppendWinner(room.HistoryWinners, DominionHistory.EncodeWinners(roundWinners));
+            int[] historyWinners = DominionHistory.AppendWinner(room.HistoryWinners, historyEntry);
             RoundOutcome outcome = DominionRules.AfterRound(room.Round, wins, cfg.RoundsToWin, cfg.MaxRounds, teamsInMatch);
             DominionWrite write;
             switch (outcome.Next)
             {
                 case DominionStage.Over:
-                    write = Stage(room, "match won", new Hashtable
+                    write = Stage(room, what ?? "match won", new Hashtable
                     {
                         { DominionKeys.Stage, (int)DominionStage.Over },
                         { DominionKeys.Winner, outcome.Winner },
                         { DominionKeys.Wins, wins },
                         { DominionKeys.History, history },
                         { DominionKeys.HistoryWinners, historyWinners },
-                    }, scoresRound: true);
+                    }, scoresRound);
                     break;
                 case DominionStage.SuddenDeath:
-                    write = Stage(room, "sudden death", new Hashtable
+                    write = Stage(room, what ?? "sudden death", new Hashtable
                     {
                         { DominionKeys.Stage, (int)DominionStage.SuddenDeath },
                         { DominionKeys.StageEnd, 0 },
@@ -258,10 +293,10 @@ namespace Overpower.Dominion
                         { DominionKeys.Wins, wins },
                         { DominionKeys.History, history },
                         { DominionKeys.HistoryWinners, historyWinners },
-                    }, scoresRound: true);
+                    }, scoresRound);
                     break;
                 default:
-                    write = Stage(room, "round over, break", new Hashtable
+                    write = Stage(room, what ?? "round over, break", new Hashtable
                     {
                         { DominionKeys.Round, room.Round + 1 },
                         { DominionKeys.Stage, (int)DominionStage.Break },
@@ -270,10 +305,17 @@ namespace Overpower.Dominion
                         { DominionKeys.History, history },
                         { DominionKeys.HistoryWinners, historyWinners },
                         { DominionKeys.CentrePayout, null }, // null removes the key: the round's last payout time is stale in the break (the next round start writes a fresh one)
-                    }, scoresRound: true);
+                    }, scoresRound);
+                    if (room.Stage == DominionStage.SuddenDeath)
+                    {
+                        // Out of a round's sudden death into a break: the circle and its teams leave the room, so nothing later reads a finished one.
+                        write.Props[DominionKeys.SuddenDeathStart] = null;
+                        write.Props[DominionKeys.SuddenDeathTeams] = null;
+                    }
                     break;
             }
             ClearOvertime(write.Props, room);
+            if (DecidesARound(room)) write.Props[DominionKeys.SuddenDeathRound] = null;
             return write;
         }
 
@@ -287,13 +329,12 @@ namespace Overpower.Dominion
         {
             if (write == null) return null;
             if (write.What == WhatSuddenDeathReplay) return WhatSuddenDeathReplay;
-            if (write.What == WhatSuddenDeathWon)
-                return WhatSuddenDeathWon + ":" + (write.Props.TryGetValue(DominionKeys.Winner, out object team) ? team : "?");
+            if (write.What == WhatSuddenDeathWon) return WhatSuddenDeathWon + ":" + write.VerdictTeam;
             return null;
         }
 
         /// <summary>Sudden death has no clock: the master judges it from who is alive and, when nobody is, from the death stamps (A31). One team of the
-        /// tied ones with anyone alive wins the match; when all have fallen the team whose last player fell latest wins, and only the exact same server
+        /// tied ones with anyone alive wins the match (or, in a round's own sudden death, that round); when all have fallen the team whose last player fell latest wins, and only the exact same server
         /// moment starts it over (A8) with a new circle start; two or more alive writes nothing. Only after the judging beat, and the write expects the
         /// circle start it judged, so two masters cannot both replay and a replay cannot be followed by a stale win.</summary>
         private static DominionWrite NextInSuddenDeath(DominionRoomState room, int nowMs, DominionFlowNumbers cfg, int[] teamsInMatch, SuddenDeathRules.Tally tally)
@@ -303,18 +344,26 @@ namespace Overpower.Dominion
             SuddenDeathResult verdict = SuddenDeathRules.Judge(tally, playing, cfg.SameInstantToleranceMs);
             if (verdict.State == SuddenDeathState.Ongoing) return null;
 
-            DominionWrite write = verdict.State == SuddenDeathState.Won
-                ? Stage(room, WhatSuddenDeathWon, new Hashtable
+            DominionWrite write;
+            if (verdict.State == SuddenDeathState.Won && DecidesARound(room))
+                // A65: the round's sudden death gives its winner the round win alone; then the match is over, the next round's break, or (no
+                // rounds left and still level) the match's own sudden death.
+                write = ScoredRound(room, nowMs, cfg, teamsInMatch, new[] { verdict.Team }, DominionHistory.EncodeSuddenDeathWinner(verdict.Team),
+                    scoresRound: false, what: WhatSuddenDeathWon);
+            else if (verdict.State == SuddenDeathState.Won)
+                write = Stage(room, WhatSuddenDeathWon, new Hashtable
                 {
                     { DominionKeys.Stage, (int)DominionStage.Over },
                     { DominionKeys.Winner, verdict.Team },
-                })
-                : Stage(room, WhatSuddenDeathReplay, new Hashtable
+                });
+            else
+                write = Stage(room, WhatSuddenDeathReplay, new Hashtable
                 {
                     { DominionKeys.SuddenDeathStart, DominionRules.StageEndMs(nowMs, cfg.SuddenDeathCountdownSeconds) },
                     // A33: only the teams whose last players fell together play again; the others stay out (dead and waiting).
                     { DominionKeys.SuddenDeathTeams, verdict.ReplayTeams ?? playing },
                 });
+            if (verdict.State == SuddenDeathState.Won) write.VerdictTeam = verdict.Team;
             write.Expected[DominionKeys.SuddenDeathStart] = room.SuddenDeathMs;
             return write;
         }
@@ -411,7 +460,8 @@ namespace Overpower.Dominion
         /// nothing (going live already did the fresh start), and nothing else is an edge.</summary>
         public static DominionEdge EdgeBetween(int prevRound, DominionStage prevStage, int round, DominionStage stage)
         {
-            if (stage == DominionStage.Break && DominionRules.IsRoundPlay(prevStage)) return DominionEdge.BreakStarted; // a round, or the overtime after it
+            // A round, the overtime after it, or a round's own sudden death (A65): the dead waiting in it come back with the break's fresh start.
+            if (stage == DominionStage.Break && (DominionRules.IsRoundPlay(prevStage) || prevStage == DominionStage.SuddenDeath)) return DominionEdge.BreakStarted;
             if (stage == DominionStage.Round && prevStage == DominionStage.Break) return DominionEdge.RoundStarted;
             return DominionEdge.None;
         }

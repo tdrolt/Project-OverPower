@@ -38,6 +38,7 @@ namespace Overpower.UI
         private DominionResultPanel result;
 
         private DominionRoomState state;
+        private bool finishedInSuddenDeath; // that round was decided by its own sudden death (A65)
         private int[] finishedWinners = Array.Empty<int>(); // who won the round the break follows, as the room recorded it (read when the room changes, not every frame)
         private DominionRoomState previous;
         private bool haveState;
@@ -130,7 +131,7 @@ namespace Overpower.UI
                     centre.SetVisible(false);
                     sudden.Hide();
                     breakCard.SetDotsToWin(config.RoundsToWin);
-                    breakCard.Refresh(teams, state.Round, state.Round <= 1, state.Points, finishedWinners, state.Wins, DominionHudText.SecondsLeft(state.EndMs, now),
+                    breakCard.Refresh(teams, state.Round, state.Round <= 1, state.Points, finishedWinners, finishedInSuddenDeath, state.Wins, DominionHudText.SecondsLeft(state.EndMs, now),
                         Mathf.RoundToInt(config.BreakCountdownSeconds), config.WeaponDepthByRound, config.ArmorUpgradesByRound, names,
                         Teams.TryGetPlayingTeam(PhotonNetwork.LocalPlayer, out _), OpenTheShop);
                     break;
@@ -165,6 +166,7 @@ namespace Overpower.UI
             bool hadPrevious = haveState;
             state = DominionRoomState.Read(PhotonNetwork.CurrentRoom.CustomProperties);
             finishedWinners = DominionHistory.WinnersOfFinishedRound(state); // the break after round N names round N's winners
+            finishedInSuddenDeath = DominionHistory.FinishedRoundWonInSuddenDeath(state);
             haveState = true;
             dirty = false;
             if (teamsRoom != PhotonNetwork.CurrentRoom)
@@ -244,7 +246,7 @@ namespace Overpower.UI
             if (config == null) return false;
             ReadRoom(config);
             HideBars();
-            result.Show(winner, teams, state.Wins, state.History, state.HistoryWinners, state.SuddenDeathMs, theme.scoreboardTeamNames, onBack);
+            result.Show(winner, teams, state.Wins, state.History, state.HistoryWinners, state.SuddenDeathMs, config.RoundsToWin, theme.scoreboardTeamNames, onBack);
             Debug.Log($"[DOMINION] result: {result.HeadlineText} | {string.Join(" / ", result.TableRows)}");
             return true;
         }

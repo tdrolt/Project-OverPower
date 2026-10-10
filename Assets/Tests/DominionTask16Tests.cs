@@ -101,21 +101,13 @@ namespace Overpower.Tests
 
         [Test] public void NoWinnersAddNothing() => CollectionAssert.AreEqual(new[] { 1, 0, 1 }, DominionRules.WinsAfterRound(new[] { 1, 0, 1 }, new int[0]));
 
-        // ---------------------------------------------------------------- after a round: two reach the target together
+        // ---------------------------------------------------------------- after a round: a share on match point (A65 replaced "two reach the target together")
 
-        [Test] public void TwoTeamsReachingTheTargetTogetherGoToSuddenDeathBetweenThem()
-        {
-            RoundOutcome o = DominionRules.AfterRound(2, new[] { 2, 2, 0 }, 2, 3, Three);
-            Assert.AreEqual(DominionStage.SuddenDeath, o.Next);
-            CollectionAssert.AreEqual(new[] { 0, 1 }, o.SuddenDeathTeams);
-        }
+        [Test] public void TwoTeamsOnMatchPointSharingPlaySuddenDeathForTheRoundInsteadOfBothReachingTheTarget() =>
+            CollectionAssert.AreEqual(new[] { 0, 1 }, DominionRules.SharedRoundGoesToSuddenDeath(new[] { 1, 1, 0 }, new[] { 0, 1 }, 2));
 
-        [Test] public void ThreeTeamsReachingTheTargetTogetherAllPlaySuddenDeath()
-        {
-            RoundOutcome o = DominionRules.AfterRound(2, new[] { 2, 2, 2 }, 2, 3, Three);
-            Assert.AreEqual(DominionStage.SuddenDeath, o.Next);
-            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, o.SuddenDeathTeams);
-        }
+        [Test] public void ThreeTeamsOnMatchPointSharingAllPlaySuddenDeathForTheRound() =>
+            CollectionAssert.AreEqual(new[] { 0, 1, 2 }, DominionRules.SharedRoundGoesToSuddenDeath(new[] { 1, 1, 1 }, new[] { 2, 0, 1 }, 2));
 
         [Test] public void OneTeamAtTheTargetStillWinsTheMatchAtOnce()
         {
@@ -253,17 +245,18 @@ namespace Overpower.Tests
             CollectionAssert.AreEqual(new[] { 1, 1, 0 }, (int[])w.Props[DominionKeys.Wins], "team 2 is 600 behind: no share");
         }
 
-        [Test] public void TwoSharedRoundsMakeTwoTwoAndSendThoseTwoTeamsToSuddenDeath()
+        [Test] public void ASharedRoundAtOneOneSendsThoseTwoTeamsToSuddenDeathForTheRoundWithoutAddingWins()
         {
+            // A65 replaced "2-2 after two shared rounds, then sudden death for the match": the share at 1-1 never hands out the wins.
             var room = Room(DominionStage.Overtime, 160000, new[] { 520, 600, 0 }, wins: new[] { 1, 1, 0 }, round: 2, otTeams: Two, history: new[] { 400, 450, 0 });
             DominionWrite w = Next(room, 160000);
             Assert.AreEqual((int)DominionStage.SuddenDeath, w.Props[DominionKeys.Stage]);
-            CollectionAssert.AreEqual(new[] { 2, 2, 0 }, (int[])w.Props[DominionKeys.Wins]);
+            Assert.IsFalse(w.Props.ContainsKey(DominionKeys.Wins));
             CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])w.Props[DominionKeys.SuddenDeathTeams]);
             Assert.IsNull(w.Props[DominionKeys.OvertimeTeams]);
         }
 
-        [Test] public void ThreeTeamsReachingTheTargetOnASharedRoundAllPlaySuddenDeath()
+        [Test] public void ThreeTeamsOnMatchPointSharingARoundAllPlayItsSuddenDeath()
         {
             var room = Room(DominionStage.Overtime, 160000, new[] { 300, 300, 300 }, wins: new[] { 1, 1, 1 }, round: 2, otTeams: Three, history: new[] { 400, 450, 0 });
             DominionWrite w = Next(room, 160000);
@@ -427,7 +420,8 @@ namespace Overpower.Tests
         {
             Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), "Next", Rule(typeof(DominionRules), nameof(DominionRules.OvertimeLeader))));
             Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), "Next", Rule(typeof(DominionRules), nameof(DominionRules.AtOvertimeEnd))));
-            Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), "ScoreRound", Rule(typeof(DominionRules), nameof(DominionRules.WinsAfterRound))));
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), "ScoreRound", Rule(typeof(DominionRules), nameof(DominionRules.SharedRoundGoesToSuddenDeath))));
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), "ScoredRound", Rule(typeof(DominionRules), nameof(DominionRules.WinsAfterRound))));
             Assert.IsTrue(IlWiring.Uses(typeof(DominionRoomWrites), "ScoreRound", Rule(typeof(DominionHistory), nameof(DominionHistory.EncodeWinners))));
         }
 
