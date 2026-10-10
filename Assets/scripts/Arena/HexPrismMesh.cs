@@ -6,6 +6,7 @@ namespace Overpower.Arena
     /// Corners stand at 0, 60 ... 300 degrees of yaw (the first faces +Z, like the first column). Flat-shaded.</summary>
     public static class HexPrismMesh
     {
+        public const string MeshName = "Hex Prism";
         public const int Sides = 6;
         public const int VertexCount = Sides * 4 + 2 * (Sides + 1);
 
@@ -47,7 +48,7 @@ namespace Overpower.Arena
                 }
             }
 
-            var mesh = new Mesh { name = "Hex Prism", hideFlags = HideFlags.DontSave };
+            var mesh = new Mesh { name = MeshName, hideFlags = HideFlags.DontSave };
             mesh.vertices = vertices;
             mesh.normals = normals;
             mesh.triangles = triangles.ToArray();

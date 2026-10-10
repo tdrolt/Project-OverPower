@@ -160,6 +160,7 @@ namespace Overpower.UI
         private Vector3 lastSamplePosition;
         private bool hasSamplePosition;
         private bool ownershipDirty = true;
+        private bool drawnForDominion;
         private float appliedYaw = float.NaN;
         // The triangular mask/edge's constant offset from the map's yaw rotation, computed once in TryBuild from the real
         // capital positions (ComputeTriangleBaseRotation). 0 for the shipped arena, but never hard-coded as 0.
@@ -267,6 +268,9 @@ namespace Overpower.UI
                 shownKnowledgeVersion = knowledge.Version;
                 ownershipDirty = true;
             }
+
+            if (MinimapLayout.SpawnDrawingIsStale(drawnForDominion, Overpower.Dominion.DominionMode.IsActive()))
+                ownershipDirty = true;
 
             if (ownershipDirty && manager.Current != null)
             {
@@ -694,6 +698,7 @@ namespace Overpower.UI
         {
             TerritorySnapshot snapshot = manager.Current;
             MatchDirector director = MatchDirector.Instance;
+            drawnForDominion = Overpower.Dominion.DominionMode.IsActive();
             foreach (ZoneUi zone in zones)
             {
                 // Out of play wins over ownership: a capital nobody plays for (host start) or a zone behind the phase-two

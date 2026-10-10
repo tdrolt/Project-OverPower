@@ -151,6 +151,38 @@ namespace Overpower.Tests
 
         private float ColliderRadius => instance.GetComponent<CapsuleCollider>().radius;
 
+        /// <summary>The farthest any vertex of the piece stands from the tower's axis, on the ground plane: a hexagon's corner counts, not just its extent along x and z.</summary>
+        internal static float HorizontalReach(Renderer piece, Vector3 axis)
+        {
+            var filter = piece.GetComponent<MeshFilter>();
+            if (filter == null || filter.sharedMesh == null)
+                return new Vector2(Mathf.Max(Mathf.Abs(piece.bounds.max.x - axis.x), Mathf.Abs(piece.bounds.min.x - axis.x)),
+                                   Mathf.Max(Mathf.Abs(piece.bounds.max.z - axis.z), Mathf.Abs(piece.bounds.min.z - axis.z))).magnitude;
+            float reach = 0f;
+            Matrix4x4 toWorld = piece.transform.localToWorldMatrix;
+            foreach (Vector3 v in filter.sharedMesh.vertices)
+            {
+                Vector3 w = toWorld.MultiplyPoint3x4(v) - axis;
+                reach = Mathf.Max(reach, new Vector2(w.x, w.z).magnitude);
+            }
+            return reach;
+        }
+
+        [Test]
+        public void AHexagonCornerPastTheColliderOnADiagonalIsSeen()
+        {
+            var go = new GameObject("diagonal", typeof(MeshFilter), typeof(MeshRenderer));
+            var mesh = new Mesh { vertices = new[] { Vector3.zero, new Vector3(1.9f, 0f, 1.9f), new Vector3(1.9f, 1f, 0f) }, triangles = new[] { 0, 1, 2 } };
+            try
+            {
+                go.GetComponent<MeshFilter>().sharedMesh = mesh;
+                Bounds b = go.GetComponent<MeshRenderer>().bounds;
+                Assert.LessOrEqual(Mathf.Max(b.max.x, -b.min.x, b.max.z, -b.min.z), 2.6f, "the old measure along x and z misses it");
+                Assert.Greater(HorizontalReach(go.GetComponent<MeshRenderer>(), Vector3.zero), 2.6f);
+            }
+            finally { Object.DestroyImmediate(go); Object.DestroyImmediate(mesh); }
+        }
+
         private float TopOfShown() => instance.GetComponentsInChildren<Renderer>(false).Max(r => r.bounds.max.y);
 
         [Test]
@@ -178,9 +210,7 @@ namespace Overpower.Tests
             look.UseSpawnLook(true);
             foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(false))
             {
-                Bounds b = r.bounds;
-                float reach = Mathf.Max(Mathf.Abs(b.max.x), Mathf.Abs(b.min.x), Mathf.Abs(b.max.z), Mathf.Abs(b.min.z));
-                Assert.LessOrEqual(reach, ColliderRadius + 1e-3f, r.transform.parent.name + "/" + r.name);
+                Assert.LessOrEqual(HorizontalReach(r, instance.transform.position), ColliderRadius + 1e-3f, r.transform.parent.name + "/" + r.name);
             }
             Assert.LessOrEqual(TopOfShown(), topBefore + 1e-3f);
         }
@@ -232,6 +262,59 @@ namespace Overpower.Tests
             look.UseSpawnLook(true);
             look.ApplyColumnsAtRuntime(1);
             Assert.AreEqual(SpawnTowerRules.ColumnCount(theme.spawnTowerColumnCount), look.ShownColumns);
+        }
+    }
+
+    public class SpawnLookLeftoverTests
+    {
+        private static readonly System.Reflection.BindingFlags Any =
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+
+        [TestCase(false, true, true)]
+        [TestCase(true, false, true)]
+        [TestCase(true, true, false)]
+        [TestCase(false, false, false)]
+        public void TheMapRedrawsOnlyWhenTheModeDiffersFromWhatItDrew(bool drawn, bool now, bool stale)
+        {
+            Assert.AreEqual(stale, MinimapLayout.SpawnDrawingIsStale(drawn, now));
+        }
+
+        [Test]
+        public void TheMapAsksWhetherItsSpawnDrawingIsStaleEveryFrame()
+        {
+            var rule = typeof(MinimapLayout).GetMethod(nameof(MinimapLayout.SpawnDrawingIsStale));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(MinimapView), "LateUpdate", rule));
+        }
+
+        [Test]
+        public void ReadingThePanelRectAllocatesNothing()
+        {
+            var go = new GameObject("hud", typeof(RectTransform), typeof(PlayerHud));
+            try
+            {
+                var hud = go.GetComponent<PlayerHud>();
+                typeof(PlayerHud).GetField("panelRect", Any).SetValue(hud, go.GetComponent<RectTransform>());
+                hud.TryGetScreenRect(out _);
+                long before = System.GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < 100; i++) hud.TryGetScreenRect(out _);
+                Assert.Less(System.GC.GetAllocatedBytesForCurrentThread() - before, 100);
+            }
+            finally { Object.DestroyImmediate(go); }
+        }
+
+        [Test]
+        public void TheSharedHexMeshIsFreedWhenTheGameStarts()
+        {
+            var hook = typeof(TowerLook).GetMethod("FreeSharedMesh", Any);
+            Assert.IsNotNull(hook);
+            var attribute = (RuntimeInitializeOnLoadMethodAttribute)System.Attribute.GetCustomAttribute(hook, typeof(RuntimeInitializeOnLoadMethodAttribute));
+            Assert.IsNotNull(attribute);
+            Assert.AreEqual(RuntimeInitializeLoadType.SubsystemRegistration, attribute.loadType);
+
+            Mesh orphan = HexPrismMesh.Create();
+            hook.Invoke(null, null);
+            Assert.IsTrue(orphan == null, "a hex mesh left over from an earlier session is destroyed");
+            Assert.IsNull(typeof(TowerLook).GetField("hexMesh", Any).GetValue(null));
         }
     }
 

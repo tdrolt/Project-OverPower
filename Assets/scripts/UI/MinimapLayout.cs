@@ -18,6 +18,9 @@ namespace Overpower.UI
     /// </summary>
     public static class MinimapLayout
     {
+        /// <summary>Whether the bubbles drawn for one mode must be redrawn: the mode can arrive after the first recolour, and the spawn answer follows it.</summary>
+        public static bool SpawnDrawingIsStale(bool drawnForDominion, bool dominionNow) => drawnForDominion != dominionNow;
+
         /// <summary>A world point's map-space position. The baked image covers a square of worldSizeMetres centred on
         /// worldCentreXZ (world x, z), drawn mapSize canvas units across.</summary>
         public static Vector2 WorldToMap(Vector3 world, Vector2 worldCentreXZ, float worldSizeMetres, float mapSize)

@@ -213,15 +213,15 @@ namespace Overpower.UI
         public static PlayerHud Local { get; private set; }
 
         private RectTransform panelRect;
+        private static readonly Vector3[] cornerBuffer = new Vector3[4];
 
         /// <summary>The bars-and-slots panel in screen pixels (the HUD canvas is screen space overlay). False while the HUD is not built.</summary>
         public bool TryGetScreenRect(out Rect screenRect)
         {
             screenRect = default;
             if (panelRect == null) return false;
-            var corners = new Vector3[4];
-            panelRect.GetWorldCorners(corners);
-            screenRect = Rect.MinMaxRect(corners[0].x, corners[0].y, corners[2].x, corners[2].y);
+            panelRect.GetWorldCorners(cornerBuffer);
+            screenRect = Rect.MinMaxRect(cornerBuffer[0].x, cornerBuffer[0].y, cornerBuffer[2].x, cornerBuffer[2].y);
             return true;
         }
 

@@ -77,6 +77,20 @@ namespace Overpower.Arena
         public float capitalColumnRadius = 0.6f;
 
         private static Mesh hexMesh;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void FreeSharedMesh()
+        {
+            if (hexMesh != null)
+                DestroyImmediate(hexMesh);
+            hexMesh = null;
+#if UNITY_EDITOR
+            // With domain reload on, the static was already lost: the DontSave mesh of the last session is found by name.
+            foreach (Mesh leftover in Resources.FindObjectsOfTypeAll<Mesh>())
+                if (leftover.name == HexPrismMesh.MeshName)
+                    DestroyImmediate(leftover);
+#endif
+        }
         private bool spawnLook;
         private bool roundShapesKept;
         private int appliedTier = 1;

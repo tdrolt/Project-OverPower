@@ -242,14 +242,27 @@ namespace Overpower.Match
         // The local player's HUD panel (ability slots and bars) on this canvas; nothing to avoid without one.
         private bool AvoidBar(out Rect rect)
         {
-            rect = default;
-            PlayerHud hud = PlayerHud.Local;
-            if (hud == null || !hud.TryGetScreenRect(out Rect screen)) return false;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen.min, null, out Vector2 low);
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen.max, null, out Vector2 high);
-            rect = Rect.MinMaxRect(low.x, low.y, high.x, high.y);
-            return true;
+            if (barFrame != Time.frameCount)
+            {
+                barFrame = Time.frameCount;
+                barRect = default;
+                hasBarRect = false;
+                PlayerHud hud = PlayerHud.Local;
+                if (hud != null && hud.TryGetScreenRect(out Rect screen))
+                {
+                    RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen.min, null, out Vector2 low);
+                    RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen.max, null, out Vector2 high);
+                    barRect = Rect.MinMaxRect(low.x, low.y, high.x, high.y);
+                    hasBarRect = true;
+                }
+            }
+            rect = barRect;
+            return hasBarRect;
         }
+
+        private int barFrame = -1;
+        private Rect barRect;
+        private bool hasBarRect;
 
         private static Vector2 SizeOf(TextMeshProUGUI label) =>
             new Vector2(label.GetPreferredValues(label.text).x, BountyLabelPlacement.LabelHeight(label.fontSize));
