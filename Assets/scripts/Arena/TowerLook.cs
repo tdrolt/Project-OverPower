@@ -87,7 +87,7 @@ namespace Overpower.Arena
 #if UNITY_EDITOR
             // With domain reload on, the static was already lost: the DontSave mesh of the last session is found by name.
             foreach (Mesh leftover in Resources.FindObjectsOfTypeAll<Mesh>())
-                if (leftover.name == HexPrismMesh.MeshName)
+                if (leftover.name == HexPrismMesh.MeshName && (leftover.hideFlags & HideFlags.DontSave) != 0 && !UnityEditor.EditorUtility.IsPersistent(leftover))
                     DestroyImmediate(leftover);
 #endif
         }
