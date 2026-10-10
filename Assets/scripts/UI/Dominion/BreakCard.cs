@@ -35,6 +35,7 @@ namespace Overpower.UI
         private bool drawnFirstBreak, drawnCanPick;
         private int[] drawnPoints = System.Array.Empty<int>(), drawnWins = System.Array.Empty<int>(), drawnWinners = System.Array.Empty<int>();
         private bool pulsing;
+        private int pulsedRound = -1;
         private float pulseStart;
         private bool countdownDrawn;
         private int drawnSeconds, drawnCountdownRound, drawnBigFrom;
@@ -112,8 +113,18 @@ namespace Overpower.UI
                     winDots[i].sprite = won ? GeneratedSprites.Disc : DominionHudSprites.EmptyDot(theme);
                     winDots[i].color = won ? Pick(theme.dominionTeamColors, team) : theme.dominionDimColor;
                 }
-                pulsing = shared;
-                pulseStart = Time.unscaledTime;
+                switch (DominionHudText.PulseStepOnRedraw(shared, round, pulsedRound))
+                {
+                    case DominionHudText.PulseStep.Stop:
+                        pulsing = false;
+                        ResetDotScales();
+                        break;
+                    case DominionHudText.PulseStep.Start:
+                        pulsing = true;
+                        pulsedRound = round;
+                        pulseStart = Time.unscaledTime;
+                        break;
+                }
                 opens.text = DominionHudText.OpensLine(round, depthByRound, armorByRound,
                     new OpensTexts(theme.dominionOpensFormat, theme.dominionOpensFirstText, theme.dominionOpensWeaponFamily, theme.dominionOpensWeaponUpgrade,
                                    theme.dominionOpensArmorOne, theme.dominionOpensArmorMore, theme.dominionOpensAnd, theme.dominionOpensNothing));
@@ -153,7 +164,16 @@ namespace Overpower.UI
                 float scale = pulses ? DominionHudText.PulseScale(elapsed, theme.dominionBreakPulseSeconds, theme.dominionBreakPulseScale) : 1f;
                 winDots[i].rectTransform.localScale = new Vector3(scale, scale, 1f);
             }
-            if (elapsed >= theme.dominionBreakPulseSeconds) pulsing = false;
+            if (elapsed >= theme.dominionBreakPulseSeconds)
+            {
+                pulsing = false;
+                ResetDotScales();
+            }
+        }
+
+        private void ResetDotScales()
+        {
+            for (int i = 0; i < winDots.Count; i++) winDots[i].rectTransform.localScale = Vector3.one;
         }
 
         private string[] TeamHex()
@@ -185,6 +205,7 @@ namespace Overpower.UI
             card = null;
             countdownIsBig = false;
             pulsing = false;
+            pulsedRound = -1;
             pointsTexts.Clear(); winDots.Clear(); winDotTeam.Clear();
             drawn = false;
             countdownDrawn = false;

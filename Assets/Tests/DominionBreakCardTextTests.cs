@@ -17,6 +17,27 @@ namespace Overpower.Tests
 
         private static string C(string hex, string text) => "<color=#" + hex + ">" + text + "</color>";
 
+        [TestCase(false, 3, -1, DominionHudText.PulseStep.Stop)]
+        [TestCase(false, 3, 3, DominionHudText.PulseStep.Stop)]
+        [TestCase(true, 3, 3, DominionHudText.PulseStep.Keep)]
+        [TestCase(true, 3, -1, DominionHudText.PulseStep.Start)]
+        [TestCase(true, 4, 3, DominionHudText.PulseStep.Start)]
+        public void ARedrawOfTheBreakCardStopsKeepsOrStartsThePulse(bool shared, int round, int pulsedRound, DominionHudText.PulseStep expected) =>
+            Assert.AreEqual(expected, DominionHudText.PulseStepOnRedraw(shared, round, pulsedRound));
+
+        [Test] public void TheBreakCardAsksThePulseRuleOnEveryRedraw() =>
+            Assert.IsTrue(IlWiring.Uses(typeof(BreakCard), "Refresh", typeof(DominionHudText).GetMethod(nameof(DominionHudText.PulseStepOnRedraw))));
+
+        [Test] public void NoTeamListMeansNoWinnersAtTheBuzzer()
+        {
+            foreach (bool overtime in new[] { false, true })
+            {
+                DominionRules.BuzzerResult r = DominionRules.AtBuzzer(new[] { 800, 100 }, null, 100, overtime);
+                Assert.AreEqual(0, r.Winners.Length);
+                Assert.IsNull(r.OvertimeTeams);
+            }
+        }
+
         // ---------------------------------------------------------------- the shared-round line
 
         [Test] public void TwoSharedWinnersAreJoinedWithAndEachInItsColour() =>

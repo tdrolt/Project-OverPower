@@ -188,8 +188,8 @@ namespace Overpower.Dominion
                 return start;
             }
 
-            // The clock ran out. A round: a team a lead ahead has won it, otherwise the close teams play overtime. An overtime: its minute is up, so a
-            // team with the lead wins and else every team still in it shares the round.
+            // The clock ran out. A round: a team a lead ahead wins it, otherwise every team plays overtime. An overtime: a team a lead ahead wins, else
+            // every team within the lead of the top shares the round.
             int[] winners;
             if (room.Stage == DominionStage.Overtime)
                 winners = DominionRules.AtOvertimeEnd(room.Points, overtimeTeams, cfg.OvertimeLeadPoints);

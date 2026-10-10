@@ -121,9 +121,8 @@ namespace Overpower.Dominion
             return present.ToArray();
         }
 
-        /// <summary>The teams the round bar and the score bars show: every team of the match, and in overtime less a team with nobody left in the game
-        ///. A team whose presence is not known (no count, or past the end of
-        /// it) is shown, and so is every team when nobody was counted at all. The match's own array is handed back when nothing is hidden, so a per-frame call allocates nothing.</summary>
+        /// <summary>The teams the round bar and the score bars show: every team of the match, and in overtime less a team with nobody left in the game.
+        /// A team whose presence is not known (no count, or past the end of it) is shown, and so is every team when nobody was counted at all. The match's own array is handed back when nothing is hidden, so a per-frame call allocates nothing.</summary>
         public static int[] TeamsShownIn(DominionStage stage, int[] matchTeams, int[] playersPerTeam)
         {
             if (stage != DominionStage.Overtime || matchTeams == null || playersPerTeam == null) return matchTeams;
@@ -170,6 +169,7 @@ namespace Overpower.Dominion
         /// team of the match has 0 points counts for nobody either, overtime or not.</summary>
         public static BuzzerResult AtBuzzer(int[] points, int[] teamsInMatch, int leadPoints, bool overtimeOn)
         {
+            if (teamsInMatch == null) return new BuzzerResult { Winners = new int[0] };
             if (NobodyScored(points, teamsInMatch)) return new BuzzerResult { Winners = new int[0] };
             if (!overtimeOn)
             {

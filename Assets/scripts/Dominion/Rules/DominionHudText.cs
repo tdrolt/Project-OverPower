@@ -112,6 +112,13 @@ namespace Overpower.Dominion
             return 1f + (peak - 1f) * (float)Math.Sin(Math.PI * elapsed / duration);
         }
 
+        public enum PulseStep { Stop, Keep, Start }
+
+        /// <summary>What a redraw of the break card does to the pulse: a card that is not a shared round stops it, a shared round that already pulsed
+        /// (<paramref name="pulsedRound"/>) keeps it as it is, and the first draw of a shared round starts it.</summary>
+        public static PulseStep PulseStepOnRedraw(bool shared, int round, int pulsedRound) =>
+            !shared ? PulseStep.Stop : round == pulsedRound ? PulseStep.Keep : PulseStep.Start;
+
         /// <summary>Does this round-win dot pulse when the shared-round card appears: the newest win of a team that shared the round (dot number
         /// <paramref name="slot"/>, 0-based, of a team that now has <paramref name="wins"/> wins).</summary>
         public static bool PulsesDot(int[] winners, int team, int slot, int wins)
