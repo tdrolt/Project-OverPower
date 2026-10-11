@@ -15,7 +15,7 @@ MonoBehaviour:
   roundsToWin: 2
   maxRounds: 3
   roundSeconds: 180
-  breakSeconds: 20
+  breakSeconds: 45
   breakCountdownSeconds: 5
   overtimeSeconds: 60
   overtimeLeadPoints: 200
