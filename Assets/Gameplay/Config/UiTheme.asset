@@ -200,7 +200,7 @@ MonoBehaviour:
   capitalUnderAttackRespawnNote: Your capital is under attack - you will respawn
     at your Tier 2 zone
   capitalUnderAttackRespawnToast: 'Respawned at Tier 2: capital under attack'
-  capitalUnderAttackNoteFontSize: 30
+  capitalUnderAttackNoteFontSize: 24
   capitalUnderAttackNoteColor: {r: 1, g: 1, b: 1, a: 1}
   capitalUnderAttackNoteBackingColor: {r: 0, g: 0, b: 0, a: 0.6}
   twoTeamsLeftBannerText: 'Two teams left: lose your base and you can''t respawn'
@@ -297,8 +297,6 @@ MonoBehaviour:
   minimapCutWallColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
   minimapCutWallWidth: 3
   matchCountdownText: MATCH STARTS IN {0}
-  matchStartButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
-  matchStartButtonSize: {x: 260, y: 52}
   warmupTopOffset: 130
   matchLiveToastText: The match is live! Zones, gold, loadouts and respawn timers
     are reset.
@@ -535,13 +533,10 @@ MonoBehaviour:
   resultButtonLobbyList: Back to the lobby list
   resultButtonQuit: Quit
   connectionLostPanelWidth: 640
-  connectionLostPanelColor: {r: 0.08, g: 0.08, b: 0.08, a: 0.95}
   connectionLostTitleColor: {r: 1, g: 0.55, b: 0.35, a: 1}
   connectionLostTitleSize: 34
   connectionLostBodySize: 22
-  rejoinButtonSize: {x: 260, y: 52}
   rejoinMatchButtonSize: {x: 420, y: 52}
-  rejoinButtonColor: {r: 0.16, g: 0.45, b: 0.25, a: 0.95}
   rejoinButtonGapAboveNameBox: 16
   spectateButton: Spectate
   spectateNextButton: Next
@@ -914,3 +909,24 @@ MonoBehaviour:
   flashWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   arenaNeutralLineColor: {r: 0.48, g: 0.5, b: 0.54, a: 1}
   arenaLook: {fileID: 11400000, guid: 746d0f1da4232aa45bb093092c2e0c3b, type: 2}
+  deathCardRespawnFormat: RESPAWN IN {0}
+  deathCardWidth: 520
+  deathCardTitleSize: 44
+  deathCardPadding: {x: 28, y: 18}
+  deathCardGap: 10
+  deathCardMargin: 16
+  deathCardShopOpenTitleSize: 26
+  deathCardShopOpenPadding: {x: 20, y: 3}
+  deathCardShopOpenMargin: 6
+  deathVignetteColor: {r: 0, g: 0, b: 0, a: 0.5}
+  popupDimColor: {r: 0, g: 0, b: 0, a: 0.55}
+  popupCardWidth: 640
+  popupTitleSize: 40
+  popupBodySize: 22
+  masterVolumeLabel: MASTER VOLUME
+  masterVolumePercentFormat: '{0}%'
+  masterVolumeRowHeight: 36
+  matchLogDismissText: Dismiss
+  resultPanelCardWidth: 720
+  resultPanelTitleSize: 72
+  resultPanelButtonWidth: 440

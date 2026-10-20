@@ -19,8 +19,9 @@ namespace Overpower.UI
     /// The shop screen (P or the bottom-right "Loadout (P)" button; closed by P, Esc or its X): weapon upgrade tree, armor
     /// rows and ability cards on two tabs ("Weapons", "Abilities & Armor"), reopening on the page last used
     /// (ShopPageMemory). OWNER ONLY, built in code like PlayerHud (every listener sits on its button's line), dormant on
-    /// remote copies. SORT ORDER: modal canvas at -5, above PlayerHud (-10) but below the F1 panel (500) and MatchUI's
-    /// win/lose panels (0), which must show over an open shop; the "Loadout (P)" button has its own canvas at -10, HUD depth.
+    /// remote copies. SORT ORDER (UiLayers): modal canvas at Shop, above PlayerHud and the death card (a dead player sees and clicks the
+    /// whole shop) but below the F1 panel and MatchUI's win/lose panels, which must show over an open shop; the "Loadout (P)" button has its
+    /// own canvas at HUD depth.
     /// INPUT: PlayerInputRouter's Shop action / ShopToggled (own emit gate, see ShopSuppressed); while open it claims tool
     /// focus (SetToolFocus), keyed by owner so it and the F1 panel can be open together. Hover pop-up: LoadoutScreen.Tooltip.cs.
     /// </summary>
@@ -156,6 +157,9 @@ namespace Overpower.UI
 
         /// <summary>The page on screen right now (the one whose tab is lit).</summary>
         public ShopPage CurrentPage => shownPage;
+
+        /// <summary>The shop's panel (the death card keeps clear of it); null before the shop is built.</summary>
+        public RectTransform PanelRect => panelRect;
 
         // ---- shop header --------------------------------------------------------------
 

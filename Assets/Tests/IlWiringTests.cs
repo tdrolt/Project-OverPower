@@ -25,6 +25,7 @@ namespace Overpower.Tests
             public void StoresTrue() { flagField = true; }
             public void StoresTheField() { field = 3; }
             public int ReadsTheField() => field;
+            public void HandsTheTargetOverAsADelegate() { System.Action later = Target; later(); }
         }
 
         private static readonly MethodInfo Target = typeof(Probe).GetMethod(nameof(Probe.Target));
@@ -89,6 +90,14 @@ namespace Overpower.Tests
             Assert.IsFalse(IlWiring.Uses(typeof(Probe), nameof(Probe.CallsAnotherAssembly), other), "the byte compare cannot see across assemblies");
             Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(Probe), nameof(Probe.CallsAnotherAssembly), other));
             Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), other));
+        }
+
+        [Test] public void AMethodHandedOverAsADelegateIsFoundAndACallIsNot()
+        {
+            // a listener added with a method group (slider.onValueChanged.AddListener(OnVolumeChanged)) is an ldftn, not a call
+            Assert.IsTrue(IlWiring.HandsOver(typeof(Probe), nameof(Probe.HandsTheTargetOverAsADelegate), Target));
+            Assert.IsFalse(IlWiring.HandsOver(typeof(Probe), nameof(Probe.CallsTheTarget), Target), "a direct call is not a subscription");
+            Assert.IsFalse(IlWiring.HandsOver(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), Target));
         }
 
         [Test] public void AMethodNameThatDoesNotExistFindsNothing() =>

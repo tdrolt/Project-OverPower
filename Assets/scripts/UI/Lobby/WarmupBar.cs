@@ -18,7 +18,7 @@ namespace Overpower.UI
     public sealed class WarmupBar : MonoBehaviour
     {
         /// <summary>Where the bar's canvas sorts: below the Loadout screen (-5), under the scoreboard (30), like the spectator bar.</summary>
-        public const int SortingOrder = -10;
+        public const int SortingOrder = UiLayers.Hud;
 
         private LobbyUiKit kit;
         private UiTheme theme;

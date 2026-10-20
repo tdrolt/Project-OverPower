@@ -316,7 +316,7 @@ namespace Overpower.Match
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = -21; // same layer as the scan countdown: under the HUD's hit feedback canvas
+            canvas.sortingOrder = Overpower.UI.UiLayers.ScanAndBounty; // same layer as the scan countdown: under the HUD's hit feedback canvas
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;

@@ -49,7 +49,7 @@ namespace Overpower.UI
             kit = new LobbyUiKit(theme);
             Canvas canvas = kit.CreateCanvas(transform, "Spectator Result Canvas");
             canvas.overrideSorting = true;
-            canvas.sortingOrder = 5; // over the spectator bar (-10), under the saved-log box (10)
+            canvas.sortingOrder = UiLayers.SpectatorResult; // over the spectator bar, under the saved-log box
 
             // The card itself (title and button) is the lobby look from LobbyUiKit.ResultCard, shared with Dominion's result screen.
             LobbyButton button = kit.ResultCard(canvas.transform, Title, teamColor, ButtonText, out RectTransform card);

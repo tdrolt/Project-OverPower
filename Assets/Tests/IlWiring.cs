@@ -47,6 +47,31 @@ namespace Overpower.Tests
             return false;
         }
 
+        /// <summary>True when the method called <paramref name="methodName"/> (or its lambdas and state machine) hands the target over as a delegate
+        /// (an IL ldftn / ldvirtftn: a listener added with a method group). A direct call of the target does not count, so a method that both calls a
+        /// handler once and subscribes it is checked for the subscription.</summary>
+        public static bool HandsOver(System.Type owner, string methodName, MethodBase target)
+        {
+            byte[] token = System.BitConverter.GetBytes(target.MetadataToken);
+            string generated = "<" + methodName + ">";
+            var types = new List<System.Type> { owner };
+            types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+            foreach (System.Type type in types)
+            {
+                bool wholeTypeIsTheMethod = type != owner && type.Name.StartsWith(generated);
+                foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
+                {
+                    if (!wholeTypeIsTheMethod && method.Name != methodName && !method.Name.StartsWith(generated)) continue;
+                    byte[] il = method.GetMethodBody()?.GetILAsByteArray();
+                    if (il == null) continue;
+                    for (int i = 0; i + 5 < il.Length; i++)
+                        if (il[i] == 0xFE && (il[i + 1] == 0x06 || il[i + 1] == 0x07) // ldftn, ldvirtftn
+                            && il[i + 2] == token[0] && il[i + 3] == token[1] && il[i + 4] == token[2] && il[i + 5] == token[3]) return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>True when the method called <paramref name="methodName"/> (or its lambdas and state machine) STORES into the field (an IL stfld): the
         /// "this method remembers the value" check, which a read (ldfld) cannot show.</summary>
         public static bool Stores(System.Type owner, string methodName, FieldInfo field)

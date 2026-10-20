@@ -572,23 +572,20 @@ namespace Overpower.UI
         public float bountyToastDurationSeconds = 3f;
 
         [Header("Capital under attack")]
-        [Tooltip("Shown on the respawn panel while a player waits to respawn and their capital is currently " +
+        [Tooltip("Shown on the death card, under the countdown, while a player waits to respawn and their capital is currently " +
                  "under attack, so their coming respawn will land at their Tier 2 zone instead of the capital.")]
         public string capitalUnderAttackRespawnNote = "Your capital is under attack - you will respawn at your Tier 2 zone";
         [Tooltip("HUD toast shown right after a player respawns at their capital's Tier 2 zone because the " +
                  "capital was under attack. Uses the same toast label and duration as the bounty payout " +
                  "(Bounty Toast Duration Seconds above).")]
         public string capitalUnderAttackRespawnToast = "Respawned at Tier 2: capital under attack";
-        [Tooltip("Font size of the capital-under-attack respawn note, in canvas units - its own dedicated size rather " +
-                 "than Body Text Size: plain white text at that size read too faint against the respawn panel's pale " +
-                 "salmon wash (616x576 capture) to notice at a glance.")]
-        public float capitalUnderAttackNoteFontSize = 30f;
-        [Tooltip("Text colour of the capital-under-attack respawn note.")]
+        [Tooltip("Text size of the capital-under-attack note on the death card, in reference pixels (the HUD's 1920x1080 grid). " +
+                 "The card is as wide as Death Card Width, so a larger size takes more lines.")]
+        public float capitalUnderAttackNoteFontSize = 24f;
+        [Tooltip("Text colour of the capital-under-attack note on the death card.")]
         public Color capitalUnderAttackNoteColor = Color.white;
-        [Tooltip("Background strip drawn behind the capital-under-attack respawn note - the same readability trick " +
-                 "the HUD's own Panel Colour gives every bar/slot group, applied here because the note otherwise " +
-                 "fights the respawn panel's own pale wash instead of standing out against it. Semi-opaque dark so " +
-                 "the note still reads as sitting ON the respawn panel, not as a second, unrelated overlay.")]
+        [Tooltip("The strip drawn behind the capital-under-attack note inside the death card, a shade darker than the card, " +
+                 "so the warning reads as its own line and not as part of the countdown.")]
         public Color capitalUnderAttackNoteBackingColor = new Color(0f, 0f, 0f, 0.6f);
 
         [Header("Phase transition")]
@@ -599,8 +596,8 @@ namespace Overpower.UI
                  "characters): the toast label grows upward and clips at the top of the screen.")]
         public string twoTeamsLeftBannerText = "Two teams left: lose your base and you can't respawn";
 
-        [Tooltip("The panel a dead player sees while their team holds no base and nobody on it can respawn - shown by " +
-                 "MatchUI in place of the text baked into the waiting panel.")]
+        [Tooltip("The waiting card a dead player sees while their team holds no base and nobody on it can respawn. " +
+                 "Line breaks and runs of spaces read as one space: the card shows it as one line that wraps.")]
         public string waitingPanelText = "Waiting for team to \n\ncapture Base territory ";
 
         [Header("Capture ring")]
@@ -876,10 +873,6 @@ namespace Overpower.UI
                  "client's own synced server clock - it MUST stay in the text, or the number never shows. The countdown's " +
                  "own length is GameplayConfig > Match Start Countdown Seconds.")]
         public string matchCountdownText = "MATCH STARTS IN {0}";
-        [Tooltip("Fill colour of the green confirm button of the saved-log overlay (Open folder). Kept from the old Start button.")]
-        public Color matchStartButtonColor = new Color(0.16f, 0.45f, 0.25f, 0.95f);
-        [Tooltip("Width/height of the buttons of the saved-log overlay, in canvas units. Kept from the old Start button.")]
-        public Vector2 matchStartButtonSize = new Vector2(260f, 52f);
         [Tooltip("Gap from the top of the screen to the top of the warm-up bar, in reference pixels. It must clear " +
                  "a two-line toast above it (the longest a warm-up can raise is the 'capital under attack' respawn " +
                  "toast), or the two run into each other.")]
@@ -1035,9 +1028,9 @@ namespace Overpower.UI
         public float dominionBreakTop = 195f;
         [Tooltip("The dark box of the break card and the sudden-death banner.")]
         public Color dominionCardFill = new Color(0.059f, 0.063f, 0.078f, 0.85f);
-        [Tooltip("The rounded corners of the break card.")]
+        [Tooltip("The rounded corners of the break card. Also the corners of the death card, the YOU WIN / YOU LOSE card and the pop-ups.")]
         public float dominionCardRadius = 15f;
-        [Tooltip("Empty space inside the break card, left and right, then top and bottom.")]
+        [Tooltip("Empty space inside the break card, left and right, then top and bottom. The saved-log box uses half of it.")]
         public Vector2 dominionCardPadding = new Vector2(42f, 36f);
         [Tooltip("Space between the lines of the break card.")]
         public float dominionCardGap = 18f;
@@ -1053,11 +1046,11 @@ namespace Overpower.UI
         public float dominionBreakSmallSize = 22f;
         [Tooltip("Size of the line saying what the next round opens.")]
         public float dominionBreakOpensSize = 24f;
-        [Tooltip("Size of the PICK YOUR BUILD button's words.")]
+        [Tooltip("Size of the PICK YOUR BUILD button's words. Also the words of every pop-up button: Escape, Connection lost, the saved-log box, the death card's Quit, YOU WIN / YOU LOSE.")]
         public float dominionBreakButtonSize = 30f;
-        [Tooltip("Height of the PICK YOUR BUILD button.")]
+        [Tooltip("Height of the PICK YOUR BUILD button. Also the height of every pop-up button: Escape, Connection lost, the saved-log box, the death card's Quit, YOU WIN / YOU LOSE.")]
         public float dominionBreakButtonHeight = 72f;
-        [Tooltip("Space left and right of the words inside the PICK YOUR BUILD button.")]
+        [Tooltip("Space left and right of the words inside the PICK YOUR BUILD button. Also inside the pop-ups' buttons (Escape, Connection lost, the saved-log box, the death card's Quit).")]
         public float dominionBreakButtonPadding = 42f;
         [Tooltip("Size of the countdown line at the bottom of the break card (ROUND 2 STARTS IN 14).")]
         public float dominionBreakCountdownSize = 33f;
@@ -1225,7 +1218,7 @@ namespace Overpower.UI
         [Tooltip("Size of the small note under the result table.")]
         public float dominionResultNoteSize = 21f;
         [Tooltip("Which sorting order the result card draws at: above the match panels, under the saved-log box.")]
-        public int dominionResultSortingOrder = 5;
+        public int dominionResultSortingOrder = UiLayers.DominionResultDefault;
 
         [Header("Mark")]
         [Tooltip("Canvas units, the mark diamond's width and height (both the shooter's own diamond over an " +
@@ -1326,7 +1319,7 @@ namespace Overpower.UI
                  "column 2 from the second to the third, and so on. Keep them rising.")]
         public float[] scoreboardColumnEdges = { 0.02f, 0.42f, 0.53f, 0.64f, 0.75f, 0.88f, 0.99f };
         [Tooltip("Draw order of the scoreboard against other screen panels: higher is on top. The HUD is at -10.")]
-        public int scoreboardSortingOrder = 30;
+        public int scoreboardSortingOrder = UiLayers.ScoreboardDefault;
         [Tooltip("Empty space, in reference pixels, between the scoreboard's left and right edges and its text.")]
         public int scoreboardPaddingHorizontal = 12;
         [Tooltip("Empty space, in reference pixels, above and below the scoreboard's lines.")]
@@ -1371,21 +1364,15 @@ namespace Overpower.UI
         public string resultButtonQuit = "Quit";
         [Tooltip("Width of the connection lost panel, in reference pixels.")]
         public float connectionLostPanelWidth = 640f;
-        [Tooltip("Fill colour of the connection lost panel.")]
-        public Color connectionLostPanelColor = new Color(0.08f, 0.08f, 0.08f, 0.95f);
         [Tooltip("Colour of the connection lost title.")]
         public Color connectionLostTitleColor = new Color(1f, 0.55f, 0.35f, 1f);
         [Tooltip("Text size of the connection lost title, in reference pixels.")]
         [Min(8f)] public float connectionLostTitleSize = 34f;
         [Tooltip("Text size of the line under the title, in reference pixels.")]
         [Min(8f)] public float connectionLostBodySize = 22f;
-        [Tooltip("Size of the connection lost panel's Rejoin / Leave / OK buttons, in reference pixels.")]
-        public Vector2 rejoinButtonSize = new Vector2(260f, 52f);
         [Tooltip("Size of the name screen's Rejoin your match button, in reference pixels. Wider than the panel's buttons: the " +
                  "name screen's font is wide and would wrap the label.")]
         public Vector2 rejoinMatchButtonSize = new Vector2(420f, 52f);
-        [Tooltip("Fill colour of the Rejoin buttons - the same affirmative green the match Start button uses.")]
-        public Color rejoinButtonColor = new Color(0.16f, 0.45f, 0.25f, 0.95f);
         [Tooltip("Distance from the top of the name box to the bottom of the Rejoin your match button, in reference pixels.")]
         public float rejoinButtonGapAboveNameBox = 16f;
 
@@ -1474,13 +1461,13 @@ namespace Overpower.UI
         public string spectatorResultTitle = "{0} wins the match";
         [Tooltip("Text size of the spectator result card's title, in reference pixels.")]
         public float spectatorResultTitleSize = 56f;
-        [Tooltip("Fill colour of the spectator result card.")]
+        [Tooltip("Fill colour of the spectator result card. Also the fill of the death card, the YOU WIN / YOU LOSE card and the pop-ups (Escape, Connection lost, the saved-log box).")]
         public Color spectatorResultCardColor = new Color(0.06f, 0.063f, 0.078f, 0.92f);
-        [Tooltip("Empty space inside the spectator result card, left and right, then top and bottom, in reference pixels.")]
+        [Tooltip("Empty space inside the spectator result card, left and right, then top and bottom, in reference pixels. Also inside the YOU WIN / YOU LOSE card, the Escape pop-up and the Connection lost box.")]
         public Vector2 spectatorResultCardPadding = new Vector2(64f, 36f);
         [Tooltip("How far the spectator result card sits below the top of the screen, in reference pixels.")]
         public float spectatorResultCardTop = 150f;
-        [Tooltip("Space between the title and the button on a result card (the spectator's match result), in reference pixels.")]
+        [Tooltip("Space between the title and the button on a result card (the spectator's match result), in reference pixels. Also between the lines of the YOU WIN / YOU LOSE card, the Escape pop-up and the Connection lost box.")]
         public float spectatorResultCardGap = 24f;
         [Tooltip("Letter spacing of the small heading above a result card's big line (and the Dominion break card's heading), as a share of the heading's size.")]
         public float resultHeadingSpacingShare = 0.23f;
@@ -2128,5 +2115,51 @@ namespace Overpower.UI
         public Color arenaNeutralLineColor = new Color(0.48f, 0.5f, 0.54f, 1f);
         [Tooltip("The asset that holds the arena's world-look numbers and the look of every ability (its shape and what its colour means). Effects find their look through this reference.")]
         public ArenaLook arenaLook;
+
+        [Header("Death card and pop-ups")]
+        [Tooltip("The death card's countdown line while a player waits to respawn. {0} is the whole seconds left, rounded up, so the last second reads 1.")]
+        public string deathCardRespawnFormat = "RESPAWN IN {0}";
+        [Tooltip("Width of the death card (the RESPAWN IN card and the waiting card), in reference pixels (the HUD's 1920x1080 grid).")]
+        public float deathCardWidth = 520f;
+        [Tooltip("Text size of the death card's main line (the countdown, or the waiting text), in reference pixels.")]
+        public float deathCardTitleSize = 44f;
+        [Tooltip("Space inside the death card around its contents, in reference pixels: x left and right, y top and bottom.")]
+        public Vector2 deathCardPadding = new Vector2(28f, 18f);
+        [Tooltip("Space between the lines of the death card (the countdown, the capital-under-attack note, the Quit button), in reference pixels. " +
+                 "The saved-log box uses the same space between its lines.")]
+        public float deathCardGap = 10f;
+        [Tooltip("The gap the death card keeps to the screen's top edge, the Dominion round bar, the HUD's top message and the ability bar, in reference pixels.")]
+        public float deathCardMargin = 16f;
+        [Tooltip("Text size of the countdown while the shop is open: the card shrinks to fit the strip between the shop and the ability bar, so both stay readable.")]
+        public float deathCardShopOpenTitleSize = 26f;
+        [Tooltip("Space inside the death card while the shop is open, in reference pixels: x left and right, y top and bottom (small, so the card fits under the shop).")]
+        public Vector2 deathCardShopOpenPadding = new Vector2(20f, 3f);
+        [Tooltip("The gap the death card keeps to the open shop and to the ability bar while the shop is open, in reference pixels.")]
+        public float deathCardShopOpenMargin = 6f;
+        [Tooltip("The dark edge on the world while this player is dead: its colour, and its alpha is how dark the corners get (the middle stays clear). " +
+                 "The HUD and every panel draw over it.")]
+        public Color deathVignetteColor = new Color(0f, 0f, 0f, 0.5f);
+        [Tooltip("The dark wash over the game behind the Escape pop-up and the Connection lost box, so the question reads first.")]
+        public Color popupDimColor = new Color(0f, 0f, 0f, 0.55f);
+        [Tooltip("Width of the Escape pop-up's card, in reference pixels.")]
+        public float popupCardWidth = 640f;
+        [Tooltip("Text size of the question at the top of the Escape pop-up, in reference pixels.")]
+        public float popupTitleSize = 40f;
+        [Tooltip("Text size of the plain text in the pop-ups (the volume row, the saved-log box), in reference pixels.")]
+        public float popupBodySize = 22f;
+        [Tooltip("The label in front of the volume slider on the Escape pop-up. The slider sets the volume of everything in the game, gunfire included.")]
+        public string masterVolumeLabel = "MASTER VOLUME";
+        [Tooltip("How the volume reads next to the slider on the Escape pop-up. {0} is the volume from 0 to 100.")]
+        public string masterVolumePercentFormat = "{0}%";
+        [Tooltip("Height of the volume row on the Escape pop-up, and of the slider's knob, in reference pixels.")]
+        public float masterVolumeRowHeight = 36f;
+        [Tooltip("The saved-log box's button that closes the box (only the box, nothing else).")]
+        public string matchLogDismissText = "Dismiss";
+        [Tooltip("Width of the YOU WIN / YOU LOSE card, in reference pixels. Its height fits the title and the buttons.")]
+        public float resultPanelCardWidth = 720f;
+        [Tooltip("Text size of YOU WIN / YOU LOSE on their card, in reference pixels.")]
+        public float resultPanelTitleSize = 72f;
+        [Tooltip("Width of the button on the YOU WIN / YOU LOSE card (Quit, or Back to the lobby list once the match is over), in reference pixels.")]
+        public float resultPanelButtonWidth = 440f;
     }
 }

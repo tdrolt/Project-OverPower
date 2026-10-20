@@ -42,6 +42,7 @@ namespace Overpower.UI
         public string ClockText => clockLabel != null ? clockLabel.text : "";
         public string FlashTextShown => flashLabel != null && flashLabel.gameObject.activeSelf ? flashLabel.text : "";
         public bool IsShowing => root != null && root.gameObject.activeSelf;
+        public RectTransform Root => root;
 
         public RoundHud(LobbyUiKit kit, Transform parent)
         {

@@ -13,21 +13,21 @@ namespace Overpower.UI
     /// OWNERSHIP: LoadoutScreen and the chat panel close THEMSELVES on Escape in the same frame and Update() order
     /// is not fixed, so this asks EscapeOwnershipRule (this frame OR the last). While open it claims tool focus on the
     /// local player's PlayerInputRouter (no moving or shooting while deciding; the match keeps running), the
-    /// "resolve the local player, claim/release keyed by this" recipe TestRangePanel uses.
+    /// "resolve the local player, claim/release keyed by this" recipe TestRangePanel uses. The master volume row sits above
+    /// Yes / No (MasterVolume: applied while dragging, remembered on release).
     /// </summary>
     [DisallowMultipleComponent]
     public class QuitConfirmPanel : MonoBehaviour
     {
-        [Tooltip("Read for quitPromptText/quitYesText/quitNoText.")]
+        [Tooltip("Read for the pop-up's words (quitPromptText, quitYesText, quitNoText, the master volume row) and its card look.")]
         [SerializeField] private UiTheme theme;
 
+        private LobbyUiKit kit;
         private GameObject uiRoot;
         private TextMeshProUGUI promptLabel;
+        private TextMeshProUGUI volumeLabel;
+        private Slider volumeSlider;
         private bool visible;
-
-        // One shared TMP material for both button labels (as ConnectionLostPanel.ApplyOutline/PlayerHud.AddLabel):
-        // otherwise TMP clones one per label the moment its outline is touched.
-        private Material textMaterial;
 
         private bool shopOpenLastFrame;
         private bool chatOpenLastFrame;
@@ -47,11 +47,7 @@ namespace Overpower.UI
             claimedRouter = null;
         }
 
-        private void OnDestroy()
-        {
-            if (textMaterial != null)
-                Destroy(textMaterial);
-        }
+        private void OnDestroy() => kit?.Dispose();
 
         private void Update()
         {
@@ -80,6 +76,11 @@ namespace Overpower.UI
             visible = true;
             if (promptLabel != null && theme != null)
                 promptLabel.text = theme.quitPromptText;
+            if (volumeSlider != null)
+            {
+                volumeSlider.SetValueWithoutNotify(AudioListener.volume);
+                OnVolumeChanged(AudioListener.volume);
+            }
             uiRoot.SetActive(true);
 
             PlayerInputRouter router = ResolveLocalPlayer()?.GetComponentInChildren<PlayerInputRouter>(true);
@@ -120,128 +121,57 @@ namespace Overpower.UI
 
         private void OnNoClicked() => Close();
 
-        // ---- UI construction (TestRangePanel.BuildUi/AddButton's own recipe) ----
+        // ---- master volume ----
+
+        private void OnVolumeChanged(float volume)
+        {
+            MasterVolume.Apply(volume);
+            if (volumeLabel != null && theme != null)
+                volumeLabel.text = MasterVolume.PercentText(theme.masterVolumePercentFormat, volume);
+        }
+
+        /// <summary>Saved only when the slider is let go: a drag writes the volume every frame, the registry once.</summary>
+        private void OnVolumeReleased() => MasterVolume.Save(volumeSlider != null ? volumeSlider.value : AudioListener.volume);
+
+        /// <summary>The Escape pop-up's slider (checks and captures drive it).</summary>
+        public Slider VolumeSlider => volumeSlider;
+        public bool IsOpen => visible;
+
+        // ---- UI construction (PopupCard: the card look of the round bar and result card) ----
 
         private void BuildUi()
         {
-            var canvasGo = new GameObject("Quit Confirm Canvas", typeof(RectTransform));
-            canvasGo.transform.SetParent(transform, false);
-            Canvas canvas = canvasGo.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 700; // Above the F1 test range panel (500) - a decision to close the game must never be hidden behind a debug tool.
-            canvasGo.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            canvasGo.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1920f, 1080f);
-            canvasGo.AddComponent<GraphicRaycaster>();
-            uiRoot = canvasGo;
+            theme = PopupCard.ThemeOrDefault(theme);
+            kit = new LobbyUiKit(theme);
+            Canvas canvas = PopupCard.CreateCanvas(transform, "Quit Confirm Canvas", UiLayers.QuitConfirm, theme, true);
+            uiRoot = canvas.gameObject;
+            kit.Backdrop(canvas.transform, "Dim", theme.popupDimColor);
 
-            GameObject dim = new GameObject("Dim", typeof(RectTransform));
-            dim.transform.SetParent(canvasGo.transform, false);
-            Image dimImage = dim.AddComponent<Image>();
-            dimImage.color = new Color(0f, 0f, 0f, 0.55f);
-            RectTransform dimRt = dim.GetComponent<RectTransform>();
-            dimRt.anchorMin = Vector2.zero;
-            dimRt.anchorMax = Vector2.one;
-            dimRt.offsetMin = dimRt.offsetMax = Vector2.zero;
+            RectTransform card = PopupCard.Card(kit, canvas.transform, "Panel", theme.popupCardWidth, theme.spectatorResultCardPadding, theme.spectatorResultCardGap);
+            card.anchorMin = card.anchorMax = card.pivot = new Vector2(0.5f, 0.5f);
+            promptLabel = PopupCard.Line(kit, card, "Prompt", theme.quitPromptText, kit.Display, theme.popupTitleSize, theme.lobbyOffWhiteColor, false);
 
-            GameObject panel = new GameObject("Panel", typeof(RectTransform));
-            panel.transform.SetParent(canvasGo.transform, false);
-            panel.AddComponent<Image>().color = new Color(0.08f, 0.08f, 0.08f, 0.95f);
-            RectTransform panelRt = panel.GetComponent<RectTransform>();
-            panelRt.anchorMin = panelRt.anchorMax = panelRt.pivot = new Vector2(0.5f, 0.5f);
-            // Wide enough for two matchStartButtonSize buttons plus the row's own spacing.
-            panelRt.sizeDelta = new Vector2(600f, 0f);
+            HorizontalLayoutGroup row = LobbyUiKit.HGroup(card, "Volume", theme.lobbyListColumnGap, TextAnchor.MiddleCenter);
+            LobbyUiKit.Size(row.gameObject, -1f, theme.masterVolumeRowHeight);
+            TextMeshProUGUI label = kit.Text(row.transform, "Label", theme.masterVolumeLabel, kit.Bold, theme.popupBodySize, theme.lobbyMutedColor,
+                TextAlignmentOptions.MidlineLeft, theme.lobbyLabelSpacing);
+            label.overflowMode = TextOverflowModes.Overflow;
+            LobbyUiKit.Size(label.gameObject, label.GetPreferredValues(theme.masterVolumeLabel).x);
+            volumeSlider = PopupCard.MakeSlider(kit, row.transform, "Slider", theme.masterVolumeRowHeight);
+            volumeLabel = kit.Text(row.transform, "Percent", MasterVolume.PercentText(theme.masterVolumePercentFormat, 1f), kit.Bold, theme.popupBodySize,
+                theme.lobbyOffWhiteColor, TextAlignmentOptions.MidlineRight);
+            volumeLabel.overflowMode = TextOverflowModes.Overflow;
+            LobbyUiKit.Size(volumeLabel.gameObject, volumeLabel.GetPreferredValues("100%").x);
+            volumeSlider.SetValueWithoutNotify(AudioListener.volume);
+            OnVolumeChanged(AudioListener.volume);
+            volumeSlider.onValueChanged.AddListener(OnVolumeChanged);
+            volumeSlider.gameObject.AddComponent<PointerUpRelay>().Released = OnVolumeReleased;
 
-            VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(20, 20, 20, 20);
-            layout.spacing = 14f;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = layout.childControlHeight = layout.childForceExpandWidth = true;
-            panel.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var res = new TMP_DefaultControls.Resources();
-            promptLabel = AddLabel(panel.transform, theme != null ? theme.quitPromptText : "Close the game?");
-            promptLabel.alignment = TextAlignmentOptions.Center;
-            promptLabel.fontSize = 26f;
-
-            GameObject buttonRow = new GameObject("Buttons", typeof(RectTransform));
-            buttonRow.transform.SetParent(panel.transform, false);
-            HorizontalLayoutGroup rowLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
-            rowLayout.spacing = 12f;
-            rowLayout.childAlignment = TextAnchor.MiddleCenter;
-            // All four off: a freshly-added HorizontalLayoutGroup defaults childForceExpandHeight to true, which
-            // stretches the buttons to the ROW's height, and the row's height comes from its children, so it
-            // collapsed to 0 (zero-height buttons). Each button keeps its own fixed size via a LayoutElement
-            // (see AddButton).
-            rowLayout.childControlWidth = rowLayout.childControlHeight = false;
-            rowLayout.childForceExpandWidth = rowLayout.childForceExpandHeight = false;
-
-            // Real buttons (filled, not the bare default sprite): the size/font/outline recipe of WarmupBar's End
-            // warm-up button, copied rather than shared because that builder is private to its canvas. Yes takes the
-            // Start button's green (an affirmative action); No takes Bar Track Colour, the neutral fill Loadout's
-            // buttons reuse (see UiTheme.matchStartButtonColor's tooltip); no new UiTheme token.
-            AddButton(buttonRow.transform, res, theme != null ? theme.quitYesText : "Yes",
-                theme != null ? theme.matchStartButtonColor : new Color(0.16f, 0.45f, 0.25f, 0.95f), OnYesClicked);
-            AddButton(buttonRow.transform, res, theme != null ? theme.quitNoText : "No",
-                theme != null ? theme.barTrackColor : new Color(0.18f, 0.18f, 0.2f, 1f), OnNoClicked);
+            Transform buttons = PopupCard.ButtonRow(card, theme.lobbyListColumnGap);
+            PopupCard.Primary(kit, buttons, theme.quitYesText, OnYesClicked);
+            PopupCard.Secondary(kit, buttons, theme.quitNoText, OnNoClicked);
 
             uiRoot.SetActive(false);
-        }
-
-        private static TextMeshProUGUI AddLabel(Transform parent, string text)
-        {
-            GameObject go = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
-            go.transform.SetParent(parent, false);
-            TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
-            tmp.text = text;
-            tmp.fontSize = 20f;
-            tmp.color = Color.white;
-            tmp.enableWordWrapping = true;
-            return tmp;
-        }
-
-        /// <summary>A real button: filled background sized from the Start button's UiTheme tokens; the label's
-        /// font/size/outline come from this panel's theme and textMaterial.</summary>
-        private void AddButton(Transform parent, TMP_DefaultControls.Resources res, string label, Color fillColor,
-                                UnityEngine.Events.UnityAction onClick)
-        {
-            GameObject go = TMP_DefaultControls.CreateButton(res);
-            go.transform.SetParent(parent, false);
-            Vector2 size = theme != null ? theme.matchStartButtonSize : new Vector2(260f, 52f);
-            go.GetComponent<RectTransform>().sizeDelta = size;
-            // The row's HorizontalLayoutGroup never resizes children (all flags off, see BuildUi), but it still needs
-            // a LayoutElement for ITS OWN preferred height: sizeDelta alone measured 0, since Unity reads preferred
-            // size from an ILayoutElement, not the RectTransform, once a LayoutGroup is involved.
-            LayoutElement layoutElement = go.AddComponent<LayoutElement>();
-            layoutElement.preferredWidth = size.x;
-            layoutElement.preferredHeight = size.y;
-            go.GetComponent<Image>().color = fillColor;
-
-            TextMeshProUGUI buttonLabel = go.GetComponentInChildren<TextMeshProUGUI>();
-            buttonLabel.text = label;
-            if (theme != null)
-            {
-                if (theme.font != null)
-                    buttonLabel.font = theme.font;
-                buttonLabel.fontSize = theme.bodyTextSize;
-                buttonLabel.color = theme.textColor;
-                ApplyOutline(buttonLabel);
-            }
-
-            Button button = go.GetComponent<Button>();
-            button.onClick.AddListener(onClick);
-            button.navigation = new Navigation { mode = Navigation.Mode.None }; // Same fix as every other code-built control here - see TestRangePanel.AddDropdown's comment.
-        }
-
-        /// <summary>Same reasoning as ConnectionLostPanel.ApplyOutline: one shared Material instance for
-        /// every button label this panel builds, instead of letting TMP auto-clone one per label.</summary>
-        private void ApplyOutline(TextMeshProUGUI tmp)
-        {
-            if (textMaterial == null)
-            {
-                textMaterial = new Material(tmp.fontSharedMaterial);
-                theme.ApplyHudTextStyle(textMaterial);
-            }
-            tmp.fontSharedMaterial = textMaterial;
         }
     }
 }

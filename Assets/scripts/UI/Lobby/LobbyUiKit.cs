@@ -54,8 +54,8 @@ namespace Overpower.UI
     {
         public readonly UiTheme Theme;
 
-        /// <summary>Above the match UI (0 to -21), below the Escape pop-up (700) and the connection-lost panel (900).</summary>
-        public const int CanvasSortingOrder = 100;
+        /// <summary>Above the match UI, below the Escape pop-up and the connection-lost panel (UiLayers).</summary>
+        public const int CanvasSortingOrder = UiLayers.Lobby;
 
         private readonly List<Material> materialInstances = new List<Material>();
 

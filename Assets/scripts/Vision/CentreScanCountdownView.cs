@@ -144,7 +144,7 @@ namespace Overpower.Vision
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = -21; // under PlayerHud's hit feedback canvas (-20): a flash of damage draws over the countdown, never under it
+            canvas.sortingOrder = Overpower.UI.UiLayers.ScanAndBounty; // under PlayerHud's hit feedback canvas: a flash of damage draws over the countdown, never under it
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;

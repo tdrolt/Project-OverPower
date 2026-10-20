@@ -213,6 +213,10 @@ namespace Overpower.UI
         public static PlayerHud Local { get; private set; }
 
         private RectTransform panelRect;
+        /// <summary>The bars-and-slots panel itself (the death card keeps clear of it); null while the HUD is not built.</summary>
+        public RectTransform PanelRect => panelRect;
+        /// <summary>The top-centre toast's root (the death card keeps clear of it while it shows); null while the HUD is not built.</summary>
+        public RectTransform ToastRect => toastGo != null ? (RectTransform)toastGo.transform : null;
         private static readonly Vector3[] cornerBuffer = new Vector3[4];
 
         /// <summary>The bars-and-slots panel in screen pixels (the HUD canvas is screen space overlay). False while the HUD is not built.</summary>
@@ -818,10 +822,10 @@ namespace Overpower.UI
             canvasGo.transform.SetParent(transform, false);
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // Below both the F1 test panel (order 500) and MatchUI's win/lose/respawn panels (default overlay canvas): the
-            // HUD must never cover either. overrideSorting makes that true whatever the creation order.
+            // Below the F1 test panel, the death card and MatchUI's win/lose panels (UiLayers): the HUD must never cover any of
+            // them. overrideSorting makes that true whatever the creation order.
             canvas.overrideSorting = true;
-            canvas.sortingOrder = -10;
+            canvas.sortingOrder = UiLayers.Hud;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;
@@ -944,7 +948,7 @@ namespace Overpower.UI
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.overrideSorting = true;
-            canvas.sortingOrder = -20;
+            canvas.sortingOrder = UiLayers.HitFeedback;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;

@@ -19,6 +19,8 @@ using Overpower.Net;
 public sealed class SpectateView : MonoBehaviour
 {
     private const float RefreshSeconds = 0.25f;
+    /// <summary>The space between the Spectate button and the Quit button under it (ResultPanelSkin sizes the lose card for both).</summary>
+    public const float ButtonGap = 10f;
 
     private MatchUI ui;
     private GameObject panel;
@@ -57,7 +59,7 @@ public sealed class SpectateView : MonoBehaviour
         DestroyImmediate(copy.GetComponent<QuitButton>()); // the copy must not quit the game
         RectTransform rect = copy.GetComponent<RectTransform>();
         quitRect = quit.GetComponent<RectTransform>();
-        rect.anchoredPosition = quitRect.anchoredPosition + new Vector2(0f, quitRect.sizeDelta.y + 10f);
+        rect.anchoredPosition = quitRect.anchoredPosition + new Vector2(0f, quitRect.sizeDelta.y + ButtonGap);
         button = copy.GetComponent<Button>();
         button.onClick.RemoveAllListeners();
         button.onClick.AddListener(Advance);

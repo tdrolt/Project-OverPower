@@ -52,10 +52,10 @@ namespace Overpower.Chat
     public static class ChatPanelRule
     {
         /// <summary>Above the lobby screens' canvas (LobbyUiKit.CanvasSortingOrder, 100).</summary>
-        public const int LobbyRoomOrder = 101;
+        public const int LobbyRoomOrder = Overpower.UI.UiLayers.ChatInLobbyRoom;
 
-        /// <summary>In the match: above the HUD canvases (-10 .. -20) and under the result panels (0), the match-log box (10) and the scoreboard (30).</summary>
-        public const int MatchOrder = -1;
+        /// <summary>In the match: above the HUD canvases and the death card, under the result panels, the match-log box and the scoreboard (UiLayers).</summary>
+        public const int MatchOrder = Overpower.UI.UiLayers.ChatInMatch;
 
         /// <summary>Enter opens the panel only when a channel is subscribed.</summary>
         public static bool MayOpen(string subscribedChannel) => subscribedChannel != null;

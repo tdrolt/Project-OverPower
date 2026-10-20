@@ -22,6 +22,11 @@ namespace Overpower.UI
         public static Sprite Disc => disc != null ? disc : (disc = Build("Generated Disc", Size, (x, y) => DiscAlpha(x, y, Size)));
         public static Sprite Triangle => triangle != null ? triangle : (triangle = Build("Generated Triangle", Size, (x, y) => TriangleAlpha(x, y, Size)));
 
+        private static Sprite vignette;
+
+        /// <summary>Clear in the middle, opaque in the corners (the death card's dark edge): stretched over the screen it follows its shape.</summary>
+        public static Sprite Vignette => vignette != null ? vignette : (vignette = Build("Generated Vignette", Size, (x, y) => VignetteAlpha(x, y, Size)));
+
         /// <summary>A 512 px equilateral triangle, apex up, for the minimap's Mask. Unlike Triangle above its 3
         /// vertices sit at equal distance from the sprite's pixel centre, so rotating the Image about its pivot turns
         /// the triangle rigidly in place instead of swinging it off-centre. Not cached: bandFraction comes from
@@ -72,6 +77,14 @@ namespace Overpower.UI
             float half = size / 2f;
             float distance = Mathf.Sqrt((x - half) * (x - half) + (y - half) * (y - half));
             return (half - 1f) - distance + 0.5f;
+        }
+
+        // 0 inside about half the way to the corners, rising smoothly to 1 at the corners (about 0.45 at the middle of an edge).
+        private static float VignetteAlpha(float x, float y, int size)
+        {
+            float half = size / 2f;
+            float r = Mathf.Sqrt((x - half) * (x - half) + (y - half) * (y - half)) / (half * 1.41421356f);
+            return Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.45f, 1f, r));
         }
 
         // Apex at the top centre, base along the bottom: points up (+y) before any rotation.

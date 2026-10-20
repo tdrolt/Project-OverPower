@@ -124,6 +124,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     /// assign it, RespawnPlayer nulls it at the end). ResetForMatchStart needs the handle to stop it, so a countdown
     /// already running when the match went live cannot teleport the player a second time once it finishes.</summary>
     private Coroutine respawnRoutine;
+    private float respawnWaitLeft;
+
+    /// <summary>Seconds until the running respawn wait ends (game time, as the wait counts), or 0 when none runs. The death card counts down from it.</summary>
+    public float RespawnSecondsLeft => Overpower.UI.DeathCardRules.SecondsLeft(respawnRoutine != null, respawnWaitLeft);
 
     // Caches the last value shown on the respawn note so UpdateRespawnNote only touches MatchUI's
     // text when the under-attack state actually flips, not every frame it is polled.
@@ -455,8 +459,8 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     }
 
     /// The second way back into the match: your team lost its capital, you are sitting on the
-    /// waiting panel, and a teammate recaptures it. The waiting panel's own visibility is the flag
-    /// for "I am stuck waiting" - kept that way rather than adding a second piece of state that
+    /// waiting card, and a teammate recaptures it. MatchUI.IsWaitingForRespawn (what the card is
+    /// shown from) is the flag for "I am stuck waiting" - no second piece of state here that
     /// could disagree with what the player can see on screen.
     void CheckForCathedralCapture()
     {
@@ -765,14 +769,16 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     private IEnumerator RespawnPlayer(float delay, int teamID, int actorNumber)
     {
         // A per-frame wait rather than a single WaitForSeconds(delay), so the capital-under-attack note can update
-        // live on the respawn panel while this wait runs (UpdateRespawnNote).
+        // live on the death card while this wait runs (UpdateRespawnNote).
         float elapsed = 0f;
         while (elapsed < delay)
         {
+            respawnWaitLeft = delay - elapsed;
             UpdateRespawnNote(teamID);
             yield return null;
             elapsed += Time.deltaTime;
         }
+        respawnWaitLeft = 0f;
 
         // The stage can move into sudden death while the wait runs (the edge stops this coroutine, but a client that missed it must not bring
         // the body back either): stay dead.
@@ -956,10 +962,10 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
         return underAttack[spawnIndex];
     }
 
-    /// <summary>Refreshes the "your capital is under attack" line on the respawn panel, polled every frame of
-    /// RespawnPlayer's wait (the respawn panel is up: an ordinary death, capital still owned but possibly under
-    /// attack). NOT also called from CheckForCathedralCapture's waitingPanel poll: MatchUI parents the note under
-    /// respawnPanel, which is inactive during that lost-capital wait, so writing it there would be invisible. Only
+    /// <summary>Refreshes the "your capital is under attack" line on the death card, polled every frame of
+    /// RespawnPlayer's wait (the countdown is up: an ordinary death, capital still owned but possibly under
+    /// attack). NOT also called from CheckForCathedralCapture's waiting poll: the waiting card shows no note,
+    /// so writing it there would be invisible. Only
     /// writes MatchUI's text when the bool flips, and only trusts IsUnderAttack while this team still owns the
     /// capital (the race in ChooseSpawnPoint).</summary>
     private void UpdateRespawnNote(int teamID)

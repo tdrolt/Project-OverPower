@@ -23,8 +23,8 @@ namespace Overpower.UI
     {
         public static DominionHud Instance { get; private set; }
 
-        /// <summary>Under the shop (-5), over the player HUD (-10) and the minimap (-9).</summary>
-        public const int SortingOrder = -6;
+        /// <summary>Under the shop, over the player HUD, the minimap and the death card (UiLayers).</summary>
+        public const int SortingOrder = UiLayers.DominionHud;
 
         private RoomManager rooms;
         private UiTheme theme;
@@ -229,6 +229,22 @@ namespace Overpower.UI
             PhotonView view = PlayerLookup.GetPhotonViewFor(PhotonNetwork.LocalPlayer.ActorNumber);
             LoadoutScreen shop = view != null ? view.GetComponent<LoadoutScreen>() : null;
             if (shop != null) shop.Toggle();
+        }
+
+        /// <summary>The screen pixels the top-centre HUD covers now: the round bar with room for the payout flash under it, and the break card.
+        /// Empty when neither shows. The death card is placed clear of it.</summary>
+        public Rect TopBandOnScreen()
+        {
+            if (canvas == null || theme == null) return Rect.zero;
+            Rect band = Rect.zero;
+            if (round != null && round.IsShowing)
+            {
+                Rect bar = ScreenRects.Of(round.Root);
+                float flash = (theme.dominionFlashGap + theme.dominionFlashSize * 1.5f) * canvas.scaleFactor;
+                band = new Rect(bar.x, bar.y - flash, bar.width, bar.height + flash);
+            }
+            if (breakCard != null && breakCard.IsShowing) band = ScreenRects.Union(band, ScreenRects.Of(breakCard.Root));
+            return band;
         }
 
         // ---------------------------------------------------------------- the result

@@ -446,7 +446,7 @@ namespace Overpower.UI
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             // Above the HUD (-10), below the loadout screen (-5), MatchUI's panels (0) and the F1 test panel (500).
             canvas.overrideSorting = true;
-            canvas.sortingOrder = -9;
+            canvas.sortingOrder = UiLayers.Minimap;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = theme.referenceResolution;

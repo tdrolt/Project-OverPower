@@ -187,7 +187,7 @@ namespace Overpower.TestRange
             canvasGo.transform.SetParent(transform, false);
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 500; // Above match UI and chat - a designer opened this on purpose.
+            canvas.sortingOrder = Overpower.UI.UiLayers.TestRange; // Above match UI and chat - a designer opened this on purpose.
             canvasGo.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             canvasGo.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1920f, 1080f);
             canvasGo.AddComponent<GraphicRaycaster>();

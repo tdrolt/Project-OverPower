@@ -1,16 +1,16 @@
 using System.Collections;
 using Photon.Pun;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 using Overpower.UI;
 
 /// <summary>
-/// The four full-screen panels that tell one player where they stand: waiting to be revived,
-/// respawning, you won, you lost. They live on the player prefab, not in the scene, because every
-/// message is addressed to one specific player; a scene-level HUD would have to work out who it was for.
+/// What tells one player where they stand: waiting to be revived, respawning, you won, you lost. It lives on the
+/// player prefab, not in the scene, because every message is addressed to one specific player; a scene-level HUD
+/// would have to work out who it was for. Respawning and waiting are the death card (DeathCard, built on first use,
+/// under the shop); the prefab's respawn and waiting panels stay inactive and are kept only because their objects
+/// are referenced. YOU WIN / YOU LOSE are the prefab's panels, restyled to the card look at Awake (ResultPanelSkin).
 ///
-/// This component only shows and hides panels. It never decides that someone died, how long a respawn
+/// This component only shows and hides. It never decides that someone died, how long a respawn
 /// takes, or who won: PlayerLifecycle and MatchDirector own that and call in here.
 ///
 /// Deliberately NOT IPunObservable - see PlayerNetSync.cs for why there can only be one.
@@ -18,38 +18,36 @@ using Overpower.UI;
 public class MatchUI : MonoBehaviour
 {
     [Header("Panels")]
-    [SerializeField, Tooltip("Shown while this player is dead and their team has lost its capital, " +
-             "so they are waiting for a teammate to recapture it before they can respawn.")]
+    [SerializeField, Tooltip("Stays inactive: the death card's waiting card shows this state (dead, the team's capital lost).")]
     private GameObject waitingPanel;
 
     [SerializeField, Tooltip("Shown for the rest of the match when this player's team wins.")]
     private GameObject youWonPanel;
 
-    [SerializeField, Tooltip("Shown during the respawn countdown after an ordinary death.")]
+    [SerializeField, Tooltip("Stays inactive: the death card's RESPAWN IN countdown shows this state (an ordinary death).")]
     private GameObject respawnPanel;
 
     [SerializeField, Tooltip("Shown for the rest of the match when this player's team is eliminated.")]
     private GameObject youLostPanel;
 
     [Header("Capital under attack")]
-    [SerializeField, Tooltip("Colours/font/text the respawn panel's under-attack note is styled from - the " +
-             "same theme asset PlayerHud reads for the HUD.")]
+    [SerializeField, Tooltip("Colours, fonts and texts of the death card, its capital-under-attack note and the " +
+             "YOU WIN / YOU LOSE cards - the same theme asset PlayerHud reads for the HUD.")]
     private UiTheme theme;
 
     private PhotonView photonView;
     private Rigidbody rigidbody;
     private PlayerMotor playerMotor;
 
-    // Built lazily on the first SetRespawnNote call. respawnNoteGo is the note's OWN root (backing strip +
-    // text child) and what SetActive toggles, the same "the root, not a child" rule as PlayerHud.ShowToast:
-    // toggling the text alone would leave a blank backing strip on the panel.
-    private GameObject respawnNoteGo;
-    private TextMeshProUGUI respawnNoteText;
+    private DeathCard deathCard;
+    private bool waiting;
 
-    /// <summary>True while this player is stuck on the waiting panel. PlayerLifecycle polls this as its
-    /// "waiting for my capital back" flag: the visible panel is the single source of truth, not a second
-    /// bool that could disagree.</summary>
-    public bool IsWaitingForRespawn => waitingPanel != null && waitingPanel.activeSelf;
+    /// <summary>True while this player is on the waiting card. PlayerLifecycle polls this as its "waiting for my
+    /// capital back" flag: the one bool the card is shown from, so the two cannot disagree.</summary>
+    public bool IsWaitingForRespawn => waiting;
+
+    /// <summary>The death card, or null before this player's first death. Checks and captures read it.</summary>
+    public DeathCard DeathCard => deathCard;
 
     /// <summary>True once this player has been shown a match result panel (win or lose). LoadoutScreen
     /// reads it: FreezeForRestOfMatch only stops movement and PlayerInputRouter's ShopSuppressed does not
@@ -67,117 +65,55 @@ public class MatchUI : MonoBehaviour
 
     public UiTheme Theme => theme;
 
-    private const string WaitingTitleObjectName = "Waiting";
-
     private void Awake()
     {
         photonView = GetComponent<PhotonView>();
         rigidbody = GetComponent<Rigidbody>();
         playerMotor = GetComponent<PlayerMotor>();
 
-        // A missing panel or theme is silent at runtime (every call is null-guarded so one broken
-        // Inspector reference cannot throw mid-match, and BuildRespawnNoteLabel falls back to plain
-        // white), so say so once at spawn.
-        // The waiting text lives on the UiTheme (one home for texts), set here, not baked into the prefab.
-        if (waitingPanel != null && theme != null)
-        {
-            // The title is the child named "Waiting"; the QUIT button's TMP text is a child too, so a
-            // bare GetComponentInChildren would be order-dependent.
-            TMP_Text waitingText = null;
-            foreach (TMP_Text candidate in waitingPanel.GetComponentsInChildren<TMP_Text>(true))
-                if (candidate.gameObject.name == WaitingTitleObjectName) { waitingText = candidate; break; }
-            if (waitingText != null)
-                waitingText.text = theme.waitingPanelText;
-            else
-                Debug.LogError($"[MatchUI] {name}: the waiting panel has no text object named \"{WaitingTitleObjectName}\" - its title stays as the prefab has it.");
-        }
+        ResultPanelSkin.Apply(youWonPanel, theme, 1);
+        ResultPanelSkin.Apply(youLostPanel, theme, 2); // Quit, and SpectateView's Spectate over it
 
+        // A missing panel or theme is silent at runtime (every call is null-guarded so one broken
+        // Inspector reference cannot throw mid-match), so say so once at spawn.
         if (waitingPanel == null || youWonPanel == null || respawnPanel == null || youLostPanel == null || theme == null)
             Debug.LogError($"[MatchUI] {name}: one or more match panels, or the UiTheme, are not " +
-                            "assigned - this player will not be told when they win, lose or respawn, " +
-                            "and the capital-under-attack respawn note will render unstyled.");
+                            "assigned - this player will not be told when they win or lose, " +
+                            "and the death card will draw in the default look.");
     }
 
-    /// <summary>Called by PlayerLifecycle during the respawn countdown.</summary>
+    /// <summary>The death card, built the first time something is shown on it; never on a remote body.</summary>
+    private DeathCard EnsureCard()
+    {
+        if (deathCard != null || (photonView != null && !photonView.IsMine))
+            return deathCard;
+        deathCard = gameObject.AddComponent<DeathCard>();
+        deathCard.Init(theme);
+        return deathCard;
+    }
+
+    /// <summary>Called by PlayerLifecycle during the respawn countdown: the death card's RESPAWN IN n.</summary>
     public void SetRespawnPanelVisible(bool visible)
     {
-        if (respawnPanel != null)
-            respawnPanel.SetActive(visible);
+        if (visible)
+            EnsureCard();
+        deathCard?.SetRespawn(visible);
     }
 
     /// <summary>Called by PlayerLifecycle once this player is on their way back into the match.</summary>
     public void HideWaitingPanel()
     {
-        if (waitingPanel != null)
-            waitingPanel.SetActive(false);
+        waiting = false;
+        deathCard?.SetWaiting(false);
     }
 
     /// <summary>The "your capital is under attack - you will respawn at your Tier 2 zone" line PlayerLifecycle
-    /// polls onto the respawn panel. Built lazily under respawnPanel, below its "Respawning! Please Wait!"
-    /// label; hides itself (SetActive on respawnNoteGo, the note's root) whenever text is empty.</summary>
+    /// polls onto the death card, under the countdown; empty text hides it.</summary>
     public void SetRespawnNote(string text)
     {
-        if (respawnPanel == null)
-            return; // Awake already logged it
-
-        if (respawnNoteGo == null)
-            BuildRespawnNoteLabel();
-
-        respawnNoteText.text = text ?? "";
-        respawnNoteGo.SetActive(!string.IsNullOrEmpty(text));
-    }
-
-    /// <summary>PlayerHud.AddLabel/ApplyOutline's recipe (font/colour from UiTheme, one outline material) plus
-    /// a dark backing strip, because plain outlined white text read too faint against the respawn panel's pale
-    /// salmon wash. Duplicated rather than shared: the two components have no other coupling.</summary>
-    private void BuildRespawnNoteLabel()
-    {
-        respawnNoteGo = new GameObject("Under Attack Note", typeof(RectTransform));
-        respawnNoteGo.transform.SetParent(respawnPanel.transform, false);
-
-        RectTransform rootRt = respawnNoteGo.GetComponent<RectTransform>();
-        // The panel's "Respawning! Please Wait!" sits at anchoredPosition (0, 150); this sits below it,
-        // inside the panel's -80/-80 stretch margin at the tested 616x576 Game view.
-        rootRt.anchorMin = rootRt.anchorMax = new Vector2(0.5f, 0.5f);
-        rootRt.pivot = new Vector2(0.5f, 0.5f);
-        rootRt.anchoredPosition = new Vector2(0f, 60f);
-        rootRt.sizeDelta = new Vector2(500f, 90f);
-
-        Image backing = respawnNoteGo.AddComponent<Image>();
-        backing.color = theme != null ? theme.capitalUnderAttackNoteBackingColor : new Color(0f, 0f, 0f, 0.6f);
-        backing.raycastTarget = false;
-
-        GameObject textGo = TMP_DefaultControls.CreateText(new TMP_DefaultControls.Resources());
-        textGo.name = "Text";
-        textGo.transform.SetParent(respawnNoteGo.transform, false);
-        RectTransform textRt = textGo.GetComponent<RectTransform>();
-        textRt.anchorMin = Vector2.zero;
-        textRt.anchorMax = Vector2.one;
-        textRt.offsetMin = new Vector2(10f, 6f);
-        textRt.offsetMax = new Vector2(-10f, -6f);
-
-        respawnNoteText = textGo.GetComponent<TextMeshProUGUI>();
-        if (theme != null && theme.font != null)
-            respawnNoteText.font = theme.font;
-        // Its own size/colour, not Body Text Size/Text Colour: those are tuned for the HUD's dark Panel
-        // Colour backing, and this note must read at a glance on the respawn panel.
-        respawnNoteText.fontSize = theme != null ? theme.capitalUnderAttackNoteFontSize : 30f;
-        respawnNoteText.color = theme != null ? theme.capitalUnderAttackNoteColor : Color.white;
-        respawnNoteText.alignment = TextAlignmentOptions.Center;
-        respawnNoteText.enableWordWrapping = true;
-        respawnNoteText.raycastTarget = false;
-
-        if (theme != null)
-        {
-            // Font before fontSharedMaterial: assigning .font switches fontSharedMaterial to that font
-            // asset's default, which is the template cloned here (as PlayerHud.AddLabel).
-            Material outlineMaterial = new Material(respawnNoteText.fontSharedMaterial);
-            outlineMaterial.SetFloat(TMPro.ShaderUtilities.ID_OutlineWidth, theme.textOutlineWidth);
-            outlineMaterial.SetColor(TMPro.ShaderUtilities.ID_OutlineColor, theme.textOutlineColor);
-            respawnNoteText.fontSharedMaterial = outlineMaterial;
-        }
-
-        respawnNoteGo.SetActive(false); // SetRespawnNote shows/hides it from here on
+        if (deathCard == null && string.IsNullOrEmpty(text))
+            return;
+        EnsureCard()?.SetNote(text);
     }
 
     /// Shows the end-of-match result to this client, win or lose. The territory win condition needs
@@ -286,10 +222,11 @@ public class MatchUI : MonoBehaviour
 
         // Never over "you lost" (elimination outranks waiting for a respawn that is not coming) nor
         // "you won": MatchOver covers both.
-        if (waitingPanel != null && !waitingPanel.activeSelf && !MatchOver)
+        if (!waiting && !MatchOver)
         {
-            waitingPanel.SetActive(true);
-            Debug.Log("[MatchUI] (local) Showing Waiting panel.");
+            waiting = true;
+            EnsureCard()?.SetWaiting(true);
+            Debug.Log("[MatchUI] (local) Showing the waiting card.");
         }
     }
 
@@ -312,13 +249,9 @@ public class MatchUI : MonoBehaviour
         Debug.Log($"waitingPanel: {(waitingPanel == null ? "null" : waitingPanel.name)}, activeInHierarchy: {waitingPanel?.activeInHierarchy}");
         Debug.Log($"youLostPanel: {(youLostPanel == null ? "null" : youLostPanel.name)}, activeInHierarchy: {youLostPanel?.activeInHierarchy}");
 
-        if (waitingPanel != null)
-        {
-            waitingPanel.SetActive(false);
-            Debug.Log("[MatchUI] waitingPanel.SetActive(false) called");
-        }
+        HideWaitingPanel();
 
-        if (youLostPanel != null && !waitingPanel.activeSelf)
+        if (youLostPanel != null && !IsWaitingForRespawn)
         {
             youLostPanel.SetActive(true);
             Debug.Log("[MatchUI] youLostPanel.SetActive(true) called");

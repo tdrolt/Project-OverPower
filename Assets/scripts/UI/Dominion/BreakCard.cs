@@ -41,6 +41,7 @@ namespace Overpower.UI
         private int drawnSeconds, drawnCountdownRound, drawnBigFrom;
 
         public bool IsShowing => card != null && card.gameObject.activeSelf;
+        public RectTransform Root => card;
         public string HeaderText => header != null ? header.text : "";
         public string HeadlineText => headline != null ? headline.text : "";
         public string SharedLineText => sharedLine != null && sharedLine.gameObject.activeSelf ? sharedLine.text : "";
