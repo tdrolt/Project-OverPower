@@ -63,7 +63,7 @@ public class PlayerNameTag : MonoBehaviourPunCallbacks
 
         UpdateNameTagColour();
 
-        // One prefab serves all three teams: without this every player wears team 0's colour.
+        // One prefab serves all three teams: without this every player keeps the template's neutral look.
         teamAppearance?.Apply();
     }
 

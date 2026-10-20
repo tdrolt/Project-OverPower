@@ -1,3 +1,5 @@
+using Overpower.Arena;
+using Overpower.UI;
 using UnityEngine;
 
 /// <summary>
@@ -7,26 +9,9 @@ using UnityEngine;
 /// </summary>
 public class PlayerTeamAppearance : MonoBehaviour
 {
-    /// <summary>
-    /// Indexed by team ID: element 0 is team 0.
-    ///
-    /// BEWARE the asset names are 1-based and the teams 0-based: "PBR team 1.mat" belongs to team **0**.
-    /// The index is the team; do not trust the asset name.
-    ///
-    /// "PBR team 1.mat" is also the source character's default material, shared with
-    /// PBRCharacter.prefab. Do not edit it to recolour team 0; point this array at a new material.
-    /// </summary>
-    public Material[] teamMaterials = new Material[3];
-
     private SkinnedMeshRenderer[] meshRenderers;
     private int appliedTeam = PlayerTeam.NoTeam;
-
-    void Awake()
-    {
-        // Include inactive: the mesh is disabled while dead, and a respawn can land on a team colour
-        // assigned while hidden.
-        meshRenderers = GetComponentsInChildren<SkinnedMeshRenderer>(true);
-    }
+    private bool warnedNoLook;
 
     void Start()
     {
@@ -42,25 +27,30 @@ public class PlayerTeamAppearance : MonoBehaviour
     /// </summary>
     public void Apply()
     {
-        if (meshRenderers == null || teamMaterials == null)
-            return;
-
         PlayerTeam team = GetComponent<PlayerTeam>();
-        int teamID = team != null ? team.teamID : PlayerTeam.NoTeam;
+        PlayerHealth health = GetComponent<PlayerHealth>();
+        ApplyTeam(team != null ? team.teamID : PlayerTeam.NoTeam, health != null ? health.Theme : null);
+    }
 
+    internal void ApplyTeam(int teamID, UiTheme theme)
+    {
         // Team not known yet: keep the prefab's look and wait to be called again.
-        if (teamID < 0 || teamID >= teamMaterials.Length)
+        if (teamID < 0 || teamID == appliedTeam)
             return;
 
-        if (teamID == appliedTeam)
-            return;
-
-        Material teamMaterial = teamMaterials[teamID];
+        Material teamMaterial = MechMaterials.For(teamID, theme, theme != null ? theme.arenaLook : null);
         if (teamMaterial == null)
         {
-            Debug.LogWarning($"[PlayerTeamAppearance] No material assigned for team {teamID}.");
+            if (!warnedNoLook)
+                Debug.LogError($"[PlayerTeamAppearance] {name}: no mech material for team {teamID} - the UiTheme needs an Arena Look with a Mech Template.");
+            warnedNoLook = true;
             return;
         }
+
+        // Include inactive: the mesh is disabled while dead, and a respawn can land on a team colour
+        // assigned while hidden.
+        if (meshRenderers == null)
+            meshRenderers = GetComponentsInChildren<SkinnedMeshRenderer>(true);
 
         // sharedMaterial, not material: .material clones the asset per renderer and leaks an
         // instance for every player that spawns. Each renderer has exactly one slot.

@@ -46,9 +46,11 @@ namespace Overpower.Arena
 
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]
-        [Range(0f, 1f)] public float mechBaseMix = 0.5f;
-        [Tooltip("How bright the glow lines on a mech are, as a multiple of the team colour. About 1.5 gives a thin halo; much higher washes the mech out.")]
-        public float mechGlowStrength = 1.5f;
+        [Range(0f, 1f)] public float mechBaseMix = 0.85f;
+        [Tooltip("How bright the glow on a mech is: the brightest part of the team colour is shown at this strength, where 1 is as bright as the colour can be shown and more makes the glow bloom. The model only has a few glowing parts (the chin lamp and a strip). Above about 2 the glow turns pale and drifts toward pink or white.")]
+        public float mechGlowStrength = 1.8f;
+        [Tooltip("The material every team's mech is copied from: the model's own maps, with a greyscale glow-line map so the glow can take any team colour. Each team wears its own copy at runtime, so this file is never changed while playing.")]
+        public Material mechTemplate;
 
         public IReadOnlyList<AbilityLook> AbilityLooks => abilityLooks;
         public AbilityLook RespawnBubbleLook => respawnBubbleLook;

@@ -428,17 +428,16 @@ namespace Overpower.UI
         public float loadoutToggleButtonMargin = 24f;
 
         [Header("Shots")]
-        [Tooltip("Trail colour for each team, index = team id (0/1/2) - Teams.TryGetTeam's own numbering, " +
-                 "read through ShotColorFor below rather than indexed directly so an out-of-range id falls " +
-                 "back safely. NOT the same three colours as the player meshes (white/black/cyan): team 1's " +
-                 "mesh is black, and a black trail would be invisible against the arena's dark walls, so its " +
-                 "shot colour is chosen separately here instead of copied from the mesh.")]
+        [Tooltip("Each team's colour, index = team id (0/1/2) - Teams.TryGetTeam's own numbering, read through ShotColorFor " +
+                 "below rather than indexed directly so an out-of-range id falls back safely. It is that team's colour " +
+                 "wherever one is drawn: shot trails and bullet cores, the respawn bubble, the minimap and scoreboard, and " +
+                 "the mech's body and glow, so changing one recolours all of them. Keep it bright enough to read against the arena's dark walls.")]
         public Color[] teamShotColors = new Color[3]
         {
-            new Color(0.93f, 0.97f, 1f, 1f),  // team 0 - cool near-white (mesh is white; a warm pale yellow
-                                               // measured unreadable against the arena's orange/sand ground)
-            new Color(0.68f, 0.32f, 1f, 1f),  // team 1 - violet (mesh is black - would be invisible as a trail)
-            new Color(0.15f, 0.95f, 1f, 1f),  // team 2 - cyan (matches its mesh)
+            new Color(0.93f, 0.97f, 1f, 1f),  // team 0 - cool near-white (a warm pale yellow measured unreadable
+                                               // against the arena's orange/sand ground)
+            new Color(0.68f, 0.32f, 1f, 1f),  // team 1 - violet
+            new Color(0.15f, 0.95f, 1f, 1f),  // team 2 - cyan
         };
         [Tooltip("Trail/tint colour used when the shooter's team could not be resolved - Teams.TryGetTeam returned " +
                  "-1. Should never actually appear in a real match; only a debug/test-range shot fired with no team " +
