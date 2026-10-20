@@ -70,5 +70,9 @@ MonoBehaviour:
   shieldSeamFraction: 0.08
   shieldRiseSeconds: 0.15
   shieldRiseStagger: 0.35
+  shieldPlateGlow: 0.4
+  shieldSeamShade: {r: 0.035, g: 0.03, b: 0.025, a: 1}
+  hologram: {fileID: 2100000, guid: 1fe75856c4baaa040901b468e37773cd, type: 2}
+  shieldPlates: {fileID: 2100000, guid: 1e1873c4ddf885842a6e6a0bff6f06e5, type: 2}
   mechBaseMix: 0.5
   mechGlowStrength: 1.5

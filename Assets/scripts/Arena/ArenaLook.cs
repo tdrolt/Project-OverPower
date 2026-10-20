@@ -33,6 +33,16 @@ namespace Overpower.Arena
         public float shieldRiseSeconds = 0.15f;
         [Tooltip("How much the lowest plates lead the highest ones as the Shield rises, as a fraction of the rise time: 0 moves every plate together, higher sends the bottom plates up first.")]
         [Range(0f, 1f)] public float shieldRiseStagger = 0.35f;
+        [Tooltip("How much the Shield's gold plates glow on their own, as a multiple of the gold: 0 is plain lit metal, about 0.5 keeps them readable in the dark without a bloom halo that hides the player.")]
+        [Min(0f)] public float shieldPlateGlow = 0.4f;
+        [Tooltip("The colour seen through the seams between the Shield's plates, wherever the player is not behind them. Keep it near black so the seams read dark over any floor or team colour.")]
+        public Color shieldSeamShade = new Color(0.035f, 0.03f, 0.025f, 1f);
+
+        [Header("Materials")]
+        [Tooltip("The see-through glowing glass of the respawn bubble (the Overpower/Hologram shader). Every bubble wears its own copy in its owner's team colour, so this file is never changed while playing.")]
+        public Material hologram;
+        [Tooltip("The metal of the Shield's hexagon plates: solid and lit, so the player inside is only seen through the seams. Its gold and the seams' shade are put on each Shield when it triggers, so this file is never changed while playing.")]
+        public Material shieldPlates;
 
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]

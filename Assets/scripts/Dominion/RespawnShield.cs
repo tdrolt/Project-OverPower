@@ -2,6 +2,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
 using Overpower.Abilities;
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Match;
@@ -263,12 +264,13 @@ namespace Overpower.Dominion
         {
             DominionConfig config = DominionMode.Config();
             UiTheme theme = health != null ? health.Theme : null;
-            if (config == null || theme == null || invulnerabilityReference == null)
+            ArenaLook look = theme != null ? theme.arenaLook : null;
+            if (config == null || theme == null || invulnerabilityReference == null || look == null || look.hologram == null)
             {
                 if (!setupErrorLogged)
                 {
                     setupErrorLogged = true;
-                    Debug.LogError($"[DOMINION] {name}: the respawn shield bubble needs the Dominion config, the UiTheme and the Invulnerability reference - none drawn.");
+                    Debug.LogError($"[DOMINION] {name}: the respawn shield bubble needs the Dominion config, the UiTheme with its Arena Look and hologram material, and the Invulnerability reference - none drawn.");
                 }
                 return;
             }
@@ -276,31 +278,16 @@ namespace Overpower.Dominion
             bubble = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             bubble.name = "Respawn Shield VFX (cosmetic only)";
             DestroyImmediate(bubble.GetComponent<Collider>()); // never a solid, physics-blocking object, not even for a frame
+            if (bubbleMaterial == null)
+                bubbleMaterial = new Material(look.hologram) { name = "Respawn Bubble (instance)" };
+            RespawnBubbleLook.Dress(bubbleMaterial, look, RespawnBubbleLook.ColourFor(health.TeamId, theme), photonView.OwnerActorNr);
             var renderer = bubble.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = BubbleMaterial(theme.respawnShieldColor);
+            renderer.sharedMaterial = bubbleMaterial;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             bubble.transform.SetParent(transform, false);
             bubble.transform.localPosition = Vector3.zero;
-            bubble.transform.localScale = Vector3.one * (invulnerabilityReference.ShieldDiameter * config.ShieldBubbleScale);
+            bubble.transform.localScale = Vector3.one * RespawnBubbleLook.Diameter(invulnerabilityReference.ShieldDiameter, config.ShieldBubbleScale);
             bubbleGate = VisibleWhenSeen.AttachToCaster(bubble, photonView); // hidden in the fog together with the player it surrounds
-        }
-
-        private Material BubbleMaterial(Color color)
-        {
-            if (bubbleMaterial == null)
-            {
-                bubbleMaterial = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                bubbleMaterial.SetFloat("_Surface", 1f); // transparent, so the player can be seen through the bubble
-                bubbleMaterial.SetFloat("_Blend", 0f);
-                bubbleMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                bubbleMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                bubbleMaterial.SetFloat("_ZWrite", 0f);
-                bubbleMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                bubbleMaterial.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-                bubbleMaterial.SetOverrideTag("RenderType", "Transparent");
-            }
-            bubbleMaterial.color = color;
-            return bubbleMaterial;
         }
 
         private void DestroyBubble()
