@@ -1,4 +1,5 @@
 using Overpower.Combat;
+using Overpower.UI;
 using UnityEngine;
 
 namespace Overpower.Abilities
@@ -20,9 +21,16 @@ namespace Overpower.Abilities
     /// </summary>
     public sealed class FlameConeVisual : MonoBehaviour
     {
+        public const string TonguesChildName = "Flame Tongues";
+
         [SerializeField, Tooltip("The filled fan: a MeshFilter whose mesh and per-vertex colour are generated here, " +
                  "drawn with Flame Cone.mat (Particles/Unlit - plain Unlit never shows a mesh's vertex colours).")]
         private MeshFilter fan;
+
+        [SerializeField, Tooltip("The short upright flames and the embers along the fan (a child particle system; the flames draw with " +
+                 "the Arena Look's Fx Alpha, the embers with its Fx Additive). Where they rise is sized to the real Cone Range and Cone Angle " +
+                 "on every spray; how many come from the Arena Look.")]
+        private ParticleSystem tongues;
 
         [SerializeField, Tooltip("The faint aiming outline at the true range and angle. Its opacity for the CASTER's " +
                  "own screen is Edge Opacity below; for everyone else it is Non-Caster Edge Opacity.")]
@@ -123,6 +131,14 @@ namespace Overpower.Abilities
                 edge.enabled = outlineOpacity > 0f;
                 VisualTint.SetLineColor(edge, VisualTint.WithAlpha(color, outlineOpacity));
             }
+        }
+
+        /// <summary>Spreads the flames and embers over the real cone, orange edge to yellow core from the Flamethrower's row of the look table.</summary>
+        public void ConfigureTongues(float range, float fullAngleDegrees, UiTheme theme, int abilityId)
+        {
+            if (tongues == null || theme == null || theme.arenaLook == null)
+                return;
+            FlameLook.Apply(tongues, range, fullAngleDegrees, FlameLook.Core(theme), FlameLook.Edge(theme, abilityId), theme.arenaLook);
         }
 
         /// <summary>Tip on the floor under <paramref name="apex"/>, opening along <paramref name="forward"/>'s flat direction.</summary>

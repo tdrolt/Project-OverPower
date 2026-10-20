@@ -138,6 +138,10 @@ namespace Overpower.Tests
             return found;
         }
 
+        /// <summary>The IL offsets of every load (ldfld) of the field in one method body: with CallOffsets, which value goes into which call.</summary>
+        public static List<int> FieldLoadOffsets(MethodBase method, FieldInfo field) =>
+            OffsetsOf(method, System.BitConverter.GetBytes(field.MetadataToken), 0x7B);
+
         /// <summary>True when the named method (or its lambdas and state machine) calls a method that may live in another assembly (see CallOffsets).</summary>
         public static bool CallsAcrossAssemblies(System.Type owner, string methodName, MethodBase target)
         {

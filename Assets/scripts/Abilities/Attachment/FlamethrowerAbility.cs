@@ -265,6 +265,7 @@ namespace Overpower.Abilities
             // Owner.IsMine (A3): the faint aiming outline is only ever drawn on the caster's OWN screen -
             // everyone else sees just the soft fan, never a hard edge.
             vfx.Configure(coneRange, coneAngle, vfxColor, Owner.IsMine);
+            vfx.ConfigureTongues(coneRange, coneAngle, Owner.Health != null ? Owner.Health.Theme : null, Definition.Id);
             vfx.gameObject.SetActive(true);
             // Vision: the cone is hidden with the enemy who sprays it, checked every frame (friendly: always).
             // It is also shown while the cone reaches any of my team (the fire hurts them, so they must see it).

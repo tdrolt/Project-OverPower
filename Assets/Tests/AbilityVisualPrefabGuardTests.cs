@@ -35,7 +35,18 @@ namespace Overpower.Tests
             "Assets/Gameplay/Abilities/Electric Fence.prefab",
             "Assets/Gameplay/Abilities/Flamethrower.prefab",
             "Assets/Gameplay/Abilities/Zip Gun.prefab",
+            StunBulletPath,
+            StunBurstPath,
+            "Assets/Gameplay/Abilities/Sonic Pulse.prefab",
+            FlameConePath,
         };
+
+        private const string StunBulletPath = "Assets/Gameplay/Projectiles/Stun Gun Bullet.prefab";
+        private const string StunBurstPath = "Assets/Gameplay/FX/Impacts/FX Stun Burst.prefab";
+        private const string FlameConePath = "Assets/Gameplay/Abilities/Flamethrower Cone.prefab";
+        private const string LookPath = "Assets/Gameplay/Config/ArenaLook.asset";
+        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
+        private const int StunGunId = 22;
 
         private static GameObject Load(string path)
         {
@@ -142,6 +153,82 @@ namespace Overpower.Tests
             AssetAt(Fields<DetonateAtCursor>("Assets/Gameplay/Projectiles/Rocket Cursor.prefab"), "fireFieldPrefab",
                 "Assets/Resources/Fire Field.prefab");
             PhotonViews("Assets/Resources/Fire Field.prefab", 1);
+        }
+            [Test]
+        public void StunBulletIsNotTheBuiltInSphere()
+        {
+            GameObject bullet = Load(StunBulletPath);
+            Mesh mesh = bullet.GetComponent<MeshFilter>().sharedMesh;
+            Assert.IsNotNull(mesh);
+            Assert.AreNotEqual("Sphere", mesh.name, "the 0.6 m ball is gone");
+            Assert.AreEqual("Assets/Gameplay/Art/StunBolt.fbx", AssetDatabase.GetAssetPath(mesh), "the faceted bolt from Blender");
+            Assert.Less(mesh.triangles.Length / 3, 300, "a small low-poly model");
+            Assert.Greater(mesh.bounds.size.z, mesh.bounds.size.x * 2f, "long along its flight (+Z), slim across");
+            Vector3 size = Vector3.Scale(mesh.bounds.size, bullet.transform.localScale);
+            Assert.Less(Mathf.Max(size.x, size.y, size.z), 0.6f, "smaller than the 0.6 m ball it replaces, in every direction");
+            Assert.IsEmpty(bullet.GetComponentsInChildren<Collider>(true), "hits come from the motor's sphere cast, never a collider");
+        }
+
+        [Test]
+        public void StunBulletHasNoShotTeamVisuals()
+        {
+            GameObject bullet = Load(StunBulletPath);
+            Assert.IsNull(bullet.GetComponent<ShotTeamVisuals>(), "an ability shot is not a team-coloured weapon shot");
+            SerializedObject tint = Fields<LookTint>(StunBulletPath);
+            Assert.AreEqual(StunGunId, Field(tint, "abilityId").intValue, "the Stun Gun row of the look table");
+            AssetAt(tint, "theme", ThemePath);
+            SerializedObject motor = Fields<ProjectileMotor>(StunBulletPath);
+            AssetAt(motor, "fallbackImpactVfx", StunBurstPath);
+            Assert.IsNotNull(bullet.GetComponentInChildren<ParticleSystem>(true), "a crackle behind the bolt");
+
+            SerializedObject burstTint = Fields<LookTint>(StunBurstPath);
+            Assert.AreEqual(StunGunId, Field(burstTint, "abilityId").intValue, "the burst is blue like the bolt");
+            AssetAt(burstTint, "theme", ThemePath);
+            Assert.IsNotNull(Load(StunBurstPath).GetComponent<ParticleSystem>(), "VFXManager times the burst from its particle systems");
+        }
+
+        [Test]
+        public void PulseHasAView()
+        {
+            SerializedObject view = Fields<SonicPulseView>("Assets/Gameplay/Abilities/Sonic Pulse.prefab");
+            AssetAt(view, "theme", ThemePath);
+            Assert.IsNotNull(Load("Assets/Gameplay/Abilities/Sonic Pulse.prefab").GetComponent<SonicPulseAbility>());
+        }
+
+        [Test]
+        public void FlameConeHasTongues()
+        {
+            GameObject cone = Load(FlameConePath);
+            Transform tongues = cone.transform.Find(FlameConeVisual.TonguesChildName);
+            Assert.IsNotNull(tongues, "a 'Flame Tongues' child on the cone");
+            ParticleSystem system = tongues.GetComponent<ParticleSystem>();
+            Assert.IsNotNull(system);
+            Assert.AreSame(system, new SerializedObject(cone.GetComponent<FlameConeVisual>()).FindProperty("tongues").objectReferenceValue);
+            var look = AssetDatabase.LoadAssetAtPath<Overpower.Arena.ArenaLook>(LookPath);
+            Assert.AreSame(look.fxAlpha, tongues.GetComponent<ParticleSystemRenderer>().sharedMaterial, "the flames keep their orange over any floor (FX Alpha)");
+            foreach (ParticleSystemRenderer renderer in tongues.GetComponentsInChildren<ParticleSystemRenderer>(true))
+                Assert.IsTrue(renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive, renderer.name + " is drawn with an FX material");
+            Assert.GreaterOrEqual(tongues.GetComponentsInChildren<ParticleSystem>(true).Length, 2, "flames and embers");
+            Assert.AreEqual("Assets/Gameplay/Abilities/Flame Cone.mat",
+                AssetDatabase.GetAssetPath(cone.transform.Find("Fan").GetComponent<MeshRenderer>().sharedMaterial), "the fan is untouched");
+        }
+
+        [Test]
+        public void TheFxMaterialsAreVertexColourParticlesOneAddingOneBlending()
+        {
+            var look = AssetDatabase.LoadAssetAtPath<Overpower.Arena.ArenaLook>(LookPath);
+            Assert.IsNotNull(look.fxAdditive, "ArenaLook › Fx Additive");
+            Assert.IsNotNull(look.fxAlpha, "ArenaLook › Fx Alpha");
+            Assert.AreEqual("Assets/Gameplay/FX/Materials/FX Additive.mat", AssetDatabase.GetAssetPath(look.fxAdditive));
+            Assert.AreEqual("Assets/Gameplay/FX/Materials/FX Alpha.mat", AssetDatabase.GetAssetPath(look.fxAlpha));
+            foreach (Material m in new[] { look.fxAdditive, look.fxAlpha })
+            {
+                Assert.AreEqual("Universal Render Pipeline/Particles/Unlit", m.shader.name, m.name + ": reads vertex colours, a URP name");
+                Assert.AreEqual(1f, m.GetFloat("_Surface"), m.name + " transparent");
+                Assert.AreEqual(0f, m.GetFloat("_ZWrite"), m.name + " writes no depth");
+            }
+            Assert.AreEqual((float)UnityEngine.Rendering.BlendMode.One, look.fxAdditive.GetFloat("_DstBlend"), "additive: adds light");
+            Assert.AreEqual((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha, look.fxAlpha.GetFloat("_DstBlend"), "see-through: blends");
         }
     }
 }

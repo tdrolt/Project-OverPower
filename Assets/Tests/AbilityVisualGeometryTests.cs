@@ -204,5 +204,54 @@ namespace Overpower.Tests
                 Assert.AreEqual(0f, AbilityVisualGeometry.FanVertexSideFraction(centre, Slices), 1e-5f, $"ring {ring + 1} centre");
             }
         }
+
+        // The Sonic Pulse's live cone as Sonic Pulse.prefab ships it; literal here, the prefab may be retuned freely.
+        private const float PulseRange = 5f;
+        private const float PulseAngle = 60f;
+
+        [Test]
+        public void EveryArcPointPassesConeFilter()
+        {
+            const int points = 17;
+            for (int band = 0; band < 3; band++)
+                for (float t = 0f; t <= 0.5f; t += 0.01f)
+                {
+                    float radius = AbilityVisualGeometry.ArcBandRadius(band, t, 0.2f, PulseRange, 0.18f);
+                    for (int k = 0; k < points; k++)
+                    {
+                        Vector3 p = AbilityVisualGeometry.ArcPoint(radius, PulseAngle, k, points);
+                        Assert.IsTrue(ConeFilter.IsWithinCone(Vector3.zero, Vector3.forward, p, PulseRange, PulseAngle),
+                            $"band {band} at {t:F2}s point {k} {p:F4} is outside the cone the pulse really hits");
+                    }
+                }
+
+            Assert.That(Vector3.Distance(AbilityVisualGeometry.CirclePoint(PulseRange, -PulseAngle * 0.5f), AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle, 0, points)),
+                Is.LessThan(0.002f), "the first point is on the cone's left edge at its range (within 2 mm)");
+            Assert.That(Vector3.Distance(AbilityVisualGeometry.CirclePoint(PulseRange, PulseAngle * 0.5f), AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle, points - 1, points)),
+                Is.LessThan(0.002f), "the last point is on its right edge");
+            Assert.That(Vector3.Distance(AbilityVisualGeometry.CirclePoint(PulseRange, 0f), AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle, points / 2, points)),
+                Is.LessThan(0.002f), "the middle point is straight ahead");
+            Assert.IsFalse(ConeFilter.IsWithinCone(Vector3.zero, Vector3.forward, AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle + 4f, 0, points), PulseRange, PulseAngle),
+                "control: an arc 2 degrees wider each side leaves the cone");
+        }
+
+        [Test]
+        public void OuterBandEndsAtRange()
+        {
+            Assert.AreEqual(0f, AbilityVisualGeometry.ArcBandRadius(0, 0f, 0.2f, PulseRange, 0.18f), 1e-5f, "starts at the caster");
+            Assert.AreEqual(PulseRange * 0.5f, AbilityVisualGeometry.ArcBandRadius(0, 0.1f, 0.2f, PulseRange, 0.18f), 1e-4f, "halfway at half the sweep");
+            Assert.AreEqual(PulseRange, AbilityVisualGeometry.ArcBandRadius(0, 0.2f, 0.2f, PulseRange, 0.18f), 1e-5f, "the leading band ends exactly at the range");
+            Assert.AreEqual(PulseRange, AbilityVisualGeometry.ArcBandRadius(0, 3f, 0.2f, PulseRange, 0.18f), 1e-5f, "and stays there while it fades");
+            float previous = -1f;
+            for (float t = 0f; t <= 0.4f; t += 0.01f)
+            {
+                float lead = AbilityVisualGeometry.ArcBandRadius(0, t, 0.2f, PulseRange, 0.18f);
+                float second = AbilityVisualGeometry.ArcBandRadius(1, t, 0.2f, PulseRange, 0.18f);
+                Assert.GreaterOrEqual(lead, previous, "the wave only moves outward");
+                Assert.Less(second, lead + 1e-5f, "a later band trails the leading one");
+                previous = lead;
+            }
+            Assert.AreEqual(0f, AbilityVisualGeometry.ArcBandRadius(1, 0.02f, 0.2f, PulseRange, 0.18f), 1e-5f, "a trailing band is not out yet at the start");
+        }
     }
 }

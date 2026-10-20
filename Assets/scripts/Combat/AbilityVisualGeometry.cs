@@ -145,5 +145,28 @@ namespace Overpower.Combat
             float t = slice / (float)slices;
             return Mathf.Abs(t * 2f - 1f);
         }
+    
+        /// <summary>Point <paramref name="k"/> of <paramref name="n"/> along a flat arc of this radius, opening along +Z and running from the
+        /// left edge (-half angle) to the right edge: drawn at a cone's range it traces the far edge ConeFilter.IsWithinCone tests.</summary>
+        public static Vector3 ArcPoint(float radius, float fullAngleDegrees, int k, int n)
+        {
+            // A hair inside the edge and the range (under a millimetre at 5 m): exactly on them, float rounding puts the point a
+            // millionth outside ConeFilter's own test, and the bands must never claim ground the pulse does not hit.
+            float half = Mathf.Max(0f, fullAngleDegrees * 0.5f - ArcEdgeInsetDegrees);
+            float t = n > 1 ? Mathf.Clamp01(k / (float)(n - 1)) : 0.5f;
+            return CirclePoint(radius * ArcRadiusInset, Mathf.Lerp(-half, half, t));
+        }
+
+        private const float ArcEdgeInsetDegrees = 0.01f;
+        private const float ArcRadiusInset = 0.9999f;
+
+        /// <summary>How far out from the caster band <paramref name="band"/> (0 leads) has swept <paramref name="t"/> seconds after a cast: the
+        /// leading band reaches <paramref name="range"/> after <paramref name="sweepSeconds"/> and stays there, each later band trails the one
+        /// ahead by <paramref name="spacing"/> of the range, and none ever passes the range. 0 = not out yet.</summary>
+        public static float ArcBandRadius(int band, float t, float sweepSeconds, float range, float spacing)
+        {
+            float lead = sweepSeconds > 0f ? Mathf.Clamp01(t / sweepSeconds) : 1f;
+            return range * Mathf.Max(0f, lead - band * spacing);
+        }
     }
 }

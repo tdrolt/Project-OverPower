@@ -24,5 +24,13 @@ namespace Overpower.Arena
         }
 
         public static Color FireCore(UiTheme theme) => theme.fireCoreColor;
+
+        /// <summary>The colour of an ability's row in the look table, so retuning the table recolours the effect. Without a table or a row the effect
+        /// keeps the family it was built for, since hiding it would hide a rule from players.</summary>
+        public static Color ForAbility(UiTheme theme, int abilityId, int team, LookFamily fallback)
+        {
+            LookFamily family = theme.arenaLook != null && theme.arenaLook.TryGetLook(abilityId, out AbilityLook look) ? look.Family : fallback;
+            return For(family, team, theme);
+        }
     }
 }

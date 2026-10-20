@@ -119,6 +119,10 @@ public class PlayerStatusEffects : MonoBehaviour, IStatusReceiver, IArmedShield
         overheadLabel = StatusLabelOverhead.TryCreate(this,
             playerHealth != null ? playerHealth.Theme : null,
             playerHealth != null ? playerHealth.OverheadCanvas : null);
+        // Crackles round the body while the label above says STUNNED, on every client's copy, so it reads what the label reads.
+        CapsuleCollider body = GetComponent<CapsuleCollider>();
+        Overpower.Abilities.StunArcsView.TryCreate(transform, this, photonView,
+            playerHealth != null ? playerHealth.Theme : null, body != null ? body.center.y : 1f);
     }
 
     /// <summary>The label this player wears, its time left and its starting length (for the bar). The
