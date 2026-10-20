@@ -257,6 +257,12 @@ namespace Overpower.Arena
         [Tooltip("How often a circuit stripe runs up or down from one square into the next: 0 never, 1 always. Lower than the sideways chance keeps the pattern mostly level.")]
         [Range(0f, 1f)] public float circuitUpChance = 0.3f;
 
+        [Header("Capture towers")]
+        [Tooltip("The material of a capture tower's body and columns: the arena wall's dark glossy look, whose circuit stripes take the zone owner's colour from the ground the tower stands on. Point it at another arena surface material, such as the blocks', to give the towers that tint instead. Dominion spawn towers keep their own solid team colour.")]
+        public Material towerBody;
+        [Tooltip("How much of a capture tower's lid is dark, as a share of its width: the rest is a glowing rim in the owner's colour. 0 makes the whole lid glow; about 0.75 leaves a rim as wide as the glowing base ring, so from above an owned tower reads as a glowing outline instead of a solid disc of colour.")]
+        [Range(0f, 0.95f)] public float towerCrownInset = 0.75f;
+
         public IReadOnlyList<AbilityLook> AbilityLooks => abilityLooks;
         public AbilityLook RespawnBubbleLook => respawnBubbleLook;
 

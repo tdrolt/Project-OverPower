@@ -147,6 +147,14 @@ Anti-goals (a failure even if it works): a floor or wall bright enough to hide a
 effect that nobody owns; soft round Tron blobs; a frame-rate drop in a nine-player SMG fight; a death card that covers any
 part of the shop; a look that differs between clients.
 
+## Added 20 Oct, morning (Tudor)
+
+**Capture towers match the arena.** Every capturable zone tower (Conquest zones and capitals, Dominion lane zones) becomes an
+eight-sided faceted tower (six sides stay the Dominion spawn's mark): a dark glossy body with circuit stripes like the
+walls; the crown, the base ring and the stripes glow in the owner's colour; a neutral tower stays dark with unlit lines;
+contested red and the under-attack pulse stay on the crown. Size and collider unchanged. **Dominion spawn towers stay as
+they are** (solid team colour, six sides, corner columns), so they never read as capturable.
+
 ## Calls made after the builder check (the session's, not Tudor's; he sees them in the report)
 
 - **Neutral vs. the White team:** neutral stripes and tile edges are **unlit** (a slightly lighter grey line, no glow);

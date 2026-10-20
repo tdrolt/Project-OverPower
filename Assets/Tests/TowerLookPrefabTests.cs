@@ -204,24 +204,16 @@ namespace Overpower.Tests
             Assert.IsNotNull(renderer, label);
             var block = new MaterialPropertyBlock();
             renderer.GetPropertyBlock(block);
-            Assert.IsTrue(block.isEmpty, $"{label}: must never be given a property block while its slot is hidden");
+            Assert.IsTrue(block.isEmpty, $"{label}: must never be painted (a hidden slot, or a body that takes its colour from the ground)");
         }
 
-        /// <summary>2026-09-23 (Tudor: "the exterior collumns and the base of the territory prefab glow the same
-        /// color as the top"): Refresh must paint the Plinth and every SHOWN shaft at the very same FULL colour the
-        /// crown/caps get - no shade - now that they are on the Unlit "Tower Owner" material. The Drum keeps the
-        /// Lit "Tower Stone" material and is still painted at colour times UiTheme.towerBodyShade, so the tower
-        /// keeps a silhouette. A HIDDEN shaft (tier 2 shows only 2 of 4 slots) must never be painted at all, same
-        /// rule ApplyColumns already applies to a hidden cap.
-        ///
-        /// 2026-09-24 (Tudor: "add bloom on the towers"): an OWNED tower's crown/caps/plinth/shown shafts are now
-        /// painted at colour times UiTheme.towerOwnerGlow, past 1 so a bright enough colour clears the scene's
-        /// Bloom threshold. The test picks its own glow value (not the asset's tuned number) so a later retune of
-        /// Tower Owner Glow can never silently break this test's arithmetic - see the try/finally restoring it.
-        /// The Drum never glows: it stays exactly colour times Tower Body Shade, same as before this change.
+        /// <summary>A capture tower glows only at its crown, its base and its column caps: the colour brightened by
+        /// UiTheme.towerOwnerGlow (TowerLookRules.GlowKeepingHue), past 1 so it clears the scene's Bloom threshold. The body and the
+        /// shafts wear the arena wall look and are never painted, so an owned tower never turns into one flat block of
+        /// colour. A HIDDEN slot is never painted. The test picks its own glow value (not the asset's tuned number).
         /// </summary>
         [Test]
-        public void RefreshPaintsShaftsAndPlinthAtFullColourTimesGlowAndTheDrumAtColourTimesBodyShadeNeverGlowing()
+        public void RefreshGlowsTheCrownCapsAndPlinthAndNeverPaintsTheBodyOrTheShafts()
         {
             UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
             Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
@@ -238,23 +230,19 @@ namespace Overpower.Tests
                 var state = new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, team, TerritoryMap.Neutral, false);
                 look.Refresh(state, 0f);
 
-                Color baseColour = theme.ShotColorFor(team);
-                Color expectedGlow = baseColour * testGlow;
-                expectedGlow.a = baseColour.a;
-                Color expectedBody = baseColour * theme.towerBodyShade;
-                expectedBody.a = baseColour.a;
+                Color expectedGlow = TowerLookRules.GlowKeepingHue(theme.ShotColorFor(team), testGlow);
 
-                // The crown/caps/plinth/shown shafts all glow: colour times the owner glow.
                 AssertBaseColor(look.crown, expectedGlow, "crown");
                 AssertBaseColor(look.columnCaps[0], expectedGlow, "shown cap 0");
+                AssertBaseColor(look.columnCaps[1], expectedGlow, "shown cap 1");
                 AssertBaseColor(look.plinth, expectedGlow, "plinth");
-                AssertBaseColor(look.columnShafts[0], expectedGlow, "shown shaft 0");
-                AssertBaseColor(look.columnShafts[1], expectedGlow, "shown shaft 1");
+                AssertNeverPainted(look.columnCaps[2], "hidden cap 2");
+                AssertNeverPainted(look.columnCaps[3], "hidden cap 3");
+                AssertNeverPainted(look.columnShafts[0], "shown shaft 0");
+                AssertNeverPainted(look.columnShafts[1], "shown shaft 1");
                 AssertNeverPainted(look.columnShafts[2], "hidden shaft 2");
                 AssertNeverPainted(look.columnShafts[3], "hidden shaft 3");
-
-                // The drum never glows - unchanged: colour times body shade only.
-                AssertBaseColor(look.drum, expectedBody, "drum");
+                AssertNeverPainted(look.drum, "drum");
             }
             finally
             {
@@ -287,15 +275,10 @@ namespace Overpower.Tests
             AssertBaseColor(look.columnCaps[3], look.ShownColor, "the newly-shown fourth slot's cap");
         }
 
-        /// <summary>Pins the controller's neutral choice (Rule 6, chosen by capture): the plinth follows the exact
-        /// same rule as an owned tower's plinth (the full UiTheme.towerNeutralColor, no shade, since 2026-09-23),
-        /// and the drum keeps the shaded formula - so a neutral tower is never left on the stone's own unpainted
-        /// colour, and the ring and the whole tower can never disagree about what "nobody owns this" looks like.
-        ///
-        /// 2026-09-24: a neutral tower must never glow, even with Tower Owner Glow raised well past 1 - "glow
-        /// means owned" (the field's own tooltip). Proven here by deliberately raising the glow before Refresh:
-        /// if OwnerPaintBase.Team were ever mis-checked (e.g. matched on Neutral too), this would catch it.
-        /// </summary>
+        /// <summary>A neutral tower's crown and plinth are the full UiTheme.towerNeutralColor, no shade, so the ring and
+        /// the tower never disagree about what "nobody owns this" looks like; the body is the arena look, never painted.
+        /// It never glows, even with Tower Owner Glow raised well past 1 ("glow means owned"): the raised glow catches
+        /// OwnerPaintBase.Team ever being matched on Neutral too.</summary>
         [Test]
         public void RefreshNeverGlowsANeutralTowerEvenWithGlowRaised()
         {
@@ -312,12 +295,9 @@ namespace Overpower.Tests
                 var state = new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, TerritoryMap.Neutral, TerritoryMap.Neutral, false);
                 look.Refresh(state, 0f);
 
-                Color expectedBody = theme.towerNeutralColor * theme.towerBodyShade;
-                expectedBody.a = theme.towerNeutralColor.a;
-
                 AssertBaseColor(look.crown, theme.towerNeutralColor, "neutral crown");
                 AssertBaseColor(look.plinth, theme.towerNeutralColor, "neutral plinth");
-                AssertBaseColor(look.drum, expectedBody, "neutral drum");
+                AssertNeverPainted(look.drum, "neutral drum");
             }
             finally
             {

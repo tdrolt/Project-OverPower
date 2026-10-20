@@ -7,24 +7,11 @@ using Overpower.UI;
 namespace Overpower.Arena
 {
     /// <summary>
-    /// A round tower with as many columns as its tier, and pieces that change colour with who owns it. The prefab has
-    /// four column slots (a shaft and a cap each); ApplyColumns shows the first N and hides the rest. The capital's one
-    /// column is BIG, every other tier's share one normal size (columnRadius, capitalColumnRadius). The cap keeps the
-    /// plan's shaft:cap proportion (Decision 6) at whichever shaft radius is showing, so one number retunes a column's
-    /// whole silhouette (CODING-STANDARDS #3). TowerLookRules.ColumnRingRadius keeps a column's outer edge tangent to
-    /// this prefab's collider radius, so columns never add cover over the plain round tower (Decision 6).
-    ///
-    /// The crown, every SHOWN cap, the Plinth and every SHOWN shaft share one Unlit material ("Tower Owner"), tinted
-    /// through one reused MaterialPropertyBlock (VisualTint.SetMeshColor) - no material copy per tower - at the FULL
-    /// owner colour. The Drum alone stays on the Lit "Tower Stone" material, tinted by UiTheme's Tower Body Shade, so
-    /// the tower keeps a silhouette instead of one flat block of colour. Refresh gets exactly the same CaptureRingState
-    /// the ring on the ground gets every frame (via OwnerPaint.From / OwnerPaintColours.For), so the tower and the ring
-    /// can never disagree and a late joiner is right at once. The pieces are grey (the material's own colour) until the
-    /// first Refresh; no collider here depends on the tier.
-    ///
-    /// UseSpawnLook(true) turns the same pieces into a Dominion spawn: a six-sided plinth, body and lid and UiTheme's
-    /// Spawn Tower columns (up to six, so slots are cloned on demand). Every piece is still painted by Refresh, and the
-    /// collider is never touched.
+    /// A capture tower with as many columns as its tier (four slots; ApplyColumns shows the first N, each kept inside the
+    /// collider by TowerLookRules.ColumnRingRadius). Bind makes the pieces eight-sided at the prefab's own scales and puts
+    /// the body and shafts on ArenaLook's Tower Body, whose stripes read the owner from the ground under them. Refresh
+    /// paints the crown, the plinth and every SHOWN cap with the same CaptureRingState the ring gets. UseSpawnLook(true)
+    /// gives a Dominion spawn its own look: six-sided stone body, round columns, every piece in the team colour.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TowerLook : MonoBehaviour
@@ -44,26 +31,25 @@ namespace Overpower.Arena
                  "the crown.")]
         public Renderer[] columnCaps = new Renderer[4];
 
-        [Tooltip("The crown on top of the tower - painted with the owner's colour, like the shown caps.")]
+        [Tooltip("The crown on top of the tower - it glows in the owner's colour, like the base and the shown caps.")]
         public Renderer crown;
 
         // Trap: never mark these pieces (or Plinth/Drum) Batching Static. A statically-batched renderer draws through
         // its BATCH ROOT's combined mesh, so SetPropertyBlock on the ORIGINAL renderer (what VisualTint.SetMeshColor
         // calls) never reaches the screen, even though GetPropertyBlock/SetPropertyBlock both succeed and a test
         // reading the renderer's own block back looks green (TowerLookPrefabTests pins the flag).
-        [Tooltip("Each slot's Shaft renderer, in the same order as columnSlots - the Unlit 'Tower Owner' material, so " +
-                 "Refresh paints it (like Plinth below) at the full owner colour, exactly like the crown/caps (no " +
-                 "shade). Only a SHOWN slot's shaft is painted, same rule as columnCaps. Must not be Batching Static " +
-                 "- see the comment above.")]
+        [Tooltip("Each slot's Shaft renderer, in the same order as columnSlots. On a capture tower it wears the dark " +
+                 "Tower Body look like the drum and is never painted; on a Dominion spawn it is painted in the team " +
+                 "colour like the crown. Must not be Batching Static - see the comment above.")]
         public Renderer[] columnShafts = new Renderer[4];
 
-        [Tooltip("The tower's base (Unlit 'Tower Owner' material) - painted with the full owner colour, exactly like " +
-                 "the crown/caps/shown shafts (no shade). Must not be Batching Static.")]
+        [Tooltip("The tower's base ring (Unlit 'Tower Owner' material) - it glows in the owner's colour, exactly like " +
+                 "the crown and the shown caps. Must not be Batching Static.")]
         public Renderer plinth;
 
-        [Tooltip("The tower's body (Lit 'Tower Stone' material) - painted with the owner's colour times UiTheme's " +
-                 "Tower Body Shade (the only piece this shade still applies to), so the tower keeps a silhouette " +
-                 "instead of turning into one flat block of colour. Must not be Batching Static.")]
+        [Tooltip("The tower's body. On a capture tower it wears ArenaLook's Tower Body (dark, with circuit stripes in " +
+                 "the owner's colour) and is never painted; on a Dominion spawn it is the Lit 'Tower Stone' painted " +
+                 "with the team colour times UiTheme's Tower Body Shade. Must not be Batching Static.")]
         public Renderer drum;
 
         // Decision 6's starting value; the cap is drawn wider in CapToShaftRatio whichever shaft radius is showing.
@@ -76,7 +62,11 @@ namespace Overpower.Arena
                  "as the grandest. The cap keeps the same shaft:cap proportion as every other tier's columns.")]
         public float capitalColumnRadius = 0.6f;
 
+        public const string CrownInsetName = "Crown Inset";
+        private const float CrownInsetHalfHeight = 0.01f;
+
         private static Mesh hexMesh;
+        private static Mesh octagonMesh;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void FreeSharedMesh()
@@ -84,10 +74,14 @@ namespace Overpower.Arena
             if (hexMesh != null)
                 DestroyImmediate(hexMesh);
             hexMesh = null;
+            if (octagonMesh != null)
+                DestroyImmediate(octagonMesh);
+            octagonMesh = null;
 #if UNITY_EDITOR
-            // With domain reload on, the static was already lost: the DontSave mesh of the last session is found by name.
+            // With domain reload on, the statics were already lost: the DontSave meshes of the last session are found by name.
             foreach (Mesh leftover in Resources.FindObjectsOfTypeAll<Mesh>())
-                if (leftover.name == HexPrismMesh.MeshName && (leftover.hideFlags & HideFlags.DontSave) != 0 && !UnityEditor.EditorUtility.IsPersistent(leftover))
+                if ((leftover.name == HexPrismMesh.MeshName || leftover.name == OctagonPrismMesh.MeshName)
+                    && (leftover.hideFlags & HideFlags.DontSave) != 0 && !UnityEditor.EditorUtility.IsPersistent(leftover))
                     DestroyImmediate(leftover);
 #endif
         }
@@ -95,6 +89,11 @@ namespace Overpower.Arena
         private bool roundShapesKept;
         private int appliedTier = 1;
         private Shape drumRound, plinthRound, crownRound;
+        // The prefab's own column meshes and materials, which a Dominion spawn wears.
+        private Mesh roundShaft, roundCap;
+        private Material stoneDrum, ownerShaft;
+        private GameObject crownInset;
+        private bool bodyFromGround;
         private MaterialPropertyBlock block;
         private UiTheme theme;
         private bool bound;
@@ -170,24 +169,119 @@ namespace Overpower.Arena
         {
             if (spawn == spawnLook || !bound)
                 return;
-            if (!roundShapesKept)
-            {
-                drumRound = Shape.Of(drum);
-                plinthRound = Shape.Of(plinth);
-                crownRound = Shape.Of(crown);
-                roundShapesKept = true;
-            }
             spawnLook = spawn;
             if (spawn)
+            {
+                ApplyRoundColumnsAndStone();
                 ApplySpawnShapes();
+            }
             else
             {
                 drumRound.Restore(drum);
                 plinthRound.Restore(plinth);
                 crownRound.Restore(crown);
+                ApplyZoneShapes();
             }
             ApplyColumns(appliedTier);
             shownColorSet = false;
+        }
+
+        private void KeepRoundShapes()
+        {
+            drumRound = Shape.Of(drum);
+            plinthRound = Shape.Of(plinth);
+            crownRound = Shape.Of(crown);
+            Renderer shaft = columnShafts.Length > 0 ? columnShafts[0] : null;
+            Renderer cap = columnCaps.Length > 0 ? columnCaps[0] : null;
+            roundShaft = shaft != null ? shaft.GetComponent<MeshFilter>().sharedMesh : null;
+            ownerShaft = shaft != null ? shaft.sharedMaterial : null;
+            roundCap = cap != null ? cap.GetComponent<MeshFilter>().sharedMesh : null;
+            stoneDrum = drum != null ? drum.sharedMaterial : null;
+            roundShapesKept = true;
+        }
+
+        // Same scales and places as the round pieces, so the footprint and the collider fit stay exactly as they were.
+        private void ApplyZoneShapes()
+        {
+            if (octagonMesh == null)
+                octagonMesh = OctagonPrismMesh.Create();
+            Material body = theme.arenaLook != null ? theme.arenaLook.towerBody : null;
+            bodyFromGround = body != null;
+            SetMesh(drum, octagonMesh);
+            SetMesh(plinth, octagonMesh);
+            SetMesh(crown, octagonMesh);
+            WearBody(drum, body);
+            foreach (Renderer shaft in columnShafts)
+            {
+                SetMesh(shaft, octagonMesh);
+                WearBody(shaft, body);
+            }
+            foreach (Renderer cap in columnCaps)
+                SetMesh(cap, octagonMesh);
+            ShowCrownInset(body);
+        }
+
+        // A dark skin on the lid, so from above an owned tower reads as a glowing rim, not a solid disc of its colour.
+        // Cloned from the crown so it is born in the tower's own scene (a new GameObject would land in the open scene).
+        private void ShowCrownInset(Material body)
+        {
+            float share = theme.arenaLook != null ? theme.arenaLook.towerCrownInset : 0f;
+            if (crown == null || body == null || share <= 0f)
+            {
+                if (crownInset != null)
+                    crownInset.SetActive(false);
+                return;
+            }
+            if (crownInset == null)
+            {
+                Transform found = crown.transform.parent.Find(CrownInsetName);
+                crownInset = found != null ? found.gameObject : Instantiate(crown.gameObject, crown.transform.parent);
+                crownInset.name = CrownInsetName;
+            }
+            Transform lid = crown.transform;
+            float lidTop = lid.localPosition.y + lid.localScale.y;
+            crownInset.transform.localPosition = new Vector3(lid.localPosition.x, lidTop + CrownInsetHalfHeight, lid.localPosition.z);
+            crownInset.transform.localRotation = lid.localRotation;
+            crownInset.transform.localScale = new Vector3(lid.localScale.x * share, CrownInsetHalfHeight, lid.localScale.z * share);
+            crownInset.GetComponent<MeshFilter>().sharedMesh = octagonMesh;
+            var top = crownInset.GetComponent<Renderer>();
+            top.sharedMaterial = body;
+            top.SetPropertyBlock(null);
+            top.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            crownInset.SetActive(true);
+        }
+
+        private void ApplyRoundColumnsAndStone()
+        {
+            if (crownInset != null)
+                crownInset.SetActive(false);
+            if (drum != null && stoneDrum != null)
+                drum.sharedMaterial = stoneDrum;
+            foreach (Renderer shaft in columnShafts)
+            {
+                SetMesh(shaft, roundShaft);
+                if (shaft != null && ownerShaft != null)
+                    shaft.sharedMaterial = ownerShaft;
+            }
+            foreach (Renderer cap in columnCaps)
+                SetMesh(cap, roundCap);
+        }
+
+        private static void SetMesh(Renderer piece, Mesh mesh)
+        {
+            if (piece != null && mesh != null)
+                piece.GetComponent<MeshFilter>().sharedMesh = mesh;
+        }
+
+        // The body's colour comes from the ground under it (the arena shader), so it carries no paint of its own; a
+        // spawn's leftover paint is cleared too, which also keeps it in the SRP Batcher.
+        private static void WearBody(Renderer piece, Material body)
+        {
+            if (piece == null)
+                return;
+            if (body != null)
+                piece.sharedMaterial = body;
+            piece.SetPropertyBlock(null);
         }
 
         // Radii are held to the collider here, not trusted from the asset: the footprint is what players hit and stand against.
@@ -282,6 +376,12 @@ namespace Overpower.Arena
             theme = uiTheme;
             block ??= new MaterialPropertyBlock();
             bound = theme != null;
+            if (!bound)
+                return;
+            if (!roundShapesKept)
+                KeepRoundShapes();
+            if (!spawnLook)
+                ApplyZoneShapes();
         }
 
         /// <summary>Called every frame by BuildingCapture.RefreshRingView, with exactly the same state and time the
@@ -294,12 +394,11 @@ namespace Overpower.Arena
             OwnerPaint paint = OwnerPaint.From(state);
             Color colour = OwnerPaintColours.For(paint, theme, theme.towerNeutralColor, timeSeconds);
 
-            // An OWNED tower glows: its flat colour is multiplied past 1 so a bright enough channel clears the scene's
-            // Bloom threshold. Neutral and out-of-play towers never glow (glow stays 1, i.e. the plain flat colour), so
-            // a glow always means "this is owned".
+            // Only an OWNED tower glows past 1 (the scene's Bloom threshold), so a glow always means "this is owned". A
+            // spawn's look is fixed and keeps the plain multiply (Color * float scales alpha too - put it back).
             float glow = paint.Base == OwnerPaintBase.Team ? theme.towerOwnerGlow : 1f;
-            Color lit = colour * glow;
-            lit.a = colour.a; // Color * float scales every channel, alpha included - put it back.
+            Color lit = spawnLook ? colour * glow : TowerLookRules.GlowKeepingHue(colour, glow);
+            lit.a = colour.a;
 
             // The cache compares the PAINTED colour (lit), not the raw owner colour - so tuning Tower Owner Glow
             // in the Inspector while Play Mode is running repaints at once instead of waiting for the next real
@@ -318,11 +417,13 @@ namespace Overpower.Arena
                 if (cap != null && cap.gameObject.activeInHierarchy)
                     VisualTint.SetMeshColor(cap, block, lit);
             }
-
-            // The Plinth and every SHOWN shaft are on the Unlit "Tower Owner" material, so they get exactly the same
-            // colour as the crown/caps above, glow included.
             if (plinth != null)
                 VisualTint.SetMeshColor(plinth, block, lit);
+
+            // A capture tower's body and shafts take their colour from the ground; without a Tower Body to show it they
+            // are painted like a spawn's rather than left bare.
+            if (!spawnLook && bodyFromGround)
+                return;
             for (int i = 0; i < columnShafts.Length; i++)
             {
                 Renderer shaft = columnShafts[i];
@@ -330,12 +431,8 @@ namespace Overpower.Arena
                     VisualTint.SetMeshColor(shaft, block, lit);
             }
 
-            // The Drum alone stays on the Lit "Tower Stone" material and is tinted rather than flat-repainted, so its
-            // own shading survives - the owner's RAW colour (never the glow) times UiTheme's Tower Body Shade (never
-            // above 1), always dimmer than the glow every other painted piece gets above. That keeps the tower reading
-            // as a silhouette rather than one flat block of colour; the Drum staying off the glow is also what keeps it
-            // from blooming, on purpose - see UiTheme.towerOwnerGlow's tooltip. Alpha is put back afterwards, same
-            // reason as above.
+            // The spawn's Drum (Lit "Tower Stone") takes the RAW colour times Tower Body Shade, never the glow, so the
+            // spawn keeps a shaded silhouette and its body never blooms. Alpha is put back, same reason as above.
             if (drum != null)
             {
                 Color bodyColour = colour * theme.towerBodyShade;

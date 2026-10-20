@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace Overpower.Arena
 {
@@ -23,5 +24,19 @@ namespace Overpower.Arena
         /// <summary>The ring a column of this radius stands on: its outer edge is tangent to the tower's collider,
         /// never past it, because columns must never add cover over the plain round tower (Decision 6).</summary>
         public static float ColumnRingRadius(float columnRadius, float towerRadius) => towerRadius - columnRadius;
+
+        /// <summary>The colour brightened by glow without changing its hue on screen. The screen clips each channel at
+        /// full strength (1), so only the brightest channel goes past it (that is what blooms); every other channel stops
+        /// at its share of the colour at full strength, or purple's red would catch up with its blue and turn it pink.</summary>
+        public static Color GlowKeepingHue(Color colour, float glow)
+        {
+            float peak = colour.maxColorComponent;
+            if (peak <= 0f)
+                return colour;
+            return new Color(Channel(colour.r, peak, glow), Channel(colour.g, peak, glow), Channel(colour.b, peak, glow), colour.a);
+        }
+
+        private static float Channel(float value, float peak, float glow) =>
+            value >= peak ? value * glow : Math.Min(value * glow, Math.Max(value, value / peak));
     }
 }

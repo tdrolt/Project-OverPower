@@ -179,3 +179,5 @@ MonoBehaviour:
   topEdgeWidth: 0.08
   circuitAcrossChance: 0.55
   circuitUpChance: 0.3
+  towerBody: {fileID: 2100000, guid: 0ddd8131a35b6b94aa03ab4a047f0576, type: 2}
+  towerCrownInset: 0.75

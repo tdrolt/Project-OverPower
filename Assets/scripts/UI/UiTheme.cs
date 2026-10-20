@@ -1233,23 +1233,21 @@ namespace Overpower.UI
         public float markIndicatorMinAlpha = 0.35f;
 
         [Header("Towers (arena rebuild)")]
-        [Tooltip("Colour of a tower's crown and column caps while nobody owns its zone. Owned towers use their team's " +
+        [Tooltip("Colour of a tower's crown, base ring and column caps while nobody owns its zone. Owned towers use their team's " +
                  "colour (Team Shot Colors), a capital cut from a two-team match uses Out Of Play Zone Colour, and an " +
                  "attacked or drained tower pulses exactly like its ring on the ground. Keep it a plain mid grey: " +
                  "team 0 is near-white, so a light neutral would read as owned by team 0.")]
         public Color towerNeutralColor = new Color(0.42f, 0.42f, 0.42f, 1f);
-        [Tooltip("Multiplies the owner's colour before TowerLook paints the Drum only (the tower's body) - the one " +
-                 "piece still on the Lit 'Tower Stone' material, so it reads as the team colour with its own " +
-                 "lighting/shading intact instead of going flat like everything else TowerLook paints (the Crown, " +
-                 "caps, Plinth and shown shafts, all on the Unlit 'Tower Owner' material at the full colour, no " +
-                 "shade). 1 would make the Drum just as bright/flat as the rest and lose the tower's silhouette; kept " +
-                 "here next to Tower Neutral Colour because the two are only ever read together through " +
-                 "OwnerPaintColours - chosen by capture, not calculation (Rule 6), see captures/towers-2026-09-21 and " +
-                 "captures/tower-glow-2026-09-23.")]
+        [Tooltip("How dark a Dominion spawn tower's body is against its team colour: the body is painted with the " +
+                 "team colour times this, so the spawn keeps a shaded silhouette under its glowing lid, base and " +
+                 "columns. 1 would make the body as flat and bright as the rest. Capture towers do not use it: their " +
+                 "body is the dark arena wall look (Arena Look, Tower Body).")]
         [Range(0f, 1f)] public float towerBodyShade = 0.8f;
-        [Tooltip("How brightly an OWNED tower's crown, caps, columns and base glow in the owner's colour. 1 = " +
-                 "flat colour, no glow; 1.3 = soft; 1.5 = clear glow; 1.75+ = strong, and violet starts turning " +
-                 "lilac. Neutral and out-of-play towers never glow, so a glow means owned. The drum never glows.")]
+        [Tooltip("How brightly an OWNED tower's crown, base ring and column caps glow in the owner's colour (on a " +
+                 "Dominion spawn, its columns too). 1 = flat colour, no glow; 1.3 = soft; 1.5 = clear glow; 1.75+ = " +
+                 "strong. On a capture tower only the colour's brightest part is pushed this far, so purple stays the " +
+                 "violet of its stripes; on a Dominion spawn, past about 1.75 violet starts turning lilac. Neutral and " +
+                 "out-of-play towers never glow, so a glow means owned. The body never glows.")]
         [Range(1f, 2.5f)] public float towerOwnerGlow = 1.5f;
 
         [Header("Spawn towers (Dominion)")]
