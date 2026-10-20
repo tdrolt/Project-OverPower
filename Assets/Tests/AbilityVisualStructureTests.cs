@@ -118,23 +118,19 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheSplashShellIsASeeThroughSphereWithNoCollider()
+        public void TheSplashShellIsAFlatShockwaveRingWithNoCollider()
         {
-            // A6: what step 6 drops on a rocket blast instead of a floor BlastMarker - a short shell at the real
-            // burst point (any height), not snapped to the ground.
+            // A rocket blast is drawn at the real burst point (any height), never snapped to the ground; Spawn sizes the ring to the blast's radius.
             GameObject prefab = Load(ShellPath);
             var shell = prefab.GetComponent<SplashShell>();
             Assert.IsNotNull(shell);
-            Transform sphere = Child(prefab.transform, "Sphere");
-            // "pSphere1" is the REAL name of Unity's builtin Sphere.fbx mesh on this engine version, not "Sphere" -
-            // same finding as the marker's Cylinder, above.
-            AssertMesh(sphere, "pSphere1", GlassPath);
-            Assert.AreEqual(1f, sphere.localScale.x, 1e-5f, "unit diameter - Spawn scales it to the blast");
-            Assert.AreEqual(1f, sphere.localScale.y, 1e-5f);
-            Assert.AreEqual(1f, sphere.localScale.z, 1e-5f);
-            Assert.AreSame(sphere, Ref(shell, "sphere"));
+            Assert.IsNull(prefab.transform.Find("Sphere"), "the soft sphere is gone");
+            LineRenderer ring = AssertLine(Child(prefab.transform, "Ring"), flat: true);
+            Assert.IsTrue(ring.loop, "a closed ring");
+            Assert.IsFalse(ring.useWorldSpace, "drawn round the burst point");
+            Assert.AreSame(ring, Ref(shell, "ring"));
             AssertNoCollider(prefab);
-            Assert.IsNull(prefab.GetComponent<SnapVisualToGround>(), "the shell stays at the real burst height - never snapped to the floor");
+            Assert.IsNull(prefab.GetComponent<SnapVisualToGround>(), "the ring stays at the real burst height - never snapped to the floor");
         }
 
         [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab")]

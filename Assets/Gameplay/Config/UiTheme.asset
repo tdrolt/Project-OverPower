@@ -182,7 +182,7 @@ MonoBehaviour:
   trailStartWidth: 0.15
   trailEndWidth: 0.02
   trailMaterial: {fileID: 2100000, guid: 26c3ed38fb3f03746848d4f3ce14fb2c, type: 2}
-  bulletTintStrength: 0.9
+  bulletTintStrength: 0.2
   bulletEmission: 5
   laserWarningStartWidth: 0.03
   laserWarningEndWidth: 0.14

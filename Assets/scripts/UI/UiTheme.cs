@@ -464,18 +464,13 @@ namespace Overpower.UI
                  "own colour stays white: every trail tints itself through TrailRenderer.colorGradient, which is what " +
                  "lets one material serve every team.")]
         public Material trailMaterial;
-        [Tooltip("0 = the bullet's core keeps its own material colour, 1 = fully replaced by the team colour. How far " +
-                 "ShotTeamVisuals lerps the core's tint toward Shot Color For. Raised from an original 0.65, which " +
-                 "against Boolet Weapon.mat's ORIGINAL blue base colour left the core reading as a washed-out version " +
-                 "of that old blue for every team rather than the team's own colour - fixed together with turning " +
-                 "that base colour neutral white below, so the tint now has a true white to blend from instead of " +
-                 "fighting a saturated blue.")]
-        [Range(0f, 1f)] public float bulletTintStrength = 0.9f;
-        [Tooltip("Emission brightness multiplier on the bullet core's team colour, so the core itself - not just its " +
-                 "trail - reads as a bright, glowing shot rather than a flat-lit sphere at a glance. 1 = no boost " +
-                 "over the plain team colour. Raised from an original 2.4 - the scene's Bloom " +
-                 "(Assets/Settings/SampleSceneProfile.asset, threshold 1.0) only blooms a pixel whose linear value " +
-                 "clears that threshold, and 2.4 left the dimmer channels of some team colours under it.")]
+        [Tooltip("How much of the team colour the bullet's core takes, in its colour and its glow: 0 is a white-hot core (Flash White), 1 is the full " +
+                 "team colour. Keep it low so the core reads white-hot and the team shows in the trail and the light under the shot; high " +
+                 "values turn the whole shot into one team-coloured blob.")]
+        [Range(0f, 1f)] public float bulletTintStrength = 0.2f;
+        [Tooltip("How brightly the bullet's white-hot core glows (its colour is Flash White with Bullet Tint Strength of the team " +
+                 "colour). Keep it well above 1: the scene's Bloom only halos what is brighter than 1, and the halo is what makes " +
+                 "the core read as a hot shot instead of a flat-lit pellet.")]
         public float bulletEmission = 5f;
 
         /// <summary>The trail/tint colour for a shot fired by teamId; Unknown Team Shot Colour for an unresolved
@@ -2109,7 +2104,7 @@ namespace Overpower.UI
         public Color fireEdgeColor = new Color(1f, 0.45f, 0.1f, 1f);
         [Tooltip("The red of the danger ultimates (the AoE Zone and the Raybeam). Red, because green reads as healing.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
-        [Tooltip("The white of a hit or a shot leaving: impact flashes, muzzle flashes and the white-hot core of a bullet.")]
+        [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);
         [Tooltip("The light grey of the lines on ground and walls around a zone nobody owns. Bright enough that the zone stands out from the faint grid, but never glowing and clearly dimmer than the White team's lines, so a neutral zone is not mistaken for White ground.")]
         public Color arenaNeutralLineColor = new Color(0.6f, 0.62f, 0.66f, 1f);

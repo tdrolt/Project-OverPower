@@ -99,6 +99,14 @@ MonoBehaviour:
   flameTonguesPerMetre: 22
   flameEmbersPerSecond: 8
   flameTongueStart: 0.15
+  shotLightCap: 4
+  shotLightRange: 4
+  shotLightIntensity: 0.3
+  fxPoolCap: 24
+  fxCameraPull: 1
+  blastRingWidth: 0.2
+  shotLightHeight: 0.5
+  gunFlashGlow: 2.5
   mechBaseMix: 0.85
   mechGlowStrength: 1.8
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}

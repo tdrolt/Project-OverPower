@@ -162,6 +162,7 @@ GameObject:
   - component: {fileID: 5730266993843930018}
   - component: {fileID: 6410789498585402660}
   - component: {fileID: 694183307610266887}
+  - component: {fileID: 4408912442221456574}
   m_Layer: 7
   m_Name: Burst Bullet - Bounce
   m_TagString: Bullet
@@ -192,7 +193,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1623706127264014633}
-  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 7463129355102976366, guid: c9e74c8442e0058488b02c49d169e58f, type: 3}
 --- !u!23 &5667895376292780098
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -254,7 +255,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 9
   maxLifetimeSeconds: 3.6
-  fallbackImpactVfx: {fileID: 1000010321467122, guid: c108d1bfc37c0494daea3e4e53c3c16e, type: 3}
+  fallbackImpactVfx: {fileID: 693511621494492993, guid: 1ac1fe755599862438aa09679b91452d, type: 3}
   impactSfx: {fileID: 8300000, guid: d6bb1df959326064a8f5fcc97b8e436f, type: 3}
 --- !u!114 &6410789498585402660
 MonoBehaviour:
@@ -283,3 +284,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
+--- !u!114 &4408912442221456574
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1623706127264014633}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40e88d1b0b9e9ba4d921f164da793e49, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  chevron: {fileID: 6034886109391819002, guid: 88ee6181f8c4e0945818773bcc6d887d, type: 3}

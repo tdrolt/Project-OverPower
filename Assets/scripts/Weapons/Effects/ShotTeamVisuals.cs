@@ -1,6 +1,7 @@
 using UnityEngine;
 using Overpower.Combat;
 using Overpower.UI;
+using Overpower.Vision;
 
 namespace Overpower.Weapons
 {
@@ -14,6 +15,8 @@ namespace Overpower.Weapons
     /// ALLOCATION-FREE PER SHOT (every client simulates every projectile, so a nine-player SMG burst is a lot of bullets a second): the trail is a
     /// CHILD BAKED ONTO EACH WEAPON PROJECTILE PREFAB (Trail Child Name, pre-configured with shared settings, emitting off), found once in Awake;
     /// its colour comes from UiTheme.GradientFor, which builds one Gradient per team once and reuses it.
+    /// The core is white-hot (Bullet Tint Strength keeps only a hint of the team); the team colour lives in the trail and in the shot light
+    /// ShotLightPool may put under it.
     /// </summary>
     [DisallowMultipleComponent]
     public class ShotTeamVisuals : MonoBehaviour, IProjectileBehaviour
@@ -35,6 +38,8 @@ namespace Overpower.Weapons
         private Renderer bulletRenderer;
         private MaterialPropertyBlock propertyBlock;
         private TrailRenderer trail;
+        private VisibleWhenSeen gate;
+        private Color lightColour = Color.white;
 
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
@@ -64,9 +69,24 @@ namespace Overpower.Weapons
             }
         }
 
+        /// <summary>The shooter's team colour, for the light under this shot.</summary>
+        public Color LightColour => lightColour;
+
+        /// <summary>The sight gate WeaponFiring attaches right after the spawn; null until then, or when there is no sight at all.</summary>
+        public VisibleWhenSeen Gate
+        {
+            get
+            {
+                if (gate == null)
+                    gate = GetComponent<VisibleWhenSeen>();
+                return gate;
+            }
+        }
+
         /// <summary>Runs before the projectile's first step, so the trail and the core tint are set before anyone sees an untinted frame.</summary>
         public void OnSpawned(ProjectileMotor motor, ProjectileContext context)
         {
+            ShotLightPool.Register(this);
             if (theme == null)
             {
                 if (!warnedMissingTheme)
@@ -77,8 +97,9 @@ namespace Overpower.Weapons
                 return;
             }
 
+            lightColour = theme.ShotColorFor(context.ShooterTeamId);
             ConfigureTrail(context.ShooterTeamId);
-            TintCore(theme.ShotColorFor(context.ShooterTeamId));
+            TintCore(lightColour);
         }
 
         private void ConfigureTrail(int teamId)
@@ -102,6 +123,15 @@ namespace Overpower.Weapons
             trail.emitting = true;
         }
 
+        /// <summary>The core's glow: Flash White pulled toward the team colour by the tint strength, so a low strength reads white-hot. The team
+        /// colour's alpha scales it, so the unknown-team fallback's fainter colour dims the core as well as the trail.</summary>
+        public static Color EmissionFor(Color teamColor, Color white, float tintStrength, float emission)
+        {
+            Color hue = Color.Lerp(white, teamColor, tintStrength);
+            float glow = emission * teamColor.a;
+            return new Color(hue.r * glow, hue.g * glow, hue.b * glow, 1f);
+        }
+
         private void TintCore(Color teamColor)
         {
             if (bulletRenderer == null)
@@ -109,18 +139,10 @@ namespace Overpower.Weapons
 
             bulletRenderer.GetPropertyBlock(propertyBlock);
 
-            Color baseColor = Color.Lerp(bulletRenderer.sharedMaterial.color, teamColor, theme.bulletTintStrength);
+            Color baseColor = Color.Lerp(theme.flashWhiteColor, teamColor, theme.bulletTintStrength);
             propertyBlock.SetColor(BaseColorId, baseColor);
 
-            // teamColor.a scales the glow too, not just the trail's fade: otherwise the unknown-team fallback's lower alpha (meant to read as a faint,
-            // washed-out "not a real team" colour) showed only in its trail, and its emissive CORE came out as bright as a real team's and read as an
-            // extra near-white team.
-            float glow = theme.bulletEmission * teamColor.a;
-            propertyBlock.SetColor(EmissionColorId, new Color(
-                teamColor.r * glow,
-                teamColor.g * glow,
-                teamColor.b * glow,
-                1f));
+            propertyBlock.SetColor(EmissionColorId, EmissionFor(teamColor, theme.flashWhiteColor, theme.bulletTintStrength, theme.bulletEmission));
 
             bulletRenderer.SetPropertyBlock(propertyBlock);
         }
@@ -139,6 +161,7 @@ namespace Overpower.Weapons
         /// the bullet disappears.</summary>
         public void OnExpired(ProjectileMotor motor, ProjectileContext context)
         {
+            ShotLightPool.Unregister(this);
             if (trail == null)
                 return;
 
@@ -148,5 +171,7 @@ namespace Overpower.Weapons
             Destroy(trailObject, theme != null ? theme.trailTime : 0.25f);
             trail = null; // OnExpired only ever runs once per flight; guards a stray double call.
         }
+
+        private void OnDestroy() => ShotLightPool.Unregister(this);
     }
 }

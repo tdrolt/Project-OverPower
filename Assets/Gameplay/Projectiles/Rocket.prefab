@@ -45,7 +45,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 537786092872534407}
-  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  m_Mesh: {fileID: 7463129355102976366, guid: c9e74c8442e0058488b02c49d169e58f, type: 3}
 --- !u!23 &7865796367927346528
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -107,7 +107,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 9
   maxLifetimeSeconds: 5
-  fallbackImpactVfx: {fileID: 1000010321467122, guid: c108d1bfc37c0494daea3e4e53c3c16e, type: 3}
+  fallbackImpactVfx: {fileID: 4862279073090411601, guid: a7fca23a7a826764c95837e203c58949, type: 3}
   impactSfx: {fileID: 8300000, guid: d6bb1df959326064a8f5fcc97b8e436f, type: 3}
 --- !u!114 &7530234440571959590
 MonoBehaviour:

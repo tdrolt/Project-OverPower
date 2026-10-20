@@ -415,6 +415,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8692459025203184426}
   - component: {fileID: 8254476888781021927}
+  - component: {fileID: 3304083304129262986}
   m_Layer: 0
   m_Name: vfx
   m_TagString: Untagged
@@ -449,6 +450,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: be5db73882ac08f459507e8488bab976, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
+--- !u!114 &3304083304129262986
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4521935745214891500}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24cde9b553cad5b4f9edb2a3d07b84ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!1 &6121510889568424097
 GameObject:
   m_ObjectHideFlags: 0

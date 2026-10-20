@@ -101,6 +101,24 @@ namespace Overpower.Arena
         [Tooltip("How far from the caster the flame tongues start, as a fraction of the cone's range, so the flames never hide the player holding the Flamethrower.")]
         [Range(0f, 0.9f)] public float flameTongueStart = 0.15f;
 
+        [Header("Guns")]
+        [Tooltip("How many shots can light up the floor under them at the same time. Only shots you can see get a light, the nearest to your view first; more lights cost frame time in a big SMG fight, 0 turns the shot lights off.")]
+        [Range(0, 8)] public int shotLightCap = 4;
+        [Tooltip("How far, in metres, the light under a shot reaches across the floor and walls around it.")]
+        [Min(0f)] public float shotLightRange = 4f;
+        [Tooltip("How bright the light under a shot is, in the shooter's team colour: high enough to tint the floor under the shot, low enough that it never hides a player standing there.")]
+        [Min(0f)] public float shotLightIntensity = 0.3f;
+        [Tooltip("How many copies of one impact or muzzle flash can be on screen at once. Past this the oldest copy is moved to the newest hit, so a long SMG fight never makes new objects.")]
+        [Min(1)] public int fxPoolCap = 24;
+        [Tooltip("How far, in metres, each impact and muzzle flash is drawn toward your camera from the spot it happened. It stays on the same spot on screen, and a flash on a wall is not half hidden inside the wall; 0 draws it exactly where it happened.")]
+        [Min(0f)] public float fxCameraPull = 1f;
+        [Tooltip("How thick, in metres, the rocket's flat shockwave ring is drawn at the edge of its real blast.")]
+        [Min(0.01f)] public float blastRingWidth = 0.2f;
+        [Tooltip("How high, in metres, the light under a shot hangs over the floor straight below the shot. Low, so its glow lands on the floor under the slug instead of a bright dot off to the side.")]
+        [Min(0.05f)] public float shotLightHeight = 0.5f;
+        [Tooltip("How much brighter than plain Flash White every gun flash is drawn (impacts, the muzzle flash, the ricochet chevron). Above 1 the flash glows past the arena's stripes so a hit stands out; 1 is plain white, and much above 3 the glow swallows the flash's outline into a round blob that hides the player it hit.")]
+        [Min(0f)] public float gunFlashGlow = 2.5f;
+
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]
         [Range(0f, 1f)] public float mechBaseMix = 0.85f;

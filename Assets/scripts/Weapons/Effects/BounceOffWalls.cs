@@ -36,6 +36,9 @@ namespace Overpower.Weapons
 
         private int bounces;
 
+        /// <summary>Bounces so far on this flight, read-only - the ricochet chevron shows one per bounce.</summary>
+        public int Bounces => bounces;
+
         /// A pooled or otherwise reused GameObject must never carry a previous flight's bounce
         /// count into a new one.
         public void OnSpawned(ProjectileMotor motor, ProjectileContext shot)
