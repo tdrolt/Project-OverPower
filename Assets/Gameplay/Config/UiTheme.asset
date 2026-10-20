@@ -85,8 +85,8 @@ MonoBehaviour:
   ultimateNoneText: No ultimate
   statusStunnedText: STUNNED
   statusSlowedText: SLOWED
-  statusStunnedColor: {r: 1, g: 0.86, b: 0.1, a: 1}
-  statusSlowedColor: {r: 0.4, g: 0.7, b: 1, a: 1}
+  statusStunnedColor: {r: 0.2, g: 0.45, b: 1, a: 1}
+  statusSlowedColor: {r: 0.78, g: 0.62, b: 0.4, a: 1}
   statusHudOffsetY: 170
   statusHudBarSize: {x: 220, y: 8}
   statusOverheadTextSize: 15
@@ -908,3 +908,10 @@ MonoBehaviour:
   modeInfoCardTextLineSpacing: 20
   lobbyRoomCloseCrossSize: 21
   lobbyRoomCloseCrossThickness: 3
+  movementSilverColor: {r: 0.66, g: 0.68, b: 0.7, a: 1}
+  fireCoreColor: {r: 1, g: 0.92, b: 0.6, a: 1}
+  fireEdgeColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  dangerColor: {r: 1, g: 0.18, b: 0.15, a: 1}
+  flashWhiteColor: {r: 1, g: 1, b: 1, a: 1}
+  arenaNeutralLineColor: {r: 0.48, g: 0.5, b: 0.54, a: 1}
+  arenaLook: {fileID: 11400000, guid: 746d0f1da4232aa45bb093092c2e0c3b, type: 2}

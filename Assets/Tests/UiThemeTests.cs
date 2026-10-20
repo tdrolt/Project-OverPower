@@ -1,6 +1,8 @@
 using System.Reflection;
 using NUnit.Framework;
+using Overpower.Arena;
 using Overpower.UI;
+using UnityEditor;
 using UnityEngine;
 
 namespace Overpower.Tests
@@ -130,6 +132,31 @@ namespace Overpower.Tests
 
             Assert.AreNotSame(before, after);
             Assert.AreEqual(Color.magenta, after.colorKeys[0].color);
+        }
+
+        [Test]
+        public void TheLookFieldsAreInTheYamlWithATooltip()
+        {
+            string yaml = System.IO.File.ReadAllText("Assets/Gameplay/Config/UiTheme.asset").Replace("\r\n", "\n");
+            foreach (string name in new[] { "statusStunnedColor", "movementSilverColor", "fireCoreColor", "fireEdgeColor", "dangerColor",
+                         "flashWhiteColor", "arenaNeutralLineColor", "arenaLook" })
+            {
+                FieldInfo f = typeof(UiTheme).GetField(name);
+                Assert.NotNull(f, name);
+                var tip = f.GetCustomAttribute<TooltipAttribute>();
+                Assert.NotNull(tip, name + " has no tooltip");
+                Assert.Greater(tip.tooltip.Length, 40, name + " tooltip is not a full sentence");
+                StringAssert.Contains("\n  " + name + ":", yaml, name + " is not in UiTheme.asset");
+            }
+        }
+
+        [Test]
+        public void ThemePointsAtArenaLook()
+        {
+            var real = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            var look = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/Gameplay/Config/ArenaLook.asset");
+            Assert.NotNull(look, "ArenaLook.asset");
+            Assert.AreSame(look, real.arenaLook, "effects find their look through the theme");
         }
     }
 }

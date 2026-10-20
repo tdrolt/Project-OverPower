@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Overpower.Arena;
 using TMPro;
 using UnityEngine;
 
@@ -244,10 +245,12 @@ namespace Overpower.UI
         public string statusStunnedText = "STUNNED";
         [Tooltip("Text shown over a slowed player's head, and on your own HUD when it is you (only while not stunned).")]
         public string statusSlowedText = "SLOWED";
-        [Tooltip("Colour of the STUNNED label and the thin bar shrinking under it.")]
-        public Color statusStunnedColor = new Color(1f, 0.86f, 0.1f, 1f);
-        [Tooltip("Colour of the SLOWED label and the thin bar shrinking under it - a cool blue so it never reads as the stun.")]
-        public Color statusSlowedColor = new Color(0.4f, 0.7f, 1f, 1f);
+        [Tooltip("The electric blue of the Stun Gun and the Sonic Pulse: the stun bolt, the arcs on a stunned player and the pulse bands, " +
+                 "and also the STUNNED label with the thin bar shrinking under it. A deeper blue than the cyan team and the White team's " +
+                 "pale blue shots, and never the gold of the Shield, so a stun is told apart from all of them.")]
+        public Color statusStunnedColor = new Color(0.2f, 0.45f, 1f, 1f);
+        [Tooltip("Colour of the SLOWED label and the thin bar shrinking under it - a sandy tan, the colour of being stuck in the mud, that no team, shot or ability uses, so a slow is never taken for the stun's electric blue.")]
+        public Color statusSlowedColor = new Color(0.78f, 0.62f, 0.4f, 1f);
         [Tooltip("Your own HUD label: how far below the middle of the screen it sits, in canvas units.")]
         public float statusHudOffsetY = 170f;
         [Tooltip("Your own HUD bar: width and height, in canvas units. Sits directly under the label.")]
@@ -2114,5 +2117,21 @@ namespace Overpower.UI
         public float lobbyRoomCloseCrossSize = 21f;
         [Tooltip("Thickness of the lines of that cross, in reference pixels.")]
         public float lobbyRoomCloseCrossThickness = 3f;
+
+        [Header("Look colours (the colour language of abilities and guns)")]
+        [Tooltip("The silver of every movement ability (Dash, Blink, Sprint and the Zip Gun): their streaks, shards, speed-lines and cable. A neutral metallic grey with no blue tint, so a movement effect never reads as the White team's pale blue, any other team colour or the gold Shield.")]
+        public Color movementSilverColor = new Color(0.66f, 0.68f, 0.7f, 1f);
+        [Tooltip("The hot cream-white heart of the Flamethrower: the middle of its flames and its embers. Pale on purpose, so it is never mistaken for the gold of the Shield.")]
+        public Color fireCoreColor = new Color(1f, 0.92f, 0.6f, 1f);
+        [Tooltip("The orange of the Flamethrower's flat fan and the outer tips of its flames.")]
+        public Color fireEdgeColor = new Color(1f, 0.45f, 0.1f, 1f);
+        [Tooltip("The red of the danger ultimates (the AoE Zone and the Raybeam). Red, because green reads as healing.")]
+        public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
+        [Tooltip("The white of a hit or a shot leaving: impact flashes, muzzle flashes and the white-hot core of a bullet.")]
+        public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);
+        [Tooltip("The plain grey of the lines on ground and walls nobody owns. It is a little lighter than the floor and has no glow, so a neutral zone never looks like the White team, whose lines glow.")]
+        public Color arenaNeutralLineColor = new Color(0.48f, 0.5f, 0.54f, 1f);
+        [Tooltip("The asset that holds the arena's world-look numbers and the look of every ability (its shape and what its colour means). Effects find their look through this reference.")]
+        public ArenaLook arenaLook;
     }
 }

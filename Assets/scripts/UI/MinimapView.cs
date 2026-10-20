@@ -689,11 +689,6 @@ namespace Overpower.UI
 
         private int shownKnowledgeVersion = -1;
 
-        /// <summary>The owner this player's team believes a zone has: the known one while the zone switch is off
-        /// (ZoneKnowledge), else the live snapshot's.</summary>
-        private static int OwnerShown(TerritorySnapshot snapshot, int zone) =>
-            ZoneKnowledge.TryGetDisplayed(zone, out ZoneView known) ? known.OwnerTeam : snapshot.OwnerOf(zone);
-
         private void RecolourOwnership()
         {
             TerritorySnapshot snapshot = manager.Current;
@@ -714,12 +709,12 @@ namespace Overpower.UI
                 zone.IsSpawn = manager.IsSpawnZone(zone.Zone);
                 zone.Upright.gameObject.SetActive(zone.Shown && !zone.OutOfPlay && !zone.IsSpawn);
 
-                int owner = OwnerShown(snapshot, zone.Zone);
+                int owner = ZoneOwnerShown.Of(snapshot, zone.Zone);
                 zone.Fill.color = zone.OutOfPlay ? theme.outOfPlayZoneColor
                     : owner >= 0 ? theme.ShotColorFor(owner) : theme.minimapNeutralColor;
             }
             foreach (LinkUi link in links)
-                ApplyLinkStyle(link, MinimapLinkStyle.For(OwnerShown(snapshot, link.A), OwnerShown(snapshot, link.B)));
+                ApplyLinkStyle(link, MinimapLinkStyle.For(ZoneOwnerShown.Of(snapshot, link.A), ZoneOwnerShown.Of(snapshot, link.B)));
         }
 
         /// <summary>The closed part darkened and the wall drawn, painted once per cut into one texture over the baked

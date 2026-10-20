@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 300004ea8b27cea499b38e573ced17b8, type: 3}
+  m_Name: ArenaLook
+  m_EditorClassIdentifier: 
+  abilityLooks:
+  - abilityId: 14
+    shape: 1
+    family: 4
+  - abilityId: 15
+    shape: 2
+    family: 4
+  - abilityId: 16
+    shape: 3
+    family: 4
+  - abilityId: 17
+    shape: 4
+    family: 1
+  - abilityId: 18
+    shape: 5
+    family: 4
+  - abilityId: 19
+    shape: 6
+    family: 1
+  - abilityId: 20
+    shape: 7
+    family: 1
+  - abilityId: 21
+    shape: 8
+    family: 5
+  - abilityId: 22
+    shape: 9
+    family: 3
+  - abilityId: 23
+    shape: 10
+    family: 3
+  - abilityId: 24
+    shape: 11
+    family: 6
+  - abilityId: 25
+    shape: 12
+    family: 2
+  - abilityId: 26
+    shape: 13
+    family: 1
+  - abilityId: 27
+    shape: 14
+    family: 6
+  - abilityId: 28
+    shape: 0
+    family: 0
+  respawnBubbleLook:
+    abilityId: -1
+    shape: 15
+    family: 1
+  hologramRim: 0.8
+  hologramScanDensity: 4
+  hologramScanSpeed: 0.6
+  hologramFlicker: 0.08
+  hologramIntensity: 1
+  shieldSeamFraction: 0.08
+  shieldRiseSeconds: 0.15
+  shieldRiseStagger: 0.35
+  mechBaseMix: 0.5
+  mechGlowStrength: 1.5
