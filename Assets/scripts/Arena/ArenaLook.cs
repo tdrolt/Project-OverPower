@@ -76,6 +76,14 @@ namespace Overpower.Arena
         [Tooltip("How much a hexagon on owned ground glows with the owner's colour in its middle, at its strongest near the zone. Keep it low so a player standing on it stays easy to see.")]
         [Min(0f)] public float ownedFillGlow = 0.2f;
 
+        [Header("Ownership on the floor")]
+        [Tooltip("How far past a zone's capture ring the floor and walls still show its owner, in floor hexagons: 1 paints one ring of tiles outside the circle you capture in, 0 paints only the tiles whose middle is inside it.")]
+        [Min(0f)] public float ownerBandTiles = 1f;
+        [Tooltip("How strongly an owned hexagon fills with the owner's colour at the zone's middle, from 0 (lines only) to 1 (the full Owned Fill Glow).")]
+        [Range(0f, 1f)] public float ownerFillInside = 1f;
+        [Tooltip("How strongly an owned hexagon fills at the outer edge of the painted band, from 0 to 1. The fill fades from the middle's strength down to this, and never grows outward, so the zone reads as a soft pool of its owner's colour.")]
+        [Range(0f, 1f)] public float ownerFillEdge = 0.2f;
+
         [Header("Wall and block circuit stripes")]
         [Tooltip("The colour the floor grid and the circuit stripes glow in away from every zone. A neutral cool white with no blue cast, kept dim, so it never reads as a team's colour.")]
         public Color outsideLineColor = new Color(0.8f, 0.86f, 0.92f, 1f);

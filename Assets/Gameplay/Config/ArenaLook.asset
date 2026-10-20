@@ -99,6 +99,9 @@ MonoBehaviour:
   floorGridGlow: 0.05
   ownedEdgeGlow: 1.2
   ownedFillGlow: 0.2
+  ownerBandTiles: 1
+  ownerFillInside: 1
+  ownerFillEdge: 0.2
   outsideLineColor: {r: 0.8, g: 0.86, b: 0.92, a: 1}
   outsideStripeGlow: 0.35
   stripeGlow: 1.2

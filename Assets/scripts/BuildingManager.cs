@@ -302,6 +302,11 @@ public class BuildingManager : MonoBehaviourPunCallbacks
         return false;
     }
 
+    /// <summary>The zone's live capture radius (BuildingCapture.CaptureRadius: the centre's circle shrinks while a corner is cut).
+    /// 0 while its tower has not registered.</summary>
+    public float CaptureRadiusOf(int zone) =>
+        captures.TryGetValue(zone, out BuildingCapture capture) && capture != null ? capture.CaptureRadius : 0f;
+
     /// <summary>What a long hold of this zone pays in Conquest (its tier's capture bounty and the hold time, as SetCaptured gets them) and the UiTheme
     /// the tower was built with. False while the tower has not registered.</summary>
     public bool TryGetZoneBounty(int zone, out int tierBounty, out float holdSeconds, out Overpower.UI.UiTheme theme)

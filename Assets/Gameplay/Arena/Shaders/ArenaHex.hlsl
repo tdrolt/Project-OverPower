@@ -41,19 +41,21 @@ float2 ArenaCentreOf(float2 axial, float2 origin, float size)
     return origin + size * float2(axial.x + 0.5 * axial.y, 0.5 * ARENA_SQRT3 * axial.y);
 }
 
-// --- Owner tiles (OwnerTileTexel): alpha 0 plain, 64 neutral (unlit lines in the texel colour), 128..255 owned with fill 0..1. ---
+// --- Owner tiles (OwnerTileTexel): alpha 0 plain, 64 neutral (unlit lines in the texel colour), 128..255 owned with fill 0..1;
+// 40 and 104 are neutral and owned for the walls only (a tile whose centre is past the arena's outline): the floor draws those plain. ---
 
 struct ArenaOwner
 {
     float state;   // 0 outside every band, 1 neutral, 2 owned
     float3 colour; // linear
     float fill;
+    bool wallsOnly;
 };
 
 ArenaOwner ArenaOwnerAt(float2 xz)
 {
     ArenaOwner o;
-    o.state = 0; o.colour = 0; o.fill = 0;
+    o.state = 0; o.colour = 0; o.fill = 0; o.wallsOnly = false;
     if (_ArenaOwnerGrid.w < 0.5)
         return o; // never sample unbound tiles (lobby, Edit Mode)
     int2 texel = int2(ArenaTileAt(xz, _ArenaOwnerGrid.xy, _ArenaOwnerGrid.z) - _ArenaOwnerMin.xy);
@@ -66,6 +68,7 @@ ArenaOwner ArenaOwnerAt(float2 xz)
     o.colour = t.rgb;
     o.state = a < 96.0 ? 1 : 2;
     o.fill = saturate((a - 128.0) / 127.0);
+    o.wallsOnly = a < 56.0 || (a >= 96.0 && a < 120.0);
     return o;
 }
 
@@ -161,6 +164,8 @@ void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inou
     float hd = max(abs(p.x), max(abs(0.5 * p.x + 0.8660254 * p.y), abs(-0.5 * p.x + 0.8660254 * p.y)));
     float edges = normalWS.y > 0.5 ? ArenaLineMask(0.5 * size - hd, _ArenaFloorLine.x, aa) : 0;
     ArenaOwner o = ArenaOwnerAt(positionWS.xz);
+    if (o.wallsOnly)
+        o.state = 0;
     if (o.state > 1.5)
         s.emission += o.colour * (edges * _ArenaFloorLine.z + (1.0 - edges) * o.fill * _ArenaFloorLine.w);
     else if (o.state > 0.5)

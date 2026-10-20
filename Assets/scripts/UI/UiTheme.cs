@@ -2111,8 +2111,10 @@ namespace Overpower.UI
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: impact flashes, muzzle flashes and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);
-        [Tooltip("The plain grey of the lines on ground and walls nobody owns. It is a little lighter than the floor and has no glow, so a neutral zone never looks like the White team, whose lines glow.")]
-        public Color arenaNeutralLineColor = new Color(0.48f, 0.5f, 0.54f, 1f);
+        [Tooltip("The light grey of the lines on ground and walls around a zone nobody owns. Bright enough that the zone stands out from the faint grid, but never glowing and clearly dimmer than the White team's lines, so a neutral zone is not mistaken for White ground.")]
+        public Color arenaNeutralLineColor = new Color(0.6f, 0.62f, 0.66f, 1f);
+        [Tooltip("The plain grey of the lines on ground and walls in a zone that is out of play (a closed corner, or a capital nobody plays for). Darker than a neutral zone's lines and never glowing, so it reads as dead ground, but still light enough that the dark walls there keep their stripes and the line along their top.")]
+        public Color arenaOutOfPlayLineColor = new Color(0.45f, 0.45f, 0.47f, 1f);
         [Tooltip("The asset that holds the arena's world-look numbers and the look of every ability (its shape and what its colour means). Effects find their look through this reference.")]
         public ArenaLook arenaLook;
 
