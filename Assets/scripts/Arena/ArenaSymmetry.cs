@@ -191,6 +191,7 @@ namespace Overpower.Arena
                 Debug.LogError($"[Arena] {name}: Source Outline has fewer than two points - blink, portals and the " +
                                 "out-of-arena safety net cannot tell inside from outside.");
             Active = this;
+            ArenaShaderGlobals.SetGridOrigin(new Vector2(centre.x, centre.z));
 
             if (GetComponent<ArenaPhaseTwoCut>() == null)
                 gameObject.AddComponent<ArenaPhaseTwoCut>();

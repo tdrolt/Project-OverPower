@@ -45,17 +45,44 @@ namespace Overpower.Tests
                         if (m == null) { problems.Add($"{Path(renderer.transform)}: material[{i}] is null"); continue; }
                         Shader sh = m.shader;
                         if (sh == null) { problems.Add($"{Path(renderer.transform)}: material[{i}] '{m.name}' has a null shader"); continue; }
-                        if (sh.name == "Hidden/InternalErrorShader")
-                        {
-                            problems.Add($"{Path(renderer.transform)}: material[{i}] '{m.name}' uses the missing-shader placeholder");
-                            continue;
-                        }
-                        if (!sh.name.StartsWith(UrpShaderPrefix))
-                            problems.Add($"{Path(renderer.transform)}: material[{i}] '{m.name}' uses '{sh.name}', not a {UrpShaderPrefix}* shader");
+                        string problem = ShaderProblem(sh);
+                        if (problem != null)
+                            problems.Add($"{Path(renderer.transform)}: material[{i}] '{m.name}' {problem}");
                     }
                 }
                 Assert.IsEmpty(problems, "Active renderer(s) with a missing/null/non-URP shader (would render magenta):\n" + string.Join("\n", problems));
             });
+        }
+
+        [Test]
+        public void UnknownPrefixStillFails()
+        {
+            Assert.IsFalse(NameAllowed("Overpower/Not An Arena Shader"), "an Overpower shader that is not on the list");
+            Assert.IsFalse(NameAllowed("Legacy Shaders/Diffuse"), "a built-in pipeline shader");
+            Assert.IsFalse(NameAllowed("Overpower/Arena Surface (copy)"), "the list is exact names, not prefixes");
+            Assert.IsTrue(NameAllowed("Universal Render Pipeline/Lit"));
+            Assert.IsTrue(NameAllowed("Overpower/Arena Surface"));
+            Shader builtIn = Shader.Find("Unlit/Color");
+            Assert.NotNull(builtIn, "the fixture: Unlit/Color exists");
+            StringAssert.Contains("not a " + UrpShaderPrefix, ShaderProblem(builtIn) ?? "", "a real built-in pipeline shader is reported by name");
+            Assert.IsNull(ShaderProblem(Shader.Find("Universal Render Pipeline/Lit")));
+        }
+
+        /// <summary>Custom shaders an arena renderer may use. Each is hand-written on URP's own includes; a new one is added here by
+        /// name, never by renaming it into the URP prefix.</summary>
+        private static readonly string[] AllowedCustomShaders = { "Overpower/Arena Surface" };
+
+        private static bool NameAllowed(string shaderName) =>
+            shaderName.StartsWith(UrpShaderPrefix) || Array.IndexOf(AllowedCustomShaders, shaderName) >= 0;
+
+        private static string ShaderProblem(Shader sh)
+        {
+            if (sh == null) return "has a null shader";
+            if (sh.name == "Hidden/InternalErrorShader") return "uses the missing-shader placeholder";
+            if (!NameAllowed(sh.name)) return $"uses '{sh.name}', not a {UrpShaderPrefix}* shader or an allowed custom one";
+            if (ShaderUtil.ShaderHasError(sh)) return $"uses '{sh.name}', which has compile errors";
+            if (!sh.isSupported) return $"uses '{sh.name}', which this machine cannot run";
+            return null;
         }
 
         private static string Path(Transform t)

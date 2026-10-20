@@ -77,3 +77,34 @@ MonoBehaviour:
   mechBaseMix: 0.85
   mechGlowStrength: 1.8
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}
+  floorSurface:
+    baseTint: {r: 0.16, g: 0.17, b: 0.19, a: 1}
+    gloss: 0.7
+    sunShine: 0
+  wallSurface:
+    baseTint: {r: 0.12, g: 0.13, b: 0.15, a: 1}
+    gloss: 0.75
+    sunShine: 0.1
+  blockSurface:
+    baseTint: {r: 0.2, g: 0.21, b: 0.24, a: 1}
+    gloss: 0.7
+    sunShine: 0.1
+  barrierSurface:
+    baseTint: {r: 0.86, g: 0.64, b: 0.26, a: 1}
+    gloss: 0.8
+    sunShine: 0.6
+  reflectionStrength: 0.5
+  floorTileSize: 3
+  floorLineWidth: 0.05
+  floorGridGlow: 0.05
+  ownedEdgeGlow: 1.2
+  ownedFillGlow: 0.2
+  outsideLineColor: {r: 0.8, g: 0.86, b: 0.92, a: 1}
+  outsideStripeGlow: 0.35
+  stripeGlow: 1.2
+  circuitCellSize: 1.5
+  stripeWidth: 0.06
+  nodeSize: 0.22
+  topEdgeWidth: 0.08
+  circuitAcrossChance: 0.55
+  circuitUpChance: 0.3

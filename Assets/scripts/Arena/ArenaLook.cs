@@ -52,8 +52,62 @@ namespace Overpower.Arena
         [Tooltip("The material every team's mech is copied from: the model's own maps, with a greyscale glow-line map so the glow can take any team colour. Each team wears its own copy at runtime, so this file is never changed while playing.")]
         public Material mechTemplate;
 
+        [Header("Arena surfaces")]
+        [Tooltip("The floor's paint and shine under its hexagon grid.")]
+        public SurfaceLook floorSurface = new SurfaceLook(new Color(0.16f, 0.17f, 0.19f, 1f), 0.7f, 0f);
+        [Tooltip("The paint and shine of the tall boundary walls under their circuit stripes.")]
+        public SurfaceLook wallSurface = new SurfaceLook(new Color(0.12f, 0.13f, 0.15f, 1f), 0.75f, 0.1f);
+        [Tooltip("The paint and shine of the blocks (houses, crates and other solid cover) under their circuit stripes.")]
+        public SurfaceLook blockSurface = new SurfaceLook(new Color(0.2f, 0.21f, 0.24f, 1f), 0.7f, 0.1f);
+        [Tooltip("The paint and shine of the low barriers. They get no stripes at all, so low cover always reads as cover.")]
+        public SurfaceLook barrierSurface = new SurfaceLook(new Color(0.86f, 0.64f, 0.26f, 1f), 0.8f, 0.6f);
+        [Tooltip("How strongly the glossy arena mirrors the sky: 0 shows no sky in the shine, 1 shows all of it. Lower it if the floor turns pale at a shallow view and players get harder to see.")]
+        [Range(0f, 1f)] public float reflectionStrength = 0.5f;
+
+        [Header("Floor hexagon grid")]
+        [Tooltip("How wide one floor hexagon is across its flat sides, in metres. It is also the size of the tiles that will show who owns the ground.")]
+        [Min(0.5f)] public float floorTileSize = 3f;
+        [Tooltip("How thick the lines between floor hexagons are, in metres.")]
+        [Min(0f)] public float floorLineWidth = 0.05f;
+        [Tooltip("How much the floor's hexagon lines glow away from every zone: 0 shows no grid there, about 0.05 is a faint grid that never competes with a player or a shot. Keep it fainter than a neutral zone's lighter lines, or the zone's band will not stand out.")]
+        [Min(0f)] public float floorGridGlow = 0.05f;
+        [Tooltip("How brightly the hexagon lines glow in the owner's colour on ground a team owns. 1 is the colour at full strength; keep it under about 1.5 so the glow gets only a thin halo.")]
+        [Min(0f)] public float ownedEdgeGlow = 1.2f;
+        [Tooltip("How much a hexagon on owned ground glows with the owner's colour in its middle, at its strongest near the zone. Keep it low so a player standing on it stays easy to see.")]
+        [Min(0f)] public float ownedFillGlow = 0.2f;
+
+        [Header("Wall and block circuit stripes")]
+        [Tooltip("The colour the floor grid and the circuit stripes glow in away from every zone. A neutral cool white with no blue cast, kept dim, so it never reads as a team's colour.")]
+        public Color outsideLineColor = new Color(0.8f, 0.86f, 0.92f, 1f);
+        [Tooltip("How much the circuit stripes on walls and blocks glow away from every zone: 0 turns them off there. Keep it well below the owned glow, because only the brightness tells these lines from ground the White team owns.")]
+        [Min(0f)] public float outsideStripeGlow = 0.35f;
+        [Tooltip("How brightly the circuit stripes glow in the owner's colour on walls and blocks near ground a team owns. Keep it under about 1.5 so the glow gets only a thin halo.")]
+        [Min(0f)] public float stripeGlow = 1.2f;
+        [Tooltip("The size of one square of the circuit pattern on walls and blocks, in metres. Each square holds at most one turn or one node, so smaller squares make a busier pattern.")]
+        [Min(0.25f)] public float circuitCellSize = 1.5f;
+        [Tooltip("How thick the circuit stripes are, in metres.")]
+        [Min(0f)] public float stripeWidth = 0.06f;
+        [Tooltip("How wide the small square nodes where stripes end or meet are, in metres.")]
+        [Min(0f)] public float nodeSize = 0.22f;
+        [Tooltip("How thick the glowing line around the top of every wall and block is, in metres. It is what shows a wall's shape when seen from above.")]
+        [Min(0f)] public float topEdgeWidth = 0.08f;
+        [Tooltip("How often a circuit stripe runs on sideways from one square into the next: 0 never, 1 always. Higher gives long level runs.")]
+        [Range(0f, 1f)] public float circuitAcrossChance = 0.55f;
+        [Tooltip("How often a circuit stripe runs up or down from one square into the next: 0 never, 1 always. Lower than the sideways chance keeps the pattern mostly level.")]
+        [Range(0f, 1f)] public float circuitUpChance = 0.3f;
+
         public IReadOnlyList<AbilityLook> AbilityLooks => abilityLooks;
         public AbilityLook RespawnBubbleLook => respawnBubbleLook;
+
+        private void OnValidate() => ArenaShaderGlobals.Push(this);
+
+        // In a player the asset loads with the first scene that references UiTheme. The Editor pushes the saved asset from
+        // ArenaLookEditorGlobals instead: here every CreateInstance (tests make literal looks) would overwrite the real look.
+        private void OnEnable()
+        {
+            if (!Application.isEditor)
+                ArenaShaderGlobals.Push(this);
+        }
 
         /// <summary>Finds a row by ability Id, never by position.</summary>
         public bool TryGetLook(int abilityId, out AbilityLook look)

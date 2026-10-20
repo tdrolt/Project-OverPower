@@ -37,6 +37,23 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void EveryFieldOfASurfaceLookIsInTheYamlWithATooltip()
+        {
+            string yaml = File.ReadAllText(AssetPath).Replace("\r\n", "\n");
+            FieldInfo[] fields = SerializedFields(typeof(SurfaceLook));
+            Assert.AreEqual(3, fields.Length, "tint, gloss and sun shine");
+            foreach (FieldInfo f in fields)
+            {
+                var tip = f.GetCustomAttribute<TooltipAttribute>();
+                Assert.NotNull(tip, f.Name + " has no tooltip");
+                Assert.Greater(tip.tooltip.Length, 40, f.Name);
+                StringAssert.EndsWith(".", tip.tooltip.TrimEnd(), f.Name + " tooltip does not end like a sentence");
+                foreach (string surface in new[] { "floorSurface", "wallSurface", "blockSurface", "barrierSurface" })
+                    StringAssert.IsMatch("\n  " + surface + ":\n(    .*\n)*?    " + f.Name + ":", yaml, surface + "." + f.Name + " is not in the YAML");
+            }
+        }
+
+        [Test]
         public void EveryFieldOfOneTableEntryIsInTheYamlWithATooltip()
         {
             string yaml = File.ReadAllText(AssetPath).Replace("\r\n", "\n");
