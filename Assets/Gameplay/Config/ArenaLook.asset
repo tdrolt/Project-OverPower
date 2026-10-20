@@ -107,6 +107,41 @@ MonoBehaviour:
   blastRingWidth: 0.2
   shotLightHeight: 0.5
   gunFlashGlow: 2.5
+  dashStreakWidth: 0.5
+  dashStreakHeight: 0.5
+  dashStreakAlpha: 1
+  dashFadeSeconds: 0.25
+  dashChevronCount: 3
+  dashChevronSpacing: 0.7
+  dashChevronSize: 0.6
+  dashChevronWidth: 0.1
+  dashStreakGap: 1.05
+  blinkShardCount: 8
+  blinkShardLength: 0.45
+  blinkShardWidth: 0.2
+  blinkShardReach: 1.5
+  blinkShardHeight: 0.8
+  blinkShardSeconds: 0.35
+  blinkRingRadius: 1.3
+  blinkRingWidth: 0.12
+  blinkRingSnapSeconds: 0.12
+  blinkRingFadeSeconds: 0.3
+  blinkRingSpread: 0.35
+  blinkAlpha: 1
+  zipCable: {fileID: 2100000, guid: 1a6ce82f403382047836db5eb6a16bfb, type: 2}
+  zipCableWidth: 0.24
+  zipChevronSpacing: 0.6
+  zipChevronSpeed: 8
+  sprintLineCount: 3
+  sprintLineLength: 0.75
+  sprintLineWidth: 0.12
+  sprintLineSpread: 0.25
+  sprintLineBehind: 0.6
+  sprintLineTravel: 0.7
+  sprintLineRate: 3
+  sprintLineMinSpeed: 1
+  sprintLineAlpha: 1
+  sprintLineLift: 0.06
   mechBaseMix: 0.85
   mechGlowStrength: 1.8
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}

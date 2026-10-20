@@ -44,15 +44,6 @@ namespace Overpower.Abilities
                  "floor beneath it.")]
         private float maxStepUp = 0.6f;
 
-        [Header("Remote VFX (cosmetic only)")]
-        [SerializeField, Tooltip("Radius in metres of the marker briefly shown at the start and end " +
-                 "point, on every OTHER client's screen only - the caster's own screen already shows " +
-                 "the real teleport. 0 shows nothing.")]
-        private float remoteVfxRadius = 0.4f;
-
-        [SerializeField, Tooltip("Seconds the remote marker stays up before it disappears on its own.")]
-        private float remoteVfxSeconds = 0.3f;
-
         // Not a design tunable (like PlayerDisplacement's blockMask): a designer could mis-set it into a blink through the
         // arena floor. Computed in Awake, not a static initializer: LayerMask.GetMask there crashes on spawn.
         private int blockMask;
@@ -62,9 +53,14 @@ namespace Overpower.Abilities
         // player's hitbox can never quietly disagree with what blink thinks it needs to fit into.
         private CapsuleCollider capsule;
 
+        // Every other client: the shards where the blink left and the ring where it landed, on this prefab (none without the view). The
+        // caster's own screen already shows the real teleport and draws none.
+        private BlinkMarkView marks;
+
         private void Awake()
         {
             blockMask = LayerMask.GetMask("Default", "Building");
+            marks = GetComponent<BlinkMarkView>();
         }
 
         public override void OnEquip()
@@ -146,25 +142,15 @@ namespace Overpower.Abilities
                 return;
             }
 
-            // Vision: an enemy's Blink is seen leaving only if the start is in my team's sight, and arriving only if
-            // the landing is (they can Blink into the fog and be gone). My own team's always show.
-            PlayRemoteVfx(cast.Payload.Origin, cast.CasterTeam);
-            PlayRemoteVfx(cast.Payload.Point, cast.CasterTeam);
-        }
-
-        private void PlayRemoteVfx(Vector3 point, int casterTeam)
-        {
-            if (remoteVfxRadius <= 0f || !TeamSight.ShotShownAt(casterTeam, point))
+            if (marks == null)
                 return;
 
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.name = "Blink VFX (cheap, remote only)";
-            // Removed immediately, not with Destroy (end of frame): for that frame the sphere would be a solid object
-            // in the world. Same trick as DebugPingAbility.
-            DestroyImmediate(marker.GetComponent<Collider>());
-            marker.transform.position = point;
-            marker.transform.localScale = Vector3.one * remoteVfxRadius * 2f;
-            Destroy(marker, remoteVfxSeconds);
+            // Vision: an enemy's Blink is seen leaving only if the start is in my team's sight, and arriving only if
+            // the landing is (they can Blink into the fog and be gone). My own team's always show.
+            if (TeamSight.ShotShownAt(cast.CasterTeam, cast.Payload.Origin))
+                marks.PlayDeparture(cast.Payload.Origin, cast.CasterTeam);
+            if (TeamSight.ShotShownAt(cast.CasterTeam, cast.Payload.Point))
+                marks.PlayArrival(cast.Payload.Point, cast.CasterTeam);
         }
 
         private static float HorizontalDistance(Vector3 a, Vector3 b)

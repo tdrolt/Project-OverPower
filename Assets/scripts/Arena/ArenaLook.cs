@@ -45,7 +45,7 @@ namespace Overpower.Arena
         public Material shieldPlates;
         [Tooltip("The material that adds light, put on the Flamethrower's embers each time it sprays. The stun burst's bright spikes use the same file through their own prefab, so change the file itself to change both. Adding light turns any colour paler over the grey floor, so effects whose colour must read stay on Fx Alpha. It draws whatever colour the effect gives it, so this file is never changed while playing.")]
         public Material fxAdditive;
-        [Tooltip("The see-through material for effects whose colour must read over any floor, put on the Sonic Pulse bands, the arcs on a stunned player and the Flamethrower's flame tongues as they are built. The stun bolt's crackle and its burst use the same file through their own prefabs, so change the file itself to change them all. It draws whatever colour the effect gives it, so this file is never changed while playing.")]
+        [Tooltip("The see-through material for effects whose colour must read over any floor, put on the Sonic Pulse bands, the arcs on a stunned player, the Flamethrower's flame tongues, the Dash streak and chevrons, the Blink shards and ring and the Sprint speed-lines as they are built. The stun bolt's crackle and its burst use the same file through their own prefabs, so change the file itself to change them all. It draws whatever colour the effect gives it, so this file is never changed while playing.")]
         public Material fxAlpha;
 
         [Header("Stun Gun")]
@@ -118,6 +118,84 @@ namespace Overpower.Arena
         [Min(0.05f)] public float shotLightHeight = 0.5f;
         [Tooltip("How much brighter than plain Flash White every gun flash is drawn (impacts, the muzzle flash, the ricochet chevron). Above 1 the flash glows past the arena's stripes so a hit stands out; 1 is plain white, and much above 3 the glow swallows the flash's outline into a round blob that hides the player it hit.")]
         [Min(0f)] public float gunFlashGlow = 2.5f;
+
+        [Header("Dash")]
+        [Tooltip("How wide the Dash's silver streak is at the dasher's end, in metres. It narrows to a sharp point where the dash began.")]
+        [Min(0.01f)] public float dashStreakWidth = 0.5f;
+        [Tooltip("How high above the floor the Dash streak runs, in metres. About hip height, so it reads as the path the body took.")]
+        [Min(0f)] public float dashStreakHeight = 0.5f;
+        [Tooltip("How solid the Dash streak and its floor chevrons are while the dash travels, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float dashStreakAlpha = 1f;
+        [Tooltip("How long the Dash streak and its floor chevrons take to fade once the dash has ended, in seconds.")]
+        [Min(0f)] public float dashFadeSeconds = 0.25f;
+        [Tooltip("How many flat chevrons the Dash leaves on the floor where it began, pointing the way it went. 0 draws only the streak.")]
+        [Range(0, 4)] public int dashChevronCount = 3;
+        [Tooltip("How far apart the Dash's floor chevrons are, in metres. On a dash too short to hold them all they squeeze closer, and a dash stopped short by a wall shows only the chevrons it reached.")]
+        [Min(0f)] public float dashChevronSpacing = 0.7f;
+        [Tooltip("How wide each Dash floor chevron is from wing tip to wing tip, in metres.")]
+        [Min(0.05f)] public float dashChevronSize = 0.6f;
+        [Tooltip("How thick the lines of each Dash floor chevron are, in metres.")]
+        [Min(0.01f)] public float dashChevronWidth = 0.1f;
+        [Tooltip("How far behind the dasher the Dash streak's wide end stops, in metres, so the streak never paints over the dasher's legs.")]
+        [Min(0f)] public float dashStreakGap = 1.05f;
+
+        [Header("Blink")]
+        [Tooltip("How many silver shards burst out where a player blinked away from.")]
+        [Range(3, 16)] public int blinkShardCount = 8;
+        [Tooltip("How long each Blink shard is from its base to its point, in metres.")]
+        [Min(0.01f)] public float blinkShardLength = 0.45f;
+        [Tooltip("How wide each Blink shard is at its base, in metres. It narrows to a sharp point.")]
+        [Min(0.01f)] public float blinkShardWidth = 0.2f;
+        [Tooltip("How far the Blink shards fly out from where the player stood, in metres.")]
+        [Min(0f)] public float blinkShardReach = 1.5f;
+        [Tooltip("How high above the floor the Blink shards burst, in metres: about the middle of the body that vanished.")]
+        [Min(0f)] public float blinkShardHeight = 0.8f;
+        [Tooltip("How long the Blink shards fly and fade, in seconds.")]
+        [Min(0.01f)] public float blinkShardSeconds = 0.35f;
+        [Tooltip("How far the flat hexagon ring reaches out on the floor where a player blinked to, in metres, measured to its corners.")]
+        [Min(0.05f)] public float blinkRingRadius = 1.3f;
+        [Tooltip("How thick the Blink landing ring's line is, in metres.")]
+        [Min(0.01f)] public float blinkRingWidth = 0.12f;
+        [Tooltip("How long the Blink landing ring takes to snap out to its full size, in seconds.")]
+        [Min(0.01f)] public float blinkRingSnapSeconds = 0.12f;
+        [Tooltip("How long the Blink landing ring takes to fade once it has snapped out, in seconds.")]
+        [Min(0f)] public float blinkRingFadeSeconds = 0.3f;
+        [Tooltip("How much wider the Blink landing ring keeps growing while it fades, as a share of its size: 0.35 ends it 35% wider. A ring that keeps moving reads as a landing, not as a lit floor tile; 0 holds it still.")]
+        [Min(0f)] public float blinkRingSpread = 0.35f;
+        [Tooltip("How solid the Blink shards and landing ring are at their strongest, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float blinkAlpha = 1f;
+
+        [Header("Zip Gun")]
+        [Tooltip("The Zip Gun's cable, in flight and during the pull: short silver segments with small chevrons between them that run toward the target. Its colour is put on each cable while playing, so this file is never changed while playing.")]
+        public Material zipCable;
+        [Tooltip("How wide the Zip Gun's cable is drawn, in metres. Its chevrons fill this width; the cable's segments are a thin line along its middle.")]
+        [Min(0.01f)] public float zipCableWidth = 0.24f;
+        [Tooltip("How far apart the chevrons on the Zip Gun's cable are, in metres.")]
+        [Min(0.05f)] public float zipChevronSpacing = 0.6f;
+        [Tooltip("How fast the chevrons run along the Zip Gun's cable toward the target, in metres per second. 0 holds them still.")]
+        [Min(0f)] public float zipChevronSpeed = 8f;
+
+        [Header("Sprint")]
+        [Tooltip("How many silver speed-lines stream behind a sprinting player's feet.")]
+        [Range(1, 6)] public int sprintLineCount = 3;
+        [Tooltip("How long each Sprint speed-line is, in metres.")]
+        [Min(0.05f)] public float sprintLineLength = 0.75f;
+        [Tooltip("How thick each Sprint speed-line is, in metres.")]
+        [Min(0.005f)] public float sprintLineWidth = 0.12f;
+        [Tooltip("How far apart the Sprint speed-lines are side by side, in metres.")]
+        [Min(0f)] public float sprintLineSpread = 0.25f;
+        [Tooltip("How far behind the middle of a sprinting player the speed-lines begin, in metres, so they never cover the player or their feet.")]
+        [Min(0f)] public float sprintLineBehind = 0.6f;
+        [Tooltip("How far back each Sprint speed-line slides before it fades out and starts again, in metres.")]
+        [Min(0f)] public float sprintLineTravel = 0.7f;
+        [Tooltip("How many times a second each Sprint speed-line slides back and starts again: higher reads as faster.")]
+        [Min(0.1f)] public float sprintLineRate = 3f;
+        [Tooltip("How fast a sprinting player must actually move before the speed-lines show, in metres per second, so holding Sprint while standing still draws nothing.")]
+        [Min(0.01f)] public float sprintLineMinSpeed = 1f;
+        [Tooltip("How solid the Sprint speed-lines are at their strongest, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float sprintLineAlpha = 1f;
+        [Tooltip("How high above the floor the Sprint speed-lines run, in metres: just above it, so they read as kicked up by the feet.")]
+        [Min(0f)] public float sprintLineLift = 0.06f;
 
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]

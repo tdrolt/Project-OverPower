@@ -1,5 +1,4 @@
 using UnityEngine;
-using Overpower.Vision;
 using Overpower.Match;
 
 namespace Overpower.Abilities
@@ -8,7 +7,7 @@ namespace Overpower.Abilities
     /// A short burst of movement along the held WASD direction (DashDirectionRule), else toward the cursor. The travel
     /// belongs to PlayerDisplacement: a dash is a Voluntary request to the one shared mover, so it loses to a knockback in
     /// flight and cancels on death like every displacement. This module owns what makes it a DASH: the numbers, the
-    /// damage-reduction buff while travelling and the remote trail. Owner.Displacement is typed IDisplaceable, so DisplaceVoluntary
+    /// damage-reduction buff while travelling and what other screens see of it (DashStreakView). Owner.Displacement is typed IDisplaceable, so DisplaceVoluntary
     /// and Cancel need the cast down to PlayerDisplacement - safe because a dash only ever moves its own caster.
     /// </summary>
     public sealed class DashAbility : AbilityModule
@@ -34,12 +33,6 @@ namespace Overpower.Abilities
         [Min(0)]
         private int chargesNeededAfterRunningDry = 2;
 
-        [Header("Remote trail (cosmetic only)")]
-        [SerializeField, Tooltip("TrailRenderer shown on every OTHER client's screen while this " +
-                 "dash travels, so a fast dash still reads clearly at a distance. The caster's own " +
-                 "screen already shows the real movement and draws no trail of its own.")]
-        private TrailRenderer remoteTrail;
-
         // Not a design tunable: the radius, in metres, inside which the cursor is essentially on the player, so the dash
         // falls back to the aim direction instead of normalizing a near-zero vector. Only used while standing still.
         private const float CursorOnSelfThreshold = 0.1f;
@@ -54,8 +47,9 @@ namespace Overpower.Abilities
         private bool travelling;
         private Vector3 travelStart;
 
-        // Every client: counts down the remote trail so it turns off on its own without a second network message.
-        private float remoteTrailSecondsLeft;
+        // Every other client: the silver streak and floor chevrons on this prefab (none without the view). The caster's own screen
+        // already shows the real movement and draws none.
+        private DashStreakView streak;
 
         protected override int ChargesNeededAfterRunningDry => chargesNeededAfterRunningDry;
 
@@ -65,6 +59,11 @@ namespace Overpower.Abilities
         /// for the rest of the press-buffer window: unlike most refusals, the reason can clear a few frames later (you
         /// turn to face open ground, or the knockback ends) without a fresh key press.</summary>
         internal override bool RetriesRefusalWithinBuffer => true;
+
+        private void Awake()
+        {
+            streak = GetComponent<DashStreakView>();
+        }
 
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
@@ -101,7 +100,7 @@ namespace Overpower.Abilities
             if (cast.IsCasterClient)
                 StartTravel(cast.Payload.Direction);
             else
-                PlayRemoteTrail();
+                PlayRemoteStreak(cast);
         }
 
         public override void Interrupt(InterruptReason reason)
@@ -115,17 +114,6 @@ namespace Overpower.Abilities
                 return;
 
             (Owner.Displacement as PlayerDisplacement)?.Cancel();
-        }
-
-        private void Update()
-        {
-            // Every client, including the caster: the trail switches off on its own, no second network message.
-            if (remoteTrailSecondsLeft <= 0f)
-                return;
-
-            remoteTrailSecondsLeft -= Time.deltaTime;
-            if (remoteTrailSecondsLeft <= 0f && remoteTrail != null)
-                remoteTrail.emitting = false;
         }
 
         private void StartTravel(Vector3 direction)
@@ -160,16 +148,15 @@ namespace Overpower.Abilities
             LogDash(Vector3.Distance(travelStart, end.EndPosition), end.Outcome);
         }
 
-        private void PlayRemoteTrail()
+        private void PlayRemoteStreak(in CastEvent cast)
         {
-            if (remoteTrail == null)
+            if (streak == null)
                 return;
 
-            // Vision: the trail betrays the dasher, so it is shown only while the dasher is (my team's always).
-            VisibleWhenSeen.AttachToCaster(remoteTrail.gameObject, Owner.PhotonView);
-            remoteTrail.Clear();
-            remoteTrail.emitting = true;
-            remoteTrailSecondsLeft = travelSpeed > 0f ? distance / travelSpeed : 0f;
+            // Vision: the streak betrays the dasher, so the view shows it only while the dasher is (my team's always). It fades on its
+            // own after the travel time, no second network message.
+            streak.Play(cast.Payload.Origin, cast.Payload.Direction, distance, travelSpeed > 0f ? distance / travelSpeed : 0f,
+                        Owner.Root.transform, cast.CasterTeam, Owner.PhotonView);
         }
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]

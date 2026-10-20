@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1805406647234984190}
   - component: {fileID: 4249642757679535609}
+  - component: {fileID: 1042128086407342735}
   m_Layer: 0
   m_Name: Blink
   m_TagString: Untagged
@@ -50,5 +51,16 @@ MonoBehaviour:
   searchStep: 0.25
   groundProbeDistance: 2
   maxStepUp: 0.6
-  remoteVfxRadius: 0.4
-  remoteVfxSeconds: 0.3
+--- !u!114 &1042128086407342735
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4109286014405793723}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1765a19d30e7924181faa60472a1b4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}

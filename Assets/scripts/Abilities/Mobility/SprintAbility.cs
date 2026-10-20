@@ -1,4 +1,5 @@
 using UnityEngine;
+using Overpower.Combat;
 using Overpower.Match;
 
 namespace Overpower.Abilities
@@ -9,7 +10,8 @@ namespace Overpower.Abilities
     /// (MaxCharges 0) - self-limiting through heat. Hold and toggle share the SAME active logic in OwnerTick; only the
     /// input deciding "should this be on" differs. Never writes PlayerMotor's speed directly (a direct write caused a
     /// respawn bug, see AddSpeedMultiplier): the keyed multiplier is added and removed here only, so a stale one can never
-    /// survive past the moment this ability stops.
+    /// survive past the moment this ability stops. Every client hears each real start and stop of the sprint as a phase (SprintLinesRule),
+    /// which is what the speed-lines behind a sprinter's feet follow on other screens (SprintLinesView).
     /// </summary>
     public sealed class SprintAbility : AbilityModule
     {
@@ -43,7 +45,40 @@ namespace Overpower.Abilities
         // OwnerTick never runs there - see AbilityRunner.Update's IsMine guard.
         private bool active;
 
+        // Every client: the last start or stop phase heard for this player, so other screens can draw the speed-lines.
+        private bool announced;
+
+        // Every client: the speed-lines behind this player's feet, hung on the player and freed with this module.
+        private SprintLinesView lines;
+
         public override bool IsActive => active;
+
+        /// <summary>The sprint as other screens know it: started by the start phase, stopped by the stop phase, a death, an unequip or a
+        /// respawn.</summary>
+        public bool AnnouncedSprinting => announced;
+
+        /// <summary>Whether this player's screen copy should show as sprinting: the owner's real state on the owner's own screen, what was
+        /// heard everywhere else.</summary>
+        public bool LooksSprinting => SprintLinesRule.Sprinting(Owner != null && Owner.IsMine, active, announced);
+
+        public override void OnEquip()
+        {
+            var capsule = Owner.Root.GetComponent<CapsuleCollider>();
+            float feetBelowRoot = capsule != null
+                ? AbilityVisualGeometry.RootAboveFeet(capsule.center.y, capsule.height, Owner.Root.transform.lossyScale.y)
+                : 0f;
+            lines = SprintLinesView.TryCreate(Owner.Root.transform, this, Owner.PhotonView,
+                                              Owner.Health != null ? Owner.Health.Theme : null, feetBelowRoot);
+        }
+
+        private void OnDestroy()
+        {
+            if (lines == null)
+                return;
+            if (Application.isPlaying) Destroy(lines.gameObject);
+            else DestroyImmediate(lines.gameObject);
+            lines = null;
+        }
 
         public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
         {
@@ -51,22 +86,25 @@ namespace Overpower.Abilities
                 toggledOn = !toggledOn;
 
             // Hold mode needs no state here at all: OwnerTick's own `held` parameter already tracks
-            // the key continuously (AbilityRunner.IsHeld), so "starting" a hold sprint is just this
-            // cast going out for other clients to see, not a flag this class has to remember.
+            // the key continuously (AbilityRunner.IsHeld). Other clients learn of the sprint from
+            // OwnerTick's start phase, not from this cast: the press may start nothing.
             payload = default;
             return true;
         }
 
         public override void ExecuteCast(in CastEvent cast)
         {
-            // Reserved for a future cosmetic hook (a dust trail on phase 0, dust-off on phase 1).
-            // Sprint needs no functional network message at all - the caster's own faster movement
-            // already reaches every other client through PlayerNetSync's ordinary position replication.
+            // Cosmetic only: the speed-lines. Sprint needs no functional network message at all - the caster's own faster
+            // movement already reaches every other client through PlayerNetSync's ordinary position replication.
+            announced = SprintLinesRule.AnnouncedAfter(announced, cast.Phase);
         }
 
         public override void OwnerTick(float deltaTime, bool held, bool canAct)
         {
             bool wantsActive = (toggleMode ? toggledOn : held) && canAct;
+
+            if (SprintLinesRule.StartsNow(active, wantsActive))
+                SendPhase(SprintLinesRule.StartedPhase, default);
 
             if (wantsActive)
             {
@@ -87,6 +125,8 @@ namespace Overpower.Abilities
 
         public override void Interrupt(InterruptReason reason)
         {
+            announced = false;
+
             if (reason == InterruptReason.Silenced)
             {
                 // A toggled sprint must not resume by surprise the instant heat decays back down. Hold mode needs
@@ -106,13 +146,14 @@ namespace Overpower.Abilities
         public override void OnRespawned()
         {
             toggledOn = false;
+            announced = false;
         }
 
         private void StopSprinting()
         {
             Owner.Motor?.RemoveSpeedMultiplier(this);
             active = false;
-            SendPhase(1, default); // No-ops on every machine but the owner's - see SendPhase's own comment.
+            SendPhase(SprintLinesRule.StoppedPhase, default); // No-ops on every machine but the owner's - see SendPhase's own comment.
         }
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]

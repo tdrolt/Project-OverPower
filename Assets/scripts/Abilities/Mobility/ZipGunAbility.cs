@@ -1,7 +1,9 @@
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Weapons;
 using Overpower.Match;
+using Overpower.UI;
 using Overpower.Vision;
 
 namespace Overpower.Abilities
@@ -61,15 +63,9 @@ namespace Overpower.Abilities
         private float tetherMarkerSeconds = 0.3f;
 
         [SerializeField, Tooltip("Material of the square anchor - Assets/Gameplay/Abilities/Ability Visual Solid.mat. " +
-                 "Its colour is the hook colour on the projectile prefab (Zip Bolt View).")]
+                 "Its colour is the Zip Gun's row in the look table (silver), like the harpoon and its cable; the cable's own " +
+                 "look is in UiTheme's Arena Look.")]
         private Material anchorMaterial;
-
-        [SerializeField, Tooltip("Material of the rope from you to the anchor during the pull - " +
-                 "Assets/Gameplay/UI/AimConeLine.mat.")]
-        private Material ropeMaterial;
-
-        [SerializeField, Tooltip("Rope thickness, in metres.")]
-        private float ropeWidth = 0.05f;
 
         // Owner only: the player's capsule, so the pull stops a radius short of the impact point instead of driving the
         // player's centre into whatever it hit.
@@ -79,13 +75,16 @@ namespace Overpower.Abilities
         // someone else's Forced move (PlayerDisplacement's priority rules; same as DashAbility).
         private bool pulling;
 
-        // Every client: the pull rope, built once and reused. Unparented, like the flamethrower's cone, because this
+        // Every client: the pull cable, built once and reused. Unparented, like the flamethrower's cone, because this
         // module sits under the player, whose hierarchy changes layer on death.
         private LineRenderer pullRope;
         private Vector3 tetherPoint;
         private float ropeUntil;
         private int ropeTeam = -1;
+        private Color ropeColour = Color.white;
+        private ArenaLook cableLook;
         private MaterialPropertyBlock anchorBlock;
+        private MaterialPropertyBlock ropeBlock;
 
         public override bool IsActive => pulling;
 
@@ -250,7 +249,7 @@ namespace Overpower.Abilities
             toPoint.y = 0f;
             float travel = Mathf.Max(0f, toPoint.magnitude - (capsule != null ? capsule.radius : 0f));
             float seconds = Mathf.Max(tetherMarkerSeconds, AbilityVisualGeometry.PullSeconds(travel, pullSpeed));
-            Color color = HookColor();
+            Color color = CableColour(casterTeam);
 
             if (tetherMarkerRadius > 0f)
             {
@@ -272,11 +271,11 @@ namespace Overpower.Abilities
                 Destroy(anchor, seconds);
             }
 
-            if (ropeMaterial == null)
-                return;
             if (pullRope == null)
                 pullRope = BuildRope();
-            VisualTint.SetLineColor(pullRope, color);
+            if (pullRope == null)
+                return;
+            ropeColour = color;
             tetherPoint = point;
             ropeTeam = casterTeam;
             ropeUntil = Time.time + seconds;
@@ -284,25 +283,23 @@ namespace Overpower.Abilities
             UpdateRope();
         }
 
-        private Color HookColor()
+        /// <summary>The Zip Gun's row in the look table, so the anchor and the pull cable match the harpoon and its cable in flight.</summary>
+        private Color CableColour(int team)
         {
-            ZipBoltView view = projectilePrefab != null ? projectilePrefab.GetComponent<ZipBoltView>() : null;
-            return view != null ? view.HookColor : Color.white;
+            UiTheme theme = Owner != null && Owner.Health != null ? Owner.Health.Theme : null;
+            return theme != null ? LookColours.ForAbility(theme, Definition.Id, team, LookFamily.Silver) : Color.white;
         }
 
         private LineRenderer BuildRope()
         {
+            cableLook = Owner != null && Owner.Health != null && Owner.Health.Theme != null ? Owner.Health.Theme.arenaLook : null;
+            if (cableLook == null || cableLook.zipCable == null)
+                return null;
             var go = new GameObject("Zip Rope VFX (cheap, cosmetic only)");
             var line = go.AddComponent<LineRenderer>();
-            line.sharedMaterial = ropeMaterial;
+            ZipCableLook.Configure(line, cableLook);
             line.useWorldSpace = true;
             line.positionCount = 2;
-            line.startWidth = ropeWidth;
-            line.endWidth = ropeWidth;
-            line.numCapVertices = 0;
-            line.numCornerVertices = 0;
-            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            line.receiveShadows = false;
             line.enabled = false;
             return line;
         }
@@ -324,6 +321,9 @@ namespace Overpower.Abilities
             Vector3 start = Owner.Weapon != null ? Owner.Weapon.MuzzlePosition : Owner.Root.transform.position;
             pullRope.SetPosition(0, start);
             pullRope.SetPosition(1, tetherPoint);
+            if (ropeBlock == null)
+                ropeBlock = new MaterialPropertyBlock();
+            ZipCableLook.Paint(pullRope, ropeBlock, ropeColour, ZipCableLook.Scroll(Time.time, cableLook.zipChevronSpeed, cableLook.zipChevronSpacing));
             // D2: an enemy's pull rope is drawn only while the line crosses my team's sight, checked every frame it is
             // drawn (own team's always).
             pullRope.enabled = TeamSight.ShotShownAlong(ropeTeam, start, tetherPoint);

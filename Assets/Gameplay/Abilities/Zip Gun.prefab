@@ -54,5 +54,3 @@ MonoBehaviour:
   tetherMarkerRadius: 0.35
   tetherMarkerSeconds: 0.3
   anchorMaterial: {fileID: 2100000, guid: 0fce28b9fb8854e43ad9452f200ea99b, type: 2}
-  ropeMaterial: {fileID: 2100000, guid: ad2e00cea264ef94fa08363867d004e5, type: 2}
-  ropeWidth: 0.05

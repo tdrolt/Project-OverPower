@@ -2096,8 +2096,8 @@ namespace Overpower.UI
         public float lobbyRoomCloseCrossThickness = 3f;
 
         [Header("Look colours (the colour language of abilities and guns)")]
-        [Tooltip("The silver of every movement ability (Dash, Blink, Sprint and the Zip Gun): their streaks, shards, speed-lines and cable. A neutral metallic grey with no blue tint, so a movement effect never reads as the White team's pale blue, any other team colour or the gold Shield.")]
-        public Color movementSilverColor = new Color(0.66f, 0.68f, 0.7f, 1f);
+        [Tooltip("The silver of every movement ability (Dash, Blink, Sprint and the Zip Gun): their streaks, shards, speed-lines and cable. A neutral metallic grey with no blue tint, so a movement effect never reads as the White team's pale blue, any other team colour or the gold Shield. Kept clearly brighter than the neutral zone lines, so an effect never sinks into the floor grid, and clearly darker than the White team's near-white.")]
+        public Color movementSilverColor = new Color(0.76f, 0.77f, 0.78f, 1f);
         [Tooltip("The hot cream-white heart of the Flamethrower: the middle of its flames and its embers. Pale on purpose, so it is never mistaken for the gold of the Shield.")]
         public Color fireCoreColor = new Color(1f, 0.92f, 0.6f, 1f);
         [Tooltip("The orange of the Flamethrower's flat fan and the outer tips of its flames.")]
