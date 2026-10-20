@@ -197,6 +197,48 @@ namespace Overpower.Arena
         [Tooltip("How high above the floor the Sprint speed-lines run, in metres: just above it, so they read as kicked up by the feet.")]
         [Min(0f)] public float sprintLineLift = 0.06f;
 
+        [Header("Portal")]
+        [Tooltip("How thick the portal's hexagon frame on the floor is, in metres. Its corners sit on the portal's real edge, where a player can still use it.")]
+        [Min(0.01f)] public float portalFrameWidth = 0.14f;
+        [Tooltip("How big the turning hexagon inside a portal is, as a share of the portal's size: 0.5 is half as wide as the frame.")]
+        [Range(0.1f, 0.95f)] public float portalInnerScale = 0.55f;
+        [Tooltip("How thick the turning hexagon inside a portal is, in metres.")]
+        [Min(0.01f)] public float portalInnerWidth = 0.07f;
+        [Tooltip("How fast the hexagon inside a portal turns, in degrees each second. Slow, so it reads as a live gate without pulling the eye.")]
+        public float portalInnerTurnSpeed = 20f;
+
+        [Header("Mines")]
+        [Tooltip("How brightly the light on a mine's cap glows in its team colour while it is on: 1 is the plain team colour, more makes it bloom.")]
+        [Min(0f)] public float mineCapGlow = 1.5f;
+        [Tooltip("Seconds from one blink of a mine's light to the next. Every player sees the same mine blink at the same moment. 0 keeps the light on steadily.")]
+        [Min(0f)] public float mineBlinkPeriod = 1f;
+        [Tooltip("How many seconds each blink of a mine's light lasts.")]
+        [Min(0f)] public float mineBlinkOnSeconds = 0.2f;
+        [Tooltip("How bright a mine's light stays between blinks, as a share of the blink: 0 goes dark, 1 never blinks.")]
+        [Range(0f, 1f)] public float mineCapDim = 0.3f;
+
+        [Header("Cover")]
+        [Tooltip("How thick the glowing team-colour band along every edge of a placed cover wall is, in metres. It is what tells you whose cover it is.")]
+        [Min(0f)] public float coverEdgeWidth = 0.08f;
+        [Tooltip("How brightly the edges of a placed cover wall glow in its owner's colour: 1 is the plain team colour, more makes it bloom.")]
+        [Min(0f)] public float coverEdgeGlow = 1.2f;
+
+        [Header("Electric Fence")]
+        [Tooltip("How many times a second the electric arcs between an Electric Fence's pylons jump into a new shape. Every player sees the same shape at the same moment.")]
+        [Min(1f)] public float fenceArcRate = 15f;
+        [Tooltip("How many kinks each electric arc has between two neighbouring pylons: more reads as a more jagged spark.")]
+        [Range(2, 10)] public int fenceArcPointsPerGap = 5;
+        [Tooltip("How far an electric arc between pylons jumps in, out, up and down, in metres.")]
+        [Min(0f)] public float fenceArcJitter = 0.15f;
+        [Tooltip("How thick each electric arc between the fence's pylons is, in metres.")]
+        [Min(0.005f)] public float fenceArcWidth = 0.06f;
+        [Tooltip("How brightly the fence's arcs glow in its owner's colour: 1 is the plain team colour, more makes them bloom.")]
+        [Min(0f)] public float fenceArcGlow = 1.2f;
+        [Tooltip("How much of the owner's colour an Electric Fence pylon's body takes: 0 is black, 1 the full team colour. Darker than the arcs, so the arcs carry the glow.")]
+        [Range(0f, 1f)] public float fencePylonShade = 0.45f;
+        [Tooltip("How much a fence pylon glows in its owner's colour on top of its body: 0 not at all, 1 as bright as the team colour.")]
+        [Min(0f)] public float fencePylonGlow = 0.35f;
+
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]
         [Range(0f, 1f)] public float mechBaseMix = 0.85f;

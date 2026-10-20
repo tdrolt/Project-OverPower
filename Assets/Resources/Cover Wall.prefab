@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4048214961365084118}
   - component: {fileID: 7764158070035951280}
   - component: {fileID: 2967576308502993098}
+  - component: {fileID: 343515303879020291}
   m_Layer: 3
   m_Name: Cover Wall
   m_TagString: Untagged
@@ -95,6 +96,21 @@ MonoBehaviour:
   height: 2
   thickness: 0.4
   hitPoints: 100
+--- !u!114 &343515303879020291
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 308846974893480960}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3783d9731e99b044ab5e08c4120b0da, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
+  abilityId: 20
+  panel: {fileID: 7643208458276804886}
 --- !u!1 &1558340835324552849
 GameObject:
   m_ObjectHideFlags: 0
@@ -159,7 +175,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 0ddd8131a35b6b94aa03ab4a047f0576, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

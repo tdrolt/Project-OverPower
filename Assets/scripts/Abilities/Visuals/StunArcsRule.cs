@@ -41,7 +41,7 @@ namespace Overpower.Abilities
             return p;
         }
 
-        private static float Hash01(int seed, int a, int b)
+        internal static float Hash01(int seed, int a, int b)
         {
             unchecked
             {

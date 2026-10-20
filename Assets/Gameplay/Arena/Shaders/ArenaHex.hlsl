@@ -15,6 +15,8 @@ float  _ArenaLookReady;        // 0 until ArenaLook was pushed: draw the materia
 float4 _ArenaOwnerGrid;        // origin x, origin z, tile size, 1 while owner tiles are bound
 float4 _ArenaOwnerMin;         // lowest q, lowest r, texture width, texture height
 TEXTURE2D(_ArenaOwnerTex);
+// Never set as a global: only a placed cover wall's property block fills it (CoverPanelLook), so the static arena reads 0 and draws as before.
+float4 _ArenaPanelEdge;        // linear owner colour x glow, band width m (0 = no band)
 
 #define ARENA_SQRT3 1.7320508
 
@@ -177,8 +179,12 @@ void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inou
     float2 along = float2(normalWS.z, -normalWS.x);
     along *= rsqrt(max(dot(along, along), 1e-6));
     float circuit = ArenaCircuit(float2(dot(positionWS.xz, along), positionWS.y), aa);
-    float top = ArenaLineMask(ArenaFaceEdgeMetres(uv, positionWS), 2.0 * _ArenaStripe.w, aa); // a band from the edge inward
+    float edgeMetres = ArenaFaceEdgeMetres(uv, positionWS); // screen derivatives: taken outside any branch
+    float top = ArenaLineMask(edgeMetres, 2.0 * _ArenaStripe.w, aa); // a band from the edge inward
     float stripe = normalWS.y > 0.5 ? top : (normalWS.y < -0.5 ? 0 : circuit);
+    float panelEdge = ArenaLineMask(edgeMetres, 2.0 * _ArenaPanelEdge.w, aa); // 0 at width 0
+    stripe *= 1.0 - panelEdge;
+    s.emission += _ArenaPanelEdge.rgb * panelEdge;
     ArenaOwner o = ArenaOwnerAt(positionWS.xz);
     if (o.state > 1.5)
         s.emission += o.colour * (stripe * _ArenaStripeGlow.y);
