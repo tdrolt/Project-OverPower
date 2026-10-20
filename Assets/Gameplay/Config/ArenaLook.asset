@@ -142,6 +142,23 @@ MonoBehaviour:
   sprintLineMinSpeed: 1
   sprintLineAlpha: 1
   sprintLineLift: 0.06
+  portalFrameWidth: 0.14
+  portalInnerScale: 0.55
+  portalInnerWidth: 0.07
+  portalInnerTurnSpeed: 20
+  mineCapGlow: 1.5
+  mineBlinkPeriod: 1
+  mineBlinkOnSeconds: 0.2
+  mineCapDim: 0.3
+  coverEdgeWidth: 0.08
+  coverEdgeGlow: 1.2
+  fenceArcRate: 15
+  fenceArcPointsPerGap: 5
+  fenceArcJitter: 0.15
+  fenceArcWidth: 0.06
+  fenceArcGlow: 1.2
+  fencePylonShade: 0.15
+  fencePylonGlow: 0.2
   mechBaseMix: 0.85
   mechGlowStrength: 1.8
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}

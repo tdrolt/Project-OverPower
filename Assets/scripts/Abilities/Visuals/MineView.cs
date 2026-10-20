@@ -1,3 +1,4 @@
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Net;
 using Overpower.UI;
@@ -7,31 +8,29 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// What a mine looks like: a small dark puck with four stubby spikes and a stud in the owner's team colour, lying on the
-    /// floor - squat, dark and small, where a portal is wide, light and see-through; the colour reads on the MIDDLE of a
-    /// mine, never a rim (A8, the opposite of PortalView). The owner's own team also sees a thin ring at the real Trigger
-    /// Radius; enemies don't. When the mine goes off, every client flashes a BlastMarker at the real Explosion Radius.
-    /// Once Mine.InvisibleAfterSeconds has passed an enemy sees nothing and the owner's team sees a faded Ghost
-    /// (A5); MineVisibilityRule decides which from Mine.SecondsSincePlaced (Age, network-agreed, so every client switches at
-    /// the true placement moment with no timestamp or RPC of this view's own). Hiding toggles each part's Renderer.enabled,
-    /// not the Visual root's GameObject, so it never collides with LateUpdate's detonation check (Mine.Detonated).
-    /// Visual only. Sizes come from Mine; the detonation is noticed without touching its code: Mine hides its own Visual
-    /// on every client the instant it goes off.
+    /// A mine: a dark hex puck on the floor with a light on its cap blinking in the Mines row of the look table (the owner's team
+    /// colour), counted from Mine.SecondsSincePlaced so every client blinks together; the colour reads on the middle, never a rim
+    /// (A8). The owner's team also sees a ring at the real Trigger Radius. After Mine.InvisibleAfterSeconds MineVisibilityRule hides
+    /// it from enemies and shows the owner's team a faded Ghost (A5) by Renderer.enabled, never the Visual's GameObject, which Mine
+    /// itself hides when it goes off (Mine.Detonated); every client then flashes a BlastMarker at the real Explosion Radius.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class MineView : MonoBehaviour, IDeployableView
     {
-        [SerializeField, Tooltip("Team colours - Assets/Gameplay/Config/UiTheme.asset (Shot Color For), the same " +
-                 "colours as each team's shots.")]
+        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/Gameplay/Config/UiTheme.asset.")]
         private UiTheme theme;
 
-        [SerializeField, Tooltip("The dark parts: the puck and its spikes.")]
+        [SerializeField, Tooltip("Which row of the Arena Look table colours this mine: the Mines ability's id.")]
+        private int abilityId = 19;
+
+        [SerializeField, Tooltip("The dark parts: the puck.")]
         private Renderer[] bodyParts;
 
         [SerializeField, Tooltip("Colour of the dark parts. Dark so a mine never reads as a portal.")]
         private Color bodyColor = new Color(0.1f, 0.1f, 0.12f, 1f);
 
-        [SerializeField, Tooltip("The parts drawn in the owner's team colour: the stud on top.")]
+        [SerializeField, Tooltip("The parts drawn in the owner's team colour: the blinking light on the cap. They hide from " +
+                 "enemies with the puck.")]
         private Renderer[] teamParts;
 
         [SerializeField, Tooltip("Flat ring at the mine's Trigger Radius, shown only to the owner's own team.")]
@@ -51,13 +50,12 @@ namespace Overpower.Abilities
         private Transform visualRoot;
 
         [Header("Ghost (A5 - the owner's own team, once otherwise invisible)")]
-        [SerializeField, Tooltip("The see-through material (Assets/Gameplay/Abilities/Ability Visual Glass.mat) body " +
-                 "and stud switch to for the owner's own team once the mine is a Ghost - the body/stud otherwise " +
-                 "render with the opaque Solid material, whose alpha channel has no visible effect at all. Left " +
-                 "empty just dims the Ghost instead of making it translucent.")]
+        [SerializeField, Tooltip("The see-through material (Assets/Gameplay/Abilities/Ability Visual Glass.mat) the puck " +
+                 "switches to for the owner's own team once the mine is a Ghost; the puck's own material is opaque, so its " +
+                 "alpha alone shows nothing. Left empty just dims the Ghost instead of making it translucent.")]
         private Material ghostMaterial;
 
-        [SerializeField, Range(0f, 1f), Tooltip("Alpha of the body and stud once this mine is a Ghost. The trigger " +
+        [SerializeField, Range(0f, 1f), Tooltip("Alpha of the puck once this mine is a Ghost. The trigger " +
                  "ring is unaffected - it stays at its own Trigger Ring Opacity, so a teammate can still read the " +
                  "exact radius even once the puck itself has faded.")]
         private float ghostAlpha = 0.35f;
@@ -67,6 +65,9 @@ namespace Overpower.Abilities
         private bool blastShown;
         private MineVisibility lastVisibility = MineVisibility.Visible;
         private bool visibilityApplied;
+        private float paintedLight = -1f;
+        private MaterialPropertyBlock block;
+        private static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         public void OnDeployablePlaced(NetworkedDeployable deployable)
         {
@@ -74,8 +75,8 @@ namespace Overpower.Abilities
             if (mine == null)
                 return;
 
-            teamColor = theme != null ? theme.ShotColorFor(deployable.OwnerTeam) : Color.white;
-            var block = new MaterialPropertyBlock();
+            teamColor = theme != null ? LookColours.ForAbility(theme, abilityId, deployable.OwnerTeam, LookFamily.Team) : Color.white;
+            block ??= new MaterialPropertyBlock();
             foreach (Renderer part in bodyParts)
                 VisualTint.SetMeshColor(part, block, bodyColor);
             foreach (Renderer part in teamParts)
@@ -113,6 +114,29 @@ namespace Overpower.Abilities
             }
 
             UpdateVisibility();
+            PaintCap(mine.SecondsSincePlaced);
+        }
+
+        /// <summary>Colours the cap's light for this moment of its blink: the team colour and a glow.</summary>
+        public void PaintCap(float secondsSincePlaced)
+        {
+            ArenaLook look = theme != null ? theme.arenaLook : null;
+            float light = look != null ? MinePuckLook.CapLight(secondsSincePlaced, look.mineBlinkPeriod, look.mineBlinkOnSeconds, look.mineCapDim) : 1f;
+            if (light == paintedLight)
+                return;
+            paintedLight = light;
+            float glow = look != null ? look.mineCapGlow : 0f;
+            Color lit = MinePuckLook.CapColour(teamColor, light);
+            block ??= new MaterialPropertyBlock();
+            foreach (Renderer part in teamParts)
+            {
+                if (part == null)
+                    continue;
+                part.GetPropertyBlock(block);
+                block.SetColor(EmissionId, lit * glow);
+                part.SetPropertyBlock(block);
+                VisualTint.SetMeshColor(part, block, lit);
+            }
         }
 
         /// <summary>Switches this mine's look between Visible/Ghost/Hidden and keeps the trigger ring's enabled state in
@@ -131,19 +155,27 @@ namespace Overpower.Abilities
 
             MineVisibility visibility = MineVisibilityRule.For(LocalTeam(), mine.OwnerTeam, mine.SecondsSincePlaced, mine.InvisibleAfterSeconds);
             if (visibilityApplied && visibility == lastVisibility)
-                return; // Only the body/stud recolour below is worth gating - Visible can become Ghost or Hidden but never the reverse.
-
-            lastVisibility = visibility;
-            visibilityApplied = true;
-
-            var block = new MaterialPropertyBlock();
-            foreach (Renderer part in bodyParts)
-                ApplyVisibility(part, bodyColor, visibility, block);
-            foreach (Renderer part in teamParts)
-                ApplyVisibility(part, teamColor, visibility, block);
+                return; // Only the recolour below is worth gating - Visible can become Ghost or Hidden but never the reverse.
+            ShowAs(visibility);
         }
 
-        private void ApplyVisibility(Renderer part, Color baseColor, MineVisibility visibility, MaterialPropertyBlock block)
+        /// <summary>Puts every part into one of the mine's looks: Visible, a faded Ghost puck, or Hidden.</summary>
+        public void ShowAs(MineVisibility visibility)
+        {
+            lastVisibility = visibility;
+            visibilityApplied = true;
+            paintedLight = -1f; // the recolour below resets the cap to the plain team colour: paint its light again
+
+            block ??= new MaterialPropertyBlock();
+            foreach (Renderer part in bodyParts)
+                ApplyVisibility(part, bodyColor, visibility, fades: true);
+            foreach (Renderer part in teamParts)
+                ApplyVisibility(part, teamColor, visibility, fades: false);
+        }
+
+        /// <summary>A Ghost fades only the puck: the cap stays on its own material, the one that can glow, so the owner's team
+        /// still sees the light blink (the glass has no glow).</summary>
+        private void ApplyVisibility(Renderer part, Color baseColor, MineVisibility visibility, bool fades)
         {
             if (part == null)
                 return;
@@ -152,7 +184,7 @@ namespace Overpower.Abilities
             if (!part.enabled)
                 return; // Hidden: nothing else to set - the enemy sees nothing at all.
 
-            if (visibility == MineVisibility.Ghost)
+            if (visibility == MineVisibility.Ghost && fades)
             {
                 if (ghostMaterial != null)
                     part.sharedMaterial = ghostMaterial;
