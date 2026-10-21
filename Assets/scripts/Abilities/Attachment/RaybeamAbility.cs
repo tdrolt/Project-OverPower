@@ -20,7 +20,7 @@ namespace Overpower.Abilities
     /// field here: one beam is the per-beam magnitude, two or three reach the cap.
     /// Ultimate slot: readiness comes entirely from Owner.UltimateCharge (IsReady/TryBuildCast, like the other ultimates),
     /// not the base class's 1-charge/0 s pool, which recovers instantly and so never gates anything.
-    /// beamWidth is the ONE home for the hit diameter (SphereCast radius) and the drawn diameter (DrawBeam), so what a
+    /// beamWidth is the ONE home for the hit diameter (SphereCast radius) and the drawn diameter (ShowBeam), so what a
     /// player sees is what hits them; beamOriginSpacing must leave a visible gap between beam edges.
     /// RUNS ON EVERY CLIENT, once per cast; STATUS IS VICTIM-SIDE like Hitscan: every client resolves the same three rays
     /// from the synced Origin/Direction/Point and calls IStatusReceiver.ApplyStatus, and the receiver's IsMine guard
@@ -57,9 +57,7 @@ namespace Overpower.Abilities
         private float beamRange = 28.8f;
 
         [SerializeField, Tooltip("Diameter of each beam, in metres - BOTH what it hits (the SphereCast radius below) AND what you see " +
-                 "(DrawBeam sets the drawn line's width from this same number, on the instantiated clone only - never " +
-                 "on the shared Laser Beam VFX prefab, which the two laser weapons also use). One number, one home: " +
-                 "the drawn line used to be a flat 0.08m regardless of this value.")]
+                 "(the red sheath of each drawn beam is exactly this wide, its white core a share of it). One number, one home.")]
         private float beamWidth = 0.6825f;
 
         [SerializeField, Tooltip("How far downrange, in metres, the two OUTER beams are aimed to cross the centre beam's line - a " +
@@ -79,20 +77,25 @@ namespace Overpower.Abilities
         private LayerMask hitMask = ~0;
 
         [Header("Visuals")]
-        [SerializeField, Tooltip("The visible beam. A prefab with a Line Renderer on it - its two " +
-                 "points are set to run from that beam's own origin to wherever it ended. Leave " +
-                 "empty for invisible beams (useful while first wiring the ability up).")]
+        [SerializeField, Tooltip("The visible beam, drawn once per beam from that beam's own origin to wherever it ended, " +
+                 "exactly Beam Width wide: Raybeam Beam (a red sheath with a white-hot core). Any other prefab with a Line Renderer " +
+                 "draws as a plain line. Leave empty for invisible beams (useful while first wiring the ability up).")]
         private GameObject beamVfx;
 
         [SerializeField, Tooltip("Seconds each beam line stays on screen. Purely visual - the status " +
                  "application already happened the instant the cast was received.")]
         private float beamVisualSeconds = 0.15f;
 
+        [SerializeField, Tooltip("The scorch that flashes where a beam stops on a wall or a placed cover. Shown where your team " +
+                 "can see that spot, like a gun's impact. Leave empty for no scorch.")]
+        private GameObject scorchVfx;
+
         // Not a tuning value, matching Hitscan's MaxContacts: nine players with a couple of colliders each plus the
         // walls along a beam fit comfortably.
         private const int MaxContacts = 32;
         private readonly RaycastHit[] hitBuffer = new RaycastHit[MaxContacts];
         private readonly List<BeamContact> contactBuffer = new List<BeamContact>(MaxContacts);
+        private readonly List<Vector3> normalBuffer = new List<Vector3>(MaxContacts); // alongside contactBuffer: where a scorch faces
 
         // Vulnerability's magnitude and duration never change per cast, so the spec is built once
         // rather than re-boxed every ExecuteCast.
@@ -205,6 +208,7 @@ namespace Overpower.Abilities
                                                    beamRange, BuildMask(), QueryTriggerInteraction.Ignore);
 
             contactBuffer.Clear();
+            normalBuffer.Clear();
             for (int i = 0; i < count; i++)
             {
                 RaycastHit hit = hitBuffer[i];
@@ -213,6 +217,7 @@ namespace Overpower.Abilities
 
                 IDamageable target = hit.collider.GetComponentInParent<IDamageable>();
                 contactBuffer.Add(new BeamContact(hit.distance, target, hit.point, target is IStructure));
+                normalBuffer.Add(hit.normal);
             }
 
             // Unlimited: this ONE beam applies to every enemy it crosses before the cut (pierce); BeamResolver still
@@ -228,6 +233,11 @@ namespace Overpower.Abilities
 
             Vector3 end = beamOrigin + aimDirection * beam.Length;
             DrawBeam(beamOrigin, end, casterTeam);
+
+            RaybeamLook.ScorchSpot(contactBuffer, normalBuffer, beam, end, aimDirection, out Vector3 scorchAt, out Quaternion scorchFacing);
+            if (RaybeamLook.ShowsScorch(RaybeamLook.EndsOnSurface(beam), TeamSight.ShotShownAt(casterTeam, scorchAt)) &&
+                scorchVfx != null && VFXManager.Instance != null)
+                VFXManager.Instance.PlayVFX(scorchVfx, scorchAt, scorchFacing);
         }
 
         /// <summary>Hitscan.BuildMask's identical reasoning: the designer's layers minus the three
@@ -247,21 +257,28 @@ namespace Overpower.Abilities
                 return;
 
             GameObject beam = Instantiate(beamVfx, from, Quaternion.identity);
-            LineRenderer line = beam.GetComponentInChildren<LineRenderer>();
-            if (line != null)
+            ShowBeam(beam, from, to, casterTeam);
+            Destroy(beam, beamVisualSeconds);
+        }
+
+        /// <summary>Lays one drawn beam (an instantiated clone, never the prefab asset) from its origin to where it ended, exactly as wide
+        /// as the beam that hits (beamWidth is the one home). A beam prefab without the Raybeam's own view gets a plain line.</summary>
+        internal void ShowBeam(GameObject beam, Vector3 from, Vector3 to, int casterTeam)
+        {
+            if (beam.TryGetComponent(out RaybeamBeamView view))
             {
-                line.useWorldSpace = true;
-
-                // Exactly as wide as the beam that hits (beamWidth is the one home). Set on the INSTANTIATED CLONE, never
-                // the prefab asset: Laser Beam VFX is shared with both laser weapons, and widening it would widen those too.
-                line.startWidth = line.endWidth = beamWidth;
-
-                line.positionCount = 2;
-                line.SetPosition(0, from);
-                line.SetPosition(1, to);
+                view.Draw(from, to, beamWidth, casterTeam);
+                return;
             }
 
-            Destroy(beam, beamVisualSeconds);
+            LineRenderer line = beam.GetComponentInChildren<LineRenderer>();
+            if (line == null)
+                return;
+            line.useWorldSpace = true;
+            line.startWidth = line.endWidth = beamWidth;
+            line.positionCount = 2;
+            line.SetPosition(0, from);
+            line.SetPosition(1, to);
         }
 
         public override string ShopStatsText() =>

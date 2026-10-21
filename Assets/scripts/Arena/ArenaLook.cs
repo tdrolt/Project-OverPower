@@ -239,6 +239,40 @@ namespace Overpower.Arena
         [Tooltip("How much a fence pylon glows in its owner's colour on top of its body: 0 not at all, 1 as bright as the team colour.")]
         [Min(0f)] public float fencePylonGlow = 0.2f;
 
+        [Header("AoE Zone")]
+        [Tooltip("How deep the ring of hexagon cells inside the AoE Zone's edge is, in metres. The middle of the zone stays clear so the players standing in it are easy to see; the edge line still marks the whole area that hurts.")]
+        [Min(0f)] public float aoeRingBand = 1.6f;
+        [Tooltip("How wide one hexagon cell of the AoE Zone's ring is across its flat sides, in metres. Smaller cells make a finer, busier ring.")]
+        [Min(0.1f)] public float aoeCellSize = 0.7f;
+        [Tooltip("How much dark floor shows between two neighbouring cells of the AoE Zone's ring, in metres, so each cell reads as its own hexagon.")]
+        [Min(0f)] public float aoeCellGap = 0.08f;
+        [Tooltip("How thick the outline of each hexagon cell in the AoE Zone's ring is, in metres.")]
+        [Min(0.005f)] public float aoeCellLineWidth = 0.05f;
+        [Tooltip("How thick the hard red line round the AoE Zone's edge is, in metres. It sits on the zone's real radius: inside it you take damage.")]
+        [Min(0.01f)] public float aoeEdgeWidth = 0.16f;
+        [Tooltip("How solid the line round the AoE Zone's edge is, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float aoeEdgeAlpha = 1f;
+        [Tooltip("How many of the AoE Zone's cells are lit at any moment, as a share of them all: 0 leaves every cell dim, 1 lights them all and the ring stops flickering.")]
+        [Range(0f, 1f)] public float aoeLitShare = 0.35f;
+        [Tooltip("How solid the outline of a lit AoE Zone cell is, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float aoeLitLineAlpha = 0.85f;
+        [Tooltip("How solid the outline of a dim AoE Zone cell is, from 0 (invisible) to 1 (solid). Keep it above 0 so the whole ring always shows.")]
+        [Range(0f, 1f)] public float aoeDimLineAlpha = 0.3f;
+        [Tooltip("How strongly a lit AoE Zone cell fills with red between its lines, from 0 (lines only) to 1 (solid). Keep it low so a player standing on a lit cell stays easy to see.")]
+        [Range(0f, 1f)] public float aoeLitFillAlpha = 0.3f;
+        [Tooltip("How many times a second the AoE Zone's cells change which ones are lit. The pattern comes from the server clock and the caster, so every player sees the same flicker.")]
+        [Min(0.1f)] public float aoeFlickerRate = 8f;
+        [Tooltip("How high above the floor the AoE Zone's ring is drawn, in metres: just enough that it never flickers into the floor.")]
+        [Min(0f)] public float aoeLift = 0.04f;
+
+        [Header("Raybeam")]
+        [Tooltip("How solid each Raybeam's red sheath is, from 0 (invisible) to 1 (solid). The sheath is exactly as wide as what the beam hits; keep it see-through so a player under the beam stays easy to see, the white core carries the beam.")]
+        [Range(0f, 1f)] public float raybeamSheathAlpha = 0.4f;
+        [Tooltip("How wide each Raybeam's white-hot core is, as a share of the beam's width: 0 draws no core, 1 makes the whole beam white.")]
+        [Range(0f, 1f)] public float raybeamCoreShare = 0.25f;
+        [Tooltip("How brightly each Raybeam's white core glows: 1 is plain white, more makes it bloom; much above 2 the glow swallows the red sheath.")]
+        [Min(0f)] public float raybeamCoreGlow = 2f;
+
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]
         [Range(0f, 1f)] public float mechBaseMix = 0.85f;

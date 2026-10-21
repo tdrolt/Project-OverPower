@@ -159,6 +159,21 @@ MonoBehaviour:
   fenceArcGlow: 1.2
   fencePylonShade: 0.15
   fencePylonGlow: 0.2
+  aoeRingBand: 1.6
+  aoeCellSize: 0.7
+  aoeCellGap: 0.08
+  aoeCellLineWidth: 0.05
+  aoeEdgeWidth: 0.16
+  aoeEdgeAlpha: 1
+  aoeLitShare: 0.35
+  aoeLitLineAlpha: 0.85
+  aoeDimLineAlpha: 0.3
+  aoeLitFillAlpha: 0.3
+  aoeFlickerRate: 8
+  aoeLift: 0.04
+  raybeamSheathAlpha: 0.4
+  raybeamCoreShare: 0.25
+  raybeamCoreGlow: 2
   mechBaseMix: 0.85
   mechGlowStrength: 1.8
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}
