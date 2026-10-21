@@ -31,9 +31,10 @@ namespace Overpower.Abilities
         private MeshFilter fan;
 
         [SerializeField, Tooltip("The flames and embers that jet from the gun (a child particle system; the flames draw with the Arena " +
-                 "Look's Fx Alpha, the embers with its Fx Additive). They leave from the gun's muzzle every physics step and spread over the " +
-                 "real Cone Range and Cone Angle; how many and how far they fly come from the Arena Look; their size, life and fall toward the " +
-                 "floor are authored here.")]
+                 "Look's Flame Jet Material, stretched along their flight, the embers with its Fx Additive). They leave from the gun's muzzle " +
+                 "every physics step and stream over the real Cone Range and Cone Angle; how many, how wide, how stretched and how far they fly " +
+                 "come from the Arena Look; their life, the smallest flame's share of the biggest (Start Size), their fade and their fall " +
+                 "toward the floor are authored here.")]
         private ParticleSystem tongues;
 
         [SerializeField, Tooltip("The faint aiming outline at the true range and angle. Its opacity for the CASTER's " +
@@ -108,7 +109,7 @@ namespace Overpower.Abilities
         private float nextFlickerTime;
         private MaterialPropertyBlock block;
         private float fanStrength = 1f;
-        private float jetReach = 1f;
+        private ArenaLook look;
         private ParticleSystem[] jetSystems;
 
         private void OnValidate()
@@ -146,9 +147,8 @@ namespace Overpower.Abilities
         {
             if (theme == null || theme.arenaLook == null)
                 return;
-            ArenaLook look = theme.arenaLook;
+            look = theme.arenaLook;
             fanStrength = look.flameFanStrength;
-            jetReach = look.flameJetReach;
             ApplyFlicker();
             if (tongues == null)
                 return;
@@ -167,7 +167,7 @@ namespace Overpower.Abilities
             float floor = GroundSnap.TryFindGroundY(apex, out float groundY) ? groundY : apex.y;
             transform.SetPositionAndRotation(new Vector3(apex.x, floor + heightAboveGround, apex.z), Quaternion.LookRotation(forward));
             if (jetSystems != null && builtRange > 0f)
-                FlameLook.AimJet(jetSystems, tongues.transform.InverseTransformPoint(muzzle), builtRange, builtAngle, jetReach);
+                FlameLook.AimJet(jetSystems, tongues.transform.InverseTransformPoint(muzzle), builtRange, builtAngle, look);
         }
 
         private void Update()

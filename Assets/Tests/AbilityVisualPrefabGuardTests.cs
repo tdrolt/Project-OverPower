@@ -205,9 +205,15 @@ namespace Overpower.Tests
             Assert.IsNotNull(system);
             Assert.AreSame(system, new SerializedObject(cone.GetComponent<FlameConeVisual>()).FindProperty("tongues").objectReferenceValue);
             var look = AssetDatabase.LoadAssetAtPath<Overpower.Arena.ArenaLook>(LookPath);
-            Assert.AreSame(look.fxAlpha, tongues.GetComponent<ParticleSystemRenderer>().sharedMaterial, "the flames keep their orange over any floor (FX Alpha)");
+            var flames = tongues.GetComponent<ParticleSystemRenderer>();
+            Assert.IsNotNull(look.flameJetMaterial, "Arena Look > Flame Jet Material");
+            Assert.AreSame(look.flameJetMaterial, flames.sharedMaterial, "the flames are pointed flame shapes that keep their colour over any floor (FX Flame Jet)");
+            Assert.AreEqual("Universal Render Pipeline/Particles/Unlit", look.flameJetMaterial.shader.name, "draws the fire colours each flame is given");
+            Assert.IsNotNull(look.flameJetMaterial.GetTexture("_BaseMap"), "the flame shape");
+            Assert.AreEqual(ParticleSystemRenderMode.Stretch, flames.renderMode, "stretched along the flight");
             foreach (ParticleSystemRenderer renderer in tongues.GetComponentsInChildren<ParticleSystemRenderer>(true))
-                Assert.IsTrue(renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive, renderer.name + " is drawn with an FX material");
+                Assert.IsTrue(renderer.sharedMaterial == look.flameJetMaterial || renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive,
+                    renderer.name + " is drawn with an FX material");
             Assert.GreaterOrEqual(tongues.GetComponentsInChildren<ParticleSystem>(true).Length, 2, "flames and embers");
             Assert.AreEqual("Assets/Gameplay/Abilities/Flame Cone.mat",
                 AssetDatabase.GetAssetPath(cone.transform.Find("Fan").GetComponent<MeshRenderer>().sharedMaterial), "the fan is untouched");

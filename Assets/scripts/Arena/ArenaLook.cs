@@ -108,11 +108,23 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float pulseEdgeStrength = 0.3f;
 
         [Header("Flamethrower")]
-        [Tooltip("How many flames the Flamethrower's jet throws from the gun each second for every metre of its range: more makes a thicker jet.")]
-        [Min(0f)] public float flameTonguesPerMetre = 32f;
+        [Tooltip("The material put on the Flamethrower's flames each time it sprays: a pointed, see-through flame shape that is stretched along each flame's flight, so the jet points at the target. It draws whatever fire colour each flame is given, so this file is never changed while playing.")]
+        public Material flameJetMaterial;
+        [Tooltip("How many flames overlap at every point along the Flamethrower's jet: 1 is just enough for one unbroken stream from the gun to the target, more makes it thicker and brighter but costs more to draw.")]
+        [Min(0.5f)] public float flameJetOverlap = 1.5f;
+        [Tooltip("How much of the Flamethrower's cone the flames' paths fan out over, as a share of its angle: low keeps a tight stream whose growing flames fill the cone's sides by the end, 0.9 sends them close to its edges, where the flames must stay thin to stay inside it.")]
+        [Range(0.1f, 0.9f)] public float flameJetSpread = 0.5f;
+        [Tooltip("How many times longer than wide each of the Flamethrower's flames is, stretched along its flight: higher reads as a fast, pointed jet, lower as wide, billowing flames.")]
+        [Range(1f, 6f)] public float flameStretch = 1.5f;
+        [Tooltip("How wide the Flamethrower's flames grow by the time they land, as a share of the widest they can be while staying inside the ground the cone burns: 1 lets the outermost flames touch its edge.")]
+        [Range(0.2f, 1f)] public float flameJetWidth = 1f;
+        [Tooltip("How big a flame is as it leaves the Flamethrower's gun, as a share of its full size where it lands; it grows evenly in between, so the jet is thin at the gun and widens as it flies. Lower needs more flames to stay unbroken near the gun.")]
+        [Range(0.02f, 1f)] public float flameJetStartSize = 0.06f;
+        [Tooltip("How high above the floor the Flamethrower's flames are when they land at the end of the jet, in metres: the jet is aimed down from the gun so it licks the floor where it burns, which lines it up with the fan seen from the camera. The gun's height or more keeps it level.")]
+        [Min(0f)] public float flameJetLandHeight = 0.15f;
         [Tooltip("How many embers fly from the Flamethrower's gun each second.")]
         [Min(0f)] public float flameEmbersPerSecond = 8f;
-        [Tooltip("How far the Flamethrower's flames fly from the gun, as a share of the way to the end of its reach: 1 lets them lick the very edge of the ground it burns.")]
+        [Tooltip("How far the Flamethrower's flames fly from the gun, as a share of the way to the end of its reach: 1 lets their tips lick the very edge of the ground it burns.")]
         [Range(0.3f, 1f)] public float flameJetReach = 0.95f;
         [Tooltip("How strong the flat fan on the floor under the Flamethrower's spray is: 1 is fully bright, lower leaves a faint marker of the ground that burns.")]
         [Range(0f, 1f)] public float flameFanStrength = 0.4f;

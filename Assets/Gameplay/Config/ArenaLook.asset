@@ -101,7 +101,13 @@ MonoBehaviour:
   pulseCoreWidth: 0.3
   pulseEdgeWidth: 0.05
   pulseEdgeStrength: 0.3
-  flameTonguesPerMetre: 32
+  flameJetMaterial: {fileID: 2100000, guid: c1c06d0c6fb850742956c70ef59ba743, type: 2}
+  flameJetOverlap: 1.5
+  flameJetSpread: 0.5
+  flameStretch: 1.5
+  flameJetWidth: 1
+  flameJetStartSize: 0.06
+  flameJetLandHeight: 0.15
   flameEmbersPerSecond: 8
   flameJetReach: 0.95
   flameFanStrength: 0.4
