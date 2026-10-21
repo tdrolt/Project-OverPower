@@ -313,6 +313,28 @@ namespace Overpower.Arena
         [Tooltip("How strongly an owned hexagon fills at the outer edge of the painted band, from 0 to 1. The fill fades from the middle's strength down to this, and never grows outward, so the zone reads as a soft pool of its owner's colour.")]
         [Range(0f, 1f)] public float ownerFillEdge = 0.2f;
 
+        [Header("Ripple when a zone flips")]
+        [Tooltip("How long the ring of brightened floor hexagons takes to run from a tower to the edge of its zone's painted ground when the zone changes owner, in seconds. The floor then rests in its new colour.")]
+        [Min(0.05f)] public float rippleSeconds = 0.6f;
+        [Tooltip("How far the running ring of brightened floor hexagons reaches to either side of its line, in metres, fading out to nothing at that distance. About one floor hexagon lights two rings of tiles at a time; less lights a thinner ring.")]
+        [Min(0.1f)] public float rippleRingWidth = 3f;
+        [Tooltip("How brightly the running ring lights the floor hexagons in the zone's new colour: 1 is the plain colour, more makes it bloom. It fades out as the ring reaches the edge.")]
+        [Min(0f)] public float rippleGlow = 0.8f;
+
+        [Header("Team hexagon under the feet")]
+        [Tooltip("Whether every player stands on a flat hexagon in their team's colour, so you can tell teams apart by the ground under them. Untick it to hide every one of these hexagons at once.")]
+        public bool feetHexShown = true;
+        [Tooltip("How far the hexagon under a player's feet reaches from their middle to one of its corners, in metres. Big enough to show round the mech at the normal camera, small enough to leave most of the floor's own owner tiles in view.")]
+        [Min(0.1f)] public float feetHexRadius = 1.1f;
+        [Tooltip("How thick the bright edge of the hexagon under a player's feet is, in metres.")]
+        [Min(0.005f)] public float feetHexEdgeWidth = 0.08f;
+        [Tooltip("How solid the bright edge of the hexagon under a player's feet is, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float feetHexEdgeAlpha = 0.9f;
+        [Tooltip("How strongly the inside of the hexagon under a player's feet fills with the team colour, from 0 (edge only) to 1 (solid). Keep it soft so the floor's owner tiles still show through.")]
+        [Range(0f, 1f)] public float feetHexFillAlpha = 0.2f;
+        [Tooltip("How high above the floor the hexagon under a player's feet is drawn, in metres: just enough that it never flickers into the floor.")]
+        [Min(0.001f)] public float feetHexLift = 0.03f;
+
         [Header("Wall and block circuit stripes")]
         [Tooltip("The colour the floor grid and the circuit stripes glow in away from every zone. A neutral cool white with no blue cast, kept dim, so it never reads as a team's colour.")]
         public Color outsideLineColor = new Color(0.8f, 0.86f, 0.92f, 1f);

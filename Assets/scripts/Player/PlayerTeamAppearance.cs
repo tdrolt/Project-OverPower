@@ -16,6 +16,19 @@ public class PlayerTeamAppearance : MonoBehaviour
     void Start()
     {
         Apply();
+        BuildFeetHex();
+    }
+
+    // The team hexagon on the floor under this player, on every client's copy: it reads the team property itself, so it needs no Apply.
+    private void BuildFeetHex()
+    {
+        PlayerHealth health = GetComponent<PlayerHealth>();
+        var capsule = GetComponent<CapsuleCollider>();
+        float feetBelowRoot = capsule != null
+            ? Overpower.Combat.AbilityVisualGeometry.RootAboveFeet(capsule.center.y, capsule.height, transform.lossyScale.y)
+            : 0f;
+        FeetHexView.TryCreate(transform, GetComponent<Photon.Pun.PhotonView>(), GetComponent<PlayerLifecycle>(),
+                              health != null ? health.Theme : null, feetBelowRoot);
     }
 
     /// <summary>

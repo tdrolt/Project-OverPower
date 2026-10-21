@@ -105,6 +105,25 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void RipplesReachTheShaderAndStopWithTheOwnerTiles()
+        {
+            var shape = new[] { new Vector4(1f, 2f, 3f, 0.5f), Vector4.zero, Vector4.zero, new Vector4(4f, 5f, 6f, 0.25f) };
+            var colour = new[] { new Vector4(0.1f, 0.2f, 0.3f, 9f), Vector4.zero, Vector4.zero, new Vector4(0.4f, 0.5f, 0.6f, 7f) };
+            try
+            {
+                ArenaShaderGlobals.SetRipples(shape, colour, 1.75f, true);
+                Assert.AreEqual(new Vector4(1.75f, 1f, 0f, 0f), Shader.GetGlobalVector(ArenaShaderGlobals.RippleLookId), "ring width, running");
+                Vector4[] handed = Shader.GetGlobalVectorArray(ArenaShaderGlobals.RippleId);
+                Assert.AreEqual(4, handed.Length, "a fixed array of four");
+                Assert.AreEqual(shape[3], handed[3]);
+                Assert.AreEqual(colour[3], Shader.GetGlobalVectorArray(ArenaShaderGlobals.RippleColourId)[3]);
+                ArenaShaderGlobals.ClearOwnerTiles();
+                Assert.AreEqual(0f, Shader.GetGlobalVector(ArenaShaderGlobals.RippleLookId).y, "a plain arena (lobby, no room) runs no ripple");
+            }
+            finally { ArenaShaderGlobals.ClearOwnerTiles(); }
+        }
+
+        [Test]
         public void TheEditorHookPushesTheLookAndTheArenaCentre()
         {
             System.Reflection.MethodInfo pushAll = typeof(ArenaLookEditorGlobals).GetMethod(nameof(ArenaLookEditorGlobals.PushAll));

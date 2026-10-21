@@ -212,6 +212,62 @@ namespace Overpower.Tests
             Check(IlWiring.StoresBool(Painter, "HandleLiveStateChanged", marked, true), "a live-state event marks a repaint");
             Assert.IsEmpty(missing, string.Join("; ", missing));
         }
+
+        [Test]
+        public void RipplesGoThroughTheTestedRules()
+        {
+            MethodInfo startFlips = typeof(RippleRule).GetMethod(nameof(RippleRule.StartFlips));
+            MethodInfo repaint = Painter.GetMethod("Repaint", Any);
+            MethodInfo stepRipples = Painter.GetMethod("StepRipples", Any);
+            Assert.IsNotNull(repaint);
+            var missing = new System.Collections.Generic.List<string>();
+            void Check(bool ok, string what) { if (!ok) missing.Add(what); }
+            Check(IlWiring.Uses(Painter, "LateUpdate", startFlips), "a repaint starts the flips' ripples through RippleRule.StartFlips");
+            var starts = IlWiring.CallOffsets(Painter.GetMethod("LateUpdate", Any), startFlips);
+            var paints = IlWiring.CallOffsets(Painter.GetMethod("LateUpdate", Any), repaint);
+            Check(starts.Count == 1 && paints.Count == 1 && starts[0] < paints[0],
+                "the flips are read before the repaint copies the new state over the painted one");
+            Check(stepRipples != null && IlWiring.Uses(Painter, "LateUpdate", stepRipples), "the running ripples are stepped every frame");
+            MethodInfo pack = typeof(RippleRule).GetMethod(nameof(RippleRule.Pack));
+            Check(IlWiring.Uses(Painter, "StepRipples", pack), "through RippleRule.Pack");
+            Check(IlWiring.ResultDecidesABranch(Painter, "StepRipples", pack), "whether any still runs decides whether the globals are written");
+            MethodInfo numbersOf = typeof(RippleRule).GetMethod(nameof(RippleRule.NumbersOf));
+            Check(IlWiring.Uses(Painter, "LateUpdate", numbersOf), "the flips start with the look's numbers through RippleRule.NumbersOf");
+            Check(IlWiring.Uses(Painter, "StepRipples", numbersOf), "and run with them");
+            Check(IlWiring.Uses(Painter, "StepRipples", typeof(ArenaShaderGlobals).GetMethod(nameof(ArenaShaderGlobals.SetRipples))),
+                "and handed to the shader as globals");
+            Check(IlWiring.Uses(Painter, "LateUpdate", typeof(RippleRule).GetMethod(nameof(RippleRule.StopAll))),
+                "the room's lobby (and leaving the room) stops every ripple");
+            Assert.IsEmpty(missing, string.Join("; ", missing));
+        }
+        // The frame the last ripple ends must still reach the shader once, or its ring would stay lit on the floor.
+        [Test]
+        public void TheShaderGetsTheLookNumbersAndHearsTheLastRippleEnd()
+        {
+            var go = new GameObject("RippleStepPainter") { hideFlags = HideFlags.HideAndDontSave };
+            try
+            {
+                ArenaOwnershipPainter painter = NewPainter(go);
+                look.rippleSeconds = 0.5f;
+                look.rippleGlow = 1.5f;
+                look.rippleRingWidth = 2.25f;
+                var ripples = (Ripple[])Painter.GetField("ripples", Any).GetValue(painter);
+                MethodInfo step = Painter.GetMethod("StepRipples", Any);
+                float now = Time.time;
+                ripples[1] = new Ripple { Centre = new Vector2(3f, -7f), Reach = 9f, Colour = Color.red, Start = now - 0.1f, Running = true };
+                step.Invoke(painter, null);
+                Assert.AreEqual(new Vector4(2.25f, 1f, 0f, 0f), Shader.GetGlobalVector(ArenaShaderGlobals.RippleLookId), "Ripple Ring Width, running");
+                Vector4 shape = Shader.GetGlobalVectorArray(ArenaShaderGlobals.RippleId)[1];
+                Assert.AreEqual(RippleRule.Strength(now - ripples[1].Start, 0.5f) * 1.5f, shape.w, 1e-3f, "its strength times Ripple Glow");
+                Assert.AreEqual(RippleRule.Radius(now - ripples[1].Start, 0.5f, 9f), shape.z, 1e-3f, "over Ripple Seconds");
+
+                ripples[1].Start = now - 10f;
+                step.Invoke(painter, null);
+                Assert.AreEqual(0f, Shader.GetGlobalVector(ArenaShaderGlobals.RippleLookId).y, "the last ripple's end switches the shader's ripples off");
+                Assert.AreEqual(0f, Shader.GetGlobalVectorArray(ArenaShaderGlobals.RippleId)[1].w, "and hands over nothing for its slot");
+            }
+            finally { DestroyLikeTheGame(go); }
+        }
     }
 
     /// <summary>The painter rides on MatchSystems, which both arena scenes hold, so neither scene file changes.</summary>

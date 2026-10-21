@@ -9,7 +9,8 @@ namespace Overpower.Arena
     /// <summary>Paints who owns the ground into one small texture (one texel per floor hexagon) that the arena shader reads for the floor
     /// tiles and the wall stripes. It reads every zone each frame without allocating, but repaints only when OwnershipSignature says a
     /// zone's state changed or an event marked it; before the warm-up (the room's lobby, no room) the arena draws plain. The owner is the minimap's
-    /// (ZoneOwnerShown), so the floor and the minimap always agree. Lives on MatchSystems, so neither scene file holds it.</summary>
+    /// (ZoneOwnerShown), so the floor and the minimap always agree. A repaint that flips a zone's shown owner also starts a ripple
+    /// (RippleRule). Lives on MatchSystems, so neither scene file holds it.</summary>
     public sealed class ArenaOwnershipPainter : MonoBehaviour
     {
         public const string TextureName = "Arena Owner Tiles";
@@ -35,6 +36,10 @@ namespace Overpower.Arena
         private float maskSize;
         private ArenaBounds maskBounds;
         private bool bound;
+        private readonly Ripple[] ripples = new Ripple[RippleRule.Slots];
+        private readonly Vector4[] rippleShape = new Vector4[RippleRule.Slots];
+        private readonly Vector4[] rippleColour = new Vector4[RippleRule.Slots];
+        private bool ripplesOn;
 
         private void Awake()
         {
@@ -57,6 +62,8 @@ namespace Overpower.Arena
                     bound = false;
                 }
                 OwnershipSignature.Forget(painted);
+                RippleRule.StopAll(ripples);
+                ripplesOn = false;
                 unregisteredSince = -1f;
                 return;
             }
@@ -73,9 +80,24 @@ namespace Overpower.Arena
 
             ReadZones();
             if (OwnershipSignature.NeedsRepaint(painted, now, zoneIds.Length, marked))
+            {
+                RippleRule.StartFlips(painted, now, zoneIds.Length, RippleRule.NumbersOf(theme.arenaLook), theme, ripples, Time.time);
                 Repaint(lookKey);
+            }
             else
                 WarnIfAZoneNeverRegisters();
+            StepRipples();
+        }
+
+        // Globals are only written while a ripple runs, plus once as the last one ends.
+        private void StepRipples()
+        {
+            RippleNumbers numbers = RippleRule.NumbersOf(theme.arenaLook);
+            bool running = RippleRule.Pack(ripples, Time.time, numbers, rippleShape, rippleColour);
+            if (!running && !ripplesOn)
+                return;
+            ArenaShaderGlobals.SetRipples(rippleShape, rippleColour, numbers.RingWidth, running);
+            ripplesOn = running;
         }
 
         // A tower missing from the scene (or destroyed) holds every repaint back without a word, so name the missing zones once.
@@ -178,8 +200,8 @@ namespace Overpower.Arena
         public void PaintBands(ZoneBand[] zones, Vector2 origin)
         {
             ArenaLook look = theme.arenaLook;
-            float size = Mathf.Max(0.5f, look.floorTileSize);
-            float band = Mathf.Max(0f, look.ownerBandTiles) * size;
+            float size = FloorTileRule.TileSize(look);
+            float band = FloorTileRule.BandMetres(look);
             TileRange(zones, band, origin, size, out Vector2Int min, out Vector2Int extent);
 
             int count = extent.x * extent.y;

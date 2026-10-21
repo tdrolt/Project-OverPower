@@ -202,6 +202,15 @@ MonoBehaviour:
   ownerBandTiles: 1
   ownerFillInside: 1
   ownerFillEdge: 0.2
+  rippleSeconds: 0.6
+  rippleRingWidth: 3
+  rippleGlow: 0.8
+  feetHexShown: 1
+  feetHexRadius: 1.1
+  feetHexEdgeWidth: 0.08
+  feetHexEdgeAlpha: 0.9
+  feetHexFillAlpha: 0.2
+  feetHexLift: 0.03
   outsideLineColor: {r: 0.8, g: 0.86, b: 0.92, a: 1}
   outsideStripeGlow: 0.35
   stripeGlow: 1.2

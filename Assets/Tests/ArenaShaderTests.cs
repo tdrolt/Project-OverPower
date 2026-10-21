@@ -326,6 +326,61 @@ namespace Overpower.Tests
             }
         }
 
+        // A ripple lights whole owned tiles whose centre lies on its ring, only inside its reach; neutral ground on the ring stays unlit
+        // (lit vs. unlit tells neutral from the White team) and with the switch off the shader never lights anything. Tiles on the x
+        // axis, or a set that mirrors onto itself: the image may be read upside down.
+        [Test]
+        public void TheRippleLightsTheTilesOnItsRingInsideTheBandOnly()
+        {
+            ArenaLook look = PlainLook();
+            look.floorTileSize = FloorSize;
+            look.floorGridGlow = 0f;
+            var pixels = new Color32[25];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = OwnerTileTexel.Encode(new TileLook(TileState.Owned, Color.black, 0f)); // every tile owned, in black, unfilled
+            Vector2Int plain = HexGrid.Texel(new Vector2Int(-1, 0), FloorMin);
+            pixels[plain.y * 5 + plain.x] = OwnerTileTexel.Encode(new TileLook(TileState.Plain, Color.black, 0f));
+            var neutralRing = new[] { new Vector2Int(0, 1), new Vector2Int(0, -1), new Vector2Int(1, -1), new Vector2Int(-1, 1) };
+            foreach (Vector2Int tile in neutralRing)
+            {
+                Vector2Int t = HexGrid.Texel(tile, FloorMin);
+                pixels[t.y * 5 + t.x] = OwnerTileTexel.Encode(new TileLook(TileState.Neutral, Color.black, 0f));
+            }
+
+            Vector2 tower = HexGrid.CentreOf(Vector2Int.zero, FloorOrigin, FloorSize);
+            var shape = new Vector4[RippleRule.Slots];
+            var colour = new Vector4[RippleRule.Slots];
+            shape[2] = new Vector4(tower.x, tower.y, FloorSize, 1f);         // the ring one tile out, full strength
+            colour[2] = new Vector4(1f, 0f, 0f, FloorSize * 1.2f);            // red, reaching just past that ring
+            shape[0] = new Vector4(tower.x, tower.y, FloorSize, 1f);          // the same ring
+            colour[0] = new Vector4(0f, 1f, 0f, FloorSize * 0.5f);            // green, but its band ends before the ring
+            Texture2D read = null, idle = null;
+            try
+            {
+                ArenaShaderGlobals.SetRipples(shape, colour, 0.5f, true);
+                read = RenderFloor(look, pixels);
+                ArenaShaderGlobals.SetRipples(shape, colour, 0.5f, false);
+                idle = RenderFloor(look, pixels);
+                Color lit = FloorAt(read, HexGrid.CentreOf(new Vector2Int(1, 0), FloorOrigin, FloorSize));
+                Assert.Greater(lit.r, 0.3f, "a tile on the ring lights up in the ripple's colour");
+                Assert.Less(lit.g, 0.05f, "a ripple never runs past its own band's reach");
+                Assert.Less(Luma(FloorAt(read, tower)), 0.05f, "the tower's own tile is behind the ring");
+                Assert.Less(Luma(FloorAt(read, HexGrid.CentreOf(new Vector2Int(-1, 0), FloorOrigin, FloorSize))), 0.05f,
+                    "a tile outside every band stays plain");
+                Assert.Less(Luma(FloorAt(read, HexGrid.CentreOf(new Vector2Int(0, 1), FloorOrigin, FloorSize))), 0.05f,
+                    "a neutral tile on the ring stays unlit");
+                Assert.Less(Luma(FloorAt(idle, HexGrid.CentreOf(new Vector2Int(1, 0), FloorOrigin, FloorSize))), 0.05f,
+                    "with no ripple running nothing lights");
+            }
+            finally
+            {
+                ArenaShaderGlobals.SetRipples(shape, colour, 0.5f, false);
+                Object.DestroyImmediate(look);
+                if (read != null) Object.DestroyImmediate(read);
+                if (idle != null) Object.DestroyImmediate(idle);
+            }
+        }
+
         // Literal numbers (never the real asset's tuning): black, matte, no sky and no sun, so all that shows is the pattern's glow.
         private static ArenaLook PlainLook()
         {

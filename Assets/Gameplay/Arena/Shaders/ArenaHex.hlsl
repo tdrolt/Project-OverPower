@@ -17,6 +17,9 @@ float4 _ArenaOwnerMin;         // lowest q, lowest r, texture width, texture hei
 TEXTURE2D(_ArenaOwnerTex);
 // Never set as a global: only a placed cover wall's property block fills it (CoverPanelLook), so the static arena reads 0 and draws as before.
 float4 _ArenaPanelEdge;        // linear owner colour x glow, band width m (0 = no band)
+float4 _ArenaRipple[4];        // per flip ripple (RippleRule.Pack): centre x, centre z, ring radius m, strength x glow (0 = idle)
+float4 _ArenaRippleColour[4];  // per flip ripple: linear colour of the new owner, reach m (the zone's band)
+float4 _ArenaRippleLook;       // ring width m, 1 while any ripple runs
 
 #define ARENA_SQRT3 1.7320508
 
@@ -72,6 +75,22 @@ ArenaOwner ArenaOwnerAt(float2 xz)
     o.fill = saturate((a - 128.0) / 127.0);
     o.wallsOnly = a < 56.0 || (a >= 96.0 && a < 120.0);
     return o;
+}
+
+// --- Flip ripples: a ring of whole tiles (measured at the tile's centre) brightened in the new owner's colour, out to the zone's band edge. ---
+
+float3 ArenaRippleGlow(float2 tileCentre)
+{
+    float3 glow = 0;
+    float width = max(_ArenaRippleLook.x, 0.01);
+    [unroll] for (int i = 0; i < 4; i++)
+    {
+        float4 r = _ArenaRipple[i];
+        float d = distance(tileCentre, r.xy);
+        float ring = saturate(1.0 - abs(d - r.z) / width) * step(d, _ArenaRippleColour[i].w);
+        glow += _ArenaRippleColour[i].rgb * (ring * r.w);
+    }
+    return glow;
 }
 
 // --- Line drawing in metres: antialiased over aa (metres per pixel, taken before any branch), and fading out where a line is
@@ -174,6 +193,11 @@ void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inou
         s.albedo = lerp(s.albedo, o.colour, edges);
     else
         s.emission += _ArenaOutsideLine.rgb * (edges * _ArenaFloorLine.y);
+    UNITY_BRANCH if (_ArenaRippleLook.y > 0.5) // uniform: nothing to pay while no zone flipped
+    {
+        if (o.state > 1.5) // owned tiles only: neutral ground stays unlit
+            s.emission += ArenaRippleGlow(centre);
+    }
 #elif defined(_ARENA_WALL) || defined(_ARENA_BLOCK)
     // Side faces: u along the face and level, v up, both in metres, so yawed and stretched pieces keep straight, even stripes.
     float2 along = float2(normalWS.z, -normalWS.x);

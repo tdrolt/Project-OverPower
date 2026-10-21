@@ -51,6 +51,11 @@ namespace Overpower.Arena
     /// disagrees with them. The floor never pulses: tiles change when the owner flips, not while a zone is attacked or drained.</summary>
     public static class FloorTileRule
     {
+        public static float TileSize(ArenaLook look) => Mathf.Max(0.5f, look.floorTileSize);
+
+        /// <summary>How far past a zone's live radius its paint reaches, in metres.</summary>
+        public static float BandMetres(ArenaLook look) => Mathf.Max(0f, look.ownerBandTiles) * TileSize(look);
+
         /// <summary>Out of play first (as on the ring and the minimap), then a spawn in its team's colour like its tower, then the owner shown.</summary>
         public static OwnerPaint FloorPaint(int ownerShown, bool spawn, int spawnTeam, bool outOfPlay)
         {

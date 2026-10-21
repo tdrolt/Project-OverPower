@@ -33,6 +33,9 @@ namespace Overpower.Arena
         public static readonly int StripeId = Shader.PropertyToID("_ArenaStripe");
         public static readonly int StripeGlowId = Shader.PropertyToID("_ArenaStripeGlow");
         public static readonly int OutsideLineId = Shader.PropertyToID("_ArenaOutsideLine");
+        public static readonly int RippleId = Shader.PropertyToID("_ArenaRipple");
+        public static readonly int RippleColourId = Shader.PropertyToID("_ArenaRippleColour");
+        public static readonly int RippleLookId = Shader.PropertyToID("_ArenaRippleLook");
 
         // x, y: grid origin (world x, z); z: tile size; w: 1 while painted owner tiles are bound. Kept here so each setter changes only its part.
         private static Vector4 ownerGrid = new Vector4(0f, 0f, 3f, 0f);
@@ -98,8 +101,19 @@ namespace Overpower.Arena
             Shader.SetGlobalVector(OwnerGridId, ownerGrid);
         }
 
+        /// <summary>The flip ripples (RippleRule.Pack): always the fixed four slots, because a shader global array keeps the length it was
+        /// first set with. While none runs the shader skips them on one uniform branch.</summary>
+        public static void SetRipples(Vector4[] shape, Vector4[] colour, float ringWidth, bool running)
+        {
+            Shader.SetGlobalVectorArray(RippleId, shape);
+            Shader.SetGlobalVectorArray(RippleColourId, colour);
+            Shader.SetGlobalVector(RippleLookId, new Vector4(ringWidth, running ? 1f : 0f, 0f, 0f));
+        }
+
+        /// <summary>Also stops any ripple: a plain arena runs none.</summary>
         public static void ClearOwnerTiles()
         {
+            Shader.SetGlobalVector(RippleLookId, Vector4.zero);
             ownerGrid.w = 0f;
             Shader.SetGlobalTexture(OwnerTexId, Texture2D.blackTexture);
             Shader.SetGlobalVector(OwnerMinId, Vector4.zero);
