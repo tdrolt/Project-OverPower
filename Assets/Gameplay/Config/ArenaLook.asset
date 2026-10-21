@@ -51,7 +51,7 @@ MonoBehaviour:
     family: 2
   - abilityId: 26
     shape: 13
-    family: 1
+    family: 6
   - abilityId: 27
     shape: 14
     family: 6

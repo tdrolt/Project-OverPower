@@ -30,6 +30,7 @@ namespace Overpower.Tests
             theme.arenaLook = look;
             look.abilityShotGlow = 2f;
             look.abilitySparkGlow = 3f;
+            look.stunBoltGlow = 2.5f;
         }
 
         [TearDown]
@@ -65,6 +66,43 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheBoltsCoreGlowsBrightWithoutLeavingItsBlue()
+        {
+            var blue = new Color(0.2f, 0.45f, 1f, 1f);
+            theme.statusStunnedColor = blue;
+            look.stunBoltGlow = 3f;
+            SetRow(StunGunId, LookShape.Bolt, LookFamily.ElectricBlue);
+            var lit = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var root = new GameObject("core glow test");
+            try
+            {
+                root.AddComponent<MeshFilter>();
+                MeshRenderer core = root.AddComponent<MeshRenderer>();
+                core.sharedMaterial = lit;
+                LookTint tint = root.AddComponent<LookTint>();
+                var so = new SerializedObject(tint);
+                so.FindProperty("theme").objectReferenceValue = theme;
+                so.FindProperty("abilityId").intValue = StunGunId;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                Assert.IsTrue(tint.Apply(-1));
+
+                var block = new MaterialPropertyBlock();
+                core.GetPropertyBlock(block);
+                Color glow = block.GetColor(EmissionColorId);
+                Assert.AreEqual(3f, glow.b, 1e-4f, "the blue glows past 1 and blooms");
+                Assert.AreEqual(0.2f, glow.r, 1e-4f, "red stays at its share, so the bolt never turns pale cyan");
+                Assert.AreEqual(0.45f, glow.g, 1e-4f, "and so does green");
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+                Object.DestroyImmediate(lit);
+            }
+            Assert.IsTrue(IlWiring.Uses(typeof(LookTint), nameof(LookTint.Apply), typeof(TowerLookRules).GetMethod(nameof(TowerLookRules.GlowKeepingHue))));
+            Assert.IsTrue(IlWiring.Uses(typeof(LookTint), nameof(LookTint.Apply), typeof(ArenaLook).GetField(nameof(ArenaLook.stunBoltGlow))));
+        }
+
+        [Test]
         public void ApplyPutsTheLookColourOnEveryRendererThroughAPropertyBlock()
         {
             SetRow(StunGunId, LookShape.Bolt, LookFamily.ElectricBlue);
@@ -94,7 +132,7 @@ namespace Overpower.Tests
                 Color coreColour = block.GetColor(BaseColorId);
                 Assert.AreEqual(Stunned.r, coreColour.r, 1e-4f, "the core is painted the look colour");
                 Assert.AreEqual(Stunned.b, coreColour.b, 1e-4f);
-                Assert.AreEqual(Stunned.b * 2f, block.GetColor(EmissionColorId).b, 1e-4f, "and glows by Ability Shot Glow");
+                Assert.AreEqual(TowerLookRules.GlowKeepingHue(Stunned, 2.5f), block.GetColor(EmissionColorId), "and glows by Stun Bolt Glow, its hue kept");
                 sparkRenderer.GetPropertyBlock(block);
                 Assert.AreEqual(Stunned.b * 3f, block.GetColor(BaseColorId).b, 1e-4f, "a spark carries Ability Spark Glow in its colour");
                 Assert.AreEqual(Color.white, lit.GetColor(BaseColorId), "the shared material file is untouched");

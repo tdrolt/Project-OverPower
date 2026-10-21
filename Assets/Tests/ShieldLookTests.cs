@@ -97,6 +97,26 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheShellIsDrawnBiggerThanTheShieldWhileTheBubbleKeepsItsSize()
+        {
+            Assert.AreEqual(2.64f, ShieldLook.ShellDiameter(2.2f, 1.2f), 1e-5f, "Shield Diameter times Shield Shell Scale");
+            Assert.AreEqual(2f, ShieldLook.ShellDiameter(2f, 1f), 1e-6f, "a scale of 1 is the Shield Diameter itself");
+            MethodInfo shell = typeof(ShieldLook).GetMethod(nameof(ShieldLook.ShellDiameter));
+            Assert.IsTrue(IlWiring.Uses(typeof(InvulnerabilityAbility), "ShowShield", shell), "the shell is drawn at the shell's own size");
+            Assert.IsTrue(IlWiring.Uses(typeof(InvulnerabilityAbility), "ShowShield", typeof(ArenaLook).GetField(nameof(ArenaLook.shieldShellScale))),
+                "from Arena Look's Shield Shell Scale");
+            Assert.IsFalse(IlWiring.Uses(typeof(Overpower.Dominion.RespawnShield), typeof(ArenaLook).GetField(nameof(ArenaLook.shieldShellScale))),
+                "the respawn bubble keeps its size from the Shield Diameter, never from the shell's look");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Dominion.RespawnShield), "BuildBubble", typeof(InvulnerabilityAbility).GetProperty(nameof(InvulnerabilityAbility.ShieldDiameter)).GetGetMethod()));
+
+            // The rise starts on the armed ring the player saw: the ring is measured in the drawn shell's space, so a bigger shell keeps it in place.
+            float drawn = ShieldLook.ShellDiameter(2.2f, 1.2f);
+            Vector2 ring = ShieldLook.RingInShellSpace(2.4f, 0.05f, drawn, 0.8f);
+            Assert.AreEqual(1.2f, ring.x * drawn, 1e-5f, "the plates still leave the 2.4 m ring");
+            Assert.AreEqual(0.05f - 0.8f, ring.y * drawn, 1e-5f);
+        }
+
+        [Test]
         public void TheRingIsHandedToTheShellInItsOwnSpace()
         {
             // Ring 2.4 m wide at 0.05 m, Shield 2.2 m wide centred 0.8 m above the feet: radius 1.2 / 2.2, height (0.05 - 0.8) / 2.2.

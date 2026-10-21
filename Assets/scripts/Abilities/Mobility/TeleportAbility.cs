@@ -5,6 +5,7 @@ using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Vision;
 using Overpower.Match;
+using Overpower.UI;
 
 namespace Overpower.Abilities
 {
@@ -61,11 +62,11 @@ namespace Overpower.Abilities
         private float channelSeconds = 3f;
 
         [Header("Remote visuals (cosmetic only)")]
-        [SerializeField, Tooltip("Radius in metres of the marker shown at a portal while ANYONE - " +
+        [SerializeField, Tooltip("Radius in metres of the flat silver hexagon shown on a portal while ANYONE - " +
                  "your own screen included - is channelling in it. Purely visual; 0 shows nothing.")]
         private float channelVfxRadius = 0.6f;
 
-        [SerializeField, Tooltip("Radius in metres of the brief marker shown at both portals, on " +
+        [SerializeField, Tooltip("Radius in metres of the brief flat silver hexagon shown at both portals, on " +
                  "every OTHER client's screen, the moment a travel completes. The caster's own screen " +
                  "already shows the real teleport. 0 shows nothing.")]
         private float arrivalVfxRadius = 0.5f;
@@ -378,7 +379,7 @@ namespace Overpower.Abilities
 
                 case PhaseChannelStart:
                     ClearChannelVfx();
-                    channelVfx = SpawnMarker(cast.Payload.Point, channelVfxRadius);
+                    channelVfx = SpawnMarker(cast.Payload.Point, channelVfxRadius, cast.CasterTeam);
                     // Vision: it lasts seconds, so it follows my team's sight instead of being judged once (friendly: always).
                     VisibleWhenSeen.Attach(channelVfx, cast.CasterTeam);
                     return;
@@ -540,22 +541,18 @@ namespace Overpower.Abilities
         {
             if (arrivalVfxRadius <= 0f || !TeamSight.ShotShownAt(casterTeam, point))
                 return;
-            Destroy(SpawnMarker(point, arrivalVfxRadius), arrivalVfxSeconds);
+            GameObject mark = SpawnMarker(point, arrivalVfxRadius, casterTeam);
+            if (mark != null)
+                Destroy(mark, arrivalVfxSeconds);
         }
 
-        private static GameObject SpawnMarker(Vector3 point, float radius)
+        // A flat hexagon ring in the movement look (TeleportRing); null without a radius or a UiTheme with an Arena Look.
+        private GameObject SpawnMarker(Vector3 point, float radius, int casterTeam)
         {
-            if (radius <= 0f)
+            UiTheme theme = Owner != null && Owner.Health != null ? Owner.Health.Theme : null;
+            if (theme == null)
                 return null;
-
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            marker.name = "Teleport VFX (cheap, cosmetic only)";
-            // Removed immediately, not with Destroy (end of frame): for that frame the sphere would be a solid object in
-            // the world. Same trick as BlinkAbility.PlayRemoteVfx.
-            DestroyImmediate(marker.GetComponent<Collider>());
-            marker.transform.position = point;
-            marker.transform.localScale = Vector3.one * radius * 2f;
-            return marker;
+            return TeleportRing.Build(point, radius, LookColours.For(LookFamily.Silver, casterTeam, theme), theme.arenaLook);
         }
 
         public override string ShopStatsText() =>

@@ -8,11 +8,12 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The zip gun's hook in flight: a small silver harpoon facing its flight, and a straight segmented silver cable back to the shooter's
+    /// The zip gun's hook in flight: a silver harpoon facing its flight, and a straight segmented silver cable back to the shooter's
     /// muzzle whose chevrons run toward the target (ZipCableLook). Every client already spawns this projectile locally from the cast RPC,
-    /// so every client draws the same. The harpoon spans the real hit sphere along its flight (its back at the sphere's back, its point at
-    /// the front), so the look tells the truth about the hit; the hit itself is ProjectileMotor's `radius`, which this class never reads or
-    /// touches. Visual only beyond that: an IProjectileBehaviour that never keeps a shot flying and never touches the sweep.
+    /// so every client draws the same. The harpoon is drawn Zip Harpoon Size times the hit sphere's width with its point at the sphere's
+    /// front, so it touches a target exactly when the hit lands, and at sizes above 1 reads bigger than the hit. The hit itself (the shot's
+    /// ProjectileRadius) is only read here. Visual only beyond that: an IProjectileBehaviour that never keeps a shot flying and never
+    /// touches the sweep.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class ZipBoltView : MonoBehaviour, IProjectileBehaviour
@@ -54,9 +55,23 @@ namespace Overpower.Abilities
                 block.SetColor(BaseColorId, colour);
                 block.SetColor(EmissionColorId, new Color(colour.r * glow, colour.g * glow, colour.b * glow, 1f));
                 head.SetPropertyBlock(block);
+                PlaceHarpoon(context.ProjectileRadius);
             }
             ZipCableLook.Configure(rope, look);
             UpdateRope();
+        }
+
+        // Zip Harpoon Size times the hit's width, scaled evenly from the model's own length (its origin is its back, its point at +Z).
+        private void PlaceHarpoon(float hitRadius)
+        {
+            var filter = head.GetComponent<MeshFilter>();
+            float modelLength = filter != null && filter.sharedMesh != null ? filter.sharedMesh.bounds.max.z : 0f;
+            if (look == null || modelLength <= 0f)
+                return;
+            float length = ZipCableLook.HarpoonLength(hitRadius, look.zipHarpoonSize);
+            Transform t = head.transform;
+            t.localScale = Vector3.one * (length / modelLength);
+            t.localPosition = new Vector3(t.localPosition.x, t.localPosition.y, ZipCableLook.HarpoonBack(hitRadius, length));
         }
 
         private void LateUpdate() => UpdateRope();

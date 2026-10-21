@@ -12,6 +12,10 @@ namespace Overpower.Abilities
 
         public static Color Colour(UiTheme theme, int abilityId, int team) => LookColours.ForAbility(theme, abilityId, team, LookFamily.Gold);
 
+        /// <summary>How wide the gold shell is drawn, in metres: the Shield's diameter times Shield Shell Scale. The Shield Diameter itself
+        /// stays the size the respawn bubble is measured from.</summary>
+        public static float ShellDiameter(float shieldDiameter, float shellScale) => shieldDiameter * shellScale;
+
         /// <summary>The armed ring (metres, measured from the player's feet) in the shell's own space, where the whole shell is one unit
         /// wide and centred <paramref name="lift"/> metres above the feet: x is the ring's radius, y its height.</summary>
         public static Vector2 RingInShellSpace(float ringDiameter, float ringHeight, float shieldDiameter, float lift) =>

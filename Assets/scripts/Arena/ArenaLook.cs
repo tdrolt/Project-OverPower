@@ -38,6 +38,8 @@ namespace Overpower.Arena
         [Min(0f)] public float shieldPlateGlow = 0.4f;
         [Tooltip("The colour seen through the seams between the Shield's plates, wherever the player is not behind them. Keep it near black so the seams read dark over any floor or team colour.")]
         public Color shieldSeamShade = new Color(0.035f, 0.03f, 0.025f, 1f);
+        [Tooltip("How big the Shield's gold shell is drawn, as a multiple of the Shield Diameter on the Shield ability: about 1.18 draws it 2.6 m across, so the whole mech fits inside. Only the look: the respawn bubble keeps its size from the Shield Diameter, and the plates still rise from the armed ring on the floor.")]
+        [Min(0.1f)] public float shieldShellScale = 1.18f;
 
         [Header("Materials")]
         [Tooltip("The see-through glowing glass of the respawn bubble (the Overpower/Hologram shader). Every bubble wears its own copy in its owner's team colour, so this file is never changed while playing.")]
@@ -50,10 +52,10 @@ namespace Overpower.Arena
         public Material fxAlpha;
 
         [Header("Stun Gun")]
-        [Tooltip("How brightly the solid core of an ability's own shot (the Stun Gun bolt) glows in its look colour. About 0.6 keeps a deep electric blue; above about 1 the glow turns the bolt pale cyan, the colour of the cyan team.")]
-        [Min(0f)] public float abilityShotGlow = 0.6f;
         [Tooltip("How bright the sparks of an ability's own shot are (the crackle behind the Stun Gun bolt and the burst where it lands), as a multiple of its look colour. 1 is exactly the STUNNED label's blue; above 1 the blue lifts toward the paler blue of the health bar and the cyan team.")]
         [Min(0f)] public float abilitySparkGlow = 1f;
+        [Tooltip("How brightly the Stun Gun bolt's core glows in its own electric blue: above 1 it glows past the arena's stripes and blooms. The blue stays blue however high this goes, because only its blue part grows.")]
+        [Min(0f)] public float stunBoltGlow = 2.5f;
         [Tooltip("How many electric arcs crackle around a stunned player.")]
         [Range(1, 6)] public int stunArcCount = 3;
         [Tooltip("How many times a second the arcs on a stunned player jump to a new shape. The shape comes from the server clock and the player, so everyone sees the same arcs.")]
@@ -210,6 +212,10 @@ namespace Overpower.Arena
         [Min(0.05f)] public float zipChevronSpacing = 0.6f;
         [Tooltip("How fast the chevrons run along the Zip Gun's cable toward the target, in metres per second. 0 holds them still.")]
         [Min(0f)] public float zipChevronSpeed = 8f;
+        [Tooltip("How brightly the Zip Gun's harpoon glows in its silver: 0 is plain lit metal, about 0.6 keeps it readable over the dark floor without a halo.")]
+        [Min(0f)] public float abilityShotGlow = 0.6f;
+        [Tooltip("How long the Zip Gun's harpoon is drawn, as a multiple of the width of what it can hit: 1 spans exactly the hit, 1.5 draws it half as long again (it then reads bigger than the hit). Its point always sits at the front of the hit, so it touches a target exactly when it hooks it.")]
+        [Range(0.5f, 3f)] public float zipHarpoonSize = 1.5f;
 
         [Header("Sprint")]
         [Tooltip("How many silver speed-lines stream behind a sprinting player's feet.")]
@@ -232,6 +238,12 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float sprintLineAlpha = 1f;
         [Tooltip("How high above the floor the Sprint speed-lines run, in metres: just above it, so they read as kicked up by the feet.")]
         [Min(0f)] public float sprintLineLift = 0.06f;
+
+        [Header("Teleport")]
+        [Tooltip("How thick the flat silver hexagon is that marks a Teleport: on a portal while someone channels in it, and at both ends of a trip on other players' screens, in metres.")]
+        [Min(0.01f)] public float teleportRingWidth = 0.12f;
+        [Tooltip("How solid the Teleport's hexagon marks are, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float teleportRingAlpha = 0.9f;
 
         [Header("Portal")]
         [Tooltip("How thick the portal's hexagon frame on the floor is, in metres. Its corners sit on the portal's real edge, where a player can still use it.")]
@@ -268,7 +280,7 @@ namespace Overpower.Arena
         [Min(0f)] public float fenceArcJitter = 0.15f;
         [Tooltip("How thick each electric arc between the fence's pylons is, in metres.")]
         [Min(0.005f)] public float fenceArcWidth = 0.06f;
-        [Tooltip("How brightly the fence's arcs glow in its owner's colour: 1 is the plain team colour, more makes them bloom.")]
+        [Tooltip("How brightly the Electric Fence's red arcs glow: 1 is the plain danger red, more makes them bloom.")]
         [Min(0f)] public float fenceArcGlow = 1.2f;
         [Tooltip("How much of the owner's colour an Electric Fence pylon's body takes: 0 is black, 1 the full team colour. Darker than the arcs, so the arcs carry the glow.")]
         [Range(0f, 1f)] public float fencePylonShade = 0.15f;

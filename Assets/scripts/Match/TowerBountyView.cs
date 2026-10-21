@@ -14,8 +14,8 @@ namespace Overpower.Match
     /// <summary>
     /// The bounty floating above a tower, and the pop when it is paid. A HUD label projected from the tower onto its own screen-overlay canvas
     /// (like CentreScanCountdownView), so it keeps one size however far the camera is zoomed out and can never be hidden by the tower's glow or its
-    /// capture ring. It is not fogged: zone owners are drawn without sight, and so is this. BountyLabelPlacement keeps it on screen and off the
-    /// corner minimap. Every client works it out from the replicated TerritorySnapshot and the server clock (BountyLabelRules), so there is no extra
+    /// capture ring. It is not fogged: zone owners are drawn without sight, and so is this. It is shown only while its tower is on this player's
+    /// screen (no label pinned to the edge for a tower out of view); BountyLabelPlacement keeps it inside the screen and off the corner minimap. Every client works it out from the replicated TerritorySnapshot and the server clock (BountyLabelRules), so there is no extra
     /// network traffic. Text, colour, sizes and heights: UiTheme > Bounty fields. Lives on the BuildingManager.
     /// </summary>
     [DefaultExecutionOrder(1000)] // after the camera has moved this frame
@@ -267,13 +267,13 @@ namespace Overpower.Match
         private static Vector2 SizeOf(TextMeshProUGUI label) =>
             new Vector2(label.GetPreferredValues(label.text).x, BountyLabelPlacement.LabelHeight(label.fontSize));
 
-        // The zone's centre, anchorHeight metres up, on this canvas. False when it is behind the camera.
+        // The zone's centre, anchorHeight metres up, on this canvas. False when that point is off this player's screen or behind the camera.
         private bool TryScreenPoint(BuildingManager manager, int zone, UiTheme theme, Camera cam, out Vector2 local)
         {
             local = default;
             if (!manager.TryGetZoneCentre(zone, out Vector3 centre)) return false;
             Vector3 screen = cam.WorldToScreenPoint(centre + Vector3.up * theme.bountyLabelAnchorHeight);
-            if (screen.z < 0f) return false;
+            if (!BountyLabelPlacement.OnScreen(screen, cam.pixelRect)) return false;
             RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen, null, out local);
             return true;
         }

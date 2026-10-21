@@ -2104,7 +2104,7 @@ namespace Overpower.UI
         public Color fireCoreColor = new Color(1f, 0.92f, 0.6f, 1f);
         [Tooltip("The orange of the Flamethrower's flat fan and the outer tips of its flames.")]
         public Color fireEdgeColor = new Color(1f, 0.45f, 0.1f, 1f);
-        [Tooltip("The red of the danger ultimates (the AoE Zone and the Raybeam). Red, because green reads as healing.")]
+        [Tooltip("The red of damage: the AoE Zone, the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);

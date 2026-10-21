@@ -165,7 +165,8 @@ namespace Overpower.Tests
             Assert.Less(mesh.triangles.Length / 3, 300, "a small low-poly model");
             Assert.Greater(mesh.bounds.size.z, mesh.bounds.size.x * 2f, "long along its flight (+Z), slim across");
             Vector3 size = Vector3.Scale(mesh.bounds.size, bullet.transform.localScale);
-            Assert.Less(Mathf.Max(size.x, size.y, size.z), 0.6f, "smaller than the 0.6 m ball it replaces, in every direction");
+            Assert.AreEqual(0.6f, Mathf.Max(size.x, size.y, size.z), 0.05f, "about as long as the 0.6 m ball it replaced was wide, so it reads at play zoom");
+            Assert.LessOrEqual(Mathf.Max(size.x, size.y), 0.6f, "and never wider than the ball");
             Assert.IsEmpty(bullet.GetComponentsInChildren<Collider>(true), "hits come from the motor's sphere cast, never a collider");
         }
 

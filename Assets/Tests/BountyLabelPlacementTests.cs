@@ -133,6 +133,21 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ALabelIsDrawnOnlyWhileItsTowerIsOnTheScreen()
+        {
+            var screen = new Rect(0f, 0f, 1920f, 1080f);
+            Assert.IsTrue(BountyLabelPlacement.OnScreen(new Vector3(960f, 540f, 12f), screen), "the tower in the middle of the view");
+            Assert.IsTrue(BountyLabelPlacement.OnScreen(new Vector3(1f, 1079f, 12f), screen), "just inside a corner");
+            Assert.IsFalse(BountyLabelPlacement.OnScreen(new Vector3(-40f, 540f, 12f), screen), "off the left edge: no label pinned there");
+            Assert.IsFalse(BountyLabelPlacement.OnScreen(new Vector3(1960f, 540f, 12f), screen), "off the right edge");
+            Assert.IsFalse(BountyLabelPlacement.OnScreen(new Vector3(960f, -5f, 12f), screen), "below the screen");
+            Assert.IsFalse(BountyLabelPlacement.OnScreen(new Vector3(960f, 1100f, 12f), screen), "above the screen");
+            Assert.IsFalse(BountyLabelPlacement.OnScreen(new Vector3(960f, 540f, -3f), screen), "behind the camera");
+            Assert.IsTrue(BountyLabelPlacement.OnScreen(new Vector3(300f, 200f, 5f), new Rect(100f, 100f, 400f, 300f)), "a camera drawn into part of the screen");
+            Assert.IsFalse(BountyLabelPlacement.OnScreen(new Vector3(50f, 200f, 5f), new Rect(100f, 100f, 400f, 300f)));
+        }
+
+        [Test]
         public void TheHeightIsAboutSixTenthsOfTheFontSize()
         {
             Assert.AreEqual(30f, BountyLabelPlacement.LabelHeight(50f), 1e-3f);

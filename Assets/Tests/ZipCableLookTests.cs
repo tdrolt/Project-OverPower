@@ -9,7 +9,7 @@ namespace Overpower.Tests
 {
     /// <summary>The Zip Gun fires a small silver harpoon on a straight segmented silver cable whose chevrons run toward the target, in flight
     /// and during the pull; every colour from the Zip Gun's row in the look table. The harpoon is a look only: no collider, the hit size and
-    /// the bullet's root scale stay, and the harpoon spans exactly the hit sphere along its flight.</summary>
+    /// the bullet's root scale stay; the harpoon is drawn Zip Harpoon Size times the hit sphere's width, its point at the sphere's front.</summary>
     public class ZipCableLookTests
     {
         private const System.Reflection.BindingFlags Any = MovementLookTestKit.Any;
@@ -83,6 +83,44 @@ namespace Overpower.Tests
                 Assert.AreEqual(1f, block.GetVector(BaseMapStId).x, 1e-5f, "the pattern's size comes from the line, not the material");
                 Assert.AreEqual(head.transform.position, rope.GetPosition(1), "the cable ends at the back of the harpoon");
             }
+        }
+
+        [Test]
+        public void TheHarpoonIsDrawnZipHarpoonSizeTimesTheHitWithItsPointAtTheHitsFront()
+        {
+            Assert.AreEqual(0.45f, ZipCableLook.HarpoonLength(0.225f, 1f), 1e-6f, "size 1 spans exactly the hit");
+            Assert.AreEqual(0.675f, ZipCableLook.HarpoonLength(0.225f, 1.5f), 1e-6f, "half as long again");
+            Assert.AreEqual(-0.225f, ZipCableLook.HarpoonBack(0.225f, 0.45f), 1e-6f, "the old placement: back at the hit's back");
+            Assert.AreEqual(-0.45f, ZipCableLook.HarpoonBack(0.225f, 0.675f), 1e-6f, "a longer harpoon reaches further back; its point stays at the hit's front");
+
+            using (var kit = new MovementLookTestKit(ZipId, LookShape.HarpoonCable))
+            {
+                kit.Look.zipHarpoonSize = 1.5f;
+                GameObject bolt = kit.NewObject("zip harpoon size test");
+                bolt.transform.position = new Vector3(4f, 500f, 2f);
+                var head = new GameObject("Head");
+                head.transform.SetParent(bolt.transform, false);
+                head.transform.localScale = Vector3.one * 0.45f;
+                MeshRenderer headRenderer = head.AddComponent<MeshRenderer>();
+                Mesh spear = kit.Make(new Mesh { vertices = new[] { new Vector3(-0.2f, 0f, 0f), new Vector3(0.2f, 0f, 0f), new Vector3(0f, 0f, 2f) }, triangles = new[] { 0, 1, 2 } });
+                head.AddComponent<MeshFilter>().sharedMesh = spear; // 2 m long from its back (z 0) to its point
+                ZipBoltView view = bolt.AddComponent<ZipBoltView>();
+                var so = new SerializedObject(view);
+                so.FindProperty("theme").objectReferenceValue = kit.Theme;
+                so.FindProperty("head").objectReferenceValue = headRenderer;
+                so.ApplyModifiedPropertiesWithoutUndo();
+
+                view.OnSpawned(null, new ProjectileContext(ZipId, 40f, 0.3f, 15f, 0f, -1, 1, Vector3.forward, bolt.transform.position));
+
+                Assert.AreEqual(0.9f / 2f, head.transform.localScale.z, 1e-5f, "0.9 m long (1.5 x the 0.6 m hit) from a 2 m model");
+                Assert.AreEqual(head.transform.localScale.z, head.transform.localScale.x, 1e-6f, "scaled evenly, the model's shape kept");
+                Assert.AreEqual(-0.6f, head.transform.localPosition.z, 1e-5f, "its back 0.9 m behind the hit's front");
+                Assert.AreEqual(0.3f, head.transform.localPosition.z + 2f * head.transform.localScale.z, 1e-5f, "its point at the hit's front");
+            }
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), nameof(ZipBoltView.OnSpawned), typeof(ZipBoltView).GetMethod("PlaceHarpoon", Any)), "every spawned bolt sizes its harpoon");
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), "PlaceHarpoon", typeof(ArenaLook).GetField(nameof(ArenaLook.zipHarpoonSize))));
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), "PlaceHarpoon", typeof(ZipCableLook).GetMethod(nameof(ZipCableLook.HarpoonLength))));
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), "PlaceHarpoon", typeof(ZipCableLook).GetMethod(nameof(ZipCableLook.HarpoonBack))));
         }
 
         [Test]
