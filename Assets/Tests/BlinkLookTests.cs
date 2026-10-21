@@ -158,7 +158,9 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(BlinkMarkView), nameof(BlinkMarkView.DrawRing), typeof(VisualTint).GetMethod(nameof(VisualTint.FillFlatCircle))));
             Assert.IsTrue(IlWiring.Uses(typeof(BlinkMarkView), typeof(LookColours).GetMethod(nameof(LookColours.ForAbility))));
             Assert.IsNull(typeof(BlinkAbility).GetField("remoteVfxRadius", Any), "no sphere size: the marks are shards and a ring");
-            Assert.IsFalse(IlWiring.Uses(typeof(BlinkAbility), typeof(GameObject).GetMethod(nameof(GameObject.CreatePrimitive))), "no primitive sphere");
+            MethodInfo primitive = typeof(GameObject).GetMethod(nameof(GameObject.CreatePrimitive));
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(BlinkAbility), primitive), "no primitive sphere where the Blink is cast");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(BlinkMarkView), primitive), "nor where its marks are drawn");
         }
 
         [Test]

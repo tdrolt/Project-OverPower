@@ -123,7 +123,8 @@ namespace Overpower.Tests
                     Assert.AreEqual(0f, v.y, 1e-6f, "flat on the floor");
                 }
                 foreach (Color c in mesh.colors)
-                    MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, c, "the cells wear the AoE Zone's row");
+                    MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold.linear, c,
+                        "the cells wear the AoE Zone's row, handed over linear like the feet hex (a mesh's vertex colours are not converted)");
 
                 Vector3[] vertices = mesh.vertices;
                 Vector3 centre = new Vector3(centres[0].x, 0f, centres[0].y);
@@ -584,6 +585,20 @@ namespace Overpower.Tests
         {
             string[] failed = checks.Where(c => !c.ok).Select(c => c.what).ToArray();
             Assert.IsEmpty(failed, "failed: " + string.Join(" | ", failed));
+        }
+
+        [Test]
+        public void EveryMeshPaintedOnFxAlphaGetsItsColoursLinear()
+        {
+            var red = new Color(1f, 0.18f, 0.15f, 0.4f);
+            Color v = VisualTint.VertexColour(red);
+            Assert.AreEqual(red.linear.r, v.r, 1e-5f);
+            Assert.AreEqual(red.linear.g, v.g, 1e-5f, "a mesh's vertex colours reach the shader unconverted: hand them over linear");
+            Assert.AreEqual(red.linear.b, v.b, 1e-5f);
+            Assert.AreEqual(0.4f, v.a, 1e-5f, "opacity is not a colour: it stays as it is");
+            MethodInfo vertex = typeof(VisualTint).GetMethod(nameof(VisualTint.VertexColour));
+            Assert.IsTrue(IlWiring.Uses(typeof(AoeZoneView), nameof(AoeZoneView.OnDeployablePlaced), vertex), "the AoE Zone's cells");
+            Assert.IsTrue(IlWiring.Uses(typeof(FeetHexView), "Dress", vertex), "the team hex under the feet");
         }
 
         private static Object Ref(Component component, string field) =>

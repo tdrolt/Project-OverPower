@@ -93,7 +93,7 @@ namespace Overpower.Tests
                 "two arcs at different heights never move as one");
             Color team = new Color(0.8f, 0.4f, 0.2f, 1f);
             Assert.AreEqual(new Color(0.4f, 0.2f, 0.1f, 1f), FenceArcsRule.PylonBody(team, 0.5f), "a darker team colour, solid");
-            Assert.AreEqual(new Color(1.2f, 0.6f, 0.3f, 1f), FenceArcsRule.PylonGlow(team, 1.5f));
+            Assert.AreEqual(new Color(1.2f, 0.5f, 0.25f, 1f), FenceArcsRule.PylonGlow(team, 1.5f), "the brightest channel glows, the weaker ones stop at their share (hue kept)");
         }
 
         // ---- views ----
@@ -176,7 +176,7 @@ namespace Overpower.Tests
                 view.PaintCap(0.05f);
                 cap.GetPropertyBlock(block);
                 MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, block.GetColor(BaseColorId), "the cap wears the Mines row in the look table, light on");
-                MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold * 2f, block.GetColor(EmissionId), "and glows by Mine Cap Glow");
+                MovementLookTestKit.AssertRgb(TowerLookRules.GlowKeepingHue(MovementLookTestKit.Gold, 2f), block.GetColor(EmissionId), "and glows by Mine Cap Glow, hue kept");
 
                 view.PaintCap(0.6f);
                 cap.GetPropertyBlock(block);
@@ -226,7 +226,7 @@ namespace Overpower.Tests
 
                 view.PaintCap(0.05f);
                 cap.GetPropertyBlock(block);
-                MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold * 2f, block.GetColor(EmissionId), "the Ghost's cap still lights up by Mine Cap Glow");
+                MovementLookTestKit.AssertRgb(TowerLookRules.GlowKeepingHue(MovementLookTestKit.Gold, 2f), block.GetColor(EmissionId), "the Ghost's cap still lights up by Mine Cap Glow");
                 Assert.AreEqual(1f, block.GetColor(BaseColorId).a, 1e-5f, "a solid light on the faded puck");
                 view.PaintCap(0.6f);
                 cap.GetPropertyBlock(block);
@@ -432,9 +432,57 @@ namespace Overpower.Tests
             string name = CoverPanelLook.PropertyName;
             StringAssert.Contains("float4 " + name + ";", hlsl, "the wall shader declares the edge the cover's property block fills");
             StringAssert.Contains("s.emission += " + name + ".rgb", hlsl, "and lights the band with it");
-            var setGlobal = new System.Text.RegularExpressions.Regex(@"SetGlobal\w*\s*\([^;]*(" + name + @"|CoverPanelLook\.PropertyName)");
-            foreach (string file in System.IO.Directory.GetFiles("Assets/scripts", "*.cs", System.IO.SearchOption.AllDirectories))
-                Assert.IsFalse(setGlobal.IsMatch(System.IO.File.ReadAllText(file)), file + " sets the cover edge as a global: every static arena wall would light up");
+            // Read from the compiled game, not the source text: a global set through a cached id field (Shader.PropertyToID) looks like any
+            // other int in the text. Any method that sets a shader global must neither load the name nor a field holding its id.
+            int edgeId = Shader.PropertyToID(name);
+            System.Reflection.Module game = typeof(CoverPanelView).Module;
+            var methods = new System.Collections.Generic.List<System.Reflection.MethodBase>();
+            foreach (System.Type type in game.GetTypes())
+            {
+                const System.Reflection.BindingFlags all = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static |
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly;
+                methods.AddRange(type.GetMethods(all));
+                methods.AddRange(type.GetConstructors(all));
+            }
+            int setters = 0;
+            foreach (System.Reflection.MethodBase method in methods)
+            {
+                byte[] il = method.GetMethodBody()?.GetILAsByteArray();
+                if (il == null) continue;
+                bool setsGlobal = false, namesEdge = false;
+                for (int pass = 0; pass < 2 && (pass == 0 || setsGlobal); pass++) // the second pass (names) only for a method that sets a global
+                    for (int i = 0; i + 4 < il.Length; i++)
+                    {
+                        int token = System.BitConverter.ToInt32(il, i + 1);
+                        try
+                        {
+                            if (pass == 0 && (il[i] == 0x28 || il[i] == 0x6F) && game.ResolveMethod(token) is System.Reflection.MethodBase called
+                                && called.Name.StartsWith("SetGlobal") && (called.DeclaringType == typeof(Shader) || called.DeclaringType == typeof(UnityEngine.Rendering.CommandBuffer)))
+                                setsGlobal = true;
+                            else if (pass == 1 && il[i] == 0x72 && game.ResolveString(token) == name)
+                                namesEdge = true;
+                            else if (pass == 1 && il[i] == 0x7E && game.ResolveField(token) is System.Reflection.FieldInfo f && f.FieldType == typeof(int)
+                                && f.IsStatic && f.IsInitOnly && (int)f.GetValue(null) == edgeId)
+                                namesEdge = true;
+                        }
+                        catch (System.Exception) { /* the bytes only looked like a token */ }
+                    }
+                if (setsGlobal) setters++;
+                Assert.IsFalse(setsGlobal && namesEdge, method.DeclaringType + "." + method.Name + " sets the cover edge as a global: every static arena wall would light up");
+            }
+            Assert.Greater(setters, 0, "the scan sees the methods that do set shader globals (ArenaShaderGlobals)");
+        }
+
+        [Test]
+        public void PlacedThingsGlowInTheirTeamsHueLikeTheTowers()
+        {
+            var purple = new Color(0.68f, 0.32f, 1f, 1f);
+            Color pylon = FenceArcsRule.PylonGlow(purple, 1.5f);
+            Assert.AreEqual(TowerLookRules.GlowKeepingHue(purple, 1.5f), pylon, "one glow rule for every team-owned glow");
+            Assert.AreEqual(0.68f, pylon.r, 1e-4f, "purple's red stays at its share, or the glow would turn pink");
+            Assert.AreEqual(1f, pylon.a);
+            Assert.IsTrue(IlWiring.Uses(typeof(MineView), nameof(MineView.PaintCap), typeof(TowerLookRules).GetMethod(nameof(TowerLookRules.GlowKeepingHue))),
+                "the mine's cap glows through the same rule");
         }
 
         // ---- helpers ----

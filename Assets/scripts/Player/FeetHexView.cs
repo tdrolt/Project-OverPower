@@ -108,8 +108,7 @@ namespace Overpower.Arena
                 Rebuild();
             if (team == dressedTeam && dressedEdgeAlpha == look.feetHexEdgeAlpha && dressedFillAlpha == look.feetHexFillAlpha)
                 return;
-            // FX Alpha takes vertex colours as they are and the project renders in linear space, so hand them over linear.
-            Color colour = LookColours.For(LookFamily.Team, team, theme).linear;
+            Color colour = VisualTint.VertexColour(LookColours.For(LookFamily.Team, team, theme));
             Color edge = VisualTint.WithAlpha(colour, look.feetHexEdgeAlpha);
             Color fill = VisualTint.WithAlpha(colour, look.feetHexFillAlpha);
             for (int i = 0; i < colours.Length; i++)

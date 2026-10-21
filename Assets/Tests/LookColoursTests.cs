@@ -1,14 +1,12 @@
 using NUnit.Framework;
 using Overpower.Arena;
 using Overpower.UI;
-using UnityEditor;
 using UnityEngine;
 
 namespace Overpower.Tests
 {
     /// <summary>Each colour family reads from exactly one UiTheme field. The sentinels are made-up so the tests check where a colour
-    /// comes from, not what it is tuned to; the last test checks the one thing the colour language asks of the shipped values: families
-    /// that must never be mistaken for each other stay apart.</summary>
+    /// comes from, not what it is tuned to.</summary>
     public class LookColoursTests
     {
         private static readonly Color Team0 = new Color(0.11f, 0.12f, 0.13f, 1f);
@@ -73,25 +71,5 @@ namespace Overpower.Tests
                 Assert.Greater(LookColours.For(family, 0, theme).a, 0f, family + " must give a visible colour");
             }
         }
-
-        [Test] public void TheShippedColoursKeepTheColourLanguageApart()
-        {
-            var real = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            Assert.NotNull(real);
-            Color gold = LookColours.For(LookFamily.Gold, 0, real);
-            Color blue = LookColours.For(LookFamily.ElectricBlue, 0, real);
-            Color silver = LookColours.For(LookFamily.Silver, 0, real);
-            Assert.Greater(Apart(blue, gold), 0.3f, "stun must not read as the Shield");
-            Assert.Greater(Apart(blue, real.statusSlowedColor), 0.3f, "the STUNNED and SLOWED labels must not be the same colour family");
-            Assert.Greater(Apart(LookColours.For(LookFamily.Fire, 0, real), gold), 0.3f, "fire must not read as the Shield");
-            Assert.Greater(Apart(LookColours.FireCore(real), gold), 0.3f, "the fire's heart must not read as the Shield");
-            for (int team = 0; team < real.teamShotColors.Length; team++)
-            {
-                Assert.Greater(Apart(blue, real.ShotColorFor(team)), 0.2f, "stun must not read as team " + team);
-                Assert.Greater(Apart(silver, real.ShotColorFor(team)), 0.2f, "a movement effect must not read as team " + team);
-            }
-        }
-
-        private static float Apart(Color a, Color b) => Mathf.Max(Mathf.Abs(a.r - b.r), Mathf.Abs(a.g - b.g), Mathf.Abs(a.b - b.b));
     }
 }

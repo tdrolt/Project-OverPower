@@ -1,3 +1,4 @@
+using Overpower.Arena;
 using Overpower.Combat;
 using UnityEngine;
 
@@ -26,6 +27,11 @@ namespace Overpower.Abilities
 
         public static Color PylonBody(Color team, float shade) => new Color(team.r * shade, team.g * shade, team.b * shade, 1f);
 
-        public static Color PylonGlow(Color team, float glow) => new Color(team.r * glow, team.g * glow, team.b * glow, 1f);
+        public static Color PylonGlow(Color team, float glow)
+        {
+            Color lit = TowerLookRules.GlowKeepingHue(team, glow);
+            lit.a = 1f;
+            return lit;
+        }
     }
 }

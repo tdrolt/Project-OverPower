@@ -112,8 +112,8 @@ namespace Overpower.Vision
             SetVisible(Decide(force, sight != null, bound, casterShown, spotSeen));
         }
 
-        /// <summary>Switches the renderers on (to their authored state) or off. A trail is cleared when it comes back, so
-        /// a bullet that left the fog and returned draws no line through it.</summary>
+        /// <summary>Switches the renderers on (to their authored state) or off. A trail, and sparks a world-space particle system left
+        /// behind, are cleared when it comes back, so a bullet that left the fog and returned draws nothing of its path through it.</summary>
         public void SetVisible(bool visible)
         {
             if (visible == shown)
@@ -129,6 +129,9 @@ namespace Overpower.Vision
                 for (int i = 0; i < renderers.Count; i++)
                     if (renderers[i] is TrailRenderer trail)
                         trail.Clear();
+                    else if (renderers[i] is ParticleSystemRenderer sparks && sparks.TryGetComponent(out ParticleSystem system)
+                             && system.main.simulationSpace == ParticleSystemSimulationSpace.World)
+                        system.Clear(false);
         }
 
         private void SetRenderers(bool visible)

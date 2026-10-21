@@ -364,7 +364,15 @@ namespace Overpower.Arena
         public IReadOnlyList<AbilityLook> AbilityLooks => abilityLooks;
         public AbilityLook RespawnBubbleLook => respawnBubbleLook;
 
-        private void OnValidate() => ArenaShaderGlobals.Push(this);
+        // Only the saved asset: a look made in memory (tests make literal ones) would repaint the real arena.
+        private void OnValidate()
+        {
+#if UNITY_EDITOR
+            if (!UnityEditor.EditorUtility.IsPersistent(this))
+                return;
+#endif
+            ArenaShaderGlobals.Push(this);
+        }
 
         // In a player the asset loads with the first scene that references UiTheme. The Editor pushes the saved asset from
         // ArenaLookEditorGlobals instead: here every CreateInstance (tests make literal looks) would overwrite the real look.

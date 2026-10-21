@@ -215,6 +215,7 @@ MonoBehaviour:
   captureRingPausedOpacity: 0.6
   captureRingWarningColor: {r: 1, g: 0.2, b: 0.15, a: 1}
   captureRingPulseSpeed: 1.6
+  captureRingPulseDip: 0.35
   captureRingSegments: 96
   captureRingTrackColor: {r: 0, g: 0, b: 0, a: 0.4}
   minimapCornerSize: 340

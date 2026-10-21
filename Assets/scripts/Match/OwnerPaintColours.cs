@@ -13,12 +13,21 @@ namespace Overpower.Match
             Color colour = paint.Base == OwnerPaintBase.OutOfPlay ? theme.outOfPlayZoneColor
                          : paint.Base == OwnerPaintBase.Team ? theme.ShotColorFor(paint.Team) : neutral;
             if (paint.PulseTeam >= 0)
-                return Color.Lerp(colour, theme.ShotColorFor(paint.PulseTeam),
-                                  CaptureRingGeometry.Pulse01(timeSeconds, theme.captureRingPulseSpeed));
+                return Pulse(colour, theme.ShotColorFor(paint.PulseTeam), CaptureRingGeometry.Pulse01(timeSeconds, theme.captureRingPulseSpeed),
+                             theme.captureRingPulseDip);
             if (paint.PulsesToWarning)
-                return Color.Lerp(colour, theme.captureRingWarningColor,
-                                  CaptureRingGeometry.Pulse01(timeSeconds, theme.captureRingPulseSpeed));
+                return Pulse(colour, theme.captureRingWarningColor, CaptureRingGeometry.Pulse01(timeSeconds, theme.captureRingPulseSpeed),
+                             theme.captureRingPulseDip);
             return colour;
+        }
+
+        /// <summary>From one colour to the other: the first dims to <paramref name="dip"/> of its brightness, the second comes up from there.
+        /// Never a mix of the two (purple and red mix to pink, white and red to salmon); opacity moves straight across.</summary>
+        public static Color Pulse(Color from, Color to, float pulse01, float dip)
+        {
+            Color shown = pulse01 < 0.5f ? from * Mathf.Lerp(1f, dip, pulse01 * 2f) : to * Mathf.Lerp(dip, 1f, pulse01 * 2f - 1f);
+            shown.a = Mathf.Lerp(from.a, to.a, pulse01);
+            return shown;
         }
     }
 }

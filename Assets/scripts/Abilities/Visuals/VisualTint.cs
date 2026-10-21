@@ -15,6 +15,10 @@ namespace Overpower.Abilities
             return color;
         }
 
+        /// <summary>A colour for Mesh.colors. Unity converts the colours of a line, trail or particle to linear for the shader, but a mesh's own
+        /// vertex colours reach it as they are and the project renders in linear space: hand them over linear, or the colour shows pale.</summary>
+        public static Color VertexColour(Color color) => color.linear;
+
         public static void SetMeshColor(Renderer renderer, MaterialPropertyBlock block, Color color)
         {
             if (renderer == null || block == null)

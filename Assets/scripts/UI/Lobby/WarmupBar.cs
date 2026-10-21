@@ -17,7 +17,7 @@ namespace Overpower.UI
     /// </summary>
     public sealed class WarmupBar : MonoBehaviour
     {
-        /// <summary>Where the bar's canvas sorts: below the Loadout screen (-5), under the scoreboard (30), like the spectator bar.</summary>
+        /// <summary>Where the bar's canvas sorts: below the Loadout screen and the scoreboard (UiLayers), like the spectator bar.</summary>
         public const int SortingOrder = UiLayers.Hud;
 
         private LobbyUiKit kit;
@@ -51,7 +51,7 @@ namespace Overpower.UI
             var go = new GameObject("Warm-up Bar", typeof(RectTransform));
             go.transform.SetParent(canvas, false);
             LobbyUiKit.Stretch((RectTransform)go.transform);
-            // Its own canvas, below the shop (-5) and the scoreboard (30): on the lobby canvas (sort order 100) the bar drew over both.
+            // Its own canvas, below the shop and the scoreboard: on the lobby canvas the bar drew over both.
             Canvas own = go.AddComponent<Canvas>();
             own.overrideSorting = true;
             own.sortingOrder = SortingOrder;

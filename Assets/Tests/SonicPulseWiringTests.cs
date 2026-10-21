@@ -78,8 +78,7 @@ namespace Overpower.Tests
             Assert.Less(attachAt[0], showAt.Min(), "the gate is on before the bands show");
 
             // Built inactive, the gate's Awake would wait for the first SetActive(true) and switch every band back on from a fogged caster.
-            MethodInfo build = typeof(SonicPulseView).GetMethod("Build", Any);
-            Assert.IsEmpty(IlWiring.CallOffsets(build, typeof(GameObject).GetMethod(nameof(GameObject.SetActive))),
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(SonicPulseView), "Build", typeof(GameObject).GetMethod(nameof(GameObject.SetActive))),
                 "the bands are built awake and empty, so the gate wakes as it attaches");
         }
 

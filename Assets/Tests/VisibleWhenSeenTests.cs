@@ -89,6 +89,31 @@ namespace Overpower.Tests
             Assert.AreEqual(0, trail.positionCount);
         }
 
+        [Test]
+        public void ComingBackIntoSight_ClearsSparksLeftInTheWorldButNotOnesThatTravelWithTheObject()
+        {
+            ParticleSystem Sparks(string name, ParticleSystemSimulationSpace space)
+            {
+                var child = new GameObject(name);
+                child.transform.SetParent(root.transform, false);
+                ParticleSystem system = child.AddComponent<ParticleSystem>();
+                ParticleSystem.MainModule main = system.main;
+                main.simulationSpace = space;
+                main.startLifetime = 5f;
+                main.loop = true;
+                return system;
+            }
+            ParticleSystem world = Sparks("world sparks", ParticleSystemSimulationSpace.World);
+            ParticleSystem local = Sparks("local sparks", ParticleSystemSimulationSpace.Local);
+            gate.RefreshRenderers();
+            world.Emit(5);
+            local.Emit(5);
+            gate.SetVisible(false);
+            gate.SetVisible(true);
+            Assert.AreEqual(0, world.particleCount, "sparks dropped along the path while it was in the fog would show where it was");
+            Assert.AreEqual(5, local.particleCount, "sparks that move with the object were never left behind in the fog");
+        }
+
         // The pure choice: force wins, no sight = shown, a caster-bound object follows its caster, else its spot.
         [Test] public void Decide_Forced_IsShown() => Assert.IsTrue(VisibleWhenSeen.Decide(true, true, false, false, false));
         [Test] public void Decide_NoSight_IsShown() => Assert.IsTrue(VisibleWhenSeen.Decide(false, false, false, false, false));

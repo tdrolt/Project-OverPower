@@ -10,11 +10,7 @@ namespace Overpower.Abilities
     {
         private const int RingSides = 6;
 
-        public static Color Colour(UiTheme theme, int abilityId, int team)
-        {
-            LookFamily family = theme.arenaLook != null && theme.arenaLook.TryGetLook(abilityId, out AbilityLook look) ? look.Family : LookFamily.Gold;
-            return LookColours.For(family, team, theme);
-        }
+        public static Color Colour(UiTheme theme, int abilityId, int team) => LookColours.ForAbility(theme, abilityId, team, LookFamily.Gold);
 
         /// <summary>The armed ring (metres, measured from the player's feet) in the shell's own space, where the whole shell is one unit
         /// wide and centred <paramref name="lift"/> metres above the feet: x is the ring's radius, y its height.</summary>

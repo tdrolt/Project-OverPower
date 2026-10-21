@@ -54,7 +54,7 @@ namespace Overpower.Tests
                 Object.DestroyImmediate(theme);
             }
 
-            Assert.IsTrue(IlWiring.Uses(typeof(ShieldLook), nameof(ShieldLook.Colour), typeof(LookColours).GetMethod(nameof(LookColours.For))));
+            Assert.IsTrue(IlWiring.Uses(typeof(ShieldLook), nameof(ShieldLook.Colour), typeof(LookColours).GetMethod(nameof(LookColours.ForAbility))), "the one look-table lookup");
             Assert.IsTrue(IlWiring.Uses(typeof(InvulnerabilityAbility), "ShowShield", Colour), "the shell's gold");
             Assert.IsTrue(IlWiring.Uses(typeof(InvulnerabilityAbility), "SetRing", Colour), "the armed ring's gold");
         }
@@ -90,7 +90,8 @@ namespace Overpower.Tests
             Assert.IsNotEmpty(buildAt, "the Shield is the hex-plate shell");
             Assert.IsNotEmpty(tintAt, "the shell is tinted");
             Assert.Less(buildAt.Concat(tintAt).Max(), attachAt[0], "the gate collects the renderers once: the shell must be complete before it attaches");
-            Assert.IsEmpty(IlWiring.CallOffsets(show, typeof(GameObject).GetMethod(nameof(GameObject.CreatePrimitive))), "the smooth sphere is gone");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(InvulnerabilityAbility), "ShowShield", typeof(GameObject).GetMethod(nameof(GameObject.CreatePrimitive))),
+                "the smooth sphere is gone (lambdas included)");
             Assert.IsTrue(IlWiring.Uses(typeof(InvulnerabilityAbility), "ShowShield", typeof(ArenaLook).GetField(nameof(ArenaLook.shieldSeamShade))),
                 "the seams' shade comes from ArenaLook");
         }

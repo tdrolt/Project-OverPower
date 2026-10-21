@@ -149,6 +149,69 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheStreakStartsWhereTheDasherWasFirstSeen()
+        {
+            Assert.Less(DashLook.SeenFrom(DashLook.NotSeenYet, false, 1.5f), 0f, "hidden in the fog: nothing seen yet");
+            Assert.AreEqual(0f, DashLook.SeenFrom(DashLook.NotSeenYet, true, 0f), "seen at the launch: the whole dash shows");
+            Assert.AreEqual(2f, DashLook.SeenFrom(DashLook.NotSeenYet, true, 2f), "first seen 2 m out: the streak starts there");
+            Assert.AreEqual(2f, DashLook.SeenFrom(2f, true, 2.8f), "and stays there as the dasher goes on");
+            Assert.AreEqual(2f, DashLook.SeenFrom(2f, false, 2.8f), "hidden again later: what was seen stays where it began");
+        }
+
+        [Test]
+        public void AnEnemyDashOutOfTheFogShowsOnlyThePartItsTeamSaw()
+        {
+            using (var kit = new MovementLookTestKit(DashId, LookShape.Streak))
+            {
+                kit.Look.dashStreakGap = 0.5f;
+                kit.Look.dashChevronCount = 3;
+                kit.Look.dashChevronSpacing = 0.7f;
+                kit.Look.dashFadeSeconds = 0.25f;
+                GameObject go = kit.NewObject("dash view fog test");
+                kit.GiveDefinition(go.AddComponent<DashAbility>(), DashId);
+                DashStreakView view = go.AddComponent<DashStreakView>();
+                MovementLookTestKit.SetTheme(view, kit.Theme);
+                Vector3 start = new Vector3(2f, 500f, 1f);
+                Transform body = kit.NewObject("dasher").transform;
+                body.position = start;
+                view.Play(start, Vector3.right, 3f, 0.2f, body, 1, null); // builds the streak once
+                kit.Make(view.Root);
+                VisibleWhenSeen gate = view.Root.AddComponent<VisibleWhenSeen>(); // what TeamSight's gate is on another team's screen
+                gate.SetVisible(false);
+
+                view.Play(start, Vector3.right, 3f, 0.2f, body, 1, null); // an enemy dash that begins in the fog
+                LineRenderer streak = view.Root.transform.Find(DashStreakView.StreakName).GetComponent<LineRenderer>();
+                body.position = start + new Vector3(1.5f, 0f, 0f);
+                view.Draw(0.1f);
+                Assert.AreEqual(0, streak.positionCount, "still in the fog: nothing is drawn");
+
+                gate.SetVisible(true); // the dasher steps out of the fog 1.5 m along the dash
+                body.position = start + new Vector3(1.6f, 0f, 0f);
+                view.Draw(0.12f);
+                body.position = start + new Vector3(3f, 0f, 0f);
+                view.Draw(0.2f);
+                Assert.AreEqual(2, streak.positionCount);
+                Assert.AreEqual(3.6f, streak.GetPosition(0).x, 1e-4f, "the streak begins where the dasher was first seen, never back in the fog");
+                Assert.AreEqual(4.5f, streak.GetPosition(1).x, 1e-4f, "and still runs to just behind the dasher");
+                for (int i = 0; i < 3; i++)
+                {
+                    LineRenderer chevron = view.Root.transform.Find(DashStreakView.ChevronName + i).GetComponent<LineRenderer>();
+                    bool inFog = DashLook.ChevronDistance(i, 3, 0.7f, 3f) < 1.6f;
+                    Assert.AreEqual(inFog ? 0 : 3, chevron.positionCount, "chevron " + i + (inFog ? " lies in the fog: hidden" : " was seen: drawn"));
+                }
+
+                gate.SetVisible(false);
+                view.Play(start, Vector3.right, 3f, 0.2f, body, 1, null);
+                body.position = start + new Vector3(3f, 0f, 0f); // a dasher who walks into sight only after the dash is over
+                view.Draw(0.1f);
+                gate.SetVisible(true);
+                view.Draw(0.3f);
+                Assert.IsTrue(streak.positionCount == 0 || Mathf.Approximately(streak.GetPosition(0).x, streak.GetPosition(1).x),
+                    "nothing of the path behind them, which their enemies never saw");
+            }
+        }
+
+        [Test]
         public void TheStreakIsBuiltBeforeTheFogGateAndShownOnlyAfterIt()
         {
             MethodInfo play = typeof(DashStreakView).GetMethod(nameof(DashStreakView.Play));
@@ -160,7 +223,7 @@ namespace Overpower.Tests
             Assert.IsNotEmpty(showAt);
             Assert.Less(buildAt.Max(), attachAt[0], "every line exists before the gate collects the renderers");
             Assert.Less(attachAt[0], showAt.Min(), "the gate is on before the streak shows");
-            Assert.IsEmpty(IlWiring.CallOffsets(typeof(DashStreakView).GetMethod("Build", Any), typeof(GameObject).GetMethod(nameof(GameObject.SetActive))),
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(DashStreakView), "Build", typeof(GameObject).GetMethod(nameof(GameObject.SetActive))),
                 "built awake and empty, so the gate wakes as it attaches");
         }
 
@@ -177,6 +240,10 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(DashStreakView), "Draw", typeof(DashLook).GetMethod(nameof(DashLook.ChevronDistance))));
             Assert.IsTrue(IlWiring.Uses(typeof(DashStreakView), "Draw", typeof(DashLook).GetMethod(nameof(DashLook.ChevronPoint))));
             Assert.IsTrue(IlWiring.Uses(typeof(DashStreakView), "Draw", typeof(DashLook).GetMethod(nameof(DashLook.Alpha))));
+            Assert.IsTrue(IlWiring.Uses(typeof(DashStreakView), "Draw", typeof(DashLook).GetMethod(nameof(DashLook.SeenFrom))),
+                "the streak starts where the dasher's enemies first saw them");
+            Assert.IsTrue(IlWiring.Uses(typeof(DashStreakView), "Draw", typeof(VisibleWhenSeen).GetProperty(nameof(VisibleWhenSeen.Shown)).GetGetMethod()),
+                "asked of the dasher's own fog gate");
             Assert.IsTrue(IlWiring.Uses(typeof(DashStreakView), nameof(DashStreakView.Play), typeof(LookColours).GetMethod(nameof(LookColours.ForAbility))));
         }
 

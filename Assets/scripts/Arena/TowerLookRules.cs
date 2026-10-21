@@ -25,9 +25,10 @@ namespace Overpower.Arena
         /// never past it, because columns must never add cover over the plain round tower (Decision 6).</summary>
         public static float ColumnRingRadius(float columnRadius, float towerRadius) => towerRadius - columnRadius;
 
-        /// <summary>The colour brightened by glow without changing its hue on screen. The screen clips each channel at
-        /// full strength (1), so only the brightest channel goes past it (that is what blooms); every other channel stops
-        /// at its share of the colour at full strength, or purple's red would catch up with its blue and turn it pink.</summary>
+        /// <summary>The colour brightened by glow without changing its hue on screen. The tonemapper squeezes every bright channel
+        /// toward the same level, so a weaker channel stops at its share of the colour at full strength (or purple's red would catch
+        /// up with its blue and turn it pink), while a channel close to the brightest grows with it (or white's blue alone would glow
+        /// and turn it lavender, cyan's blue alone sky blue).</summary>
         public static Color GlowKeepingHue(Color colour, float glow)
         {
             float peak = colour.maxColorComponent;
@@ -36,7 +37,14 @@ namespace Overpower.Arena
             return new Color(Channel(colour.r, peak, glow), Channel(colour.g, peak, glow), Channel(colour.b, peak, glow), colour.a);
         }
 
-        private static float Channel(float value, float peak, float glow) =>
-            value >= peak ? value * glow : Math.Min(value * glow, Math.Max(value, value / peak));
+        // A channel this close to the brightest (a share of it) starts to grow with it, and from the second share on grows fully.
+        private const float NearPeakFrom = 0.85f, NearPeakFull = 0.92f;
+
+        private static float Channel(float value, float peak, float glow)
+        {
+            float capped = Math.Min(value * glow, Math.Max(value, value / peak));
+            float near = Mathf.Clamp01((value / peak - NearPeakFrom) / (NearPeakFull - NearPeakFrom));
+            return capped + (value * glow - capped) * near;
+        }
     }
 }

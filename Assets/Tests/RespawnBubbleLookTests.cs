@@ -137,9 +137,7 @@ namespace Overpower.Tests
         {
             Assert.IsNull(typeof(UiTheme).GetField("respawnShieldColor"), "the old blue bubble colour has no reader left and must go");
             MethodInfo find = typeof(Shader).GetMethod(nameof(Shader.Find), new[] { typeof(string) });
-            foreach (MethodInfo m in typeof(RespawnShield).GetMethods(Any | BindingFlags.DeclaredOnly))
-                if (m.GetMethodBody() != null)
-                    Assert.IsEmpty(IlWiring.CallOffsets(m, find), m.Name + ": the bubble's material hangs off ArenaLook");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(RespawnShield), find), "the bubble's material hangs off ArenaLook (lambdas and coroutines included)");
         }
 
         [Test]

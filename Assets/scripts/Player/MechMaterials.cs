@@ -35,7 +35,8 @@ namespace Overpower.Arena
             Color body = MechLook.Base(team, look.mechBaseMix);
             material.SetColor(BaseColorId, body);
             material.SetColor(ColorId, body);
-            // URP Lit's _EmissionColor is an HDR property, which the shader reads as it is (a plain colour property is converted to linear): hence .linear.
+            // Material.SetColor hands an HDR property (URP Lit's _EmissionColor) to the shader as it is, a plain colour converted to linear: hence
+            // .linear here. A MaterialPropertyBlock.SetColor converts every colour, HDR or not, so the property-block glows pass theirs unconverted.
             material.SetColor(EmissionColorId, MechLook.Glow(team.linear, look.mechGlowStrength));
             material.EnableKeyword("_EMISSION");
         }

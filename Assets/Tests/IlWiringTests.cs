@@ -87,9 +87,14 @@ namespace Overpower.Tests
         [Test] public void AMethodOfAnotherAssemblyIsFoundByResolvingTheCall()
         {
             MethodInfo other = typeof(string).GetMethod(nameof(string.IsNullOrEmpty));
-            Assert.IsFalse(IlWiring.Uses(typeof(Probe), nameof(Probe.CallsAnotherAssembly), other), "the byte compare cannot see across assemblies");
+            Assert.Throws<System.ArgumentException>(() => IlWiring.Uses(typeof(Probe), nameof(Probe.CallsAnotherAssembly), other),
+                "the byte compare cannot see across assemblies, so it refuses instead of answering a false that can never fail");
+            Assert.Throws<System.ArgumentException>(() => IlWiring.Uses(typeof(Probe), other));
             Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(Probe), nameof(Probe.CallsAnotherAssembly), other));
             Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), other));
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(Probe), other), "type-wide");
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(Probe), typeof(Probe).GetMethod(nameof(Probe.Target))), "type-wide, lambdas included");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(Probe), typeof(string).GetMethod(nameof(string.Concat), new[] { typeof(string), typeof(string) })));
         }
 
         [Test] public void AMethodHandedOverAsADelegateIsFoundAndACallIsNot()

@@ -48,6 +48,14 @@ namespace Overpower.Abilities
         /// <summary>A chevron shows once the dasher has reached it, so a dash stopped short by a wall draws none past where it got.</summary>
         public static bool ChevronShown(float chevronDistance, float bodyReach) => bodyReach >= chevronDistance;
 
+        /// <summary>Before the dasher has been seen on this screen: nothing of the dash is drawn.</summary>
+        public const float NotSeenYet = -1f;
+
+        /// <summary>How far along the dash the dasher was when this screen first saw them (their fog gate opened): the streak and chevrons start
+        /// there, so a dash out of the fog never draws back to where it was launched. Fixed once found.</summary>
+        public static float SeenFrom(float seenFrom, bool shownNow, float bodyReach) =>
+            seenFrom >= 0f || !shownNow ? seenFrom : Mathf.Max(0f, bodyReach);
+
         /// <summary>Solid while the dash travels, then fading to nothing over <paramref name="fadeSeconds"/>.</summary>
         public static float Alpha(float ageSeconds, float travelSeconds, float fadeSeconds) =>
             ageSeconds <= travelSeconds ? 1f : AbilityVisualGeometry.Fade01(ageSeconds - travelSeconds, fadeSeconds);

@@ -444,7 +444,7 @@ namespace Overpower.UI
             canvasGo.transform.SetParent(transform, false);
             Canvas canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // Above the HUD (-10), below the loadout screen (-5), MatchUI's panels (0) and the F1 test panel (500).
+            // Over UiLayers.Hud, under the death card, the shop, MatchUI's panels and the F1 test panel (the order is UiLayers').
             canvas.overrideSorting = true;
             canvas.sortingOrder = UiLayers.Minimap;
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();

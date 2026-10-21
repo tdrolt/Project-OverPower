@@ -19,6 +19,7 @@ namespace Overpower.Tests
         /// hand-off out of the method that matters fails the test that names it.</summary>
         public static bool Uses(System.Type owner, string methodName, MemberInfo target)
         {
+            SameAssembly(owner, target);
             byte[] token = System.BitConverter.GetBytes(target.MetadataToken);
             string generated = "<" + methodName + ">"; // the compiler names a lambda "<Apply>b__12_0" and a state machine type "<Apply>d__3"
             var types = new List<System.Type> { owner };
@@ -38,6 +39,7 @@ namespace Overpower.Tests
         /// <summary>True when any method of the type has an IL call, callvirt, newobj or field load of the target.</summary>
         public static bool Uses(System.Type owner, MemberInfo target)
         {
+            SameAssembly(owner, target);
             byte[] token = System.BitConverter.GetBytes(target.MetadataToken);
             var types = new List<System.Type> { owner };
             types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
@@ -52,6 +54,7 @@ namespace Overpower.Tests
         /// handler once and subscribes it is checked for the subscription.</summary>
         public static bool HandsOver(System.Type owner, string methodName, MethodBase target)
         {
+            SameAssembly(owner, target);
             byte[] token = System.BitConverter.GetBytes(target.MetadataToken);
             string generated = "<" + methodName + ">";
             var types = new List<System.Type> { owner };
@@ -160,6 +163,18 @@ namespace Overpower.Tests
             return false;
         }
 
+        /// <summary>True when any method of the type (or a lambda, iterator or state machine nested in it) calls the target, which may live in
+        /// another assembly: the type-wide "never calls X" check for a Unity or System method.</summary>
+        public static bool CallsAcrossAssemblies(System.Type owner, MethodBase target)
+        {
+            var types = new List<System.Type> { owner };
+            types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+            foreach (System.Type type in types)
+                foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
+                    if (CallOffsets(method, target).Count > 0) return true;
+            return false;
+        }
+
         /// <summary>True when the named method (or its lambdas and state machine) calls the target AND the very next instruction branches on what it
         /// returned (brtrue / brfalse): the "the answer is acted on" check, which a bare "it calls the rule" cannot give (a call whose result is thrown away
         /// would pass that one). Only for a rule whose answer is a bool used directly in an if.</summary>
@@ -202,6 +217,17 @@ namespace Overpower.Tests
                 return false;
             }
             return false;
+        }
+
+        // The byte compare reads this assembly's own MethodDef/FieldDef token; a member of another assembly is reached through a MemberRef
+        // token with other bytes, so "Uses" would answer false whatever the code does. A negative check built on that can never fail.
+        private static void SameAssembly(System.Type owner, MemberInfo target)
+        {
+            if (target == null)
+                throw new System.ArgumentNullException(nameof(target));
+            if (target.Module != owner.Module)
+                throw new System.ArgumentException(target.DeclaringType + "." + target.Name + " lives in another assembly than " + owner +
+                                                   ": use CallsAcrossAssemblies, which resolves each call");
         }
 
         private static List<int> OffsetsOf(MethodBase method, byte[] token, byte wanted)

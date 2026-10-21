@@ -286,7 +286,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 9
   maxLifetimeSeconds: 5
-  fallbackImpactVfx: {fileID: 1000010321467122, guid: c108d1bfc37c0494daea3e4e53c3c16e, type: 3}
+  fallbackImpactVfx: {fileID: 7520184254590907587, guid: e92f71356cab71642af94f2670e22b5e, type: 3}
   impactSfx: {fileID: 8300000, guid: d6bb1df959326064a8f5fcc97b8e436f, type: 3}
 --- !u!114 &9106049966841855171
 MonoBehaviour:

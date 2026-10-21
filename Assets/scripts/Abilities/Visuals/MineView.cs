@@ -133,7 +133,7 @@ namespace Overpower.Abilities
                 if (part == null)
                     continue;
                 part.GetPropertyBlock(block);
-                block.SetColor(EmissionId, lit * glow);
+                block.SetColor(EmissionId, TowerLookRules.GlowKeepingHue(lit, glow));
                 part.SetPropertyBlock(block);
                 VisualTint.SetMeshColor(part, block, lit);
             }

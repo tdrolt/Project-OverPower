@@ -59,10 +59,11 @@ namespace Overpower.Tests
                 "every flash asks the tested rule whether to reuse, make or recycle");
             var destroy = typeof(Object).GetMethod(nameof(Object.Destroy), new[] { typeof(Object), typeof(float) });
             var destroyNow = typeof(Object).GetMethod(nameof(Object.Destroy), new[] { typeof(Object) });
-            Assert.IsFalse(IlWiring.Uses(typeof(VFXManager), "PlayVFX", destroy), "no timed Destroy per flash");
-            Assert.IsFalse(IlWiring.Uses(typeof(VFXManager), "PlayVFX", destroyNow));
-            Assert.IsFalse(IlWiring.Uses(typeof(VFXManager), "Update", destroy));
-            Assert.IsFalse(IlWiring.Uses(typeof(VFXManager), "Update", destroyNow), "a finished flash is switched off and kept");
+            Assert.IsTrue(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "Awake", destroyNow), "the check sees a Destroy where there is one");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "PlayVFX", destroy), "no timed Destroy per flash");
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "PlayVFX", destroyNow));
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "Update", destroy));
+            Assert.IsFalse(IlWiring.CallsAcrossAssemblies(typeof(VFXManager), "Update", destroyNow), "a finished flash is switched off and kept");
         }
     }
 }

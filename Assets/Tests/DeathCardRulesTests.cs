@@ -197,6 +197,8 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), nameof(MatchUI.ShowWaitingPanel), waiting));
             Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), nameof(MatchUI.HideWaitingPanel), waiting));
             Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), nameof(MatchUI.SetRespawnNote), note));
+            Assert.IsTrue(IlWiring.Uses(typeof(MatchUI), "RPC_HideWaitingPanelAll", typeof(MatchUI).GetMethod(nameof(MatchUI.HideWaitingPanel))),
+                "an older client's hide still reaches the card, like the other kept RPCs");
         }
 
         [Test]

@@ -120,7 +120,7 @@ namespace Overpower.Tests
         [Test]
         public void OnScreenAGlowingColourKeepsItsHue()
         {
-            foreach (Color colour in new[] { Purple, Cyan, White, Red, Color.Lerp(Purple, Red, 0.4f) })
+            foreach (Color colour in new[] { Purple, Red, Color.Lerp(Purple, Red, 0.4f) })
                 foreach (float glow in new[] { 1.5f, 2.5f })
                 {
                     Color shown = Clipped(TowerLookRules.GlowKeepingHue(colour, glow));
@@ -130,6 +130,22 @@ namespace Overpower.Tests
                     Assert.AreEqual(colour.g / peak, shown.g / shownPeak, 1e-4f, label + " g");
                     Assert.AreEqual(colour.b / peak, shown.b / shownPeak, 1e-4f, label + " b");
                 }
+        }
+
+        // The tonemapper compresses every bright channel toward the same level: if only white's blue glowed, its red and green would fall
+        // behind and the crown would read lavender (cyan's green: sky blue). A channel close to the brightest glows with it.
+        [Test]
+        public void WhiteGlowsWhiteAndCyanKeepsItsGreen()
+        {
+            foreach (float glow in new[] { 1.5f, 2.5f })
+            {
+                Color white = TowerLookRules.GlowKeepingHue(White, glow);
+                Assert.AreEqual(White.r / White.b, white.r / white.b, 1e-4f, "white's red grows with its blue, x" + glow);
+                Assert.AreEqual(White.g / White.b, white.g / white.b, 1e-4f, "white's green grows with its blue, x" + glow);
+                Color cyan = TowerLookRules.GlowKeepingHue(Cyan, glow);
+                Assert.AreEqual(Cyan.g / Cyan.b, cyan.g / cyan.b, 1e-4f, "cyan's green grows with its blue, x" + glow);
+                Assert.AreEqual(Cyan.r, cyan.r, 1e-4f, "cyan's faint red stays at its share");
+            }
         }
 
         [Test]
@@ -172,32 +188,36 @@ namespace Overpower.Tests
         private GameObject instance;
         private TowerLook look;
         private UiTheme theme;
-        private float originalGlow, originalInset;
-        private Material originalBody;
         private const float TestInset = 0.5f;
 
+        // The test's own theme and look with literal colours and numbers, so no retune of Tudor's assets can break the arithmetic and no
+        // test value can be saved into them. Only the tower prefab and the arena-surface material are real (structure).
         [SetUp]
         public void SetUp()
         {
+            Material arenaWall = AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/Gameplay/Config/ArenaLook.asset").towerBody;
+            theme = ScriptableObject.CreateInstance<UiTheme>();
+            theme.teamShotColors = new[] { new Color(0.93f, 0.97f, 1f, 1f), new Color(0.68f, 0.32f, 1f, 1f), new Color(0.15f, 0.95f, 1f, 1f) };
+            theme.captureRingWarningColor = new Color(1f, 0.2f, 0.15f, 1f);
+            theme.captureRingPulseSpeed = 1f;
+            theme.captureRingPulseDip = 0.35f;
+            theme.towerNeutralColor = new Color(0.3f, 0.32f, 0.35f, 1f);
+            theme.towerOwnerGlow = 2f;
+            theme.arenaLook = ScriptableObject.CreateInstance<ArenaLook>();
+            theme.arenaLook.towerCrownInset = TestInset;
+            theme.arenaLook.towerBody = arenaWall;
             scene = EditorSceneManager.NewPreviewScene();
             instance = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath));
             SceneManager.MoveGameObjectToScene(instance, scene);
             look = instance.GetComponent<TowerLook>();
-            theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            originalGlow = theme.towerOwnerGlow;
-            theme.towerOwnerGlow = 2f; // the test's own glow, so a retune of the asset never breaks the arithmetic
-            originalInset = theme.arenaLook.towerCrownInset;
-            theme.arenaLook.towerCrownInset = TestInset;
-            originalBody = theme.arenaLook.towerBody;
             look.ApplyColumns(4);
         }
 
         [TearDown]
         public void TearDown()
         {
-            theme.towerOwnerGlow = originalGlow;
-            theme.arenaLook.towerCrownInset = originalInset;
-            theme.arenaLook.towerBody = originalBody;
+            Object.DestroyImmediate(theme.arenaLook);
+            Object.DestroyImmediate(theme);
             EditorSceneManager.ClosePreviewScene(scene);
         }
 

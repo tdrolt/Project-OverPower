@@ -198,20 +198,13 @@ public class MatchUI : MonoBehaviour
     }
 
     /// Has no caller today - kept because the name is in the committed RpcList and an older client
-    /// could still send it. Delete the entry from PhotonServerSettings and this method together.
+    /// could still send it; it forwards to the local method, like the RPCs below. Delete the entry from
+    /// PhotonServerSettings and this method together.
     [PunRPC]
     void RPC_HideWaitingPanelAll(int teamID)
     {
-        int localTeamID = (int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey];
-        if (teamID != localTeamID) return;
-
-        Debug.Log("[MatchUI] Hiding Waiting Panel Entered");
-
-        if (waitingPanel != null && waitingPanel.activeSelf)
-        {
-            waitingPanel.SetActive(false);
-            Debug.Log($"[MatchUI] (RPC) Hiding Waiting for Team {teamID}.");
-        }
+        if ((int)PhotonNetwork.LocalPlayer.CustomProperties[PlayerTeam.TeamKey] != teamID) return;
+        HideWaitingPanel();
     }
 
     /// <summary>Shows the "waiting for a teammate to retake the capital" panel, locally. PlayerLifecycle

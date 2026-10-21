@@ -38,6 +38,7 @@ namespace Overpower.Abilities
         private Mesh mesh;
         private Color[] colours;
         private Color danger;
+        private Color cellDanger; // the same red for the cells' vertex colours
         private int salt;
         private int shownSeed;
         private bool shown;
@@ -51,6 +52,7 @@ namespace Overpower.Abilities
                 return;
             look = theme.arenaLook;
             danger = LookColours.ForAbility(theme, abilityId, zone.OwnerTeam, LookFamily.Danger);
+            cellDanger = VisualTint.VertexColour(danger);
             salt = zone.OwnerActor;
             float radius = zone.Radius;
 
@@ -101,8 +103,8 @@ namespace Overpower.Abilities
             for (int i = 0; i < centres.Count; i++)
             {
                 bool lit = AoeRingLook.Lit(seed, i, look.aoeLitShare);
-                Color line = AoeRingLook.Line(danger, lit, look.aoeLitLineAlpha, look.aoeDimLineAlpha);
-                Color fill = AoeRingLook.Fill(danger, lit, look.aoeLitFillAlpha);
+                Color line = AoeRingLook.Line(cellDanger, lit, look.aoeLitLineAlpha, look.aoeDimLineAlpha);
+                Color fill = AoeRingLook.Fill(cellDanger, lit, look.aoeLitFillAlpha);
                 int b = i * AoeRingMesh.VerticesPerCell;
                 for (int v = 0; v < AoeRingMesh.FillStart; v++)
                     colours[b + v] = line;

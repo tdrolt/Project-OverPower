@@ -18,6 +18,26 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ALookMadeInMemoryNeverRepaintsTheArena()
+        {
+            ArenaLookEditorGlobals.PushAll();
+            Vector4 real = Shader.GetGlobalVector(ArenaShaderGlobals.FloorLineId);
+            ArenaLook literal = ScriptableObject.CreateInstance<ArenaLook>();
+            try
+            {
+                literal.floorGridGlow = real.y + 0.37f;
+                typeof(ArenaLook).GetMethod("OnValidate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .Invoke(literal, null); // what an Inspector edit or a test's SerializedObject apply runs
+                Assert.AreEqual(real, Shader.GetGlobalVector(ArenaShaderGlobals.FloorLineId),
+                    "only the saved look asset reaches the shader globals: a test's literal look would repaint the real arena");
+            }
+            finally
+            {
+                Object.DestroyImmediate(literal);
+            }
+        }
+
+        [Test]
         public void TileSizeAndReflectionHandedOver()
         {
             ArenaLook look = Literal();

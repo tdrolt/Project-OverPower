@@ -16,7 +16,7 @@ namespace Overpower.UI
     /// this can live on the player prefab). Owns one overlay canvas and draws RoundHud, BreakCard, CentrePayoutLabel (3v3v3), ScoreBars (spectators
     /// too), SuddenDeathOverlay and, built on request from MatchUI (players) or SpectatorSeatView (spectators), DominionResultPanel. It reads the ROOM
     /// alone (DominionRoomState and the server clock), so every screen shows the same numbers, and only Room Properties (no networking of its own).
-    /// Hidden until the match is live in a Dominion room: nothing in Conquest, the warm-up or the lobby screens. The canvas sorts under the shop (-5)
+    /// Hidden until the match is live in a Dominion room: nothing in Conquest, the warm-up or the lobby screens. The canvas sorts under the shop (UiLayers)
     /// and over the player HUD and minimap, so the shop opens on top of the break card.
     /// </summary>
     public sealed class DominionHud : MonoBehaviourPunCallbacks
@@ -283,7 +283,7 @@ namespace Overpower.UI
             canvas.sortingOrder = SortingOrder;
             resultCanvas = kit.CreateCanvas(transform, "Dominion Result Canvas");
             resultCanvas.overrideSorting = true;
-            resultCanvas.sortingOrder = theme.dominionResultSortingOrder; // over the spectator bar (-10), under the saved-log box (10)
+            resultCanvas.sortingOrder = theme.dominionResultSortingOrder; // over the spectator bar, under the saved-log box (UiLayers)
             round = new RoundHud(kit, canvas.transform);
             breakCard = new BreakCard(kit, canvas.transform);
             centre = new CentrePayoutLabel(kit, canvas.transform);

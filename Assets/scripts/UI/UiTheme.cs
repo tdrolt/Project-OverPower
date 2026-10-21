@@ -625,6 +625,10 @@ namespace Overpower.UI
         [Tooltip("Pulses per second of a zone's edge while it is under attack, or being drained (a drain pulses in the " +
                  "draining team's colour instead).")]
         public float captureRingPulseSpeed = 1.6f;
+        [Tooltip("How dark a pulsing zone edge and tower crown get at the moment they swap colour (0 = black, 1 = no dip, a hard blink). " +
+                 "The owner's colour fades down, then the warning red (or the draining team's colour) fades up, so the two colours never " +
+                 "mix into a third: purple and red mixed read as pink, white and red as salmon.")]
+        [Range(0f, 1f)] public float captureRingPulseDip = 0.35f;
         [Tooltip("How many straight pieces make up each ring. More reads as a smoother circle; 96 is smooth at every zoom.")]
         [Range(16, 256)] public int captureRingSegments = 96;
         [Tooltip("The dark loop behind a capture's progress band, so how full it is reads like a loading bar.")]

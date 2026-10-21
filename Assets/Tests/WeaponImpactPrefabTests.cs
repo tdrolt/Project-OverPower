@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>Each gun family lands with its own impact and every gun fires the white muzzle flash; the old shared puff is gone from the
-    /// guns. The Stun Gun and the Zip Gun keep their own impacts. Impacts are timed particles only: no collider, no light, no loop
+    /// guns. The Stun Gun and the Zip Gun have their own impacts. Impacts are timed particles only: no collider, no light, no loop
     /// (VFXManager times each from its particle systems and reuses it).</summary>
     public class WeaponImpactPrefabTests
     {
@@ -17,15 +17,15 @@ namespace Overpower.Tests
         private const string MuzzlePath = "Assets/Gameplay/FX/FX Muzzle Flash.prefab";
         private const string ImpactsFolder = "Assets/Gameplay/FX/Impacts/";
 
-        // The shop's weapon tree: each upgrade stays in its root gun's family.
-        private static readonly Dictionary<string, string> FamilyOf = new Dictionary<string, string>
+        // The shop's weapon tree: a gun's family is the gun its upgrade line grows from, the one bought straight off the starting gun
+        // (the starting gun is its own family). Read from the data, so adding or renaming a gun needs no edit here.
+        private static WeaponDefinition FamilyOf(WeaponDefinition weapon)
         {
-            { "01 Baseline", "Baseline" },
-            { "02 Rocket", "Rocket" }, { "03 Rocket - Distance", "Rocket" }, { "04 Rocket - Cursor Fire", "Rocket" },
-            { "05 Burst", "Burst" }, { "06 Burst - Charge", "Burst" }, { "07 Burst - Bounce", "Burst" },
-            { "08 SMG", "SMG" }, { "09 SMG - Double Rate", "SMG" }, { "10 SMG - Shotgun", "SMG" },
-            { "11 Laser", "Laser" }, { "12 Laser - Mark", "Laser" }, { "13 Laser - Through Walls", "Laser" },
-        };
+            WeaponDefinition family = weapon;
+            while (family.Parent != null && family.Parent.Parent != null)
+                family = family.Parent;
+            return family;
+        }
 
         private static string PathOf(Object o) => o != null ? AssetDatabase.GetAssetPath(o) : "(none)";
 
@@ -53,18 +53,17 @@ namespace Overpower.Tests
         [Test]
         public void EachFamilyHasItsOwnImpact()
         {
-            var impactOfFamily = new Dictionary<string, string>();
+            var impactOfFamily = new Dictionary<WeaponDefinition, string>();
             foreach (WeaponDefinition weapon in BulletPrefabGuardTests.Weapons())
             {
-                Assert.IsTrue(FamilyOf.TryGetValue(weapon.name, out string family), weapon.name + " is in the family table");
+                WeaponDefinition family = FamilyOf(weapon);
                 string impact = PathOf(weapon.ImpactVfx);
                 if (impactOfFamily.TryGetValue(family, out string seen))
-                    Assert.AreEqual(seen, impact, weapon.name + " lands like the rest of the " + family + " family");
+                    Assert.AreEqual(seen, impact, weapon.name + " lands like the rest of the " + family.name + " family");
                 else
                     impactOfFamily[family] = impact;
             }
-            Assert.AreEqual(5, impactOfFamily.Count);
-            Assert.AreEqual(5, new HashSet<string>(impactOfFamily.Values).Count, "no two families share an impact");
+            Assert.AreEqual(impactOfFamily.Count, new HashSet<string>(impactOfFamily.Values).Count, "no two families share an impact");
         }
 
         [Test]
@@ -72,7 +71,12 @@ namespace Overpower.Tests
         {
             Assert.AreEqual("Assets/Gameplay/FX/Impacts/FX Stun Burst.prefab",
                 FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Projectiles/Stun Gun Bullet.prefab")));
-            Assert.AreEqual(PuffPath, FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab")));
+            const string zipHit = "Assets/Gameplay/FX/Impacts/FX Zip Hit.prefab";
+            Assert.AreEqual(zipHit, FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab")),
+                "the Zip Gun's hit is its own silver burst, not the old yellow-to-red puff (yellow reads as the Shield's gold)");
+            var tint = AssetDatabase.LoadAssetAtPath<GameObject>(zipHit).GetComponent<LookTint>();
+            Assert.IsNotNull(tint, "coloured by the look table");
+            Assert.AreEqual(18, new SerializedObject(tint).FindProperty("abilityId").intValue, "from the Zip Gun's row (silver, movement)");
         }
 
         [Test]

@@ -11,7 +11,8 @@ namespace Overpower.Abilities
     /// What another player's screen shows of a Dash: a straight silver streak from where it began to just behind the dasher, and flat
     /// silver chevrons on the floor at the start pointing the way it went, then a short fade (DashLook decides every place and fade). One
     /// unparented object, left where the dash happened, reused by the next dash; the fog gate follows the dasher, so a dash in the fog draws
-    /// nothing. Only line points and colours change per frame (VisibleWhenSeen owns Renderer.enabled).
+    /// nothing, and a dash out of the fog starts where the dasher was first seen. Only line points and colours change per frame
+    /// (VisibleWhenSeen owns Renderer.enabled).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class DashStreakView : MonoBehaviour
@@ -37,6 +38,8 @@ namespace Overpower.Abilities
         private float distance;
         private float travelSeconds;
         private float bodyReach;
+        private float seenFrom = DashLook.NotSeenYet;
+        private VisibleWhenSeen gate;
         private Color colour;
         private float playedAt = -1f;
         private static bool warnedMissingLook;
@@ -73,8 +76,10 @@ namespace Overpower.Abilities
             int abilityId = module != null && module.Definition != null ? module.Definition.Id : -1;
             colour = LookColours.ForAbility(theme, abilityId, casterTeam, LookFamily.Silver);
             playedAt = Time.time;
-            Draw(0f);
             VisibleWhenSeen.AttachToCaster(Root, caster);
+            gate = Root.GetComponent<VisibleWhenSeen>(); // none without fog: everything shows
+            seenFrom = DashLook.SeenFrom(DashLook.NotSeenYet, gate == null || gate.Shown, 0f); // seen at the cast = seen at the launch
+            Draw(0f);
             Root.SetActive(true);
         }
 
@@ -138,9 +143,17 @@ namespace Overpower.Abilities
             // end after the travel time; a frame hitch must not freeze the head short.
             if (body != null)
                 bodyReach = Mathf.Max(bodyReach, DashLook.StreakReach(start, forward, body.position, distance));
-            streak.positionCount = 2;
-            streak.SetPosition(0, flatStart + up);
-            streak.SetPosition(1, flatStart + forward * DashLook.HeadReach(bodyReach, look.dashStreakGap) + up);
+            // The gate's answer is last frame's (it decides in LateUpdate), so the first frame it opens draws nothing yet: no frame of fog.
+            seenFrom = DashLook.SeenFrom(seenFrom, gate == null || gate.Shown, bodyReach);
+            float head = DashLook.HeadReach(bodyReach, look.dashStreakGap);
+            if (seenFrom < 0f || head <= seenFrom)
+                streak.positionCount = 0;
+            else
+            {
+                streak.positionCount = 2;
+                streak.SetPosition(0, flatStart + forward * seenFrom + up);
+                streak.SetPosition(1, flatStart + forward * head + up);
+            }
             VisualTint.SetLineColor(streak, shown);
 
             Vector3 floor = flatStart + Vector3.up * (floorY + FloorLift);
@@ -149,7 +162,8 @@ namespace Overpower.Abilities
             {
                 float along = DashLook.ChevronDistance(i, chevrons.Length, look.dashChevronSpacing, distance);
                 LineRenderer chevron = chevrons[i];
-                if (!DashLook.ChevronShown(along, bodyReach))
+                bool seen = seenFrom >= 0f && along >= seenFrom;
+                if (!DashLook.ChevronShown(along, bodyReach) || !seen)
                 {
                     chevron.positionCount = 0;
                     continue;

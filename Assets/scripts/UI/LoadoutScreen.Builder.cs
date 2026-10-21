@@ -542,7 +542,7 @@ namespace Overpower.UI
         }
 
         /// <summary>The always-visible "Loadout (P)" button, bottom-right, clear of the HUD panel (bottom-centre) and chat
-        /// (bottom-left). Its own canvas at HUD depth (-10), not modal depth (LoadoutScreen.cs, SORT ORDER).</summary>
+        /// (bottom-left). Its own canvas at HUD depth (UiLayers.Hud), not modal depth (LoadoutScreen.cs, SORT ORDER).</summary>
         private void BuildToggleButtonCanvas()
         {
             GameObject canvasGo = new GameObject("Loadout Toggle Canvas", typeof(RectTransform));

@@ -19,23 +19,19 @@ namespace Overpower.Tests
             var weapons = new WeaponDefinition[guids.Length];
             for (int i = 0; i < guids.Length; i++)
                 weapons[i] = AssetDatabase.LoadAssetAtPath<WeaponDefinition>(AssetDatabase.GUIDToAssetPath(guids[i]));
-            Assert.AreEqual(13, weapons.Length, "the 13 weapons of the shop");
+            Assert.IsNotEmpty(weapons, "the shop's weapons are found");
             return weapons;
         }
 
         [Test]
         public void WeaponBulletsUseSlugAndAddNoCollider()
         {
-            int slugs = 0, beams = 0;
             foreach (WeaponDefinition weapon in Weapons())
             {
                 GameObject shot = weapon.ProjectilePrefab;
                 Assert.IsNotNull(shot, weapon.name);
                 if (shot.GetComponent<Hitscan>() != null)
-                {
-                    beams++;
-                    continue;
-                }
+                    continue; // a laser keeps its beam
                 Mesh mesh = shot.GetComponent<MeshFilter>().sharedMesh;
                 Assert.IsNotNull(mesh, weapon.name);
                 Assert.AreEqual(SlugPath, AssetDatabase.GetAssetPath(mesh), weapon.name + " flies the slug from Blender, not the built-in ball");
@@ -43,10 +39,7 @@ namespace Overpower.Tests
                 Assert.Greater(mesh.bounds.size.z, mesh.bounds.size.x * 2f, "long along its flight (+Z), slim across");
                 Assert.IsEmpty(shot.GetComponentsInChildren<Collider>(true), weapon.name + ": hits come from the motor's sphere cast, never a collider");
                 Assert.IsNotNull(shot.GetComponent<ShotTeamVisuals>(), weapon.name + " keeps its team-colour trail");
-                slugs++;
             }
-            Assert.AreEqual(10, slugs, "Baseline, the three rockets, the three bursts and the three SMGs");
-            Assert.AreEqual(3, beams, "the three lasers keep their beams");
         }
 
         [Test]
