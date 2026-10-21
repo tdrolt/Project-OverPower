@@ -1,3 +1,4 @@
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.UI;
 using UnityEngine;
@@ -5,10 +6,12 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The flamethrower's cone: a SOFT flat fan on the floor, tip under the caster's root, opening to the ability's Cone
-    /// Range and Cone Angle (exactly ConeFilter.IsWithinCone's shape), warm at the tip and fading to transparent toward the
-    /// far and side edges with a subtle flicker, plus an aiming outline (Edge Opacity for the caster, Non Caster Edge
-    /// Opacity for others). FlamethrowerAbility.ShowVfx passes Owner.IsMine in; no network state here.
+    /// The flamethrower's cone: flames jetting from the gun over the cone (the Flame Tongues child, laid out by FlameLook), and a SOFT
+    /// flat fan on the floor, tip under the caster's root, opening to the ability's Cone Range and Cone Angle (exactly
+    /// ConeFilter.IsWithinCone's shape), warm at the tip and fading to transparent toward the far and side edges with a subtle
+    /// flicker, dimmed by the Arena Look's Flame Fan Strength to a faint marker of the ground that burns, plus an aiming outline
+    /// (Edge Opacity for the caster, Non Caster Edge Opacity for others). FlamethrowerAbility.ShowVfx passes Owner.IsMine in; no
+    /// network state here.
     /// VERTEX-COLOUR TRAP: the shared Ability Visual Glass.mat is URP/Unlit, which never reads a mesh's vertex colours, so
     /// the tip-to-edge gradient would render as a flat wash. The fan uses Flame Cone.mat (Particles/Unlit, which multiplies
     /// the material colour by the vertex colour); don't edit Glass.mat, the mine, portal and fence ship with it.
@@ -27,9 +30,10 @@ namespace Overpower.Abilities
                  "drawn with Flame Cone.mat (Particles/Unlit - plain Unlit never shows a mesh's vertex colours).")]
         private MeshFilter fan;
 
-        [SerializeField, Tooltip("The short upright flames and the embers along the fan (a child particle system; the flames draw with " +
-                 "the Arena Look's Fx Alpha, the embers with its Fx Additive). Where they rise is sized to the real Cone Range and Cone Angle " +
-                 "on every spray; how many come from the Arena Look.")]
+        [SerializeField, Tooltip("The flames and embers that jet from the gun (a child particle system; the flames draw with the Arena " +
+                 "Look's Fx Alpha, the embers with its Fx Additive). They leave from the gun's muzzle every physics step and spread over the " +
+                 "real Cone Range and Cone Angle; how many and how far they fly come from the Arena Look; their size, life and fall toward the " +
+                 "floor are authored here.")]
         private ParticleSystem tongues;
 
         [SerializeField, Tooltip("The faint aiming outline at the true range and angle. Its opacity for the CASTER's " +
@@ -103,6 +107,9 @@ namespace Overpower.Abilities
         private Color builtColor = Color.clear;
         private float nextFlickerTime;
         private MaterialPropertyBlock block;
+        private float fanStrength = 1f;
+        private float jetReach = 1f;
+        private ParticleSystem[] jetSystems;
 
         private void OnValidate()
         {
@@ -133,16 +140,25 @@ namespace Overpower.Abilities
             }
         }
 
-        /// <summary>Spreads the flames and embers over the real cone, orange edge to yellow core from the Flamethrower's row of the look table.</summary>
-        public void ConfigureTongues(float range, float fullAngleDegrees, UiTheme theme, int abilityId)
+        /// <summary>Spreads the flames and embers over the real cone, orange edge to yellow core from the Flamethrower's row of the look
+        /// table, and dims the fan to the Arena Look's faint marker.</summary>
+        public void ConfigureFire(float range, float fullAngleDegrees, UiTheme theme, int abilityId)
         {
-            if (tongues == null || theme == null || theme.arenaLook == null)
+            if (theme == null || theme.arenaLook == null)
                 return;
-            FlameLook.Apply(tongues, range, fullAngleDegrees, FlameLook.Core(theme), FlameLook.Edge(theme, abilityId), theme.arenaLook);
+            ArenaLook look = theme.arenaLook;
+            fanStrength = look.flameFanStrength;
+            jetReach = look.flameJetReach;
+            ApplyFlicker();
+            if (tongues == null)
+                return;
+            jetSystems ??= tongues.GetComponentsInChildren<ParticleSystem>(true);
+            FlameLook.Apply(tongues, range, fullAngleDegrees, FlameLook.Core(theme), FlameLook.Edge(theme, abilityId), look);
         }
 
-        /// <summary>Tip on the floor under <paramref name="apex"/>, opening along <paramref name="forward"/>'s flat direction.</summary>
-        public void Place(Vector3 apex, Vector3 forward)
+        /// <summary>Tip on the floor under <paramref name="apex"/>, opening along <paramref name="forward"/>'s flat direction; the flames
+        /// leave from <paramref name="muzzle"/>, the gun's muzzle.</summary>
+        public void Place(Vector3 apex, Vector3 forward, Vector3 muzzle)
         {
             forward.y = 0f;
             if (forward.sqrMagnitude < 0.0001f)
@@ -150,6 +166,8 @@ namespace Overpower.Abilities
 
             float floor = GroundSnap.TryFindGroundY(apex, out float groundY) ? groundY : apex.y;
             transform.SetPositionAndRotation(new Vector3(apex.x, floor + heightAboveGround, apex.z), Quaternion.LookRotation(forward));
+            if (jetSystems != null && builtRange > 0f)
+                FlameLook.AimJet(jetSystems, tongues.transform.InverseTransformPoint(muzzle), builtRange, builtAngle, jetReach);
         }
 
         private void Update()
@@ -177,7 +195,7 @@ namespace Overpower.Abilities
             float flicker = 1f - flickerDepth * Mathf.PerlinNoise(Time.time * 3f, 0.5f);
             for (int i = 0; i < colors.Length; i++)
             {
-                byte a = (byte)Mathf.Clamp(baseAlpha[i] * flicker * 255f, 0f, 255f);
+                byte a = (byte)Mathf.Clamp(baseAlpha[i] * flicker * fanStrength * 255f, 0f, 255f);
                 Color32 rgb = baseRgb[i];
                 colors[i] = new Color32(rgb.r, rgb.g, rgb.b, a);
             }

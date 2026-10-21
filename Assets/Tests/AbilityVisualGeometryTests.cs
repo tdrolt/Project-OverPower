@@ -209,30 +209,108 @@ namespace Overpower.Tests
         private const float PulseRange = 5f;
         private const float PulseAngle = 60f;
 
-        [Test]
-        public void EveryArcPointPassesConeFilter()
-        {
-            const int points = 17;
-            for (int band = 0; band < 3; band++)
-                for (float t = 0f; t <= 0.5f; t += 0.01f)
-                {
-                    float radius = AbilityVisualGeometry.ArcBandRadius(band, t, 0.2f, PulseRange, 0.18f);
-                    for (int k = 0; k < points; k++)
-                    {
-                        Vector3 p = AbilityVisualGeometry.ArcPoint(radius, PulseAngle, k, points);
-                        Assert.IsTrue(ConeFilter.IsWithinCone(Vector3.zero, Vector3.forward, p, PulseRange, PulseAngle),
-                            $"band {band} at {t:F2}s point {k} {p:F4} is outside the cone the pulse really hits");
-                    }
-                }
+        private const int ArchPoints = 25;
+        private static readonly float[] Bends = { 0f, 0.5f, 1f };
 
-            Assert.That(Vector3.Distance(AbilityVisualGeometry.CirclePoint(PulseRange, -PulseAngle * 0.5f), AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle, 0, points)),
-                Is.LessThan(0.002f), "the first point is on the cone's left edge at its range (within 2 mm)");
-            Assert.That(Vector3.Distance(AbilityVisualGeometry.CirclePoint(PulseRange, PulseAngle * 0.5f), AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle, points - 1, points)),
-                Is.LessThan(0.002f), "the last point is on its right edge");
-            Assert.That(Vector3.Distance(AbilityVisualGeometry.CirclePoint(PulseRange, 0f), AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle, points / 2, points)),
-                Is.LessThan(0.002f), "the middle point is straight ahead");
-            Assert.IsFalse(ConeFilter.IsWithinCone(Vector3.zero, Vector3.forward, AbilityVisualGeometry.ArcPoint(PulseRange, PulseAngle + 4f, 0, points), PulseRange, PulseAngle),
-                "control: an arc 2 degrees wider each side leaves the cone");
+        [Test]
+        public void TheArchsFootStaysInsideTheHitCone()
+        {
+            foreach (float bend in Bends)
+                for (int arch = 0; arch < 2; arch++)
+                    for (float t = 0f; t <= 0.5f; t += 0.01f)
+                    {
+                        float radius = AbilityVisualGeometry.ArcBandRadius(arch, t, 0.2f, PulseRange, 0.18f);
+                        float height = AbilityVisualGeometry.ArchHeight(radius, PulseAngle, 0.8f, 2.2f);
+                        for (int k = 0; k < ArchPoints; k++)
+                        {
+                            Vector3 p = AbilityVisualGeometry.ArchPoint(radius, PulseAngle, height, bend, k, ArchPoints);
+                            Assert.IsTrue(ConeFilter.IsWithinCone(Vector3.zero, Vector3.forward, p, PulseRange, PulseAngle),
+                                $"bend {bend} arch {arch} at {t:F2}s point {k} {p:F4} stands over ground the pulse does not hit");
+                            Assert.GreaterOrEqual(p.y, 0f, "never under the floor");
+                        }
+                    }
+
+            Vector3 wide = AbilityVisualGeometry.ArchPoint(PulseRange, PulseAngle + 4f, 1f, 1f, 0, ArchPoints);
+            Assert.IsFalse(ConeFilter.IsWithinCone(Vector3.zero, Vector3.forward, wide, PulseRange, PulseAngle),
+                "control: an arch 2 degrees wider each side leaves the cone");
+        }
+
+        [Test]
+        public void TheArchSpansTheConesWidthAtItsDistance()
+        {
+            float half = PulseAngle * 0.5f * Mathf.Deg2Rad;
+            foreach (float bend in Bends)
+                foreach (float radius in new[] { 1f, 2.5f, PulseRange })
+                {
+                    Vector3 left = AbilityVisualGeometry.ArchPoint(radius, PulseAngle, 1f, bend, 0, ArchPoints);
+                    Vector3 right = AbilityVisualGeometry.ArchPoint(radius, PulseAngle, 1f, bend, ArchPoints - 1, ArchPoints);
+                    Assert.AreEqual(0f, left.y, 1e-5f, "the feet stand on the floor");
+                    Assert.AreEqual(0f, right.y, 1e-5f);
+                    Assert.AreEqual(radius, new Vector2(left.x, left.z).magnitude, 0.002f, $"bend {bend}: the left foot at the arch's distance");
+                    Assert.AreEqual(-PulseAngle * 0.5f, Mathf.Atan2(left.x, left.z) * Mathf.Rad2Deg, 0.05f, "on the cone's left edge");
+                    Assert.AreEqual(PulseAngle * 0.5f, Mathf.Atan2(right.x, right.z) * Mathf.Rad2Deg, 0.05f, "and the right foot on its right edge");
+                    float forward = radius * Mathf.Cos(half);
+                    Assert.AreEqual(2f * forward * Mathf.Tan(half), Vector3.Distance(left, right), 0.003f,
+                        "the span is the cone's width where the feet stand: 2 d tan(angle / 2)");
+                }
+        }
+
+        [Test]
+        public void TheArchStandsUprightFacingTheAim()
+        {
+            const float height = 1.7f;
+            Vector3 crest = AbilityVisualGeometry.ArchPoint(PulseRange, PulseAngle, height, 1f, ArchPoints / 2, ArchPoints);
+            Assert.AreEqual(0f, crest.x, 1e-4f, "the crest is straight ahead");
+            Assert.AreEqual(height, crest.y, 1e-4f, "the crest is the arch's height");
+            Assert.AreEqual(PulseRange, crest.z, 0.002f, "with the foot following the reach, the crest stands at the full reach");
+            for (int k = 0; k < ArchPoints; k++)
+            {
+                Vector3 p = AbilityVisualGeometry.ArchPoint(PulseRange, PulseAngle, height, 1f, k, ArchPoints);
+                Vector3 mirror = AbilityVisualGeometry.ArchPoint(PulseRange, PulseAngle, height, 1f, ArchPoints - 1 - k, ArchPoints);
+                Assert.AreEqual(p.y, mirror.y, 1e-4f, "the same on both sides of the aim");
+                Assert.AreEqual(-p.x, mirror.x, 1e-4f);
+                Assert.LessOrEqual(p.y, height + 1e-4f, "no point above the crest");
+                Assert.AreEqual(PulseRange, new Vector2(p.x, p.z).magnitude, 0.002f, "every point stands right above the reach: the arch is upright");
+                if (k > 0 && k <= ArchPoints / 2)
+                    Assert.Greater(p.y, AbilityVisualGeometry.ArchPoint(PulseRange, PulseAngle, height, 1f, k - 1, ArchPoints).y, "rising from the foot to the crest");
+                Vector3 straight = AbilityVisualGeometry.ArchPoint(PulseRange, PulseAngle, height, 0f, k, ArchPoints);
+                Assert.AreEqual(PulseRange * Mathf.Cos(PulseAngle * 0.5f * Mathf.Deg2Rad), straight.z, 0.002f,
+                    "a straight arch stands in one upright plane across the aim");
+            }
+        }
+
+        [Test]
+        public void TheArchGrowsWithItsDistanceUpToItsMaxHeight()
+        {
+            float previous = -1f;
+            for (float r = 0f; r <= PulseRange; r += 0.25f)
+            {
+                float h = AbilityVisualGeometry.ArchHeight(r, PulseAngle, 0.8f, 10f);
+                Assert.AreEqual(0.8f * r * Mathf.Sin(PulseAngle * 0.5f * Mathf.Deg2Rad), h, 1e-4f, "Arch Height of half the span between the feet");
+                Assert.Greater(h, previous, "taller the farther it travels");
+                previous = h;
+            }
+            Assert.AreEqual(2.5f, AbilityVisualGeometry.ArchHeight(PulseRange, PulseAngle, 1f, 10f), 1e-4f, "1 makes a half circle");
+            Assert.AreEqual(1.3f, AbilityVisualGeometry.ArchHeight(PulseRange, PulseAngle, 1f, 1.3f), 1e-5f, "never above Max Height");
+            Assert.AreEqual(0f, AbilityVisualGeometry.ArchHeight(0f, PulseAngle, 1f, 1.3f), 1e-5f, "nothing at the caster");
+        }
+
+        [Test]
+        public void TheArchFadesAsItReachesTheEnd()
+        {
+            Assert.AreEqual(1f, AbilityVisualGeometry.ArchStrength(0f, 0.2f, 0.25f, 0.4f), 1e-5f, "full strength as it leaves the caster");
+            Assert.AreEqual(0.7f, AbilityVisualGeometry.ArchStrength(0.1f, 0.2f, 0.25f, 0.4f), 1e-4f, "fading on the way out");
+            Assert.AreEqual(0.4f, AbilityVisualGeometry.ArchStrength(0.2f, 0.2f, 0.25f, 0.4f), 1e-4f, "End Strength as it reaches the end");
+            Assert.AreEqual(0.2f, AbilityVisualGeometry.ArchStrength(0.325f, 0.2f, 0.25f, 0.4f), 1e-4f, "then gone over the fade");
+            Assert.AreEqual(0f, AbilityVisualGeometry.ArchStrength(0.45f, 0.2f, 0.25f, 0.4f), 1e-5f);
+            Assert.AreEqual(0f, AbilityVisualGeometry.ArchStrength(3f, 0.2f, 0.25f, 0.4f), 1e-5f);
+            float previous = 2f;
+            for (float t = 0f; t <= 0.5f; t += 0.01f)
+            {
+                float s = AbilityVisualGeometry.ArchStrength(t, 0.2f, 0.25f, 0.4f);
+                Assert.LessOrEqual(s, previous + 1e-5f, "it only ever fades");
+                previous = s;
+            }
         }
 
         [Test]

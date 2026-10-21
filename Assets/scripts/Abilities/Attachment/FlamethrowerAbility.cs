@@ -4,6 +4,7 @@ using UnityEngine;
 using Overpower.Combat;
 using Overpower.Vision;
 using Overpower.Match;
+using Overpower.UI;
 
 namespace Overpower.Abilities
 {
@@ -65,9 +66,9 @@ namespace Overpower.Abilities
         private LayerMask detectionMask = ~0;
 
         [Header("VFX (cheap, cosmetic only)")]
-        [SerializeField, Tooltip("Colour of the flame cone drawn on the floor on every client for the " +
-                 "duration of Spray Seconds (its per-vertex opacity is on the cone prefab). Nothing " +
-                 "about the burn itself depends on it.")]
+        [SerializeField, Tooltip("Colour of the flame cone on the floor only when the player has no UiTheme (never in a match): " +
+                 "in a match the fan takes the fire colour of the Flamethrower's row of the look table, like its flames. Nothing about " +
+                 "the burn itself depends on it.")]
         private Color vfxColor = new Color(1f, 0.45f, 0.1f, 1f);
 
         [SerializeField, Tooltip("The soft flame cone - Assets/Gameplay/Abilities/Flamethrower Cone.prefab. Drawn from Cone Angle and " +
@@ -185,7 +186,7 @@ namespace Overpower.Abilities
             // wall and a Deployable Cover). The clearance check pulls the point back to the near side of the wall.
             Vector3 muzzle = Owner.Weapon != null ? Owner.Weapon.SafeMuzzlePosition : apex;
 
-            PositionVfx(apex, forward);
+            PositionVfx(apex, forward, muzzle);
 
             int count = Physics.OverlapSphereNonAlloc(apex, coneRange, overlapBuffer, detectionMask,
                                                        QueryTriggerInteraction.Ignore);
@@ -262,10 +263,11 @@ namespace Overpower.Abilities
             }
 
             // Re-read on every spray, so an Inspector change to Cone Angle/Range shows on the next cast.
-            // Owner.IsMine (A3): the faint aiming outline is only ever drawn on the caster's OWN screen -
-            // everyone else sees just the soft fan, never a hard edge.
-            vfx.Configure(coneRange, coneAngle, vfxColor, Owner.IsMine);
-            vfx.ConfigureTongues(coneRange, coneAngle, Owner.Health != null ? Owner.Health.Theme : null, Definition.Id);
+            // Owner.IsMine: the aiming outline is the caster's own aid, at its stronger opacity only on their screen.
+            UiTheme theme = Owner.Health != null ? Owner.Health.Theme : null;
+            Color fire = theme != null ? FlameLook.Edge(theme, Definition.Id) : vfxColor;
+            vfx.Configure(coneRange, coneAngle, fire, Owner.IsMine);
+            vfx.ConfigureFire(coneRange, coneAngle, theme, Definition.Id);
             vfx.gameObject.SetActive(true);
             // Vision: the cone is hidden with the enemy who sprays it, checked every frame (friendly: always).
             // It is also shown while the cone reaches any of my team (the fire hurts them, so they must see it).
@@ -274,10 +276,10 @@ namespace Overpower.Abilities
                 gate.SetCone(coneRange, coneAngle);
         }
 
-        private void PositionVfx(Vector3 apex, Vector3 forward)
+        private void PositionVfx(Vector3 apex, Vector3 forward, Vector3 muzzle)
         {
             if (vfx != null)
-                vfx.Place(apex, forward);
+                vfx.Place(apex, forward, muzzle);
         }
 
         private void HideVfx()

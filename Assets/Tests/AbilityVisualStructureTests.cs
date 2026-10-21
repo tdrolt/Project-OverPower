@@ -165,38 +165,24 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheFireFieldHasNoVisualChildSnapItAlreadySpawnsOnTheFloor()
+        public void TheFireFieldBurnsWithFloorFlamesNotADisc()
         {
-            // A2 (Tudor 2026-09-17 evening, gameplay change): DetonateAtCursor now spawns this prefab's ROOT at the
-            // floor point below the burst (GroundSnap.TryFindGroundY, read on the shooter's own client and
-            // replicated by PhotonNetwork.Instantiate's own position argument - no new RPC), so the disc already
-            // riding on that root needs no floor-snap of its own. The plan's printed Task 6 Step 1 put a
-            // SnapVisualToGround on this prefab's Visual child instead; A2 supersedes that - a second, independent
-            // floor probe on the disc would fight the root's own placement every frame for no reason.
+            // The root is placed on the floor at spawn (DetonateAtCursor.OnExpired, GroundSnap on the shooter's client, replicated by
+            // PhotonNetwork.Instantiate's position), so nothing in the field snaps to the ground on its own. The
+            // burning ground is floor flames in the fire colours, sized to the real Radius when it lights (FireFieldLookTests), and the rim
+            // still marks the true edge.
             GameObject prefab = Load("Assets/Resources/Fire Field.prefab");
-            Transform visual = Child(prefab.transform, "Visual");
-            Assert.IsNull(visual.GetComponent<SnapVisualToGround>(),
-                "the field's root is placed on the floor at spawn time - see DetonateAtCursor.OnExpired");
-            AssertNoCollider(prefab);
-        }
-
-        [Test]
-        public void TheFireFieldDiscHasAGlassMaterialAndABrightRimSoItReadsAsFireNotAShadow()
-        {
-            // Ability visuals step 6 amendment (2026-09-18, review findings): the disc shipped as an UNSTYLED
-            // default-grey URP/Lit cylinder - at the mercy of scene lighting, it read as a shadow or scorch mark,
-            // not fire, against this arena's own tan/orange ground (pixel-sampled within 5-15 RGB units of bare
-            // ground). Moved to the shared Ability Visual Glass.mat (unlit, immune to scene lighting) plus a bright
-            // Rim outline, the same fill+rim shape Blast Marker and Portal already use. Tudor's second answer
-            // replaced a fixed hot-orange palette with the SHOOTER'S TEAM colour (theme.ShotColorFor) - matching
-            // MineView/PortalView/FenceCageView/SplashShell, and telling a player whose fire they are standing in,
-            // which no fixed colour could.
-            GameObject prefab = Load("Assets/Resources/Fire Field.prefab");
-            Transform visual = Child(prefab.transform, "Visual");
-            Assert.AreEqual(GlassPath, AssetDatabase.GetAssetPath(visual.GetComponent<MeshRenderer>().sharedMaterial),
-                "the disc must not still be Unity's own default Lit material");
-            LineRenderer rim = AssertLine(Child(prefab.transform, "Rim"), flat: true);
+            Assert.IsNull(prefab.transform.Find("Visual"), "no flat disc: the burning ground is drawn by its flames");
+            Assert.IsEmpty(prefab.GetComponentsInChildren<SnapVisualToGround>(true), "the field's root is placed on the floor at spawn time");
             var field = prefab.GetComponent<FireField>();
+            Transform flames = Child(prefab.transform, FireField.FlamesChildName);
+            var system = flames.GetComponent<ParticleSystem>();
+            Assert.IsNotNull(system, "the floor flames are particles");
+            Assert.AreSame(system, Ref(field, "flames"));
+            Assert.GreaterOrEqual(flames.GetComponentsInChildren<ParticleSystem>(true).Length, 2, "flames and embers");
+            Assert.IsEmpty(prefab.GetComponentsInChildren<MeshRenderer>(true), "no solid disc or mesh left in the field");
+            Assert.IsNotNull(prefab.GetComponent<Overpower.Vision.VisibleWhenSeen>(), "the fog gate on the root hides every renderer under it, the flames included");
+            LineRenderer rim = AssertLine(Child(prefab.transform, "Rim"), flat: true);
             Assert.AreSame(rim, Ref(field, "rim"));
             Assert.AreEqual(ThemePath, AssetDatabase.GetAssetPath(Ref(field, "theme")));
             AssertNoCollider(prefab);

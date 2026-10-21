@@ -145,6 +145,10 @@ namespace Overpower.Tests
         public static List<int> FieldLoadOffsets(MethodBase method, FieldInfo field) =>
             OffsetsOf(method, System.BitConverter.GetBytes(field.MetadataToken), 0x7B);
 
+        /// <summary>The IL offsets of every store (stfld) into the field in one method body: with CallOffsets, whether a value is set before a call reads it.</summary>
+        public static List<int> FieldStoreOffsets(MethodBase method, FieldInfo field) =>
+            OffsetsOf(method, System.BitConverter.GetBytes(field.MetadataToken), 0x7D);
+
         /// <summary>True when the named method (or its lambdas and state machine) calls a method that may live in another assembly (see CallOffsets).</summary>
         public static bool CallsAcrossAssemblies(System.Type owner, string methodName, MethodBase target)
         {

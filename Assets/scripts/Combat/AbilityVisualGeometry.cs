@@ -146,23 +146,48 @@ namespace Overpower.Combat
             return Mathf.Abs(t * 2f - 1f);
         }
     
-        /// <summary>Point <paramref name="k"/> of <paramref name="n"/> along a flat arc of this radius, opening along +Z and running from the
-        /// left edge (-half angle) to the right edge: drawn at a cone's range it traces the far edge ConeFilter.IsWithinCone tests.</summary>
-        public static Vector3 ArcPoint(float radius, float fullAngleDegrees, int k, int n)
+        /// <summary>How tall the Sonic Pulse's arch stands at <paramref name="radius"/> from the caster: <paramref name="heightShare"/> of half the
+        /// span between its feet (1 = a half circle), never above <paramref name="maxHeight"/>.</summary>
+        public static float ArchHeight(float radius, float fullAngleDegrees, float heightShare, float maxHeight)
+        {
+            float half = Mathf.Clamp(fullAngleDegrees * 0.5f, 0f, 90f) * Mathf.Deg2Rad;
+            return Mathf.Min(Mathf.Max(0f, radius) * Mathf.Sin(half) * heightShare, maxHeight);
+        }
+
+        /// <summary>Point <paramref name="k"/> of <paramref name="n"/> along an upright arch whose feet stand on the cone's two edges at
+        /// <paramref name="radius"/> from the caster (local space, opening along +Z, the feet on the floor at y 0, the crest straight ahead at
+        /// <paramref name="height"/>). <paramref name="bend"/> 1 runs its foot along the cone's round edge at that radius, 0 straight across
+        /// between the two edge points; in between it stays inside the cone, which is convex.</summary>
+        public static Vector3 ArchPoint(float radius, float fullAngleDegrees, float height, float bend, int k, int n)
         {
             // A hair inside the edge and the range (under a millimetre at 5 m): exactly on them, float rounding puts the point a
-            // millionth outside ConeFilter's own test, and the bands must never claim ground the pulse does not hit.
-            float half = Mathf.Max(0f, fullAngleDegrees * 0.5f - ArcEdgeInsetDegrees);
-            float t = n > 1 ? Mathf.Clamp01(k / (float)(n - 1)) : 0.5f;
-            return CirclePoint(radius * ArcRadiusInset, Mathf.Lerp(-half, half, t));
+            // millionth outside ConeFilter's own test, and the arch must never stand on ground the pulse does not hit.
+            float half = Mathf.Clamp(fullAngleDegrees * 0.5f - ArcEdgeInsetDegrees, 0f, 90f);
+            float across = n > 1 ? Mathf.Clamp01(k / (float)(n - 1)) * 2f - 1f : 0f;
+            float r = radius * ArcRadiusInset;
+            Vector3 onEdge = CirclePoint(r, across * half);
+            Vector3 straight = new Vector3(r * Mathf.Sin(half * Mathf.Deg2Rad) * across, 0f, r * Mathf.Cos(half * Mathf.Deg2Rad));
+            Vector3 point = Vector3.Lerp(straight, onEdge, Mathf.Clamp01(bend));
+            point.y = height * Mathf.Sqrt(Mathf.Max(0f, 1f - across * across));
+            return point;
+        }
+
+        /// <summary>How solid the arch is <paramref name="t"/> seconds after the cast, as a share of its full strength: from 1 at the caster down
+        /// to <paramref name="endStrength"/> as it reaches the end of the sweep, then to 0 over <paramref name="fadeSeconds"/>.</summary>
+        public static float ArchStrength(float t, float sweepSeconds, float fadeSeconds, float endStrength)
+        {
+            if (t <= sweepSeconds)
+                return Mathf.Lerp(1f, endStrength, sweepSeconds > 0f ? Mathf.Clamp01(t / sweepSeconds) : 1f);
+            return endStrength * Fade01(t - sweepSeconds, fadeSeconds);
         }
 
         private const float ArcEdgeInsetDegrees = 0.01f;
         private const float ArcRadiusInset = 0.9999f;
 
-        /// <summary>How far out from the caster band <paramref name="band"/> (0 leads) has swept <paramref name="t"/> seconds after a cast: the
-        /// leading band reaches <paramref name="range"/> after <paramref name="sweepSeconds"/> and stays there, each later band trails the one
-        /// ahead by <paramref name="spacing"/> of the range, and none ever passes the range. 0 = not out yet.</summary>
+        /// <summary>How far out from the caster the Sonic Pulse's arch <paramref name="band"/> (0 leads, the rest are its after-images) has
+        /// travelled <paramref name="t"/> seconds after a cast: the arch reaches <paramref name="range"/> after <paramref name="sweepSeconds"/>
+        /// and stays there, each after-image trails the one ahead by <paramref name="spacing"/> of the range, and none ever passes the range.
+        /// 0 = not out yet.</summary>
         public static float ArcBandRadius(int band, float t, float sweepSeconds, float range, float spacing)
         {
             float lead = sweepSeconds > 0f ? Mathf.Clamp01(t / sweepSeconds) : 1f;

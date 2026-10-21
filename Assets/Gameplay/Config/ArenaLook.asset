@@ -86,19 +86,27 @@ MonoBehaviour:
   stunArcWidth: 0.05
   stunArcSweepDegrees: {x: 50, y: 100}
   stunArcGlow: 1
-  pulseBandCount: 3
+  pulseArchCount: 2
   pulseSweepSeconds: 0.2
-  pulseFadeSeconds: 0.25
-  pulseBandSpacing: 0.18
-  pulseBandWidth: 0.3
-  pulseBandHeight: 0.4
-  pulseBandAlpha: 0.85
+  pulseFadeSeconds: 0.2
+  pulseArchSpacing: 0.18
+  pulseArchWidth: 0.3
+  pulseArchHeight: 0.8
+  pulseArchMaxHeight: 2.2
+  pulseArchBend: 1
+  pulseArchAlpha: 0.85
+  pulseArchEndStrength: 0.5
   pulseTrailAlpha: 0.55
   pulseCoreWhiteness: 0.55
   pulseCoreWidth: 0.3
-  flameTonguesPerMetre: 22
+  pulseEdgeWidth: 0.05
+  pulseEdgeStrength: 0.3
+  flameTonguesPerMetre: 32
   flameEmbersPerSecond: 8
-  flameTongueStart: 0.15
+  flameJetReach: 0.95
+  flameFanStrength: 0.4
+  fireFieldFlamesPerSquareMetre: 14
+  fireFieldEmbersPerSquareMetre: 1.5
   shotLightCap: 4
   shotLightRange: 4
   shotLightIntensity: 0.3

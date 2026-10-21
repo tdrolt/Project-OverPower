@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Overpower.Arena
 {
@@ -43,9 +44,9 @@ namespace Overpower.Arena
         public Material hologram;
         [Tooltip("The metal of the Shield's hexagon plates: solid and lit, so the player inside is only seen through the seams. Its gold and the seams' shade are put on each Shield when it triggers, so this file is never changed while playing.")]
         public Material shieldPlates;
-        [Tooltip("The material that adds light, put on the Flamethrower's embers each time it sprays. The stun burst's bright spikes use the same file through their own prefab, so change the file itself to change both. Adding light turns any colour paler over the grey floor, so effects whose colour must read stay on Fx Alpha. It draws whatever colour the effect gives it, so this file is never changed while playing.")]
+        [Tooltip("The material that adds light, put on the Flamethrower's embers each time it sprays and on the embers of the Rocket's burning ground as it lights. The stun burst's bright spikes use the same file through their own prefab, so change the file itself to change both. Adding light turns any colour paler over the grey floor, so effects whose colour must read stay on Fx Alpha. It draws whatever colour the effect gives it, so this file is never changed while playing.")]
         public Material fxAdditive;
-        [Tooltip("The see-through material for effects whose colour must read over any floor, put on the Sonic Pulse bands, the arcs on a stunned player, the Flamethrower's flame tongues, the Dash streak and chevrons, the Blink shards and ring and the Sprint speed-lines as they are built. The stun bolt's crackle and its burst use the same file through their own prefabs, so change the file itself to change them all. It draws whatever colour the effect gives it, so this file is never changed while playing.")]
+        [Tooltip("The see-through material for effects whose colour must read over any floor, put on the Sonic Pulse arch, the arcs on a stunned player, the Flamethrower's flames, the flames of the Rocket's burning ground, the Dash streak and chevrons, the Blink shards and ring and the Sprint speed-lines as they are built. The stun bolt's crackle and its burst use the same file through their own prefabs, so change the file itself to change them all. It draws whatever colour the effect gives it, so this file is never changed while playing.")]
         public Material fxAlpha;
 
         [Header("Stun Gun")]
@@ -71,35 +72,56 @@ namespace Overpower.Arena
         [Min(0f)] public float stunArcGlow = 1f;
 
         [Header("Sonic Pulse")]
-        [Tooltip("How many see-through bands sweep out over the Sonic Pulse's cone when it is cast.")]
-        [Range(1, 4)] public int pulseBandCount = 3;
-        [Tooltip("How long the leading Sonic Pulse band takes to sweep from the caster to the end of the cone, in seconds.")]
+        [Tooltip("How many arches the Sonic Pulse sends out: the arch itself plus fainter after-images trailing behind it.")]
+        [FormerlySerializedAs("pulseBandCount")]
+        [Range(1, 3)] public int pulseArchCount = 2;
+        [Tooltip("How long the Sonic Pulse's arch takes to travel from the caster to the end of the pulse's reach, in seconds.")]
         [Min(0.01f)] public float pulseSweepSeconds = 0.2f;
-        [Tooltip("How long the Sonic Pulse bands take to fade away once the leading band reaches the end of the cone, in seconds.")]
-        [Min(0f)] public float pulseFadeSeconds = 0.25f;
-        [Tooltip("How far each Sonic Pulse band trails the one ahead of it, as a fraction of the cone's range: 0 stacks them all on one arc.")]
-        [Range(0f, 0.5f)] public float pulseBandSpacing = 0.18f;
-        [Tooltip("How thick each Sonic Pulse band is, in metres.")]
-        [Min(0.01f)] public float pulseBandWidth = 0.3f;
-        [Tooltip("How high above the floor the Sonic Pulse bands sweep, in metres. Around waist height they pass through the players they push.")]
-        [Min(0f)] public float pulseBandHeight = 0.4f;
-        [Tooltip("How solid the leading Sonic Pulse band is, from 0 (invisible) to 1 (solid); the bands behind it are fainter. Below about 0.8 the blue mixes with the grey floor into a dull slate; at 1 it hides the players inside the cone.")]
-        [Range(0f, 1f)] public float pulseBandAlpha = 0.85f;
-
-        [Tooltip("How solid the last Sonic Pulse band is, as a share of the leading band: 1 makes every band as solid as the first, lower fades the trailing bands. Too low and they vanish into the grey floor.")]
+        [Tooltip("How long the Sonic Pulse's arch takes to vanish once it reaches the end of the pulse's reach, in seconds.")]
+        [Min(0f)] public float pulseFadeSeconds = 0.2f;
+        [Tooltip("How far each after-image trails the arch ahead of it, as a share of the pulse's reach: 0 stacks them on the arch.")]
+        [FormerlySerializedAs("pulseBandSpacing")]
+        [Range(0f, 0.5f)] public float pulseArchSpacing = 0.18f;
+        [Tooltip("How thick the Sonic Pulse's arch is, in metres.")]
+        [FormerlySerializedAs("pulseBandWidth")]
+        [Min(0.01f)] public float pulseArchWidth = 0.3f;
+        [Tooltip("How tall the Sonic Pulse's arch stands, as a share of half its width: 1 is a half circle, lower is a flatter arch.")]
+        [Range(0.1f, 1.5f)] public float pulseArchHeight = 0.8f;
+        [Tooltip("The tallest the Sonic Pulse's arch ever stands, in metres, so at the far end it does not tower over the players it pushes.")]
+        [Min(0.1f)] public float pulseArchMaxHeight = 2.2f;
+        [Tooltip("How much the foot of the Sonic Pulse's arch curves: 1 follows the round edge of the ground the pulse really reaches, 0 is a straight arch between the cone's two edges, which stops short of the full reach in the middle.")]
+        [Range(0f, 1f)] public float pulseArchBend = 1f;
+        [Tooltip("How solid the Sonic Pulse's arch is as it leaves the caster, from 0 (invisible) to 1 (solid). Below about 0.8 the blue mixes with the grey floor into a dull slate; at 1 it hides the players it passes.")]
+        [FormerlySerializedAs("pulseBandAlpha")]
+        [Range(0f, 1f)] public float pulseArchAlpha = 0.85f;
+        [Tooltip("How solid the Sonic Pulse's arch still is when it reaches the end of the pulse's reach, as a share of how it started: lower fades it out as it arrives.")]
+        [Range(0f, 1f)] public float pulseArchEndStrength = 0.5f;
+        [Tooltip("How solid the last after-image is, as a share of the arch: 1 makes every after-image as solid as the arch, lower fades them. Too low and they vanish into the grey floor.")]
         [Range(0f, 1f)] public float pulseTrailAlpha = 0.55f;
-        [Tooltip("How pale the thin line along the middle of each Sonic Pulse band is: 0 is the band's own blue, 1 is white. A paler middle keeps the bands visible over a grey floor for players who tell colours apart by brightness.")]
+        [Tooltip("How pale the thin line along the middle of the Sonic Pulse's arch is: 0 is the arch's own blue, 1 is white. A paler middle keeps the arch visible over a grey floor for players who tell colours apart by brightness.")]
         [Range(0f, 1f)] public float pulseCoreWhiteness = 0.55f;
-        [Tooltip("How thick the pale line along the middle of each Sonic Pulse band is, as a share of the band's thickness.")]
+        [Tooltip("How thick the pale line along the middle of the Sonic Pulse's arch is, as a share of the arch's thickness.")]
         [Range(0.05f, 1f)] public float pulseCoreWidth = 0.3f;
+        [Tooltip("How far the thin outline of the Sonic Pulse's arch shows past its tube on each side, in metres. 0 hides it.")]
+        [Min(0f)] public float pulseEdgeWidth = 0.05f;
+        [Tooltip("How solid the outline of the Sonic Pulse's arch is, as a share of the arch: low keeps the arch see-through where the outline lies under it, so players behind it stay visible.")]
+        [Range(0f, 1f)] public float pulseEdgeStrength = 0.3f;
 
         [Header("Flamethrower")]
-        [Tooltip("How many flame tongues the Flamethrower raises each second for every metre of its range: more makes a denser fire along the fan.")]
-        [Min(0f)] public float flameTonguesPerMetre = 22f;
-        [Tooltip("How many embers rise from the Flamethrower's fan each second.")]
+        [Tooltip("How many flames the Flamethrower's jet throws from the gun each second for every metre of its range: more makes a thicker jet.")]
+        [Min(0f)] public float flameTonguesPerMetre = 32f;
+        [Tooltip("How many embers fly from the Flamethrower's gun each second.")]
         [Min(0f)] public float flameEmbersPerSecond = 8f;
-        [Tooltip("How far from the caster the flame tongues start, as a fraction of the cone's range, so the flames never hide the player holding the Flamethrower.")]
-        [Range(0f, 0.9f)] public float flameTongueStart = 0.15f;
+        [Tooltip("How far the Flamethrower's flames fly from the gun, as a share of the way to the end of its reach: 1 lets them lick the very edge of the ground it burns.")]
+        [Range(0.3f, 1f)] public float flameJetReach = 0.95f;
+        [Tooltip("How strong the flat fan on the floor under the Flamethrower's spray is: 1 is fully bright, lower leaves a faint marker of the ground that burns.")]
+        [Range(0f, 1f)] public float flameFanStrength = 0.4f;
+
+        [Header("Rocket Cursor Fire")]
+        [Tooltip("How many flames rise each second from every square metre of the Rocket's burning ground: more makes a denser fire.")]
+        [Min(0f)] public float fireFieldFlamesPerSquareMetre = 14f;
+        [Tooltip("How many embers rise each second from every square metre of the Rocket's burning ground.")]
+        [Min(0f)] public float fireFieldEmbersPerSquareMetre = 1.5f;
 
         [Header("Guns")]
         [Tooltip("How many shots can light up the floor under them at the same time. Only shots you can see get a light, the nearest to your view first; more lights cost frame time in a big SMG fight, 0 turns the shot lights off.")]

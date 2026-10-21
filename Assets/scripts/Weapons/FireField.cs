@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
 using Overpower.Abilities;
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Net;
 using Overpower.UI;
@@ -35,8 +36,8 @@ namespace Overpower.Weapons
                  "is in total.")]
         private float damagePerSecond = 12f;
 
-        [SerializeField, Tooltip("How far the fire reaches from its centre, in metres. The visual " +
-                 "is resized to match this, so the burning patch is always exactly as big as it " +
+        [SerializeField, Tooltip("How far the fire reaches from its centre, in metres. The flames are " +
+                 "laid out over exactly this radius, so the burning patch is always exactly as big as it " +
                  "looks.")]
         private float radius = 2.5f;
 
@@ -50,36 +51,28 @@ namespace Overpower.Weapons
                  "and practice dummies are; nothing on any other layer has health to lose.")]
         private LayerMask burnMask = ~0;
 
-        [SerializeField, Tooltip("The flames. Scaled sideways to match Radius when the field " +
-                 "lights up, so one prefab covers every size of fire; its height is left alone " +
-                 "and is yours to author here.")]
-        private Transform visual;
-
         [Header("Look (visual only)")]
+        [SerializeField, Tooltip("The floor flames and their embers (a child particle system, the Flamethrower's flames laid flat). " +
+                 "They rise from the whole circle of Radius when the field lights, in the fire colours of the UiTheme; how many come " +
+                 "from its Arena Look; their size, life and upward drift are authored here.")]
+        private ParticleSystem flames;
+
         [SerializeField, Tooltip("The bright ring drawn at the fire's true edge - Assets/Gameplay/UI/AimConeLine.mat. " +
-                 "This carries most of the 'don't stand here' read alongside the filled disc's own team colour.")]
+                 "It is in the SHOOTER's team colour, so a player can tell whose fire they are standing in; the flames say it is fire.")]
         private LineRenderer rim;
 
-        [SerializeField, Tooltip("Team colours - Assets/Gameplay/Config/UiTheme.asset (Shot Color For). Tudor's " +
-                 "call: the disc is the SHOOTER's team colour, not a fixed fire palette - a first attempt at a " +
-                 "hot pale orange still blended into this arena's own tan/orange ground (the same trap team 0's " +
-                 "near-white and the flamethrower's orange both hit), and a fixed colour cannot tell a player " +
-                 "whose fire they are standing in anyway. Matches MineView/PortalView/FenceCageView/SplashShell, " +
-                 "which all read the shooter/owner's team the same way.")]
+        [SerializeField, Tooltip("Assets/Gameplay/Config/UiTheme.asset: the fire colours and Arena Look for the flames, and the team " +
+                 "colours (Shot Color For) for the rim.")]
         private UiTheme theme;
 
-        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the filled disc. Kept modest on purpose so the ground " +
-                 "reads as a translucent hazard, not a solid slab - the rim below carries the strong edge.")]
-        private float fillOpacity = 0.55f;
-
-        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the rim outline - higher than the fill, since the rim " +
-                 "carries most of the 'don't stand here' read.")]
+        [SerializeField, Range(0f, 1f), Tooltip("Opacity of the rim outline at the fire's true edge: the flames are scattered over " +
+                 "the ground, so the rim carries the sharp 'this is where it stops burning' read.")]
         private float rimOpacity = 0.95f;
 
         [SerializeField, Tooltip("Points on the rim circle. 48 reads as round at the game camera's distance.")]
         private int rimSegments = 48;
 
-        private MaterialPropertyBlock block;
+        public const string FlamesChildName = "Floor Flames";
 
         // Not a tuning value: how many colliders one tick considers, matching ExplodeOnImpact.
         private const int MaxBurningColliders = 32;
@@ -182,22 +175,7 @@ namespace Overpower.Weapons
             // time here; fields are short-lived and the worst case is one tick counted as new. (A26)
             placedServerTimestampMs = info.SentServerTimestamp;
 
-            Color teamColor = theme != null ? theme.ShotColorFor(sourceTeamId) : Color.white;
-
-            if (visual != null)
-            {
-                visual.localScale = new Vector3(radius * 2f, visual.localScale.y, radius * 2f);
-
-                if (block == null)
-                    block = new MaterialPropertyBlock();
-                VisualTint.SetMeshColor(visual.GetComponent<Renderer>(), block, VisualTint.WithAlpha(teamColor, fillOpacity));
-            }
-
-            if (rim != null)
-            {
-                VisualTint.FillFlatCircle(rim, radius, rimSegments);
-                VisualTint.SetLineColor(rim, VisualTint.WithAlpha(teamColor, rimOpacity));
-            }
+            ShowLook();
 
             // Vision: shown when any part of the disc is in sight, or it reaches my team.
             VisibleWhenSeen gate = GetComponent<VisibleWhenSeen>();
@@ -208,6 +186,26 @@ namespace Overpower.Weapons
                        $"{damagePerSecond:0.#} dmg/s for {duration:0.##}s");
 
             StartCoroutine(Burn());
+        }
+
+        /// <summary>The floor flames over exactly the radius this field was sent, and the rim at its edge in the shooter's team colour.</summary>
+        private void ShowLook()
+        {
+            if (flames != null)
+            {
+                // Flames never laid over the radius would burn the prefab's own shape, not this field's ground.
+                bool laidOut = theme != null && theme.arenaLook != null;
+                flames.gameObject.SetActive(laidOut);
+                if (laidOut)
+                    FlameLook.ApplyFloor(flames, radius, LookColours.FireCore(theme), LookColours.For(LookFamily.Fire, sourceTeamId, theme), theme.arenaLook);
+            }
+
+            if (rim != null)
+            {
+                Color teamColor = theme != null ? theme.ShotColorFor(sourceTeamId) : Color.white;
+                VisualTint.FillFlatCircle(rim, radius, rimSegments);
+                VisualTint.SetLineColor(rim, VisualTint.WithAlpha(teamColor, rimOpacity));
+            }
         }
 
         /// <summary>
