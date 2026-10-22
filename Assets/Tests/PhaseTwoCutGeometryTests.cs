@@ -193,6 +193,38 @@ namespace Overpower.Tests
             }
         }
 
+        /// <summary>The cut's own walls plus the full outline's walls leave no hole round the smaller arena, and no two of
+        /// the cut's walls share space at its right-angle turns (the arena shader shows any overlap).</summary>
+        private static void AssertClosedAndFaceToFace(PhaseTwoCutGeometry cut, IReadOnlyList<Vector2> full, float thickness)
+        {
+            var footprints = new List<BoxFootprint>();
+            foreach (ArenaWallPlan.Run run in cut.WallRuns) footprints.Add(run.Footprint(thickness));
+            foreach (ArenaWallPlan.Run run in ArenaWallPlan.ForSource(full, full.Count, thickness)) footprints.Add(run.Footprint(thickness));
+            List<string> holes = ArenaWallCoverage.FindHoles(cut.Playable, footprints, thickness);
+            Assert.IsEmpty(holes, "the cut wall must close the smaller arena:\n" + string.Join("\n", holes));
+
+            Vector2[] Corners(ArenaWallPlan.Run run) =>
+                ArenaPieceShapes.FootprintCorners(run.Centre(thickness), run.UnityYawDegrees, new Vector2(run.Length, thickness));
+            for (int i = 0; i < cut.WallRuns.Count; i++)
+                for (int j = i + 1; j < cut.WallRuns.Count; j++)
+                    Assert.That(ArenaPieceShapes.OverlapDepth(Corners(cut.WallRuns[i]), Corners(cut.WallRuns[j])),
+                        Is.LessThan(ArenaWallPlan.StraightOverlapMetres + 1e-3f), $"cut walls {i} and {j} share space");
+        }
+
+        [Test]
+        public void TheToyCutIsClosedAndItsWallsMeetFaceToFace([Values(0f, 2f)] float recessWidth)
+        {
+            PhaseTwoCutGeometry cut = ToyCut(width: recessWidth);
+            Assert.NotNull(cut);
+            AssertClosedAndFaceToFace(cut, Toy, 0.2f);
+        }
+
+        [Test]
+        public void EachRealCutIsClosedAndItsWallsMeetFaceToFace([Values(0, 1, 2)] int team)
+        {
+            AssertClosedAndFaceToFace(RealCut(team), ArenaBounds.FromSourceOutline(SourceOutline, ArenaCentre).Polygon, 0.724f);
+        }
+
         [Test]
         public void TheCentresWholeCaptureAreaStaysReachable([Values(0, 1, 2)] int team)
         {

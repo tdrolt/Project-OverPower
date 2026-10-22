@@ -6,10 +6,15 @@ namespace Overpower.Arena
     /// <summary>
     /// Turns the arena's outline into one straight wall per edge, built exactly from the outline corner to corner so
     /// no corner has an empty space (D3):
-    /// - An OUTWARD (convex) corner gets each of its two walls extended past the corner by thickness * tan(turn / 2),
-    ///   exactly enough for their outer edges to meet (a 90 degree turn needs one thickness).
-    /// - An INWARD (reflex) corner needs no extension: the walls already overlap behind it, so extending would poke a
-    ///   wedge into the play space instead of closing a gap.
+    /// - A RIGHT-ANGLE corner is closed by the longer of its two walls alone, the shorter reaching only the straight
+    ///   run's hairline into it: the arena shader draws a line round every wall's top, so two walls sharing the corner
+    ///   square show crossed lines. Outward, the longer runs on by one thickness; inward (reflex), the shorter stops
+    ///   one thickness (less the hairline) short.
+    /// - Any other OUTWARD (convex) corner gets each of its two walls extended past the corner by
+    ///   thickness * tan(turn / 2), exactly enough for their outer edges to meet. No pair of boxes closes such a corner
+    ///   without sharing space, so these two do, behind the inner faces.
+    /// - Any other INWARD (reflex) corner needs no extension: the walls already overlap behind it, so extending would
+    ///   poke a wedge into the play space instead of closing a gap.
     /// - A straight run (no turn) still gets a hairline 1 cm overlap, so floating-point rounding never leaves a crack
     ///   between two collinear pieces meant to butt together as one wall.
     ///
@@ -23,6 +28,10 @@ namespace Overpower.Arena
         /// <summary>Below this many radians either way, a corner counts as a straight run rather than a genuine
         /// turn - float noise from three-fold rotation must never be read as a real (if tiny) corner.</summary>
         private const float StraightToleranceRadians = 1e-4f;
+
+        /// <summary>How far off 90 degrees a corner may be and still be closed by one wall alone; ArenaOverlapCheck reads it
+        /// too, so the builder and its check agree on what a right angle is.</summary>
+        public const float RightAngleToleranceRadians = 1e-3f;
 
         public readonly struct Run
         {
@@ -89,8 +98,8 @@ namespace Overpower.Arena
                 Vector2 dir = (b - a).normalized;
                 Vector2 inward = leftSign * new Vector2(-dir.y, dir.x);
 
-                float startExtension = CornerExtension(prev, a, b, leftSign, thickness);
-                float endExtension = CornerExtension(a, b, next, leftSign, thickness);
+                float startExtension = CornerExtension(prev, a, b, false, leftSign, thickness);
+                float endExtension = CornerExtension(a, b, next, true, leftSign, thickness);
 
                 Vector2 innerStart = a - dir * startExtension;
                 Vector2 innerEnd = b + dir * endExtension;
@@ -100,9 +109,10 @@ namespace Overpower.Arena
             return runs;
         }
 
-        /// <summary>The extension both walls meeting at the corner (prev -> corner -> next) get, applied identically
-        /// whichever of the two edges is asking (the end of one, the start of the other).</summary>
-        private static float CornerExtension(Vector2 prev, Vector2 corner, Vector2 next, float leftSign, float thickness)
+        /// <summary>How far the wall arriving at (<paramref name="forArriving"/>) or leaving the corner (prev -> corner ->
+        /// next) runs past it; negative stops it short. At a right angle the longer edge owns the corner (a tie goes to the
+        /// arriving one); at any other corner both walls get the same extension.</summary>
+        private static float CornerExtension(Vector2 prev, Vector2 corner, Vector2 next, bool forArriving, float leftSign, float thickness)
         {
             Vector2 inDir = (corner - prev).normalized;
             Vector2 outDir = (next - corner).normalized;
@@ -112,6 +122,17 @@ namespace Overpower.Arena
             float dot = inDir.x * outDir.x + inDir.y * outDir.y;
             float turnRadians = leftSign * Mathf.Atan2(cross, dot);
 
+            if (Mathf.Abs(Mathf.Abs(turnRadians) - Mathf.PI * 0.5f) < RightAngleToleranceRadians)
+            {
+                float arriving = Vector2.Distance(prev, corner), leaving = Vector2.Distance(corner, next);
+                bool owns = forArriving ? arriving >= leaving : leaving > arriving;
+                // The hairline keeps a raycast from threading the seam where the shorter wall's end meets the longer one.
+                if (turnRadians > 0f)
+                    return owns ? thickness : StraightOverlapMetres;
+                // Each end gives up at most half the shorter edge: a wall shorter than two thicknesses keeps a stub (still
+                // inside its owners) instead of turning inside out, and the owners' own thickness covers its face.
+                return owns ? 0f : StraightOverlapMetres - Mathf.Min(thickness, 0.5f * Mathf.Min(arriving, leaving));
+            }
             if (turnRadians > StraightToleranceRadians)
                 return thickness * Mathf.Tan(turnRadians * 0.5f);
             if (turnRadians < -StraightToleranceRadians)

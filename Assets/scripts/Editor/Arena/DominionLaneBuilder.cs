@@ -44,6 +44,13 @@ namespace Overpower.EditorTools
             Debug.Log("[DominionLane] Build:\n" + string.Join("\n", report));
         }
 
+        [MenuItem("OverPower/Rebuild Dominion Lane Walls")]
+        private static void RebuildPiecesFromMenu()
+        {
+            List<string> report = RebuildPieces(SceneManager.GetActiveScene());
+            Debug.Log("[DominionLane] Rebuild walls:\n" + string.Join("\n", report));
+        }
+
         [MenuItem("OverPower/Measure Dominion Lane Gaps")]
         private static void MeasureFromMenu()
         {
@@ -98,6 +105,39 @@ namespace Overpower.EditorTools
             arena.sourceOutline = layout.Outline.Select(p => new Vector2(arena.centre.x + p.x, arena.centre.z + p.y)).ToList();
 
             // ---- 2. walls (the outer walls are boundary walls and block a portal's path; the H is in the blocks group), boxes, the plus
+            BuildPieces(arena, layout, arenaLayout, boundry, blocks, barriers);
+            report.Add($"Walls {layout.Walls.Count}, boxes {layout.Boxes.Count}, barriers {layout.Barriers.Count} built under '{RootName}'.");
+
+            // ---- 3. floor
+            ArenaPrimitiveBuilder.BuildFloor(environment, arenaLayout, arena.centre);
+            Transform floor = environment.Find(ArenaPrimitiveBuilder.FloorObjectName);
+            floor.localScale = new Vector3(layout.FloorSize.x, arenaLayout.FloorThickness, layout.FloorSize.y);
+            report.Add($"Floor {layout.FloorSize.x} x {layout.FloorSize.y} m.");
+
+            // ---- 4. towers: keep four, number them, put them where the drawing has them, remove the rest
+            List<string> towerReport = PlaceTowers(scene, arena, layout);
+            report.AddRange(towerReport);
+            if (towerReport.Any(l => l.StartsWith("PROBLEM"))) return report;
+
+            // ---- 5. spawn points, healing areas, per-scene data
+            report.AddRange(PlaceSpawns(scene, arena, layout, heals));
+            report.AddRange(WriteBuildingData(scene));
+
+            // ---- 6. the minimap picture
+            report.Add(BakeMinimap(scene, arena, layout, rootGo.transform));
+
+            // ---- 6b. the straight camera (A41): own spawn on the left of the screen
+            report.Add(EnsureCameraConfig(scene));
+
+            // ---- 7. checks
+            report.AddRange(CheckSceneViewIds(scene));
+            report.AddRange(ArenaOverlapCheck.FindOverlaps(arena).Select(f => "PROBLEM: " + f));
+            EditorSceneManager.MarkSceneDirty(scene);
+            return report;
+        }
+
+        private static void BuildPieces(ArenaSymmetry arena, DominionLaneLayout layout, ArenaLayout arenaLayout, Transform boundry, Transform blocks, Transform barriers)
+        {
             float wallCentreY = (arenaLayout.WallBottomY + arenaLayout.WallTopY) * 0.5f;
             float wallHeight = arenaLayout.WallTopY - arenaLayout.WallBottomY;
             foreach (LaneRect wall in layout.Walls)
@@ -127,31 +167,37 @@ namespace Overpower.EditorTools
                 BoxCollider box = go.GetComponent<BoxCollider>();
                 box.center = c; box.size = s;
             }
-            report.Add($"Walls {layout.Walls.Count}, boxes {layout.Boxes.Count}, barriers {layout.Barriers.Count} built under '{RootName}'.");
+        }
 
-            // ---- 3. floor
-            ArenaPrimitiveBuilder.BuildFloor(environment, arenaLayout, arena.centre);
-            Transform floor = environment.Find(ArenaPrimitiveBuilder.FloorObjectName);
-            floor.localScale = new Vector3(layout.FloorSize.x, arenaLayout.FloorThickness, layout.FloorSize.y);
-            report.Add($"Floor {layout.FloorSize.x} x {layout.FloorSize.y} m.");
+        /// <summary>Rebuilds only the lane's walls, boxes and barriers from the layout, in their groups' places; the towers, spawns, healing
+        /// ground, minimap picture and camera stay as they are (Build redoes all of those). Never in Play Mode; never saves the scene.</summary>
+        public static List<string> RebuildPieces(Scene scene)
+        {
+            var report = new List<string>();
+            if (EditorApplication.isPlayingOrWillChangePlaymode) { report.Add("PROBLEM: not in Play Mode."); return report; }
+            if (scene.name != SceneName) { report.Add($"PROBLEM: the open scene is '{scene.name}', not '{SceneName}'."); return report; }
+            var layout = AssetDatabase.LoadAssetAtPath<DominionLaneLayout>(LayoutPath);
+            var arenaLayout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/Gameplay/Config/ArenaLayout.asset");
+            if (layout == null || arenaLayout == null) { report.Add("PROBLEM: the lane layout or the arena layout asset is missing."); return report; }
+            ArenaSymmetry[] arenas = scene.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<ArenaSymmetry>(true)).ToArray();
+            if (arenas.Length != 1) { report.Add($"PROBLEM: {arenas.Length} ArenaSymmetry components in the scene (need exactly one)."); return report; }
+            ArenaSymmetry arena = arenas[0];
+            Transform root = arena.transform.Find(RootName);
+            if (root == null) { report.Add($"PROBLEM: no '{RootName}' under the arena - run Build Dominion Lane Map first."); return report; }
 
-            // ---- 4. towers: keep four, number them, put them where the drawing has them, remove the rest
-            List<string> towerReport = PlaceTowers(scene, arena, layout);
-            report.AddRange(towerReport);
-            if (towerReport.Any(l => l.StartsWith("PROBLEM"))) return report;
-
-            // ---- 5. spawn points, healing areas, per-scene data
-            report.AddRange(PlaceSpawns(scene, arena, layout, heals));
-            report.AddRange(WriteBuildingData(scene));
-
-            // ---- 6. the minimap picture
-            report.Add(BakeMinimap(scene, arena, layout, rootGo.transform));
-
-            // ---- 6b. the straight camera (A41): own spawn on the left of the screen
-            report.Add(EnsureCameraConfig(scene));
-
-            // ---- 7. checks
-            report.AddRange(CheckSceneViewIds(scene));
+            var groups = new Transform[3];
+            string[] names = { ArenaSymmetry.BoundaryGroupName, ArenaSymmetry.BlocksGroupName, ArenaSymmetry.BarriersGroupName };
+            for (int g = 0; g < names.Length; g++)
+            {
+                Transform old = root.Find(names[g]);
+                int index = old != null ? old.GetSiblingIndex() : root.childCount;
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+                groups[g] = ArenaPrimitiveBuilder.NewMarkedGroup(root, names[g]);
+                groups[g].SetSiblingIndex(index);
+            }
+            BuildPieces(arena, layout, arenaLayout, groups[0], groups[1], groups[2]);
+            report.Add($"Walls {layout.Walls.Count}, boxes {layout.Boxes.Count}, barriers {layout.Barriers.Count} rebuilt under '{RootName}'.");
+            report.AddRange(ArenaOverlapCheck.FindOverlaps(arena).Select(f => "PROBLEM: " + f));
             EditorSceneManager.MarkSceneDirty(scene);
             return report;
         }

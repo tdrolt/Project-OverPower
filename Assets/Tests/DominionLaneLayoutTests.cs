@@ -66,6 +66,20 @@ namespace Overpower.Tests
             }
         }
 
+        [Test] public void NoTwoWallsOrTwoBarriersShareSpaceTheyMeetFaceToFace()
+        {
+            // The arena shader draws a line round every piece's top, so two pieces sharing a corner show crossed lines.
+            DominionLaneLayout layout = Layout();
+            foreach (IReadOnlyList<LaneRect> rects in new[] { layout.Walls, layout.Barriers })
+                for (int i = 0; i < rects.Count; i++)
+                    for (int j = i + 1; j < rects.Count; j++)
+                    {
+                        float depth = Mathf.Min(Mathf.Min(rects[i].Max.x, rects[j].Max.x) - Mathf.Max(rects[i].Min.x, rects[j].Min.x),
+                                                Mathf.Min(rects[i].Max.y, rects[j].Max.y) - Mathf.Max(rects[i].Min.y, rects[j].Min.y));
+                        Assert.LessOrEqual(depth, Tolerance, $"{rects[i].name} and {rects[j].name} share space");
+                    }
+        }
+
         [Test] public void TheZonesSitOneAboveTheOtherAndTheSpawnsFaceEachOther()
         {
             DominionLaneLayout layout = Layout();

@@ -19,31 +19,33 @@ namespace Overpower.EditorTools
         private const float BoardMiddleX = 550f;
         private const float BoardMiddleY = 342f;
 
-        // left, top, width, height in board pixels
+        // left, top, width, height in board pixels. Where two pieces meet at a corner or cross, the longer runs through and the
+        // shorter stops at its face (same footprint as the board): the arena shader shows any two pieces sharing space.
         private static readonly (string name, int l, int t, int w, int h)[] WallPixels =
         {
             ("Hall Wall Top",           401, 145, 298, 10),
             ("Hall Wall Bottom",        401, 529, 298, 10),
-            ("Hall Stub Top Left",      401, 145,  10, 76),
-            ("Hall Stub Bottom Left",   401, 463,  10, 76),
-            ("Hall Stub Top Right",     689, 145,  10, 76),
-            ("Hall Stub Bottom Right",  689, 463,  10, 76),
+            ("Hall Stub Top Left",      401, 155,  10, 56),
+            ("Hall Stub Bottom Left",   401, 473,  10, 56),
+            ("Hall Stub Top Right",     689, 155,  10, 56),
+            ("Hall Stub Bottom Right",  689, 473,  10, 56),
             ("Pocket Wall Left Top",     77, 211, 334, 10),
             ("Pocket Wall Left Bottom",  77, 463, 334, 10),
-            ("Pocket Wall Left End",     77, 211,  10, 262),
+            ("Pocket Wall Left End",     77, 221,  10, 242),
             ("Pocket Wall Right Top",   689, 211, 334, 10),
             ("Pocket Wall Right Bottom",689, 463, 334, 10),
-            ("Pocket Wall Right End",  1013, 211,  10, 262),
+            ("Pocket Wall Right End",  1013, 221,  10, 242),
             ("H Wall Left",             443, 282,  10, 120),
             ("H Wall Right",            647, 282,  10, 120),
-            ("H Arm Left",              448, 337,  66, 10),
-            ("H Arm Right",             586, 337,  66, 10),
+            ("H Arm Left",              453, 337,  61, 10),
+            ("H Arm Right",             586, 337,  61, 10),
         };
 
         private static readonly (string name, int l, int t, int w, int h)[] BarrierPixels =
         {
             ("Plus Across", 514, 339, 72, 6),
-            ("Plus Along",  547, 306,  6, 72),
+            ("Plus Along Top",    547, 306,  6, 33),
+            ("Plus Along Bottom", 547, 345,  6, 33),
         };
 
         // The grey 30-pixel squares: left, top.

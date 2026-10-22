@@ -33,16 +33,21 @@ MonoBehaviour:
     centre: {x: 55.301132, y: 1.3000064, z: 77.70094}
     yawDegrees: 299.60715
     size: {x: 8.4507475, y: 2.8000083, z: 5.326815}
-  - name: House_04R (3)
+  - name: Corner Block Square
     kind: 0
-    centre: {x: 66.66976, y: 3.5000048, z: 67.927025}
-    yawDegrees: 312.79303
-    size: {x: 10.200001, y: 7.0000095, z: 5.5507407}
-  - name: House_05 (2)
+    centre: {x: 65.05, y: 3.5000048, z: 66.22118}
+    yawDegrees: 315
+    size: {x: 5.5507407, y: 7.0000095, z: 5.5507407}
+  - name: Corner Block Right Arm
     kind: 0
-    centre: {x: 61.118443, y: 3.5803294, z: 69.64506}
-    yawDegrees: 312.79303
-    size: {x: 5.723678, y: 7.160659, z: 5.74206}
+    centre: {x: 68.65624, y: 3.5000048, z: 69.82742}
+    yawDegrees: 315
+    size: {x: 4.64926, y: 7.0000095, z: 5.5507407}
+  - name: Corner Block Left Arm
+    kind: 0
+    centre: {x: 61.44376, y: 3.5000048, z: 69.82743}
+    yawDegrees: 315
+    size: {x: 5.5507407, y: 7.0000095, z: 4.64926}
   - name: Cover Crate Defender Front
     kind: 0
     centre: {x: 65.018265, y: 1.3096044, z: 100.98971}

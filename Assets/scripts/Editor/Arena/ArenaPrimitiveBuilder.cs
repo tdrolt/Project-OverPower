@@ -461,6 +461,9 @@ namespace Overpower.EditorTools
             report.Add("--- 7. Final Validate ---");
             report.AddRange(ArenaSymmetryBuilder.Validate(arena));
 
+            report.Add("--- 8. Overlapping pieces ---");
+            report.AddRange(ArenaOverlapCheck.FindOverlaps(arena).Select(f => "PROBLEM: " + f));
+
             return report;
         }
 

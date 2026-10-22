@@ -247,7 +247,8 @@ namespace Overpower.Tests
 
                     // Centre-Tier-III-walls, 2026-09-26: "Centre - Tier III wall (zone 4)" is a real Block too (a
                     // full-height wall, not cover), so "not a crate" no longer means "a house" - counted on its own.
-                    int crateCount = 0, houseCount = 0, otherCount = 0;
+                    // The corner block by the centre is three Corner Block pieces, counted apart from the houses.
+                    int crateCount = 0, houseCount = 0, cornerCount = 0, otherCount = 0;
                     foreach (Transform block in blocks)
                     {
                         Assert.IsFalse(block.name.StartsWith("Rock_03"),
@@ -257,10 +258,12 @@ namespace Overpower.Tests
 
                         if (block.name.StartsWith("Cover Crate")) crateCount++;
                         else if (block.name.StartsWith("House")) houseCount++;
+                        else if (block.name.StartsWith("Corner Block")) cornerCount++;
                         else otherCount++;
                     }
                     Assert.AreEqual(6, crateCount, $"{third.name} should still have all six Cover Crate blocks");
-                    Assert.AreEqual(6, houseCount, $"{third.name} should still have all six house blocks");
+                    Assert.AreEqual(4, houseCount, $"{third.name} should still have its four other house blocks");
+                    Assert.AreEqual(3, cornerCount, $"{third.name} should have the three Corner Block pieces");
                     Assert.AreEqual(1, otherCount, $"{third.name} should have exactly one other Block (the centre-to-Tier-III wall)");
                 }
             });

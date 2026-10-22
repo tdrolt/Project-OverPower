@@ -21,16 +21,16 @@ MonoBehaviour:
     size: {x: 24.833334, y: 0.8333333}
   - name: Hall Stub Top Left
     centre: {x: -12, y: 13.25}
-    size: {x: 0.8333333, y: 6.3333335}
+    size: {x: 0.8333333, y: 4.6666665}
   - name: Hall Stub Bottom Left
     centre: {x: -12, y: -13.25}
-    size: {x: 0.8333333, y: 6.3333335}
+    size: {x: 0.8333333, y: 4.6666665}
   - name: Hall Stub Top Right
     centre: {x: 12, y: 13.25}
-    size: {x: 0.8333333, y: 6.3333335}
+    size: {x: 0.8333333, y: 4.6666665}
   - name: Hall Stub Bottom Right
     centre: {x: 12, y: -13.25}
-    size: {x: 0.8333333, y: 6.3333335}
+    size: {x: 0.8333333, y: 4.6666665}
   - name: Pocket Wall Left Top
     centre: {x: -25.5, y: 10.5}
     size: {x: 27.833334, y: 0.8333333}
@@ -39,7 +39,7 @@ MonoBehaviour:
     size: {x: 27.833334, y: 0.8333333}
   - name: Pocket Wall Left End
     centre: {x: -39, y: -0}
-    size: {x: 0.8333333, y: 21.833334}
+    size: {x: 0.8333333, y: 20.166666}
   - name: Pocket Wall Right Top
     centre: {x: 25.5, y: 10.5}
     size: {x: 27.833334, y: 0.8333333}
@@ -48,7 +48,7 @@ MonoBehaviour:
     size: {x: 27.833334, y: 0.8333333}
   - name: Pocket Wall Right End
     centre: {x: 39, y: -0}
-    size: {x: 0.8333333, y: 21.833334}
+    size: {x: 0.8333333, y: 20.166666}
   - name: H Wall Left
     centre: {x: -8.5, y: -0}
     size: {x: 0.8333333, y: 10}
@@ -56,18 +56,21 @@ MonoBehaviour:
     centre: {x: 8.5, y: -0}
     size: {x: 0.8333333, y: 10}
   - name: H Arm Left
-    centre: {x: -5.75, y: -0}
-    size: {x: 5.5, y: 0.8333333}
+    centre: {x: -5.5416665, y: -0}
+    size: {x: 5.0833335, y: 0.8333333}
   - name: H Arm Right
-    centre: {x: 5.75, y: -0}
-    size: {x: 5.5, y: 0.8333333}
+    centre: {x: 5.5416665, y: -0}
+    size: {x: 5.0833335, y: 0.8333333}
   barriers:
   - name: Plus Across
     centre: {x: 0, y: -0}
     size: {x: 6, y: 0.5}
-  - name: Plus Along
-    centre: {x: 0, y: -0}
-    size: {x: 0.5, y: 6}
+  - name: Plus Along Top
+    centre: {x: 0, y: 1.625}
+    size: {x: 0.5, y: 2.75}
+  - name: Plus Along Bottom
+    centre: {x: 0, y: -1.625}
+    size: {x: 0.5, y: 2.75}
   boxes:
   - {x: -22, y: 6}
   - {x: -22, y: -0}

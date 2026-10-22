@@ -52,6 +52,26 @@ namespace Overpower.Arena
             return true;
         }
 
+        /// <summary>How far two footprints reach into each other, in metres: the smallest overlap of their shadows on
+        /// the same four axes <see cref="FootprintsOverlap"/> tests. Zero means they only touch (a shared face),
+        /// negative that a gap separates them.</summary>
+        public static float OverlapDepth(Vector2[] a, Vector2[] b)
+        {
+            Vector2[] axes =
+            {
+                (a[0] - a[1]).normalized, (a[0] - a[2]).normalized,
+                (b[0] - b[1]).normalized, (b[0] - b[2]).normalized,
+            };
+            float depth = float.MaxValue;
+            foreach (Vector2 axis in axes)
+            {
+                ProjectExtent(a, axis, out float aMin, out float aMax);
+                ProjectExtent(b, axis, out float bMin, out float bMax);
+                depth = Mathf.Min(depth, Mathf.Min(aMax, bMax) - Mathf.Max(aMin, bMin));
+            }
+            return depth;
+        }
+
         private static void ProjectExtent(Vector2[] corners, Vector2 axis, out float min, out float max)
         {
             min = float.MaxValue;
