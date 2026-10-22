@@ -69,13 +69,13 @@ namespace Overpower.Lobby
         /// <summary>What the bar's name line reads ("Mara - Purple", "Whole map"); empty before Begin.</summary>
         public string BarLine => bar != null ? bar.NameLine : "";
 
-        /// <summary>The fixed angle a spectator watches from: the theme's one angle, or - on a map with a straight camera (SceneCameraConfig) - White's own view.</summary>
+        /// <summary>The fixed angle a spectator watches from: the theme's one angle, or - on a map with a straight camera (SceneCameraConfig) - Orange's own view.</summary>
         private float SpectatorYaw(float themeAngle)
         {
-            Vector2 toWhite = Vector2.zero;
+            Vector2 toOrange = Vector2.zero;
             if (roomManager != null)
-                Overpower.Data.CameraYawRules.ToSpawnFromCentre(roomManager.teamSpawnPoints, Overpower.Data.CameraYawRules.FirstTeamWithSpawn(roomManager.teamSpawnPoints), out toWhite);
-            return Overpower.Data.CameraYawRules.SpectatorYaw(Overpower.Data.SceneCameraConfig.SceneWantsOwnSpawnOnLeft(), themeAngle, toWhite.x, toWhite.y);
+                Overpower.Data.CameraYawRules.ToSpawnFromCentre(roomManager.teamSpawnPoints, Overpower.Data.CameraYawRules.FirstTeamWithSpawn(roomManager.teamSpawnPoints), out toOrange);
+            return Overpower.Data.CameraYawRules.SpectatorYaw(Overpower.Data.SceneCameraConfig.SceneWantsOwnSpawnOnLeft(), themeAngle, toOrange.x, toOrange.y);
         }
 
         /// <summary>Starts spectating (the spec = true edge): the bar goes up and the camera starts on the first player.</summary>

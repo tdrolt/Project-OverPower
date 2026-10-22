@@ -262,7 +262,7 @@ namespace Overpower.Tests
                 var plan = Overpower.EditorTools.DominionLaneBuilder.PlanFor(layout);
                 Assert.AreEqual(2, plan[Overpower.EditorTools.DominionLaneBuilder.TopZone].tier, "a different tier in the asset reaches the zones");
                 Assert.AreEqual(2, plan[Overpower.EditorTools.DominionLaneBuilder.BottomZone].tier);
-                Assert.AreEqual(1, plan[Overpower.EditorTools.DominionLaneBuilder.WhiteSpawnZone].tier, "a spawn tower is a capital whatever the zones are");
+                Assert.AreEqual(1, plan[Overpower.EditorTools.DominionLaneBuilder.OrangeSpawnZone].tier, "a spawn tower is a capital whatever the zones are");
                 Assert.AreEqual(1, plan[Overpower.EditorTools.DominionLaneBuilder.PurpleSpawnZone].tier);
             }
             finally { Object.DestroyImmediate(layout); }

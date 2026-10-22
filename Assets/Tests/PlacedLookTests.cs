@@ -309,7 +309,7 @@ namespace Overpower.Tests
                     MovementLookTestKit.AssertRgb(FenceArcsRule.PylonBody(team1, 0.5f), block.GetColor(BaseColorId), "a pylon wears its owner's team colour, darker (whose fence it is)");
                     MovementLookTestKit.AssertRgb(FenceArcsRule.PylonGlow(team1, 0.4f), block.GetColor(EmissionId), "and glows faintly in it");
                 }
-                MovementLookTestKit.AssertRgb(team1, band.startColor, "the faint floor band is the owner's too");
+                MovementLookTestKit.AssertRgb(GroundTint.Faint(team1, kit.Look.ownedFillHueLift), band.startColor, "the faint floor band is the owner's too, lifted like an owned fill");
 
                 view.Reshape(2000);
                 int seed = StunArcsRule.Seed(2000, 7, 15f);

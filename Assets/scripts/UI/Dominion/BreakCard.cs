@@ -266,7 +266,7 @@ namespace Overpower.UI
                     pointsLabel.overflowMode = TextOverflowModes.Overflow;
                 }
                 TextMeshProUGUI value = kit.Text(points.transform, "Points " + teams[i], "0", kit.Display, theme.dominionBreakPointsSize,
-                    teams.Length == 2 && i == 0 ? theme.lobbyOffWhiteColor : TextColour(teams[i]), TextAlignmentOptions.Midline);
+                    TextColour(teams[i]), TextAlignmentOptions.Midline);
                 value.overflowMode = TextOverflowModes.Overflow;
                 pointsTexts.Add(value);
             }
@@ -342,7 +342,6 @@ namespace Overpower.UI
 
         private Color TextColour(int team) => Pick(theme.dominionTeamTextColors, team);
 
-        private static Color Pick(Color[] colours, int index) =>
-            colours != null && colours.Length > 0 ? colours[Mathf.Clamp(index, 0, colours.Length - 1)] : Color.white;
+        private Color Pick(Color[] colours, int team) => TeamPalette.Of(colours, team, theme.dominionDimColor);
     }
 }

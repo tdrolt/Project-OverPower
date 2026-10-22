@@ -63,8 +63,8 @@ namespace Overpower.Tests
         public void NoRippleWhenAZoneTurnsNeutral()
         {
             Assert.IsFalse(RippleRule.Starts(Zone(1), Zone(-1)),
-                "drained back to neutral: neutral ground never glows (lit vs. unlit tells it from the White team)");
-            Assert.IsFalse(RippleRule.Starts(Zone(0), Zone(-1)), "nor for the White team's own zone going neutral");
+                "drained back to neutral: neutral ground never glows (lit vs. unlit tells it from owned ground)");
+            Assert.IsFalse(RippleRule.Starts(Zone(0), Zone(-1)), "nor for team 0's own zone going neutral");
         }
 
         // The live start and every Dominion break and round start reset the zones in one go: owned zones go neutral, the capitals

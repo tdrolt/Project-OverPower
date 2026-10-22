@@ -5,16 +5,17 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>The mech's colours as pure rules: the body is never black whatever the team colour (a dark team colour still reads as
-    /// a colour), the White team stays light, and the glow lines are the team's own hue at a brightness that does not depend on it.</summary>
+    /// a colour), a pale colour stays light, every team keeps its hue, and the glow lines are the team's own hue at a brightness that does not depend on it.</summary>
     public class MechLookTests
     {
-        private static readonly Color White = new Color(0.93f, 0.97f, 1f, 1f);
+        private static readonly Color Pale = new Color(0.93f, 0.97f, 1f, 1f);
+        private static readonly Color Orange = new Color(1f, 0.45f, 0.05f, 1f);
         private static readonly Color Purple = new Color(0.68f, 0.32f, 1f, 1f);
         private static readonly Color Cyan = new Color(0.15f, 0.95f, 1f, 1f);
         private static readonly Color DarkPurple = new Color(0.1f, 0.03f, 0.2f, 1f);
         private static readonly Color Black = new Color(0f, 0f, 0f, 1f);
 
-        private static readonly Color[] EveryColour = { White, Purple, Cyan, DarkPurple, Black };
+        private static readonly Color[] EveryColour = { Pale, Orange, Purple, Cyan, DarkPurple, Black };
         private static readonly float[] EveryMix = { 0f, 0.25f, 0.5f, 0.9f, 1f };
 
         private static float Hue(Color c)
@@ -43,17 +44,18 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheWhiteTeamStaysLight()
+        public void APaleColourStaysLight()
         {
-            Color body = MechLook.Base(White, 0.5f);
-            Assert.GreaterOrEqual(body.grayscale, 0.6f, $"the White team's mech must stay light: {body}");
+            Color body = MechLook.Base(Pale, 0.5f);
+            Assert.GreaterOrEqual(body.grayscale, 0.6f, $"a pale colour's mech must stay light: {body}");
         }
 
         [Test]
         public void TheBodyKeepsTheTeamHue()
         {
-            foreach (float mix in new[] { 0.3f, 0.5f, 0.9f, 1f })
-                Assert.Less(HueGap(Hue(MechLook.Base(Purple, mix)), Hue(Purple)), 0.02f, $"purple at mix {mix} must stay purple");
+            foreach (Color team in new[] { Orange, Purple, Cyan })
+                foreach (float mix in new[] { 0.3f, 0.5f, 0.9f, 1f })
+                    Assert.Less(HueGap(Hue(MechLook.Base(team, mix)), Hue(team)), 0.02f, $"{team} at mix {mix} must keep its hue");
         }
 
         [Test]
@@ -76,7 +78,7 @@ namespace Overpower.Tests
         [Test]
         public void GlowIsTheTeamHue()
         {
-            foreach (Color team in new[] { White, Purple, Cyan, DarkPurple })
+            foreach (Color team in new[] { Pale, Orange, Purple, Cyan, DarkPurple })
                 foreach (float strength in new[] { 0.5f, 1f, 1.5f, 3f })
                 {
                     Color glow = MechLook.Glow(team.linear, strength);
@@ -87,7 +89,7 @@ namespace Overpower.Tests
         [Test]
         public void TheBrightestChannelOfTheGlowIsTheStrengthWhateverTheTeamColour()
         {
-            foreach (Color team in new[] { White, Purple, Cyan, DarkPurple })
+            foreach (Color team in new[] { Pale, Orange, Purple, Cyan, DarkPurple })
             {
                 Color glow = MechLook.Glow(team.linear, 1.5f);
                 Assert.AreEqual(1.5f, Mathf.Max(glow.r, Mathf.Max(glow.g, glow.b)), 1e-4f, $"{team}: a dim team colour glows as bright as a bright one");

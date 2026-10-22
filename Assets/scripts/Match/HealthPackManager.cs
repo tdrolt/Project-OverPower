@@ -10,7 +10,7 @@ namespace Overpower.Match
 {
     /// <summary>
     /// The Tier III health packs: one floating cross in each Tier III zone's recess, between the arena wall and the
-    /// yellow barrier. Walk over it hurt and alive and it heals you 50 (never past max), then it is gone for everyone for 30 s.
+    /// low barrier. Walk over it hurt and alive and it heals you 50 (never past max), then it is gone for everyone for 30 s.
     ///
     /// State: ONE Room Property per pack, "hp" + zone, int[] { takenUntilMs, takerActor, requestId } (see
     /// HealthPackRules), written ONLY by the master with a check-and-set. A player asks by writing a Player
@@ -178,7 +178,7 @@ namespace Overpower.Match
 
         private Pack Build(int zone, Vector3 tower)
         {
-            // In the zone's Tier III recess, midway between the arena wall behind it and the yellow barrier across its
+            // In the zone's Tier III recess, midway between the arena wall behind it and the low barrier across its
             // mouth. The spot is authored once (ArenaLayout.HealthPackPoint, Source third); the copy nearest this
             // zone's tower is the one in its recess, so the three packs are placed by the same rule.
             Vector3 spot = SpotFor(tower);

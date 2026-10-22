@@ -301,11 +301,7 @@ namespace Overpower.UI
             image.raycastTarget = false;
         }
 
-        private Color TeamColour(int team)
-        {
-            Color[] colours = theme.lobbyRoomTeamColors;
-            return colours != null && team >= 0 && team < colours.Length ? colours[team] : theme.lobbyMutedColor;
-        }
+        private Color TeamColour(int team) => TeamPalette.Of(theme.lobbyRoomTeamColors, team, theme.lobbyMutedColor);
 
         private void BuildSpectators(Transform parent, GameModeDefinition mode)
         {

@@ -65,8 +65,8 @@ namespace Overpower.Data
         [Tooltip("How fast the scan wave spreads out from the centre, in metres per second. Faster means zones refresh sooner after a scan starts.")]
         [SerializeField, Min(1f)] private float scanWaveSpeed = 40f;
 
-        [Tooltip("The colour of the scan wave as it crosses the arena, on the ground and on the minimap ring, and of the scan countdown. It is yellow (the jersey-barrier yellow of the UI theme) so it never reads as an enemy. The enemy dots the scan leaves on the minimap have their own colour, Minimap Enemy Colour.")]
-        [SerializeField] private Color scanWaveColour = new Color(0.91f, 0.725f, 0.192f, 1f);
+        [Tooltip("The colour of the scan wave as it crosses the arena, on the ground and on the minimap ring, and of the scan countdown. It is white, the colour of nobody's things, so it never reads as a team, an enemy or an ability. The enemy dots the scan leaves on the minimap have their own colour, Minimap Enemy Colour.")]
+        [SerializeField] private Color scanWaveColour = Color.white;
 
         [Tooltip("How thick the wave ring on the ground is, in metres. Thicker is easier to see from the top-down camera.")]
         [SerializeField, Min(0.1f)] private float scanWaveWidth = 1.5f;

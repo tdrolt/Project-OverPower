@@ -6,14 +6,18 @@ namespace Overpower.Arena
     /// and glow lines in the team's own hue, bright (unclamped) so the scene's Bloom gives them a thin halo.</summary>
     public static class MechLook
     {
-        // The model's own albedo darkens whatever the body is tinted with, so the tint starts from a pale grey and keeps a floor.
+        // The model's own albedo darkens whatever the body is tinted with, so the tint starts from a pale grey and its brightest channel
+        // keeps a floor. Raised as a whole (never per channel, which would add the missing channels and turn orange red).
         private static readonly Color PaleGrey = new Color(0.85f, 0.85f, 0.85f, 1f);
         private const float Floor = 0.25f;
 
         public static Color Base(Color team, float mix)
         {
             Color tint = Color.Lerp(PaleGrey, team, Mathf.Clamp01(mix));
-            return new Color(Mathf.Max(tint.r, Floor), Mathf.Max(tint.g, Floor), Mathf.Max(tint.b, Floor), 1f);
+            float peak = Mathf.Max(tint.r, Mathf.Max(tint.g, tint.b));
+            if (peak < Floor)
+                tint = peak > 0f ? tint * (Floor / peak) : new Color(Floor, Floor, Floor);
+            return new Color(tint.r, tint.g, tint.b, 1f);
         }
 
         /// <summary>The team colour (linear light) scaled so its brightest channel is the strength: a dim team colour glows as bright as

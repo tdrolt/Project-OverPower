@@ -31,7 +31,7 @@ namespace Overpower.Arena
     /// <summary>When the owner this client's floor shows for a zone flips to a team, a ring of brightened tiles runs from its tower to the
     /// edge of its band in the new colour, then the floor rests as painted. Only a flip between two paints of the same room starts one
     /// (never a first paint, a late join or the room's lobby, whose painted state is forgotten), only to a team (neutral ground is unlit,
-    /// which is what tells it from the White team; this also keeps a zone reset quiet) and only where the floor shows the owner (not out
+    /// so it never reads as owned; this also keeps a zone reset quiet) and only where the floor shows the owner (not out
     /// of play, not a spawn area). The owner is ZoneOwnerShown's, so a flip this team cannot know about stays hidden. A few run at once
     /// in a fixed set of shader slots.</summary>
     public static class RippleRule

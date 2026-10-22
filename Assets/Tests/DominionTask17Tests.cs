@@ -217,7 +217,7 @@ namespace Overpower.Tests
         [Test] public void TheRealConfigsDotsAreNotTheWavesColour()
         {
             VisionConfig vision = RealVision();
-            Assert.AreNotEqual(vision.ScanWaveColour, vision.MinimapEnemyColour, "the wave is yellow, the enemy dots it leaves keep their own colour");
+            Assert.AreNotEqual(vision.ScanWaveColour, vision.MinimapEnemyColour, "the wave is white, the enemy dots it leaves keep their own colour");
         }
 
         [Test] public void TheWorldWaveUsesTheWaveColourAndTheMinimapDotsUseTheDotColour()

@@ -6,7 +6,7 @@ namespace Overpower.Arena
     /// <summary>Turns a look's colour family into the UiTheme colour it stands for, so every effect has one colour source.</summary>
     public static class LookColours
     {
-        /// <summary>Fire gives its outer orange; the hot yellow heart is <see cref="FireCore"/>. None gives a clear colour, since a look
+        /// <summary>Fire gives its pale hot yellow edge; the white-hot heart is <see cref="FireCore"/>. None gives a clear colour, since a look
         /// with no family draws nothing.</summary>
         public static Color For(LookFamily family, int team, UiTheme theme)
         {

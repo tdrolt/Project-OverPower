@@ -25,7 +25,7 @@ namespace Overpower.Data
     [Serializable]
     public struct LaneSpawn
     {
-        [Tooltip("Which team this end belongs to (0 = White, 1 = Purple).")]
+        [Tooltip("Which team this end belongs to (0 = Orange, 1 = Purple).")]
         public int team;
         [Tooltip("Where the spawn tower stands, in metres. It sits in the middle of the pocket and is cover.")]
         public Vector2 towerCentre;
@@ -51,7 +51,7 @@ namespace Overpower.Data
                  "like the triangle arena's middle wall, which a Portal can cross.")]
         [SerializeField] private List<LaneRect> walls = new List<LaneRect>();
 
-        [Tooltip("The yellow plus in the middle: jersey barriers. They stop walking only; shots, Dash, Zip, Blink and Portals cross them.")]
+        [Tooltip("The plus in the middle: low jersey barriers. They stop walking only; shots, Dash, Zip, Blink and Portals cross them.")]
         [SerializeField] private List<LaneRect> barriers = new List<LaneRect>();
 
         [Header("Boxes")]
@@ -84,7 +84,7 @@ namespace Overpower.Data
         [SerializeField, Min(0.5f)] private float spawnTowerSizeMetres = 3.8f;
 
         [Header("Spawns")]
-        [Tooltip("One row per team: spawn tower, spawn point and healing ground. The drawing has the Purple pocket on the left and the White pocket on the right.")]
+        [Tooltip("One row per team: spawn tower, spawn point and healing ground. The drawing has the Purple pocket on the left and the Orange pocket on the right.")]
         [SerializeField] private List<LaneSpawn> spawns = new List<LaneSpawn>();
 
         [Tooltip("The distance the drawing's title gives between the two spawns ('56 m spawn to spawn'), in metres: the straight line between the two teams' spawn points.")]
@@ -106,7 +106,7 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float minimapMarginMetres = 4f;
 
         [Header("Builder measures")]
-        [Tooltip("How tall the yellow jersey barriers are, in metres. Waist high, like the triangle arena's barriers: players see over them and shots cross them.")]
+        [Tooltip("How tall the low jersey barriers are, in metres. Waist high, like the triangle arena's barriers: players see over them and shots cross them.")]
         [SerializeField, Min(0.1f)] private float barrierHeightMetres = 1f;
 
         [Tooltip("How far, in metres, the unused 'capital under attack' spawn point stands from the normal spawn point. Dominion never respawns anyone there; the point only keeps the scene's spawn list whole.")]

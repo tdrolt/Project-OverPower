@@ -130,7 +130,7 @@ namespace Overpower.Data
 
         [Header("Health packs")]
         [Tooltip("Where the health pack stands in the Source (Team 2) third's Tier III recess, world metres: on the floor " +
-                 "midway between the recess's back wall and the yellow barrier across its mouth, level with the middle of " +
+                 "midway between the recess's back wall and the low barrier across its mouth, level with the middle of " +
                  "both. The other two recesses' packs are this point turned 120 and 240 degrees about the arena centre. " +
                  "Its height is used only when there is no terrain under it: the pack stands on the terrain if there is one, " +
                  "else at this point's own height.")]

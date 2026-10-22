@@ -62,7 +62,7 @@ namespace Overpower.EditorTools
         private static readonly (int team, int towerL, int towerT, int healL, int healT, int healW, int healH)[] SpawnPixels =
         {
             (1, 155, 319, 82, 216, 189, 252),    // the left pocket is drawn purple: Purple (team 1)
-            (0, 899, 319, 829, 216, 189, 252),   // the right pocket is drawn cyan, which 2v2 does not have: White (team 0)
+            (0, 899, 319, 829, 216, 189, 252),   // the right pocket is drawn cyan, which 2v2 does not have: Orange (team 0)
         };
         private const int TowerPixelSize = 46;
 

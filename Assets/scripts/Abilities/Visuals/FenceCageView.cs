@@ -113,7 +113,8 @@ namespace Overpower.Abilities
                 VisualTint.FillFlatCircle(band, fence.Radius, circleSegments);
                 band.startWidth = fence.RingThickness;
                 band.endWidth = fence.RingThickness;
-                VisualTint.SetLineColor(band, VisualTint.WithAlpha(team, bandOpacity));
+                Color faint = look != null ? GroundTint.Faint(team, look.ownedFillHueLift) : team;
+                VisualTint.SetLineColor(band, VisualTint.WithAlpha(faint, bandOpacity));
             }
         }
 

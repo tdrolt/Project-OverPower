@@ -22,7 +22,7 @@ namespace Overpower.EditorTools
     /// Everything it makes sits under ONE object it owns ("Dominion Lane" under Arena), which a re-run destroys and builds again;
     /// towers, spawn points and scene data are updated in place. It only edits a scene called Dominion 2v2 (never Game Scene),
     /// never in Play Mode, and never saves: the caller looks at the report, then saves.
-    /// Zone numbering: 0 = top zone, 1 = bottom zone, 2 = White's spawn tower, 3 = Purple's spawn tower (contiguous from 0, so the
+    /// Zone numbering: 0 = top zone, 1 = bottom zone, 2 = Orange's spawn tower, 3 = Purple's spawn tower (contiguous from 0, so the
     /// zone count is 4). Links: each spawn tower links to both zones and the zones link to each other, so either team can take
     /// either zone from the start (a capital counts as held for "capture next to a zone you hold").
     /// </summary>
@@ -35,7 +35,7 @@ namespace Overpower.EditorTools
         public const string MinimapImagePath = "Assets/Gameplay/UI/DominionLaneMinimap.png";
         public const string MinimapConfigPath = "Assets/Gameplay/Config/DominionLaneMinimapConfig.asset";
 
-        public const int TopZone = 0, BottomZone = 1, WhiteSpawnZone = 2, PurpleSpawnZone = 3;
+        public const int TopZone = 0, BottomZone = 1, OrangeSpawnZone = 2, PurpleSpawnZone = 3;
 
         [MenuItem("OverPower/Build Dominion Lane Map")]
         private static void BuildFromMenu()
@@ -165,10 +165,10 @@ namespace Overpower.EditorTools
         {
             (TopZone, new[] { "Zone Top", "House_05 (12)" }, layout.ZoneTier),
             (BottomZone, new[] { "Zone Bottom", "House_05 (18)" }, layout.ZoneTier),
-            (WhiteSpawnZone, new[] { "Spawn Tower White", "Cathedral_Team0" }, SpawnTowerTier),
+            (OrangeSpawnZone, new[] { "Spawn Tower Orange", "Spawn Tower White", "Cathedral_Team0" }, SpawnTowerTier),
             (PurpleSpawnZone, new[] { "Spawn Tower Purple", "Cathedral_Team1" }, SpawnTowerTier),
         };
-        private static readonly string[] NewNames = { "Zone Top", "Zone Bottom", "Spawn Tower White", "Spawn Tower Purple" };
+        private static readonly string[] NewNames = { "Zone Top", "Zone Bottom", "Spawn Tower Orange", "Spawn Tower Purple" };
 
         private static List<string> PlaceTowers(Scene scene, ArenaSymmetry arena, DominionLaneLayout layout)
         {
@@ -260,7 +260,7 @@ namespace Overpower.EditorTools
                 if (normal == null || attacked == null) { report.Add($"PROBLEM: RoomManager has no spawn point object for team {index}."); return report; }
                 // The team looks towards the middle of the map.
                 float yaw = spawn.spawnPoint.x < 0f ? 90f : 270f;
-                string colour = index == 0 ? "White" : "Purple";
+                string colour = index == 0 ? "Orange" : "Purple";
                 normal.SetPositionAndRotation(World(arena, spawn.spawnPoint), Quaternion.Euler(0f, yaw, 0f));
                 normal.gameObject.name = "Spawn " + colour;
                 // Two points, to either side of the spawn point: the team's two players take one each (RoomManager.SpawnPointFor).
@@ -312,9 +312,9 @@ namespace Overpower.EditorTools
 
             int[][] adjacents =
             {
-                new[] { BottomZone, WhiteSpawnZone, PurpleSpawnZone },   // top zone
-                new[] { TopZone, WhiteSpawnZone, PurpleSpawnZone },      // bottom zone
-                new[] { TopZone, BottomZone },                           // White's spawn
+                new[] { BottomZone, OrangeSpawnZone, PurpleSpawnZone },   // top zone
+                new[] { TopZone, OrangeSpawnZone, PurpleSpawnZone },      // bottom zone
+                new[] { TopZone, BottomZone },                           // Orange's spawn
                 new[] { TopZone, BottomZone },                           // Purple's spawn
             };
             SerializedProperty list = so.FindProperty("TowerDictionary.dictionaryList");
@@ -335,12 +335,12 @@ namespace Overpower.EditorTools
 
             SerializedProperty capitals = so.FindProperty("capitalZones");
             capitals.arraySize = 2;
-            capitals.GetArrayElementAtIndex(0).FindPropertyRelative("zone").intValue = WhiteSpawnZone;
+            capitals.GetArrayElementAtIndex(0).FindPropertyRelative("zone").intValue = OrangeSpawnZone;
             capitals.GetArrayElementAtIndex(0).FindPropertyRelative("team").intValue = 0;
             capitals.GetArrayElementAtIndex(1).FindPropertyRelative("zone").intValue = PurpleSpawnZone;
             capitals.GetArrayElementAtIndex(1).FindPropertyRelative("team").intValue = 1;
             so.ApplyModifiedProperties();
-            report.Add("BuildingManager: 4 zones (0 top, 1 bottom, 2 White spawn, 3 Purple spawn), capitals 2 -> team 0 and 3 -> team 1, links: each spawn to both zones, the zones to each other.");
+            report.Add("BuildingManager: 4 zones (0 top, 1 bottom, 2 Orange spawn, 3 Purple spawn), capitals 2 -> team 0 and 3 -> team 1, links: each spawn to both zones, the zones to each other.");
             return report;
         }
 

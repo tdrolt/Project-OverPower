@@ -112,7 +112,6 @@ namespace Overpower.UI
             LobbyUiKit.Size(label.gameObject, width, height);
         }
 
-        private static Color Pick(Color[] colours, int index) =>
-            colours != null && colours.Length > 0 ? colours[Mathf.Clamp(index, 0, colours.Length - 1)] : Color.white;
+        private Color Pick(Color[] colours, int team) => TeamPalette.Of(colours, team, theme.dominionDimColor);
     }
 }

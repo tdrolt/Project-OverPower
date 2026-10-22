@@ -57,7 +57,7 @@ namespace Overpower.Dominion
             winner < 0 ? tiedText : Fmt(winsFormat, LobbyRoomRules.TeamName(teamNames, winner).ToUpperInvariant());
 
         /// <summary>Team names in capitals, each in its colour (rich text, colourHex[team] as RRGGBB; null = bare), joined by <paramref name="separator"/>
-        /// with <paramref name="lastSeparator"/> before the last: "WHITE, PURPLE and CYAN".</summary>
+        /// with <paramref name="lastSeparator"/> before the last: "ORANGE, PURPLE and CYAN".</summary>
         public static string TeamNameList(int[] teams, string[] teamNames, string[] colourHex, string separator, string lastSeparator)
         {
             var sb = new StringBuilder();
@@ -74,8 +74,8 @@ namespace Overpower.Dominion
         public static string SharedRoundLine(string format, int[] winners, string[] teamNames, string[] colourHex, string separator, string lastSeparator) =>
             Fmt(format, TeamNameList(winners, teamNames, colourHex, separator, lastSeparator));
 
-        /// <summary>The match score in round wins. Two teams: "WHITE 1 - 1 PURPLE" (a name on the outer side of its number); three or more: each number
-        /// keeps its own name ("WHITE 1 - PURPLE 1 - CYAN 0") so no number is left guessing. Each part is in its team's colour.</summary>
+        /// <summary>The match score in round wins. Two teams: "ORANGE 1 - 1 PURPLE" (a name on the outer side of its number); three or more: each number
+        /// keeps its own name ("ORANGE 1 - PURPLE 1 - CYAN 0") so no number is left guessing. Each part is in its team's colour.</summary>
         public static string MatchScoreLine(int[] teams, int[] wins, string[] teamNames, string[] colourHex, string dash)
         {
             var parts = new List<string>();
@@ -101,7 +101,7 @@ namespace Overpower.Dominion
             return result.ToArray();
         }
 
-        /// <summary>"MATCH POINT: WHITE, PURPLE" from a format with {0} the names; empty when no team is on match point.</summary>
+        /// <summary>"MATCH POINT: ORANGE, PURPLE" from a format with {0} the names; empty when no team is on match point.</summary>
         public static string MatchPointLine(string format, int[] pointTeams, string[] teamNames, string[] colourHex, string separator) =>
             pointTeams == null || pointTeams.Length == 0 ? "" : Fmt(format, TeamNameList(pointTeams, teamNames, colourHex, separator, separator));
 

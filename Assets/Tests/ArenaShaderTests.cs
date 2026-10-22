@@ -77,6 +77,36 @@ namespace Overpower.Tests
             Assert.Less(barrier, 0.002f, "a barrier face is one even colour");
         }
 
+        // Seen from above a low barrier is its paint with a band of the top line's colour from each edge of its top, as wide as the look
+        // says (the asset's band covers the whole top); its sides stay plain (BarrierHasNoStripes). The test look's line is green, the
+        // paint orange and the faint outside glow white, so each reads apart.
+        [Test]
+        public void BarrierTopTakesTheConfiguredLineColour()
+        {
+            Color[] pixels = RenderTop("Arena Barrier", 3f);
+            Assert.IsTrue(IsPaint(TopAt(pixels, 0f, 0f)), "the control: the middle of the top is the barrier's own orange test paint");
+            foreach (Vector2 edge in new[] { new Vector2(1.45f, 0f), new Vector2(-1.45f, 0f), new Vector2(0f, 1.45f), new Vector2(0f, -1.45f) })
+            {
+                Color line = TopAt(pixels, edge.x, edge.y);
+                Assert.Greater(line.g, 1.5f * Mathf.Max(line.r, line.b), "the line's own green, not the paint or a grey, at " + edge + ": " + line);
+            }
+        }
+
+        [Test]
+        public void BarrierTopBandIsTheConfiguredWidth()
+        {
+            Color[] pixels = RenderTop("Arena Barrier", 3f); // PlainLook: 0.2 m
+            foreach (float sign in new[] { 1f, -1f })
+            {
+                Assert.IsFalse(IsPaint(TopAt(pixels, sign * (1.5f - 0.14f), 0f)), "0.14 m in from the edge is still the band");
+                Assert.IsTrue(IsPaint(TopAt(pixels, sign * (1.5f - 0.28f), 0f)), "0.28 m in from the edge is the paint again");
+                Assert.IsFalse(IsPaint(TopAt(pixels, 0f, sign * (1.5f - 0.14f))), "along the other side too");
+                Assert.IsTrue(IsPaint(TopAt(pixels, 0f, sign * (1.5f - 0.28f))), "along the other side too");
+            }
+        }
+
+        private static bool IsPaint(Color c) => c.r > 1.5f * c.b && c.r > c.g;
+
         // A boundary wall stands on tiles whose centre is past the arena's outline; the painter keeps those for the walls alone.
         [Test]
         public void WallStripesReadAWallsOnlyTile()
@@ -175,6 +205,71 @@ namespace Overpower.Tests
                 Object.DestroyImmediate(read);
                 Object.DestroyImmediate(tiles);
             }
+        }
+
+        private const int TopPx = 128;
+        private const float TopHalf = 2.5f; // metres from the image centre to its edge
+
+        // Renders a size x 1 x size box of the material straight from above (orthographic, the box in the middle of a 5 x 5 m view).
+        private static Color[] RenderTop(string materialName, float size)
+        {
+            var material = AssetDatabase.LoadAssetAtPath<Material>(Materials + materialName + ".mat");
+            Assert.NotNull(material, materialName);
+            ArenaLook look = PlainLook();
+            ArenaShaderGlobals.Push(look);
+            ArenaShaderGlobals.ClearOwnerTiles();
+            const int Layer = 31;
+            bool async = ShaderUtil.allowAsyncCompilation;
+            var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var camGo = new GameObject("ArenaShaderTests Camera");
+            var target = new RenderTexture(TopPx, TopPx, 24, RenderTextureFormat.ARGBHalf);
+            var read = new Texture2D(TopPx, TopPx, TextureFormat.RGBAHalf, false, true);
+            try
+            {
+                ShaderUtil.allowAsyncCompilation = false;
+                block.hideFlags = camGo.hideFlags = HideFlags.HideAndDontSave;
+                Object.DestroyImmediate(block.GetComponent<Collider>());
+                block.layer = Layer;
+                block.transform.position = new Vector3(3.7f, -500f, 11.3f);
+                block.transform.localScale = new Vector3(size, 1f, size);
+                block.GetComponent<MeshRenderer>().sharedMaterial = material;
+                block.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+
+                var cam = camGo.AddComponent<Camera>();
+                cam.enabled = false;
+                cam.orthographic = true;
+                cam.orthographicSize = TopHalf;
+                cam.cullingMask = 1 << Layer;
+                cam.clearFlags = CameraClearFlags.SolidColor;
+                cam.backgroundColor = Color.black;
+                cam.transform.position = new Vector3(3.7f, -495f, 11.3f);
+                cam.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+                cam.targetTexture = target;
+                cam.Render();
+
+                RenderTexture previous = RenderTexture.active;
+                RenderTexture.active = target;
+                read.ReadPixels(new Rect(0, 0, TopPx, TopPx), 0, 0);
+                RenderTexture.active = previous;
+                return read.GetPixels();
+            }
+            finally
+            {
+                ShaderUtil.allowAsyncCompilation = async;
+                Object.DestroyImmediate(look);
+                Object.DestroyImmediate(block);
+                Object.DestroyImmediate(camGo);
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(read);
+            }
+        }
+
+        // The pixel at (x, z) metres from the box's middle; the line is its own mirror image, so the image's flips do not matter.
+        private static Color TopAt(Color[] pixels, float x, float z)
+        {
+            int px = Mathf.RoundToInt(x / (2f * TopHalf) * TopPx + TopPx * 0.5f - 0.5f);
+            int py = Mathf.RoundToInt(z / (2f * TopHalf) * TopPx + TopPx * 0.5f - 0.5f);
+            return pixels[py * TopPx + px];
         }
 
         private const float FloorSize = 2f, FloorHalf = 4f; // FloorHalf: metres from the image centre to its edge
@@ -288,6 +383,42 @@ namespace Overpower.Tests
             }
         }
 
+        // An owned hexagon's fill moves its colour's middle channel toward the brightest by Owned Fill Hue Lift (GroundTint.Lift); its lines
+        // keep the exact colour. Rendered linear and unlit (PlainLook), so the green-to-red ratio is the colour's own.
+        [TestCase(0.5f, 0.6f)]
+        [TestCase(0f, 0.2f)]
+        public void TheFillLiftsTheMiddleChannelAndTheLinesKeepTheColour(float lift, float fillGreenShare)
+        {
+            ArenaLook look = PlainLook();
+            look.floorTileSize = FloorSize;
+            look.floorLineWidth = 0.3f;
+            look.floorGridGlow = 0f;
+            look.ownedEdgeGlow = 1f;
+            look.ownedFillGlow = 1f;
+            look.ownedFillHueLift = lift;
+            var owned = new Vector2Int(1, 0);
+            var pixels = new Color32[25];
+            Vector2Int texel = HexGrid.Texel(owned, FloorMin);
+            pixels[texel.y * 5 + texel.x] = new Color32(255, 51, 0, 255); // linear (1, 0.2, 0), fill at its strongest
+            Texture2D read = RenderFloor(look, pixels);
+            try
+            {
+                Vector2 centre = HexGrid.CentreOf(owned, FloorOrigin, FloorSize);
+                Color mid = FloorAt(read, centre);
+                Assert.Greater(mid.r, 0.3f, "the control: the owned tile fills");
+                Assert.AreEqual(fillGreenShare, mid.g / mid.r, 0.05f, "the fill's green share at lift " + lift + ": " + mid);
+                Vector2 edge = 0.5f * (centre + HexGrid.CentreOf(Vector2Int.zero, FloorOrigin, FloorSize));
+                Color line = FloorAt(read, Vector2.Lerp(edge, centre, 0.05f));
+                Assert.Greater(line.r, 0.3f, "the control: the owned tile's line is drawn");
+                Assert.AreEqual(0.2f, line.g / line.r, 0.05f, "its line keeps the colour itself: " + line);
+            }
+            finally
+            {
+                Object.DestroyImmediate(look);
+                Object.DestroyImmediate(read);
+            }
+        }
+
         // The texels as the painter writes them (OwnerTileTexel.Encode), read by the shader: an owned tile fills in its colour, and a
         // tile kept for the walls alone (its centre past the arena's outline) leaves the floor plain, lines in the plain white included.
         [Test]
@@ -327,7 +458,7 @@ namespace Overpower.Tests
         }
 
         // A ripple lights whole owned tiles whose centre lies on its ring, only inside its reach; neutral ground on the ring stays unlit
-        // (lit vs. unlit tells neutral from the White team) and with the switch off the shader never lights anything. Tiles on the x
+        // (lit vs. unlit tells neutral from owned) and with the switch off the shader never lights anything. Tiles on the x
         // axis, or a set that mirrors onto itself: the image may be read upside down.
         [Test]
         public void TheRippleLightsTheTilesOnItsRingInsideTheBandOnly()
@@ -388,6 +519,8 @@ namespace Overpower.Tests
             var black = new SurfaceLook(Color.black, 0f, 0f);
             look.floorSurface = look.wallSurface = look.blockSurface = black;
             look.barrierSurface = new SurfaceLook(new Color(0.8f, 0.5f, 0.2f, 1f), 0f, 0f);
+            look.barrierTopStripeColor = new Color(0.1f, 0.7f, 0.2f, 1f);
+            look.barrierTopStripeWidth = 0.2f;
             look.reflectionStrength = 0f;
             look.outsideLineColor = Color.white;
             look.outsideStripeGlow = 1f;

@@ -597,15 +597,15 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
     return out;
   }
 
-  // The game's own team colours (UiTheme.teamShotColors): White, Purple, Cyan (Tudor, 2026-09-27: lines must match the names).
-  var TEAM_COLORS = ['#edf7ff', '#ad52ff', '#26f2ff', '#8c8c94'];
+  // The game's own team colours (UiTheme.teamShotColors), in team order; the report's lines must match the names.
+  var TEAM_COLORS = ['#ff730d', '#ad52ff', '#26f2ff', '#8c8c94'];
   function teamColor(team) {
     var i = ((team % TEAM_COLORS.length) + TEAM_COLORS.length) % TEAM_COLORS.length;
     return TEAM_COLORS[i];
   }
 
-  // 2026-09-27 designer change: 'White'/'Purple'/'Cyan' instead of a team number, everywhere the
-  // report names a team - DATA.teamNames is ArenaNames.TeamName(0..2), embedded once by the writer.
+  // Everywhere the report names a team it uses the team's name, never a number: DATA.teamNames is ArenaNames.TeamName(0..2),
+  // embedded once by the writer.
   function teamName(team) {
     var names = DATA.teamNames;
     return (names && team >= 0 && team < names.length) ? names[team] : ('Team ' + team);
@@ -653,7 +653,7 @@ details.section-details[open] > summary::before { transform: rotate(90deg); }
   // comment) or 'Zone 0 · T2' for any other tier, falling back to a plain 'Zone N' if no ownership
   // or income row ever named this zone's tier (never captured, or a malformed/partial log).
   // 2026-09-27 designer change: DATA.zoneNames (ArenaNames.ZoneName(0..9)) instead of a bare
-  // 'Zone N . T2' - a name like 'Cyan T2' or 'White-Cyan T3' already says the tier and who it's
+  // 'Zone N . T2' - a name like 'Cyan T2' or 'Orange-Cyan T3' already says the tier and who it's
   // near, so the old tier suffix is dropped rather than duplicated.
   function zoneLabel(zoneId) {
     if (zoneId === -1) return 'Unattributed';

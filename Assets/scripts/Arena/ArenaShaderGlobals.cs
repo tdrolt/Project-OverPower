@@ -8,7 +8,11 @@ namespace Overpower.Arena
         public float TileSize, FloorLineWidth, FloorGridGlow, OwnedEdgeGlow, OwnedFillGlow;
         public float StripeGlow, OutsideStripeGlow, CellSize, StripeWidth, NodeSize, TopEdgeWidth, AcrossChance, UpChance;
         public float Reflection;
+        /// <summary>ArenaLook's Owned Fill Hue Lift: how far an owned hexagon's fill moves its middle channel (GroundTint).</summary>
+        public float FillLift;
         public Vector4 OutsideLine;
+        /// <summary>The line around a barrier's top: linear colour, then its width in metres.</summary>
+        public Vector4 BarrierStripe;
         /// <summary>Floor, wall, block, barrier: the order of the shader's surface index.</summary>
         public Vector4[] SurfaceBase;
         public float[] SurfaceGloss;
@@ -25,6 +29,7 @@ namespace Overpower.Arena
         public static readonly int OwnerMinId = Shader.PropertyToID("_ArenaOwnerMin");
         public static readonly int OwnerTexId = Shader.PropertyToID("_ArenaOwnerTex");
         public static readonly int ReflectionId = Shader.PropertyToID("_ArenaReflection");
+        public static readonly int FillLiftId = Shader.PropertyToID("_ArenaFillLift");
         public static readonly int LookReadyId = Shader.PropertyToID("_ArenaLookReady");
         public static readonly int SurfaceBaseId = Shader.PropertyToID("_ArenaSurfaceBase");
         public static readonly int SurfaceGlossId = Shader.PropertyToID("_ArenaSurfaceGloss");
@@ -33,6 +38,7 @@ namespace Overpower.Arena
         public static readonly int StripeId = Shader.PropertyToID("_ArenaStripe");
         public static readonly int StripeGlowId = Shader.PropertyToID("_ArenaStripeGlow");
         public static readonly int OutsideLineId = Shader.PropertyToID("_ArenaOutsideLine");
+        public static readonly int BarrierStripeId = Shader.PropertyToID("_ArenaBarrierStripe");
         public static readonly int RippleId = Shader.PropertyToID("_ArenaRipple");
         public static readonly int RippleColourId = Shader.PropertyToID("_ArenaRippleColour");
         public static readonly int RippleLookId = Shader.PropertyToID("_ArenaRippleLook");
@@ -56,7 +62,9 @@ namespace Overpower.Arena
             AcrossChance = look.circuitAcrossChance,
             UpChance = look.circuitUpChance,
             Reflection = look.reflectionStrength,
+            FillLift = look.ownedFillHueLift,
             OutsideLine = look.outsideLineColor.linear,
+            BarrierStripe = BarrierStripeOf(look),
             SurfaceBase = new Vector4[]
             {
                 look.floorSurface.baseTint.linear, look.wallSurface.baseTint.linear,
@@ -65,6 +73,12 @@ namespace Overpower.Arena
             SurfaceGloss = new[] { look.floorSurface.gloss, look.wallSurface.gloss, look.blockSurface.gloss, look.barrierSurface.gloss },
             SurfaceShine = new[] { look.floorSurface.sunShine, look.wallSurface.sunShine, look.blockSurface.sunShine, look.barrierSurface.sunShine },
         };
+
+        private static Vector4 BarrierStripeOf(ArenaLook look)
+        {
+            Color line = look.barrierTopStripeColor.linear;
+            return new Vector4(line.r, line.g, line.b, look.barrierTopStripeWidth);
+        }
 
         public static void Push(ArenaLook look)
         {
@@ -78,7 +92,9 @@ namespace Overpower.Arena
             Shader.SetGlobalVector(StripeId, new Vector4(g.CellSize, g.StripeWidth, g.NodeSize, g.TopEdgeWidth));
             Shader.SetGlobalVector(StripeGlowId, new Vector4(g.OutsideStripeGlow, g.StripeGlow, g.AcrossChance, g.UpChance));
             Shader.SetGlobalVector(OutsideLineId, g.OutsideLine);
+            Shader.SetGlobalVector(BarrierStripeId, g.BarrierStripe);
             Shader.SetGlobalFloat(ReflectionId, g.Reflection);
+            Shader.SetGlobalFloat(FillLiftId, g.FillLift);
             ownerGrid.z = Mathf.Max(0.01f, g.TileSize);
             Shader.SetGlobalVector(OwnerGridId, ownerGrid);
             Shader.SetGlobalFloat(LookReadyId, 1f);

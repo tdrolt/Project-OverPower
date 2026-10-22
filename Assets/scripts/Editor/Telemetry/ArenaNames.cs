@@ -5,17 +5,17 @@ namespace Overpower.EditorTools.Telemetry
     /// replacing the id), the bug cards' "Where:" line, the capture list. No IO, no live scene lookup: the arena (one map) was read
     /// once from BuildingManager.TowerDictionary/CathedralBuildingIDs and is hard-coded here so the report builds OFFLINE from a log.
     ///
-    /// Zone 6/7/8 are the White/Purple/Cyan capitals (Tier I); 0/1/2 are each team's own Tier II (adjacent to its capital); 3/4/5 are
-    /// the Tier III zones, each between exactly two teams' Tier IIs (3: White-Purple, 4: Purple-Cyan, 5: White-Cyan); 9 is the
+    /// Zone 6/7/8 are the Orange/Purple/Cyan capitals (Tier I); 0/1/2 are each team's own Tier II (adjacent to its capital); 3/4/5 are
+    /// the Tier III zones, each between exactly two teams' Tier IIs (3: Orange-Purple, 4: Purple-Cyan, 5: Orange-Cyan); 9 is the
     /// centre (Tier IV).</summary>
     public static class ArenaNames
     {
-        /// <summary>Team 0 = White, 1 = Purple, 2 = Cyan - UiTheme.teamShotColors' own comment names
+        /// <summary>Team 0 = Orange, 1 = Purple, 2 = Cyan - UiTheme.teamShotColors' own comment names
         /// the same three colours. Any other id (a malformed log, or TerritoryMap.Neutral = -1) reads
         /// as a plain "Team N" rather than a made-up colour.</summary>
         public static string TeamName(int teamId) => teamId switch
         {
-            0 => "White",
+            0 => "Orange",
             1 => "Purple",
             2 => "Cyan",
             _ => "Team " + teamId,

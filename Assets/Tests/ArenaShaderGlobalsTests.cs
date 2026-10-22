@@ -50,6 +50,7 @@ namespace Overpower.Tests
                 Assert.AreEqual(0.11f, g.FloorGridGlow);
                 Assert.AreEqual(1.1f, g.OwnedEdgeGlow);
                 Assert.AreEqual(0.15f, g.OwnedFillGlow);
+                Assert.AreEqual(0.27f, g.FillLift, "how far an owned hexagon's fill moves its middle channel");
                 Assert.AreEqual(1.3f, g.StripeGlow, "stripeGlow is the glow on owned ground");
                 Assert.AreEqual(0.4f, g.OutsideStripeGlow, "the glow away from every zone");
                 Assert.AreEqual(1.25f, g.CellSize);
@@ -68,6 +69,8 @@ namespace Overpower.Tests
                     Assert.AreEqual((Vector4)Tint[i].linear, g.SurfaceBase[i], "the tint is handed over in linear space, surface " + i);
                 }
                 Assert.AreEqual((Vector4)look.outsideLineColor.linear, g.OutsideLine, "outside line colour, linear");
+                Color line = look.barrierTopStripeColor.linear;
+                AreClose(new Vector4(line.r, line.g, line.b, 0.13f), g.BarrierStripe, "the barrier's top line: linear colour, width");
                 Assert.IsTrue(IlWiring.Uses(typeof(ArenaShaderGlobals), "Push", typeof(ArenaShaderGlobals).GetMethod(nameof(ArenaShaderGlobals.From))),
                     "Push sends what From reads");
             }
@@ -86,6 +89,7 @@ namespace Overpower.Tests
                 Vector4 grid = Shader.GetGlobalVector(ArenaShaderGlobals.OwnerGridId);
                 Assert.AreEqual(new Vector3(12f, -7f, 2.5f), (Vector3)grid, "origin x, origin z, tile size");
                 Assert.AreEqual(0.3f, Shader.GetGlobalFloat(ArenaShaderGlobals.ReflectionId), 1e-6f);
+                Assert.AreEqual(0.27f, Shader.GetGlobalFloat(ArenaShaderGlobals.FillLiftId), 1e-6f, "the fill's hue lift");
                 Assert.AreEqual(1f, Shader.GetGlobalFloat(ArenaShaderGlobals.LookReadyId));
                 AreClose(new Vector4(0.07f, 0.11f, 1.1f, 0.15f), Shader.GetGlobalVector(ArenaShaderGlobals.FloorLineId),
                     "floor: line width, outside grid glow, owned edge glow, owned fill glow");
@@ -94,6 +98,9 @@ namespace Overpower.Tests
                 AreClose(new Vector4(0.4f, 1.3f, 0.6f, 0.25f), Shader.GetGlobalVector(ArenaShaderGlobals.StripeGlowId),
                     "stripe glow: outside, owned, across chance, up chance");
                 AreClose(look.outsideLineColor.linear, Shader.GetGlobalVector(ArenaShaderGlobals.OutsideLineId), "outside line colour, linear");
+                Color line = look.barrierTopStripeColor.linear;
+                AreClose(new Vector4(line.r, line.g, line.b, 0.13f), Shader.GetGlobalVector(ArenaShaderGlobals.BarrierStripeId),
+                    "the barrier's top line: linear colour, width");
                 Vector4[] bases = Shader.GetGlobalVectorArray(ArenaShaderGlobals.SurfaceBaseId);
                 float[] gloss = Shader.GetGlobalFloatArray(ArenaShaderGlobals.SurfaceGlossId);
                 float[] shine = Shader.GetGlobalFloatArray(ArenaShaderGlobals.SurfaceShineId);
@@ -195,6 +202,7 @@ namespace Overpower.Tests
             look.floorGridGlow = 0.11f;
             look.ownedEdgeGlow = 1.1f;
             look.ownedFillGlow = 0.15f;
+            look.ownedFillHueLift = 0.27f;
             look.stripeGlow = 1.3f;
             look.outsideStripeGlow = 0.4f;
             look.circuitCellSize = 1.25f;
@@ -204,6 +212,8 @@ namespace Overpower.Tests
             look.circuitAcrossChance = 0.6f;
             look.circuitUpChance = 0.25f;
             look.outsideLineColor = new Color(0.5f, 0.6f, 0.7f, 1f);
+            look.barrierTopStripeColor = new Color(0.45f, 0.35f, 0.25f, 1f);
+            look.barrierTopStripeWidth = 0.13f;
             look.floorSurface = new SurfaceLook(Tint[0], Gloss[0], Shine[0]);
             look.wallSurface = new SurfaceLook(Tint[1], Gloss[1], Shine[1]);
             look.blockSurface = new SurfaceLook(Tint[2], Gloss[2], Shine[2]);

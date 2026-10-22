@@ -489,7 +489,7 @@ namespace Overpower.UI
             TextMeshProUGUI titleLabel = Text(box.Outer, "Title", title, Display, size, titleColour, TextAlignmentOptions.Midline);
             if (cardWidth > 0f)
             {
-                // A fixed-width card (Dominion): a long title ("WHITE WINS IN SUDDEN DEATH") shrinks to fit instead of being cut off with dots.
+                // A fixed-width card (Dominion): a long title ("ORANGE WINS IN SUDDEN DEATH") shrinks to fit instead of being cut off with dots.
                 titleLabel.enableAutoSizing = true;
                 titleLabel.fontSizeMax = size;
                 titleLabel.fontSizeMin = size * Theme.resultTitleMinSizeShare;

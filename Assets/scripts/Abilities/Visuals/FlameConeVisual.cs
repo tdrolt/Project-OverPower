@@ -15,7 +15,7 @@ namespace Overpower.Abilities
     /// VERTEX-COLOUR TRAP: the shared Ability Visual Glass.mat is URP/Unlit, which never reads a mesh's vertex colours, so
     /// the tip-to-edge gradient would render as a flat wash. The fan uses Flame Cone.mat (Particles/Unlit, which multiplies
     /// the material colour by the vertex colour); don't edit Glass.mat, the mine, portal and fence ship with it.
-    /// GROUND-HUE TRAP: a flat orange fill barely separates from this arena's tan/orange floor and alpha alone cannot fix
+    /// GROUND-HUE TRAP: a flat fill in the fire's colour barely separates from the ground under it and alpha alone cannot fix
     /// it, so Core Colour pushes the TIP to pale yellow-white, fading to the ability's Colour and to clear by the far edge.
     /// RADIAL-FADE TRAP: with a single outer vertex ring the range fraction is a step (0 or 1), so alpha was a straight line
     /// from one bright point to zero and Radial Hold Fraction and the side fade did nothing; Radial Rings gives real vertices.
@@ -45,14 +45,14 @@ namespace Overpower.Abilities
         [SerializeField, Range(0f, 1f), Tooltip("Alpha at the fan's tip, under the caster - the brightest the flame " +
                  "ever gets. A3's number: about 0.45, low enough that the caster and anyone standing in the flame " +
                  "stay visible. Core Colour and Radial Rings/Hold Fraction below do most of the work of reading " +
-                 "against a warm floor now - this is a secondary knob, not the primary fix.")]
+                 "against the floor - this is a secondary knob, not the primary fix.")]
         private float tipAlpha = 0.45f;
 
         [SerializeField, Tooltip("Colour at the very tip, under the caster - pushed toward hot, pale yellow-white rather than more " +
-                 "orange (this arena's tan/orange floor, about RGB 172,102,60, sits too close to a plain-orange flame " +
+                 "orange (a plain-orange flame sits too close to the orange team's owned ground " +
                  "for alpha alone to separate from it - a real flame also reads hottest and palest at its base). " +
-                 "Blends toward the ability's own Colour (vfxColor) across the fan, so the far half still reads as " +
-                 "ordinary flame-orange fading to nothing. Alpha on this field is unused - Tip Alpha above is the " +
+                 "Blends toward the fire colour of the look table across the fan, so the far half reads as the " +
+                 "pale hot yellow of fire fading to nothing. Alpha on this field is unused - Tip Alpha above is the " +
                  "only opacity control.")]
         private Color coreColor = new Color(1f, 0.95f, 0.78f, 1f);
 

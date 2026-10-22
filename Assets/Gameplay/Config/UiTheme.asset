@@ -174,7 +174,7 @@ MonoBehaviour:
   loadoutToggleButtonHeight: 48
   loadoutToggleButtonMargin: 24
   teamShotColors:
-  - {r: 0.93, g: 0.97, b: 1, a: 1}
+  - {r: 1, g: 0.45, b: 0.05, a: 1}
   - {r: 0.68, g: 0.32, b: 1, a: 1}
   - {r: 0.15, g: 0.95, b: 1, a: 1}
   unknownTeamShotColor: {r: 0.55, g: 0.55, b: 0.58, a: 0.5}
@@ -325,11 +325,11 @@ MonoBehaviour:
   suddenDeathRingWidthMetres: 0.6
   suddenDeathMinimapRingWidth: 2.5
   dominionTeamColors:
-  - {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  - {r: 1, g: 0.45, b: 0.05, a: 1}
   - {r: 0.42, g: 0.247, b: 0.749, a: 1}
   - {r: 0.169, g: 0.722, b: 0.769, a: 1}
   dominionTeamTextColors:
-  - {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  - {r: 1, g: 0.5, b: 0.15, a: 1}
   - {r: 0.612, g: 0.482, b: 0.878, a: 1}
   - {r: 0.31, g: 0.827, b: 0.871, a: 1}
   dominionGoldColor: {r: 0.91, g: 0.725, b: 0.192, a: 1}
@@ -514,7 +514,7 @@ MonoBehaviour:
   - Damage
   - Zones
   scoreboardTeamNames:
-  - White
+  - Orange
   - Purple
   - Cyan
   scoreboardUnknownTeamText: Joining
@@ -719,7 +719,7 @@ MonoBehaviour:
   lobbyRoomSideBorder: {r: 0.2, g: 0.212, b: 0.247, a: 1}
   lobbyRoomHeadingColor: {r: 0.847, g: 0.835, b: 0.808, a: 1}
   lobbyRoomTeamColors:
-  - {r: 0.957, g: 0.949, b: 0.929, a: 1}
+  - {r: 1, g: 0.45, b: 0.05, a: 1}
   - {r: 0.42, g: 0.247, b: 0.749, a: 1}
   - {r: 0.169, g: 0.722, b: 0.769, a: 1}
   lobbyRoomPadding: {x: 72, y: 54}
@@ -904,8 +904,8 @@ MonoBehaviour:
   lobbyRoomCloseCrossSize: 21
   lobbyRoomCloseCrossThickness: 3
   movementSilverColor: {r: 0.76, g: 0.77, b: 0.78, a: 1}
-  fireCoreColor: {r: 1, g: 0.92, b: 0.6, a: 1}
-  fireEdgeColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  fireCoreColor: {r: 1, g: 0.98, b: 0.88, a: 1}
+  fireEdgeColor: {r: 1, g: 0.88, b: 0.6, a: 1}
   dangerColor: {r: 1, g: 0.18, b: 0.15, a: 1}
   flashWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   arenaNeutralLineColor: {r: 0.6, g: 0.62, b: 0.66, a: 1}

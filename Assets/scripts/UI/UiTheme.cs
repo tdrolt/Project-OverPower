@@ -246,8 +246,8 @@ namespace Overpower.UI
         [Tooltip("Text shown over a slowed player's head, and on your own HUD when it is you (only while not stunned).")]
         public string statusSlowedText = "SLOWED";
         [Tooltip("The electric blue of the Stun Gun and the Sonic Pulse: the stun bolt, the arcs on a stunned player and the pulse bands, " +
-                 "and also the STUNNED label with the thin bar shrinking under it. A deeper blue than the cyan team and the White team's " +
-                 "pale blue shots, and never the gold of the Shield, so a stun is told apart from all of them.")]
+                 "and also the STUNNED label with the thin bar shrinking under it. A deeper blue than the cyan team, " +
+                 "and never the gold of the Shield, so a stun is told apart from both.")]
         public Color statusStunnedColor = new Color(0.2f, 0.45f, 1f, 1f);
         [Tooltip("Colour of the SLOWED label and the thin bar shrinking under it - a sandy tan, the colour of being stuck in the mud, that no team, shot or ability uses, so a slow is never taken for the stun's electric blue.")]
         public Color statusSlowedColor = new Color(0.78f, 0.62f, 0.4f, 1f);
@@ -434,8 +434,7 @@ namespace Overpower.UI
                  "the mech's body and glow, so changing one recolours all of them. Keep it bright enough to read against the arena's dark walls.")]
         public Color[] teamShotColors = new Color[3]
         {
-            new Color(0.93f, 0.97f, 1f, 1f),  // team 0 - cool near-white (a warm pale yellow measured unreadable
-                                               // against the arena's orange/sand ground)
+            new Color(1f, 0.45f, 0.05f, 1f),  // team 0 - orange
             new Color(0.68f, 0.32f, 1f, 1f),  // team 1 - violet
             new Color(0.15f, 0.95f, 1f, 1f),  // team 2 - cyan
         };
@@ -444,10 +443,7 @@ namespace Overpower.UI
                  "assigned reads this. Deliberately dimmer AND lower alpha than every real team colour - both the " +
                  "trail's fade (reads straight off this colour's alpha) and the core's glow (ShotTeamVisuals.TintCore " +
                  "scales emission by this same alpha) key off it, so an unresolved shot reads as a faint, washed-out " +
-                 "ghost rather than a fourth team colour. Two earlier versions both still read as a near-duplicate of " +
-                 "Team 0's near-white once Team 0's own washed-out blue tint was fixed: a flat mid-grey at full " +
-                 "alpha, then a light grey whose CORE glow (before emission also scaled by alpha) was still just as " +
-                 "bright as a real team's.")]
+                 "ghost rather than a fourth team colour.")]
         public Color unknownTeamShotColor = new Color(0.55f, 0.55f, 0.58f, 0.5f);
         [Tooltip("How many seconds a shot's trail keeps fading behind it after the bullet itself is gone. Raised from " +
                  "an original 0.25 - at the game's normal camera zoom a shot crosses almost the whole visible frame " +
@@ -627,7 +623,7 @@ namespace Overpower.UI
         public float captureRingPulseSpeed = 1.6f;
         [Tooltip("How dark a pulsing zone edge and tower crown get at the moment they swap colour (0 = black, 1 = no dip, a hard blink). " +
                  "The owner's colour fades down, then the warning red (or the draining team's colour) fades up, so the two colours never " +
-                 "mix into a third: purple and red mixed read as pink, white and red as salmon.")]
+                 "mix into a third: purple and red mixed read as pink, orange and red as a muddy red.")]
         [Range(0f, 1f)] public float captureRingPulseDip = 0.35f;
         [Tooltip("How many straight pieces make up each ring. More reads as a smoother circle; 96 is smooth at every zoom.")]
         [Range(16, 256)] public int captureRingSegments = 96;
@@ -953,10 +949,10 @@ namespace Overpower.UI
         // Dominion HUD. Sizes are in reference pixels (the boards' pixels x 1.5 at 1920 x 1080), like the lobby screens.
         // ------------------------------------------------------------------------------------------------
         [Header("Dominion HUD: team colours")]
-        [Tooltip("Each team's colour in the Dominion HUD (the underline of its score, its round-win dots, its name on the break card), in team order: white, purple, cyan.")]
-        public Color[] dominionTeamColors = { new Color(0.957f, 0.949f, 0.929f, 1f), new Color(0.42f, 0.247f, 0.749f, 1f), new Color(0.169f, 0.722f, 0.769f, 1f) };
-        [Tooltip("Each team's lighter colour for writing its name or number on a dark card (a plain purple is too dark to read there), in team order: white, purple, cyan.")]
-        public Color[] dominionTeamTextColors = { new Color(0.957f, 0.949f, 0.929f, 1f), new Color(0.612f, 0.482f, 0.878f, 1f), new Color(0.31f, 0.827f, 0.871f, 1f) };
+        [Tooltip("Each team's colour in the Dominion HUD (the underline of its score, its round-win dots, its name on the break card), in team order: orange, purple, cyan.")]
+        public Color[] dominionTeamColors = { new Color(1f, 0.45f, 0.05f, 1f), new Color(0.42f, 0.247f, 0.749f, 1f), new Color(0.169f, 0.722f, 0.769f, 1f) };
+        [Tooltip("Each team's lighter colour for writing its name or number on a dark card (a plain purple is too dark to read there), in team order: orange, purple, cyan.")]
+        public Color[] dominionTeamTextColors = { new Color(1f, 0.5f, 0.15f, 1f), new Color(0.612f, 0.482f, 0.878f, 1f), new Color(0.31f, 0.827f, 0.871f, 1f) };
         [Tooltip("The gold of the Dominion HUD's accents: the points of the centre payout, the break countdown.")]
         public Color dominionGoldColor = new Color(0.91f, 0.725f, 0.192f, 1f);
         [Tooltip("The dim grey of an empty round-win dot and of the small labels on the Dominion cards.")]
@@ -1063,17 +1059,17 @@ namespace Overpower.UI
         public string dominionBreakTiedText = "TIED";
         [Tooltip("The big line of the break card when an overtime ran out and the round was shared.")]
         public string dominionBreakSharedText = "SHARED ROUND";
-        [Tooltip("The line under the shared-round headline. {0} = the names of the teams that share the round, each in its colour (WHITE and PURPLE, or WHITE, PURPLE and CYAN).")]
+        [Tooltip("The line under the shared-round headline. {0} = the names of the teams that share the round, each in its colour (ORANGE and PURPLE, or ORANGE, PURPLE and CYAN).")]
         public string dominionBreakSharedLineFormat = "{0} each get a round win";
         [Tooltip("The small line under \"<TEAM> WINS\" on the break card when the round was shared at match point and its sudden death decided it.")]
         public string dominionBreakSuddenDeathLine = "won the round in sudden death";
         [Tooltip("Font size of the line that names the teams sharing the round (also the line that says a round was won in sudden death).")]
         public float dominionBreakSharedLineSize = 28f;
-        [Tooltip("What sits between team names in the break card's lists (WHITE, PURPLE) - also between the teams on match point.")]
+        [Tooltip("What sits between team names in the break card's lists (ORANGE, PURPLE) - also between the teams on match point.")]
         public string dominionBreakNamesSeparator = ", ";
-        [Tooltip("What sits before the last team name in the shared-round line (WHITE and PURPLE).")]
+        [Tooltip("What sits before the last team name in the shared-round line (ORANGE and PURPLE).")]
         public string dominionBreakNamesLast = " and ";
-        [Tooltip("What sits between the teams' round wins in the match score on the break card (WHITE 1 - 1 PURPLE).")]
+        [Tooltip("What sits between the teams' round wins in the match score on the break card (ORANGE 1 - 1 PURPLE).")]
         public string dominionBreakScoreDash = " - ";
         [Tooltip("Font size of the match score on the break card (shown from round 2 on).")]
         public float dominionBreakScoreSize = 45f;
@@ -1240,7 +1236,7 @@ namespace Overpower.UI
         [Tooltip("Colour of a tower's crown, base ring and column caps while nobody owns its zone. Owned towers use their team's " +
                  "colour (Team Shot Colors), a capital cut from a two-team match uses Out Of Play Zone Colour, and an " +
                  "attacked or drained tower pulses exactly like its ring on the ground. Keep it a plain mid grey: " +
-                 "team 0 is near-white, so a light neutral would read as owned by team 0.")]
+                 "grey and white mean nobody, so a neutral tower never reads as owned.")]
         public Color towerNeutralColor = new Color(0.42f, 0.42f, 0.42f, 1f);
         [Tooltip("How dark a Dominion spawn tower's body is against its team colour: the body is painted with the " +
                  "team colour times this, so the spawn keeps a shaded silhouette under its glowing lid, base and " +
@@ -1329,9 +1325,9 @@ namespace Overpower.UI
         public string scoreboardTitleText = "Scoreboard";
         [Tooltip("The column headings, in order: player name, kills, deaths, assists, damage dealt, zones captured.")]
         public string[] scoreboardColumnTexts = { "Player", "Kills", "Deaths", "Assists", "Damage", "Zones" };
-        [Tooltip("Each team's name on the scoreboard, in team order (White, Purple, Cyan). Each one is drawn in that " +
+        [Tooltip("Each team's name on the scoreboard, in team order (Orange, Purple, Cyan). Each one is drawn in that " +
                  "team's Team Shot Colour.")]
-        public string[] scoreboardTeamNames = { "White", "Purple", "Cyan" };
+        public string[] scoreboardTeamNames = { "Orange", "Purple", "Cyan" };
         [Tooltip("Shown for a team the scoreboard cannot name (a player whose team has not arrived yet).")]
         public string scoreboardUnknownTeamText = "Joining";
 
@@ -1722,8 +1718,8 @@ namespace Overpower.UI
         public Color lobbyRoomSideBorder = new Color(0.2f, 0.212f, 0.247f, 1f);
         [Tooltip("The Spectators heading.")]
         public Color lobbyRoomHeadingColor = new Color(0.847f, 0.835f, 0.808f, 1f);
-        [Tooltip("The coloured edge on top of each team column, by team number (White, Purple, Cyan).")]
-        public Color[] lobbyRoomTeamColors = { new Color(0.957f, 0.949f, 0.929f, 1f), new Color(0.42f, 0.247f, 0.749f, 1f), new Color(0.169f, 0.722f, 0.769f, 1f) };
+        [Tooltip("The coloured edge on top of each team column, by team number (Orange, Purple, Cyan).")]
+        public Color[] lobbyRoomTeamColors = { new Color(1f, 0.45f, 0.05f, 1f), new Color(0.42f, 0.247f, 0.749f, 1f), new Color(0.169f, 0.722f, 0.769f, 1f) };
         [Tooltip("Empty space round the lobby room screen: left and right, then top and bottom, in reference pixels.")]
         public Vector2 lobbyRoomPadding = new Vector2(72f, 54f);
         [Tooltip("Space between the heading, the seats and the bottom row of the lobby room, in reference pixels.")]
@@ -2098,17 +2094,17 @@ namespace Overpower.UI
         public float lobbyRoomCloseCrossThickness = 3f;
 
         [Header("Look colours (the colour language of abilities and guns)")]
-        [Tooltip("The silver of every movement ability (Dash, Blink, Sprint and the Zip Gun): their streaks, shards, speed-lines and cable. A neutral metallic grey with no blue tint, so a movement effect never reads as the White team's pale blue, any other team colour or the gold Shield. Kept clearly brighter than the neutral zone lines, so an effect never sinks into the floor grid, and clearly darker than the White team's near-white.")]
+        [Tooltip("The silver of every movement ability (Dash, Blink, Sprint and the Zip Gun): their streaks, shards, speed-lines and cable. A neutral metallic grey with no blue tint, so a movement effect never reads as a team colour or the gold Shield. Kept clearly brighter than the neutral zone lines, so an effect never sinks into the floor grid.")]
         public Color movementSilverColor = new Color(0.76f, 0.77f, 0.78f, 1f);
-        [Tooltip("The hot cream-white heart of the Flamethrower: the middle of its flames and its embers. Pale on purpose, so it is never mistaken for the gold of the Shield.")]
-        public Color fireCoreColor = new Color(1f, 0.92f, 0.6f, 1f);
-        [Tooltip("The orange of the Flamethrower's flat fan and the outer tips of its flames.")]
-        public Color fireEdgeColor = new Color(1f, 0.45f, 0.1f, 1f);
+        [Tooltip("The white-hot heart of fire: the middle of the Flamethrower's flames and embers and of the Rocket Cursor's burning ground. Nearly white on purpose, so fire never reads as the orange team or the gold of the Shield.")]
+        public Color fireCoreColor = new Color(1f, 0.98f, 0.88f, 1f);
+        [Tooltip("The pale hot yellow of fire's outer parts: the Flamethrower's flat fan and the tips of its flames, and the edges of the Rocket Cursor's burning ground. Keep it pale and a little warmer than the Shield's gold: a deeper or a gold-coloured yellow reads as the Shield, an orange as the orange team.")]
+        public Color fireEdgeColor = new Color(1f, 0.88f, 0.6f, 1f);
         [Tooltip("The red of damage: the AoE Zone, the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);
-        [Tooltip("The light grey of the lines on ground and walls around a zone nobody owns. Bright enough that the zone stands out from the faint grid, but never glowing and clearly dimmer than the White team's lines, so a neutral zone is not mistaken for White ground.")]
+        [Tooltip("The light grey of the lines on ground and walls around a zone nobody owns. Bright enough that the zone stands out from the faint grid, but never glowing and never a colour, so a neutral zone is not mistaken for owned ground.")]
         public Color arenaNeutralLineColor = new Color(0.6f, 0.62f, 0.66f, 1f);
         [Tooltip("The plain grey of the lines on ground and walls in a zone that is out of play (a closed corner, or a capital nobody plays for). Darker than a neutral zone's lines and never glowing, so it reads as dead ground, but still light enough that the dark walls there keep their stripes and the line along their top.")]
         public Color arenaOutOfPlayLineColor = new Color(0.45f, 0.45f, 0.47f, 1f);

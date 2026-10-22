@@ -164,12 +164,7 @@ namespace Overpower.UI
             quit.Root.AddComponent<QuitButton>(); // the panels' own Quit: wires itself, and its label follows what it will do
         }
 
-        private Color TeamTextColour(int team)
-        {
-            Color[] colours = theme.dominionTeamTextColors;
-            if (team < 0 || colours == null || colours.Length == 0) return theme.lobbyBorderColor;
-            return colours[Mathf.Clamp(team, 0, colours.Length - 1)];
-        }
+        private Color TeamTextColour(int team) => TeamPalette.Of(theme.dominionTeamTextColors, team, theme.lobbyBorderColor);
 
         private void OnDestroy()
         {

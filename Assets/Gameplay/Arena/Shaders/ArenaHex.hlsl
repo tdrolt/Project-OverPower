@@ -10,7 +10,9 @@ float4 _ArenaFloorLine;        // line width m, outside grid glow, owned edge gl
 float4 _ArenaStripe;           // circuit cell m, stripe width m, node size m, top edge width m
 float4 _ArenaStripeGlow;       // outside stripe glow, owned stripe glow (ArenaLook.stripeGlow), across chance, up chance
 float4 _ArenaOutsideLine;      // linear colour of the faint glow away from every zone
+float4 _ArenaBarrierStripe;    // linear colour of the line round a barrier's top, its width m
 float  _ArenaReflection;       // 0..1 share of URP's sky reflection kept
+float  _ArenaFillLift;         // 0..1: how far an owned fill's middle channel moves toward its brightest (GroundTint)
 float  _ArenaLookReady;        // 0 until ArenaLook was pushed: draw the material's own Lit values
 float4 _ArenaOwnerGrid;        // origin x, origin z, tile size, 1 while owner tiles are bound
 float4 _ArenaOwnerMin;         // lowest q, lowest r, texture width, texture height
@@ -93,6 +95,16 @@ float3 ArenaRippleGlow(float2 tileCentre)
     return glow;
 }
 
+// GroundTint.Lift line for line: the floor's blue pulls a faint fill toward another hue (orange toward red), so the middle channel
+// moves toward the brightest; the brightest and darkest stay. The lines are bright enough to keep the exact owner colour.
+float3 ArenaFillColour(float3 c)
+{
+    float hi = max(c.r, max(c.g, c.b));
+    float lo = min(c.r, min(c.g, c.b));
+    float3 middle = step(lo + 1e-5, c) * step(c, hi - 1e-5);
+    return c + middle * (hi - c) * _ArenaFillLift;
+}
+
 // --- Line drawing in metres: antialiased over aa (metres per pixel, taken before any branch), and fading out where a line is
 // thinner than a pixel so it never shimmers. ---
 
@@ -171,7 +183,9 @@ float ArenaFaceEdgeMetres(float2 uv, float3 positionWS)
 }
 
 // Paints the pattern of one surface onto Lit's surface data. Lines in an owned band glow in the owner's colour; in a neutral
-// band they are unlit lighter lines (lit vs. unlit, not brightness, tells neutral from the White team); elsewhere a faint cool glow.
+// band they are unlit lighter lines (lit vs. unlit tells a neutral line from an owned one); elsewhere a faint cool glow. A barrier
+// has no pattern but grey paint reaching in from the edges of its top (the asset's reaches across the whole top), whatever owns the
+// ground, so low cover always reads the same.
 void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inout SurfaceData s)
 {
     s.albedo = _ArenaSurfaceBase[surface].rgb;
@@ -188,7 +202,7 @@ void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inou
     if (o.wallsOnly)
         o.state = 0;
     if (o.state > 1.5)
-        s.emission += o.colour * (edges * _ArenaFloorLine.z + (1.0 - edges) * o.fill * _ArenaFloorLine.w);
+        s.emission += o.colour * (edges * _ArenaFloorLine.z) + ArenaFillColour(o.colour) * ((1.0 - edges) * o.fill * _ArenaFloorLine.w);
     else if (o.state > 0.5)
         s.albedo = lerp(s.albedo, o.colour, edges);
     else
@@ -216,6 +230,10 @@ void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inou
         s.albedo = lerp(s.albedo, o.colour, stripe);
     else
         s.emission += _ArenaOutsideLine.rgb * (stripe * _ArenaStripeGlow.x);
+#elif defined(_ARENA_BARRIER)
+    float edgeMetres = ArenaFaceEdgeMetres(uv, positionWS); // screen derivatives: taken outside any branch
+    float top = normalWS.y > 0.5 ? ArenaLineMask(edgeMetres, 2.0 * _ArenaBarrierStripe.w, aa) : 0;
+    s.albedo = lerp(s.albedo, _ArenaBarrierStripe.rgb, top);
 #endif
 }
 

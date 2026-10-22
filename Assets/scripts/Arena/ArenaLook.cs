@@ -336,8 +336,12 @@ namespace Overpower.Arena
         public SurfaceLook wallSurface = new SurfaceLook(new Color(0.12f, 0.13f, 0.15f, 1f), 0.75f, 0.1f);
         [Tooltip("The paint and shine of the blocks (houses, crates and other solid cover) under their circuit stripes.")]
         public SurfaceLook blockSurface = new SurfaceLook(new Color(0.2f, 0.21f, 0.24f, 1f), 0.7f, 0.1f);
-        [Tooltip("The paint and shine of the low barriers. They get no stripes at all, so low cover always reads as cover.")]
-        public SurfaceLook barrierSurface = new SurfaceLook(new Color(0.86f, 0.64f, 0.26f, 1f), 0.8f, 0.6f);
+        [Tooltip("The paint and shine of the low barriers' sides: dark and glossy like the rest of the arena, a little darker than the floor so a barrier's side reads as the shaded side of something raised. They get no circuit stripes, only the grey top below, so low cover always reads as cover.")]
+        public SurfaceLook barrierSurface = new SurfaceLook(new Color(0.1f, 0.105f, 0.12f, 1f), 0.75f, 0.1f);
+        [Tooltip("The colour of the top of every low barrier: a plain grey paint that never glows, so from above a low barrier reads as a raised bar of low cover and is never taken for a wall's line or a team's colour.")]
+        public Color barrierTopStripeColor = new Color(0.6f, 0.6f, 0.62f, 1f);
+        [Tooltip("How far the grey reaches in from each edge of a low barrier's top, in metres. Half the barrier's width or more (the barriers are about 0.5 to 0.6 m wide) paints the whole top as one solid grey stripe; less leaves two thin lines along the edges, which read as marks on the floor rather than cover.")]
+        [Min(0f)] public float barrierTopStripeWidth = 0.35f;
         [Tooltip("How strongly the glossy arena mirrors the sky: 0 shows no sky in the shine, 1 shows all of it. Lower it if the floor turns pale at a shallow view and players get harder to see.")]
         [Range(0f, 1f)] public float reflectionStrength = 0.5f;
 
@@ -352,6 +356,8 @@ namespace Overpower.Arena
         [Min(0f)] public float ownedEdgeGlow = 1.2f;
         [Tooltip("How much a hexagon on owned ground glows with the owner's colour in its middle, at its strongest near the zone. Keep it low so a player standing on it stays easy to see.")]
         [Min(0f)] public float ownedFillGlow = 0.2f;
+        [Tooltip("Keeps a faint team colour on the floor (an owned hexagon's fill, an Electric Fence's floor band) reading as that team. The dark blue-grey floor pulls a faint colour toward its own blue, so a faint orange reads red-brown and a faint purple bluish; this moves the colour's middle channel toward its brightest to push it back. 0 leaves the team colour as it is; about 0.35 keeps orange orange. The hexagon lines and everything bright keep the exact team colour.")]
+        [Range(0f, 1f)] public float ownedFillHueLift = 0.35f;
 
         [Header("Ownership on the floor")]
         [Tooltip("How far past a zone's capture ring the floor and walls still show its owner, in floor hexagons: 1 paints one ring of tiles outside the circle you capture in, 0 paints only the tiles whose middle is inside it.")]
@@ -386,7 +392,7 @@ namespace Overpower.Arena
         [Header("Wall and block circuit stripes")]
         [Tooltip("The colour the floor grid and the circuit stripes glow in away from every zone. A neutral cool white with no blue cast, kept dim, so it never reads as a team's colour.")]
         public Color outsideLineColor = new Color(0.8f, 0.86f, 0.92f, 1f);
-        [Tooltip("How much the circuit stripes on walls and blocks glow away from every zone: 0 turns them off there. Keep it well below the owned glow, because only the brightness tells these lines from ground the White team owns.")]
+        [Tooltip("How much the circuit stripes on walls and blocks glow away from every zone: 0 turns them off there. Keep it well below the owned glow, so these faint lines never compete with ground a team owns.")]
         [Min(0f)] public float outsideStripeGlow = 0.35f;
         [Tooltip("How brightly the circuit stripes glow in the owner's colour on walls and blocks near ground a team owns. Keep it under about 1.5 so the glow gets only a thin halo.")]
         [Min(0f)] public float stripeGlow = 1.2f;

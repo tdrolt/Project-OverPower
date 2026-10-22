@@ -9,8 +9,8 @@ namespace Overpower.Data
     /// </summary>
     public sealed class SceneCameraConfig : MonoBehaviour
     {
-        [SerializeField, Tooltip("On: the camera looks straight along the map's long walls, your own spawn is on the left of your screen and the enemy's on the right (White and " +
-                                 "Purple see mirror images, and pressing right always walks towards the enemy). Off: the angled view the triangle arena has. Spectators watch from White's side.")]
+        [SerializeField, Tooltip("On: the camera looks straight along the map's long walls, your own spawn is on the left of your screen and the enemy's on the right (Orange and " +
+                                 "Purple see mirror images, and pressing right always walks towards the enemy). Off: the angled view the triangle arena has. Spectators watch from Orange's side.")]
         private bool ownSpawnOnLeft = true;
 
         public bool OwnSpawnOnLeft => ownSpawnOnLeft;
@@ -26,7 +26,7 @@ namespace Overpower.Data
     public static class CameraYawRules
     {
         /// <summary>The yaw of a camera that has the enemy on the RIGHT of the screen. toOwnSpawn is the horizontal vector from the middle of all spawns to this team's spawn,
-        /// so the enemy lies the other way. Screen right is (cos yaw, -sin yaw); solving for -toOwnSpawn gives atan2(z, -x). White (spawn east) gets 180, Purple (west) 0.</summary>
+        /// so the enemy lies the other way. Screen right is (cos yaw, -sin yaw); solving for -toOwnSpawn gives atan2(z, -x). Orange (spawn east) gets 180, Purple (west) 0.</summary>
         public static float OwnSpawnLeftYaw(float toOwnSpawnX, float toOwnSpawnZ) => Mathf.Atan2(toOwnSpawnZ, -toOwnSpawnX) * Mathf.Rad2Deg;
 
         /// <summary>The horizontal vector from the middle of all the placed spawns to one team's spawn (the camera and the spectator both start from it). A
@@ -64,8 +64,8 @@ namespace Overpower.Data
         public static float TeamYaw(bool ownSpawnOnLeft, float toOwnSpawnX, float toOwnSpawnZ, float teamYawOffset) =>
             ownSpawnOnLeft ? OwnSpawnLeftYaw(toOwnSpawnX, toOwnSpawnZ) : AngledYaw(toOwnSpawnX, toOwnSpawnZ, teamYawOffset);
 
-        /// <summary>The fixed yaw a spectator (a seat with no body) watches from: White's straight view on a map that asks for one, else the theme's one angle.</summary>
-        public static float SpectatorYaw(bool ownSpawnOnLeft, float themeAngle, float toWhiteSpawnX, float toWhiteSpawnZ) =>
-            ownSpawnOnLeft ? OwnSpawnLeftYaw(toWhiteSpawnX, toWhiteSpawnZ) : themeAngle;
+        /// <summary>The fixed yaw a spectator (a seat with no body) watches from: Orange's straight view on a map that asks for one, else the theme's one angle.</summary>
+        public static float SpectatorYaw(bool ownSpawnOnLeft, float themeAngle, float toOrangeSpawnX, float toOrangeSpawnZ) =>
+            ownSpawnOnLeft ? OwnSpawnLeftYaw(toOrangeSpawnX, toOrangeSpawnZ) : themeAngle;
     }
 }
