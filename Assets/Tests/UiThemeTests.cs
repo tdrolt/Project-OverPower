@@ -138,7 +138,7 @@ namespace Overpower.Tests
         public void TheLookFieldsAreInTheYamlWithATooltip()
         {
             string yaml = System.IO.File.ReadAllText("Assets/Gameplay/Config/UiTheme.asset").Replace("\r\n", "\n");
-            foreach (string name in new[] { "statusStunnedColor", "movementSilverColor", "fireCoreColor", "fireEdgeColor", "dangerColor",
+            foreach (string name in new[] { "statusStunnedColor", "movementGreyColor", "fireCoreColor", "fireEdgeColor", "dangerColor",
                          "flashWhiteColor", "arenaNeutralLineColor", "arenaOutOfPlayLineColor", "arenaLook" })
             {
                 FieldInfo f = typeof(UiTheme).GetField(name);

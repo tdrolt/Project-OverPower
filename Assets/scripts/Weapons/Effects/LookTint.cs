@@ -9,7 +9,9 @@ namespace Overpower.Weapons
     /// Paints an ability's own shot (the Stun Gun bolt) or its impact burst in the colour of its row in the look table, through a property
     /// block on each renderer so the shared material file never changes while playing. The solid core (a MeshRenderer, URP Lit with
     /// emission) gets the colour plus Stun Bolt Glow, brightened without leaving its hue; every other renderer is an unlit spark
-    /// (Particles/Unlit), whose Ability Spark Glow rides in its colour. A projectile is tinted as it spawns; anything else (a burst) when it starts.
+    /// (Particles/Unlit), whose Ability Spark Glow rides in its colour; on a shot they may wear the caster's team accent instead (the bolt's
+    /// crackle and its thin trail say whose; the trail's length and width are Stun Trail Seconds and Width). A projectile is tinted as it
+    /// spawns; anything else (a burst) when it starts.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LookTint : MonoBehaviour, IProjectileBehaviour
@@ -20,6 +22,11 @@ namespace Overpower.Weapons
 
         [SerializeField, Tooltip("The ability whose look-table row colours this object, by the Id on its ability asset (22 is the Stun Gun).")]
         private int abilityId;
+
+        [SerializeField, Tooltip("On for an ability's own shot (the Stun Gun bolt): its sparks, the crackle trail behind it, take the caster's team " +
+                 "colour, a thin accent that says whose bolt it is while the core keeps the ability's colour. Off for the burst where it lands: a hit " +
+                 "never carries a team.")]
+        private bool sparksInCastersTeam;
 
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
@@ -46,6 +53,7 @@ namespace Overpower.Weapons
                 return false;
             float coreGlow = theme.arenaLook != null ? theme.arenaLook.stunBoltGlow : 1f;
             float sparkGlow = theme.arenaLook != null ? theme.arenaLook.abilitySparkGlow : 1f;
+            Color sparkColour = sparksInCastersTeam ? LookColours.Accent(team, theme, colour) : colour;
 
             if (renderers == null)
                 renderers = GetComponentsInChildren<Renderer>(true);
@@ -62,8 +70,13 @@ namespace Overpower.Weapons
                     block.SetColor(EmissionColorId, glow);
                 }
                 else
-                    block.SetColor(BaseColorId, new Color(colour.r * sparkGlow, colour.g * sparkGlow, colour.b * sparkGlow, colour.a));
+                    block.SetColor(BaseColorId, new Color(sparkColour.r * sparkGlow, sparkColour.g * sparkGlow, sparkColour.b * sparkGlow, colour.a));
                 r.SetPropertyBlock(block);
+                if (r is TrailRenderer trail && theme.arenaLook != null)
+                {
+                    trail.time = theme.arenaLook.stunTrailSeconds;
+                    trail.widthMultiplier = theme.arenaLook.stunTrailWidth;
+                }
             }
             applied = true;
             return true;

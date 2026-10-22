@@ -17,14 +17,14 @@ namespace Overpower.Tests
         [Test]
         public void ACompleteTableHasNoProblems()
         {
-            var table = new[] { Look(1, LookShape.Streak, LookFamily.Silver), Look(2, LookShape.Bolt, LookFamily.ElectricBlue) };
+            var table = new[] { Look(1, LookShape.Streak, LookFamily.Movement), Look(2, LookShape.Bolt, LookFamily.ElectricBlue) };
             Assert.IsEmpty(Problems(new[] { 1, 2 }, table));
         }
 
         [Test]
         public void AMissingIdIsReportedByNumber()
         {
-            var table = new[] { Look(1, LookShape.Streak, LookFamily.Silver) };
+            var table = new[] { Look(1, LookShape.Streak, LookFamily.Movement) };
             List<string> problems = Problems(new[] { 1, 2 }, table);
             Assert.AreEqual(1, problems.Count);
             StringAssert.Contains("2", problems[0]);
@@ -33,21 +33,21 @@ namespace Overpower.Tests
         [Test]
         public void ADuplicateIdIsReported()
         {
-            var table = new[] { Look(1, LookShape.Streak, LookFamily.Silver), Look(1, LookShape.Bolt, LookFamily.ElectricBlue) };
+            var table = new[] { Look(1, LookShape.Streak, LookFamily.Movement), Look(1, LookShape.Bolt, LookFamily.ElectricBlue) };
             Assert.AreEqual(1, Problems(new[] { 1 }, table).Count);
         }
 
         [Test]
         public void TwoEntriesWithTheSameShapeAndFamilyAreReported()
         {
-            var table = new[] { Look(1, LookShape.Streak, LookFamily.Silver), Look(2, LookShape.Streak, LookFamily.Silver) };
+            var table = new[] { Look(1, LookShape.Streak, LookFamily.Movement), Look(2, LookShape.Streak, LookFamily.Movement) };
             Assert.AreEqual(1, Problems(new[] { 1, 2 }, table).Count);
         }
 
         [Test]
         public void TheSameShapeInAnotherFamilyIsFine()
         {
-            var table = new[] { Look(1, LookShape.Beam, LookFamily.Danger), Look(2, LookShape.Beam, LookFamily.Silver) };
+            var table = new[] { Look(1, LookShape.Beam, LookFamily.Danger), Look(2, LookShape.Beam, LookFamily.Movement) };
             Assert.IsEmpty(Problems(new[] { 1, 2 }, table));
         }
 
@@ -61,7 +61,7 @@ namespace Overpower.Tests
         [Test]
         public void AnExemptIdNeedsNoEntry()
         {
-            var table = new[] { Look(1, LookShape.Streak, LookFamily.Silver) };
+            var table = new[] { Look(1, LookShape.Streak, LookFamily.Movement) };
             Assert.IsEmpty(Problems(new[] { 1, 901 }, table, 901));
             Assert.AreEqual(1, Problems(new[] { 1, 901 }, table).Count, "without the exemption it is missing");
         }
@@ -69,7 +69,7 @@ namespace Overpower.Tests
         [Test]
         public void AnEntryForAnIdTheCatalogueDoesNotHaveIsReported()
         {
-            var table = new[] { Look(1, LookShape.Streak, LookFamily.Silver), Look(7, LookShape.Bolt, LookFamily.ElectricBlue) };
+            var table = new[] { Look(1, LookShape.Streak, LookFamily.Movement), Look(7, LookShape.Bolt, LookFamily.ElectricBlue) };
             List<string> problems = Problems(new[] { 1 }, table);
             Assert.AreEqual(1, problems.Count);
             StringAssert.Contains("7", problems[0]);

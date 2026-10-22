@@ -121,8 +121,9 @@ namespace Overpower.Abilities
         }
 
         /// <summary>Sizes the cone to the ability's real numbers and colours it. Cheap when nothing changed.
-        /// <paramref name="isCasterView"/> picks Edge Opacity vs. Non-Caster Edge Opacity for the aiming outline.</summary>
-        public void Configure(float range, float fullAngleDegrees, Color color, bool isCasterView)
+        /// <paramref name="outline"/> colours the aiming outline (the caster's team accent); <paramref name="isCasterView"/> picks Edge Opacity vs.
+        /// Non-Caster Edge Opacity for it.</summary>
+        public void Configure(float range, float fullAngleDegrees, Color color, Color outline, bool isCasterView)
         {
             if (range != builtRange || fullAngleDegrees != builtAngle || color != builtColor)
                 Rebuild(range, fullAngleDegrees, color);
@@ -138,7 +139,7 @@ namespace Overpower.Abilities
             {
                 float outlineOpacity = isCasterView ? edgeOpacity : nonCasterEdgeOpacity;
                 edge.enabled = outlineOpacity > 0f;
-                VisualTint.SetLineColor(edge, VisualTint.WithAlpha(color, outlineOpacity));
+                VisualTint.SetLineColor(edge, VisualTint.WithAlpha(outline, outlineOpacity));
             }
         }
 

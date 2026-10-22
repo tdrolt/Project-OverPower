@@ -9,6 +9,8 @@ namespace Overpower.Abilities
     public static class ShieldLook
     {
         private const int RingSides = 6;
+        public const string TeamRingName = "Shield Team Ring";
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         public static Color Colour(UiTheme theme, int abilityId, int team) => LookColours.ForAbility(theme, abilityId, team, LookFamily.Gold);
 
@@ -43,5 +45,37 @@ namespace Overpower.Abilities
 
         /// <summary>The armed ring as a flat hexagon, corners on <paramref name="radius"/>.</summary>
         public static void DrawRing(LineRenderer line, float radius) => VisualTint.FillFlatCircle(line, radius, RingSides);
+
+        /// <summary>The thin ring in the caster's team colour round the base of the shell (it says whose Shield it is): a flat hexagon at Shield
+        /// Team Ring Height over the feet, its sides touching the shell's widest circle, so the camera above sees it round the shell rather than
+        /// hidden under it. A child of the shell, so the shell's fog gate and timed end take it too, kept at world scale so its numbers are
+        /// metres. Null without an Arena Look with FX Alpha.</summary>
+        public static LineRenderer AddTeamRing(GameObject shell, float shellDiameter, float lift, Color accent, ArenaLook look)
+        {
+            if (shell == null || look == null || look.fxAlpha == null)
+                return null;
+            float fromCentre = look.shieldTeamRingHeight - lift;
+
+            var go = new GameObject(TeamRingName);
+            go.transform.SetParent(shell.transform, false);
+            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            go.transform.position = shell.transform.position + shell.transform.up * fromCentre;
+            float shellScale = shell.transform.lossyScale.x;
+            go.transform.localScale = Vector3.one * (shellScale > 0f ? 1f / shellScale : 1f);
+
+            LineRenderer line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = look.fxAlpha;
+            line.alignment = LineAlignment.TransformZ;
+            line.widthMultiplier = look.shieldTeamRingWidth;
+            line.numCornerVertices = 0;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            VisualTint.FillFlatCircle(line, shellDiameter * 0.5f / Mathf.Cos(Mathf.PI / RingSides), RingSides);
+            VisualTint.SetLineColor(line, VisualTint.WithAlpha(accent, look.shieldTeamRingAlpha));
+            var block = new MaterialPropertyBlock(); // the glow rides past 1 in _BaseColor: the vertex colour clamps at 1
+            block.SetColor(BaseColorId, new Color(look.shieldTeamRingGlow, look.shieldTeamRingGlow, look.shieldTeamRingGlow, 1f));
+            line.SetPropertyBlock(block);
+            return line;
+        }
     }
 }

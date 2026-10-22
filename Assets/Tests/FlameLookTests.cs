@@ -60,7 +60,7 @@ namespace Overpower.Tests
             var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             var visual = cone.GetComponent<FlameConeVisual>();
-            visual.Configure(Range, angle, Color.red, true);
+            visual.Configure(Range, angle, Color.red, Color.red, true);
             visual.ConfigureFire(Range, angle, theme, 21);
             visual.Place(Vector3.zero, Vector3.forward, Muzzle);
             ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
@@ -145,7 +145,7 @@ namespace Overpower.Tests
                 theme.arenaLook = look;
                 look.flameJetReach = 1f;
                 var visual = cone.GetComponent<FlameConeVisual>();
-                visual.Configure(Range, Angle, Color.red, true);
+                visual.Configure(Range, Angle, Color.red, Color.red, true);
                 visual.ConfigureFire(Range, Angle, theme, 21);
                 visual.Place(new Vector3(0f, 0.05f, 0f), Vector3.forward, new Vector3(0f, 0.05f, 0f) + Muzzle);
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
@@ -401,7 +401,7 @@ namespace Overpower.Tests
                 theme.arenaLook = look;
                 look.flameJetMostFlames = 80;
                 var visual = cone.GetComponent<FlameConeVisual>();
-                visual.Configure(Range, Angle, Color.red, true);
+                visual.Configure(Range, Angle, Color.red, Color.red, true);
                 visual.ConfigureFire(Range, Angle, theme, 21);
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 float life = tongues.main.startLifetime.constantMax;
@@ -711,7 +711,7 @@ namespace Overpower.Tests
                 var visual = cone.GetComponent<FlameConeVisual>();
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 float shareOfWidest = tongues.main.startSize.constantMin / tongues.main.startSize.constantMax;
-                visual.Configure(Range, Angle, Color.red, true);
+                visual.Configure(Range, Angle, Color.red, Color.red, true);
                 visual.ConfigureFire(Range, Angle, theme, 21);
                 var apex = new Vector3(10f, 0f, -4f);
                 visual.Place(apex, Vector3.right, apex + new Vector3(0.68f, 1.49f, -0.07f));
@@ -800,7 +800,7 @@ namespace Overpower.Tests
             {
                 theme.arenaLook = look;
                 var visual = cone.GetComponent<FlameConeVisual>();
-                visual.Configure(Range, Angle, Color.red, true);
+                visual.Configure(Range, Angle, Color.red, Color.red, true);
                 byte full = cone.transform.Find("Fan").GetComponent<MeshFilter>().sharedMesh.colors32.Max(c => c.a);
                 look.flameFanStrength = 0.4f;
                 visual.ConfigureFire(Range, Angle, theme, 21);
@@ -839,7 +839,7 @@ namespace Overpower.Tests
             {
                 theme.arenaLook = look;
                 var visual = cone.GetComponent<FlameConeVisual>();
-                visual.Configure(Range, Angle, Color.red, true);
+                visual.Configure(Range, Angle, Color.red, Color.red, true);
                 visual.ConfigureFire(Range, Angle, theme, 21);
                 // Far from any collider in the open scene, so only the jet's own work is measured. GC.GetAllocatedBytesForCurrentThread
                 // reads 0 in the Editor's Mono whatever is allocated; the profiler's GC.Alloc samples do count.

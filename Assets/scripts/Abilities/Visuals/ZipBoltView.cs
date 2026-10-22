@@ -8,7 +8,7 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The zip gun's hook in flight: a silver harpoon facing its flight, and a straight segmented silver cable back to the shooter's
+    /// The zip gun's hook in flight: a grey harpoon facing its flight, and a straight segmented grey cable back to the shooter's
     /// muzzle whose chevrons run toward the target (ZipCableLook). Every client already spawns this projectile locally from the cast RPC,
     /// so every client draws the same. The harpoon is drawn Zip Harpoon Size times the hit sphere's width with its point at the sphere's
     /// front, so it touches a target exactly when the hit lands, and at sizes above 1 reads bigger than the hit. The hit itself (the shot's
@@ -22,7 +22,7 @@ namespace Overpower.Abilities
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
         [SerializeField, Tooltip("Where the harpoon's and cable's colour (the Zip Gun row of the look table), the cable's material and its " +
-                 "sizes come from: Assets/Gameplay/Config/UiTheme.asset and its Arena Look. Not a team colour: movement abilities are silver.")]
+                 "sizes come from: Assets/Gameplay/Config/UiTheme.asset and its Arena Look. Movement is grey with a faint tint of the shooter's team.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("The harpoon head. Its origin is the back of its shaft, where the cable ties on; the cable ends there.")]
@@ -45,7 +45,7 @@ namespace Overpower.Abilities
 
             look = theme != null ? theme.arenaLook : null;
             if (theme != null)
-                colour = LookColours.ForAbility(theme, context.AbilityId, context.ShooterTeamId, LookFamily.Silver);
+                colour = LookColours.ForAbility(theme, context.AbilityId, context.ShooterTeamId, LookFamily.Movement);
             if (block == null)
                 block = new MaterialPropertyBlock();
             if (head != null)

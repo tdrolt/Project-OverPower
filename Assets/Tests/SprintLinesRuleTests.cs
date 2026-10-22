@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace Overpower.Tests
 {
-    /// <summary>Short silver speed-lines stream behind a sprinting player's feet. The sprinter tells every client when a sprint really starts
+    /// <summary>Short grey speed-lines stream behind a sprinting player's feet. The sprinter tells every client when a sprint really starts
     /// and stops (phases on the ability's one RPC), so everyone who can see the player sees the lines; the sprinter's own screen uses its
     /// real state. Lines show only while the player actually moves.</summary>
     public class SprintLinesRuleTests
@@ -200,7 +200,10 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(SprintAbility), "get_" + nameof(SprintAbility.LooksSprinting), typeof(SprintLinesRule).GetMethod(nameof(SprintLinesRule.Sprinting))));
             Assert.IsTrue(IlWiring.Uses(typeof(SprintLinesView), "LateUpdate", typeof(SprintLinesView).GetMethod(nameof(SprintLinesView.Step))));
             Assert.IsTrue(IlWiring.Uses(typeof(SprintLinesView), "Reshape", typeof(SprintLinesRule).GetMethod(nameof(SprintLinesRule.LinePoint))));
-            Assert.IsTrue(IlWiring.Uses(typeof(SprintLinesView), nameof(SprintLinesView.TryCreate), typeof(LookColours).GetMethod(nameof(LookColours.ForAbility))));
+            MethodInfo colourOf = typeof(SprintLinesView).GetMethod("ColourOf", Any);
+            Assert.IsTrue(IlWiring.Uses(typeof(SprintLinesView), "ColourOf", typeof(LookColours).GetMethod(nameof(LookColours.ForAbility))));
+            Assert.IsTrue(IlWiring.Uses(typeof(SprintLinesView), nameof(SprintLinesView.TryCreate), colourOf), "coloured as they are built");
+            Assert.IsTrue(IlWiring.Uses(typeof(SprintLinesView), nameof(SprintLinesView.Step), colourOf), "and again as each run starts");
             Assert.IsTrue(IlWiring.Uses(typeof(SprintAbility), nameof(SprintAbility.OnEquip), create), "every client's copy of the sprint builds its lines");
         }
 

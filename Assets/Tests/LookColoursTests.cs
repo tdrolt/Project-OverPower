@@ -28,7 +28,7 @@ namespace Overpower.Tests
             theme.teamShotColors = new[] { Team0, Team1 };
             theme.immuneBarColor = Gold;
             theme.statusStunnedColor = Stunned;
-            theme.movementSilverColor = Silver;
+            theme.movementGreyColor = Silver;
             theme.fireCoreColor = FireCore;
             theme.fireEdgeColor = FireEdge;
             theme.dangerColor = Danger;
@@ -48,9 +48,9 @@ namespace Overpower.Tests
 
         [Test] public void ElectricBlueIsTheStunnedColour() => Assert.AreEqual(Stunned, LookColours.For(LookFamily.ElectricBlue, 0, theme));
 
-        [Test] public void SilverDangerAndWhiteEachReadTheirOwnField()
+        [Test] public void MovementGreyDangerAndWhiteEachReadTheirOwnField()
         {
-            Assert.AreEqual(Silver, LookColours.For(LookFamily.Silver, 0, theme));
+            Assert.AreEqual(Silver, LookColours.For(LookFamily.Movement, 0, theme));
             Assert.AreEqual(Danger, LookColours.For(LookFamily.Danger, 0, theme));
             Assert.AreEqual(White, LookColours.For(LookFamily.White, 0, theme));
         }

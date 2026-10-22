@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Short silver speed-lines streaming behind a sprinting player's feet, on every client's copy of the player (built by the Sprint
+    /// Short grey speed-lines streaming behind a sprinting player's feet, on every client's copy of the player (built by the Sprint
     /// module as it is equipped). The lines live on a child this view switches on and off by SprintLinesRule; the view's own object stays
     /// active so its LateUpdate keeps running, and the fog gate on it (VisibleWhenSeen, following the player) only ever touches
     /// Renderer.enabled. The gate collects renderers once, so every line is built before it attaches. The run's speed and direction come
@@ -24,6 +24,8 @@ namespace Overpower.Abilities
 
         private SprintAbility source;
         private PhotonView caster;
+        private UiTheme theme;
+        private int abilityId;
         private ArenaLook look;
         private Transform body;
         private float feetBelowRoot;
@@ -54,8 +56,7 @@ namespace Overpower.Abilities
             lines.SetActive(false);
 
             int abilityId = source != null && source.Definition != null ? source.Definition.Id : -1;
-            int team = caster != null && Overpower.Net.Teams.TryGetTeam(caster.Owner, out int t) ? t : -1;
-            Color colour = LookColours.ForAbility(theme, abilityId, team, LookFamily.Silver);
+            Color colour = ColourOf(theme, abilityId, caster);
             var all = new LineRenderer[look.sprintLineCount];
             for (int i = 0; i < all.Length; i++)
             {
@@ -77,6 +78,8 @@ namespace Overpower.Abilities
             SprintLinesView view = root.AddComponent<SprintLinesView>();
             view.source = source;
             view.caster = caster;
+            view.theme = theme;
+            view.abilityId = abilityId;
             view.look = look;
             view.body = body;
             view.feetBelowRoot = feetBelowRoot;
@@ -85,6 +88,13 @@ namespace Overpower.Abilities
             view.colour = colour;
             view.gate = VisibleWhenSeen.AttachToCaster(root, caster);
             return view;
+        }
+
+        // Grey tinted by the sprinter's team as it stands now; plain grey while the team property has not arrived.
+        private static Color ColourOf(UiTheme theme, int abilityId, PhotonView caster)
+        {
+            int team = caster != null && Overpower.Net.Teams.TryGetTeam(caster.Owner, out int t) ? t : -1;
+            return LookColours.ForAbility(theme, abilityId, team, LookFamily.Movement);
         }
 
         private void LateUpdate()
@@ -115,7 +125,11 @@ namespace Overpower.Abilities
                 if (gate == null)
                     gate = VisibleWhenSeen.AttachToCaster(gameObject, caster);
                 if (!lines.activeSelf)
+                {
+                    // The lines are built on equip, which can come before the player's team property (a late join): ask again per run.
+                    colour = ColourOf(theme, abilityId, caster);
                     lines.SetActive(true);
+                }
                 Reshape(time);
             }
             else if (lines.activeSelf)

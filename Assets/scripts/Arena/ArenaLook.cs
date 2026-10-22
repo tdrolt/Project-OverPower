@@ -40,6 +40,14 @@ namespace Overpower.Arena
         public Color shieldSeamShade = new Color(0.035f, 0.03f, 0.025f, 1f);
         [Tooltip("How big the Shield's gold shell is drawn, as a multiple of the Shield Diameter on the Shield ability: about 1.18 draws it 2.6 m across, so the whole mech fits inside. Only the look: the respawn bubble keeps its size from the Shield Diameter, and the plates still rise from the armed ring on the floor.")]
         [Min(0.1f)] public float shieldShellScale = 1.18f;
+        [Tooltip("How thick the thin ring in the caster's team colour is that lies on the floor round the base of the Shield's gold shell, in metres. It says whose Shield it is; keep it thin so the gold still says Shield.")]
+        [Min(0f)] public float shieldTeamRingWidth = 0.06f;
+        [Tooltip("How high above the caster's feet the team-colour ring round the Shield's base lies, in metres. Just above the floor, where the gold shell meets the ground.")]
+        [Min(0f)] public float shieldTeamRingHeight = 0.04f;
+        [Tooltip("How solid the team-colour ring round the Shield's base is, from 0 (hidden) to 1 (solid).")]
+        [Range(0f, 1f)] public float shieldTeamRingAlpha = 0.9f;
+        [Tooltip("How brightly the team-colour ring round the Shield's base glows: 1 is the plain team colour, more makes it bloom. Keep it above the owned floor's Owned Edge Glow, or on its own team's floor the ring reads as one more floor line.")]
+        [Min(0f)] public float shieldTeamRingGlow = 2f;
 
         [Header("Materials")]
         [Tooltip("The see-through glowing glass of the respawn bubble (the Overpower/Hologram shader). Every bubble wears its own copy in its owner's team colour, so this file is never changed while playing.")]
@@ -56,6 +64,10 @@ namespace Overpower.Arena
         [Min(0f)] public float abilitySparkGlow = 1f;
         [Tooltip("How brightly the Stun Gun bolt's core glows in its own electric blue: above 1 it glows past the arena's stripes and blooms. The blue stays blue however high this goes, because only its blue part grows. About 6 wraps the bolt in a soft blue halo, so it reads about as big as the old ball at play zoom.")]
         [Min(0f)] public float stunBoltGlow = 6f;
+        [Tooltip("How long the thin line in the caster's team colour lingers behind a Stun Gun bolt, in seconds: the tail is this long times the bolt's speed. It says whose bolt it is; 0 draws none.")]
+        [Min(0f)] public float stunTrailSeconds = 0.12f;
+        [Tooltip("How thick the team-colour line behind a Stun Gun bolt is where it leaves the bolt, in metres; it thins out behind. Keep it thinner than the bolt so the electric blue still says Stun Gun.")]
+        [Min(0f)] public float stunTrailWidth = 0.08f;
         [Tooltip("How many electric arcs crackle around a stunned player.")]
         [Range(1, 6)] public int stunArcCount = 3;
         [Tooltip("How many times a second the arcs on a stunned player jump to a new shape. The shape comes from the server clock and the player, so everyone sees the same arcs.")]
@@ -104,10 +116,10 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float pulseCoreWhiteness = 0.55f;
         [Tooltip("How thick the pale line along the middle of the Sonic Pulse's arch is, as a share of the arch's thickness.")]
         [Range(0.05f, 1f)] public float pulseCoreWidth = 0.3f;
-        [Tooltip("How far the thin outline of the Sonic Pulse's arch shows past its tube on each side, in metres. 0 hides it.")]
-        [Min(0f)] public float pulseEdgeWidth = 0.05f;
-        [Tooltip("How solid the outline of the Sonic Pulse's arch is, as a share of the arch: low keeps the arch see-through where the outline lies under it, so players behind it stay visible.")]
-        [Range(0f, 1f)] public float pulseEdgeStrength = 0.3f;
+        [Tooltip("How thick the thin outline in the caster's team colour is that runs just outside the Sonic Pulse's arch, in metres. It says whose pulse it is; 0 hides it.")]
+        [Min(0f)] public float pulseEdgeWidth = 0.06f;
+        [Tooltip("How solid the team-colour outline of the Sonic Pulse's arch is, as a share of the arch: it fades with the arch and its after-images. It lies beside the tube, never over it, so the arch keeps its own blue.")]
+        [Range(0f, 1f)] public float pulseEdgeStrength = 0.8f;
 
         [Header("Flamethrower")]
         [Tooltip("The material put on the Flamethrower's flames each time it sprays: a pointed, hard-edged flame shape with a solid middle, stretched along each flame's flight so the jet points at the target. It takes each flame's fire colour, so the same shape serves every team.")]
@@ -157,8 +169,12 @@ namespace Overpower.Arena
         [Tooltip("How much brighter than plain Flash White every gun flash is drawn (impacts, the muzzle flash, the ricochet chevron). Above 1 the flash glows past the arena's stripes so a hit stands out; 1 is plain white, and much above 3 the glow swallows the flash's outline into a round blob that hides the player it hit.")]
         [Min(0f)] public float gunFlashGlow = 2.5f;
 
+        [Header("Team accent")]
+        [Tooltip("How much of the caster's team colour tints the grey of the movement abilities (the Dash streak and chevrons, the Blink shards and ring, the Sprint lines, the Zip Gun's cable and harpoon, the Teleport rings): 0 keeps them plain grey, 1 paints them fully in the team colour. A faint tint tells whose move it was while the grey still says movement.")]
+        [Range(0f, 1f)] public float movementTeamTint = 0.3f;
+
         [Header("Dash")]
-        [Tooltip("How wide the Dash's silver streak is at the dasher's end, in metres. It narrows to a sharp point where the dash began.")]
+        [Tooltip("How wide the Dash's grey streak is at the dasher's end, in metres. It narrows to a sharp point where the dash began.")]
         [Min(0.01f)] public float dashStreakWidth = 0.5f;
         [Tooltip("How high above the floor the Dash streak runs, in metres. About hip height, so it reads as the path the body took.")]
         [Min(0f)] public float dashStreakHeight = 0.5f;
@@ -178,7 +194,7 @@ namespace Overpower.Arena
         [Min(0f)] public float dashStreakGap = 1.05f;
 
         [Header("Blink")]
-        [Tooltip("How many silver shards burst out where a player blinked away from.")]
+        [Tooltip("How many grey shards burst out where a player blinked away from.")]
         [Range(3, 16)] public int blinkShardCount = 8;
         [Tooltip("How long each Blink shard is from its base to its point, in metres.")]
         [Min(0.01f)] public float blinkShardLength = 0.45f;
@@ -204,7 +220,7 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float blinkAlpha = 1f;
 
         [Header("Zip Gun")]
-        [Tooltip("The Zip Gun's cable, in flight and during the pull: short silver segments with small chevrons between them that run toward the target. Its colour is put on each cable while playing, so this file is never changed while playing.")]
+        [Tooltip("The Zip Gun's cable, in flight and during the pull: short grey segments with small chevrons between them that run toward the target. Its colour is put on each cable while playing, so this file is never changed while playing.")]
         public Material zipCable;
         [Tooltip("How wide the Zip Gun's cable is drawn, in metres. Its chevrons fill this width; the cable's segments are a thin line along its middle.")]
         [Min(0.01f)] public float zipCableWidth = 0.24f;
@@ -212,13 +228,13 @@ namespace Overpower.Arena
         [Min(0.05f)] public float zipChevronSpacing = 0.6f;
         [Tooltip("How fast the chevrons run along the Zip Gun's cable toward the target, in metres per second. 0 holds them still.")]
         [Min(0f)] public float zipChevronSpeed = 8f;
-        [Tooltip("How brightly the Zip Gun's harpoon glows in its silver: 0 is plain lit metal, about 0.6 keeps it readable over the dark floor without a halo.")]
+        [Tooltip("How brightly the Zip Gun's harpoon glows in its grey: 0 is plain lit metal, about 0.6 keeps it readable over the dark floor without a halo.")]
         [Min(0f)] public float abilityShotGlow = 0.6f;
         [Tooltip("How long the Zip Gun's harpoon is drawn, as a multiple of the width of what it can hit: 1 spans exactly the hit, 1.5 draws it half as long again (it then reads bigger than the hit). Its point always sits at the front of the hit, so it touches a target exactly when it hooks it.")]
         [Range(0.5f, 3f)] public float zipHarpoonSize = 1.5f;
 
         [Header("Sprint")]
-        [Tooltip("How many silver speed-lines stream behind a sprinting player's feet.")]
+        [Tooltip("How many grey speed-lines stream behind a sprinting player's feet.")]
         [Range(1, 6)] public int sprintLineCount = 3;
         [Tooltip("How long each Sprint speed-line is, in metres.")]
         [Min(0.05f)] public float sprintLineLength = 0.75f;
@@ -240,7 +256,7 @@ namespace Overpower.Arena
         [Min(0f)] public float sprintLineLift = 0.06f;
 
         [Header("Teleport")]
-        [Tooltip("How thick the flat silver hexagon is that marks a Teleport: on a portal while someone channels in it, and at both ends of a trip on other players' screens, in metres. Keep it clearly thicker than the floor's seam lines, or the mark reads as part of the floor.")]
+        [Tooltip("How thick the flat grey hexagon is that marks a Teleport: on a portal while someone channels in it, and at both ends of a trip on other players' screens, in metres. Keep it clearly thicker than the floor's seam lines, or the mark reads as part of the floor.")]
         [Min(0.01f)] public float teleportRingWidth = 0.2f;
         [Tooltip("How solid the Teleport's hexagon marks are, from 0 (invisible) to 1 (solid).")]
         [Range(0f, 1f)] public float teleportRingAlpha = 1f;
@@ -320,6 +336,14 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float raybeamCoreShare = 0.25f;
         [Tooltip("How brightly each Raybeam's white core glows: 1 is plain white, more makes it bloom; much above 2 the glow swallows the red sheath.")]
         [Min(0f)] public float raybeamCoreGlow = 2f;
+        [Tooltip("How thick the thin outline in the caster's team colour is that runs just outside each Raybeam's red sheath, in metres. It says whose beam it is; 0 hides it.")]
+        [Min(0f)] public float raybeamEdgeWidth = 0.05f;
+        [Tooltip("How solid the team-colour outline of each Raybeam is, from 0 (hidden) to 1 (solid).")]
+        [Range(0f, 1f)] public float raybeamEdgeAlpha = 0.9f;
+        [Tooltip("How much dark floor shows between each Raybeam's red sheath and its team-colour outline, in metres. The gap keeps an orange outline from melting into the red beam; 0 lays the outline against the sheath.")]
+        [Min(0f)] public float raybeamEdgeGap = 0.04f;
+        [Tooltip("How brightly each Raybeam's team-colour outline glows: 1 is the plain team colour, more makes it bloom and stand off the red sheath.")]
+        [Min(0f)] public float raybeamEdgeGlow = 1.5f;
 
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]

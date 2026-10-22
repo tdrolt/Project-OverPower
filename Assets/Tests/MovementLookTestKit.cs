@@ -9,29 +9,29 @@ using UnityEngine;
 
 namespace Overpower.Tests
 {
-    /// <summary>A literal theme and look for the movement-look tests: the ability's row in the table is Gold, so a view that reads the row
-    /// paints gold and one that hard-codes silver is caught. Everything made here is destroyed by Dispose.</summary>
+    /// <summary>A literal theme and look for the movement-look tests: the ability's row in the table is Gold unless a test asks for another
+    /// family, so a view that reads the row paints gold and one that hard-codes the movement grey is caught. Everything made here is destroyed by Dispose.</summary>
     internal sealed class MovementLookTestKit : System.IDisposable
     {
         public const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
         public static readonly Color Gold = new Color(0.81f, 0.52f, 0.23f, 1f);
-        public static readonly Color Silver = new Color(0.31f, 0.62f, 0.44f, 1f);
+        public static readonly Color Grey = new Color(0.31f, 0.62f, 0.44f, 1f);
 
         public readonly UiTheme Theme;
         public readonly ArenaLook Look;
         public readonly Material Fx;
         private readonly List<UnityEngine.Object> made = new List<UnityEngine.Object>();
 
-        public MovementLookTestKit(int abilityId, LookShape shape)
+        public MovementLookTestKit(int abilityId, LookShape shape, LookFamily family = LookFamily.Gold)
         {
             Theme = Make(ScriptableObject.CreateInstance<UiTheme>());
             Look = Make(ScriptableObject.CreateInstance<ArenaLook>());
             Fx = Make(new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit")));
             Theme.immuneBarColor = Gold;
-            Theme.movementSilverColor = Silver;
+            Theme.movementGreyColor = Grey;
             Theme.arenaLook = Look;
             Look.fxAlpha = Fx;
-            ((List<AbilityLook>)typeof(ArenaLook).GetField("abilityLooks", Any).GetValue(Look)).Add(new AbilityLook(abilityId, shape, LookFamily.Gold));
+            ((List<AbilityLook>)typeof(ArenaLook).GetField("abilityLooks", Any).GetValue(Look)).Add(new AbilityLook(abilityId, shape, family));
         }
 
         public T Make<T>(T thing) where T : UnityEngine.Object

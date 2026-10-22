@@ -62,11 +62,11 @@ namespace Overpower.Abilities
         private float channelSeconds = 3f;
 
         [Header("Remote visuals (cosmetic only)")]
-        [SerializeField, Tooltip("Radius in metres of the flat silver hexagon shown on a portal while ANYONE - " +
+        [SerializeField, Tooltip("Radius in metres of the flat grey hexagon shown on a portal while ANYONE - " +
                  "your own screen included - is channelling in it. Purely visual; 0 shows nothing.")]
         private float channelVfxRadius = 0.6f;
 
-        [SerializeField, Tooltip("Radius in metres of the brief flat silver hexagon shown at both portals, on " +
+        [SerializeField, Tooltip("Radius in metres of the brief flat grey hexagon shown at both portals, on " +
                  "every OTHER client's screen, the moment a travel completes. The caster's own screen " +
                  "already shows the real teleport. 0 shows nothing.")]
         private float arrivalVfxRadius = 0.5f;
@@ -555,8 +555,12 @@ namespace Overpower.Abilities
             UiTheme theme = Owner != null && Owner.Health != null ? Owner.Health.Theme : null;
             if (theme == null)
                 return null;
-            return TeleportRing.Build(point, radius, LookColours.For(LookFamily.Silver, casterTeam, theme), theme.arenaLook);
+            return TeleportRing.Build(point, radius, RingColour(theme, casterTeam), theme.arenaLook);
         }
+
+        /// <summary>The rings' colour: the movement grey tinted by the caster's team. Taken from the movement family directly, because the
+        /// Portal's row in the look table is its own team gate, not this mark.</summary>
+        public static Color RingColour(UiTheme theme, int casterTeam) => LookColours.For(LookFamily.Movement, casterTeam, theme);
 
         public override string ShopStatsText() =>
             ShopNumberFormat.Lines($"Place up to {ShopNumberFormat.Compact(placementRange)}m away · {maxPortals} portals",

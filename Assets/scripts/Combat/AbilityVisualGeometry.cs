@@ -172,6 +172,27 @@ namespace Overpower.Combat
             return point;
         }
 
+        /// <summary>A closed outline round a camera-facing tube through the first <paramref name="count"/> <paramref name="points"/>, written into
+        /// 2 x count points of <paramref name="outline"/>: out along one side, back along the other, each <paramref name="offset"/> from the
+        /// middle, sideways as <paramref name="viewer"/> sees the tube (the way a camera-facing line widens), so it frames the tube and never
+        /// lies over it.</summary>
+        public static void TubeOutline(Vector3[] points, int count, Vector3 viewer, float offset, Vector3[] outline)
+        {
+            for (int k = 0; k < count; k++)
+            {
+                Vector3 tangent = points[Mathf.Min(k + 1, count - 1)] - points[Mathf.Max(k - 1, 0)];
+                Vector3 side = Vector3.Cross(tangent, viewer - points[k]);
+                // Seen end-on there is no "sideways": any direction across the tube beats collapsing the outline onto its body.
+                if (side.sqrMagnitude <= 1e-12f)
+                    side = Vector3.Cross(tangent, Vector3.up);
+                if (side.sqrMagnitude <= 1e-12f)
+                    side = Vector3.Cross(tangent, Vector3.right);
+                side = side.sqrMagnitude > 1e-12f ? side.normalized * offset : Vector3.zero;
+                outline[k] = points[k] + side;
+                outline[2 * count - 1 - k] = points[k] - side;
+            }
+        }
+
         /// <summary>How solid the arch is <paramref name="t"/> seconds after the cast, as a share of its full strength: from 1 at the caster down
         /// to <paramref name="endStrength"/> as it reaches the end of the sweep, then to 0 over <paramref name="fadeSeconds"/>.</summary>
         public static float ArchStrength(float t, float sweepSeconds, float fadeSeconds, float endStrength)

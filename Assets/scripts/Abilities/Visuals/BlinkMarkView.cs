@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// What another player's screen shows of a Blink: a burst of silver triangle shards where the player left, and a flat silver hexagon ring
+    /// What another player's screen shows of a Blink: a burst of grey triangle shards where the player left, and a flat grey hexagon ring
     /// snapping out on the floor where they landed, turned off the floor grid (BlinkLook decides every move and fade). Each shard is a
     /// two-point line narrowing to a point. The two marks are unparented objects, built once and reused, left where the blink happened.
     /// Whether each mark is drawn at all is the caller's sight check for its own spot, made before it plays.
@@ -138,7 +138,7 @@ namespace Overpower.Abilities
             if (module == null)
                 module = GetComponent<AbilityModule>();
             int abilityId = module != null && module.Definition != null ? module.Definition.Id : -1;
-            return LookColours.ForAbility(theme, abilityId, casterTeam, LookFamily.Silver);
+            return LookColours.ForAbility(theme, abilityId, casterTeam, LookFamily.Movement);
         }
 
         private static float FloorUnder(Vector3 point) => GroundSnap.TryFindGroundY(point, out float groundY) ? groundY : point.y;

@@ -2094,8 +2094,9 @@ namespace Overpower.UI
         public float lobbyRoomCloseCrossThickness = 3f;
 
         [Header("Look colours (the colour language of abilities and guns)")]
-        [Tooltip("The silver of every movement ability (Dash, Blink, Sprint and the Zip Gun): their streaks, shards, speed-lines and cable. A neutral metallic grey with no blue tint, so a movement effect never reads as a team colour or the gold Shield. Kept clearly brighter than the neutral zone lines, so an effect never sinks into the floor grid.")]
-        public Color movementSilverColor = new Color(0.76f, 0.77f, 0.78f, 1f);
+        [Tooltip("The grey of every movement ability (Dash, Blink, Sprint, the Zip Gun and the Teleport rings): their streaks, shards, speed-lines, cable and rings. The Arena Look's Movement Team Tint mixes a little of the caster's team colour into it, so others can tell whose dash it was while it still reads as movement and never as the gold Shield. Kept clearly brighter than the neutral zone lines, so an effect never sinks into the floor grid.")]
+        [UnityEngine.Serialization.FormerlySerializedAs("movementSilverColor")]
+        public Color movementGreyColor = new Color(0.76f, 0.77f, 0.78f, 1f);
         [Tooltip("The white-hot heart of fire: the middle of the Flamethrower's flames and embers and of the Rocket Cursor's burning ground. Nearly white on purpose, so fire never reads as the orange team or the gold of the Shield.")]
         public Color fireCoreColor = new Color(1f, 0.98f, 0.88f, 1f);
         [Tooltip("The pale hot yellow of fire's outer parts: the Flamethrower's flat fan and the tips of its flames, and the edges of the Rocket Cursor's burning ground. Keep it pale and a little warmer than the Shield's gold: a deeper or a gold-coloured yellow reads as the Shield, an orange as the orange team.")]

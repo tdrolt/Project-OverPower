@@ -63,7 +63,7 @@ namespace Overpower.Abilities
         private float tetherMarkerSeconds = 0.3f;
 
         [SerializeField, Tooltip("Material of the square anchor - Assets/Gameplay/Abilities/Ability Visual Solid.mat. " +
-                 "Its colour is the Zip Gun's row in the look table (silver), like the harpoon and its cable; the cable's own " +
+                 "Its colour is the Zip Gun's row in the look table (grey with a faint team tint), like the harpoon and its cable; the cable's own " +
                  "look is in UiTheme's Arena Look.")]
         private Material anchorMaterial;
 
@@ -287,7 +287,7 @@ namespace Overpower.Abilities
         private Color CableColour(int team)
         {
             UiTheme theme = Owner != null && Owner.Health != null ? Owner.Health.Theme : null;
-            return theme != null ? LookColours.ForAbility(theme, Definition.Id, team, LookFamily.Silver) : Color.white;
+            return theme != null ? LookColours.ForAbility(theme, Definition.Id, team, LookFamily.Movement) : Color.white;
         }
 
         private LineRenderer BuildRope()

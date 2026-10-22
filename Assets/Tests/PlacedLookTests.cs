@@ -138,12 +138,12 @@ namespace Overpower.Tests
                     "turned by the server clock, still lying flat");
                 Assert.Less(Quaternion.Angle(Quaternion.Euler(90f, 0f, 0f), rim.transform.localRotation), 0.01f, "the gate itself never turns");
 
-                kit.Theme.portalCooldownColor = MovementLookTestKit.Silver;
+                kit.Theme.portalCooldownColor = MovementLookTestKit.Grey;
                 typeof(PortalView).GetMethod("Paint", Any).Invoke(view, new object[] { false });
-                MovementLookTestKit.AssertRgb(MovementLookTestKit.Silver, rim.startColor, "cooling down: the frame turns the cooling-down colour");
-                MovementLookTestKit.AssertRgb(MovementLookTestKit.Silver, inner.startColor, "and so does the inner hexagon");
+                MovementLookTestKit.AssertRgb(MovementLookTestKit.Grey, rim.startColor, "cooling down: the frame turns the cooling-down colour");
+                MovementLookTestKit.AssertRgb(MovementLookTestKit.Grey, inner.startColor, "and so does the inner hexagon");
                 fill.GetPropertyBlock(block);
-                MovementLookTestKit.AssertRgb(MovementLookTestKit.Silver, block.GetColor(BaseColorId), "and the floor of the gate");
+                MovementLookTestKit.AssertRgb(MovementLookTestKit.Grey, block.GetColor(BaseColorId), "and the floor of the gate");
             }
         }
 

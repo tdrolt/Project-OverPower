@@ -75,7 +75,8 @@ namespace Overpower.Tests
             Assert.IsNotNull(spawn);
             Assert.IsTrue(IlWiring.Uses(teleport, "SpawnMarker", typeof(TeleportRing).GetMethod(nameof(TeleportRing.Build))), "the mark is the hex ring");
             Assert.IsFalse(IlWiring.CallsAcrossAssemblies(teleport, "SpawnMarker", typeof(GameObject).GetMethod(nameof(GameObject.CreatePrimitive))), "the grey sphere is gone");
-            Assert.IsTrue(IlWiring.Uses(teleport, "SpawnMarker", typeof(LookColours).GetMethod(nameof(LookColours.For))), "coloured from the look's colour families");
+            Assert.IsTrue(IlWiring.Uses(teleport, "SpawnMarker", teleport.GetMethod(nameof(TeleportAbility.RingColour))), "coloured by the ring's colour rule");
+            Assert.IsTrue(IlWiring.Uses(teleport, nameof(TeleportAbility.RingColour), typeof(LookColours).GetMethod(nameof(LookColours.For))), "from the look's colour families");
 
             MethodInfo attach = typeof(VisibleWhenSeen).GetMethod(nameof(VisibleWhenSeen.Attach), new[] { typeof(GameObject), typeof(int) });
             Assert.IsNotNull(attach);

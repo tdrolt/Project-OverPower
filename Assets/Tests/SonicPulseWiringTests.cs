@@ -33,6 +33,7 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(SonicPulseView), "Draw", typeof(AbilityVisualGeometry).GetMethod(nameof(AbilityVisualGeometry.ArchPoint))), "the arch's shape comes from the tested rule");
             Assert.IsTrue(IlWiring.Uses(typeof(SonicPulseView), "Draw", typeof(AbilityVisualGeometry).GetMethod(nameof(AbilityVisualGeometry.ArchHeight))), "and its height");
             Assert.IsTrue(IlWiring.Uses(typeof(SonicPulseView), "Draw", typeof(AbilityVisualGeometry).GetMethod(nameof(AbilityVisualGeometry.ArchStrength))), "and its fade");
+            Assert.IsTrue(IlWiring.Uses(typeof(SonicPulseView), "Draw", typeof(AbilityVisualGeometry).GetMethod(nameof(AbilityVisualGeometry.TubeOutline))), "and its outline");
 
             // The getters are read as Play's range and angle arguments, in that order (C# evaluates arguments left to right).
             MethodInfo cast = typeof(SonicPulseAbility).GetMethod(nameof(SonicPulseAbility.ExecuteCast));
@@ -156,18 +157,20 @@ namespace Overpower.Tests
                     LineRenderer edge = body.transform.Find(SonicPulseView.EdgeName)?.GetComponent<LineRenderer>();
                     Assert.IsNotNull(edge, body.name + " has its own edge line, the slot for the caster's team accent");
                     Assert.AreSame(material, edge.sharedMaterial);
-                    Assert.Less(edge.sortingOrder, body.sortingOrder, "the edge draws under its tube, so only its rim shows");
-                    Assert.AreEqual(0.3f + 2f * 0.05f, edge.widthMultiplier, 1e-4f, "Pulse Edge Width past the tube on each side");
-                    Assert.AreEqual(body.startColor.a * 0.3f, edge.startColor.a, 1f / 255f,
-                        "Pulse Edge Strength of its tube, so where the outline lies under the tube the arch stays see-through");
+                    Assert.AreEqual(0.05f, edge.widthMultiplier, 1e-4f, "Pulse Edge Width thick");
+                    Assert.IsTrue(edge.loop, "one closed outline round its tube");
+                    Assert.AreEqual(body.startColor.a * 0.3f, edge.startColor.a, 1f / 255f, "Pulse Edge Strength of its tube");
 
                     Assert.Greater(body.positionCount, 8);
                     Assert.AreEqual(body.positionCount, core.positionCount);
-                    Assert.AreEqual(body.positionCount, edge.positionCount);
+                    Assert.AreEqual(2 * body.positionCount, edge.positionCount, "out along one side of the tube, back along the other");
                     for (int i = 0; i < body.positionCount; i++)
                     {
                         Assert.AreEqual(body.GetPosition(i), core.GetPosition(i), "the core runs along the middle of its tube");
-                        Assert.AreEqual(body.GetPosition(i), edge.GetPosition(i), "the edge runs along its tube");
+                        Vector3 side = edge.GetPosition(i), other = edge.GetPosition(2 * body.positionCount - 1 - i);
+                        Assert.AreEqual(0f, Vector3.Distance((side + other) * 0.5f, body.GetPosition(i)), 1e-4f, "the outline is centred on its tube");
+                        Assert.AreEqual(0.3f * 0.5f + 0.05f * 0.5f, Vector3.Distance(side, body.GetPosition(i)), 1e-4f,
+                            "just outside the tube, never over it: the tube is see-through and the accent must not tint its body");
                         Vector3 p = body.transform.TransformPoint(body.GetPosition(i));
                         Assert.IsTrue(ConeFilter.IsWithinCone(origin, Vector3.right, p, 3.25f + 1e-3f, 71f + 1e-2f), $"{body.name} point {i} {p:F3}");
                         if (a == 0)

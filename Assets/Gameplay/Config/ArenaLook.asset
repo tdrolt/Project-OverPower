@@ -73,12 +73,18 @@ MonoBehaviour:
   shieldPlateGlow: 0.4
   shieldSeamShade: {r: 0.035, g: 0.03, b: 0.025, a: 1}
   shieldShellScale: 1.18
+  shieldTeamRingWidth: 0.06
+  shieldTeamRingHeight: 0.04
+  shieldTeamRingAlpha: 0.9
+  shieldTeamRingGlow: 2
   hologram: {fileID: 2100000, guid: 1fe75856c4baaa040901b468e37773cd, type: 2}
   shieldPlates: {fileID: 2100000, guid: 1e1873c4ddf885842a6e6a0bff6f06e5, type: 2}
   fxAdditive: {fileID: 2100000, guid: cf2a97addcf17b04f91edd80fd735769, type: 2}
   fxAlpha: {fileID: 2100000, guid: 7201e9527e5d7e447aafc48ac13dcdb5, type: 2}
   abilitySparkGlow: 1
   stunBoltGlow: 6
+  stunTrailSeconds: 0.12
+  stunTrailWidth: 0.08
   stunArcCount: 3
   stunArcRate: 15
   stunArcRadius: 0.85
@@ -100,8 +106,8 @@ MonoBehaviour:
   pulseTrailAlpha: 0.55
   pulseCoreWhiteness: 0.55
   pulseCoreWidth: 0.3
-  pulseEdgeWidth: 0.05
-  pulseEdgeStrength: 0.3
+  pulseEdgeWidth: 0.06
+  pulseEdgeStrength: 0.8
   flameJetMaterial: {fileID: 2100000, guid: c1c06d0c6fb850742956c70ef59ba743, type: 2}
   flameJetOverlap: 1.5
   flameJetSpread: 0.75
@@ -123,6 +129,7 @@ MonoBehaviour:
   blastRingWidth: 0.2
   shotLightHeight: 1.6
   gunFlashGlow: 2.5
+  movementTeamTint: 0.3
   dashStreakWidth: 0.5
   dashStreakHeight: 0.5
   dashStreakAlpha: 1
@@ -194,6 +201,10 @@ MonoBehaviour:
   raybeamSheathAlpha: 0.4
   raybeamCoreShare: 0.25
   raybeamCoreGlow: 2
+  raybeamEdgeWidth: 0.05
+  raybeamEdgeAlpha: 0.9
+  raybeamEdgeGap: 0.04
+  raybeamEdgeGlow: 1.5
   mechBaseMix: 0.85
   mechGlowStrength: 1.8
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}

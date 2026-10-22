@@ -47,7 +47,7 @@ namespace Overpower.Abilities
         private bool travelling;
         private Vector3 travelStart;
 
-        // Every other client: the silver streak and floor chevrons on this prefab (none without the view). The caster's own screen
+        // Every other client: the grey streak and floor chevrons on this prefab (none without the view). The caster's own screen
         // already shows the real movement and draws none.
         private DashStreakView streak;
 

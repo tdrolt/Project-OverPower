@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Vision;
 using Overpower.Match;
@@ -156,7 +157,7 @@ namespace Overpower.Abilities
             var alreadyHit = new HashSet<IDamageable>();
             var burn = new StatusEffectSpec { kind = StatusKind.Burn, duration = burnSeconds, magnitude = burnDamagePerSecond, abilityId = Definition.Id };
 
-            ShowVfx();
+            ShowVfx(casterTeam);
 
             float elapsed = 0f;
             while (elapsed < spraySeconds)
@@ -249,7 +250,7 @@ namespace Overpower.Abilities
 
         // ---- VFX (cheap, cosmetic only - see the Inspector tooltip) --------------------------------
 
-        private void ShowVfx()
+        private void ShowVfx(int casterTeam)
         {
             if (vfx == null)
             {
@@ -264,9 +265,11 @@ namespace Overpower.Abilities
 
             // Re-read on every spray, so an Inspector change to Cone Angle/Range shows on the next cast.
             // Owner.IsMine: the aiming outline is the caster's own aid, at its stronger opacity only on their screen.
+            // The outline wears the caster's team colour (the accent that says whose fire it is); the fan and flames stay fire.
             UiTheme theme = Owner.Health != null ? Owner.Health.Theme : null;
             Color fire = theme != null ? FlameLook.Edge(theme, Definition.Id) : vfxColor;
-            vfx.Configure(coneRange, coneAngle, fire, Owner.IsMine);
+            Color outline = theme != null ? LookColours.Accent(casterTeam, theme, fire) : fire;
+            vfx.Configure(coneRange, coneAngle, fire, outline, Owner.IsMine);
             vfx.ConfigureFire(coneRange, coneAngle, theme, Definition.Id);
             vfx.gameObject.SetActive(true);
             // Vision: the cone is hidden with the enemy who sprays it, checked every frame (friendly: always).

@@ -8,8 +8,8 @@ using UnityEngine.Rendering;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// What another player's screen shows of a Dash: a straight silver streak from where it began to just behind the dasher, and flat
-    /// silver chevrons on the floor at the start pointing the way it went, then a short fade (DashLook decides every place and fade). One
+    /// What another player's screen shows of a Dash: a straight grey streak from where it began to just behind the dasher, and flat
+    /// grey chevrons on the floor at the start pointing the way it went, then a short fade (DashLook decides every place and fade). One
     /// unparented object, left where the dash happened, reused by the next dash; the fog gate follows the dasher, so a dash in the fog draws
     /// nothing, and a dash out of the fog starts where the dasher was first seen. Only line points and colours change per frame
     /// (VisibleWhenSeen owns Renderer.enabled).
@@ -74,7 +74,7 @@ namespace Overpower.Abilities
             if (module == null)
                 module = GetComponent<AbilityModule>();
             int abilityId = module != null && module.Definition != null ? module.Definition.Id : -1;
-            colour = LookColours.ForAbility(theme, abilityId, casterTeam, LookFamily.Silver);
+            colour = LookColours.ForAbility(theme, abilityId, casterTeam, LookFamily.Movement);
             playedAt = Time.time;
             VisibleWhenSeen.AttachToCaster(Root, caster);
             gate = Root.GetComponent<VisibleWhenSeen>(); // none without fog: everything shows

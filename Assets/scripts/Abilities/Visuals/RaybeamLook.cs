@@ -10,6 +10,21 @@ namespace Overpower.Abilities
     {
         public static float CoreWidth(float beamWidth, float coreShare) => beamWidth * Mathf.Clamp01(coreShare);
 
+        /// <summary>The four corners of the beam's team-colour outline, in order round it: a line <paramref name="edgeWidth"/> thick running
+        /// <paramref name="gap"/> outside each long side of the beam (Beam Width wide), sideways in the floor's plane so the top-down camera
+        /// sees both sides, and across both ends.</summary>
+        public static void EdgeOutline(Vector3 from, Vector3 to, float beamWidth, float edgeWidth, float gap, Vector3[] corners)
+        {
+            Vector3 side = Vector3.Cross(Vector3.up, to - from);
+            if (side.sqrMagnitude < 1e-8f)
+                side = Vector3.right;
+            side = side.normalized * ((beamWidth + edgeWidth) * 0.5f + Mathf.Max(0f, gap));
+            corners[0] = from + side;
+            corners[1] = to + side;
+            corners[2] = to - side;
+            corners[3] = from - side;
+        }
+
         /// <summary>True when a wall stopped the beam, or a placed structure did (it always ends the beam where it takes the hit);
         /// false when the beam ran out its range, whoever it pierced on the way.</summary>
         public static bool EndsOnSurface(BeamResult beam) =>

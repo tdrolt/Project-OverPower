@@ -13,7 +13,8 @@ namespace Overpower.Abilities
     /// really hits (the ability's live range and angle, handed in by ExecuteCast on every client, no RPC), travels from the caster to the
     /// end of the reach, fading as it arrives, with fainter after-images behind it. One unparented object, so it stays where the pulse went
     /// off while the caster is thrown back; the fog gate follows the caster, so a pulse from the fog draws nothing.
-    /// Each arch is a tube with a paler core line (it reads by brightness over the grey floor) and a slightly wider, fainter edge line under it.
+    /// Each arch is a tube with a paler core line (it reads by brightness over the grey floor) and a thin outline just outside it in the
+    /// caster's team colour.
     /// Only line colours and points change per frame (VisibleWhenSeen owns Renderer.enabled).
     /// </summary>
     [DisallowMultipleComponent]
@@ -37,9 +38,11 @@ namespace Overpower.Abilities
         private float range;
         private float fullAngle;
         private Color colour;
-        // The edge's own colour slot: the arch's blue unless a team accent is given to it.
+        // The caster's team colour: the thin edge says whose pulse it is while the arch says what it is.
         private Color edgeColour;
         private float playedAt = -1f;
+        private readonly Vector3[] points = new Vector3[ArchPoints];
+        private readonly Vector3[] outline = new Vector3[2 * ArchPoints];
         private static bool warnedMissingLook;
 
         public GameObject Arch => arch;
@@ -70,7 +73,7 @@ namespace Overpower.Abilities
                 module = GetComponent<AbilityModule>();
             int abilityId = module != null && module.Definition != null ? module.Definition.Id : -1;
             colour = LookColours.ForAbility(theme, abilityId, casterTeam, LookFamily.ElectricBlue);
-            edgeColour = colour;
+            edgeColour = LookColours.Accent(casterTeam, theme, colour);
             playedAt = Time.time;
             Draw(0f);
             VisibleWhenSeen.AttachToCaster(arch, caster);
@@ -91,7 +94,8 @@ namespace Overpower.Abilities
                 body.transform.SetParent(arch.transform, false);
                 bodies[i] = AddLine(body, look.pulseArchWidth, 0);
                 cores[i] = AddLine(Child(body, CoreName), look.pulseArchWidth * look.pulseCoreWidth, 1);
-                edges[i] = AddLine(Child(body, EdgeName), look.pulseArchWidth + 2f * look.pulseEdgeWidth, -1);
+                edges[i] = AddLine(Child(body, EdgeName), look.pulseEdgeWidth, -1);
+                edges[i].loop = true;
             }
         }
 
@@ -109,7 +113,7 @@ namespace Overpower.Abilities
             line.sharedMaterial = look.fxAlpha;
             line.alignment = LineAlignment.View; // a ribbon facing the camera reads as a round tube from any angle
             line.widthMultiplier = width;
-            line.sortingOrder = sortingOrder; // edge under the tube under the core, whichever is nearer the camera
+            line.sortingOrder = sortingOrder; // tube under the core, whichever is nearer the camera
             line.shadowCastingMode = ShadowCastingMode.Off;
             line.receiveShadows = false;
             line.positionCount = 0;
@@ -138,6 +142,7 @@ namespace Overpower.Abilities
                 return;
             float fade = AbilityVisualGeometry.ArchStrength(secondsSinceCast, look.pulseSweepSeconds, look.pulseFadeSeconds, look.pulseArchEndStrength);
             Color pale = Color.Lerp(colour, Color.white, look.pulseCoreWhiteness);
+            Vector3 viewer = Viewer();
             for (int i = 0; i < bodies.Length; i++)
             {
                 LineRenderer body = bodies[i], core = cores[i], edge = edges[i];
@@ -150,22 +155,30 @@ namespace Overpower.Abilities
                     continue;
                 }
                 float height = AbilityVisualGeometry.ArchHeight(radius, fullAngle, look.pulseArchHeight, look.pulseArchMaxHeight);
+                for (int k = 0; k < ArchPoints; k++)
+                    points[k] = AbilityVisualGeometry.ArchPoint(radius, fullAngle, height, look.pulseArchBend, k, ArchPoints);
                 body.positionCount = ArchPoints;
                 core.positionCount = ArchPoints;
-                edge.positionCount = ArchPoints;
-                for (int k = 0; k < ArchPoints; k++)
-                {
-                    Vector3 point = AbilityVisualGeometry.ArchPoint(radius, fullAngle, height, look.pulseArchBend, k, ArchPoints);
-                    body.SetPosition(k, point);
-                    core.SetPosition(k, point);
-                    edge.SetPosition(k, point);
-                }
+                body.SetPositions(points);
+                core.SetPositions(points);
+                AbilityVisualGeometry.TubeOutline(points, ArchPoints, viewer, (look.pulseArchWidth + look.pulseEdgeWidth) * 0.5f, outline);
+                edge.positionCount = outline.Length;
+                edge.SetPositions(outline);
                 float trail = bodies.Length > 1 ? i / (float)(bodies.Length - 1) : 0f;
                 float strength = look.pulseArchAlpha * fade * Mathf.Lerp(1f, look.pulseTrailAlpha, trail);
                 VisualTint.SetLineColor(body, VisualTint.WithAlpha(colour, strength));
                 VisualTint.SetLineColor(core, VisualTint.WithAlpha(pale, strength));
                 VisualTint.SetLineColor(edge, VisualTint.WithAlpha(edgeColour, strength * look.pulseEdgeStrength));
             }
+        }
+
+        // The game camera in the arch's own space, so the outline sits beside the tube as that camera sees it; without one (edit mode),
+        // straight above.
+        private Vector3 Viewer()
+        {
+            Camera viewer = Camera.main;
+            Vector3 eye = viewer != null ? viewer.transform.position : arch.transform.position + Vector3.up * 100f;
+            return arch.transform.InverseTransformPoint(eye);
         }
 
         private void OnDestroy()

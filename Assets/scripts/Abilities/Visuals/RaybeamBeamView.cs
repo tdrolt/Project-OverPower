@@ -5,15 +5,16 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// One Raybeam line: a hard-edged sheath in the Raybeam's row of the look table, exactly Beam Width wide (what the beam hits), and a
-    /// white-hot core inside it that glows past white through a property block (the vertex colour clamps at 1). The shared line material
-    /// is never copied.
+    /// One Raybeam line: a hard-edged sheath in the Raybeam's row of the look table, exactly Beam Width wide (what the beam hits), a
+    /// white-hot core inside it that glows past white through a property block (the vertex colour clamps at 1), and a thin outline just
+    /// outside the sheath in the caster's team colour that says whose beam it is. The shared line material is never copied.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RaybeamBeamView : MonoBehaviour
     {
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static MaterialPropertyBlock block;
+        private Vector3[] corners;
 
         [SerializeField, Tooltip("Where the colour (the look table's row for the ability below), Flash White and the beam numbers come " +
                  "from: Assets/Gameplay/Config/UiTheme.asset and its Arena Look.")]
@@ -28,6 +29,9 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("The white-hot middle of the beam, drawn over the sheath.")]
         private LineRenderer core;
 
+        [SerializeField, Tooltip("The thin outline in the caster's team colour drawn just outside the sheath: it says whose beam it is.")]
+        private LineRenderer edge;
+
         public void Draw(Vector3 from, Vector3 to, float beamWidth, int casterTeam)
         {
             ArenaLook look = theme != null ? theme.arenaLook : null;
@@ -38,6 +42,27 @@ namespace Overpower.Abilities
                   look != null ? look.raybeamCoreGlow : 1f);
             if (core != null && sheath != null)
                 core.sortingOrder = sheath.sortingOrder + 1; // two see-through lines on one spot: sorting by distance alone flips them
+            if (edge != null && look != null)
+                PaintEdge(from, to, beamWidth, look, LookColours.Accent(casterTeam, theme, danger));
+        }
+
+        // A closed outline just outside the sheath, not a wider line under it: the sheath is see-through, so an underlay would tint the beam's
+        // whole body with the team colour.
+        private void PaintEdge(Vector3 from, Vector3 to, float beamWidth, ArenaLook look, Color accent)
+        {
+            corners ??= new Vector3[4];
+            RaybeamLook.EdgeOutline(from, to, beamWidth, look.raybeamEdgeWidth, look.raybeamEdgeGap, corners);
+            edge.useWorldSpace = true;
+            edge.loop = true;
+            edge.positionCount = corners.Length;
+            edge.SetPositions(corners);
+            edge.startWidth = edge.endWidth = look.raybeamEdgeWidth;
+            VisualTint.SetLineColor(edge, VisualTint.WithAlpha(accent, look.raybeamEdgeAlpha));
+            if (block == null)
+                block = new MaterialPropertyBlock();
+            edge.GetPropertyBlock(block);
+            block.SetColor(BaseColorId, new Color(look.raybeamEdgeGlow, look.raybeamEdgeGlow, look.raybeamEdgeGlow, 1f));
+            edge.SetPropertyBlock(block);
         }
 
         private static void Paint(LineRenderer line, Vector3 from, Vector3 to, float width, Color colour, float glow)
