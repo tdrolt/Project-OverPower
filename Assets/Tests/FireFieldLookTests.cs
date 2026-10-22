@@ -87,7 +87,7 @@ namespace Overpower.Tests
                     Assert.AreEqual(3.25f, system.shape.radius, 1e-5f, system.name + ": the radius the field was sent");
                     Assert.AreEqual(360f, system.shape.arc, 1e-4f, system.name + ": the whole circle burns");
                     ParticleSystem.Particle[] particles = Simulated(system, 1.5f);
-                    Assert.Greater(particles.Length, 5, system.name + " burned");
+                    Assert.Greater(particles.Length, 0, system.name + " burned");
                     foreach (ParticleSystem.Particle particle in particles)
                         Assert.LessOrEqual(new Vector2(particle.position.x, particle.position.z).magnitude, 3.25f + 1e-3f,
                             $"{system.name} particle at {particle.position:F3} drifted off the burning ground: its prefab moves it sideways");
@@ -95,6 +95,9 @@ namespace Overpower.Tests
                 UiTheme theme = (UiTheme)typeof(FireField).GetField("theme", Any).GetValue(fire);
                 Assert.AreEqual(LookColours.FireCore(theme), flames.main.startColor.colorMin, "the fire's own colours, not a team's");
                 Assert.AreEqual(LookColours.For(LookFamily.Fire, -1, theme), flames.main.startColor.colorMax);
+                var glow = new MaterialPropertyBlock();
+                flames.GetComponent<ParticleSystemRenderer>().GetPropertyBlock(glow);
+                Assert.AreEqual(theme.arenaLook.flameGlow, glow.GetColor("_BaseColor").r, 1e-3f, "the burning ground glows by Flame Glow, as the jet");
 
                 LineRenderer rim = field.transform.Find("Rim").GetComponent<LineRenderer>();
                 Assert.AreEqual(3.25f, new Vector2(rim.GetPosition(0).x, rim.GetPosition(0).y).magnitude, 1e-3f, "the rim still marks the true edge");

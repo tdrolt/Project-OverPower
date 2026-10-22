@@ -68,6 +68,7 @@ namespace Overpower.Match
         /// <summary>The pack numbers and colours (the minimap reads the ready and taken colours from here).</summary>
         public HealthPackConfig Config => config;
 
+        // PackZones, IsCrossShown, IsReadyShown and RoomValue: diagnostics like the counters above, read by the multi-client recorders.
         public IEnumerable<int> PackZones => packs.Keys;
         public bool HasPack(int zone) => packs.ContainsKey(zone);
         public Vector3 PackCentre(int zone) => packs.TryGetValue(zone, out Pack p) ? p.centre : Vector3.zero;

@@ -52,6 +52,14 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheShotLightsGlintIsScaledByShotLightShine()
+        {
+            string source = System.IO.File.ReadAllText(ShaderPath);
+            StringAssert.Contains("LIGHT_LOOP_BEGIN", source, "the forward pass walks the shot lights");
+            StringAssert.Contains("_ArenaShotLightShine", source, "and takes their glint out by Shot Light Shine");
+        }
+
+        [Test]
         public void FourArenaMaterialsUseItWithTheirKeyword()
         {
             var shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderPath);

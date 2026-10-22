@@ -128,6 +128,7 @@ namespace Overpower.Tests
             {
                 ("Capture Ring Warning Color (a contested tower)", t.captureRingWarningColor), ("Danger Color", t.dangerColor),
                 ("Immune Bar Color (the Shield's gold)", t.immuneBarColor), ("Dominion Gold Color (the HUD's gold)", t.dominionGoldColor),
+                ("Mark Color (a marked enemy and its damage numbers)", t.markColor),
             };
             foreach ((string name, Color other) in others)
                 foreach ((string list, Color[] colours) in new[] { ("Team Shot Colors", t.teamShotColors), ("Dominion Team Text Colors", t.dominionTeamTextColors) })

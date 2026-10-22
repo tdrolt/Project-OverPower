@@ -469,13 +469,7 @@ namespace Overpower.UI
 
         /// <summary>The trail/tint colour for a shot fired by teamId; Unknown Team Shot Colour for an unresolved
         /// (-1) or out-of-range id - the same fail-open reading ShooterTeamId carries in the rest of the weapons code.</summary>
-        public Color ShotColorFor(int teamId)
-        {
-            if (teamShotColors != null && teamId >= 0 && teamId < teamShotColors.Length)
-                return teamShotColors[teamId];
-
-            return unknownTeamShotColor;
-        }
+        public Color ShotColorFor(int teamId) => TeamPalette.Of(teamShotColors, teamId, unknownTeamShotColor);
 
         // Not serialized - built lazily per bucket, then reused. Every client simulates every projectile, so
         // ShotTeamVisuals must not allocate a Gradient per shot (see GradientFor).
@@ -489,7 +483,7 @@ namespace Overpower.UI
         /// cached by resolved bucket (0/1/2, -1 for every unresolved id) so equal teams share one object.</summary>
         public Gradient GradientFor(int teamId)
         {
-            int bucket = (teamShotColors != null && teamId >= 0 && teamId < teamShotColors.Length) ? teamId : -1;
+            int bucket = TeamPalette.Holds(teamShotColors, teamId) ? teamId : -1;
 
             if (cachedShotGradients == null)
                 cachedShotGradients = new Dictionary<int, Gradient>();
@@ -886,9 +880,9 @@ namespace Overpower.UI
         [Tooltip("An ordinary hit's number.")]
         public Color damageNumberColor = new Color(1f, 1f, 1f, 1f);
         [Tooltip("A hit that used up your mark (+50% damage) - both the bigger number and the mark diamond over " +
-                 "an enemy you've marked share this colour. Keep it apart from the team colours and " +
-                 "Immune Bar Colour.")]
-        public Color markColor = new Color(1f, 0.45f, 0.1f, 1f);
+                 "an enemy you've marked share this colour. Keep it apart from the team colours, the reds and the golds: " +
+                 "a hot pink says 'marked', never 'owned by a team'.")]
+        public Color markColor = new Color(1f, 0.25f, 0.7f, 1f);
         [Tooltip("How much bigger a marked hit's number is than an ordinary one, for its whole life.")]
         public float damageNumberMarkedScale = 1.4f;
         [Tooltip("How long the number takes to rise and fade away once it starts moving - it stays put and solid " +
@@ -2101,7 +2095,7 @@ namespace Overpower.UI
         public Color fireEdgeColor = new Color(1f, 0.88f, 0.6f, 1f);
         [Tooltip("The red of damage: the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
-        [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
+        [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the rocket's shockwave ring and a mine's blast, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);
         [Tooltip("The green of healing: the health packs' cross and the edge of their pad, the plus-shaped sparks rising round any player whose health is going up, and the Heal Zone. Keep it clearly green, never blue-green: it must not read as the cyan team, the electric blue of the Stun Gun or the white of a hit.")]
         public Color healGreenColor = new Color(0.25f, 1f, 0.3f, 1f);

@@ -46,6 +46,11 @@ namespace Overpower.Vision
         public static bool BlastShown(bool shooterIsFriendly, bool centreSeen, bool reachesMyTeam) =>
             shooterIsFriendly || centreSeen || reachesMyTeam;
 
+        /// <summary>A placed disc of an enemy is drawn while any part of it is seen; one that hurts whoever stands in it (a Fire Field) also when it
+        /// reaches my team, so fire from the fog is never invisible. One that does nothing to us (an enemy Heal Zone) never shows from that alone:
+        /// a ring round a hidden caster would point straight at them.</summary>
+        public static bool DiscShown(bool discSeen, bool hurtsMyTeam, bool reachesMyTeam) => discSeen || (hurtsMyTeam && reachesMyTeam);
+
         /// <summary>True when any of the positions is within <paramref name="radius"/> of the blast centre (the rim counts).</summary>
         public static bool ReachesAny(Vector3 centre, float radius, IReadOnlyList<Vector3> positions)
         {

@@ -46,6 +46,7 @@ namespace Overpower.Tests
                 ArenaGlobals g = ArenaShaderGlobals.From(look);
                 Assert.AreEqual(2.5f, g.TileSize);
                 Assert.AreEqual(0.3f, g.Reflection);
+                Assert.AreEqual(0.35f, g.ShotLightShine, "the share of a shot light's glint kept");
                 Assert.AreEqual(0.07f, g.FloorLineWidth);
                 Assert.AreEqual(0.11f, g.FloorGridGlow);
                 Assert.AreEqual(1.1f, g.OwnedEdgeGlow);
@@ -89,6 +90,7 @@ namespace Overpower.Tests
                 Vector4 grid = Shader.GetGlobalVector(ArenaShaderGlobals.OwnerGridId);
                 Assert.AreEqual(new Vector3(12f, -7f, 2.5f), (Vector3)grid, "origin x, origin z, tile size");
                 Assert.AreEqual(0.3f, Shader.GetGlobalFloat(ArenaShaderGlobals.ReflectionId), 1e-6f);
+                Assert.AreEqual(0.35f, Shader.GetGlobalFloat(ArenaShaderGlobals.ShotLightShineId), 1e-6f, "the shot lights' glint share");
                 Assert.AreEqual(0.27f, Shader.GetGlobalFloat(ArenaShaderGlobals.FillLiftId), 1e-6f, "the fill's hue lift");
                 Assert.AreEqual(1f, Shader.GetGlobalFloat(ArenaShaderGlobals.LookReadyId));
                 AreClose(new Vector4(0.07f, 0.11f, 1.1f, 0.15f), Shader.GetGlobalVector(ArenaShaderGlobals.FloorLineId),
@@ -198,6 +200,7 @@ namespace Overpower.Tests
             var look = ScriptableObject.CreateInstance<ArenaLook>();
             look.floorTileSize = 2.5f;
             look.reflectionStrength = 0.3f;
+            look.shotLightShine = 0.35f;
             look.floorLineWidth = 0.07f;
             look.floorGridGlow = 0.11f;
             look.ownedEdgeGlow = 1.1f;

@@ -6,7 +6,8 @@ namespace Overpower.UI
     /// list) gets the caller's neutral colour: clamping it onto an entry would paint it in a real team's colour.</summary>
     public static class TeamPalette
     {
-        public static Color Of(Color[] colours, int team, Color unknown) =>
-            colours != null && team >= 0 && team < colours.Length ? colours[team] : unknown;
+        public static Color Of(Color[] colours, int team, Color unknown) => Holds(colours, team) ? colours[team] : unknown;
+
+        public static bool Holds(Color[] colours, int team) => colours != null && team >= 0 && team < colours.Length;
     }
 }

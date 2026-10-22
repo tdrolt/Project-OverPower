@@ -37,10 +37,22 @@ namespace Overpower.Tests
         [TestCase(typeof(CentrePayoutLabel), "Pick")]
         [TestCase(typeof(DeathCard), "TeamTextColour")]
         [TestCase(typeof(LobbyRoomPanel), "TeamColour")]
+        [TestCase(typeof(UiTheme), nameof(UiTheme.ShotColorFor))]
+        [TestCase(typeof(Overpower.Arena.LookColours), nameof(Overpower.Arena.LookColours.Accent))]
         public void EveryScreenThatColoursATeamAsksThePalette(System.Type screen, string picker)
         {
             var of = typeof(TeamPalette).GetMethod(nameof(TeamPalette.Of));
             Assert.IsTrue(IlWiring.Uses(screen, picker, of), screen.Name + "." + picker + " picks its team colours through TeamPalette.Of");
+        }
+
+        [Test]
+        public void TheShotTrailCacheSharesThePalettesTeamTest()
+        {
+            Assert.IsTrue(TeamPalette.Holds(new[] { A, B }, 1));
+            Assert.IsFalse(TeamPalette.Holds(new[] { A, B }, 2));
+            Assert.IsFalse(TeamPalette.Holds(null, 0));
+            Assert.IsTrue(IlWiring.Uses(typeof(UiTheme), nameof(UiTheme.GradientFor), typeof(TeamPalette).GetMethod(nameof(TeamPalette.Holds))),
+                "an unknown team shares the unknown trail, as ShotColorFor gives it the unknown colour");
         }
 
         [TestCase(typeof(BreakCard), "TextColour")]

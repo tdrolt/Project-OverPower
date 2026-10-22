@@ -44,6 +44,10 @@ namespace Overpower.Tests
             so.FindProperty("padEdgeWidthMetres").floatValue = 0.1f;
             so.FindProperty("readyGlow").floatValue = 1.5f;
             so.FindProperty("respawningBrightness").floatValue = 0.25f;
+            so.FindProperty("floatHeightMetres").floatValue = 1f;
+            so.FindProperty("bobHeightMetres").floatValue = 0.2f;
+            so.FindProperty("bobCyclesPerSecond").floatValue = 0.5f; // 0.4 s is a fifth of a bob, never a whole one
+            so.FindProperty("spinDegreesPerSecond").floatValue = 50f;
             so.ApplyModifiedPropertiesWithoutUndo();
             parent = new GameObject("HealthPackLookTests") { hideFlags = HideFlags.HideAndDontSave };
         }

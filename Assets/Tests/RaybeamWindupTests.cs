@@ -195,6 +195,37 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheOwnersFrameHandsCanActToTheRuleAndActsOnItsAnswer()
+        {
+            // OwnerTick(deltaTime, held, canAct): canAct (ldarg.3) carries the runner's stun, overheat and death check into the rule; the step the
+            // rule returns decides whether the wind-up ends and is what EndWindup is handed.
+            MethodInfo tick = typeof(RaybeamAbility).GetMethod(nameof(RaybeamAbility.OwnerTick));
+            MethodInfo step = typeof(RaybeamWindup).GetMethod(nameof(RaybeamWindup.Step));
+            MethodInfo end = typeof(RaybeamAbility).GetMethod("EndWindup", Any);
+            byte[] il = tick.GetMethodBody().GetILAsByteArray();
+            var stepAt = IlWiring.CallOffsets(tick, step);
+            var endAt = IlWiring.CallOffsets(tick, end);
+            Assert.AreEqual(1, stepAt.Count, "one question a frame");
+            Assert.AreEqual(1, endAt.Count);
+            int local = StoredLocal(il, stepAt[0] + 5);
+            AssertAll(
+                (il[stepAt[0] - 1] == 0x05, "canAct is the rule's last argument, not a constant"),
+                (IlWiring.ResultDecidesABranch(typeof(RaybeamAbility), nameof(RaybeamAbility.OwnerTick), step), "the rule's step decides whether the wind-up ends"),
+                (local >= 0 && LoadsLocal(il, endAt[0], local), "and the step itself is what ends it (fire or cancel)"));
+        }
+
+        // The local a value is stored in right at il[at] (stloc.0-3 or stloc.s), or -1.
+        private static int StoredLocal(byte[] il, int at)
+        {
+            if (il[at] >= 0x0A && il[at] <= 0x0D) return il[at] - 0x0A;
+            return il[at] == 0x13 ? il[at + 1] : -1;
+        }
+
+        // Whether the instruction right before il[at] loads that local (ldloc.0-3 or ldloc.s).
+        private static bool LoadsLocal(byte[] il, int at, int local) =>
+            local <= 3 ? il[at - 1] == 0x06 + local : il[at - 2] == 0x11 && il[at - 1] == local;
+
+        [Test]
         public void OnlyTheUltimateMeterGatesThePress()
         {
             var go = new GameObject("raybeam charge pool test");

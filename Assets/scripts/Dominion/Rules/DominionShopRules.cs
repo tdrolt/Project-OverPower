@@ -26,8 +26,7 @@ namespace Overpower.Dominion
 
         /// <summary>The shop takes picks anywhere, in the break and at any time during a round (its play, overtime and sudden death), with
         /// the round's limits either way. Only while no round or break is on (before the first break, after the match) is it shut.</summary>
-        public static bool MayPick(DominionStage stage) =>
-            stage == DominionStage.Break || DominionRules.IsRoundPlay(stage) || stage == DominionStage.SuddenDeath;
+        public static bool MayPick(DominionStage stage) => stage == DominionStage.Break || LateJoinerWindowOpen(stage);
 
         /// <summary>NotInBreak while a live Dominion match has no round or break on, else None. Conquest and the warm-up are never blocked by this.</summary>
         public static PurchaseBlock PickBlock(bool dominionLive, DominionStage stage) =>

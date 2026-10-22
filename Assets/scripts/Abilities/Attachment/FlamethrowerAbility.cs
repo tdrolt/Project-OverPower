@@ -36,11 +36,11 @@ namespace Overpower.Abilities
     {
         [Header("Burn")]
         [SerializeField, Tooltip("Damage per second the burn deals, routed through the normal damage " +
-                 "funnel so armor absorbs it like any other hit. Tudor's spec: 5.")]
+                 "funnel so armor absorbs it like any other hit.")]
         private float burnDamagePerSecond = 5f;
 
         [SerializeField, Tooltip("How many seconds the burn lasts once applied - it keeps ticking even " +
-                 "after the target leaves the cone. Tudor's spec: 5. Landing it again before it expires " +
+                 "after the target leaves the cone. Landing it again before it expires " +
                  "REFRESHES the full duration rather than stacking a second one (StatusEffectState's " +
                  "Refresh rule for Burn), so two overlapping sprays still deal 5 damage per second, " +
                  "never 10.")]
@@ -49,16 +49,16 @@ namespace Overpower.Abilities
         [Header("Cone")]
         [SerializeField, Tooltip("Full angle of the spray cone, in degrees, measured on the ground " +
                  "plane - 45 means 22.5 degrees either side of wherever the caster is currently " +
-                 "facing. Controller's call.")]
+                 "facing.")]
         private float coneAngle = 45f;
 
         [SerializeField, Tooltip("How far the spray reaches, in metres, measured on the ground plane " +
-                 "from the caster's own position (their root, not the muzzle - see TickCone). Controller's call.")]
+                 "from the caster's own position (their root, not the muzzle - see TickCone).")]
         private float coneRange = 7f;
 
         [SerializeField, Tooltip("How long the spray stays live once cast, in seconds - the cone is " +
                  "re-checked every physics step for this long and then stops on its own. The burn " +
-                 "already applied keeps ticking for its own Burn Seconds well past this. Controller's call.")]
+                 "already applied keeps ticking for its own Burn Seconds well past this.")]
         private float spraySeconds = 1f;
 
         [SerializeField, Tooltip("Which layers count as a target. Default is where a living player or " +

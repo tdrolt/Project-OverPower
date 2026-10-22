@@ -304,7 +304,7 @@ MonoBehaviour:
   showDamageNumbers: 1
   damageNumberTextSize: 30
   damageNumberColor: {r: 1, g: 1, b: 1, a: 1}
-  markColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  markColor: {r: 1, g: 0.25, b: 0.7, a: 1}
   damageNumberMarkedScale: 1.4
   damageNumberLifetimeSeconds: 0.8
   damageNumberPopSeconds: 0.12

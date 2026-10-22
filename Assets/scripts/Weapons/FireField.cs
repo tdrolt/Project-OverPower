@@ -177,10 +177,10 @@ namespace Overpower.Weapons
 
             ShowLook();
 
-            // Vision: shown when any part of the disc is in sight, or it reaches my team.
+            // Vision: shown when any part of the disc is in sight, or it reaches my team (it burns us).
             VisibleWhenSeen gate = GetComponent<VisibleWhenSeen>();
             if (gate != null)
-                gate.SetSeenRadius(radius);
+                gate.SetSeenRadius(radius, true);
 
             Debug.Log($"[FireField] lit at {transform.position} - {radius:0.##}m, " +
                        $"{damagePerSecond:0.#} dmg/s for {duration:0.##}s");
@@ -188,21 +188,22 @@ namespace Overpower.Weapons
             StartCoroutine(Burn());
         }
 
-        /// <summary>The floor flames over exactly the radius this field was sent, and the rim at its edge in the shooter's team colour.</summary>
+        /// <summary>The floor flames over exactly the radius this field was sent, and the rim at its edge: the shooter's team accent.</summary>
         private void ShowLook()
         {
+            Color fire = theme != null ? LookColours.For(LookFamily.Fire, sourceTeamId, theme) : Color.white;
             if (flames != null)
             {
                 // Flames never laid over the radius would burn the prefab's own shape, not this field's ground.
                 bool laidOut = theme != null && theme.arenaLook != null;
                 flames.gameObject.SetActive(laidOut);
                 if (laidOut)
-                    FlameLook.ApplyFloor(flames, radius, LookColours.FireCore(theme), LookColours.For(LookFamily.Fire, sourceTeamId, theme), theme.arenaLook);
+                    FlameLook.ApplyFloor(flames, radius, LookColours.FireCore(theme), fire, theme.arenaLook);
             }
 
             if (rim != null)
             {
-                Color teamColor = theme != null ? theme.ShotColorFor(sourceTeamId) : Color.white;
+                Color teamColor = theme != null ? LookColours.Accent(sourceTeamId, theme, fire) : Color.white;
                 VisualTint.FillFlatCircle(rim, radius, rimSegments);
                 VisualTint.SetLineColor(rim, VisualTint.WithAlpha(teamColor, rimOpacity));
             }

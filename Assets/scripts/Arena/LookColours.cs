@@ -38,8 +38,7 @@ namespace Overpower.Arena
         /// <summary>The colour of an ability's thin team accent (a trail, an edge or a rim, never its body): the caster's team colour, the same
         /// one its shots wear. A team the theme does not know has no accent, so the part keeps <paramref name="own"/>, the ability's own
         /// colour, rather than the grey of an unknown shot.</summary>
-        public static Color Accent(int team, UiTheme theme, Color own) =>
-            theme.teamShotColors != null && team >= 0 && team < theme.teamShotColors.Length ? theme.ShotColorFor(team) : own;
+        public static Color Accent(int team, UiTheme theme, Color own) => TeamPalette.Of(theme.teamShotColors, team, own);
 
         /// <summary>The colour of an ability's row in the look table, so retuning the table recolours the effect. Without a table or a row the effect
         /// keeps the family it was built for, since hiding it would hide a rule from players.</summary>

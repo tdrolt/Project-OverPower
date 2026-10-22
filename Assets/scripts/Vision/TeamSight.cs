@@ -400,15 +400,16 @@ namespace Overpower.Vision
                 eyeSpots.Add(new Vector3(eyes[i].Position.x, eyes[i].EyeY - eyeHeight, eyes[i].Position.y)); // each player's feet
         }
 
-        /// <summary>Whether a placed disc (an AoE Zone, a Fire Field) of this owner team is drawn: always for my team;
-        /// otherwise when its centre or any of 8 rim points is seen, or when the disc reaches any of my team.</summary>
-        public static bool DiscShownAt(int ownerTeam, Vector3 centre, float radius)
+        /// <summary>Whether a placed disc (a Heal Zone, a Fire Field) of this owner team is drawn: always for my team; otherwise when its centre or
+        /// any of 8 rim points is seen, or, for a disc that hurts us, when it reaches any of my team (ShotVisibilityRules.DiscShown).</summary>
+        public static bool DiscShownAt(int ownerTeam, Vector3 centre, float radius, bool hurtsMyTeam)
         {
             TeamSight sight = Local;
             if (sight == null || sight.IsFriendlyTeam(ownerTeam) || !sight.FogOn)
                 return true;
             sight.canSeeShotPoint ??= sight.CanSeeShot;
-            return ShotVisibilityRules.DiscSeen(centre, radius, 8, sight.canSeeShotPoint) || sight.BlastReachesMyTeam(centre, radius);
+            bool seen = ShotVisibilityRules.DiscSeen(centre, radius, 8, sight.canSeeShotPoint);
+            return ShotVisibilityRules.DiscShown(seen, hurtsMyTeam, !seen && hurtsMyTeam && sight.BlastReachesMyTeam(centre, radius));
         }
 
         /// <summary>True when the flat cone (apex, forward, range, full angle) reaches any of my team's players.</summary>

@@ -30,6 +30,10 @@ namespace Overpower.Tests
 
         private static readonly MethodInfo Target = typeof(Probe).GetMethod(nameof(Probe.Target));
 
+        [Test] public void AMethodNameThatIsNotThereIsAnErrorNotANo() =>
+            Assert.Throws<System.ArgumentException>(() => IlWiring.Uses(typeof(Probe), "RenamedAway", Target),
+                "a negative check on a renamed method must fail, not pass for ever");
+
         [Test] public void AMethodThatCallsTheTargetIsFound() =>
             Assert.IsTrue(IlWiring.Uses(typeof(Probe), nameof(Probe.CallsTheTarget), Target));
 
@@ -104,8 +108,5 @@ namespace Overpower.Tests
             Assert.IsFalse(IlWiring.HandsOver(typeof(Probe), nameof(Probe.CallsTheTarget), Target), "a direct call is not a subscription");
             Assert.IsFalse(IlWiring.HandsOver(typeof(Probe), nameof(Probe.DoesNotCallTheTarget), Target));
         }
-
-        [Test] public void AMethodNameThatDoesNotExistFindsNothing() =>
-            Assert.IsFalse(IlWiring.Uses(typeof(Probe), "NoSuchMethod", Target));
     }
 }

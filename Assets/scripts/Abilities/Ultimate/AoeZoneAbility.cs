@@ -107,8 +107,7 @@ namespace Overpower.Abilities
 
             ClearOldThrow();
 
-            // This ability's id travels with the zone (AoeZone.AbilityId), as every deployable's does.
-            GameObject placed = NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
+            GameObject placed = NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, null);
             ownZone = placed != null ? placed.GetComponent<AoeZone>() : null;
         }
 

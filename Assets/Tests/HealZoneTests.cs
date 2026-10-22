@@ -152,6 +152,52 @@ namespace Overpower.Tests
                 (IlWiring.FieldLoadOffsets(tick, candidates).TrueForAll(at => at < asked), "the candidates are not read once the rule has answered"),
                 (IlWiring.FieldLoadOffsets(tick, healed).Exists(at => at > asked), "the heal loop reads the rule's answer"),
                 (heals.Count > 0 && heals.TrueForAll(at => at > asked), "every heal comes after the rule has answered"));
+
+            // The tuned number is what is handed over: the instruction right before each Heal loads Heal Per Tick.
+            FieldInfo amount = typeof(AoeZone).GetField("healPerTick", BindingFlags.Instance | BindingFlags.NonPublic);
+            List<int> amountLoads = IlWiring.FieldLoadOffsets(tick, amount);
+            Assert.IsTrue(heals.TrueForAll(at => amountLoads.Contains(at - 5)), "each heal is Heal Per Tick, not another number");
+        }
+
+        // ---- in the fog ----
+
+        [Test]
+        public void ADiscThatDoesNothingToUsNeverShowsJustBecauseItReachesUs()
+        {
+            Assert.IsTrue(Overpower.Vision.ShotVisibilityRules.DiscShown(true, false, false), "seen: shown");
+            Assert.IsTrue(Overpower.Vision.ShotVisibilityRules.DiscShown(true, true, false));
+            Assert.IsTrue(Overpower.Vision.ShotVisibilityRules.DiscShown(false, true, true), "fire from the fog that reaches us shows");
+            Assert.IsFalse(Overpower.Vision.ShotVisibilityRules.DiscShown(false, false, true), "a heal for them, reaching us from the fog, stays hidden");
+            Assert.IsFalse(Overpower.Vision.ShotVisibilityRules.DiscShown(false, true, false));
+        }
+
+        [Test]
+        public void TheHealZoneIsHiddenWithItsCasterAndNeverShownByReach()
+        {
+            const BindingFlags Any = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            MethodInfo setRadius = typeof(Overpower.Vision.VisibleWhenSeen).GetMethod(nameof(Overpower.Vision.VisibleWhenSeen.SetSeenRadius));
+            MethodInfo placed = typeof(AoeZone).GetMethod("OnPlaced", Any);
+            MethodInfo fieldPlaced = typeof(Overpower.Weapons.FireField).GetMethod(nameof(Overpower.Weapons.FireField.OnPhotonInstantiate));
+            MethodInfo update = typeof(AoeZone).GetMethod("Update", Any);
+            Assert.NotNull(update, "the zone has its Update");
+            AssertAll(
+                (LastArgumentIsBool(placed, setRadius, false), "the Heal Zone does nothing to an enemy, so reaching them never shows it"),
+                (LastArgumentIsBool(fieldPlaced, setRadius, true), "a Fire Field burns us, so reaching us shows it"),
+                (IlWiring.Uses(typeof(Overpower.Vision.TeamSight), nameof(Overpower.Vision.TeamSight.DiscShownAt),
+                    typeof(Overpower.Vision.ShotVisibilityRules).GetMethod(nameof(Overpower.Vision.ShotVisibilityRules.DiscShown))), "the sight asks the tested rule"),
+                (IlWiring.Uses(typeof(Overpower.Vision.VisibleWhenSeen), nameof(Overpower.Vision.VisibleWhenSeen.Apply),
+                    typeof(Overpower.Vision.VisibleWhenSeen).GetField("discHurtsMyTeam", Any)), "the gate hands the disc's kind over"),
+                (IlWiring.ResultDecidesABranch(typeof(AoeZone), "Update", typeof(AoeZone).GetProperty(nameof(AoeZone.IsFollowing)).GetMethod),
+                    "while it follows its caster the zone is hidden with them"),
+                (IlWiring.Uses(typeof(AoeZone), "Update", typeof(Overpower.Vision.VisibleWhenSeen).GetMethod(nameof(Overpower.Vision.VisibleWhenSeen.FollowCaster))),
+                    "through the caster binding every ability visual uses"));
+        }
+
+        private static bool LastArgumentIsBool(MethodBase method, MethodBase target, bool value)
+        {
+            byte[] il = method.GetMethodBody().GetILAsByteArray();
+            List<int> calls = IlWiring.CallOffsets(method, target);
+            return calls.Count > 0 && calls.TrueForAll(at => at > 0 && il[at - 1] == (value ? 0x17 : 0x16));
         }
 
         [Test]

@@ -181,6 +181,17 @@ Shader "Overpower/Arena Surface"
                     half3 radiance = sun.color * (sun.distanceAttenuation * sun.shadowAttenuation * saturate(dot(inputData.normalWS, sun.direction)));
                     removed += (1.0 - saturate(_ArenaSurfaceShine[ARENA_SURFACE])) * brdf.specular
                              * DirectBRDFSpecular(brdf, inputData.normalWS, sun.direction, inputData.viewDirectionWS) * radiance;
+
+                    // The shot lights' glint lands where the camera sees the reflection, beside the shot: it reads as a misplaced bullet.
+                #if defined(_ADDITIONAL_LIGHTS)
+                    uint pixelLightCount = GetAdditionalLightsCount();
+                    LIGHT_LOOP_BEGIN(pixelLightCount)
+                        Light shot = GetAdditionalLight(lightIndex, inputData, shadowMask, ao);
+                        half3 shotRadiance = shot.color * (shot.distanceAttenuation * shot.shadowAttenuation * saturate(dot(inputData.normalWS, shot.direction)));
+                        removed += (1.0 - saturate(_ArenaShotLightShine)) * brdf.specular
+                                 * DirectBRDFSpecular(brdf, inputData.normalWS, shot.direction, inputData.viewDirectionWS) * shotRadiance;
+                    LIGHT_LOOP_END
+                #endif
                     color.rgb = max(color.rgb - removed, 0.0);
                 }
 

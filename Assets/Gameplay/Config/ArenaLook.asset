@@ -106,6 +106,7 @@ MonoBehaviour:
   pulseTrailAlpha: 0.55
   pulseCoreWhiteness: 0.55
   pulseCoreWidth: 0.3
+  pulseCoreGlow: 2
   pulseEdgeWidth: 0.06
   pulseEdgeStrength: 0.8
   flameJetMaterial: {fileID: 2100000, guid: c1c06d0c6fb850742956c70ef59ba743, type: 2}
@@ -116,6 +117,7 @@ MonoBehaviour:
   flameJetStartSize: 0.06
   flameJetMostFlames: 150
   flameJetLandHeight: 0.1
+  flameGlow: 2
   flameEmbersPerSecond: 8
   flameJetReach: 0.95
   flameFanStrength: 0.4
@@ -128,6 +130,7 @@ MonoBehaviour:
   fxCameraPull: 1
   blastRingWidth: 0.2
   shotLightHeight: 1.6
+  shotLightShine: 0
   gunFlashGlow: 2.5
   movementTeamTint: 0.3
   dashStreakWidth: 0.5

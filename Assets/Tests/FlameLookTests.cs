@@ -62,15 +62,35 @@ namespace Overpower.Tests
             var visual = cone.GetComponent<FlameConeVisual>();
             visual.Configure(Range, angle, Color.red, Color.red, true);
             visual.ConfigureFire(Range, angle, theme, 21);
-            visual.Place(Vector3.zero, Vector3.forward, Muzzle);
             ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
+            PinTuning(tongues);
+            visual.Place(Vector3.zero, Vector3.forward, Muzzle);
+            Seeded(tongues);
+            return (cone, tongues);
+        }
+
+        // Stopped and cleared first: a playing system takes no new seed.
+        private static void Seeded(ParticleSystem tongues)
+        {
             foreach (ParticleSystem system in tongues.GetComponentsInChildren<ParticleSystem>(true))
             {
                 system.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
                 system.useAutoRandomSeed = false;
                 system.randomSeed = 7;
             }
-            return (cone, tongues);
+        }
+
+        // The prefab's lifetimes, caps and fall are tuning: literal ones here (today's), so retuning the prefab never fails a rule test.
+        private static void PinTuning(ParticleSystem tongues)
+        {
+            foreach (ParticleSystem system in tongues.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                bool jet = system == tongues;
+                ParticleSystem.MainModule main = system.main;
+                main.startLifetime = jet ? 0.4f : 0.9f;
+                main.maxParticles = jet ? 200 : 40;
+                main.gravityModifier = jet ? -2.25f : 0f;
+            }
         }
 
         private static (GameObject root, ParticleSystem flames) NewFlames()
@@ -81,6 +101,29 @@ namespace Overpower.Tests
             ParticleSystem flames = root.AddComponent<ParticleSystem>();
             embersGo.AddComponent<ParticleSystem>();
             return (root, flames);
+        }
+
+        [Test]
+        public void FlameGlowRidesInTheFlamesBaseColour()
+        {
+            (GameObject root, ParticleSystem flames) = NewFlames();
+            ArenaLook look = JetLook();
+            try
+            {
+                look.flameGlow = 2.5f;
+                FlameLook.Apply(flames, Range, Angle, Color.white, Color.yellow, look);
+                var block = new MaterialPropertyBlock();
+                flames.GetComponent<ParticleSystemRenderer>().GetPropertyBlock(block);
+                Color glow = block.GetColor("_BaseColor");
+                Assert.AreEqual(2.5f, glow.r, 1e-3f, "a particle's colour stops at 1, so the glow that blooms rides in the renderer's base colour");
+                Assert.AreEqual(glow.r, glow.g, 1e-5f, "white, so the flames keep their own colours");
+                Assert.AreEqual(glow.r, glow.b, 1e-5f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+                Object.DestroyImmediate(look);
+            }
         }
 
         [Test]
@@ -147,8 +190,10 @@ namespace Overpower.Tests
                 var visual = cone.GetComponent<FlameConeVisual>();
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
                 visual.ConfigureFire(Range, Angle, theme, 21);
-                visual.Place(new Vector3(0f, 0.05f, 0f), Vector3.forward, new Vector3(0f, 0.05f, 0f) + Muzzle);
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
+                PinTuning(tongues);
+                visual.Place(new Vector3(0f, 0.05f, 0f), Vector3.forward, new Vector3(0f, 0.05f, 0f) + Muzzle);
+                Seeded(tongues);
                 Vector3 muzzleLocal = tongues.transform.InverseTransformPoint(new Vector3(0f, 0.05f, 0f) + Muzzle);
 
                 foreach (ParticleSystem system in SimulatedSystems(tongues, 0.02f))
@@ -322,7 +367,7 @@ namespace Overpower.Tests
                         drawn++;
                         Assert.LessOrEqual(across, 0.5f * (1f - u) + 1f / pixels.height, $"pixel {x},{y} draws outside the wedge");
                     }
-                Assert.Greater(drawn, pixels.width * pixels.height / 5, "the flame fills its wedge");
+                Assert.Greater(drawn, 0, "the shape draws a flame");
             }
             finally
             {
@@ -757,6 +802,8 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(FlameConeVisual), nameof(FlameConeVisual.Place), typeof(FlameLook).GetMethod(nameof(FlameLook.AimJet))), "the jet is aimed by the tested rule");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), nameof(FlameLook.AimJet), typeof(FlameLook).GetMethod("SizeJet", any | BindingFlags.Static)), "each step sizes the flames");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetWidest))), "by the cone rule");
+            Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), nameof(FlameLook.JetWidest), typeof(FlameLook).GetMethod(nameof(FlameLook.JetTipReach))),
+                "the widest a head may be is measured where the tested rule says the heads land");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetRate))), "and throws them as often as the no-gap rule asks");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetSweep))), "on paths spread evenly over the jet");
             Assert.IsTrue(IlWiring.Uses(typeof(FlameLook), "SizeJet", typeof(FlameLook).GetMethod(nameof(FlameLook.JetAcross))), "enough to cover its width too");

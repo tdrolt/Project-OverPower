@@ -90,7 +90,7 @@ namespace Overpower.Abilities
             float start = Mathf.Max(0.01f, look.flameJetStartSize);
             float stretch = Mathf.Max(0.01f, look.flameStretch);
             float tail = JetTailRoom(jetFrom, coneAngle, spread);
-            float widest = Mathf.Min(JetWidth(gun + travel, coneAngle, spread), JetWidth(gun, coneAngle, spread) / start);
+            float widest = Mathf.Min(JetWidth(JetTipReach(jetFrom, range, look.flameJetReach), coneAngle, spread), JetWidth(gun, coneAngle, spread) / start);
             widest = Mathf.Min(widest, Mathf.Min(tail / (start * stretch), (travel + tail) / stretch));
             return Mathf.Max(0f, look.flameJetWidth * widest);
         }
@@ -166,6 +166,7 @@ namespace Overpower.Abilities
                 {
                     StretchJet(system, look);
                     SetMaterial(system, look.flameJetMaterial != null ? look.flameJetMaterial : look.fxAlpha);
+                    SetGlow(system, look.flameGlow);
                 }
                 else
                 {
@@ -286,9 +287,25 @@ namespace Overpower.Abilities
                 shape.sphericalDirectionAmount = 0f;
                 shape.randomPositionAmount = 0f;
                 SetMaterial(system, system == flames ? look.fxAlpha : look.fxAdditive);
+                if (system == flames)
+                    SetGlow(system, look.flameGlow);
                 ParticleSystem.EmissionModule emission = system.emission;
                 emission.rateOverTime = area * (system == flames ? look.fireFieldFlamesPerSquareMetre : look.fireFieldEmbersPerSquareMetre);
             }
+        }
+
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static MaterialPropertyBlock glowBlock;
+
+        // A particle's own colour is 8-bit, so only the material side can pass 1 and reach the bloom: Flame Glow rides in the renderer's base colour.
+        private static void SetGlow(ParticleSystem system, float glow)
+        {
+            if (!system.TryGetComponent(out ParticleSystemRenderer renderer))
+                return;
+            glowBlock ??= new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(glowBlock);
+            glowBlock.SetColor(BaseColorId, new Color(glow, glow, glow, 1f));
+            renderer.SetPropertyBlock(glowBlock);
         }
 
         private static void SetMaterial(ParticleSystem system, Material material)

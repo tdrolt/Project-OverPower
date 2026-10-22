@@ -113,6 +113,7 @@ namespace Overpower.Tests
                 look.pulseTrailAlpha = 0.5f;
                 look.pulseCoreWhiteness = 0.6f;
                 look.pulseCoreWidth = 0.3f;
+                look.pulseCoreGlow = 2.5f;
                 look.pulseEdgeWidth = 0.05f;
                 look.pulseEdgeStrength = 0.3f;
                 ((List<AbilityLook>)typeof(ArenaLook).GetField("abilityLooks", Any).GetValue(look)).Add(new AbilityLook(testId, LookShape.ArcBands, LookFamily.Gold));
@@ -153,6 +154,11 @@ namespace Overpower.Tests
                     Assert.AreEqual(0.09f, core.widthMultiplier, 1e-4f, "Pulse Core Width of the tube");
                     Assert.Greater(core.startColor.grayscale, body.startColor.grayscale + 0.1f, "lighter than its tube, so the pulse reads in value over a grey floor");
                     Assert.AreEqual(body.startColor.a, core.startColor.a, 1f / 255f, "fades with its tube");
+                    var coreBlock = new MaterialPropertyBlock();
+                    core.GetPropertyBlock(coreBlock);
+                    Color coreGlow = coreBlock.GetColor("_BaseColor");
+                    Assert.AreEqual(2.5f, coreGlow.r, 1e-3f, "Pulse Core Glow rides in its base colour, past what a line's colours can hold");
+                    Assert.AreEqual(coreGlow.r, coreGlow.b, 1e-5f, "white, so the core keeps its own colour");
 
                     LineRenderer edge = body.transform.Find(SonicPulseView.EdgeName)?.GetComponent<LineRenderer>();
                     Assert.IsNotNull(edge, body.name + " has its own edge line, the slot for the caster's team accent");

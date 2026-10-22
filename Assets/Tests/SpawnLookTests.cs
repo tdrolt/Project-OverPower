@@ -295,9 +295,7 @@ namespace Overpower.Tests
                 var hud = go.GetComponent<PlayerHud>();
                 typeof(PlayerHud).GetField("panelRect", Any).SetValue(hud, go.GetComponent<RectTransform>());
                 hud.TryGetScreenRect(out _);
-                long before = System.GC.GetAllocatedBytesForCurrentThread();
-                for (int i = 0; i < 100; i++) hud.TryGetScreenRect(out _);
-                Assert.Less(System.GC.GetAllocatedBytesForCurrentThread() - before, 100);
+                Assert.AreEqual(0, AllocationProbe.Count(() => { for (int i = 0; i < 100; i++) hud.TryGetScreenRect(out _); }));
             }
             finally { Object.DestroyImmediate(go); }
         }

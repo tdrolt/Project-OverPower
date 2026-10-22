@@ -23,6 +23,7 @@ namespace Overpower.Abilities
         public const string ArchName = "Sonic Pulse Arch";
         public const string CoreName = "Core";
         public const string EdgeName = "Edge";
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private const int ArchPoints = 25; // keeps the drawn curve within a couple of centimetres of the rule's at 5 m; not a look number
 
         [SerializeField, Tooltip("Where the arch's colour (the Sonic Pulse row of the look table), material and timing come from: " +
@@ -94,9 +95,18 @@ namespace Overpower.Abilities
                 body.transform.SetParent(arch.transform, false);
                 bodies[i] = AddLine(body, look.pulseArchWidth, 0);
                 cores[i] = AddLine(Child(body, CoreName), look.pulseArchWidth * look.pulseCoreWidth, 1);
+                Glow(cores[i], look.pulseCoreGlow);
                 edges[i] = AddLine(Child(body, EdgeName), look.pulseEdgeWidth, -1);
                 edges[i].loop = true;
             }
+        }
+
+        // A line's vertex colours are 8-bit: the glow past 1 that the bloom picks up rides in the renderer's base colour.
+        private static void Glow(LineRenderer line, float glow)
+        {
+            var block = new MaterialPropertyBlock();
+            block.SetColor(BaseColorId, new Color(glow, glow, glow, 1f));
+            line.SetPropertyBlock(block);
         }
 
         private static GameObject Child(GameObject parent, string childName)

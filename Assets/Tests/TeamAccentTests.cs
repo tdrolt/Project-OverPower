@@ -190,6 +190,32 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ThePulseTheShieldAndTheStunBoltTakeTheCastersTeam()
+        {
+            MethodInfo pulseCast = typeof(SonicPulseAbility).GetMethod(nameof(SonicPulseAbility.ExecuteCast));
+            byte[] pulseIl = pulseCast.GetMethodBody().GetILAsByteArray();
+            var angleAt = IlWiring.CallOffsets(pulseCast, typeof(SonicPulseAbility).GetProperty(nameof(SonicPulseAbility.ConeAngle)).GetMethod);
+            var playAt = IlWiring.CallOffsets(pulseCast, typeof(SonicPulseView).GetMethod(nameof(SonicPulseView.Play)));
+            byte[] castsTeam = new byte[] { 0x03 }.Concat(CastersTeam).ToArray(); // ldarg.1 (the cast) + ldfld CasterTeam: Play's team argument, right after the angle
+            bool pulse = angleAt.Count == 1 && playAt.Count == 1 && pulseIl.Skip(angleAt[0] + 5).Take(castsTeam.Length).SequenceEqual(castsTeam);
+
+            MethodInfo showShield = typeof(InvulnerabilityAbility).GetMethod("ShowShield", Any);
+            MethodInfo teamGetter = typeof(PlayerHealth).GetProperty(nameof(PlayerHealth.TeamId)).GetMethod;
+
+            MethodInfo onSpawned = typeof(LookTint).GetMethod(nameof(LookTint.OnSpawned));
+            var shooterAt = IlWiring.CallOffsets(onSpawned, typeof(ProjectileContext).GetProperty(nameof(ProjectileContext.ShooterTeamId)).GetMethod);
+            var applyAt = IlWiring.CallOffsets(onSpawned, typeof(LookTint).GetMethod(nameof(LookTint.Apply)));
+
+            Assert.NotNull(showShield, "the Shield has its ShowShield");
+            AssertAll(
+                (pulse, "Sonic Pulse: the cast's team is Play's team argument"),
+                (LastArgumentIs(typeof(InvulnerabilityAbility).GetMethod(nameof(InvulnerabilityAbility.ExecuteCast)), showShield, CastersTeam), "Shield: the cast's team reaches the shell"),
+                (LastArgumentIs(showShield, typeof(ShieldLook).GetMethod(nameof(ShieldLook.Colour)), Ldarg(1)), "Shield: the shell's gold takes it"),
+                (!IlWiring.Uses(typeof(InvulnerabilityAbility), "ShowShield", teamGetter), "Shield: no second team source beside the armed ring's"),
+                (applyAt.Count == 1 && shooterAt.Count == 1 && shooterAt[0] + 5 == applyAt[0], "Stun bolt: the shooter's team is what Apply is handed"));
+        }
+
+        [Test]
         public void EveryAccentedViewAsksTheOneAccentRule()
         {
             MethodInfo accent = AccentRule;
@@ -199,6 +225,7 @@ namespace Overpower.Tests
                 (IlWiring.Uses(typeof(FlamethrowerAbility), "ShowVfx", accent), "Flamethrower fan outline"),
                 (IlWiring.Uses(typeof(InvulnerabilityAbility), "ShowShield", accent), "Shield base ring"),
                 (IlWiring.Uses(typeof(RaybeamBeamView), nameof(RaybeamBeamView.Draw), accent), "Raybeam edges"),
+                (IlWiring.Uses(typeof(FireField), "ShowLook", accent), "Rocket Cursor Fire rim"),
                 (IlWiring.Uses(typeof(LookColours), nameof(LookColours.For), typeof(LookColours).GetMethod(nameof(LookColours.Movement))), "the movement family"));
         }
 

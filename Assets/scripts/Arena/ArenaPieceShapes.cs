@@ -35,22 +35,7 @@ namespace Overpower.Arena
         /// <see cref="FootprintCorners"/> returns, in that winding. For two rectangles only their own four edge
         /// directions (two each, since opposite edges are parallel) can ever separate them, so testing those four is
         /// enough - no axis among them with a gap means the rectangles intersect.</summary>
-        public static bool FootprintsOverlap(Vector2[] a, Vector2[] b)
-        {
-            Vector2[] axes =
-            {
-                (a[0] - a[1]).normalized, (a[0] - a[2]).normalized,
-                (b[0] - b[1]).normalized, (b[0] - b[2]).normalized,
-            };
-            foreach (Vector2 axis in axes)
-            {
-                ProjectExtent(a, axis, out float aMin, out float aMax);
-                ProjectExtent(b, axis, out float bMin, out float bMax);
-                if (aMax < bMin || bMax < aMin)
-                    return false; // this axis separates them - they can't overlap
-            }
-            return true;
-        }
+        public static bool FootprintsOverlap(Vector2[] a, Vector2[] b) => OverlapDepth(a, b) >= 0f;
 
         /// <summary>How far two footprints reach into each other, in metres: the smallest overlap of their shadows on
         /// the same four axes <see cref="FootprintsOverlap"/> tests. Zero means they only touch (a shared face),

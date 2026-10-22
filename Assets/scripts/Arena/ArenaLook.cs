@@ -116,6 +116,8 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float pulseCoreWhiteness = 0.55f;
         [Tooltip("How thick the pale line along the middle of the Sonic Pulse's arch is, as a share of the arch's thickness.")]
         [Range(0.05f, 1f)] public float pulseCoreWidth = 0.3f;
+        [Tooltip("How brightly the pale line along the middle of the Sonic Pulse's arch glows. Above 1 it blooms like the stun bolt, so the arch reads as electric, not painted; 1 is its plain colour, much above 3 the arch turns into a white smear.")]
+        [Min(0f)] public float pulseCoreGlow = 2f;
         [Tooltip("How thick the thin outline in the caster's team colour is that runs just outside the Sonic Pulse's arch, in metres. It says whose pulse it is; 0 hides it.")]
         [Min(0f)] public float pulseEdgeWidth = 0.06f;
         [Tooltip("How solid the team-colour outline of the Sonic Pulse's arch is, as a share of the arch: it fades with the arch and its after-images. It lies beside the tube, never over it, so the arch keeps its own blue.")]
@@ -138,6 +140,8 @@ namespace Overpower.Arena
         [Min(10)] public int flameJetMostFlames = 150;
         [Tooltip("How high above the floor the Flamethrower's flames are when they land at the end of the jet, in metres: the jet is aimed down from the gun so it licks the floor where it burns, which lines it up with the fan seen from the camera. The gun's height or more keeps it level.")]
         [Min(0f)] public float flameJetLandHeight = 0.15f;
+        [Tooltip("How brightly the flames of the Flamethrower and the Rocket's burning ground glow: their colours times this. Above 1 their white-hot hearts bloom so fire reads hot, not as pale paper; 1 is the plain colours, much above 3 the jet turns into a white blob that hides the players in it.")]
+        [Min(0f)] public float flameGlow = 2f;
         [Tooltip("How many embers fly from the Flamethrower's gun each second.")]
         [Min(0f)] public float flameEmbersPerSecond = 8f;
         [Tooltip("How far the Flamethrower's flames fly from the gun, as a share of the way to the end of its reach: 1 lets their tips lick the very edge of the ground it burns.")]
@@ -166,6 +170,8 @@ namespace Overpower.Arena
         [Min(0.01f)] public float blastRingWidth = 0.2f;
         [Tooltip("How high, in metres, the light under a shot hangs over the floor straight below the shot (never above the shot itself). Higher spreads its glint on the glossy floor into a soft smudge; low, about 0.5, makes it a sharp bright dot that reads as a misplaced bullet.")]
         [Min(0.05f)] public float shotLightHeight = 1.6f;
+        [Tooltip("How much of the light under a shot glints off the glossy floor and walls (0 to 1). The glint sits where the camera sees the reflection, not under the shot, so it reads as a second bullet in the wrong place; 0 keeps only the soft wash on the surface under the shot.")]
+        [Range(0f, 1f)] public float shotLightShine = 0f;
         [Tooltip("How much brighter than plain Flash White every gun flash is drawn (impacts, the muzzle flash, the ricochet chevron). Above 1 the flash glows past the arena's stripes so a hit stands out; 1 is plain white, and much above 3 the glow swallows the flash's outline into a round blob that hides the player it hit.")]
         [Min(0f)] public float gunFlashGlow = 2.5f;
 

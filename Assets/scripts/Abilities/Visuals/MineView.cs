@@ -12,7 +12,7 @@ namespace Overpower.Abilities
     /// colour), counted from Mine.SecondsSincePlaced so every client blinks together; the colour reads on the middle, never a rim
     /// (A8). The owner's team also sees a ring at the real Trigger Radius. After Mine.InvisibleAfterSeconds MineVisibilityRule hides
     /// it from enemies and shows the owner's team a faded Ghost (A5) by Renderer.enabled, never the Visual's GameObject, which Mine
-    /// itself hides when it goes off (Mine.Detonated); every client then flashes a BlastMarker at the real Explosion Radius.
+    /// itself hides when it goes off (Mine.Detonated); every client then flashes a BlastMarker at the real Explosion Radius, in the impact white.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class MineView : MonoBehaviour, IDeployableView
@@ -108,7 +108,8 @@ namespace Overpower.Abilities
                 {
                     blastShown = true;
                     Vector3 at = mine.transform.position;
-                    BlastMarker.Spawn(blastMarkerPrefab, new Vector3(at.x, visualRoot.position.y, at.z), mine.ExplosionRadius, teamColor);
+                    BlastMarker.Spawn(blastMarkerPrefab, new Vector3(at.x, visualRoot.position.y, at.z), mine.ExplosionRadius,
+                        theme != null ? theme.flashWhiteColor : Color.white);
                 }
                 return;
             }

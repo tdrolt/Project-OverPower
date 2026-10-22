@@ -172,10 +172,12 @@ namespace Overpower.Tests
                 HealSparksView view = Make();
                 view.Step(50f, true, Vector3.zero, Frame, 0f);
                 view.Step(50.1f, true, Vector3.zero, Frame, 0.02f); // warm up: the first show may set things up once
-                long before = System.GC.GetAllocatedBytesForCurrentThread();
-                for (int i = 0; i < 120; i++)
-                    view.Step(50.1f + i * 0.1f, true, Vector3.zero, Frame, 0.04f + i * Frame);
-                Assert.AreEqual(0, System.GC.GetAllocatedBytesForCurrentThread() - before, "no allocation while the sparks rise");
+                int allocations = AllocationProbe.Count(() =>
+                {
+                    for (int i = 0; i < 120; i++)
+                        view.Step(50.1f + i * 0.1f, true, Vector3.zero, Frame, 0.04f + i * Frame);
+                });
+                Assert.AreEqual(0, allocations, "no allocation while the sparks rise");
             }
             finally
             {

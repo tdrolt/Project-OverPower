@@ -14,14 +14,13 @@ namespace Overpower.Abilities
     /// inside (the numbers below). AoeZoneAbility only decides WHEN it goes down. TICK ON EVERY CLIENT, DESTROY ON THE OWNER ONLY (the
     /// FireField pattern): PlayerHealth.Heal on a remote copy does nothing, so each healed player's own client heals them, as damage is
     /// victim-side. NetworkedDeployable's Lifetime Seconds is unused: the finished tick schedule ends the zone (RequestDestroy). No
-    /// per-tick logging: the old AoE froze a 9-player playtest doing it.
+    /// per-tick logging: with 9 players it froze the game.
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
     public sealed class AoeZone : NetworkedDeployable, IInRoomCallbacks
     {
         [Header("Zone")]
-        [SerializeField, Tooltip("How far the zone reaches from its centre, in metres. Claude's " +
-                 "number: 5.")]
+        [SerializeField, Tooltip("How far the zone reaches from its centre, in metres.")]
         private float radius = 5f;
 
         [SerializeField, FormerlySerializedAs("damagePerTick"), Tooltip("Health given back on each tick to you and every teammate " +
@@ -30,17 +29,16 @@ namespace Overpower.Abilities
         private float healPerTick = 14f;
 
         [SerializeField, Tooltip("How long the zone lasts, in seconds, before it disappears on its " +
-                 "own. Tudor's spec: 6.")]
+                 "own.")]
         private float durationSeconds = 6f;
 
         [SerializeField, Tooltip("Seconds between heal ticks - tick k lands at k * Tick Seconds " +
-                 "after the zone was placed. Tudor's spec: 1.0, which with a 6s duration gives " +
-                 "exactly 6 ticks.")]
+                 "after the zone was placed. 1 with a 6 s duration gives exactly 6 ticks.")]
         private float tickSeconds = 1f;
 
         [Header("Anchor")]
         [SerializeField, Tooltip("If checked, the zone follows the caster instead of staying where " +
-                 "it was cast. Tudor's spec: the zone follows, so this defaults ON. The throw (pressing the " +
+                 "it was cast (on by default). The throw (pressing the " +
                  "ultimate again to throw the zone to the cursor) only works while the zone follows its caster.")]
         private bool followsCaster = true;
 
@@ -67,10 +65,7 @@ namespace Overpower.Abilities
 
         private ZoneTickSchedule schedule;
         private CasterFollower follower;
-
-        /// <summary>The id of the AoeZoneAbility that placed this, threaded through instantiationData because this deployable is a
-        /// separate prefab with no AbilityDefinition. -1 if the data is missing.</summary>
-        public int AbilityId { get; private set; } = -1;
+        private VisibleWhenSeen gate;
 
         /// <summary>Radius, Heal Per Tick, Duration Seconds and Tick Seconds, read-only - the shop's pop-up shows them.</summary>
         public float Radius => radius;
@@ -131,9 +126,6 @@ namespace Overpower.Abilities
 
         protected override void OnPlaced(object[] data, PhotonMessageInfo info)
         {
-            if (data != null && data.Length >= 1 && data[0] is int abilityId)
-                AbilityId = abilityId;
-
             int totalTicks = Mathf.Max(1, Mathf.RoundToInt(durationSeconds / tickSeconds));
 
             // Age already reflects how old this zone really is on THIS client (NetworkedDeployable derives it from the
@@ -159,10 +151,17 @@ namespace Overpower.Abilities
             if (visual != null)
                 visual.localScale = new Vector3(radius * 2f, visual.localScale.y, radius * 2f);
 
-            // Vision: shown when any part of the disc is in sight, or it reaches my team.
-            VisibleWhenSeen gate = GetComponent<VisibleWhenSeen>();
+            // Vision: an enemy's zone does nothing to us, so reaching my team never shows it (see Update for the following zone).
+            gate = GetComponent<VisibleWhenSeen>();
             if (gate != null)
-                gate.SetSeenRadius(Radius);
+                gate.SetSeenRadius(Radius, false);
+        }
+
+        // A zone round its caster is hidden with them: drawn by the spot rule, a ring whose rim crosses my sight would centre on a hidden caster.
+        private void Update()
+        {
+            if (gate != null)
+                gate.FollowCaster(IsFollowing ? follower?.CasterView : null);
         }
 
         private void FixedUpdate()

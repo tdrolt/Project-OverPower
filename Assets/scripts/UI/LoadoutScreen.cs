@@ -298,7 +298,7 @@ namespace Overpower.UI
 
         private void Start()
         {
-            // Owner only (Awake switched every other copy off). A fresh joiner mid-round (A12) finds the shop open by itself, with the round's
+            // Owner only (Awake switched every other copy off). A fresh joiner mid-round finds the shop open by itself, with the round's
             // limits, so they pick a build before spawning; a rejoiner keeps what they had.
             if (!photonView.IsMine || photonView.Owner == null || photonView.Owner.HasRejoined || !ShopPricing.DominionLive())
                 return;

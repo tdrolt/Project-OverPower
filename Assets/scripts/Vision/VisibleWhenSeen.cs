@@ -20,7 +20,8 @@ namespace Overpower.Vision
         // prefabs, not a designer field: unticking it would hide your own team's zones.
         [SerializeField, HideInInspector]
         private bool ownersTeamAlwaysSees;
-        private float seenRadius; // > 0: a placed disc, shown when any part of it is seen or it reaches my team
+        private float seenRadius; // > 0: a placed disc, shown when any part of it is seen (or, if it hurts us, it reaches my team)
+        private bool discHurtsMyTeam;
         private float coneRange, coneAngle; // > 0 range: a flame cone, shown while its caster is shown or it reaches my team
 
         private PhotonView ownView;
@@ -58,9 +59,16 @@ namespace Overpower.Vision
             return gate;
         }
 
-        /// <summary>For a placed disc (AoE Zone, Fire Field): with a radius above zero it is shown when its centre or any
-        /// part of its rim is seen, or when it reaches my team.</summary>
-        public void SetSeenRadius(float radius) => seenRadius = Mathf.Max(0f, radius);
+        /// <summary>For a placed disc (Heal Zone, Fire Field): with a radius above zero it is shown when its centre or any part of its rim is
+        /// seen, or, when <paramref name="hurtsMyTeam"/>, when it reaches my team.</summary>
+        public void SetSeenRadius(float radius, bool hurtsMyTeam)
+        {
+            seenRadius = Mathf.Max(0f, radius);
+            discHurtsMyTeam = hurtsMyTeam;
+        }
+
+        /// <summary>Shown exactly while this player is shown, as AttachToCaster; null goes back to the spot rule.</summary>
+        public void FollowCaster(PhotonView casterView) => followCaster = casterView;
 
         /// <summary>For the Flamethrower cone: also shown while the cone reaches any of my team.</summary>
         public void SetCone(float range, float fullAngleDegrees)
@@ -108,7 +116,7 @@ namespace Overpower.Vision
             bool casterShown = bound && sight != null && (sight.CanSeePlayer(followCaster)
                 || (coneRange > 0f && TeamSight.ConeReachesMyTeam(transform.position, transform.forward, coneRange, coneAngle)));
             bool spotSeen = sight != null && !bound && !force
-                && (seenRadius > 0f ? TeamSight.DiscShownAt(-1, transform.position, seenRadius) : sight.CanSeeShot(transform.position));
+                && (seenRadius > 0f ? TeamSight.DiscShownAt(-1, transform.position, seenRadius, discHurtsMyTeam) : sight.CanSeeShot(transform.position));
             SetVisible(Decide(force, sight != null, bound, casterShown, spotSeen));
         }
 

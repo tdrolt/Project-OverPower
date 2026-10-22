@@ -77,10 +77,10 @@ namespace Overpower.Abilities
         // since NameToLayer never changes at runtime.
         private int buildingMask;
 
-        // The bands drawn on every client (none without the view on the prefab).
+        // The arch drawn on every client (none without the view on the prefab).
         private SonicPulseView view;
 
-        /// <summary>The cone the pulse really hits with, read live so the bands always show it.</summary>
+        /// <summary>The cone the pulse really hits with, read live so the arch always shows it.</summary>
         public float ConeRange => coneRange;
         public float ConeAngle => coneAngle;
 
@@ -127,7 +127,7 @@ namespace Overpower.Abilities
             PushCasterBack(forward, cast.IsCasterClient);
 
             if (view != null)
-                view.Play(origin, forward, ConeRange, ConeAngle, casterTeam, Owner != null ? Owner.PhotonView : null);
+                view.Play(origin, forward, ConeRange, ConeAngle, cast.CasterTeam, Owner != null ? Owner.PhotonView : null);
 
             int count = Physics.OverlapSphereNonAlloc(origin, coneRange, overlapBuffer, detectionMask,
                                                        QueryTriggerInteraction.Ignore);

@@ -43,6 +43,8 @@ namespace Overpower.Abilities
         /// <summary>True while this still follows the caster (not stopped, dead or gone).</summary>
         public bool IsActive => active;
 
+        public PhotonView CasterView => casterView;
+
         /// <summary>Call every frame this object is alive. Snaps target to the caster's current
         /// position while the caster still exists and is alive; the first frame that stops being true
         /// switches this off for good, leaving target exactly where it last was.

@@ -8,6 +8,8 @@ namespace Overpower.Arena
         public float TileSize, FloorLineWidth, FloorGridGlow, OwnedEdgeGlow, OwnedFillGlow;
         public float StripeGlow, OutsideStripeGlow, CellSize, StripeWidth, NodeSize, TopEdgeWidth, AcrossChance, UpChance;
         public float Reflection;
+        /// <summary>ArenaLook's Shot Light Shine: the share of the shot lights' glint kept.</summary>
+        public float ShotLightShine;
         /// <summary>ArenaLook's Owned Fill Hue Lift: how far an owned hexagon's fill moves its middle channel (GroundTint).</summary>
         public float FillLift;
         public Vector4 OutsideLine;
@@ -29,6 +31,7 @@ namespace Overpower.Arena
         public static readonly int OwnerMinId = Shader.PropertyToID("_ArenaOwnerMin");
         public static readonly int OwnerTexId = Shader.PropertyToID("_ArenaOwnerTex");
         public static readonly int ReflectionId = Shader.PropertyToID("_ArenaReflection");
+        public static readonly int ShotLightShineId = Shader.PropertyToID("_ArenaShotLightShine");
         public static readonly int FillLiftId = Shader.PropertyToID("_ArenaFillLift");
         public static readonly int LookReadyId = Shader.PropertyToID("_ArenaLookReady");
         public static readonly int SurfaceBaseId = Shader.PropertyToID("_ArenaSurfaceBase");
@@ -62,6 +65,7 @@ namespace Overpower.Arena
             AcrossChance = look.circuitAcrossChance,
             UpChance = look.circuitUpChance,
             Reflection = look.reflectionStrength,
+            ShotLightShine = look.shotLightShine,
             FillLift = look.ownedFillHueLift,
             OutsideLine = look.outsideLineColor.linear,
             BarrierStripe = BarrierStripeOf(look),
@@ -94,6 +98,7 @@ namespace Overpower.Arena
             Shader.SetGlobalVector(OutsideLineId, g.OutsideLine);
             Shader.SetGlobalVector(BarrierStripeId, g.BarrierStripe);
             Shader.SetGlobalFloat(ReflectionId, g.Reflection);
+            Shader.SetGlobalFloat(ShotLightShineId, g.ShotLightShine);
             Shader.SetGlobalFloat(FillLiftId, g.FillLift);
             ownerGrid.z = Mathf.Max(0.01f, g.TileSize);
             Shader.SetGlobalVector(OwnerGridId, ownerGrid);

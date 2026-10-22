@@ -126,7 +126,7 @@ namespace Overpower.EditorTools
             // ---- 6. the minimap picture
             report.Add(BakeMinimap(scene, arena, layout, rootGo.transform));
 
-            // ---- 6b. the straight camera (A41): own spawn on the left of the screen
+            // ---- 6b. the straight camera: own spawn on the left of the screen
             report.Add(EnsureCameraConfig(scene));
 
             // ---- 7. checks

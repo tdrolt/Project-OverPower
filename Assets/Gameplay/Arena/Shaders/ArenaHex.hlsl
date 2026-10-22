@@ -12,6 +12,7 @@ float4 _ArenaStripeGlow;       // outside stripe glow, owned stripe glow (ArenaL
 float4 _ArenaOutsideLine;      // linear colour of the faint glow away from every zone
 float4 _ArenaBarrierStripe;    // linear colour of the line round a barrier's top, its width m
 float  _ArenaReflection;       // 0..1 share of URP's sky reflection kept
+float  _ArenaShotLightShine;   // 0..1 share of the additional (shot) lights' specular glint kept
 float  _ArenaFillLift;         // 0..1: how far an owned fill's middle channel moves toward its brightest (GroundTint)
 float  _ArenaLookReady;        // 0 until ArenaLook was pushed: draw the material's own Lit values
 float4 _ArenaOwnerGrid;        // origin x, origin z, tile size, 1 while owner tiles are bound

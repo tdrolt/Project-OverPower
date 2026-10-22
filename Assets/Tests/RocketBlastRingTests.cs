@@ -1,3 +1,4 @@
+using System.Reflection;
 using NUnit.Framework;
 using Overpower.Abilities;
 using Overpower.UI;
@@ -38,12 +39,15 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheShellDrawsTheTestedRingInTheShootersColour()
+        public void TheShellDrawsTheTestedRingInTheImpactWhite()
         {
             Assert.IsTrue(IlWiring.Uses(typeof(SplashShell), "Apply", typeof(SplashShell).GetMethod(nameof(SplashShell.RingRadius))),
                 "the drawn ring is the tested size");
-            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Weapons.RocketBlastView), "HandleDetonated",
-                typeof(UiTheme).GetMethod(nameof(UiTheme.ShotColorFor))), "the shooter's team colour, as before");
+            FieldInfo white = typeof(UiTheme).GetField(nameof(UiTheme.flashWhiteColor));
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Weapons.RocketBlastView), "HandleDetonated", white), "an impact is white");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Abilities.MineView), "LateUpdate", white), "a mine's blast too");
+            Assert.IsFalse(IlWiring.Uses(typeof(Overpower.Weapons.RocketBlastView), typeof(UiTheme).GetMethod(nameof(UiTheme.ShotColorFor))),
+                "and never the shooter's team (the design: hits and impacts never carry it)");
             Assert.IsTrue(IlWiring.Uses(typeof(Overpower.Weapons.RocketBlastView), "HandleDetonated",
                 typeof(Overpower.Arena.ArenaLook).GetField(nameof(Overpower.Arena.ArenaLook.blastRingWidth))), "as thick as the Arena Look's Blast Ring Width");
         }

@@ -79,8 +79,8 @@ namespace Overpower.Abilities
 
         private CasterFollower follower;
 
-        /// <summary>Telemetry: the id of the ElectricFenceAbility that placed this, threaded through instantiationData
-        /// like AoeZone.AbilityId. -1 if the data is missing.</summary>
+        /// <summary>Telemetry: the id of the ElectricFenceAbility that placed this, threaded through instantiationData because the
+        /// fence is a separate prefab with no AbilityDefinition. -1 if the data is missing.</summary>
         public int AbilityId { get; private set; } = -1;
 
         /// <summary>Radius, read-only - FenceCageView builds the cage on this one number.</summary>

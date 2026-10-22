@@ -24,15 +24,20 @@ namespace Overpower.Tests
             string generated = "<" + methodName + ">"; // the compiler names a lambda "<Apply>b__12_0" and a state machine type "<Apply>d__3"
             var types = new List<System.Type> { owner };
             types.AddRange(owner.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic));
+            bool found = false;
             foreach (System.Type type in types)
             {
                 bool wholeTypeIsTheMethod = type != owner && type.Name.StartsWith(generated); // a state machine class made for exactly this method
                 foreach (MethodBase method in type.GetMethods(All).Cast<MethodBase>().Concat(type.GetConstructors(All)))
                 {
                     if (!wholeTypeIsTheMethod && method.Name != methodName && !method.Name.StartsWith(generated)) continue;
+                    found = true;
                     if (Reads(method, token)) return true;
                 }
             }
+            // A renamed method would otherwise answer "never uses it", and a negative check built on that could never fail.
+            if (!found)
+                throw new System.ArgumentException(owner + " has no method " + methodName);
             return false;
         }
 
@@ -203,7 +208,8 @@ namespace Overpower.Tests
         }
 
         /// <summary>True when the instructions from <paramref name="at"/> on are only the plumbing a compiler puts between a bool and the branch that uses it (a
-        /// debug build negates with ldc.i4.0 / ceq and goes through a local: stloc / ldloc / nop) and then a brtrue or brfalse. A local that is loaded must be the
+        /// debug build negates with ldc.i4.0 / ceq, compares an enum with its zero value with ldc.i4.0 / cgt.un, and goes through a local: stloc / ldloc / nop) and
+        /// then a brtrue or brfalse. A local that is loaded must be the
         /// one the answer was stored in. Anything else first (a pop, a store to a field, another call, another local) means the answer was not what the branch used.</summary>
         private static bool BranchFollows(byte[] il, int at)
         {
@@ -217,7 +223,7 @@ namespace Overpower.Tests
                 if (op == 0x13 && i + 1 < il.Length) { stored = il[i + 1]; i += 2; continue; } // stloc.s
                 if (op >= 0x06 && op <= 0x09) { if (stored != op - 0x06) return false; i += 1; continue; } // ldloc.0-3
                 if (op == 0x11 && i + 1 < il.Length) { if (stored != il[i + 1]) return false; i += 2; continue; } // ldloc.s
-                if (op == 0xFE && i + 1 < il.Length && il[i + 1] == 0x01) { i += 2; continue; } // ceq
+                if (op == 0xFE && i + 1 < il.Length && (il[i + 1] == 0x01 || il[i + 1] == 0x03)) { i += 2; continue; } // ceq, cgt.un
                 return false;
             }
             return false;

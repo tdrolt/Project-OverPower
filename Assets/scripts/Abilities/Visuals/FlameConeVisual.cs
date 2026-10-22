@@ -6,21 +6,11 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The flamethrower's cone: flames jetting from the gun over the cone (the Flame Tongues child, laid out by FlameLook), and a SOFT
-    /// flat fan on the floor, tip under the caster's root, opening to the ability's Cone Range and Cone Angle (exactly
-    /// ConeFilter.IsWithinCone's shape), warm at the tip and fading to transparent toward the far and side edges with a subtle
-    /// flicker, dimmed by the Arena Look's Flame Fan Strength to a faint marker of the ground that burns, plus an aiming outline
-    /// (Edge Opacity for the caster, Non Caster Edge Opacity for others). FlamethrowerAbility.ShowVfx passes Owner.IsMine in; no
-    /// network state here.
-    /// VERTEX-COLOUR TRAP: the shared Ability Visual Glass.mat is URP/Unlit, which never reads a mesh's vertex colours, so
-    /// the tip-to-edge gradient would render as a flat wash. The fan uses Flame Cone.mat (Particles/Unlit, which multiplies
-    /// the material colour by the vertex colour); don't edit Glass.mat, the mine, portal and fence ship with it.
-    /// GROUND-HUE TRAP: a flat fill in the fire's colour barely separates from the ground under it and alpha alone cannot fix
-    /// it, so Core Colour pushes the TIP to pale yellow-white, fading to the ability's Colour and to clear by the far edge.
-    /// RADIAL-FADE TRAP: with a single outer vertex ring the range fraction is a step (0 or 1), so alpha was a straight line
-    /// from one bright point to zero and Radial Hold Fraction and the side fade did nothing; Radial Rings gives real vertices.
-    /// Visual only. The mesh rebuilds only when Cone Range/Angle/Colour change; Place runs every physics step and allocates
-    /// nothing; the flicker recolours the SAME cached arrays at a capped rate.
+    /// The flamethrower's cone: flames jetting from the gun (the Flame Tongues child, laid out by FlameLook) and a faint flat fan on the
+    /// floor over exactly ConeFilter.IsWithinCone's shape, with an aiming outline. Visual only; Place runs every physics step, allocating nothing.
+    /// TRAPS: the fan needs Flame Cone.mat (Particles/Unlit), since URP/Unlit (Glass.mat, shared by mine, portal and fence) ignores vertex
+    /// colours; a flat fill in the fire's colour vanishes into the ground, so Core Colour pushes the tip to pale yellow-white; one outer vertex
+    /// ring makes the radial fade a step, so Radial Rings gives it real vertices.
     /// </summary>
     public sealed class FlameConeVisual : MonoBehaviour
     {
@@ -43,7 +33,7 @@ namespace Overpower.Abilities
         private LineRenderer edge;
 
         [SerializeField, Range(0f, 1f), Tooltip("Alpha at the fan's tip, under the caster - the brightest the flame " +
-                 "ever gets. A3's number: about 0.45, low enough that the caster and anyone standing in the flame " +
+                 "ever gets. About 0.45: low enough that the caster and anyone standing in the flame " +
                  "stay visible. Core Colour and Radial Rings/Hold Fraction below do most of the work of reading " +
                  "against the floor - this is a secondary knob, not the primary fix.")]
         private float tipAlpha = 0.45f;
@@ -143,8 +133,8 @@ namespace Overpower.Abilities
             }
         }
 
-        /// <summary>Spreads the flames and embers over the real cone, orange edge to yellow core from the Flamethrower's row of the look
-        /// table, and dims the fan to the Arena Look's faint marker.</summary>
+        /// <summary>Spreads the flames and embers over the real cone in the fire colours (FlameLook.Core and Edge, from the Flamethrower's row of
+        /// the look table), and dims the fan to the Arena Look's faint marker.</summary>
         public void ConfigureFire(float range, float fullAngleDegrees, UiTheme theme, int abilityId)
         {
             if (theme == null || theme.arenaLook == null)
