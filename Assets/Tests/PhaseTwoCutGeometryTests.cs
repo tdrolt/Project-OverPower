@@ -155,7 +155,7 @@ namespace Overpower.Tests
 
         // ---- the real arena (the Source outline and tower positions of Game Scene, arena rebuild plan section B)
 
-        private static readonly Vector3 ArenaCentre = new Vector3(65.05f, 0f, 53.34f);
+        internal static readonly Vector3 ArenaCentre = new Vector3(65.05f, 0f, 53.34f);
         private static readonly List<Vector2> SourceOutline = new List<Vector2>
         {
             new Vector2(96.184f, 60.034f), new Vector2(98.998505f, 61.659004f), new Vector2(89.22851f, 78.581f),
@@ -171,7 +171,7 @@ namespace Overpower.Tests
         };
         private static readonly int[][] CutZonesOfTeam = { new[] { 0, 3, 5, 6 }, new[] { 1, 3, 4, 7 }, new[] { 2, 4, 5, 8 } };
 
-        private static PhaseTwoCutGeometry RealCut(int team)
+        internal static PhaseTwoCutGeometry RealCut(int team)
         {
             IReadOnlyList<Vector2> full = ArenaBounds.FromSourceOutline(SourceOutline, ArenaCentre).Polygon;
             Vector2 centre = new Vector2(ArenaCentre.x, ArenaCentre.z);

@@ -40,6 +40,21 @@ namespace Overpower.Match
             return zones;
         }
 
+        /// <summary>The pack in the recess of the phase-two wall: its index, or -1 for none. It exists while the room's cut and the
+        /// wall this client built for it agree and that wall has a recess; never in Dominion. The index is zoneCount + the cut team,
+        /// after every zone's pack, so its room key and its requests reuse the zone packs' protocol unchanged and every client
+        /// (a late joiner too) names the same pack from the cut alone, with no key of its own.</summary>
+        public static int RecessPackIndex(bool dominion, int cutTeam, int wallCutTeam, bool wallHasRecess, int zoneCount)
+        {
+            if (dominion || cutTeam < 0 || wallCutTeam != cutTeam || !wallHasRecess || zoneCount <= 0)
+                return -1;
+            return zoneCount + cutTeam;
+        }
+
+        /// <summary>Whether a pack is shown and may be taken: a zone's pack while its zone is in play; the recess pack always, since it
+        /// exists only while its cut stands and its index names no zone.</summary>
+        public static bool PackInPlay(bool isRecessPack, bool zoneOutOfPlay) => isRecessPack || !zoneOutOfPlay;
+
         /// <summary>The master's answer to one request: whether it is granted, and if so the value to write.</summary>
         public readonly struct Decision
         {

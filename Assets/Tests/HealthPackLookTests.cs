@@ -216,8 +216,12 @@ namespace Overpower.Tests
             Check(IlWiring.Uses(typeof(HealthPackView), "Paint", typeof(HealthPackLook).GetMethod(nameof(HealthPackLook.CrossColour))), "the cross colour is the rule's");
             Check(IlWiring.Uses(typeof(HealthPackView), "Paint", typeof(HealthPackLook).GetMethod(nameof(HealthPackLook.EdgeGlow))), "and so is the edge's glow");
             Check(IlWiring.Uses(typeof(HealthPackView), "Create", typeof(LookColours).GetMethod(nameof(LookColours.For))), "the green is the heal family's");
-            Check(IlWiring.Uses(typeof(MinimapView), "UpdatePackBadge", typeof(LookColours).GetMethod(nameof(LookColours.For))),
+            Check(IlWiring.Uses(typeof(MinimapView), "ShowPackBadge", typeof(LookColours).GetMethod(nameof(LookColours.For))),
                   "a ready pack is the same healing green on the minimap");
+            MethodInfo zoneBadge = typeof(MinimapView).GetMethod("UpdatePackBadge", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo showBadge = typeof(MinimapView).GetMethod("ShowPackBadge", BindingFlags.Instance | BindingFlags.NonPublic);
+            Check(zoneBadge != null && IlWiring.Uses(typeof(MinimapView), "UpdateZones", zoneBadge), "every zone's pack gets a badge");
+            Check(showBadge != null && IlWiring.Uses(typeof(MinimapView), "UpdatePackBadge", showBadge), "drawn the one way every pack's badge is");
             Assert.IsEmpty(failed, string.Join("; ", failed));
         }
     }

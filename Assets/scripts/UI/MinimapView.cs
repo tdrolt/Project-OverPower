@@ -87,12 +87,19 @@ namespace Overpower.UI
             public float ShownRingFill = -1f;
             public Color ShownRingColor;
             public Color ShownOutlineColor;
-            /// <summary>Health pack badge: built the first time this zone has a pack in play, then only recoloured
-            /// (ShownPackReady: -1 not decided yet, 0 grey, 1 green) and shown or hidden.</summary>
-            public RectTransform PackBadge;
-            public Image PackBadgeBarA;
-            public Image PackBadgeBarB;
-            public int ShownPackReady = -1;
+            /// <summary>Health pack badge: built the first time this zone has a pack in play.</summary>
+            public PackBadgeUi PackBadge;
+        }
+
+        /// <summary>A health pack's plus: built once, then only recoloured (ShownReady: -1 not decided yet, 0 grey, 1 green),
+        /// shown or hidden, and moved if its pack is (a later cut's recess).</summary>
+        private sealed class PackBadgeUi
+        {
+            public RectTransform Root;
+            public Image BarA;
+            public Image BarB;
+            public int ShownReady = -1;
+            public Vector3 World;
         }
 
         private sealed class LinkUi
@@ -112,6 +119,8 @@ namespace Overpower.UI
         private readonly List<RectTransform> teammateDots = new List<RectTransform>();
         private readonly List<RectTransform> enemyDots = new List<RectTransform>();
         private readonly HashSet<int> hiddenZones = new HashSet<int>();
+        private PackBadgeUi recessPackBadge; // the pack a cut adds in its wall's recess: no bubble of its own
+        private Quaternion upright = Quaternion.identity;
 
         private PlayerInputRouter inputRouter;
         private LoadoutScreen loadoutScreen;
@@ -678,13 +687,15 @@ namespace Overpower.UI
             float triangleRotation = triangleBaseRotationDegrees + MinimapLayout.MapRotationDegrees(yaw);
             viewport.localEulerAngles = new Vector3(0f, 0f, triangleRotation);
             edgeShape.localEulerAngles = new Vector3(0f, 0f, triangleRotation);
-            var upright = Quaternion.Euler(0f, 0f, MinimapLayout.UprightRotationDegrees(yaw));
+            upright = Quaternion.Euler(0f, 0f, MinimapLayout.UprightRotationDegrees(yaw));
             foreach (ZoneUi zone in zones)
             {
                 zone.Upright.localRotation = upright;
                 if (zone.PackBadge != null)
-                    zone.PackBadge.localRotation = upright;
+                    zone.PackBadge.Root.localRotation = upright;
             }
+            if (recessPackBadge != null)
+                recessPackBadge.Root.localRotation = upright;
         }
 
         private int shownKnowledgeVersion = -1;
@@ -788,6 +799,7 @@ namespace Overpower.UI
             ZonePresenceTracker presence = ZonePresenceTracker.Instance;
             TerritorySnapshot snapshot = manager.Current;
 
+            UpdateRecessPackBadge();
             foreach (ZoneUi zone in zones)
             {
                 // A hidden out-of-play bubble is already inactive (RecolourOwnership): no ring state to compute for it.
@@ -846,45 +858,67 @@ namespace Overpower.UI
             HealthPackManager packs = HealthPackManager.Instance;
             bool inPlay = zone.Shown && !zone.OutOfPlay && packs != null && packs.Config != null
                 && packs.TryGetPack(zone.Zone, out _, out _);
-            if (!inPlay)
-            {
-                if (zone.PackBadge != null && zone.PackBadge.gameObject.activeSelf)
-                    zone.PackBadge.gameObject.SetActive(false);
-                zone.ShownPackReady = -1;
-                return;
-            }
-            packs.TryGetPack(zone.Zone, out Vector3 packWorld, out bool ready);
-            if (zone.PackBadge == null)
-                BuildPackBadge(zone, packWorld);
-            if (!zone.PackBadge.gameObject.activeSelf)
-                zone.PackBadge.gameObject.SetActive(true);
-            int state = ready ? 1 : 0;
-            if (state == zone.ShownPackReady)
-                return;
-            zone.ShownPackReady = state;
-            Color colour = ready ? LookColours.For(LookFamily.Heal, -1, theme) : packs.Config.TakenColour;
-            zone.PackBadgeBarA.color = colour;
-            zone.PackBadgeBarB.color = colour;
+            ShowPackBadge(ref zone.PackBadge, inPlay, packs, zone.Zone);
         }
 
-        /// <summary>A plus made of two bars, each with a dark copy behind it so it reads on any bubble colour.</summary>
-        private void BuildPackBadge(ZoneUi zone, Vector3 packWorld)
+        /// <summary>The pack a cut adds in its wall's recess, drawn like a zone's pack while the manager has one.</summary>
+        private void UpdateRecessPackBadge()
+        {
+            HealthPackManager packs = HealthPackManager.Instance;
+            int index = packs != null ? packs.RecessPackIndex : -1;
+            bool shown = index >= 0 && packs.Config != null && packs.TryGetPack(index, out _, out _);
+            ShowPackBadge(ref recessPackBadge, shown, packs, index);
+        }
+
+        private void ShowPackBadge(ref PackBadgeUi badge, bool shown, HealthPackManager packs, int pack)
+        {
+            if (!shown)
+            {
+                if (badge != null)
+                {
+                    if (badge.Root.gameObject.activeSelf)
+                        badge.Root.gameObject.SetActive(false);
+                    badge.ShownReady = -1;
+                }
+                return;
+            }
+            packs.TryGetPack(pack, out Vector3 packWorld, out bool ready);
+            if (badge == null)
+                badge = BuildPackBadge($"Health Pack {pack}");
+            if (badge.World != packWorld)
+            {
+                badge.World = packWorld;
+                badge.Root.anchoredPosition = MinimapLayout.WorldToMap(packWorld, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
+            }
+            if (!badge.Root.gameObject.activeSelf)
+                badge.Root.gameObject.SetActive(true);
+            int state = ready ? 1 : 0;
+            if (state == badge.ShownReady)
+                return;
+            badge.ShownReady = state;
+            Color colour = ready ? LookColours.For(LookFamily.Heal, -1, theme) : packs.Config.TakenColour;
+            badge.BarA.color = colour;
+            badge.BarB.color = colour;
+        }
+
+        /// <summary>A plus made of two bars, each with a dark copy behind it so it reads on any bubble colour. Placed by ShowPackBadge.</summary>
+        private PackBadgeUi BuildPackBadge(string badgeName)
         {
             float size = theme.minimapPackBadgeSize;
             float bar = size * theme.minimapPackBadgeBarFraction;
             float outline = theme.minimapBubbleOutlineWidth * 0.5f;
-            RectTransform badge = NewRect($"Health Pack {zone.Zone}", packsLayer);
-            badge.sizeDelta = Vector2.one * size;
-            badge.anchoredPosition = MinimapLayout.WorldToMap(packWorld, config.WorldCentre, config.WorldSizeMetres, frameSize.x);
-            badge.localRotation = zone.Upright.localRotation;
+            RectTransform root = NewRect(badgeName, packsLayer);
+            root.sizeDelta = Vector2.one * size;
+            root.localRotation = upright;
             Color dark = theme.minimapBubbleOutlineColor;
-            NewImage("Outline Horizontal", badge, null, dark, 0f).rectTransform.sizeDelta = new Vector2(size + 2f * outline, bar + 2f * outline);
-            NewImage("Outline Vertical", badge, null, dark, 0f).rectTransform.sizeDelta = new Vector2(bar + 2f * outline, size + 2f * outline);
-            zone.PackBadgeBarA = NewImage("Bar Horizontal", badge, null, Color.white, 0f);
-            zone.PackBadgeBarA.rectTransform.sizeDelta = new Vector2(size, bar);
-            zone.PackBadgeBarB = NewImage("Bar Vertical", badge, null, Color.white, 0f);
-            zone.PackBadgeBarB.rectTransform.sizeDelta = new Vector2(bar, size);
-            zone.PackBadge = badge;
+            NewImage("Outline Horizontal", root, null, dark, 0f).rectTransform.sizeDelta = new Vector2(size + 2f * outline, bar + 2f * outline);
+            NewImage("Outline Vertical", root, null, dark, 0f).rectTransform.sizeDelta = new Vector2(bar + 2f * outline, size + 2f * outline);
+            var badge = new PackBadgeUi { Root = root, World = new Vector3(float.NaN, 0f, 0f) };
+            badge.BarA = NewImage("Bar Horizontal", root, null, Color.white, 0f);
+            badge.BarA.rectTransform.sizeDelta = new Vector2(size, bar);
+            badge.BarB = NewImage("Bar Vertical", root, null, Color.white, 0f);
+            badge.BarB.rectTransform.sizeDelta = new Vector2(bar, size);
+            return badge;
         }
 
         // The fog layer: on while TeamSight draws the fog, with its colour and darkness; off (today's map) otherwise.

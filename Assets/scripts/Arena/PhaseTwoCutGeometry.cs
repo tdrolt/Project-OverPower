@@ -46,9 +46,14 @@ namespace Overpower.Arena
         /// side.</summary>
         public Vector2 TowardClosed { get; }
 
+        /// <summary>The middle of the recess: on the cut's axis, midway between its mouth (where the barrier stands) and its
+        /// back wall, as the outer recesses' packs stand between their barrier and wall. Where the health pack a cut adds
+        /// stands. The mouth's middle when there is no recess.</summary>
+        public Vector2 RecessCentre { get; }
+
         private PhaseTwoCutGeometry(List<Vector2> wallLine, ArenaBounds playable, ArenaBounds closed,
                                     List<ArenaWallPlan.Run> runs, bool hasRecess, Vector2 barrierCentre, float barrierYaw,
-                                    Vector2 alongWall, Vector2 towardClosed)
+                                    Vector2 alongWall, Vector2 towardClosed, Vector2 recessCentre)
         {
             WallLine = wallLine;
             Playable = playable;
@@ -59,6 +64,7 @@ namespace Overpower.Arena
             BarrierYawDegrees = barrierYaw;
             AlongWall = alongWall;
             TowardClosed = towardClosed;
+            RecessCentre = recessCentre;
         }
 
         /// <summary>True for a point behind the wall: inside the old arena, outside the new one. The wall's own body counts
@@ -152,9 +158,10 @@ namespace Overpower.Arena
 
             List<ArenaWallPlan.Run> runs = ArenaWallPlan.ForSource(playable, wallLine.Count - 1, wallThickness);
             float barrierYaw = Quaternion.LookRotation(new Vector3(-u.x, 0f, -u.y), Vector3.up).eulerAngles.y;
+            Vector2 recessCentre = hasRecess ? mouthMiddle + u * (recessDepth * 0.5f) : mouthMiddle;
 
             return new PhaseTwoCutGeometry(wallLine, ArenaBounds.FromPolygon(playable), ArenaBounds.FromPolygon(closed),
-                                           runs, hasRecess, mouthMiddle, barrierYaw, along, u);
+                                           runs, hasRecess, mouthMiddle, barrierYaw, along, u, recessCentre);
         }
 
         // Metres past the wall line (positive = the closed side).

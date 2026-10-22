@@ -10,18 +10,12 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 namespace Overpower.Match
 {
     /// <summary>
-    /// The Tier III health packs: one floating cross in each Tier III zone's recess, between the arena wall and the
-    /// low barrier. Walk over it hurt and alive and it heals you 50 (never past max), then it is gone for everyone for 30 s.
-    ///
-    /// State: ONE Room Property per pack, "hp" + zone, int[] { takenUntilMs, takerActor, requestId } (see
-    /// HealthPackRules), written ONLY by the master with a check-and-set. A player asks by writing a Player
-    /// Property on itself, "hpReq" = int[] { zone, requestId }; the master decides in OnPlayerPropertiesUpdate.
-    /// A write returning true only means "sent": the taker heals when it READS the echo naming it. No RPC.
-    ///
-    /// Every client builds the packs itself (they are not networked objects) once each Tier III tower has
-    /// registered, and draws them from the Room Property and the server clock alone, so all clients agree. A
-    /// taken pack stays in place, its cross and pad edge dimmed, until it returns (HealthPackView draws it). A Tier III
-    /// zone that is out of play after the map shrinks hides its pack and cannot be taken.
+    /// The health packs: a floating cross in each Tier III zone's recess and, while a corner is cut, one in the cut wall's
+    /// recess (indexed after the zones'). Walk over one hurt and alive and it heals you, then it is gone for everyone until it returns.
+    /// State: ONE Room Property per pack, "hp" + index, written ONLY by the master with a check-and-set; a player asks through
+    /// its own Player Property "hpReq" and heals when it READS the echo naming it, never on the send. No RPC. Every client
+    /// builds and draws the packs itself from the room and the server clock alone, so all agree; a pack whose zone the map
+    /// shrink put out of play is hidden and cannot be taken. The decisions and the values' layout live in HealthPackRules.
     /// </summary>
     public sealed class HealthPackManager : MonoBehaviourPunCallbacks
     {
@@ -42,8 +36,9 @@ namespace Overpower.Match
         private sealed class Pack
         {
             public int zone;
-            public string key;             // "hp" + zone, built once
-            public Vector3 centre;         // the ground point of the pack, in the zone's recess
+            public string key;             // "hp" + index, built once
+            public bool recess;            // the cut wall's recess pack: "zone" is its index, not a zone
+            public Vector3 centre;         // the pack's ground point
             public GameObject root;
             public HealthPackView view;
             // Asking side (every client)
@@ -113,7 +108,12 @@ namespace Overpower.Match
 
         private void Update()
         {
-            if (config == null || !PhotonNetwork.InRoom || BuildingManager.Instance == null)
+            if (config == null || BuildingManager.Instance == null)
+                return;
+
+            MatchDirector match = MatchDirector.Instance;
+            EnsureRecessPack(match); // before the room check: leaving the room ends the cut, and its pack goes with it
+            if (!PhotonNetwork.InRoom)
                 return;
 
             EnsurePacks();
@@ -122,10 +122,9 @@ namespace Overpower.Match
             if (now == 0)
                 return; // Server clock not synced yet: showing anything would be a guess.
 
-            MatchDirector match = MatchDirector.Instance;
             foreach (Pack pack in packs.Values)
             {
-                bool inPlay = match == null || !match.IsOutOfPlay(pack.zone);
+                bool inPlay = InPlay(pack, match);
                 bool available = IsPackAvailable(pack, now, match);
                 Show(pack, inPlay, available);
                 if (inPlay)
@@ -138,6 +137,11 @@ namespace Overpower.Match
         // ---- building and drawing ------------------------------------------------------------------
 
         private bool packsSettled; // nothing more to build in this room: EnsurePacks returns at once instead of allocating a list every frame
+
+        private int recessPack = -1;
+
+        /// <summary>The index of the pack in the cut wall's recess, or -1 while there is none.</summary>
+        public int RecessPackIndex => recessPack;
 
         private void EnsurePacks()
         {
@@ -152,10 +156,42 @@ namespace Overpower.Match
             {
                 if (!buildings.TryGetZoneCentre(zone, out Vector3 tower))
                     continue;
-                packs[zone] = Build(zone, tower);
+                packs[zone] = Build(zone, SpotFor(tower), recess: false);
             }
             packsSettled = settled;
         }
+
+        /// <summary>The recess pack follows the wall this client has built (ArenaPhaseTwoCut, from the room's cut), so it
+        /// appears when that corner closes, on a late join too, and goes when the cut does.</summary>
+        private void EnsureRecessPack(MatchDirector match)
+        {
+            ArenaPhaseTwoCut wall = ArenaPhaseTwoCut.Active;
+            PhaseTwoCutGeometry cut = wall != null ? wall.Geometry : null;
+            int wanted = HealthPackRules.RecessPackIndex(Overpower.Dominion.DominionMode.IsActive(),
+                match != null ? match.CutTeam : PhaseTwoCutRules.NoCut,
+                wall != null ? wall.AppliedCutTeam : PhaseTwoCutRules.NoCut,
+                cut != null && cut.HasRecess, BuildingManager.Instance.ZoneCount);
+            if (wanted != recessPack)
+                SetRecessPack(wanted, wanted >= 0 ? cut.RecessCentre : Vector2.zero);
+        }
+
+        /// <summary>Takes away the recess pack there was and builds the one at <paramref name="index"/> (-1: none) on
+        /// <paramref name="spot"/> (world X, Z).</summary>
+        internal void SetRecessPack(int index, Vector2 spot)
+        {
+            if (recessPack >= 0 && packs.TryGetValue(recessPack, out Pack old))
+            {
+                packs.Remove(recessPack);
+                if (Application.isPlaying) Destroy(old.root);
+                else DestroyImmediate(old.root);
+            }
+            recessPack = index;
+            if (index >= 0)
+                packs[index] = Build(index, new Vector3(spot.x, 0f, spot.y), recess: true);
+        }
+
+        private static bool InPlay(Pack pack, MatchDirector match) =>
+            HealthPackRules.PackInPlay(pack.recess, match != null && match.IsOutOfPlay(pack.zone));
 
         /// <summary>The pack's spot for the zone whose tower is at <paramref name="tower"/>: the authored recess point
         /// (turned into that zone's third), or the tower itself when there is no arena or layout to read it from (a
@@ -172,17 +208,17 @@ namespace Overpower.Match
             return RadialSymmetry.NearestCopy(arena.layout.HealthPackPoint, arena.centre, tower);
         }
 
-        private Pack Build(int zone, Vector3 tower)
+        // A zone's pack stands in its Tier III recess, midway between the arena wall behind it and the low barrier across
+        // its mouth. That spot is authored once (ArenaLayout.HealthPackPoint, Source third); the copy nearest this zone's
+        // tower is the one in its recess, so the three packs are placed by the same rule.
+        private Pack Build(int zone, Vector3 spot, bool recess)
         {
-            // In the zone's Tier III recess, midway between the arena wall behind it and the low barrier across its
-            // mouth. The spot is authored once (ArenaLayout.HealthPackPoint, Source third); the copy nearest this
-            // zone's tower is the one in its recess, so the three packs are placed by the same rule.
-            Vector3 spot = SpotFor(tower);
             float ground = CaptureRingView.GroundHeight(spot, 0.5f);
-            var pack = new Pack { zone = zone, key = PackKey(zone), centre = new Vector3(spot.x, ground, spot.z) };
+            var pack = new Pack { zone = zone, key = PackKey(zone), recess = recess, centre = new Vector3(spot.x, ground, spot.z) };
 
             solidMaterial = solidMaterial != null ? solidMaterial : new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            pack.view = HealthPackView.Create(transform, pack.centre, "Health Pack (zone " + zone + ")", config, theme, solidMaterial);
+            string packName = recess ? "Health Pack (recess " + zone + ")" : "Health Pack (zone " + zone + ")";
+            pack.view = HealthPackView.Create(transform, pack.centre, packName, config, theme, solidMaterial);
             pack.root = pack.view.gameObject;
             return pack;
         }
@@ -218,7 +254,7 @@ namespace Overpower.Match
                     continue;
                 }
 
-                bool inPlay = match == null || !match.IsOutOfPlay(pack.zone);
+                bool inPlay = InPlay(pack, match);
                 bool available = IsPackAvailable(pack, now, match);
                 if (!HealthPackRules.MayTake(localHealth.IsAlive, localHealth.Health, localHealth.MaxHealth,
                                              config.MinimumMissingHealth, available, inPlay))
@@ -282,7 +318,7 @@ namespace Overpower.Match
 
             bool alive = !(targetPlayer.CustomProperties.TryGetValue(PlayerLifecycle.AliveKey, out object a) && a is bool isAlive && !isAlive);
             MatchDirector match = MatchDirector.Instance;
-            bool inPlay = match == null || !match.IsOutOfPlay(zone);
+            bool inPlay = InPlay(pack, match);
             bool inRange = RequesterInRange(targetPlayer.ActorNumber, pack);
 
             int[] roomValue = ReadRoomValue(pack.key);
