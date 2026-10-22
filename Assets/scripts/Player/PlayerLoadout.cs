@@ -118,7 +118,7 @@ public class PlayerLoadout : MonoBehaviourPun, IInRoomCallbacks
     /// <summary>The starting kit's id for one ability slot: the ONE definition Start and ResetForMatchStart
     /// share. The ultimate is the exception: it starts EMPTY unless the shop is free
     /// (ShopPricing.StartingUltimateHandedOut: Free Loadout or the pre-live warm-up sandbox, never a live
-    /// Dominion match, whose ultimate is a break pick), when it carries the prefab's assigned starting
+    /// Dominion match, whose ultimate is a shop pick), when it carries the prefab's assigned starting
     /// ultimate. Every other slot starts at the prefab's default. The live reset calls this again once the
     /// shop is no longer free, so the ultimate starts empty from there on.</summary>
     private int StartingAbilityId(AbilitySlot slot)

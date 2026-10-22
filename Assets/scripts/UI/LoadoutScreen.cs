@@ -215,10 +215,6 @@ namespace Overpower.UI
 
         // ---- Dominion ---------------------------------------------------------------------
 
-        /// <summary>A player who joined a Dominion match mid-round may pick once before spawning (A12): the shop opens by
-        /// itself once, free, with the current round's limits, and stays pickable until they close it or the round ends;
-        /// after that it is break-only. Set in Start for a fresh joiner, never a rejoiner (who keeps the round's picks).</summary>
-        private bool lateJoinerPick;
         private readonly Dictionary<int, int> weaponDepth = new Dictionary<int, int>();
         private RoomManager roomManager;
         private PlayerHud playerHud;
@@ -302,15 +298,17 @@ namespace Overpower.UI
 
         private void Start()
         {
-            // Owner only (Awake switched every other copy off). A joiner mid-round gets the shop once, free; a rejoiner keeps what they had.
+            // Owner only (Awake switched every other copy off). A fresh joiner mid-round (A12) finds the shop open by itself, with the round's
+            // limits, so they pick a build before spawning; a rejoiner keeps what they had.
             if (!photonView.IsMine || photonView.Owner == null || photonView.Owner.HasRejoined || !ShopPricing.DominionLive())
                 return;
             DominionDirector director = DominionDirector.Instance;
-            if (director == null || !DominionShopRules.LateJoinerWindowOpen(director.Stage))
+            if (director == null)
                 return;
-            lateJoinerPick = true;
+            if (!DominionShopRules.LateJoinerWindowOpen(director.Stage))
+                return;
             Open();
-            Debug.Log($"[SHOP] late joiner: shop opened once, free, round {director.Round} limits");
+            Debug.Log($"[SHOP] late joiner: shop opened by itself, round {director.Round} limits");
         }
 
         private void OnDisable()
@@ -346,21 +344,18 @@ namespace Overpower.UI
         {
             bool matchOver = matchUI != null && matchUI.MatchOver;
 
-            // Dominion: a late joiner's one pick ends with the round they joined in; the shop is shut outside the break.
-            if (lateJoinerPick && DominionMode.IsActive() && DominionDirector.Instance != null
-                && !DominionShopRules.LateJoinerWindowOpen(DominionDirector.Instance.Stage))
-                lateJoinerPick = false;
-            bool shopShut = ShopPricing.DominionClosed(lateJoinerPick) != PurchaseBlock.None;
+            // Dominion: the shop is shut only while no round or break is on.
+            bool shopShut = ShopPricing.DominionClosed() != PurchaseBlock.None;
 
-            // The always-visible toggle button stops offering a loadout once the match is over, or while the shop is shut
-            // (outside the break). Runs regardless of isOpenLocal: the button is clickable whether the screen is open or not.
+            // The always-visible toggle button stops offering a loadout once the match is over, or while the shop is shut.
+            // Runs regardless of isOpenLocal: the button is clickable whether the screen is open or not.
             if (loadoutToggleButton != null)
                 loadoutToggleButton.interactable = !matchOver && !shopShut;
 
             if (!isOpenLocal)
                 return;
 
-            // The round started (the break ended): an open shop closes the moment the stage leaves the break.
+            // The stage left every round and break (the match ended): an open shop closes.
             if (shopShut)
             {
                 Close();
@@ -419,9 +414,9 @@ namespace Overpower.UI
             // applied in ShopPricing.Build; the combat gate needs none, PlayerHealth puts the clock out of combat on death).
             if (matchUI != null && matchUI.MatchOver)
                 return; // The match is already decided.
-            if (ShopPricing.DominionClosed(lateJoinerPick) != PurchaseBlock.None)
+            if (ShopPricing.DominionClosed() != PurchaseBlock.None)
             {
-                // Dominion outside the break: stays shut, with a short word on why (the header is not on screen to say it).
+                // Dominion with no round or break on: stays shut, with a short word on why (the header is not on screen to say it).
                 Debug.Log($"[SHOP] open refused: NotInBreak (stage {DominionDirector.Instance?.Stage})");
                 if (playerHud != null && theme != null) playerHud.ShowToast(theme.loadoutShopClosedText);
                 return;
@@ -458,7 +453,6 @@ namespace Overpower.UI
 
             isOpenLocal = false;
             IsOpen = false;
-            lateJoinerPick = false; // a late joiner's one pick ends when they close the shop
             HideTooltip();
             screenRoot.SetActive(false);
             inputRouter?.SetToolFocus(this, false);
@@ -522,11 +516,10 @@ namespace Overpower.UI
         /// cached, so every caller this frame agrees even if territory or the wallet changed mid-frame.</summary>
         private ShopContext CurrentShopContext() =>
             ShopPricing.Build(gameplayConfig, playerHealth, goldWallet, photonView.Owner, transform.position,
-                lifecycle == null || lifecycle.IsAlive, lateJoinerPick, DominionCfg,
-                theme != null ? theme.loadoutDominionFreeText : "", theme != null ? theme.loadoutShopClosedText : "",
-                theme != null ? theme.loadoutDominionLateJoinerFreeText : "");
+                lifecycle == null || lifecycle.IsAlive, DominionCfg,
+                theme != null ? theme.loadoutDominionFreeText : "", theme != null ? theme.loadoutShopClosedText : "");
 
-        /// <summary>Dominion: a refused pick because the shop is shut (outside the break). True when the caller should stop.</summary>
+        /// <summary>Dominion: a refused pick because the shop is shut (no round or break on). True when the caller should stop.</summary>
         private bool RefuseIfClosed(ShopContext ctx, int itemId = -1)
         {
             if (ctx.Closed == PurchaseBlock.None)

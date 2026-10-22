@@ -81,18 +81,5 @@ namespace Overpower.Tests
             ZoneThreat.ZoneClosesLink(5, zone => { asked.Add("capturable " + zone); return true; }, zone => { asked.Add("attack " + zone); return true; });
             CollectionAssert.AreEquivalent(new[] { "capturable 5", "attack 5" }, asked);
         }
-
-        // ---- the shop header's free note
-
-        [Test] public void TheHeaderUsesTheLateJoinersWordsWhileTheirPickIsOpenMidRound()
-        {
-            Assert.AreEqual("late", DominionShopRules.HeaderFreeText(DominionStage.Round, true, "break", "late"));
-            Assert.AreEqual("late", DominionShopRules.HeaderFreeText(DominionStage.SuddenDeath, true, "break", "late"));
-        }
-        [Test] public void TheHeaderUsesTheBreaksWordsOtherwise()
-        {
-            Assert.AreEqual("break", DominionShopRules.HeaderFreeText(DominionStage.Break, true, "break", "late"));
-            Assert.AreEqual("break", DominionShopRules.HeaderFreeText(DominionStage.Round, false, "break", "late"));
-        }
     }
 }

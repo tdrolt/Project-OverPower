@@ -6,7 +6,7 @@ using Overpower.Match;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The AoE zone ultimate: drops a damage zone at the caster's feet that follows them and ticks for its duration. This
+    /// The Heal Zone ultimate: drops a healing zone at the caster's feet that follows them and ticks for its duration. This
     /// module only decides WHEN and WHERE; what the zone does lives on the networked AoeZone (as ElectricFenceAbility /
     /// ElectricFence). Shared by all three ultimates: cooldownSeconds 0 / charges 1 on the prefab, readiness comes entirely
     /// from UltimateCharge (IsReady reads IsFull; TryBuildCast only casts if Spend() returns true; Point is ctx.Origin).
@@ -18,7 +18,7 @@ namespace Overpower.Abilities
     {
         [SerializeField, Tooltip("The zone that gets placed - a networked object that must live in " +
                  "Assets/Resources (PhotonNetwork.Instantiate resolves it by name). Every number the " +
-                 "zone itself uses - radius, damage, duration, tick rate, whether it follows the " +
+                 "zone itself uses - radius, heal, duration, tick rate, whether it follows the " +
                  "caster - lives on that prefab; this ability only reads its name to spawn it.")]
         private GameObject zonePrefab;
 
@@ -107,7 +107,7 @@ namespace Overpower.Abilities
 
             ClearOldThrow();
 
-            // This ability's id, so AoeZone can attribute its damage ticks (DamageInfo.AbilityId) for telemetry.
+            // This ability's id travels with the zone (AoeZone.AbilityId), as every deployable's does.
             GameObject placed = NetworkedDeployable.Spawn(zonePrefab.name, cast.Payload.Point, new object[] { Definition.Id });
             ownZone = placed != null ? placed.GetComponent<AoeZone>() : null;
         }
@@ -140,8 +140,8 @@ namespace Overpower.Abilities
             if (zone == null)
                 return "";
             return ShopNumberFormat.Lines(
-                $"Radius {ShopNumberFormat.Compact(zone.Radius)}m · {ShopNumberFormat.Compact(zone.DamagePerTick)} damage every {ShopNumberFormat.Compact(zone.TickSeconds)}s",
-                $"Lasts {ShopNumberFormat.Compact(zone.DurationSeconds)}s");
+                $"Radius {ShopNumberFormat.Compact(zone.Radius)}m · heals {ShopNumberFormat.Compact(zone.HealPerTick)} health every {ShopNumberFormat.Compact(zone.TickSeconds)}s",
+                $"Lasts {ShopNumberFormat.Compact(zone.DurationSeconds)}s · heals you and your teammates inside");
         }
     }
 }

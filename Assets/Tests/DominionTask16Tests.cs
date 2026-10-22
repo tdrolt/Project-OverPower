@@ -302,8 +302,8 @@ namespace Overpower.Tests
         [Test] public void LateJoinersMayStillPickWhileOvertimeRuns() =>
             Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(DominionStage.Overtime));
 
-        [Test] public void TheShopStaysClosedInOvertime() =>
-            Assert.IsFalse(DominionShopRules.MayPick(DominionStage.Overtime, false));
+        [Test] public void TheShopTakesPicksInOvertime() =>
+            Assert.IsTrue(DominionShopRules.MayPick(DominionStage.Overtime));
 
         [Test] public void ARespawnIsAllowedInOvertime() =>
             Assert.IsTrue(DominionRules.RespawnAllowed(true, DominionStage.Overtime));

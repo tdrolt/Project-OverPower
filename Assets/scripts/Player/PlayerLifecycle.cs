@@ -592,7 +592,7 @@ public class PlayerLifecycle : MonoBehaviour, IInRoomCallbacks
     }
 
     /// <summary>Dominion: a new round starts after a break. Back at this team's own spawn with full health, alive and out of any respawn wait -
-    /// and nothing else: the build, gold, ultimate charge and every pick the player made in the break stay exactly as they are (that is what
+    /// and nothing else: the build, gold, ultimate charge and every pick the player made in the shop stay exactly as they are (that is what
     /// ResetForMatchStart, the fresh start a break begins with, is not). Only the owner's client does anything.</summary>
     public void ResetForRoundStart(int team)
     {

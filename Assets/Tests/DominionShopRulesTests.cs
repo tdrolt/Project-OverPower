@@ -49,16 +49,6 @@ namespace Overpower.Tests
             Assert.AreEqual(0, DominionShopRules.ArmorUpgradesAllowed(2, new int[0]));
         }
 
-        [Test] public void PickingIsAllowedInTheBreakOnlyPlusALateJoinersFirstPick()
-        {
-            Assert.IsTrue(DominionShopRules.MayPick(DominionStage.Break, false));
-            Assert.IsFalse(DominionShopRules.MayPick(DominionStage.Round, false));
-            Assert.IsFalse(DominionShopRules.MayPick(DominionStage.SuddenDeath, false));
-            Assert.IsFalse(DominionShopRules.MayPick(DominionStage.Over, false));
-            Assert.IsFalse(DominionShopRules.MayPick(DominionStage.None, false));
-            Assert.IsTrue(DominionShopRules.MayPick(DominionStage.Round, true));
-        }
-
         [Test] public void TheLockedLabelNamesTheFirstRoundThatOpensTheDepth()
         {
             Assert.AreEqual(1, DominionShopRules.FirstRoundAllowingDepth(0, Depth));
@@ -120,44 +110,68 @@ namespace Overpower.Tests
 
         // ---- Task 5: the shop in a live Dominion match
 
+        // The shop takes picks anywhere, any time in a round, as well as in the break, with the same limits.
+
+        [TestCase(DominionStage.Break)]
         [TestCase(DominionStage.Round)]
+        [TestCase(DominionStage.Overtime)]
         [TestCase(DominionStage.SuddenDeath)]
-        [TestCase(DominionStage.Over)]
-        [TestCase(DominionStage.None)]
-        public void PicksAreRefusedOutsideTheBreak(DominionStage stage) =>
-            Assert.AreEqual(PurchaseBlock.NotInBreak, DominionShopRules.PickBlock(true, stage, false));
-
-        [Test] public void PicksAreAllowedInTheBreak() =>
-            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, DominionStage.Break, false));
-
-        [Test] public void ALateJoinersOnePickIsAllowedWhateverTheStage()
+        public void PicksAreTakenInTheBreakAndAnyTimeDuringARound(DominionStage stage)
         {
-            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, DominionStage.Round, true));
-            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, DominionStage.SuddenDeath, true));
+            Assert.IsTrue(DominionShopRules.MayPick(stage), stage.ToString());
+            Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(true, stage), stage.ToString());
         }
 
-        [Test] public void ConquestAndTheWarmupAreNeverBlockedByTheBreakRule()
+        [TestCase(DominionStage.None)]
+        [TestCase(DominionStage.Over)]
+        public void PicksAreRefusedOnlyWhileNoRoundOrBreakIsOn(DominionStage stage)
+        {
+            Assert.IsFalse(DominionShopRules.MayPick(stage), stage.ToString());
+            Assert.AreEqual(PurchaseBlock.NotInBreak, DominionShopRules.PickBlock(true, stage), stage.ToString());
+        }
+
+        [Test] public void ConquestAndTheWarmupAreNeverBlockedByDominionsPickRule()
         {
             foreach (DominionStage stage in System.Enum.GetValues(typeof(DominionStage)))
-                Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(false, stage, false), stage.ToString());
+                Assert.AreEqual(PurchaseBlock.None, DominionShopRules.PickBlock(false, stage), stage.ToString());
         }
 
-        [Test]
-        public void TheShopHeaderNamesTheLateJoinersPickOnlyOutsideTheBreak()
+        [Test] public void AMidRoundPickHasTheRoundsLimitsJustAsTheBreak()
         {
-            Assert.IsTrue(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.Round, true));
-            Assert.IsTrue(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.SuddenDeath, true));
-            Assert.IsFalse(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.Break, true), "in a break everyone's pick is the break's");
-            Assert.IsFalse(DominionShopRules.HeaderNamesLateJoinerPick(DominionStage.Round, false));
+            System.Reflection.MethodInfo stage = typeof(DominionDirector).GetProperty(nameof(DominionDirector.Stage)).GetGetMethod();
+            System.Reflection.MethodInfo round = typeof(DominionDirector).GetProperty(nameof(DominionDirector.Round)).GetGetMethod();
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.ShopPricing), nameof(Overpower.UI.ShopPricing.DominionLimits), round), "the limits are the round's");
+            Assert.IsFalse(IlWiring.Uses(typeof(Overpower.UI.ShopPricing), nameof(Overpower.UI.ShopPricing.DominionLimits), stage),
+                "and never depend on whether the round is being played or about to start");
+            var limits = new DominionShopLimits(2, Depth, Armor, "Round {0}");
+            Assert.AreEqual(UpgradeNodeState.Locked, limits.NodeState(UpgradeNodeState.Selectable, 2), "past the round's weapon depth: still refused");
+            Assert.AreEqual(UpgradeNodeState.Selectable, limits.NodeState(UpgradeNodeState.Locked, 1), "within it: pickable");
+            Assert.AreEqual(1, limits.ArmorCap(3), "the round's armour allowance");
         }
 
-        [Test] public void ALateJoinersPickLastsOnlyWhileTheRoundTheyJoinedInIsGoing()
+        [Test] public void TheShopAndItsButtonAskTheTestedRule()
+        {
+            System.Reflection.MethodInfo closed = typeof(Overpower.UI.ShopPricing).GetMethod(nameof(Overpower.UI.ShopPricing.DominionClosed));
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.ShopPricing), nameof(Overpower.UI.ShopPricing.DominionClosed),
+                typeof(DominionShopRules).GetMethod(nameof(DominionShopRules.PickBlock))), "the stage goes through PickBlock");
+            Assert.IsTrue(IlWiring.Uses(typeof(DominionShopRules), nameof(DominionShopRules.PickBlock),
+                typeof(DominionShopRules).GetMethod(nameof(DominionShopRules.MayPick))), "PickBlock asks MayPick");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.LoadoutScreen), nameof(Overpower.UI.LoadoutScreen.Open), closed), "opening the shop");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.LoadoutScreen), "Update", closed), "the Loadout button and an open shop");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.ShopPricing), nameof(Overpower.UI.ShopPricing.Build), closed), "every pick's check");
+        }
+
+        [Test] public void AFreshJoinerFindsTheShopOpenByItselfOnlyWhileTheirRoundIsGoing()
         {
             Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(DominionStage.Round));
             Assert.IsTrue(DominionShopRules.LateJoinerWindowOpen(DominionStage.SuddenDeath));
-            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(DominionStage.Break), "the round ended: the break's shop is everyone's");
+            Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(DominionStage.Break), "in a break the break card points everyone to the shop");
             Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(DominionStage.Over));
             Assert.IsFalse(DominionShopRules.LateJoinerWindowOpen(DominionStage.None));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(typeof(Overpower.UI.LoadoutScreen), "Start",
+                typeof(DominionShopRules).GetMethod(nameof(DominionShopRules.LateJoinerWindowOpen))), "the shop asks the rule when it starts");
+            Assert.IsTrue(IlWiring.Uses(typeof(Overpower.UI.LoadoutScreen), "Start",
+                typeof(Overpower.UI.LoadoutScreen).GetMethod(nameof(Overpower.UI.LoadoutScreen.Open))), "and opens itself on its answer");
         }
 
         [Test] public void TheArmourCapIsTheSmallerOfTheShopMaximumAndTheRoundsAllowance()

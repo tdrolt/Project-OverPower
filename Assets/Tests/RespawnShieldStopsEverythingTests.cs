@@ -329,13 +329,6 @@ namespace Overpower.Tests
             Assert.AreEqual(DamageSource.Zone, info.Source);
         }
 
-        [Test] public void AnAoeZonesTickCarriesWhenTheZoneWasPlaced()
-        {
-            DamageInfo info = PlacedEffects.AoeZoneTick(8f, 3, 1, Vector3.one, 9, placedMs: 333);
-            Assert.AreEqual(333, info.EffectPlacedMs);
-            Assert.AreEqual(DamageSource.Zone, info.Source);
-        }
-
         [Test] public void AFireFieldsBurnCarriesWhenTheFieldWasLit()
         {
             DamageInfo info = PlacedEffects.FireFieldBurn(5f, 3, 1, weaponId: 4, Vector3.one, placedMs: 444);
@@ -400,9 +393,6 @@ namespace Overpower.Tests
             Assert.IsTrue(Uses(fence, "EvaluateTrackedTargets", Builder(nameof(PlacedEffects.FenceTick))));
             Assert.IsTrue(Uses(fence, "EvaluateTrackedTargets", Builder(nameof(PlacedEffects.PlacedSlow))));
         }
-
-        [Test] public void AoeZoneTicksGoThroughTheBuilder() =>
-            Assert.IsTrue(Uses(typeof(Overpower.Abilities.AoeZone), "ApplyTick", Builder(nameof(PlacedEffects.AoeZoneTick))));
 
         [Test] public void FireFieldBurnsGoThroughTheBuilder() =>
             Assert.IsTrue(Uses(typeof(Overpower.Weapons.FireField), "BurnEveryoneInside", Builder(nameof(PlacedEffects.FireFieldBurn))));

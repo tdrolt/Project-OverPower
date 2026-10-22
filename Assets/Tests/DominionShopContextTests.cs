@@ -5,7 +5,7 @@ using Overpower.UI;
 
 namespace Overpower.Tests
 {
-    /// <summary>Dominion Task 5: the shop's gate in a Dominion match (free, break only) and Conquest's gate unchanged. Literal numbers throughout.</summary>
+    /// <summary>Dominion Task 5: the shop's gate in a Dominion match (free; shut only while no round or break is on) and Conquest's gate unchanged. Literal numbers throughout.</summary>
     public class DominionShopContextTests
     {
         private static readonly DominionShopLimits Round2 = new DominionShopLimits(2, new[] { 0, 1, 2 }, new[] { 0, 1, 2 }, "Round {0}");

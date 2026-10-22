@@ -143,9 +143,8 @@ MonoBehaviour:
   loadoutArmorUpgradeFormat: Upgrade {0} of {1}
   loadoutArmorMaxFormat: '{0} of {0} (max)'
   loadoutArmorRoundMaxFormat: '{0} of {0} this round'
-  loadoutDominionFreeText: Free (break)
-  loadoutDominionLateJoinerFreeText: Free (your one pick)
-  loadoutShopClosedText: The shop opens in the break
+  loadoutDominionFreeText: Free (any time)
+  loadoutShopClosedText: The shop is closed
   loadoutArmorTopLevelText: top level
   loadoutArmorAbsorbRowFormat: 'Absorb lv {0}: {1}'
   loadoutArmorRechargeRowFormat: 'Recharge lv {0}: {1}'

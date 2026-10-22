@@ -28,7 +28,7 @@ namespace Overpower.UI
         /// Tells the header's two free-shop reasons apart ("Free (warm-up)" vs "Free (test mode)").</summary>
         public readonly bool IsWarmupSandbox;
 
-        /// <summary>NotInBreak while a live Dominion match is outside the break (the shop takes no picks), else None.</summary>
+        /// <summary>NotInBreak while a live Dominion match has no round or break on (the shop takes no picks), else None.</summary>
         public readonly PurchaseBlock Closed;
         /// <summary>What this round opens; null in Conquest and in the warm-up.</summary>
         public readonly DominionShopLimits Limits;
@@ -56,7 +56,7 @@ namespace Overpower.UI
         /// <summary>None outright while IsFree (Free Loadout, or the pre-live warm-up sandbox). Every click handler
         /// calls this rather than checking a flag itself, so one place decides what a free shop means for a purchase.</summary>
         public PurchaseBlock Check(int price) =>
-            Closed != PurchaseBlock.None ? Closed // Dominion outside the break: nothing can be picked, however free it is
+            Closed != PurchaseBlock.None ? Closed // Dominion with no round or break on: nothing can be picked, however free it is
             : IsFree ? PurchaseBlock.None
                      : ShopRules.Check(InOwnTerritory, SecondsSinceCombat, RequiredOutOfCombatSeconds, Balance, price);
 
@@ -77,7 +77,7 @@ namespace Overpower.UI
                 case PurchaseBlock.NotInOwnTerritory: return "Go to a zone your team owns";
                 case PurchaseBlock.InCombat: return $"Out of combat in {SecondsUntilOutOfCombat.ToString("0.0", CultureInfo.InvariantCulture)}s";
                 case PurchaseBlock.CannotAfford: return $"Need {price - Balance} more gold";
-                case PurchaseBlock.NotInBreak: return string.IsNullOrEmpty(closedText) ? "The shop opens in the break" : closedText;
+                case PurchaseBlock.NotInBreak: return string.IsNullOrEmpty(closedText) ? "The shop is closed" : closedText;
                 default: return "";
             }
         }
@@ -87,7 +87,7 @@ namespace Overpower.UI
         /// instead of a block reason, split between the warm-up sandbox and Free Loadout's test mode.</summary>
         public string StatusText() =>
             Closed != PurchaseBlock.None ? ReasonText(Closed, 0)
-            : IsDominion ? (string.IsNullOrEmpty(dominionFreeText) ? "Free (break)" : dominionFreeText)
+            : IsDominion ? (string.IsNullOrEmpty(dominionFreeText) ? "Free" : dominionFreeText)
             : IsFree ? (IsWarmupSandbox ? "Free (warm-up)" : "Free (test mode)") : ReasonText(Check(0), 0);
     }
 
@@ -109,15 +109,15 @@ namespace Overpower.UI
                 MatchDirector.Instance != null && MatchDirector.Instance.IsLive,
                 DominionMode.IsActive());
 
-        /// <summary>True in a live Dominion match (not the warm-up, where the shop is the free sandbox and the break rule does not apply).</summary>
+        /// <summary>True in a live Dominion match (not the warm-up, where the shop is the free sandbox and Dominion's pick rule does not apply).</summary>
         public static bool DominionLive() => DominionMode.IsLive();
 
         /// <summary>Why the shop takes no picks right now (NotInBreak), or None. The stage comes from the room via DominionDirector.</summary>
-        public static PurchaseBlock DominionClosed(bool lateJoinerPickOpen)
+        public static PurchaseBlock DominionClosed()
         {
             DominionDirector director = DominionDirector.Instance;
             DominionStage stage = director != null ? director.Stage : DominionStage.None;
-            return DominionShopRules.PickBlock(DominionLive(), stage, lateJoinerPickOpen);
+            return DominionShopRules.PickBlock(DominionLive(), stage);
         }
 
         /// <summary>What the current round opens, or null outside a live Dominion match / without a DominionConfig. The round is the one
@@ -142,8 +142,7 @@ namespace Overpower.UI
         private static DominionConfig cachedLimitsConfig;
 
         public static ShopContext Build(GameplayConfig config, PlayerHealth health, GoldWallet wallet, Player owner, Vector3 position, bool isAlive,
-                                        bool lateJoinerPickOpen = false, DominionConfig dominion = null, string dominionFreeText = "", string closedText = "",
-                                        string lateJoinerFreeText = "")
+                                        DominionConfig dominion = null, string dominionFreeText = "", string closedText = "")
         {
             bool freeLoadout = config == null || config.FreeLoadout;
             bool isFree = IsFreeNow(config);
@@ -154,15 +153,7 @@ namespace Overpower.UI
             float required = config != null ? config.ShopOutOfCombatSeconds : 0f;
             int balance = wallet != null ? wallet.Balance : 0;
             return new ShopContext(isFree, isWarmupSandbox, inOwnTerritory, secondsSinceCombat, required, balance,
-                DominionClosed(lateJoinerPickOpen), DominionLimits(dominion), HeaderFreeText(lateJoinerPickOpen, dominionFreeText, lateJoinerFreeText), closedText);
-        }
-
-        /// <summary>The header's free note: the late joiner's own wording while their one pick is open mid-round, the break's otherwise.</summary>
-        private static string HeaderFreeText(bool lateJoinerPickOpen, string breakText, string lateJoinerText)
-        {
-            DominionDirector director = DominionDirector.Instance;
-            DominionStage stage = director != null ? director.Stage : DominionStage.None;
-            return DominionShopRules.HeaderFreeText(stage, lateJoinerPickOpen, breakText, lateJoinerText);
+                DominionClosed(), DominionLimits(dominion), dominionFreeText, closedText);
         }
 
         private static bool InOwnTerritory(Player owner, Vector3 position)

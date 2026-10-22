@@ -234,7 +234,7 @@ namespace Overpower.UI
         [Tooltip("Colour of the READY text shown over the Ultimate slot once its charge is full.")]
         public Color ultimateReadyTextColor = new Color(1f, 0.95f, 0.6f);
         [Tooltip("Text shown over the Ultimate slot while the meter is empty but the key still does something - " +
-                 "the AoE Zone can be thrown to the cursor once. Same colour as the READY text.")]
+                 "the Heal Zone can be thrown to the cursor once. Same colour as the READY text.")]
         public string ultimateRecastText = "THROW";
         [Tooltip("Text shown over the Ultimate slot once its meter is full.")]
         public string ultimateReadyText = "READY";
@@ -368,12 +368,10 @@ namespace Overpower.UI
         public string loadoutArmorMaxFormat = "{0} of {0} (max)";
         [Tooltip("Armour row wording in Dominion once this round's allowance is used up (the shop's own maximum is higher; later rounds open more). {0} = this round's allowance.")]
         public string loadoutArmorRoundMaxFormat = "{0} of {0} this round";
-        [Tooltip("The shop header's note in a Dominion break: picks are free there, no gold involved.")]
-        public string loadoutDominionFreeText = "Free (break)";
-        [Tooltip("The shop header's note for a player who joined a Dominion match in the middle of a round: they get one free pick before they spawn, outside the break.")]
-        public string loadoutDominionLateJoinerFreeText = "Free (your one pick)";
-        [Tooltip("What the shop says when it is asked to open (P, or the Loadout button) in a Dominion match outside the break, and what its header says if it is somehow open then. Shown as a short toast over the game when the shop stays shut.")]
-        public string loadoutShopClosedText = "The shop opens in the break";
+        [Tooltip("The shop header's note in a Dominion match: picks are free, no gold involved, and you can make them anywhere, in the break and at any time during a round.")]
+        public string loadoutDominionFreeText = "Free (any time)";
+        [Tooltip("What the shop says when it is asked to open (P, or the Loadout button) in a Dominion match while no round or break is on (the moment before the first break, or once the match is over), and what its header says if it is somehow open then. Shown as a short toast over the game when the shop stays shut.")]
+        public string loadoutShopClosedText = "The shop is closed";
         [Tooltip("Armour row wording for a row that is at its own top level with upgrades still left in the shared limit.")]
         public string loadoutArmorTopLevelText = "top level";
         [Tooltip("The Absorb armour row. {0} = its level, {1} = the status text (which upgrade is next, or max).")]
@@ -2101,7 +2099,7 @@ namespace Overpower.UI
         public Color fireCoreColor = new Color(1f, 0.98f, 0.88f, 1f);
         [Tooltip("The pale hot yellow of fire's outer parts: the Flamethrower's flat fan and the tips of its flames, and the edges of the Rocket Cursor's burning ground. Keep it pale and a little warmer than the Shield's gold: a deeper or a gold-coloured yellow reads as the Shield, an orange as the orange team.")]
         public Color fireEdgeColor = new Color(1f, 0.88f, 0.6f, 1f);
-        [Tooltip("The red of damage: the AoE Zone, the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
+        [Tooltip("The red of damage: the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);

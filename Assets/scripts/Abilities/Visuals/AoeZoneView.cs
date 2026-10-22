@@ -7,9 +7,10 @@ using UnityEngine;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The AoE Zone: a hard edge line on its real Radius and a band of hexagon cells just inside it, in the AoE Zone's row of the look table.
-    /// The cells flicker at Aoe Flicker Rate (ArenaLook) from the server clock and the caster, so every client lights the same cells; only
-    /// vertex colours change. Both parts are on the prefab, so the zone's fog gate (collected in its Awake) hides them with it.
+    /// The Heal Zone: a hard edge line on its real Radius and a band of hexagon cells just inside it. The cells wear the zone's row of the look
+    /// table (the healing green); the edge is its team accent, the caster's team colour, since it heals only that team. The cells flicker at
+    /// Aoe Flicker Rate (ArenaLook) from the server clock and the caster, so every client lights the same cells; only vertex colours change.
+    /// Both parts are on the prefab, so the zone's fog gate (collected in its Awake) hides them with it.
     /// The zone sits on its caster's root, half a metre up, so the ring is put back on the floor whenever the zone moves.
     /// </summary>
     [DisallowMultipleComponent]
@@ -21,7 +22,7 @@ namespace Overpower.Abilities
                  "Assets/Gameplay/Config/UiTheme.asset and its Arena Look.")]
         private UiTheme theme;
 
-        [SerializeField, Tooltip("Which row of the Arena Look table colours this zone: the AoE Zone ability's id.")]
+        [SerializeField, Tooltip("Which row of the Arena Look table colours this zone: the Heal Zone ability's id.")]
         private int abilityId = 27;
 
         [SerializeField, Tooltip("The holder of the cells and the edge, kept on the floor under the zone.")]
@@ -37,8 +38,7 @@ namespace Overpower.Abilities
         private ArenaLook look;
         private Mesh mesh;
         private Color[] colours;
-        private Color danger;
-        private Color cellDanger; // the same red for the cells' vertex colours
+        private Color cellColour; // the row's colour, converted for the cells' vertex colours
         private int salt;
         private int shownSeed;
         private bool shown;
@@ -51,8 +51,8 @@ namespace Overpower.Abilities
             if (zone == null || theme == null || theme.arenaLook == null)
                 return;
             look = theme.arenaLook;
-            danger = LookColours.ForAbility(theme, abilityId, zone.OwnerTeam, LookFamily.Danger);
-            cellDanger = VisualTint.VertexColour(danger);
+            Color own = LookColours.ForAbility(theme, abilityId, zone.OwnerTeam, LookFamily.Heal);
+            cellColour = VisualTint.VertexColour(own);
             salt = zone.OwnerActor;
             float radius = zone.Radius;
 
@@ -60,7 +60,7 @@ namespace Overpower.Abilities
             {
                 VisualTint.FillFlatCircle(edge, radius, EdgeSegments);
                 edge.startWidth = edge.endWidth = look.aoeEdgeWidth;
-                VisualTint.SetLineColor(edge, VisualTint.WithAlpha(danger, look.aoeEdgeAlpha));
+                VisualTint.SetLineColor(edge, VisualTint.WithAlpha(LookColours.Accent(zone.OwnerTeam, theme, own), look.aoeEdgeAlpha));
             }
 
             if (cells != null)
@@ -103,8 +103,8 @@ namespace Overpower.Abilities
             for (int i = 0; i < centres.Count; i++)
             {
                 bool lit = AoeRingLook.Lit(seed, i, look.aoeLitShare);
-                Color line = AoeRingLook.Line(cellDanger, lit, look.aoeLitLineAlpha, look.aoeDimLineAlpha);
-                Color fill = AoeRingLook.Fill(cellDanger, lit, look.aoeLitFillAlpha);
+                Color line = AoeRingLook.Line(cellColour, lit, look.aoeLitLineAlpha, look.aoeDimLineAlpha);
+                Color fill = AoeRingLook.Fill(cellColour, lit, look.aoeLitFillAlpha);
                 int b = i * AoeRingMesh.VerticesPerCell;
                 for (int v = 0; v < AoeRingMesh.FillStart; v++)
                     colours[b + v] = line;

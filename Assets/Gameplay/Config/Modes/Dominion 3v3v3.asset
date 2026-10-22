@@ -37,7 +37,7 @@ MonoBehaviour:
     text: "Hold a zone long enough and it builds a bounty; whoever takes it from you collects the points."
     accent: {r: 0.41960785, g: 0.24705882, b: 0.7490196, a: 1}
   - title: Your build each round
-    text: "Every round starts from scratch. In the break before it you pick your gear for free. Round one is the pistol only, round two opens the weapon families and an armor upgrade, and round three opens the weapon upgrades and a second armor upgrade."
+    text: "Every round starts from scratch. You pick your gear for free, in the break before it or at any time during the round, from anywhere. Round one is the pistol only, round two opens the weapon families and an armor upgrade, and round three opens the weapon upgrades and a second armor upgrade."
     accent: {r: 0.9098039, g: 0.7254902, b: 0.19215687, a: 1}
   - title: Respawns
     text: "You always come back after the same short wait, inside a shield that blocks all damage, stuns and pushes. It breaks when its time runs out, when you hit an enemy or when you leave your spawn, and you can't capture while it's up."

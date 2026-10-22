@@ -74,6 +74,14 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheHealZoneIsAGreenHexRing()
+        {
+            Assert.IsTrue(look.TryGetLook(27, out AbilityLook zone));
+            Assert.AreEqual(LookShape.HexGridRing, zone.Shape);
+            Assert.AreEqual(LookFamily.Heal, zone.Family, "it heals: the healing green, like health packs (its outer ring wears the caster's team)");
+        }
+
+        [Test]
         public void TheBubbleIsAHologramInTheTeamColour()
         {
             Assert.AreEqual(LookShape.HologramSphere, look.RespawnBubbleLook.Shape);

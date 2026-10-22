@@ -338,7 +338,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   lifetimeSeconds: 0
   radius: 5
-  damagePerTick: 14
+  healPerTick: 14
   durationSeconds: 6
   tickSeconds: 1
   followsCaster: 1

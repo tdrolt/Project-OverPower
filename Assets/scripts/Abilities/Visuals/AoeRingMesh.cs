@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Overpower.Abilities
 {
-    /// <summary>One flat mesh for every cell of the AoE Zone's ring, facing up in the ground plane: per cell a hexagon outline (outer and
+    /// <summary>One flat mesh for every cell of the Heal Zone's ring, facing up in the ground plane: per cell a hexagon outline (outer and
     /// inner corners, 0..11) then a fill (centre and inner corners, 12..18), so the view recolours a cell by its own vertex range.</summary>
     public static class AoeRingMesh
     {

@@ -13,8 +13,9 @@ MonoBehaviour:
   m_Name: 27 AoE Zone U
   m_EditorClassIdentifier: 
   id: 27
-  displayName: Zone
-  description: A damaging aura that follows you.
+  displayName: Heal Zone
+  description: A healing aura that follows you and heals you and your teammates inside
+    it.
   slot: 2
   icon: {fileID: 0}
   goldCost: 640

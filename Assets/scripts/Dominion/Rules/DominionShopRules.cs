@@ -5,7 +5,7 @@ using Overpower.Match;
 namespace Overpower.Dominion
 {
     /// <summary>
-    /// What the Dominion shop opens each round. The tables come from DominionConfig and are
+    /// What the Dominion shop opens each round, and when it takes picks. The tables come from DominionConfig and are
     /// passed in. Weapon depth counts steps up the weapon tree: the Baseline pistol (the root) is 0, a weapon family 1, a family's upgrade 2.
     /// </summary>
     public static class DominionShopRules
@@ -24,25 +24,17 @@ namespace Overpower.Dominion
             return table[index];
         }
 
-        /// <summary>The shop takes picks in the Break only - plus the one pick a late joiner makes before spawning.</summary>
-        public static bool MayPick(DominionStage stage, bool lateJoinerFirstPick) =>
-            stage == DominionStage.Break || lateJoinerFirstPick;
+        /// <summary>The shop takes picks anywhere, in the break and at any time during a round (its play, overtime and sudden death), with
+        /// the round's limits either way. Only while no round or break is on (before the first break, after the match) is it shut.</summary>
+        public static bool MayPick(DominionStage stage) =>
+            stage == DominionStage.Break || DominionRules.IsRoundPlay(stage) || stage == DominionStage.SuddenDeath;
 
-        /// <summary>NotInBreak while a live Dominion match is outside the break (and the late joiner's one pick is not open), else None.
-        /// Conquest and the warm-up are never blocked by this.</summary>
-        public static PurchaseBlock PickBlock(bool dominionLive, DominionStage stage, bool lateJoinerPickOpen) =>
-            dominionLive && !MayPick(stage, lateJoinerPickOpen) ? PurchaseBlock.NotInBreak : PurchaseBlock.None;
+        /// <summary>NotInBreak while a live Dominion match has no round or break on, else None. Conquest and the warm-up are never blocked by this.</summary>
+        public static PurchaseBlock PickBlock(bool dominionLive, DominionStage stage) =>
+            dominionLive && !MayPick(stage) ? PurchaseBlock.NotInBreak : PurchaseBlock.None;
 
-        /// <summary>The words of the shop header's free note: the late joiner's own while their one pick is open mid-round, the break's otherwise.</summary>
-        public static string HeaderFreeText(DominionStage stage, bool lateJoinerPickOpen, string breakText, string lateJoinerText) =>
-            HeaderNamesLateJoinerPick(stage, lateJoinerPickOpen) ? lateJoinerText : breakText;
-
-        /// <summary>True when the shop header should name the late joiner's one pick ("Free (your one pick)") instead of the break: the pick is
-        /// open and the room is not in a break.</summary>
-        public static bool HeaderNamesLateJoinerPick(DominionStage stage, bool lateJoinerPickOpen) =>
-            lateJoinerPickOpen && stage != DominionStage.Break;
-
-        /// <summary>A late joiner's one pick lasts only while the round they joined in is still going.</summary>
+        /// <summary>A fresh joiner finds the shop opened by itself only while the round they joined in is still going (in a break the break
+        /// card points everyone to it).</summary>
         public static bool LateJoinerWindowOpen(DominionStage stage) =>
             DominionRules.IsRoundPlay(stage) || stage == DominionStage.SuddenDeath;
 

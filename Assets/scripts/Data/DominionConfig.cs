@@ -21,7 +21,7 @@ namespace Overpower.Data
         [Tooltip("How long one round lasts, in seconds, before the team with the most points wins it.")]
         [SerializeField, Min(1f)] private float roundSeconds = 180f;
 
-        [Tooltip("How long the break between rounds lasts, in seconds (the shop is open during it).")]
+        [Tooltip("How long the break between rounds lasts, in seconds (the shop is open during it, as it is all through every round).")]
         [SerializeField, Min(0f)] private float breakSeconds = 20f;
 
         [Tooltip("The last seconds of the break that read Round N starts in ... as a countdown.")]

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Overpower.Abilities
 {
-    /// <summary>The AoE Zone's ring: hexagon cells on one grid (a corner toward +Z, as the floor's tiles) in a band just inside the zone's
+    /// <summary>The Heal Zone's ring: hexagon cells on one grid (a corner toward +Z, as the floor's tiles) in a band just inside the zone's
     /// real radius, which of them are lit at a moment, and their colours. The lit cells come only from a seed (StunArcsRule.Seed on the
     /// server clock and the caster), so every client flickers the same cells; the cell order is the grid's, the same on every client.</summary>
     public static class AoeRingLook
@@ -42,8 +42,8 @@ namespace Overpower.Abilities
 
         public static bool Lit(int seed, int cell, float litShare) => StunArcsRule.Hash01(seed, cell, 0) < litShare;
 
-        public static Color Line(Color danger, bool lit, float litAlpha, float dimAlpha) => VisualTint.WithAlpha(danger, lit ? litAlpha : dimAlpha);
+        public static Color Line(Color colour, bool lit, float litAlpha, float dimAlpha) => VisualTint.WithAlpha(colour, lit ? litAlpha : dimAlpha);
 
-        public static Color Fill(Color danger, bool lit, float fillAlpha) => VisualTint.WithAlpha(danger, lit ? fillAlpha : 0f);
+        public static Color Fill(Color colour, bool lit, float fillAlpha) => VisualTint.WithAlpha(colour, lit ? fillAlpha : 0f);
     }
 }

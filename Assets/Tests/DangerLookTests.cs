@@ -13,9 +13,9 @@ using UnityEngine;
 
 namespace Overpower.Tests
 {
-    /// <summary>The two danger ultimates in red: the AoE Zone a flat ring of flickering hexagon cells inside a hard edge at its real radius,
-    /// the Raybeam one hard beam per hit line at its real width with a white-hot core, and a scorch where a beam stops on a surface. Every
-    /// colour comes from the ability's row in the look table (Gold here, so a view that hard-codes red is caught).</summary>
+    /// <summary>The two zone and beam ultimates: the Heal Zone a flat ring of flickering hexagon cells inside a hard edge at its real radius (the
+    /// edge in the caster's team colour), the Raybeam one hard beam per hit line at its real width with a white-hot core, and a scorch where a
+    /// beam stops on a surface. Every body colour comes from the ability's row in the look table (Gold here, so a hard-coded colour is caught).</summary>
     public class DangerLookTests
     {
         private const BindingFlags Any = MovementLookTestKit.Any;
@@ -29,6 +29,8 @@ namespace Overpower.Tests
         private const string LaserBeamPath = "Assets/Gameplay/Projectiles/Laser Beam VFX.prefab";
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly Color White = new Color(0.93f, 0.96f, 0.99f, 1f);
+        private static readonly Color Green = new Color(0.21f, 0.83f, 0.27f, 1f);
+        private static readonly Color[] TeamColours = { new Color(0.9f, 0.3f, 0.1f, 1f), new Color(0.6f, 0.2f, 0.9f, 1f), new Color(0.1f, 0.8f, 0.9f, 1f) };
 
         // ---- AoE Zone rules ----
 
@@ -95,6 +97,7 @@ namespace Overpower.Tests
             using (var kit = new MovementLookTestKit(AoeId, LookShape.HexGridRing))
             {
                 SetAoeLook(kit.Look);
+                kit.Theme.teamShotColors = (Color[])TeamColours.Clone();
                 var parts = NewZone(kit, 3.7f, owner: 7, out AoeZone zone, out AoeZoneView view);
                 int renderers = zone.GetComponentsInChildren<Renderer>(true).Length;
 
@@ -108,7 +111,7 @@ namespace Overpower.Tests
                 for (int i = 0; i < edge.positionCount; i++)
                     Assert.AreEqual(3.7f, new Vector2(edge.GetPosition(i).x, edge.GetPosition(i).y).magnitude, 1e-4f, "the edge sits on the zone's real Radius");
                 Assert.AreEqual(0.11f, edge.startWidth, 1e-5f, "Aoe Edge Width");
-                MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, edge.startColor, "the edge wears the AoE Zone's row in the look table");
+                MovementLookTestKit.AssertRgb(TeamColours[1], edge.startColor, "the outer ring wears the caster's team colour: the zone heals only that team");
                 Assert.AreEqual(0.95f, edge.startColor.a, 1f / 255f, "Aoe Edge Alpha");
 
                 Mesh mesh = parts.cells.sharedMesh;
@@ -163,6 +166,32 @@ namespace Overpower.Tests
                 parts.cells.sharedMesh.colors = colours;
                 view.Flicker(2000 + 3 * 125);
                 Assert.AreNotEqual(colours, parts.cells.sharedMesh.colors, "a later step lights other cells");
+            }
+        }
+
+        [Test]
+        public void TheHealZoneIsGreenWithItsOuterRingInTheCastersTeamColour()
+        {
+            using (var kit = new MovementLookTestKit(AoeId, LookShape.HexGridRing, LookFamily.Heal))
+            {
+                SetAoeLook(kit.Look);
+                kit.Theme.healGreenColor = Green;
+                kit.Theme.teamShotColors = (Color[])TeamColours.Clone();
+                var parts = NewZone(kit, 4f, owner: 7, out AoeZone zone, out AoeZoneView view);
+                view.OnDeployablePlaced(zone);
+                foreach (Color c in parts.cells.sharedMesh.colors)
+                    MovementLookTestKit.AssertRgb(Green.linear, c, "the cells wear the healing green of the zone's row");
+                MovementLookTestKit.AssertRgb(TeamColours[1], parts.edge.startColor, "the outer ring: the caster's team (team 1 here)");
+
+                var other = NewZone(kit, 4f, owner: 8, out AoeZone otherZone, out AoeZoneView otherView);
+                typeof(NetworkedDeployable).GetProperty(nameof(NetworkedDeployable.OwnerTeam)).GetSetMethod(true).Invoke(otherZone, new object[] { 2 });
+                otherView.OnDeployablePlaced(otherZone);
+                MovementLookTestKit.AssertRgb(TeamColours[2], other.edge.startColor, "another team's zone shows its own team");
+
+                var unknown = NewZone(kit, 4f, owner: 9, out AoeZone unknownZone, out AoeZoneView unknownView);
+                typeof(NetworkedDeployable).GetProperty(nameof(NetworkedDeployable.OwnerTeam)).GetSetMethod(true).Invoke(unknownZone, new object[] { -1 });
+                unknownView.OnDeployablePlaced(unknownZone);
+                MovementLookTestKit.AssertRgb(Green, unknown.edge.startColor, "no team known: the ring stays green");
             }
         }
 

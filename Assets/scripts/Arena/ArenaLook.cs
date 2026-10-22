@@ -303,30 +303,30 @@ namespace Overpower.Arena
         [Tooltip("How much a fence pylon glows in its owner's colour on top of its body: 0 not at all, 1 as bright as the team colour; above 1 they start to bloom.")]
         [Min(0f)] public float fencePylonGlow = 1.2f;
 
-        [Header("AoE Zone")]
-        [Tooltip("How deep the ring of hexagon cells inside the AoE Zone's edge is, in metres. The middle of the zone stays clear so the players standing in it are easy to see; the edge line still marks the whole area that hurts.")]
+        [Header("Heal Zone")]
+        [Tooltip("How deep the ring of hexagon cells inside the Heal Zone's edge is, in metres. The middle of the zone stays clear so the players standing in it are easy to see; the edge line still marks the whole area that heals.")]
         [Min(0f)] public float aoeRingBand = 1.6f;
-        [Tooltip("How wide one hexagon cell of the AoE Zone's ring is across its flat sides, in metres. Smaller cells make a finer, busier ring.")]
+        [Tooltip("How wide one hexagon cell of the Heal Zone's ring is across its flat sides, in metres. Smaller cells make a finer, busier ring.")]
         [Min(0.1f)] public float aoeCellSize = 0.7f;
-        [Tooltip("How much dark floor shows between two neighbouring cells of the AoE Zone's ring, in metres, so each cell reads as its own hexagon.")]
+        [Tooltip("How much dark floor shows between two neighbouring cells of the Heal Zone's ring, in metres, so each cell reads as its own hexagon.")]
         [Min(0f)] public float aoeCellGap = 0.08f;
-        [Tooltip("How thick the outline of each hexagon cell in the AoE Zone's ring is, in metres.")]
+        [Tooltip("How thick the outline of each hexagon cell in the Heal Zone's ring is, in metres.")]
         [Min(0.005f)] public float aoeCellLineWidth = 0.05f;
-        [Tooltip("How thick the hard red line round the AoE Zone's edge is, in metres. It sits on the zone's real radius: inside it you take damage.")]
+        [Tooltip("How thick the hard line round the Heal Zone's edge is, in metres. It wears the caster's team colour and sits on the zone's real radius: inside it the caster's team heals.")]
         [Min(0.01f)] public float aoeEdgeWidth = 0.16f;
-        [Tooltip("How solid the line round the AoE Zone's edge is, from 0 (invisible) to 1 (solid).")]
+        [Tooltip("How solid the line round the Heal Zone's edge is, from 0 (invisible) to 1 (solid).")]
         [Range(0f, 1f)] public float aoeEdgeAlpha = 1f;
-        [Tooltip("How many of the AoE Zone's cells are lit at any moment, as a share of them all: 0 leaves every cell dim, 1 lights them all and the ring stops flickering.")]
+        [Tooltip("How many of the Heal Zone's cells are lit at any moment, as a share of them all: 0 leaves every cell dim, 1 lights them all and the ring stops flickering.")]
         [Range(0f, 1f)] public float aoeLitShare = 0.35f;
-        [Tooltip("How solid the outline of a lit AoE Zone cell is, from 0 (invisible) to 1 (solid).")]
+        [Tooltip("How solid the outline of a lit Heal Zone cell is, from 0 (invisible) to 1 (solid).")]
         [Range(0f, 1f)] public float aoeLitLineAlpha = 0.85f;
-        [Tooltip("How solid the outline of a dim AoE Zone cell is, from 0 (invisible) to 1 (solid). Keep it above 0 so the whole ring always shows.")]
+        [Tooltip("How solid the outline of a dim Heal Zone cell is, from 0 (invisible) to 1 (solid). Keep it above 0 so the whole ring always shows.")]
         [Range(0f, 1f)] public float aoeDimLineAlpha = 0.3f;
-        [Tooltip("How strongly a lit AoE Zone cell fills with red between its lines, from 0 (lines only) to 1 (solid). Keep it low so a player standing on a lit cell stays easy to see.")]
+        [Tooltip("How strongly a lit Heal Zone cell fills with green between its lines, from 0 (lines only) to 1 (solid). Keep it low so a player standing on a lit cell stays easy to see.")]
         [Range(0f, 1f)] public float aoeLitFillAlpha = 0.3f;
-        [Tooltip("How many times a second the AoE Zone's cells change which ones are lit. The pattern comes from the server clock and the caster, so every player sees the same flicker.")]
+        [Tooltip("How many times a second the Heal Zone's cells change which ones are lit. The pattern comes from the server clock and the caster, so every player sees the same flicker.")]
         [Min(0.1f)] public float aoeFlickerRate = 8f;
-        [Tooltip("How high above the floor the AoE Zone's ring is drawn, in metres: just enough that it never flickers into the floor.")]
+        [Tooltip("How high above the floor the Heal Zone's ring is drawn, in metres: just enough that it never flickers into the floor.")]
         [Min(0f)] public float aoeLift = 0.04f;
 
         [Header("Raybeam")]
@@ -428,8 +428,8 @@ namespace Overpower.Arena
         [Min(0.02f)] public float healSparkSize = 0.8f;
         [Tooltip("How brightly the green plus signs glow. Above 1 they catch a thin halo from the bloom; keep it low enough that a healing player stays easy to see.")]
         [Min(0f)] public float healSparkGlow = 2f;
-        [Tooltip("How long the green plus signs keep rising after a player's health last went up, in seconds. It bridges the gaps between health updates from other players, and lets a health pack's one big heal show for a moment.")]
-        [Min(0f)] public float healSparkTailSeconds = 0.9f;
+        [Tooltip("How long the green plus signs keep rising after a player's health last went up, in seconds. It bridges the gaps between health updates from other players and between the Heal Zone's ticks (keep it above the zone's Tick Seconds, or the signs blink off between ticks), and lets a health pack's one big heal show for a moment.")]
+        [Min(0f)] public float healSparkTailSeconds = 1.2f;
         [Tooltip("A rise in health that comes together with the body jumping more than this many metres is a respawn or a new round putting the player back at their spawn, not healing, so it shows no green plus signs. Larger than any normal step between two health updates.")]
         [Min(0.5f)] public float healSpawnJumpMetres = 5f;
 

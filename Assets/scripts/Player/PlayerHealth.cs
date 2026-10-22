@@ -468,7 +468,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         health = Mathf.Min(maxHealth, health + rate * deltaTime);
     }
 
-    /// <summary>A health pack heals here. Owner only (health is this client's own), alive only, never above max health;
+    /// <summary>A health pack and the Heal Zone heal here. Owner only (health is this client's own), alive only, never above max health;
     /// returns how much actually landed. Reaches the other clients the same way regen does, through PlayerNetSync's
     /// serialize tick reading Health live, and updates the overhead bar at once.</summary>
     public float Heal(float amount)
@@ -494,7 +494,7 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         // return on purpose, so it fires on a copy the shooter does not own. A self-hit raises nothing.
         //
         // Only for a source whose HitPoint is a genuine point of impact (Projectile, Splash, Contact). Burn and Zone
-        // carry the field's or zone's own centre (FireField, AoeZone, ElectricFence), which would anchor the next
+        // carry the field's own centre (FireField, ElectricFence), which would anchor the next
         // number at that stationary point instead of falling back to the victim's centre.
         if (!photonView.IsMine && PhotonNetwork.LocalPlayer != null
             && info.SourceActorNumber == PhotonNetwork.LocalPlayer.ActorNumber

@@ -3,7 +3,7 @@ using UnityEngine;
 namespace Overpower.Combat
 {
     /// <summary>
-    /// The one place that builds the damage and status of a lasting effect (a mine, a fence, a zone, a fire field, a burn), so each
+    /// The one place that builds the damage and status of a lasting effect (a mine, a fence, a fire field, a burn), so each
     /// carries the server time it was set up (A26). The components call these instead of building the DamageInfo inline, so a test can
     /// say "a mine's hit carries when the mine was laid" and the game cannot quietly stop doing it.
     /// </summary>
@@ -13,9 +13,6 @@ namespace Overpower.Combat
             new DamageInfo(amount, actor, team, -1, DamageSource.Splash, false, at, abilityId, effectPlacedMs: placedMs);
 
         public static DamageInfo FenceTick(float amount, int actor, int team, Vector3 at, int abilityId, int placedMs) =>
-            new DamageInfo(amount, actor, team, -1, DamageSource.Zone, false, at, abilityId, effectPlacedMs: placedMs);
-
-        public static DamageInfo AoeZoneTick(float amount, int actor, int team, Vector3 at, int abilityId, int placedMs) =>
             new DamageInfo(amount, actor, team, -1, DamageSource.Zone, false, at, abilityId, effectPlacedMs: placedMs);
 
         public static DamageInfo FireFieldBurn(float amount, int actor, int team, int weaponId, Vector3 at, int placedMs) =>

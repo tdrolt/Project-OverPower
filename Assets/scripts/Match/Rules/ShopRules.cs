@@ -11,7 +11,8 @@ namespace Overpower.Match
         /// <summary>GDD: out of combat for the shop's required seconds.</summary>
         InCombat,
         CannotAfford,
-        /// <summary>Dominion: picks are only possible in the break (plus a late joiner's one pick).</summary>
+        /// <summary>Dominion: no round or break is on (before the first break, after the match), so no picks (telemetry writes it
+        /// "not in break").</summary>
         NotInBreak,
     }
 
@@ -62,7 +63,7 @@ namespace Overpower.Match
         public static bool IsFree(bool freeLoadout, bool matchLive, bool dominionMatch = false) => dominionMatch || freeLoadout || !matchLive;
 
         /// <summary>Whether a reset hands out the prefab's starting ultimate: only while the shop is free, and never in a live Dominion match
-        /// (the shop is free there too, but the ultimate is picked in the break like everything else).</summary>
+        /// (the shop is free there too, but the ultimate is picked in the shop like everything else).</summary>
         public static bool StartingUltimateHandedOut(bool freeLoadout, bool matchLive, bool dominionMatch) =>
             !(dominionMatch && matchLive) && IsFree(freeLoadout, matchLive, dominionMatch);
 

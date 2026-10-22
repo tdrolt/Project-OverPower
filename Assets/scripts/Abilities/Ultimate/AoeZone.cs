@@ -3,22 +3,18 @@ using ExitGames.Client.Photon;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Overpower.Combat;
 using Overpower.Vision;
 
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// The AoE ultimate's zone: a disc that ticks damage (Radius, Damage Per Tick, Duration Seconds, Tick Seconds below) and
-    /// follows its caster. AoeZoneAbility only decides WHEN it goes down; everything it does once placed lives here.
-    /// TICK ON EVERY CLIENT, DESTROY ON THE OWNER ONLY (the FireField pattern): ApplyDamage on a remote copy of THEIR
-    /// PlayerHealth returns default(), so owner-only ticking would hurt nobody else. Every client runs its own
-    /// ZoneTickSchedule on the same clock (Age + real time on this client, as Mine.cs does), so a late joiner pays exactly
-    /// the ticks it is owed. No per-tick logging: the old AoE froze a 9-player playtest doing it. NetworkedDeployable's
-    /// Lifetime Seconds is unused: duration and tick count are one number seen two ways, so the finished schedule ends the
-    /// zone (RequestDestroy). Following reads the caster's PhotonView transform, which PlayerNetSync lerps toward the last
-    /// received position, so a victim can be inside the zone on their own client while the caster's screen shows them
-    /// clear, and ApplyTick (victim-side) hits anyway: the accepted victim-favours-the-defender trade-off, as projectiles.
+    /// The Heal Zone (the zone ultimate): a disc that follows its caster and on every tick heals the caster and the caster's teammates
+    /// inside (the numbers below). AoeZoneAbility only decides WHEN it goes down. TICK ON EVERY CLIENT, DESTROY ON THE OWNER ONLY (the
+    /// FireField pattern): PlayerHealth.Heal on a remote copy does nothing, so each healed player's own client heals them, as damage is
+    /// victim-side. NetworkedDeployable's Lifetime Seconds is unused: the finished tick schedule ends the zone (RequestDestroy). No
+    /// per-tick logging: the old AoE froze a 9-player playtest doing it.
     /// </summary>
     [RequireComponent(typeof(PhotonView))]
     public sealed class AoeZone : NetworkedDeployable, IInRoomCallbacks
@@ -28,15 +24,16 @@ namespace Overpower.Abilities
                  "number: 5.")]
         private float radius = 5f;
 
-        [SerializeField, Tooltip("Damage dealt to every enemy standing inside on each tick. Claude's " +
-                 "number: 14 - 84 over the full 6-tick duration.")]
-        private float damagePerTick = 14f;
+        [SerializeField, FormerlySerializedAs("damagePerTick"), Tooltip("Health given back on each tick to you and every teammate " +
+                 "standing inside. Never past full health, and never armour. Enemies inside are not touched. 14 a tick heals up to 84 " +
+                 "over the full 6 ticks.")]
+        private float healPerTick = 14f;
 
         [SerializeField, Tooltip("How long the zone lasts, in seconds, before it disappears on its " +
                  "own. Tudor's spec: 6.")]
         private float durationSeconds = 6f;
 
-        [SerializeField, Tooltip("Seconds between damage ticks - tick k lands at k * Tick Seconds " +
+        [SerializeField, Tooltip("Seconds between heal ticks - tick k lands at k * Tick Seconds " +
                  "after the zone was placed. Tudor's spec: 1.0, which with a 6s duration gives " +
                  "exactly 6 ticks.")]
         private float tickSeconds = 1f;
@@ -50,9 +47,8 @@ namespace Overpower.Abilities
         // A thrown zone stays where it landed, so it counts as a placed deployable for the corner-close clean-up.
         protected override bool FollowsCaster => followsCaster && !Thrown;
 
-        [SerializeField, Tooltip("Which layers this zone can hit. Default is where living players " +
-                 "and practice dummies are; nothing on any other layer has an IDamageable to find, so " +
-                 "widening this only costs performance.")]
+        [SerializeField, Tooltip("Which layers this zone looks for players on. Default is every layer; " +
+                 "only players can be healed, so narrowing it to the players' layer only saves performance.")]
         private LayerMask detectionMask = ~0;
 
         [SerializeField, Tooltip("The zone's visible mesh, if any. Resized sideways to match Radius " +
@@ -67,17 +63,18 @@ namespace Overpower.Abilities
         // Scratch set for one tick's overlap pass, so a target of several colliders is only counted once (as FireField).
         private readonly HashSet<IDamageable> seenThisTick = new HashSet<IDamageable>();
         private readonly List<IDamageable> candidateBuffer = new List<IDamageable>();
+        private readonly List<IDamageable> healedBuffer = new List<IDamageable>();
 
         private ZoneTickSchedule schedule;
         private CasterFollower follower;
 
-        /// <summary>Telemetry: the id of the AoeZoneAbility that placed this, threaded through instantiationData because
-        /// this deployable is a separate prefab with no AbilityDefinition. -1 if the data is missing.</summary>
+        /// <summary>The id of the AoeZoneAbility that placed this, threaded through instantiationData because this deployable is a
+        /// separate prefab with no AbilityDefinition. -1 if the data is missing.</summary>
         public int AbilityId { get; private set; } = -1;
 
-        /// <summary>Radius, Damage Per Tick, Duration Seconds and Tick Seconds, read-only - the shop's pop-up shows them.</summary>
+        /// <summary>Radius, Heal Per Tick, Duration Seconds and Tick Seconds, read-only - the shop's pop-up shows them.</summary>
         public float Radius => radius;
-        public float DamagePerTick => damagePerTick;
+        public float HealPerTick => healPerTick;
         public float DurationSeconds => durationSeconds;
         public float TickSeconds => tickSeconds;
 
@@ -127,7 +124,7 @@ namespace Overpower.Abilities
         private void OnValidate()
         {
             radius = Mathf.Max(0.1f, radius);
-            damagePerTick = Mathf.Max(0f, damagePerTick);
+            healPerTick = Mathf.Max(0f, healPerTick);
             durationSeconds = Mathf.Max(0.01f, durationSeconds);
             tickSeconds = Mathf.Max(0.01f, tickSeconds);
         }
@@ -175,6 +172,7 @@ namespace Overpower.Abilities
             if (schedule == null)
                 return;
 
+            // Every client runs its own schedule on the same clock (Age + real time here, as Mine.cs), so a late joiner gets exactly the ticks it is owed.
             float secondsSincePlaced = (float)Age + (Time.time - localPlacedRealTime);
             int dueTicks = schedule.ConsumeDueTicks(secondsSincePlaced);
             for (int i = 0; i < dueTicks; i++)
@@ -208,12 +206,12 @@ namespace Overpower.Abilities
                 candidateBuffer.Add(candidate);
             }
 
-            // Not a teammate, not the caster, not a structure, and locally authoritative - Mine.cs's rule (MineTargeting).
-            List<IDamageable> targets = MineTargeting.SelectTargets(candidateBuffer, OwnerActor, OwnerTeam);
-            foreach (IDamageable target in targets)
-            {
-                target.ApplyDamage(PlacedEffects.AoeZoneTick(damagePerTick, OwnerActor, OwnerTeam, transform.position, AbilityId, PlacedServerTimestampMs));
-            }
+            // The zone follows the caster's lerped copy, so a teammate can be inside on their own client while the caster's screen
+            // shows them just outside: the heal follows the healed player's own screen.
+            HealZoneTargeting.SelectHealed(candidateBuffer, OwnerActor, OwnerTeam, healedBuffer);
+            for (int i = 0; i < healedBuffer.Count; i++)
+                if (healedBuffer[i] is PlayerHealth player)
+                    player.Heal(healPerTick);
         }
     }
 }
