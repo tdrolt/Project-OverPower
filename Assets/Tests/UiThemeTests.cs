@@ -139,7 +139,7 @@ namespace Overpower.Tests
         {
             string yaml = System.IO.File.ReadAllText("Assets/Gameplay/Config/UiTheme.asset").Replace("\r\n", "\n");
             foreach (string name in new[] { "statusStunnedColor", "movementGreyColor", "fireCoreColor", "fireEdgeColor", "dangerColor",
-                         "flashWhiteColor", "arenaNeutralLineColor", "arenaOutOfPlayLineColor", "arenaLook" })
+                         "flashWhiteColor", "healGreenColor", "arenaNeutralLineColor", "arenaOutOfPlayLineColor", "arenaLook" })
             {
                 FieldInfo f = typeof(UiTheme).GetField(name);
                 Assert.NotNull(f, name);

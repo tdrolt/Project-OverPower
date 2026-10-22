@@ -20,14 +20,16 @@ MonoBehaviour:
   minimumMissingHealth: 0
   maxAttemptsPerVisit: 6
   pendingWriteSeconds: 1.5
-  glowHeightMetres: 0.05
-  readyColour: {r: 0.2, g: 0.9, b: 0.3, a: 1}
-  glowColour: {r: 0.2, g: 0.9, b: 0.3, a: 0.35}
   takenColour: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  readyGlow: 1.6
+  respawningBrightness: 0.45
+  padColour: {r: 0.05, g: 0.055, b: 0.065, a: 1}
+  padThicknessMetres: 0.08
+  padEdgeWidthMetres: 0.09
+  padFillAlpha: 0
   crossSizeMetres: 1.2
-  glowDiameterMetres: 2.4
   floatHeightMetres: 1.2
   bobHeightMetres: 0.15
   bobCyclesPerSecond: 0.6
-  crossLeanDegrees: 35
+  crossLeanDegrees: 65
   spinDegreesPerSecond: 60

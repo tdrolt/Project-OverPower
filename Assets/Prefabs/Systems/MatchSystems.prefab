@@ -347,6 +347,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   config: {fileID: 11400000, guid: 40e14b735081ac443afb77696ee3e3d3, type: 2}
+  theme: {fileID: 11400000, guid: f62f37c594a04704dabc20018ea290d9, type: 2}
 --- !u!114 &4576037948649082989
 MonoBehaviour:
   m_ObjectHideFlags: 0

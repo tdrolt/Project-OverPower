@@ -196,6 +196,16 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         UpdateOverheadBar();
     }
 
+    // The green plus signs while this player's health goes up, on every client's copy: they read the health this class already shows.
+    private void Start()
+    {
+        var capsule = GetComponent<CapsuleCollider>();
+        float feetBelowRoot = capsule != null
+            ? Overpower.Combat.AbilityVisualGeometry.RootAboveFeet(capsule.center.y, capsule.height, transform.lossyScale.y)
+            : 0f;
+        Overpower.Arena.HealSparksView.TryCreate(transform, photonView, this, theme, feetBelowRoot);
+    }
+
     /// <summary>Hides (or shows) the whole overhead bar; called from PlayerLifecycle.ApplyAliveState, which runs on
     /// every client for every player. Keyed off the caller's own alive value rather than IsAlive: isDead is only
     /// written on the owner's machine (ApplyDamage's IsMine guard), and this caller is what updates

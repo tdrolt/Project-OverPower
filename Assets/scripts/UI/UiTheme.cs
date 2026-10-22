@@ -2105,6 +2105,8 @@ namespace Overpower.UI
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]
         public Color flashWhiteColor = new Color(1f, 1f, 1f, 1f);
+        [Tooltip("The green of healing: the health packs' cross and the edge of their pad, the plus-shaped sparks rising round any player whose health is going up, and the Heal Zone. Keep it clearly green, never blue-green: it must not read as the cyan team, the electric blue of the Stun Gun or the white of a hit.")]
+        public Color healGreenColor = new Color(0.25f, 1f, 0.3f, 1f);
         [Tooltip("The light grey of the lines on ground and walls around a zone nobody owns. Bright enough that the zone stands out from the faint grid, but never glowing and never a colour, so a neutral zone is not mistaken for owned ground.")]
         public Color arenaNeutralLineColor = new Color(0.6f, 0.62f, 0.66f, 1f);
         [Tooltip("The plain grey of the lines on ground and walls in a zone that is out of play (a closed corner, or a capital nobody plays for). Darker than a neutral zone's lines and never glowing, so it reads as dead ground, but still light enough that the dark walls there keep their stripes and the line along their top.")]

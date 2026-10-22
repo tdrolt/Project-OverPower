@@ -245,6 +245,15 @@ MonoBehaviour:
   feetHexEdgeAlpha: 0.9
   feetHexFillAlpha: 0.2
   feetHexLift: 0.03
+  healSparkCount: 7
+  healSparkRiseSeconds: 1.1
+  healSparkRadius: 1.25
+  healSparkStartHeight: 0.3
+  healSparkRiseMetres: 1.9
+  healSparkSize: 0.8
+  healSparkGlow: 2
+  healSparkTailSeconds: 0.9
+  healSpawnJumpMetres: 5
   outsideLineColor: {r: 0.8, g: 0.86, b: 0.92, a: 1}
   outsideStripeGlow: 0.35
   stripeGlow: 1.2

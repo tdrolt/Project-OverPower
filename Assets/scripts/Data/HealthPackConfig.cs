@@ -4,7 +4,8 @@ namespace Overpower.Data
 {
     /// <summary>
     /// The three Tier III health packs: how much they heal, how long they stay gone, how close you have to
-    /// stand (where each pack stands is in ArenaLayout), and what they look like. One asset, shared by every pack.
+    /// stand (where each pack stands is in ArenaLayout), and what they look like (their green is the UI Theme's healing
+    /// green). One asset, shared by every pack.
     /// </summary>
     [CreateAssetMenu(menuName = "OverPower/Health Pack Config", fileName = "HealthPackConfig")]
     public sealed class HealthPackConfig : ScriptableObject
@@ -36,23 +37,35 @@ namespace Overpower.Data
                  "own record again. Only matters if the confirmation never arrives.")]
         [SerializeField, Min(0.1f)] private float pendingWriteSeconds = 1.5f;
 
-        [Tooltip("How high, in metres, the glow disc sits above the ground, just enough to not flicker against it.")]
-        [SerializeField, Min(0f)] private float glowHeightMetres = 0.05f;
-
-        [Tooltip("Colour of the floating cross while the pack is ready to take.")]
-        [SerializeField] private Color readyColour = new Color(0.2f, 0.9f, 0.3f, 1f);
-
-        [Tooltip("Colour of the soft glow on the ground under the cross while the pack is ready. Turned off while the pack is gone.")]
-        [SerializeField] private Color glowColour = new Color(0.2f, 0.9f, 0.3f, 0.35f);
-
-        [Tooltip("Colour of the cross while the pack is gone and waiting to come back. It stays in place, greyed out, with no glow.")]
+        [Tooltip("Colour of a pack's cross on the minimap while the pack is gone and waiting to come back. A ready pack shows there in " +
+                 "the healing green of the UI Theme, like the pack itself.")]
         [SerializeField] private Color takenColour = new Color(0.5f, 0.5f, 0.5f, 1f);
+
+        [Tooltip("How brightly the floating cross and the edge of its pad glow while the pack is ready to take. Above 1 they catch a " +
+                 "halo from the bloom. The green itself is the healing green of the UI Theme.")]
+        [SerializeField, Min(0f)] private float readyGlow = 1.6f;
+
+        [Tooltip("How bright the cross and the edge of its pad stay while the pack is gone and waiting to come back, as a share of the " +
+                 "healing green (0 = black, 1 = the full green, unglowing). Low, so a waiting pack reads as off, but high enough that " +
+                 "players still see where it will come back on the darkest floor.")]
+        [SerializeField, Range(0f, 1f)] private float respawningBrightness = 0.45f;
+
+        [Tooltip("Colour of the flat hexagon pad on the floor under the cross: dark, like the arena's walls, so the green edge round it " +
+                 "stands out. The pad reaches exactly as far as the pickup radius, so standing anywhere on it takes the pack.")]
+        [SerializeField] private Color padColour = new Color(0.05f, 0.055f, 0.065f, 1f);
+
+        [Tooltip("How thick the pad on the floor is, in metres: a low plate, never something to step up onto (it has no collider).")]
+        [SerializeField, Min(0.01f)] private float padThicknessMetres = 0.08f;
+
+        [Tooltip("How wide the glowing green edge round the pad is, in metres.")]
+        [SerializeField, Min(0.01f)] private float padEdgeWidthMetres = 0.09f;
+
+        [Tooltip("How strongly the inside of the pad fills with green, from 0 (edge only) to 1 (solid green). Even a few hundredths " +
+                 "already turn the dark pad clearly green, so keep it at 0 for a dark pad with a glowing edge.")]
+        [SerializeField, Range(0f, 1f)] private float padFillAlpha = 0f;
 
         [Tooltip("Size of the cross in metres, tip to tip.")]
         [SerializeField, Min(0.2f)] private float crossSizeMetres = 1.2f;
-
-        [Tooltip("Diameter in metres of the glow on the ground.")]
-        [SerializeField, Min(0.2f)] private float glowDiameterMetres = 2.4f;
 
         [Tooltip("How high above the ground the middle of the cross floats, in metres.")]
         [SerializeField, Min(0f)] private float floatHeightMetres = 1.2f;
@@ -65,8 +78,9 @@ namespace Overpower.Data
 
         [Tooltip("How far the cross leans back from standing straight up, in degrees. 0 = perfectly upright. The game camera " +
                  "looks almost straight down, so a fully upright cross is seen edge-on as a bar; leaning it back lets the plus " +
-                 "sign show. The lean turns with the cross.")]
-        [SerializeField, Range(0f, 80f)] private float crossLeanDegrees = 35f;
+                 "sign show. The lean turns with the cross, so below about 60 the cross is edge-on to the camera for part of every turn " +
+                 "and reads as a green bar.")]
+        [SerializeField, Range(0f, 80f)] private float crossLeanDegrees = 65f;
 
         [Tooltip("How fast the cross turns, in degrees per second.")]
         [SerializeField] private float spinDegreesPerSecond = 60f;
@@ -74,18 +88,20 @@ namespace Overpower.Data
         public float MinimumMissingHealth => minimumMissingHealth;
         public int MaxAttemptsPerVisit => maxAttemptsPerVisit;
         public float PendingWriteSeconds => pendingWriteSeconds;
-        public float GlowHeightMetres => glowHeightMetres;
         public float HealAmount => healAmount;
         public float RespawnSeconds => respawnSeconds;
         public int RespawnMs => Mathf.RoundToInt(respawnSeconds * 1000f);
         public float PickupRadius => pickupRadius;
         public float HostSlackMetres => hostSlackMetres;
         public float RetrySeconds => retrySeconds;
-        public Color ReadyColour => readyColour;
-        public Color GlowColour => glowColour;
         public Color TakenColour => takenColour;
+        public float ReadyGlow => readyGlow;
+        public float RespawningBrightness => respawningBrightness;
+        public Color PadColour => padColour;
+        public float PadThicknessMetres => padThicknessMetres;
+        public float PadEdgeWidthMetres => padEdgeWidthMetres;
+        public float PadFillAlpha => padFillAlpha;
         public float CrossSizeMetres => crossSizeMetres;
-        public float GlowDiameterMetres => glowDiameterMetres;
         public float FloatHeightMetres => floatHeightMetres;
         public float BobHeightMetres => bobHeightMetres;
         public float BobCyclesPerSecond => bobCyclesPerSecond;

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Overpower.Arena;
 using Overpower.Data;
+using Overpower.UI;
 using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
@@ -19,8 +20,8 @@ namespace Overpower.Match
     ///
     /// Every client builds the packs itself (they are not networked objects) once each Tier III tower has
     /// registered, and draws them from the Room Property and the server clock alone, so all clients agree. A
-    /// taken pack stays in place greyed out with no glow until it returns. A Tier III zone that is out of play
-    /// after the map shrinks hides its pack and cannot be taken.
+    /// taken pack stays in place, its cross and pad edge dimmed, until it returns (HealthPackView draws it). A Tier III
+    /// zone that is out of play after the map shrinks hides its pack and cannot be taken.
     /// </summary>
     public sealed class HealthPackManager : MonoBehaviourPunCallbacks
     {
@@ -35,18 +36,16 @@ namespace Overpower.Match
         [SerializeField, Tooltip("The health pack numbers: heal amount, respawn time, pickup radius, and the look.")]
         private HealthPackConfig config;
 
+        [SerializeField, Tooltip("The UI Theme: the packs take their healing green from it, and the green edge's material from its Arena Look.")]
+        private UiTheme theme;
+
         private sealed class Pack
         {
             public int zone;
             public string key;             // "hp" + zone, built once
             public Vector3 centre;         // the ground point of the pack, in the zone's recess
             public GameObject root;
-            public Transform cross;        // spins and bobs
-            public Transform lean;         // holds the two bars, leaned back from upright
-            public Renderer[] crossRenderers;
-            public GameObject glow;
-            public bool colourKnown;
-            public bool shownReady;
+            public HealthPackView view;
             // Asking side (every client)
             public bool hasOutstanding;
             public float requestSentAt;
@@ -58,10 +57,7 @@ namespace Overpower.Match
 
         private readonly Dictionary<int, Pack> packs = new Dictionary<int, Pack>();
         private System.Func<int, bool> hasPackNow; // made once: a lambda written at the call would be a new object every frame
-        private static readonly int ColorId = Shader.PropertyToID("_BaseColor");
-        private MaterialPropertyBlock block;
-        private Material crossMaterial;
-        private Material glowMaterial;
+        private Material solidMaterial; // the pads and crosses share it; each is coloured by a property block
 
         private float nextLocalSearchAt;
         private int nextRequestId;
@@ -80,11 +76,10 @@ namespace Overpower.Match
         public IEnumerable<int> PackZones => packs.Keys;
         public bool HasPack(int zone) => packs.ContainsKey(zone);
         public Vector3 PackCentre(int zone) => packs.TryGetValue(zone, out Pack p) ? p.centre : Vector3.zero;
-        /// <summary>The cross is drawn (zone in play), ready or greyed.</summary>
+        /// <summary>The cross is drawn (zone in play), ready or dimmed.</summary>
         public bool IsCrossShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.root.activeSelf;
-        /// <summary>The cross is drawn green with its glow: ready to take.</summary>
-        public bool IsReadyShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.root.activeSelf && p.shownReady;
-        public bool IsGlowShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.glow.activeSelf;
+        /// <summary>The cross is drawn glowing: ready to take.</summary>
+        public bool IsReadyShown(int zone) => packs.TryGetValue(zone, out Pack p) && p.root.activeSelf && p.view.ShownReady;
         public int[] RoomValue(int zone) => packs.TryGetValue(zone, out Pack p) ? ReadRoomValue(p.key) : null;
 
         /// <summary>For the minimap: where a pack is and whether it is ready to take right now. False for a zone
@@ -96,7 +91,7 @@ namespace Overpower.Match
             if (!packs.TryGetValue(zone, out Pack pack) || !pack.root.activeSelf)
                 return false;
             worldPosition = pack.centre;
-            ready = pack.shownReady;
+            ready = pack.view.ShownReady;
             return true;
         }
 
@@ -106,13 +101,14 @@ namespace Overpower.Match
             hasPackNow = zone => packs.ContainsKey(zone);
             if (config == null)
                 Debug.LogError($"[HealthPackManager] {name}: Health Pack Config is not assigned - there will be no health packs.");
+            if (theme == null)
+                Debug.LogError($"[HealthPackManager] {name}: UI Theme is not assigned - the health packs will be drawn white, with no glowing edge.");
         }
 
         private void OnDestroy()
         {
             if (Instance == this) Instance = null;
-            if (crossMaterial != null) Destroy(crossMaterial);
-            if (glowMaterial != null) Destroy(glowMaterial);
+            if (solidMaterial != null) Destroy(solidMaterial);
         }
 
         private void Update()
@@ -133,7 +129,7 @@ namespace Overpower.Match
                 bool available = IsPackAvailable(pack, now, match);
                 Show(pack, inPlay, available);
                 if (inPlay)
-                    AnimateCross(pack);
+                    pack.view.Animate(Time.time);
             }
 
             TryRequestLocal(now, match);
@@ -185,100 +181,18 @@ namespace Overpower.Match
             float ground = CaptureRingView.GroundHeight(spot, 0.5f);
             var pack = new Pack { zone = zone, key = PackKey(zone), centre = new Vector3(spot.x, ground, spot.z) };
 
-            pack.root = new GameObject("Health Pack (zone " + zone + ")");
-            pack.root.transform.SetParent(transform, false);
-            pack.root.transform.position = pack.centre;
-
-            crossMaterial = crossMaterial != null ? crossMaterial : new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            glowMaterial = glowMaterial != null ? glowMaterial : MakeTransparentUnlit();
-            block = block ?? new MaterialPropertyBlock();
-
-            // The cross: two boxes in an UPRIGHT plus (in a vertical plane, like the classic health sign), floating
-            // above the spot, bobbing, and turning slowly about the vertical axis so it reads from the top-down
-            // camera as it turns.
-            var cross = new GameObject("Cross");
-            cross.transform.SetParent(pack.root.transform, false);
-            pack.cross = cross.transform;
-            var lean = new GameObject("Lean");
-            lean.transform.SetParent(cross.transform, false);
-            pack.lean = lean.transform;
-            float length = config.CrossSizeMetres, arm = length / 3f;
-            pack.crossRenderers = new[]
-            {
-                MakeBox(lean.transform, "Horizontal bar", new Vector3(length, arm, arm), crossMaterial),
-                MakeBox(lean.transform, "Vertical bar", new Vector3(arm, length, arm), crossMaterial),
-            };
-
-            // The glow: a flat disc on the ground.
-            GameObject glow = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            glow.name = "Glow";
-            DestroyImmediate(glow.GetComponent<Collider>());
-            glow.transform.SetParent(pack.root.transform, false);
-            glow.transform.localPosition = new Vector3(0f, config.GlowHeightMetres, 0f);
-            glow.transform.localScale = new Vector3(config.GlowDiameterMetres, 0.005f, config.GlowDiameterMetres);
-            var glowRenderer = glow.GetComponent<MeshRenderer>();
-            glowRenderer.sharedMaterial = glowMaterial;
-            glowRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            glowRenderer.receiveShadows = false;
-            block.SetColor(ColorId, config.GlowColour);
-            glowRenderer.SetPropertyBlock(block);
-            pack.glow = glow;
+            solidMaterial = solidMaterial != null ? solidMaterial : new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            pack.view = HealthPackView.Create(transform, pack.centre, "Health Pack (zone " + zone + ")", config, theme, solidMaterial);
+            pack.root = pack.view.gameObject;
             return pack;
-        }
-
-        private static Renderer MakeBox(Transform parent, string boxName, Vector3 size, Material material)
-        {
-            GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            box.name = boxName;
-            DestroyImmediate(box.GetComponent<Collider>()); // never a solid, physics-blocking object
-            box.transform.SetParent(parent, false);
-            box.transform.localScale = size;
-            var renderer = box.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            return renderer;
-        }
-
-        private static Material MakeTransparentUnlit()
-        {
-            var material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            material.SetFloat("_Surface", 1f); // transparent
-            material.SetFloat("_Blend", 0f);
-            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            material.SetFloat("_ZWrite", 0f);
-            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-            material.SetOverrideTag("RenderType", "Transparent");
-            return material;
         }
 
         private void Show(Pack pack, bool inPlay, bool available)
         {
             if (pack.root.activeSelf != inPlay)
                 pack.root.SetActive(inPlay);
-            if (!inPlay)
-                return;
-
-            if (pack.glow.activeSelf != available)
-                pack.glow.SetActive(available);
-
-            if (pack.colourKnown && pack.shownReady == available)
-                return;
-            pack.colourKnown = true;
-            pack.shownReady = available;
-            block.SetColor(ColorId, available ? config.ReadyColour : config.TakenColour);
-            foreach (Renderer r in pack.crossRenderers)
-                r.SetPropertyBlock(block);
-        }
-
-        private void AnimateCross(Pack pack)
-        {
-            float t = Time.time;
-            float bob = Mathf.Sin(t * config.BobCyclesPerSecond * Mathf.PI * 2f) * config.BobHeightMetres;
-            pack.cross.localPosition = new Vector3(0f, config.FloatHeightMetres + bob, 0f);
-            pack.cross.localRotation = Quaternion.Euler(0f, t * config.SpinDegreesPerSecond, 0f);
-            pack.lean.localRotation = Quaternion.Euler(config.CrossLeanDegrees, 0f, 0f);
+            if (inPlay)
+                pack.view.SetReady(available);
         }
 
         // ---- asking (every client, for its own player) ---------------------------------------------

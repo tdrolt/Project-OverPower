@@ -18,6 +18,7 @@ namespace Overpower.Tests
         private static readonly Color FireEdge = new Color(0.71f, 0.72f, 0.73f, 1f);
         private static readonly Color Danger = new Color(0.81f, 0.82f, 0.83f, 1f);
         private static readonly Color White = new Color(0.91f, 0.92f, 0.93f, 1f);
+        private static readonly Color HealGreen = new Color(0.14f, 0.15f, 0.16f, 1f);
 
         private UiTheme theme;
 
@@ -33,6 +34,7 @@ namespace Overpower.Tests
             theme.fireEdgeColor = FireEdge;
             theme.dangerColor = Danger;
             theme.flashWhiteColor = White;
+            theme.healGreenColor = HealGreen;
         }
 
         [TearDown]
@@ -60,6 +62,8 @@ namespace Overpower.Tests
             Assert.AreEqual(FireEdge, LookColours.For(LookFamily.Fire, 0, theme));
             Assert.AreEqual(FireCore, LookColours.FireCore(theme));
         }
+
+        [Test] public void HealIsTheHealingGreen() => Assert.AreEqual(HealGreen, LookColours.For(LookFamily.Heal, 2, theme), "one green for every healing look, whoever heals");
 
         [Test] public void NoFamilyDrawsNothing() => Assert.AreEqual(0f, LookColours.For(LookFamily.None, 0, theme).a);
 

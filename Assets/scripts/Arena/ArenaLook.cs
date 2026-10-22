@@ -413,6 +413,26 @@ namespace Overpower.Arena
         [Tooltip("How high above the floor the hexagon under a player's feet is drawn, in metres: just enough that it never flickers into the floor.")]
         [Min(0.001f)] public float feetHexLift = 0.03f;
 
+        [Header("Heal effect")]
+        [Tooltip("How many green plus signs rise round a player at once while their health is going up (zone regeneration, the spawn, a health pack, the Heal Zone).")]
+        [Min(1)] public int healSparkCount = 7;
+        [Tooltip("How long one green plus sign takes to rise from the player's feet to its highest point, in seconds. Shorter rises faster.")]
+        [Min(0.1f)] public float healSparkRiseSeconds = 1.1f;
+        [Tooltip("How far from the middle of the player the green plus signs rise, in metres. Just outside the mech, so they ring it rather than hide in it.")]
+        [Min(0f)] public float healSparkRadius = 1.25f;
+        [Tooltip("How high above the player's feet a green plus sign appears, in metres.")]
+        [Min(0f)] public float healSparkStartHeight = 0.3f;
+        [Tooltip("How far a green plus sign rises before it fades out, in metres.")]
+        [Min(0.1f)] public float healSparkRiseMetres = 1.9f;
+        [Tooltip("The size of one green plus sign, tip to tip, in metres, at its fullest (they grow in as they appear and shrink as they fade).")]
+        [Min(0.02f)] public float healSparkSize = 0.8f;
+        [Tooltip("How brightly the green plus signs glow. Above 1 they catch a thin halo from the bloom; keep it low enough that a healing player stays easy to see.")]
+        [Min(0f)] public float healSparkGlow = 2f;
+        [Tooltip("How long the green plus signs keep rising after a player's health last went up, in seconds. It bridges the gaps between health updates from other players, and lets a health pack's one big heal show for a moment.")]
+        [Min(0f)] public float healSparkTailSeconds = 0.9f;
+        [Tooltip("A rise in health that comes together with the body jumping more than this many metres is a respawn or a new round putting the player back at their spawn, not healing, so it shows no green plus signs. Larger than any normal step between two health updates.")]
+        [Min(0.5f)] public float healSpawnJumpMetres = 5f;
+
         [Header("Wall and block circuit stripes")]
         [Tooltip("The colour the floor grid and the circuit stripes glow in away from every zone. A neutral cool white with no blue cast, kept dim, so it never reads as a team's colour.")]
         public Color outsideLineColor = new Color(0.8f, 0.86f, 0.92f, 1f);

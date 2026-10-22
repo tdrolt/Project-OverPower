@@ -20,6 +20,7 @@ namespace Overpower.Arena
                 case LookFamily.Fire: return theme.fireEdgeColor;
                 case LookFamily.Danger: return theme.dangerColor;
                 case LookFamily.White: return theme.flashWhiteColor;
+                case LookFamily.Heal: return theme.healGreenColor;
                 default: return Color.clear;
             }
         }

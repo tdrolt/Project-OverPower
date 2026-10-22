@@ -839,7 +839,7 @@ namespace Overpower.UI
         }
 
         /// <summary>A small cross at the health pack's real spot (same world-to-map transform as the bubbles, so it sits in
-        /// the recess toward the map edge). Ready/taken colours are the pack's own (HealthPackConfig). Hidden when the pack
+        /// the recess toward the map edge). Ready is the healing green every pack wears (UiTheme), taken the config's minimap grey. Hidden when the pack
         /// or its zone is out of play or hidden; built once, then recoloured only when the ready state changes.</summary>
         private void UpdatePackBadge(ZoneUi zone)
         {
@@ -862,7 +862,7 @@ namespace Overpower.UI
             if (state == zone.ShownPackReady)
                 return;
             zone.ShownPackReady = state;
-            Color colour = ready ? packs.Config.ReadyColour : packs.Config.TakenColour;
+            Color colour = ready ? LookColours.For(LookFamily.Heal, -1, theme) : packs.Config.TakenColour;
             zone.PackBadgeBarA.color = colour;
             zone.PackBadgeBarB.color = colour;
         }

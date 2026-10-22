@@ -908,6 +908,7 @@ MonoBehaviour:
   fireEdgeColor: {r: 1, g: 0.88, b: 0.6, a: 1}
   dangerColor: {r: 1, g: 0.18, b: 0.15, a: 1}
   flashWhiteColor: {r: 1, g: 1, b: 1, a: 1}
+  healGreenColor: {r: 0.25, g: 1, b: 0.3, a: 1}
   arenaNeutralLineColor: {r: 0.6, g: 0.62, b: 0.66, a: 1}
   arenaOutOfPlayLineColor: {r: 0.45, g: 0.45, b: 0.47, a: 1}
   arenaLook: {fileID: 11400000, guid: 746d0f1da4232aa45bb093092c2e0c3b, type: 2}
