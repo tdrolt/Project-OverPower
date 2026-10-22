@@ -330,20 +330,30 @@ namespace Overpower.Arena
         [Min(0f)] public float aoeLift = 0.04f;
 
         [Header("Raybeam")]
-        [Tooltip("How solid each Raybeam's red sheath is, from 0 (invisible) to 1 (solid). The sheath is exactly as wide as what the beam hits; keep it see-through so a player under the beam stays easy to see, the white core carries the beam.")]
+        [Tooltip("How solid the Raybeam's red sheath is, from 0 (invisible) to 1 (solid). The sheath covers exactly what its three lines hit; keep it see-through so a player under the beam stays easy to see, the white core carries the beam.")]
         [Range(0f, 1f)] public float raybeamSheathAlpha = 0.4f;
-        [Tooltip("How wide each Raybeam's white-hot core is, as a share of the beam's width: 0 draws no core, 1 makes the whole beam white.")]
+        [Tooltip("How wide the Raybeam's white-hot core is, as a share of ONE hit line's width (the Raybeam's Beam Width): one core runs down the middle of the beam; 0 draws no core, 1 makes it as wide as one line.")]
         [Range(0f, 1f)] public float raybeamCoreShare = 0.25f;
         [Tooltip("How brightly each Raybeam's white core glows: 1 is plain white, more makes it bloom; much above 2 the glow swallows the red sheath.")]
         [Min(0f)] public float raybeamCoreGlow = 2f;
-        [Tooltip("How thick the thin outline in the caster's team colour is that runs just outside each Raybeam's red sheath, in metres. It says whose beam it is; 0 hides it.")]
+        [Tooltip("How thick the thin outline in the caster's team colour is that runs just outside the Raybeam's red sheath and round its charging hexagon, in metres. It says whose beam it is; 0 hides it.")]
         [Min(0f)] public float raybeamEdgeWidth = 0.05f;
-        [Tooltip("How solid the team-colour outline of each Raybeam is, from 0 (hidden) to 1 (solid).")]
+        [Tooltip("How solid the team-colour outline of the Raybeam and of its charging hexagon is, from 0 (hidden) to 1 (solid).")]
         [Range(0f, 1f)] public float raybeamEdgeAlpha = 0.9f;
-        [Tooltip("How much dark floor shows between each Raybeam's red sheath and its team-colour outline, in metres. The gap keeps an orange outline from melting into the red beam; 0 lays the outline against the sheath.")]
+        [Tooltip("How much dark floor shows between the Raybeam's red sheath (or its charging hexagon) and the team-colour outline, in metres. The gap keeps an orange outline from melting into the red; 0 lays the outline against it.")]
         [Min(0f)] public float raybeamEdgeGap = 0.04f;
-        [Tooltip("How brightly each Raybeam's team-colour outline glows: 1 is the plain team colour, more makes it bloom and stand off the red sheath.")]
+        [Tooltip("How brightly the Raybeam's team-colour outline glows, on the beam and round its charging hexagon: 1 is the plain team colour, more makes it bloom and stand off the red.")]
         [Min(0f)] public float raybeamEdgeGlow = 1.5f;
+        [Tooltip("How big the red hexagon at the caster's gun is the moment the Raybeam is pressed, from its middle to a corner, in metres. It shrinks to Raybeam Charge End Radius over the wind-up, so everyone who can see the caster knows the beams are about to fire.")]
+        [Min(0f)] public float raybeamChargeStartRadius = 1.2f;
+        [Tooltip("How big the Raybeam's charging hexagon is when the beams fire, from its middle to a corner, in metres: the size it shrinks down to at the gun.")]
+        [Min(0f)] public float raybeamChargeEndRadius = 0.25f;
+        [Tooltip("How thick the red line of the Raybeam's charging hexagon is, in metres.")]
+        [Min(0.01f)] public float raybeamChargeWidth = 0.14f;
+        [Tooltip("How solid the red line of the Raybeam's charging hexagon is, from 0 (invisible) to 1 (solid).")]
+        [Range(0f, 1f)] public float raybeamChargeAlpha = 0.9f;
+        [Tooltip("How brightly the Raybeam's charging hexagon glows red: 1 is the plain danger red, a little more makes it bloom. Much above 1.3 the red washes out towards pink and nears an orange team's outline.")]
+        [Min(0f)] public float raybeamChargeGlow = 1.2f;
 
         [Header("Mech team colours")]
         [Tooltip("How much of the team colour the mech's body takes: 0 is a plain pale grey, 1 is the full team colour. Never so dark that the mech reads as black.")]

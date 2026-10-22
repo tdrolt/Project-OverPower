@@ -205,6 +205,11 @@ MonoBehaviour:
   raybeamEdgeAlpha: 0.9
   raybeamEdgeGap: 0.04
   raybeamEdgeGlow: 1.5
+  raybeamChargeStartRadius: 1.2
+  raybeamChargeEndRadius: 0.25
+  raybeamChargeWidth: 0.14
+  raybeamChargeAlpha: 0.9
+  raybeamChargeGlow: 1.2
   mechBaseMix: 0.85
   mechGlowStrength: 1.8
   mechTemplate: {fileID: 2100000, guid: 8bd3427c0e9b2d04eb19a742ff9ad1fc, type: 2}

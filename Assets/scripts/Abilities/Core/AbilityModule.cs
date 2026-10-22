@@ -57,7 +57,7 @@ namespace Overpower.Abilities
         /// <summary>
         /// Owner only. Turns what the caster's machine knows into the payload every client will
         /// receive. Return false to refuse the cast (no valid target, say) - nothing is spent and
-        /// nothing is sent. The only hook allowed to read input, the aim or the camera.
+        /// nothing is sent. The only hook allowed to read input, the aim or the camera (a later phase reads them through CurrentContext).
         /// </summary>
         public abstract bool TryBuildCast(in CastContext ctx, out CastPayload payload);
 
@@ -80,6 +80,10 @@ namespace Overpower.Abilities
             if (runner != null)
                 runner.SendCast(this, phase, payload);
         }
+
+        /// <summary>Owner only. What the caster's machine knows right now, built exactly as for a press: for a cast that fires after a
+        /// wind-up from wherever the gun is and points by then. Default before the module is bound.</summary>
+        protected CastContext CurrentContext() => runner != null ? runner.BuildContext() : default;
 
         /// <summary>Owner only. Spends one charge; false if there was none to spend. Always true
         /// for an ability with no charges.</summary>

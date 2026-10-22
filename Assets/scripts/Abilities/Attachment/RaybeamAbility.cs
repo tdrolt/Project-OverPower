@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using Overpower.Combat;
+using Overpower.UI;
 using Overpower.Weapons;
 using Overpower.Match;
 using Overpower.Vision;
@@ -8,23 +9,12 @@ using Overpower.Vision;
 namespace Overpower.Abilities
 {
     /// <summary>
-    /// Three beams, the outer two converging at beamConvergenceRange straight down the shooter's aim direction, each
-    /// applying Vulnerability to every enemy it crosses. Zero damage: a debuff, not a weapon.
-    /// WHY A FIXED CONVERGENCE POINT, NOT THE CURSOR: converging on the cursor's depth lands all three at any range for a
-    /// pixel-perfect click (RaybeamGeometryTests), but a ground-plane cursor cannot be clicked that precisely at range, so
-    /// the bonus only worked up close. Now catching two or three beams is about closing in and firing along the target.
-    /// THE THIRD BEAM IS REDUNDANCY AGAINST A PARTIAL MISS, NOT EXTRA DAMAGE, and PIERCE IS ON: each beam debuffs every
-    /// enemy along its whole line (BeamResolver.Unlimited), convergence point or not, but still stops at the first
-    /// Building or IStructure and applies once per target.
-    /// VULNERABILITY'S CAP IS GLOBAL (GameplayConfig > Vulnerability Cap, read by StatusEffectState's StackToCap), never a
-    /// field here: one beam is the per-beam magnitude, two or three reach the cap.
-    /// Ultimate slot: readiness comes entirely from Owner.UltimateCharge (IsReady/TryBuildCast, like the other ultimates),
-    /// not the base class's 1-charge/0 s pool, which recovers instantly and so never gates anything.
-    /// beamWidth is the ONE home for the hit diameter (SphereCast radius) and the drawn diameter (ShowBeam), so what a
-    /// player sees is what hits them; beamOriginSpacing must leave a visible gap between beam edges.
-    /// RUNS ON EVERY CLIENT, once per cast; STATUS IS VICTIM-SIDE like Hitscan: every client resolves the same three rays
-    /// from the synced Origin/Direction/Point and calls IStatusReceiver.ApplyStatus, and the receiver's IsMine guard
-    /// means only the victim's machine applies it. The maths lives in RaybeamGeometry (Combat/), tested pure.
+    /// Three beams from the gun, the outer two converging at Beam Convergence Range straight down the aim (a ground cursor cannot be clicked
+    /// precisely enough at range to converge on it), each applying Vulnerability once to every enemy it crosses (pierce) up to the first wall or
+    /// IStructure. Zero damage; the third beam is redundancy against a partial miss, and the stacking cap is GameplayConfig's Vulnerability Cap.
+    /// Beam Width is the one home for what hits and what is drawn (one merged beam, RaybeamBeamView). The press only starts the wind-up
+    /// (RaybeamWindup); the caster's machine then fires with the aim of that moment or cancels, and only firing spends the meter, which alone
+    /// gates the press. The fire phase runs on every client from the synced rays; status is victim-side (the receiver's IsMine guard).
     /// </summary>
     public sealed class RaybeamAbility : AbilityModule
     {
@@ -41,23 +31,23 @@ namespace Overpower.Abilities
                  "since it always shows whichever stack has the most time remaining.")]
         private float vulnerabilitySeconds = 4f;
 
-        [SerializeField, Tooltip("How far apart the two outer beams start either side of the muzzle, in metres. Controller's call: " +
-                 "wide enough that the three beams read as separate shots at close range, narrow enough that all " +
-                 "three still converge on one target at the tuned range below. The gap is kept wide enough to read " +
-                 "between beam edges now that Beam Width is thicker (see its own tooltip); it is not meant to change " +
-                 "the spread.")]
+        [SerializeField, Tooltip("How far apart the two outer beams start either side of the muzzle, in metres. The three lines are " +
+                 "drawn as one beam, so this is not a visible gap: with Beam Width it sets how wide the beam is at the gun, and with " +
+                 "Beam Convergence Range where the lines cross. Narrow enough that all three still converge on one target at the " +
+                 "tuned range below.")]
         private float beamOriginSpacing = 0.9f;
 
         [SerializeField, Tooltip("How far each beam TRAVELS AND DEBUFFS from its OWN origin, in metres, pierce included. Two things " +
                  "at once: the CAMERA sets how far out you can place the cursor on screen (roughly 19m out at default " +
-                 "zoom, up to 38m fully zoomed out) - but TryBuildCast pulls the convergence point back to THIS " +
+                 "zoom, up to 38m fully zoomed out) - but when the beams fire, the cursor's point is pulled back to THIS " +
                  "number whenever the cursor sits further away than it, so the beams meet at this distance instead of " +
                  "at the cursor. That makes this both how far a beam keeps hitting things past its target AND the " +
                  "furthest point the three beams can ever converge, whatever the camera would otherwise let you reach.")]
         private float beamRange = 28.8f;
 
-        [SerializeField, Tooltip("Diameter of each beam, in metres - BOTH what it hits (the SphereCast radius below) AND what you see " +
-                 "(the red sheath of each drawn beam is exactly this wide, its white core a share of it). One number, one home.")]
+        [SerializeField, Tooltip("Diameter of each of the three hit lines, in metres - BOTH what it hits (the SphereCast radius is half " +
+                 "of it) AND what you see: the drawn beam spans the outer lines' outer edges, each exactly this wide, and its white " +
+                 "core is a share of this width. One number, one home.")]
         private float beamWidth = 0.6825f;
 
         [SerializeField, Tooltip("How far downrange, in metres, the two OUTER beams are aimed to cross the centre beam's line - a " +
@@ -76,14 +66,22 @@ namespace Overpower.Abilities
                  "as an IStructure on whatever collider it actually sits on, whichever layer that is.")]
         private LayerMask hitMask = ~0;
 
+        [Header("Wind-up")]
+        [SerializeField, Tooltip("Seconds from pressing the Raybeam to the beams firing. Meanwhile a red hexagon shrinks at your gun " +
+                 "for everyone who can see you, and you can still move and aim: the beams fire from wherever your gun is and points " +
+                 "when it ends. Being stunned, overheating or dying during it cancels the Raybeam, and your ultimate meter stays " +
+                 "full. 0 fires at the press.")]
+        private float windupSeconds = 0.4f;
+
         [Header("Visuals")]
-        [SerializeField, Tooltip("The visible beam, drawn once per beam from that beam's own origin to wherever it ended, " +
-                 "exactly Beam Width wide: Raybeam Beam (a red sheath with a white-hot core). Any other prefab with a Line Renderer " +
-                 "draws as a plain line. Leave empty for invisible beams (useful while first wiring the ability up).")]
+        [SerializeField, Tooltip("The visible beam: the three hit lines drawn as ONE beam spanning the outer lines' outer edges (each " +
+                 "line exactly Beam Width wide): Raybeam Beam (one red sheath, one white-hot core, one team-colour outline). Any other " +
+                 "prefab with a Line Renderer draws the centre line as a plain line. Leave empty for invisible beams (useful while " +
+                 "first wiring the ability up).")]
         private GameObject beamVfx;
 
-        [SerializeField, Tooltip("Seconds each beam line stays on screen. Purely visual - the status " +
-                 "application already happened the instant the cast was received.")]
+        [SerializeField, Tooltip("Seconds the beam stays on screen. Purely visual - the status " +
+                 "application already happened the instant the beams fired.")]
         private float beamVisualSeconds = 0.15f;
 
         [SerializeField, Tooltip("The scorch that flashes where a beam stops on a wall or a placed cover. Shown where your team " +
@@ -93,6 +91,7 @@ namespace Overpower.Abilities
         // Not a tuning value, matching Hitscan's MaxContacts: nine players with a couple of colliders each plus the
         // walls along a beam fit comfortably.
         private const int MaxContacts = 32;
+        private const byte PhaseWindup = 0, PhaseFire = 1, PhaseCancel = 2; // 0 is always the press (CastEvent.Phase)
         private readonly RaycastHit[] hitBuffer = new RaycastHit[MaxContacts];
         private readonly List<BeamContact> contactBuffer = new List<BeamContact>(MaxContacts);
         private readonly List<Vector3> normalBuffer = new List<Vector3>(MaxContacts); // alongside contactBuffer: where a scorch faces
@@ -100,6 +99,12 @@ namespace Overpower.Abilities
         // Vulnerability's magnitude and duration never change per cast, so the spec is built once
         // rather than re-boxed every ExecuteCast.
         private StatusEffectSpec vulnerabilitySpec;
+
+        private readonly Vector3[] lineFrom = new Vector3[3], lineTo = new Vector3[3];
+        private bool windingUp; // owner only
+        private float windupStartedAt;
+        private RaybeamChargeView charge;
+        private bool chargeBuilt;
 
         protected override void OnValidate()
         {
@@ -110,11 +115,21 @@ namespace Overpower.Abilities
             beamRange = Mathf.Max(0.1f, beamRange);
             beamWidth = Mathf.Max(0.01f, beamWidth);
             beamConvergenceRange = Mathf.Clamp(beamConvergenceRange, 0.1f, beamRange);
+            windupSeconds = Mathf.Max(0f, windupSeconds);
             beamVisualSeconds = Mathf.Max(0f, beamVisualSeconds);
             RebuildSpec();
         }
 
         private void Awake() => RebuildSpec();
+
+        // The meter alone gates the press (IsReady): the runner must never refuse a press after TryBuildCast has started the wind-up.
+        protected override bool SpendsChargeOnCast => false;
+
+        private void OnDestroy()
+        {
+            if (charge != null)
+                Destroy(charge.gameObject);
+        }
 
         /// <summary>Rebuilt once more here: Awake/OnValidate run before Bind assigns Definition (AbilityModule: "do not
         /// read it in Awake"), so the Awake spec always has abilityId -1. OnEquip is the first point Definition is safe.</summary>
@@ -135,25 +150,60 @@ namespace Overpower.Abilities
 
         // ---- owner only ---------------------------------------------------------------------------
 
-        /// <summary>Full meter only, like the other ultimates: the base class's 1 charge and 0 s cooldown recover
-        /// instantly, so without this override that pool would never refuse a cast and Raybeam would be spammable.</summary>
-        public override bool IsReady => Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull;
+        /// <summary>Full meter only, like the other ultimates, and not while a wind-up is already charging: the base class's 1 charge and
+        /// 0 s cooldown recover instantly, so without this override that pool would never refuse a cast and Raybeam would be spammable.</summary>
+        public override bool IsReady => RaybeamWindup.IsReady(Owner.UltimateCharge != null && Owner.UltimateCharge.IsFull, windingUp);
+
+        /// <summary>The press only starts the wind-up: the payload tells every client where the gun was, for the hexagon. The meter is
+        /// not spent here but when the beams fire (EndWindup), so a cancelled wind-up leaves it full.</summary>
+        public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
+        {
+            payload = default;
+            if (!IsReady)
+                return false;
+
+            windingUp = true;
+            windupStartedAt = Time.time;
+            payload = new CastPayload { Origin = ctx.Muzzle, Direction = ctx.AimDirection };
+            return true;
+        }
+
+        public override void OwnerTick(float deltaTime, bool held, bool canAct)
+        {
+            if (!windingUp)
+                return;
+            RaybeamWindupStep step = RaybeamWindup.Step(Time.time - windupStartedAt, windupSeconds, canAct);
+            if (step != RaybeamWindupStep.Waiting)
+                EndWindup(step);
+        }
+
+        /// <summary>Died and Unequipped reach every client, Stunned and Silenced only the owner: the owner's cancel phase hides the
+        /// hexagon everywhere else.</summary>
+        public override void Interrupt(InterruptReason reason)
+        {
+            if (windingUp)
+                EndWindup(RaybeamWindupStep.Cancel);
+            if (charge != null)
+                charge.End();
+        }
+
+        private void EndWindup(RaybeamWindupStep end)
+        {
+            windingUp = false;
+            if (RaybeamWindup.SpendsUltimate(end) && Owner.UltimateCharge != null && Owner.UltimateCharge.Spend())
+                SendPhase(PhaseFire, BeamPayload(CurrentContext()));
+            else
+                SendPhase(PhaseCancel, default);
+        }
 
         /// <summary>
         /// Origin is the MUZZLE (ctx.Muzzle, the wall-safe one), not the body: three beams from the gun read better than
         /// from the chest, and SafeMuzzlePosition keeps it off the inside of a wall the caster is pressed against.
         /// Point is the cursor's ground point with Y set to muzzle height (a ground point would angle every beam into the
         /// floor), clamped to Beam Range from the muzzle.
-        /// Refuses unless UltimateCharge agrees to spend, so the base-class SpendCharge never runs on a meter that was not full.
         /// </summary>
-        public override bool TryBuildCast(in CastContext ctx, out CastPayload payload)
+        private CastPayload BeamPayload(in CastContext ctx)
         {
-            payload = default;
-            if (Owner.UltimateCharge == null || !Owner.UltimateCharge.Spend())
-                return false;
-
-            // Past this point the meter is already spent - no early return may follow, or a later
-            // `return false` would eat a full ultimate meter with no cast to show for it.
             Vector3 origin = ctx.Muzzle;
 
             Vector3 rawPoint = ctx.TargetPoint;
@@ -165,17 +215,44 @@ namespace Overpower.Abilities
                 ? origin + toRaw / rawDistance * beamRange
                 : rawPoint;
 
-            payload = new CastPayload { Origin = origin, Direction = ctx.AimDirection, Point = point };
-            return true;
+            return new CastPayload { Origin = origin, Direction = ctx.AimDirection, Point = point };
         }
 
         // ---- every client -------------------------------------------------------------------------
 
         public override void ExecuteCast(in CastEvent cast)
         {
-            if (cast.Phase != 0)
-                return;
+            switch (cast.Phase)
+            {
+                case PhaseWindup:
+                    ShowCharge(cast);
+                    return;
+                case PhaseFire:
+                    if (charge != null)
+                        charge.End();
+                    FireBeams(cast);
+                    return;
+                case PhaseCancel:
+                    if (charge != null)
+                        charge.End();
+                    return;
+            }
+        }
 
+        private void ShowCharge(in CastEvent cast)
+        {
+            if (!chargeBuilt)
+            {
+                chargeBuilt = true; // one try: a theme without its look warns once, not on every press
+                UiTheme theme = Owner != null && Owner.Health != null ? Owner.Health.Theme : null;
+                charge = RaybeamChargeView.TryCreate(theme, Definition.Id, Owner?.PhotonView, Owner?.Weapon, Owner?.Root.transform);
+            }
+            if (charge != null)
+                charge.Begin(Time.time - cast.SecondsLate, windupSeconds, cast.CasterTeam);
+        }
+
+        private void FireBeams(in CastEvent cast)
+        {
             Vector3 origin = cast.Payload.Origin;
             Vector3 direction = cast.Payload.Direction;
             int casterActor = cast.CasterActor;
@@ -190,16 +267,19 @@ namespace Overpower.Abilities
             // The formula lives in RaybeamGeometry so it has its own test.
             Vector3 convergePoint = RaybeamGeometry.ConvergencePoint(origin, direction, beamConvergenceRange, beamRange);
 
-            FireOneBeam(left, convergePoint, direction, casterActor, casterTeam);
-            FireOneBeam(centre, convergePoint, direction, casterActor, casterTeam);
-            FireOneBeam(right, convergePoint, direction, casterActor, casterTeam);
+            lineFrom[0] = left;
+            lineFrom[1] = centre;
+            lineFrom[2] = right;
+            for (int i = 0; i < lineFrom.Length; i++)
+                lineTo[i] = FireOneBeam(lineFrom[i], convergePoint, direction, casterActor, casterTeam);
+            DrawBeam(origin, direction, casterTeam);
         }
 
         /// <summary>
-        /// One beam: resolve who it crosses, apply the debuff to each once, draw the line. No ApplyDamage at all (zero
-        /// damage; SonicPulseAbility likewise carries no dead "damage" field).
+        /// One beam: resolve who it crosses, apply the debuff to each once, scorch where it stops; returns where it ended. No
+        /// ApplyDamage at all (zero damage; SonicPulseAbility likewise carries no dead "damage" field).
         /// </summary>
-        private void FireOneBeam(Vector3 beamOrigin, Vector3 point, Vector3 fallbackDirection,
+        private Vector3 FireOneBeam(Vector3 beamOrigin, Vector3 point, Vector3 fallbackDirection,
                                  int casterActor, int casterTeam)
         {
             Vector3 aimDirection = RaybeamGeometry.AimFromOriginToPoint(beamOrigin, point, fallbackDirection);
@@ -232,12 +312,12 @@ namespace Overpower.Abilities
             }
 
             Vector3 end = beamOrigin + aimDirection * beam.Length;
-            DrawBeam(beamOrigin, end, casterTeam);
 
             RaybeamLook.ScorchSpot(contactBuffer, normalBuffer, beam, end, aimDirection, out Vector3 scorchAt, out Quaternion scorchFacing);
             if (RaybeamLook.ShowsScorch(RaybeamLook.EndsOnSurface(beam), TeamSight.ShotShownAt(casterTeam, scorchAt)) &&
                 scorchVfx != null && VFXManager.Instance != null)
                 VFXManager.Instance.PlayVFX(scorchVfx, scorchAt, scorchFacing);
+            return end;
         }
 
         /// <summary>Hitscan.BuildMask's identical reasoning: the designer's layers minus the three
@@ -247,38 +327,38 @@ namespace Overpower.Abilities
 
         /// <summary>A local, throwaway effect on each client, matching Hitscan.DrawBeam - never a
         /// networked object, since every client draws its own copy from the same cast event.</summary>
-        private void DrawBeam(Vector3 from, Vector3 to, int casterTeam)
+        private void DrawBeam(Vector3 origin, Vector3 aim, int casterTeam)
         {
             if (beamVfx == null)
                 return;
 
-            // D2: an enemy's Raybeam is drawn only while this beam's line crosses my team's sight (own team's always).
-            if (!TeamSight.ShotShownAlong(casterTeam, from, to))
+            if (!RaybeamLook.BeamShown(lineFrom, lineTo, (a, b) => TeamSight.ShotShownAlong(casterTeam, a, b)))
                 return;
 
-            GameObject beam = Instantiate(beamVfx, from, Quaternion.identity);
-            ShowBeam(beam, from, to, casterTeam);
+            GameObject beam = Instantiate(beamVfx, origin, Quaternion.identity);
+            ShowBeam(beam, origin, aim, lineFrom, lineTo, casterTeam);
             Destroy(beam, beamVisualSeconds);
         }
 
-        /// <summary>Lays one drawn beam (an instantiated clone, never the prefab asset) from its origin to where it ended, exactly as wide
-        /// as the beam that hits (beamWidth is the one home). A beam prefab without the Raybeam's own view gets a plain line.</summary>
-        internal void ShowBeam(GameObject beam, Vector3 from, Vector3 to, int casterTeam)
+        /// <summary>Lays the drawn beam (an instantiated clone, never the prefab asset) over the three lines, each exactly as wide as the
+        /// line that hits (beamWidth is the one home). A beam prefab without the Raybeam's own view gets a plain centre line.</summary>
+        internal void ShowBeam(GameObject beam, Vector3 origin, Vector3 aim, Vector3[] from, Vector3[] to, int casterTeam)
         {
             if (beam.TryGetComponent(out RaybeamBeamView view))
             {
-                view.Draw(from, to, beamWidth, casterTeam);
+                view.Draw(origin, aim, from, to, beamWidth, casterTeam);
                 return;
             }
 
             LineRenderer line = beam.GetComponentInChildren<LineRenderer>();
             if (line == null)
                 return;
+            int middle = from.Length / 2;
             line.useWorldSpace = true;
             line.startWidth = line.endWidth = beamWidth;
             line.positionCount = 2;
-            line.SetPosition(0, from);
-            line.SetPosition(1, to);
+            line.SetPosition(0, from[middle]);
+            line.SetPosition(1, to[middle]);
         }
 
         public override string ShopStatsText() =>

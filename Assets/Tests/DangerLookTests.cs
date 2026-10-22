@@ -14,8 +14,8 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>The two zone and beam ultimates: the Heal Zone a flat ring of flickering hexagon cells inside a hard edge at its real radius (the
-    /// edge in the caster's team colour), the Raybeam one hard beam per hit line at its real width with a white-hot core, and a scorch where a
-    /// beam stops on a surface. Every body colour comes from the ability's row in the look table (Gold here, so a hard-coded colour is caught).</summary>
+    /// edge in the caster's team colour), the Raybeam's three hit lines drawn as one hard beam spanning their real widths with one white-hot
+    /// core, and a scorch where a line stops on a surface. Every body colour comes from the ability's row in the look table (Gold here, so a hard-coded colour is caught).</summary>
     public class DangerLookTests
     {
         private const BindingFlags Any = MovementLookTestKit.Any;
@@ -324,7 +324,7 @@ namespace Overpower.Tests
         // ---- Raybeam ----
 
         [Test]
-        public void TheRaybeamDrawsOneHardBeamAtItsRealWidthWithAWhiteHotCore()
+        public void TheThreeHitLinesDrawAsOneBeamWithOneWhiteHotCore()
         {
             using (var kit = new MovementLookTestKit(RaybeamId, LookShape.Beam))
             {
@@ -335,28 +335,190 @@ namespace Overpower.Tests
                 so.FindProperty("beamWidth").floatValue = 0.5f;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 RaybeamBeamView view = NewBeam(kit, out LineRenderer sheath, out LineRenderer core);
-                var from = new Vector3(1f, 1.2f, 2f);
-                var to = new Vector3(9f, 1.2f, 14f);
+                var origin = new Vector3(1f, 1.2f, 2f);
+                ConvergingLines(origin, 0.9f, 15f, 20f, out Vector3[] from, out Vector3[] to);
 
-                ability.ShowBeam(view.gameObject, from, to, 1);
+                ability.ShowBeam(view.gameObject, origin, Vector3.forward, from, to, 1);
 
-                Assert.AreEqual(2, sheath.positionCount);
-                Assert.AreEqual(from, sheath.GetPosition(0), "from the beam's own origin");
-                Assert.AreEqual(to, sheath.GetPosition(1), "to where the beam really ended");
                 Assert.IsTrue(sheath.useWorldSpace);
-                Assert.AreEqual(0.5f, sheath.startWidth, 1e-5f, "the sheath is exactly as wide as the beam that hits (Beam Width)");
-                Assert.AreEqual(0.5f, sheath.endWidth, 1e-5f, "one width all along: a hard beam, not a taper");
+                Assert.GreaterOrEqual(sheath.positionCount, 3, "one beam along the three lines, pinched where they cross");
+                Assert.AreEqual(origin, sheath.GetPosition(0), "from the gun");
+                Assert.AreEqual(0.9f * 2f + 0.5f, WidthAt(sheath, 0), 1e-4f, "at the gun it spans the outer lines' outer edges (Beam Width each)");
+                int pinch = StationAt(sheath, origin.z + 15f);
+                Assert.AreEqual(0.5f, WidthAt(sheath, pinch), 1e-4f, "where the three lines cross it is one Beam Width");
+                Assert.AreEqual(2, core.positionCount, "one core, straight down the middle hit line");
+                Assert.AreEqual(from[1], core.GetPosition(0));
+                Assert.AreEqual(to[1], core.GetPosition(1));
+                for (int k = 0; k < core.positionCount; k++)
+                    Assert.AreEqual(0.5f * 0.3f, WidthAt(core, k), 1e-4f,
+                        "Raybeam Core Share of ONE hit line's width all along: a hot line inside the sheath, never a slab across the merged span");
+                foreach (LineRenderer line in new[] { sheath, core })
+                {
+                    Assert.AreEqual(LineAlignment.TransformZ, line.alignment, line.name + " lies flat in the floor's plane, like its outline");
+                    Assert.Greater(Vector3.Dot(line.transform.forward, Vector3.down), 0.999f, line.name + " faces the camera above");
+                }
                 MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, sheath.startColor, "the sheath wears the Raybeam's row in the look table");
                 Assert.AreEqual(0.85f, sheath.startColor.a, 1f / 255f, "Raybeam Sheath Alpha");
-                Assert.AreEqual(from, core.GetPosition(0));
-                Assert.AreEqual(to, core.GetPosition(1));
-                Assert.AreEqual(0.5f * 0.3f, core.startWidth, 1e-5f, "Raybeam Core Share of the beam");
                 MovementLookTestKit.AssertRgb(White, core.startColor, "a white-hot core (Flash White)");
                 var block = new MaterialPropertyBlock();
                 core.GetPropertyBlock(block);
                 Assert.AreEqual(1.7f, block.GetColor(BaseColorId).r, 1e-4f, "Raybeam Core Glow");
                 Assert.Greater(core.sortingOrder, sheath.sortingOrder, "the core draws over the sheath");
             }
+        }
+
+        [Test]
+        public void TheMergedBeamSpansTheOutermostLinesAndPinchesWhereTheyCross()
+        {
+            var origin = new Vector3(0f, 1f, 0f);
+            ConvergingLines(origin, 0.9f, 15f, 28.8f, out Vector3[] from, out Vector3[] to);
+            var centres = new List<Vector3>();
+            var widths = new List<float>();
+
+            RaybeamLook.MergedSpan(origin, Vector3.forward, from, to, 0.6f, centres, widths);
+
+            Assert.AreEqual(centres.Count, widths.Count);
+            Assert.GreaterOrEqual(centres.Count, 3);
+            Assert.AreEqual(origin, centres[0], "it starts at the gun");
+            Assert.AreEqual(2.4f, widths[0], 1e-4f, "two spacings plus one Beam Width: the outer lines' outer edges");
+            int pinch = centres.FindIndex(c => Mathf.Abs(c.z - 15f) < 1e-3f);
+            Assert.GreaterOrEqual(pinch, 0, "a station where the lines cross");
+            Assert.AreEqual(0.6f, widths[pinch], 1e-4f, "one Beam Width where all three cross");
+            float outerEnd = 28.8f * Mathf.Cos(Mathf.Atan2(0.9f, 15f)); // the outer lines are tilted in, so they end a little short along the aim
+            int wide = centres.FindIndex(c => Mathf.Abs(c.z - outerEnd) < 1e-3f);
+            Assert.GreaterOrEqual(wide, 0, "a station where the outer lines end");
+            Assert.AreEqual(2f * 0.9f * (outerEnd - 15f) / 15f + 0.6f, widths[wide], 1e-3f, "past the cross the outer lines spread apart again");
+            int last = centres.Count - 1;
+            Assert.AreEqual(28.8f, centres[last].z, 1e-3f, "to the end of the longest line");
+            Assert.AreEqual(widths[wide], widths[last], 1e-4f,
+                "the centre line's last few centimetres past the tilted outer lines are too short to narrow into: the beam keeps its width to the end");
+            AssertNoSharpTurn(centres, widths);
+            foreach (Vector3 c in centres)
+            {
+                Assert.AreEqual(0f, c.x, 1e-4f, "three lines spread evenly: the middle stays on the aim");
+                Assert.AreEqual(1f, c.y, 1e-4f, "at the gun's height");
+            }
+            for (int k = 1; k < centres.Count; k++)
+                Assert.Greater(centres[k].z, centres[k - 1].z, "stations run forward along the aim, never doubling back");
+        }
+
+        [Test]
+        public void WhereOneLineStopsTheMergedBeamCarriesOnAsTheOthers()
+        {
+            var origin = Vector3.zero;
+            ConvergingLines(origin, 0.9f, 15f, 20f, out Vector3[] from, out Vector3[] to);
+            to[0] = from[0] + (to[0] - from[0]).normalized * 5f; // the left line stops on a wall
+            var centres = new List<Vector3>();
+            var widths = new List<float>();
+
+            RaybeamLook.MergedSpan(origin, Vector3.forward, from, to, 0.6f, centres, widths);
+
+            float wallZ = to[0].z;
+            float Lo(int k) => centres[k].x - widths[k] * 0.5f;
+            float Hi(int k) => centres[k].x + widths[k] * 0.5f;
+            int at = centres.FindIndex(c => Mathf.Abs(c.z - wallZ) < 1e-3f);
+            Assert.GreaterOrEqual(at, 0, "a station where the left line stops");
+            Assert.AreEqual(-(0.9f - 0.9f * wallZ / 15f) - 0.3f, Lo(at), 1e-3f, "up to the wall it still spans the left line");
+            int after = at + 1;
+            float rightAt = 0.9f - 0.9f * centres[after].z / 15f;
+            Assert.AreEqual(-0.3f, Lo(after), 1e-3f, "past the wall the beam's left side is the centre line's");
+            Assert.AreEqual(rightAt + 0.3f, Hi(after), 1e-3f, "and its right side the right line's");
+            Assert.AreEqual(Lo(after) - Lo(at), centres[after].z - wallZ, 1e-3f, "it narrows over as far as its side moves in (45 degrees)");
+            AssertNoSharpTurn(centres, widths);
+        }
+
+        [Test]
+        public void TheDrawnBeamLiesFlatAndNeverJumpsSidewaysWhereALineStops()
+        {
+            using (var kit = new MovementLookTestKit(RaybeamId, LookShape.Beam))
+            {
+                SetBeamLook(kit);
+                RaybeamBeamView view = NewBeam(kit, out LineRenderer sheath, out LineRenderer core);
+                ConvergingLines(Vector3.zero, 0.9f, 15f, 20f, out Vector3[] from, out Vector3[] to);
+                to[2] = from[2] + (to[2] - from[2]).normalized * 2f; // the right line stops on a wall close to the gun
+                view.Draw(Vector3.zero, Vector3.forward, from, to, 0.6f, 1);
+
+                foreach (LineRenderer line in new[] { sheath, core })
+                    for (int k = 1; k < line.positionCount; k++)
+                    {
+                        Vector3 step = line.GetPosition(k) - line.GetPosition(k - 1);
+                        // A line renderer widens each stretch square to that stretch: one turned far off the aim is drawn as a blob across it.
+                        Assert.LessOrEqual(Mathf.Abs(step.x), step.z * Mathf.Tan(30f * Mathf.Deg2Rad) + 1e-4f,
+                            $"{line.name} stretch {k} turns {Mathf.Atan2(step.x, step.z) * Mathf.Rad2Deg:0} degrees off the aim");
+                    }
+                Assert.AreEqual(2, core.positionCount, "the core never jogs where an outer line stops: it runs the middle hit line");
+                Assert.AreEqual(from[1], core.GetPosition(0));
+                Assert.AreEqual(to[1], core.GetPosition(1));
+                Assert.LessOrEqual(core.GetPosition(1).z, sheath.GetPosition(sheath.positionCount - 1).z + 1e-4f, "the core never runs past the sheath's end");
+            }
+        }
+
+        [Test]
+        public void AnEnemysBeamShowsWhereAnyOfItsLinesCrossesMySight()
+        {
+            Vector3[] from = { Vector3.left, Vector3.zero, Vector3.right };
+            Vector3[] to = { new Vector3(-1f, 0f, 9f), new Vector3(0f, 0f, 9f), new Vector3(1f, 0f, 9f) };
+            var asked = new List<Vector3>();
+            System.Func<Vector3, Vector3, bool> Seen(params int[] seenLines) => (a, b) =>
+            {
+                asked.Add(a);
+                return System.Array.Exists(seenLines, i => from[i] == a && to[i] == b);
+            };
+
+            Assert.IsFalse(RaybeamLook.BeamShown(from, to, Seen()), "no line crosses my sight");
+            CollectionAssert.AreEquivalent(from, asked, "every line is asked, each with its own ends");
+            Assert.IsTrue(RaybeamLook.BeamShown(from, to, Seen(0)), "only the left line crosses my sight");
+            Assert.IsTrue(RaybeamLook.BeamShown(from, to, Seen(2)), "only the right line crosses my sight");
+            Assert.IsTrue(RaybeamLook.BeamShown(from, to, Seen(1)));
+        }
+
+        [Test]
+        public void ThreeLinesOnOneTrackAreOnePlainBeam()
+        {
+            var a = new Vector3(2f, 1f, 3f);
+            var b = new Vector3(2f, 1f, 13f);
+            var centres = new List<Vector3>();
+            var widths = new List<float>();
+
+            RaybeamLook.MergedSpan(a, Vector3.forward, new[] { a, a, a }, new[] { b, b, b }, 0.5f, centres, widths);
+
+            CollectionAssert.AreEqual(new[] { a, b }, centres);
+            CollectionAssert.AreEqual(new[] { 0.5f, 0.5f }, widths);
+        }
+
+        [Test]
+        public void TheTeamOutlineFollowsTheMergedBeamAGapOutsideIt()
+        {
+            var centres = new List<Vector3> { Vector3.zero, new Vector3(0f, 0f, 10f), new Vector3(0f, 0f, 20f) };
+            var widths = new List<float> { 2f, 0.5f, 1f };
+            var outline = new List<Vector3>();
+
+            RaybeamLook.MergedOutline(centres, widths, Vector3.forward, 0.04f, 0.03f, outline);
+
+            float Off(float width) => width * 0.5f + 0.02f + 0.03f; // half the beam, half the outline's own width, the gap
+            var expected = new[]
+            {
+                new Vector3(Off(2f), 0f, 0f), new Vector3(Off(0.5f), 0f, 10f), new Vector3(Off(1f), 0f, 20f),
+                new Vector3(-Off(1f), 0f, 20f), new Vector3(-Off(0.5f), 0f, 10f), new Vector3(-Off(2f), 0f, 0f)
+            };
+            Assert.AreEqual(expected.Length, outline.Count, "down one side of the beam and back up the other, one closed line");
+            for (int k = 0; k < expected.Length; k++)
+                Assert.Less(Vector3.Distance(expected[k], outline[k]), 1e-4f, $"corner {k}: {outline[k]}");
+        }
+
+        [Test]
+        public void TheWidthCurveIsTheBeamsWidthAtEveryStation()
+        {
+            var centres = new List<Vector3> { Vector3.zero, new Vector3(0f, 0f, 10f), new Vector3(0f, 0f, 30f) };
+            var widths = new List<float> { 2f, 0.5f, 1.5f };
+
+            AnimationCurve curve = RaybeamLook.WidthCurve(centres, widths);
+
+            Assert.AreEqual(2f, curve.Evaluate(0f), 1e-4f);
+            Assert.AreEqual(0.5f, curve.Evaluate(1f / 3f), 1e-4f, "a third of the way along the line's length");
+            Assert.AreEqual(1.5f, curve.Evaluate(1f), 1e-4f);
+            Assert.AreEqual(1.25f, curve.Evaluate(1f / 6f), 1e-4f, "straight between stations, so the beam's sides are straight");
+            Assert.AreEqual(1f, curve.Evaluate(2f / 3f), 1e-4f);
         }
 
         [Test]
@@ -367,8 +529,9 @@ namespace Overpower.Tests
                 SetBeamLook(kit);
                 int meshes = Count<Mesh>(), materials = Count<Material>();
                 RaybeamBeamView view = NewBeam(kit, out _, out _);
-                view.Draw(Vector3.zero, Vector3.forward * 10f, 0.6f, 0);
-                view.Draw(Vector3.zero, Vector3.right * 10f, 0.6f, 2);
+                ConvergingLines(Vector3.zero, 0.9f, 15f, 20f, out Vector3[] from, out Vector3[] to);
+                view.Draw(Vector3.zero, Vector3.forward, from, to, 0.6f, 0);
+                view.Draw(Vector3.zero, Vector3.forward, from, to, 0.6f, 2);
                 Assert.AreEqual(meshes, Count<Mesh>());
                 Assert.AreEqual(materials, Count<Material>(), "colours go through line colours and a property block, never a material copy");
             }
@@ -381,9 +544,10 @@ namespace Overpower.Tests
             {
                 RaybeamBeamView view = NewBeam(kit, out LineRenderer sheath, out LineRenderer core);
                 MovementLookTestKit.SetTheme(view, null);
-                view.Draw(Vector3.zero, Vector3.forward * 10f, 0.6f, 0);
-                Assert.AreEqual(0.6f, sheath.startWidth, 1e-5f, "the beam itself still shows at its real width");
-                Assert.AreEqual(0f, core.startWidth, 1e-6f, "no copy of a tuning number stands in for Raybeam Core Share");
+                Vector3 b = Vector3.forward * 10f;
+                view.Draw(Vector3.zero, Vector3.forward, new[] { Vector3.zero, Vector3.zero, Vector3.zero }, new[] { b, b, b }, 0.6f, 0);
+                Assert.AreEqual(0.6f, WidthAt(sheath, 0), 1e-5f, "the beam itself still shows at its real width");
+                Assert.AreEqual(0f, WidthAt(core, 0), 1e-6f, "no copy of a tuning number stands in for Raybeam Core Share");
             }
         }
 
@@ -410,8 +574,10 @@ namespace Overpower.Tests
         {
             MethodInfo show = typeof(RaybeamAbility).GetMethod(nameof(RaybeamAbility.ShowBeam), Any);
             AssertAll(
-                (IlWiring.ResultDecidesABranch(typeof(RaybeamAbility), "DrawBeam", typeof(TeamSight).GetMethod(nameof(TeamSight.ShotShownAlong))),
-                    "an enemy's beam is made only where its line crosses my team's sight"),
+                (IlWiring.ResultDecidesABranch(typeof(RaybeamAbility), "DrawBeam", typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.BeamShown))),
+                    "an enemy's beam is made only where the rule says one of its lines crosses my team's sight"),
+                (IlWiring.Uses(typeof(RaybeamAbility), "DrawBeam", typeof(TeamSight).GetMethod(nameof(TeamSight.ShotShownAlong))),
+                    "each line asks my team's sight, as a gun's shot"),
                 (IlWiring.Uses(typeof(RaybeamAbility), "DrawBeam", show),
                     "every drawn beam goes through the view hand-over"),
                 (IlWiring.Uses(typeof(RaybeamAbility), nameof(RaybeamAbility.ShowBeam), typeof(RaybeamBeamView).GetMethod(nameof(RaybeamBeamView.Draw))),
@@ -420,6 +586,12 @@ namespace Overpower.Tests
                     "the drawn width is Beam Width, the number the hit reads"),
                 (IlWiring.Uses(typeof(RaybeamBeamView), nameof(RaybeamBeamView.Draw), typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.CoreWidth))),
                     "RaybeamLook.CoreWidth"),
+                (IlWiring.Uses(typeof(RaybeamBeamView), nameof(RaybeamBeamView.Draw), typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.MergedSpan))),
+                    "the three lines are drawn as the one beam the rule spans"),
+                (IlWiring.Uses(typeof(RaybeamBeamView), "Paint", typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.WidthCurve))),
+                    "the beam's width along it is the rule's"),
+                (IlWiring.Uses(typeof(RaybeamAbility), "FireBeams", typeof(RaybeamAbility).GetMethod("DrawBeam", Any)),
+                    "one drawn beam for the three lines, drawn once they are all resolved"),
                 (IlWiring.ResultDecidesABranch(typeof(RaybeamAbility), "FireOneBeam", typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.ShowsScorch))),
                     "the scorch plays only when the rule says so"),
                 (IlWiring.Uses(typeof(RaybeamAbility), "FireOneBeam", typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.EndsOnSurface))),
@@ -584,6 +756,50 @@ namespace Overpower.Tests
         private static void LateUpdate(AoeZoneView view) => typeof(AoeZoneView).GetMethod("LateUpdate", Any).Invoke(view, null);
 
         private static Transform Ring(AoeZoneView view) => (Transform)Ref(view, "ring");
+
+        private static void ConvergingLines(Vector3 origin, float spacing, float converge, float length, out Vector3[] from, out Vector3[] to)
+        {
+            Vector3 cross = origin + Vector3.forward * converge;
+            from = new[] { origin + Vector3.left * spacing, origin, origin + Vector3.right * spacing };
+            to = new Vector3[3];
+            for (int i = 0; i < 3; i++)
+                to[i] = from[i] + (cross - from[i]).normalized * length;
+        }
+
+        // The drawn width at one of the line's points: its width curve is laid along the line's own length.
+        private static float WidthAt(LineRenderer line, int index)
+        {
+            float total = 0f, upTo = 0f;
+            for (int k = 1; k < line.positionCount; k++)
+            {
+                float step = Vector3.Distance(line.GetPosition(k - 1), line.GetPosition(k));
+                total += step;
+                if (k <= index)
+                    upTo += step;
+            }
+            return line.widthCurve.Evaluate(total > 0f ? upTo / total : 0f) * line.widthMultiplier;
+        }
+
+        // No side of the merged beam turns more than 45 degrees off the aim between stations, so the drawn middle turns at most ~27.
+        private static void AssertNoSharpTurn(List<Vector3> centres, List<float> widths)
+        {
+            for (int k = 1; k < centres.Count; k++)
+            {
+                float step = centres[k].z - centres[k - 1].z;
+                float lo = (centres[k].x - widths[k] * 0.5f) - (centres[k - 1].x - widths[k - 1] * 0.5f);
+                float hi = (centres[k].x + widths[k] * 0.5f) - (centres[k - 1].x + widths[k - 1] * 0.5f);
+                Assert.LessOrEqual(Mathf.Max(Mathf.Abs(lo), Mathf.Abs(hi)), step + 1e-4f, $"stretch {k}: a side jumps sideways");
+            }
+        }
+
+        private static int StationAt(LineRenderer line, float z)
+        {
+            for (int k = 0; k < line.positionCount; k++)
+                if (Mathf.Abs(line.GetPosition(k).z - z) < 1e-3f)
+                    return k;
+            Assert.Fail("no point of the beam at z " + z);
+            return -1;
+        }
 
         private static RaybeamBeamView NewBeam(MovementLookTestKit kit, out LineRenderer sheath, out LineRenderer core)
         {

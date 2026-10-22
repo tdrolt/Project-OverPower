@@ -185,7 +185,8 @@ namespace Overpower.Tests
                 (LastArgumentIs(typeof(ZipGunAbility).GetMethod(nameof(ZipGunAbility.ExecuteCast)), typeof(ZipGunAbility).GetMethod("PlayTether", Any), CastersTeam), "Zip cable"),
                 (LastArgumentIs(typeof(FlamethrowerAbility).GetMethod(nameof(FlamethrowerAbility.ExecuteCast)), typeof(FlamethrowerAbility).GetMethod("SprayRoutine", Any), CastersTeam), "Flamethrower spray"),
                 (LastArgumentIs(spray.GetMethod("MoveNext", Any), showVfx, Ldfld(spray.GetField("casterTeam", Any))), "Flamethrower fan outline"),
-                (LastArgumentIs(typeof(RaybeamAbility).GetMethod(nameof(RaybeamAbility.ShowBeam), Any), typeof(RaybeamBeamView).GetMethod(nameof(RaybeamBeamView.Draw)), Ldarg(4)), "Raybeam edges"));
+                (LastArgumentIs(typeof(RaybeamAbility).GetMethod(nameof(RaybeamAbility.ShowBeam), Any), typeof(RaybeamBeamView).GetMethod(nameof(RaybeamBeamView.Draw)), Ldarg(6)), "Raybeam edges"),
+                (LastArgumentIs(typeof(RaybeamAbility).GetMethod("ShowCharge", Any), typeof(RaybeamChargeView).GetMethod(nameof(RaybeamChargeView.Begin)), CastersTeam), "Raybeam charge edge"));
         }
 
         [Test]
@@ -463,9 +464,13 @@ namespace Overpower.Tests
                 var from = new Vector3(1f, 1.2f, 2f);
                 var to = new Vector3(9f, 1.2f, 14f);
 
-                view.Draw(from, to, 0.5f, 2);
+                // Three lines on one track: the merged beam is one plain beam, its outline a rectangle.
+                Vector3[] froms = { from, from, from }, tos = { to, to, to };
+                view.Draw(from, to - from, froms, tos, 0.5f, 2);
                 Assert.IsTrue(edge.useWorldSpace);
                 Assert.IsTrue(edge.loop, "one closed outline round the beam");
+                Assert.AreEqual(LineAlignment.TransformZ, edge.alignment, "laid flat like the sheath, so the camera sees both the same way");
+                Assert.Greater(Vector3.Dot(edge.transform.forward, Vector3.down), 0.999f);
                 Assert.AreEqual(4, edge.positionCount);
                 Assert.AreEqual(0.04f, edge.startWidth, 1e-5f, "Raybeam Edge Width thick");
                 Assert.AreEqual(0.04f, edge.endWidth, 1e-5f);
@@ -485,11 +490,11 @@ namespace Overpower.Tests
                 Assert.AreEqual(0.7f, edge.startColor.a, 1f / 255f, "Raybeam Edge Alpha");
                 Assert.AreEqual(new Color(1.3f, 1.3f, 1.3f, 1f), GlowOf(edge), "Raybeam Edge Glow");
                 MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, sheath.startColor, "the sheath keeps the Raybeam's own row");
-                Assert.AreEqual(0.5f, sheath.startWidth, 1e-5f, "and its width, what the beam hits");
+                Assert.AreEqual(0.5f, sheath.widthCurve.Evaluate(0f) * sheath.widthMultiplier, 1e-5f, "and its width, what the beam hits");
 
-                view.Draw(from, to, 0.5f, -1);
+                view.Draw(from, to - from, froms, tos, 0.5f, -1);
                 MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, edge.startColor, "no team known: the outline is the beam's own colour");
-                Assert.IsTrue(IlWiring.Uses(typeof(RaybeamBeamView), "PaintEdge", typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.EdgeOutline))), "the outline's shape is the rule's");
+                Assert.IsTrue(IlWiring.Uses(typeof(RaybeamBeamView), "PaintEdge", typeof(RaybeamLook).GetMethod(nameof(RaybeamLook.MergedOutline))), "the outline's shape is the rule's");
             }
         }
 

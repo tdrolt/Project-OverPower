@@ -246,9 +246,9 @@ public class AbilityRunner : MonoBehaviourPun, ITestRangeResettable
         return true;
     }
 
-    /// <summary>What the caster's machine knows at the press, gathered in one place so no module reads
+    /// <summary>What the caster's machine knows now (at the press, or at a wind-up's end), gathered in one place so no module reads
     /// the mouse or the camera itself.</summary>
-    private CastContext BuildContext()
+    internal CastContext BuildContext()
     {
         Vector3 origin = transform.position;
         // SafeMuzzlePosition, not MuzzlePosition: a cast fired flush against a wall (stun gun, zip
