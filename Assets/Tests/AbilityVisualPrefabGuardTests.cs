@@ -158,14 +158,20 @@ namespace Overpower.Tests
         public void StunBulletIsNotTheBuiltInSphere()
         {
             GameObject bullet = Load(StunBulletPath);
-            Mesh mesh = bullet.GetComponent<MeshFilter>().sharedMesh;
+            Assert.AreEqual(new Vector3(0.6f, 0.6f, 0.6f), bullet.transform.localScale, "the bullet's root scale is untouched");
+            Assert.IsNull(bullet.GetComponent<MeshFilter>(), "the bolt is a child, so it can be drawn thicker across without touching the root");
+            Transform bolt = bullet.transform.Find("Bolt");
+            Assert.IsNotNull(bolt, "the bolt's mesh");
+            Mesh mesh = bolt.GetComponent<MeshFilter>().sharedMesh;
             Assert.IsNotNull(mesh);
             Assert.AreNotEqual("Sphere", mesh.name, "the 0.6 m ball is gone");
             Assert.AreEqual("Assets/Gameplay/Art/StunBolt.fbx", AssetDatabase.GetAssetPath(mesh), "the faceted bolt from Blender");
             Assert.Less(mesh.triangles.Length / 3, 300, "a small low-poly model");
             Assert.Greater(mesh.bounds.size.z, mesh.bounds.size.x * 2f, "long along its flight (+Z), slim across");
-            Vector3 size = Vector3.Scale(mesh.bounds.size, bullet.transform.localScale);
-            Assert.Less(Mathf.Max(size.x, size.y, size.z), 0.6f, "smaller than the 0.6 m ball it replaces, in every direction");
+            Vector3 size = Vector3.Scale(mesh.bounds.size, Vector3.Scale(bullet.transform.localScale, bolt.localScale));
+            Assert.LessOrEqual(Mathf.Max(size.x, size.y, size.z), 0.601f, "never bigger than the 0.6 m ball it replaced, in any direction");
+            Assert.GreaterOrEqual(size.z, 0.3f, "at least half the ball's size along its flight, so it reads at play zoom");
+            Assert.GreaterOrEqual(size.z, 1.5f * Mathf.Max(size.x, size.y), "still a bolt: clearly longer along its flight than across");
             Assert.IsEmpty(bullet.GetComponentsInChildren<Collider>(true), "hits come from the motor's sphere cast, never a collider");
         }
 

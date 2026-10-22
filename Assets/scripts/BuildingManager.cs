@@ -193,8 +193,8 @@ public class BuildingManager : MonoBehaviourPunCallbacks
     public int CaptureProgressPublishCount { get; private set; }
 
     /// <summary>Whether this zone can be captured or drained in this room: a capital cannot in Dominion (DominionTerritoryRules). The capital
-    /// still counts as held for adjacency; this only stops its own capture and drain. Its ring and its "under attack" warning still show: an enemy
-    /// standing in it warns the team but never closes the link to the zones next to it (ZoneThreat.ZoneClosesLink).</summary>
+    /// still counts as held for adjacency; this only stops its own capture and drain. An enemy standing in it never closes the link to the zones
+    /// next to it (ZoneThreat.ZoneClosesLink), and its ring and tower never pulse for it (TowerLookRules.Shown).</summary>
     public bool IsCapturableZone(int zone)
     {
         bool isCapital = Map != null && Map.CapitalTeamOf(zone) != TerritoryMap.Neutral;

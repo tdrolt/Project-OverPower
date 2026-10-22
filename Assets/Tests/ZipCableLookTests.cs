@@ -9,7 +9,7 @@ namespace Overpower.Tests
 {
     /// <summary>The Zip Gun fires a small silver harpoon on a straight segmented silver cable whose chevrons run toward the target, in flight
     /// and during the pull; every colour from the Zip Gun's row in the look table. The harpoon is a look only: no collider, the hit size and
-    /// the bullet's root scale stay, and the harpoon spans exactly the hit sphere along its flight.</summary>
+    /// the bullet's root scale stay; the harpoon is drawn Zip Harpoon Size times the hit sphere's width, its point at the sphere's front.</summary>
     public class ZipCableLookTests
     {
         private const System.Reflection.BindingFlags Any = MovementLookTestKit.Any;
@@ -86,6 +86,44 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheHarpoonIsDrawnZipHarpoonSizeTimesTheHitWithItsPointAtTheHitsFront()
+        {
+            Assert.AreEqual(0.45f, ZipCableLook.HarpoonLength(0.225f, 1f), 1e-6f, "size 1 spans exactly the hit");
+            Assert.AreEqual(0.675f, ZipCableLook.HarpoonLength(0.225f, 1.5f), 1e-6f, "half as long again");
+            Assert.AreEqual(-0.225f, ZipCableLook.HarpoonBack(0.225f, 0.45f), 1e-6f, "the old placement: back at the hit's back");
+            Assert.AreEqual(-0.45f, ZipCableLook.HarpoonBack(0.225f, 0.675f), 1e-6f, "a longer harpoon reaches further back; its point stays at the hit's front");
+
+            using (var kit = new MovementLookTestKit(ZipId, LookShape.HarpoonCable))
+            {
+                kit.Look.zipHarpoonSize = 1.5f;
+                GameObject bolt = kit.NewObject("zip harpoon size test");
+                bolt.transform.position = new Vector3(4f, 500f, 2f);
+                var head = new GameObject("Head");
+                head.transform.SetParent(bolt.transform, false);
+                head.transform.localScale = Vector3.one * 0.45f;
+                MeshRenderer headRenderer = head.AddComponent<MeshRenderer>();
+                Mesh spear = kit.Make(new Mesh { vertices = new[] { new Vector3(-0.2f, 0f, 0f), new Vector3(0.2f, 0f, 0f), new Vector3(0f, 0f, 2f) }, triangles = new[] { 0, 1, 2 } });
+                head.AddComponent<MeshFilter>().sharedMesh = spear; // 2 m long from its back (z 0) to its point
+                ZipBoltView view = bolt.AddComponent<ZipBoltView>();
+                var so = new SerializedObject(view);
+                so.FindProperty("theme").objectReferenceValue = kit.Theme;
+                so.FindProperty("head").objectReferenceValue = headRenderer;
+                so.ApplyModifiedPropertiesWithoutUndo();
+
+                view.OnSpawned(null, new ProjectileContext(ZipId, 40f, 0.3f, 15f, 0f, -1, 1, Vector3.forward, bolt.transform.position));
+
+                Assert.AreEqual(0.9f / 2f, head.transform.localScale.z, 1e-5f, "0.9 m long (1.5 x the 0.6 m hit) from a 2 m model");
+                Assert.AreEqual(head.transform.localScale.z, head.transform.localScale.x, 1e-6f, "scaled evenly, the model's shape kept");
+                Assert.AreEqual(-0.6f, head.transform.localPosition.z, 1e-5f, "its back 0.9 m behind the hit's front");
+                Assert.AreEqual(0.3f, head.transform.localPosition.z + 2f * head.transform.localScale.z, 1e-5f, "its point at the hit's front");
+            }
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), nameof(ZipBoltView.OnSpawned), typeof(ZipBoltView).GetMethod("PlaceHarpoon", Any)), "every spawned bolt sizes its harpoon");
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), "PlaceHarpoon", typeof(ArenaLook).GetField(nameof(ArenaLook.zipHarpoonSize))));
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), "PlaceHarpoon", typeof(ZipCableLook).GetMethod(nameof(ZipCableLook.HarpoonLength))));
+            Assert.IsTrue(IlWiring.Uses(typeof(ZipBoltView), "PlaceHarpoon", typeof(ZipCableLook).GetMethod(nameof(ZipCableLook.HarpoonBack))));
+        }
+
+        [Test]
         public void ThePullCableAndAnchorUseTheSameLookAndTheTestedRules()
         {
             System.Reflection.MemberInfo forAbility = typeof(LookColours).GetMethod(nameof(LookColours.ForAbility));
@@ -108,7 +146,7 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheZipBulletIsAHarpoonWithNoColliderSpanningTheHit()
+        public void TheZipBulletIsAHarpoonWithNoCollider()
         {
             GameObject bullet = AssetDatabase.LoadAssetAtPath<GameObject>(BulletPath);
             Assert.IsNotNull(bullet);
@@ -121,17 +159,13 @@ namespace Overpower.Tests
             Assert.AreEqual(HarpoonPath, AssetDatabase.GetAssetPath(mesh), "the harpoon head from Blender");
             Assert.Less(mesh.triangles.Length / 3, 300, "a small low-poly model");
             Assert.Greater(mesh.bounds.size.z, mesh.bounds.size.x * 2f, "long along its flight (+Z), slim across");
-            Assert.AreEqual(0f, mesh.bounds.min.z, 0.02f * mesh.bounds.size.z, "its origin is the back of the shaft, where the cable ties on");
+            Assert.AreEqual(0f, mesh.bounds.min.z, 0.02f * mesh.bounds.size.z,
+                "its origin is the back of the shaft, where the cable ties on (ZipBoltView.PlaceHarpoon takes bounds.max.z as the model's length)");
             Vector3 tip = Vector3.zero;
             foreach (Vector3 v in mesh.vertices)
                 if (v.z > tip.z) tip = v;
             Assert.Less(Mathf.Abs(tip.x), 0.05f * mesh.bounds.size.z, "the spear point is at +Z, on the middle line");
             Assert.AreEqual(HarpoonMaterialPath, AssetDatabase.GetAssetPath(head.GetComponent<MeshRenderer>().sharedMaterial));
-
-            float radius = new SerializedObject(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Zip Gun.prefab").GetComponent<ZipGunAbility>())
-                .FindProperty("projectileRadius").floatValue;
-            Assert.AreEqual(-radius, head.localPosition.z, 1e-4f, "the harpoon's back sits at the back of the hit sphere");
-            Assert.AreEqual(2f * radius, mesh.bounds.max.z * head.localScale.z, 0.01f, "and its point at the front: the look tells the truth about the hit");
 
             ZipBoltView view = bullet.GetComponent<ZipBoltView>();
             Assert.AreEqual("Assets/Gameplay/Config/UiTheme.asset", AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("theme").objectReferenceValue));

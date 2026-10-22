@@ -8,8 +8,9 @@ namespace Overpower.Abilities
 {
     /// <summary>
     /// The Electric Fence: pylons round its real Radius, jagged arcs between neighbours at each bar's height and a faint floor band as
-    /// wide as Ring Thickness (where a hit really lands), in the Fence's row of the look table. The arcs take a new shape at Fence Arc
-    /// Rate (ArenaLook) from the server clock and the fence's view id, so every client draws the same; only line points change.
+    /// wide as Ring Thickness (where a hit really lands). The pylons and the band are in the owner's team colour; the arcs, which hurt, in the
+    /// Fence's row of the look table (red Danger). The arcs take a new shape at Fence Arc Rate (ArenaLook) from the server clock and the
+    /// fence's view id, so every client draws the same; only line points change.
     /// VISUAL ONLY, NO COLLIDERS: the fence damages and slows on crossing, it never blocks players or shots.
     /// </summary>
     [DisallowMultipleComponent]
@@ -21,7 +22,7 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("Team colours and the Arena Look - Assets/Gameplay/Config/UiTheme.asset.")]
         private UiTheme theme;
 
-        [SerializeField, Tooltip("Which row of the Arena Look table colours this fence: the Electric Fence ability's id.")]
+        [SerializeField, Tooltip("Which row of the Arena Look table colours this fence's arcs: the Electric Fence ability's id.")]
         private int abilityId = 26;
 
         [SerializeField, Tooltip("One pylon, already on the prefab with its foot at the floor; copied round the ring. Its size is " +
@@ -61,7 +62,9 @@ namespace Overpower.Abilities
             if (fence == null || post == null)
                 return;
 
-            Color team = theme != null ? LookColours.ForAbility(theme, abilityId, deployable.OwnerTeam, LookFamily.Team) : Color.white;
+            // The pylons and the floor band say whose fence it is; the arcs, which hurt, take the Fence's row (red Danger).
+            Color team = theme != null ? LookColours.For(LookFamily.Team, deployable.OwnerTeam, theme) : Color.white;
+            Color arcs = theme != null ? LookColours.ForAbility(theme, abilityId, deployable.OwnerTeam, LookFamily.Danger) : Color.white;
             look = theme != null ? theme.arenaLook : null;
             radius = fence.Radius;
             salt = fence.photonView != null ? fence.photonView.ViewID : 0;
@@ -98,7 +101,7 @@ namespace Overpower.Abilities
                     bar.loop = true;
                     bar.positionCount = points.Length;
                     bar.startWidth = bar.endWidth = look.fenceArcWidth;
-                    VisualTint.SetLineColor(bar, VisualTint.WithAlpha(team, barOpacity));
+                    VisualTint.SetLineColor(bar, VisualTint.WithAlpha(arcs, barOpacity));
                     bar.SetPropertyBlock(glow); // the glow rides on the shared line material's colour multiplier, per renderer
                 }
                 shaped = false;

@@ -1,4 +1,5 @@
 using System;
+using Overpower.Match;
 using UnityEngine;
 
 namespace Overpower.Arena
@@ -24,6 +25,12 @@ namespace Overpower.Arena
         /// <summary>The ring a column of this radius stands on: its outer edge is tangent to the tower's collider,
         /// never past it, because columns must never add cover over the plain round tower (Decision 6).</summary>
         public static float ColumnRingRadius(float columnRadius, float towerRadius) => towerRadius - columnRadius;
+
+        /// <summary>What a zone's tower and ring show. A spawn can never be taken, so an enemy standing in it or a drain must not make it
+        /// pulse or flicker as if it were under attack: it keeps its owner's steady colour. Every other zone shows its state as it is.</summary>
+        public static CaptureRingState Shown(CaptureRingState state, bool spawn) =>
+            spawn ? new CaptureRingState(CaptureRingPhase.Idle, 0f, TerritoryMap.Neutral, state.OutlineTeam, TerritoryMap.Neutral, false, state.OutOfPlay)
+                  : state;
 
         /// <summary>The colour brightened by glow without changing its hue on screen. The tonemapper squeezes every bright channel
         /// toward the same level, so a weaker channel stops at its share of the colour at full strength (or purple's red would catch

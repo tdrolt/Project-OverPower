@@ -437,6 +437,7 @@ public class BuildingCapture : MonoBehaviourPun
             state = CaptureRingState.From(manager.CaptureProgressOf(buildingID), owner, underAttack,
                                           PhotonNetwork.ServerTimestamp, outOfPlay: false);
         }
+        state = Overpower.Arena.TowerLookRules.Shown(state, manager.IsSpawnZone(buildingID));
 
         if (ringView != null)
         {

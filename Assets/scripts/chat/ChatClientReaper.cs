@@ -10,17 +10,32 @@ public sealed class ChatClientReaper : MonoBehaviour
 {
     private const float GiveUpSeconds = 8f;
     private static ChatClientReaper instance;
+    private static bool quitting;
     private readonly List<ChatClient> closing = new List<ChatClient>();
     private readonly List<float> startedAt = new List<float>();
 
     /// <summary>True while some connection is still closing: the next connection waits for it.</summary>
     public static bool Busy => instance != null && instance.closing.Count > 0;
 
+    /// <summary>Whether a reaper must be made now: never while the game quits or Play Mode closes, because a helper made then outlives the
+    /// scene being torn down (Unity's "objects were not cleaned up" warning) and would never get an Update to Service the client anyway.</summary>
+    public static bool HelperNeeded(bool exists, bool quitting) => !exists && !quitting;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void WatchQuitting()
+    {
+        quitting = false; // statics survive into the next Play Mode when Enter Play Mode skips the domain reload
+        Application.quitting -= OnQuitting;
+        Application.quitting += OnQuitting;
+    }
+
+    internal static void OnQuitting() => quitting = true;
+
     /// <summary>Makes sure the reaper exists. Called when a chat connection STARTS, so it is never first created while a scene is closing (a scene
     /// loaded for the whole room closes the one with the chat in it: Unity reports an object made during that as an error).</summary>
     public static void Ensure()
     {
-        if (instance != null) return;
+        if (!HelperNeeded(instance != null, quitting)) return;
         var go = new GameObject("Chat client reaper");
         DontDestroyOnLoad(go);
         instance = go.AddComponent<ChatClientReaper>();
@@ -31,6 +46,7 @@ public sealed class ChatClientReaper : MonoBehaviour
         if (client == null) return;
         client.Disconnect();
         Ensure();
+        if (instance == null) return; // quitting: the client is told to disconnect above, and nothing will run to Service it after this
         instance.closing.Add(client);
         instance.startedAt.Add(Time.unscaledTime);
     }

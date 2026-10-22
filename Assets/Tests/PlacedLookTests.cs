@@ -268,10 +268,12 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void TheFenceIsPylonsWithJaggedArcsReshapedFromTheServerClock()
+        public void TheFenceIsTeamPylonsWithJaggedArcsInItsRowReshapedFromTheServerClock()
         {
             using (var kit = new MovementLookTestKit(FenceId, LookShape.ArcPylons))
             {
+                var team1 = new Color(0.12f, 0.34f, 0.56f, 1f);
+                kit.Theme.teamShotColors = new[] { Color.black, team1 };
                 kit.Look.fenceArcRate = 15f;
                 kit.Look.fenceArcPointsPerGap = 4;
                 kit.Look.fenceArcJitter = 0.2f;
@@ -286,8 +288,9 @@ namespace Overpower.Tests
                 MeshRenderer post = Part<MeshRenderer>(kit, cage, "Post");
                 LineRenderer low = Part<LineRenderer>(kit, cage, "Bar Low");
                 LineRenderer top = Part<LineRenderer>(kit, cage, "Bar Top");
+                LineRenderer band = Part<LineRenderer>(kit, go, "Band");
                 FenceCageView view = go.AddComponent<FenceCageView>();
-                Wire(view, kit, FenceId, ("post", post.transform));
+                Wire(view, kit, FenceId, ("post", post.transform), ("band", band));
                 var so = new SerializedObject(view);
                 SetArray(so, "bars", low, top);
                 so.ApplyModifiedPropertiesWithoutUndo();
@@ -303,9 +306,10 @@ namespace Overpower.Tests
                 foreach (MeshRenderer pylon in pylons)
                 {
                     pylon.GetPropertyBlock(block);
-                    MovementLookTestKit.AssertRgb(FenceArcsRule.PylonBody(MovementLookTestKit.Gold, 0.5f), block.GetColor(BaseColorId), "a pylon wears the Fence's row, darker");
-                    MovementLookTestKit.AssertRgb(FenceArcsRule.PylonGlow(MovementLookTestKit.Gold, 0.4f), block.GetColor(EmissionId), "and glows faintly in it");
+                    MovementLookTestKit.AssertRgb(FenceArcsRule.PylonBody(team1, 0.5f), block.GetColor(BaseColorId), "a pylon wears its owner's team colour, darker (whose fence it is)");
+                    MovementLookTestKit.AssertRgb(FenceArcsRule.PylonGlow(team1, 0.4f), block.GetColor(EmissionId), "and glows faintly in it");
                 }
+                MovementLookTestKit.AssertRgb(team1, band.startColor, "the faint floor band is the owner's too");
 
                 view.Reshape(2000);
                 int seed = StunArcsRule.Seed(2000, 7, 15f);
@@ -316,7 +320,7 @@ namespace Overpower.Tests
                     Assert.AreEqual(FenceArcsRule.PointCount(posts, 4), bar.positionCount, "a jagged loop through every pylon");
                     Assert.IsTrue(bar.loop);
                     Assert.AreEqual(0.05f, bar.startWidth, 1e-5f, "Fence Arc Width");
-                    MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, bar.startColor, "the arcs wear the Fence's row");
+                    MovementLookTestKit.AssertRgb(MovementLookTestKit.Gold, bar.startColor, "the arcs wear the Fence's row in the look table (red Danger in the game)");
                     for (int i = 0; i < bar.positionCount; i++)
                         Assert.AreEqual(FenceArcsRule.Point(seed, level, i, posts, 4, fence.Radius, 0.2f), bar.GetPosition(i), $"arc {level} point {i} from the server clock's seed");
                     bar.GetPropertyBlock(block);

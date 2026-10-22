@@ -15,6 +15,13 @@ namespace Overpower.Abilities
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int BaseMapStId = Shader.PropertyToID("_BaseMap_ST");
 
+        /// <summary>How long the harpoon is drawn, in metres: <paramref name="size"/> times the width of the hit sphere.</summary>
+        public static float HarpoonLength(float hitRadius, float size) => 2f * hitRadius * size;
+
+        /// <summary>Where the harpoon's back sits along its flight, from the hit sphere's centre: its point stays at the front of the sphere, so a
+        /// longer harpoon reaches back, never past what it hooks.</summary>
+        public static float HarpoonBack(float hitRadius, float length) => hitRadius - length;
+
         /// <summary>The texture's shift along the cable at this moment, in tiles, kept in (-1, 0]. A falling value moves each chevron away
         /// from the shooter's end, at <paramref name="speed"/> metres per second.</summary>
         public static float Scroll(float seconds, float speed, float spacing)

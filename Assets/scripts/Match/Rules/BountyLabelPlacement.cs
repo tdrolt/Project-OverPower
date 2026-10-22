@@ -31,6 +31,10 @@ namespace Overpower.Match
             return centre;
         }
 
+        /// <summary>Whether a tower's label (and its pop) is drawn at all: only while the point it hangs from is on this player's screen, in front
+        /// of the camera. An off-screen tower gets no label pinned to the screen's edge.</summary>
+        public static bool OnScreen(Vector3 screenPoint, Rect pixels) => screenPoint.z >= 0f && pixels.Contains(screenPoint);
+
         /// <summary>Whether the text and its cached size must be set again: the label is new, its amount changed, or the theme's font size changed.</summary>
         public static bool NeedsRedo(bool hasShown, int shownAmount, float shownFontSize, int amount, float fontSize) =>
             !hasShown || shownAmount != amount || !Mathf.Approximately(shownFontSize, fontSize);

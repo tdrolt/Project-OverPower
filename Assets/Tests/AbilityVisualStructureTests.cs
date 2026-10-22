@@ -401,7 +401,7 @@ namespace Overpower.Tests
             Assert.IsNotNull(prefab.GetComponent<ProjectileMotor>());
             Assert.IsNotNull(prefab.GetComponent<AbilityHitRelay>());
             Transform head = Child(prefab.transform, "Head");
-            // The harpoon spans the hit sphere along its flight (ZipCableLookTests.TheZipBulletIsAHarpoonWithNoColliderSpanningTheHit).
+            // Its drawn size and place along the flight are set at spawn (ZipCableLookTests: ZipBoltView.PlaceHarpoon).
             AssertMesh(head, "HarpoonHead", "Assets/Gameplay/FX/Materials/Zip Harpoon.mat");
             var rope = Child(prefab.transform, "Rope").GetComponent<LineRenderer>();
             Assert.IsNotNull(rope);

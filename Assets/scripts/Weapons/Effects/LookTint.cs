@@ -8,9 +8,8 @@ namespace Overpower.Weapons
     /// <summary>
     /// Paints an ability's own shot (the Stun Gun bolt) or its impact burst in the colour of its row in the look table, through a property
     /// block on each renderer so the shared material file never changes while playing. The solid core (a MeshRenderer, URP Lit with
-    /// emission) gets the colour plus Ability Shot Glow; every other renderer is an unlit spark (Particles/Unlit), whose Ability Spark
-    /// Glow rides in its colour.
-    /// A projectile is tinted as it spawns; anything else (a burst) when it starts.
+    /// emission) gets the colour plus Stun Bolt Glow, brightened without leaving its hue; every other renderer is an unlit spark
+    /// (Particles/Unlit), whose Ability Spark Glow rides in its colour. A projectile is tinted as it spawns; anything else (a burst) when it starts.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class LookTint : MonoBehaviour, IProjectileBehaviour
@@ -45,7 +44,7 @@ namespace Overpower.Weapons
             Color colour = LookColours.ForAbility(theme, abilityId, team, LookFamily.None);
             if (colour.a <= 0f)
                 return false;
-            float coreGlow = theme.arenaLook != null ? theme.arenaLook.abilityShotGlow : 1f;
+            float coreGlow = theme.arenaLook != null ? theme.arenaLook.stunBoltGlow : 1f;
             float sparkGlow = theme.arenaLook != null ? theme.arenaLook.abilitySparkGlow : 1f;
 
             if (renderers == null)
@@ -58,7 +57,9 @@ namespace Overpower.Weapons
                 if (r is MeshRenderer)
                 {
                     block.SetColor(BaseColorId, colour);
-                    block.SetColor(EmissionColorId, new Color(colour.r * coreGlow, colour.g * coreGlow, colour.b * coreGlow, 1f));
+                    Color glow = TowerLookRules.GlowKeepingHue(colour, coreGlow);
+                    glow.a = 1f;
+                    block.SetColor(EmissionColorId, glow);
                 }
                 else
                     block.SetColor(BaseColorId, new Color(colour.r * sparkGlow, colour.g * sparkGlow, colour.b * sparkGlow, colour.a));

@@ -66,6 +66,14 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheElectricFencesArcsAreRedDamage()
+        {
+            Assert.IsTrue(look.TryGetLook(26, out AbilityLook fence));
+            Assert.AreEqual(LookShape.ArcPylons, fence.Shape);
+            Assert.AreEqual(LookFamily.Danger, fence.Family, "the arcs hurt: red, like the Raybeam (the pylons keep the owner's team colour)");
+        }
+
+        [Test]
         public void TheBubbleIsAHologramInTheTeamColour()
         {
             Assert.AreEqual(LookShape.HologramSphere, look.RespawnBubbleLook.Shape);

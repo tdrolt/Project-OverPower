@@ -37,6 +37,17 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void TheLabelAndThePopShowOnlyWhileTheirTowerIsOnScreen()
+        {
+            System.Type view = typeof(TowerBountyView);
+            System.Reflection.MethodInfo onScreen = Rule(typeof(BountyLabelPlacement), nameof(BountyLabelPlacement.OnScreen));
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(view, "TryScreenPoint", onScreen), "the one place a tower's screen point is worked out decides on it");
+            System.Reflection.MethodInfo screenPoint = view.GetMethod("TryScreenPoint", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(view, "LateUpdate", screenPoint), "the label is hidden when it is off screen");
+            Assert.IsTrue(IlWiring.ResultDecidesABranch(view, "UpdatePops", screenPoint), "and so is the pop");
+        }
+
+        [Test]
         public void TheMinimapRectComesFromTheOneSharedHelper()
         {
             System.Reflection.MethodInfo helper = typeof(Overpower.UI.HudScreenLayout).GetMethod(nameof(Overpower.UI.HudScreenLayout.CornerMinimapRect));

@@ -51,7 +51,7 @@ MonoBehaviour:
     family: 2
   - abilityId: 26
     shape: 13
-    family: 1
+    family: 6
   - abilityId: 27
     shape: 14
     family: 6
@@ -72,12 +72,13 @@ MonoBehaviour:
   shieldRiseStagger: 0.35
   shieldPlateGlow: 0.4
   shieldSeamShade: {r: 0.035, g: 0.03, b: 0.025, a: 1}
+  shieldShellScale: 1.18
   hologram: {fileID: 2100000, guid: 1fe75856c4baaa040901b468e37773cd, type: 2}
   shieldPlates: {fileID: 2100000, guid: 1e1873c4ddf885842a6e6a0bff6f06e5, type: 2}
   fxAdditive: {fileID: 2100000, guid: cf2a97addcf17b04f91edd80fd735769, type: 2}
   fxAlpha: {fileID: 2100000, guid: 7201e9527e5d7e447aafc48ac13dcdb5, type: 2}
-  abilityShotGlow: 0.6
   abilitySparkGlow: 1
+  stunBoltGlow: 6
   stunArcCount: 3
   stunArcRate: 15
   stunArcRadius: 0.85
@@ -115,12 +116,12 @@ MonoBehaviour:
   fireFieldFlamesPerSquareMetre: 14
   fireFieldEmbersPerSquareMetre: 1.5
   shotLightCap: 4
-  shotLightRange: 4
-  shotLightIntensity: 0.3
+  shotLightRange: 8
+  shotLightIntensity: 0.25
   fxPoolCap: 24
   fxCameraPull: 1
   blastRingWidth: 0.2
-  shotLightHeight: 0.5
+  shotLightHeight: 1.6
   gunFlashGlow: 2.5
   dashStreakWidth: 0.5
   dashStreakHeight: 0.5
@@ -147,6 +148,8 @@ MonoBehaviour:
   zipCableWidth: 0.24
   zipChevronSpacing: 0.6
   zipChevronSpeed: 8
+  abilityShotGlow: 0.6
+  zipHarpoonSize: 1.5
   sprintLineCount: 3
   sprintLineLength: 0.75
   sprintLineWidth: 0.12
@@ -157,6 +160,8 @@ MonoBehaviour:
   sprintLineMinSpeed: 1
   sprintLineAlpha: 1
   sprintLineLift: 0.06
+  teleportRingWidth: 0.2
+  teleportRingAlpha: 1
   portalFrameWidth: 0.14
   portalInnerScale: 0.55
   portalInnerWidth: 0.07
@@ -172,8 +177,8 @@ MonoBehaviour:
   fenceArcJitter: 0.15
   fenceArcWidth: 0.06
   fenceArcGlow: 1.2
-  fencePylonShade: 0.15
-  fencePylonGlow: 0.2
+  fencePylonShade: 0.6
+  fencePylonGlow: 1.2
   aoeRingBand: 1.6
   aoeCellSize: 0.7
   aoeCellGap: 0.08

@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Overpower.Arena;
+using Overpower.Match;
 
 namespace Overpower.Tests
 {
@@ -75,6 +76,62 @@ namespace Overpower.Tests
             // never passes the tower's own collider radius, so columns never add cover over the plain round tower.
             Assert.LessOrEqual(normalRing + 0.35f, towerRadius + 0.0001f);
             Assert.LessOrEqual(capitalRing + 0.6f, towerRadius + 0.0001f);
+        }
+
+        [Test]
+        public void ASpawnNeverPulsesWhileAnEnemyStandsInItOrDrainsIt()
+        {
+            var attacked = new CaptureRingState(CaptureRingPhase.Idle, 0f, -1, 1, -1, underAttack: true);
+            var drained = new CaptureRingState(CaptureRingPhase.Draining, 0.6f, 1, 1, 2, underAttack: true);
+            foreach (CaptureRingState state in new[] { attacked, drained })
+            {
+                OwnerPaint paint = OwnerPaint.From(TowerLookRules.Shown(state, spawn: true));
+                Assert.AreEqual(OwnerPaintBase.Team, paint.Base, "a spawn keeps its owner's colour");
+                Assert.AreEqual(1, paint.Team);
+                Assert.IsFalse(paint.PulsesToWarning, "no attack flicker: a spawn cannot be taken");
+                Assert.AreEqual(-1, paint.PulseTeam, "and no drain pulse");
+                Assert.IsFalse(TowerLookRules.Shown(state, spawn: true).ShowsArc, "no capture band on a spawn");
+            }
+
+            var outOfPlay = new CaptureRingState(CaptureRingPhase.Idle, 0f, -1, -1, -1, false, outOfPlay: true);
+            Assert.AreEqual(OwnerPaintBase.OutOfPlay, OwnerPaint.From(TowerLookRules.Shown(outOfPlay, spawn: true)).Base, "out of play still wins");
+        }
+
+        [Test]
+        public void ACaptureTowerKeepsItsAttackAndDrainPulse()
+        {
+            var attacked = new CaptureRingState(CaptureRingPhase.Idle, 0f, -1, 1, -1, underAttack: true);
+            Assert.IsTrue(OwnerPaint.From(TowerLookRules.Shown(attacked, spawn: false)).PulsesToWarning);
+            var drained = new CaptureRingState(CaptureRingPhase.Draining, 0.6f, 1, 1, 2, underAttack: true);
+            CaptureRingState shown = TowerLookRules.Shown(drained, spawn: false);
+            Assert.AreEqual(2, OwnerPaint.From(shown).PulseTeam, "pulses toward the drainer");
+            Assert.AreEqual(0.6f, shown.Fill01);
+            Assert.AreEqual(CaptureRingPhase.Draining, shown.Phase);
+        }
+
+        [Test]
+        public void EveryZoneAsksTheRuleBeforeItsRingAndTowerArePainted()
+        {
+            System.Reflection.MethodInfo rule = typeof(TowerLookRules).GetMethod(nameof(TowerLookRules.Shown));
+            Assert.IsTrue(IlWiring.Uses(typeof(BuildingCapture), "RefreshRingView", rule), "the ring and the tower read the same calmed state");
+            Assert.IsTrue(IlWiring.Uses(typeof(BuildingCapture), "RefreshRingView",
+                typeof(BuildingManager).GetMethod(nameof(BuildingManager.IsSpawnZone))));
+
+            // The calmed state is the one painted: the rule's answer is kept (not thrown away) and handed over before either paint call.
+            const System.Reflection.BindingFlags any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic |
+                                                       System.Reflection.BindingFlags.Public;
+            System.Reflection.MethodInfo refresh = typeof(BuildingCapture).GetMethod("RefreshRingView", any);
+            Assert.IsNotNull(refresh);
+            var shownAt = IlWiring.CallOffsets(refresh, rule);
+            Assert.AreEqual(1, shownAt.Count, "one calmed state per refresh");
+            byte next = refresh.GetMethodBody().GetILAsByteArray()[shownAt[0] + 5];
+            Assert.IsTrue((next >= 0x0A && next <= 0x0D) || next == 0x13, "the rule's answer is stored as the state to paint, not discarded");
+            var ringAt = IlWiring.CallOffsets(refresh, typeof(CaptureRingView).GetMethod(nameof(CaptureRingView.Refresh)));
+            var towerAt = IlWiring.CallOffsets(refresh, typeof(TowerLook).GetMethod(nameof(TowerLook.Refresh)));
+            Assert.AreEqual(1, ringAt.Count, "the ring is painted once");
+            Assert.AreEqual(1, towerAt.Count, "the tower is painted once");
+            Assert.Less(shownAt[0], ringAt[0], "the ring is painted from the calmed state");
+            Assert.Less(shownAt[0], towerAt[0], "the tower is painted from the calmed state");
         }
     }
 }
