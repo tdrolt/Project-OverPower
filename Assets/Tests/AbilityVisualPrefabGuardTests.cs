@@ -211,11 +211,11 @@ namespace Overpower.Tests
             var look = AssetDatabase.LoadAssetAtPath<Overpower.Arena.ArenaLook>(LookPath);
             var flames = tongues.GetComponent<ParticleSystemRenderer>();
             Assert.IsNotNull(look.flameJetMaterial, "Arena Look > Flame Jet Material");
-            Assert.AreSame(look.flameJetMaterial, flames.sharedMaterial, "the flames are pointed flame shapes that keep their colour over any floor (FX Flame Jet)");
+            Assert.AreSame(look.flameJetMaterial, flames.sharedMaterial, "the flames are soft fire puffs that keep their colour over any floor (FX Flame Jet)");
             Assert.AreEqual("Universal Render Pipeline/Particles/Unlit", look.flameJetMaterial.shader.name, "draws the fire colours each flame is given");
-            Assert.IsNotNull(look.flameJetMaterial.GetTexture("_BaseMap"), "the flame shape");
-            Assert.AreEqual(ParticleSystemRenderMode.Stretch, flames.renderMode, "stretched along the flight");
-            Assert.AreEqual(ParticleSystemCurveMode.Constant, system.main.gravityModifier.mode, "one fall for every flame: the jet's aim down counts on it");
+            Assert.IsNotNull(look.flameJetMaterial.GetTexture("_BaseMap"), "the fire sheet");
+            Assert.AreEqual(ParticleSystemRenderMode.Billboard, flames.renderMode, "round puffs facing the camera, never stretched into spikes");
+            Assert.IsTrue(system.textureSheetAnimation.enabled, "each puff one shape of the fire sheet");
             foreach (ParticleSystemRenderer renderer in tongues.GetComponentsInChildren<ParticleSystemRenderer>(true))
                 Assert.IsTrue(renderer.sharedMaterial == look.flameJetMaterial || renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive,
                     renderer.name + " is drawn with an FX material");

@@ -52,9 +52,10 @@ namespace Overpower.Weapons
         private LayerMask burnMask = ~0;
 
         [Header("Look (visual only)")]
-        [SerializeField, Tooltip("The floor flames and their embers (a child particle system, the Flamethrower's flames laid flat). " +
-                 "They rise from the whole circle of Radius when the field lights, in the fire colours of the UiTheme; how many come " +
-                 "from its Arena Look; their size, life and upward drift are authored here.")]
+        [SerializeField, Tooltip("The floor flames and their embers (a child particle system, the Flamethrower's soft fire puffs). " +
+                 "They rise from the whole circle of Radius when the field lights, catching one after another, in the fire colours of the " +
+                 "UiTheme; how many and how fast each catches come from its Arena Look; their size and growth, life and upward drift are " +
+                 "authored here.")]
         private ParticleSystem flames;
 
         [SerializeField, Tooltip("The bright ring drawn at the fire's true edge - Assets/Gameplay/UI/AimConeLine.mat. " +
@@ -176,6 +177,8 @@ namespace Overpower.Weapons
             placedServerTimestampMs = info.SentServerTimestamp;
 
             ShowLook();
+            if (flames != null && flames.gameObject.activeSelf)
+                StartCoroutine(BurnOut());
 
             // Vision: shown when any part of the disc is in sight, or it reaches my team (it burns us).
             VisibleWhenSeen gate = GetComponent<VisibleWhenSeen>();
@@ -198,7 +201,7 @@ namespace Overpower.Weapons
                 bool laidOut = theme != null && theme.arenaLook != null;
                 flames.gameObject.SetActive(laidOut);
                 if (laidOut)
-                    FlameLook.ApplyFloor(flames, radius, LookColours.FireCore(theme), fire, theme.arenaLook);
+                    FlameLook.ApplyFloor(flames, radius, LookColours.FireCore(theme), fire, LookColours.FireTip(theme), theme.arenaLook);
             }
 
             if (rim != null)
@@ -207,6 +210,14 @@ namespace Overpower.Weapons
                 VisualTint.FillFlatCircle(rim, radius, rimSegments);
                 VisualTint.SetLineColor(rim, VisualTint.WithAlpha(teamColor, rimOpacity));
             }
+        }
+
+        // Look only: the flames die down while the ground still burns, and the rim keeps marking it to the end.
+        private IEnumerator BurnOut()
+        {
+            yield return new WaitForSeconds(FlameLook.FloorBurnsOutAt(duration, flames));
+            if (flames != null)
+                flames.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         }
 
         /// <summary>

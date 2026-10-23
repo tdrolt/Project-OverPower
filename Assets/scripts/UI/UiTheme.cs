@@ -2091,8 +2091,10 @@ namespace Overpower.UI
         public Color movementGreyColor = new Color(0.76f, 0.77f, 0.78f, 1f);
         [Tooltip("The white-hot heart of fire: the middle of the Flamethrower's flames and embers and of the Rocket Cursor's burning ground. Nearly white on purpose, so fire never reads as the orange team or the gold of the Shield.")]
         public Color fireCoreColor = new Color(1f, 0.98f, 0.88f, 1f);
-        [Tooltip("The pale hot yellow of fire's outer parts: the Flamethrower's flat fan and the tips of its flames, and the edges of the Rocket Cursor's burning ground. Keep it pale and a little warmer than the Shield's gold: a deeper or a gold-coloured yellow reads as the Shield, an orange as the orange team.")]
+        [Tooltip("The pale hot yellow of fire's outer parts: the Flamethrower's flat fan, the yellow each flame turns soon after it is born (half-way to the tip colour), and the edges of the Rocket Cursor's burning ground. Keep it pale and a little warmer than the Shield's gold: a deeper or a gold-coloured yellow reads as the Shield, an orange as the orange team.")]
         public Color fireEdgeColor = new Color(1f, 0.88f, 0.6f, 1f);
+        [Tooltip("The warm yellow-amber at the tips of fire: each flame of the Flamethrower and of the Rocket Cursor's burning ground turns this colour as it burns out and fades away. Deeper than the edge colour so the fire reads warm, but keep it clearly paler than the orange team and off the Shield's gold.")]
+        public Color fireTipColor = new Color(1f, 0.72f, 0.36f, 1f);
         [Tooltip("The red of damage: the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the rocket's shockwave ring and a mine's blast, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]

@@ -13,8 +13,10 @@ namespace Overpower.Arena
         /// <summary>ArenaLook's Owned Fill Hue Lift: how far an owned hexagon's fill moves its middle channel (GroundTint).</summary>
         public float FillLift;
         public Vector4 OutsideLine;
-        /// <summary>The line around a barrier's top: linear colour, then its width in metres.</summary>
+        /// <summary>The stripe down the middle of a barrier's top: linear colour, then its width in metres.</summary>
         public Vector4 BarrierStripe;
+        /// <summary>The share of the barrier's top stripe drawn with its own light.</summary>
+        public float BarrierStripeLight;
         /// <summary>Floor, wall, block, barrier: the order of the shader's surface index.</summary>
         public Vector4[] SurfaceBase;
         public float[] SurfaceGloss;
@@ -42,6 +44,7 @@ namespace Overpower.Arena
         public static readonly int StripeGlowId = Shader.PropertyToID("_ArenaStripeGlow");
         public static readonly int OutsideLineId = Shader.PropertyToID("_ArenaOutsideLine");
         public static readonly int BarrierStripeId = Shader.PropertyToID("_ArenaBarrierStripe");
+        public static readonly int BarrierStripeLightId = Shader.PropertyToID("_ArenaBarrierStripeLight");
         public static readonly int RippleId = Shader.PropertyToID("_ArenaRipple");
         public static readonly int RippleColourId = Shader.PropertyToID("_ArenaRippleColour");
         public static readonly int RippleLookId = Shader.PropertyToID("_ArenaRippleLook");
@@ -69,6 +72,7 @@ namespace Overpower.Arena
             FillLift = look.ownedFillHueLift,
             OutsideLine = look.outsideLineColor.linear,
             BarrierStripe = BarrierStripeOf(look),
+            BarrierStripeLight = look.barrierTopStripeSelfLight,
             SurfaceBase = new Vector4[]
             {
                 look.floorSurface.baseTint.linear, look.wallSurface.baseTint.linear,
@@ -97,6 +101,7 @@ namespace Overpower.Arena
             Shader.SetGlobalVector(StripeGlowId, new Vector4(g.OutsideStripeGlow, g.StripeGlow, g.AcrossChance, g.UpChance));
             Shader.SetGlobalVector(OutsideLineId, g.OutsideLine);
             Shader.SetGlobalVector(BarrierStripeId, g.BarrierStripe);
+            Shader.SetGlobalFloat(BarrierStripeLightId, g.BarrierStripeLight);
             Shader.SetGlobalFloat(ReflectionId, g.Reflection);
             Shader.SetGlobalFloat(ShotLightShineId, g.ShotLightShine);
             Shader.SetGlobalFloat(FillLiftId, g.FillLift);

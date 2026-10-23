@@ -124,36 +124,44 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float pulseEdgeStrength = 0.8f;
 
         [Header("Flamethrower")]
-        [Tooltip("The material put on the Flamethrower's flames each time it sprays: a pointed, hard-edged flame shape with a solid middle, stretched along each flame's flight so the jet points at the target. It takes each flame's fire colour, so the same shape serves every team.")]
+        [Tooltip("The material put on the flames of the Flamethrower each time it sprays and of the Rocket's burning ground as it lights: the Soft Fire sheet of round, billowing puffs with a dense middle and ragged, feathered edges (made by OverPower > FX > Make Soft Fire Texture), each puff turned its own way. It takes each flame's fire colour, so the same shapes serve every team.")]
         public Material flameJetMaterial;
         [Tooltip("How many flames overlap at every point along the Flamethrower's jet: 1 is just enough for one unbroken stream from the gun to the target, more makes it thicker and brighter but costs more to draw.")]
         [Min(0.5f)] public float flameJetOverlap = 1.5f;
         [Tooltip("How much of the Flamethrower's cone the flames' paths fan out over, as a share of its angle: low keeps a tight stream whose growing flames fill the cone's sides by the end, 0.9 sends them close to its edges, where the flames must stay thin to stay inside it.")]
         [Range(0.1f, 0.9f)] public float flameJetSpread = 0.5f;
-        [Tooltip("How many times longer than wide each of the Flamethrower's flames is, stretched along its flight: higher reads as a fast, pointed jet, lower as wide, billowing flames.")]
-        [Range(1f, 6f)] public float flameStretch = 1.5f;
         [Tooltip("How wide the Flamethrower's flames grow by the time they land, as a share of the widest they can be while staying inside the ground the cone burns: 1 lets the outermost flames touch its edge.")]
         [Range(0.2f, 1f)] public float flameJetWidth = 1f;
         [Tooltip("How big a flame is as it leaves the Flamethrower's gun, as a share of its full size where it lands; it grows evenly in between, so the jet is thin at the gun and widens as it flies. Lower needs more flames to stay unbroken near the gun.")]
-        [Range(0.02f, 1f)] public float flameJetStartSize = 0.06f;
+        [Range(0.02f, 1f)] public float flameJetStartSize = 0.15f;
         [Tooltip("The most flames one Flamethrower spray keeps in the air at once. In the open the jet needs far fewer; pressed against a wall its gun is pulled back and its flames shrink, so this keeps a spray there as cheap to draw as in the open, at the cost of small gaps near the gun.")]
         [Min(10)] public int flameJetMostFlames = 150;
-        [Tooltip("How high above the floor the Flamethrower's flames are when they land at the end of the jet, in metres: the jet is aimed down from the gun so it licks the floor where it burns, which lines it up with the fan seen from the camera. The gun's height or more keeps it level.")]
-        [Min(0f)] public float flameJetLandHeight = 0.15f;
+        [Tooltip("How fast each of the Flamethrower's flames still flies where it lands, as a share of its speed leaving the gun: low makes the flames burst out of the gun and then hang and billow at the end of the jet, 1 keeps them as fast all the way. They land as far out either way.")]
+        [Range(0.1f, 1f)] public float flameJetSlowdown = 0.35f;
+        [Tooltip("How far each of the Flamethrower's flames drifts upward over its flight, in metres, as hot fire does: the jet itself stays level at the gun's height, 0 keeps every flame exactly there.")]
+        [Min(0f)] public float flameJetRise = 0.25f;
         [Tooltip("How brightly the flames of the Flamethrower and the Rocket's burning ground glow: their colours times this. Above 1 their white-hot hearts bloom so fire reads hot, not as pale paper; 1 is the plain colours, much above 3 the jet turns into a white blob that hides the players in it.")]
         [Min(0f)] public float flameGlow = 2f;
+        [Tooltip("How much of Flame Glow the flames keep once their white-hot heart has burnt off, a fifth of the way through their life: only the hearts near the Flamethrower's gun and at the foot of the burning ground bloom, and the rest of the fire shows its yellow and amber. Near 1 the whole fire glows as bright as its heart and washes out to a pale cream, like steam.")]
+        [Range(0.2f, 1f)] public float flameBodyGlow = 0.7f;
+        [Tooltip("How much of Flame Glow the tips of the flames keep as they burn out and fade, at most Flame Body Glow: lower lets the tips darken to a deeper, warm yellow-amber (UiTheme Fire Tip Color) as they die, 1 keeps them as bright as the heart.")]
+        [Range(0.1f, 1f)] public float flameTipGlow = 0.45f;
         [Tooltip("How many embers fly from the Flamethrower's gun each second.")]
         [Min(0f)] public float flameEmbersPerSecond = 8f;
-        [Tooltip("How far the Flamethrower's flames fly from the gun, as a share of the way to the end of its reach: 1 lets their tips lick the very edge of the ground it burns.")]
-        [Range(0.3f, 1f)] public float flameJetReach = 0.95f;
+        [Tooltip("How far the middles of the Flamethrower's flames fly from the gun, as a share of the way to the end of its reach. Their soft fronts reach on past that, and the flames are kept small enough never to burn past the edge of the ground the cone burns: higher sends them farther but leaves the far flames less room to grow.")]
+        [Range(0.3f, 1f)] public float flameJetReach = 0.75f;
         [Tooltip("How strong the flat fan on the floor under the Flamethrower's spray is: 1 is fully bright, lower leaves a faint marker of the ground that burns.")]
         [Range(0f, 1f)] public float flameFanStrength = 0.4f;
 
         [Header("Rocket Cursor Fire")]
-        [Tooltip("How many flames rise each second from every square metre of the Rocket's burning ground: more makes a denser fire.")]
-        [Min(0f)] public float fireFieldFlamesPerSquareMetre = 14f;
+        [Tooltip("How many flames rise each second from every square metre of the Rocket's burning ground: more makes a denser fire, fewer leaves a few big, lazy flames. Together with each flame's life (on the Fire Field prefab) it sets how many burn at once.")]
+        [Min(0f)] public float fireFieldFlamesPerSquareMetre = 3f;
         [Tooltip("How many embers rise each second from every square metre of the Rocket's burning ground.")]
         [Min(0f)] public float fireFieldEmbersPerSquareMetre = 1.5f;
+        [Tooltip("How long each flame of the Rocket's burning ground takes to catch, as a share of its life: it swells up from nothing over this, so the fire builds up after the rocket lands instead of flaring all at once. 0 lets each flame appear at full strength.")]
+        [Range(0f, 0.6f)] public float fireFieldFlameCatch = 0.3f;
+        [Tooltip("How solid each flame of the Rocket's burning ground is at its densest, 0 to 1: lower lets the floor and whoever stands in the fire show through it and the flames layer into each other, near 1 the fire piles up into one opaque blob that hides the players in it.")]
+        [Range(0.2f, 0.9f)] public float fireFieldFlameOpacity = 0.7f;
 
         [Header("Guns")]
         [Tooltip("How many shots can light up the floor under them at the same time. Only shots you can see get a light, the nearest to your view first; more lights cost frame time in a big SMG fight, 0 turns the shot lights off.")]
@@ -376,12 +384,14 @@ namespace Overpower.Arena
         public SurfaceLook wallSurface = new SurfaceLook(new Color(0.12f, 0.13f, 0.15f, 1f), 0.75f, 0.1f);
         [Tooltip("The paint and shine of the blocks (houses, crates and other solid cover) under their circuit stripes.")]
         public SurfaceLook blockSurface = new SurfaceLook(new Color(0.2f, 0.21f, 0.24f, 1f), 0.7f, 0.1f);
-        [Tooltip("The paint and shine of the low barriers' sides: dark and glossy like the rest of the arena, a little darker than the floor so a barrier's side reads as the shaded side of something raised. They get no circuit stripes, only the grey top below, so low cover always reads as cover.")]
+        [Tooltip("The paint and shine of the low barriers' sides: dark and glossy like the rest of the arena, a little darker than the floor so a barrier's side reads as the shaded side of something raised. They get no circuit stripes, only the light stripe down their top below, so low cover always reads as cover.")]
         public SurfaceLook barrierSurface = new SurfaceLook(new Color(0.1f, 0.105f, 0.12f, 1f), 0.75f, 0.1f);
-        [Tooltip("The colour of the top of every low barrier: a plain grey paint that never glows, so from above a low barrier reads as a raised bar of low cover and is never taken for a wall's line or a team's colour.")]
-        public Color barrierTopStripeColor = new Color(0.6f, 0.6f, 0.62f, 1f);
-        [Tooltip("How far the grey reaches in from each edge of a low barrier's top, in metres. Half the barrier's width or more (the barriers are about 0.5 to 0.6 m wide) paints the whole top as one solid grey stripe; less leaves two thin lines along the edges, which read as marks on the floor rather than cover.")]
-        [Min(0f)] public float barrierTopStripeWidth = 0.35f;
+        [Tooltip("The colour of the stripe painted down the middle of every low barrier's top: a light grey, matte paint that never glows and is never a team's colour, clearly lighter than the walls' edge lines, so from the camera a low barrier reads as a raised bar of low cover with a dark margin either side of its stripe.")]
+        public Color barrierTopStripeColor = new Color(0.86f, 0.87f, 0.9f, 1f);
+        [Tooltip("How wide the light stripe down the middle of a low barrier's top is, in metres; it runs the barrier's whole length. Keep it well under the barriers' width (about 0.5 to 0.6 m) so a dark margin shows either side: a stripe as wide as the top reads as a plain grey block instead of low cover.")]
+        [Min(0f)] public float barrierTopStripeWidth = 0.22f;
+        [Tooltip("How much of the low barriers' top stripe is drawn with its own light, so it reads as clearly in the dim corners as under the lamps: 0 is plain lit paint, higher lights it more. Keep the stripe's colour (taken in linear light) times this below 0.6 so it never glows like an owned line, and above a wall's edge line so it stands out.")]
+        [Range(0f, 0.9f)] public float barrierTopStripeSelfLight = 0.6f;
         [Tooltip("How strongly the glossy arena mirrors the sky: 0 shows no sky in the shine, 1 shows all of it. Lower it if the floor turns pale at a shallow view and players get harder to see.")]
         [Range(0f, 1f)] public float reflectionStrength = 0.5f;
 

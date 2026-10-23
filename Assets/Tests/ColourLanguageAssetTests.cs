@@ -10,7 +10,7 @@ namespace Overpower.Tests
     /// <summary>The colour language on the saved assets: a team colour is a colour (white and grey mean neutral), each team is one hue in every
     /// list that draws it, the neutral greys and whites, the fire, the reds and the golds never read as a team, fire is paler than the
     /// Shield's gold and off its hue, the Conquest scan wave is white and the low barriers are painted as dark as the rest of the arena
-    /// with a clearly lighter top. Relations only: the colours themselves stay free to tune.</summary>
+    /// with a light stripe down their top. Relations only: the colours themselves stay free to tune.</summary>
     public class ColourLanguageAssetTests
     {
         private const float MinTeamSaturation = 0.4f;
@@ -108,7 +108,7 @@ namespace Overpower.Tests
         public void FireNeverReadsAsATeamOrAsTheShieldGold()
         {
             UiTheme t = Theme();
-            var fires = new[] { ("Fire Core Color", t.fireCoreColor), ("Fire Edge Color", t.fireEdgeColor), ("the Flamethrower fan's Core Color", FanCore()) };
+            var fires = new[] { ("Fire Core Color", t.fireCoreColor), ("Fire Edge Color", t.fireEdgeColor), ("Fire Tip Color", t.fireTipColor), ("the Flamethrower fan's Core Color", FanCore()) };
             foreach ((string name, Color fire) in fires)
             {
                 for (int team = 0; team < t.teamShotColors.Length; team++)
@@ -152,7 +152,12 @@ namespace Overpower.Tests
                 "the low barriers are no lighter than the blocks: the grey on their top says low cover, not the paint");
             Assert.LessOrEqual(Sat(look.barrierSurface.baseTint), 0.3f, "and not a colour of their own");
             Assert.GreaterOrEqual(Val(look.barrierTopStripeColor) - Val(look.barrierSurface.baseTint), 0.3f,
-                "their top is clearly lighter than their sides, so from above a barrier reads as a raised bar");
+                "their top stripe is clearly lighter than their sides, so from above a barrier reads as a raised bar");
+            // The stripe against the real barriers' width: BarrierSurfaceSceneTests.
+            float stripeLight = look.barrierTopStripeColor.linear.maxColorComponent * look.barrierTopStripeSelfLight;
+            float wallLine = look.outsideLineColor.linear.maxColorComponent * look.outsideStripeGlow;
+            Assert.GreaterOrEqual(stripeLight, 1.3f * wallLine, "the stripe's own light alone is clearly lighter than a wall's edge line, so it reads in any light");
+            Assert.Less(stripeLight, 0.6f, "and stays plain paint: in linear light below the bloom threshold, so it never glows like an owned line");
         }
     }
 }

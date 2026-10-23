@@ -905,6 +905,7 @@ MonoBehaviour:
   movementGreyColor: {r: 0.76, g: 0.77, b: 0.78, a: 1}
   fireCoreColor: {r: 1, g: 0.98, b: 0.88, a: 1}
   fireEdgeColor: {r: 1, g: 0.88, b: 0.6, a: 1}
+  fireTipColor: {r: 1, g: 0.72, b: 0.36, a: 1}
   dangerColor: {r: 1, g: 0.18, b: 0.15, a: 1}
   flashWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   healGreenColor: {r: 0.25, g: 1, b: 0.3, a: 1}

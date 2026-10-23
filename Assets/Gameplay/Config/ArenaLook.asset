@@ -111,18 +111,22 @@ MonoBehaviour:
   pulseEdgeStrength: 0.8
   flameJetMaterial: {fileID: 2100000, guid: c1c06d0c6fb850742956c70ef59ba743, type: 2}
   flameJetOverlap: 1.5
-  flameJetSpread: 0.75
-  flameStretch: 2.5
+  flameJetSpread: 0.5
   flameJetWidth: 1
-  flameJetStartSize: 0.06
+  flameJetStartSize: 0.15
   flameJetMostFlames: 150
-  flameJetLandHeight: 0.1
+  flameJetSlowdown: 0.35
+  flameJetRise: 0.25
   flameGlow: 2
+  flameBodyGlow: 0.7
+  flameTipGlow: 0.45
   flameEmbersPerSecond: 8
-  flameJetReach: 0.95
+  flameJetReach: 0.75
   flameFanStrength: 0.4
-  fireFieldFlamesPerSquareMetre: 14
+  fireFieldFlamesPerSquareMetre: 3
   fireFieldEmbersPerSquareMetre: 1.5
+  fireFieldFlameCatch: 0.3
+  fireFieldFlameOpacity: 0.7
   shotLightCap: 4
   shotLightRange: 8
   shotLightIntensity: 0.25
@@ -232,8 +236,9 @@ MonoBehaviour:
     baseTint: {r: 0.1, g: 0.105, b: 0.12, a: 1}
     gloss: 0.75
     sunShine: 0.1
-  barrierTopStripeColor: {r: 0.6, g: 0.6, b: 0.62, a: 1}
-  barrierTopStripeWidth: 0.35
+  barrierTopStripeColor: {r: 0.86, g: 0.87, b: 0.9, a: 1}
+  barrierTopStripeWidth: 0.22
+  barrierTopStripeSelfLight: 0.6
   reflectionStrength: 0.5
   floorTileSize: 3
   floorLineWidth: 0.05

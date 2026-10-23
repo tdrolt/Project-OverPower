@@ -71,7 +71,8 @@ namespace Overpower.Tests
                 }
                 Assert.AreEqual((Vector4)look.outsideLineColor.linear, g.OutsideLine, "outside line colour, linear");
                 Color line = look.barrierTopStripeColor.linear;
-                AreClose(new Vector4(line.r, line.g, line.b, 0.13f), g.BarrierStripe, "the barrier's top line: linear colour, width");
+                AreClose(new Vector4(line.r, line.g, line.b, 0.13f), g.BarrierStripe, "the barrier's top stripe: linear colour, width");
+                Assert.AreEqual(0.45f, g.BarrierStripeLight, "the share of the stripe drawn with its own light");
                 Assert.IsTrue(IlWiring.Uses(typeof(ArenaShaderGlobals), "Push", typeof(ArenaShaderGlobals).GetMethod(nameof(ArenaShaderGlobals.From))),
                     "Push sends what From reads");
             }
@@ -102,7 +103,8 @@ namespace Overpower.Tests
                 AreClose(look.outsideLineColor.linear, Shader.GetGlobalVector(ArenaShaderGlobals.OutsideLineId), "outside line colour, linear");
                 Color line = look.barrierTopStripeColor.linear;
                 AreClose(new Vector4(line.r, line.g, line.b, 0.13f), Shader.GetGlobalVector(ArenaShaderGlobals.BarrierStripeId),
-                    "the barrier's top line: linear colour, width");
+                    "the barrier's top stripe: linear colour, width");
+                Assert.AreEqual(0.45f, Shader.GetGlobalFloat(ArenaShaderGlobals.BarrierStripeLightId), 1e-6f, "the stripe's own light");
                 Vector4[] bases = Shader.GetGlobalVectorArray(ArenaShaderGlobals.SurfaceBaseId);
                 float[] gloss = Shader.GetGlobalFloatArray(ArenaShaderGlobals.SurfaceGlossId);
                 float[] shine = Shader.GetGlobalFloatArray(ArenaShaderGlobals.SurfaceShineId);
@@ -217,6 +219,7 @@ namespace Overpower.Tests
             look.outsideLineColor = new Color(0.5f, 0.6f, 0.7f, 1f);
             look.barrierTopStripeColor = new Color(0.45f, 0.35f, 0.25f, 1f);
             look.barrierTopStripeWidth = 0.13f;
+            look.barrierTopStripeSelfLight = 0.45f;
             look.floorSurface = new SurfaceLook(Tint[0], Gloss[0], Shine[0]);
             look.wallSurface = new SurfaceLook(Tint[1], Gloss[1], Shine[1]);
             look.blockSurface = new SurfaceLook(Tint[2], Gloss[2], Shine[2]);

@@ -10,7 +10,8 @@ float4 _ArenaFloorLine;        // line width m, outside grid glow, owned edge gl
 float4 _ArenaStripe;           // circuit cell m, stripe width m, node size m, top edge width m
 float4 _ArenaStripeGlow;       // outside stripe glow, owned stripe glow (ArenaLook.stripeGlow), across chance, up chance
 float4 _ArenaOutsideLine;      // linear colour of the faint glow away from every zone
-float4 _ArenaBarrierStripe;    // linear colour of the line round a barrier's top, its width m
+float4 _ArenaBarrierStripe;    // linear colour of the stripe down the middle of a barrier's top, its width m
+float  _ArenaBarrierStripeLight; // 0..1 share of that stripe drawn unlit
 float  _ArenaReflection;       // 0..1 share of URP's sky reflection kept
 float  _ArenaShotLightShine;   // 0..1 share of the additional (shot) lights' specular glint kept
 float  _ArenaFillLift;         // 0..1: how far an owned fill's middle channel moves toward its brightest (GroundTint)
@@ -168,25 +169,32 @@ float ArenaCircuit(float2 uv, float aa)
     return (n == 1 || n >= 3) ? max(stripe, node) : stripe;
 }
 
-// Metres from the nearest edge of a face, from UV0 (the arena's cubes map every face 0..1). The UV-to-world scale comes from
-// screen derivatives, so a stretched cube still gets a border of the same width in metres on every side.
-float ArenaFaceEdgeMetres(float2 uv, float3 positionWS)
+// A face's size in metres along U and V, from UV0 (the arena's cubes map every face 0..1). The UV-to-world scale comes from screen
+// derivatives, so it holds for a stretched, statically batched cube; 0 where the face is seen edge-on.
+float2 ArenaFaceMetres(float2 uv, float3 positionWS)
 {
     float2 duvdx = ddx(uv), duvdy = ddy(uv);
     float3 dpdx = ddx(positionWS), dpdy = ddy(positionWS);
     float det = duvdx.x * duvdy.y - duvdx.y * duvdy.x;
     if (abs(det) < 1e-12)
+        return float2(0, 0);
+    return float2(length((dpdx * duvdy.y - dpdy * duvdx.y) / det), length((dpdy * duvdx.x - dpdx * duvdy.x) / det));
+}
+
+// Metres from the nearest edge of a face, so a stretched cube still gets a border of the same width in metres on every side.
+float ArenaFaceEdgeMetres(float2 uv, float3 positionWS)
+{
+    float2 metres = ArenaFaceMetres(uv, positionWS);
+    if (metres.x <= 0)
         return 1e4;
-    float metresPerU = length((dpdx * duvdy.y - dpdy * duvdx.y) / det);
-    float metresPerV = length((dpdy * duvdx.x - dpdx * duvdy.x) / det);
     float2 e = min(uv, 1.0 - uv);
-    return min(e.x * metresPerU, e.y * metresPerV);
+    return min(e.x * metres.x, e.y * metres.y);
 }
 
 // Paints the pattern of one surface onto Lit's surface data. Lines in an owned band glow in the owner's colour; in a neutral
 // band they are unlit lighter lines (lit vs. unlit tells a neutral line from an owned one); elsewhere a faint cool glow. A barrier
-// has no pattern but grey paint reaching in from the edges of its top (the asset's reaches across the whole top), whatever owns the
-// ground, so low cover always reads the same.
+// has no pattern but a light, matte stripe down the middle of its top along its long side, partly unlit so it reads in any light,
+// whatever owns the ground, so low cover always reads the same.
 void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inout SurfaceData s)
 {
     s.albedo = _ArenaSurfaceBase[surface].rgb;
@@ -232,9 +240,12 @@ void ArenaPaint(int surface, float3 positionWS, float3 normalWS, float2 uv, inou
     else
         s.emission += _ArenaOutsideLine.rgb * (stripe * _ArenaStripeGlow.x);
 #elif defined(_ARENA_BARRIER)
-    float edgeMetres = ArenaFaceEdgeMetres(uv, positionWS); // screen derivatives: taken outside any branch
-    float top = normalWS.y > 0.5 ? ArenaLineMask(edgeMetres, 2.0 * _ArenaBarrierStripe.w, aa) : 0;
+    float2 metres = ArenaFaceMetres(uv, positionWS); // screen derivatives: taken outside any branch
+    float acrossMiddle = metres.x < metres.y ? abs(uv.x - 0.5) * metres.x : abs(uv.y - 0.5) * metres.y;
+    float top = normalWS.y > 0.5 && metres.x > 0 ? ArenaLineMask(acrossMiddle, _ArenaBarrierStripe.w, aa) : 0;
     s.albedo = lerp(s.albedo, _ArenaBarrierStripe.rgb, top);
+    s.smoothness = lerp(s.smoothness, 0, top);
+    s.emission += _ArenaBarrierStripe.rgb * (top * _ArenaBarrierStripeLight);
 #endif
 }
 

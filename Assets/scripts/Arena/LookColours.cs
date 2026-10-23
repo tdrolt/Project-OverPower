@@ -27,6 +27,8 @@ namespace Overpower.Arena
 
         public static Color FireCore(UiTheme theme) => theme.fireCoreColor;
 
+        public static Color FireTip(UiTheme theme) => theme.fireTipColor;
+
         /// <summary>The movement grey with Movement Team Tint of the caster's team colour mixed in: grey says movement, the tint says whose.
         /// No team known, or no Arena Look, leaves the plain grey.</summary>
         public static Color Movement(int team, UiTheme theme)

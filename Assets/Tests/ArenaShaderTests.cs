@@ -85,32 +85,44 @@ namespace Overpower.Tests
             Assert.Less(barrier, 0.002f, "a barrier face is one even colour");
         }
 
-        // Seen from above a low barrier is its paint with a band of the top line's colour from each edge of its top, as wide as the look
-        // says (the asset's band covers the whole top); its sides stay plain (BarrierHasNoStripes). The test look's line is green, the
-        // paint orange and the faint outside glow white, so each reads apart.
+        // Seen from above a low barrier is its dark paint with a light stripe down the middle of its top, as wide as the look says, running
+        // its whole length; its sides stay plain (BarrierHasNoStripes). The test look's stripe is green, the paint orange and the faint
+        // outside glow white, so each reads apart. The barrier lies both ways: the stripe follows the top's long side either way, also
+        // when it is turned a quarter and baked into one mesh, as static batching hands it to the shader in a match.
         [Test]
-        public void BarrierTopTakesTheConfiguredLineColour()
+        public void BarrierTopHasTheConfiguredStripeDownItsMiddle()
         {
-            Color[] pixels = RenderTop("Arena Barrier", 3f);
-            Assert.IsTrue(IsPaint(TopAt(pixels, 0f, 0f)), "the control: the middle of the top is the barrier's own orange test paint");
-            foreach (Vector2 edge in new[] { new Vector2(1.45f, 0f), new Vector2(-1.45f, 0f), new Vector2(0f, 1.45f), new Vector2(0f, -1.45f) })
+            foreach ((bool alongX, bool baked) in new[] { (true, false), (false, false), (true, true), (false, true) })
             {
-                Color line = TopAt(pixels, edge.x, edge.y);
-                Assert.Greater(line.g, 1.5f * Mathf.Max(line.r, line.b), "the line's own green, not the paint or a grey, at " + edge + ": " + line);
+                Color[] pixels = alongX ? RenderTop("Arena Barrier", 3f, 0.6f, baked: baked) : RenderTop("Arena Barrier", 0.6f, 3f, baked: baked);
+                Vector2 Across(float along, float across) => alongX ? new Vector2(along, across) : new Vector2(across, along);
+                foreach (float along in new[] { 0f, 1.2f, -1.2f, 1.45f })
+                {
+                    Vector2 at = Across(along, 0f);
+                    Color stripe = TopAt(pixels, at.x, at.y);
+                    Assert.Greater(stripe.g, 1.5f * Mathf.Max(stripe.r, stripe.b), $"the stripe's own green down the middle, {along} m along: {stripe}");
+                }
+                foreach (float side in new[] { 1f, -1f })
+                {
+                    Vector2 margin = Across(0.6f, side * 0.24f);
+                    Assert.IsTrue(IsPaint(TopAt(pixels, margin.x, margin.y)), "the paint again near the long edge: a stripe, not a painted top");
+                    Vector2 inside = Across(0.6f, side * 0.07f);
+                    Assert.IsFalse(IsPaint(TopAt(pixels, inside.x, inside.y)), "0.07 m off the middle is still the 0.2 m stripe");
+                    Vector2 outside = Across(0.6f, side * 0.15f);
+                    Assert.IsTrue(IsPaint(TopAt(pixels, outside.x, outside.y)), "0.15 m off the middle is past it");
+                }
             }
         }
 
         [Test]
-        public void BarrierTopBandIsTheConfiguredWidth()
+        public void BarrierStripeCarriesItsOwnLight()
         {
-            Color[] pixels = RenderTop("Arena Barrier", 3f); // PlainLook: 0.2 m
-            foreach (float sign in new[] { 1f, -1f })
-            {
-                Assert.IsFalse(IsPaint(TopAt(pixels, sign * (1.5f - 0.14f), 0f)), "0.14 m in from the edge is still the band");
-                Assert.IsTrue(IsPaint(TopAt(pixels, sign * (1.5f - 0.28f), 0f)), "0.28 m in from the edge is the paint again");
-                Assert.IsFalse(IsPaint(TopAt(pixels, 0f, sign * (1.5f - 0.14f))), "along the other side too");
-                Assert.IsTrue(IsPaint(TopAt(pixels, 0f, sign * (1.5f - 0.28f))), "along the other side too");
-            }
+            Color plain = TopAt(RenderTop("Arena Barrier", 3f, 0.6f), 0f, 0f);
+            Color lit = TopAt(RenderTop("Arena Barrier", 3f, 0.6f, 0.5f), 0f, 0f);
+            Color line = new Color(0.1f, 0.7f, 0.2f, 1f).linear;
+            Assert.AreEqual(0.5f * line.g, lit.g - plain.g, 0.03f, "Barrier Top Stripe Self Light of its colour drawn unlit, so it reads in any light");
+            Color margin = TopAt(RenderTop("Arena Barrier", 3f, 0.6f, 0.5f), 0f, 0.24f);
+            Assert.IsTrue(IsPaint(margin), "the margins keep the plain paint");
         }
 
         private static bool IsPaint(Color c) => c.r > 1.5f * c.b && c.r > c.g;
@@ -218,12 +230,14 @@ namespace Overpower.Tests
         private const int TopPx = 128;
         private const float TopHalf = 2.5f; // metres from the image centre to its edge
 
-        // Renders a size x 1 x size box of the material straight from above (orthographic, the box in the middle of a 5 x 5 m view).
-        private static Color[] RenderTop(string materialName, float size)
+        // Renders a sizeX x 1 x sizeZ box of the material straight from above (orthographic, the box in the middle of a 5 x 5 m view).
+        // Baked: the same footprint as a cube turned 90 degrees and combined into one mesh at no scale, as a static batch draws it.
+        private static Color[] RenderTop(string materialName, float sizeX, float sizeZ, float stripeLight = 0f, bool baked = false)
         {
             var material = AssetDatabase.LoadAssetAtPath<Material>(Materials + materialName + ".mat");
             Assert.NotNull(material, materialName);
             ArenaLook look = PlainLook();
+            look.barrierTopStripeSelfLight = stripeLight;
             ArenaShaderGlobals.Push(look);
             ArenaShaderGlobals.ClearOwnerTiles();
             const int Layer = 31;
@@ -232,6 +246,7 @@ namespace Overpower.Tests
             var camGo = new GameObject("ArenaShaderTests Camera");
             var target = new RenderTexture(TopPx, TopPx, 24, RenderTextureFormat.ARGBHalf);
             var read = new Texture2D(TopPx, TopPx, TextureFormat.RGBAHalf, false, true);
+            Mesh bakedMesh = null;
             try
             {
                 ShaderUtil.allowAsyncCompilation = false;
@@ -239,7 +254,18 @@ namespace Overpower.Tests
                 Object.DestroyImmediate(block.GetComponent<Collider>());
                 block.layer = Layer;
                 block.transform.position = new Vector3(3.7f, -500f, 11.3f);
-                block.transform.localScale = new Vector3(size, 1f, size);
+                block.transform.localScale = new Vector3(sizeX, 1f, sizeZ);
+                if (baked)
+                {
+                    MeshFilter filter = block.GetComponent<MeshFilter>();
+                    bakedMesh = new Mesh { hideFlags = HideFlags.HideAndDontSave };
+                    bakedMesh.CombineMeshes(new[]
+                    {
+                        new CombineInstance { mesh = filter.sharedMesh, transform = Matrix4x4.TRS(Vector3.zero, Quaternion.Euler(0f, 90f, 0f), new Vector3(sizeZ, 1f, sizeX)) },
+                    }, true, true);
+                    filter.sharedMesh = bakedMesh;
+                    block.transform.localScale = Vector3.one;
+                }
                 block.GetComponent<MeshRenderer>().sharedMaterial = material;
                 block.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
 
@@ -269,6 +295,8 @@ namespace Overpower.Tests
                 Object.DestroyImmediate(camGo);
                 Object.DestroyImmediate(target);
                 Object.DestroyImmediate(read);
+                if (bakedMesh != null)
+                    Object.DestroyImmediate(bakedMesh);
             }
         }
 
