@@ -16,6 +16,6 @@ MonoBehaviour:
   displayName: Dash
   description: Two quick hops toward your cursor.
   slot: 3
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 436f3fe3026685c458dbb9b343e3cb00, type: 3}
   goldCost: 640
   modulePrefab: {fileID: 548643278543839526, guid: dea25e794e582474c97ca818b53293fc, type: 3}

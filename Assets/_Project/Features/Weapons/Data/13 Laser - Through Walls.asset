@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: X-Ray
   description: The beam passes through walls, after a short warning.
   parent: {fileID: 11400000, guid: 8fa3cfc5d5169494cb5251a678cca581, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: eab83da9cc1fc964a986a7a8051db9ee, type: 3}
   goldCost: 1280
   damage: 21
   fireInterval: 1.2

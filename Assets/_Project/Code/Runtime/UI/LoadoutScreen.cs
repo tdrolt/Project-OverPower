@@ -100,6 +100,7 @@ namespace Overpower.UI
             public Image outer; // The equipped highlight border - transparent except when Equipped.
             public Image inner; // The node's actual fill colour, inset inside outer.
             public TextMeshProUGUI label;
+            public Image icon; // Switched off when the weapon has no picture.
         }
 
         private readonly Dictionary<int, WeaponNodeUi> weaponNodes = new Dictionary<int, WeaponNodeUi>();
@@ -114,6 +115,7 @@ namespace Overpower.UI
             public Image outer;
             public Image inner;
             public TextMeshProUGUI label;
+            public Image icon;
         }
 
         // Keyed by (slot, id): ids are already globally unique (AbilityCatalogue), but RefreshAbilities needs the pair to
@@ -130,7 +132,7 @@ namespace Overpower.UI
 
         // ---- hover pop-up ---------------------------------------------------------------
 
-        /// <summary>Turns UI pointer enter/exit/move into plain callbacks on every weapon node, ability card and armor row
+        /// <summary>Turns UI pointer enter/exit/move into plain callbacks on every weapon node, ability card and armour card
         /// to drive the pop-up (LoadoutScreen.Tooltip.cs). A MonoBehaviour because the pointer handlers only work on one.</summary>
         private sealed class HoverRelay : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerMoveHandler
         {
@@ -190,16 +192,25 @@ namespace Overpower.UI
         /// no card that can read Equipped at spawn, so the column would otherwise not say why nothing is highlighted.</summary>
         private TextMeshProUGUI ultimateEmptyLabel;
 
-        // Reset-button labels, kept so Refresh can rewrite their refund preview in place (RefreshResetLabels).
+        // Reset buttons, kept so Refresh can rewrite their refund preview and paint them refused or open (RefreshResetButtons).
         private TextMeshProUGUI resetWeaponLabel;
         private TextMeshProUGUI resetArmorLabel;
+        private Image resetWeaponImage;
+        private Image resetArmorImage;
 
         // ---- armor --------------------------------------------------------------------------------
 
-        private TextMeshProUGUI absorbText;
-        private TextMeshProUGUI rechargeText;
-        private Button absorbButton;
-        private Button rechargeButton;
+        /// <summary>One armour card's pieces (BuildArmorCard): no border state, since an armour path is never "equipped".</summary>
+        private sealed class ArmorCardUi
+        {
+            public Button plus;
+            public Image inner;
+            public TextMeshProUGUI label;
+            public Image icon;
+        }
+
+        private ArmorCardUi absorbCard;
+        private ArmorCardUi rechargeCard;
 
         // ---- screen state / built UI ---------------------------------------------------------------
 
@@ -507,7 +518,7 @@ namespace Overpower.UI
             RefreshWeaponTree(ctx);
             RefreshArmor(ctx);
             RefreshAbilities(ctx);
-            RefreshResetLabels();
+            RefreshResetButtons(ctx);
             tooltipTextDirty = true; // A price, a level or the equipped item may have changed under an open pop-up.
 
             // Snapshot what was just drawn, so Update()'s poll calls back in only when something ACTUALLY changed since.
@@ -630,19 +641,28 @@ namespace Overpower.UI
         }
 
         /// <summary>Rewrites the Reset buttons' labels with a refund preview ("Reset Weapon (+600)"), read off the ledger
-        /// and never spent, so the player sees what undoing returns before clicking.</summary>
-        private void RefreshResetLabels()
+        /// and never spent, so the player sees what undoing returns before clicking; a reset the gate refuses (mid-round in
+        /// Dominion, out of territory...) gets the shop's refused look, from the same gate its click asks.</summary>
+        private void RefreshResetButtons(ShopContext ctx)
         {
             double rate = gameplayConfig != null ? gameplayConfig.SellRefundRate : 0.5;
             if (resetWeaponLabel != null)
             {
                 int refund = ledger.WeaponRefundPreview(rate);
                 resetWeaponLabel.text = refund > 0 ? $"Reset Weapon (+{refund})" : "Reset Weapon";
+                PurchaseBlock block = ctx.WeaponResetGate();
+                resetWeaponLabel.color = ShopItemLook.ButtonText(block, theme);
+                if (resetWeaponImage != null)
+                    resetWeaponImage.color = ShopItemLook.ButtonFill(block, theme);
             }
             if (resetArmorLabel != null)
             {
                 int refund = GoldMath.Refund(ledger.ArmorSpent, rate);
                 resetArmorLabel.text = refund > 0 ? $"Reset Armor (+{refund})" : "Reset Armor";
+                PurchaseBlock block = ctx.ArmorResetGate();
+                resetArmorLabel.color = ShopItemLook.ButtonText(block, theme);
+                if (resetArmorImage != null)
+                    resetArmorImage.color = ShopItemLook.ButtonFill(block, theme);
             }
         }
 
@@ -722,19 +742,12 @@ namespace Overpower.UI
             if (tree.RootId < 0)
                 return;
 
-            // A reset has no price, only the territory/combat gate (price 0 never trips CannotAfford): the same Check(0)
-            // the header reads decides whether the refund is allowed.
+            // A reset has no price, only the gate (a shut shop, the round's lock, territory/combat): the button's look asks the same one.
             ShopContext ctx = CurrentShopContext();
-            if (RefuseIfClosed(ctx) || RefuseIf(ctx, ctx.GunBlock()))
+            if (RefuseIf(ctx, ctx.WeaponResetGate()))
                 return;
             if (!ctx.IsFree)
             {
-                PurchaseBlock block = ctx.Check(0);
-                if (block != PurchaseBlock.None)
-                {
-                    ShowBlockedReason(ctx, block, 0);
-                    return;
-                }
                 if (goldWallet != null && gameplayConfig != null)
                 {
                     WeaponDefinition sold = weapons != null ? weapons.Resolve(CurrentWeaponId()) : null;
@@ -838,6 +851,8 @@ namespace Overpower.UI
                     ui.button.interactable = false;
                     break;
             }
+            bool pickable = state == UpgradeNodeState.Equipped || state == UpgradeNodeState.Selectable && !shopBlocked;
+            ui.icon.color = ShopItemLook.IconTint(!pickable, theme);
         }
 
         // ============================================================================================
@@ -898,16 +913,10 @@ namespace Overpower.UI
         {
             // No price of its own, only the gate applies (as OnResetWeaponClicked).
             ShopContext ctx = CurrentShopContext();
-            if (RefuseIfClosed(ctx) || RefuseIf(ctx, ctx.ArmorResetBlock()))
+            if (RefuseIf(ctx, ctx.ArmorResetGate()))
                 return;
             if (!ctx.IsFree)
             {
-                PurchaseBlock block = ctx.Check(0);
-                if (block != PurchaseBlock.None)
-                {
-                    ShowBlockedReason(ctx, block, 0);
-                    return;
-                }
                 if (goldWallet != null && gameplayConfig != null)
                 {
                     int refund = ledger.SellArmor(gameplayConfig.SellRefundRate);
@@ -926,7 +935,7 @@ namespace Overpower.UI
 
         /// <summary>A refused upgrade DISABLES the + button, computed up front from the ArmorUpgradePath rule TryUpgrade
         /// applies, so a click that would be refused is never offered. Shows the next purchase's price (ShopPricing.
-        /// PriceLine) next to a buyable path, and mutes both rows' text (not the + buttons) while shop-blocked, like the
+        /// PriceLine) on a buyable card, and gives that card the refused look while shop-blocked (StyleArmorCard), like the
         /// weapon tree's "visible but reads as unavailable".</summary>
         private void RefreshArmor(ShopContext ctx)
         {
@@ -945,22 +954,27 @@ namespace Overpower.UI
             bool roundLimited = cap < armorConfig.MaxArmorUpgrades;
             string limit = ArmorLimitLabel.Text(path.TotalUpgrades, cap,
                 theme.loadoutArmorUpgradeFormat, roundLimited ? theme.loadoutArmorRoundMaxFormat : theme.loadoutArmorMaxFormat);
-            absorbText.text = path.CanUpgradeAbsorb
-                ? ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel, $"{limit} ({priceLine})")
-                : ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel, ArmorRowFull(path.TotalUpgrades, cap, limit));
-            rechargeText.text = path.CanUpgradeRecharge
-                ? ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel, $"{limit} ({priceLine})")
-                : ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel, ArmorRowFull(path.TotalUpgrades, cap, limit));
-            absorbText.color = path.CanUpgradeAbsorb && gateBlocked ? theme.mutedTextColor : theme.textColor;
-            rechargeText.color = path.CanUpgradeRecharge && gateBlocked ? theme.mutedTextColor : theme.textColor;
-
-            absorbButton.interactable = path.CanUpgradeAbsorb;
-            rechargeButton.interactable = path.CanUpgradeRecharge;
+            StyleArmorCard(absorbCard, path.CanUpgradeAbsorb, gateBlocked, ArmorRow(theme.loadoutArmorAbsorbRowFormat, playerHealth.AbsorbLevel,
+                path.CanUpgradeAbsorb ? $"{limit} ({priceLine})" : ArmorRowFull(path.TotalUpgrades, cap, limit)));
+            StyleArmorCard(rechargeCard, path.CanUpgradeRecharge, gateBlocked, ArmorRow(theme.loadoutArmorRechargeRowFormat, playerHealth.RechargeLevel,
+                path.CanUpgradeRecharge ? $"{limit} ({priceLine})" : ArmorRowFull(path.TotalUpgrades, cap, limit)));
         }
 
-        /// <summary>One armour row's text from its UiTheme format: {0} = this row's level, {1} = the status.</summary>
-        private static string ArmorRow(string format, int level, string status) =>
-            string.Format(System.Globalization.CultureInfo.InvariantCulture, format, level, status);
+        /// <summary>An armour card reads refused (Loadout Shop Blocked Colour, muted text, faded picture) only while it has an upgrade left that the
+        /// gate refuses; a card with none left keeps the normal look, its + disabled.</summary>
+        private void StyleArmorCard(ArmorCardUi card, bool canUpgrade, bool gateBlocked, string text)
+        {
+            bool refused = canUpgrade && gateBlocked;
+            card.label.text = text;
+            card.label.color = refused ? theme.mutedTextColor : theme.textColor;
+            card.inner.color = refused ? theme.loadoutShopBlockedColor : theme.loadoutSelectableColor;
+            card.icon.color = ShopItemLook.IconTint(refused, theme);
+            card.plus.interactable = canUpgrade;
+        }
+
+        /// <summary>One armour card's text from its UiTheme format: {0} = the level, {1} = the status, drawn at the price line's size.</summary>
+        private string ArmorRow(string format, int level, string status) =>
+            string.Format(System.Globalization.CultureInfo.InvariantCulture, format, level, $"<size={theme.loadoutPriceLineSizePercent}%>{status}</size>");
 
         /// <summary>What a row says when it cannot be bought: the shared limit's "N of N (max)" if the budget is
         /// spent, otherwise that this row is at its own top level.</summary>
@@ -1050,6 +1064,7 @@ namespace Overpower.UI
                 ui.outer.color = equipped ? theme.highlightColor : Color.clear;
                 ui.inner.color = shopBlocked ? theme.loadoutShopBlockedColor : theme.loadoutSelectableColor;
                 ui.label.color = shopBlocked ? theme.mutedTextColor : theme.textColor;
+                ui.icon.color = ShopItemLook.IconTint(shopBlocked, theme);
             }
 
             if (ultimateEmptyLabel != null)

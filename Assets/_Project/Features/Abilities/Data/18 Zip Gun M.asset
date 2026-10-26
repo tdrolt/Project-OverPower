@@ -16,6 +16,6 @@ MonoBehaviour:
   displayName: Zip
   description: Fire a hook that pulls you to what it hits.
   slot: 3
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 56eaae853ab355c46b3e39c2d8a4e5c0, type: 3}
   goldCost: 640
   modulePrefab: {fileID: 9070495242582315718, guid: 56fd099dc058ce24f9a45cbebebb8324, type: 3}

@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Scaling
   description: Rockets hit harder the further they travel.
   parent: {fileID: 11400000, guid: 73e5ab1af24e5fa44b3323918b8d42ee, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 86ff5913eaafd35409b7e8e637cab22f, type: 3}
   goldCost: 1280
   damage: 10
   fireInterval: 1.1

@@ -114,10 +114,17 @@ MonoBehaviour:
   loadoutNodeHeight: 96
   loadoutAbilityCardWidth: 240
   loadoutAbilityCardHeight: 88
+  loadoutArmorCardWidth: 500
+  loadoutCardIconSize: 60
+  loadoutNodeIconSize: 48
+  loadoutCardIconGap: 8
+  loadoutIconUnavailableTint: {r: 0.5, g: 0.5, b: 0.5, a: 0.75}
+  loadoutArmorAbsorbIcon: {fileID: 21300000, guid: bf9bdbcfbe6fdf04c8a75be60e42b622, type: 3}
+  loadoutArmorRechargeIcon: {fileID: 21300000, guid: 1460b6e267ab9014bbd41ed3a370f7a6, type: 3}
   loadoutAbilityColumnGap: 60
   loadoutNodeSpacing: 20
   loadoutArmorPlusGap: 12
-  loadoutArmorRowGap: 90
+  loadoutArmorRowGap: 20
   loadoutEquippedBorderWidth: 4
   loadoutStepperButtonSize: 56
   loadoutStepperFontSize: 32
@@ -148,8 +155,12 @@ MonoBehaviour:
   loadoutLockedUntilBreakText: Locked until the break
   loadoutDominionRoundText: 'Round on: only empty slots can be filled'
   loadoutArmorTopLevelText: top level
-  loadoutArmorAbsorbRowFormat: 'Absorb lv {0}: {1}'
-  loadoutArmorRechargeRowFormat: 'Recharge lv {0}: {1}'
+  loadoutArmorAbsorbRowFormat: 'Absorb lv {0}
+
+    {1}'
+  loadoutArmorRechargeRowFormat: 'Recharge lv {0}
+
+    {1}'
   loadoutArrowColor: {r: 0.42, g: 0.42, b: 0.47, a: 1}
   loadoutArrowWidth: 3
   loadoutArrowHeadSize: 12

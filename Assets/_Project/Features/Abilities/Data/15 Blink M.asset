@@ -16,6 +16,6 @@ MonoBehaviour:
   displayName: Blink
   description: Teleport to your cursor.
   slot: 3
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 4cd49053392691f4899f911f4b2b2769, type: 3}
   goldCost: 640
   modulePrefab: {fileID: 4109286014405793723, guid: 477593d2dad459640bb6e5ab6ed1e77e, type: 3}

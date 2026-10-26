@@ -80,6 +80,11 @@ namespace Overpower.UI
         public PurchaseBlock AbilityBlock(bool slotFilled) => DominionShopRules.AbilityBlock(RoundLocked, slotFilled);
         public PurchaseBlock ArmorResetBlock() => DominionShopRules.ArmorResetBlock(RoundLocked);
 
+        /// <summary>Why Reset Weapon is refused right now, or None: the click and the button's blocked look both ask this, so a refused reset never looks open.</summary>
+        public PurchaseBlock WeaponResetGate() => Check(0, GunBlock());
+        /// <summary>Why Reset Armor is refused right now, or None (as WeaponResetGate).</summary>
+        public PurchaseBlock ArmorResetGate() => Check(0, ArmorResetBlock());
+
         /// <summary>What a node/card's price line reads under this gate: the lock's text for an item locked until the break, "Free" for everything
         /// else in Dominion (there is no gold), else the usual line.</summary>
         public string PriceLine(int price, PurchaseBlock block = PurchaseBlock.None) =>

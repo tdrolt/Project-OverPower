@@ -9,7 +9,7 @@ using Overpower.Match;
 namespace Overpower.UI
 {
     /// <summary>
-    /// The UI-CONSTRUCTION half of LoadoutScreen: builds the GameObjects (the two pages and tabs, weapon tree, armor rows,
+    /// The UI-CONSTRUCTION half of LoadoutScreen: builds the GameObjects (the two pages and tabs, weapon tree, armour cards,
     /// ability columns, header, toggle button, low-level helpers) and wires listeners to methods on the other partial, with
     /// no purchase, refresh or hover-content logic of its own. Awake/Update/Open/Close, the click handlers, the Refresh*
     /// repaints and the pop-up live in LoadoutScreen.cs and LoadoutScreen.Tooltip.cs; partial classes share one field list.
@@ -129,7 +129,7 @@ namespace Overpower.UI
         }
 
         /// <summary>One weapon node: an outer Image (transparent except when Equipped, where it is the highlight border), an
-        /// inner Image inset by Loadout Equipped Border Width holding the state colour, and the display name on top. Two
+        /// inner Image inset by Loadout Equipped Border Width holding the state colour, the weapon's picture at its left and the name beside it. Two
         /// Images rather than a UI Outline effect: an offset duplicate does not read as a border on a filled rectangle.</summary>
         private WeaponNodeUi BuildNodeButton(Transform parent, WeaponDefinition def)
         {
@@ -163,61 +163,57 @@ namespace Overpower.UI
             Image inner = innerGo.AddComponent<Image>();
             inner.raycastTarget = false;
 
+            Image icon = AddCardIcon(innerGo.transform, def.Icon, theme.loadoutNodeIconSize);
             TextMeshProUGUI label = AddLabel(innerGo.transform, def.DisplayName, theme.bodyTextSize, FontStyles.Normal);
-            RectTransform labelRt = label.rectTransform;
-            labelRt.anchorMin = Vector2.zero;
-            labelRt.anchorMax = Vector2.one;
-            labelRt.offsetMin = Vector2.zero;
-            labelRt.offsetMax = Vector2.zero;
+            PlaceCardLabel(label, icon, theme.loadoutNodeIconSize, 0f);
 
             int weaponId = def.Id; // Captured per node: a loop variable would be the last weapon by click time.
             button.onClick.AddListener(() => OnWeaponNodeClicked(weaponId));
 
             AddPopUp(go, "w:" + def.Id, () => WeaponPopUpText(def));
 
-            return new WeaponNodeUi { button = button, outer = outer, inner = inner, label = label };
+            return new WeaponNodeUi { button = button, outer = outer, inner = inner, label = label, icon = icon };
         }
 
         // ============================================================================================
         // Armor UI - construction only; the click handlers and RefreshArmor are on the other partial.
         // ============================================================================================
 
-        /// <summary>The armor rows (Absorb, Recharge) and Reset Armor side by side under an "Armor" heading, at the top of
-        /// the Abilities &amp; Armor page. Each row is its label with its own "+" right after it; a wide gap separates the
-        /// rows so a "+" never reads as belonging to the other upgrade. Reset Armor sits at the right edge.</summary>
+        /// <summary>The two armour cards (Absorb, Recharge) side by side under an "Armor" heading, at the top of the Abilities &amp; Armor page,
+        /// with Reset Armor at the right edge. Each card is built like an ability card (border, fill, picture, text) with its own + inside it.</summary>
         private void BuildArmorSection(Transform page)
         {
             AddSectionHeader(page, "Armor");
 
-            GameObject group = new GameObject("Armor Rows", typeof(RectTransform));
+            GameObject group = new GameObject("Armor Cards", typeof(RectTransform));
             group.transform.SetParent(page, false);
             HorizontalLayoutGroup layout = group.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = theme.loadoutNodeSpacing; // Between the rows group, the spacer and Reset Armor.
+            layout.spacing = theme.loadoutNodeSpacing; // Between the cards group, the spacer and Reset Armor.
             layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = layout.childControlHeight = true;
             layout.childForceExpandWidth = layout.childForceExpandHeight = false;
 
-            // The two rows sit in their own group, so the wide Armor Row Gap is only between them, not around the spacer.
-            GameObject rows = new GameObject("Armor Rows Inner", typeof(RectTransform));
-            rows.transform.SetParent(group.transform, false);
-            HorizontalLayoutGroup rowsLayout = rows.AddComponent<HorizontalLayoutGroup>();
-            rowsLayout.spacing = theme.loadoutArmorRowGap;
-            rowsLayout.childAlignment = TextAnchor.MiddleLeft;
-            rowsLayout.childControlWidth = rowsLayout.childControlHeight = true;
-            rowsLayout.childForceExpandWidth = rowsLayout.childForceExpandHeight = false;
+            GameObject cards = new GameObject("Armor Cards Inner", typeof(RectTransform));
+            cards.transform.SetParent(group.transform, false);
+            HorizontalLayoutGroup cardsLayout = cards.AddComponent<HorizontalLayoutGroup>();
+            cardsLayout.spacing = theme.loadoutArmorRowGap;
+            cardsLayout.childAlignment = TextAnchor.MiddleLeft;
+            cardsLayout.childControlWidth = cardsLayout.childControlHeight = true;
+            cardsLayout.childForceExpandWidth = cardsLayout.childForceExpandHeight = false;
 
-            absorbText = BuildArmorRow(rows.transform, out absorbButton, OnAbsorbClicked, "armor:absorb", () => ArmorPopUpText(true));
-            rechargeText = BuildArmorRow(rows.transform, out rechargeButton, OnRechargeClicked, "armor:recharge", () => ArmorPopUpText(false));
+            absorbCard = BuildArmorCard(cards.transform, theme.loadoutArmorAbsorbIcon, OnAbsorbClicked, "armor:absorb", () => ArmorPopUpText(true));
+            rechargeCard = BuildArmorCard(cards.transform, theme.loadoutArmorRechargeIcon, OnRechargeClicked, "armor:recharge", () => ArmorPopUpText(false));
 
-            // Pushes Reset Armor to the right edge, so the free width is not spread between the two rows.
-            GameObject spacer = new GameObject("Armor Rows Spacer", typeof(RectTransform));
+            // Pushes Reset Armor to the right edge, so the free width is not spread between the cards.
+            GameObject spacer = new GameObject("Armor Cards Spacer", typeof(RectTransform));
             spacer.transform.SetParent(group.transform, false);
             spacer.AddComponent<LayoutElement>().flexibleWidth = 1f;
 
             Button resetArmorButton = AddButton(group.transform, "Reset Armor", OnResetArmorClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
             resetArmorLabel = resetArmorButton.GetComponentInChildren<TextMeshProUGUI>();
+            resetArmorImage = resetArmorButton.GetComponent<Image>();
 
-            // Room between the armor rows and the ability columns below them.
+            // Room between the armour cards and the ability columns below them.
             GameObject gap = new GameObject("Armor Section Gap", typeof(RectTransform));
             gap.transform.SetParent(page, false);
             LayoutElement gapLe = gap.AddComponent<LayoutElement>();
@@ -225,30 +221,73 @@ namespace Overpower.UI
             gapLe.minHeight = theme.loadoutSectionGap;
         }
 
-        private TextMeshProUGUI BuildArmorRow(Transform parent, out Button plusButton, UnityEngine.Events.UnityAction onClick,
-            string popUpKey, System.Func<string> popUpText)
+        /// <summary>One armour card: the ability card's recipe at Loadout Armor Card Width, with the + pinned inside its right edge and the text
+        /// between the picture and the +. The whole card opens the pop-up.</summary>
+        private ArmorCardUi BuildArmorCard(Transform parent, Sprite sprite, UnityEngine.Events.UnityAction onClick, string popUpKey, System.Func<string> popUpText)
         {
-            GameObject row = new GameObject("Armor Row", typeof(RectTransform));
-            row.transform.SetParent(parent, false);
-            HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = theme.loadoutArmorPlusGap; // The "+" sits this close after its own label.
-            layout.childAlignment = TextAnchor.MiddleLeft;
-            layout.childControlWidth = layout.childControlHeight = true;
-            layout.childForceExpandWidth = layout.childForceExpandHeight = false;
+            GameObject go = new GameObject("Armor Card", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            LayoutElement le = go.AddComponent<LayoutElement>();
+            le.preferredWidth = le.minWidth = theme.loadoutArmorCardWidth;
+            le.preferredHeight = le.minHeight = theme.loadoutAbilityCardHeight;
 
-            // Invisible, but it is what the pointer lands on between the text and the + button, so the pop-up opens on the whole row.
-            Image hit = row.AddComponent<Image>();
-            hit.color = Color.clear;
-            hit.raycastTarget = true;
+            // Clear, but it is what the pointer lands on around the text and the +, so the pop-up opens on the whole card.
+            Image outer = go.AddComponent<Image>();
+            outer.color = Color.clear;
+            outer.raycastTarget = true;
 
-            TextMeshProUGUI label = AddLabel(row.transform, "", theme.bodyTextSize, FontStyles.Normal);
-            label.alignment = TextAlignmentOptions.MidlineLeft;
-            // No flexible width on the label or the row: the label is as wide as its text, so the + follows it directly.
+            GameObject innerGo = new GameObject("Fill", typeof(RectTransform));
+            innerGo.transform.SetParent(go.transform, false);
+            RectTransform innerRt = innerGo.GetComponent<RectTransform>();
+            innerRt.anchorMin = Vector2.zero;
+            innerRt.anchorMax = Vector2.one;
+            float b = theme.loadoutEquippedBorderWidth;
+            innerRt.offsetMin = new Vector2(b, b);
+            innerRt.offsetMax = new Vector2(-b, -b);
+            Image inner = innerGo.AddComponent<Image>();
+            inner.raycastTarget = false;
 
-            plusButton = AddButton(row.transform, "+", onClick, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
+            Image icon = AddCardIcon(innerGo.transform, sprite, theme.loadoutCardIconSize);
+            Button plus = AddButton(innerGo.transform, "+", onClick, theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize, theme.loadoutStepperFontSize);
+            RectTransform plusRt = plus.GetComponent<RectTransform>();
+            plusRt.anchorMin = plusRt.anchorMax = plusRt.pivot = new Vector2(1f, 0.5f);
+            plusRt.anchoredPosition = new Vector2(-theme.loadoutCardIconGap, 0f);
+            plusRt.sizeDelta = new Vector2(theme.loadoutStepperButtonSize, theme.loadoutStepperButtonSize);
 
-            AddPopUp(row, popUpKey, popUpText);
-            return label;
+            TextMeshProUGUI label = AddLabel(innerGo.transform, "", theme.bodyTextSize, FontStyles.Normal);
+            PlaceCardLabel(label, icon, theme.loadoutCardIconSize, theme.loadoutCardIconGap + theme.loadoutStepperButtonSize + theme.loadoutArmorPlusGap);
+
+            AddPopUp(go, popUpKey, popUpText);
+            return new ArmorCardUi { plus = plus, inner = inner, label = label, icon = icon };
+        }
+
+        /// <summary>An item's picture at the left of a card's fill, Loadout Card Icon Gap in from the edge; switched off when the item has none, so no
+        /// white square is drawn.</summary>
+        private Image AddCardIcon(Transform fill, Sprite sprite, float size)
+        {
+            GameObject go = new GameObject("Icon", typeof(RectTransform));
+            go.transform.SetParent(fill, false);
+            RectTransform rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 0.5f);
+            rt.anchoredPosition = new Vector2(theme.loadoutCardIconGap, 0f);
+            rt.sizeDelta = new Vector2(size, size);
+            Image icon = go.AddComponent<Image>();
+            icon.sprite = sprite;
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            icon.enabled = sprite != null;
+            return icon;
+        }
+
+        /// <summary>Stretches a card's text over the fill, starting after the picture (when there is one) and stopping rightInset short of the right edge.</summary>
+        private void PlaceCardLabel(TextMeshProUGUI label, Image icon, float iconSize, float rightInset)
+        {
+            RectTransform rt = label.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            float left = icon.enabled ? 2f * theme.loadoutCardIconGap + iconSize : 0f;
+            rt.offsetMin = new Vector2(left, 0f);
+            rt.offsetMax = new Vector2(-rightInset, 0f);
         }
 
         // ============================================================================================
@@ -348,12 +387,9 @@ namespace Overpower.UI
             Image inner = innerGo.AddComponent<Image>();
             inner.raycastTarget = false;
 
+            Image icon = AddCardIcon(innerGo.transform, def.Icon, theme.loadoutCardIconSize);
             TextMeshProUGUI label = AddLabel(innerGo.transform, def.DisplayName, theme.bodyTextSize, FontStyles.Normal);
-            RectTransform labelRt = label.rectTransform;
-            labelRt.anchorMin = Vector2.zero;
-            labelRt.anchorMax = Vector2.one;
-            labelRt.offsetMin = Vector2.zero;
-            labelRt.offsetMax = Vector2.zero;
+            PlaceCardLabel(label, icon, theme.loadoutCardIconSize, 0f);
 
             AbilitySlot slot = def.Slot;
             int abilityId = def.Id;
@@ -361,7 +397,7 @@ namespace Overpower.UI
 
             AddPopUp(go, "a:" + def.Slot + ":" + def.Id, () => AbilityPopUpText(def));
 
-            return new AbilityCardUi { button = button, outer = outer, inner = inner, label = label };
+            return new AbilityCardUi { button = button, outer = outer, inner = inner, label = label, icon = icon };
         }
 
         // ============================================================================================
@@ -443,6 +479,7 @@ namespace Overpower.UI
             BuildWeaponTreeUi(weaponsPageRoot.transform);
             Button resetWeaponButton = AddButton(weaponsPageRoot.transform, "Reset Weapon", OnResetWeaponClicked, theme.loadoutSmallButtonWidth, theme.loadoutSmallButtonHeight);
             resetWeaponLabel = resetWeaponButton.GetComponentInChildren<TextMeshProUGUI>();
+            resetWeaponImage = resetWeaponButton.GetComponent<Image>();
 
             abilitiesPageRoot = BuildPage(pages.transform, "Abilities and Armor Page");
             BuildArmorSection(abilitiesPageRoot.transform);

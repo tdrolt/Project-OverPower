@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Rapid
   description: Double fire rate, wide spread. Close range.
   parent: {fileID: 11400000, guid: 27983484f42c6eb409acf1c5d0d8e823, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 3924a5ed33f03d34ea10edb914683554, type: 3}
   goldCost: 1280
   damage: 4.2
   fireInterval: 0.08

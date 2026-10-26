@@ -16,6 +16,6 @@ MonoBehaviour:
   displayName: Sprint
   description: Run faster, but it builds overheat.
   slot: 3
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: f2020be2dc655344bbe1253f7d73e8cb, type: 3}
   goldCost: 640
   modulePrefab: {fileID: 8688947986194434508, guid: 5fca336d5646eb240b59477ac4ab9027, type: 3}

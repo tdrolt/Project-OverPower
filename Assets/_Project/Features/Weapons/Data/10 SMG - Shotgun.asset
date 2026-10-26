@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Shotgun
   description: A wide blast of pellets. Deadly up close.
   parent: {fileID: 11400000, guid: 27983484f42c6eb409acf1c5d0d8e823, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 0be5560b22fe82948945dfd28ac4815b, type: 3}
   goldCost: 1280
   damage: 7
   fireInterval: 1.5

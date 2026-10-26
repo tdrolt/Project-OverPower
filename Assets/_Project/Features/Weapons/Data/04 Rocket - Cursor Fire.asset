@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Cursor
   description: Rockets burst at your cursor and leave fire on the ground.
   parent: {fileID: 11400000, guid: 73e5ab1af24e5fa44b3323918b8d42ee, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: b2b323e2dcd283b419eea32aa4d18f96, type: 3}
   goldCost: 1280
   damage: 10
   fireInterval: 1.4

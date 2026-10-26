@@ -84,12 +84,6 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void ScopeHasNoIconYetLikeEveryOtherAbility()
-        {
-            Assert.IsNull(LoadDefinition().Icon);
-        }
-
-        [Test]
         public void ScopeResolvesThroughTheRealCatalogueByItsOwnId()
         {
             var catalogue = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>(CataloguePath);

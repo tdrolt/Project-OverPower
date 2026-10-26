@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Bounce
   description: Shots ricochet off walls and hit harder each bounce.
   parent: {fileID: 11400000, guid: b52e9c7b32723bf4a8dcd0d813187443, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 97badf23662e3cd4fa118b85db32fba0, type: 3}
   goldCost: 1280
   damage: 7
   fireInterval: 0.38

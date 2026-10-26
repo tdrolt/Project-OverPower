@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Rocket
   description: Slow, heavy rockets that explode on impact.
   parent: {fileID: 11400000, guid: 0023f41e1c59d7c4cb3f34c116cacfe1, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: cfa507df6f416814d87fb9c55b52763d, type: 3}
   goldCost: 960
   damage: 10
   fireInterval: 1.1

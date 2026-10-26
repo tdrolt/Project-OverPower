@@ -185,9 +185,11 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(context, nameof(Overpower.UI.ShopContext.AbilityBlock), Rule(nameof(DominionShopRules.AbilityBlock))));
             Assert.IsTrue(IlWiring.Uses(context, nameof(Overpower.UI.ShopContext.ArmorResetBlock), Rule(nameof(DominionShopRules.ArmorResetBlock))));
             Assert.IsTrue(IlWiring.Uses(screen, "OnWeaponNodeClicked", Ctx(nameof(Overpower.UI.ShopContext.GunBlock))), "a gun pick");
-            Assert.IsTrue(IlWiring.Uses(screen, "OnResetWeaponClicked", Ctx(nameof(Overpower.UI.ShopContext.GunBlock))), "Reset Weapon");
+            Assert.IsTrue(IlWiring.Uses(screen, "OnResetWeaponClicked", Ctx(nameof(Overpower.UI.ShopContext.WeaponResetGate))), "Reset Weapon");
+            Assert.IsTrue(IlWiring.Uses(context, nameof(Overpower.UI.ShopContext.WeaponResetGate), Ctx(nameof(Overpower.UI.ShopContext.GunBlock))), "Reset Weapon's gate");
             Assert.IsTrue(IlWiring.Uses(screen, "OnAbilityCardClicked", Ctx(nameof(Overpower.UI.ShopContext.AbilityBlock))), "an ability pick");
-            Assert.IsTrue(IlWiring.Uses(screen, "OnResetArmorClicked", Ctx(nameof(Overpower.UI.ShopContext.ArmorResetBlock))), "Reset Armor");
+            Assert.IsTrue(IlWiring.Uses(screen, "OnResetArmorClicked", Ctx(nameof(Overpower.UI.ShopContext.ArmorResetGate))), "Reset Armor");
+            Assert.IsTrue(IlWiring.Uses(context, nameof(Overpower.UI.ShopContext.ArmorResetGate), Ctx(nameof(Overpower.UI.ShopContext.ArmorResetBlock))), "Reset Armor's gate");
             Assert.IsTrue(IlWiring.Uses(screen, "StyleNode", Ctx(nameof(Overpower.UI.ShopContext.GunBlock))), "a weapon node's look");
             Assert.IsTrue(IlWiring.Uses(screen, "RefreshAbilities", Ctx(nameof(Overpower.UI.ShopContext.AbilityBlock))), "an ability card's look");
             Assert.IsTrue(IlWiring.Uses(screen, "Update", context.GetField(nameof(Overpower.UI.ShopContext.RoundLocked))),

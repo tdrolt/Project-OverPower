@@ -16,6 +16,6 @@ MonoBehaviour:
   displayName: Mines
   description: Drop mines that damage and slow enemies.
   slot: 1
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: c2d3e69b588755540a8e885aa59474ef, type: 3}
   goldCost: 640
   modulePrefab: {fileID: 8955745586176628307, guid: 029294588b429ef438c4b52d8735316f, type: 3}

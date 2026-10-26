@@ -16,6 +16,6 @@ MonoBehaviour:
   displayName: Pulse
   description: Knock enemies back; walls and allies stun them.
   slot: 1
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 42597a0c515d03c458e0554d4c6ce63d, type: 3}
   goldCost: 640
   modulePrefab: {fileID: 4275577269441808119, guid: ed58e88a087148e4b907129279cc9ae5, type: 3}

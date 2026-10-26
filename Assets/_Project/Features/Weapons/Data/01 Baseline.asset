@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: Baseline
   description: Reliable single shots. Every path upgrades from here.
   parent: {fileID: 0}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 7c2bd3efc4ffb8642ac9b7bf01320425, type: 3}
   goldCost: 0
   damage: 20
   fireInterval: 0.4

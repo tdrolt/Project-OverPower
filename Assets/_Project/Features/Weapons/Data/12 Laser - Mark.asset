@@ -18,7 +18,7 @@ MonoBehaviour:
     bonus damage and uses the mark up; the hit after that marks them again. Fires
     after a short warning.
   parent: {fileID: 11400000, guid: 8fa3cfc5d5169494cb5251a678cca581, type: 2}
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: a60669549f5c7d140b275d0f5c651a7c, type: 3}
   goldCost: 1280
   damage: 36
   fireInterval: 1
