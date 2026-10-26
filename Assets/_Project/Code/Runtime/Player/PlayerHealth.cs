@@ -31,8 +31,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     [SerializeField, Tooltip("The shield (armor) fill on the overhead HealthBarCanvas, same rect " +
              "as the health fill but drawn AFTER it in the hierarchy so it renders on top - " +
-             "Tudor's call [T]: one bar, shield drawn over health. The shield is measured in the same hit " +
-             "points as health (HealthArmourBar): armour worth a quarter of max health covers a quarter of the bar.")]
+             "Tudor's call [T]: one bar, shield drawn over health, each against its own max. A " +
+             "full shield hides max HP on purpose. Fraction is armor / armor capacity; with no armor to hold the shield is hidden.")]
     private Image shieldFillImage;
 
     [SerializeField, Tooltip("The static backing behind both fills on the overhead HealthBarCanvas. " +
@@ -378,15 +378,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         }
     }
 
-    /// <summary>The one place both overhead fills are written: shield drawn OVER health, both in hit points of max health
-    /// (HealthArmourBar, the HUD's rule too). The shield has no empty track of its own here: the health under it shows
-    /// through. Skips an unchanged fillAmount: the recharge tick calls this every frame armor is not full, and a filled
-    /// Image write is not free.</summary>
+    /// <summary>The one place both overhead fills are written: shield drawn OVER health, each fill against its OWN max
+    /// (HealthArmourBar's health and armourOfTrack), so a full shield hides max HP by design; no armour to hold draws no shield.
+    /// The plate has no armour track of its own, so hit-point lengths would make full and part-full armour look alike.
+    /// Skips an unchanged fillAmount: the recharge tick calls this every frame armor is not full, and a filled Image write is not free.</summary>
     private void UpdateOverheadBar()
     {
         HealthArmourBar.Lengths bar = HealthArmourBar.Compute(health, MaxHealth, armor.Current, armor.Capacity);
         float healthFraction = bar.health;
-        float shieldFraction = bar.armour;
+        float shieldFraction = bar.armourShown ? bar.armourOfTrack : 0f;
         if (shieldFillImage != null)
             shieldFillImage.enabled = bar.armourShown;
 

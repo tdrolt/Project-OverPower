@@ -99,7 +99,7 @@ namespace Overpower.Tests
             Assert.IsTrue(barGo.activeSelf);
         }
 
-        // Max health is 100 here (no GameplayConfig), so 25 armour is a quarter of the bar whatever the armour's capacity.
+        // The plate draws the shield against its own maximum (Tudor's [T] rule), so full armour fills the plate whatever its size in hit points.
         private Image DrawWithArmour(float current, float capacity)
         {
             var pool = new Overpower.Combat.ArmorState(capacity, 6f, 3f);
@@ -110,15 +110,15 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void FullBaseArmourCoversAsMuchOfThePlateBarAsItsHitPoints()
+        public void FullArmourFillsThePlateBar()
         {
-            Assert.AreEqual(0.25f, DrawWithArmour(25f, 25f).fillAmount, 1e-4f);
+            Assert.AreEqual(1f, DrawWithArmour(25f, 25f).fillAmount, 1e-4f);
         }
 
         [Test]
-        public void HalfBaseArmourCoversHalfThat()
+        public void HalfArmourFillsHalfThePlateBar()
         {
-            Assert.AreEqual(0.125f, DrawWithArmour(12.5f, 25f).fillAmount, 1e-4f);
+            Assert.AreEqual(0.5f, DrawWithArmour(12.5f, 25f).fillAmount, 1e-4f);
         }
 
         [Test]

@@ -5,8 +5,8 @@ namespace Overpower.UI
     /// <summary>
     /// How much of a health-and-armour bar each part takes, as fractions of the bar's full length, where the full length is max
     /// health. Armour is measured in the same hit points: its track is as long as the armour this player can hold now, so full
-    /// armour always fills its whole track and no empty track is drawn past it. PlayerHud's bars and the plate over every head
-    /// (PlayerHealth.UpdateOverheadBar) both draw from this.
+    /// armour always fills its whole track and no empty track is drawn past it. PlayerHud's bars draw from this; the plate over
+    /// every head (PlayerHealth.UpdateOverheadBar), which has no armour track, uses only health, armourOfTrack and armourShown.
     /// </summary>
     public static class HealthArmourBar
     {

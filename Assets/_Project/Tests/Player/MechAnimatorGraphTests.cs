@@ -95,6 +95,18 @@ namespace Overpower.Tests
             Assert.IsFalse(clip.isLooping, "a looping shoot clip replays on its own between shots, out of step with them");
         }
 
+        // The shoot bool turns on while the gun is cooling down too; only a shot that leaves (animScript.OnShotShown) may start the recoil.
+        [Test]
+        public void TheShootBoolOnlyRaisesTheGunAndNeverStartsTheRecoil()
+        {
+            AnimatorStateMachine sm = Layer();
+            AnimatorState shoot = State(sm, ShootState);
+            var into = sm.states.SelectMany(s => s.state.transitions).Where(t => t.destinationState == shoot).ToList();
+            Assert.IsNotEmpty(into);
+            foreach (AnimatorStateTransition t in into)
+                Assert.GreaterOrEqual(t.offset, 0.9f, "a transition into Shoot must enter at the motion's end pose, not replay it");
+        }
+
         [Test]
         public void TheShootStatesSpeedIsAFloatEachClientSetsForItself()
         {

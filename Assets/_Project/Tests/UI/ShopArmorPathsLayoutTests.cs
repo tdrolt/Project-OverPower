@@ -75,12 +75,24 @@ namespace Overpower.Tests
 
         private static T Part<T>(object ui, string name) => (T)ui.GetType().GetField(name).GetValue(ui);
 
-        /// <summary>World-space rect (x right, y up) of a built element.</summary>
+        /// <summary>World-space bounds (x right, y up) of a built element over all four corners: the step diamonds are turned 45 degrees,
+        /// so two opposite corners alone give a rect with no width.</summary>
         private static Rect WorldRect(RectTransform rt)
         {
             var c = new Vector3[4];
             rt.GetWorldCorners(c);
-            return Rect.MinMaxRect(c[0].x, c[0].y, c[2].x, c[2].y);
+            float xMin = Mathf.Min(c[0].x, c[1].x, c[2].x, c[3].x), xMax = Mathf.Max(c[0].x, c[1].x, c[2].x, c[3].x);
+            float yMin = Mathf.Min(c[0].y, c[1].y, c[2].y, c[3].y), yMax = Mathf.Max(c[0].y, c[1].y, c[2].y, c[3].y);
+            return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+        }
+
+        [Test]
+        public void AStepDiamondIsMeasuredAsWideAsItIsTall()
+        {
+            Image step = Part<Image[]>(Path("absorbPath"), "stepRings")[0];
+            Rect r = WorldRect(step.rectTransform);
+            Assert.Greater(r.width, 1f, "a turned diamond still has a width");
+            Assert.AreEqual(r.height, r.width, 0.5f);
         }
 
         private static bool Inside(Rect inner, Rect outer, float slack = 0.5f) =>
@@ -113,7 +125,9 @@ namespace Overpower.Tests
             Rect text = WorldRect(Part<TMPro.TextMeshProUGUI>(ui, "label").rectTransform);
             Rect plus = WorldRect((RectTransform)Part<Button>(ui, "plus").transform);
             Image[] steps = Part<Image[]>(ui, "stepRings");
+            TMPro.TextMeshProUGUI[] values = Part<TMPro.TextMeshProUGUI[]>(ui, "stepValues");
             Assert.AreEqual(levels, steps.Length, field + ": one step per level, the start included");
+            Assert.AreEqual(levels, values.Length, field + ": one value per step");
             float lastX = float.MinValue;
             for (int i = 0; i < steps.Length; i++)
             {
@@ -123,6 +137,10 @@ namespace Overpower.Tests
                 Assert.LessOrEqual(step.xMax, plus.xMin + 0.5f, $"{field} step {i} left of the +");
                 Assert.Greater(step.center.x, lastX, $"{field} steps run left to right");
                 lastX = step.center.x;
+
+                Rect value = WorldRect(values[i].rectTransform);
+                Assert.IsTrue(Inside(value, row), $"{field} step {i}'s value inside its path: {value} / {row}");
+                Assert.LessOrEqual(value.xMax, plus.xMin + 0.5f, $"{field} step {i}'s value left of the +");
             }
             Assert.IsTrue(Inside(plus, row), field + ": the + inside its path");
         }
