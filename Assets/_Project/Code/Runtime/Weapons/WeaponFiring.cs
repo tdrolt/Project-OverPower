@@ -309,10 +309,7 @@ namespace Overpower.Weapons
             // Routing the trigger through CastGate instead of this class's own if-chain is what
             // keeps "can this player act right now" from drifting between the weapon and whatever
             // ability checks it next - a stun that should freeze a dash must freeze the gun too.
-            bool alive = lifecycle == null || lifecycle.IsAlive;
-            bool stunned = statusEffects != null && statusEffects.IsStunned;
-            bool silenced = overheat != null && overheat.IsSilenced;
-            if (CastGate.ForActor(alive, stunned, silenced) != CastBlock.None)
+            if (ActorBlock() != CastBlock.None)
             {
                 // Without this, a blocked player's stale nextFireTime sat wherever it was left when the block started, and the first tick after the block
                 // lifted could misread as "still mid-cadence" and fire a shot only a sliver of an interval later - see FireScheduleRule.
@@ -369,7 +366,16 @@ namespace Overpower.Weapons
             photonView.RPC(nameof(RPC_FireWeapon), RpcTarget.AllViaServer, weapon.Id, origin,
                            direction, targetPoint, coneAngle, seed, chargeFraction,
                            damageMultiplier, rangeMultiplier);
+            LastShotTime = Time.time;
             return true;
+        }
+
+        private CastBlock ActorBlock()
+        {
+            bool alive = lifecycle == null || lifecycle.IsAlive;
+            bool stunned = statusEffects != null && statusEffects.IsStunned;
+            bool silenced = overheat != null && overheat.IsSilenced;
+            return CastGate.ForActor(alive, stunned, silenced);
         }
 
         /// <summary>
@@ -434,6 +440,14 @@ namespace Overpower.Weapons
         /// Fire Interval a hold has to wait out first (see its own comment). An empty ring during that wait is the
         /// point - it is what tells the player the gun is not charging yet.</summary>
         public bool ChargeHeld => weapon != null && weapon.CanCharge && triggerHeldSince > 0f;
+
+        /// <summary>Whether a trigger pull would be allowed right now (cooldown aside): the gun is switched on (off while dead) and the cast gate
+        /// TryFire refuses on says nothing against it. The mech's shoot pose reads it so a stun or death cuts the pose at once.</summary>
+        public bool MayFire => enabled && ActorBlock() == CastBlock.None;
+
+        /// <summary>Time.time of this owner's last committed trigger pull, stamped before the RPC goes out so it does not wait for the server
+        /// echo. Owner-only, like ChargeHeld.</summary>
+        public float LastShotTime { get; private set; } = float.NegativeInfinity;
 
         /// <summary>
         /// Builds this shot on EVERY client, including the shooter's own. Every value it needs arrives as a parameter or from info.Sender; nothing in this

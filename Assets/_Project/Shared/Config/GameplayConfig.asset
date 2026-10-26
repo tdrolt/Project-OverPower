@@ -44,4 +44,5 @@ MonoBehaviour:
   scoreboardPublishesPerSecond: 4
   rejoinWindowSeconds: 120
   droppedGraceSeconds: 10
+  shootPoseMinimumSeconds: 0.2
   testRangeEnabled: 1
