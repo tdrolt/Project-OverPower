@@ -3,8 +3,8 @@ namespace Overpower.Combat
     /// <summary>When a mech flashes white for damage, and how bright the flash still is. Decided on every copy of the victim that runs the
     /// damage (bullets and blasts run on every client, the fire field too; a burn, the fence and the sudden-death circle only on the victim's
     /// own client), so the flash needs no message; damage the victim's client would turn away (self, teammate, the yellow immunity, the
-    /// respawn shield) is turned away here from the looks those already show. Damage over time starts a flash at most once per gap: its
-    /// ticks come every frame, and refreshing on each would keep a burning mech white.</summary>
+    /// respawn shield) is turned away here from the looks those already show. Damage over time starts a flash at most once per gap: the
+    /// burn status ticks every frame, and refreshing on each would keep a burning mech white.</summary>
     public static class HitFlashRule
     {
         public static bool FlashesOnHit(DamageSource source, float amount, bool victimAlive, bool fromSelf, bool fromTeammate,

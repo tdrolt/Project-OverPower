@@ -428,7 +428,7 @@ namespace Overpower.Arena
         [Min(0f)] public float hitFlashSeconds = 0.1f;
         [Tooltip("How bright the white of a hit flash is at its peak: 1 lights the whole mech plain white, more makes it bloom. The white itself is the UiTheme's Flash White, the same as every gun's impact flash.")]
         [Min(0f)] public float hitFlashGlow = 1.2f;
-        [Tooltip("The shortest time between two flashes from damage over time (a burn, the fire field, the Electric Fence, the sudden-death circle), in seconds: their ticks come many times a second, so a burning mech flashes once, shows its own colour, and flashes again only after this time. Bullets, blasts and contact hits always flash. Keep it well above Hit Flash Seconds or a burning mech stays white; below about 0.33 it blinks more than three times a second, which some players find hard to look at. 0 flashes on every tick.")]
+        [Tooltip("The shortest time between two flashes from damage over time (a burn, the fire field, the Electric Fence, the sudden-death circle), in seconds. The burn status ticks every frame, so this sets how fast a burning mech blinks; the fire field (1 s), the fence (1 s per target) and the sudden-death circle (0.5 s) tick slower and only skip a flash that comes within this time of another one. Bullets, blasts and contact hits always flash. Keep it well above Hit Flash Seconds or a burning mech stays white; below about 0.33 it blinks more than three times a second, which some players find hard to look at. 0 flashes on every tick.")]
         [Min(0f)] public float overTimeFlashGapSeconds = 0.35f;
 
         [Header("Arena surfaces")]
