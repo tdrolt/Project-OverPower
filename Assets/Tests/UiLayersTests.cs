@@ -77,7 +77,7 @@ namespace Overpower.Tests
             // an order written as a number: assigned, or handed to PopupCard.CreateCanvas (its third argument), or chosen in a ternary
             var literal = new Regex(@"sortingOrder\s*=\s*(-?\d|[^;]*\?\s*-?\d|[^;]*:\s*-?\d)|CreateCanvas\([^,]*,[^,]*,\s*-?\d", RegexOptions.IgnoreCase);
             var found = new List<string>();
-            foreach (string path in Directory.GetFiles("Assets/scripts", "*.cs", SearchOption.AllDirectories))
+            foreach (string path in Directory.GetFiles("Assets/_Project/Code", "*.cs", SearchOption.AllDirectories))
             {
                 if (Path.GetFileName(path) == "UiLayers.cs") continue;
                 string[] lines = File.ReadAllLines(path);

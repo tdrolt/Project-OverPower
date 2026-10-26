@@ -9,7 +9,7 @@ namespace Overpower.EditorTools
     /// <summary>Bakes the current commit hash into a Resources text asset before every build, so a
     /// Player - which ships with no .git folder to read from - can still stamp its telemetry session
     /// line with the commit it was built from. MatchTelemetry.ReadCommitHash reads this exact file
-    /// back at runtime via Resources.Load; GitCommitReader (Assets/scripts/Telemetry, shared with the
+    /// back at runtime via Resources.Load; GitCommitReader (Assets/_Project/Code/Runtime/Telemetry, shared with the
     /// Editor path) is the one place that actually parses .git.
     ///
     /// The output file is a build artifact, not source - it goes stale the moment someone pulls

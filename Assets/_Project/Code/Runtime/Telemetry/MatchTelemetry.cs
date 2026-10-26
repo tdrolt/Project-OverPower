@@ -24,7 +24,7 @@ namespace Overpower.Telemetry
     /// key, so two masters racing during a migration cannot both win even inside the re-check's race window
     /// (TryClaimMatchIdentity). A plain write is the fallback if mId never echoes back (ClaimMatchIdentityWhenClockIsReady).
     ///
-    /// Deleting Assets/scripts/Telemetry removes this whole component and the game still runs (design doc, Principle 1): nothing
+    /// Deleting Assets/_Project/Code/Runtime/Telemetry removes this whole component and the game still runs (design doc, Principle 1): nothing
     /// outside this folder depends on it existing.
     /// </summary>
     [DisallowMultipleComponent]

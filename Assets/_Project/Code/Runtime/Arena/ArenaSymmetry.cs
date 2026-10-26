@@ -29,7 +29,7 @@ namespace Overpower.Arena
     /// ActiveBounds, IsInsideArena) for blink, portals and the out-of-arena safety net - the smaller, playable one
     /// while a corner is closed (UsePlayableBounds), the full one otherwise - and adds ArenaPhaseTwoCut, which builds
     /// and removes the phase-two wall. Everything else it stores is read by the Editor tool
-    /// (Assets/scripts/Editor/Arena/ArenaSymmetryBuilder.cs).
+    /// (Assets/_Project/Code/Editor/Arena/ArenaSymmetryBuilder.cs).
     /// </summary>
     public class ArenaSymmetry : MonoBehaviour
     {

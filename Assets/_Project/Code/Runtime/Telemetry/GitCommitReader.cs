@@ -7,7 +7,7 @@ namespace Overpower.Telemetry
 {
     /// <summary>Reads the current commit hash straight out of .git, with no `git` subprocess (slow, and not on PATH on every machine).
     /// Two callers must never fall out of sync: MatchTelemetry's session header (Editor play mode) and BuildInfoWriter's pre-build step
-    /// (Assets/scripts/Editor/Telemetry), which bakes the hash into a Resources text asset so a Player build, which has no .git, can
+    /// (Assets/_Project/Code/Editor/Telemetry), which bakes the hash into a Resources text asset so a Player build, which has no .git, can
     /// still stamp its header (MatchTelemetry.ReadCommitHash). In the Runtime assembly under #if UNITY_EDITOR because MatchTelemetry
     /// (Runtime) cannot reference Overpower.Editor; the class does not exist in a Player build.</summary>
     public static class GitCommitReader

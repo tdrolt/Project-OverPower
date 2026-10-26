@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 namespace Overpower.Data
 {
     /// <summary>
-    /// The whole tuning surface for match telemetry. Turning Enabled off (or deleting Assets/scripts/Telemetry
+    /// The whole tuning surface for match telemetry. Turning Enabled off (or deleting Assets/_Project/Code/Runtime/Telemetry
     /// entirely - the design doc's Principle 1) is the whole kill switch: no other system reads or writes anything
     /// under this asset's control.
     /// </summary>

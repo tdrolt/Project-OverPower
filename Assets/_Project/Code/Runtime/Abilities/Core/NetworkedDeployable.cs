@@ -9,7 +9,7 @@ namespace Overpower.Abilities
     /// <summary>
     /// The shared base for every ability that leaves a real networked object behind (portal, mine, cover wall, fence,
     /// zone) instead of a local RPC-rebuilt one: a player who joins while it still stands must see it, which only
-    /// PhotonNetwork.Instantiate gives (see FireField's class comment, Assets/scripts/Weapons).
+    /// PhotonNetwork.Instantiate gives (see FireField's class comment, Assets/_Project/Code/Runtime/Weapons).
     /// OnPhotonInstantiate resolves OwnerActor/OwnerTeam from info.Sender, never PhotonNetwork.LocalPlayer, which in
     /// that callback is the RECEIVER. OnPlaced (every client, a late joiner's cache replay included) is the subclass hook.
     ///

@@ -23,7 +23,7 @@ namespace Overpower.Tests
         public void TheReportDrawsEachTeamInTheGamesColour()
         {
             var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            string source = System.IO.File.ReadAllText("Assets/scripts/Editor/Telemetry/HtmlReportWriter.cs");
+            string source = System.IO.File.ReadAllText("Assets/_Project/Code/Editor/Telemetry/HtmlReportWriter.cs");
             var list = System.Text.RegularExpressions.Regex.Match(source, @"var TEAM_COLORS = \[([^\]]*)\]");
             Assert.IsTrue(list.Success, "the report's team colour list");
             var hexes = System.Text.RegularExpressions.Regex.Matches(list.Groups[1].Value, "#([0-9a-fA-F]{6})");

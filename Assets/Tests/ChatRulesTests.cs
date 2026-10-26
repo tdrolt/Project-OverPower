@@ -118,7 +118,7 @@ namespace Overpower.Tests
             string scene = System.IO.File.ReadAllText("Assets/Scenes/Game Scene.unity");
             StringAssert.DoesNotContain("to chat", scene, "the pixel-font hint was removed; the chat's own input box is the only hint");
             StringAssert.DoesNotContain("m_Name: chattext", scene);
-            string screen = System.IO.File.ReadAllText("Assets/scripts/UI/Lobby/NameScreen.cs");
+            string screen = System.IO.File.ReadAllText("Assets/_Project/Code/Runtime/UI/Lobby/NameScreen.cs");
             StringAssert.DoesNotContain("chattext", screen, "nothing switches the old hint object on any more");
         }
 
@@ -173,7 +173,7 @@ namespace Overpower.Tests
         [Test]
         public void TheChatLookNumbersLiveInTheTheme()
         {
-            string source = System.IO.File.ReadAllText("Assets/scripts/chat/chatmanager.cs");
+            string source = System.IO.File.ReadAllText("Assets/_Project/Code/Runtime/Chat/chatmanager.cs");
             StringAssert.DoesNotContain("15f / 255f", source);
             StringAssert.DoesNotContain("new Vector2(18f, 0f)", source);
             StringAssert.DoesNotContain("new Vector2(1.5f, 1.5f)", source);

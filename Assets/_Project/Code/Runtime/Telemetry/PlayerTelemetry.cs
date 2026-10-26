@@ -17,7 +17,7 @@ namespace Overpower.Telemetry
     /// MatchTelemetry.Instance.Log, which no-ops when telemetry is off or the file never opened - this class never checks that itself.
     ///
     /// REMOTE COPIES DO NOTHING: Awake disables the component when photonView.IsMine is false, before any GetComponent call or
-    /// subscription runs. Deleting Assets/scripts/Telemetry leaves the game running (design doc, Principle 1).
+    /// subscription runs. Deleting Assets/_Project/Code/Runtime/Telemetry leaves the game running (design doc, Principle 1).
     ///
     /// ALLOCATION: one TelemetryLine is reused for every event; the shots/dots accumulators are reset in place on every flush; event-name
     /// strings come from static arrays instead of Enum.ToString(). The only per-frame work is two cheap bool reads in Update's polling
