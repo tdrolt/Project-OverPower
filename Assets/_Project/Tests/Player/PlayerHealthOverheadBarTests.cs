@@ -98,5 +98,33 @@ namespace Overpower.Tests
 
             Assert.IsTrue(barGo.activeSelf);
         }
+
+        // Max health is 100 here (no GameplayConfig), so 25 armour is a quarter of the bar whatever the armour's capacity.
+        private Image DrawWithArmour(float current, float capacity)
+        {
+            var pool = new Overpower.Combat.ArmorState(capacity, 6f, 3f);
+            pool.Absorb(capacity - current);
+            SetField("armor", pool);
+            typeof(PlayerHealth).GetMethod("UpdateOverheadBar", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(health, null);
+            return barGo.transform.Find("Shield Fill").GetComponent<Image>();
+        }
+
+        [Test]
+        public void FullBaseArmourCoversAsMuchOfThePlateBarAsItsHitPoints()
+        {
+            Assert.AreEqual(0.25f, DrawWithArmour(25f, 25f).fillAmount, 1e-4f);
+        }
+
+        [Test]
+        public void HalfBaseArmourCoversHalfThat()
+        {
+            Assert.AreEqual(0.125f, DrawWithArmour(12.5f, 25f).fillAmount, 1e-4f);
+        }
+
+        [Test]
+        public void NoArmourToHoldHidesTheShieldFill()
+        {
+            Assert.IsFalse(DrawWithArmour(0f, 0f).enabled);
+        }
     }
 }

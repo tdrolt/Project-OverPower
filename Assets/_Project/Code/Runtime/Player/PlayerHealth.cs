@@ -31,8 +31,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     [SerializeField, Tooltip("The shield (armor) fill on the overhead HealthBarCanvas, same rect " +
              "as the health fill but drawn AFTER it in the hierarchy so it renders on top - " +
-             "Tudor's call [T]: one bar, shield drawn over health, each against its own max. A " +
-             "full shield hides max HP on purpose. Fraction is armor / armor capacity.")]
+             "Tudor's call [T]: one bar, shield drawn over health. The shield is measured in the same hit " +
+             "points as health (HealthArmourBar): armour worth a quarter of max health covers a quarter of the bar.")]
     private Image shieldFillImage;
 
     [SerializeField, Tooltip("The static backing behind both fills on the overhead HealthBarCanvas. " +
@@ -378,20 +378,17 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         }
     }
 
-    /// <summary>The one place both overhead fills are written: shield drawn OVER health, each fill against its OWN max
-    /// (health/maxHealth, armor/ArmorCapacity), so a full shield hides max HP by design. Skips an unchanged
-    /// fillAmount: the recharge tick calls this every frame armor is not full, and a filled Image write is not
-    /// free.</summary>
+    /// <summary>The one place both overhead fills are written: shield drawn OVER health, both in hit points of max health
+    /// (HealthArmourBar, the HUD's rule too). The shield has no empty track of its own here: the health under it shows
+    /// through. Skips an unchanged fillAmount: the recharge tick calls this every frame armor is not full, and a filled
+    /// Image write is not free.</summary>
     private void UpdateOverheadBar()
     {
-        float maxHealth = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
-        float healthFraction = maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
-
-        float capacity = armor.Capacity;
-        // Guarded against a capacity of 0 (no armor upgrade bought yet) - dividing by it would be
-        // a NaN fillAmount, which Unity's UI renders as an empty-looking bar anyway but for the
-        // wrong reason.
-        float shieldFraction = capacity > 0f ? Mathf.Clamp01(armor.Current / capacity) : 0f;
+        HealthArmourBar.Lengths bar = HealthArmourBar.Compute(health, MaxHealth, armor.Current, armor.Capacity);
+        float healthFraction = bar.health;
+        float shieldFraction = bar.armour;
+        if (shieldFillImage != null)
+            shieldFillImage.enabled = bar.armourShown;
 
         if (healthFillImage != null && !Mathf.Approximately(healthFraction, lastHealthFraction))
         {

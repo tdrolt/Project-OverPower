@@ -431,25 +431,26 @@ namespace Overpower.UI
 
             // Read live from the same asset PlayerHealth uses, so retuning it in Play Mode moves the HUD at once.
             float maxHealth = gameplayConfig != null ? gameplayConfig.MaxHealth : 100f;
+            HealthArmourBar.Lengths bar = HealthArmourBar.Compute(playerHealth.Health, maxHealth, playerHealth.Armor, playerHealth.ArmorCapacity);
 
-            float healthFraction = maxHealth > 0f ? Mathf.Clamp01(playerHealth.Health / maxHealth) : 0f;
+            float healthFraction = bar.health;
             if (!Mathf.Approximately(healthFraction, lastHealthFraction))
             {
                 healthFill.fillAmount = healthFraction;
                 lastHealthFraction = healthFraction;
             }
 
-            // The armor TRACK's visible width scales with capacity (BuildArmorBar says why).
-            float capacity = playerHealth.ArmorCapacity;
-            float trackWidth = theme.barWidth - 4f; // matches the 2px margin baked into BuildArmorBar on each side.
-            float extentWidth = maxHealth > 0f ? Mathf.Clamp01(capacity / maxHealth) * trackWidth : 0f;
+            // The armour row draws only as far as the armour this player can hold (BuildArmorBar), plus the 2px margins.
+            if (armorExtentRect.gameObject.activeSelf != bar.armourShown)
+                armorExtentRect.gameObject.SetActive(bar.armourShown);
+            float extentWidth = bar.armourTrack * (theme.barWidth - 4f) + 4f;
             if (!Mathf.Approximately(extentWidth, lastArmorExtentWidth))
             {
                 armorExtentRect.sizeDelta = new Vector2(extentWidth, armorExtentRect.sizeDelta.y);
                 lastArmorExtentWidth = extentWidth;
             }
 
-            float armorFraction = capacity > 0f ? Mathf.Clamp01(playerHealth.Armor / capacity) : 0f;
+            float armorFraction = bar.armourOfTrack;
             if (!Mathf.Approximately(armorFraction, lastArmorFraction))
             {
                 armorFill.fillAmount = armorFraction;
@@ -918,9 +919,8 @@ namespace Overpower.UI
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
             ventBandImage = BuildVentBand(overheatTrack.transform);
             armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
-            // armorExtentRect.parent is the armor bar's TRACK root: the frame goes there, not on the extent, so it covers
-            // the WHOLE bar rather than shrinking with a part-empty capacity.
-            armorImmuneFrame = BuildImmuneFrame(armorExtentRect.parent);
+            // On the extent, the only part of the armour row that is drawn: a frame round the whole row would box empty space.
+            armorImmuneFrame = BuildImmuneFrame(armorExtentRect);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
             healthImmuneFrame = BuildImmuneFrame(healthFill.transform.parent);
 
@@ -1282,11 +1282,11 @@ namespace Overpower.UI
             return bandImg;
         }
 
-        /// <summary>A fixed-width track holding a "capacity extent" rectangle whose WIDTH is set live from script
-        /// (UpdateHealthAndArmor), not by a layout group, which sidesteps layout-rebuild timing (a plain child's
-        /// sizeDelta takes effect at once). Inside it, an ordinary fill shows current armor against its capacity. The
-        /// width scales with capacity relative to max health (same hit-point scale), so an armor pool as big as max
-        /// health fills the track and "+Absorb twice" reads as a visibly bigger segment, not a fuller small one.</summary>
+        /// <summary>An invisible row as wide as the health bar, holding the drawn track ("Capacity Extent") whose WIDTH is set
+        /// live from script (UpdateHealthAndArmor), not by a layout group, which sidesteps layout-rebuild timing (a plain
+        /// child's sizeDelta takes effect at once). The track is as long as the armour this player can hold, in the health
+        /// bar's hit points (HealthArmourBar), so full armour always looks full and "+Absorb twice" reads as a longer bar.
+        /// The row keeps its height with no armour, so the HUD does not jump when armour is bought.</summary>
         private Image BuildArmorBar(Transform parent, out RectTransform extentRect)
         {
             GameObject track = new GameObject("Armor Bar", typeof(RectTransform));
@@ -1294,10 +1294,7 @@ namespace Overpower.UI
             LayoutElement le = track.AddComponent<LayoutElement>();
             le.preferredWidth = theme.barWidth;
             le.preferredHeight = theme.armorBarHeight;
-            // panelLayout's child control is ON (BuildUi): this LayoutElement alone is the track's size.
-            Image background = track.AddComponent<Image>();
-            background.color = theme.barTrackColor;
-            background.raycastTarget = false;
+            // panelLayout's child control is ON (BuildUi): this LayoutElement alone is the row's size.
 
             GameObject extentGo = new GameObject("Capacity Extent", typeof(RectTransform));
             extentGo.transform.SetParent(track.transform, false);
@@ -1305,16 +1302,19 @@ namespace Overpower.UI
             extentRect.anchorMin = new Vector2(0f, 0f);
             extentRect.anchorMax = new Vector2(0f, 1f);
             extentRect.pivot = new Vector2(0f, 0.5f);
-            extentRect.anchoredPosition = new Vector2(2f, 0f);
-            extentRect.sizeDelta = new Vector2(0f, -4f); // Width set live; height = track height minus the 2px top/bottom margin.
+            extentRect.anchoredPosition = Vector2.zero;
+            extentRect.sizeDelta = Vector2.zero; // Width set live; full row height.
+            Image background = extentGo.AddComponent<Image>();
+            background.color = theme.barTrackColor;
+            background.raycastTarget = false;
 
             GameObject fillGo = new GameObject("Fill", typeof(RectTransform));
             fillGo.transform.SetParent(extentGo.transform, false);
             RectTransform fillRt = fillGo.GetComponent<RectTransform>();
             fillRt.anchorMin = Vector2.zero;
             fillRt.anchorMax = Vector2.one;
-            fillRt.offsetMin = Vector2.zero;
-            fillRt.offsetMax = Vector2.zero;
+            fillRt.offsetMin = new Vector2(2f, 2f);
+            fillRt.offsetMax = new Vector2(-2f, -2f);
             Image fillImg = fillGo.AddComponent<Image>();
             fillImg.color = theme.shieldColor;
             // See BuildBar's comment: sprite before type, or fillAmount is ignored.
