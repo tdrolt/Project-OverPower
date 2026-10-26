@@ -52,7 +52,7 @@ namespace Overpower.Weapons
         private LayerMask burnMask = ~0;
 
         [Header("Look (visual only)")]
-        [SerializeField, Tooltip("The floor flames and their embers (a child particle system, the Flamethrower's soft fire puffs). " +
+        [SerializeField, Tooltip("The floor flames and their embers (a child particle system, the Flamethrower's flickering fire, standing up, with their hearts in the Flame Core child). " +
                  "They rise from the whole circle of Radius when the field lights, catching one after another, in the fire colours of the " +
                  "UiTheme; how many and how fast each catches come from its Arena Look; their size and growth, life and upward drift are " +
                  "authored here.")]
@@ -201,7 +201,7 @@ namespace Overpower.Weapons
                 bool laidOut = theme != null && theme.arenaLook != null;
                 flames.gameObject.SetActive(laidOut);
                 if (laidOut)
-                    FlameLook.ApplyFloor(flames, radius, LookColours.FireCore(theme), fire, LookColours.FireTip(theme), theme.arenaLook);
+                    FlameLook.ApplyFloor(flames, radius, FlameLook.Colours(theme, fire), theme.arenaLook);
             }
 
             if (rim != null)

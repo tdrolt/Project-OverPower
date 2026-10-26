@@ -2186,12 +2186,28 @@ namespace Overpower.UI
         [Tooltip("The grey of every movement ability (Dash, Blink, Sprint, the Zip Gun and the Teleport rings): their streaks, shards, speed-lines, cable and rings. The Arena Look's Movement Team Tint mixes a little of the caster's team colour into it, so others can tell whose dash it was while it still reads as movement and never as the gold Shield. Kept clearly brighter than the neutral zone lines, so an effect never sinks into the floor grid.")]
         [UnityEngine.Serialization.FormerlySerializedAs("movementSilverColor")]
         public Color movementGreyColor = new Color(0.76f, 0.77f, 0.78f, 1f);
-        [Tooltip("The white-hot heart of fire: the middle of the Flamethrower's flames and embers and of the Rocket Cursor's burning ground. Nearly white on purpose, so fire never reads as the orange team or the gold of the Shield.")]
-        public Color fireCoreColor = new Color(1f, 0.98f, 0.88f, 1f);
-        [Tooltip("The pale hot yellow of fire's outer parts: the Flamethrower's flat fan, the yellow each flame turns soon after it is born (half-way to the tip colour), and the edges of the Rocket Cursor's burning ground. Keep it pale and a little warmer than the Shield's gold: a deeper or a gold-coloured yellow reads as the Shield, an orange as the orange team.")]
-        public Color fireEdgeColor = new Color(1f, 0.88f, 0.6f, 1f);
-        [Tooltip("The warm yellow-amber at the tips of fire: each flame of the Flamethrower and of the Rocket Cursor's burning ground turns this colour as it burns out and fades away. Deeper than the edge colour so the fire reads warm, but keep it clearly paler than the orange team and off the Shield's gold.")]
-        public Color fireTipColor = new Color(1f, 0.72f, 0.36f, 1f);
+        [Tooltip("The glowing yellow-orange heart of fire: the hot end of the Flamethrower's embers and of the Rocket Cursor's burning ground's embers. Keep it paler than the orange team and well off the Shield's gold, toward orange.")]
+        public Color fireCoreColor = new Color(1f, 0.7f, 0.33f, 1f);
+        [Tooltip("The orange-red of fire as it is seen: the Flamethrower's flat fan on the floor and the cool end of the embers. Keep it on the red side of the orange team (a plain or yellower orange reads as the team) and well off the Shield's gold.")]
+        public Color fireEdgeColor = new Color(1f, 0.38f, 0.1f, 1f);
+        [Tooltip("Each flame's colour over its life, from left (born) to right (burnt out), for the Flamethrower's jet and the Rocket Cursor's burning ground: it tints the flame sheet, whose own red rim and yellow inner tongue show through. Keep it at or below plain colour (the Arena Look's Flame Body Glow scales it): a body brighter than white washes out to cream and reads as smoke. Its alpha fades the flame out.")]
+        public Gradient fireBodyOverLife = FireRamp(
+            new[] { new GradientColorKey(new Color(1f, 0.571f, 0.242f), 0f), new GradientColorKey(new Color(0.934f, 0.462f, 0.185f), 0.35f),
+                    new GradientColorKey(new Color(0.877f, 0.414f, 0.167f), 0.62f), new GradientColorKey(new Color(0.781f, 0.341f, 0.148f), 0.82f),
+                    new GradientColorKey(new Color(0.372f, 0.148f, 0.097f), 1f) },
+            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.35f), new GradientAlphaKey(0.5f, 0.62f), new GradientAlphaKey(0f, 0.82f), new GradientAlphaKey(0f, 1f) });
+        [Tooltip("The colour over its life of each flame's hot heart, drawn over the flame with light added, from left (born) to right (burnt out). The Arena Look's Flame Glow lifts it past white so it blooms: only the heart glows, the flame around it keeps its orange-red. Its alpha fades the heart out before the flame.")]
+        public Gradient fireCoreOverLife = FireRamp(
+            new[] { new GradientColorKey(new Color(1f, 0.701f, 0.332f), 0f), new GradientColorKey(new Color(0.827f, 0.485f, 0.19f), 0.5f),
+                    new GradientColorKey(new Color(0.455f, 0.206f, 0.061f), 0.85f), new GradientColorKey(Color.black, 1f) },
+            new[] { new GradientAlphaKey(0.8f, 0f), new GradientAlphaKey(0.6f, 0.5f), new GradientAlphaKey(0.15f, 0.85f), new GradientAlphaKey(0f, 1f) });
+
+        private static Gradient FireRamp(GradientColorKey[] colours, GradientAlphaKey[] alphas)
+        {
+            var ramp = new Gradient();
+            ramp.SetKeys(colours, alphas);
+            return ramp;
+        }
         [Tooltip("The red of damage: the Raybeam and the Electric Fence's arcs. Red, because green reads as healing.")]
         public Color dangerColor = new Color(1f, 0.18f, 0.15f, 1f);
         [Tooltip("The white of a hit or a shot leaving: every gun's impact flash, the rocket's shockwave ring and a mine's blast, the muzzle flash, the Bounce ricochet chevron (all drawn brighter by the Arena Look's Gun Flash Glow) and the white-hot core of a bullet.")]

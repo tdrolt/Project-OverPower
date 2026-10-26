@@ -9,7 +9,7 @@ namespace Overpower.Abilities
     /// The flamethrower's cone: flames jetting from the gun (the Flame Tongues child, laid out by FlameLook) and a faint flat fan on the
     /// floor over exactly ConeFilter.IsWithinCone's shape, with an aiming outline. Visual only; Place runs every physics step, allocating nothing.
     /// TRAPS: the fan needs Flame Cone.mat (Particles/Unlit), since URP/Unlit (Glass.mat, shared by mine, portal and fence) ignores vertex
-    /// colours; a flat fill in the fire's colour vanishes into the ground, so Core Colour pushes the tip to pale yellow-white; one outer vertex
+    /// colours; a flat fill in the fire's colour vanishes into the ground, so Core Colour lifts the tip to the fire's paler heart; one outer vertex
     /// ring makes the radial fade a step, so Radial Rings gives it real vertices.
     /// </summary>
     public sealed class FlameConeVisual : MonoBehaviour
@@ -20,8 +20,9 @@ namespace Overpower.Abilities
                  "drawn with Flame Cone.mat (Particles/Unlit - plain Unlit never shows a mesh's vertex colours).")]
         private MeshFilter fan;
 
-        [SerializeField, Tooltip("The flames and embers that jet from the gun (a child particle system; the flames draw as soft fire " +
-                 "puffs with the Arena Look's Flame Jet Material, the embers with its Fx Additive). They leave from the gun's muzzle every " +
+        [SerializeField, Tooltip("The flames and embers that jet from the gun (a child particle system; the flames draw as flickering " +
+                 "fire with the Arena Look's Flame Jet Material, their hearts (the Flame Core child) with its Flame Core Material, the " +
+                 "embers with its Fx Additive). They leave from the gun's muzzle every " +
                  "physics step and stream level over the real Cone Range and Cone Angle; how many, how wide, how fast they slow, how far they " +
                  "fly and rise, and their colours come from the Arena Look and the UiTheme. Authored here: one life for every flame (the " +
                  "longest Start Lifetime) and the smallest flame's share of the biggest (Start Size).")]
@@ -37,13 +38,11 @@ namespace Overpower.Abilities
                  "against the floor - this is a secondary knob, not the primary fix.")]
         private float tipAlpha = 0.45f;
 
-        [SerializeField, Tooltip("Colour at the very tip, under the caster - pushed toward hot, pale yellow-white rather than more " +
-                 "orange (a plain-orange flame sits too close to the orange team's owned ground " +
-                 "for alpha alone to separate from it - a real flame also reads hottest and palest at its base). " +
-                 "Blends toward the fire colour of the look table across the fan, so the far half reads as the " +
-                 "pale hot yellow of fire fading to nothing. Alpha on this field is unused - Tip Alpha above is the " +
+        [SerializeField, Tooltip("Colour at the very tip, under the caster: the fire's hot yellow-orange heart, paler than the orange " +
+                 "team's owned ground (a real flame also reads hottest and palest at its base). Blends toward the orange-red fire colour " +
+                 "of the look table across the fan, fading to nothing. Alpha on this field is unused - Tip Alpha above is the " +
                  "only opacity control.")]
-        private Color coreColor = new Color(1f, 0.95f, 0.78f, 1f);
+        private Color coreColor = new Color(1f, 0.7f, 0.33f, 1f);
 
         [SerializeField, Range(1, 12), Tooltip("Concentric rings beyond the tip the fan's radial fade is built from: with only 1 (the tip and a " +
                  "single outer arc, no vertex between them), Radial Hold Fraction had no vertex to hold ANY value at " +
@@ -132,8 +131,8 @@ namespace Overpower.Abilities
             }
         }
 
-        /// <summary>Spreads the flames and embers over the real cone in the fire colours (FlameLook.Core, Edge from the Flamethrower's row of
-        /// the look table, and Tip), and dims the fan to the Arena Look's faint marker.</summary>
+        /// <summary>Spreads the flames, their hearts and the embers over the real cone in the theme's fire colours (FlameLook.Colours, the
+        /// embers' cool end from the Flamethrower's row of the look table), and dims the fan to the Arena Look's faint marker.</summary>
         public void ConfigureFire(float range, float fullAngleDegrees, UiTheme theme, int abilityId)
         {
             if (theme == null || theme.arenaLook == null)
@@ -144,7 +143,7 @@ namespace Overpower.Abilities
             if (tongues == null)
                 return;
             jetSystems ??= tongues.GetComponentsInChildren<ParticleSystem>(true);
-            FlameLook.Apply(tongues, range, fullAngleDegrees, FlameLook.Core(theme), FlameLook.Edge(theme, abilityId), FlameLook.Tip(theme), look);
+            FlameLook.Apply(tongues, range, fullAngleDegrees, FlameLook.Colours(theme, FlameLook.Edge(theme, abilityId)), look);
         }
 
         /// <summary>Tip on the floor under <paramref name="apex"/>, opening along <paramref name="forward"/>'s flat direction; the flames

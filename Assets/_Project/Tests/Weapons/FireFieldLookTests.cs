@@ -29,37 +29,51 @@ namespace Overpower.Tests
         {
             var root = new GameObject("floor flames test");
             var embersGo = new GameObject("Embers");
+            var coreGo = new GameObject(FlameLook.CoreChildName);
             ArenaLook look = ScriptableObject.CreateInstance<ArenaLook>();
             var soft = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
             try
             {
                 embersGo.transform.SetParent(root.transform, false);
+                coreGo.transform.SetParent(root.transform, false);
                 ParticleSystem flames = root.AddComponent<ParticleSystem>();
                 ParticleSystem embers = embersGo.AddComponent<ParticleSystem>();
+                ParticleSystem hearts = coreGo.AddComponent<ParticleSystem>();
                 look.fireFieldFlamesPerSquareMetre = 9f;
                 look.fireFieldEmbersPerSquareMetre = 3f;
                 look.fireFieldFlameOpacity = 0.6f;
                 look.flameJetMaterial = soft;
+                look.flameLean = 8f;
                 ParticleSystem.MainModule size = flames.main;
                 size.startSize = new ParticleSystem.MinMaxCurve(0.4f, 0.8f);
-                var core = new Color(0.61f, 0.62f, 0.63f, 1f);
-                var edge = new Color(0.71f, 0.72f, 0.73f, 1f);
-                var tip = new Color(0.5f, 0.4f, 0.3f, 1f);
-                FlameLook.ApplyFloor(flames, 2.5f, core, edge, tip, look);
+                var body = new Gradient();
+                body.SetKeys(new[] { new GradientColorKey(new Color(0.61f, 0.32f, 0.13f), 0f), new GradientColorKey(new Color(0.3f, 0.1f, 0.05f), 1f) },
+                    new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+                FlameLook.ApplyFloor(flames, 2.5f, new FlameLook.FireColours(body, body, Color.yellow, Color.red), look);
 
                 float area = Mathf.PI * 2.5f * 2.5f;
                 Assert.AreEqual(9f * area, flames.emission.rateOverTime.constant, 1e-3f, "Flames Per Square Metre over the whole burning area");
                 Assert.AreEqual(3f * area, embers.emission.rateOverTime.constant, 1e-3f, "Embers Per Square Metre");
                 Assert.AreEqual(2.5f - 0.4f, flames.shape.radius, 1e-4f, "the flames' middles keep half the biggest flame's width in from the edge");
+                Assert.AreEqual(flames.shape.radius, hearts.shape.radius, 1e-4f, "their hearts burn on them");
+                Assert.AreEqual(flames.shape.position, hearts.shape.position);
+                Assert.AreEqual(9f * area, hearts.emission.rateOverTime.constant, 1e-3f, "one heart for every flame");
                 Assert.AreEqual(2.5f, embers.shape.radius, 1e-4f, "the embers rise from all of it");
                 Assert.AreEqual(new Color(1f, 1f, 1f, 0.6f), flames.main.startColor.color,
                     "every flame starts plain white (its colour is its age) and at most Flame Opacity solid, so whoever stands in the fire still shows through it");
-                GradientColorKey[] keys = flames.colorOverLifetime.color.gradient.colorKeys;
-                Assert.AreEqual(core, keys[0].color, "the fire's hot heart where it rises from the floor");
-                Assert.AreSame(soft, flames.GetComponent<ParticleSystemRenderer>().sharedMaterial, "the same soft fire as the Flamethrower's");
-                Assert.AreEqual(ParticleSystemRenderMode.Billboard, flames.GetComponent<ParticleSystemRenderer>().renderMode, "round puffs, never upright spikes");
-                Assert.AreEqual(2f * Mathf.PI, flames.main.startRotation.constantMax, 1e-3f, "each turned its own way");
-                Assert.IsTrue(flames.textureSheetAnimation.enabled, "each one shape of the fire sheet");
+                Color drawn = flames.colorOverLifetime.color.gradient.Evaluate(0.5f), meant = body.Evaluate(0.5f);
+                Assert.AreEqual(meant.r, drawn.r, 2e-3f, "burning through the fire's colour over life");
+                Assert.AreEqual(meant.g, drawn.g, 2e-3f);
+                Assert.AreEqual(meant.b, drawn.b, 2e-3f);
+                Assert.AreSame(soft, flames.GetComponent<ParticleSystemRenderer>().sharedMaterial, "the same fire as the Flamethrower's");
+                foreach (ParticleSystem flame in new[] { flames, hearts })
+                {
+                    Assert.AreEqual(ParticleSystemRenderMode.Billboard, flame.GetComponent<ParticleSystemRenderer>().renderMode, flame.name + ": facing the camera, standing up on its screen");
+                    Assert.AreEqual(-8f * Mathf.Deg2Rad, flame.main.startRotation.constantMin, 1e-4f, flame.name + ": straight up, leaning by up to Flame Lean");
+                    Assert.AreEqual(8f * Mathf.Deg2Rad, flame.main.startRotation.constantMax, 1e-4f, flame.name);
+                    Assert.IsFalse(flame.rotationOverLifetime.enabled, flame.name + ": and never spinning, so the tongues stay up");
+                    Assert.IsTrue(flame.textureSheetAnimation.enabled, flame.name + ": the fire sheet's frames");
+                }
                 foreach (ParticleSystem system in new[] { flames, embers })
                 {
                     ParticleSystem.Particle[] particles = Simulated(system, 1f);
@@ -100,7 +114,9 @@ namespace Overpower.Tests
                 ParticleSystem.EmissionModule emission = flames.emission;
                 emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 30) });
                 look.fireFieldFlameCatch = 0.3f;
-                FlameLook.ApplyFloor(flames, 2.5f, Color.white, Color.yellow, Color.red, look);
+                var ramp = new Gradient();
+                ramp.SetKeys(new[] { new GradientColorKey(Color.white, 0f) }, new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.6f), new GradientAlphaKey(0f, 1f) });
+                FlameLook.ApplyFloor(flames, 2.5f, new FlameLook.FireColours(ramp, ramp, Color.white, Color.yellow), look);
                 Assert.IsFalse(flames.main.prewarm, "never lit already burning");
                 Assert.AreEqual(0, flames.emission.burstCount, "no burst: the flames come one after another");
                 Gradient life = flames.colorOverLifetime.color.gradient;
@@ -207,7 +223,7 @@ namespace Overpower.Tests
                 ParticleSystem flames = field.transform.Find(FireField.FlamesChildName).GetComponent<ParticleSystem>();
                 foreach (ParticleSystem system in flames.GetComponentsInChildren<ParticleSystem>(true))
                 {
-                    float half = system == flames ? 0.5f * FlameLook.BiggestFlame(system) : 0f;
+                    float half = system.textureSheetAnimation.enabled ? 0.5f * FlameLook.BiggestFlame(flames) : 0f;
                     Assert.Greater(3.25f - half, 3.25f * 0.5f, system.name + ": its flames are small next to the ground they burn");
                     Assert.AreEqual(3.25f - half, system.shape.radius, 1e-4f, system.name + ": the radius the field was sent, less half its biggest flame");
                     Assert.AreEqual(half, system.shape.position.y, 1e-4f, system.name + ": lifted half its biggest flame off the floor");
@@ -219,15 +235,11 @@ namespace Overpower.Tests
                             $"{system.name} particle at {particle.position:F3} draws off the burning ground: its prefab moves it sideways");
                 }
                 UiTheme theme = (UiTheme)typeof(FireField).GetField("theme", Any).GetValue(fire);
-                GradientColorKey[] keys = flames.colorOverLifetime.color.gradient.colorKeys;
-                Assert.AreEqual(LookColours.FireCore(theme), keys[0].color, "the fire's own colours, not a team's");
-                Color edge = LookColours.For(LookFamily.Fire, -1, theme);
-                Color yellow = Color.Lerp(edge, LookColours.FireTip(theme), 0.5f);
-                Assert.AreEqual(yellow.g / yellow.r, keys[1].color.g / keys[1].color.r, 1e-3f, "through yellow");
-                Assert.AreEqual(LookColours.FireTip(theme).g / LookColours.FireTip(theme).r, keys[2].color.g / keys[2].color.r, 1e-3f, "to its tip");
-                var glow = new MaterialPropertyBlock();
-                flames.GetComponent<ParticleSystemRenderer>().GetPropertyBlock(glow);
-                Assert.AreEqual(theme.arenaLook.flameGlow, glow.GetColor("_BaseColor").r, 1e-3f, "the burning ground glows by Flame Glow, as the jet");
+                ParticleSystem hearts = flames.transform.Find(FlameLook.CoreChildName).GetComponent<ParticleSystem>();
+                Assert.AreEqual(theme.fireBodyOverLife.Evaluate(0.7f).g, flames.colorOverLifetime.color.gradient.Evaluate(0.7f).g, 2e-3f, "the fire's own colours, not a team's");
+                Assert.AreEqual(theme.fireCoreOverLife.Evaluate(0.7f).g, hearts.colorOverLifetime.color.gradient.Evaluate(0.7f).g, 2e-3f, "and its hearts'");
+                Assert.AreEqual(theme.arenaLook.flameBodyGlow, Glow(flames), 1e-3f, "the burning ground's flames as bright as the jet's");
+                Assert.AreEqual(theme.arenaLook.flameGlow, Glow(hearts), 1e-3f, "and their hearts glow by Flame Glow, as the jet's");
 
                 LineRenderer rim = field.transform.Find("Rim").GetComponent<LineRenderer>();
                 Assert.AreEqual(3.25f, new Vector2(rim.GetPosition(0).x, rim.GetPosition(0).y).magnitude, 1e-3f, "the rim still marks the true edge");
@@ -273,8 +285,36 @@ namespace Overpower.Tests
             Assert.IsTrue(IlWiring.Uses(typeof(FireField), "ShowLook", typeof(FlameLook).GetMethod(nameof(FlameLook.ApplyFloor))), "laid out by the tested rule");
             int applyAt = IlWiring.CallOffsets(show, typeof(FlameLook).GetMethod(nameof(FlameLook.ApplyFloor))).Single();
             Assert.IsNotEmpty(IlWiring.FieldLoadOffsets(show, radius).Where(at => at < applyAt), "with the field's radius");
-            Assert.IsTrue(IlWiring.Uses(typeof(FireField), "ShowLook", typeof(LookColours).GetMethod(nameof(LookColours.FireCore))), "in the fire colours of the theme");
-            Assert.IsTrue(IlWiring.Uses(typeof(FireField), "ShowLook", typeof(LookColours).GetMethod(nameof(LookColours.FireTip))), "to the tips of its flames");
+            Assert.IsTrue(IlWiring.Uses(typeof(FireField), "ShowLook", typeof(FlameLook).GetMethod(nameof(FlameLook.Colours))), "in the fire colours of the theme");
+        }
+
+        [Test]
+        public void TheBurningGroundsHeartsBurnOnTheirFlames()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Fire Field.prefab");
+            GameObject field = Object.Instantiate(prefab);
+            try
+            {
+                FireField fire = field.GetComponent<FireField>();
+                typeof(FireField).GetField("radius", Any).SetValue(fire, 2.5f);
+                typeof(FireField).GetMethod("ShowLook", Any).Invoke(fire, null);
+                ParticleSystem flames = field.transform.Find(FireField.FlamesChildName).GetComponent<ParticleSystem>();
+                UiTheme theme = (UiTheme)typeof(FireField).GetField("theme", Any).GetValue(fire);
+                Transform core = flames.transform.Find(FlameLook.CoreChildName);
+                Assert.IsNotNull(core, "the burning ground's flames have their hearts");
+                FlameLookTests.AssertHeartsOnFlames(flames, core.GetComponent<ParticleSystem>(), theme.arenaLook.flameCoreSize, 1.5f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(field);
+            }
+        }
+
+        private static float Glow(ParticleSystem system)
+        {
+            var block = new MaterialPropertyBlock();
+            system.GetComponent<ParticleSystemRenderer>().GetPropertyBlock(block);
+            return block.GetVector("_BaseColor").x;
         }
     }
 }

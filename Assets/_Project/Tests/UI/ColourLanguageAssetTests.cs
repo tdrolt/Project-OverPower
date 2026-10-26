@@ -8,9 +8,10 @@ using UnityEngine;
 namespace Overpower.Tests
 {
     /// <summary>The colour language on the saved assets: a team colour is a colour (white and grey mean neutral), each team is one hue in every
-    /// list that draws it, the neutral greys and whites, the fire, the reds and the golds never read as a team, fire is paler than the
-    /// Shield's gold and off its hue, the Conquest scan wave is white and the low barriers are painted as dark as the rest of the arena
-    /// with a light stripe down their top. Relations only: the colours themselves stay free to tune.</summary>
+    /// list that draws it, the neutral greys, the whites, the reds and the golds never read as a team, fire is orange-red (on the red side
+    /// of the Orange team and of the Shield's gold, and only its heart glows past white), the Conquest scan wave is white and the low
+    /// barriers are painted as dark as the rest of the arena with a light stripe down their top. Relations only: the colours themselves
+    /// stay free to tune.</summary>
     public class ColourLanguageAssetTests
     {
         private const float MinTeamSaturation = 0.4f;
@@ -20,7 +21,7 @@ namespace Overpower.Tests
         private static ArenaLook Look() => AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset");
         private static Color ScanWave() => AssetDatabase.LoadAssetAtPath<VisionConfig>("Assets/_Project/Shared/Config/VisionConfig.asset").ScanWaveColour;
 
-        // The Flamethrower fan's own white-hot tip, a second fire colour kept on the prefab.
+        // The Flamethrower fan's own hot tip under the caster, a second fire colour kept on the prefab.
         private static Color FanCore()
         {
             var cone = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
@@ -56,7 +57,24 @@ namespace Overpower.Tests
             Assert.IsTrue(ReadApart(orange, new Color(1f, 0.2f, 0.15f, 1f)), "orange and red");
             Assert.IsTrue(ReadApart(orange, new Color(1f, 0.92f, 0.5f, 1f)), "orange and a pale yellow");
             Assert.IsTrue(ReadApart(orange, Color.white), "orange and white");
+            Assert.IsTrue(RedSideOf(new Color(1f, 0.35f, 0.08f, 1f), orange), "an orange-red is on the red side of the orange");
+            Assert.IsFalse(RedSideOf(new Color(1f, 0.47f, 0.06f, 1f), orange), "the same orange is not");
+            Assert.IsFalse(RedSideOf(new Color(1f, 0.7f, 0.1f, 1f), orange), "nor a yellower one");
+            Assert.IsFalse(RedSideOf(new Color(0.4f, 0.3f, 1f, 1f), orange), "nor a blue");
         }
+
+        // A clearly redder hue than the other colour's, both being colours at all: the hue running toward red (down, wrapping at 0).
+        private static bool RedSideOf(Color a, Color b)
+        {
+            if (Sat(a) < 0.25f || Sat(b) < 0.25f)
+                return false;
+            float toward = Hue(b) - Hue(a);
+            if (toward > 180f) toward -= 360f;
+            if (toward < -180f) toward += 360f;
+            return toward >= RedderDegrees && toward <= 90f;
+        }
+
+        private const float RedderDegrees = 5f;
 
         private static (string name, Color[] colours)[] TeamLists(UiTheme t) => new[]
         {
@@ -102,21 +120,39 @@ namespace Overpower.Tests
                     Assert.IsTrue(ReadApart(neutral, t.teamShotColors[team]), $"{name} ({neutral}) reads as team {team} ({t.teamShotColors[team]})");
         }
 
-        // Fire is paler than the Shield's gold, and where it is still a colour at all it sits off the gold's hue: paleness alone reads as
-        // a lighter gold next to the shell.
+        // Fire is orange-red (Tudor, 25 October): it reads apart from every team, or sits clearly on the red side of it (the Orange team's own
+        // orange and anything yellower read as the team), and it sits on the red side of the Shield's gold, apart from it. Its heart is
+        // the palest part of it, as a flame's hottest part is.
         [Test]
-        public void FireNeverReadsAsATeamOrAsTheShieldGold()
+        public void FireIsOrangeRedApartFromTheTeamsAndTheShieldGold()
         {
             UiTheme t = Theme();
-            var fires = new[] { ("Fire Core Color", t.fireCoreColor), ("Fire Edge Color", t.fireEdgeColor), ("Fire Tip Color", t.fireTipColor), ("the Flamethrower fan's Core Color", FanCore()) };
+            var fires = new[] { ("Fire Core Color", t.fireCoreColor), ("Fire Edge Color", t.fireEdgeColor), ("the Flamethrower fan's Core Color", FanCore()) };
             foreach ((string name, Color fire) in fires)
             {
                 for (int team = 0; team < t.teamShotColors.Length; team++)
-                    Assert.IsTrue(ReadApart(fire, t.teamShotColors[team]), $"{name} ({fire}) reads as team {team} ({t.teamShotColors[team]})");
-                Assert.LessOrEqual(Sat(fire), Sat(t.immuneBarColor) - 0.25f, $"{name} ({fire}) is not clearly paler than the Shield's gold ({t.immuneBarColor})");
-                if (Sat(fire) >= 0.25f)
-                    Assert.GreaterOrEqual(HueDegreesApart(fire, t.immuneBarColor), 8f, $"{name} ({fire}) is the Shield gold's own hue ({t.immuneBarColor})");
+                    Assert.IsTrue(ReadApart(fire, t.teamShotColors[team]) || RedSideOf(fire, t.teamShotColors[team]),
+                        $"{name} ({fire}) reads as team {team} ({t.teamShotColors[team]})");
+                Assert.IsTrue(ReadApart(fire, t.immuneBarColor) && RedSideOf(fire, t.immuneBarColor), $"{name} ({fire}) is not clearly on the red side of the Shield's gold ({t.immuneBarColor})");
             }
+            Assert.Less(Sat(t.fireCoreColor), Sat(t.fireEdgeColor), "the fire's heart is paler than its orange-red");
+        }
+
+        // Fire read as bright smoke while all of it was pushed past white (bake-off, 26 October): the flames stay at or under plain colour in
+        // light and only their heart, drawn with light added, glows past white to bloom.
+        [Test]
+        public void OnlyTheFiresHeartGlowsPastWhite()
+        {
+            UiTheme t = Theme();
+            ArenaLook look = Look();
+            float body = 0f, heart = 0f;
+            for (int i = 0; i <= 50; i++)
+            {
+                body = Mathf.Max(body, t.fireBodyOverLife.Evaluate(i / 50f).linear.maxColorComponent * look.flameBodyGlow);
+                heart = Mathf.Max(heart, t.fireCoreOverLife.Evaluate(i / 50f).linear.maxColorComponent * look.flameGlow);
+            }
+            Assert.LessOrEqual(body, 1.1f, "the flames themselves never glow past white, so they never wash out to cream");
+            Assert.Greater(heart, 1.2f, "their heart does, so the fire blooms hot");
         }
 
         // The Dominion HUD gold sits right next to a team's name on the cards, so it is checked against the text colours too.

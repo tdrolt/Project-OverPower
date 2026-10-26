@@ -1,0 +1,6 @@
+q3 (readability first), built from p2's generator, palette family and additive core; 8x8 / 64 frames, outside_circle 0.0.
+Shape: p2's many small noise-cut licks became one flame of three explicit tongues (tall centre, two shorter sides) that sway and stretch on whole-loop cycles, so each sprite is a clear "campfire flame" icon even when shrunk to ~40 px.
+Edges: coarser noise, less fine erosion and a crisper alpha ramp (0.03-0.09 vs 0.02-0.14): bold silhouettes instead of ragged blobs; the base is rounded and soft so the jet's sideways flames don't stack into hard combs.
+Hot inner layer: the sheet steps from a deep-red rim to a small yellow inner tongue in the lower half, and the additive core traces it (alpha 0.8 vs 0.7), so the red-edge/hot-centre read survives at 5 m; body tint stays at or below ~1.05, only the core goes over 1.
+Particles: fewer and larger (jet 95/s vs 150, sizes 0.3-1.45 m vs 0.25-1.1; ground 42 alive vs 85, 1.2-1.8 m vs 0.9-1.4), fps 32, jitter 10 deg, and late-life tint fades earlier so the jet tail doesn't go brown-smoky.
+Trade-off: the ground fire reads instantly as fire; the jet near the nozzle is still a little busy/serrated where tiny sideways flames overlap - next try would be a lower body alpha for the first ~20% of jet life.

@@ -945,9 +945,68 @@ MonoBehaviour:
   lobbyRoomCloseCrossSize: 21
   lobbyRoomCloseCrossThickness: 3
   movementGreyColor: {r: 0.76, g: 0.77, b: 0.78, a: 1}
-  fireCoreColor: {r: 1, g: 0.98, b: 0.88, a: 1}
-  fireEdgeColor: {r: 1, g: 0.88, b: 0.6, a: 1}
-  fireTipColor: {r: 1, g: 0.72, b: 0.36, a: 1}
+  fireCoreColor: {r: 1, g: 0.7, b: 0.33, a: 1}
+  fireEdgeColor: {r: 1, g: 0.38, b: 0.1, a: 1}
+  fireBodyOverLife:
+    serializedVersion: 2
+    key0: {r: 1, g: 0.571, b: 0.242, a: 1}
+    key1: {r: 0.934, g: 0.462, b: 0.185, a: 1}
+    key2: {r: 0.877, g: 0.414, b: 0.167, a: 0.5}
+    key3: {r: 0.781, g: 0.341, b: 0.148, a: 0}
+    key4: {r: 0.372, g: 0.148, b: 0.097, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 22937
+    ctime2: 40632
+    ctime3: 53739
+    ctime4: 65535
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 22937
+    atime2: 40632
+    atime3: 53739
+    atime4: 65535
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 5
+    m_NumAlphaKeys: 5
+  fireCoreOverLife:
+    serializedVersion: 2
+    key0: {r: 1, g: 0.701, b: 0.332, a: 0.8}
+    key1: {r: 0.827, g: 0.485, b: 0.19, a: 0.6}
+    key2: {r: 0.455, g: 0.206, b: 0.061, a: 0.15}
+    key3: {r: 0, g: 0, b: 0, a: 0}
+    key4: {r: 0, g: 0, b: 0, a: 0}
+    key5: {r: 0, g: 0, b: 0, a: 0}
+    key6: {r: 0, g: 0, b: 0, a: 0}
+    key7: {r: 0, g: 0, b: 0, a: 0}
+    ctime0: 0
+    ctime1: 32768
+    ctime2: 55705
+    ctime3: 65535
+    ctime4: 0
+    ctime5: 0
+    ctime6: 0
+    ctime7: 0
+    atime0: 0
+    atime1: 32768
+    atime2: 55705
+    atime3: 65535
+    atime4: 0
+    atime5: 0
+    atime6: 0
+    atime7: 0
+    m_Mode: 0
+    m_ColorSpace: -1
+    m_NumColorKeys: 4
+    m_NumAlphaKeys: 4
   dangerColor: {r: 1, g: 0.18, b: 0.15, a: 1}
   flashWhiteColor: {r: 1, g: 1, b: 1, a: 1}
   healGreenColor: {r: 0.25, g: 1, b: 0.3, a: 1}

@@ -211,15 +211,19 @@ namespace Overpower.Tests
             var look = AssetDatabase.LoadAssetAtPath<Overpower.Arena.ArenaLook>(LookPath);
             var flames = tongues.GetComponent<ParticleSystemRenderer>();
             Assert.IsNotNull(look.flameJetMaterial, "Arena Look > Flame Jet Material");
-            Assert.AreSame(look.flameJetMaterial, flames.sharedMaterial, "the flames are soft fire puffs that keep their colour over any floor (FX Flame Jet)");
+            Assert.AreSame(look.flameJetMaterial, flames.sharedMaterial, "the flames keep their colour over any floor (FX Fire Body)");
             Assert.AreEqual("Universal Render Pipeline/Particles/Unlit", look.flameJetMaterial.shader.name, "draws the fire colours each flame is given");
             Assert.IsNotNull(look.flameJetMaterial.GetTexture("_BaseMap"), "the fire sheet");
-            Assert.AreEqual(ParticleSystemRenderMode.Billboard, flames.renderMode, "round puffs facing the camera, never stretched into spikes");
-            Assert.IsTrue(system.textureSheetAnimation.enabled, "each puff one shape of the fire sheet");
+            Assert.AreEqual(ParticleSystemRenderMode.Stretch, flames.renderMode, "flames pointing along their flight");
+            Assert.IsTrue(system.textureSheetAnimation.enabled, "each flame plays the fire sheet");
+            Transform core = tongues.Find(Overpower.Abilities.FlameLook.CoreChildName);
+            Assert.IsNotNull(core, "a 'Flame Core' child draws each flame's heart");
+            Assert.AreSame(look.flameCoreMaterial, core.GetComponent<ParticleSystemRenderer>().sharedMaterial, "with light added (FX Fire Core)");
             foreach (ParticleSystemRenderer renderer in tongues.GetComponentsInChildren<ParticleSystemRenderer>(true))
-                Assert.IsTrue(renderer.sharedMaterial == look.flameJetMaterial || renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive,
+                Assert.IsTrue(renderer.sharedMaterial == look.flameJetMaterial || renderer.sharedMaterial == look.flameCoreMaterial
+                              || renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive,
                     renderer.name + " is drawn with an FX material");
-            Assert.GreaterOrEqual(tongues.GetComponentsInChildren<ParticleSystem>(true).Length, 2, "flames and embers");
+            Assert.GreaterOrEqual(tongues.GetComponentsInChildren<ParticleSystem>(true).Length, 3, "flames, their hearts and embers");
             Assert.AreEqual("Assets/_Project/Features/Abilities/Data/Flame Cone.mat",
                 AssetDatabase.GetAssetPath(cone.transform.Find("Fan").GetComponent<MeshRenderer>().sharedMaterial), "the fan is untouched");
         }
@@ -233,10 +237,14 @@ namespace Overpower.Tests
             Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Additive.mat", AssetDatabase.GetAssetPath(look.fxAdditive));
             Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Alpha.mat", AssetDatabase.GetAssetPath(look.fxAlpha));
             Assert.IsNotNull(look.flameJetMaterial, "ArenaLook › Flame Jet Material");
-            Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Flame Jet.mat", AssetDatabase.GetAssetPath(look.flameJetMaterial));
+            Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Fire Body.mat", AssetDatabase.GetAssetPath(look.flameJetMaterial));
             Assert.AreEqual((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha, look.flameJetMaterial.GetFloat("_DstBlend"),
                 "the flames blend, so their shape's alpha keeps them inside their wedge (an opaque quad would draw outside the hit cone)");
-            foreach (Material m in new[] { look.fxAdditive, look.fxAlpha, look.flameJetMaterial })
+            Assert.IsNotNull(look.flameCoreMaterial, "ArenaLook › Flame Core Material");
+            Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Fire Core.mat", AssetDatabase.GetAssetPath(look.flameCoreMaterial));
+            Assert.AreEqual((float)UnityEngine.Rendering.BlendMode.One, look.flameCoreMaterial.GetFloat("_DstBlend"), "the flames' hearts add light, so they glow");
+            Assert.IsNotNull(look.flameCoreMaterial.GetTexture("_BaseMap"), "the heart sheet");
+            foreach (Material m in new[] { look.fxAdditive, look.fxAlpha, look.flameJetMaterial, look.flameCoreMaterial })
             {
                 Assert.AreEqual("Universal Render Pipeline/Particles/Unlit", m.shader.name, m.name + ": reads vertex colours, a URP name");
                 Assert.AreEqual(1f, m.GetFloat("_Surface"), m.name + " transparent");

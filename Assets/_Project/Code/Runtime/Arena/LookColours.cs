@@ -7,8 +7,8 @@ namespace Overpower.Arena
     /// caster's team accent that says whose an ability is.</summary>
     public static class LookColours
     {
-        /// <summary>Fire gives its pale hot yellow edge; the white-hot heart is <see cref="FireCore"/>. None gives a clear colour, since a look
-        /// with no family draws nothing.</summary>
+        /// <summary>Fire gives its orange-red; its glowing heart is <see cref="FireCore"/>. None gives a clear colour, since a look with no
+        /// family draws nothing.</summary>
         public static Color For(LookFamily family, int team, UiTheme theme)
         {
             switch (family)
@@ -26,8 +26,6 @@ namespace Overpower.Arena
         }
 
         public static Color FireCore(UiTheme theme) => theme.fireCoreColor;
-
-        public static Color FireTip(UiTheme theme) => theme.fireTipColor;
 
         /// <summary>The movement grey with Movement Team Tint of the caster's team colour mixed in: grey says movement, the tint says whose.
         /// No team known, or no Arena Look, leaves the plain grey.</summary>

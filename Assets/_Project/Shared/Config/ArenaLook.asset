@@ -110,20 +110,23 @@ MonoBehaviour:
   pulseEdgeWidth: 0.06
   pulseEdgeStrength: 0.8
   flameJetMaterial: {fileID: 2100000, guid: c1c06d0c6fb850742956c70ef59ba743, type: 2}
-  flameJetOverlap: 1.5
+  flameCoreMaterial: {fileID: 2100000, guid: f832f8e15618add48955243b90bb15fa, type: 2}
+  flameCoreSize: 0.9
+  flameFlickerFps: 32
+  flameLean: 10
+  flameJetOverlap: 1
   flameJetSpread: 0.5
   flameJetWidth: 1
-  flameJetStartSize: 0.15
+  flameJetStartSize: 0.21
   flameJetMostFlames: 150
-  flameJetSlowdown: 0.35
-  flameJetRise: 0.25
+  flameJetSlowdown: 0.4
+  flameJetRise: 0.35
   flameGlow: 2
-  flameBodyGlow: 0.7
-  flameTipGlow: 0.45
+  flameBodyGlow: 1.05
   flameEmbersPerSecond: 8
   flameJetReach: 0.75
   flameFanStrength: 0.4
-  fireFieldFlamesPerSquareMetre: 3
+  fireFieldFlamesPerSquareMetre: 3.7
   fireFieldEmbersPerSquareMetre: 1.5
   fireFieldFlameCatch: 0.3
   fireFieldFlameOpacity: 0.7

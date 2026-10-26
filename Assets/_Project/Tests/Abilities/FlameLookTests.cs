@@ -99,26 +99,52 @@ namespace Overpower.Tests
             var root = new GameObject("flame jet test");
             var embersGo = new GameObject("Embers");
             embersGo.transform.SetParent(root.transform, false);
+            var coreGo = new GameObject(FlameLook.CoreChildName);
+            coreGo.transform.SetParent(root.transform, false);
             ParticleSystem flames = root.AddComponent<ParticleSystem>();
             embersGo.AddComponent<ParticleSystem>();
+            coreGo.AddComponent<ParticleSystem>();
             return (root, flames);
         }
 
+        private static ParticleSystem CoreOf(ParticleSystem flames) => flames.transform.Find(FlameLook.CoreChildName).GetComponent<ParticleSystem>();
+
+        // Literal ramps (the theme's may be retuned freely): an orange body and a yellow heart, both fading out.
+        private static Gradient Ramp(Color born, Color dies, float startAlpha)
+        {
+            var ramp = new Gradient();
+            ramp.SetKeys(new[] { new GradientColorKey(born, 0f), new GradientColorKey(dies, 1f) },
+                new[] { new GradientAlphaKey(startAlpha, 0f), new GradientAlphaKey(startAlpha, 0.4f), new GradientAlphaKey(0f, 1f) });
+            return ramp;
+        }
+
+        private static FlameLook.FireColours TestColours() =>
+            new FlameLook.FireColours(Ramp(new Color(1f, 0.5f, 0.2f), new Color(0.4f, 0.1f, 0.05f), 1f), Ramp(new Color(1f, 0.8f, 0.3f), Color.black, 0.7f),
+                Color.yellow, Color.red);
+
+        // The glow rides in the renderer's base colour as a plain number in light (a colour set there would be read as sRGB and raised).
+        private static float Glow(ParticleSystem system)
+        {
+            var block = new MaterialPropertyBlock();
+            system.GetComponent<ParticleSystemRenderer>().GetPropertyBlock(block);
+            Vector4 glow = block.GetVector("_BaseColor");
+            Assert.AreEqual(glow.x, glow.y, 1e-5f, system.name + ": white, so the flames keep their own colours");
+            Assert.AreEqual(glow.x, glow.z, 1e-5f, system.name);
+            return glow.x;
+        }
+
         [Test]
-        public void FlameGlowRidesInTheFlamesBaseColour()
+        public void OnlyTheHeartGlowsPastWhite()
         {
             (GameObject root, ParticleSystem flames) = NewFlames();
             ArenaLook look = JetLook();
             try
             {
                 look.flameGlow = 2.5f;
-                FlameLook.Apply(flames, Range, Angle, Color.white, Color.yellow, Color.red, look);
-                var block = new MaterialPropertyBlock();
-                flames.GetComponent<ParticleSystemRenderer>().GetPropertyBlock(block);
-                Color glow = block.GetColor("_BaseColor");
-                Assert.AreEqual(2.5f, glow.r, 1e-3f, "a particle's colour stops at 1, so the glow that blooms rides in the renderer's base colour");
-                Assert.AreEqual(glow.r, glow.g, 1e-5f, "white, so the flames keep their own colours");
-                Assert.AreEqual(glow.r, glow.b, 1e-5f);
+                look.flameBodyGlow = 0.9f;
+                FlameLook.Apply(flames, Range, Angle, TestColours(), look);
+                Assert.AreEqual(0.9f, Glow(flames), 1e-3f, "the flames at Flame Body Glow, in light: a particle's colour stops at 1, so the glow rides in the renderer");
+                Assert.AreEqual(2.5f, Glow(CoreOf(flames)), 1e-3f, "their hearts at Flame Glow, so the heart alone blooms");
             }
             finally
             {
@@ -139,7 +165,7 @@ namespace Overpower.Tests
                 main.startLifetime = 0.4f; // a flame's life, so the jet is fast and dense like the shipped one
                 foreach ((float angle, Vector3 muzzle) in new[] { (Angle, Muzzle), (20f, Muzzle), (Angle, new Vector3(1.5f, 1.4f, 0.3f)), (Angle, new Vector3(0f, 1.4f, -0.4f)) })
                 {
-                    FlameLook.Apply(flames, Range, angle, Color.yellow, Color.red, Color.blue, look);
+                    FlameLook.Apply(flames, Range, angle, TestColours(), look);
                     FlameLook.AimJet(flames.GetComponentsInChildren<ParticleSystem>(true), muzzle, Range, angle, look);
                     foreach (ParticleSystem system in SimulatedSystems(flames, 0.6f))
                     {
@@ -232,61 +258,199 @@ namespace Overpower.Tests
             (GameObject root, ParticleSystem flames) = NewFlames();
             ArenaLook look = JetLook();
             var jet = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+            var heart = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
             var alpha = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
             var additive = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
             try
             {
                 look.fxAlpha = alpha;
                 look.fxAdditive = additive;
-                FlameLook.Apply(flames, Range, Angle, Color.yellow, Color.red, Color.blue, look);
+                look.flameLean = 12f;
+                look.flameFlickerFps = 27f;
+                ParticleSystem core = CoreOf(flames);
+                FlameLook.Apply(flames, Range, Angle, TestColours(), look);
                 var renderer = root.GetComponent<ParticleSystemRenderer>();
+                var coreRenderer = core.GetComponent<ParticleSystemRenderer>();
                 Assert.AreSame(alpha, renderer.sharedMaterial, "no Flame Jet material: the flames keep the see-through Fx Alpha");
+                Assert.AreSame(additive, coreRenderer.sharedMaterial, "no Flame Core material: their hearts add light with Fx Additive");
                 Assert.AreSame(additive, root.transform.Find("Embers").GetComponent<ParticleSystemRenderer>().sharedMaterial, "the embers: Arena Look > Fx Additive");
 
                 look.flameJetMaterial = jet;
-                // A prefab edit that would break the cone rule: stretched spikes, extra paths, pushed round or sped up, a fall of its own.
-                ParticleSystem.MainModule main = flames.main;
-                main.gravityModifier = -2f;
-                renderer.renderMode = ParticleSystemRenderMode.Stretch;
-                ParticleSystem.ShapeModule paths = flames.shape;
-                paths.arcSpread = 0.5f;
-                ParticleSystem.VelocityOverLifetimeModule push = flames.velocityOverLifetime;
-                push.orbitalY = 2f;
-                push.radial = 1f;
-                push.speedModifier = 2f;
-                FlameLook.Apply(flames, Range, Angle, Color.yellow, Color.red, Color.blue, look);
-                Assert.AreSame(jet, renderer.sharedMaterial, "the flames: Arena Look > Flame Jet Material, the soft fire puffs");
-                Assert.AreEqual(ParticleSystemRenderMode.Billboard, renderer.renderMode, "round puffs facing the camera, never stretched into spikes");
-                Assert.AreEqual(ParticleSystemRenderSpace.View, renderer.alignment);
-                Assert.AreEqual(ParticleSystemCurveMode.TwoConstants, flames.main.startRotation.mode, "each puff turned its own way, so no two read as one stamped pattern");
-                Assert.AreEqual(0f, flames.main.startRotation.constantMin, 1e-4f);
-                Assert.AreEqual(2f * Mathf.PI, flames.main.startRotation.constantMax, 1e-3f, "any way round");
-                ParticleSystem.TextureSheetAnimationModule sheet = flames.textureSheetAnimation;
-                Assert.IsTrue(sheet.enabled, "each puff one of the fire texture's shapes");
-                Assert.AreEqual(FlameLook.FireSheetTiles, sheet.numTilesX);
-                Assert.AreEqual(FlameLook.FireSheetTiles, sheet.numTilesY);
-                Assert.AreEqual(0f, sheet.startFrame.constantMin, 1e-4f, "picked at random");
-                Assert.Greater(sheet.startFrame.constantMax, 0.99f);
-                Assert.AreEqual(0f, sheet.frameOverTime.Evaluate(0.5f), 1e-4f, "and kept for its life, so a puff never flickers into another");
-                Assert.AreEqual(0f, flames.main.gravityModifier.constant, "no fall or rise of the prefab's own: the drift up is Flame Jet Rise alone");
-                Assert.AreEqual(0f, flames.shape.arcSpread, "paths anywhere on the spread, not on a few fixed lines");
-                Assert.AreEqual(0f, flames.velocityOverLifetime.orbitalY.constant, "never swung round the caster");
-                Assert.AreEqual(0f, flames.velocityOverLifetime.radial.constant, "nor pushed out from the aim");
-                ParticleSystem.MinMaxCurve pace = flames.velocityOverLifetime.speedModifier;
-                Assert.AreEqual(1f, pace.Evaluate(0f), 1e-3f, "full speed out of the gun");
-                Assert.AreEqual(0.4f, pace.Evaluate(1f), 1e-3f, "slowing evenly to Flame Jet Slowdown of it where it lands");
-                Assert.AreEqual(0.7f, pace.Evaluate(0.5f), 1e-3f);
-                Assert.AreEqual(ParticleSystemShapeMultiModeValue.Loop, flames.shape.arcMode, "the flames take their paths in turn");
-                Assert.AreEqual(ParticleSystemShapeMultiModeValue.Random, root.transform.Find("Embers").GetComponent<ParticleSystem>().shape.arcMode, "the embers fly anywhere");
-                Assert.AreEqual(ParticleSystemRenderMode.Billboard, root.transform.Find("Embers").GetComponent<ParticleSystemRenderer>().renderMode, "the embers stay sparks");
+                look.flameCoreMaterial = heart;
+                // A prefab edit that would break the cone rule: stretched spikes, round billboards, extra paths, pushed round or sped up, a fall of its own.
+                foreach (ParticleSystem flame in new[] { flames, core })
+                {
+                    ParticleSystem.MainModule main = flame.main;
+                    main.gravityModifier = -2f;
+                    var drawn = flame.GetComponent<ParticleSystemRenderer>();
+                    drawn.renderMode = ParticleSystemRenderMode.Billboard;
+                    drawn.lengthScale = 3f;
+                    drawn.velocityScale = 0.5f;
+                    ParticleSystem.ShapeModule paths = flame.shape;
+                    paths.arcSpread = 0.5f;
+                    ParticleSystem.VelocityOverLifetimeModule push = flame.velocityOverLifetime;
+                    push.orbitalY = 2f;
+                    push.radial = 1f;
+                    push.speedModifier = 2f;
+                    ParticleSystem.RotationOverLifetimeModule spin = flame.rotationOverLifetime;
+                    spin.enabled = true;
+                }
+                FlameLook.Apply(flames, Range, Angle, TestColours(), look);
+                Assert.AreSame(jet, renderer.sharedMaterial, "the flames: Arena Look > Flame Jet Material");
+                Assert.AreSame(heart, coreRenderer.sharedMaterial, "their hearts: Arena Look > Flame Core Material");
+                Assert.Less(coreRenderer.sortingFudge, renderer.sortingFudge, "each heart drawn over the flames, never hidden under them");
+                foreach (ParticleSystem flame in new[] { flames, core })
+                {
+                    var drawn = flame.GetComponent<ParticleSystemRenderer>();
+                    Assert.AreEqual(ParticleSystemRenderMode.Stretch, drawn.renderMode, flame.name + ": each flame points along its flight");
+                    Assert.IsTrue(drawn.freeformStretching, flame.name + ": turned on the screen, still facing the camera whichever way it flies");
+                    Assert.IsTrue(drawn.rotateWithStretchDirection, flame.name);
+                    Assert.AreEqual(1f, drawn.lengthScale, 1e-5f, flame.name + ": a square, never stretched into a spike");
+                    Assert.AreEqual(0f, drawn.velocityScale, 1e-5f, flame.name);
+                    Assert.AreEqual(0f, drawn.cameraVelocityScale, 1e-5f, flame.name);
+                    Assert.AreEqual(ParticleSystemCurveMode.TwoConstants, flame.main.startRotation.mode, flame.name + ": each leaning its own way off its flight");
+                    Assert.AreEqual(FlameLook.FlowTurn - 12f * Mathf.Deg2Rad, flame.main.startRotation.constantMin, 1e-4f, flame.name + ": by up to Flame Lean");
+                    Assert.AreEqual(FlameLook.FlowTurn + 12f * Mathf.Deg2Rad, flame.main.startRotation.constantMax, 1e-4f, flame.name);
+                    Assert.IsFalse(flame.rotationOverLifetime.enabled, flame.name + ": never spinning off its flight");
+                    ParticleSystem.TextureSheetAnimationModule sheet = flame.textureSheetAnimation;
+                    Assert.IsTrue(sheet.enabled, flame.name + ": the fire sheet's frames");
+                    Assert.AreEqual(FlameLook.FireSheetTiles, sheet.numTilesX);
+                    Assert.AreEqual(FlameLook.FireSheetTiles, sheet.numTilesY);
+                    Assert.AreEqual(ParticleSystemAnimationType.WholeSheet, sheet.animation, flame.name + ": played through the whole sheet");
+                    Assert.AreEqual(ParticleSystemAnimationTimeMode.FPS, sheet.timeMode, flame.name + ": a flicker at its own pace, whatever the flame's life");
+                    Assert.AreEqual(27f, sheet.fps, 1e-4f, flame.name + ": Flame Flicker Fps");
+                    Assert.AreEqual(0f, sheet.startFrame.constantMin, 1e-4f, flame.name + ": starting on a frame picked at random, so no two flames flicker as one");
+                    Assert.Greater(sheet.startFrame.constantMax, 0.99f, flame.name);
+                    Assert.AreEqual(0f, flame.main.gravityModifier.constant, flame.name + ": no fall or rise of the prefab's own: the drift up is Flame Jet Rise alone");
+                    Assert.AreEqual(0f, flame.shape.arcSpread, flame.name + ": paths anywhere on the spread, not on a few fixed lines");
+                    Assert.AreEqual(0f, flame.velocityOverLifetime.orbitalY.constant, flame.name + ": never swung round the caster");
+                    Assert.AreEqual(0f, flame.velocityOverLifetime.radial.constant, flame.name + ": nor pushed out from the aim");
+                    ParticleSystem.MinMaxCurve pace = flame.velocityOverLifetime.speedModifier;
+                    Assert.AreEqual(1f, pace.Evaluate(0f), 1e-3f, flame.name + ": full speed out of the gun");
+                    Assert.AreEqual(0.4f, pace.Evaluate(1f), 1e-3f, flame.name + ": slowing evenly to Flame Jet Slowdown of it where it lands");
+                    Assert.AreEqual(0.7f, pace.Evaluate(0.5f), 1e-3f, flame.name);
+                    Assert.AreEqual(ParticleSystemShapeMultiModeValue.Loop, flame.shape.arcMode, flame.name + ": the flames take their paths in turn");
+                }
+                ParticleSystem embers = root.transform.Find("Embers").GetComponent<ParticleSystem>();
+                Assert.AreEqual(ParticleSystemShapeMultiModeValue.Random, embers.shape.arcMode, "the embers fly anywhere");
+                Assert.AreEqual(ParticleSystemRenderMode.Billboard, embers.GetComponent<ParticleSystemRenderer>().renderMode, "the embers stay sparks");
+                Assert.IsFalse(embers.textureSheetAnimation.enabled, "drawn whole, never as frames of the fire sheet");
             }
             finally
             {
                 Object.DestroyImmediate(root);
                 Object.DestroyImmediate(look);
                 Object.DestroyImmediate(jet);
+                Object.DestroyImmediate(heart);
                 Object.DestroyImmediate(alpha);
                 Object.DestroyImmediate(additive);
+            }
+        }
+
+        // From straight above, the way each flame points on the floor (its frame's base-to-tongue axis) and the way it flies.
+        [Test]
+        public void EachJetFlamePointsAlongItsFlight()
+        {
+            UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
+            ArenaLook look = JetLook();
+            var eye = new GameObject("flame direction camera");
+            var mesh = new Mesh();
+            GameObject cone = null;
+            try
+            {
+                theme.arenaLook = look;
+                look.flameLean = 0f;
+                ParticleSystem tongues;
+                (cone, tongues) = SprayedCone(theme, Angle);
+                tongues.Simulate(0.8f, false, true);
+                Camera camera = eye.AddComponent<Camera>();
+                camera.enabled = false;
+                eye.transform.SetPositionAndRotation(new Vector3(0f, 40f, Range * 0.5f), Quaternion.Euler(90f, 0f, 0f));
+                tongues.GetComponent<ParticleSystemRenderer>().BakeMesh(mesh, camera, ParticleSystemBakeMeshOptions.Default);
+                Vector3[] vertices = mesh.vertices;
+                var uv = new System.Collections.Generic.List<Vector2>();
+                mesh.GetUVs(0, uv);
+                int pointing = 0, quads = 0;
+                for (int q = 0; q + 3 < vertices.Length; q += 4)
+                {
+                    // The frame's up: from the corners with the lowest v (its base) to those with the highest (its tongues).
+                    Vector3 low = Vector3.zero, high = Vector3.zero;
+                    float lowV = float.MaxValue, highV = float.MinValue;
+                    for (int k = q; k < q + 4; k++) { lowV = Mathf.Min(lowV, uv[k].y); highV = Mathf.Max(highV, uv[k].y); }
+                    for (int k = q; k < q + 4; k++)
+                    {
+                        if (uv[k].y < lowV + 1e-4f) low += vertices[k];
+                        if (uv[k].y > highV - 1e-4f) high += vertices[k];
+                    }
+                    Vector3 up = tongues.transform.TransformDirection(high - low);
+                    quads++;
+                    if (Bearing(up) > -FlameLook.JetSpread(Angle, look.flameJetSpread) && Bearing(up) < FlameLook.JetSpread(Angle, look.flameJetSpread))
+                        pointing++;
+                }
+                Assert.Greater(quads, 10, "the jet was drawn");
+                Assert.AreEqual(quads, pointing, "every flame's tongues point out along the jet, away from the gun, its base toward it");
+            }
+            finally
+            {
+                if (cone != null) Object.DestroyImmediate(cone);
+                Object.DestroyImmediate(eye);
+                Object.DestroyImmediate(mesh);
+                Object.DestroyImmediate(look);
+                Object.DestroyImmediate(theme);
+            }
+        }
+
+        // The heart is the same flame drawn again: it must fly, grow and die with it, or it glows where no flame is.
+        [Test]
+        public void EachHeartFliesWithItsFlame()
+        {
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
+            GameObject cone = Object.Instantiate(prefab);
+            UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
+            ArenaLook look = JetLook();
+            try
+            {
+                theme.arenaLook = look;
+                look.flameCoreSize = 0.8f;
+                var visual = cone.GetComponent<FlameConeVisual>();
+                visual.Configure(Range, Angle, Color.red, Color.red, true);
+                visual.ConfigureFire(Range, Angle, theme, 21);
+                visual.Place(Vector3.zero, Vector3.forward, Muzzle);
+                ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
+                ParticleSystem core = CoreOf(tongues);
+                AssertHeartsOnFlames(tongues, core, 0.8f, 1.1f);
+
+                core.Stop(false, ParticleSystemStopBehavior.StopEmittingAndClear);
+                core.randomSeed = tongues.randomSeed + 1;
+                tongues.Simulate(1.1f, false, true);
+                core.Simulate(1.1f, false, true);
+                ParticleSystem.Particle[] flames = ParticlesOf(tongues), hearts = ParticlesOf(core);
+                int n = Mathf.Min(flames.Length, hearts.Length);
+                Assert.Greater(Enumerable.Range(0, n).Max(i => Mathf.Abs(Mathf.DeltaAngle(flames[i].rotation, hearts[i].rotation))), 1f,
+                    "control: hearts from another seed lean apart from their flames");
+            }
+            finally
+            {
+                Object.DestroyImmediate(cone);
+                Object.DestroyImmediate(look);
+                Object.DestroyImmediate(theme);
+            }
+        }
+
+        public static void AssertHeartsOnFlames(ParticleSystem flames, ParticleSystem core, float coreSize, float seconds)
+        {
+            Assert.IsNotNull(core, "a Flame Core child draws the hearts");
+            flames.Simulate(seconds, false, true);
+            core.Simulate(seconds, false, true);
+            ParticleSystem.Particle[] bodies = ParticlesOf(flames), hearts = ParticlesOf(core);
+            Assert.Greater(bodies.Length, 10, "the flames burned");
+            Assert.AreEqual(bodies.Length, hearts.Length, "one heart for every flame");
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                Assert.Less(Vector3.Distance(bodies[i].position, hearts[i].position), 1e-3f, $"heart {i} sits on its flame");
+                Assert.AreEqual(bodies[i].remainingLifetime, hearts[i].remainingLifetime, 1e-4f, $"heart {i} lives as long as its flame");
+                Assert.AreEqual(coreSize * bodies[i].GetCurrentSize(flames), hearts[i].GetCurrentSize(core), 1e-3f, $"heart {i} is Flame Core Size of its flame");
+                Assert.AreEqual(bodies[i].rotation, hearts[i].rotation, 1e-3f, $"heart {i} leans with its flame");
             }
         }
 
@@ -366,47 +530,61 @@ namespace Overpower.Tests
         [Test]
         public void TheShippedFireShapeNeverDrawsOutsideItsCircle()
         {
-            // The cone rule counts on it: each cell of the fire sheet draws only inside the circle that fits its square, and fades to its
-            // edge (soft, billowing fire, never a hard-edged or pointed shape).
+            // The cone rule counts on it: each frame of both fire sheets draws only inside the circle that fits its square, whichever way the
+            // flame is turned. The flame itself reads as fire up its middle, base to tongue, over Fire Drawn Share of its size (the no-gap
+            // rules count that much), and its edge is anti-aliased, never a hard cut-out.
             var look = UnityEditor.AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset");
-            Texture shape = look.flameJetMaterial.GetTexture("_BaseMap");
-            var pixels = new Texture2D(2, 2);
-            try
+            foreach ((Material material, bool body) in new[] { (look.flameJetMaterial, true), (look.flameCoreMaterial, false) })
             {
-                Assert.IsTrue(pixels.LoadImage(System.IO.File.ReadAllBytes(UnityEditor.AssetDatabase.GetAssetPath(shape))));
-                Assert.AreEqual(TextureWrapMode.Clamp, shape.wrapMode, "a flame's edge never wraps round to the other side");
-                int cell = pixels.width / FlameLook.FireSheetTiles;
-                Assert.AreEqual(cell * FlameLook.FireSheetTiles, pixels.height, "a square sheet of Fire Sheet Tiles x Fire Sheet Tiles cells");
-                for (int cy = 0; cy < FlameLook.FireSheetTiles; cy++)
-                    for (int cx = 0; cx < FlameLook.FireSheetTiles; cx++)
-                    {
-                        int drawn = 0, soft = 0;
-                        for (int y = 0; y < cell; y++)
-                            for (int x = 0; x < cell; x++)
-                            {
-                                float a = pixels.GetPixel(cx * cell + x, cy * cell + y).a;
-                                if (a < 0.02f) continue;
-                                drawn++;
-                                if (a < 0.9f) soft++;
-                                float u = (x + 0.5f) / cell - 0.5f, v = (y + 0.5f) / cell - 0.5f;
-                                Assert.LessOrEqual(Mathf.Sqrt(u * u + v * v), 0.5f + 1f / cell, $"cell {cx},{cy} pixel {x},{y} draws outside its circle");
-                            }
-                        Assert.Greater(drawn, cell * cell / 6, $"cell {cx},{cy} draws a flame");
-                        Assert.Greater(soft, drawn / 3, $"cell {cx},{cy} fades out over a wide feathered edge, not a hard one");
-                        float middle = pixels.GetPixel(cx * cell + cell / 2, cy * cell + cell / 2).a;
-                        Assert.Greater(middle, 0.6f, $"cell {cx},{cy} is dense in its middle");
-                        for (int k = 0; k < 72; k++)
+                Assert.IsNotNull(material, body ? "Flame Jet Material" : "Flame Core Material");
+                Texture shape = material.GetTexture("_BaseMap");
+                Assert.IsNotNull(shape, material.name + " has its fire sheet");
+                var pixels = new Texture2D(2, 2);
+                try
+                {
+                    Assert.IsTrue(pixels.LoadImage(System.IO.File.ReadAllBytes(UnityEditor.AssetDatabase.GetAssetPath(shape))));
+                    Assert.AreEqual(TextureWrapMode.Clamp, shape.wrapMode, shape.name + ": a flame's edge never wraps round to the other side");
+                    int cell = pixels.width / FlameLook.FireSheetTiles;
+                    Assert.AreEqual(cell * FlameLook.FireSheetTiles, pixels.height, shape.name + ": a square sheet of Fire Sheet Tiles x Fire Sheet Tiles frames");
+                    Color32[] all = pixels.GetPixels32();
+                    float A(int x, int y) => all[y * pixels.width + x].a / 255f;
+                    for (int cy = 0; cy < FlameLook.FireSheetTiles; cy++)
+                        for (int cx = 0; cx < FlameLook.FireSheetTiles; cx++)
                         {
-                            float a = k * Mathf.PI / 36f;
-                            for (float r = 0f; r < 0.5f * FlameLook.FireDrawnShare; r += 0.5f / cell)
-                                Assert.GreaterOrEqual(pixels.GetPixel(cx * cell + (int)(cell * (0.5f + r * Mathf.Cos(a))), cy * cell + (int)(cell * (0.5f + r * Mathf.Sin(a)))).a, 0.15f,
-                                    $"cell {cx},{cy} reads as fire across Fire Drawn Share of its width");
+                            int drawn = 0, soft = 0;
+                            for (int y = 0; y < cell; y++)
+                                for (int x = 0; x < cell; x++)
+                                {
+                                    float a = A(cx * cell + x, cy * cell + y);
+                                    if (a < 0.02f) continue;
+                                    drawn++;
+                                    if (a < 0.9f) soft++;
+                                    float u = (x + 0.5f) / cell - 0.5f, v = (y + 0.5f) / cell - 0.5f;
+                                    Assert.LessOrEqual(Mathf.Sqrt(u * u + v * v), 0.5f + 1f / cell, $"{shape.name} frame {cx},{cy} pixel {x},{y} draws outside its circle");
+                                }
+                            Assert.Greater(drawn, cell * cell / 20, $"{shape.name} frame {cx},{cy} draws something");
+                            if (!body)
+                                continue;
+                            Assert.Greater(soft, drawn / 20, $"{shape.name} frame {cx},{cy} has an anti-aliased edge, not a hard cut-out");
+                            int middle = cx * cell + cell / 2, run = 0;
+                            for (int y = cell / 2; y >= 0 && A(middle, cy * cell + y) >= 0.15f; y--) run++;
+                            for (int y = cell / 2 + 1; y < cell && A(middle, cy * cell + y) >= 0.15f; y++) run++;
+                            Assert.GreaterOrEqual(run, FlameLook.FireDrawnShare * cell, $"{shape.name} frame {cx},{cy} reads as fire up its middle over Fire Drawn Share of its size");
+                            int widest = 0;
+                            for (int y = cell / 2 - cell / 16; y <= cell / 2 + cell / 16; y++)
+                            {
+                                int across = 0;
+                                for (int x = cell / 2; x >= 0 && A(cx * cell + x, cy * cell + y) >= 0.15f; x--) across++;
+                                for (int x = cell / 2 + 1; x < cell && A(cx * cell + x, cy * cell + y) >= 0.15f; x++) across++;
+                                widest = Mathf.Max(widest, across);
+                            }
+                            Assert.GreaterOrEqual(widest, FlameLook.FireDrawnWidth * cell, $"{shape.name} frame {cx},{cy} reads as fire across Fire Drawn Width of its size near its middle");
                         }
-                    }
-            }
-            finally
-            {
-                Object.DestroyImmediate(pixels);
+                }
+                finally
+                {
+                    Object.DestroyImmediate(pixels);
+                }
             }
         }
 
@@ -479,7 +657,7 @@ namespace Overpower.Tests
             try
             {
                 theme.arenaLook = look;
-                look.flameJetMostFlames = 150;
+                look.flameJetMostFlames = 2500;
                 var visual = cone.GetComponent<FlameConeVisual>();
                 visual.Configure(Range, Angle, Color.red, Color.red, true);
                 visual.ConfigureFire(Range, Angle, theme, 21);
@@ -487,15 +665,15 @@ namespace Overpower.Tests
                 float life = tongues.main.startLifetime.constantMax;
                 visual.Place(Vector3.zero, Vector3.forward, Muzzle);
                 float open = tongues.emission.rateOverTime.constant;
-                Assert.Less(open * life, 150f, "in the open the jet needs fewer, so the limit never thins it there");
+                Assert.Less(open * life, 2500f, "in the open the jet needs fewer, so the limit never thins it there");
                 foreach (Vector3 muzzle in new[] { new Vector3(0f, 1.49f, 0.05f), new Vector3(2f, 1.49f, 0.05f), new Vector3(0.3f, 1.49f, 0.1f) })
                 {
                     visual.Place(Vector3.zero, Vector3.forward, muzzle);
                     Assert.Greater(tongues.emission.rateOverTime.constant, open, $"gun at {muzzle:F2}: smaller flames, more of them");
-                    Assert.LessOrEqual(tongues.emission.rateOverTime.constant * life, 150f + 1e-3f, $"gun at {muzzle:F2}: no more than Flame Jet Most Flames alive");
-                    Assert.LessOrEqual(tongues.main.maxParticles, 151, $"gun at {muzzle:F2}: nor room kept for more, even after spraying in the open");
+                    Assert.LessOrEqual(tongues.emission.rateOverTime.constant * life, 2500f + 1e-3f, $"gun at {muzzle:F2}: no more than Flame Jet Most Flames alive");
+                    Assert.LessOrEqual(tongues.main.maxParticles, 2501, $"gun at {muzzle:F2}: nor room kept for more, even after spraying in the open");
                     tongues.Simulate(1.2f, false, true);
-                    Assert.LessOrEqual(tongues.particleCount, 151, $"gun at {muzzle:F2}: flames alive");
+                    Assert.LessOrEqual(tongues.particleCount, 2501, $"gun at {muzzle:F2}: flames alive");
                 }
             }
             finally
@@ -516,6 +694,7 @@ namespace Overpower.Tests
             {
                 theme.arenaLook = look;
                 look.flameJetSpread = 0.75f; // paths over three quarters of the cone, so the far flames reach toward its sides
+                look.flameJetMostFlames = 5000; // never the limit: the stream as the no-gap rule throws it
                 (cone, tongues) = SprayedCone(theme, Angle);
                 ParticleSystem.MainModule main = tongues.main;
                 Assert.AreEqual(ParticleSystemCurveMode.Constant, main.startLifetime.mode, "every flame lives as long, so its size says how far it has flown");
@@ -745,8 +924,8 @@ namespace Overpower.Tests
                 ParticleSystem tongues = cone.transform.Find(FlameConeVisual.TonguesChildName).GetComponent<ParticleSystem>();
                 foreach (ParticleSystem system in tongues.GetComponentsInChildren<ParticleSystem>(true))
                 {
-                    float arc = system == tongues ? FlameLook.JetSpread(71f, 0.4f) : 71f;
-                    Assert.AreEqual(arc, system.shape.arc, 1e-4f, system.name + ": the angle handed in (the flames: Flame Jet Spread of it; the embers: all of it)");
+                    float arc = system.textureSheetAnimation.enabled ? FlameLook.JetSpread(71f, 0.4f) : 71f;
+                    Assert.AreEqual(arc, system.shape.arc, 1e-4f, system.name + ": the angle handed in (the flames and their hearts: Flame Jet Spread of it; the embers: all of it)");
                     Assert.AreEqual(FlameLook.Sector(arc).y, system.shape.rotation.z, 1e-4f, system.name + ": centred on the aim");
                     Assert.AreEqual(ParticleSystemSimulationSpace.Local, system.main.simulationSpace, system.name + ": turns with the aim, so it stays in the cone");
                 }
@@ -806,8 +985,8 @@ namespace Overpower.Tests
                 foreach (ParticleSystem system in tongues.GetComponentsInChildren<ParticleSystem>(true))
                 {
                     Assert.That(Vector3.Distance(expected, system.shape.position), Is.LessThan(1e-4f), $"{system.name} leaves from the gun: {system.shape.position:F3}");
-                    if (system == tongues)
-                        continue;
+                    if (system.textureSheetAnimation.enabled)
+                        continue; // the flames and their hearts, below
                     Assert.AreEqual(travel / system.main.startLifetime.constantMax, system.main.startSpeed.constant, 1e-4f,
                         $"{system.name} flies the Arena Look's Flame Jet Reach of the way, no farther");
                 }
@@ -828,12 +1007,19 @@ namespace Overpower.Tests
                 Assert.AreEqual(widest, main.startSize.constantMax, 1e-4f, "the flames grow to the widest the jet rule allows");
                 Assert.AreEqual(shareOfWidest, main.startSize.constantMin / main.startSize.constantMax, 1e-4f, "the prefab's smallest-to-biggest share kept");
                 float drawn = widest * shareOfWidest * FlameLook.FireDrawnShare;
-                float across = FlameLook.JetAcross(FlameLook.JetSpread(Angle, 0.4f), travel / pace, drawn, 0.2f);
+                float across = FlameLook.JetAcross(FlameLook.JetSpread(Angle, 0.4f), travel / pace, widest * shareOfWidest * FlameLook.FireDrawnWidth, 0.2f);
                 float rate = FlameLook.JetRate(speed, drawn * 0.2f, 2.5f * across, life, look.flameJetMostFlames);
                 Assert.AreEqual(rate, tongues.emission.rateOverTime.constant, 1e-2f, "as many flames as an unbroken jet needs: Flame Jet Overlap, the dense part of the smallest flame as it leaves the gun at full speed");
                 Assert.GreaterOrEqual(main.maxParticles, Mathf.CeilToInt(rate * main.startLifetime.constantMax), "room for every flame alive at once");
                 Assert.AreEqual(ParticleSystemShapeMultiModeValue.Loop, tongues.shape.arcMode, "the flames' paths go round the spread in turn, never by chance");
                 Assert.AreEqual(FlameLook.JetSweep(rate, tongues.shape.arc), tongues.shape.arcSpeed.constant, 1e-3f, "each a golden share of it from the last, at this rate");
+                ParticleSystem core = CoreOf(tongues);
+                Assert.AreEqual(speed, core.main.startSpeed.constant, 1e-4f, "the hearts fly with their flames");
+                Assert.AreEqual(lift.y.constant, core.velocityOverLifetime.y.constant, 1e-4f);
+                Assert.AreEqual(rate, core.emission.rateOverTime.constant, 1e-2f, "one heart thrown with every flame");
+                Assert.AreEqual(tongues.shape.arcSpeed.constant, core.shape.arcSpeed.constant, 1e-4f, "on its path");
+                Assert.AreEqual(look.flameCoreSize * widest, core.main.startSize.constantMax, 1e-4f, "Flame Core Size of it");
+                Assert.AreEqual(main.maxParticles, core.main.maxParticles, "with room for every heart");
             }
             finally
             {
@@ -981,63 +1167,62 @@ namespace Overpower.Tests
         }
 
         [Test]
-        public void EachFlameBurnsFromTheWhiteHotHeartThroughYellowToItsTipAndFadesOut()
+        public void EachFlameAndItsHeartBurnThroughTheThemesColoursAndFadeOut()
         {
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = ScriptableObject.CreateInstance<ArenaLook>();
-            var go = new GameObject("flame colours test");
+            (GameObject root, ParticleSystem tongues) = NewFlames();
             try
             {
-                var core = new Color(0.9f, 0.8f, 0.7f, 1f);
-                var edge = new Color(0.8f, 0.6f, 0.4f, 1f);
-                var tip = new Color(0.6f, 0.3f, 0.1f, 1f);
-                theme.fireCoreColor = core;
-                theme.fireEdgeColor = edge;
-                theme.fireTipColor = tip;
+                FlameLook.FireColours test = TestColours();
+                theme.fireBodyOverLife = test.Body;
+                theme.fireCoreOverLife = test.Core;
+                theme.fireCoreColor = new Color(0.9f, 0.8f, 0.3f, 1f);
                 theme.arenaLook = look;
-                look.flameGlow = 2f;
-                look.flameBodyGlow = 0.6f;
-                look.flameTipGlow = 0.4f;
-                ParticleSystem tongues = go.AddComponent<ParticleSystem>();
-                FlameLook.Apply(tongues, Range, Angle, FlameLook.Core(theme), FlameLook.Edge(theme, 21), FlameLook.Tip(theme), look);
-                Assert.AreEqual(Color.white, tongues.main.startColor.color, "every flame starts plain white: its colour is its age");
-                Assert.IsTrue(tongues.colorOverLifetime.enabled);
-                Gradient life = tongues.colorOverLifetime.color.gradient;
-                Assert.NotNull(life);
-                AssertColour(core, life.Evaluate(0f), "the white-hot heart near the gun, at its full glow");
-                float Warmth(Color c) => c.b / Mathf.Max(1e-4f, c.r); // lower is deeper toward amber
-                Color previous = life.Evaluate(0f);
-                for (int i = 1; i <= 20; i++)
+                FlameLook.Apply(tongues, Range, Angle, FlameLook.Colours(theme, new Color(0.8f, 0.3f, 0.1f, 1f)), look);
+                foreach ((ParticleSystem flame, Gradient ramp) in new[] { (tongues, test.Body), (CoreOf(tongues), test.Core) })
                 {
-                    Color now = life.Evaluate(i / 20f);
-                    Assert.LessOrEqual(now.maxColorComponent, core.maxColorComponent + 1e-3f, $"brightest as it is born ({i / 20f:F2})");
-                    Assert.LessOrEqual(Warmth(now), Warmth(previous) + 1e-3f, $"only ever deepening toward the tip colour ({i / 20f:F2})");
-                    previous = now;
+                    Assert.AreEqual(Color.white, flame.main.startColor.color, flame.name + ": every flame starts plain white: its colour is its age");
+                    Assert.IsTrue(flame.colorOverLifetime.enabled, flame.name);
+                    Gradient life = flame.colorOverLifetime.color.gradient;
+                    for (int i = 0; i <= 10; i++)
+                        AssertColour(ramp.Evaluate(i / 10f), life.Evaluate(i / 10f), $"{flame.name} at {i / 10f:F1} of its life: the theme's colour over life");
+                    Assert.AreEqual(ramp.Evaluate(0.2f).a, life.Evaluate(0.2f).a, 1e-3f, flame.name + ": and its fade");
+                    Assert.AreEqual(0f, life.Evaluate(1f).a, 1e-4f, flame.name + ": fading out to nothing, no hard cut-off");
                 }
-                Color yellow = life.Evaluate(0.3f);
-                Assert.Less(Warmth(yellow), Warmth(edge) - 0.02f, "soon yellow: past the pale hot edge colour");
-                Assert.Greater(Warmth(yellow), Warmth(tip) + 0.02f, "but not yet the tip's");
-                for (float t = 0.3f; t <= 0.95f; t += 0.05f)
-                    Assert.LessOrEqual(life.Evaluate(t).maxColorComponent, 0.6f + 1e-3f,
-                        $"once the white-hot heart burns off a flame keeps only Flame Body Glow of the glow, so its yellow and amber are not washed to cream ({t:F2})");
-                Assert.AreEqual(Warmth(tip), Warmth(life.Evaluate(0.8f)), 0.02f, "the tip's own warm yellow-amber in the second half of its life");
-                Assert.AreEqual(0.4f * tip.maxColorComponent, life.Evaluate(1f).maxColorComponent, 0.02f,
-                    "burning out at Flame Tip Glow of the glow, so the tips never bloom to white");
-                Assert.AreEqual(0f, life.Evaluate(1f).a, 1e-4f, "fading out to nothing, no hard cut-off");
-                Assert.Greater(life.Evaluate(0.5f).a, 0.5f, "still burning half-way");
-                Assert.Less(life.Evaluate(0.9f).a, life.Evaluate(0.5f).a, "fading as it reaches the end");
+                ParticleSystem.MinMaxGradient sparks = tongues.transform.Find("Embers").GetComponent<ParticleSystem>().main.startColor;
+                AssertColour(theme.fireCoreColor, sparks.colorMin, "the embers fly from the fire's glowing heart");
+                AssertColour(new Color(0.8f, 0.3f, 0.1f, 1f), sparks.colorMax, "to the look table's fire colour");
             }
             finally
             {
-                Object.DestroyImmediate(go);
+                Object.DestroyImmediate(root);
                 Object.DestroyImmediate(look);
                 Object.DestroyImmediate(theme);
             }
 
             Assert.IsTrue(IlWiring.Uses(typeof(FlameConeVisual), nameof(FlameConeVisual.ConfigureFire), typeof(FlameLook).GetMethod(nameof(FlameLook.Apply))));
-            Assert.IsTrue(IlWiring.Uses(typeof(FlameConeVisual), nameof(FlameConeVisual.ConfigureFire), typeof(FlameLook).GetMethod(nameof(FlameLook.Tip))), "with the fire's tip colour");
+            Assert.IsTrue(IlWiring.Uses(typeof(FlameConeVisual), nameof(FlameConeVisual.ConfigureFire), typeof(FlameLook).GetMethod(nameof(FlameLook.Colours))), "in the theme's fire colours");
             Assert.IsTrue(IlWiring.Uses(typeof(FlamethrowerAbility), "ShowVfx", typeof(FlameConeVisual).GetMethod(nameof(FlameConeVisual.ConfigureFire))),
                 "each spray sizes the flames to the live cone");
+        }
+
+        [Test]
+        public void ABurningGroundsFlamesCatchWhileTheirColourKeepsItsRamp()
+        {
+            var ramp = new Gradient();
+            ramp.SetKeys(new[] { new GradientColorKey(new Color(1f, 0.5f, 0.2f), 0f), new GradientColorKey(new Color(0.5f, 0.1f, 0.05f), 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(1f, 0.5f), new GradientAlphaKey(0f, 1f) });
+            Gradient caught = FlameLook.FireOverLife(ramp, 0.3f);
+            Assert.AreEqual(0f, caught.Evaluate(0f).a, 1e-4f, "each flame catches from nothing");
+            Assert.AreEqual(0.5f, caught.Evaluate(0.15f).a, 0.02f, "swelling up evenly over the catch");
+            Assert.AreEqual(1f, caught.Evaluate(0.3f).a, 1e-3f, "and burning as the ramp says from then");
+            Assert.AreEqual(ramp.Evaluate(0.75f).a, caught.Evaluate(0.75f).a, 1e-3f);
+            for (int i = 0; i <= 10; i++)
+                AssertColour(ramp.Evaluate(i / 10f), caught.Evaluate(i / 10f), $"its colour at {i / 10f:F1} untouched");
+            Gradient whole = FlameLook.FireOverLife(ramp, 0f);
+            Assert.AreEqual(1f, whole.Evaluate(0f).a, 1e-4f, "no catch: born whole");
+            Assert.AreNotSame(ramp, whole, "a copy: the theme's own ramp is never changed by a spray");
         }
 
         private static void AssertColour(Color expected, Color actual, string what)

@@ -124,8 +124,16 @@ namespace Overpower.Arena
         [Range(0f, 1f)] public float pulseEdgeStrength = 0.8f;
 
         [Header("Flamethrower")]
-        [Tooltip("The material put on the flames of the Flamethrower each time it sprays and of the Rocket's burning ground as it lights: the Soft Fire sheet of round, billowing puffs with a dense middle and ragged, feathered edges (made by OverPower > FX > Make Soft Fire Texture), each puff turned its own way. It takes each flame's fire colour, so the same shapes serve every team.")]
+        [Tooltip("The see-through material put on the flames of the Flamethrower each time it sprays and of the Rocket's burning ground as it lights: the Fire Body sheet, 64 frames of a flame with three tongues, a red rim and a yellow inner tongue, played as a flicker (made by make_fire.py in Shared/FX/Textures/Source~). It takes each flame's colour over its life from the UiTheme, so the same frames serve every team.")]
         public Material flameJetMaterial;
+        [Tooltip("The material that adds light, put on the hot heart drawn over every flame of the Flamethrower and of the Rocket's burning ground: the Fire Core sheet, the same 64 frames' yellow inner tongue. Adding light lets the heart glow past white and bloom while the flame around it keeps its orange-red.")]
+        public Material flameCoreMaterial;
+        [Tooltip("How big each flame's hot heart is next to its flame: 1 the same size, lower keeps it inside the flame's yellow inner tongue.")]
+        [Range(0.3f, 1f)] public float flameCoreSize = 0.9f;
+        [Tooltip("How fast the flames of the Flamethrower and the Rocket's burning ground flicker, in frames of the fire sheet a second: each flame starts on a frame of its own and plays on through the sheet's 64. Lower looks lazy and slow, much higher looks like a sped-up film.")]
+        [Range(4f, 60f)] public float flameFlickerFps = 32f;
+        [Tooltip("How far each flame leans at random off the way it points, in degrees: the Flamethrower's flames point along their flight and the burning ground's straight up. 0 lines every flame up exactly, so the fire looks combed.")]
+        [Range(0f, 45f)] public float flameLean = 10f;
         [Tooltip("How many flames overlap at every point along the Flamethrower's jet: 1 is just enough for one unbroken stream from the gun to the target, more makes it thicker and brighter but costs more to draw.")]
         [Min(0.5f)] public float flameJetOverlap = 1.5f;
         [Tooltip("How much of the Flamethrower's cone the flames' paths fan out over, as a share of its angle: low keeps a tight stream whose growing flames fill the cone's sides by the end, 0.9 sends them close to its edges, where the flames must stay thin to stay inside it.")]
@@ -140,12 +148,10 @@ namespace Overpower.Arena
         [Range(0.1f, 1f)] public float flameJetSlowdown = 0.35f;
         [Tooltip("How far each of the Flamethrower's flames drifts upward over its flight, in metres, as hot fire does: the jet itself stays level at the gun's height, 0 keeps every flame exactly there.")]
         [Min(0f)] public float flameJetRise = 0.25f;
-        [Tooltip("How brightly the flames of the Flamethrower and the Rocket's burning ground glow: their colours times this. Above 1 their white-hot hearts bloom so fire reads hot, not as pale paper; 1 is the plain colours, much above 3 the jet turns into a white blob that hides the players in it.")]
+        [Tooltip("How brightly the hot heart of every flame glows, in light: its colour over life (UiTheme Fire Core Over Life) times this. Above 1 the heart blooms, so fire reads hot; much above 3 the jet turns into a white blob that hides the players in it.")]
         [Min(0f)] public float flameGlow = 2f;
-        [Tooltip("How much of Flame Glow the flames keep once their white-hot heart has burnt off, a fifth of the way through their life: only the hearts near the Flamethrower's gun and at the foot of the burning ground bloom, and the rest of the fire shows its yellow and amber. Near 1 the whole fire glows as bright as its heart and washes out to a pale cream, like steam.")]
-        [Range(0.2f, 1f)] public float flameBodyGlow = 0.7f;
-        [Tooltip("How much of Flame Glow the tips of the flames keep as they burn out and fade, at most Flame Body Glow: lower lets the tips darken to a deeper, warm yellow-amber (UiTheme Fire Tip Color) as they die, 1 keeps them as bright as the heart.")]
-        [Range(0.1f, 1f)] public float flameTipGlow = 0.45f;
+        [Tooltip("How bright the flames themselves are, in light: their colour over life (UiTheme Fire Body Over Life) times this. Keep it at or near 1: only the heart should bloom, and a body pushed past white washes out to a pale cream that reads as smoke.")]
+        [Range(0.2f, 1.5f)] public float flameBodyGlow = 1.05f;
         [Tooltip("How many embers fly from the Flamethrower's gun each second.")]
         [Min(0f)] public float flameEmbersPerSecond = 8f;
         [Tooltip("How far the middles of the Flamethrower's flames fly from the gun, as a share of the way to the end of its reach. Their soft fronts reach on past that, and the flames are kept small enough never to burn past the edge of the ground the cone burns: higher sends them farther but leaves the far flames less room to grow.")]
