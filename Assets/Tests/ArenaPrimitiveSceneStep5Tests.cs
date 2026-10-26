@@ -81,15 +81,15 @@ namespace Overpower.Tests
                     if (filter != null && filter.sharedMesh != null)
                     {
                         string meshPath = AssetDatabase.GetAssetPath(filter.sharedMesh);
-                        Assert.IsFalse(meshPath.StartsWith("Assets/Sources/"),
-                            $"'{GetPath(renderer.transform)}' still renders a mesh from Assets/Sources/ ('{meshPath}')");
+                        Assert.IsFalse(meshPath.StartsWith("Assets/ThirdParty/LowPolyFPS2/"),
+                            $"'{GetPath(renderer.transform)}' still renders a mesh from Assets/ThirdParty/LowPolyFPS2/ ('{meshPath}')");
                     }
                     foreach (Material material in renderer.sharedMaterials)
                     {
                         if (material == null) continue;
                         string materialPath = AssetDatabase.GetAssetPath(material);
-                        Assert.IsFalse(materialPath.StartsWith("Assets/Sources/"),
-                            $"'{GetPath(renderer.transform)}' still uses a material from Assets/Sources/ ('{materialPath}')");
+                        Assert.IsFalse(materialPath.StartsWith("Assets/ThirdParty/LowPolyFPS2/"),
+                            $"'{GetPath(renderer.transform)}' still uses a material from Assets/ThirdParty/LowPolyFPS2/ ('{materialPath}')");
                     }
                 }
             });
