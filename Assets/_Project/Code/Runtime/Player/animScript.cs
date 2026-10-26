@@ -4,20 +4,31 @@ using Overpower.Arena;
 using Overpower.Data;
 using Overpower.Weapons;
 
+// After PhotonAnimatorView (default order 0): on a remote copy its Update writes the streamed shoot bool, and the pose held after a shot
+// this client saw must win over a stale value in the same frame.
+[DefaultExecutionOrder(100)]
 public class animScript : MonoBehaviourPun
 {
     private static readonly int RunParam = Animator.StringToHash("run");
     private static readonly int IdleParam = Animator.StringToHash("idle");
     private static readonly int ShootParam = Animator.StringToHash("shoot");
+    // Local only: PhotonAnimatorView must not list it, each client works it out from the shot it saw.
+    private static readonly int ShootSpeedParam = Animator.StringToHash("shootSpeed");
+    private static readonly int ShootState = Animator.StringToHash("Shoot_SingleShot_AR");
 
     private Animator anim;
     public WeaponFiring weaponFiring;
     private PlayerInputRouter input;
     private PhotonView photonView;
+    private float lastShotSeen = float.NegativeInfinity;
 
-    [SerializeField, Tooltip("Where the shortest shoot pose after a shot comes from: Assets/_Project/Shared/Config/GameplayConfig.asset. " +
-             "Left empty, the mech only shows the shoot pose while the trigger is held, and a charge weapon's shot shows no pose at all.")]
+    [SerializeField, Tooltip("Where the shortest shoot pose after a shot and the shoot motion's speed-up and blend come from: " +
+             "Assets/_Project/Shared/Config/GameplayConfig.asset. Left empty, the mech only shows the shoot pose while the trigger is held, " +
+             "a charge weapon's shot shows no pose at all, and a fast gun's motion is not sped up.")]
     private GameplayConfig gameplayConfig;
+
+    [SerializeField, Tooltip("The clip the Shoot state plays; its length sets how much a fast gun speeds the shoot motion up.")]
+    private AnimationClip shootClip;
 
     void Awake()
     {
@@ -32,13 +43,25 @@ public class animScript : MonoBehaviourPun
             Debug.LogError($"[animScript] {name}: GameplayConfig is not assigned - a quick tap or a charge shot shows no shoot pose.");
     }
 
+    void OnEnable()
+    {
+        if (weaponFiring != null)
+            weaponFiring.ShotShown += OnShotShown;
+    }
+
+    void OnDisable()
+    {
+        if (weaponFiring != null)
+            weaponFiring.ShotShown -= OnShotShown;
+    }
+
     void Update()
     {
-        // Remote copies play the bools PhotonAnimatorView streams in; only the owner works them out.
-        if (!photonView.IsMine)
-            return;
-
-        ApplyParams();
+        // The owner works the bools out; remote copies play the ones PhotonAnimatorView streams in.
+        if (photonView.IsMine)
+            ApplyParams();
+        else
+            HoldRemoteShotPose();
     }
 
     private void ApplyParams()
@@ -54,5 +77,24 @@ public class animScript : MonoBehaviourPun
         anim.SetBool(RunParam, p.Run);
         anim.SetBool(IdleParam, p.Idle);
         anim.SetBool(ShootParam, p.Shoot);
+    }
+
+    // The shot's RPC usually lands before the streamed shoot bool; without this the restarted motion blends straight back out.
+    private void HoldRemoteShotPose()
+    {
+        float pose = gameplayConfig != null ? gameplayConfig.ShootPoseMinimumSeconds : 0f;
+        if (ShootMotion.HoldsPose(Time.time - lastShotSeen, pose))
+            anim.SetBool(ShootParam, true);
+    }
+
+    private void OnShotShown(float fireIntervalSeconds)
+    {
+        lastShotSeen = Time.time;
+        float clipSeconds = shootClip != null ? shootClip.length : 0f;
+        float maxSpeed = gameplayConfig != null ? gameplayConfig.ShootMotionMaxSpeed : 1f;
+        float blend = gameplayConfig != null ? gameplayConfig.ShootMotionBlendSeconds : 0f;
+
+        anim.SetFloat(ShootSpeedParam, ShootMotion.Speed(clipSeconds, fireIntervalSeconds, maxSpeed));
+        anim.CrossFadeInFixedTime(ShootState, blend, 0, 0f);
     }
 }

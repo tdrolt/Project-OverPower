@@ -244,6 +244,17 @@ namespace Overpower.Data
         [SerializeField, Min(0f)] private float shootPoseMinimumSeconds = 0.2f;
         public float ShootPoseMinimumSeconds => shootPoseMinimumSeconds;
 
+        [Tooltip("How many times faster than normal a mech's shoot motion may play on a fast gun. Every shot restarts the motion, and a " +
+                 "gun that fires faster than the motion lasts speeds it up so one motion fits between two shots. Above this cap the next " +
+                 "shot cuts the motion short instead. 1 means the motion is never sped up.")]
+        [SerializeField, Min(1f)] private float shootMotionMaxSpeed = 5f;
+        public float ShootMotionMaxSpeed => shootMotionMaxSpeed;
+
+        [Tooltip("How long, in seconds, a mech blends into its shoot motion when a shot leaves: from standing or running, and from the end " +
+                 "of the previous shot's motion back to its start. 0 snaps straight to the first frame.")]
+        [SerializeField, Min(0f)] private float shootMotionBlendSeconds = 0.05f;
+        public float ShootMotionBlendSeconds => shootMotionBlendSeconds;
+
         [Header("Debug")]
         [Tooltip("Turns the whole practice range and all of its dummy targets on or off in one " +
                  "click. Handy while tuning weapons; switch it off for a real match.")]

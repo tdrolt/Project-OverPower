@@ -14,7 +14,7 @@ namespace Overpower.Tests
         private const string ControllerPath = "Assets/ThirdParty/SciFiWarriorPBRHPPolyart/Animators/SciFiWarrior.controller";
         private const string IdleState = "Idle_gunMiddle_AR";
         private const string RunState = "Run_gunMiddle_AR";
-        private const string ShootState = "Shoot_SingleShot_AR";
+        internal const string ShootState = "Shoot_SingleShot_AR";
 
         private static AnimatorStateMachine Layer()
         {
@@ -85,6 +85,31 @@ namespace Overpower.Tests
                     Assert.AreEqual(Wanted(run, shoot), at.name, $"from {start} with run={run} shoot={shoot}");
                     Assert.IsEmpty(Open(at, run, shoot), $"{at.name} does not stay put with run={run} shoot={shoot}");
                 }
+        }
+
+        [Test]
+        public void TheShootMotionPlaysOnceAndHoldsItsLastFrame()
+        {
+            var clip = State(Layer(), ShootState).motion as AnimationClip;
+            Assert.IsNotNull(clip);
+            Assert.IsFalse(clip.isLooping, "a looping shoot clip replays on its own between shots, out of step with them");
+        }
+
+        [Test]
+        public void TheShootStatesSpeedIsAFloatEachClientSetsForItself()
+        {
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(ControllerPath);
+            AnimatorState shoot = State(controller.layers[0].stateMachine, ShootState);
+            Assert.IsTrue(shoot.speedParameterActive, "the Shoot state's speed must follow a parameter");
+            AnimatorControllerParameter p = controller.parameters.FirstOrDefault(x => x.name == shoot.speedParameter);
+            Assert.IsNotNull(p, shoot.speedParameter);
+            Assert.AreEqual(AnimatorControllerParameterType.Float, p.type);
+
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab");
+            var sync = prefab.GetComponentInChildren<Photon.Pun.PhotonAnimatorView>(true);
+            Assert.IsNotNull(sync);
+            Assert.AreEqual(Photon.Pun.PhotonAnimatorView.SynchronizeType.Disabled, sync.GetParameterSynchronizeType(shoot.speedParameter),
+                "every client works the speed out from the shot it saw; streaming it would lag behind the shot");
         }
 
         [Test]

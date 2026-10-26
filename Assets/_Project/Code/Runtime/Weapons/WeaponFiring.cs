@@ -1,6 +1,7 @@
 using System.Collections;
 using Photon.Pun;
 using UnityEngine;
+using Overpower.Arena;
 using Overpower.Combat;
 using Overpower.Data;
 using Overpower.Net;
@@ -367,6 +368,7 @@ namespace Overpower.Weapons
                            direction, targetPoint, coneAngle, seed, chargeFraction,
                            damageMultiplier, rangeMultiplier);
             LastShotTime = Time.time;
+            RaiseShotShown(interval);
             return true;
         }
 
@@ -449,6 +451,13 @@ namespace Overpower.Weapons
         /// echo. Owner-only, like ChargeHeld.</summary>
         public float LastShotTime { get; private set; } = float.NegativeInfinity;
 
+        /// <summary>Raised on every client when this player's shot shows there, with the gun's fire interval in seconds: on the shooter's
+        /// own client when TryFire commits it, elsewhere when RPC_FireWeapon arrives (the muzzle flash). A local event; the mech's shoot
+        /// motion restarts on it, so every screen plays one motion per real shot without syncing a trigger.</summary>
+        public event System.Action<float> ShotShown;
+
+        private void RaiseShotShown(float fireIntervalSeconds) => ShotShown?.Invoke(fireIntervalSeconds);
+
         /// <summary>
         /// Builds this shot on EVERY client, including the shooter's own. Every value it needs arrives as a parameter or from info.Sender; nothing in this
         /// body reads local state that would differ per machine.
@@ -494,6 +503,10 @@ namespace Overpower.Weapons
                 VFXManager.Instance.PlayVFX(fired.MuzzleVfx, origin);
             if (fired.FireSfx != null && AudioManager.Instance != null)
                 AudioManager.Instance.Play3D(fired.FireSfx, origin);
+
+            // The base interval: a receiver cannot know the shooter's fire-rate buff (see SetStatMultipliers).
+            if (ShootMotion.ShowsArrivingShot(photonView.IsMine))
+                RaiseShotShown(fired.FireInterval);
         }
 
         /// <summary>Fires every shot now, simultaneously or spaced by Sequential Delay - what RPC_FireWeapon does for a weapon without a wind-up. Its own

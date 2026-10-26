@@ -46,4 +46,6 @@ MonoBehaviour:
   rejoinWindowSeconds: 120
   droppedGraceSeconds: 10
   shootPoseMinimumSeconds: 0.2
+  shootMotionMaxSpeed: 5
+  shootMotionBlendSeconds: 0.05
   testRangeEnabled: 1
