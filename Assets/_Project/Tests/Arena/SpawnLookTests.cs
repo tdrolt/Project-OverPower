@@ -124,7 +124,7 @@ namespace Overpower.Tests
 
     public class SpawnLookTowerTests
     {
-        private const string PrefabPath = "Assets/Gameplay/Arena/Tower Look.prefab";
+        private const string PrefabPath = "Assets/_Project/Features/Arena/Tower Look.prefab";
         private Scene scene;
         private GameObject instance;
         private TowerLook look;

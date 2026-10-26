@@ -193,7 +193,7 @@ namespace Overpower.Tests
 
         // ---------------------------------------------------------------- A53: the scan wave is yellow, the dots keep their colour
 
-        private static VisionConfig RealVision() => UnityEditor.AssetDatabase.LoadAssetAtPath<VisionConfig>("Assets/Gameplay/Config/VisionConfig.asset");
+        private static VisionConfig RealVision() => UnityEditor.AssetDatabase.LoadAssetAtPath<VisionConfig>("Assets/_Project/Shared/Config/VisionConfig.asset");
 
         // The wave's colour itself is Tudor's (VisionConfig › Scan Wave Colour); the rule guarded here is that the wave and the dots have separate colours.
         [Test] public void TheWaveAndTheMinimapDotsReadSeparateColourFields()

@@ -11,7 +11,7 @@ namespace Overpower.Tests
     /// nothing else in the project has claimed r for itself either.</summary>
     public class VentInputActionTests
     {
-        private const string AssetPath = "Assets/Gameplay/Input/OverpowerControls.inputactions";
+        private const string AssetPath = "Assets/_Project/Shared/Input/OverpowerControls.inputactions";
 
         private static InputActionAsset Load()
         {

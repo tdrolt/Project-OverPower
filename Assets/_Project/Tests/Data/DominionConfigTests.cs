@@ -9,8 +9,8 @@ namespace Overpower.Tests
     {
         private static DominionConfig Load()
         {
-            var config = AssetDatabase.LoadAssetAtPath<DominionConfig>("Assets/Gameplay/Config/DominionConfig.asset");
-            Assert.IsNotNull(config, "Assets/Gameplay/Config/DominionConfig.asset exists");
+            var config = AssetDatabase.LoadAssetAtPath<DominionConfig>("Assets/_Project/Shared/Config/DominionConfig.asset");
+            Assert.IsNotNull(config, "Assets/_Project/Shared/Config/DominionConfig.asset exists");
             return config;
         }
 

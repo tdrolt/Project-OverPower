@@ -276,7 +276,7 @@ namespace Overpower.Tests
         // cards exist in both modes, once each, with words and no exact numbers (except the 3v3v3 Rounds card, which says the overtime lead).
         private static GameModeDefinition Mode(string mode)
         {
-            var def = UnityEditor.AssetDatabase.LoadAssetAtPath<GameModeDefinition>("Assets/Gameplay/Config/Modes/" + mode + ".asset");
+            var def = UnityEditor.AssetDatabase.LoadAssetAtPath<GameModeDefinition>("Assets/_Project/Shared/Config/Modes/" + mode + ".asset");
             Assert.IsNotNull(def, mode);
             return def;
         }

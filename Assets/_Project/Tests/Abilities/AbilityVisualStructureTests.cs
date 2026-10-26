@@ -14,28 +14,28 @@ namespace Overpower.Tests
     /// </summary>
     public class AbilityVisualStructureTests
     {
-        private const string SolidPath = "Assets/Gameplay/Abilities/Ability Visual Solid.mat";
-        private const string GlassPath = "Assets/Gameplay/Abilities/Ability Visual Glass.mat";
-        private const string LinePath = "Assets/Gameplay/UI/AimConeLine.mat";
-        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
-        private const string MarkerPath = "Assets/Gameplay/Projectiles/Blast Marker.prefab";
-        private const string PuckPath = "Assets/Gameplay/Art/MinePuck.fbx";
-        private const string PylonPath = "Assets/Gameplay/Art/FencePylon.fbx";
-        private const string PlacedBodyPath = "Assets/Gameplay/FX/Materials/Placed Body.mat";
-        private const string WallPath = "Assets/Gameplay/Arena/Materials/Arena Wall.mat";
+        private const string SolidPath = "Assets/_Project/Features/Abilities/Data/Ability Visual Solid.mat";
+        private const string GlassPath = "Assets/_Project/Features/Abilities/Data/Ability Visual Glass.mat";
+        private const string LinePath = "Assets/_Project/Features/UI/AimConeLine.mat";
+        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string MarkerPath = "Assets/_Project/Features/Weapons/Projectiles/Blast Marker.prefab";
+        private const string PuckPath = "Assets/_Project/Shared/Art/MinePuck.fbx";
+        private const string PylonPath = "Assets/_Project/Shared/Art/FencePylon.fbx";
+        private const string PlacedBodyPath = "Assets/_Project/Shared/FX/Materials/Placed Body.mat";
+        private const string WallPath = "Assets/_Project/Features/Arena/Materials/Arena Wall.mat";
         private const string CoverPath = "Assets/Resources/Cover Wall.prefab";
 
         // A6 (Tudor 2026-09-17 evening): rocket blasts stay at their real height, so step 6 needs a short see-through
         // shell at the burst point instead of a floor BlastMarker. Built here, in the shared kit, so step 6 has it
         // ready - see this file's own extra test below the marker's.
-        private const string ShellPath = "Assets/Gameplay/Projectiles/Splash Shell.prefab";
+        private const string ShellPath = "Assets/_Project/Features/Weapons/Projectiles/Splash Shell.prefab";
 
         // A3 (Tudor 2026-09-17 evening): the flamethrower's fan needs a genuine per-vertex tip-to-edge gradient, and
         // GlassPath (URP/Unlit) never reads a mesh's vertex colours at all (verified against the shader's own HLSL
         // source - its Attributes struct has no COLOR semantic). Laser Beam.mat hit exactly this bug on 2026-09-15 and
         // was moved to Particles/Unlit; the fan below gets its OWN new material for the same reason, rather than
         // reshading Ability Visual Glass.mat out from under the mine, portal and fence, which already ship with it.
-        private const string FlamePath = "Assets/Gameplay/Abilities/Flame Cone.mat";
+        private const string FlamePath = "Assets/_Project/Features/Abilities/Data/Flame Cone.mat";
 
         private static GameObject Load(string path)
         {
@@ -149,9 +149,9 @@ namespace Overpower.Tests
             Assert.IsNull(prefab.GetComponent<SnapVisualToGround>(), "the ring stays at the real burst height - never snapped to the floor");
         }
 
-        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab")]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab")]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab")]
+        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab")]
+        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab")]
+        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab")]
         public void EveryRocketShowsASplashShellAtItsRealBurstPoint(string path)
         {
             // A6: replaces the plan's own printed RocketBlastView (a floor BlastMarker) - the shell stays at the
@@ -340,10 +340,10 @@ namespace Overpower.Tests
         {
             (string definition, string field, System.Type view)[] placed =
             {
-                ("Assets/Gameplay/Abilities/17 Teleport M.asset", "portalPrefab", typeof(PortalView)),
-                ("Assets/Gameplay/Abilities/19 Mines A.asset", "minePrefab", typeof(MineView)),
-                ("Assets/Gameplay/Abilities/20 Deployable Cover A.asset", "coverPrefab", typeof(CoverPanelView)),
-                ("Assets/Gameplay/Abilities/26 Electric Fence U.asset", "fencePrefab", typeof(FenceCageView)),
+                ("Assets/_Project/Features/Abilities/Data/17 Teleport M.asset", "portalPrefab", typeof(PortalView)),
+                ("Assets/_Project/Features/Abilities/Data/19 Mines A.asset", "minePrefab", typeof(MineView)),
+                ("Assets/_Project/Features/Abilities/Data/20 Deployable Cover A.asset", "coverPrefab", typeof(CoverPanelView)),
+                ("Assets/_Project/Features/Abilities/Data/26 Electric Fence U.asset", "fencePrefab", typeof(FenceCageView)),
             };
             foreach (var (definitionPath, field, viewType) in placed)
             {
@@ -377,10 +377,10 @@ namespace Overpower.Tests
         [Test]
         public void TheFlamethrowerDrawsASoftFlameConePrefabWithNoCollider()
         {
-            GameObject module = Load("Assets/Gameplay/Abilities/Flamethrower.prefab");
+            GameObject module = Load("Assets/_Project/Features/Abilities/Data/Flamethrower.prefab");
             var cone = Ref(module.GetComponent<FlamethrowerAbility>(), "sprayVfxPrefab") as FlameConeVisual;
             Assert.IsNotNull(cone, "Flamethrower › Spray Vfx Prefab");
-            Assert.AreEqual("Assets/Gameplay/Abilities/Flamethrower Cone.prefab", AssetDatabase.GetAssetPath(cone));
+            Assert.AreEqual("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab", AssetDatabase.GetAssetPath(cone));
             Transform fan = Child(cone.transform, "Fan");
             // A3: the fan's own material is FlamePath, not GlassPath - see TheFlameConeMaterialIsUnlitParticles... and
             // this file's own FlamePath comment, above.
@@ -395,26 +395,26 @@ namespace Overpower.Tests
         [Test]
         public void TheZipHookIsAHarpoonHeadOnACableWithNoCollider()
         {
-            GameObject prefab = Load("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab");
+            GameObject prefab = Load("Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab");
             Assert.AreEqual(Vector3.one, prefab.transform.localScale, "the old 0.2 sphere scale is gone");
             Assert.IsNull(prefab.GetComponent<MeshRenderer>(), "the head is a child now");
             Assert.IsNotNull(prefab.GetComponent<ProjectileMotor>());
             Assert.IsNotNull(prefab.GetComponent<AbilityHitRelay>());
             Transform head = Child(prefab.transform, "Head");
             // Its drawn size and place along the flight are set at spawn (ZipCableLookTests: ZipBoltView.PlaceHarpoon).
-            AssertMesh(head, "HarpoonHead", "Assets/Gameplay/FX/Materials/Zip Harpoon.mat");
+            AssertMesh(head, "HarpoonHead", "Assets/_Project/Shared/FX/Materials/Zip Harpoon.mat");
             var rope = Child(prefab.transform, "Rope").GetComponent<LineRenderer>();
             Assert.IsNotNull(rope);
             Assert.IsTrue(rope.useWorldSpace);
             Assert.AreEqual(2, rope.positionCount);
-            Assert.AreEqual("Assets/Gameplay/FX/Materials/Zip Cable.mat", AssetDatabase.GetAssetPath(rope.sharedMaterial));
+            Assert.AreEqual("Assets/_Project/Shared/FX/Materials/Zip Cable.mat", AssetDatabase.GetAssetPath(rope.sharedMaterial));
             var view = prefab.GetComponent<ZipBoltView>();
             Assert.IsNotNull(view);
             Assert.AreSame(head.GetComponent<MeshRenderer>(), Ref(view, "head"));
             Assert.AreSame(rope, Ref(view, "rope"));
             AssertNoCollider(prefab);
 
-            var ability = Load("Assets/Gameplay/Abilities/Zip Gun.prefab").GetComponent<ZipGunAbility>();
+            var ability = Load("Assets/_Project/Features/Abilities/Data/Zip Gun.prefab").GetComponent<ZipGunAbility>();
             Assert.AreEqual(SolidPath, AssetDatabase.GetAssetPath(Ref(ability, "anchorMaterial")));
         }
     }

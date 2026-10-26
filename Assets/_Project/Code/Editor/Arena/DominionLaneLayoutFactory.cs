@@ -6,14 +6,14 @@ using UnityEngine;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// Writes Assets/Gameplay/Config/DominionLaneLayout.asset from the numbers of Tudor's drawing (the canvas board "Dominion 2v2 map", Main.dc.html).
+    /// Writes Assets/_Project/Shared/Config/DominionLaneLayout.asset from the numbers of Tudor's drawing (the canvas board "Dominion 2v2 map", Main.dc.html).
     /// The board is 12 pixels to the metre and its middle is (550, 342): every row below is the board's own left / top / width / height in pixels, and the
     /// conversion to metres is done here, once, so the asset holds metres and nobody types a converted number by hand. A pixel's "up" is the map's +Z.
     /// Menu: OverPower > Dominion > Write lane layout from the board.
     /// </summary>
     public static class DominionLaneLayoutFactory
     {
-        public const string AssetPath = "Assets/Gameplay/Config/DominionLaneLayout.asset";
+        public const string AssetPath = "Assets/_Project/Shared/Config/DominionLaneLayout.asset";
 
         private const float PixelsPerMetre = 12f;
         private const float BoardMiddleX = 550f;

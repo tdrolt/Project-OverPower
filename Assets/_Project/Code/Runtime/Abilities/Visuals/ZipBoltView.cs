@@ -22,7 +22,7 @@ namespace Overpower.Abilities
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
         [SerializeField, Tooltip("Where the harpoon's and cable's colour (the Zip Gun row of the look table), the cable's material and its " +
-                 "sizes come from: Assets/Gameplay/Config/UiTheme.asset and its Arena Look. Movement is grey with a faint tint of the shooter's team.")]
+                 "sizes come from: Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look. Movement is grey with a faint tint of the shooter's team.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("The harpoon head. Its origin is the back of its shaft, where the cable ties on; the cable ends there.")]

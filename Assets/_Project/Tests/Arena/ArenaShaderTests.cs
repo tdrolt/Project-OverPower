@@ -13,9 +13,9 @@ namespace Overpower.Tests
     /// plain so cover reads as cover; the barrier check renders a face and compares it with a wall's.</summary>
     public class ArenaShaderTests
     {
-        private const string ShaderPath = "Assets/Gameplay/Arena/Shaders/ArenaSurface.shader";
+        private const string ShaderPath = "Assets/_Project/Features/Arena/Shaders/ArenaSurface.shader";
         private const string ShaderName = "Overpower/Arena Surface";
-        private const string Materials = "Assets/Gameplay/Arena/Materials/";
+        private const string Materials = "Assets/_Project/Features/Arena/Materials/";
 
         private static readonly Dictionary<string, string> KeywordOf = new Dictionary<string, string>
         {

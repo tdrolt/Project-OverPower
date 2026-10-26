@@ -432,7 +432,7 @@ namespace Overpower.Tests
         [Test]
         public void TheWallShaderReadsTheCoverEdgeAndNothingSetsItForTheWholeArena()
         {
-            string hlsl = System.IO.File.ReadAllText("Assets/Gameplay/Arena/Shaders/ArenaHex.hlsl");
+            string hlsl = System.IO.File.ReadAllText("Assets/_Project/Features/Arena/Shaders/ArenaHex.hlsl");
             string name = CoverPanelLook.PropertyName;
             StringAssert.Contains("float4 " + name + ";", hlsl, "the wall shader declares the edge the cover's property block fills");
             StringAssert.Contains("s.emission += " + name + ".rgb", hlsl, "and lights the band with it");

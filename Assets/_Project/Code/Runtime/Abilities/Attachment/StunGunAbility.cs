@@ -34,7 +34,7 @@ namespace Overpower.Abilities
         private float projectileRadius = 0.45f;
 
         [SerializeField, Tooltip("The projectile this ability fires - a ProjectileMotor plus " +
-                 "ApplyStatusOnHit, no WeaponDefinition involved. Lives in Assets/Gameplay/Projectiles " +
+                 "ApplyStatusOnHit, no WeaponDefinition involved. Lives in Assets/_Project/Features/Weapons/Projectiles " +
                  "next to every other bullet.")]
         private GameObject projectilePrefab;
 

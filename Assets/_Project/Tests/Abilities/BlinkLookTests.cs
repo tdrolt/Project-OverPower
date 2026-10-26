@@ -185,10 +185,10 @@ namespace Overpower.Tests
         [Test]
         public void BlinkCarriesTheMarkView()
         {
-            GameObject blink = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Blink.prefab");
+            GameObject blink = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Blink.prefab");
             BlinkMarkView view = blink.GetComponent<BlinkMarkView>();
             Assert.IsNotNull(view);
-            Assert.AreEqual("Assets/Gameplay/Config/UiTheme.asset", AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("theme").objectReferenceValue));
+            Assert.AreEqual("Assets/_Project/Shared/Config/UiTheme.asset", AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("theme").objectReferenceValue));
             Assert.IsEmpty(blink.GetComponentsInChildren<Collider>(true));
         }
     }

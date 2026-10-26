@@ -12,7 +12,7 @@ namespace Overpower.EditorTools.Telemetry
     /// so the controller can drive the exact build path a human gets by clicking the menu (via eval).</summary>
     public static class TelemetryMenu
     {
-        private const string BalanceTargetsAssetPath = "Assets/Gameplay/Config/BalanceTargets.asset";
+        private const string BalanceTargetsAssetPath = "Assets/_Project/Shared/Config/BalanceTargets.asset";
         private const string FixtureFolder = "_Project/Tests/Telemetry/Fixtures/match_a"; // relative to Application.dataPath
 
         [MenuItem("OverPower/Telemetry/Build Report…")]

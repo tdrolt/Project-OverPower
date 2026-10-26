@@ -14,13 +14,13 @@ namespace Overpower.Tests
     /// leave a dark margin either side of that stripe. The saved scenes are opened additively and closed again (Game Scene stays open).</summary>
     public class BarrierSurfaceSceneTests
     {
-        private const string BarrierPath = "Assets/Gameplay/Arena/Materials/Arena Barrier.mat";
+        private const string BarrierPath = "Assets/_Project/Features/Arena/Materials/Arena Barrier.mat";
 
         // A stripe wider than this share of a top leaves margins too thin to read: the whole top looks one plain grey block.
         private const float MostOfTheTop = 0.7f;
 
         private static float StripeWidth() =>
-            AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/Gameplay/Config/ArenaLook.asset").barrierTopStripeWidth;
+            AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset").barrierTopStripeWidth;
 
         [TestCase("Assets/Scenes/Game Scene.unity")]
         [TestCase("Assets/Scenes/Dominion 2v2.unity")]
@@ -61,7 +61,7 @@ namespace Overpower.Tests
         [Test]
         public void TheShrinksRecessBarrierWearsTheBarrierSurfaceToo()
         {
-            var layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/Gameplay/Config/ArenaLayout.asset");
+            var layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
             Assert.AreSame(AssetDatabase.LoadAssetAtPath<Material>(BarrierPath), layout.BarrierMaterial);
             MethodInfo barrierMaterial = typeof(ArenaLayout).GetProperty(nameof(ArenaLayout.BarrierMaterial)).GetMethod;
             Assert.IsTrue(IlWiring.Uses(typeof(ArenaPhaseTwoCut), "Apply", barrierMaterial), "the shrink builds its recess barrier in the layout's barrier surface");

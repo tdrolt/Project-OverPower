@@ -27,7 +27,7 @@ namespace Overpower.Weapons
     [RequireComponent(typeof(BounceOffWalls))]
     public sealed class RicochetChevronView : MonoBehaviour, IProjectileBehaviour
     {
-        [SerializeField, Tooltip("The chevron flash shown at each bounce - Assets/Gameplay/FX/Impacts/FX Ricochet Chevron.prefab.")]
+        [SerializeField, Tooltip("The chevron flash shown at each bounce - Assets/_Project/Shared/FX/Impacts/FX Ricochet Chevron.prefab.")]
         private GameObject chevron;
 
         private BounceOffWalls bounce;

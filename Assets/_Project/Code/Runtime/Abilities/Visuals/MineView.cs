@@ -17,7 +17,7 @@ namespace Overpower.Abilities
     [DisallowMultipleComponent]
     public sealed class MineView : MonoBehaviour, IDeployableView
     {
-        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/Gameplay/Config/UiTheme.asset.")]
+        [SerializeField, Tooltip("Team colours and the Arena Look - Assets/_Project/Shared/Config/UiTheme.asset.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("Which row of the Arena Look table colours this mine: the Mines ability's id.")]
@@ -42,7 +42,7 @@ namespace Overpower.Abilities
         [SerializeField, Tooltip("Points on the trigger ring.")]
         private int triggerRingSegments = 48;
 
-        [SerializeField, Tooltip("The flash on the floor when the mine goes off - Assets/Gameplay/Projectiles/Blast Marker.prefab.")]
+        [SerializeField, Tooltip("The flash on the floor when the mine goes off - Assets/_Project/Features/Weapons/Projectiles/Blast Marker.prefab.")]
         private BlastMarker blastMarkerPrefab;
 
         [SerializeField, Tooltip("The mine's Visual: the container Snap Visual To Ground puts on the floor, and the one " +
@@ -50,7 +50,7 @@ namespace Overpower.Abilities
         private Transform visualRoot;
 
         [Header("Ghost (A5 - the owner's own team, once otherwise invisible)")]
-        [SerializeField, Tooltip("The see-through material (Assets/Gameplay/Abilities/Ability Visual Glass.mat) the puck " +
+        [SerializeField, Tooltip("The see-through material (Assets/_Project/Features/Abilities/Data/Ability Visual Glass.mat) the puck " +
                  "switches to for the owner's own team once the mine is a Ghost; the puck's own material is opaque, so its " +
                  "alpha alone shows nothing. Left empty just dims the Ghost instead of making it translucent.")]
         private Material ghostMaterial;

@@ -189,10 +189,10 @@ namespace Overpower.EditorTools
                 Debug.LogError($"[ArenaLayoutCapture] Found {arenas.Length} ArenaSymmetry components (need exactly one).");
                 return;
             }
-            ArenaLayout layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/Gameplay/Config/ArenaLayout.asset");
+            ArenaLayout layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
             if (layout == null)
             {
-                Debug.LogError("[ArenaLayoutCapture] Assets/Gameplay/Config/ArenaLayout.asset does not exist yet.");
+                Debug.LogError("[ArenaLayoutCapture] Assets/_Project/Shared/Config/ArenaLayout.asset does not exist yet.");
                 return;
             }
 

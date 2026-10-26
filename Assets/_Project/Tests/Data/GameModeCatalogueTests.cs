@@ -7,7 +7,7 @@ namespace Overpower.Tests
 {
     public class GameModeCatalogueTests
     {
-        private const string AssetPath = "Assets/Gameplay/Config/Modes/GameModeCatalogue.asset";
+        private const string AssetPath = "Assets/_Project/Shared/Config/Modes/GameModeCatalogue.asset";
 
         private static GameModeCatalogue Load()
         {

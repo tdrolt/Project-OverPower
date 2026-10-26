@@ -218,7 +218,7 @@ namespace Overpower.Tests
         [Test]
         public void TheShopPopUpShowsHealingNotDamage()
         {
-            var def = AssetDatabase.LoadAssetAtPath<AbilityDefinition>("Assets/Gameplay/Abilities/27 AoE Zone U.asset");
+            var def = AssetDatabase.LoadAssetAtPath<AbilityDefinition>("Assets/_Project/Features/Abilities/Data/27 AoE Zone U.asset");
             string text = ShopItemNumbers.Ability(def);
             // The values are tuned on the prefab, so this pins which number the pop-up shows, not the number itself.
             StringAssert.IsMatch(@"heals \d+(\.\d+)? health every \d+(\.\d+)?s", text);

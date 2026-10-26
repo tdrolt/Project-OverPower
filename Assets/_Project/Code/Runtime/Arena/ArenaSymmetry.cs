@@ -11,7 +11,7 @@ namespace Overpower.Arena
     /// HOW TO EDIT THE ARENA: boundary walls come from Source Outline (below), corner to corner - NOT from
     /// ArenaLayout.asset, which only holds their thickness and height. To move a wall, move its outline points, then run
     /// "Build primitive arena" (OverPower > Arena or the button below): walls are always rebuilt fresh from the outline,
-    /// so a hand-moved wall is thrown away. Blocks and barriers ARE built from Assets/Gameplay/Config/ArenaLayout.asset,
+    /// so a hand-moved wall is thrown away. Blocks and barriers ARE built from Assets/_Project/Shared/Config/ArenaLayout.asset,
     /// never hand-placed for real - edit a row there, or move a block or barrier in the Scene view and use the
     /// OverPower > Arena > "Capture layout from Source" MENU ITEM (not a button on this Inspector) to write its new row
     /// back, then run Build. A new block placed directly under Source must go inside one of its existing groups (e.g.
@@ -101,7 +101,7 @@ namespace Overpower.Arena
                  "into three. Leave off for the triangle arena.")]
         public bool outlineIsWholeArena;
 
-        [Tooltip("The arena's build data (Assets/Gameplay/Config/ArenaLayout.asset). In play, the phase-two wall is " +
+        [Tooltip("The arena's build data (Assets/_Project/Shared/Config/ArenaLayout.asset). In play, the phase-two wall is " +
                  "built from its wall, barrier and Phase Two Cut values, so it matches what Build primitive arena makes.")]
         public ArenaLayout layout;
 

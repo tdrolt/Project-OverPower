@@ -11,11 +11,11 @@ namespace Overpower.Tests
     /// sphere cast), and keeps its team trail; lasers keep their beams. The core glows the theme's Flash White: the team colour lives in the trail.</summary>
     public class BulletPrefabGuardTests
     {
-        private const string SlugPath = "Assets/Gameplay/Art/BulletSlug.fbx";
+        private const string SlugPath = "Assets/_Project/Shared/Art/BulletSlug.fbx";
 
         internal static WeaponDefinition[] Weapons()
         {
-            string[] guids = AssetDatabase.FindAssets("t:WeaponDefinition", new[] { "Assets/Gameplay/Weapons" });
+            string[] guids = AssetDatabase.FindAssets("t:WeaponDefinition", new[] { "Assets/_Project/Features/Weapons/Data" });
             var weapons = new WeaponDefinition[guids.Length];
             for (int i = 0; i < guids.Length; i++)
                 weapons[i] = AssetDatabase.LoadAssetAtPath<WeaponDefinition>(AssetDatabase.GUIDToAssetPath(guids[i]));

@@ -415,13 +415,13 @@ namespace Overpower.EditorTools
             }
             ArenaSymmetry arena = arenas[0];
 
-            ArenaLayout layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/Gameplay/Config/ArenaLayout.asset");
+            ArenaLayout layout = AssetDatabase.LoadAssetAtPath<ArenaLayout>("Assets/_Project/Shared/Config/ArenaLayout.asset");
             if (layout == null)
             {
-                report.Add("PROBLEM: Assets/Gameplay/Config/ArenaLayout.asset does not exist - run Capture layout from Source first.");
+                report.Add("PROBLEM: Assets/_Project/Shared/Config/ArenaLayout.asset does not exist - run Capture layout from Source first.");
                 return report;
             }
-            GameObject towerLookPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Arena/Tower Look.prefab");
+            GameObject towerLookPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Arena/Tower Look.prefab");
             Transform environment = arena.transform.parent;
             if (environment == null)
             {

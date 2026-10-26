@@ -18,13 +18,13 @@ namespace Overpower.Tests
     {
         private const BindingFlags Any = MovementLookTestKit.Any;
         private const int DashId = 14, BlinkId = 15, SprintId = 16, ZipId = 18, StunGunId = 22, RaybeamId = 24;
-        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
-        private const string LookPath = "Assets/Gameplay/Config/ArenaLook.asset";
-        private const string FxAlphaPath = "Assets/Gameplay/FX/Materials/FX Alpha.mat";
-        private const string StunBulletPath = "Assets/Gameplay/Projectiles/Stun Gun Bullet.prefab";
-        private const string StunBurstPath = "Assets/Gameplay/FX/Impacts/FX Stun Burst.prefab";
-        private const string BeamPath = "Assets/Gameplay/FX/Raybeam Beam.prefab";
-        private const string FlameConePath = "Assets/Gameplay/Abilities/Flamethrower Cone.prefab";
+        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
+        private const string FxAlphaPath = "Assets/_Project/Shared/FX/Materials/FX Alpha.mat";
+        private const string StunBulletPath = "Assets/_Project/Features/Weapons/Projectiles/Stun Gun Bullet.prefab";
+        private const string StunBurstPath = "Assets/_Project/Shared/FX/Impacts/FX Stun Burst.prefab";
+        private const string BeamPath = "Assets/_Project/Shared/FX/Raybeam Beam.prefab";
+        private const string FlameConePath = "Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab";
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         private static readonly Color Own = new Color(0.41f, 0.42f, 0.43f, 1f);

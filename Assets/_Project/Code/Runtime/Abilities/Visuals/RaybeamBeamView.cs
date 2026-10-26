@@ -26,7 +26,7 @@ namespace Overpower.Abilities
         private readonly List<Vector3> outline = new List<Vector3>(16);
 
         [SerializeField, Tooltip("Where the colour (the look table's row for the ability below), Flash White and the beam numbers come " +
-                 "from: Assets/Gameplay/Config/UiTheme.asset and its Arena Look.")]
+                 "from: Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("Which row of the Arena Look table colours this beam: the Raybeam ability's id.")]

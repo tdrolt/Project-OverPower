@@ -10,8 +10,8 @@ using UnityEngine;
 namespace Overpower.EditorTools
 {
     /// <summary>
-    /// OverPower > Arena > Bake minimap image: renders the arena from above into Assets/Gameplay/UI/ArenaMinimap.png
-    /// and records the world square it covers on Assets/Gameplay/Config/MinimapConfig.asset (created if missing).
+    /// OverPower > Arena > Bake minimap image: renders the arena from above into Assets/_Project/Features/UI/ArenaMinimap.png
+    /// and records the world square it covers on Assets/_Project/Shared/Config/MinimapConfig.asset (created if missing).
     ///
     /// Framing: a square centred on ArenaSymmetry's centre, whose side clears the farthest mesh under Source and both
     /// generated thirds by the config's margin on every side of the triangular mask (MinimapLayout.TriangleCircumradius).
@@ -24,8 +24,8 @@ namespace Overpower.EditorTools
     /// </summary>
     public static class MinimapBaker
     {
-        public const string ImagePath = "Assets/Gameplay/UI/ArenaMinimap.png";
-        public const string ConfigPath = "Assets/Gameplay/Config/MinimapConfig.asset";
+        public const string ImagePath = "Assets/_Project/Features/UI/ArenaMinimap.png";
+        public const string ConfigPath = "Assets/_Project/Shared/Config/MinimapConfig.asset";
 
         [MenuItem("OverPower/Arena/Bake minimap image")]
         private static void BakeFromMenu() => LogResult(BakeOpenScene());

@@ -9,7 +9,7 @@ namespace Overpower.Tests
     /// <summary>The round bar at the top centre shows no points (the score bars do); each team block keeps its colour line and round-win dots, centred.</summary>
     public class RoundBarSlimTests
     {
-        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
+        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
         private UiTheme theme;
         private LobbyUiKit kit;
         private GameObject canvas;

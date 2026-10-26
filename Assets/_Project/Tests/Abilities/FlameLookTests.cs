@@ -57,7 +57,7 @@ namespace Overpower.Tests
         // The shipped cone, sprayed with the look and placed with its feet at the origin, aiming +Z, the gun at Muzzle.
         private static (GameObject cone, ParticleSystem tongues) SprayedCone(UiTheme theme, float angle)
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             var visual = cone.GetComponent<FlameConeVisual>();
             visual.Configure(Range, angle, Color.red, Color.red, true);
@@ -180,7 +180,7 @@ namespace Overpower.Tests
         [Test]
         public void TheShippedJetLeavesTheGunAndSpreadsOverTheCone()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -368,7 +368,7 @@ namespace Overpower.Tests
         {
             // The cone rule counts on it: each cell of the fire sheet draws only inside the circle that fits its square, and fades to its
             // edge (soft, billowing fire, never a hard-edged or pointed shape).
-            var look = UnityEditor.AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/Gameplay/Config/ArenaLook.asset");
+            var look = UnityEditor.AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset");
             Texture shape = look.flameJetMaterial.GetTexture("_BaseMap");
             var pixels = new Texture2D(2, 2);
             try
@@ -472,7 +472,7 @@ namespace Overpower.Tests
         public void AJetPressedAgainstAWallNeverKeepsMoreThanItsMostFlamesAlive()
         {
             // A wall pulls the gun's muzzle back toward the cone's tip, where the flames must start tiny to stay inside it.
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -732,7 +732,7 @@ namespace Overpower.Tests
         [Test]
         public void EachSprayHandsTheLiveConeToTheFlames()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -780,7 +780,7 @@ namespace Overpower.Tests
         [Test]
         public void EveryPhysicsStepJetsTheFlamesFromTheGun()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = JetLook();
@@ -887,7 +887,7 @@ namespace Overpower.Tests
         [Test]
         public void TheFanIsLeftAFaintMarkerInTheFireColour()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = ScriptableObject.CreateInstance<ArenaLook>();
@@ -926,7 +926,7 @@ namespace Overpower.Tests
         [Test]
         public void AimingTheJetEveryPhysicsStepAllocatesNothing()
         {
-            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Abilities/Flamethrower Cone.prefab");
+            var prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab");
             GameObject cone = Object.Instantiate(prefab);
             UiTheme theme = ScriptableObject.CreateInstance<UiTheme>();
             ArenaLook look = ScriptableObject.CreateInstance<ArenaLook>();

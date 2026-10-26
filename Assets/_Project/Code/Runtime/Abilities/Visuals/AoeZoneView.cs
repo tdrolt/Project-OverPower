@@ -19,7 +19,7 @@ namespace Overpower.Abilities
         private const int EdgeSegments = 72;
 
         [SerializeField, Tooltip("Where the colour (the look table's row for the ability below) and every ring number come from: " +
-                 "Assets/Gameplay/Config/UiTheme.asset and its Arena Look.")]
+                 "Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("Which row of the Arena Look table colours this zone: the Heal Zone ability's id.")]

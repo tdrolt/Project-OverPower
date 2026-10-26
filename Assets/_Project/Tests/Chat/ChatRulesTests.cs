@@ -102,7 +102,7 @@ namespace Overpower.Tests
         [Test]
         public void TheThemeAssetCarriesTheChatLook()
         {
-            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            var theme = UnityEditor.AssetDatabase.LoadAssetAtPath<Overpower.UI.UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
             Assert.IsNotNull(theme);
             // The look (alpha, text size, placeholder, the spectator tag) is Tudor's, tuned in the asset: only the structure is guarded.
             Assert.IsFalse(string.IsNullOrEmpty(theme.chatInputPlaceholder));
@@ -161,7 +161,7 @@ namespace Overpower.Tests
         public void TheChatManagerObjectStartsSwitchedOffInTheScene()
         {
             // The chat manager lives in the shared match systems prefab (Dominion Task 10), so every map's scene gets it switched off the same way.
-            string scene = System.IO.File.ReadAllText("Assets/Prefabs/Systems/MatchSystems.prefab").Replace("\r\n", "\n");
+            string scene = System.IO.File.ReadAllText("Assets/_Project/Features/Match/Prefabs/MatchSystems.prefab").Replace("\r\n", "\n");
             int name = scene.IndexOf("value: chat manager\n", System.StringComparison.Ordinal);
             Assert.GreaterOrEqual(name, 0);
             int active = scene.IndexOf("propertyPath: m_IsActive", name, System.StringComparison.Ordinal);

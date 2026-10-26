@@ -15,10 +15,10 @@ namespace Overpower.Tests
     /// outline, so the player it lands on still shows through it. The Bounce shot shows a chevron on each wall it bounces off.</summary>
     public class GunFlashTests
     {
-        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
-        private const string MuzzlePath = "Assets/Gameplay/FX/FX Muzzle Flash.prefab";
-        private const string ChevronPath = "Assets/Gameplay/FX/Impacts/FX Ricochet Chevron.prefab";
-        private const string BouncePath = "Assets/Gameplay/Projectiles/Burst Bullet - Bounce.prefab";
+        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string MuzzlePath = "Assets/_Project/Shared/FX/FX Muzzle Flash.prefab";
+        private const string ChevronPath = "Assets/_Project/Shared/FX/Impacts/FX Ricochet Chevron.prefab";
+        private const string BouncePath = "Assets/_Project/Features/Weapons/Projectiles/Burst Bullet - Bounce.prefab";
 
         private static IEnumerable<string> FlashPaths()
         {
@@ -121,7 +121,7 @@ namespace Overpower.Tests
             Assert.Greater(behaviours.IndexOf(view), behaviours.IndexOf(prefab.GetComponent<BounceOffWalls>()),
                 "it reads the bounce count after BounceOffWalls has counted this hit");
             Assert.AreEqual(ChevronPath, AssetDatabase.GetAssetPath(new SerializedObject(view).FindProperty("chevron").objectReferenceValue));
-            Assert.IsNull(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Projectiles/Burst Bullet.prefab").GetComponent<RicochetChevronView>(),
+            Assert.IsNull(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Weapons/Projectiles/Burst Bullet.prefab").GetComponent<RicochetChevronView>(),
                 "only the shot that bounces");
             var chevron = AssetDatabase.LoadAssetAtPath<GameObject>(ChevronPath);
             Assert.IsNotNull(chevron, ChevronPath);

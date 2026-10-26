@@ -26,26 +26,26 @@ namespace Overpower.Tests
             "Assets/Resources/Portal.prefab",
             "Assets/Resources/Electric Fence.prefab",
             "Assets/Resources/Fire Field.prefab",
-            "Assets/Gameplay/Projectiles/Rocket.prefab",
-            "Assets/Gameplay/Projectiles/Rocket Distance.prefab",
-            "Assets/Gameplay/Projectiles/Rocket Cursor.prefab",
-            "Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab",
-            "Assets/Gameplay/Abilities/Mines.prefab",
-            "Assets/Gameplay/Abilities/Teleport.prefab",
-            "Assets/Gameplay/Abilities/Electric Fence.prefab",
-            "Assets/Gameplay/Abilities/Flamethrower.prefab",
-            "Assets/Gameplay/Abilities/Zip Gun.prefab",
+            "Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab",
+            "Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab",
+            "Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab",
+            "Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab",
+            "Assets/_Project/Features/Abilities/Data/Mines.prefab",
+            "Assets/_Project/Features/Abilities/Data/Teleport.prefab",
+            "Assets/_Project/Features/Abilities/Data/Electric Fence.prefab",
+            "Assets/_Project/Features/Abilities/Data/Flamethrower.prefab",
+            "Assets/_Project/Features/Abilities/Data/Zip Gun.prefab",
             StunBulletPath,
             StunBurstPath,
-            "Assets/Gameplay/Abilities/Sonic Pulse.prefab",
+            "Assets/_Project/Features/Abilities/Data/Sonic Pulse.prefab",
             FlameConePath,
         };
 
-        private const string StunBulletPath = "Assets/Gameplay/Projectiles/Stun Gun Bullet.prefab";
-        private const string StunBurstPath = "Assets/Gameplay/FX/Impacts/FX Stun Burst.prefab";
-        private const string FlameConePath = "Assets/Gameplay/Abilities/Flamethrower Cone.prefab";
-        private const string LookPath = "Assets/Gameplay/Config/ArenaLook.asset";
-        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
+        private const string StunBulletPath = "Assets/_Project/Features/Weapons/Projectiles/Stun Gun Bullet.prefab";
+        private const string StunBurstPath = "Assets/_Project/Shared/FX/Impacts/FX Stun Burst.prefab";
+        private const string FlameConePath = "Assets/_Project/Features/Abilities/Data/Flamethrower Cone.prefab";
+        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
+        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
         private const int StunGunId = 22;
 
         private static GameObject Load(string path)
@@ -88,7 +88,7 @@ namespace Overpower.Tests
         {
             PhotonViews("Assets/Resources/Mine.prefab", 1);
 
-            SerializedObject ability = Fields<MineAbility>("Assets/Gameplay/Abilities/Mines.prefab");
+            SerializedObject ability = Fields<MineAbility>("Assets/_Project/Features/Abilities/Data/Mines.prefab");
             AssetAt(ability, "minePrefab", "Assets/Resources/Mine.prefab");
         }
 
@@ -97,7 +97,7 @@ namespace Overpower.Tests
         {
             PhotonViews("Assets/Resources/Portal.prefab", 1);
 
-            SerializedObject ability = Fields<TeleportAbility>("Assets/Gameplay/Abilities/Teleport.prefab");
+            SerializedObject ability = Fields<TeleportAbility>("Assets/_Project/Features/Abilities/Data/Teleport.prefab");
             AssetAt(ability, "portalPrefab", "Assets/Resources/Portal.prefab");
         }
 
@@ -106,26 +106,26 @@ namespace Overpower.Tests
         {
             PhotonViews("Assets/Resources/Electric Fence.prefab", 2); // two today - flagged for Tudor, not fixed here
 
-            SerializedObject ability = Fields<ElectricFenceAbility>("Assets/Gameplay/Abilities/Electric Fence.prefab");
+            SerializedObject ability = Fields<ElectricFenceAbility>("Assets/_Project/Features/Abilities/Data/Electric Fence.prefab");
             AssetAt(ability, "fencePrefab", "Assets/Resources/Electric Fence.prefab");
         }
 
         [Test]
         public void ZipGunIsWired()
         {
-            SerializedObject zip = Fields<ZipGunAbility>("Assets/Gameplay/Abilities/Zip Gun.prefab");
-            AssetAt(zip, "projectilePrefab", "Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab");
+            SerializedObject zip = Fields<ZipGunAbility>("Assets/_Project/Features/Abilities/Data/Zip Gun.prefab");
+            AssetAt(zip, "projectilePrefab", "Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab");
 
-            Assert.IsNotNull(Load("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab").GetComponent<AbilityHitRelay>());
+            Assert.IsNotNull(Load("Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab").GetComponent<AbilityHitRelay>());
         }
 
         // The falloff curve's SHAPE (full damage at distance 0, less at the outer edge) is every splash weapon's
         // actual rule, not a value Tudor retunes - unlike splashDamage/splashRadius (his to change freely), which
         // this file no longer pins. hitMask/splashMask are dropped too: raw layer bitmasks are level-design/tuning
         // levers here, not enforced anywhere else as a structural invariant the way a PhotonView count is.
-        [TestCase("Assets/Gameplay/Projectiles/Rocket.prefab")]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Distance.prefab")]
-        [TestCase("Assets/Gameplay/Projectiles/Rocket Cursor.prefab")]
+        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab")]
+        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab")]
+        [TestCase("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab")]
         public void RocketSplashFalloffShapeIsUnchanged(string path)
         {
             SerializedObject explode = Fields<ExplodeOnImpact>(path);
@@ -150,7 +150,7 @@ namespace Overpower.Tests
             // FireField.BurnEveryoneInside burns an upright capsule over the drawn disc instead of a sphere at the
             // field's old floating centre (FireField.OverlapBurnZone, pinned in FireFieldBurnZoneTests against real
             // colliders - a capsule query needs a live PhysicsScene, which this asset-only pin test never opens).
-            AssetAt(Fields<DetonateAtCursor>("Assets/Gameplay/Projectiles/Rocket Cursor.prefab"), "fireFieldPrefab",
+            AssetAt(Fields<DetonateAtCursor>("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab"), "fireFieldPrefab",
                 "Assets/Resources/Fire Field.prefab");
             PhotonViews("Assets/Resources/Fire Field.prefab", 1);
         }
@@ -165,7 +165,7 @@ namespace Overpower.Tests
             Mesh mesh = bolt.GetComponent<MeshFilter>().sharedMesh;
             Assert.IsNotNull(mesh);
             Assert.AreNotEqual("Sphere", mesh.name, "the 0.6 m ball is gone");
-            Assert.AreEqual("Assets/Gameplay/Art/StunBolt.fbx", AssetDatabase.GetAssetPath(mesh), "the faceted bolt from Blender");
+            Assert.AreEqual("Assets/_Project/Shared/Art/StunBolt.fbx", AssetDatabase.GetAssetPath(mesh), "the faceted bolt from Blender");
             Assert.Less(mesh.triangles.Length / 3, 300, "a small low-poly model");
             // How big and how thick it is drawn is tuning (the Bolt child's scale); only its being a bolt along its flight is checked.
             Vector3 size = Vector3.Scale(mesh.bounds.size, Vector3.Scale(bullet.transform.localScale, bolt.localScale));
@@ -194,9 +194,9 @@ namespace Overpower.Tests
         [Test]
         public void PulseHasAView()
         {
-            SerializedObject view = Fields<SonicPulseView>("Assets/Gameplay/Abilities/Sonic Pulse.prefab");
+            SerializedObject view = Fields<SonicPulseView>("Assets/_Project/Features/Abilities/Data/Sonic Pulse.prefab");
             AssetAt(view, "theme", ThemePath);
-            Assert.IsNotNull(Load("Assets/Gameplay/Abilities/Sonic Pulse.prefab").GetComponent<SonicPulseAbility>());
+            Assert.IsNotNull(Load("Assets/_Project/Features/Abilities/Data/Sonic Pulse.prefab").GetComponent<SonicPulseAbility>());
         }
 
         [Test]
@@ -220,7 +220,7 @@ namespace Overpower.Tests
                 Assert.IsTrue(renderer.sharedMaterial == look.flameJetMaterial || renderer.sharedMaterial == look.fxAlpha || renderer.sharedMaterial == look.fxAdditive,
                     renderer.name + " is drawn with an FX material");
             Assert.GreaterOrEqual(tongues.GetComponentsInChildren<ParticleSystem>(true).Length, 2, "flames and embers");
-            Assert.AreEqual("Assets/Gameplay/Abilities/Flame Cone.mat",
+            Assert.AreEqual("Assets/_Project/Features/Abilities/Data/Flame Cone.mat",
                 AssetDatabase.GetAssetPath(cone.transform.Find("Fan").GetComponent<MeshRenderer>().sharedMaterial), "the fan is untouched");
         }
 
@@ -230,10 +230,10 @@ namespace Overpower.Tests
             var look = AssetDatabase.LoadAssetAtPath<Overpower.Arena.ArenaLook>(LookPath);
             Assert.IsNotNull(look.fxAdditive, "ArenaLook › Fx Additive");
             Assert.IsNotNull(look.fxAlpha, "ArenaLook › Fx Alpha");
-            Assert.AreEqual("Assets/Gameplay/FX/Materials/FX Additive.mat", AssetDatabase.GetAssetPath(look.fxAdditive));
-            Assert.AreEqual("Assets/Gameplay/FX/Materials/FX Alpha.mat", AssetDatabase.GetAssetPath(look.fxAlpha));
+            Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Additive.mat", AssetDatabase.GetAssetPath(look.fxAdditive));
+            Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Alpha.mat", AssetDatabase.GetAssetPath(look.fxAlpha));
             Assert.IsNotNull(look.flameJetMaterial, "ArenaLook › Flame Jet Material");
-            Assert.AreEqual("Assets/Gameplay/FX/Materials/FX Flame Jet.mat", AssetDatabase.GetAssetPath(look.flameJetMaterial));
+            Assert.AreEqual("Assets/_Project/Shared/FX/Materials/FX Flame Jet.mat", AssetDatabase.GetAssetPath(look.flameJetMaterial));
             Assert.AreEqual((float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha, look.flameJetMaterial.GetFloat("_DstBlend"),
                 "the flames blend, so their shape's alpha keeps them inside their wedge (an opaque quad would draw outside the hit cone)");
             foreach (Material m in new[] { look.fxAdditive, look.fxAlpha, look.flameJetMaterial })

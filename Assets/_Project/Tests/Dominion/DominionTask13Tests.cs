@@ -15,7 +15,7 @@ namespace Overpower.Tests
     /// </summary>
     public class DominionTask13Tests
     {
-        private const string ModesFolder = "Assets/Gameplay/Config/Modes/";
+        private const string ModesFolder = "Assets/_Project/Shared/Config/Modes/";
         private static GameModeDefinition Mode(string name)
         {
             var mode = AssetDatabase.LoadAssetAtPath<GameModeDefinition>(ModesFolder + name + ".asset");

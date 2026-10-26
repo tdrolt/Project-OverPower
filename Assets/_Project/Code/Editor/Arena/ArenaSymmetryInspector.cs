@@ -15,7 +15,7 @@ namespace Overpower.EditorTools
             EditorGUILayout.HelpBox(
                 "Boundary walls come from Source Outline above, corner to corner - NOT from ArenaLayout.asset, " +
                 "which only holds their thickness and height. To move a wall, move its outline points, then press " +
-                "'Build primitive arena' below. Blocks and barriers DO come from Assets/Gameplay/Config/" +
+                "'Build primitive arena' below. Blocks and barriers DO come from Assets/_Project/Shared/Config/" +
                 "ArenaLayout.asset, never hand-placed for real. Edit a row there, or move a block or barrier in the " +
                 "Scene view and use the OverPower > Arena > 'Capture layout from Source' MENU ITEM (there is no " +
                 "button for it here) to write its new row back, then press 'Build primitive arena' below to rebuild " +

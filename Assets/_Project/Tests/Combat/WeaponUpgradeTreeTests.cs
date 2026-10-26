@@ -128,9 +128,9 @@ namespace Overpower.Tests
             // pointed at the wrong path, an accidental cycle) is caught here instead of surfacing
             // as a broken loadout screen later.
             var catalogue = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>(
-                "Assets/Gameplay/Weapons/WeaponCatalogue.asset");
+                "Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset");
             Assert.NotNull(catalogue,
-                "Expected the real WeaponCatalogue asset at Assets/Gameplay/Weapons/WeaponCatalogue.asset - " +
+                "Expected the real WeaponCatalogue asset at Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset - " +
                 "if it moved, update this test's path.");
 
             var nodes = new List<(int, int)>();

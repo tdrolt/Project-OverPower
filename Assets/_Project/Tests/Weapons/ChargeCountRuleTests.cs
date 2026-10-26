@@ -4,7 +4,7 @@ using Overpower.Weapons;
 namespace Overpower.Tests
 {
     /// <summary>
-    /// Weapon 06's numbers (Assets/Gameplay/Weapons/06 Burst - Charge.asset) as they stand for charge step 2:
+    /// Weapon 06's numbers (Assets/_Project/Features/Weapons/Data/06 Burst - Charge.asset) as they stand for charge step 2:
     /// 3 rounds uncharged, 5 at full, 2 charge steps, a 0.7 s bar. They are named here as local constants rather
     /// than loaded from the asset ON PURPOSE - this file tests the RULE, and Tudor must stay free to retune the
     /// asset without a test going red (plan rule 8).

@@ -11,7 +11,7 @@ namespace Overpower.EditorTools
     [InitializeOnLoad]
     public static class ArenaLookEditorGlobals
     {
-        private const string LookPath = "Assets/Gameplay/Config/ArenaLook.asset";
+        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
 
         static ArenaLookEditorGlobals()
         {

@@ -10,7 +10,7 @@ namespace Overpower.EditorTools
     /// floor rules count on that (FlameLookTests.TheShippedFireShapeNeverDrawsOutsideItsCircle). Seeded, so a rerun draws the same sheet.</summary>
     public static class SoftFireTexture
     {
-        public const string Path = "Assets/Gameplay/FX/Textures/Soft Fire.png";
+        public const string Path = "Assets/_Project/Shared/FX/Textures/Soft Fire.png";
         private const int CellPixels = 128;
 
         [MenuItem("OverPower/FX/Make Soft Fire Texture")]

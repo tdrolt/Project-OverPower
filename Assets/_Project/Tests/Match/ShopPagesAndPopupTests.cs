@@ -49,7 +49,7 @@ namespace Overpower.Tests
             try { Assert.AreEqual(0.5f, fresh.loadoutTooltipDelaySeconds, 0.0001f); }
             finally { Object.DestroyImmediate(fresh); }
 
-            var asset = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            var asset = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
             Assert.NotNull(asset);
             Assert.AreEqual(0.5f, asset.loadoutTooltipDelaySeconds, 0.0001f);
         }
@@ -68,7 +68,7 @@ namespace Overpower.Tests
         [Test]
         public void TheTabNamesAreTheOnesTudorAskedFor()
         {
-            var asset = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+            var asset = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
             Assert.AreEqual("Weapons", asset.loadoutTabWeaponsText);
             Assert.AreEqual("Abilities & Armor", asset.loadoutTabAbilitiesArmorText);
         }
@@ -253,15 +253,15 @@ namespace Overpower.Tests
         // ---- what each item shows (read off the real assets) ----
 
         private static WeaponDefinition WeaponNamed(string assetFile) =>
-            AssetDatabase.LoadAssetAtPath<WeaponDefinition>("Assets/Gameplay/Weapons/" + assetFile);
+            AssetDatabase.LoadAssetAtPath<WeaponDefinition>("Assets/_Project/Features/Weapons/Data/" + assetFile);
 
         private static AbilityDefinition AbilityNamed(string assetFile) =>
-            AssetDatabase.LoadAssetAtPath<AbilityDefinition>("Assets/Gameplay/Abilities/" + assetFile);
+            AssetDatabase.LoadAssetAtPath<AbilityDefinition>("Assets/_Project/Features/Abilities/Data/" + assetFile);
 
         [Test]
         public void EveryWeaponShowsDamageFireIntervalRangeAndOverheat()
         {
-            var catalogue = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/Gameplay/Weapons/WeaponCatalogue.asset");
+            var catalogue = AssetDatabase.LoadAssetAtPath<WeaponCatalogue>("Assets/_Project/Features/Weapons/Data/WeaponCatalogue.asset");
             Assert.NotNull(catalogue);
             foreach (WeaponDefinition def in catalogue.Weapons)
             {
@@ -296,7 +296,7 @@ namespace Overpower.Tests
         [Test]
         public void EveryShopAbilityShowsItsCooldownOrChargeRule()
         {
-            var catalogue = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/Gameplay/Config/AbilityCatalogue.asset");
+            var catalogue = AssetDatabase.LoadAssetAtPath<AbilityCatalogue>("Assets/_Project/Shared/Config/AbilityCatalogue.asset");
             Assert.NotNull(catalogue);
             int checkedCount = 0;
             foreach (AbilityDefinition def in catalogue.Abilities)

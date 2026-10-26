@@ -120,11 +120,11 @@ namespace Overpower.Tests
         [Test]
         public void MatchSystemsCarriesTheLightPoolWithTheTheme()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Systems/MatchSystems.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Match/Prefabs/MatchSystems.prefab");
             var pool = prefab.GetComponentInChildren<ShotLightPool>(true);
             Assert.IsNotNull(pool, "both arena scenes hold MatchSystems, so neither scene file changes");
             var theme = new SerializedObject(pool).FindProperty("theme").objectReferenceValue;
-            Assert.AreEqual("Assets/Gameplay/Config/UiTheme.asset", AssetDatabase.GetAssetPath(theme));
+            Assert.AreEqual("Assets/_Project/Shared/Config/UiTheme.asset", AssetDatabase.GetAssetPath(theme));
             Assert.IsEmpty(prefab.GetComponentsInChildren<Light>(true), "the lights are made once at runtime, never saved in the prefab");
         }
 

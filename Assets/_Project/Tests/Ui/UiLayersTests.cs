@@ -21,7 +21,7 @@ namespace Overpower.Tests
             return table;
         }
 
-        private static UiTheme RealTheme() => AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
+        private static UiTheme RealTheme() => AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
 
         [Test]
         public void DeathCardUnderShopAboveHud()

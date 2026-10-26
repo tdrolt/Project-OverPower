@@ -19,7 +19,7 @@ namespace Overpower.Weapons
         public const string LightName = "Shot Light";
 
         [SerializeField, Tooltip("Where the number of lights, their reach and brightness come from (its Arena Look) and the team colours: " +
-                 "Assets/Gameplay/Config/UiTheme.asset.")]
+                 "Assets/_Project/Shared/Config/UiTheme.asset.")]
         private UiTheme theme;
 
         private static readonly List<ShotTeamVisuals> Live = new List<ShotTeamVisuals>(64);

@@ -14,7 +14,7 @@ namespace Overpower.Tests
     /// and the warm-up bar are driven by a testable Tick, and every mode's info page fits.</summary>
     public class LobbyTask12ReviewTests
     {
-        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
+        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
 
         private UiTheme theme;
         private LobbyUiKit kit;
@@ -183,7 +183,7 @@ namespace Overpower.Tests
         [Test]
         public void EveryModesInfoPageFitsItsCard()
         {
-            string[] guids = AssetDatabase.FindAssets("t:GameModeDefinition", new[] { "Assets/Gameplay/Config/Modes" });
+            string[] guids = AssetDatabase.FindAssets("t:GameModeDefinition", new[] { "Assets/_Project/Shared/Config/Modes" });
             int checkedModes = 0;
             foreach (string guid in guids)
             {

@@ -17,7 +17,7 @@ namespace Overpower.Weapons
     public sealed class LookTint : MonoBehaviour, IProjectileBehaviour
     {
         [SerializeField, Tooltip("Where the colour (the look table's row for the ability below) and the glow come from: " +
-                 "Assets/Gameplay/Config/UiTheme.asset and its Arena Look.")]
+                 "Assets/_Project/Shared/Config/UiTheme.asset and its Arena Look.")]
         private UiTheme theme;
 
         [SerializeField, Tooltip("The ability whose look-table row colours this object, by the Id on its ability asset (22 is the Stun Gun).")]

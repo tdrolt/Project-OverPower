@@ -12,9 +12,9 @@ namespace Overpower.Tests
     /// built from the real theme and assets. They read what the panels draw, never the words themselves.</summary>
     public class LobbyPagesPanelTests
     {
-        private const string ThemePath = "Assets/Gameplay/Config/UiTheme.asset";
-        private const string ConquestPath = "Assets/Gameplay/Config/Modes/Conquest 3v3v3.asset";
-        private const string Conquest3v3Path = "Assets/Gameplay/Config/Modes/Conquest 3v3.asset";
+        private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
+        private const string ConquestPath = "Assets/_Project/Shared/Config/Modes/Conquest 3v3v3.asset";
+        private const string Conquest3v3Path = "Assets/_Project/Shared/Config/Modes/Conquest 3v3.asset";
 
         private UiTheme theme;
         private LobbyUiKit kit;

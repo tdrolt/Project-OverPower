@@ -35,7 +35,7 @@ namespace Overpower.Weapons
         private Transform muzzle;
 
         [SerializeField, Tooltip("Where a laser's wind-up warning line gets its team colour and its width/alpha/material numbers from " +
-                 "- Assets/Gameplay/Config/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
+                 "- Assets/_Project/Shared/Config/UiTheme.asset, shared with the HUD, the aim cone and every shot's trail. " +
                  "Presentation only; every weapon still fires with this left empty, the warning line just falls back " +
                  "to plain numbers and no material instead of the theme's.")]
         private UiTheme theme;

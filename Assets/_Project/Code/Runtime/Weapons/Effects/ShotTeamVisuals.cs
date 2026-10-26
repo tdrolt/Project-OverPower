@@ -27,7 +27,7 @@ namespace Overpower.Weapons
         public const string TrailChildName = "Shot Trail";
 
         [SerializeField, Tooltip("Where the team colours, trail settings and tint/emission strength come " +
-                 "from - Assets/Gameplay/Config/UiTheme.asset, shared with the HUD and the aim cone. " +
+                 "from - Assets/_Project/Shared/Config/UiTheme.asset, shared with the HUD and the aim cone. " +
                  "Presentation only; nothing here is a gameplay value. Overwrites the baked 'Shot Trail' " +
                  "child's own time/width/material every spawn (see ConfigureTrail) - set those on UiTheme, " +
                  "not on the prefab child.")]

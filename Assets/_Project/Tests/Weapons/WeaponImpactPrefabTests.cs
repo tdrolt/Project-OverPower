@@ -12,10 +12,10 @@ namespace Overpower.Tests
     /// (VFXManager times each from its particle systems and reuses it).</summary>
     public class WeaponImpactPrefabTests
     {
-        private const string PuffPath = "Assets/Prefabs/FXBulletExplosion.prefab";
-        private const string OldMuzzlePath = "Assets/Prefabs/FXShot.prefab";
-        private const string MuzzlePath = "Assets/Gameplay/FX/FX Muzzle Flash.prefab";
-        private const string ImpactsFolder = "Assets/Gameplay/FX/Impacts/";
+        private const string PuffPath = "Assets/_Project/Shared/FX/Legacy/FXBulletExplosion.prefab";
+        private const string OldMuzzlePath = "Assets/_Project/Shared/FX/Legacy/FXShot.prefab";
+        private const string MuzzlePath = "Assets/_Project/Shared/FX/FX Muzzle Flash.prefab";
+        private const string ImpactsFolder = "Assets/_Project/Shared/FX/Impacts/";
 
         // The shop's weapon tree: a gun's family is the gun its upgrade line grows from, the one bought straight off the starting gun
         // (the starting gun is its own family). Read from the data, so adding or renaming a gun needs no edit here.
@@ -69,10 +69,10 @@ namespace Overpower.Tests
         [Test]
         public void TheStunAndZipGunsKeepTheirOwnImpacts()
         {
-            Assert.AreEqual("Assets/Gameplay/FX/Impacts/FX Stun Burst.prefab",
-                FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Projectiles/Stun Gun Bullet.prefab")));
-            const string zipHit = "Assets/Gameplay/FX/Impacts/FX Zip Hit.prefab";
-            Assert.AreEqual(zipHit, FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Gameplay/Projectiles/Zip Gun Bullet.prefab")),
+            Assert.AreEqual("Assets/_Project/Shared/FX/Impacts/FX Stun Burst.prefab",
+                FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Weapons/Projectiles/Stun Gun Bullet.prefab")));
+            const string zipHit = "Assets/_Project/Shared/FX/Impacts/FX Zip Hit.prefab";
+            Assert.AreEqual(zipHit, FallbackOf(AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Features/Weapons/Projectiles/Zip Gun Bullet.prefab")),
                 "the Zip Gun's hit is its own silver burst, not the old yellow-to-red puff (yellow reads as the Shield's gold)");
             var tint = AssetDatabase.LoadAssetAtPath<GameObject>(zipHit).GetComponent<LookTint>();
             Assert.IsNotNull(tint, "coloured by the look table");

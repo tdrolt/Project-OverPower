@@ -11,8 +11,8 @@ namespace Overpower.Tests
     /// Scope draws nothing, and the respawn bubble and the Shield cannot be mistaken for each other.</summary>
     public class AbilityLookTableTests
     {
-        private const string LookPath = "Assets/Gameplay/Config/ArenaLook.asset";
-        private const string CataloguePath = "Assets/Gameplay/Config/AbilityCatalogue.asset";
+        private const string LookPath = "Assets/_Project/Shared/Config/ArenaLook.asset";
+        private const string CataloguePath = "Assets/_Project/Shared/Config/AbilityCatalogue.asset";
         private const int ScopeId = 28;
         private const int ShieldId = 25;
         private static readonly int[] DebugPings = { 901, 902, 903 };

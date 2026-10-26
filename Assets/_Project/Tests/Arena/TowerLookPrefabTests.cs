@@ -16,7 +16,7 @@ namespace Overpower.Tests
     /// same pattern as ArenaSymmetryBuilderTests.</summary>
     public class TowerLookPrefabTests
     {
-        private const string PrefabPath = "Assets/Gameplay/Arena/Tower Look.prefab";
+        private const string PrefabPath = "Assets/_Project/Features/Arena/Tower Look.prefab";
 
         private Scene scene;
         private GameObject instance;
@@ -215,8 +215,8 @@ namespace Overpower.Tests
         [Test]
         public void RefreshGlowsTheCrownCapsAndPlinthAndNeverPaintsTheBodyOrTheShafts()
         {
-            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
+            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            Assert.IsNotNull(theme, "Assets/_Project/Shared/Config/UiTheme.asset");
 
             float originalGlow = theme.towerOwnerGlow;
             const float testGlow = 2f; // the test's own value, not the asset's tuned 1.5 - see the class comment above.
@@ -259,8 +259,8 @@ namespace Overpower.Tests
         [Test]
         public void ShowingAColumnAtRuntimePaintsIt()
         {
-            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
+            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            Assert.IsNotNull(theme, "Assets/_Project/Shared/Config/UiTheme.asset");
 
             look.ApplyColumns(3);
             look.Bind(theme);
@@ -282,8 +282,8 @@ namespace Overpower.Tests
         [Test]
         public void RefreshNeverGlowsANeutralTowerEvenWithGlowRaised()
         {
-            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
+            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            Assert.IsNotNull(theme, "Assets/_Project/Shared/Config/UiTheme.asset");
 
             float originalGlow = theme.towerOwnerGlow;
             theme.towerOwnerGlow = 2f;
@@ -312,8 +312,8 @@ namespace Overpower.Tests
         [Test]
         public void RefreshNeverGlowsAnOutOfPlayTowerEvenWithGlowRaised()
         {
-            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/Gameplay/Config/UiTheme.asset");
-            Assert.IsNotNull(theme, "Assets/Gameplay/Config/UiTheme.asset");
+            UiTheme theme = AssetDatabase.LoadAssetAtPath<UiTheme>("Assets/_Project/Shared/Config/UiTheme.asset");
+            Assert.IsNotNull(theme, "Assets/_Project/Shared/Config/UiTheme.asset");
 
             float originalGlow = theme.towerOwnerGlow;
             theme.towerOwnerGlow = 2f;

@@ -8,7 +8,7 @@ namespace Overpower.Tests
     internal static class HexDiscMesh
     {
         public const string MeshName = "Hex Disc";
-        public const string AssetPath = "Assets/Gameplay/Art/Hex Disc.asset";
+        public const string AssetPath = "Assets/_Project/Shared/Art/Hex Disc.asset";
         private const int Sides = 6;
         private const float CornerRadius = 0.5f;
 
