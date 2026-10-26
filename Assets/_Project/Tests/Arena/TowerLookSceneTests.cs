@@ -19,7 +19,7 @@ namespace Overpower.Tests
     /// </summary>
     public class TowerLookSceneTests
     {
-        private const string ScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string ScenePath = "Assets/_Project/Scenes/Game Scene.unity";
         private const int ExpectedTowerCount = 10;
 
         private static bool IsBatchingStatic(GameObject go) =>

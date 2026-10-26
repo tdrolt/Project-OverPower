@@ -12,7 +12,7 @@ namespace Overpower.Tests
     /// that every MonoBehaviour anywhere in the prefab (recursively) still resolves to a real script.</summary>
     public class MultiplayerPlayerPrefabIntegrityTests
     {
-        private const string PrefabPath = "Assets/Resources/Multiplayer Player.prefab";
+        private const string PrefabPath = "Assets/_Project/Resources/Multiplayer Player.prefab";
 
         // A real MonoBehaviour subclass (compiled from this very file, so it has a genuine MonoScript asset and
         // GUID) whose m_Script reference the sanity check below breaks on purpose, entirely in memory. Test-only;

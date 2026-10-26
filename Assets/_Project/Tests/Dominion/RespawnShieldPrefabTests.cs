@@ -13,7 +13,7 @@ namespace Overpower.Tests
     {
         [Test] public void ThePlayerPrefabCarriesTheRespawnShieldWiredToTheInvulnerabilityPrefab()
         {
-            var player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Multiplayer Player.prefab");
+            var player = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab");
             Assert.IsNotNull(player);
             RespawnShield shield = player.GetComponent<RespawnShield>();
             Assert.IsNotNull(shield, "the player prefab needs the RespawnShield");

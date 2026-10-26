@@ -20,7 +20,7 @@ namespace Overpower.Tests
     /// controller was worried about.</summary>
     public class ArenaSceneShaderIntegrityTests
     {
-        private const string ScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string ScenePath = "Assets/_Project/Scenes/Game Scene.unity";
         private const string UrpShaderPrefix = "Universal Render Pipeline/";
 
         [Test]

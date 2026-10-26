@@ -145,7 +145,7 @@ namespace Overpower.Tests
         public void TheOldTeamMaterialsArrayIsRetiredFromCodeAndPrefab()
         {
             Assert.IsNull(typeof(PlayerTeamAppearance).GetField("teamMaterials"), "nothing reads the PBR team array any more");
-            string prefab = File.ReadAllText("Assets/Resources/Multiplayer Player.prefab");
+            string prefab = File.ReadAllText("Assets/_Project/Resources/Multiplayer Player.prefab");
             StringAssert.DoesNotContain("teamMaterials:", prefab);
             StringAssert.DoesNotContain("1666fb81395f51e4293b01cca8f58481", prefab, "the player prefab no longer references PBR team 1");
             StringAssert.DoesNotContain("93954767c5da02742b700c59b05ae323", prefab, "or the black purple material");

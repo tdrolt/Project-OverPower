@@ -27,7 +27,7 @@ namespace Overpower.Weapons
                  "the test range replace it at runtime through PlayerLoadout.")]
         private WeaponDefinition startingWeapon;
 
-        // The muzzle's one home is its Transform on Assets/Resources/Multiplayer Player.prefab - tune
+        // The muzzle's one home is its Transform on Assets/_Project/Resources/Multiplayer Player.prefab - tune
         // it by moving that child. It sits just inside the player's body capsule; the shot logic
         // ignores the shooter, so that is safe.
         [SerializeField, Tooltip("Where projectiles leave the gun. Falls back to the player's own " +

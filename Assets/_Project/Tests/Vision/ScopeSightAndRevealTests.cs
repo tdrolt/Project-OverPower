@@ -246,7 +246,7 @@ namespace Overpower.Tests
         [Test]
         public void ThePlayerPrefabPointsTeamSightAtTheScopeModule()
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Multiplayer Player.prefab");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Resources/Multiplayer Player.prefab");
             Assert.IsNotNull(prefab);
             var sight = prefab.GetComponent<TeamSight>();
             Assert.IsNotNull(sight);

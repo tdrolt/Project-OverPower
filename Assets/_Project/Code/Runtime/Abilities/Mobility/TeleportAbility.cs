@@ -37,7 +37,7 @@ namespace Overpower.Abilities
         private int maxPortals = 2;
 
         [SerializeField, Tooltip("The portal that gets placed - a networked object that must live in " +
-                 "Assets/Resources (PhotonNetwork.Instantiate resolves it by name). Its own Portal " +
+                 "Assets/_Project/Resources (PhotonNetwork.Instantiate resolves it by name). Its own Portal " +
                  "Diameter field is the single home for how big a portal is; this ability only reads " +
                  "that value to send along with the placement, and reads the prefab's name to spawn it.")]
         private GameObject portalPrefab;

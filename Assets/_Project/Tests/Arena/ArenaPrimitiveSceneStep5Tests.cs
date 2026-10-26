@@ -19,7 +19,7 @@ namespace Overpower.Tests
     /// ArenaSymmetrySceneTests, so it never opens the scene Single (which would prompt to save a dirty scene).</summary>
     public class ArenaPrimitiveSceneStep5Tests
     {
-        private const string ScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string ScenePath = "Assets/_Project/Scenes/Game Scene.unity";
         private const string OldArtGroupName = ArenaPrimitiveBuilder.OldArtGroupName;
 
         [Test]

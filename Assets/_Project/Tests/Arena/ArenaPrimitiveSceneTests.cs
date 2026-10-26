@@ -18,7 +18,7 @@ namespace Overpower.Tests
     /// save a dirty scene).</summary>
     public class ArenaPrimitiveSceneTests
     {
-        private const string ScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string ScenePath = "Assets/_Project/Scenes/Game Scene.unity";
 
         [Test]
         public void EveryTowerShowsATowerLookWithOneColumnPerTier()

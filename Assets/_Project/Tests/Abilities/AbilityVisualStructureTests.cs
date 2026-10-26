@@ -23,7 +23,7 @@ namespace Overpower.Tests
         private const string PylonPath = "Assets/_Project/Shared/Art/FencePylon.fbx";
         private const string PlacedBodyPath = "Assets/_Project/Shared/FX/Materials/Placed Body.mat";
         private const string WallPath = "Assets/_Project/Features/Arena/Materials/Arena Wall.mat";
-        private const string CoverPath = "Assets/Resources/Cover Wall.prefab";
+        private const string CoverPath = "Assets/_Project/Resources/Cover Wall.prefab";
 
         // A6 (Tudor 2026-09-17 evening): rocket blasts stay at their real height, so step 6 needs a short see-through
         // shell at the burst point instead of a floor BlastMarker. Built here, in the shared kit, so step 6 has it
@@ -171,7 +171,7 @@ namespace Overpower.Tests
             // PhotonNetwork.Instantiate's position), so nothing in the field snaps to the ground on its own. The
             // burning ground is floor flames in the fire colours, sized to the real Radius when it lights (FireFieldLookTests), and the rim
             // still marks the true edge.
-            GameObject prefab = Load("Assets/Resources/Fire Field.prefab");
+            GameObject prefab = Load("Assets/_Project/Resources/Fire Field.prefab");
             Assert.IsNull(prefab.transform.Find("Visual"), "no flat disc: the burning ground is drawn by its flames");
             Assert.IsEmpty(prefab.GetComponentsInChildren<SnapVisualToGround>(true), "the field's root is placed on the floor at spawn time");
             var field = prefab.GetComponent<FireField>();
@@ -193,7 +193,7 @@ namespace Overpower.Tests
         [Test]
         public void TheMineIsAHexPuckWithATeamCapAndNoCollider()
         {
-            GameObject prefab = Load("Assets/Resources/Mine.prefab");
+            GameObject prefab = Load("Assets/_Project/Resources/Mine.prefab");
             Transform visual = Child(prefab.transform, "Visual");
             Assert.AreSame(visual, Ref(prefab.GetComponent<Mine>(), "visual"), "Mine hides this the instant it detonates");
             Assert.AreEqual(Vector3.zero, visual.localPosition);
@@ -230,7 +230,7 @@ namespace Overpower.Tests
         [Test]
         public void ThePortalIsAHexGateWithATurningInnerHexAndNoCollider()
         {
-            GameObject prefab = Load("Assets/Resources/Portal.prefab");
+            GameObject prefab = Load("Assets/_Project/Resources/Portal.prefab");
             Assert.IsNull(prefab.transform.Find("Visual"), "the old grey cylinder is gone");
             Transform footprint = Child(prefab.transform, "Footprint");
             AssertMeshAsset(footprint, HexDiscMesh.AssetPath, GlassPath);
@@ -260,7 +260,7 @@ namespace Overpower.Tests
         [Test]
         public void TheElectricFenceIsAngularPylonsWithArcsAndNoCollider()
         {
-            GameObject prefab = Load("Assets/Resources/Electric Fence.prefab");
+            GameObject prefab = Load("Assets/_Project/Resources/Electric Fence.prefab");
             Assert.IsNull(Ref(prefab.GetComponent<ElectricFence>(), "visual"), "nothing is stretched to the radius any more");
             Assert.IsNull(prefab.transform.Find("Visual"), "the old flat disc is gone");
             Transform cage = Child(prefab.transform, "Cage");

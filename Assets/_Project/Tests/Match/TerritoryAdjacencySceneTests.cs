@@ -17,7 +17,7 @@ namespace Overpower.Tests
     /// </summary>
     public class TerritoryAdjacencySceneTests
     {
-        private const string ScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string ScenePath = "Assets/_Project/Scenes/Game Scene.unity";
 
         [Test]
         public void TheSceneLinksTheCentreToEveryTier2Only()

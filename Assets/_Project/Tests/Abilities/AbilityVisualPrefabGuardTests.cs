@@ -22,10 +22,10 @@ namespace Overpower.Tests
     {
         private static readonly string[] TouchedPrefabs =
         {
-            "Assets/Resources/Mine.prefab",
-            "Assets/Resources/Portal.prefab",
-            "Assets/Resources/Electric Fence.prefab",
-            "Assets/Resources/Fire Field.prefab",
+            "Assets/_Project/Resources/Mine.prefab",
+            "Assets/_Project/Resources/Portal.prefab",
+            "Assets/_Project/Resources/Electric Fence.prefab",
+            "Assets/_Project/Resources/Fire Field.prefab",
             "Assets/_Project/Features/Weapons/Projectiles/Rocket.prefab",
             "Assets/_Project/Features/Weapons/Projectiles/Rocket Distance.prefab",
             "Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab",
@@ -86,28 +86,28 @@ namespace Overpower.Tests
         [Test]
         public void MineIsWired()
         {
-            PhotonViews("Assets/Resources/Mine.prefab", 1);
+            PhotonViews("Assets/_Project/Resources/Mine.prefab", 1);
 
             SerializedObject ability = Fields<MineAbility>("Assets/_Project/Features/Abilities/Data/Mines.prefab");
-            AssetAt(ability, "minePrefab", "Assets/Resources/Mine.prefab");
+            AssetAt(ability, "minePrefab", "Assets/_Project/Resources/Mine.prefab");
         }
 
         [Test]
         public void PortalIsWired()
         {
-            PhotonViews("Assets/Resources/Portal.prefab", 1);
+            PhotonViews("Assets/_Project/Resources/Portal.prefab", 1);
 
             SerializedObject ability = Fields<TeleportAbility>("Assets/_Project/Features/Abilities/Data/Teleport.prefab");
-            AssetAt(ability, "portalPrefab", "Assets/Resources/Portal.prefab");
+            AssetAt(ability, "portalPrefab", "Assets/_Project/Resources/Portal.prefab");
         }
 
         [Test]
         public void ElectricFenceIsWired()
         {
-            PhotonViews("Assets/Resources/Electric Fence.prefab", 2); // two today - flagged for Tudor, not fixed here
+            PhotonViews("Assets/_Project/Resources/Electric Fence.prefab", 2); // two today - flagged for Tudor, not fixed here
 
             SerializedObject ability = Fields<ElectricFenceAbility>("Assets/_Project/Features/Abilities/Data/Electric Fence.prefab");
-            AssetAt(ability, "fencePrefab", "Assets/Resources/Electric Fence.prefab");
+            AssetAt(ability, "fencePrefab", "Assets/_Project/Resources/Electric Fence.prefab");
         }
 
         [Test]
@@ -151,8 +151,8 @@ namespace Overpower.Tests
             // field's old floating centre (FireField.OverlapBurnZone, pinned in FireFieldBurnZoneTests against real
             // colliders - a capsule query needs a live PhysicsScene, which this asset-only pin test never opens).
             AssetAt(Fields<DetonateAtCursor>("Assets/_Project/Features/Weapons/Projectiles/Rocket Cursor.prefab"), "fireFieldPrefab",
-                "Assets/Resources/Fire Field.prefab");
-            PhotonViews("Assets/Resources/Fire Field.prefab", 1);
+                "Assets/_Project/Resources/Fire Field.prefab");
+            PhotonViews("Assets/_Project/Resources/Fire Field.prefab", 1);
         }
 
         [Test]

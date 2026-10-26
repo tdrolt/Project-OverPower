@@ -12,7 +12,7 @@ namespace Overpower.Tests
     /// </summary>
     public class ChargeRingPrefabTests
     {
-        private const string PlayerPrefab = "Assets/Resources/Multiplayer Player.prefab";
+        private const string PlayerPrefab = "Assets/_Project/Resources/Multiplayer Player.prefab";
 
         private static GameObject Player()
         {

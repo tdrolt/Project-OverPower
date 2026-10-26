@@ -18,8 +18,8 @@ namespace Overpower.Tests
     /// </summary>
     public class DominionLaneSceneTests
     {
-        private const string LanePath = "Assets/Scenes/Dominion 2v2.unity";
-        private const string GamePath = "Assets/Scenes/Game Scene.unity";
+        private const string LanePath = "Assets/_Project/Scenes/Dominion 2v2.unity";
+        private const string GamePath = "Assets/_Project/Scenes/Game Scene.unity";
 
         private static void WithScene(string path, System.Action<Scene> check)
         {

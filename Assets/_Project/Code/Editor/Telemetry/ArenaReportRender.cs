@@ -17,7 +17,7 @@ namespace Overpower.EditorTools.Telemetry
         private const float MinZ = -7f;
         private const float SpanMetres = 144f; // 137 - (-7)
         private const int PixelSize = 1024;
-        private const string GameScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string GameScenePath = "Assets/_Project/Scenes/Game Scene.unity";
 
         public sealed class Result
         {

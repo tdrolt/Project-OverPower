@@ -20,7 +20,7 @@ namespace Overpower.Tests
     /// </summary>
     public class PhaseTwoCutSceneTests
     {
-        private const string ScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string ScenePath = "Assets/_Project/Scenes/Game Scene.unity";
 
         [Test]
         public void TheArenaKnowsItsLayout()

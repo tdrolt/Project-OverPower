@@ -19,7 +19,7 @@ namespace Overpower.Tests
     public class HealZoneTests
     {
         private const int Caster = 1, CasterTeam = 0;
-        private const string ZonePrefabPath = "Assets/Resources/AoE Zone.prefab";
+        private const string ZonePrefabPath = "Assets/_Project/Resources/AoE Zone.prefab";
 
         private class FakePlayer : IDamageable
         {

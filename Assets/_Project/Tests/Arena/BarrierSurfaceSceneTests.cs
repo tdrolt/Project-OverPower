@@ -22,8 +22,8 @@ namespace Overpower.Tests
         private static float StripeWidth() =>
             AssetDatabase.LoadAssetAtPath<ArenaLook>("Assets/_Project/Shared/Config/ArenaLook.asset").barrierTopStripeWidth;
 
-        [TestCase("Assets/Scenes/Game Scene.unity")]
-        [TestCase("Assets/Scenes/Dominion 2v2.unity")]
+        [TestCase("Assets/_Project/Scenes/Game Scene.unity")]
+        [TestCase("Assets/_Project/Scenes/Dominion 2v2.unity")]
         public void EveryLowBarrierWearsTheBarrierSurface(string path)
         {
             var barrier = AssetDatabase.LoadAssetAtPath<Material>(BarrierPath);

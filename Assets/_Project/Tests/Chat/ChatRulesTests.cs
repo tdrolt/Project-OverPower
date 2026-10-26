@@ -115,7 +115,7 @@ namespace Overpower.Tests
         [Test]
         public void TheOldPressEnterToChatLabelIsGone()
         {
-            string scene = System.IO.File.ReadAllText("Assets/Scenes/Game Scene.unity");
+            string scene = System.IO.File.ReadAllText("Assets/_Project/Scenes/Game Scene.unity");
             StringAssert.DoesNotContain("to chat", scene, "the pixel-font hint was removed; the chat's own input box is the only hint");
             StringAssert.DoesNotContain("m_Name: chattext", scene);
             string screen = System.IO.File.ReadAllText("Assets/_Project/Code/Runtime/UI/Lobby/NameScreen.cs");

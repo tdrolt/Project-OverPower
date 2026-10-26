@@ -19,7 +19,7 @@ namespace Overpower.Abilities
     public sealed class DeployableCoverAbility : AbilityModule
     {
         [SerializeField, Tooltip("The wall that gets placed - a networked object that must live in " +
-                 "Assets/Resources (PhotonNetwork.Instantiate resolves it by name). Its own Width, " +
+                 "Assets/_Project/Resources (PhotonNetwork.Instantiate resolves it by name). Its own Width, " +
                  "Height, Thickness and Hit Points are the single home for those numbers; this " +
                  "ability only reads its size to validate a placement and its name to spawn it.")]
         private GameObject coverPrefab;

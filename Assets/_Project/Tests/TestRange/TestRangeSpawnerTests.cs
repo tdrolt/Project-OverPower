@@ -19,7 +19,7 @@ namespace Overpower.Tests
     /// the test to silently drift from what actually spawns.</summary>
     public class TestRangeSpawnerTests
     {
-        private const string ScenePath = "Assets/Scenes/Game Scene.unity";
+        private const string ScenePath = "Assets/_Project/Scenes/Game Scene.unity";
 
         [Test]
         public void EveryDummySpawnPointIsClearOfBuildingAndBarrierColliders()

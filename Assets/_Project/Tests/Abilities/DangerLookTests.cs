@@ -22,7 +22,7 @@ namespace Overpower.Tests
         private const int RaybeamId = 24, AoeId = 27;
         private const string ThemePath = "Assets/_Project/Shared/Config/UiTheme.asset";
         private const string FxAlphaPath = "Assets/_Project/Shared/FX/Materials/FX Alpha.mat";
-        private const string ZonePath = "Assets/Resources/AoE Zone.prefab";
+        private const string ZonePath = "Assets/_Project/Resources/AoE Zone.prefab";
         private const string RaybeamPath = "Assets/_Project/Features/Abilities/Data/Raybeam.prefab";
         private const string BeamPath = "Assets/_Project/Shared/FX/Raybeam Beam.prefab";
         private const string ScorchPath = "Assets/_Project/Shared/FX/Impacts/FX Raybeam Scorch.prefab";
