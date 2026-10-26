@@ -55,7 +55,11 @@ namespace Overpower.UI
         private RectTransform overheatTickRect; // Repositioned live (UpdateOverheat).
         private Image ventBandImage; // The Vent window band, repositioned/recoloured live (UpdateVentBand).
         private Image armorFill;
-        private RectTransform armorExtentRect; // The part of the armor track sized by capacity, not by current value.
+        private RectTransform armorTrackRect; // The drawn armour track; off while the player can hold no armour.
+        private BarDividers healthLines;
+        private BarDividers armorLines;
+        private TextMeshProUGUI healthNumber;
+        private TextMeshProUGUI armorNumber;
 
         // The yellow immunity look is a FRAME round each bar (four thin edge Images), not a recolour and not a translucent
         // overlay (a wash over blue read grey, see UiTheme.immuneBarColor). One frame each: the HUD's health and armor bars
@@ -181,7 +185,8 @@ namespace Overpower.UI
 
         private float lastHealthFraction = -1f;
         private float lastArmorFraction = -1f;
-        private float lastArmorExtentWidth = -1f;
+        private int lastHealthShown = -1, lastHealthMaxShown = -1;
+        private int lastArmorShown = -1, lastArmorMaxShown = -1;
         private float lastOverheatFraction = -1f;
         private float lastWarningThreshold01 = -1f;
         private bool lastSilenced;
@@ -439,23 +444,20 @@ namespace Overpower.UI
                 healthFill.fillAmount = healthFraction;
                 lastHealthFraction = healthFraction;
             }
+            healthLines.Layout(maxHealth, theme.barSegmentSize);
+            SetBarNumber(healthNumber, ref lastHealthShown, ref lastHealthMaxShown, playerHealth.Health, maxHealth);
 
-            // The armour row draws only as far as the armour this player can hold (BuildArmorBar), plus the 2px margins.
-            if (armorExtentRect.gameObject.activeSelf != bar.armourShown)
-                armorExtentRect.gameObject.SetActive(bar.armourShown);
-            float extentWidth = bar.armourTrack * (theme.barWidth - 4f) + 4f;
-            if (!Mathf.Approximately(extentWidth, lastArmorExtentWidth))
-            {
-                armorExtentRect.sizeDelta = new Vector2(extentWidth, armorExtentRect.sizeDelta.y);
-                lastArmorExtentWidth = extentWidth;
-            }
-
-            float armorFraction = bar.armourOfTrack;
+            // Full length at full armour whatever its size: the lines and the number say how much it holds. No armour, no bar.
+            if (armorTrackRect.gameObject.activeSelf != bar.armourShown)
+                armorTrackRect.gameObject.SetActive(bar.armourShown);
+            float armorFraction = bar.armourOfCapacity;
             if (!Mathf.Approximately(armorFraction, lastArmorFraction))
             {
                 armorFill.fillAmount = armorFraction;
                 lastArmorFraction = armorFraction;
             }
+            armorLines.Layout(playerHealth.ArmorCapacity, theme.barSegmentSize);
+            SetBarNumber(armorNumber, ref lastArmorShown, ref lastArmorMaxShown, playerHealth.Armor, playerHealth.ArmorCapacity);
 
             // Both bars turn yellow together, only while PlayerHealth's clock says the immunity (not merely the armed
             // trap) is running (ShowsImmuneLook).
@@ -468,6 +470,18 @@ namespace Overpower.UI
                 healthImmuneFrame.SetShown(immune);
                 armorImmuneFrame.SetShown(immune);
             }
+        }
+
+        /// <summary>Rewrites a bar's "current/max" only when a shown whole number changed, so the per-frame update makes no string.</summary>
+        private void SetBarNumber(TextMeshProUGUI number, ref int lastShown, ref int lastMaxShown, float current, float max)
+        {
+            int shown = BarSegments.Shown(current);
+            int maxShown = BarSegments.Shown(max);
+            if (shown == lastShown && maxShown == lastMaxShown)
+                return;
+            lastShown = shown;
+            lastMaxShown = maxShown;
+            number.text = BarSegments.Number(current, max);
         }
 
         private void UpdateOverheat()
@@ -918,10 +932,14 @@ namespace Overpower.UI
             overheatFill = BuildBar(panel.transform, "Overheat Bar", theme.barWidth, theme.overheatBarHeight, theme.overheatColor, out Image overheatTrack);
             overheatTickRect = BuildOverheatTick(overheatTrack.transform);
             ventBandImage = BuildVentBand(overheatTrack.transform);
-            armorFill = BuildArmorBar(panel.transform, out armorExtentRect);
-            // On the extent, the only part of the armour row that is drawn: a frame round the whole row would box empty space.
-            armorImmuneFrame = BuildImmuneFrame(armorExtentRect);
+            armorFill = BuildArmorBar(panel.transform, out armorTrackRect);
+            armorLines = new BarDividers(armorFill.rectTransform, theme.hudBarSegmentLineWidth, theme.barSegmentLineColor);
+            armorNumber = BuildBarNumber(armorTrackRect);
+            // On the track, so it hides with it when there is no armour to hold.
+            armorImmuneFrame = BuildImmuneFrame(armorTrackRect);
             healthFill = BuildBar(panel.transform, "Health Bar", theme.barWidth, theme.healthBarHeight, theme.healthColor, out _);
+            healthLines = new BarDividers(healthFill.rectTransform, theme.hudBarSegmentLineWidth, theme.barSegmentLineColor);
+            healthNumber = BuildBarNumber(healthFill.transform.parent);
             healthImmuneFrame = BuildImmuneFrame(healthFill.transform.parent);
 
             BuildGoldCorner(canvasGo.transform);
@@ -1282,12 +1300,9 @@ namespace Overpower.UI
             return bandImg;
         }
 
-        /// <summary>An invisible row as wide as the health bar, holding the drawn track ("Capacity Extent") whose WIDTH is set
-        /// live from script (UpdateHealthAndArmor), not by a layout group, which sidesteps layout-rebuild timing (a plain
-        /// child's sizeDelta takes effect at once). The track is as long as the armour this player can hold, in the health
-        /// bar's hit points (HealthArmourBar), so full armour always looks full and "+Absorb twice" reads as a longer bar.
-        /// The row keeps its height with no armour, so the HUD does not jump when armour is bought.</summary>
-        private Image BuildArmorBar(Transform parent, out RectTransform extentRect)
+        /// <summary>An invisible row as wide as the health bar, holding the drawn track, which UpdateHealthAndArmor switches off
+        /// while the player can hold no armour. The row keeps its height then, so the HUD does not jump when armour is bought.</summary>
+        private Image BuildArmorBar(Transform parent, out RectTransform trackRect)
         {
             GameObject track = new GameObject("Armor Bar", typeof(RectTransform));
             track.transform.SetParent(parent, false);
@@ -1296,20 +1311,19 @@ namespace Overpower.UI
             le.preferredHeight = theme.armorBarHeight;
             // panelLayout's child control is ON (BuildUi): this LayoutElement alone is the row's size.
 
-            GameObject extentGo = new GameObject("Capacity Extent", typeof(RectTransform));
-            extentGo.transform.SetParent(track.transform, false);
-            extentRect = extentGo.GetComponent<RectTransform>();
-            extentRect.anchorMin = new Vector2(0f, 0f);
-            extentRect.anchorMax = new Vector2(0f, 1f);
-            extentRect.pivot = new Vector2(0f, 0.5f);
-            extentRect.anchoredPosition = Vector2.zero;
-            extentRect.sizeDelta = Vector2.zero; // Width set live; full row height.
-            Image background = extentGo.AddComponent<Image>();
+            GameObject trackGo = new GameObject("Track", typeof(RectTransform));
+            trackGo.transform.SetParent(track.transform, false);
+            trackRect = trackGo.GetComponent<RectTransform>();
+            trackRect.anchorMin = Vector2.zero;
+            trackRect.anchorMax = Vector2.one;
+            trackRect.offsetMin = Vector2.zero;
+            trackRect.offsetMax = Vector2.zero;
+            Image background = trackGo.AddComponent<Image>();
             background.color = theme.barTrackColor;
             background.raycastTarget = false;
 
             GameObject fillGo = new GameObject("Fill", typeof(RectTransform));
-            fillGo.transform.SetParent(extentGo.transform, false);
+            fillGo.transform.SetParent(trackGo.transform, false);
             RectTransform fillRt = fillGo.GetComponent<RectTransform>();
             fillRt.anchorMin = Vector2.zero;
             fillRt.anchorMax = Vector2.one;
@@ -1609,6 +1623,22 @@ namespace Overpower.UI
             keyText.enableWordWrapping = false;
 
             return ui;
+        }
+
+        /// <summary>A bar's "current/max", centred over the whole bar and drawn after its fill and lines, in the HUD's outlined text.</summary>
+        private TextMeshProUGUI BuildBarNumber(Transform barRoot)
+        {
+            TextMeshProUGUI number = AddLabel(barRoot, string.Empty, theme.hudBarNumberSize, FontStyles.Bold);
+            number.name = "Number";
+            number.enableWordWrapping = false;
+            number.overflowMode = TextOverflowModes.Overflow;
+            number.color = theme.hudBarNumberColor;
+            RectTransform rt = number.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            return number;
         }
 
         /// <summary>Same recipe as TestRangePanel.AddLabel, kept separate because the two panels have no other coupling.

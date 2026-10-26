@@ -46,6 +46,11 @@ MonoBehaviour:
   barTrackColor: {r: 0.18, g: 0.18, b: 0.2, a: 1}
   healthBarHeight: 28
   armorBarHeight: 22
+  barSegmentSize: 25
+  barSegmentLineColor: {r: 0.04, g: 0.05, b: 0.07, a: 0.9}
+  hudBarSegmentLineWidth: 2
+  hudBarNumberSize: 19
+  hudBarNumberColor: {r: 1, g: 1, b: 1, a: 1}
   overheatBarHeight: 32
   overheatTickColor: {r: 1, g: 1, b: 1, a: 0.85}
   overheatTickWidth: 2
@@ -106,6 +111,15 @@ MonoBehaviour:
   nameplateTeammateNameColor: {r: 0, g: 1, b: 0, a: 1}
   nameplateEnemyNameColor: {r: 1, g: 0, b: 0, a: 1}
   nameplateUnknownNameColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  nameplateSegmentLineWidth: 0.15
+  nameplateArmourMarkSize: 2.6
+  nameplateArmourMarkGap: 0.4
+  nameplateArmourMarkNameGap: 0.4
+  nameplateArmourSquareLine: 0.25
+  nameplateArmourChevronWidth: 1.8
+  nameplateArmourChevronLine: 0.3
+  nameplateArmourChevronStep: 0.65
+  nameplateArmourMarkColor: {r: 0.55, g: 0.8, b: 1, a: 1}
   shieldWastedText: Wasted
   shieldWastedColor: {r: 0.75, g: 0.78, b: 0.85, a: 1}
   shieldWastedSeconds: 1.2

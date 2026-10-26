@@ -24,6 +24,9 @@ namespace Overpower.UI
             public Vector2 statusBarSize;
             public float statusLabelGap;
             public float wastedTextSize;
+            public float markSize;
+            public float markGap;
+            public float markNameGap;
         }
 
         /// <summary>Rects in overhead-canvas units (Rect.center is the anchored position of a centre-pivoted child).</summary>
@@ -35,6 +38,8 @@ namespace Overpower.UI
             public Rect statusBar;
             public Rect statusLabel;
             public Rect wasted;
+            /// <summary>The armour-upgrade marks: at the plate's left in the name's row; empty with no marks or no bar.</summary>
+            public Rect marks;
             public float edge;
         }
 
@@ -52,15 +57,24 @@ namespace Overpower.UI
             statusBarSize = theme.nameplateStatusBarSize,
             statusLabelGap = theme.nameplateStatusLabelGap,
             wastedTextSize = theme.shieldWastedTextSize,
+            markSize = theme.nameplateArmourMarkSize,
+            markGap = theme.nameplateArmourMarkGap,
+            markNameGap = theme.nameplateArmourMarkNameGap,
         };
 
         /// <summary>The plate is as wide as the longer of its bar and the name (plus padding), up to the widest allowed, and never
         /// narrower than its bar. Its top is fixed by a living player's full height, so a corpse's plate (barShown false) loses the
-        /// bar row from the bottom and the name and everything above it stay put.</summary>
-        public static Frame Compute(Settings s, float nameWidth, bool barShown)
+        /// bar row from the bottom and the name and everything above it stay put. Armour-upgrade marks (markCells of them, side by
+        /// side) take the name row's left end; the name keeps the same room free on its right, so it stays centred over the player.
+        /// A corpse shows no marks.</summary>
+        public static Frame Compute(Settings s, float nameWidth, bool barShown, int markCells = 0)
         {
+            int cells = barShown ? Mathf.Max(0, markCells) : 0;
+            float marksWidth = cells > 0 ? cells * s.markSize + (cells - 1) * s.markGap : 0f;
+            float reserve = cells > 0 ? marksWidth + s.markNameGap : 0f;
+
             float barOnly = s.barSize.x + 2f * s.padding.x;
-            float width = Mathf.Max(barOnly, Mathf.Min(Mathf.Max(s.barSize.x, nameWidth) + 2f * s.padding.x, s.maxWidth));
+            float width = Mathf.Max(barOnly, Mathf.Min(Mathf.Max(s.barSize.x, nameWidth + 2f * reserve) + 2f * s.padding.x, s.maxWidth));
 
             float top = s.bottomY + s.padding.y + s.barSize.y + s.rowGap + s.nameSize + s.padding.y;
             float nameBottom = top - s.padding.y - s.nameSize;
@@ -73,7 +87,10 @@ namespace Overpower.UI
             return new Frame
             {
                 plate = Centred(width, bottom, top - bottom),
-                name = Centred(width - 2f * s.padding.x, nameBottom, s.nameSize),
+                name = Centred(Mathf.Max(0f, width - 2f * s.padding.x - 2f * reserve), nameBottom, s.nameSize),
+                marks = cells > 0
+                    ? new Rect(-width * 0.5f + s.padding.x, nameBottom + (s.nameSize - s.markSize) * 0.5f, marksWidth, s.markSize)
+                    : default,
                 bar = Centred(s.barSize.x, s.bottomY + s.padding.y, s.barSize.y),
                 statusBar = Centred(s.statusBarSize.x, statusBarBottom, s.statusBarSize.y),
                 statusLabel = Centred(s.statusBarSize.x, labelBottom, s.statusTextSize),

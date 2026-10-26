@@ -114,6 +114,19 @@ namespace Overpower.UI
         [Range(8f, 64f)] public float healthBarHeight = 28f;
         [Tooltip("Height of the shield/armor bar, in canvas units.")]
         [Range(8f, 64f)] public float armorBarHeight = 22f;
+        [Tooltip("How many hit points lie between two thin divider lines on every health and armour bar, on your own HUD and on " +
+                 "the bar over every head. At 25, a 100 health bar is cut into four steps and a 50 armour bar into two. 0 draws no lines.")]
+        [Min(0f)] public float barSegmentSize = 25f;
+        [Tooltip("Colour of the thin divider lines on every health and armour bar. Dark, so each line reads as a small gap in the fill.")]
+        public Color barSegmentLineColor = new Color(0.04f, 0.05f, 0.07f, 0.9f);
+        [Tooltip("Width of one divider line on your own HUD's health and armour bars, in canvas units.")]
+        [Range(0.5f, 6f)] public float hudBarSegmentLineWidth = 2f;
+        [Tooltip("Size of the \"current/max\" number written in the middle of your own HUD's health and armour bars (for example " +
+                 "35/125), in canvas units. Keep it a little under the armour bar's height so it fits inside the bar.")]
+        public float hudBarNumberSize = 19f;
+        [Tooltip("Colour of the \"current/max\" number on your own HUD's health and armour bars. Its dark outline and shadow come " +
+                 "from the HUD's text style, so it reads over the fill and the empty part alike.")]
+        public Color hudBarNumberColor = Color.white;
         [Tooltip("Height of the overheat bar, in canvas units - taller than health/armor on purpose: it is the " +
                  "one bar a player must read at a glance mid-fight.")]
         [Range(8f, 64f)] public float overheatBarHeight = 32f;
@@ -296,6 +309,28 @@ namespace Overpower.UI
         public Color nameplateEnemyNameColor = Color.red;
         [Tooltip("Colour of a name while the teams are still arriving, for a moment after someone joins: grey rather than a guess.")]
         public Color nameplateUnknownNameColor = Color.grey;
+        [Tooltip("Width of one divider line on the health-and-armour bar over every head, in overhead-canvas units. The lines fall " +
+                 "every Bar Segment Size hit points: health's under the shield, armour's on the shield where it is filled.")]
+        public float nameplateSegmentLineWidth = 0.15f;
+        [Tooltip("Size of one armour-upgrade mark on the plate (an Absorb square, or the room a Recharge \"v\" stack takes), in " +
+                 "overhead-canvas units. The marks sit at the plate's left in the name's row, just above the bar.")]
+        public float nameplateArmourMarkSize = 2.6f;
+        [Tooltip("Gap between two armour-upgrade marks side by side (the two squares of the second Absorb level), in overhead-canvas units.")]
+        public float nameplateArmourMarkGap = 0.4f;
+        [Tooltip("Gap between the armour-upgrade marks and the name, in overhead-canvas units. The name keeps the same room on its " +
+                 "other side, so it stays centred over the player.")]
+        public float nameplateArmourMarkNameGap = 0.4f;
+        [Tooltip("Thickness of an Absorb square's outline on the plate, in overhead-canvas units.")]
+        public float nameplateArmourSquareLine = 0.25f;
+        [Tooltip("Width of one Recharge \"v\" on the plate, in overhead-canvas units; it is half as tall as it is wide. Keep it " +
+                 "inside an Absorb square (Armour Mark Size less two outlines), since a \"v\" sits in a square when both are bought.")]
+        public float nameplateArmourChevronWidth = 1.8f;
+        [Tooltip("Thickness of a Recharge \"v\" stroke on the plate, in overhead-canvas units.")]
+        public float nameplateArmourChevronLine = 0.3f;
+        [Tooltip("Height between the two stacked \"v\"s of the second Recharge level, in overhead-canvas units.")]
+        public float nameplateArmourChevronStep = 0.65f;
+        [Tooltip("Colour of the armour-upgrade marks on every plate (Absorb squares and Recharge \"v\"s).")]
+        public Color nameplateArmourMarkColor = new Color(0.55f, 0.8f, 1f, 1f);
         [Header("Shield wasted text (Invulnerability ultimate)")]
         [Tooltip("Text that pops over a player's head when their armed shield window ran out and nobody hit them.")]
         public string shieldWastedText = "Wasted";

@@ -254,6 +254,73 @@ namespace Overpower.Tests
             Assert.AreEqual(Vector3.one, text.rectTransform.localScale);
         }
 
+        private static int Active(System.Collections.Generic.IReadOnlyList<Image> images) =>
+            images == null ? 0 : images.Count(i => i.gameObject.activeSelf && i.enabled);
+
+        [Test]
+        public void TheArmourMarksAreDrawnAsTheRuleComposesThem()
+        {
+            NameplateView plate = NameplateView.Ensure(health);
+            plate.SetName("Ana");
+            plate.ShowArmourMarks(2, 1);
+            Assert.AreEqual(2, Active(plate.MarkSquares), "two Absorb squares");
+            Assert.AreEqual(1, Active(plate.MarkChevrons), "one Recharge v");
+
+            Image first = plate.MarkSquares[0];
+            Vector3 v = first.rectTransform.InverseTransformPoint(plate.MarkChevrons[0].rectTransform.position);
+            Assert.IsTrue(first.rectTransform.rect.Contains(v), "the v sits inside the first square");
+            Assert.Less(first.rectTransform.position.x, plate.MarkSquares[1].rectTransform.position.x, "the squares sit side by side");
+            foreach (Image i in plate.MarkSquares.Concat(plate.MarkChevrons))
+                Assert.IsFalse(i.raycastTarget, i.name + " would swallow a shot aimed past a player's head");
+
+            float width = plate.NameText.GetPreferredValues("Ana").x;
+            NameplateLayout.Frame f = NameplateLayout.Compute(NameplateLayout.From(theme), width, true, 2);
+            AssertPlaced(f.marks, plate.Marks, "marks");
+            AssertPlaced(f.name, plate.NameText.rectTransform, "name");
+        }
+
+        [Test]
+        public void TwoRechargeLevelsStackTwoVsInOneMark()
+        {
+            NameplateView plate = NameplateView.Ensure(health);
+            plate.ShowArmourMarks(0, 2);
+            Assert.AreEqual(0, Active(plate.MarkSquares));
+            Assert.AreEqual(2, Active(plate.MarkChevrons));
+            Vector3 a = plate.MarkChevrons[0].rectTransform.position, b = plate.MarkChevrons[1].rectTransform.position;
+            Assert.AreEqual(a.x, b.x, 1e-3f, "stacked, not side by side");
+            Assert.AreNotEqual(a.y, b.y);
+        }
+
+        [Test]
+        public void SellingTheUpgradesTakesTheMarksAway()
+        {
+            NameplateView plate = NameplateView.Ensure(health);
+            plate.SetName("Ana");
+            plate.ShowArmourMarks(2, 2);
+            plate.ShowArmourMarks(0, 0);
+            Assert.AreEqual(0, Active(plate.MarkSquares));
+            Assert.AreEqual(0, Active(plate.MarkChevrons));
+            float width = plate.NameText.GetPreferredValues("Ana").x;
+            AssertPlaced(NameplateLayout.Compute(NameplateLayout.From(theme), width, true).name, plate.NameText.rectTransform, "name");
+        }
+
+        [Test]
+        public void HealthLinesSitUnderTheShieldAndArmourLinesOnItWhereItIsFilled()
+        {
+            theme.barSegmentSize = 25f;
+            NameplateView plate = NameplateView.Ensure(health);
+            plate.ShowSegments(100f, 50f, 1f);
+            Assert.AreEqual(3, plate.HealthLines.Count);
+            foreach (Image line in plate.HealthLines.Lines)
+                Assert.AreSame(health.OverheadHealthFill.transform, line.transform.parent, "under the shield, which is drawn after health");
+            Assert.AreEqual(1, plate.ArmourLines.Count);
+            Assert.AreSame(health.OverheadShieldFill.transform, plate.ArmourLines.Lines[0].transform.parent);
+            Assert.AreEqual(1, Active(plate.ArmourLines.Lines));
+
+            plate.ShowSegments(100f, 50f, 0.4f);
+            Assert.AreEqual(0, Active(plate.ArmourLines.Lines), "no armour line past the shield's fill");
+        }
+
         private static MethodInfo M(System.Type type, string name) => type.GetMethod(name);
 
         [Test]

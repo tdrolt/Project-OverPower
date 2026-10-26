@@ -14,55 +14,39 @@ namespace Overpower.Tests
         {
             HealthArmourBar.Lengths l = HealthArmourBar.Compute(80f, 100f, 0f, 0f);
             Assert.IsFalse(l.armourShown);
-            Assert.AreEqual(0f, l.armourTrack, Tol);
-            Assert.AreEqual(0f, l.armour, Tol);
+            Assert.AreEqual(0f, l.armourOfCapacity, Tol);
             Assert.AreEqual(0.8f, l.health, Tol);
         }
 
         [Test]
-        public void FullArmourFillsItsWholeTrackAndTheTrackIsAsLongAsTheArmourInHitPoints()
+        public void FullArmourFillsTheWholeArmourBarWhateverItsSize()
         {
-            HealthArmourBar.Lengths l = HealthArmourBar.Compute(100f, 100f, 25f, 25f);
-            Assert.IsTrue(l.armourShown);
-            Assert.AreEqual(0.25f, l.armourTrack, Tol);
-            Assert.AreEqual(0.25f, l.armour, Tol);
-            Assert.AreEqual(1f, l.armourOfTrack, Tol);
+            foreach (float capacity in new[] { 25f, 50f, 125f })
+            {
+                HealthArmourBar.Lengths l = HealthArmourBar.Compute(100f, 100f, capacity, capacity);
+                Assert.IsTrue(l.armourShown);
+                Assert.AreEqual(1f, l.armourOfCapacity, Tol, capacity + " armour");
+            }
         }
 
         [Test]
-        public void HalfArmourFillsHalfItsTrack()
+        public void ArmourFillsItsBarAsAShareOfWhatCanBeHeld()
         {
-            HealthArmourBar.Lengths l = HealthArmourBar.Compute(100f, 100f, 12.5f, 25f);
-            Assert.AreEqual(0.25f, l.armourTrack, Tol);
-            Assert.AreEqual(0.125f, l.armour, Tol);
-            Assert.AreEqual(0.5f, l.armourOfTrack, Tol);
+            Assert.AreEqual(0.28f, HealthArmourBar.Compute(100f, 100f, 35f, 125f).armourOfCapacity, Tol);
+            Assert.AreEqual(0.5f, HealthArmourBar.Compute(100f, 100f, 12.5f, 25f).armourOfCapacity, Tol);
         }
 
         [Test]
         public void ARaisedCapacityShowsTheNewPartEmptyUntilItRecharges()
         {
-            HealthArmourBar.Lengths before = HealthArmourBar.Compute(100f, 100f, 25f, 25f);
             HealthArmourBar.Lengths after = HealthArmourBar.Compute(100f, 100f, 25f, 50f);
-            Assert.AreEqual(before.armour, after.armour, Tol);
-            Assert.Greater(after.armourTrack, before.armourTrack);
-            Assert.AreEqual(0.5f, after.armourOfTrack, Tol);
+            Assert.AreEqual(0.5f, after.armourOfCapacity, Tol);
         }
 
         [Test]
-        public void ArmourBeyondMaxHealthStopsAtTheBarsEnd()
+        public void ArmourAboveItsCapacityNeverOverfillsTheBar()
         {
-            HealthArmourBar.Lengths l = HealthArmourBar.Compute(100f, 100f, 150f, 150f);
-            Assert.AreEqual(1f, l.armourTrack, Tol);
-            Assert.AreEqual(1f, l.armour, Tol);
-            Assert.AreEqual(1f, l.armourOfTrack, Tol);
-        }
-
-        [Test]
-        public void ArmourAboveItsCapacityNeverOverfillsTheTrack()
-        {
-            HealthArmourBar.Lengths l = HealthArmourBar.Compute(100f, 100f, 40f, 25f);
-            Assert.AreEqual(0.25f, l.armour, Tol);
-            Assert.AreEqual(1f, l.armourOfTrack, Tol);
+            Assert.AreEqual(1f, HealthArmourBar.Compute(100f, 100f, 40f, 25f).armourOfCapacity, Tol);
         }
 
         [Test]

@@ -3,7 +3,8 @@ using UnityEngine;
 namespace Overpower.UI
 {
     /// <summary>
-    /// Plain white shapes the minimap and the crosshair draw with (disc, upward triangle, the triangular Mask and its edge shape, hexagon outline),
+    /// Plain white shapes the minimap, the crosshair and the plates draw with (disc, upward triangle, the triangular Mask and its edge shape,
+    /// hexagon and square outlines, the armour "v"),
     /// generated once in code and tinted by each Image's colour. A sprite is required: a Filled Image without one
     /// ignores its fill amount and draws full (the capture ring is a Filled disc). Every shape carries a mip chain,
     /// or a bubble shrinking with the map shimmers. Textures and sprites are HideAndDontSave, not DontSave, which
@@ -60,6 +61,47 @@ namespace Overpower.UI
             return Build("Generated Hex Ring", Size, (x, y) => HexRingAlpha(x, y, Size, band));
         }
 
+        /// <summary>A square outline for the plate's Absorb marks; the line is bandFraction x the sprite's size, so pass the wanted
+        /// line width / the Image's displayed size. Not cached: the band comes from UiTheme.</summary>
+        public static Sprite BuildSquareRing(float bandFraction)
+        {
+            float band = Size * Mathf.Clamp01(bandFraction);
+            return Build("Generated Square Ring", Size, (x, y) => SquareRingAlpha(x, y, Size, band));
+        }
+
+        /// <summary>A "v" pointing down for the plate's Recharge marks, twice as wide as it is tall (show it in a 2:1 rect), its stroke
+        /// strokeFraction x the sprite's width. Not cached: the stroke comes from UiTheme.</summary>
+        public static Sprite BuildChevron(float strokeFraction)
+        {
+            float stroke = Size * Mathf.Clamp(strokeFraction, 0.01f, 0.4f);
+            return Build("Generated Chevron", Size, Size / 2, (x, y) => ChevronAlpha(x, y, Size, Size / 2, stroke));
+        }
+
+        private static float SquareRingAlpha(float x, float y, int size, float band)
+        {
+            float inside = Mathf.Min(Mathf.Min(x, size - x), Mathf.Min(y, size - y));
+            return Mathf.Min(inside + 0.5f, band - inside + 0.5f);
+        }
+
+        // Two strokes meeting at the bottom centre, with round ends kept a pixel inside the sprite.
+        private static float ChevronAlpha(float x, float y, int width, int height, float stroke)
+        {
+            float m = stroke * 0.5f + 1f;
+            var p = new Vector2(x, y);
+            var left = new Vector2(m, height - m);
+            var tip = new Vector2(width * 0.5f, m);
+            var right = new Vector2(width - m, height - m);
+            float d = Mathf.Min(SegmentDistance(p, left, tip), SegmentDistance(p, tip, right));
+            return stroke * 0.5f - d + 0.5f;
+        }
+
+        private static float SegmentDistance(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+            return Vector2.Distance(p, a + t * ab);
+        }
+
         /// <summary>Alpha of BuildHexRing's sprite at pixel centre (x, y): 1 on the line, 0 inside and outside, anti-aliased by half a pixel.</summary>
         public static float HexRingAlpha(float x, float y, int size, float band)
         {
@@ -71,23 +113,25 @@ namespace Overpower.UI
             return Mathf.Clamp01(Mathf.Min(apothem - d + 0.5f, d - (apothem - band) + 0.5f));
         }
 
-        private static Sprite Build(string name, int size, System.Func<float, float, float> alphaAt)
+        private static Sprite Build(string name, int size, System.Func<float, float, float> alphaAt) => Build(name, size, size, alphaAt);
+
+        private static Sprite Build(string name, int width, int height, System.Func<float, float, float> alphaAt)
         {
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, true)
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, true)
             {
                 name = name,
                 filterMode = FilterMode.Trilinear,
                 wrapMode = TextureWrapMode.Clamp,
                 hideFlags = HideFlags.HideAndDontSave,
             };
-            var pixels = new Color32[size * size];
-            for (int y = 0; y < size; y++)
-                for (int x = 0; x < size; x++)
-                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(alphaAt(x + 0.5f, y + 0.5f))));
+            var pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                    pixels[y * width + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(alphaAt(x + 0.5f, y + 0.5f))));
             texture.SetPixels32(pixels);
             texture.Apply(true, true); // builds the mip chain, then frees the CPU copy (no longer readable)
 
-            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
+            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
             sprite.name = name;
             sprite.hideFlags = HideFlags.HideAndDontSave;
             return sprite;

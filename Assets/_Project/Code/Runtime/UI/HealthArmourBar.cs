@@ -3,23 +3,18 @@ using UnityEngine;
 namespace Overpower.UI
 {
     /// <summary>
-    /// How much of a health-and-armour bar each part takes, as fractions of the bar's full length, where the full length is max
-    /// health. Armour is measured in the same hit points: its track is as long as the armour this player can hold now, so full
-    /// armour always fills its whole track and no empty track is drawn past it. PlayerHud's bars draw from this; the plate over
-    /// every head (PlayerHealth.UpdateOverheadBar), which has no armour track, uses only health, armourOfTrack and armourShown.
+    /// How full a health-and-armour bar is: health against max health, armour against the armour this player can hold now, so
+    /// full armour always fills its whole bar however much an upgrade raised it. Your HUD (PlayerHud) and the plate over every
+    /// head (PlayerHealth.UpdateOverheadBar) both draw from this.
     /// </summary>
     public static class HealthArmourBar
     {
         public struct Lengths
         {
             public float health;
-            /// <summary>The armour this player can hold now; 0 when they can hold none.</summary>
-            public float armourTrack;
-            /// <summary>The armour they hold now.</summary>
-            public float armour;
-            /// <summary>How full the armour track is (armour held / armour possible), for a fill drawn inside the track.</summary>
-            public float armourOfTrack;
-            /// <summary>False when they can hold no armour: nothing of it is drawn, not even an empty track.</summary>
+            /// <summary>Armour held / armour this player can hold now.</summary>
+            public float armourOfCapacity;
+            /// <summary>False when they can hold no armour: nothing of it is drawn, not even an empty bar.</summary>
             public bool armourShown;
         }
 
@@ -33,11 +28,8 @@ namespace Overpower.UI
                 return l;
 
             // A remote copy can briefly hold more armour than a capacity that has not caught up yet (ArmorState.SetFromNetwork).
-            float held = Mathf.Clamp(armour, 0f, capacity);
             l.armourShown = true;
-            l.armourTrack = Mathf.Clamp01(capacity / maxHealth);
-            l.armour = Mathf.Clamp01(held / maxHealth);
-            l.armourOfTrack = held / capacity;
+            l.armourOfCapacity = Mathf.Clamp(armour, 0f, capacity) / capacity;
             return l;
         }
     }

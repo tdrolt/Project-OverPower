@@ -22,6 +22,9 @@ namespace Overpower.Tests
             statusBarSize = new Vector2(20f, 1f),
             statusLabelGap = 0.5f,
             wastedTextSize = 3f,
+            markSize = 2f,
+            markGap = 0.5f,
+            markNameGap = 0.5f,
         };
 
         [Test]
@@ -128,6 +131,48 @@ namespace Overpower.Tests
         }
 
         [Test]
+        public void ArmourMarksSitAtThePlatesLeftInTheNamesRow()
+        {
+            NameplateLayout.Frame f = NameplateLayout.Compute(S(), 5f, true, 2);
+            Assert.AreEqual(-10f, f.marks.xMin, 1e-4f, "inside the plate's left padding, above the bar's left end");
+            Assert.AreEqual(4.5f, f.marks.width, 1e-4f, "two marks and the gap between them");
+            Assert.AreEqual(2f, f.marks.height, 1e-4f);
+            Assert.AreEqual(f.name.center.y, f.marks.center.y, 1e-4f);
+            Assert.Greater(f.marks.yMin, f.bar.yMax, "above the bar");
+        }
+
+        [Test]
+        public void TheNameStaysCentredAndClearOfTheMarks()
+        {
+            foreach (float width in new[] { 0f, 5f, 14f, 40f })
+            {
+                NameplateLayout.Frame f = NameplateLayout.Compute(S(), width, true, 2);
+                Assert.AreEqual(0f, f.name.center.x, 1e-4f);
+                Assert.GreaterOrEqual(f.name.xMin, f.marks.xMax + 0.5f - 1e-4f, "name width " + width);
+                Assert.GreaterOrEqual(f.marks.xMin, f.plate.xMin + 1f - 1e-4f, "marks inside the padding, name width " + width);
+            }
+        }
+
+        [Test]
+        public void ANameThatMeetsTheMarksWidensThePlate()
+        {
+            Assert.AreEqual(22f, NameplateLayout.Compute(S(), 16f, true).plate.width, 1e-4f);
+            // One mark (2) and its gap (0.5) are kept free on both sides of the name: 16 + 2 x 2.5 + padding 2.
+            Assert.AreEqual(23f, NameplateLayout.Compute(S(), 16f, true, 1).plate.width, 1e-4f);
+        }
+
+        [Test]
+        public void NoMarksOrNoBarLeavesThePlateAsBefore()
+        {
+            NameplateLayout.Frame plain = NameplateLayout.Compute(S(), 16f, true);
+            Assert.AreEqual(0f, plain.marks.width, 1e-4f);
+            NameplateLayout.Frame dead = NameplateLayout.Compute(S(), 16f, false, 2);
+            Assert.AreEqual(NameplateLayout.Compute(S(), 16f, false).plate, dead.plate);
+            Assert.AreEqual(NameplateLayout.Compute(S(), 16f, false).name, dead.name);
+            Assert.AreEqual(0f, dead.marks.width, 1e-4f, "a corpse's plate shrinks to the name, marks too");
+        }
+
+        [Test]
         public void TheSettingsAreTheThemesNumbers()
         {
             var theme = ScriptableObject.CreateInstance<UiTheme>();
@@ -145,6 +190,9 @@ namespace Overpower.Tests
                 theme.nameplateStatusBarSize = new Vector2(2.3f, 2.4f);
                 theme.nameplateStatusLabelGap = 2.5f;
                 theme.shieldWastedTextSize = 2.6f;
+                theme.nameplateArmourMarkSize = 2.7f;
+                theme.nameplateArmourMarkGap = 2.8f;
+                theme.nameplateArmourMarkNameGap = 2.9f;
 
                 NameplateLayout.Settings s = NameplateLayout.From(theme);
                 Assert.AreEqual(1.1f, s.nameSize);
@@ -159,6 +207,9 @@ namespace Overpower.Tests
                 Assert.AreEqual(new Vector2(2.3f, 2.4f), s.statusBarSize);
                 Assert.AreEqual(2.5f, s.statusLabelGap);
                 Assert.AreEqual(2.6f, s.wastedTextSize);
+                Assert.AreEqual(2.7f, s.markSize);
+                Assert.AreEqual(2.8f, s.markGap);
+                Assert.AreEqual(2.9f, s.markNameGap);
             }
             finally
             {

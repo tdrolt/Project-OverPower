@@ -117,6 +117,8 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
     /// <summary>The health-and-armour bar on the plate over this player's head (the parent of the two fills), or null.</summary>
     public RectTransform OverheadBar => healthFillImage != null ? healthFillImage.transform.parent as RectTransform : null;
+    public Image OverheadHealthFill => healthFillImage;
+    public Image OverheadShieldFill => shieldFillImage;
 
     private PhotonView photonView;
     private PlayerLifecycle lifecycle; // the replicated alive state, read by IsAlive
@@ -379,14 +381,15 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     }
 
     /// <summary>The one place both overhead fills are written: shield drawn OVER health, each fill against its OWN max
-    /// (HealthArmourBar's health and armourOfTrack), so a full shield hides max HP by design; no armour to hold draws no shield.
-    /// The plate has no armour track of its own, so hit-point lengths would make full and part-full armour look alike.
+    /// (HealthArmourBar's health and armourOfCapacity), so a full shield hides max HP by design; no armour to hold draws no shield.
+    /// The plate has no armour track of its own, so hit-point lengths would make full and part-full armour look alike. The plate's
+    /// divider lines and armour-upgrade marks are refreshed from here too, so they follow every path that changes the bar.
     /// Skips an unchanged fillAmount: the recharge tick calls this every frame armor is not full, and a filled Image write is not free.</summary>
     private void UpdateOverheadBar()
     {
         HealthArmourBar.Lengths bar = HealthArmourBar.Compute(health, MaxHealth, armor.Current, armor.Capacity);
         float healthFraction = bar.health;
-        float shieldFraction = bar.armourShown ? bar.armourOfTrack : 0f;
+        float shieldFraction = bar.armourShown ? bar.armourOfCapacity : 0f;
         if (shieldFillImage != null)
             shieldFillImage.enabled = bar.armourShown;
 
@@ -399,6 +402,11 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         {
             shieldFillImage.fillAmount = shieldFraction;
             lastShieldFraction = shieldFraction;
+        }
+        if (nameplate != null)
+        {
+            nameplate.ShowSegments(MaxHealth, armor.Capacity, shieldFraction);
+            nameplate.ShowArmourMarks(absorbLevel, rechargeLevel);
         }
     }
 
